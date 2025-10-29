@@ -1,0 +1,30 @@
+# Node
+node_modules/
+npm-debug.log*
+pnpm-lock.yaml
+yarn.lock
+
+# Svelte/SvelteKit
+.svelte-kit/
+.build/
+dist/
+build/
+.vite/
+vite.config.ts.timestamp-*
+*.svelte-kit-tmp
+
+# IDE / SO
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Env & credenciais
+.env
+.env.*
+!.env.example
+
+# Test / Coverage
+coverage/
