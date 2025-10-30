@@ -87,9 +87,20 @@
             <!-- Card Métrica -->
             <article
                 bind:this={metricEl}
-                class="md:col-span-6 lg:col-span-4 relative rounded-3xl p-8 pb-24 /* reserva espaço para a fileira */
-         h-[382px] w-[438px] bg-[#0B1020] text-white overflow-hidden
-         shadow-[0_10px_40px_rgba(1,13,40,0.25)]"
+                class="
+                md:col-span-6
+                lg:col-span-4
+                relative
+                rounded-3xl
+                p-8
+                pb-24
+                w-[auto]
+                lg:w-[438px]
+                h-[382px]
+                bg-[#0B1020]
+                text-white
+                overflow-hidden
+                shadow-[0_10px_40px_rgba(1,13,40,0.25)]"
                 aria-label="Escolas transformadas"
             >
                 <!-- booble invertido -->
@@ -143,7 +154,7 @@
                             src={s.src}
                             alt={s.alt}
                             class="h-[80px] w-[80px] rounded-full object-cover ring-2 ring-white shadow-sm
-               {i === 0 ? 'ml-0' : '-ml-2'}"
+               {i === 0 ? 'ml-0' : '-ml-6'}"
                             style="z-index:{10 + i}"
                             loading="lazy"
                         />
@@ -151,7 +162,17 @@
 
                     <!-- círculo branco com texto laranja -->
                     <div
-                        class="h-[80px] w-[80px] -ml-2 rounded-full bg-white ring-2 ring-white shadow-sm grid place-items-center"
+                        class="
+                        h-[80px]
+                        w-[80px]
+                        -ml-6
+                        rounded-full
+                        bg-white
+                        ring-2
+                        ring-white
+                        shadow-sm
+                        grid
+                        place-items-center"
                         style="z-index:99"
                         aria-label="+ 500 redes e escolas"
                         title="+ 500 redes e escolas"

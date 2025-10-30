@@ -436,32 +436,31 @@
   });
 </script>
 
-<section class="p-12">
+<section class="pt-12 lg:p-12">
   <div
-    class="relative overflow-hidden rounded-[28px] bg-[#010D28] text-white"
+    class="lg:container px-0 relative overflow-hidden lg:rounded-[28px] bg-[#010D28] text-white"
     style="--lead-margin: {leadMarginPx}px"
   >
     <div class="absolute inset-0 z-0 overflow-hidden">
-  <!-- Imagem base com blur e brilho -->
-  <img
-    src="/booble_bg.webp"
-    alt=""
-    aria-hidden="true"
-    class="pointer-events-none select-none absolute inset-0 w-full h-full
+      <!-- Imagem base com blur e brilho -->
+      <img
+        src="/booble_bg.webp"
+        alt=""
+        aria-hidden="true"
+        class="pointer-events-none select-none absolute inset-0 w-full h-full
            object-cover opacity-[0.3] rotate-[-250deg] left-[280px] top-[400px] scale-[1.8] blur-[7px]"
-  />
+      />
 
-  <!-- Camada de ruído -->
-  <div
-    class="absolute inset-0 z-10 pointer-events-none mix-blend-overlay opacity-[0.08]"
-    style="
+      <!-- Camada de ruído -->
+      <div
+        class="absolute inset-0 z-10 pointer-events-none mix-blend-overlay opacity-[0.08]"
+        style="
       background-image: url('/noise.svg');
       background-repeat: repeat;
       background-size: 250px 250px;
     "
-  ></div>
-</div>
-
+      ></div>
+    </div>
 
     <div
       class="absolute -top-40 -left-40 w-[520px] h-[520px] rounded-full
@@ -558,7 +557,6 @@
               >
                 <SolutionCard
                   className="w-[460px] h-[460px]"
-                  width={460}
                   height={460}
                   image={c.image}
                   highlight={c.highlight}

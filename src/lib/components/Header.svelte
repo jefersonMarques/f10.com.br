@@ -4,7 +4,7 @@
   import SocialLinks from "$lib/components/SocialLinks.svelte";
 
   let isMenuOpen = false;
-  let isScrolled = false;
+  $: pathname = $page.url.pathname;
 
   const socialLinks = [
     { alt: "Facebook", src: "/social_facebook.svg", href: "https://facebook.com" },
@@ -15,35 +15,71 @@
 
   const navLinks = [
     { label: "Sobre a F10", href: "/sobre" },
-    { label: "Inovação", href: "/inovacao" },
+    { label: "Inovação", href: "/inovacao-na-escola" },
     { label: "Soluções", href: "/solucoes" },
     { label: "Contato", href: "/contato" },
   ];
 
-  $: pathname = $page.url.pathname;
-
-  // === Função que detecta o link ativo ===
   const isActive = (href: string) => {
     const current = pathname;
-
-    // âncoras internas da home (/#)
     if (href.startsWith("/#")) {
       const anchor = href.split("#")[1];
       return current === "/" && typeof window !== "undefined" && window.location.hash === `#${anchor}`;
     }
-
-    // páginas normais ou subrotas
     return current === href || current.startsWith(`${href}/`);
   };
 
-  // === Scroll: aplica sombra ao header ===
+  // Hide-on-scroll com sticky
+  let isScrolled = false;
+  let isHeaderHidden = false;
+  let isAtTop = true;
+  let lastScrollY = 0;
+  let ticking = false;
+  const HIDE_OFFSET = 48;
+
+  function updateHeaderOnScroll() {
+    if (typeof window === "undefined") return;
+
+    const rawY = window.scrollY;
+    const y = rawY < 0 ? 0 : rawY;
+    const dy = y - lastScrollY;
+
+    isScrolled = y > 8;
+    isAtTop = y <= 0;
+
+    if (isMenuOpen) {
+      isHeaderHidden = false;
+      lastScrollY = y;
+      return;
+    }
+
+    if (dy > 0 && y > HIDE_OFFSET) {
+      isHeaderHidden = true;
+    } else if (dy < 0) {
+      isHeaderHidden = false;
+    }
+
+    lastScrollY = y;
+  }
+
   let handleScroll: () => void;
+
   onMount(() => {
-    handleScroll = () => {
-      if (typeof window !== "undefined") isScrolled = window.scrollY > 8;
-    };
-    handleScroll?.();
     if (typeof window !== "undefined") {
+      lastScrollY = window.scrollY || 0;
+      isScrolled = lastScrollY > 8;
+      isAtTop = (window.scrollY || 0) <= 0;
+
+      handleScroll = () => {
+        if (!ticking) {
+          ticking = true;
+          requestAnimationFrame(() => {
+            updateHeaderOnScroll();
+            ticking = false;
+          });
+        }
+      };
+
       window.addEventListener("scroll", handleScroll, { passive: true });
     }
   });
@@ -55,19 +91,26 @@
   });
 
   const closeMenu = () => (isMenuOpen = false);
+
+  // ===== Classes calculadas para o <header> =====
+  const baseHeader =
+    "sticky top-0 z-40 transition-[transform,background-color,backdrop-filter] duration-200 will-change-transform border-b border-slate-200";
+
+  $: bgHeader = isAtTop
+    ? "bg-white/50 backdrop-blur-md"  // vidro fosco no topo
+    : "bg-white";                      // opaco abaixo do topo
+
+  $: translateClass = isHeaderHidden ? "-translate-y-full" : "";
+  $: shadowClass = isScrolled ? "shadow-sm" : "";
+  $: headerClass = `${baseHeader} ${bgHeader} ${translateClass} ${shadowClass}`;
 </script>
 
-<!-- HEADER -->
-<header
-  class="fixed left-0 right-0 z-40 transition-all duration-200
-         bg-white/[0.38] backdrop-blur-[2px] supports-[backdrop-filter]:bg-white/[0.38]
-         border-b border-slate-200"
-  class:shadow-sm={isScrolled}
->
-  <div class="container flex items-center py-[30px] h-[120px]">
+<!-- HEADER (sticky, classes calculadas) -->
+<header class={headerClass}>
+  <div class="container flex items-center py-[30px]">
     <!-- LOGO + MENU -->
     <div class="flex items-center gap-14">
-      <a href="/" class="relative flex h-[60px] items-center" aria-label="F10 Software — Início">
+      <a href="/" class="relative flex h-[50px] lg:h-[60px] items-center" aria-label="F10 Software — Início">
         <img src="/logo_f10.svg" alt="F10 Software" class="max-h-full w-auto" />
       </a>
 
@@ -127,13 +170,8 @@
       aria-label="Abrir menu"
       on:click={() => (isMenuOpen = !isMenuOpen)}
     >
-      <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M4 6h16M4 12h16M4 18h16"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-        />
+      <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
       </svg>
     </button>
   </div>
@@ -165,8 +203,7 @@
                      text-[16px] font-semibold leading-[22px] tracking-[-0.02em]
                      text-text hover:bg-text hover:text-white transition-colors"
               on:click={closeMenu}
-              >Já sou cliente</a
-            >
+            >Já sou cliente</a>
 
             <a
               href="/contato"
@@ -176,14 +213,10 @@
                      text-[16px] font-semibold leading-[22px] tracking-[-0.02em]
                      text-white hover:brightness-95 active:brightness-90 transition"
               on:click={closeMenu}
-              >Demonstração</a
-            >
+            >Demonstração</a>
           </li>
         </ul>
       </nav>
     </div>
   {/if}
 </header>
-
-<!-- Espaçador para compensar header fixo -->
-<div class="h-[120px]"></div>

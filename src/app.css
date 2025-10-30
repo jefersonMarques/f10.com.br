@@ -31,10 +31,10 @@ body::before {
   position: fixed;
   inset: 0;
   z-index: -2; /* atrás da tinta e do conteúdo */
-  background-image: url("/noise_background.webp");
+  background-image: url("/noise.svg");
   background-repeat: repeat;
   background-size: var(--noise-size) var(--noise-size);
-  opacity: 0.355;
+  opacity: 0.8;
   pointer-events: none; /* não bloqueia cliques/scroll */
 }
 
@@ -92,8 +92,8 @@ body::after {
 @supports (background-image: image-set(url("") 1x)) {
   body::before {
     background-image: image-set(
-      url("/noise_background.webp") 1x,
-      url("/noise_background.webp") 2x
+      url("/noise.svg") 1x,
+      url("/noise.svg") 2x
     );
   }
 }

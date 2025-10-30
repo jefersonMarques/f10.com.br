@@ -122,15 +122,14 @@
 </script>
 
 <nav
-    class={`text-sm text-[12px] text-[#010D28]/50 ${className}`.trim()}
-    aria-label="breadcrumb"
+    class={`text-sm text-[12px] text-[#010D28]/50 ${className} container mt-8 mb-12`.trim()}
     itemscope
     itemtype="https://schema.org/BreadcrumbList"
 >
-    <ol class="flex flex-wrap items-center gap-2 md:gap-3">
+    <ol class="flex flex-wrap gap-2 md:gap-3 leading-none">
         {#each finalCrumbs as crumb, i (crumb.href ?? crumb.label)}
             <li
-                class="inline-flex items-center gap-2"
+                class="inline-flex items-center gap-2 leading-none"
                 itemprop="itemListElement"
                 itemscope
                 itemtype="https://schema.org/ListItem"
@@ -138,18 +137,21 @@
                 {#if crumb.href && i < finalCrumbs.length - 1}
                     <a
                         href={crumb.href}
-                        class="text-[12px] hover:text-[#010D28] text-[#AEB3D9] underline-offset-4 hover:underline"
+                        class="text-[12px] hover:text-[#010D28] text-[#AEB3D9] underline-offset-4 hover:underline align-middle"
                         itemprop="item"
                     >
                         <span itemprop="name">{crumb.label}</span>
                     </a>
                     <meta itemprop="position" content={String(i + 1)} />
-                    <span aria-hidden="true" class="text-[#AEB3D9]"
-                        >{separator}</span
+                    <span
+                        aria-hidden="true"
+                        class="text-[#AEB3D9] text-[12px] align-middle leading-none flex items-center justify-center"
                     >
+                        •
+                    </span>
                 {:else}
                     <span
-                        class="text-[12px] font-semibold text-[#000A57]/70"
+                        class="text-[12px] font-semibold text-[#000A57]/70 align-middle leading-none"
                         itemprop="name"
                     >
                         {crumb.label}
@@ -160,17 +162,10 @@
         {/each}
     </ol>
 
-    <!-- JSON-LD preferido pelo Google e bem compreendido por LLMs -->
     <script type="application/ld+json">
     {jsonLdStr}
     </script>
 </nav>
 
 <style>
-    /* Espaçamento responsivo sutil */
-    nav[aria-label="breadcrumb"] {
-        padding-left: clamp(1rem, 2vw, 2rem);
-        padding-right: clamp(1rem, 2vw, 2rem);
-        margin-top: 2rem;
-    }
 </style>

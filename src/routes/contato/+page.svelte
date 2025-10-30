@@ -1,7 +1,7 @@
 <!-- src/routes/contato/+page.svelte -->
 <script lang="ts">
   import Breadcrumb from "$lib/components/Breadcrumb.svelte";
-  import ContactForm from "$lib/components/ContactForm.svelte";
+  import ContactForm from "$lib/components/forms/ContactForm.svelte";
   import SocialLinks from "$lib/components/SocialLinks.svelte";
   import IconClock from "$lib/icons/IconClock.svelte";
   import IconEmail from "$lib/icons/IconEmail.svelte";
@@ -82,7 +82,7 @@
 </svelte:head>
 
 <!-- ===== BACKGROUND / CONTAINER GERAL ===== -->
-<section class="relative isolate overflow-hidden bg-white/40">
+<section class="relative isolate overflow-hidden bg-white/80">
   <!-- ruído/texture sutil de fundo (pode trocar o asset) -->
   <div
     aria-hidden="true"
@@ -90,7 +90,7 @@
   ></div>
 
   <!-- ===== BREADCRUMB ===== -->
-  <div class="container pb-8">
+  <div>
     <Breadcrumb
       baseUrl="https://f10.com.br"
       items={[{ label: "HOME", href: "/" }, { label: "CONTATO" }]}
@@ -98,7 +98,7 @@
   </div>
 
   <!-- ===== BANNER COM OVERLAY ===== -->
-  <div class="container px-5 md:px-8 lg:px-20 pt-6">
+  <div class="container pt-6">
     <div
       class="relative h-[200px] sm:h-[260px] md:h-[313px] w-full overflow-hidden rounded-[30px] ring-1 ring-black/5 shadow-[0_20px_60px_rgba(1,13,40,0.18)]"
       aria-label="Equipe de atendimento da F10"
@@ -120,7 +120,7 @@
   </div>
 
   <!-- ===== GRID PRINCIPAL ===== -->
-  <div class="container px-5 md:px-8 lg:px-20 py-10 md:py-16">
+  <div class="container py-10 md:py-16">
     <div class="grid gap-8 lg:grid-cols-12">
       <!-- ===== COLUNA ESQUERDA ===== -->
       <div class="lg:col-span-6 xl:col-span-5">

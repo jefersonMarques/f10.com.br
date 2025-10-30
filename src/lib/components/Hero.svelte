@@ -1,5 +1,7 @@
 <script lang="ts">
+    import IconArrowRight from "$lib/icons/IconArrowRight.svelte";
     import { onMount, onDestroy } from "svelte";
+    import { showForm } from "$lib/stores/formPopup";
 
     // Parceiros (esquerda)
     const partners = [
@@ -48,6 +50,7 @@
         if (raf) cancelAnimationFrame(raf);
         observer?.disconnect();
     });
+
 </script>
 
 <section
@@ -69,65 +72,53 @@
                 franquias educacionais brasileiras.
             </p>
 
-            <div class="mt-12 flex flex-wrap items-center gap-8">
+            <div
+                class="mt-12 flex flex-col md:flex-row items-center md:items-center gap-4 md:gap-8
+         justify-center md:justify-start text-center md:text-left w-full"
+            >
                 <a
-                    href="/contato"
-                    class="inline-flex h-[56px] items-center justify-center rounded-[999px] bg-primary px-8
-                 text-[16px] font-semibold leading-[22px] tracking-[-0.02em] text-white
-                 hover:brightness-95 active:brightness-90 transition"
+                    href="Javascript:;"
+                    on:click={() => showForm.set(true)}
+                    class="inline-flex h-[52px] items-center justify-center rounded-full bg-primary
+           px-8 text-[16px] font-semibold leading-[22px] tracking-[-0.02em] text-white
+           hover:brightness-95 active:brightness-90 transition w-full md:w-auto"
                 >
-                    Quero uma demonstração <span
-                        class="ml-8 inline-block translate-y-px"
-                        ><svg
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                        >
-                            <path
-                                d="M5 12H19"
-                                stroke="white"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                            />
-                            <path
-                                d="M12 5L19 12L12 19"
-                                stroke="white"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                            />
-                        </svg>
-                    </span>
+                    Quero uma demonstração
+                    <IconArrowRight size={24} classType="ml-4" />
                 </a>
 
                 <a
                     href="/#solucoes"
-                    class="text-[16px] font-semibold text-text pl-4 underline decoration-2 underline-offset-[6px]
-                 hover:text-primary"
+                    class="text-[16px] font-semibold text-text underline decoration-2 underline-offset-[6px]
+           hover:text-primary w-full md:w-auto md:pl-4"
                 >
                     Nossas Soluções
                 </a>
             </div>
 
             <div class="mt-14">
-                <div class="flex items-center w-full gap-4 md:gap-6">
+                <!-- Wrapper principal -->
+                <div
+                    class="flex flex-col md:flex-row items-center md:items-center w-full gap-4 md:gap-6"
+                >
+                    <!-- Título -->
                     <p
-                        class="text-xs font-bold tracking-wider text-slate-900 shrink-0"
+                        class="text-xs font-bold tracking-wider text-slate-900
+         text-center md:text-left w-full md:w-auto md:whitespace-nowrap"
                     >
                         Nossos parceiros
                     </p>
 
+                    <!-- Logos -->
                     <div
-                        class="ml-auto flex items-center gap-6 md:gap-10 overflow-x-auto whitespace-nowrap"
+                        class="flex justify-center md:justify-start flex-wrap md:flex-nowrap
+             gap-6 md:gap-10 mt-3 md:mt-0 w-full overflow-x-auto md:overflow-visible ml-auto"
                     >
                         {#each partners as p}
                             <img
                                 src={p.src}
                                 alt={p.alt}
-                                class="h-8 w-auto flex-none inline-block"
+                                class="h-8 w-auto flex-none inline-block lg:ml-auto"
                                 loading="lazy"
                             />
                         {/each}

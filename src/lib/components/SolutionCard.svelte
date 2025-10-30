@@ -20,11 +20,11 @@
 </script>
 
 <article
-  class={`snap-center shrink-0 w-[460px] h-[460px]
+  class={`snap-center shrink-0 w-[320px] lg:w-[460px] h-[460px]
                      relative overflow-hidden rounded-[28px]
                      border border-[10px] border-[rgba(255,255,255,0.22)]   /* branco transparente */
                      shadow-[0_12px_40px_rgba(1,13,40,0.25)] ${className}`}
-  style={`width:${width}px; height:${height}px;`}
+  style={`height:${height}px;`}
   aria-label={title}
 >
   <!-- Borda interna -->
