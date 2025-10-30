@@ -2,6 +2,8 @@
     import IconArrowRight from "$lib/icons/IconArrowRight.svelte";
     import { onMount, onDestroy } from "svelte";
     import { showForm } from "$lib/stores/formPopup";
+    import SchoolForm from "$lib/components/forms/SchoolForm.svelte";
+    import FormPopup from "./popup/Popup.svelte";
 
     // Parceiros (esquerda)
     const partners = [
@@ -50,7 +52,6 @@
         if (raf) cancelAnimationFrame(raf);
         observer?.disconnect();
     });
-
 </script>
 
 <section
@@ -181,3 +182,6 @@
         </div>
     </div>
 </section>
+<FormPopup>
+    <SchoolForm />
+</FormPopup>

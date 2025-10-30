@@ -63,7 +63,7 @@
 </script>
 
 <section
-    class="relative overflow-hidden bg-white/20"
+    class="relative overflow-hidden bg-white/50"
     aria-label="Benefícios das soluções F10"
 >
     <div class="container relative z-10 py-16 lg:py-24">

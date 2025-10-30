@@ -436,9 +436,9 @@
   });
 </script>
 
-<section class="pt-12 lg:p-12">
+<section class="mt-12 lg:mt-0 lg:p-12 bg-white/50">
   <div
-    class="lg:container px-0 relative overflow-hidden lg:rounded-[28px] bg-[#010D28] text-white"
+    class="container px-0 mx-0 relative overflow-hidden lg:rounded-[28px] bg-[#010D28] text-white"
     style="--lead-margin: {leadMarginPx}px"
   >
     <div class="absolute inset-0 z-0 overflow-hidden">
@@ -488,7 +488,7 @@
 
       <!-- Título -->
       <h2
-        class="mt-6 text-center text-[34px] md:text-[48px] leading-tight font-semibold tracking-tight"
+        class="mt-6 text-center px-4 text-[34px] md:text-[48px] leading-tight font-semibold tracking-tight"
       >
         Conheça nossas soluções prontas para melhorar<br
           class="hidden md:block"

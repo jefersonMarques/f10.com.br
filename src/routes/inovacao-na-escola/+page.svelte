@@ -123,7 +123,7 @@
 
 <section class="relative isolate overflow-hidden bg-white/60">
   <!-- ===== Breadcrumb ===== -->
-  <div class="lg:px-20 sm:px-2 pb-12">
+  <div>
     <Breadcrumb
       baseUrl="https://f10.com.br"
       items={[{ label: "HOME", href: "/" }, { label: "INOVAÇÃO NA ESCOLA" }]}
@@ -200,7 +200,7 @@
 
 <!-- ===== SECTION 2 — HUB cards ===== -->
 <section class="relative py-12 md:py-16 bg-white/80">
-  <div class="lg:container lg:px-20">
+  <div class="lg:container">
     <div
       class="relative overflow-hidden lg:rounded-[28px] bg-[#0A1533] text-white ring-1 ring-white/5"
     >
