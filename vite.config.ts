@@ -5,11 +5,11 @@ export default defineConfig({
   plugins: [sveltekit()],
   server: {
     host: true,            // acessível na rede/local
-    port: 5173,
+    port: 5179,
     strictPort: true,
     hmr: {
       protocol: 'ws',
-      clientPort: 5173
+      clientPort: 5179
     },
     watch: {
       usePolling: true,    // <- chave no WSL/NTFS
@@ -17,7 +17,7 @@ export default defineConfig({
     }
   },
   preview: {
-    port: 5173,
+    port: 5179,
     strictPort: true
   }
 });
