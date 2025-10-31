@@ -436,7 +436,7 @@
   });
 </script>
 
-<section class="mt-12 lg:mt-0 lg:p-12 bg-white/50">
+<section class="mt-12 lg:mt-0 lg:p-12 bg-white/50 flex items-center justify-center min-h-screen">
   <div
     class="container px-0 mx-0 relative overflow-hidden lg:rounded-[28px] bg-[#010D28] text-white"
     style="--lead-margin: {leadMarginPx}px"
