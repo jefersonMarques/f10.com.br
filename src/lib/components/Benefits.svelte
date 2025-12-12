@@ -104,7 +104,6 @@
                 aria-label="Escolas transformadas"
             >
                 <!-- booble invertido -->
-                <!-- Caixa que você redimensiona e posiciona -->
                 <div
                     class="absolute pointer-events-none select-none"
                     style="

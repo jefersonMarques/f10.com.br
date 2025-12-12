@@ -2,14 +2,40 @@
     import IconArrowRight from "$lib/icons/IconArrowRight.svelte";
     import { onMount, onDestroy } from "svelte";
     import { showForm } from "$lib/stores/formPopup";
-    import SchoolForm from "$lib/components/forms/SchoolForm.svelte";
-    import FormPopup from "./popup/Popup.svelte";
+    import { Banknote, GraduationCap, BriefcaseBusiness } from "lucide-svelte";
+    import type { ComponentType } from "svelte";
+    import { contactModalConfig } from "$lib/stores/contactModals";
 
-    // Parceiros (esquerda)
-    const partners = [
-        { alt: "afterpay", src: "/logo_afterpay.svg" },
-        { alt: "basecamp", src: "/logo_basecamp.svg" },
-        { alt: "maze", src: "/logo_maze.svg" },
+    function openContactModal() {
+        showForm.set(true);
+    }
+
+    type Partner = {
+        name: string;
+        logoSrc: string;
+        alt?: string;
+        pyClass?: "py-0" | "py-0.5" | "py-1" | "py-1.5" | "py-2";
+    };
+
+    const partners: Partner[] = [
+        {
+            name: "Google Cloud Platform & API",
+            pyClass: "py-0",
+            logoSrc: "/logo_google.webp",
+            alt: "Google Cloud",
+        },
+        {
+            name: "Oracle Cloud",
+            pyClass: "py-1.5",
+            logoSrc: "/logo_oracle.webp",
+            alt: "Oracle Cloud",
+        },
+        {
+            name: "Celcoin",
+            pyClass: "py-0",
+            logoSrc: "/logo_celcoin.webp",
+            alt: "Celcoin",
+        },
     ];
 
     // ----- contador animado (0 -> 230) quando o card aparece -----
@@ -52,6 +78,18 @@
         if (raf) cancelAnimationFrame(raf);
         observer?.disconnect();
     });
+
+    function openPlansDemoModal() {
+        contactModalConfig.set({
+            defaultMessage: "Quero agendar uma demonstração",
+            product: "F10 – Planos e Implantação",
+            subSource: "Modal de contato – Página inicial",
+            leadDescription:
+                "Contato iniciado pelo modal de contato da página de planos.",
+        });
+
+        showForm.set(true); // abre o Popup global
+    }
 </script>
 
 <section
@@ -75,54 +113,66 @@
 
             <div
                 class="mt-12 flex flex-col md:flex-row items-center md:items-center gap-4 md:gap-8
-         justify-center md:justify-start text-center md:text-left w-full"
+                justify-center md:justify-start text-center md:text-left w-full"
             >
-                <a
-                    href="Javascript:;"
-                    on:click={() => showForm.set(true)}
+                <!-- Melhor usar button aqui, já que é ação -->
+                <button
+                    type="button"
+                    on:click={openPlansDemoModal}
                     class="inline-flex h-[52px] items-center justify-center rounded-full bg-primary
-           px-8 text-[16px] font-semibold leading-[22px] tracking-[-0.02em] text-white
-           hover:brightness-95 active:brightness-90 transition w-full md:w-auto"
+                    px-8 text-[16px] font-semibold leading-[22px] tracking-[-0.02em] text-white
+                    hover:brightness-95 active:brightness-90 transition w-full md:w-auto"
                 >
                     Quero uma demonstração
                     <IconArrowRight size={24} classType="ml-4" />
-                </a>
+                </button>
 
                 <a
                     href="/#solucoes"
                     class="text-[16px] font-semibold text-text underline decoration-2 underline-offset-[6px]
-           hover:text-primary w-full md:w-auto md:pl-4"
+                    hover:text-primary w-full md:w-auto md:pl-4"
                 >
                     Nossas Soluções
                 </a>
             </div>
 
             <div class="mt-14">
-                <!-- Wrapper principal -->
                 <div
-                    class="flex flex-col md:flex-row items-center md:items-center w-full gap-4 md:gap-6"
+                    class="flex flex-col gap-4 md:flex-row md:items-center md:justify-left"
                 >
-                    <!-- Título -->
-                    <p
-                        class="text-xs font-bold tracking-wider text-slate-900
-         text-center md:text-left w-full md:w-auto md:whitespace-nowrap"
-                    >
-                        Nossos parceiros
-                    </p>
+                    <!-- Bloco de título -->
+                    <div class="text-center md:text-left">
+                        <p
+                            class="text-[11px] font-semibold tracking-[0.22em] uppercase
+                            text-slate-500"
+                        >
+                            Nossos Parceiros
+                        </p>
+                    </div>
 
-                    <!-- Logos -->
-                    <div
-                        class="flex justify-center md:justify-start flex-wrap md:flex-nowrap
-             gap-6 md:gap-10 mt-3 md:mt-0 w-full overflow-x-auto md:overflow-visible ml-auto"
-                    >
-                        {#each partners as p}
-                            <img
-                                src={p.src}
-                                alt={p.alt}
-                                class="h-8 w-auto flex-none inline-block lg:ml-auto"
-                                loading="lazy"
-                            />
-                        {/each}
+                    <!-- Lista de parceiros (somente logos, cinza→azul, hover color) -->
+                    <div class="w-full md:w-auto">
+                        <div
+                            class="flex items-center justify-center md:justify-start
+           gap-5 md:gap-6 flex-wrap
+           overflow-visible md:overflow-x-auto
+           [-ms-overflow-style:none] [scrollbar-width:none]
+           md:[&::-webkit-scrollbar]:hidden"
+                            aria-label="Logos de parceiros"
+                        >
+                            {#each partners as partner}
+                                <div class="shrink-0">
+                                    <img
+                                        src={partner.logoSrc}
+                                        alt={partner.alt ?? partner.name}
+                                        title={partner.name}
+                                        class={`partner-logo h-7 md:h-8 w-auto select-none ${partner.pyClass ?? "py-0"}`}
+                                        loading="lazy"
+                                        decoding="async"
+                                    />
+                                </div>
+                            {/each}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -135,21 +185,21 @@
                 src="/tail_pizza.svg"
                 alt=""
                 class="pointer-events-none absolute left-8 hidden md:block
-           w-[300px] lg:w-[300px] z-0"
+                w-[300px] lg:w-[300px] z-0"
                 loading="lazy"
                 aria-hidden="true"
             />
 
-            <!-- badge (MAIOR e MAIS À ESQUERDA). Usa o próprio SVG, sem bg extra -->
+            <!-- badge -->
             <img
                 src="/icon_growt_hero.svg"
                 alt="Tendência de crescimento"
                 class="absolute left-[25%] top-[-50px] hidden md:block
-           w-24 lg:w-[180px] z-[2]"
+                w-24 lg:w-[180px] z-[2]"
                 loading="eager"
             />
 
-            <!-- monitor/devices SEM card branco atrás -->
+            <!-- monitor/devices -->
             <img
                 src="/hero_image.webp"
                 alt="Painéis F10 — telas do sistema"
@@ -157,12 +207,12 @@
                 fetchpriority="high"
             />
 
-            <!-- CARD 230% SEM SOMBRA e NA FRENTE DE TUDO -->
+            <!-- CARD 230% -->
             <aside
                 bind:this={metricEl}
                 class="absolute right-0 top-[-20px] hidden md:block
-         lg:w-[259px] lg:h-[281px] rounded-[20px] bg-[#F0F0F0] p-6
-           shadow-sm ring-0 z-[50]"
+                lg:w-[259px] lg:h-[281px] rounded-[20px] bg-[#F0F0F0] p-6
+                shadow-sm ring-0 z-[50]"
                 aria-label="Métrica de produtividade"
             >
                 <div class="flex items-baseline gap-2">
@@ -182,6 +232,25 @@
         </div>
     </div>
 </section>
-<FormPopup>
-    <SchoolForm />
-</FormPopup>
+
+<style>
+    /* Estado default: cinza com leve “puxado” pro azul */
+    :global(.partner-logo) {
+        opacity: 0.78;
+        filter: grayscale(1) saturate(0.2) contrast(1.05) brightness(0.98)
+            hue-rotate(195deg);
+        transition:
+            filter 220ms ease,
+            opacity 220ms ease,
+            transform 220ms ease;
+        transform: translateZ(0);
+    }
+
+    /* Hover/focus: volta pra cor original */
+    :global(.partner-logo:hover),
+    :global(.partner-logo:focus-visible) {
+        opacity: 1;
+        filter: none;
+        transform: translateY(-1px);
+    }
+</style>

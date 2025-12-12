@@ -171,7 +171,7 @@
 </section>
 
 <section class="bg-white/20 pt-12 md:pt-16 pb-20 md:pb-24">
-  <div class="container mx-auto px-4">
+  <div class="container">
     <!-- grid de 1 coluna no mobile e 2 no desktop -->
     <div class="grid grid-cols-1 md:grid-cols-[1fr_360px] gap-8 items-stretch">
       <!-- Coluna 1 -->
@@ -192,13 +192,13 @@
               Gestão Administrativa
             </h3>
             <p
-              class="text-[#7E82A2] text-[15px] md:text-[16px] leading-relaxed mb-6 md:pr-16 text-center md:text-left md:pr-24"
+              class="min-h-28 text-[#7E82A2] text-[15px] md:text-[16px] leading-relaxed mb-6 md:pr-16 text-center md:text-left md:pr-24"
             >
               Organize matrículas, calendários e turmas com automação e controle
               total da rotina escolar.
             </p>
             <a
-              href="#"
+              href="/solucoes/comercial"
               class="inline-flex items-center justify-center w-full md:w-auto px-6 py-3 rounded-full
                      bg-[#EA6D0B] text-white font-semibold text-[15px] hover:brightness-110 transition-all"
             >
@@ -222,13 +222,13 @@
               Gestão Financeira
             </h3>
             <p
-              class="text-[#7E82A2] text-[15px] md:text-[16px] leading-relaxed mb-6 md:pr-16 text-center md:text-left"
+              class="min-h-28 text-[#7E82A2] text-[15px] md:text-[16px] leading-relaxed mb-6 md:pr-16 text-center md:text-left"
             >
               Controle mensalidades, inadimplência e finanças com segurança,
               agilidade e transparência.
             </p>
             <a
-              href="#"
+              href="/solucoes/financeiro"
               class="inline-flex items-center justify-center w-full md:w-auto px-6 py-3 rounded-full
                      bg-[#EA6D0B] text-white font-semibold text-[15px] hover:brightness-110 transition-all"
             >
@@ -269,7 +269,7 @@
           <!-- Botão -->
           <div class="flex items-center justify-center mt-4 md:mt-0">
             <a
-              href="#"
+              href="/solucoes/pedagogico"
               class="inline-flex items-center justify-center w-full md:w-auto px-6 py-3 rounded-full
                      bg-[#EA6D0B] text-white font-semibold text-[15px] hover:brightness-110 transition-all"
             >
@@ -301,7 +301,7 @@
           mensagens automáticas.
         </p>
         <a
-          href="#"
+          href="/solucoes/marketing"
           class="inline-flex items-center justify-center w-full md:w-auto px-6 py-3 rounded-full
                  bg-[#EA6D0B] text-white font-semibold text-[15px] hover:brightness-110
                  transition-all mx-auto md:mx-0"

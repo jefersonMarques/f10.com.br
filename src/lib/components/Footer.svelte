@@ -9,18 +9,22 @@
     {
       alt: "Facebook",
       src: "/social_facebook.svg",
-      href: "https://facebook.com",
+      href: "https://www.facebook.com/F10Software",
     },
     {
       alt: "LinkedIn",
       src: "/social_linkedin.svg",
-      href: "https://linkedin.com",
+      href: "linkedin.com/company/f10software/",
     },
-    { alt: "YouTube", src: "/social_youtube.svg", href: "https://youtube.com" },
+    {
+      alt: "YouTube",
+      src: "/social_youtube.svg",
+      href: "https://www.youtube.com/@f10software76",
+    },
     {
       alt: "Instagram",
       src: "/social_instagram.svg",
-      href: "https://instagram.com",
+      href: "https://www.instagram.com/f10software/",
     },
   ];
 </script>
@@ -102,9 +106,14 @@
       <ul class="text-[#9B9B9C] text-[14px] leading-[24px]">
         <li><a href="/" class="hover:text-[#EA6D0B]">Início</a></li>
         <li><a href="/solucoes" class="hover:text-[#EA6D0B]">Soluções</a></li>
-        <li><a href="https://blog.f10.com.br" class="hover:text-[#EA6D0B]">Blog</a></li>
         <li>
-          <a href="https://ajuda.f10.com.br/kb" class="hover:text-[#EA6D0B]">Central de Ajuda</a>
+          <a href="https://blog.f10.com.br" class="hover:text-[#EA6D0B]">Blog</a
+          >
+        </li>
+        <li>
+          <a href="https://ajuda.f10.com.br/kb" class="hover:text-[#EA6D0B]"
+            >Central de Ajuda</a
+          >
         </li>
         <li><a href="/contato" class="hover:text-[#EA6D0B]">Contato</a></li>
       </ul>
@@ -115,10 +124,10 @@
       <h4 class="text-[18px] font-semibold">Outros links</h4>
       <ul class="text-[#9B9B9C] text-[14px] leading-[24px]">
         <li>
-          <a href="/termos" class="hover:text-[#EA6D0B]">Termos de uso</a>
+          <a href="/termos-de-uso" class="hover:text-[#EA6D0B]">Termos de uso</a>
         </li>
         <li>
-          <a href="/privacidade" class="hover:text-[#EA6D0B]"
+          <a href="/politica-de-privacidade" class="hover:text-[#EA6D0B]"
             >Políticas de privacidade</a
           >
         </li>
@@ -129,17 +138,20 @@
     <div class="flex flex-col gap-3 text-[#9B9B9C] text-[14px]">
       <div class="flex items-center gap-2">
         <IconPhone size={19} />
-        <span>(41) 3333-3333</span>
+        <span>(41) 99294-3443</span>
       </div>
 
       <div class="flex items-center gap-2">
         <IconEmail size={20} />
-        <span>contato@f10.com.br</span>
+        <span>vendas@f10.com.br</span>
       </div>
 
       <div class="flex items-center gap-2">
         <IconWhatsApp size={20} />
-        <span>Fale com o comercial</span>
+
+        <a href="https://wa.me/5541992943443" class="hover:underline"
+          ><span>Fale com o vendas</span></a
+        >
       </div>
     </div>
   </div>

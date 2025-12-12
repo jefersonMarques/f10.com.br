@@ -1,6 +1,12 @@
+<script lang="ts" context="module">
+  export type PopupSize = "sm" | "md" | "lg" | "xl" | "full";
+</script>
+
 <script lang="ts">
   import { showForm } from "$lib/stores/formPopup";
   import { onDestroy, onMount } from "svelte";
+
+  export let size: PopupSize = "lg";
 
   let isOpen = false;
   const unsubscribe = showForm.subscribe((v) => (isOpen = v));
@@ -19,9 +25,20 @@
     mounted = true;
   });
 
+  // Classes reativas
+  $: sizeClass =
+    size === "sm"
+      ? "max-w-md"
+      : size === "md"
+        ? "max-w-xl"
+        : size === "lg"
+          ? "max-w-3xl"
+          : size === "xl"
+            ? "max-w-5xl"
+            : "max-w-[96rem]";
+
   $: {
     if (mounted && portal && modalEl && isOpen) {
-      // Move o modal pro portal apenas uma vez
       if (!portal.contains(modalEl)) portal.appendChild(modalEl);
       document.body.style.overflow = "hidden";
     } else if (mounted) {
@@ -35,15 +52,13 @@
     bind:this={modalEl}
     class="fixed inset-0 z-[9999] flex items-center justify-center"
   >
-    <!-- BACKDROP -->
     <div
       class="absolute inset-0 bg-black/50 backdrop-blur-sm z-0"
       on:click={closeModal}
     ></div>
 
-    <!-- CONTEÚDO -->
     <div
-      class="relative z-10 bg-white rounded-2xl max-w-5xl w-[90%] overflow-hidden shadow-2xl animate-fadeIn"
+      class={`relative z-10 bg-white rounded-2xl w-[92%] max-h-[90vh] ${sizeClass} overflow-hidden shadow-2xl animate-fadeIn transition-all duration-300`}
     >
       <button
         on:click={closeModal}

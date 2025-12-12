@@ -12,25 +12,12 @@
   type Topic = "f10" | "jobs";
   let activeTopic: Topic = "f10";
 
-  // IDS ou URLs do formulário (ex.: RD Station, HubSpot, n8n etc.)
-  // Troque quando integrar de fato
-  const forms = {
-    f10: {
-      type: "rd-iframe",
-      src: "https://www.exemplo.com/rd/form-fale-sobre-f10",
-    },
-    jobs: {
-      type: "rd-iframe",
-      src: "https://www.exemplo.com/rd/form-trabalhe-conosco",
-    },
-  } as const;
-
   // ===== Dados estáticos do card de contato =====
   const address =
     "R. Comendador Araújo, 143 – 3º andar\nCentro, Curitiba – PR, 80420-900";
-  const phoneMain = "(41) 99228-4422";
+  const phoneMain = "(41) 9294-3443";
   const phoneAlt = "(41) 99774-2363";
-  const email = "comercial@f10.com.br";
+  const email = "vendas@f10.com.br";
   const schedule = "Seg - Sex: 08h15 - 18h | Sáb: 08h15h - 13h";
 
   // ===== Helpers visuais =====
@@ -52,18 +39,22 @@
     {
       alt: "Facebook",
       src: "/social_facebook.svg",
-      href: "https://facebook.com",
+      href: "https://www.facebook.com/F10Software",
     },
     {
       alt: "LinkedIn",
       src: "/social_linkedin.svg",
-      href: "https://linkedin.com",
+      href: "linkedin.com/company/f10software/",
     },
-    { alt: "YouTube", src: "/social_youtube.svg", href: "https://youtube.com" },
+    {
+      alt: "YouTube",
+      src: "/social_youtube.svg",
+      href: "https://www.youtube.com/@f10software76",
+    },
     {
       alt: "Instagram",
       src: "/social_instagram.svg",
-      href: "https://instagram.com",
+      href: "https://www.instagram.com/f10software/",
     },
   ];
 </script>
@@ -158,12 +149,8 @@
               <div>
                 <p>Fale com a nossa equipe de vendas:</p>
                 <p class="text-[#000A57] font-semibold">
-                  <a href="https://wa.me/5541992284422" class="hover:underline"
+                  <a href="https://wa.me/5541992943443" class="hover:underline"
                     >{phoneMain}</a
-                  >
-                  <span class="text-[#7E82A2]"> • </span>
-                  <a href="https://wa.me/5541997742363" class="hover:underline"
-                    >{phoneAlt}</a
                   >
                 </p>
               </div>

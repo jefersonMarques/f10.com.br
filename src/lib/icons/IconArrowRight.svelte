@@ -1,6 +1,7 @@
 <script lang="ts">
     export let size: number = 20;
     export let classType: string = "";
+    export let stroke: string = "white";
 </script>
 
 <svg
@@ -13,14 +14,14 @@
 >
     <path
         d="M5 12H19"
-        stroke="white"
+        stroke={stroke}
         stroke-width="2"
         stroke-linecap="round"
         stroke-linejoin="round"
     />
     <path
         d="M12 5L19 12L12 19"
-        stroke="white"
+        stroke={stroke}
         stroke-width="2"
         stroke-linecap="round"
         stroke-linejoin="round"

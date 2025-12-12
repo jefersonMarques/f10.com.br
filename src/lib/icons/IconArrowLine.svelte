@@ -2,13 +2,14 @@
     export let size: number = 20;
     export let classType: string = "";
     export let color: string = "";
+    export let stroke: string = "2";
 </script>
 
 <svg
     xmlns="http://www.w3.org/2000/svg"
     fill="none"
     viewBox="0 0 24 24"
-    stroke-width="2"
+    stroke-width={stroke}
     width={size}
     height={(size * 15) / 20}
     class={classType}

@@ -4,7 +4,6 @@
   import Solutions from "$lib/components/Solutions.svelte";
   import Testimonials from "$lib/components/Testimonials.svelte";
   import BlogSection from "$lib/components/BlogSection.svelte";
-
 </script>
 
 <svelte:head>
@@ -28,3 +27,5 @@
 <Testimonials />
 <Solutions />
 <BlogSection />
+
+

@@ -19,10 +19,10 @@
 </script>
 
 <article
-  class={`snap-center shrink-0 w-[75vw] md:w-[460px] h-[460px]
+  class={`snap-center shrink-0 md:w-[${height}px] h-[${height}px]
                      relative overflow-hidden rounded-[28px]
                      border border-[10px] border-[rgba(255,255,255,0.22)]   /* branco transparente */
-                     shadow-[0_12px_40px_rgba(1,13,40,0.25)] ${className}`}
+                      ${className}`}
   style={`height:${height}px;`}
   aria-label={title}
 >
@@ -35,8 +35,8 @@
     <img
       src={image}
       alt=""
-      width="460"
-      height="460"
+      width={height}
+      height={height}
       class="absolute inset-0 w-full h-full object-cover will-change-transform"
       loading="lazy"
       decoding="async"
