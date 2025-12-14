@@ -100,28 +100,28 @@
         highlight: "Matrícula online",
         title: "Landing page e assinatura eletrônica integradas ao CRM",
         buttonText: "Conheça +",
-        href: "/solucoes/comercial",
+        href: "/solucoes/vendas",
       },
       {
         image: "/solucoes_comercial_crm.webp",
         highlight: "CRM Comercial",
         title: "Pipeline por turma, metas de vendas e ações de WhatsApp",
         buttonText: "Conheça +",
-        href: "/solucoes/comercial",
+        href: "/solucoes/vendas",
       },
       {
         image: "/solucoes_comercial_dashboards.webp",
         highlight: "Relatórios",
         title: "Dashboards de conversão por campanha, curso e vendedor",
         buttonText: "Conheça +",
-        href: "/solucoes/comercial",
+        href: "/solucoes/vendas",
       },
       {
         image: "",
         highlight: "Campanhas",
         title: "UTM tracking, metas por consultor e funis segmentados",
         buttonText: "Conheça +",
-        href: "/solucoes/comercial",
+        href: "/solucoes/vendas",
       },
     ],
     marketing: [
@@ -130,28 +130,28 @@
         highlight: "Funil",
         title: "Leads gerados nas campanhas chegam direto no funil certo",
         buttonText: "Conheça +",
-        href: "/solucoes/marketing",
+        href: "/solucoes/marketing-captacao-de-alunos",
       },
       {
         image: "/solucoes_marketing_telemarketing.webp",
         highlight: "Marketing e comercial",
         title: "Áreas integradas para organizar e fechar mais matrículas",
         buttonText: "Conheça +",
-        href: "/solucoes/marketing",
+        href: "/solucoes/marketing-captacao-de-alunos",
       },
       {
         image: "/solucoes_marketing_api.webp",
         highlight: "API de Integração",
         title: "API disponível para receber leads de campanhas externas",
         buttonText: "Conheça +",
-        href: "/solucoes/marketing",
+        href: "/solucoes/marketing-captacao-de-alunos",
       },
       {
         image: "",
         highlight: "Templates & Fluxos",
         title: "Padronize campanhas com fluxos e modelos reutilizáveis",
         buttonText: "Conheça +",
-        href: "/solucoes/marketing",
+        href: "/solucoes/marketing-captacao-de-alunos",
       },
     ],
   };
@@ -160,6 +160,20 @@
   $: cards = content[activeTab] || [];
   // Mantém apenas 3 cards em destaque
   $: visibleCards = cards.slice(0, 3);
+
+  // pt-BR: Gera um "slug" seguro: sem acentos, sem maiúsculas, sem caracteres estranhos.
+function toSlug(value: string): string {
+  return (value ?? "")
+    .toString()
+    .normalize("NFD")                 // separa acento da letra
+    .replace(/[\u0300-\u036f]/g, "")  // remove os acentos
+    .toLowerCase()
+    .trim()
+    .replace(/&/g, " e ")             // opcional: & vira "e"
+    .replace(/[^a-z0-9]+/g, "-")      // qualquer coisa vira hífen
+    .replace(/^-+|-+$/g, "");         // remove hífens nas pontas
+}
+
 </script>
 
 <section
@@ -230,6 +244,11 @@
           <button
             bind:this={t.el}
             type="button"
+            data-track="1"
+            data-event="tab_click"
+            data-page="main_page"
+            data-cta={`tab_${toSlug(t.label)}`}
+            data-location="solutions_section"
             class="w-[236px] h-[48px] rounded-full border text-[16px] tracking-wide transition
                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60
                    {activeTab === t.id

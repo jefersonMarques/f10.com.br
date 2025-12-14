@@ -68,7 +68,7 @@
 </script>
 
 {#if $testimonialPopupData}
-  <div class="p-6 md:p-10 max-h-[90vh]">
+  <div class="p-6 md:p-10 max-h-[90vh] lg:max-h-[100vh]">
     <!-- Header -->
     <div class="flex items-start gap-4">
       {#if $testimonialPopupData.avatar}

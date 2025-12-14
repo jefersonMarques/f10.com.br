@@ -198,7 +198,7 @@
               total da rotina escolar.
             </p>
             <a
-              href="/solucoes/comercial"
+              href="/solucoes/vendas"
               class="inline-flex items-center justify-center w-full md:w-auto px-6 py-3 rounded-full
                      bg-[#EA6D0B] text-white font-semibold text-[15px] hover:brightness-110 transition-all"
             >
@@ -301,7 +301,7 @@
           mensagens automáticas.
         </p>
         <a
-          href="/solucoes/marketing"
+          href="/solucoes/marketing-captacao-de-alunos"
           class="inline-flex items-center justify-center w-full md:w-auto px-6 py-3 rounded-full
                  bg-[#EA6D0B] text-white font-semibold text-[15px] hover:brightness-110
                  transition-all mx-auto md:mx-0"

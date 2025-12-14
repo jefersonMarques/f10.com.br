@@ -63,6 +63,13 @@
         isCurrent?: boolean;
     };
 
+    // pt-BR: Classes utilitárias para evitar vazamento horizontal.
+    // - overflow-x-auto: permite rolagem horizontal só dentro do bloco
+    // - esconder scrollbar: mantém clean no mobile
+    const scrollXWrap =
+        "overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+    const noOverflowPage = "overflow-x-hidden";
+
     // ===== Cobrança de mensalidade (Etapa 1 - gerar cobrança) =====
     const tuitionParcels: TuitionParcel[] = [
         {
@@ -211,7 +218,6 @@
 
     // ===== Linhas da grade (amostra realista) =====
     const financeRows: FinanceRow[] = [
-        // RECEITAS – MENSALIDADES / MATRÍCULAS / SERVIÇOS
         {
             contract: "7066",
             person: "Alberto Braz Silva",
@@ -310,8 +316,6 @@
             value: "R$ 99,00",
             className: "18/ACC 07 A · Inglês Básico",
         },
-
-        // RECEITAS – LIVROS / PRODUTOS / EVENTOS
         {
             contract: "12001",
             person: "Mayara da Cintra",
@@ -424,8 +428,6 @@
             value: "R$ 99,00",
             className: "English Kids · Noturno",
         },
-
-        // DESPESAS – CONTAS A PAGAR
         {
             contract: "50001",
             person: "Copel Distribuição",
@@ -592,7 +594,6 @@
         febRealized?: number;
     };
 
-    // classes de indentação (para parecer a árvore do sistema)
     const indentClasses = ["pl-2", "pl-6", "pl-10", "pl-14", "pl-18"];
 
     const rowIndentClass = (level: number) =>
@@ -609,8 +610,8 @@
     const realizedClass = (budget?: number, realized?: number) => {
         if (budget === undefined || realized === undefined)
             return "text-slate-800";
-        if (realized > budget) return "text-[#16A34A] font-semibold"; // acima do orçado
-        return "text-[#DC2626] font-semibold"; // dentro / abaixo
+        if (realized > budget) return "text-[#16A34A] font-semibold";
+        return "text-[#DC2626] font-semibold";
     };
 
     const realizationLines: RealizationLine[] = [
@@ -618,15 +619,13 @@
             label: "Resultado Operacional",
             level: 0,
             highlight: true,
-            yearBudget: 900_000, // lucro esperado no ano
-            yearRealized: 970_000, // escola performou melhor
+            yearBudget: 900_000,
+            yearRealized: 970_000,
             janBudget: 75_000,
             janRealized: 72_500,
             febBudget: 75_000,
-            febRealized: 82_000, // fevereiro melhor que o orçado
+            febRealized: 82_000,
         },
-
-        // ====== RECEITAS ======
         {
             label: "Receitas",
             level: 1,
@@ -671,7 +670,7 @@
             label: "Ensino Médio",
             level: 3,
             yearBudget: 900_000,
-            yearRealized: 890_000, // um pouco abaixo
+            yearRealized: 890_000,
             janBudget: 75_000,
             janRealized: 74_000,
             febBudget: 75_000,
@@ -681,7 +680,7 @@
             label: "Cursos livres / contraturno",
             level: 3,
             yearBudget: 200_000,
-            yearRealized: 230_000, // acima do orçado (vermelho)
+            yearRealized: 230_000,
             janBudget: 17_000,
             janRealized: 17_500,
             febBudget: 17_000,
@@ -691,7 +690,7 @@
             label: "Livros e materiais",
             level: 2,
             yearBudget: 400_000,
-            yearRealized: 380_000, // ficou abaixo (verde)
+            yearRealized: 380_000,
             janBudget: 40_000,
             janRealized: 35_000,
             febBudget: 40_000,
@@ -711,14 +710,12 @@
             label: "Outras receitas",
             level: 2,
             yearBudget: 150_000,
-            yearRealized: 200_000, // receita acima do previsto
+            yearRealized: 200_000,
             janBudget: 7_000,
             janRealized: 8_500,
             febBudget: 7_000,
             febRealized: 10_000,
         },
-
-        // ====== DESPESAS ======
         {
             label: "Despesas",
             level: 1,
@@ -772,7 +769,6 @@
         property="og:description"
         content="Centralize o financeiro da sua escola no F10: cobranças, recebimentos, despesas, fluxo de caixa, notas fiscais e conciliação bancária em um único sistema integrado aos contratos."
     />
-
     <meta
         property="og:image"
         content="https://f10.com.br/og/financeiro-escolar-f10.jpg"
@@ -788,13 +784,12 @@
         name="twitter:description"
         content="Centralize o financeiro da sua escola no F10: cobranças, recebimentos, despesas, fluxo de caixa, notas fiscais e conciliação bancária em um único sistema integrado aos contratos."
     />
-
     <link rel="canonical" href="https://f10.com.br/solucoes/financeiro" />
 </svelte:head>
 
 <!-- ===== HERO FINANCEIRO ===== -->
 <section
-    class="relative isolate flex min-h-screen max-h-[900px] flex-col overflow-hidden bg-white/80"
+    class={`relative isolate flex min-h-screen max-h-[900px] flex-col overflow-hidden bg-white/80 ${noOverflowPage}`}
 >
     <!-- Breadcrumb -->
     <div class="pb-3 pt-4">
@@ -930,91 +925,97 @@
                     </div>
                 </div>
 
-                <!-- Cabeçalho da grade -->
-                <div class="border-b border-[#D4D7E3] bg-white px-3 py-1.5">
-                    <div
-                        class="grid grid-cols-[0.9fr,1.4fr,1.2fr,0.7fr,0.9fr,0.9fr,1.6fr,0.9fr,0.9fr,0.9fr,1.4fr]
-                               gap-2 rounded-[6px] bg-[#EEF1F8] px-2.5 py-1
-                               text-[10px] font-semibold text-[#4B5563]"
-                    >
-                        <span>Contrato</span>
-                        <span>Pessoa</span>
-                        <span>Titular</span>
-                        <span>Parcela</span>
-                        <span>Tipo</span>
-                        <span>Banco</span>
-                        <span>Forma de Recebimento</span>
-                        <span>Vencimento</span>
-                        <span>Pagamento</span>
-                        <span>Valor</span>
-                        <span>Conta / Turma</span>
+                <!-- pt-BR: TABELA COM SCROLL HORIZONTAL INTERNO (evita vazar no mobile) -->
+                <div class="border-b border-[#D4D7E3] bg-white">
+                    <div class={scrollXWrap}>
+                        <div class="min-w-[980px] px-3 py-1.5">
+                            <div
+                                class="grid grid-cols-[0.9fr,1.4fr,1.2fr,0.7fr,0.9fr,0.9fr,1.6fr,0.9fr,0.9fr,0.9fr,1.4fr]
+                                       gap-2 rounded-[6px] bg-[#EEF1F8] px-2.5 py-1
+                                       text-[10px] font-semibold text-[#4B5563] whitespace-nowrap"
+                            >
+                                <span>Contrato</span>
+                                <span>Pessoa</span>
+                                <span>Titular</span>
+                                <span>Parcela</span>
+                                <span>Tipo</span>
+                                <span>Banco</span>
+                                <span>Forma de Recebimento</span>
+                                <span>Vencimento</span>
+                                <span>Pagamento</span>
+                                <span>Valor</span>
+                                <span>Conta / Turma</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Linhas da grade -->
-                <div class="bg-white px-3 pb-2 pt-1">
-                    {#each financeRows as row, i}
-                        <div
-                            class={`grid grid-cols-[0.9fr,1.4fr,1.2fr,0.7fr,0.9fr,0.9fr,1.6fr,0.9fr,0.9fr,0.9fr,1.4fr]
-                                    gap-2 px-2.5 py-1 text-[11px]
-                                    ${
-                                        i % 2 === 0
-                                            ? "bg-white"
-                                            : "bg-[#F8FAFC]"
-                                    }`}
-                        >
-                            <span class="truncate text-[#111827]">
-                                {row.contract}
-                            </span>
-                            <span class="truncate text-[#111827]">
-                                {row.person}
-                            </span>
-                            <span class="truncate text-[#111827]">
-                                {row.holder}
-                            </span>
-                            <span class="truncate text-[#111827]">
-                                {row.parcel}
-                            </span>
-
-                            <!-- Tipo com quadrado colorido -->
-                            <span class="flex items-center gap-1">
-                                <span
-                                    class="inline-flex min-w-[82px]
-                                           px-2 py-0.5 text-[10px] font-semibold text-white"
-                                    style={`background-color:${row.typeColor};`}
+                <div class="bg-white">
+                    <div class={scrollXWrap}>
+                        <div class="min-w-[980px] px-3 pb-2 pt-1">
+                            {#each financeRows as row, i}
+                                <div
+                                    class={`grid grid-cols-[0.9fr,1.4fr,1.2fr,0.7fr,0.9fr,0.9fr,1.6fr,0.9fr,0.9fr,0.9fr,1.4fr]
+                                            gap-2 px-2.5 py-1 text-[11px] whitespace-nowrap
+                                            ${
+                                                i % 2 === 0
+                                                    ? "bg-white"
+                                                    : "bg-[#F8FAFC]"
+                                            }`}
                                 >
-                                    {row.type}
-                                </span>
-                            </span>
+                                    <span class="truncate text-[#111827]">
+                                        {row.contract}
+                                    </span>
+                                    <span class="truncate text-[#111827]">
+                                        {row.person}
+                                    </span>
+                                    <span class="truncate text-[#111827]">
+                                        {row.holder}
+                                    </span>
+                                    <span class="truncate text-[#111827]">
+                                        {row.parcel}
+                                    </span>
 
-                            <span class="truncate text-[#111827]">
-                                {row.bank}
-                            </span>
-                            <span class="truncate text-[#4B5563]">
-                                {row.form}
-                            </span>
-                            <span class="tabular-nums text-[#111827]">
-                                {row.due}
-                            </span>
-                            <span class="tabular-nums text-[#111827]">
-                                {row.pay}
-                            </span>
-                            <span class="tabular-nums text-[#111827]">
-                                {row.value}
-                            </span>
-                            <span class="truncate text-[#4B5563]">
-                                {row.className}
-                            </span>
+                                    <span class="flex items-center gap-1">
+                                        <span
+                                            class="inline-flex min-w-[82px]
+                                                   px-2 py-0.5 text-[10px] font-semibold text-white"
+                                            style={`background-color:${row.typeColor};`}
+                                        >
+                                            {row.type}
+                                        </span>
+                                    </span>
+
+                                    <span class="truncate text-[#111827]">
+                                        {row.bank}
+                                    </span>
+                                    <span class="truncate text-[#4B5563]">
+                                        {row.form}
+                                    </span>
+                                    <span class="tabular-nums text-[#111827]">
+                                        {row.due}
+                                    </span>
+                                    <span class="tabular-nums text-[#111827]">
+                                        {row.pay}
+                                    </span>
+                                    <span class="tabular-nums text-[#111827]">
+                                        {row.value}
+                                    </span>
+                                    <span class="truncate text-[#4B5563]">
+                                        {row.className}
+                                    </span>
+                                </div>
+                            {/each}
                         </div>
-                    {/each}
+                    </div>
                 </div>
 
-                <!-- Status bar inferior -->
+                <!-- Status bar inferior (pt-BR: flex + truncate precisa de min-w-0) -->
                 <div
                     class="flex items-center justify-between border-t border-[#D4D7E3]
                            bg-[#F3F4F6] px-3 py-1.5 text-[10px] text-[#4B5563]"
                 >
-                    <span class="truncate">
+                    <span class="flex-1 min-w-0 truncate">
                         Movimentações ocorridas no intervalo de
                         <span class="font-semibold"> 01/12/24 </span>
                         a
@@ -1025,7 +1026,7 @@
                             Crédito
                         </span>.
                     </span>
-                    <span class="hidden md:inline whitespace-nowrap">
+                    <span class="hidden md:inline whitespace-nowrap ml-3">
                         1.757 registros · versão 3.0 Financeiro F10
                     </span>
                 </div>
@@ -1035,17 +1036,16 @@
 </section>
 
 <!-- ===== O QUE O MÓDULO FINANCEIRO ENTREGA ===== -->
-<section class="relative py-12 md:py-16 bg-white">
+<section class={`relative py-12 md:py-16 bg-white ${noOverflowPage}`}>
     <div class="container">
         <div class="grid gap-8 lg:grid-cols-3 lg:items-stretch">
-            <!-- Card escuro com imagem de fundo e chamada -->
             <article
                 class="relative overflow-hidden rounded-[24px]
                        px-6 py-7 md:px-8 md:py-8
                        bg-[#0B1020] text-white
                        shadow-[0_22px_60px_rgba(1,13,40,0.60)]"
             >
-                <!-- booble invertido de fundo -->
+                <!-- pt-BR: absolute grande pode causar “empurrão” em alguns browsers, então garantimos overflow-hidden no card -->
                 <div
                     class="absolute pointer-events-none select-none"
                     style="
@@ -1064,17 +1064,13 @@
                     />
                 </div>
 
-                <!-- brilho -->
                 <div
                     class="pointer-events-none absolute -top-32 -left-24
                            h-[480px] w-[480px] rounded-full
                            bg-[radial-gradient(closest-side,rgba(255,255,255,0.08),transparent)]"
                 ></div>
 
-                <!-- conteúdo do card -->
-                <div
-                    class="relative flex h-full flex-col justify-between gap-4"
-                >
+                <div class="relative flex h-full flex-col justify-between gap-4">
                     <div class="space-y-3">
                         <h2
                             class="text-[22px] md:text-[32px] font-semibold
@@ -1097,7 +1093,6 @@
                 </div>
             </article>
 
-            <!-- Conteúdo à direita com badges e ícone de check -->
             <div class="lg:col-span-2 flex flex-col justify-center">
                 <p
                     class="text-[15px] md:text-[16px] leading-[1.9]
@@ -1110,12 +1105,12 @@
 
                 <div class="grid gap-2 sm:grid-cols-2">
                     {#each financeFunctions as fn}
-                        <div class="inline-flex items-center gap-2">
+                        <div class="inline-flex items-center gap-2 min-w-0">
                             <CheckCircle2
                                 size={16}
                                 class="flex-shrink-0 text-[#16A34A]"
                             />
-                            <span class="leading-snug">{fn.label}</span>
+                            <span class="leading-snug break-words">{fn.label}</span>
                         </div>
                     {/each}
                 </div>
@@ -1125,10 +1120,9 @@
 </section>
 
 <!-- ===== COBRANÇA DE MENSALIDADES — ETAPA 1: GERAR COBRANÇA ===== -->
-<section class="relative py-12 md:py-16 bg-white/80">
+<section class={`relative py-12 md:py-16 bg-white/80 ${noOverflowPage}`}>
     <div class="container">
         <div class="grid gap-10 lg:grid-cols-12 lg:items-center">
-            <!-- TEXTO (ESQUERDA) -->
             <div class="lg:col-span-5">
                 <p
                     class="text-[12px] font-semibold tracking-[0.22em]
@@ -1155,33 +1149,33 @@
                 </p>
 
                 <div class="mt-4 space-y-2 text-[14px] text-[#000A57]/85">
-                    <div class="flex items-start gap-2">
+                    <div class="flex items-start gap-2 min-w-0">
                         <CheckCircle2
                             size={18}
                             class="mt-[2px] flex-shrink-0 text-[#16A34A]"
                         />
-                        <span>
+                        <span class="break-words">
                             Visualize todas as parcelas recebidas e a receber em
                             uma única tela, com destaque para a próxima
                             cobrança.
                         </span>
                     </div>
-                    <div class="flex items-start gap-2">
+                    <div class="flex items-start gap-2 min-w-0">
                         <CheckCircle2
                             size={18}
                             class="mt-[2px] flex-shrink-0 text-[#16A34A]"
                         />
-                        <span>
+                        <span class="break-words">
                             Selecione rapidamente quais parcelas serão cobradas
                             nesse recebimento, sem abrir várias telas.
                         </span>
                     </div>
-                    <div class="flex items-start gap-2">
+                    <div class="flex items-start gap-2 min-w-0">
                         <CheckCircle2
                             size={18}
                             class="mt-[2px] flex-shrink-0 text-[#16A34A]"
                         />
-                        <span>
+                        <span class="break-words">
                             Os totais são calculados automaticamente, prontos
                             para seguir para PIX, caixa ou conciliação bancária.
                         </span>
@@ -1189,12 +1183,8 @@
                 </div>
             </div>
 
-            <!-- MINI TELA (DIREITA) -->
             <div class="lg:col-span-7">
-                <div
-                    class="relative flex justify-center lg:justify-end mt-6 lg:mt-0"
-                >
-                    <!-- glow de fundo -->
+                <div class="relative flex justify-center lg:justify-end mt-6 lg:mt-0">
                     <div
                         class="pointer-events-none absolute -top-10 -left-8 h-40 w-40 rounded-full
                                bg-[#4F46E5]/8 blur-3xl"
@@ -1206,26 +1196,21 @@
                             class="relative z-10 rounded-[26px] bg-white border border-slate-200
                                    shadow-[0_22px_60px_rgba(15,23,42,0.22)] overflow-hidden"
                         >
-                            <!-- topo tipo sistema -->
                             <div
                                 class="flex items-center justify-between px-4 pt-3 pb-2
                                        border-b border-slate-200 bg-slate-50"
                             >
-                                <div class="flex items-center gap-3">
+                                <div class="flex items-center gap-3 min-w-0">
                                     <div
-                                        class="hidden sm:flex items-center gap-3 text-[11px] text-slate-600"
+                                        class="hidden sm:flex items-center gap-3 text-[11px] text-slate-600 min-w-0"
                                     >
-                                        <span
-                                            class="font-semibold text-slate-800"
-                                        >
+                                        <span class="font-semibold text-slate-800">
                                             Meu F10
                                         </span>
                                         <span>Cadastros</span>
                                         <span>Comercial</span>
                                         <span>Pedagógico</span>
-                                        <span
-                                            class="font-semibold text-primary"
-                                        >
+                                        <span class="font-semibold text-primary">
                                             Financeiro
                                         </span>
                                         <span>Sistema</span>
@@ -1241,7 +1226,6 @@
                                 </div>
                             </div>
 
-                            <!-- ABA / TÍTULO DA GRADE -->
                             <div class="px-4 pt-3 pb-2">
                                 <div
                                     class="inline-flex items-center gap-2 rounded-t-xl bg-slate-100
@@ -1259,163 +1243,137 @@
                                 </div>
                             </div>
 
-                            <!-- filtros principais (data / caixa / tipo) -->
-                            <div
-                                class="px-4 pt-3 pb-2 bg-slate-50 border-b border-slate-200"
-                            >
-                                <div
-                                    class="grid gap-2 md:grid-cols-3 text-[11px]"
-                                >
-                                    <div class="flex flex-col gap-1">
+                            <div class="px-4 pt-3 pb-2 bg-slate-50 border-b border-slate-200">
+                                <div class="grid gap-2 md:grid-cols-3 text-[11px]">
+                                    <div class="flex flex-col gap-1 min-w-0">
                                         <span class="text-slate-500">
                                             Data Recebimento
                                         </span>
                                         <div
                                             class="flex items-center justify-between rounded-md
-                                                   border border-slate-200 bg-white px-2 py-1"
+                                                   border border-slate-200 bg-white px-2 py-1 min-w-0"
                                         >
-                                            <span
-                                                class="font-semibold text-slate-800"
-                                            >
+                                            <span class="font-semibold text-slate-800 truncate">
                                                 01/12/2025
                                             </span>
-                                            <span
-                                                class="text-slate-400 text-[10px]"
-                                                >▾</span
-                                            >
+                                            <span class="text-slate-400 text-[10px]">▾</span>
                                         </div>
                                     </div>
 
-                                    <div class="flex flex-col gap-1">
+                                    <div class="flex flex-col gap-1 min-w-0">
                                         <span class="text-slate-500">
                                             Caixa Recebimento
                                         </span>
                                         <div
                                             class="flex items-center justify-between rounded-md
-                                                   border border-slate-200 bg-white px-2 py-1"
+                                                   border border-slate-200 bg-white px-2 py-1 min-w-0"
                                         >
-                                            <span
-                                                class="font-semibold text-slate-800"
-                                            >
+                                            <span class="font-semibold text-slate-800 truncate">
                                                 Bianca Mello
                                             </span>
-                                            <span
-                                                class="text-slate-400 text-[10px]"
-                                                >▾</span
-                                            >
+                                            <span class="text-slate-400 text-[10px]">▾</span>
                                         </div>
                                     </div>
 
-                                    <div class="flex flex-col gap-1">
+                                    <div class="flex flex-col gap-1 min-w-0">
                                         <span class="text-slate-500">
                                             Tipo de Recebimento
                                         </span>
                                         <div
                                             class="flex items-center justify-between rounded-md
-                                                   border border-slate-200 bg-white px-2 py-1"
+                                                   border border-slate-200 bg-white px-2 py-1 min-w-0"
                                         >
-                                            <span
-                                                class="font-semibold text-slate-800"
-                                            >
+                                            <span class="font-semibold text-slate-800 truncate">
                                                 Mensalidade
                                             </span>
-                                            <span
-                                                class="text-slate-400 text-[10px]"
-                                                >▾</span
-                                            >
+                                            <span class="text-slate-400 text-[10px]">▾</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- cabeçalho da grade -->
+                            <!-- pt-BR: Tabela compacta também pode estourar; damos overflow-x interno -->
                             <div class="px-4 pt-3 pb-1">
-                                <div
-                                    class="grid grid-cols-[1.4fr,1.2fr,1.2fr,1.2fr,1.2fr,0.8fr]
-                                           text-[11px] font-semibold text-slate-600
-                                           bg-slate-100 rounded-xl px-3 py-2 border border-slate-200"
-                                >
-                                    <span>Descrição</span>
-                                    <span>Vencimento</span>
-                                    <span>Valor</span>
-                                    <span>Cálculo</span>
-                                    <span>Pago</span>
-                                    <span class="text-center">Receber</span>
+                                <div class={scrollXWrap}>
+                                    <div class="min-w-[640px]">
+                                        <div
+                                            class="grid grid-cols-[1.4fr,1.2fr,1.2fr,1.2fr,1.2fr,0.8fr]
+                                                   text-[11px] font-semibold text-slate-600
+                                                   bg-slate-100 rounded-xl px-3 py-2 border border-slate-200 whitespace-nowrap"
+                                        >
+                                            <span>Descrição</span>
+                                            <span>Vencimento</span>
+                                            <span>Valor</span>
+                                            <span>Cálculo</span>
+                                            <span>Pago</span>
+                                            <span class="text-center">Receber</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- lista de parcelas -->
                             <div class="px-4 pb-4">
                                 <div
                                     class="mt-1 rounded-[18px] border border-slate-200
                                            bg-slate-50 overflow-hidden"
                                 >
-                                    {#each tuitionParcels as row, i}
-                                        <div
-                                            class={`grid grid-cols-[1.4fr,1.2fr,1.2fr,1.2fr,1.2fr,0.8fr]
-                                                    px-3 py-1.5 text-[12px] items-center
-                                                    ${
-                                                        row.isCurrent
-                                                            ? "bg-[#FFF7ED] ring-1 ring-[#FDBA74]"
-                                                            : i % 2 === 0
-                                                              ? "bg-white"
-                                                              : "bg-slate-50/80"
-                                                    }`}
-                                        >
-                                            <span
-                                                class="truncate text-slate-800"
-                                            >
-                                                {row.description}
-                                            </span>
-                                            <span
-                                                class="tabular-nums text-slate-800"
-                                            >
-                                                {row.due}
-                                            </span>
-                                            <span
-                                                class="tabular-nums text-slate-800"
-                                            >
-                                                {row.value}
-                                            </span>
-                                            <span
-                                                class="tabular-nums text-slate-800"
-                                            >
-                                                {row.calc}
-                                            </span>
-                                            <span
-                                                class="tabular-nums text-slate-800"
-                                            >
-                                                {row.paid}
-                                            </span>
+                                    <div class={scrollXWrap}>
+                                        <div class="min-w-[640px]">
+                                            {#each tuitionParcels as row, i}
+                                                <div
+                                                    class={`grid grid-cols-[1.4fr,1.2fr,1.2fr,1.2fr,1.2fr,0.8fr]
+                                                            px-3 py-1.5 text-[12px] items-center whitespace-nowrap
+                                                            ${
+                                                                row.isCurrent
+                                                                    ? "bg-[#FFF7ED] ring-1 ring-[#FDBA74]"
+                                                                    : i % 2 === 0
+                                                                      ? "bg-white"
+                                                                      : "bg-slate-50/80"
+                                                            }`}
+                                                >
+                                                    <span class="truncate text-slate-800">
+                                                        {row.description}
+                                                    </span>
+                                                    <span class="tabular-nums text-slate-800">
+                                                        {row.due}
+                                                    </span>
+                                                    <span class="tabular-nums text-slate-800">
+                                                        {row.value}
+                                                    </span>
+                                                    <span class="tabular-nums text-slate-800">
+                                                        {row.calc}
+                                                    </span>
+                                                    <span class="tabular-nums text-slate-800">
+                                                        {row.paid}
+                                                    </span>
 
-                                            <div class="flex justify-center">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={row.receive}
-                                                    class="h-3.5 w-3.5 rounded border-slate-300
-                                                           text-[#EA6D0B] focus:ring-[#EA6D0B]"
-                                                />
-                                            </div>
+                                                    <div class="flex justify-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={row.receive}
+                                                            class="h-3.5 w-3.5 rounded border-slate-300
+                                                                   text-[#EA6D0B] focus:ring-[#EA6D0B]"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            {/each}
                                         </div>
-                                    {/each}
+                                    </div>
                                 </div>
 
-                                <!-- rodapé com totais -->
                                 <div
                                     class="mt-2 text-[10px] text-slate-600 flex items-center justify-between"
                                 >
-                                    <span>
-                                        Valores totais para recebimento na data
-                                        selecionada.
+                                    <span class="flex-1 min-w-0 truncate">
+                                        Valores totais para recebimento na data selecionada.
                                     </span>
-                                    <span class="font-semibold">
+                                    <span class="font-semibold whitespace-nowrap ml-3">
                                         Total selecionado: R$ 200,00
                                     </span>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- glow extra -->
                         <div
                             class="pointer-events-none absolute -bottom-10 -right-10 h-40 w-40 rounded-full
                                    bg-[#EA6D0B]/14 blur-3xl"
@@ -1429,13 +1387,11 @@
 </section>
 
 <!-- ===== COBRANÇA DE MENSALIDADES — ETAPA 3: RECEBIMENTO ONLINE VIA PIX ===== -->
-<section class="relative py-12 md:py-16 bg-white">
+<section class={`relative py-12 md:py-16 bg-white ${noOverflowPage}`}>
     <div class="container">
         <div class="grid gap-10 lg:grid-cols-12 items-center">
-            <!-- MINI TELA (ESQUERDA – ALINHADA À ESQUERDA) -->
             <div class="lg:col-span-6 flex justify-start">
                 <div class="relative w-full max-w-[690px]">
-                    <!-- FUNDO CINZA ROTACIONADO -->
                     <div
                         class="pointer-events-none absolute inset-0 rounded-[32px]
                    bg-[#F3F4F6]/50 rotate-[10deg]"
@@ -1447,38 +1403,25 @@
                    shadow-[0_18px_40px_rgba(1,13,40,0.12)]
                    bg-[#020617] ring-1 ring-black/5"
                     >
-                        <!-- NOISE DE FUNDO BEM SUTIL -->
                         <div
                             class="pointer-events-none absolute inset-0 opacity-[0.10] mix-blend-overlay
                      bg-[url('/noise.svg')] bg-repeat [background-size:250px_250px]"
                             aria-hidden="true"
                         ></div>
 
-                        <!-- CONTEÚDO DA “JANELA” -->
                         <div class="relative flex flex-col">
-                            <!-- BARRA SUPERIOR ESTILO SAFARI -->
                             <div
                                 class="relative flex items-center justify-center
                        px-4 md:px-6 pt-3 pb-2
                        bg-gradient-to-b from-[#020A24] via-[#020A24] to-[#020617]
                        border-b border-white/10"
                             >
-                                <!-- bolinhas estilo macOS (ESQUERDA) -->
-                                <div
-                                    class="absolute left-4 flex items-center gap-1.5"
-                                >
-                                    <span
-                                        class="h-2.5 w-2.5 rounded-full bg-[#FF5F57]"
-                                    ></span>
-                                    <span
-                                        class="h-2.5 w-2.5 rounded-full bg-[#FEBB2E]"
-                                    ></span>
-                                    <span
-                                        class="h-2.5 w-2.5 rounded-full bg-[#28C840]"
-                                    ></span>
+                                <div class="absolute left-4 flex items-center gap-1.5">
+                                    <span class="h-2.5 w-2.5 rounded-full bg-[#FF5F57]"></span>
+                                    <span class="h-2.5 w-2.5 rounded-full bg-[#FEBB2E]"></span>
+                                    <span class="h-2.5 w-2.5 rounded-full bg-[#28C840]"></span>
                                 </div>
 
-                                <!-- BARRA DE ENDEREÇO CENTRALIZADA -->
                                 <div
                                     class="flex items-center justify-center
                          px-4 md:px-6 py-1.5
@@ -1494,7 +1437,6 @@
                                 </div>
                             </div>
 
-                            <!-- ÁREA DA TELA / PRINT DO SISTEMA -->
                             <div class="relative bg-white">
                                 <img
                                     src="/financeiro_pagamento_f10.webp"
@@ -1508,7 +1450,6 @@
                 </div>
             </div>
 
-            <!-- TEXTO (DIREITA) -->
             <div class="lg:col-span-6">
                 <p
                     class="text-[12px] font-semibold tracking-[0.22em]
@@ -1524,43 +1465,31 @@
                     Financeiro completo: boletos, Pix e histórico de contratos
                 </h2>
 
-                <p
-                    class="mt-3 text-[15px] md:text-[16px] leading-[1.9]
-                 text-[#000A57]/85"
-                >
+                <p class="mt-3 text-[15px] md:text-[16px] leading-[1.9] text-[#000A57]/85">
                     No Portal do Aluno, o estudante acompanha parcelas, gera
                     boletos em PDF e paga por Pix. Quando integrado, o registro
                     do pagamento é feito automaticamente no financeiro da
                     escola.
                 </p>
 
-                <p
-                    class="mt-3 text-[15px] md:text-[16px] leading-[1.9]
-                 text-[#000A57]/85"
-                >
+                <p class="mt-3 text-[15px] md:text-[16px] leading-[1.9] text-[#000A57]/85">
                     Contratos podem ter aceite online com registro de IP e
                     geração de PDF completo, reduzindo papelada e trazendo mais
                     segurança jurídica para o EAD.
                 </p>
 
                 <div class="mt-4 space-y-2 text-[14px] text-[#000A57]/90">
-                    <div class="flex items-start gap-2">
-                        <CheckCircle2
-                            size={18}
-                            class="mt-[2px] flex-shrink-0 text-[#16A34A]"
-                        />
-                        <span>
+                    <div class="flex items-start gap-2 min-w-0">
+                        <CheckCircle2 size={18} class="mt-[2px] flex-shrink-0 text-[#16A34A]" />
+                        <span class="break-words">
                             Boletos em PDF, linha digitável e status das
                             parcelas sempre disponíveis para o responsável.
                         </span>
                     </div>
 
-                    <div class="flex items-start gap-2">
-                        <CheckCircle2
-                            size={18}
-                            class="mt-[2px] flex-shrink-0 text-[#16A34A]"
-                        />
-                        <span>
+                    <div class="flex items-start gap-2 min-w-0">
+                        <CheckCircle2 size={18} class="mt-[2px] flex-shrink-0 text-[#16A34A]" />
+                        <span class="break-words">
                             Pagamento por Pix integrado ao F10, com atualização
                             automática do financeiro quando o banco confirma o
                             recebimento.
@@ -1568,21 +1497,17 @@
                     </div>
                 </div>
 
-                <!-- Links estratégicos (AVA e Smart Aluno) -->
-                <p
-                    class="mt-5 text-[13px] md:text-[14px] leading-[1.8]
-                 text-[#000A57]/80"
-                >
+                <p class="mt-5 text-[13px] md:text-[14px] leading-[1.8] text-[#000A57]/80">
                     O acesso pode ser feito tanto pelo
                     <a
-                        href="/ambiente-virtual-de-aprendizado-ava"
+                        href="/solucoes/ambiente-virtual-de-aprendizado-ava"
                         class="font-semibold text-[#EA6D0B] hover:underline"
                     >
                         Ambiente Virtual de Aprendizado (AVA)
                     </a>
                     quanto pelo
                     <a
-                        href="/aplicativo-smart-aluno"
+                        href="/solucoes/aplicativo-smart-aluno"
                         class="font-semibold text-[#EA6D0B] hover:underline"
                     >
                         aplicativo Smart Aluno
@@ -1595,27 +1520,17 @@
 </section>
 
 <!-- ===== COBRANÇA RECORRENTE E CANAIS ===== -->
-<section class="relative py-12 md:py-16 bg-white">
+<section class={`relative py-12 md:py-16 bg-white ${noOverflowPage}`}>
     <div class="container">
         <div class="grid gap-10 lg:grid-cols-12 items-center">
             <div class="lg:col-span-5">
-                <p
-                    class="text-[13px] font-semibold tracking-[0.18em]
-                           text-[#7E82A2]"
-                >
+                <p class="text-[13px] font-semibold tracking-[0.18em] text-[#7E82A2]">
                     COBRANÇA RECORRENTE
                 </p>
-                <h2
-                    class="mt-2 text-[26px] md:text-[32px] font-semibold
-                           leading-[1.15] text-[#000A57]"
-                >
-                    Mensalidades em dia com cobrança automática e comunicação
-                    clara
+                <h2 class="mt-2 text-[26px] md:text-[32px] font-semibold leading-[1.15] text-[#000A57]">
+                    Mensalidades em dia com cobrança automática e comunicação clara
                 </h2>
-                <p
-                    class="mt-3 text-[15px] md:text-[16px] leading-[1.8]
-                           text-[#000A57]/80"
-                >
+                <p class="mt-3 text-[15px] md:text-[16px] leading-[1.8] text-[#000A57]/80">
                     Combine APP, PIX, boleto, cartão e SMS para manter o
                     responsável informado e a mensalidade em dia, sem depender
                     de controles paralelos fora do F10.
@@ -1627,24 +1542,15 @@
                     {#each billingChannels as channel}
                         <article
                             class="rounded-[20px] bg-[#F3F4FD] px-5 py-5
-                                   ring-1 ring-[#E5E7EB] flex flex-col gap-2"
+                                   ring-1 ring-[#E5E7EB] flex flex-col gap-2 min-w-0"
                         >
-                            <p
-                                class="text-[11px] font-semibold tracking-[0.18em]
-                                       text-[#9CA3AF]"
-                            >
+                            <p class="text-[11px] font-semibold tracking-[0.18em] text-[#9CA3AF]">
                                 {channel.tag}
                             </p>
-                            <h3
-                                class="text-[15px] md:text-[16px] font-semibold
-                                       text-[#000A57]"
-                            >
+                            <h3 class="text-[15px] md:text-[16px] font-semibold text-[#000A57]">
                                 {channel.title}
                             </h3>
-                            <p
-                                class="text-[13px] md:text-[14px] leading-[1.7]
-                                       text-[#4B5563]/85"
-                            >
+                            <p class="text-[13px] md:text-[14px] leading-[1.7] text-[#4B5563]/85 break-words">
                                 {channel.description}
                             </p>
                         </article>
@@ -1656,25 +1562,16 @@
 </section>
 
 <!-- ===== FLUXO FINANCEIRO NO F10 ===== -->
-<section class="relative py-12 md:py-16 bg-[#F3F4FD]">
+<section class={`relative py-12 md:py-16 bg-[#F3F4FD] ${noOverflowPage}`}>
     <div class="container">
         <div class="text-center max-w-3xl mx-auto">
-            <p
-                class="text-[13px] font-semibold tracking-[0.18em]
-                       text-[#7E82A2]"
-            >
+            <p class="text-[13px] font-semibold tracking-[0.18em] text-[#7E82A2]">
                 FLUXO FINANCEIRO DA ESCOLA
             </p>
-            <h2
-                class="mt-3 text-[26px] md:text-[32px] font-semibold
-                       leading-[1.15] text-[#000A57]"
-            >
+            <h2 class="mt-3 text-[26px] md:text-[32px] font-semibold leading-[1.15] text-[#000A57]">
                 Do contrato à conciliação bancária em quatro etapas
             </h2>
-            <p
-                class="mt-3 text-[14px] md:text-[15px] leading-[1.8]
-                       text-[#000A57]/80"
-            >
+            <p class="mt-3 text-[14px] md:text-[15px] leading-[1.8] text-[#000A57]/80">
                 Cada etapa do fluxo — geração de parcelas, cobrança, despesas e
                 conciliação — é controlada dentro do F10, conectando Comercial,
                 Financeiro e Diretoria.
@@ -1685,7 +1582,7 @@
             {#each flowSteps as step}
                 <article
                     class="relative rounded-[20px] bg-white px-5 py-5 md:px-6 md:py-6
-                           ring-1 ring-[#E5E7EB] flex flex-col gap-2"
+                           ring-1 ring-[#E5E7EB] flex flex-col gap-2 min-w-0"
                 >
                     <div
                         class="flex h-9 w-9 items-center justify-center rounded-full
@@ -1693,16 +1590,10 @@
                     >
                         {step.label}
                     </div>
-                    <h3
-                        class="mt-1 text-[15px] md:text-[16px] font-semibold
-                               text-[#000A57]"
-                    >
+                    <h3 class="mt-1 text-[15px] md:text-[16px] font-semibold text-[#000A57]">
                         {step.title}
                     </h3>
-                    <p
-                        class="text-[13px] md:text-[14px] leading-[1.7]
-                               text-[#4B5563]/85"
-                    >
+                    <p class="text-[13px] md:text-[14px] leading-[1.7] text-[#4B5563]/85 break-words">
                         {step.description}
                     </p>
                 </article>
@@ -1712,29 +1603,19 @@
 </section>
 
 <!-- ===== REALIZAÇÃO DE RECEITAS E DESPESAS ===== -->
-<section class="relative py-12 md:py-16 bg-[#F3F4FD]">
+<section class={`relative py-12 md:py-16 bg-[#F3F4FD] ${noOverflowPage}`}>
     <div class="container">
         <div class="grid gap-10 lg:grid-cols-12 items-start">
-            <!-- TEXTO (ESQUERDA) -->
             <div class="lg:col-span-5">
-                <p
-                    class="text-[12px] font-semibold tracking-[0.22em]
-               text-[#7E82A2] uppercase"
-                >
+                <p class="text-[12px] font-semibold tracking-[0.22em] text-[#7E82A2] uppercase">
                     REALIZAÇÃO DE RECEITAS E DESPESAS
                 </p>
 
-                <h2
-                    class="mt-2 text-[26px] md:text-[32px] font-semibold
-               leading-[1.15] text-[#000A57]"
-                >
+                <h2 class="mt-2 text-[26px] md:text-[32px] font-semibold leading-[1.15] text-[#000A57]">
                     Resultado operacional por nível, ano e mês
                 </h2>
 
-                <p
-                    class="mt-3 text-[15px] md:text-[16px] leading-[1.8]
-               text-[#000A57]/85"
-                >
+                <p class="mt-3 text-[15px] md:text-[16px] leading-[1.8] text-[#000A57]/85">
                     A tela de realização mostra quanto a escola planejou receber
                     e gastar e quanto, de fato, aconteceu em cada grupo de
                     contas. A direção enxerga o impacto real de cursos, livros,
@@ -1742,42 +1623,29 @@
                 </p>
 
                 <div class="mt-4 space-y-2 text-[14px] text-[#000A57]/90">
-                    <div class="flex items-start gap-2">
-                        <CheckCircle2
-                            size={18}
-                            class="mt-[2px] flex-shrink-0 text-[#16A34A]"
-                        />
-                        <span>
+                    <div class="flex items-start gap-2 min-w-0">
+                        <CheckCircle2 size={18} class="mt-[2px] flex-shrink-0 text-[#16A34A]" />
+                        <span class="break-words">
                             Estrutura em níveis, semelhante ao plano de contas,
                             permitindo analisar o resultado de
-                            <span class="font-semibold">
-                                Receitas → Cursos → Turmas
-                            </span>
+                            <span class="font-semibold"> Receitas → Cursos → Turmas </span>
                             e confrontar com as principais despesas da operação.
                         </span>
                     </div>
 
-                    <div class="flex items-start gap-2">
-                        <CheckCircle2
-                            size={18}
-                            class="mt-[2px] flex-shrink-0 text-[#16A34A]"
-                        />
-                        <span>
-                            Comparação de <span class="font-semibold">
-                                ano, janeiro à dezembro
-                            </span>
+                    <div class="flex items-start gap-2 min-w-0">
+                        <CheckCircle2 size={18} class="mt-[2px] flex-shrink-0 text-[#16A34A]" />
+                        <span class="break-words">
+                            Comparação de <span class="font-semibold"> ano, janeiro à dezembro </span>
                             com orçamento e realizado lado a lado, ajudando a revisar
                             o orçamento, ajustar investimentos e corrigir rota ainda
                             no início do ano letivo.
                         </span>
                     </div>
 
-                    <div class="flex items-start gap-2">
-                        <CheckCircle2
-                            size={18}
-                            class="mt-[2px] flex-shrink-0 text-[#16A34A]"
-                        />
-                        <span>
+                    <div class="flex items-start gap-2 min-w-0">
+                        <CheckCircle2 size={18} class="mt-[2px] flex-shrink-0 text-[#16A34A]" />
+                        <span class="break-words">
                             Base sólida para decisões estratégicas: renegociação
                             de contratos, revisão de mensalidades, controle de
                             custos fixos e avaliação do impacto de campanhas de
@@ -1787,10 +1655,8 @@
                 </div>
             </div>
 
-            <!-- MINI TELA (DIREITA) -->
             <div class="lg:col-span-7">
                 <div class="relative w-full max-w-[780px] ml-auto">
-                    <!-- fundo rotacionado -->
                     <div
                         class="pointer-events-none absolute inset-0 rounded-[32px]
                    bg-white/60 rotate-[2deg]"
@@ -1802,15 +1668,12 @@
                    bg-white border border-slate-200
                    shadow-[0_18px_40px_rgba(15,23,42,0.18)]"
                     >
-                        <!-- topo tipo sistema -->
                         <div
                             class="flex items-center justify-between px-4 pt-3 pb-2
                        border-b border-slate-200 bg-slate-50"
                         >
-                            <div class="flex items-center gap-3">
-                                <div
-                                    class="hidden sm:flex items-center gap-3 text-[11px] text-slate-600"
-                                >
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="hidden sm:flex items-center gap-3 text-[11px] text-slate-600 min-w-0">
                                     <span class="font-semibold text-slate-800">
                                         Meu F10
                                     </span>
@@ -1833,7 +1696,7 @@
                                 />
                             </div>
                         </div>
-                        <!-- ABA / TÍTULO DA GRADE -->
+
                         <div class="px-4 pt-3 pb-2">
                             <div
                                 class="inline-flex items-center gap-2 rounded-t-xl bg-slate-100
@@ -1843,62 +1706,51 @@
                                 <span
                                     class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary/10"
                                 >
-                                    <span
-                                        class="h-2 w-2 bg-primary rounded-[3px]"
-                                    ></span>
+                                    <span class="h-2 w-2 bg-primary rounded-[3px]"></span>
                                 </span>
                                 <span>Receitas e despesas</span>
                             </div>
                         </div>
 
-                        <!-- cabeçalho em 2 níveis (grupo + colunas) -->
+                        <!-- pt-BR: Essa tabela é larga; rolagem horizontal interna -->
                         <div class="px-4 pt-3 pb-1 bg-slate-50">
-                            <!-- linha dos grupos: Ano / Jan / Fev -->
-                            <div
-                                class="grid grid-cols-[2fr,1.2fr,1.2fr,1.2fr,1.2fr,1.2fr,1.2fr]
-                           text-[10px] text-slate-500 px-3"
-                            >
-                                <span></span>
-                                <span class="col-span-2 text-center"
-                                    >Ano 2025</span
-                                >
-                                <span class="col-span-2 text-center"
-                                    >Janeiro</span
-                                >
-                                <span class="col-span-2 text-center"
-                                    >Fevereiro</span
-                                >
-                            </div>
+                            <div class={scrollXWrap}>
+                                <div class="min-w-[860px]">
+                                    <div
+                                        class="grid grid-cols-[2fr,1.2fr,1.2fr,1.2fr,1.2fr,1.2fr,1.2fr]
+                           text-[10px] text-slate-500 px-3 whitespace-nowrap"
+                                    >
+                                        <span></span>
+                                        <span class="col-span-2 text-center">Ano 2025</span>
+                                        <span class="col-span-2 text-center">Janeiro</span>
+                                        <span class="col-span-2 text-center">Fevereiro</span>
+                                    </div>
 
-                            <!-- linha das colunas -->
-                            <div
-                                class="mt-1 grid grid-cols-[2fr,1.2fr,1.2fr,1.2fr,1.2fr,1.2fr,1.2fr]
+                                    <div
+                                        class="mt-1 grid grid-cols-[2fr,1.2fr,1.2fr,1.2fr,1.2fr,1.2fr,1.2fr]
                            text-[11px] font-semibold text-slate-600
-                           bg-slate-100 rounded-xl px-3 py-2 border border-slate-200"
-                            >
-                                <span>Descrição da conta</span>
-
-                                <span class="text-center">Orçado</span>
-                                <span class="text-center">Realizado</span>
-
-                                <span class="text-center">Orçado</span>
-                                <span class="text-center">Realizado</span>
-
-                                <span class="text-center">Orçado</span>
-                                <span class="text-center">Realizado</span>
+                           bg-slate-100 rounded-xl px-3 py-2 border border-slate-200 whitespace-nowrap"
+                                    >
+                                        <span>Descrição da conta</span>
+                                        <span class="text-center">Orçado</span>
+                                        <span class="text-center">Realizado</span>
+                                        <span class="text-center">Orçado</span>
+                                        <span class="text-center">Realizado</span>
+                                        <span class="text-center">Orçado</span>
+                                        <span class="text-center">Realizado</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- linhas -->
                         <div class="px-4 pb-4">
-                            <div
-                                class="mt-1 rounded-[18px] border border-slate-200
-                           bg-slate-50 overflow-hidden"
-                            >
-                                {#each realizationLines as line, i}
-                                    <div
-                                        class={`grid grid-cols-[2fr,1.2fr,1.2fr,1.2fr,1.2fr,1.2fr,1.2fr]
-                                    px-3 py-1.5 text-[12px] items-center
+                            <div class="mt-1 rounded-[18px] border border-slate-200 bg-slate-50 overflow-hidden">
+                                <div class={scrollXWrap}>
+                                    <div class="min-w-[860px]">
+                                        {#each realizationLines as line, i}
+                                            <div
+                                                class={`grid grid-cols-[2fr,1.2fr,1.2fr,1.2fr,1.2fr,1.2fr,1.2fr]
+                                    px-3 py-1.5 text-[12px] items-center whitespace-nowrap
                                     ${
                                         line.highlight
                                             ? "bg-[#E5ECFF]"
@@ -1906,151 +1758,122 @@
                                               ? "bg-white"
                                               : "bg-slate-50/80"
                                     }`}
-                                    >
-                                        <!-- descrição com “árvore” -->
-                                        <div
-                                            class={`flex items-center gap-1 truncate ${rowIndentClass(
-                                                line.level,
-                                            )}`}
-                                        >
-                                            {#if line.level === 0}
-                                                <span
-                                                    class="text-[11px] text-slate-500"
-                                                    >▾</span
+                                            >
+                                                <div
+                                                    class={`flex items-center gap-1 truncate ${rowIndentClass(
+                                                        line.level,
+                                                    )}`}
                                                 >
-                                            {:else if line.level === 1}
-                                                <span
-                                                    class="text-[11px] text-slate-500"
-                                                    >▾</span
-                                                >
-                                            {:else}
-                                                <span class="w-3"></span>
-                                            {/if}
+                                                    {#if line.level === 0}
+                                                        <span class="text-[11px] text-slate-500">▾</span>
+                                                    {:else if line.level === 1}
+                                                        <span class="text-[11px] text-slate-500">▾</span>
+                                                    {:else}
+                                                        <span class="w-3"></span>
+                                                    {/if}
 
-                                            <span
-                                                class="inline-flex items-center justify-center
+                                                    <span
+                                                        class="inline-flex items-center justify-center
                                            h-[12px] min-w-[12px]
                                            border border-slate-400 bg-white
                                            text-[11px] leading-none text-slate-700"
-                                                aria-hidden="true"
-                                            >
-                                                ✓
-                                            </span>
+                                                        aria-hidden="true"
+                                                    >
+                                                        ✓
+                                                    </span>
 
-                                            <span
-                                                class={`truncate ${
-                                                    line.level <= 1
-                                                        ? "font-semibold text-slate-800"
-                                                        : "text-slate-800"
-                                                }`}
-                                            >
-                                                {line.label}
-                                            </span>
-                                        </div>
+                                                    <span
+                                                        class={`truncate ${
+                                                            line.level <= 1
+                                                                ? "font-semibold text-slate-800"
+                                                                : "text-slate-800"
+                                                        }`}
+                                                    >
+                                                        {line.label}
+                                                    </span>
+                                                </div>
 
-                                        <!-- Ano 2025 Orçado -->
-                                        <span
-                                            class="tabular-nums text-[11px] text-slate-800 text-right"
-                                        >
-                                            {formatAmount(line.yearBudget)}
-                                        </span>
+                                                <span class="tabular-nums text-[11px] text-slate-800 text-right">
+                                                    {formatAmount(line.yearBudget)}
+                                                </span>
 
-                                        <!-- Ano 2025 Realizado -->
-                                        <span
-                                            class={`tabular-nums text-[11px] text-right ${realizedClass(
-                                                line.yearBudget,
-                                                line.yearRealized,
-                                            )}`}
-                                        >
-                                            {formatAmount(line.yearRealized)}
-                                        </span>
+                                                <span
+                                                    class={`tabular-nums text-[11px] text-right ${realizedClass(
+                                                        line.yearBudget,
+                                                        line.yearRealized,
+                                                    )}`}
+                                                >
+                                                    {formatAmount(line.yearRealized)}
+                                                </span>
 
-                                        <!-- Janeiro Orçado -->
-                                        <span
-                                            class="tabular-nums text-[11px] text-slate-800 text-right"
-                                        >
-                                            {formatAmount(line.janBudget)}
-                                        </span>
+                                                <span class="tabular-nums text-[11px] text-slate-800 text-right">
+                                                    {formatAmount(line.janBudget)}
+                                                </span>
 
-                                        <!-- Janeiro Realizado -->
-                                        <span
-                                            class={`tabular-nums text-[11px] text-right ${realizedClass(
-                                                line.janBudget,
-                                                line.janRealized,
-                                            )}`}
-                                        >
-                                            {formatAmount(line.janRealized)}
-                                        </span>
+                                                <span
+                                                    class={`tabular-nums text-[11px] text-right ${realizedClass(
+                                                        line.janBudget,
+                                                        line.janRealized,
+                                                    )}`}
+                                                >
+                                                    {formatAmount(line.janRealized)}
+                                                </span>
 
-                                        <!-- Fevereiro Orçado -->
-                                        <span
-                                            class="tabular-nums text-[11px] text-slate-800 text-right"
-                                        >
-                                            {formatAmount(line.febBudget)}
-                                        </span>
+                                                <span class="tabular-nums text-[11px] text-slate-800 text-right">
+                                                    {formatAmount(line.febBudget)}
+                                                </span>
 
-                                        <!-- Fevereiro Realizado -->
-                                        <span
-                                            class={`tabular-nums text-[11px] text-right ${realizedClass(
-                                                line.febBudget,
-                                                line.febRealized,
-                                            )}`}
-                                        >
-                                            {formatAmount(line.febRealized)}
-                                        </span>
+                                                <span
+                                                    class={`tabular-nums text-[11px] text-right ${realizedClass(
+                                                        line.febBudget,
+                                                        line.febRealized,
+                                                    )}`}
+                                                >
+                                                    {formatAmount(line.febRealized)}
+                                                </span>
+                                            </div>
+                                        {/each}
                                     </div>
-                                {/each}
+                                </div>
                             </div>
 
-                            <div
-                                class="mt-2 text-[10px] text-slate-600 flex items-center justify-between"
-                            >
-                                <span>
-                                    Estrutura em árvore semelhante ao sistema
-                                    desktop, com Resultado Operacional, Receitas
-                                    e Despesas.
+                            <div class="mt-2 text-[10px] text-slate-600 flex items-center justify-between">
+                                <span class="flex-1 min-w-0 truncate">
+                                    Estrutura em árvore semelhante ao sistema desktop, com Resultado Operacional, Receitas e Despesas.
                                 </span>
-                                <span class="hidden sm:inline">
-                                    Verde = dentro do orçamento · Vermelho =
-                                    acima do orçado.
+                                <span class="hidden sm:inline whitespace-nowrap ml-3">
+                                    Verde = dentro do orçamento · Vermelho = acima do orçado.
                                 </span>
                             </div>
                         </div>
                     </figure>
 
-                    <!-- CARDS FLUTUANTES (DIREITA INFERIOR) -->
+                    <!-- pt-BR: Cards flutuantes empurram layout no mobile → só no lg+ -->
                     <div
-                        class="pointer-events-none absolute z-10 -bottom-10 -right-12
-           flex flex-col items-end gap-3"
+                        class="pointer-events-none hidden lg:flex absolute z-10 -bottom-10 -right-12
+                               flex-col items-end gap-3"
                     >
-                        <!-- Card escuro com pizza verde (TOP) -->
                         <div
                             class="pointer-events-auto rounded-2xl bg-[#020617] text-white
-               px-4 py-3 shadow-[0_18px_40px_rgba(15,23,42,0.55)]
-               border border-white/10 w-[250px]"
+                                   px-4 py-3 shadow-[0_18px_40px_rgba(15,23,42,0.55)]
+                                   border border-white/10 w-[250px]"
                         >
-                            <p
-                                class="text-[11px] font-semibold text-emerald-300"
-                            >
+                            <p class="text-[11px] font-semibold text-emerald-300">
                                 Resultado operacional
                             </p>
-                            <p
-                                class="mt-0.5 text-[18px] font-bold leading-tight"
-                            >
+                            <p class="mt-0.5 text-[18px] font-bold leading-tight">
                                 +R$ 970 mil
                             </p>
                             <p class="mt-1 text-[10px] text-slate-300">
                                 72% receitas · 28% despesas
                             </p>
 
-                            <!-- pizza simples -->
                             <div class="mt-3 flex items-center gap-3">
                                 <svg
                                     viewBox="0 0 40 40"
                                     class="h-12 w-12 rotate-[-90deg]"
                                     aria-hidden="true"
                                 >
-                                    <!-- fundo cinza -->
                                     <circle
                                         cx="20"
                                         cy="20"
@@ -2058,7 +1881,6 @@
                                         class="fill-none stroke-slate-700/60"
                                         stroke-width="8"
                                     />
-                                    <!-- fatia verde (resultado positivo) -->
                                     <circle
                                         cx="20"
                                         cy="20"
@@ -2072,17 +1894,13 @@
 
                                 <div class="space-y-1 text-[10px]">
                                     <div class="flex items-center gap-1.5">
-                                        <span
-                                            class="h-2 w-2 rounded-full bg-emerald-400"
-                                        ></span>
+                                        <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
                                         <span class="text-slate-100">
                                             Receitas acima do previsto
                                         </span>
                                     </div>
                                     <div class="flex items-center gap-1.5">
-                                        <span
-                                            class="h-2 w-2 rounded-full bg-slate-500"
-                                        ></span>
+                                        <span class="h-2 w-2 rounded-full bg-slate-500"></span>
                                         <span class="text-slate-300">
                                             Despesas controladas
                                         </span>
@@ -2098,13 +1916,11 @@
 </section>
 
 <!-- ===== CUBO DE DADOS FINANCEIROS ===== -->
-<section class="relative py-12 md:py-16 bg-white">
+<section class={`relative py-12 md:py-16 bg-white ${noOverflowPage}`}>
     <div class="container">
         <div class="grid gap-10 lg:grid-cols-12 items-start">
-            <!-- MINI TELA -->
             <div class="lg:col-span-6">
                 <div class="relative w-full max-w-[780px] ml-auto">
-                    <!-- fundo rotacionado -->
                     <div
                         class="pointer-events-none absolute inset-0 rounded-[32px]
                                bg-white/60 rotate-[2deg]"
@@ -2116,15 +1932,12 @@
                                bg-white border border-slate-200
                                shadow-[0_18px_40px_rgba(15,23,42,0.18)]"
                     >
-                        <!-- topo tipo sistema -->
                         <div
                             class="flex items-center justify-between px-4 pt-3 pb-2
                                    border-b border-slate-200 bg-slate-50"
                         >
-                            <div class="flex items-center gap-3">
-                                <div
-                                    class="hidden sm:flex items-center gap-3 text-[11px] text-slate-600"
-                                >
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="hidden sm:flex items-center gap-3 text-[11px] text-slate-600 min-w-0">
                                     <span class="font-semibold text-slate-800">
                                         Meu F10
                                     </span>
@@ -2138,7 +1951,6 @@
                                 </div>
                             </div>
 
-                            <!-- Logo F10 alinhada aos ícones -->
                             <div class="ml-4 hidden md:block">
                                 <img
                                     src="/logo_f10_3.webp"
@@ -2149,9 +1961,7 @@
                             </div>
                         </div>
 
-                        <!-- “CUBO” – TABELA SUPERIOR -->
                         <div class="px-4 pt-3 pb-2">
-                            <!-- filtros do cubo -->
                             <div class="flex flex-wrap gap-2 text-[11px] mb-2">
                                 <div
                                     class="inline-flex items-center gap-1.5 rounded-full
@@ -2186,145 +1996,112 @@
                                 </div>
                             </div>
 
-                            <!-- cabeçalho do cubo -->
-                            <div
-                                class="grid grid-cols-[1.6fr,1fr,1fr,1fr,1fr]
-                                       text-[11px] font-semibold text-slate-600
-                                       bg-slate-100 rounded-xl px-3 py-2 border border-slate-200"
-                            >
-                                <span>Tipo de recebimento</span>
-                                <span class="text-right">Totais</span>
-                                <span class="text-right">Dinheiro</span>
-                                <span class="text-right">Cartão</span>
-                                <span class="text-right">Pix</span>
-                            </div>
+                            <!-- pt-BR: Cubo é largo no mobile -> overflow-x interno -->
+                            <div class={scrollXWrap}>
+                                <div class="min-w-[640px]">
+                                    <div
+                                        class="grid grid-cols-[1.6fr,1fr,1fr,1fr,1fr]
+                                               text-[11px] font-semibold text-slate-600
+                                               bg-slate-100 rounded-xl px-3 py-2 border border-slate-200 whitespace-nowrap"
+                                    >
+                                        <span>Tipo de recebimento</span>
+                                        <span class="text-right">Totais</span>
+                                        <span class="text-right">Dinheiro</span>
+                                        <span class="text-right">Cartão</span>
+                                        <span class="text-right">Pix</span>
+                                    </div>
 
-                            <!-- linhas do cubo -->
-                            <div
-                                class="mt-1 rounded-[14px] border border-slate-200
-                                       bg-slate-50 overflow-hidden"
-                            >
-                                <!-- Material didático -->
-                                <div
-                                    class="grid grid-cols-[1.6fr,1fr,1fr,1fr,1fr]
-                                           px-3 py-1.5 text-[12px]
-                                           bg-white"
-                                >
-                                    <span class="text-slate-800">
-                                        Material didático
-                                    </span>
-                                    <span
-                                        class="tabular-nums text-right text-slate-800"
+                                    <div
+                                        class="mt-1 rounded-[14px] border border-slate-200
+                                               bg-slate-50 overflow-hidden"
                                     >
-                                        R$ 1.250,00
-                                    </span>
-                                    <span
-                                        class="tabular-nums text-right text-slate-800"
-                                    >
-                                        R$ 249,00
-                                    </span>
-                                    <span
-                                        class="tabular-nums text-right text-slate-800"
-                                    >
-                                        R$ 499,00
-                                    </span>
-                                    <span
-                                        class="tabular-nums text-right text-slate-800"
-                                    >
-                                        R$ 502,00
-                                    </span>
-                                </div>
+                                        <div
+                                            class="grid grid-cols-[1.6fr,1fr,1fr,1fr,1fr]
+                                                   px-3 py-1.5 text-[12px]
+                                                   bg-white whitespace-nowrap"
+                                        >
+                                            <span class="text-slate-800">
+                                                Material didático
+                                            </span>
+                                            <span class="tabular-nums text-right text-slate-800">
+                                                R$ 1.250,00
+                                            </span>
+                                            <span class="tabular-nums text-right text-slate-800">
+                                                R$ 249,00
+                                            </span>
+                                            <span class="tabular-nums text-right text-slate-800">
+                                                R$ 499,00
+                                            </span>
+                                            <span class="tabular-nums text-right text-slate-800">
+                                                R$ 502,00
+                                            </span>
+                                        </div>
 
-                                <!-- Matrícula -->
-                                <div
-                                    class="grid grid-cols-[1.6fr,1fr,1fr,1fr,1fr]
-                                           px-3 py-1.5 text-[12px]
-                                           bg-slate-50/80"
-                                >
-                                    <span class="text-slate-800">
-                                        Matrícula
-                                    </span>
-                                    <span
-                                        class="tabular-nums text-right text-slate-800"
-                                    >
-                                        R$ 801,00
-                                    </span>
-                                    <span
-                                        class="tabular-nums text-right text-slate-800"
-                                    >
-                                        R$ 249,00
-                                    </span>
-                                    <span
-                                        class="tabular-nums text-right text-slate-800"
-                                    >
-                                        R$ 101,00
-                                    </span>
-                                    <span
-                                        class="tabular-nums text-right text-slate-800"
-                                    >
-                                        R$ 452,00
-                                    </span>
-                                </div>
+                                        <div
+                                            class="grid grid-cols-[1.6fr,1fr,1fr,1fr,1fr]
+                                                   px-3 py-1.5 text-[12px]
+                                                   bg-slate-50/80 whitespace-nowrap"
+                                        >
+                                            <span class="text-slate-800">
+                                                Matrícula
+                                            </span>
+                                            <span class="tabular-nums text-right text-slate-800">
+                                                R$ 801,00
+                                            </span>
+                                            <span class="tabular-nums text-right text-slate-800">
+                                                R$ 249,00
+                                            </span>
+                                            <span class="tabular-nums text-right text-slate-800">
+                                                R$ 101,00
+                                            </span>
+                                            <span class="tabular-nums text-right text-slate-800">
+                                                R$ 452,00
+                                            </span>
+                                        </div>
 
-                                <!-- Parcelas -->
-                                <div
-                                    class="grid grid-cols-[1.6fr,1fr,1fr,1fr,1fr]
-                                           px-3 py-1.5 text-[12px]
-                                           bg-white"
-                                >
-                                    <span class="text-slate-800">
-                                        Parcelas
-                                    </span>
-                                    <span
-                                        class="tabular-nums text-right text-slate-800"
-                                    >
-                                        R$ 2.079,28
-                                    </span>
-                                    <span
-                                        class="tabular-nums text-right text-slate-800"
-                                    >
-                                        R$ 467,28
-                                    </span>
-                                    <span
-                                        class="tabular-nums text-right text-slate-800"
-                                    >
-                                        R$ 550,00
-                                    </span>
-                                    <span
-                                        class="tabular-nums text-right text-slate-800"
-                                    >
-                                        R$ 1.062,00
-                                    </span>
-                                </div>
+                                        <div
+                                            class="grid grid-cols-[1.6fr,1fr,1fr,1fr,1fr]
+                                                   px-3 py-1.5 text-[12px]
+                                                   bg-white whitespace-nowrap"
+                                        >
+                                            <span class="text-slate-800">
+                                                Parcelas
+                                            </span>
+                                            <span class="tabular-nums text-right text-slate-800">
+                                                R$ 2.079,28
+                                            </span>
+                                            <span class="tabular-nums text-right text-slate-800">
+                                                R$ 467,28
+                                            </span>
+                                            <span class="tabular-nums text-right text-slate-800">
+                                                R$ 550,00
+                                            </span>
+                                            <span class="tabular-nums text-right text-slate-800">
+                                                R$ 1.062,00
+                                            </span>
+                                        </div>
 
-                                <!-- Totais -->
-                                <div
-                                    class="grid grid-cols-[1.6fr,1fr,1fr,1fr,1fr]
-                                           px-3 py-1.5 text-[12px]
-                                           bg-slate-100 border-t border-slate-200
-                                           font-semibold"
-                                >
-                                    <span class="text-slate-900"> Totais </span>
-                                    <span
-                                        class="tabular-nums text-right text-slate-900"
-                                    >
-                                        R$ 4.130,28
-                                    </span>
-                                    <span
-                                        class="tabular-nums text-right text-slate-900"
-                                    >
-                                        R$ 965,28
-                                    </span>
-                                    <span
-                                        class="tabular-nums text-right text-slate-900"
-                                    >
-                                        R$ 1.150,00
-                                    </span>
-                                    <span
-                                        class="tabular-nums text-right text-slate-900"
-                                    >
-                                        R$ 2.015,00
-                                    </span>
+                                        <div
+                                            class="grid grid-cols-[1.6fr,1fr,1fr,1fr,1fr]
+                                                   px-3 py-1.5 text-[12px]
+                                                   bg-slate-100 border-t border-slate-200
+                                                   font-semibold whitespace-nowrap"
+                                        >
+                                            <span class="text-slate-900"> Totais </span>
+                                            <span class="tabular-nums text-right text-slate-900">
+                                                R$ 4.130,28
+                                            </span>
+                                            <span class="tabular-nums text-right text-slate-900">
+                                                R$ 965,28
+                                            </span>
+                                            <span class="tabular-nums text-right text-slate-900">
+                                                R$ 1.150,00
+                                            </span>
+                                            <span class="tabular-nums text-right text-slate-900">
+                                                R$ 2.015,00
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -2332,215 +2109,114 @@
                         <!-- GRÁFICO DE BARRAS (BASEADO NO CUBO) -->
                         <div class="p-2 border-t border-slate-200 bg-slate-50">
                             <div class="px-2 pt-3">
-                                <!-- layout: gráfico à esquerda, legenda à direita -->
-                                <div
-                                    class="flex flex-col sm:flex-row sm:items-stretch gap-4"
-                                >
-                                    <!-- GRÁFICO (HTML + CSS, sem SVG) -->
-                                    <div class="flex-1 flex gap-3">
-                                        <!-- área das barras -->
+                                <div class="flex flex-col sm:flex-row sm:items-stretch gap-4">
+                                    <div class="flex-1 flex gap-3 min-w-0">
                                         <div
-                                            class="relative flex-1 bg-white border border-slate-200 rounded-xl py-4"
+                                            class="relative flex-1 bg-white border border-slate-200 rounded-xl py-4 overflow-hidden"
                                         >
-                                            <!-- grade horizontal -->
                                             <div
                                                 class="absolute inset-x-6 top-3 bottom-7 pointer-events-none"
                                             >
-                                                <div
-                                                    class="absolute inset-x-0 top-0 h-px bg-slate-200/80"
-                                                ></div>
-                                                <div
-                                                    class="absolute inset-x-0 top-1/4 h-px bg-slate-200/70"
-                                                ></div>
-                                                <div
-                                                    class="absolute inset-x-0 top-2/4 h-px bg-slate-200/70"
-                                                ></div>
-                                                <div
-                                                    class="absolute inset-x-0 top-3/4 h-px bg-slate-200/70"
-                                                ></div>
-                                                <div
-                                                    class="absolute inset-x-0 bottom-0 h-px bg-slate-200"
-                                                ></div>
+                                                <div class="absolute inset-x-0 top-0 h-px bg-slate-200/80"></div>
+                                                <div class="absolute inset-x-0 top-1/4 h-px bg-slate-200/70"></div>
+                                                <div class="absolute inset-x-0 top-2/4 h-px bg-slate-200/70"></div>
+                                                <div class="absolute inset-x-0 top-3/4 h-px bg-slate-200/70"></div>
+                                                <div class="absolute inset-x-0 bottom-0 h-px bg-slate-200"></div>
                                             </div>
 
-                                            <!-- barras -->
+                                            <!-- pt-BR: margem negativa só no sm+ para não empurrar o mobile -->
                                             <div
-                                                class="relative flex h-[250px] items-end ml-[-50px] justify-center px-8 pb-5 pt-4"
+                                                class="relative flex h-[250px] items-end ml-0 sm:ml-[-50px] justify-center px-8 pb-5 pt-4"
                                             >
-                                                <!-- Totais -->
-                                                <div
-                                                    class="flex flex-col items-center w-[80px]"
-                                                >
-                                                    <span
-                                                        class="text-[9px] text-slate-600 mb-1 tabular-nums"
-                                                    >
+                                                <div class="flex flex-col items-center w-[80px]">
+                                                    <span class="text-[9px] text-slate-600 mb-1 tabular-nums">
                                                         4.130,28
                                                     </span>
-                                                    <div
-                                                        class="w-full bg-[#FBBF24] h-[200px] border border-slate-400"
-                                                    ></div>
-                                                    <span
-                                                        class="mt-1 text-[9px] text-slate-500"
-                                                        >Totais</span
-                                                    >
+                                                    <div class="w-full bg-[#FBBF24] h-[200px] border border-slate-400"></div>
+                                                    <span class="mt-1 text-[9px] text-slate-500">Totais</span>
                                                 </div>
 
-                                                <!-- Dinheiro -->
-                                                <div
-                                                    class="flex flex-col items-center w-[80px]"
-                                                >
-                                                    <span
-                                                        class="text-[9px] text-slate-600 mb-1 tabular-nums"
-                                                    >
+                                                <div class="flex flex-col items-center w-[80px]">
+                                                    <span class="text-[9px] text-slate-600 mb-1 tabular-nums">
                                                         956,28
                                                     </span>
-                                                    <div
-                                                        class="w-full bg-[#60A5FA] h-[120px] border border-slate-400"
-                                                    ></div>
-                                                    <span
-                                                        class="mt-1 text-[9px] text-slate-500"
-                                                        >Dinheiro</span
-                                                    >
+                                                    <div class="w-full bg-[#60A5FA] h-[120px] border border-slate-400"></div>
+                                                    <span class="mt-1 text-[9px] text-slate-500">Dinheiro</span>
                                                 </div>
 
-                                                <!-- Cartão -->
-                                                <div
-                                                    class="flex flex-col items-center w-[80px]"
-                                                >
-                                                    <span
-                                                        class="text-[9px] text-slate-600 mb-1 tabular-nums"
-                                                    >
+                                                <div class="flex flex-col items-center w-[80px]">
+                                                    <span class="text-[9px] text-slate-600 mb-1 tabular-nums">
                                                         1.509,00
                                                     </span>
-                                                    <div
-                                                        class="w-full bg-[#A855F7] h-[80px] border border-slate-400"
-                                                    ></div>
-                                                    <span
-                                                        class="mt-1 text-[9px] text-slate-500"
-                                                        >Cartão</span
-                                                    >
+                                                    <div class="w-full bg-[#A855F7] h-[80px] border border-slate-400"></div>
+                                                    <span class="mt-1 text-[9px] text-slate-500">Cartão</span>
                                                 </div>
 
-                                                <!-- Pix -->
-                                                <div
-                                                    class="flex flex-col items-center w-[80px]"
-                                                >
-                                                    <span
-                                                        class="text-[9px] text-slate-600 mb-1 tabular-nums"
-                                                    >
+                                                <div class="flex flex-col items-center w-[80px]">
+                                                    <span class="text-[9px] text-slate-600 mb-1 tabular-nums">
                                                         980,00
                                                     </span>
-                                                    <div
-                                                        class="w-full bg-[#22C55E] h-[170px] border border-slate-400"
-                                                    ></div>
-                                                    <span
-                                                        class="mt-1 text-[9px] text-slate-500"
-                                                        >Pix</span
-                                                    >
+                                                    <div class="w-full bg-[#22C55E] h-[170px] border border-slate-400"></div>
+                                                    <span class="mt-1 text-[9px] text-slate-500">Pix</span>
                                                 </div>
                                             </div>
 
-                                            <!-- eixo vertical à direita com valores -->
-                                            <div
-                                                class="hidden sm:block absolute top-4 right-4 bottom-7"
-                                            >
-                                                <div
-                                                    class="relative h-full border-l border-slate-400"
-                                                >
-                                                    <span
-                                                        class="absolute -left-8 -top-1 text-[8px] text-slate-500"
-                                                    >
+                                            <div class="hidden sm:block absolute top-4 right-4 bottom-7">
+                                                <div class="relative h-full border-l border-slate-400">
+                                                    <span class="absolute -left-8 -top-1 text-[8px] text-slate-500">
                                                         4500
                                                     </span>
-                                                    <span
-                                                        class="absolute -left-8 top-[26%] text-[8px] text-slate-500"
-                                                    >
+                                                    <span class="absolute -left-8 top-[26%] text-[8px] text-slate-500">
                                                         3000
                                                     </span>
-                                                    <span
-                                                        class="absolute -left-8 top-[52%] text-[8px] text-slate-500"
-                                                    >
+                                                    <span class="absolute -left-8 top-[52%] text-[8px] text-slate-500">
                                                         2000
                                                     </span>
-                                                    <span
-                                                        class="absolute -left-8 top-[77%] text-[8px] text-slate-500"
-                                                    >
+                                                    <span class="absolute -left-8 top-[77%] text-[8px] text-slate-500">
                                                         1000
                                                     </span>
-                                                    <span
-                                                        class="absolute -left-8 -bottom-2 text-[8px] text-slate-500"
-                                                    >
+                                                    <span class="absolute -left-8 -bottom-2 text-[8px] text-slate-500">
                                                         0
                                                     </span>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <!-- legenda “numa coluna”, igual ao print -->
-                                        <div
-                                            class="hidden sm:flex flex-col justify-center gap-2 text-[10px] text-slate-600 w-[120px]"
-                                        >
-                                            <div
-                                                class="flex items-center gap-1.5"
-                                            >
-                                                <span
-                                                    class="h-2 w-3 rounded-sm bg-[#FBBF24]"
-                                                ></span>
+                                        <div class="hidden sm:flex flex-col justify-center gap-2 text-[10px] text-slate-600 w-[120px]">
+                                            <div class="flex items-center gap-1.5">
+                                                <span class="h-2 w-3 rounded-sm bg-[#FBBF24]"></span>
                                                 <span>Totais</span>
                                             </div>
-                                            <div
-                                                class="flex items-center gap-1.5"
-                                            >
-                                                <span
-                                                    class="h-2 w-3 rounded-sm bg-[#60A5FA]"
-                                                ></span>
+                                            <div class="flex items-center gap-1.5">
+                                                <span class="h-2 w-3 rounded-sm bg-[#60A5FA]"></span>
                                                 <span>Dinheiro</span>
                                             </div>
-                                            <div
-                                                class="flex items-center gap-1.5"
-                                            >
-                                                <span
-                                                    class="h-2 w-3 rounded-sm bg-[#A855F7]"
-                                                ></span>
+                                            <div class="flex items-center gap-1.5">
+                                                <span class="h-2 w-3 rounded-sm bg-[#A855F7]"></span>
                                                 <span>Cartão</span>
                                             </div>
-                                            <div
-                                                class="flex items-center gap-1.5"
-                                            >
-                                                <span
-                                                    class="h-2 w-3 rounded-sm bg-[#22C55E]"
-                                                ></span>
+                                            <div class="flex items-center gap-1.5">
+                                                <span class="h-2 w-3 rounded-sm bg-[#22C55E]"></span>
                                                 <span>Pix</span>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <!-- legenda empilhada embaixo no mobile -->
-                                    <div
-                                        class="sm:hidden mt-2 flex flex-wrap gap-3 text-[10px] text-slate-600"
-                                    >
+                                    <div class="sm:hidden mt-2 flex flex-wrap gap-3 text-[10px] text-slate-600">
                                         <div class="flex items-center gap-1.5">
-                                            <span
-                                                class="h-2 w-3 rounded-sm bg-[#FBBF24]"
-                                            ></span>
+                                            <span class="h-2 w-3 rounded-sm bg-[#FBBF24]"></span>
                                             <span>Totais</span>
                                         </div>
                                         <div class="flex items-center gap-1.5">
-                                            <span
-                                                class="h-2 w-3 rounded-sm bg-[#60A5FA]"
-                                            ></span>
+                                            <span class="h-2 w-3 rounded-sm bg-[#60A5FA]"></span>
                                             <span>Dinheiro</span>
                                         </div>
                                         <div class="flex items-center gap-1.5">
-                                            <span
-                                                class="h-2 w-3 rounded-sm bg-[#A855F7]"
-                                            ></span>
+                                            <span class="h-2 w-3 rounded-sm bg-[#A855F7]"></span>
                                             <span>Cartão</span>
                                         </div>
                                         <div class="flex items-center gap-1.5">
-                                            <span
-                                                class="h-2 w-3 rounded-sm bg-[#22C55E]"
-                                            ></span>
+                                            <span class="h-2 w-3 rounded-sm bg-[#22C55E]"></span>
                                             <span>Pix</span>
                                         </div>
                                     </div>
@@ -2551,26 +2227,16 @@
                 </div>
             </div>
 
-            <!-- TEXTO -->
             <div class="lg:col-span-6">
-                <p
-                    class="text-[12px] font-semibold tracking-[0.22em]
-                       text-[#7E82A2] uppercase"
-                >
+                <p class="text-[12px] font-semibold tracking-[0.22em] text-[#7E82A2] uppercase">
                     CUBO DE DADOS FINANCEIROS
                 </p>
 
-                <h2
-                    class="mt-2 text-[26px] md:text-[32px] font-semibold
-                           leading-[1.15] text-[#000A57]"
-                >
+                <h2 class="mt-2 text-[26px] md:text-[32px] font-semibold leading-[1.15] text-[#000A57]">
                     Arraste, solte e cruze dados de recebimentos em segundos
                 </h2>
 
-                <p
-                    class="mt-3 text-[15px] md:text-[16px] leading-[1.8]
-                           text-[#000A57]/85"
-                >
+                <p class="mt-3 text-[15px] md:text-[16px] leading-[1.8] text-[#000A57]/85">
                     O Cubo de Movimentações Financeiras permite que a escola
                     monte visões personalizadas de recebimentos: por forma de
                     pagamento, tipo de título, curso, turma, unidade, período e
@@ -2578,27 +2244,19 @@
                 </p>
 
                 <div class="mt-4 space-y-2 text-[14px] text-[#000A57]/90">
-                    <div class="flex items-start gap-2">
-                        <CheckCircle2
-                            size={18}
-                            class="mt-[2px] flex-shrink-0 text-[#16A34A]"
-                        />
-                        <span>
-                            Interface de <span class="font-semibold">
-                                arrastar e soltar
-                            </span>
+                    <div class="flex items-start gap-2 min-w-0">
+                        <CheckCircle2 size={18} class="mt-[2px] flex-shrink-0 text-[#16A34A]" />
+                        <span class="break-words">
+                            Interface de <span class="font-semibold"> arrastar e soltar </span>
                             para reorganizar colunas e linhas, cruzando rapidamente
                             formas de recebimento, tipos de lançamento e centros
                             de custo.
                         </span>
                     </div>
 
-                    <div class="flex items-start gap-2">
-                        <CheckCircle2
-                            size={18}
-                            class="mt-[2px] flex-shrink-0 text-[#16A34A]"
-                        />
-                        <span>
+                    <div class="flex items-start gap-2 min-w-0">
+                        <CheckCircle2 size={18} class="mt-[2px] flex-shrink-0 text-[#16A34A]" />
+                        <span class="break-words">
                             Comparação de períodos lado a lado — dia, mês,
                             trimestre ou ano — ajudando a entender sazonalidade,
                             impacto de campanhas e comportamento de
@@ -2606,16 +2264,11 @@
                         </span>
                     </div>
 
-                    <div class="flex items-start gap-2">
-                        <CheckCircle2
-                            size={18}
-                            class="mt-[2px] flex-shrink-0 text-[#16A34A]"
-                        />
-                        <span>
+                    <div class="flex items-start gap-2 min-w-0">
+                        <CheckCircle2 size={18} class="mt-[2px] flex-shrink-0 text-[#16A34A]" />
+                        <span class="break-words">
                             Experiência parecida com
-                            <span class="font-semibold">
-                                tabela dinâmica do Excel
-                            </span>, mas alimentada diretamente pelo F10:
+                            <span class="font-semibold"> tabela dinâmica do Excel </span>, mas alimentada diretamente pelo F10:
                             tabelas, totais e gráficos saem prontos para
                             reuniões com a direção e o conselho.
                         </span>
@@ -2627,11 +2280,9 @@
 </section>
 
 <!-- ===== FAQ FINANCEIRO ===== -->
-<section class="relative py-12 md:py-16 bg-white">
+<section class={`relative py-12 md:py-16 bg-white ${noOverflowPage}`}>
     <div class="container">
-        <div
-            class="flex flex-col md:flex-row md:items-center md:justify-between gap-6"
-        >
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
                 <h2
                     class="text-[26px] md:text-[32px] font-semibold leading-tight
@@ -2679,10 +2330,10 @@
 </section>
 
 <!-- ===== CTA FINAL ===== -->
-<section class="relative py-12 md:py-16 bg-[#F3F4FD]">
+<section class={`relative py-12 md:py-16 bg-[#F3F4FD] ${noOverflowPage}`}>
     <div class="container">
         <div class="grid gap-10 lg:grid-cols-12 items-center">
-            <div class="lg:col-span-6 flex flex-col gap-5">
+            <div class="lg:col-span-6 flex flex-col gap-5 min-w-0">
                 <h2
                     class="text-[#7E82A2] font-medium leading-[1.1]
                  tracking-[-0.01em] text-[32px] md:text-[40px]"
@@ -2691,20 +2342,14 @@
                     F10
                 </h2>
 
-                <p
-                    class="text-[#000A57] text-[15px] md:text-[16px]
-                 leading-[1.8] max-w-[560px]"
-                >
+                <p class="text-[#000A57] text-[15px] md:text-[16px] leading-[1.8] max-w-[560px]">
                     Com contratos, cobranças, despesas, notas fiscais e
                     dashboards trabalhando juntos, o F10 transforma o financeiro
                     em um centro de decisão — e não apenas em uma rotina de
                     boletos.
                 </p>
 
-                <p
-                    class="text-[#000A57]/80 text-[14px] md:text-[15px]
-                 max-w-[560px]"
-                >
+                <p class="text-[#000A57]/80 text-[14px] md:text-[15px] max-w-[560px]">
                     Veja na prática como o módulo Financeiro se conecta ao
                     Comercial, ao Pedagógico e ao app Smart Aluno na sua
                     realidade.
@@ -2731,7 +2376,6 @@
                  overflow-hidden rounded-[18px] ring-1 ring-black/5
                  bg-[#020617] shadow-[0_18px_50px_rgba(1,13,40,0.16)]"
                 >
-                    <!-- imagem de fundo -->
                     <img
                         src="/financeiro_escolar_f10_software.webp"
                         alt="Tela do módulo Financeiro F10 com gráficos e relatórios para gestão escolar."
@@ -2739,22 +2383,16 @@
                         loading="lazy"
                     />
 
-                    <!-- filtro azul escuro por cima -->
-                    <div
-                        class="absolute inset-0 bg-[#020A3A]/50 mix-blend-multiply"
-                        aria-hidden="true"
-                    ></div>
+                    <div class="absolute inset-0 bg-[#020A3A]/50 mix-blend-multiply" aria-hidden="true"></div>
 
-                    <!-- brilho suave para dar profundidade -->
                     <div
                         class="pointer-events-none absolute -top-16 -left-10 h-56 w-56 rounded-full
                    bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.38),transparent)] opacity-30"
                         aria-hidden="true"
                     ></div>
 
-                    <!-- conteúdo opcional por cima da imagem (legenda curta) -->
                     <div class="relative h-full w-full flex items-end">
-                        <div class="w-full px-6 pb-5">
+                        <div class="w-full px-6 pb-5 min-w-0">
                             <p
                                 class="text-[13px] md:text-[14px] leading-relaxed
                        text-slate-100/85 max-w-[420px]"
@@ -2766,7 +2404,6 @@
                         </div>
                     </div>
 
-                    <!-- borda interna sutil -->
                     <div
                         class="pointer-events-none absolute inset-0 rounded-[18px]
                    ring-1 ring-inset ring-white/15"
@@ -2778,6 +2415,5 @@
 </section>
 
 <style>
-    /* Mantido alinhado ao sistema visual das soluções F10, com hero escuro
-       para diferenciar o módulo Financeiro dos demais. */
+    /* pt-BR: Mantido alinhado ao sistema visual das soluções F10. */
 </style>

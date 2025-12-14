@@ -226,7 +226,7 @@
                     >
                         <div class="flex items-center gap-3">
                             <span
-                                class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10"
+                                class="inline-flex h-9 min-w-9 items-center justify-center rounded-full bg-white/10"
                             >
                                 <svg
                                     width="24px"
@@ -263,7 +263,7 @@
                     >
                         <div class="flex items-center gap-3">
                             <span
-                                class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10"
+                                class="inline-flex h-9 min-w-9 items-center justify-center rounded-full bg-white/10"
                             >
                                 <svg
                                     class="p-1"
@@ -301,7 +301,7 @@
                     >
                         <div class="flex items-center gap-3">
                             <span
-                                class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10"
+                                class="inline-flex h-9 min-w-9 items-center justify-center rounded-full bg-white/10"
                             >
                                 <svg
                                     class="p-1"

@@ -164,6 +164,32 @@
             isSubmitting = false;
         }
     }
+
+    // pt-BR: Gera um "slug" seguro: sem acentos, sem maiúsculas, sem caracteres estranhos.
+    function toSlug(value: string): string {
+        return (value ?? "")
+            .toString()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .trim()
+            .replace(/&/g, " e ")
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "");
+    }
+
+    // pt-BR: Valor final que vai para o data-page (sempre preenchido)
+    let pageForTracking = page && page.trim().length > 0 ? page.trim() : "";
+
+    // pt-BR: Se não vier page via props, pega do browser ao montar (evita SSR quebrar)
+    onMount(() => {
+        if (!pageForTracking) {
+            pageForTracking = window.location?.pathname || "/";
+        }
+    });
+
+    // pt-BR: string final para o atributo (slug + sufixo opcional)
+    $: dataPage = `${toSlug(pageForTracking || "/")}_page`;
 </script>
 
 <!-- Overlay global, sempre fixo no viewport -->
@@ -308,6 +334,10 @@
             <!-- Botão flutuante: sempre bolinha -->
             <button
                 type="button"
+                data-track="1"
+                data-event="whatsapp_click"
+                data-page={dataPage}
+                data-cta="cta_whatsapp_floating_button"
                 class="relative flex h-16 w-16 items-center justify-center rounded-full bg-[#25D366] text-white shadow-xl shadow-emerald-500/35 hover:bg-[#20bd59] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 transition"
                 on:click={toggleOpen}
                 aria-label="Falar com a F10 pelo WhatsApp"

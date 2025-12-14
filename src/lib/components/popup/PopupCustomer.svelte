@@ -46,7 +46,7 @@
 
         <!-- Container do popup -->
         <div
-            class="relative z-10 w-[92%] max-w-xl max-h-[90vh] rounded-[24px] overflow-hidden
+            class="relative z-10 w-[92%] max-w-xl max-h-[90vh] lg:max-h-[100vh] rounded-[24px] overflow-hidden
                    bg-white shadow-[0_26px_80px_rgba(1,13,40,0.55)]
                    border border-slate-200/80 animate-fadeIn"
         >

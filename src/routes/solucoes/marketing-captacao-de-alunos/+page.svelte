@@ -180,7 +180,7 @@
     property="og:description"
     content="Centralize suas campanhas de marketing educacional no F10: receba leads por formulários e APIs, organize listas de prospecção e conecte o módulo de Marketing ao CRM para enxergar o impacto real em matrículas."
   />
-  <link rel="canonical" href="https://f10.com.br/solucoes/marketing" />
+  <link rel="canonical" href="https://f10.com.br/solucoes/marketing-captacao-de-alunos" />
 
   <!-- JSON-LD: SoftwareApplication -->
   <script type="application/ld+json">
@@ -220,7 +220,7 @@
           "@type": "ListItem",
           "position": 3",
           "name": "Marketing e Captação",
-          "item": "https://f10.com.br/solucoes/marketing"
+          "item": "https://f10.com.br/solucoes/marketing-captacao-de-alunos"
         }
       ]
     }
@@ -326,7 +326,7 @@
         </button>
 
         <a
-          href="/solucoes/comercial"
+          href="/solucoes/vendas"
           class="text-[16px] font-semibold text-text underline decoration-2 underline-offset-[6px]
                  hover:text-primary w-full md:w-auto md:pl-4"
         >
@@ -407,7 +407,7 @@
 >
   <div class="container">
     <div
-      class="relative mx-auto rounded-[28px] bg-[#010D28] text-white py-8 md:py-10 lg:px-12 lg:py-12 overflow-hidden"
+      class="relative mx-auto rounded-[28px] bg-[#010D28] text-white py-8 md:py-10 px-12 lg:py-12 overflow-hidden"
     >
       <!-- fundo -->
       <div class="pointer-events-none absolute inset-0" aria-hidden="true">
@@ -948,7 +948,7 @@
     >
       <div class="flex items-start gap-3">
         <div
-          class="mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl bg-white text-primary shadow-xs"
+          class="mt-0.5 flex h-9 min-w-9 items-center justify-center rounded-2xl bg-white text-primary shadow-xs"
         >
           <span class="text-[13px] font-semibold">1</span>
         </div>
@@ -966,7 +966,7 @@
 
       <div class="flex items-start gap-3">
         <div
-          class="mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-xs"
+          class="mt-0.5 flex h-9 min-w-9 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-xs"
         >
           <span class="text-[13px] font-semibold">2</span>
         </div>
@@ -984,7 +984,7 @@
 
       <div class="flex items-start gap-3">
         <div
-          class="mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500 shadow-xs"
+          class="mt-0.5 flex h-9 min-w-9 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500 shadow-xs"
         >
           <span class="text-[13px] font-semibold">3</span>
         </div>
@@ -1010,7 +1010,7 @@
         >
           <div class="flex items-start gap-3">
             <div
-              class="mt-1 flex h-9 w-9 items-center justify-center rounded-2xl bg-primary/10 text-primary"
+              class="mt-1 flex h-9 min-w-9 items-center justify-center rounded-2xl bg-primary/10 text-primary"
             >
               <FileDown class="w-4 h-4" />
             </div>
@@ -1095,7 +1095,7 @@
           <div class="relative z-10 flex-1 flex flex-col">
             <div class="flex items-start gap-3">
               <div
-                class="mt-1 flex h-9 w-9 items-center justify-center rounded-2xl bg-white/10 text-emerald-300"
+                class="mt-1 flex h-9 min-w-9 items-center justify-center rounded-2xl bg-white/10 text-emerald-300"
               >
                 <PhoneCall class="w-4 h-4" />
               </div>
@@ -1162,7 +1162,7 @@
         >
           <div class="flex items-start gap-3">
             <div
-              class="mt-1 flex h-9 w-9 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500"
+              class="mt-1 flex h-9 min-w-9 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500"
             >
               <TrendingUp class="w-4 h-4" />
             </div>
@@ -1216,7 +1216,7 @@
           <p class="mt-4 text-[12px] leading-relaxed text-[#6B7280]">
             Todo esse trabalho se conecta direto ao
             <a
-              href="/solucoes/comercial"
+              href="/solucoes/vendas"
               class="underline decoration-2 underline-offset-[3px] text-primary hover:text-primary/90 font-semibold"
             >
               funil de vendas do módulo Comercial
@@ -1261,7 +1261,7 @@
       </div>
 
       <a
-        href="/solucoes/comercial"
+        href="/solucoes/vendas"
         class="hidden md:inline-flex items-center rounded-full border
                border-[#EA6D0B] px-4 py-2 text-[14px] font-semibold
                text-[#010D28] hover:bg-[#EA6D0B]/10
@@ -1277,7 +1277,7 @@
 
     <div class="mt-6 md:hidden">
       <a
-        href="/solucoes/comercial"
+        href="/solucoes/vendas"
         class="inline-flex items-center rounded-full border
                border-[#EA6D0B] px-4 py-2 text-[14px] font-semibold
                text-[#010D28] hover:bg-[#EA6D0B]/10

@@ -43,14 +43,14 @@ const redirectRules: RedirectRule[] = [
   { from: "/solucoes/indicadores-e-bi", to: "/solucoes/indicadores-e-bi" },
 
   // (essas NÃO existem no novo; mandando pra equivalente mais próxima)
-  { from: "/solucoes/envio-de-sms", to: "/solucoes/marketing" },
-  { from: "/solucoes/funil-de-vendas", to: "/solucoes/comercial" },
+  { from: "/solucoes/envio-de-sms", to: "/solucoes/marketing-captacao-de-alunos" },
+  { from: "/solucoes/funil-de-vendas", to: "/solucoes/vendas" },
   { from: "/solucoes/app-e-portal-do-aluno", to: "/solucoes/aplicativo-smart-aluno" },
   { from: "/solucoes/pagamento-recorrente", to: "/solucoes/financeiro" },
 
   // ===== Categorias antigas do blog =====
   { from: "/blog/gestao-escolar", to: "/solucoes" },
-  { from: "/blog/captacao-de-alunos", to: "/solucoes/marketing" },
+  { from: "/blog/captacao-de-alunos", to: "/solucoes/marketing-captacao-de-alunos" },
   { from: "/blog/pedagogico", to: "/solucoes/pedagogico" },
   { from: "/blog/inovacao", to: "/inovacao-na-escola" },
 
@@ -78,20 +78,32 @@ const redirectMap = buildRedirectMap(redirectRules);
 export const handle: Handle = async ({ event, resolve }) => {
   const pathname = normalizePath(event.url.pathname);
 
-  // 1) Match exato (o mais seguro pro SEO)
+  // 1) Redirect exato (URLs antigas específicas)
   const direct = redirectMap.get(pathname);
-  if (direct) throw redirect(direct.status, direct.to);
-
-  // 2) Airbag: qualquer coisa que sobrar no /blog/* cai numa página útil
-  // (evita 404 de URLs antigas não mapeadas)
-  if (pathname.startsWith("/blog/")) {
-    throw redirect(301, "/inovacao-na-escola/marketing-educacional");
+  if (direct) {
+    const toNormalized = normalizePath(direct.to);
+    // proteção anti-loop
+    if (toNormalized !== pathname) {
+      throw redirect(direct.status, direct.to);
+    }
   }
 
-  // 3) Airbag: soluções antigas não mapeadas caem no hub de soluções
-  if (pathname.startsWith("/solucoes/")) {
-    throw redirect(301, "/solucoes");
+  // 2) Tenta servir a rota normalmente
+  const response = await resolve(event);
+
+  // 3) Só aplica "airbag" se realmente for 404
+  if (response.status === 404) {
+    // blog antigo: manda pra página útil
+    if (pathname.startsWith("/blog/")) {
+      throw redirect(301, "/inovacao-na-escola/marketing-educacional");
+    }
+
+    // soluções antigas desconhecidas: manda pro hub
+    if (pathname.startsWith("/solucoes/")) {
+      throw redirect(301, "/solucoes");
+    }
   }
 
-  return resolve(event);
+  return response;
 };
+

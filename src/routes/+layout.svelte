@@ -3,9 +3,12 @@
   import Header from "$lib/components/Header.svelte";
   import Footer from "$lib/components/Footer.svelte";
   import Popup, { type PopupSize } from "$lib/components/popup/Popup.svelte";
+  import PopupSolutionsList, { type PopupSizeSolution } from "$lib/components/popup/PopupSolutionsList.svelte";
+
   import ContactWhatsappModalForm from "$lib/components/forms/ContactModalForm.svelte";
   import FloatingWhatsappButton from "$lib/components/forms/FloatingWhatsappButton.svelte";
   import { contactModalConfig } from "$lib/stores/contactModals";
+    import SolutionList from "$lib/components/forms/SolutionList.svelte";
 
   let modalSize: PopupSize = "xl";
 
@@ -58,3 +61,9 @@
     onChangeSize={(s) => (modalSize = s)}
   />
 </Popup>
+
+<PopupSolutionsList size={modalSize}>
+  <SolutionList
+    
+  />
+</PopupSolutionsList>

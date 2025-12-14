@@ -499,12 +499,12 @@
     content="Funil de vendas integrado a campanhas, contratos, financeiro e comissões para escolas. Receba leads via Facebook, formulários, planilhas ou API e acompanhe tudo pelo Comercial e CRM escolar F10."
   />
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://f10.com.br/solucoes/comercial" />
+  <meta property="og:url" content="https://f10.com.br/solucoes/vendas" />
   <meta
     property="og:image"
     content="https://f10.com.br/og/solucoes-comercial-f10.jpg"
   />
-  <link rel="canonical" href="https://f10.com.br/solucoes/comercial" />
+  <link rel="canonical" href="https://f10.com.br/solucoes/vendas" />
 
   <!-- JSON-LD: SoftwareApplication -->
   <script type="application/ld+json">
@@ -514,7 +514,7 @@
       "name": "F10 Comercial e CRM escolar",
       "applicationCategory": "BusinessApplication",
       "operatingSystem": "Web",
-      "url": "https://f10.com.br/solucoes/comercial",
+      "url": "https://f10.com.br/solucoes/vendas",
       "image": "https://f10.com.br/og/solucoes-comercial-f10.jpg",
       "description": "Módulo Comercial e CRM escolar do F10: organiza leads, funil de vendas, campanhas, contratos, matrículas, financeiro e comissões em um só sistema, integrado ao restante da plataforma de gestão escolar.",
       "inLanguage": "pt-BR",
@@ -552,7 +552,7 @@
           "@type": "ListItem",
           "position": 3,
           "name": "Comercial e CRM",
-          "item": "https://f10.com.br/solucoes/comercial"
+          "item": "https://f10.com.br/solucoes/vendas"
         }
       ]
     }
@@ -615,7 +615,7 @@
       "@context": "https://schema.org",
       "@type": "WebPage",
       "name": "Comercial e CRM escolar F10",
-      "url": "https://f10.com.br/solucoes/comercial",
+      "url": "https://f10.com.br/solucoes/vendas",
       "inLanguage": "pt-BR",
       "isPartOf": {
         "@type": "WebSite",
@@ -1225,7 +1225,7 @@
       <!-- CTA final da seção -->
       <div class="mt-8 flex flex-col items-center gap-3">
         <a
-          href="/solucoes/marketing"
+          href="/solucoes/marketing-captacao-de-alunos"
           class="inline-flex items-center justify-center rounded-full
                  bg-[#EA6D0B] px-7 py-3 text-[14px] md:text-[15px]
                  font-semibold text-white

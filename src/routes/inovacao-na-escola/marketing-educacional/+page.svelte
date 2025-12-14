@@ -22,14 +22,14 @@
       title: "Funil de matrículas<br/>com previsibilidade",
       description:
         "Interesse → Conversa → Visita/Proposta → Matrícula, com metas e pipeline por etapa e unidade.",
-      href: "/solucoes/comercial",
+      href: "/solucoes/vendas",
       icon: IconChartLine,
     },
     {
       title: "Captação multicanal<br/>integrada ao CRM",
       description:
         "Origem por canal (site, WhatsApp, eventos) conectada ao histórico: nada se perde, tudo avança.",
-      href: "/solucoes/comercial",
+      href: "/solucoes/vendas",
       icon: IconMegaPhoneLine,
     },
     {

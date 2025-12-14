@@ -5,10 +5,7 @@
     import { Banknote, GraduationCap, BriefcaseBusiness } from "lucide-svelte";
     import type { ComponentType } from "svelte";
     import { contactModalConfig } from "$lib/stores/contactModals";
-
-    function openContactModal() {
-        showForm.set(true);
-    }
+    import { showSolutionsPopUp } from "$lib/stores/solutionsPopup";
 
     type Partner = {
         name: string;
@@ -26,7 +23,7 @@
         },
         {
             name: "Oracle Cloud",
-            pyClass: "py-1.5",
+            pyClass: "py-2",
             logoSrc: "/logo_oracle.webp",
             alt: "Oracle Cloud",
         },
@@ -90,6 +87,10 @@
 
         showForm.set(true); // abre o Popup global
     }
+
+    function showSolutionList() {
+        showSolutionsPopUp.set(true);
+    }
 </script>
 
 <section
@@ -118,6 +119,11 @@
                 <!-- Melhor usar button aqui, já que é ação -->
                 <button
                     type="button"
+                    data-track="1"
+                    data-event="cta_click"
+                    data-page="main_page"
+                    data-cta="schedule_demo"
+                    data-location="hero_section"
                     on:click={openPlansDemoModal}
                     class="inline-flex h-[52px] items-center justify-center rounded-full bg-primary
                     px-8 text-[16px] font-semibold leading-[22px] tracking-[-0.02em] text-white
@@ -127,13 +133,13 @@
                     <IconArrowRight size={24} classType="ml-4" />
                 </button>
 
-                <a
-                    href="/#solucoes"
+                <button
+                    type="button"
+                    on:click={showSolutionList}
                     class="text-[16px] font-semibold text-text underline decoration-2 underline-offset-[6px]
                     hover:text-primary w-full md:w-auto md:pl-4"
-                >
-                    Nossas Soluções
-                </a>
+                    >Nossas soluções
+                </button>
             </div>
 
             <div class="mt-14">
@@ -203,7 +209,7 @@
             <img
                 src="/hero_image.webp"
                 alt="Painéis F10 — telas do sistema"
-                class="relative z-[1] lg:w-[725px] mt-24 rounded-xl object-cover"
+                class="relative z-[1] lg:w-[725px] mt-24 rounded-xl object-cover hidden lg:block"
                 fetchpriority="high"
             />
 

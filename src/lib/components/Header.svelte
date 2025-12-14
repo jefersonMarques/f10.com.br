@@ -16,10 +16,11 @@
   import { contactModalConfig } from "$lib/stores/contactModals";
   import { showForm } from "$lib/stores/formPopup";
   import PopupCustomer from "./popup/PopupCustomer.svelte";
+  import { fade, fly, scale } from "svelte/transition";
 
   // ===== Estado do menu =====
   let isMenuOpen = false;
-  let openDropdown: string | null = null; // para Soluções (ou outros no futuro)
+  let openDropdown: string | null = null; // pt-BR: dropdown/accordion atual
 
   $: pathname = $page.url.pathname;
 
@@ -71,12 +72,12 @@
     },
     {
       label: "Marketing e Captação",
-      href: "/solucoes/marketing",
+      href: "/solucoes/marketing-captacao-de-alunos",
       icon: Megaphone,
     },
     {
-      label: "Comercial / CRM",
-      href: "/solucoes/comercial",
+      label: "Vendas / CRM",
+      href: "/solucoes/vendas",
       icon: Handshake,
     },
     {
@@ -89,7 +90,6 @@
       href: "/solucoes/ambiente-virtual-de-aprendizado-ava",
       icon: MonitorPlay,
     },
-
     {
       label: "Pedagógico e Secretaria",
       href: "/solucoes/pedagogico",
@@ -146,12 +146,9 @@
   let dropdownCloseTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const scheduleCloseDropdown = (id: string) => {
-    // só agenda se o que está aberto for esse id
     dropdownCloseTimeout = setTimeout(() => {
-      if (openDropdown === id) {
-        openDropdown = null;
-      }
-    }, 150); // ~150ms de folga pro mouse atravessar
+      if (openDropdown === id) openDropdown = null;
+    }, 150);
   };
 
   const cancelCloseDropdown = () => {
@@ -161,7 +158,7 @@
     }
   };
 
-  // Fecha dropdown ao clicar fora
+  // Fecha dropdown ao clicar fora (desktop)
   const handleDocumentClick = () => {
     openDropdown = null;
   };
@@ -185,23 +182,37 @@
     isScrolled = y > 8;
     isAtTop = y <= 0;
 
-    // se o menu mobile está aberto, não esconder o header
+    // pt-BR: se o menu mobile está aberto, não esconder o header
     if (isMenuOpen) {
       isHeaderHidden = false;
       lastScrollY = y;
       return;
     }
 
-    if (dy > 0 && y > HIDE_OFFSET) {
-      isHeaderHidden = true;
-    } else if (dy < 0) {
-      isHeaderHidden = false;
-    }
+    if (dy > 0 && y > HIDE_OFFSET) isHeaderHidden = true;
+    else if (dy < 0) isHeaderHidden = false;
 
     lastScrollY = y;
   }
 
   let handleScroll: () => void;
+
+  // ===== Modal mobile: lock scroll + ESC =====
+  let prevBodyOverflow = "";
+
+  $: if (typeof document !== "undefined") {
+    if (isMenuOpen) {
+      prevBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = prevBodyOverflow || "";
+    }
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (!isMenuOpen) return;
+    if (e.key === "Escape") closeMenu();
+  }
 
   onMount(() => {
     if (typeof window !== "undefined") {
@@ -221,15 +232,15 @@
 
       window.addEventListener("scroll", handleScroll, { passive: true });
       window.addEventListener("click", handleDocumentClick);
+      window.addEventListener("keydown", handleKeydown);
     }
   });
 
   onDestroy(() => {
     if (typeof window !== "undefined") {
-      if (handleScroll) {
-        window.removeEventListener("scroll", handleScroll);
-      }
+      if (handleScroll) window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("click", handleDocumentClick);
+      window.removeEventListener("keydown", handleKeydown);
     }
   });
 
@@ -243,7 +254,6 @@
     "sticky top-0 z-40 transition-[transform,background-color,backdrop-filter] duration-200 will-change-transform border-b border-slate-200";
 
   $: bgHeader = isAtTop ? "bg-white/50 backdrop-blur-md" : "bg-white";
-
   $: translateClass = isHeaderHidden ? "-translate-y-full" : "";
   $: shadowClass = isScrolled ? "shadow-sm" : "";
   $: headerClass = `${baseHeader} ${bgHeader} ${translateClass} ${shadowClass}`;
@@ -256,7 +266,7 @@
       leadDescription: "Contato iniciado pelo formulário do menu.",
     });
 
-    showForm.set(true); // abre o Popup global
+    showForm.set(true);
   }
 
   function openHeaderModal() {
@@ -311,8 +321,6 @@
                   aria-expanded={openDropdown === dropdownId(link)}
                   aria-haspopup="true"
                   on:click={(e) => {
-                    // clique ainda funciona (teclado / acessibilidade),
-                    // mas hover é o principal
                     e.stopPropagation();
                     cancelCloseDropdown();
                     toggleDropdown(link);
@@ -327,7 +335,7 @@
                 </button>
 
                 {#if openDropdown === dropdownId(link)}
-                  <!-- Dropdown de Soluções (hover + clique, com delay pra fechar) -->
+                  <!-- Dropdown de Soluções -->
                   <div
                     class="absolute left-1/2 top-full z-50 mt-3 w-[320px]
                            -translate-x-1/2 rounded-2xl bg-white shadow-xl
@@ -385,7 +393,6 @@
       </div>
 
       <div class="ml-6 flex h-[48px] items-center gap-[9px]">
-        <!--href="https://ajuda.f10.com.br/kb"-->
         <button
           on:click={() => (showCustomer = true)}
           class="inline-flex h-[48px] items-center justify-center gap-4
@@ -397,7 +404,6 @@
           Já sou cliente
         </button>
 
-        <!-- svelte-ignore a11y_missing_attribute -->
         <button
           type="button"
           on:click={openPlansDemoModal}
@@ -432,76 +438,166 @@
     </button>
   </div>
 
-  <!-- DRAWER MOBILE -->
+  <!-- MODAL MOBILE (backdrop + flutuante + animação) -->
   {#if isMenuOpen}
-    <div class="border-t border-slate-200 bg-white lg:hidden">
-      <nav class="container py-3">
-        <ul class="flex flex-col gap-2">
-          {#each navLinks as link}
-            <li>
-              <a
-                href={link.href}
-                class="block rounded-md px-3 py-2 text-[14px] font-semibold leading-[18px] hover:bg-slate-100"
-                class:text-[#EA6D0B]={isParentActive(link)}
-                on:click={closeMenu}
-              >
-                {link.label}
-              </a>
+    <!-- pt-BR: Menu mobile flutuante SEM backdrop -->
+    <div class="fixed inset-0 z-[9999] lg:hidden pointer-events-none">
+      <!-- pt-BR: Área “clicável fora” para fechar (sem backdrop visual) -->
+      <button
+        type="button"
+        class="absolute inset-0 pointer-events-auto"
+        aria-label="Fechar menu"
+        on:click={closeMenu}
+      />
 
-              {#if link.children}
-                <!-- Sub-itens de Soluções no mobile -->
-                <ul class="mt-1 mb-1 pl-4 border-l border-slate-200 space-y-1">
-                  {#each link.children as child}
-                    <li>
-                      <a
-                        href={child.href}
-                        class="flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-slate-700 hover:bg-slate-100"
-                        class:text-[#EA6D0B]={isActive(child.href)}
-                        on:click={closeMenu}
-                      >
-                        <span
-                          class="flex h-6 w-6 items-center justify-center rounded-full
-                                 bg-slate-100 text-slate-700"
-                        >
-                          <svelte:component this={child.icon} size={14} />
-                        </span>
-                        <span>{child.label}</span>
-                      </a>
-                    </li>
-                  {/each}
-                </ul>
-              {/if}
-            </li>
-          {/each}
-
-          <li class="mt-2 flex items-center gap-2">
-            <a
-              href="https://ajuda.f10.com.br/kb"
-              class="flex-1 inline-flex h-[48px] items-center justify-center gap-4
-                     rounded-[50px] border border-text
-                     px-2 py-[13px]
-                     text-[16px] font-semibold leading-[22px] tracking-[-0.02em]
-                     text-text hover:bg-text hover:text-white transition-colors"
-              on:click={closeMenu}
-            >
-              Já sou cliente
-            </a>
+      <!-- Painel flutuante -->
+      <div
+        class="absolute left-1/2 top-3 w-[calc(100%-1.25rem)] max-w-[520px] -translate-x-1/2 pointer-events-auto"
+        transition:fly={{ y: -14, duration: 180 }}
+        on:click|stopPropagation
+        role="dialog"
+        aria-modal="true"
+        tabindex="-1"
+      >
+        <div
+          class="rounded-2xl bg-white shadow-2xl ring-1 ring-black/10 overflow-hidden"
+          transition:scale={{ start: 0.98, duration: 180 }}
+        >
+          <!-- Header do modal -->
+          <div
+            class="flex items-center justify-between px-4 py-3 border-b border-slate-200"
+          >
+            <div class="text-[14px] font-semibold text-[#010D28]">Menu</div>
 
             <button
-              on:click={openHeaderModal}
               type="button"
-              class="flex-1 inline-flex h-[48px] items-center justify-center gap-2
-                     rounded-[50px] bg-primary
-                     px-6 py-[13px]
-                     text-[16px] font-semibold leading-[22px] tracking-[-0.02em]
-                     text-white hover:brightness-95 active:brightness-90 transition"
+              class="inline-flex items-center justify-center rounded-lg p-2 hover:bg-slate-100"
+              aria-label="Fechar menu"
               on:click={closeMenu}
             >
-              Demonstração
+              <svg
+                class="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M6 6l12 12M18 6L6 18"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
             </button>
-          </li>
-        </ul>
-      </nav>
+          </div>
+
+          <!-- Conteúdo com scroll interno -->
+          <div
+            class="max-h-[calc(100svh-110px)] overflow-y-auto overscroll-contain"
+          >
+            <nav class="px-2 py-3">
+              <ul class="flex flex-col gap-2">
+                <li class="rounded-lg">
+                  <a
+                    href="/"
+                    class="block rounded-md px-3 py-2 text-[14px] font-semibold leading-[18px] hover:bg-slate-100"
+                    class:text-[#EA6D0B]={isActive("/")}
+                    on:click={closeMenu}
+                  >
+                    Início
+                  </a>
+                </li>
+                {#each navLinks as link}
+                  <li class="rounded-lg">
+                    {#if link.children}
+                      <button
+                        type="button"
+                        class="w-full flex items-center justify-between rounded-md px-3 py-2
+                             text-[14px] font-semibold leading-[18px] hover:bg-slate-100"
+                        class:text-[#EA6D0B]={isParentActive(link)}
+                        on:click={() => toggleDropdown(link)}
+                        aria-expanded={openDropdown === dropdownId(link)}
+                      >
+                        <span>{link.label}</span>
+                        <ChevronDown
+                          class={`h-4 w-4 transition-transform ${
+                            openDropdown === dropdownId(link)
+                              ? "rotate-180"
+                              : ""
+                          }`}
+                        />
+                      </button>
+
+                      {#if openDropdown === dropdownId(link)}
+                        <ul
+                          class="mt-1 mb-1 pl-4 border-l border-slate-200 space-y-1"
+                        >
+                          {#each link.children as child}
+                            <li>
+                              <a
+                                href={child.href}
+                                class="flex items-center gap-2 rounded-md px-3 py-1.5
+                                     text-[13px] text-slate-700 hover:bg-slate-100"
+                                class:text-[#EA6D0B]={isActive(child.href)}
+                                on:click={closeMenu}
+                              >
+                                <span
+                                  class="flex h-6 w-6 items-center justify-center rounded-full
+                                       bg-slate-100 text-slate-700"
+                                >
+                                  <svelte:component
+                                    this={child.icon}
+                                    size={14}
+                                  />
+                                </span>
+                                <span>{child.label}</span>
+                              </a>
+                            </li>
+                          {/each}
+                        </ul>
+                      {/if}
+                    {:else}
+                      <a
+                        href={link.href}
+                        class="block rounded-md px-3 py-2 text-[14px] font-semibold leading-[18px] hover:bg-slate-100"
+                        class:text-[#EA6D0B]={isActive(link.href)}
+                        on:click={closeMenu}
+                      >
+                        {link.label}
+                      </a>
+                    {/if}
+                  </li>
+                {/each}
+
+                <li class="mt-2 flex items-center gap-2 px-2 pb-2">
+                  <a
+                    href="https://ajuda.f10.com.br/kb"
+                    class="flex-1 inline-flex h-[48px] items-center justify-center
+                         rounded-[50px] border border-text px-2
+                         text-[16px] font-semibold text-text hover:bg-text hover:text-white transition-colors"
+                    on:click={closeMenu}
+                  >
+                    Já sou cliente
+                  </a>
+
+                  <button
+                    type="button"
+                    class="flex-1 inline-flex h-[48px] items-center justify-center
+                         rounded-[50px] bg-primary px-6
+                         text-[16px] font-semibold text-white hover:brightness-95 active:brightness-90 transition"
+                    on:click={() => {
+                      openHeaderModal();
+                      closeMenu();
+                    }}
+                  >
+                    Demonstração
+                  </button>
+                </li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </div>
     </div>
   {/if}
 

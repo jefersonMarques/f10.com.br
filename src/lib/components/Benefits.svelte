@@ -216,6 +216,10 @@
                 <!-- botão play com radar -->
                 <button
                     type="button"
+                    data-event="play_click"
+                    data-page="main_page"
+                    data-cta="play_video_f10_1_minute"
+                    data-location="benefits_section"
                     on:click={openVideo}
                     class="group absolute right-6 md:right-12 bottom-6 md:bottom-12
            inline-flex items-center justify-center

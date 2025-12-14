@@ -17,7 +17,7 @@
                 class="rounded-[20px] bg-white ring-1 ring-black/5 p-6 shadow-[0_8px_30px_rgba(1,13,40,0.06)]"
             >
                 <div
-                    class="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#EA6D0B] text-white font-bold"
+                    class="mb-3 inline-flex h-9 min-w-9 items-center justify-center rounded-full bg-[#EA6D0B] text-white font-bold"
                 >
                     {i + 1}
                 </div>

@@ -216,7 +216,7 @@
 
     {#if !isSuccess}
         <!-- ESTADO: FORMULÁRIO -->
-        <div class="grid gap-8 px-6 py-6 md:px-8 md:py-8 md:grid-cols-2 max-h-[70vh] overflow-y-auto">
+        <div class="grid gap-8 px-6 py-6 md:px-8 md:py-8 md:grid-cols-2 overflow-y-auto">
 
             <!-- COLUNA ESQUERDA -->
             <div class="hidden lg:block">

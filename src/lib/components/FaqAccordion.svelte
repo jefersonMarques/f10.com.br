@@ -33,7 +33,7 @@
 
                     <!-- wrapper da seta -->
                     <span
-                        class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-[2px] border-[#EA6D0B]/60 transition-transform duration-200"
+                        class="inline-flex h-9 min-w-9 shrink-0 items-center justify-center rounded-full border-[2px] border-[#EA6D0B]/60 transition-transform duration-200"
                         class:rotate-90={open.has(i)}
                         class:rotate-0={!open.has(i)}
                     >

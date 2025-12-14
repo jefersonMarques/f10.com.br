@@ -1,19 +1,19 @@
 <script lang="ts" context="module">
-  export type PopupSize = "sm" | "md" | "lg" | "xl" | "full";
+  export type PopupSizeSolution = "sm" | "md" | "lg" | "xl" | "full";
 </script>
 
 <script lang="ts">
-  import { showForm } from "$lib/stores/formPopup";
+  import { showSolutionsPopUp } from "$lib/stores/solutionsPopup";
   import { onDestroy, onMount } from "svelte";
 
-  export let size: PopupSize = "lg";
+  export let size: PopupSizeSolution = "lg";
 
   let isOpen = false;
-  const unsubscribe = showForm.subscribe((v) => (isOpen = v));
+  const unsubscribe = showSolutionsPopUp.subscribe((v) => (isOpen = v));
   onDestroy(unsubscribe);
 
   function closeModal() {
-    showForm.set(false);
+    showSolutionsPopUp.set(false);
   }
 
   let portal: HTMLElement | null = null;
@@ -54,7 +54,11 @@
   >
     <div
       class="absolute inset-0 bg-black/50 backdrop-blur-sm z-0"
+      role="button"
+      tabindex="0"
       on:click={closeModal}
+      on:keydown={(e) => e.key === "Escape" && closeModal()}
+      aria-label="Close modal"
     ></div>
 
     <div
