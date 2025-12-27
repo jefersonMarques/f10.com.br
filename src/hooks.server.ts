@@ -35,7 +35,7 @@ function buildRedirectMap(rules: RedirectRule[]): Map<string, { to: string; stat
 const redirectRules: RedirectRule[] = [
 
   // ===== Páginas principais do sitemap antigo =====
-  { from: "/blog", to: "/inovacao-na-escola/marketing-educacional" },
+  { from: "/blog", to: "/inovacao-na-escola" },
   { from: "/f10", to: "/sobre" },
   { from: "/inovacao-digital", to: "/inovacao-na-escola" },
 
@@ -70,6 +70,10 @@ const redirectRules: RedirectRule[] = [
   {
     from: "/blog/conheca-5-maiores-desafios-da-gestao-escolar-e-como-supera-los",
     to: "/solucoes"
+  },
+  {
+    from: "/download/InstaladorF10.exe",
+    to: "/download"
   }
 ];
 

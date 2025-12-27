@@ -36,7 +36,7 @@
       title: "Matrícula online<br/>com assinatura digital",
       description:
         "Documentos digitais e assinatura eletrônica reduzem abandono e aceleram a confirmação da vaga.",
-      href: "/solucoes/portal-do-aluno",
+      href: "/solucoes/marketing-captacao-de-alunos",
       icon: IconStudantLine,
     },
     {

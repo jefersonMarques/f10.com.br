@@ -49,7 +49,7 @@
     {
       alt: "LinkedIn",
       src: "/social_linkedin.svg",
-      href: "linkedin.com/company/f10software/",
+      href: "https://www.linkedin.com/company/f10software/",
     },
     {
       alt: "YouTube",
@@ -448,7 +448,7 @@
         class="absolute inset-0 pointer-events-auto"
         aria-label="Fechar menu"
         on:click={closeMenu}
-      />
+      ></button>
 
       <!-- Painel flutuante -->
       <div

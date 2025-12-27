@@ -96,7 +96,8 @@
                 <div class="w-full max-w-sm flex flex-col gap-3 mt-1">
                     <!-- Botão principal -->
                     <a
-                        href="https://www.f10.com.br/download/InstaladorF10.exe"
+                        on:click={closeModal}
+                        href="/download"
                         class="group w-full rounded-[999px] px-5 py-3.5
                                text-[14px] md:text-[15px] font-semibold
                                bg-[#EA6D0B] text-white

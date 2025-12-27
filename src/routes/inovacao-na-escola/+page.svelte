@@ -23,28 +23,28 @@
       title: "Aumente matrículas com<br/>marketing educacional",
       description:
         "Estruture o funil de matrículas com CRM educacional, captação multicanal e matrícula online com assinatura digital.",
-      href: "/inovacao-na-escola/marketing-educacional",
+      href: "#",
       icon: IconMegaPhoneLine,
     },
     {
       title: "Ensino digital e<br/>híbrido integrado",
       description:
         "EAD conectado à secretaria, diário de classe digital e app escolar para comunicação em tempo real.",
-      href: "/inovacao-na-escola/ensino-digital",
+      href: "#",
       icon: IconStudantLine,
     },
     {
       title: "Indicadores em tempo real<br/>para decisões certeiras",
       description:
         "Dashboards escolares: financeiro, acadêmico e relacionamento. Previsão de inadimplência e alertas de evasão.",
-      href: "/inovacao-na-escola/indicadores-para-escolas",
+      href: "#",
       icon: IconChartLine,
     },
     {
       title: "Comunicação que reduz<br/>o ruído e a evasão",
       description:
         "App escolar whitelabel (Android/iOS), mensagens segmentadas, confirmação de leitura e agendamentos.",
-      href: "/inovacao-na-escola/comunicacao-com-o-aluno",
+      href: "#",
       icon: IconDevicesLine,
     },
   ];
@@ -454,7 +454,7 @@
 
         <div class="pt-2">
           <a
-            href="/novidades"
+            href="#"
             class="inline-flex items-center justify-center gap-3 rounded-[70px]
             bg-[#EA6D0B] px-8 md:px-10 py-4 text-white text-[16px] font-bold
             transition hover:brightness-110 focus:outline-none focus:ring-2

@@ -44,7 +44,7 @@
     {
       alt: "LinkedIn",
       src: "/social_linkedin.svg",
-      href: "linkedin.com/company/f10software/",
+      href: "https://www.linkedin.com/company/f10software/",
     },
     {
       alt: "YouTube",
