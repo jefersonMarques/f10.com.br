@@ -38,13 +38,13 @@
   const solutionLinks: SolutionLink[] = [
     {
       label: "Marketing e Captação",
-      href: "/solucoes/marketing",
+      href: "/solucoes/marketing-captacao-de-alunos",
       description: "Atraia leads, automatize campanhas e aumente matrículas.",
       icon: Megaphone,
     },
     {
-      label: "Comercial / CRM",
-      href: "/solucoes/comercial",
+      label: "Vendas / CRM",
+      href: "/solucoes/vendas",
       description: "Funil, tarefas, follow-up e conversão com rastreio.",
       icon: Handshake,
     },

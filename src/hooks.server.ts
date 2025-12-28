@@ -47,6 +47,7 @@ const redirectRules: RedirectRule[] = [
   { from: "/solucoes/funil-de-vendas", to: "/solucoes/vendas" },
   { from: "/solucoes/app-e-portal-do-aluno", to: "/solucoes/aplicativo-smart-aluno" },
   { from: "/solucoes/pagamento-recorrente", to: "/solucoes/financeiro" },
+  { from: "/cel_cash", to: "/cel_cash/cadastro-de-escolas" },
 
   // ===== Categorias antigas do blog =====
   { from: "/blog/gestao-escolar", to: "/solucoes" },

@@ -330,7 +330,7 @@
           class="text-[16px] font-semibold text-text underline decoration-2 underline-offset-[6px]
                  hover:text-primary w-full md:w-auto md:pl-4"
         >
-          Ver módulo Comercial / CRM
+          Ver módulo Vendas / CRM
         </a>
       </div>
 
@@ -1267,7 +1267,7 @@
                text-[#010D28] hover:bg-[#EA6D0B]/10
                focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/40"
       >
-        Ver módulo Comercial / CRM
+        Ver módulo Vendas / CRM
       </a>
     </div>
 
@@ -1283,7 +1283,7 @@
                text-[#010D28] hover:bg-[#EA6D0B]/10
                focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/40"
       >
-        Ver módulo Comercial / CRM
+        Ver módulo Vendas / CRM
       </a>
     </div>
   </div>

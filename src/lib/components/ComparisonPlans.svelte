@@ -208,7 +208,7 @@
                 "Funil de vendas, contratos, agenda comercial, comissões e jornada até a matrícula.",
             rows: [
                 {
-                    label: "Módulo Comercial / CRM para matrículas",
+                    label: "Módulo Vendas / CRM para matrículas",
                     helper:
                         "Do primeiro contato até a matrícula confirmada, em um funil único.",
                     values: {

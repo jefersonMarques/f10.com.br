@@ -17,7 +17,7 @@
     const partners: Partner[] = [
         {
             name: "Google Cloud Platform & API",
-            pyClass: "py-0",
+            pyClass: "py-1",
             logoSrc: "/logo_google.webp",
             alt: "Google Cloud",
         },
@@ -32,6 +32,12 @@
             pyClass: "py-0",
             logoSrc: "/logo_celcoin.webp",
             alt: "Celcoin",
+        },
+        {
+            name: "Zenvia",
+            pyClass: "py-0",
+            logoSrc: "/logo_zenvia.webp",
+            alt: "Zenvia",
         },
     ];
 
@@ -156,14 +162,13 @@
                         </p>
                     </div>
 
-                    <!-- Lista de parceiros (somente logos, cinza→azul, hover color) -->
-                    <div class="w-full md:w-auto">
+                    <!-- Lista de parceiros (somente logos, cinza→hover color) -->
+                    <div class="w-full md:flex-1 min-w-0">
                         <div
                             class="flex items-center justify-center md:justify-start
-           gap-5 md:gap-6 flex-wrap
-           overflow-visible md:overflow-x-auto
+           gap-4 md:gap-10 flex-nowrap overflow-x-auto
            [-ms-overflow-style:none] [scrollbar-width:none]
-           md:[&::-webkit-scrollbar]:hidden"
+           [&::-webkit-scrollbar]:hidden"
                             aria-label="Logos de parceiros"
                         >
                             {#each partners as partner}
@@ -172,7 +177,7 @@
                                         src={partner.logoSrc}
                                         alt={partner.alt ?? partner.name}
                                         title={partner.name}
-                                        class={`partner-logo h-7 md:h-8 w-auto select-none ${partner.pyClass ?? "py-0"}`}
+                                        class={`partner-logo h-7 md:h-8 w-auto max-w-[90px] object-contain select-none ${partner.pyClass ?? "py-0"}`}
                                         loading="lazy"
                                         decoding="async"
                                     />
