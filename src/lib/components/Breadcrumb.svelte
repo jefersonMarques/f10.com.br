@@ -147,7 +147,7 @@
                         aria-hidden="true"
                         class="text-[#AEB3D9] text-[12px] align-middle leading-none flex items-center justify-center"
                     >
-                        •
+                        {separator}
                     </span>
                 {:else}
                     <span

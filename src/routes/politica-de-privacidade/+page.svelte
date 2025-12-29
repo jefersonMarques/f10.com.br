@@ -159,7 +159,7 @@
                                         ? "bg-emerald-300"
                                         : "bg-slate-300 group-hover:bg-emerald-400"
                                 }`}
-                            />
+                            ></span>
                             <span
                                 class="line-clamp-2 text-[12px] md:text-[13px]"
                             >

@@ -1,0 +1,375 @@
+diff --git a/src/routes/celcoin/cadastro-de-escolas/+page.svelte b/src/routes/celcoin/cadastro-de-escolas/+page.svelte
+index 1111111..2222222 100644
+--- a/src/routes/celcoin/cadastro-de-escolas/+page.svelte
++++ b/src/routes/celcoin/cadastro-de-escolas/+page.svelte
+@@ -1,4 +1,4 @@
+ <script lang="ts">
+   import { browser } from "$app/environment";
+   import { onDestroy, tick } from "svelte";
+@@ -238,6 +238,12 @@
+   function formatBrPhone(value: string): string {
+     const d = onlyDigits(value).slice(0, 11);
+     const ddd = d.slice(0, 2);
+     const rest = d.slice(2);
+@@ -270,6 +276,11 @@
+     return `(${ddd}) ${p1}${p2 ? `-${p2}` : ""}`.trim();
+   }
+ 
++  // CNAE: apenas números (7 dígitos)
++  function formatCnaeDigits(value: string): string {
++    return onlyDigits(value).slice(0, 7);
++  }
++
+   // ==============================
+   // Validações reais
+   // ==============================
+@@ -350,13 +361,18 @@
+   async function validateStep1(): Promise<boolean> {
+     let nextErrors: FormErrors = {};
+ 
+     if (!isCnpjValid(formData.cnpj))
+       nextErrors = addError(nextErrors, "cnpj", "CNPJ inválido.");
+@@ -382,12 +398,16 @@
+     if (!safeTrim(formData.unitFantasyName))
+       nextErrors = addError(
+         nextErrors,
+         "unitFantasyName",
+         "Informe o nome fantasia.",
+       );
+-    if (!safeTrim(formData.cnaeMain))
+-      nextErrors = addError(
+-        nextErrors,
+-        "cnaeMain",
+-        "Informe o CNAE principal.",
+-      );
++    {
++      const cnaeDigits = formatCnaeDigits(formData.cnaeMain);
++      if (!cnaeDigits) {
++        nextErrors = addError(nextErrors, "cnaeMain", "Informe o CNAE principal.");
++      } else if (cnaeDigits.length !== 7) {
++        nextErrors = addError(nextErrors, "cnaeMain", "CNAE deve ter 7 dígitos.");
++      }
++    }
+ 
+     const cepDigits = onlyDigits(formData.cep);
+     if (cepDigits.length !== 8) {
+       nextErrors = addError(nextErrors, "cep", "CEP inválido.");
+     } else {
+@@ -475,18 +495,16 @@
+       const cnaeId = data?.estabelecimento?.atividade_principal?.id
+         ? String(data.estabelecimento.atividade_principal.id)
+         : "";
+-      const cnaeDesc = data?.estabelecimento?.atividade_principal?.descricao
+-        ? String(data.estabelecimento.atividade_principal.descricao)
+-        : "";
+-      const cnaeLabel = [cnaeId, cnaeDesc].filter(Boolean).join(" - ").trim();
+-      if (cnaeLabel && canAutoOverwrite("cnaeMain", "cnpj")) {
+-        setField("cnaeMain", cnaeLabel, { isAuto: true, source: "cnpj" });
++      const cnaeDigits = formatCnaeDigits(cnaeId);
++      if (cnaeDigits && canAutoOverwrite("cnaeMain", "cnpj")) {
++        setField("cnaeMain", cnaeDigits, { isAuto: true, source: "cnpj" });
+       }
+ 
+       const ddd = data?.estabelecimento?.ddd1
+         ? String(data.estabelecimento.ddd1)
+         : "";
+       const tel = data?.estabelecimento?.telefone1
+@@ -734,6 +752,7 @@
+                   <input
+                     id="cnpj"
+                     class={`w-full rounded-xl border px-4 py-3 text-[15px] outline-none ${
+                       errors.cnpj
+                         ? "border-red-400"
+                         : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                     }`}
+                     value={formData.cnpj}
+                     inputmode="numeric"
++                    maxlength="18"
+                     placeholder="00.000.000/0000-00"
+                     on:input={(e) => {
+                       const masked = formatCnpj(
+                         (e.currentTarget as HTMLInputElement).value,
+                       );
+                       setField("cnpj", masked);
+                       scheduleCnpjLookup();
+                     }}
+@@ -769,6 +788,7 @@
+                   <input
+                     id="unitLegalName"
+                     class={`mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none ${
+                       errors.unitLegalName
+                         ? "border-red-400"
+                         : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                     }`}
+                     value={formData.unitLegalName}
++                    placeholder="Ex: Escola Modelo LTDA"
+                     on:input={(e) =>
+                       setField(
+                         "unitLegalName",
+                         (e.currentTarget as HTMLInputElement).value,
+                       )}
+                   />
+@@ -791,6 +811,7 @@
+                   <input
+                     id="unitFantasyName"
+                     class={`mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none ${
+                       errors.unitFantasyName
+                         ? "border-red-400"
+                         : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                     }`}
+                     value={formData.unitFantasyName}
++                    placeholder="Ex: Escola Modelo"
+                     on:input={(e) =>
+                       setField(
+                         "unitFantasyName",
+                         (e.currentTarget as HTMLInputElement).value,
+                       )}
+                   />
+@@ -816,6 +837,10 @@
+                   <input
+                     id="cnaeMain"
+                     class={`mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none ${
+                       errors.cnaeMain
+                         ? "border-red-400"
+                         : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                     }`}
+                     value={formData.cnaeMain}
++                    inputmode="numeric"
++                    maxlength="7"
++                    placeholder="Ex: 6201500"
+                     on:input={(e) =>
+                       setField(
+                         "cnaeMain",
+-                        (e.currentTarget as HTMLInputElement).value,
++                        formatCnaeDigits(
++                          (e.currentTarget as HTMLInputElement).value,
++                        ),
+                       )}
+                   />
+                   {#if errors.cnaeMain}<p class="mt-2 text-[12px] text-red-600">
+                       {errors.cnaeMain}
+                     </p>{/if}
+                 </div>
+@@ -840,6 +865,7 @@
+                   <input
+                     id="unitPhone"
+                     class={`mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none ${
+                       errors.unitPhone
+                         ? "border-red-400"
+                         : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                     }`}
+                     value={formData.unitPhone}
+                     inputmode="tel"
++                    maxlength="15"
+                     placeholder="(00) 00000-0000"
+                     on:input={(e) =>
+                       setField(
+                         "unitPhone",
+                         formatBrPhone(
+                           (e.currentTarget as HTMLInputElement).value,
+                         ),
+                       )}
+                   />
+@@ -878,6 +904,7 @@
+                       <input
+                         id="cep"
+                         class={`w-full rounded-xl border px-4 py-3 text-[15px] outline-none ${
+                           errors.cep
+                             ? "border-red-400"
+                             : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                         }`}
+                         value={formData.cep}
+                         inputmode="numeric"
++                        maxlength="9"
+                         placeholder="00000-000"
+                         on:input={(e) => {
+                           setField(
+                             "cep",
+                             formatCep(
+                               (e.currentTarget as HTMLInputElement).value,
+                             ),
+                           );
+                           scheduleCepLookup();
+                         }}
+@@ -922,6 +949,7 @@
+                     <input
+                       id="street"
+                       class={`mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none ${
+                         errors.street
+                           ? "border-red-400"
+                           : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                       }`}
+                       value={formData.street}
++                      placeholder="Ex: Rua das Flores"
+                       on:input={(e) =>
+                         setField(
+                           "street",
+                           (e.currentTarget as HTMLInputElement).value,
+                         )}
+                     />
+@@ -944,6 +972,7 @@
+                       <input
+                         id="number"
+                         class={`mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none ${
+                           errors.number
+                             ? "border-red-400"
+                             : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                         }`}
+                         value={formData.number}
++                        placeholder="Ex: 123"
+                         on:input={(e) =>
+                           setField(
+                             "number",
+                             (e.currentTarget as HTMLInputElement).value,
+                           )}
+                       />
+@@ -966,6 +995,7 @@
+                       <input
+                         id="state"
+                         class={`mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none uppercase ${
+                           errors.state
+                             ? "border-red-400"
+                             : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                         }`}
+                         value={formData.state}
++                        maxlength="2"
++                        placeholder="Ex: PR"
+                         on:input={(e) =>
+                           setField(
+                             "state",
+                             (e.currentTarget as HTMLInputElement).value
+                               .toUpperCase()
+                               .slice(0, 2),
+                           )}
+                       />
+@@ -992,6 +1022,7 @@
+                     <input
+                       id="neighborhood"
+                       class={`mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none ${
+                         errors.neighborhood
+                           ? "border-red-400"
+                           : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                       }`}
+                       value={formData.neighborhood}
++                      placeholder="Ex: Centro"
+                       on:input={(e) =>
+                         setField(
+                           "neighborhood",
+                           (e.currentTarget as HTMLInputElement).value,
+                         )}
+                     />
+@@ -1015,6 +1046,7 @@
+                     <input
+                       id="city"
+                       class={`mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none ${
+                         errors.city
+                           ? "border-red-400"
+                           : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                       }`}
+                       value={formData.city}
++                      placeholder="Ex: Curitiba"
+                       on:input={(e) =>
+                         setField(
+                           "city",
+                           (e.currentTarget as HTMLInputElement).value,
+                         )}
+                     />
+@@ -1038,6 +1070,7 @@
+                   <input
+                     id="complement"
+                     class="mt-2 w-full rounded-xl border border-black/15 px-4 py-3 text-[15px] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                     value={formData.complement}
++                    placeholder="Ex: Sala 2 (opcional)"
+                     on:input={(e) =>
+                       setField(
+                         "complement",
+                         (e.currentTarget as HTMLInputElement).value,
+                       )}
+                   />
+@@ -1089,6 +1122,7 @@
+                 <input
+                   id="managerName"
+                   class={`mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none ${
+                     errors.managerName
+                       ? "border-red-400"
+                       : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                   }`}
+                   value={formData.managerName}
++                  placeholder="Ex: João da Silva"
+                   on:input={(e) =>
+                     setField(
+                       "managerName",
+                       (e.currentTarget as HTMLInputElement).value,
+                     )}
+                 />
+@@ -1112,6 +1146,7 @@
+                 <input
+                   id="managerCpf"
+                   class={`mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none ${
+                     errors.managerCpf
+                       ? "border-red-400"
+                       : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                   }`}
+                   value={formData.managerCpf}
+                   inputmode="numeric"
++                  maxlength="14"
+                   placeholder="000.000.000-00"
+                   on:input={(e) =>
+                     setField(
+                       "managerCpf",
+                       formatCpf((e.currentTarget as HTMLInputElement).value),
+                     )}
+                 />
+@@ -1137,6 +1172,7 @@
+                 <input
+                   id="managerRg"
+                   class={`mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none ${
+                     errors.managerRg
+                       ? "border-red-400"
+                       : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                   }`}
+                   value={formData.managerRg}
++                  placeholder="Ex: 12.345.678-9"
+                   on:input={(e) =>
+                     setField(
+                       "managerRg",
+                       (e.currentTarget as HTMLInputElement).value,
+                     )}
+                 />
+@@ -1157,6 +1193,7 @@
+                 <input
+                   id="managerWhatsapp"
+                   class={`mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none ${
+                     errors.managerWhatsapp
+                       ? "border-red-400"
+                       : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                   }`}
+                   value={formData.managerWhatsapp}
+                   inputmode="tel"
++                  maxlength="15"
+                   placeholder="(00) 00000-0000"
+                   on:input={(e) =>
+                     setField(
+                       "managerWhatsapp",
+                       formatBrPhone(
+                         (e.currentTarget as HTMLInputElement).value,
+                       ),
+                     )}
+                 />
+@@ -1181,6 +1218,7 @@
+                 <input
+                   id="managerEmail"
+                   class={`mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none ${
+                     errors.managerEmail
+                       ? "border-red-400"
+                       : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+                   }`}
+                   value={formData.managerEmail}
+                   inputmode="email"
++                  placeholder="ex: financeiro@suaescola.com.br"
+                   on:input={(e) =>
+                     setField(
+                       "managerEmail",
+                       (e.currentTarget as HTMLInputElement).value,
+                     )}
+                 />

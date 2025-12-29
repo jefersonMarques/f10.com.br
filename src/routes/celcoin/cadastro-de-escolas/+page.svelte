@@ -1165,7 +1165,7 @@
       <h1
         class="text-[26px] sm:text-[32px] leading-tight font-semibold text-[var(--primary)]"
       >
-        Criar conta - CEL CASH F10
+        Criar conta - CELCOIN F10
       </h1>
 
       <!-- Stepper (4 etapas) -->

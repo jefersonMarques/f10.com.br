@@ -160,7 +160,7 @@
                                         ? "bg-emerald-300"
                                         : "bg-slate-300 group-hover:bg-emerald-400"
                                 }`}
-                            />
+                            ></span>
                             <span
                                 class="line-clamp-2 text-[12px] md:text-[13px]"
                             >
@@ -245,7 +245,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 1. Da Propriedade Intelectual -->
             <section
@@ -300,7 +300,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 2. Declarações do LICENCIADO -->
             <section id="declaracoes-licenciado" class="scroll-mt-28 space-y-4">
@@ -363,7 +363,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 3. Licença de Uso do Software -->
             <section id="licenca-uso-software" class="scroll-mt-28 space-y-4">
@@ -409,7 +409,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 4. Das Restrições -->
             <section id="restricoes" class="scroll-mt-28 space-y-4">
@@ -453,7 +453,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 5. Do Prazo -->
             <section id="prazo" class="scroll-mt-28 space-y-4">
@@ -491,7 +491,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 6. Da Remuneração e Forma de Pagamento -->
             <section
@@ -576,7 +576,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 7. Restituição das Informações -->
             <section
@@ -638,7 +638,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 8. Das Obrigações do Licenciado -->
             <section id="obrigacoes-licenciado" class="scroll-mt-28 space-y-4">
@@ -737,7 +737,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 9. Das Obrigações do Licenciante -->
             <section id="obrigacoes-licenciante" class="scroll-mt-28 space-y-4">
@@ -804,7 +804,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 10. Nível de Serviço -->
             <section id="nivel-servico" class="scroll-mt-28 space-y-4">
@@ -874,7 +874,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 11. Isenção de Responsabilidade da Licenciante -->
             <section
@@ -961,7 +961,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 12. Da Retomada dos Softwares -->
             <section id="retomada-softwares" class="scroll-mt-28 space-y-4">
@@ -995,7 +995,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 13. Das Garantias Limitadas -->
             <section id="garantias-limitadas" class="scroll-mt-28 space-y-4">
@@ -1047,7 +1047,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 14. Limitação de Responsabilidade -->
             <section
@@ -1095,7 +1095,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 15. Da Rescisão -->
             <section id="rescisao" class="scroll-mt-28 space-y-4">
@@ -1172,7 +1172,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 16. Das disposições Legais -->
             <section id="disposicoes-legais" class="scroll-mt-28 space-y-4">
@@ -1294,7 +1294,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 17. Da Lei Aplicável -->
             <section id="lei-aplicavel" class="scroll-mt-28 space-y-4">
@@ -1331,7 +1331,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 18. Das definições -->
             <section id="definicoes" class="scroll-mt-28 space-y-4">
@@ -1397,7 +1397,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 19. Política de Privacidade -->
             <section id="politica-privacidade" class="scroll-mt-28 space-y-4">
@@ -1888,7 +1888,7 @@
 
             <div
                 class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-            />
+            ></div>
 
             <!-- 20. Dos serviços em observância à LGPD -->
             <section id="lgpd-servicos" class="scroll-mt-28 space-y-4">

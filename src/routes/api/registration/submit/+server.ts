@@ -138,7 +138,7 @@ function buildEmailText(params: {
   const { payload, docs, meta } = params;
 
   const lines: string[] = [];
-  lines.push(`Novo cadastro — CEL CASH F10`);
+  lines.push(`Novo cadastro — CELCOIN F10`);
   lines.push(`Recebido em: ${meta.submittedAt}`);
   lines.push(`Token: ${meta.messageToken}`);
   lines.push("");
@@ -311,7 +311,7 @@ function buildEmailHtml(params: {
                 </table>
 
                 <div style="margin-top:14px; font-size:22px; font-weight:800; color:${primary}; line-height:1.2;">
-                  Novo cadastro — CEL CASH F10
+                  Novo cadastro — CELCOIN F10
                 </div>
                 <div style="margin-top:6px; color:${muted}; font-size:13px;">
                   Abaixo estão <strong>todos os dados</strong> enviados no formulário (incluindo campos opcionais).

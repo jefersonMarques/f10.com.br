@@ -39,10 +39,12 @@
         class="fixed inset-0 z-[9999] flex items-center justify-center"
     >
         <!-- Overlay -->
-        <div
+        <button
+            type="button"
             class="absolute inset-0 bg-[#020618]/70 backdrop-blur-sm z-0"
             on:click={closeModal}
-        ></div>
+            aria-label="Fechar modal"
+        ></button>
 
         <!-- Container do popup -->
         <div

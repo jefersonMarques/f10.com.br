@@ -54,7 +54,11 @@
   >
     <div
       class="absolute inset-0 bg-black/50 backdrop-blur-sm z-0"
+      role="button"
+      tabindex="0"
       on:click={closeModal}
+      on:keydown={(e) => e.key === 'Escape' && closeModal()}
+      aria-label="Close modal overlay"
     ></div>
 
     <div

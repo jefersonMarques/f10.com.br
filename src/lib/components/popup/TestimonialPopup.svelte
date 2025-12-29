@@ -48,7 +48,14 @@
 
 {#if mounted && portal && isOpen}
   <div bind:this={modalEl} class="fixed inset-0 z-[9999] flex items-center justify-center">
-    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm z-0" on:click={closeModal}></div>
+    <div
+      class="absolute inset-0 bg-black/50 backdrop-blur-sm z-0"
+      role="button"
+      tabindex="0"
+      on:click={closeModal}
+      on:keydown={(e) => e.key === "Escape" && closeModal()}
+      aria-label="Close modal"
+    ></div>
 
     <div
       class={`relative z-10 bg-white rounded-2xl  ${sizeClass} overflow-hidden shadow-2xl animate-fadeIn transition-all duration-300`}
