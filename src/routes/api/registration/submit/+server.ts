@@ -9,7 +9,10 @@ import { env } from "$env/dynamic/private";
  * IMPORTANTE:
  * - O frontend envia:
  *   - payload (string JSON)
- *   - doc_rg_cnh, doc_cnpj, doc_contrato, doc_selfie (File)
+ *   - doc_rg_cnh (File[])  -> múltiplos
+ *   - doc_cnpj (File[])    -> múltiplos
+ *   - doc_contrato (File[])-> múltiplos
+ *   - doc_selfie (File)    -> único
  */
 
 type RegistrationPayload = {
@@ -45,20 +48,63 @@ type RegistrationPayload = {
 
 type DocKey = "doc_rg_cnh" | "doc_cnpj" | "doc_contrato" | "doc_selfie";
 
-const DOCS: Array<{ key: DocKey; label: string; required: boolean }> = [
-  { key: "doc_rg_cnh", label: "RG ou CNH", required: true },
-  { key: "doc_cnpj", label: "Documento do CNPJ", required: true },
-  { key: "doc_contrato", label: "Contrato Social", required: true },
-  { key: "doc_selfie", label: "Selfie com documento", required: true },
-];
+type DocConfig = {
+  key: DocKey;
+  label: string;
+  required: boolean;
+  multiple: boolean;
+  allowedMime: ReadonlySet<string>;
+  maxFiles: number;
+};
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024; // 2MB (igual ao front)
-const ALLOWED_MIME = new Set([
+const MAX_FILES_PER_DOC_TYPE = 6; // igual ao front (passo 3)
+
+// Docs do passo 3: PDF/JPG/PNG
+const ALLOWED_DOC_MIME = new Set([
   "application/pdf",
   "image/jpeg",
   "image/jpg",
   "image/png",
 ]);
+
+// Selfie: só imagem (igual ao front)
+const ALLOWED_SELFIE_MIME = new Set(["image/jpeg", "image/jpg", "image/png"]);
+
+const DOCS: DocConfig[] = [
+  {
+    key: "doc_rg_cnh",
+    label: "RG ou CNH",
+    required: true,
+    multiple: true,
+    allowedMime: ALLOWED_DOC_MIME,
+    maxFiles: MAX_FILES_PER_DOC_TYPE,
+  },
+  {
+    key: "doc_cnpj",
+    label: "Documento do CNPJ",
+    required: true,
+    multiple: true,
+    allowedMime: ALLOWED_DOC_MIME,
+    maxFiles: MAX_FILES_PER_DOC_TYPE,
+  },
+  {
+    key: "doc_contrato",
+    label: "Contrato Social",
+    required: true,
+    multiple: true,
+    allowedMime: ALLOWED_DOC_MIME,
+    maxFiles: MAX_FILES_PER_DOC_TYPE,
+  },
+  {
+    key: "doc_selfie",
+    label: "Selfie com documento",
+    required: true,
+    multiple: false,
+    allowedMime: ALLOWED_SELFIE_MIME,
+    maxFiles: 1,
+  },
+];
 
 function escapeHtml(value: unknown): string {
   const str =
@@ -116,6 +162,17 @@ function formatDateTimeBR(iso: string | undefined): string {
 async function fileToBase64(file: File): Promise<string> {
   const ab = await file.arrayBuffer();
   return Buffer.from(ab).toString("base64");
+}
+
+function isFileLike(value: unknown): value is File {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as any).name === "string" &&
+    typeof (value as any).size === "number" &&
+    typeof (value as any).type === "string" &&
+    typeof (value as any).arrayBuffer === "function"
+  );
 }
 
 function buildEmailText(params: {
@@ -251,8 +308,8 @@ function buildEmailHtml(params: {
 
   const docsRows = docs.length
     ? docs
-        .map(
-          (d) => `
+      .map(
+        (d) => `
             <tr>
               <td style="padding:10px 12px; border-top:1px solid ${outline}; color:${muted}; font-size:12px; width:220px;">
                 ${escapeHtml(d.label)}
@@ -265,8 +322,8 @@ function buildEmailHtml(params: {
               </td>
             </tr>
           `,
-        )
-        .join("")
+      )
+      .join("")
     : `
       <tr>
         <td style="padding:12px; border-top:1px solid ${outline}; color:${muted}; font-size:13px;">
@@ -275,7 +332,6 @@ function buildEmailHtml(params: {
       </tr>
     `;
 
-  // Preheader curto e limpo (sem zwnj infinito)
   const preheaderText =
     "Cadastro completo recebido (unidade, endereço, responsável, divulgação, documentos e metadados).";
 
@@ -288,7 +344,6 @@ function buildEmailHtml(params: {
     <title>Novo cadastro - F10</title>
   </head>
   <body style="margin:0; padding:0; background:${bg}; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif;">
-    <!-- token anti-“parece repetido” (não aparece pro usuário) -->
     <span style="display:none !important; font-size:0; line-height:0; max-height:0; max-width:0; opacity:0; overflow:hidden; mso-hide:all; color:transparent;">
       ${escapeHtml(preheaderText)} • ${escapeHtml(meta.messageToken)}
     </span>
@@ -323,36 +378,36 @@ function buildEmailHtml(params: {
               <td style="padding:0 18px 18px 18px;">
                 <div style="background:${surface}; border:1px solid ${outline}; border-radius:22px; padding:18px;">
                   ${section("Dados da unidade", [
-                    ["CNPJ", safeValue(payload.cnpj)],
-                    ["Razão Social", safeValue(payload.unitLegalName)],
-                    ["Nome Fantasia", safeValue(payload.unitFantasyName)],
-                    ["CNAE principal", safeValue(payload.cnaeMain)],
-                    ["Telefone Comercial", safeValue(payload.unitPhone)],
-                  ])}
+    ["CNPJ", safeValue(payload.cnpj)],
+    ["Razão Social", safeValue(payload.unitLegalName)],
+    ["Nome Fantasia", safeValue(payload.unitFantasyName)],
+    ["CNAE principal", safeValue(payload.cnaeMain)],
+    ["Telefone Comercial", safeValue(payload.unitPhone)],
+  ])}
 
                   ${section("Endereço da unidade", [
-                    ["CEP", safeValue(payload.cep)],
-                    ["Logradouro", safeValue(payload.street)],
-                    ["Número", safeValue(payload.number)],
-                    ["Complemento", safeValue(payload.complement)],
-                    ["Bairro", safeValue(payload.neighborhood)],
-                    ["Cidade", safeValue(payload.city)],
-                    ["UF", safeValue(payload.state)],
-                  ])}
+    ["CEP", safeValue(payload.cep)],
+    ["Logradouro", safeValue(payload.street)],
+    ["Número", safeValue(payload.number)],
+    ["Complemento", safeValue(payload.complement)],
+    ["Bairro", safeValue(payload.neighborhood)],
+    ["Cidade", safeValue(payload.city)],
+    ["UF", safeValue(payload.state)],
+  ])}
 
                   ${section("Dados do responsável", [
-                    ["Responsável", safeValue(payload.managerName)],
-                    ["CPF", safeValue(payload.managerCpf)],
-                    ["RG", safeValue(payload.managerRg)],
-                    ["WhatsApp", safeValue(payload.managerWhatsapp)],
-                    ["E-mail", safeValue(payload.managerEmail)],
-                  ])}
+    ["Responsável", safeValue(payload.managerName)],
+    ["CPF", safeValue(payload.managerCpf)],
+    ["RG", safeValue(payload.managerRg)],
+    ["WhatsApp", safeValue(payload.managerWhatsapp)],
+    ["E-mail", safeValue(payload.managerEmail)],
+  ])}
 
                   ${section("Dados de divulgação (opcional)", [
-                    ["Site", safeValue(payload.marketingSite)],
-                    ["Instagram", safeValue(payload.marketingInstagram)],
-                    ["Facebook", safeValue(payload.marketingFacebook)],
-                  ])}
+    ["Site", safeValue(payload.marketingSite)],
+    ["Instagram", safeValue(payload.marketingInstagram)],
+    ["Facebook", safeValue(payload.marketingFacebook)],
+  ])}
 
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${outline}; border-radius:16px; overflow:hidden; background:${surface}; margin-top:14px;">
                     <tr>
@@ -366,12 +421,12 @@ function buildEmailHtml(params: {
                   </table>
 
                   ${section("Metadados técnicos", [
-                    ["IP (proxy)", safeValue(meta.clientIp)],
-                    ["User-Agent", safeValue(meta.userAgent)],
-                    ["Origem", safeValue(meta.origin)],
-                    ["submittedAt (payload)", safeValue(payload.submittedAt)],
-                    ["messageToken", safeValue(meta.messageToken)],
-                  ])}
+    ["IP (proxy)", safeValue(meta.clientIp)],
+    ["User-Agent", safeValue(meta.userAgent)],
+    ["Origem", safeValue(meta.origin)],
+    ["submittedAt (payload)", safeValue(payload.submittedAt)],
+    ["messageToken", safeValue(meta.messageToken)],
+  ])}
 
                   <div style="margin-top:14px; font-size:12px; color:${muted}; line-height:1.5;">
                     Aviso: este e-mail contém informações sensíveis. Evite encaminhar e mantenha em local seguro.
@@ -429,7 +484,10 @@ export const POST: RequestHandler = async ({ request, url }) => {
     form = await request.formData();
   } catch {
     return json(
-      { success: false, message: "Conteúdo inválido. Envie como multipart/form-data." },
+      {
+        success: false,
+        message: "Conteúdo inválido. Envie como multipart/form-data.",
+      },
       { status: 400 },
     );
   }
@@ -437,7 +495,10 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const payloadRaw = form.get("payload");
   if (typeof payloadRaw !== "string" || !payloadRaw.trim()) {
     return json(
-      { success: false, message: "Payload ausente. Campo 'payload' é obrigatório." },
+      {
+        success: false,
+        message: "Payload ausente. Campo 'payload' é obrigatório.",
+      },
       { status: 400 },
     );
   }
@@ -452,53 +513,70 @@ export const POST: RequestHandler = async ({ request, url }) => {
     );
   }
 
-  // ====== Valida docs ======
+  // ====== Valida docs (agora com múltiplos) ======
   const docFiles: Array<{
     key: DocKey;
     label: string;
     file: File;
+    index: number; // 1-based por tipo
   }> = [];
 
   for (const d of DOCS) {
-    const entry = form.get(d.key);
+    const entries = d.multiple ? form.getAll(d.key) : [form.get(d.key)];
+    const files = entries.filter(isFileLike) as File[];
 
-    if (!entry) {
-      if (d.required) {
+    if (d.required && files.length === 0) {
+      return json(
+        { success: false, message: `Documento obrigatório ausente: ${d.label}.` },
+        { status: 400 },
+      );
+    }
+
+    if (files.length > d.maxFiles) {
+      return json(
+        {
+          success: false,
+          message: `Muitos arquivos em: ${d.label}. Limite: ${d.maxFiles}.`,
+        },
+        { status: 400 },
+      );
+    }
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      const fileName = file.name || "";
+      const fileType = file.type || "";
+      const fileSize = file.size || 0;
+
+      if (!fileName || !fileSize) {
         return json(
-          { success: false, message: `Documento obrigatório ausente: ${d.label}.` },
+          { success: false, message: `Arquivo inválido em: ${d.label}.` },
           { status: 400 },
         );
       }
-      continue;
+
+      if (fileSize > MAX_FILE_BYTES) {
+        return json(
+          { success: false, message: `Arquivo acima de 2MB em: ${d.label}.` },
+          { status: 400 },
+        );
+      }
+
+      if (!d.allowedMime.has(fileType)) {
+        const allowedText =
+          d.key === "doc_selfie" ? "JPG/PNG" : "PDF/JPG/PNG";
+        return json(
+          {
+            success: false,
+            message: `Formato inválido em: ${d.label} (use ${allowedText}).`,
+          },
+          { status: 400 },
+        );
+      }
+
+      docFiles.push({ key: d.key, label: d.label, file, index: i + 1 });
     }
-
-    const file = entry as unknown as File;
-    const fileName = typeof (file as any)?.name === "string" ? (file as any).name : "";
-    const fileType = typeof (file as any)?.type === "string" ? (file as any).type : "";
-    const fileSize = typeof (file as any)?.size === "number" ? (file as any).size : 0;
-
-    if (!fileName || !fileSize) {
-      return json(
-        { success: false, message: `Arquivo inválido em: ${d.label}.` },
-        { status: 400 },
-      );
-    }
-
-    if (fileSize > MAX_FILE_BYTES) {
-      return json(
-        { success: false, message: `Arquivo acima de 2MB em: ${d.label}.` },
-        { status: 400 },
-      );
-    }
-
-    if (!ALLOWED_MIME.has(fileType)) {
-      return json(
-        { success: false, message: `Formato inválido em: ${d.label} (use PDF/JPG/PNG).` },
-        { status: 400 },
-      );
-    }
-
-    docFiles.push({ key: d.key, label: d.label, file });
   }
 
   // ====== Monta anexos (Brevo: content base64 + name) ======
@@ -512,15 +590,20 @@ export const POST: RequestHandler = async ({ request, url }) => {
   }> = [];
 
   for (const d of docFiles) {
-    const name = sanitizeFilename(d.file.name);
+    const baseName = sanitizeFilename(d.file.name);
+    const numberedName =
+      d.key === "doc_selfie"
+        ? `doc_selfie_${baseName}`
+        : `${d.key}_${String(d.index).padStart(2, "0")}_${baseName}`;
+
     const content = await fileToBase64(d.file);
 
-    attachments.push({ name, content });
+    attachments.push({ name: numberedName, content });
 
     docsInfoForHtml.push({
       key: d.key,
       label: d.label,
-      fileName: name,
+      fileName: numberedName,
       fileType: d.file.type || "application/octet-stream",
       fileSize: d.file.size,
     });
@@ -556,7 +639,9 @@ export const POST: RequestHandler = async ({ request, url }) => {
 
   // ====== Assunto ÚNICO (evita “conversa” e trimming) ======
   const stampForSubject = nowIso.replace("T", " ").slice(0, 19);
-  const subject = `Novo cadastro F10 • ${safeValue(payload.unitFantasyName)} • ${cnpjDigits || "CNPJ"} • ${stampForSubject}`;
+  const subject = `Novo cadastro F10 • ${safeValue(
+    payload.unitFantasyName,
+  )} • ${cnpjDigits || "CNPJ"} • ${stampForSubject}`;
 
   // ====== Envia via Brevo ======
   try {
@@ -573,7 +658,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
         subject,
         htmlContent,
         textContent,
-        tags: ["cadastro", "f10", "celcash"],
+        tags: ["cadastro", "f10", "celcoin"],
         attachment: attachments,
       }),
     });

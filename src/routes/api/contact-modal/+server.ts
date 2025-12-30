@@ -3,7 +3,7 @@ import type { RequestHandler } from "./$types";
 import { json } from "@sveltejs/kit";
 import fs from "fs/promises";
 import path from "path";
-import { EXACT_TOKEN } from "$env/static/private";
+import { EXACT_TOKEN, EXACT_FUNNEL_ID } from "$env/static/private";
 
 // Tipo do lead específico do modal de contato
 type ContactWhatsappLead = {
@@ -104,9 +104,24 @@ async function sendLeadToExactSales(lead: ContactWhatsappLead) {
 
     descriptionLines.push(`Criado em: ${lead.createdAt}`);
 
+
+    function parseFunnelId(raw: unknown): number | null {
+        const value = String(raw ?? "").trim();
+        if (!value) return null;
+
+        // Aceita "123" (string). Se vier com espaços, ok.
+        const parsed = Number.parseInt(value, 10);
+        if (!Number.isFinite(parsed) || parsed <= 0) return null;
+
+        return parsed;
+    }
+
+    const funnelId = parseFunnelId(EXACT_FUNNEL_ID);
+
     const exactBody = {
         duplicityValidation: false,
         lead: {
+            funnelId: funnelId || undefined,
             name: lead.name,
             industry: "Educação",
             source: sourceForExact,

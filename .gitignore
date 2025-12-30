@@ -29,3 +29,7 @@ Thumbs.db
 # Test / Coverage
 coverage/
 static/InstaladorF10.exe
+
+#data logs
+data\contact-modal-leads.json
+data\whatsapp-leads.json

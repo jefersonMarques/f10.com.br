@@ -3,13 +3,7 @@ import type { RequestHandler } from "./$types";
 import { json } from "@sveltejs/kit";
 import fs from "fs/promises";
 import path from "path";
-import {
-    EXACT_TOKEN,
-    // EXACT_ORGANIZATION_ID,
-    // EXACT_SDR_EMAIL,
-    // EXACT_MKT_LINK,
-    // EXACT_FUNNEL_ID
-} from "$env/static/private";
+import { EXACT_TOKEN, EXACT_FUNNEL_ID } from "$env/static/private";
 
 // Tipo do lead que você salva localmente
 type WhatsappLead = {
@@ -33,13 +27,11 @@ async function loadLeadsFromFile(): Promise<WhatsappLead[]> {
     try {
         const content = await fs.readFile(DATA_FILE_PATH, "utf-8");
         const parsed = JSON.parse(content);
-        if (Array.isArray(parsed)) {
-            return parsed;
-        }
+        if (Array.isArray(parsed)) return parsed;
         return [];
     } catch (err: any) {
         // Se o arquivo não existir, cria um vazio
-        if (err.code === "ENOENT") {
+        if (err?.code === "ENOENT") {
             await fs.mkdir(path.dirname(DATA_FILE_PATH), { recursive: true });
             await fs.writeFile(DATA_FILE_PATH, "[]", "utf-8");
             return [];
@@ -62,6 +54,18 @@ function normalizePhone(rawPhone: string): string {
     return String(rawPhone).replace(/\D/g, "");
 }
 
+// Tenta extrair um funnelId válido (inteiro > 0) de env
+function parseFunnelId(raw: unknown): number | null {
+    const value = String(raw ?? "").trim();
+    if (!value) return null;
+
+    // Aceita "123" (string). Se vier com espaços, ok.
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+
+    return parsed;
+}
+
 // ===== Integração com ExactSales =====
 
 async function sendLeadToExactSales(lead: WhatsappLead) {
@@ -78,13 +82,10 @@ async function sendLeadToExactSales(lead: WhatsappLead) {
     const defaultSource = "Botão WhatsApp Site F10";
 
     const sourceForExact =
-        rawSource.startsWith("/")
-            ? `https://f10.com.br${rawSource}`
-            : rawSource || defaultSource;
+        rawSource.startsWith("/") ? `https://f10.com.br${rawSource}` : rawSource || defaultSource;
 
     const leadProduct = lead.product?.trim() || "Software F10";
-    const subSourceForExact =
-        lead.subSource?.trim() || "Botão flutuante site";
+    const subSourceForExact = lead.subSource?.trim() || "Botão flutuante site";
 
     const descriptionLines: string[] = [
         "Lead capturado pelo botão de WhatsApp flutuante do site."
@@ -99,10 +100,11 @@ async function sendLeadToExactSales(lead: WhatsappLead) {
     }
 
     descriptionLines.push(`Criado em: ${lead.createdAt}`);
-
-    const exactBody = {
+    const funnelId = parseFunnelId(EXACT_FUNNEL_ID);
+    const exactBody: any = {
         duplicityValidation: false,
         lead: {
+            funnelId: funnelId || undefined,
             name: lead.name,
             industry: "Educação",
             source: sourceForExact,
@@ -125,6 +127,11 @@ async function sendLeadToExactSales(lead: WhatsappLead) {
         }
     };
 
+    // Só injeta funnelId se for válido (evita 400 bobo)
+    if (funnelId) {
+        exactBody.lead.funilId = funnelId;
+    }
+
     console.log(
         "[whatsapp-lead] Enviando para ExactSales:",
         JSON.stringify(exactBody, null, 2)
@@ -134,7 +141,7 @@ async function sendLeadToExactSales(lead: WhatsappLead) {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            "token_exact": EXACT_TOKEN
+            token_exact: EXACT_TOKEN
         },
         body: JSON.stringify(exactBody)
     });
@@ -157,10 +164,7 @@ async function sendLeadToExactSales(lead: WhatsappLead) {
         return { ok: false, status: response.status, body: msg };
     }
 
-    console.log(
-        "[whatsapp-lead] Lead enviado para ExactSales com sucesso:",
-        text
-    );
+    console.log("[whatsapp-lead] Lead enviado para ExactSales com sucesso:", text);
     return { ok: true, status: response.status, body: text };
 }
 
@@ -242,10 +246,7 @@ export const POST: RequestHandler = async ({ request }) => {
     try {
         exactResult = await sendLeadToExactSales(newLead);
     } catch (err) {
-        console.error(
-            "[whatsapp-lead] Erro inesperado ao enviar para ExactSales:",
-            err
-        );
+        console.error("[whatsapp-lead] Erro inesperado ao enviar para ExactSales:", err);
         exactResult = { ok: false, error: "unexpected_error" };
     }
 

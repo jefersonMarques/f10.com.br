@@ -1,5 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher, onMount } from "svelte";
+    import { ArrowRight, Coins, Sparkles } from "lucide-svelte";
 
     // Única prop: controla se o popup está visível
     export let open = false;
@@ -18,9 +19,7 @@
     // Controla scroll da página e portal
     $: {
         if (mounted && portal && modalEl && open) {
-            if (!portal.contains(modalEl)) {
-                portal.appendChild(modalEl);
-            }
+            if (!portal.contains(modalEl)) portal.appendChild(modalEl);
             document.body.style.overflow = "hidden";
         } else if (mounted) {
             document.body.style.overflow = "";
@@ -34,10 +33,7 @@
 </script>
 
 {#if mounted && portal && open}
-    <div
-        bind:this={modalEl}
-        class="fixed inset-0 z-[9999] flex items-center justify-center"
-    >
+    <div bind:this={modalEl} class="fixed inset-0 z-[9999] flex items-center justify-center">
         <!-- Overlay -->
         <button
             type="button"
@@ -48,13 +44,15 @@
 
         <!-- Container do popup -->
         <div
-            class="relative z-10 w-[92%] max-w-xl max-h-[90vh] lg:max-h-[100vh] rounded-[24px] overflow-hidden
-                   bg-white shadow-[0_26px_80px_rgba(1,13,40,0.55)]
+            class="relative z-10 w-[92%] max-w-xl max-h-[90vh]
+                   rounded-[24px] overflow-hidden bg-white
+                   shadow-[0_26px_80px_rgba(1,13,40,0.55)]
                    border border-slate-200/80 animate-fadeIn"
         >
-            <!-- faixa superior / glow -->
+            <!-- glow superior (delicado) -->
             <div
-                class="absolute inset-x-0 -top-20 h-40 bg-[radial-gradient(circle_at_top,_rgba(234,109,11,0.35),_transparent)]
+                class="absolute inset-x-0 -top-20 h-40
+                       bg-[radial-gradient(circle_at_top,_rgba(234,109,11,0.22),_transparent)]
                        pointer-events-none"
                 aria-hidden="true"
             ></div>
@@ -62,82 +60,146 @@
             <!-- Botão fechar -->
             <button
                 on:click={closeModal}
-                class="absolute top-3 right-4 text-slate-400 hover:text-slate-600 text-2xl leading-none
-                       transition-colors z-20"
+                class="absolute top-3 right-4 text-slate-400 hover:text-slate-600
+                       text-2xl leading-none transition-colors z-20"
                 aria-label="Fechar modal"
             >
                 ×
             </button>
 
-            <!-- Conteúdo fixo -->
-            <div
-                class="relative px-6 pt-7 pb-9 md:px-9 md:pt-9 md:pb-10
-                       flex flex-col items-center text-center gap-6 bg-white"
-            >
-                <!-- Tag + título + subtítulo -->
-                <div class="space-y-3 max-w-lg">
-                    <h2
-                        class="text-[22px] md:text-[26px] font-semibold
-                               leading-[1.25] tracking-[-0.02em] text-[#010D28]"
-                    >
+            <!-- Conteúdo -->
+            <div class="relative px-6 pt-8 pb-9 md:px-9 md:pt-9 md:pb-10 bg-white">
+                <!-- Título + subtítulo -->
+                <div class="text-center space-y-3">
+                    <h2 class="text-[22px] md:text-[26px] font-semibold tracking-[-0.02em] text-[#010D28]">
                         Como deseja continuar?
                     </h2>
 
-                    <p
-                        class="text-[14px] md:text-[15px] text-[#000A57]/80
-                               leading-[1.8] max-w-xl mx-auto"
-                    >
-                        Se você já utiliza o F10 no desktop, faça o download da
-                        versão atualizada. Se precisa de ajuda com financeiro,
-                        matrícula ou suporte técnico, acesse diretamente nossa
-                        central de atendimento.
+                    <p class="text-[14px] md:text-[15px] leading-[1.8] text-[#000A57]/75 max-w-[520px] mx-auto">
+                        Atualize o F10 no desktop, acesse a central de ajuda ou conheça a
+                        integração Celcoin para cobranças via Pix.
                     </p>
                 </div>
 
-                <!-- Botões empilhados -->
-                <div class="w-full max-w-sm flex flex-col gap-3 mt-1">
-                    <!-- Botão principal -->
+                <!-- Botões principais (menores e delicados) -->
+                <div class="mt-7 flex flex-col items-center gap-3">
+                    <!-- Download (laranja, destaque) -->
                     <a
-                        on:click={closeModal}
                         href="/download"
-                        class="group w-full rounded-[999px] px-5 py-3.5
-                               text-[14px] md:text-[15px] font-semibold
-                               bg-[#EA6D0B] text-white
-                               shadow-[0_18px_40px_rgba(234,109,11,0.45)]
+                        on:click={closeModal}
+                        class="group relative w-full max-w-sm h-[50px]
+                               rounded-[999px] bg-[#EA6D0B] text-white font-semibold
+                               shadow-[0_16px_40px_rgba(234,109,11,0.38)]
                                hover:brightness-110 active:translate-y-[1px]
-                               transition-all flex items-center justify-center gap-2"
+                               transition-all focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/35"
+                        aria-label="Fazer download do F10"
                     >
-                        <span>Fazer download do F10</span>
-                        <span
-                            class="inline-block translate-x-[1px] group-hover:translate-x-[4px] transition-transform"
-                        >
-                            →
+                        <span class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                            Fazer download do F10
+                        </span>
+
+                        <span class="absolute right-5 top-1/2 -translate-y-1/2">
+                            <ArrowRight
+                                size={18}
+                                class="translate-x-[0px] group-hover:translate-x-[4px] transition-transform"
+                            />
                         </span>
                     </a>
 
-                    <!-- Botão secundário -->
+                    <!-- Ajuda (logo abaixo) -->
                     <a
                         href="https://ajuda.f10.com.br/kb"
-                        class="w-full rounded-[999px] px-5 py-3.5
-                               text-[14px] md:text-[15px] font-semibold
-                               border border-[#CBD5F0] bg-white
-                               text-[#000A57] hover:bg-[#F4F6FF]
-                               active:translate-y-[1px]
-                               transition-all flex items-center justify-center gap-2"
+                        class="group relative w-full max-w-sm h-[50px]
+                               rounded-[999px] bg-white text-[#000A57] font-semibold
+                               border border-[#CBD5F0] shadow-sm
+                               hover:bg-[#F4F6FF] active:translate-y-[1px]
+                               transition-all focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/25"
+                        aria-label="Acessar a central de ajuda"
                     >
-                        <span>Acessar a central de suporte</span>
+                        <span class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                            Acessar a central de ajuda
+                        </span>
+
+                        <span class="absolute right-5 top-1/2 -translate-y-1/2 text-[#EA6D0B]">
+                            <ArrowRight size={18} />
+                        </span>
                     </a>
                 </div>
 
-                <!-- Rodapé discreto -->
-                <p
-                    class="mt-1 text-[11px] text-[#6B7280] leading-relaxed max-w-sm"
-                >
-                    Download exclusivo para escolas e cursos que utilizam o F10
-                    Software. Em caso de dúvida sobre instalação, acesse o
-                    suporte.
+                <!-- Separador -->
+                <div class="mt-7 flex items-center justify-center gap-4">
+                    <span class="h-px w-[120px] bg-slate-200"></span>
+                    <span class="text-[11px] font-semibold text-slate-400 tracking-widest">
+                        CONHEÇA
+                    </span>
+                    <span class="h-px w-[120px] bg-slate-200"></span>
+                </div>
+
+                <!-- Card Celcoin (compacto e delicado) -->
+                <div class="mt-6 flex justify-center">
+                    <div
+                        class="w-full max-w-sm rounded-[22px]
+                               border border-[#EA6D0B]/30 bg-[#F3F4FD]
+                               px-5 py-5 shadow-[0_10px_26px_rgba(1,13,40,0.06)]"
+                    >
+                        <div class="flex items-start gap-3">
+                            <div
+                                class="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full
+                                       bg-white ring-1 ring-black/5"
+                                aria-hidden="true"
+                            >
+                                <Coins size={18} class="text-[#EA6D0B]" />
+                            </div>
+
+                            <div class="flex-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <p class="text-[#010D28] font-semibold text-[15px] leading-snug">
+                                        Quer cobrar com Pix no F10?
+                                    </p>
+
+                                    <span
+                                        class="inline-flex items-center gap-1 rounded-full
+                                               bg-white text-[#EA6D0B] px-2.5 py-1
+                                               text-[10px] font-bold ring-1 ring-[#EA6D0B]/20"
+                                    >
+                                        <Sparkles size={12} />
+                                        NOVO
+                                    </span>
+                                </div>
+
+                                <p class="mt-2 text-[#7E82A2] text-[13px] leading-relaxed">
+                                    Conheça a Celcoin e veja como ativar a integração para
+                                    simplificar a conciliação e acelerar recebimentos.
+                                </p>
+
+                                <a
+                                    href="/celcoin"
+                                    on:click={closeModal}
+                                    class="mt-4 inline-flex items-center gap-2
+                                           rounded-[999px] bg-[#000A57]
+                                           px-5 py-2.5 text-white font-semibold text-[14px]
+                                           shadow-[0_14px_30px_rgba(0,10,87,0.18)]
+                                           hover:brightness-110 active:translate-y-[1px]
+                                           transition-all"
+                                    aria-label="Conhecer a página Celcoin"
+                                >
+                                    <span>Conhecer Celcoin</span>
+                                    <ArrowRight size={18} class="text-[#EA6D0B]" />
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rodapé -->
+                <p class="mt-7 text-center text-[11px] text-[#6B7280] leading-relaxed max-w-sm mx-auto">
+                    Download exclusivo para escolas e cursos que utilizam o F10 Software.
+                    Em caso de dúvida sobre instalação, acesse a central de ajuda.
                 </p>
             </div>
+
+            <!-- borda interna -->
+            <div class="pointer-events-none absolute inset-0 rounded-[24px] ring-1 ring-inset ring-white/10"></div>
         </div>
     </div>
 {/if}

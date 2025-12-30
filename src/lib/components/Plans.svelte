@@ -1,5 +1,7 @@
 <script lang="ts">
     import IconArrowRight from "$lib/icons/IconArrowRight.svelte";
+    import { contactModalConfig } from "$lib/stores/contactModals";
+    import { showForm } from "$lib/stores/formPopup";
     import { Check, X, AlertTriangle } from "lucide-svelte";
 
     type BillingPeriod = "monthly" | "yearly";
@@ -181,6 +183,17 @@
         }
         return "bg-[#010D28] text-white";
     }
+
+    function openMarketingModal(planType: string = "", pricePlan: string = "") {
+        contactModalConfig.set({
+            defaultMessage: "Quero agendar uma demonstração do Marketing",
+            product: `Plano ${planType} - Valor ${pricePlan}`,
+            subSource: `F10 – Planos`,
+            leadDescription: "Contato iniciado pelo formulário de preços.",
+        });
+
+        showForm.set(true);
+    }
 </script>
 
 <!-- Toggle mensal / anual -->
@@ -281,17 +294,13 @@
             <div class="mt-5">
                 <p
                     class={`text-[26px] md:text-[30px] font-semibold tracking-[-0.03em] ${
-                        isHighlighted(plan)
-                            ? "text-white"
-                            : "text-[#010D28]"
+                        isHighlighted(plan) ? "text-white" : "text-[#010D28]"
                     }`}
                 >
                     {getCurrentPrice(plan)}
 
                     {#if plan.priceMonthly !== "Sob consulta"}
-                        <span
-                            class="ml-1 text-[13px] font-normal text-inherit"
-                        >
+                        <span class="ml-1 text-[13px] font-normal text-inherit">
                             {getBillingSuffix()}
                         </span>
                     {/if}
@@ -402,8 +411,9 @@
 
             <!-- CTA -->
             <div class="mt-6">
-                <a
-                    href={plan.ctaHref}
+                <button
+                    on:click={() =>
+                        openMarketingModal(plan.name, getCurrentPrice(plan))}
                     class={`inline-flex w-full items-center justify-center rounded-full px-5 py-2.5 text-[14px] font-semibold transition
                         ${
                             isHighlighted(plan)
@@ -417,7 +427,7 @@
                         stroke={isHighlighted(plan) ? "#010D28" : "white"}
                         classType="ml-2"
                     />
-                </a>
+                </button>
                 <p
                     class={`mt-2 text-[12px] ${
                         isHighlighted(plan)
@@ -429,9 +439,7 @@
                 </p>
             </div>
 
-            <div
-                class="mt-4 border-t border-white/10 border-slate-200/80 pt-4"
-            >
+            <div class="mt-4 border-t border-white/10 border-slate-200/80 pt-4">
                 <p
                     class={`text-[12px] font-medium ${
                         isHighlighted(plan)

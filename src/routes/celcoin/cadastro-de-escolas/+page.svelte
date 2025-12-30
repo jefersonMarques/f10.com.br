@@ -10,6 +10,7 @@
     Trash2,
     X,
   } from "lucide-svelte";
+  import Breadcrumb from "$lib/components/Breadcrumb.svelte";
 
   // ==============================
   // Tipos
@@ -44,7 +45,8 @@
 
   type FormErrors = Partial<Record<keyof FormData, string>>;
 
-  type DocType = "rg_cnh" | "cnpj" | "contrato" | "selfie";
+  type Step3DocType = "rg_cnh" | "cnpj" | "contrato";
+  type DocType = Step3DocType | "selfie";
 
   type UploadedFile = {
     id: string;
@@ -52,6 +54,17 @@
     createdAt: number;
     docType: DocType;
   };
+
+  type DocFilesMap = {
+    rg_cnh: UploadedFile[]; // múltiplos
+    cnpj: UploadedFile[]; // múltiplos
+    contrato: UploadedFile[]; // múltiplos
+    selfie: UploadedFile | null; // único
+  };
+
+  function isStep3DocType(docType: DocType): docType is Step3DocType {
+    return docType !== "selfie";
+  }
 
   // ==============================
   // Estado
@@ -104,10 +117,18 @@
   // CEP status (validado via ViaCEP)
   let cepStatus: "unknown" | "valid" | "invalid" = "unknown";
 
+  // Dica/descrição do CNAE (sem misturar com o valor numérico)
+  let cnaeMainDescription = "";
+
   // ==============================
-  // Documentos (1 por 1)
+  // Documentos
+  // - Passo 3: múltiplos arquivos por tipo
+  // - Passo 4: selfie única
   // ==============================
-  const maxFileSizeBytes = 2 * 1024 * 1024; // 2MB
+  const maxFileSizeBytes = 2 * 1024 * 1024; // 2MB por arquivo
+  const maxFilesPerDocType = 6; // proteção contra exageros (ajuste se quiser)
+
+  const step3DocTypes: Step3DocType[] = ["rg_cnh", "cnpj", "contrato"];
 
   // Tipos aceitos para docs (exceto selfie)
   const acceptedDocMime = new Set([
@@ -120,10 +141,10 @@
   // Tipos aceitos para selfie
   const acceptedSelfieMime = new Set(["image/jpeg", "image/jpg", "image/png"]);
 
-  let docFiles: Record<DocType, UploadedFile | null> = {
-    rg_cnh: null,
-    cnpj: null,
-    contrato: null,
+  let docFiles: DocFilesMap = {
+    rg_cnh: [],
+    cnpj: [],
+    contrato: [],
     selfie: null,
   };
 
@@ -214,57 +235,136 @@
     return { ok: true };
   }
 
-  function setDocFile(docType: DocType, file: File) {
+  function hasDoc(docType: DocType): boolean {
+    if (docType === "selfie") return !!docFiles.selfie;
+    return docFiles[docType].length > 0;
+  }
+
+  function addDocFile(docType: Step3DocType, file: File) {
+    // evita duplicar (heurística simples: nome+size)
+    const exists = docFiles[docType].some(
+      (f) => f.file.name === file.name && f.file.size === file.size,
+    );
+    if (exists) return;
+
     const uploaded: UploadedFile = {
       id: createId(),
       file,
       createdAt: Date.now(),
       docType,
     };
-    docFiles = { ...docFiles, [docType]: uploaded };
+
+    docFiles = { ...docFiles, [docType]: [...docFiles[docType], uploaded] };
     clearDocTypeError(docType);
   }
 
-  function removeDocFile(docType: DocType) {
-    docFiles = { ...docFiles, [docType]: null };
+  function setSelfieFile(file: File) {
+    const uploaded: UploadedFile = {
+      id: createId(),
+      file,
+      createdAt: Date.now(),
+      docType: "selfie",
+    };
+
+    docFiles = { ...docFiles, selfie: uploaded };
+    clearDocTypeError("selfie");
+  }
+
+  function removeDocFileById(docType: Step3DocType, id: string) {
+    docFiles = {
+      ...docFiles,
+      [docType]: docFiles[docType].filter((f) => f.id !== id),
+    };
+    clearDocTypeError(docType);
+  }
+
+  function clearDocFiles(docType: Step3DocType) {
+    docFiles = { ...docFiles, [docType]: [] };
     // remove o destaque agora; validação vai recolocar quando tentar avançar
     clearDocTypeError(docType);
   }
 
+  function removeDocFile(docType: DocType) {
+    if (docType === "selfie") {
+      docFiles = { ...docFiles, selfie: null };
+      clearDocTypeError("selfie");
+      return;
+    }
+    clearDocFiles(docType);
+  }
+
   function handleDocFileChange(e: Event) {
     const input = e.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
+    const files = Array.from(input.files ?? []);
     const docType = activeDocType;
 
-    if (!file || !docType) return;
+    if (!files.length || !docType) return;
 
-    const validation = validateFileForDoc(docType, file);
-    if (!validation.ok) {
-      const msg = validation.reason ?? "Arquivo inválido (tipo/tamanho).";
+    // Selfie: 1 arquivo
+    if (docType === "selfie") {
+      const file = files[0];
+      const validation = validateFileForDoc(docType, file);
+
+      if (!validation.ok) {
+        const msg = validation.reason ?? "Arquivo inválido (tipo/tamanho).";
+        setDocTypeError(docType, msg);
+        setDocMessage(msg);
+        return;
+      }
+
+      setSelfieFile(file);
+      setDocMessage("");
+      return;
+    }
+
+    // Passo 3: múltiplos
+    const currentCount = docFiles[docType].length;
+    const remaining = Math.max(0, maxFilesPerDocType - currentCount);
+
+    if (remaining <= 0) {
+      const msg = `Limite de ${maxFilesPerDocType} arquivos para ${docTitle(docType)}.`;
       setDocTypeError(docType, msg);
       setDocMessage(msg);
       return;
     }
 
-    setDocFile(docType, file);
-    setDocMessage("");
-  }
+    const toProcess = files.slice(0, remaining);
 
-  function hasDoc(docType: DocType): boolean {
-    return !!docFiles[docType];
+    let addedCount = 0;
+    let firstRejected: string | null = null;
+
+    for (const file of toProcess) {
+      const validation = validateFileForDoc(docType, file);
+      if (!validation.ok) {
+        if (!firstRejected)
+          firstRejected = validation.reason ?? "Arquivo inválido (tipo/tamanho).";
+        continue;
+      }
+
+      addDocFile(docType, file);
+      addedCount++;
+    }
+
+    if (firstRejected) {
+      setDocMessage(firstRejected);
+      if (addedCount === 0) setDocTypeError(docType, firstRejected);
+      else clearDocTypeError(docType);
+      return;
+    }
+
+    setDocMessage("");
+    clearDocTypeError(docType);
   }
 
   function validateDocsStep3(): { ok: boolean; message?: string } {
-    // Etapa 3: RG/CNH, CNPJ, Contrato
-    const required: DocType[] = ["rg_cnh", "cnpj", "contrato"];
+    // Etapa 3: RG/CNH, CNPJ, Contrato (agora: pelo menos 1 arquivo em cada)
     let anyMissing = false;
 
-    for (const dt of required) {
+    for (const dt of step3DocTypes) {
       if (!hasDoc(dt)) {
         anyMissing = true;
         markDocAttention(dt, "Obrigatório.");
       } else {
-        // se já tem, limpa atenção
         clearDocTypeError(dt);
       }
     }
@@ -286,7 +386,6 @@
   // ==============================
   // Câmera (Selfie) - tela cheia + preview + confirmar/cancelar
   // ==============================
-
   let cameraOverlayOpen = false; // controla tela cheia da câmera
   let cameraActive = false;
   let cameraStream: MediaStream | null = null;
@@ -357,7 +456,7 @@
 
   function confirmSelfie() {
     if (!pendingSelfie) return;
-    setDocFile("selfie", pendingSelfie.file);
+    setSelfieFile(pendingSelfie.file);
     setDocMessage("");
     closeCameraOverlay();
   }
@@ -446,13 +545,17 @@
   const successVideoUrl = "https://www.youtube.com/embed/XWWe9c7QDgo";
   const supportLink = "https://f10.movidesk.com/kb";
   const whatsappLink =
-    "https://wa.me/5500000000000?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20o%20cadastro.";
+    "https://wa.me/554130274747?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20o%20cadastro.";
 
   // ==============================
   // Helpers base
   // ==============================
   function onlyDigits(value: string): string {
     return value.replace(/\D+/g, "");
+  }
+
+  function limitDigits(value: string, maxDigits: number): string {
+    return onlyDigits(value).slice(0, maxDigits);
   }
 
   function safeTrim(value: unknown): string {
@@ -490,6 +593,7 @@
       cnpjAutoFilledKeys.delete(key);
       cepAutoFilledKeys.delete(key);
       if (key === "cep") cepStatus = "unknown";
+      if (key === "cnaeMain") cnaeMainDescription = "";
     }
 
     // Se foi autofill, marca origem
@@ -515,10 +619,10 @@
   }
 
   // ==============================
-  // Máscaras / Formatação
+  // Máscaras / Formatação (com limite de dígitos)
   // ==============================
   function formatCpf(value: string): string {
-    const d = onlyDigits(value).slice(0, 11);
+    const d = limitDigits(value, 11);
     const p1 = d.slice(0, 3);
     const p2 = d.slice(3, 6);
     const p3 = d.slice(6, 9);
@@ -532,7 +636,7 @@
   }
 
   function formatCnpj(value: string): string {
-    const d = onlyDigits(value).slice(0, 14);
+    const d = limitDigits(value, 14);
     const p1 = d.slice(0, 2);
     const p2 = d.slice(2, 5);
     const p3 = d.slice(5, 8);
@@ -548,14 +652,14 @@
   }
 
   function formatCep(value: string): string {
-    const d = onlyDigits(value).slice(0, 8);
+    const d = limitDigits(value, 8);
     const p1 = d.slice(0, 5);
     const p2 = d.slice(5, 8);
     return p2 ? `${p1}-${p2}` : p1;
   }
 
   function formatBrPhone(value: string): string {
-    const d = onlyDigits(value).slice(0, 11);
+    const d = limitDigits(value, 11);
     const ddd = d.slice(0, 2);
     const rest = d.slice(2);
 
@@ -570,6 +674,21 @@
     const p1 = rest.slice(0, 4);
     const p2 = rest.slice(4, 8);
     return `(${ddd}) ${p1}${p2 ? `-${p2}` : ""}`.trim();
+  }
+
+  // CNAE: apenas números (7 dígitos)
+  function formatCnae(value: string): string {
+    return limitDigits(value, 7);
+  }
+
+  // RG: apenas números (limite conservador)
+  function formatRg(value: string): string {
+    return limitDigits(value, 14);
+  }
+
+  // Número do endereço: apenas números (limite conservador)
+  function formatAddressNumber(value: string): string {
+    return limitDigits(value, 10);
   }
 
   // ==============================
@@ -655,23 +774,28 @@
 
     if (!isCnpjValid(formData.cnpj))
       nextErrors = addError(nextErrors, "cnpj", "CNPJ inválido.");
+
     if (!safeTrim(formData.unitLegalName))
       nextErrors = addError(
         nextErrors,
         "unitLegalName",
         "Informe a razão social.",
       );
+
     if (!safeTrim(formData.unitFantasyName))
       nextErrors = addError(
         nextErrors,
         "unitFantasyName",
         "Informe o nome fantasia.",
       );
-    if (!safeTrim(formData.cnaeMain))
+
+    // CNAE: obrigatório e apenas números (7 dígitos)
+    const cnaeDigits = onlyDigits(formData.cnaeMain);
+    if (cnaeDigits.length !== 7)
       nextErrors = addError(
         nextErrors,
         "cnaeMain",
-        "Informe o CNAE principal.",
+        "CNAE inválido (7 dígitos).",
       );
 
     const cepDigits = onlyDigits(formData.cep);
@@ -687,12 +811,16 @@
 
     if (!safeTrim(formData.street))
       nextErrors = addError(nextErrors, "street", "Informe o logradouro.");
+
     if (!safeTrim(formData.number))
       nextErrors = addError(nextErrors, "number", "Informe o número.");
+
     if (!safeTrim(formData.neighborhood))
       nextErrors = addError(nextErrors, "neighborhood", "Informe o bairro.");
+
     if (!safeTrim(formData.city))
       nextErrors = addError(nextErrors, "city", "Informe a cidade.");
+
     if (safeTrim(formData.state).length !== 2)
       nextErrors = addError(nextErrors, "state", "Informe a UF.");
 
@@ -712,16 +840,20 @@
         "managerName",
         "Informe o responsável.",
       );
+
     if (!isCpfValid(formData.managerCpf))
       nextErrors = addError(nextErrors, "managerCpf", "CPF inválido.");
+
     if (!safeTrim(formData.managerRg))
       nextErrors = addError(nextErrors, "managerRg", "Informe o RG.");
+
     if (!isBrazilPhoneValid(formData.managerWhatsapp))
       nextErrors = addError(
         nextErrors,
         "managerWhatsapp",
         "WhatsApp inválido.",
       );
+
     if (!isEmailValid(formData.managerEmail))
       nextErrors = addError(nextErrors, "managerEmail", "E-mail inválido.");
 
@@ -776,15 +908,19 @@
         setField("unitFantasyName", fantasy, { isAuto: true, source: "cnpj" });
       }
 
-      const cnaeId = data?.estabelecimento?.atividade_principal?.id
+      // CNAE: salvar somente números (id). Descrição vai em cnaeMainDescription.
+      const cnaeIdRaw = data?.estabelecimento?.atividade_principal?.id
         ? String(data.estabelecimento.atividade_principal.id)
         : "";
+      const cnaeId = formatCnae(cnaeIdRaw);
+
       const cnaeDesc = data?.estabelecimento?.atividade_principal?.descricao
         ? String(data.estabelecimento.atividade_principal.descricao)
         : "";
-      const cnaeLabel = [cnaeId, cnaeDesc].filter(Boolean).join(" - ").trim();
-      if (cnaeLabel && canAutoOverwrite("cnaeMain", "cnpj")) {
-        setField("cnaeMain", cnaeLabel, { isAuto: true, source: "cnpj" });
+
+      if (cnaeId && canAutoOverwrite("cnaeMain", "cnpj")) {
+        setField("cnaeMain", cnaeId, { isAuto: true, source: "cnpj" });
+        cnaeMainDescription = cnaeDesc || "";
       }
 
       const ddd = data?.estabelecimento?.ddd1
@@ -822,10 +958,14 @@
       }
 
       if (data?.estabelecimento?.numero && canAutoOverwrite("number", "cnpj")) {
-        setField("number", String(data.estabelecimento.numero), {
-          isAuto: true,
-          source: "cnpj",
-        });
+        setField(
+          "number",
+          formatAddressNumber(String(data.estabelecimento.numero)),
+          {
+            isAuto: true,
+            source: "cnpj",
+          },
+        );
       }
 
       if (
@@ -955,11 +1095,9 @@
   // ==============================
   // Navegação do Wizard
   // ==============================
-
   async function scrollPageToTop() {
     if (!browser) return;
     await tick();
-    // garante topo mesmo em navegadores/chatices diferentes
     window.scrollTo({ top: 0, left: 0 });
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
@@ -1006,7 +1144,7 @@
   }
 
   // ==============================
-  // Envio final (stub)
+  // Envio final
   // ==============================
   async function handleFinalSubmit() {
     submitMessage = "";
@@ -1044,7 +1182,7 @@
     isSubmitting = true;
 
     try {
-      // 1) Monta multipart com payload + 4 arquivos
+      // 1) Monta multipart com payload + arquivos
       const fd = new FormData();
 
       fd.append(
@@ -1055,10 +1193,12 @@
         }),
       );
 
-      // obrigatórios (validados acima)
-      fd.append("doc_rg_cnh", docFiles.rg_cnh!.file);
-      fd.append("doc_cnpj", docFiles.cnpj!.file);
-      fd.append("doc_contrato", docFiles.contrato!.file);
+      // Passo 3 (múltiplos): repete o mesmo field name várias vezes
+      for (const uf of docFiles.rg_cnh) fd.append("doc_rg_cnh", uf.file);
+      for (const uf of docFiles.cnpj) fd.append("doc_cnpj", uf.file);
+      for (const uf of docFiles.contrato) fd.append("doc_contrato", uf.file);
+
+      // Passo 4 (único)
       fd.append("doc_selfie", docFiles.selfie!.file);
 
       // 2) Envia para o endpoint que dispara o e-mail via Brevo
@@ -1146,24 +1286,34 @@
 </script>
 
 <section
-  class="min-h-screen"
+  class="min-h-screen pb-12 bg-white/50 flex flex-1 flex-col"
   style="--primary:#ea6d0b; --page-bg:#FFF7EF; --surface:#FFFFFF; --muted:#000000a6; --outline:#0000001a;"
 >
+  <Breadcrumb
+    baseUrl="https://f10.com.br"
+    items={[
+      { label: "HOME", href: "/" },
+      { label: "CELCOIN", href: "/celcoin" },
+      { label: "CADASTRO" },
+    ]}
+  />
+
   <!-- input único (controlado por activeDocType) -->
   <input
     bind:this={fileInputRef}
     type="file"
     class="hidden"
     on:change={handleDocFileChange}
+    multiple={!!activeDocType && activeDocType !== "selfie"}
     accept={activeDocType
       ? getAcceptByDocType(activeDocType)
       : "application/pdf,image/png,image/jpeg"}
   />
 
-  <div class="mx-auto max-w-[900px] px-4 sm:px-6 py-8 sm:py-10">
+  <div class="container flex-1 flex flex-col justify-center">
     <header class="mb-6">
       <h1
-        class="text-[26px] sm:text-[32px] leading-tight font-semibold text-[var(--primary)]"
+        class="text-[16px] sm:text-[16px] leading-tight font-semibold text-[var(--secondary)]"
       >
         Criar conta - CELCOIN F10
       </h1>
@@ -1258,6 +1408,7 @@
              Etapa 1 — Unidade
              ======================= -->
         {#if currentStep === 1}
+          <!-- (Etapa 1 igual ao seu código original — mantida) -->
           <div>
             <h2 class="text-[18px] font-semibold text-[var(--primary)]">
               Dados da unidade
@@ -1281,6 +1432,10 @@
                     }`}
                     value={formData.cnpj}
                     inputmode="numeric"
+                    type="tel"
+                    pattern="\d*"
+                    maxlength="18"
+                    autocomplete="off"
                     placeholder="00.000.000/0000-00"
                     on:input={(e) => {
                       const masked = formatCnpj(
@@ -1325,6 +1480,8 @@
                         : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                     }`}
                     value={formData.unitLegalName}
+                    placeholder="Ex: Escola Exemplo LTDA"
+                    autocomplete="organization"
                     on:input={(e) =>
                       setField(
                         "unitLegalName",
@@ -1352,6 +1509,8 @@
                         : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                     }`}
                     value={formData.unitFantasyName}
+                    placeholder="Ex: Escola Exemplo"
+                    autocomplete="organization"
                     on:input={(e) =>
                       setField(
                         "unitFantasyName",
@@ -1381,12 +1540,24 @@
                         : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                     }`}
                     value={formData.cnaeMain}
-                    on:input={(e) =>
-                      setField(
-                        "cnaeMain",
+                    inputmode="numeric"
+                    type="tel"
+                    pattern="\d*"
+                    maxlength="7"
+                    autocomplete="off"
+                    placeholder="0000000"
+                    on:input={(e) => {
+                      const v = formatCnae(
                         (e.currentTarget as HTMLInputElement).value,
-                      )}
+                      );
+                      setField("cnaeMain", v);
+                    }}
                   />
+                  {#if cnaeMainDescription}
+                    <p class="mt-2 text-[12px] text-black/55">
+                      {cnaeMainDescription}
+                    </p>
+                  {/if}
                   {#if errors.cnaeMain}<p class="mt-2 text-[12px] text-red-600">
                       {errors.cnaeMain}
                     </p>{/if}
@@ -1407,6 +1578,9 @@
                     }`}
                     value={formData.unitPhone}
                     inputmode="tel"
+                    type="tel"
+                    maxlength="15"
+                    autocomplete="tel"
                     placeholder="(00) 00000-0000"
                     on:input={(e) =>
                       setField(
@@ -1446,6 +1620,10 @@
                         }`}
                         value={formData.cep}
                         inputmode="numeric"
+                        type="tel"
+                        pattern="\d*"
+                        maxlength="9"
+                        autocomplete="postal-code"
                         placeholder="00000-000"
                         on:input={(e) => {
                           setField(
@@ -1493,6 +1671,8 @@
                           : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                       }`}
                       value={formData.street}
+                      placeholder="Ex: Rua das Flores"
+                      autocomplete="street-address"
                       on:input={(e) =>
                         setField(
                           "street",
@@ -1519,10 +1699,18 @@
                             : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                         }`}
                         value={formData.number}
+                        inputmode="numeric"
+                        type="tel"
+                        pattern="\d*"
+                        maxlength="10"
+                        autocomplete="off"
+                        placeholder="123"
                         on:input={(e) =>
                           setField(
                             "number",
-                            (e.currentTarget as HTMLInputElement).value,
+                            formatAddressNumber(
+                              (e.currentTarget as HTMLInputElement).value,
+                            ),
                           )}
                       />
                       {#if errors.number}<p
@@ -1546,6 +1734,9 @@
                             : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                         }`}
                         value={formData.state}
+                        maxlength="2"
+                        autocomplete="address-level1"
+                        placeholder="PR"
                         on:input={(e) =>
                           setField(
                             "state",
@@ -1578,6 +1769,8 @@
                           : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                       }`}
                       value={formData.neighborhood}
+                      placeholder="Ex: Centro"
+                      autocomplete="address-level3"
                       on:input={(e) =>
                         setField(
                           "neighborhood",
@@ -1605,6 +1798,8 @@
                           : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                       }`}
                       value={formData.city}
+                      placeholder="Ex: Curitiba"
+                      autocomplete="address-level2"
                       on:input={(e) =>
                         setField(
                           "city",
@@ -1627,6 +1822,8 @@
                     id="complement"
                     class="mt-2 w-full rounded-xl border border-black/15 px-4 py-3 text-[15px] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                     value={formData.complement}
+                    placeholder="Ex: Apto 12, Bloco B (opcional)"
+                    autocomplete="address-line2"
                     on:input={(e) =>
                       setField(
                         "complement",
@@ -1643,6 +1840,7 @@
              Etapa 2 — Responsável + Divulgação
              ======================= -->
         {#if currentStep === 2}
+          <!-- (Etapa 2 igual ao seu código original — mantida) -->
           <div>
             <h2 class="text-[18px] font-semibold text-[var(--primary)]">
               Dados do responsável
@@ -1663,6 +1861,8 @@
                       : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                   }`}
                   value={formData.managerName}
+                  placeholder="Ex: Maria da Silva"
+                  autocomplete="name"
                   on:input={(e) =>
                     setField(
                       "managerName",
@@ -1690,6 +1890,10 @@
                   }`}
                   value={formData.managerCpf}
                   inputmode="numeric"
+                  type="tel"
+                  pattern="\d*"
+                  maxlength="14"
+                  autocomplete="off"
                   placeholder="000.000.000-00"
                   on:input={(e) =>
                     setField(
@@ -1715,10 +1919,16 @@
                       : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                   }`}
                   value={formData.managerRg}
+                  inputmode="numeric"
+                  type="tel"
+                  pattern="\d*"
+                  maxlength="14"
+                  autocomplete="off"
+                  placeholder="000000000"
                   on:input={(e) =>
                     setField(
                       "managerRg",
-                      (e.currentTarget as HTMLInputElement).value,
+                      formatRg((e.currentTarget as HTMLInputElement).value),
                     )}
                 />
                 {#if errors.managerRg}<p class="mt-2 text-[12px] text-red-600">
@@ -1741,6 +1951,9 @@
                   }`}
                   value={formData.managerWhatsapp}
                   inputmode="tel"
+                  type="tel"
+                  maxlength="15"
+                  autocomplete="tel"
                   placeholder="(00) 00000-0000"
                   on:input={(e) =>
                     setField(
@@ -1765,6 +1978,7 @@
                 >
                 <input
                   id="managerEmail"
+                  type="email"
                   class={`mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none ${
                     errors.managerEmail
                       ? "border-red-400"
@@ -1772,6 +1986,8 @@
                   }`}
                   value={formData.managerEmail}
                   inputmode="email"
+                  autocomplete="email"
+                  placeholder="nome@exemplo.com"
                   on:input={(e) =>
                     setField(
                       "managerEmail",
@@ -1807,6 +2023,7 @@
                     }`}
                     value={formData.marketingSite}
                     placeholder="ex: escola.com.br"
+                    autocomplete="url"
                     on:input={(e) =>
                       setField(
                         "marketingSite",
@@ -1834,7 +2051,8 @@
                         : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                     }`}
                     value={formData.marketingInstagram}
-                    placeholder="instagram.com/suaescola"
+                    placeholder="@suaescola ou instagram.com/suaescola"
+                    autocomplete="off"
                     on:input={(e) =>
                       setField(
                         "marketingInstagram",
@@ -1863,6 +2081,7 @@
                     }`}
                     value={formData.marketingFacebook}
                     placeholder="facebook.com/suaescola"
+                    autocomplete="off"
                     on:input={(e) =>
                       setField(
                         "marketingFacebook",
@@ -1881,7 +2100,7 @@
         {/if}
 
         <!-- =======================
-             Etapa 3 — Documentos (1 por 1)
+             Etapa 3 — Documentos (múltiplos por tipo)
              ======================= -->
         {#if currentStep === 3}
           <div>
@@ -1897,14 +2116,14 @@
                   <FileText size={18} class="text-[var(--primary)]" />
                 </div>
                 <div class="text-[13px] text-black/65 space-y-1">
-                  <p>Envie os documentos obrigatórios, um por vez.</p>
-                  <p>Formatos aceitos: PDF, JPG, PNG (até 2MB).</p>
+                  <p>Envie os documentos obrigatórios (você pode anexar mais de um arquivo por item).</p>
+                  <p>Formatos aceitos: PDF, JPG, PNG (até 2MB por arquivo).</p>
                 </div>
               </div>
             </div>
 
             <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-5">
-              {#each ["rg_cnh", "cnpj", "contrato"] as DocType[] as dt (dt)}
+              {#each step3DocTypes as dt (dt)}
                 <div
                   class={`rounded-2xl border ${docCardBorderClass(dt)} bg-white p-5`}
                 >
@@ -1918,7 +2137,7 @@
                       </p>
                     </div>
 
-                    {#if hasDoc(dt)}
+                    {#if docFiles[dt].length > 0}
                       <CheckCircle2 size={18} class="text-[var(--primary)]" />
                     {:else}
                       <XCircle
@@ -1930,22 +2149,42 @@
                     {/if}
                   </div>
 
-                  <div
-                    class="mt-4 rounded-xl border border-black/10 bg-black/[0.02] px-4 py-3"
-                  >
-                    {#if docFiles[dt]}
-                      <p
-                        class="text-[13px] font-semibold text-black/75 truncate"
-                      >
-                        {docFiles[dt]!.file.name}
-                      </p>
-                      <p class="text-[12px] text-black/50">
-                        {formatBytes(docFiles[dt]!.file.size)}
-                      </p>
+                  <div class="mt-4 space-y-2">
+                    {#if docFiles[dt].length > 0}
+                      {#each docFiles[dt] as uf (uf.id)}
+                        <div
+                          class="flex items-start justify-between gap-3 rounded-xl border border-black/10 bg-black/[0.02] px-4 py-3"
+                        >
+                          <div class="min-w-0">
+                            <p
+                              class="text-[13px] font-semibold text-black/75 truncate"
+                            >
+                              {uf.file.name}
+                            </p>
+                            <p class="text-[12px] text-black/50">
+                              {formatBytes(uf.file.size)}
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            class="inline-flex items-center justify-center rounded-xl px-3 py-2 text-[12px] font-semibold text-[var(--primary)] border border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
+                            on:click={() => removeDocFileById(dt, uf.id)}
+                            aria-label="Remover arquivo"
+                            title="Remover"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      {/each}
                     {:else}
-                      <p class="text-[13px] text-black/55">
-                        Nenhum arquivo enviado.
-                      </p>
+                      <div
+                        class="rounded-xl border border-black/10 bg-black/[0.02] px-4 py-3"
+                      >
+                        <p class="text-[13px] text-black/55">
+                          Nenhum arquivo enviado.
+                        </p>
+                      </div>
                     {/if}
                   </div>
 
@@ -1962,21 +2201,27 @@
                       on:click={() => openFilePicker(dt)}
                     >
                       <Upload size={16} />
-                      {docFiles[dt] ? "Substituir" : "Enviar"}
+                      {docFiles[dt].length > 0 ? "Adicionar" : "Enviar"}
                     </button>
 
-                    {#if docFiles[dt]}
+                    {#if docFiles[dt].length > 0}
                       <button
                         type="button"
                         class="inline-flex items-center justify-center rounded-xl px-4 py-3 text-[13px] font-semibold text-[var(--primary)] border border-[var(--primary)]/30 hover:bg-[var(--primary)]/10"
-                        on:click={() => removeDocFile(dt)}
-                        aria-label="Remover"
-                        title="Remover"
+                        on:click={() => clearDocFiles(dt)}
+                        aria-label="Remover todos"
+                        title="Remover todos"
                       >
                         <Trash2 size={16} />
                       </button>
                     {/if}
                   </div>
+
+                  {#if docFiles[dt].length > 0}
+                    <p class="mt-3 text-[12px] text-black/50">
+                      {docFiles[dt].length} arquivo(s) anexado(s) — limite {maxFilesPerDocType}.
+                    </p>
+                  {/if}
                 </div>
               {/each}
             </div>
@@ -2119,7 +2364,9 @@
                 </div>
 
                 {#if submitMessage}
-                  <p class="mt-4 text-[13px] text-black/70">{submitMessage}</p>
+                  <p class="mt-4 text-[13px] text-black/70">
+                    {submitMessage}
+                  </p>
                 {/if}
               </div>
             </div>
