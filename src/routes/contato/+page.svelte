@@ -681,8 +681,7 @@
                     on:change={handleResumeChange}
                   />
                   <p class="mt-1 text-[12px] text-[#7E82A2]">
-                    Anexe seu currículo. O limite é controlado no backend via
-                    JOBS_RESUME_MAX_MB.
+                    Anexe seu currículo.
                   </p>
                 </div>
 

@@ -9,6 +9,7 @@ import {
   SITE_URL,
   BREVO_API_KEY,
   BREVO_MAIL_TO,
+  BREVO_SALES_MAIL_TO,
   BREVO_FROM_EMAIL,
   BREVO_FROM_NAME,
 } from "$env/static/private";
@@ -378,9 +379,9 @@ export const POST: RequestHandler = async ({ request }) => {
   await appendToJsonFile<ContactLead>(DATA_FILE_PATH, lead);
 
   // E-mail (Brevo)
-  const toEmail = safeString(BREVO_MAIL_TO);
+  const toEmail = safeString(BREVO_SALES_MAIL_TO);
   if (!toEmail) {
-    console.warn("[contact/lead] BREVO_MAIL_TO não definido. Pulando e-mail.");
+    console.warn("[contact/lead] BREVO_SALES_MAIL_TO não definido. Pulando e-mail.");
   }
 
   const emailHtml = buildLeadEmailHtml(lead);
