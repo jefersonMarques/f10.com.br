@@ -31,5 +31,7 @@ coverage/
 static/InstaladorF10.exe
 
 #data logs
-data\contact-modal-leads.json
-data\whatsapp-leads.json
+data/contact-modal-leads.json
+data/whatsapp-leads.json
+data/contact-jobs.json
+data/contact-leads.json
