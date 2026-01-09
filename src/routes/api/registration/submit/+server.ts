@@ -1,6 +1,8 @@
+import "$lib/server/load-env";
 import { json } from "@sveltejs/kit";
+import { appendFileSync, mkdirSync } from "node:fs";
+import { resolve } from "node:path";
 import type { RequestHandler } from "./$types";
-import { env } from "$env/dynamic/private";
 
 /**
  * Endpoint para receber o cadastro (multipart/form-data),
@@ -451,21 +453,62 @@ function buildEmailHtml(params: {
   `.trim();
 }
 
+function getEnv(key: string): string | undefined {
+  const value = process.env[key];
+  if (typeof value === "string" && value.length > 0) {
+    return value;
+  }
+  return undefined;
+}
+
+function logMultipartError(error: unknown): void {
+  try {
+    const dir = resolve(process.cwd(), "data");
+    mkdirSync(dir, { recursive: true });
+    const entry = [
+      `[${new Date().toISOString()}] multipart/form-data parse failure`,
+      error instanceof Error ? error.stack || error.message : String(error),
+      "",
+    ].join("\n");
+    appendFileSync(resolve(dir, "registration-errors.log"), entry, "utf8");
+  } catch (logError) {
+    console.error("[registration] Falha ao registrar erro:", logError);
+  }
+}
+
 export const GET: RequestHandler = async () => {
   // Healthcheck simples
   const isConfigured = Boolean(
-    env.BREVO_API_KEY && env.BREVO_MAIL_TO && env.BREVO_FROM_EMAIL,
+    getEnv("BREVO_API_KEY") &&
+      getEnv("BREVO_MAIL_TO") &&
+      getEnv("BREVO_FROM_EMAIL"),
   );
   return json({ ok: true, emailConfigured: isConfigured });
 };
 
 export const POST: RequestHandler = async ({ request, url }) => {
+    const contentType = request.headers.get("content-type") ?? "—";
+  const contentLength = request.headers.get("content-length") ?? "—";
+
+  console.log("[registration] incoming", { contentType, contentLength });
+
+  if (!contentType.toLowerCase().includes("multipart/form-data")) {
+    return json(
+      {
+        success: false,
+        message: "Conteúdo inválido. Envie como multipart/form-data.",
+        details: `content-type=${contentType} content-length=${contentLength}`,
+      },
+      { status: 415 },
+    );
+  }
+  
   // ====== Config ======
-  const apiKey = env.BREVO_API_KEY;
-  const toEmail = env.BREVO_MAIL_TO; // ex: cadastro@f10.com.br
-  const fromEmail = env.BREVO_FROM_EMAIL; // ex: no-reply@f10.com.br
-  const fromName = env.BREVO_FROM_NAME || "F10";
-  const siteUrl = env.PUBLIC_SITE_URL || url.origin;
+  const apiKey = getEnv("BREVO_API_KEY");
+  const toEmail = getEnv("BREVO_MAIL_TO"); // ex: cadastro@f10.com.br
+  const fromEmail = getEnv("BREVO_FROM_EMAIL"); // ex: no-reply@f10.com.br
+  const fromName = getEnv("BREVO_FROM_NAME") || "F10";
+  const siteUrl = getEnv("PUBLIC_SITE_URL") || url.origin;
 
   if (!apiKey || !toEmail || !fromEmail) {
     return json(
@@ -482,11 +525,15 @@ export const POST: RequestHandler = async ({ request, url }) => {
   let form: FormData;
   try {
     form = await request.formData();
-  } catch {
+  } catch (error) {
+    console.error("[registration] Falha ao ler multipart:", error);
+    logMultipartError(error);
     return json(
       {
         success: false,
         message: "Conteúdo inválido. Envie como multipart/form-data.",
+        details:
+          error instanceof Error ? error.message.slice(0, 500) : String(error),
       },
       { status: 400 },
     );

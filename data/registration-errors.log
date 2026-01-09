@@ -1,0 +1,24 @@
+[2026-01-08T20:01:00.853Z] multipart/form-data parse failure
+Error: Content-length of 1268028 exceeds limit of 524288 bytes.
+    at Object.start (file:///opt/f10.com.br/build/handler.js:996:19)
+    at setupReadableStreamDefaultController (node:internal/webstreams/readablestream:2464:23)
+    at setupReadableStreamDefaultControllerFromSource (node:internal/webstreams/readablestream:2496:3)
+    at new ReadableStream (node:internal/webstreams/readablestream:279:7)
+    at get_raw_body (file:///opt/f10.com.br/build/handler.js:985:9)
+    at getRequest (file:///opt/f10.com.br/build/handler.js:1094:7)
+    at Array.ssr (file:///opt/f10.com.br/build/handler.js:1293:19)
+    at handle (file:///opt/f10.com.br/build/handler.js:1363:23)
+    at file:///opt/f10.com.br/build/handler.js:1363:40
+    at Array.<anonymous> (file:///opt/f10.com.br/build/handler.js:1282:9)
+[2026-01-08T20:22:22.441Z] multipart/form-data parse failure
+Error: Content-length of 1268028 exceeds limit of 524288 bytes.
+    at Object.start (file:///opt/f10.com.br/build/handler.js:996:19)
+    at setupReadableStreamDefaultController (node:internal/webstreams/readablestream:2464:23)
+    at setupReadableStreamDefaultControllerFromSource (node:internal/webstreams/readablestream:2496:3)
+    at new ReadableStream (node:internal/webstreams/readablestream:279:7)
+    at get_raw_body (file:///opt/f10.com.br/build/handler.js:985:9)
+    at getRequest (file:///opt/f10.com.br/build/handler.js:1094:7)
+    at Array.ssr (file:///opt/f10.com.br/build/handler.js:1293:19)
+    at handle (file:///opt/f10.com.br/build/handler.js:1363:23)
+    at file:///opt/f10.com.br/build/handler.js:1363:40
+    at Array.<anonymous> (file:///opt/f10.com.br/build/handler.js:1282:9)

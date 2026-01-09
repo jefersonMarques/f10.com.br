@@ -6,13 +6,13 @@ import path from "node:path";
 import {
   EXACT_TOKEN,
   EXACT_FUNNEL_ID,
-  SITE_URL,
   BREVO_API_KEY,
   BREVO_MAIL_TO,
   BREVO_SALES_MAIL_TO,
   BREVO_FROM_EMAIL,
   BREVO_FROM_NAME,
 } from "$env/static/private";
+import { PUBLIC_SITE_URL } from "$env/static/public";
 
 // =========================
 // Tipos
@@ -88,7 +88,7 @@ function parseFunnelId(raw: unknown): number | undefined {
 }
 
 function buildAbsoluteSource(rawSource: string): string {
-  const siteUrl = safeString(SITE_URL) || "https://f10.com.br";
+  const siteUrl = safeString(PUBLIC_SITE_URL) || "https://f10.com.br";
   const s = safeString(rawSource) || "/";
   if (s.startsWith("/")) return `${siteUrl}${s}`;
   return s;
