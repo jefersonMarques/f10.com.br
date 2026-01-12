@@ -1,24 +1,35 @@
-import "$lib/server/load-env";
+﻿import "$lib/server/load-env";
 import { json } from "@sveltejs/kit";
+import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import type { RequestHandler } from "./$types";
 
-/**
- * Endpoint para receber o cadastro (multipart/form-data),
- * montar um e-mail HTML completo (bonito) e enviar via Brevo.
- *
- * IMPORTANTE:
- * - O frontend envia:
- *   - payload (string JSON)
- *   - doc_rg_cnh (File[])  -> múltiplos
- *   - doc_cnpj (File[])    -> múltiplos
- *   - doc_contrato (File[])-> múltiplos
- *   - doc_selfie (File)    -> único
- */
+type ContractClientMeta = {
+  userAgent?: string;
+  platform?: string;
+  language?: string;
+  timeZone?: string;
+  screen?: string;
+  viewport?: string;
+  referrer?: string;
+};
+
+type ContractPayload = {
+  title?: string;
+  contractVersion?: string;
+  termsVersion?: string;
+  accepted?: boolean;
+  acceptedAt?: string;
+  snapshotText?: string;
+  snapshotHtml?: string;
+  snapshotFileName?: string;
+  signedAtClient?: string;
+  signedClientMeta?: ContractClientMeta;
+};
 
 type RegistrationPayload = {
-  // Etapa 1 — Unidade
+  // Etapa 1 â€” Unidade
   cnpj: string;
   unitLegalName: string;
   unitFantasyName: string;
@@ -32,20 +43,23 @@ type RegistrationPayload = {
   state: string;
   unitPhone: string;
 
-  // Etapa 2 — Responsável
+  // Etapa 2 â€” ResponsÃ¡vel
   managerName: string;
   managerCpf: string;
   managerRg: string;
   managerWhatsapp: string;
   managerEmail: string;
 
-  // Etapa 2 — Divulgação (opcional)
+  // Etapa 2 â€” Divulga\u00e7\u00e3o (opcional)
   marketingSite: string;
   marketingInstagram: string;
   marketingFacebook: string;
 
   // Metadata
   submittedAt?: string;
+
+  // Contrato
+  contract?: ContractPayload;
 };
 
 type DocKey = "doc_rg_cnh" | "doc_cnpj" | "doc_contrato" | "doc_selfie";
@@ -70,7 +84,7 @@ const ALLOWED_DOC_MIME = new Set([
   "image/png",
 ]);
 
-// Selfie: só imagem (igual ao front)
+// Selfie: sÃ³ imagem (igual ao front)
 const ALLOWED_SELFIE_MIME = new Set(["image/jpeg", "image/jpg", "image/png"]);
 
 const DOCS: DocConfig[] = [
@@ -131,25 +145,35 @@ function formatBytes(bytes: number): string {
 
 function safeValue(value: unknown): string {
   const v = typeof value === "string" ? value.trim() : "";
-  return v ? v : "—";
+  return v ? v : "-";
+}
+
+function formatYesNo(value: unknown): string {
+  if (value === true) return "sim";
+  if (value === false) return "nao";
+  return "-";
+}
+
+function hashSha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 function sanitizeFilename(name: string): string {
-  // Remove caminhos e caracteres problemáticos
+  // Remove caminhos e caracteres problemÃ¡ticos
   const base = (name || "arquivo").split(/[/\\]/).pop() || "arquivo";
   return base.replace(/[^\w.\-()+\s]/g, "_");
 }
 
 function getClientIp(headers: Headers): string {
   const xff = headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]?.trim() || "—";
-  return headers.get("x-real-ip") || "—";
+  if (xff) return xff.split(",")[0]?.trim() || "â€”";
+  return headers.get("x-real-ip") || "â€”";
 }
 
 function formatDateTimeBR(iso: string | undefined): string {
-  if (!iso) return "—";
+  if (!iso) return "â€”";
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return "â€”";
   return new Intl.DateTimeFormat("pt-BR", {
     timeZone: "America/Sao_Paulo",
     year: "numeric",
@@ -197,34 +221,34 @@ function buildEmailText(params: {
   const { payload, docs, meta } = params;
 
   const lines: string[] = [];
-  lines.push(`Novo cadastro — CELCOIN F10`);
+  lines.push(`Novo cadastro â€” CELCOIN F10`);
   lines.push(`Recebido em: ${meta.submittedAt}`);
   lines.push(`Token: ${meta.messageToken}`);
   lines.push("");
   lines.push("=== Dados da unidade ===");
   lines.push(`CNPJ: ${safeValue(payload.cnpj)}`);
-  lines.push(`Razão Social: ${safeValue(payload.unitLegalName)}`);
+  lines.push(`RazÃ£o Social: ${safeValue(payload.unitLegalName)}`);
   lines.push(`Nome Fantasia: ${safeValue(payload.unitFantasyName)}`);
   lines.push(`CNAE principal: ${safeValue(payload.cnaeMain)}`);
   lines.push(`Telefone Comercial: ${safeValue(payload.unitPhone)}`);
   lines.push("");
-  lines.push("=== Endereço da unidade ===");
+  lines.push("=== EndereÃ§o da unidade ===");
   lines.push(`CEP: ${safeValue(payload.cep)}`);
   lines.push(`Logradouro: ${safeValue(payload.street)}`);
-  lines.push(`Número: ${safeValue(payload.number)}`);
+  lines.push(`NÃºmero: ${safeValue(payload.number)}`);
   lines.push(`Complemento: ${safeValue(payload.complement)}`);
   lines.push(`Bairro: ${safeValue(payload.neighborhood)}`);
   lines.push(`Cidade: ${safeValue(payload.city)}`);
   lines.push(`UF: ${safeValue(payload.state)}`);
   lines.push("");
   lines.push("=== Dados do responsável ===");
-  lines.push(`Responsável: ${safeValue(payload.managerName)}`);
+  lines.push(`ResponsÃ¡vel: ${safeValue(payload.managerName)}`);
   lines.push(`CPF: ${safeValue(payload.managerCpf)}`);
   lines.push(`RG: ${safeValue(payload.managerRg)}`);
   lines.push(`WhatsApp: ${safeValue(payload.managerWhatsapp)}`);
   lines.push(`E-mail: ${safeValue(payload.managerEmail)}`);
   lines.push("");
-  lines.push("=== Divulgação (opcional) ===");
+  lines.push("=== Divulga\u00e7\u00e3o (opcional) ===");
   lines.push(`Site: ${safeValue(payload.marketingSite)}`);
   lines.push(`Instagram: ${safeValue(payload.marketingInstagram)}`);
   lines.push(`Facebook: ${safeValue(payload.marketingFacebook)}`);
@@ -240,13 +264,55 @@ function buildEmailText(params: {
     }
   }
   lines.push("");
-  lines.push("=== Metadados técnicos ===");
+  const contract = payload.contract;
+  const contractSnapshotHtml =
+    typeof contract?.snapshotHtml === "string" ? contract.snapshotHtml : "";
+  const contractSnapshotText =
+    typeof contract?.snapshotText === "string" ? contract.snapshotText : "";
+  const contractHtmlHash = contractSnapshotHtml
+    ? hashSha256(contractSnapshotHtml)
+    : "";
+  const contractTextHash = contractSnapshotText
+    ? hashSha256(contractSnapshotText)
+    : "";
+  const signedMeta = contract?.signedClientMeta;
+
+  lines.push("=== Contrato e aceite ===");
+  lines.push(`Titulo: ${safeValue(contract?.title)}`);
+  lines.push(`Contrato versao: ${safeValue(contract?.contractVersion)}`);
+  lines.push(`Termos versao: ${safeValue(contract?.termsVersion)}`);
+  lines.push(`Aceite (checkbox): ${formatYesNo(contract?.accepted)}`);
+  lines.push(
+    `Aceito em (cliente): ${formatDateTimeBR(
+      contract?.signedAtClient || contract?.acceptedAt,
+    )}`,
+  );
+  lines.push(`Snapshot arquivo: ${safeValue(contract?.snapshotFileName)}`);
+  lines.push(
+    `Snapshot HTML hash (sha256): ${safeValue(contractHtmlHash)}`,
+  );
+  lines.push(`Snapshot HTML tamanho: ${contractSnapshotHtml.length}`);
+  lines.push(
+    `Snapshot texto hash (sha256): ${safeValue(contractTextHash)}`,
+  );
+  lines.push(`Snapshot texto tamanho: ${contractSnapshotText.length}`);
+  lines.push("");
+  lines.push("=== Dados do dispositivo (cliente) ===");
+  lines.push(`User-Agent: ${safeValue(signedMeta?.userAgent)}`);
+  lines.push(`Plataforma: ${safeValue(signedMeta?.platform)}`);
+  lines.push(`Idioma: ${safeValue(signedMeta?.language)}`);
+  lines.push(`Fuso horario: ${safeValue(signedMeta?.timeZone)}`);
+  lines.push(`Tela: ${safeValue(signedMeta?.screen)}`);
+  lines.push(`Viewport: ${safeValue(signedMeta?.viewport)}`);
+  lines.push(`Referrer: ${safeValue(signedMeta?.referrer)}`);
+  lines.push("");
+  lines.push("=== Metadados tÃ©cnicos ===");
   lines.push(`IP (proxy): ${safeValue(meta.clientIp)}`);
   lines.push(`User-Agent: ${safeValue(meta.userAgent)}`);
   lines.push(`Origem: ${safeValue(meta.origin)}`);
   lines.push(`submittedAt (payload): ${safeValue(payload.submittedAt)}`);
   lines.push("");
-  lines.push("Aviso: este e-mail contém informações sensíveis. Evite encaminhar.");
+  lines.push("Aviso: este e-mail contÃ©m informaÃ§Ãµes sensÃ­veis. Evite encaminhar.");
 
   return lines.join("\n");
 }
@@ -260,6 +326,7 @@ function buildEmailHtml(params: {
     fileType: string;
     fileSize: number;
   }>;
+  selfieInlineDataUrl?: string | null;
   meta: {
     submittedAt: string;
     clientIp: string;
@@ -274,9 +341,21 @@ function buildEmailHtml(params: {
   const outline = "rgba(0,0,0,0.10)";
   const muted = "rgba(0,0,0,0.62)";
 
-  const { payload, docs, meta } = params;
+  const { payload, docs, meta, selfieInlineDataUrl } = params;
 
   const logoUrl = `${meta.origin}/logo_f10.png`;
+  const contract = payload.contract;
+  const contractSnapshotHtml =
+    typeof contract?.snapshotHtml === "string" ? contract.snapshotHtml : "";
+  const contractSnapshotText =
+    typeof contract?.snapshotText === "string" ? contract.snapshotText : "";
+  const contractHtmlHash = contractSnapshotHtml
+    ? hashSha256(contractSnapshotHtml)
+    : "";
+  const contractTextHash = contractSnapshotText
+    ? hashSha256(contractSnapshotText)
+    : "";
+  const signedMeta = contract?.signedClientMeta;
 
   const section = (title: string, rows: Array<[string, string]>) => {
     const rowsHtml = rows
@@ -319,7 +398,7 @@ function buildEmailHtml(params: {
               <td style="padding:10px 12px; border-top:1px solid ${outline}; color:#111; font-size:13px;">
                 <div style="font-weight:600;">${escapeHtml(d.fileName)}</div>
                 <div style="font-size:12px; color:${muted};">
-                  ${escapeHtml(d.fileType)} • ${escapeHtml(formatBytes(d.fileSize))}
+                  ${escapeHtml(d.fileType)} â€¢ ${escapeHtml(formatBytes(d.fileSize))}
                 </div>
               </td>
             </tr>
@@ -334,8 +413,53 @@ function buildEmailHtml(params: {
       </tr>
     `;
 
+  const contractSection = section("Contrato e aceite", [
+    ["Titulo", safeValue(contract?.title)],
+    ["Contrato versao", safeValue(contract?.contractVersion)],
+    ["Termos versao", safeValue(contract?.termsVersion)],
+    ["Aceite (checkbox)", formatYesNo(contract?.accepted)],
+    [
+      "Aceito em (cliente)",
+      formatDateTimeBR(contract?.signedAtClient || contract?.acceptedAt),
+    ],
+    ["Snapshot arquivo", safeValue(contract?.snapshotFileName)],
+    ["Snapshot HTML hash (sha256)", safeValue(contractHtmlHash)],
+    ["Snapshot HTML tamanho", String(contractSnapshotHtml.length)],
+    ["Snapshot texto hash (sha256)", safeValue(contractTextHash)],
+    ["Snapshot texto tamanho", String(contractSnapshotText.length)],
+  ]);
+
+  const deviceSection = section("Dispositivo do cliente", [
+    ["User-Agent", safeValue(signedMeta?.userAgent)],
+    ["Plataforma", safeValue(signedMeta?.platform)],
+    ["Idioma", safeValue(signedMeta?.language)],
+    ["Fuso horario", safeValue(signedMeta?.timeZone)],
+    ["Tela", safeValue(signedMeta?.screen)],
+    ["Viewport", safeValue(signedMeta?.viewport)],
+    ["Referrer", safeValue(signedMeta?.referrer)],
+  ]);
+
+  const selfiePreviewHtml = selfieInlineDataUrl
+    ? `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${outline}; border-radius:16px; overflow:hidden; background:${surface}; margin-top:14px;">
+        <tr>
+          <td style="padding:14px 16px; background:${bg};">
+            <div style="font-size:14px; font-weight:700; color:${primary};">
+              Selfie (visualizacao)
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:14px 16px;">
+            <img src="${selfieInlineDataUrl}" alt="Selfie" style="display:block; width:100%; height:auto; border-radius:12px; border:1px solid ${outline};" />
+          </td>
+        </tr>
+      </table>
+    `
+    : "";
+
   const preheaderText =
-    "Cadastro completo recebido (unidade, endereço, responsável, divulgação, documentos e metadados).";
+    "Cadastro completo recebido (unidade, endereço, responsável, divulga\u00e7\u00e3o, documentos e metadados).";
 
   return `
 <!doctype html>
@@ -347,7 +471,7 @@ function buildEmailHtml(params: {
   </head>
   <body style="margin:0; padding:0; background:${bg}; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif;">
     <span style="display:none !important; font-size:0; line-height:0; max-height:0; max-width:0; opacity:0; overflow:hidden; mso-hide:all; color:transparent;">
-      ${escapeHtml(preheaderText)} • ${escapeHtml(meta.messageToken)}
+      ${escapeHtml(preheaderText)} â€¢ ${escapeHtml(meta.messageToken)}
     </span>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${bg}; padding:24px 12px;">
@@ -368,10 +492,10 @@ function buildEmailHtml(params: {
                 </table>
 
                 <div style="margin-top:14px; font-size:22px; font-weight:800; color:${primary}; line-height:1.2;">
-                  Novo cadastro — CELCOIN F10
+                  Novo cadastro â€” CELCOIN F10
                 </div>
                 <div style="margin-top:6px; color:${muted}; font-size:13px;">
-                  Abaixo estão <strong>todos os dados</strong> enviados no formulário (incluindo campos opcionais).
+                  Abaixo estÃ£o <strong>todos os dados</strong> enviados no formulÃ¡rio (incluindo campos opcionais).
                 </div>
               </td>
             </tr>
@@ -381,16 +505,16 @@ function buildEmailHtml(params: {
                 <div style="background:${surface}; border:1px solid ${outline}; border-radius:22px; padding:18px;">
                   ${section("Dados da unidade", [
     ["CNPJ", safeValue(payload.cnpj)],
-    ["Razão Social", safeValue(payload.unitLegalName)],
+    ["RazÃ£o Social", safeValue(payload.unitLegalName)],
     ["Nome Fantasia", safeValue(payload.unitFantasyName)],
     ["CNAE principal", safeValue(payload.cnaeMain)],
     ["Telefone Comercial", safeValue(payload.unitPhone)],
   ])}
 
-                  ${section("Endereço da unidade", [
+                  ${section("EndereÃ§o da unidade", [
     ["CEP", safeValue(payload.cep)],
     ["Logradouro", safeValue(payload.street)],
-    ["Número", safeValue(payload.number)],
+    ["NÃºmero", safeValue(payload.number)],
     ["Complemento", safeValue(payload.complement)],
     ["Bairro", safeValue(payload.neighborhood)],
     ["Cidade", safeValue(payload.city)],
@@ -398,14 +522,14 @@ function buildEmailHtml(params: {
   ])}
 
                   ${section("Dados do responsável", [
-    ["Responsável", safeValue(payload.managerName)],
+    ["ResponsÃ¡vel", safeValue(payload.managerName)],
     ["CPF", safeValue(payload.managerCpf)],
     ["RG", safeValue(payload.managerRg)],
     ["WhatsApp", safeValue(payload.managerWhatsapp)],
     ["E-mail", safeValue(payload.managerEmail)],
   ])}
 
-                  ${section("Dados de divulgação (opcional)", [
+                  ${section("Dados de divulga\u00e7\u00e3o (opcional)", [
     ["Site", safeValue(payload.marketingSite)],
     ["Instagram", safeValue(payload.marketingInstagram)],
     ["Facebook", safeValue(payload.marketingFacebook)],
@@ -421,8 +545,13 @@ function buildEmailHtml(params: {
                     </tr>
                     ${docsRows}
                   </table>
+                  ${contractSection}
 
-                  ${section("Metadados técnicos", [
+                  ${deviceSection}
+
+                  ${selfiePreviewHtml}
+
+                  ${section("Metadados tÃ©cnicos", [
     ["IP (proxy)", safeValue(meta.clientIp)],
     ["User-Agent", safeValue(meta.userAgent)],
     ["Origem", safeValue(meta.origin)],
@@ -431,7 +560,7 @@ function buildEmailHtml(params: {
   ])}
 
                   <div style="margin-top:14px; font-size:12px; color:${muted}; line-height:1.5;">
-                    Aviso: este e-mail contém informações sensíveis. Evite encaminhar e mantenha em local seguro.
+                    Aviso: este e-mail contÃ©m informaÃ§Ãµes sensÃ­veis. Evite encaminhar e mantenha em local seguro.
                   </div>
 
                 </div>
@@ -440,7 +569,7 @@ function buildEmailHtml(params: {
 
             <tr>
               <td style="padding:0 18px 8px 18px; color:${muted}; font-size:11px; text-align:center;">
-                F10 • Cadastro automático
+                F10 â€¢ Cadastro automÃ¡tico
               </td>
             </tr>
 
@@ -487,8 +616,8 @@ export const GET: RequestHandler = async () => {
 };
 
 export const POST: RequestHandler = async ({ request, url }) => {
-    const contentType = request.headers.get("content-type") ?? "—";
-  const contentLength = request.headers.get("content-length") ?? "—";
+    const contentType = request.headers.get("content-type") ?? "â€”";
+  const contentLength = request.headers.get("content-length") ?? "â€”";
 
   console.log("[registration] incoming", { contentType, contentLength });
 
@@ -496,7 +625,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return json(
       {
         success: false,
-        message: "Conteúdo inválido. Envie como multipart/form-data.",
+        message: "ConteÃºdo invÃ¡lido. Envie como multipart/form-data.",
         details: `content-type=${contentType} content-length=${contentLength}`,
       },
       { status: 415 },
@@ -515,7 +644,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
       {
         success: false,
         message:
-          "E-mail não configurado no servidor (BREVO_API_KEY / BREVO_MAIL_TO / BREVO_FROM_EMAIL).",
+          "E-mail nÃ£o configurado no servidor (BREVO_API_KEY / BREVO_MAIL_TO / BREVO_FROM_EMAIL).",
       },
       { status: 500 },
     );
@@ -531,7 +660,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return json(
       {
         success: false,
-        message: "Conteúdo inválido. Envie como multipart/form-data.",
+        message: "ConteÃºdo invÃ¡lido. Envie como multipart/form-data.",
         details:
           error instanceof Error ? error.message.slice(0, 500) : String(error),
       },
@@ -544,7 +673,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return json(
       {
         success: false,
-        message: "Payload ausente. Campo 'payload' é obrigatório.",
+        message: "Payload ausente. Campo 'payload' Ã© obrigatÃ³rio.",
       },
       { status: 400 },
     );
@@ -555,12 +684,12 @@ export const POST: RequestHandler = async ({ request, url }) => {
     payload = JSON.parse(payloadRaw) as RegistrationPayload;
   } catch {
     return json(
-      { success: false, message: "Payload inválido (JSON malformado)." },
+      { success: false, message: "Payload invÃ¡lido (JSON malformado)." },
       { status: 400 },
     );
   }
 
-  // ====== Valida docs (agora com múltiplos) ======
+  // ====== Valida docs (agora com mÃºltiplos) ======
   const docFiles: Array<{
     key: DocKey;
     label: string;
@@ -574,7 +703,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
 
     if (d.required && files.length === 0) {
       return json(
-        { success: false, message: `Documento obrigatório ausente: ${d.label}.` },
+        { success: false, message: `Documento obrigatÃ³rio ausente: ${d.label}.` },
         { status: 400 },
       );
     }
@@ -598,7 +727,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
 
       if (!fileName || !fileSize) {
         return json(
-          { success: false, message: `Arquivo inválido em: ${d.label}.` },
+          { success: false, message: `Arquivo invÃ¡lido em: ${d.label}.` },
           { status: 400 },
         );
       }
@@ -616,7 +745,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
         return json(
           {
             success: false,
-            message: `Formato inválido em: ${d.label} (use ${allowedText}).`,
+            message: `Formato invÃ¡lido em: ${d.label} (use ${allowedText}).`,
           },
           { status: 400 },
         );
@@ -635,6 +764,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     fileType: string;
     fileSize: number;
   }> = [];
+  let selfieInlineDataUrl: string | null = null;
 
   for (const d of docFiles) {
     const baseName = sanitizeFilename(d.file.name);
@@ -646,6 +776,10 @@ export const POST: RequestHandler = async ({ request, url }) => {
     const content = await fileToBase64(d.file);
 
     attachments.push({ name: numberedName, content });
+    if (d.key === "doc_selfie") {
+      const mime = d.file.type || "image/jpeg";
+      selfieInlineDataUrl = `data:${mime};base64,${content}`;
+    }
 
     docsInfoForHtml.push({
       key: d.key,
@@ -653,6 +787,20 @@ export const POST: RequestHandler = async ({ request, url }) => {
       fileName: numberedName,
       fileType: d.file.type || "application/octet-stream",
       fileSize: d.file.size,
+    });
+  }
+
+  const contractSnapshotHtml =
+    typeof payload.contract?.snapshotHtml === "string"
+      ? payload.contract.snapshotHtml
+      : "";
+  const contractSnapshotFileName = sanitizeFilename(
+    payload.contract?.snapshotFileName || "contrato_f10.html",
+  );
+  if (contractSnapshotHtml) {
+    attachments.push({
+      name: contractSnapshotFileName,
+      content: Buffer.from(contractSnapshotHtml, "utf8").toString("base64"),
     });
   }
 
@@ -666,7 +814,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const meta = {
     submittedAt: formatDateTimeBR(submittedAtIso),
     clientIp: getClientIp(request.headers),
-    userAgent: request.headers.get("user-agent") || "—",
+    userAgent: request.headers.get("user-agent") || "â€”",
     origin: siteUrl,
     messageToken,
   };
@@ -675,6 +823,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const htmlContent = buildEmailHtml({
     payload,
     docs: docsInfoForHtml,
+    selfieInlineDataUrl,
     meta,
   });
 
@@ -684,11 +833,11 @@ export const POST: RequestHandler = async ({ request, url }) => {
     meta,
   });
 
-  // ====== Assunto ÚNICO (evita “conversa” e trimming) ======
+  // ====== Assunto ÃšNICO (evita â€œconversaâ€ e trimming) ======
   const stampForSubject = nowIso.replace("T", " ").slice(0, 19);
-  const subject = `Novo cadastro F10 • ${safeValue(
+  const subject = `Novo cadastro F10 â€¢ ${safeValue(
     payload.unitFantasyName,
-  )} • ${cnpjDigits || "CNPJ"} • ${stampForSubject}`;
+  )} â€¢ ${cnpjDigits || "CNPJ"} â€¢ ${stampForSubject}`;
 
   // ====== Envia via Brevo ======
   try {
@@ -716,7 +865,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
         {
           success: false,
           message:
-            "Falha ao enviar e-mail via Brevo. Verifique API Key e liberação de IP/servidor.",
+            "Falha ao enviar e-mail via Brevo. Verifique API Key e liberaÃ§Ã£o de IP/servidor.",
           details: errorText.slice(0, 2000),
         },
         { status: 502 },

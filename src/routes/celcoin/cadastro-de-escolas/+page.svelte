@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { browser } from "$app/environment";
   import { onDestroy, tick } from "svelte";
   import {
@@ -11,12 +11,13 @@
     X,
   } from "lucide-svelte";
   import Breadcrumb from "$lib/components/Breadcrumb.svelte";
+  import { getF10TermsText } from "$lib/legal/f10Terms";
 
   // ==============================
   // Tipos
   // ==============================
   type FormData = {
-    // Etapa 1 — Unidade
+    // Etapa 1 â€” Unidade
     cnpj: string;
     unitLegalName: string;
     unitFantasyName: string;
@@ -30,14 +31,14 @@
     state: string;
     unitPhone: string;
 
-    // Etapa 2 — Responsável
+    // Etapa 2 â€” ResponsÃ¡vel
     managerName: string;
     managerCpf: string;
     managerRg: string;
     managerWhatsapp: string;
     managerEmail: string;
 
-    // Etapa 2 — Divulgação (opcional)
+    // Etapa 2 â€” DivulgaÃ§Ã£o (opcional)
     marketingSite: string;
     marketingInstagram: string;
     marketingFacebook: string;
@@ -56,11 +57,48 @@
   };
 
   type DocFilesMap = {
-    rg_cnh: UploadedFile[]; // múltiplos
-    cnpj: UploadedFile[]; // múltiplos
-    contrato: UploadedFile[]; // múltiplos
-    selfie: UploadedFile | null; // único
+    rg_cnh: UploadedFile[]; // mÃºltiplos
+    cnpj: UploadedFile[]; // mÃºltiplos
+    contrato: UploadedFile[]; // mÃºltiplos
+    selfie: UploadedFile | null; // Ãºnico
   };
+
+  type ContractState = {
+    title: string;
+    accepted: boolean;
+    acceptedAt: string | null;
+    error: string;
+    contractVersion: string;
+  };
+
+  let contract: ContractState = {
+    title: "Contrato de AdesÃ£o",
+    accepted: false,
+    acceptedAt: null,
+    error: "",
+    contractVersion: "v2025_10_06",
+  };
+
+  function setContractAccepted(checked: boolean) {
+    contract = {
+      ...contract,
+      accepted: checked,
+      acceptedAt: checked ? new Date().toISOString() : null,
+      error: "",
+    };
+  }
+
+  function validateContractStep5(): boolean {
+    if (!contract.accepted) {
+      contract = {
+        ...contract,
+        error: "VocÃª precisa aceitar o contrato para continuar.",
+      };
+      return false;
+    }
+    contract = { ...contract, error: "" };
+    return true;
+  }
 
   function isStep3DocType(docType: DocType): docType is Step3DocType {
     return docType !== "selfie";
@@ -69,7 +107,65 @@
   // ==============================
   // Estado
   // ==============================
-  let currentStep: 1 | 2 | 3 | 4 = 1;
+  type WizardStep = 1 | 2 | 3 | 4 | 5;
+  type CepStatus = "unknown" | "valid" | "invalid";
+  type WizardCtx = {
+    currentStep: WizardStep;
+    formData: FormData;
+    errors: FormErrors;
+    isSubmitting: boolean;
+    isCnpjLoading: boolean;
+    isCepLoading: boolean;
+    cepStatus: CepStatus;
+    cnaeMainDescription: string;
+
+    maxFilesPerDocType: number;
+    docFiles: DocFilesMap;
+    docErrorsByType: Record<DocType, string>;
+    docAttentionByType: Record<DocType, boolean>;
+    docMessage: string;
+    step3DocTypes: Step3DocType[];
+
+    successVideoUrl: string;
+    supportLink: string;
+    whatsappLink: string;
+
+    setField: <K extends keyof FormData>(
+      key: K,
+      value: string,
+      options?: { isAuto?: boolean; source?: "cnpj" | "cep" },
+    ) => void;
+
+    formatCnpj: (value: string) => string;
+    formatCpf: (value: string) => string;
+    formatCep: (value: string) => string;
+    formatBrPhone: (value: string) => string;
+    formatCnae: (value: string) => string;
+    formatRg: (value: string) => string;
+    formatAddressNumber: (value: string) => string;
+    onlyDigits: (value: string) => string;
+
+    scheduleCnpjLookup: () => void;
+    scheduleCepLookup: () => void;
+    lookupCnpjSilently: (cnpjDigits: string) => Promise<void>;
+    lookupCepSilently: (cepDigits: string) => Promise<void>;
+
+    openFilePicker: (docType: DocType) => void;
+    removeDocFileById: (docType: Step3DocType, id: string) => void;
+    clearDocFiles: (docType: Step3DocType) => void;
+    removeDocFile: (docType: DocType) => void;
+    formatBytes: (bytes: number) => string;
+    docTitle: (docType: DocType) => string;
+    docHint: (docType: DocType) => string;
+    docCardBorderClass: (docType: DocType) => string;
+    setDocMessage: (msg: string) => void;
+
+    openCameraOverlay: () => Promise<void>;
+    submitMessage: string;
+  };
+
+  let currentStep: WizardStep = 1;
+  let wizard: WizardCtx;
 
   let formData: FormData = {
     cnpj: "",
@@ -103,30 +199,30 @@
   let isCnpjLoading = false;
   let isCepLoading = false;
 
-  // Controle para não repetir chamadas
+  // Controle para nÃ£o repetir chamadas
   let lastCnpjLookup = "";
   let lastCepLookup = "";
 
   let cnpjDebounceId: ReturnType<typeof setTimeout> | null = null;
   let cepDebounceId: ReturnType<typeof setTimeout> | null = null;
 
-  // Flags de autofill (para não sobrescrever o que o usuário editou)
+  // Flags de autofill (para nÃ£o sobrescrever o que o usuÃ¡rio editou)
   const cnpjAutoFilledKeys = new Set<keyof FormData>();
   const cepAutoFilledKeys = new Set<keyof FormData>();
 
   // CEP status (validado via ViaCEP)
-  let cepStatus: "unknown" | "valid" | "invalid" = "unknown";
+  let cepStatus: CepStatus = "unknown";
 
-  // Dica/descrição do CNAE (sem misturar com o valor numérico)
+  // Dica/descriÃ§Ã£o do CNAE (sem misturar com o valor numÃ©rico)
   let cnaeMainDescription = "";
 
   // ==============================
   // Documentos
-  // - Passo 3: múltiplos arquivos por tipo
-  // - Passo 4: selfie única
+  // - Passo 3: mÃºltiplos arquivos por tipo
+  // - Passo 4: selfie Ãºnica
   // ==============================
   const maxFileSizeBytes = 2 * 1024 * 1024; // 2MB por arquivo
-  const maxFilesPerDocType = 6; // proteção contra exageros (ajuste se quiser)
+  const maxFilesPerDocType = 6; // proteÃ§Ã£o contra exageros (ajuste se quiser)
 
   const step3DocTypes: Step3DocType[] = ["rg_cnh", "cnpj", "contrato"];
 
@@ -148,7 +244,7 @@
     selfie: null,
   };
 
-  // Erros por documento (borda vermelha no card que precisa atenção)
+  // Erros por documento (borda vermelha no card que precisa atenÃ§Ã£o)
   let docErrorsByType: Record<DocType, string> = {
     rg_cnh: "",
     cnpj: "",
@@ -156,7 +252,7 @@
     selfie: "",
   };
 
-  // “atenção” por documento (ex.: faltando obrigatório / upload inválido)
+  // â€œatenÃ§Ã£oâ€ por documento (ex.: faltando obrigatÃ³rio / upload invÃ¡lido)
   let docAttentionByType: Record<DocType, boolean> = {
     rg_cnh: false,
     cnpj: false,
@@ -206,9 +302,17 @@
   }
 
   function openFilePicker(docType: DocType) {
+    if (docType === "selfie") {
+      const msg = "Selfie deve ser capturada pela camera.";
+      setDocTypeError("selfie", msg);
+      setDocMessage(msg);
+      return;
+    }
     activeDocType = docType;
     if (!fileInputRef) return;
     fileInputRef.value = ""; // permite re-upload do mesmo arquivo
+    fileInputRef.accept = getAcceptByDocType(docType);
+    fileInputRef.multiple = docType !== "selfie";
     fileInputRef.click();
   }
 
@@ -226,12 +330,12 @@
 
     if (docType === "selfie") {
       if (!acceptedSelfieMime.has(file.type))
-        return { ok: false, reason: "Formato inválido (use JPG/PNG)." };
+        return { ok: false, reason: "Formato invÃ¡lido (use JPG/PNG)." };
       return { ok: true };
     }
 
     if (!acceptedDocMime.has(file.type))
-      return { ok: false, reason: "Formato inválido (use PDF/JPG/PNG)." };
+      return { ok: false, reason: "Formato invÃ¡lido (use PDF/JPG/PNG)." };
     return { ok: true };
   }
 
@@ -241,7 +345,7 @@
   }
 
   function addDocFile(docType: Step3DocType, file: File) {
-    // evita duplicar (heurística simples: nome+size)
+    // evita duplicar (heurÃ­stica simples: nome+size)
     const exists = docFiles[docType].some(
       (f) => f.file.name === file.name && f.file.size === file.size,
     );
@@ -280,7 +384,7 @@
 
   function clearDocFiles(docType: Step3DocType) {
     docFiles = { ...docFiles, [docType]: [] };
-    // remove o destaque agora; validação vai recolocar quando tentar avançar
+    // remove o destaque agora; validaÃ§Ã£o vai recolocar quando tentar avanÃ§ar
     clearDocTypeError(docType);
   }
 
@@ -306,7 +410,7 @@
       const validation = validateFileForDoc(docType, file);
 
       if (!validation.ok) {
-        const msg = validation.reason ?? "Arquivo inválido (tipo/tamanho).";
+        const msg = validation.reason ?? "Arquivo invÃ¡lido (tipo/tamanho).";
         setDocTypeError(docType, msg);
         setDocMessage(msg);
         return;
@@ -317,7 +421,7 @@
       return;
     }
 
-    // Passo 3: múltiplos
+    // Passo 3: mÃºltiplos
     const currentCount = docFiles[docType].length;
     const remaining = Math.max(0, maxFilesPerDocType - currentCount);
 
@@ -337,7 +441,8 @@
       const validation = validateFileForDoc(docType, file);
       if (!validation.ok) {
         if (!firstRejected)
-          firstRejected = validation.reason ?? "Arquivo inválido (tipo/tamanho).";
+          firstRejected =
+            validation.reason ?? "Arquivo invÃ¡lido (tipo/tamanho).";
         continue;
       }
 
@@ -363,20 +468,20 @@
     for (const dt of step3DocTypes) {
       if (!hasDoc(dt)) {
         anyMissing = true;
-        markDocAttention(dt, "Obrigatório.");
+        markDocAttention(dt, "ObrigatÃ³rio.");
       } else {
         clearDocTypeError(dt);
       }
     }
 
     if (anyMissing)
-      return { ok: false, message: "Envie todos os documentos obrigatórios." };
+      return { ok: false, message: "Envie todos os documentos obrigatÃ³rios." };
     return { ok: true };
   }
 
   function validateSelfieStep4(): { ok: boolean; message?: string } {
     if (!hasDoc("selfie")) {
-      markDocAttention("selfie", "Obrigatório.");
+      markDocAttention("selfie", "ObrigatÃ³rio.");
       return { ok: false, message: "Envie a selfie com documento." };
     }
     clearDocTypeError("selfie");
@@ -384,9 +489,9 @@
   }
 
   // ==============================
-  // Câmera (Selfie) - tela cheia + preview + confirmar/cancelar
+  // CÃ¢mera (Selfie) - tela cheia + preview + confirmar/cancelar
   // ==============================
-  let cameraOverlayOpen = false; // controla tela cheia da câmera
+  let cameraOverlayOpen = false; // controla tela cheia da cÃ¢mera
   let cameraActive = false;
   let cameraStream: MediaStream | null = null;
   let videoEl: HTMLVideoElement | null = null;
@@ -424,8 +529,8 @@
       clearDocTypeError("selfie");
     } catch {
       cameraActive = false;
-      setDocTypeError("selfie", "Não foi possível acessar a câmera.");
-      setDocMessage("Não foi possível acessar a câmera.");
+      setDocTypeError("selfie", "NÃ£o foi possÃ­vel acessar a cÃ¢mera.");
+      setDocMessage("NÃ£o foi possÃ­vel acessar a cÃ¢mera.");
     }
   }
 
@@ -461,14 +566,14 @@
     closeCameraOverlay();
   }
 
-  // Captura com compressão adaptativa para caber em 2MB
+  // Captura com compressÃ£o adaptativa para caber em 2MB
   async function captureSelfie() {
     if (!videoEl || !canvasEl) return;
 
     const vW = videoEl.videoWidth || 1280;
     const vH = videoEl.videoHeight || 720;
 
-    // reduz dimensão se necessário (evita arquivos grandes)
+    // reduz dimensÃ£o se necessÃ¡rio (evita arquivos grandes)
     const maxW = 1280;
     const scale = Math.min(1, maxW / vW);
     const w = Math.max(1, Math.round(vW * scale));
@@ -513,20 +618,20 @@
 
     const validation = validateFileForDoc("selfie", file);
     if (!validation.ok) {
-      setDocTypeError("selfie", validation.reason ?? "Arquivo inválido.");
-      setDocMessage(validation.reason ?? "Arquivo inválido.");
+      setDocTypeError("selfie", validation.reason ?? "Arquivo invÃ¡lido.");
+      setDocMessage(validation.reason ?? "Arquivo invÃ¡lido.");
       return;
     }
 
-    // NÃO salva direto — abre preview e pede confirmação
+    // NÃƒO salva direto â€” abre preview e pede confirmaÃ§Ã£o
     const previewUrl = URL.createObjectURL(file);
     pendingSelfie = { file, previewUrl };
 
-    // desliga a câmera para economizar e “congelar” a experiência
+    // desliga a cÃ¢mera para economizar e â€œcongelarâ€ a experiÃªncia
     stopCamera();
   }
 
-  // Para evitar câmera ligada quando sair do passo 4
+  // Para evitar cÃ¢mera ligada quando sair do passo 4
   $: if (currentStep !== 4) {
     closeCameraOverlay();
   }
@@ -546,6 +651,166 @@
   const supportLink = "https://f10.movidesk.com/kb";
   const whatsappLink =
     "https://wa.me/554130274747?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20o%20cadastro.";
+
+  // ==============================
+  // Contrato (preview do texto) via Blob URL
+  // ==============================
+  type TermsPayload = { version: string; text: string };
+  type ContractClientMeta = {
+    userAgent: string;
+    platform: string;
+    language: string;
+    timeZone: string;
+    screen: string;
+    viewport: string;
+    referrer: string;
+  };
+
+  let termsPayload: TermsPayload = { version: "unknown", text: "" };
+  let contractPreviewUrl: string | null = null;
+  let hasAutoDownloadedContract = false;
+
+  function escapeHtml(s: string) {
+    return s
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function buildContractHtml(title: string, payload: TermsPayload) {
+    const safeTitle = escapeHtml(title || "Contrato");
+    const safeVersion = escapeHtml(payload.version || "unknown");
+    const htmlText = payload.text || "";
+
+    return `<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>${safeTitle}</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; padding:24px; color:#111;}    h1{font-size:20px; margin:0 0 12px;}    .muted{color:#555; font-size:12px; margin-bottom:16px;}    pre{white-space:pre-wrap; line-height:1.45; font-size:13px; color:#222;}    @media print { body{padding:0} }  </style></head><body>
+  <h1>${safeTitle}</h1>
+  <div class="muted">VersÃ£o termos: ${safeVersion}</div>
+  <div class="prose">${htmlText}</div>
+</body>
+</html>`;
+  }
+
+  function sanitizeFilenamePart(value: string): string {
+    return value.replace(/[^\w.\-]+/g, "_").replace(/^_+|_+$/g, "");
+  }
+
+  function buildContractFilename(): string {
+    const cnpjDigits = onlyDigits(formData.cnpj);
+    const cnpjPart = cnpjDigits ? `_${cnpjDigits}` : "";
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    const baseName = `contrato_f10${cnpjPart}_${dateStamp}`;
+    return `${sanitizeFilenamePart(baseName)}.html`;
+  }
+
+  function getContractClientMeta(): ContractClientMeta {
+    if (!browser) {
+      return {
+        userAgent: "",
+        platform: "",
+        language: "",
+        timeZone: "",
+        screen: "",
+        viewport: "",
+        referrer: "",
+      };
+    }
+
+    const screenSize = window.screen
+      ? `${window.screen.width}x${window.screen.height}`
+      : "";
+    const viewportSize = `${window.innerWidth}x${window.innerHeight}`;
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+
+    return {
+      userAgent: navigator.userAgent || "",
+      platform: navigator.platform || "",
+      language: navigator.language || "",
+      timeZone,
+      screen: screenSize,
+      viewport: viewportSize,
+      referrer: document.referrer || "",
+    };
+  }
+
+  function downloadContractCopy() {
+    if (!browser) return;
+
+    const html = buildContractHtml(contract.title, termsPayload);
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = buildContractFilename();
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function refreshContractPreviewUrl() {
+    // IMPORTANTE: no SSR nÃ£o existe URL.createObjectURL
+    if (!browser) return;
+
+    // Revoga URL antiga (evita vazamento de memÃ³ria)
+    if (contractPreviewUrl) URL.revokeObjectURL(contractPreviewUrl);
+
+    const html = buildContractHtml(contract.title, termsPayload);
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    contractPreviewUrl = URL.createObjectURL(blob);
+  }
+
+  function openContractPreviewInNewTab() {
+    if (!browser) return;
+
+    // Garante que existe uma URL antes de abrir
+    if (!contractPreviewUrl) refreshContractPreviewUrl();
+
+    if (!contractPreviewUrl) {
+      setDocMessage("Contrato indisponÃ­vel para visualizaÃ§Ã£o no momento.");
+      return;
+    }
+
+    window.open(contractPreviewUrl, "_blank", "noopener,noreferrer");
+  }
+
+  // Recalcula termos + preview sempre que os dados mudarem
+  $: {
+    const legalName = safeTrim(formData.unitLegalName);
+    const cnpjDigits = onlyDigits(formData.cnpj);
+
+    termsPayload = getF10TermsText({
+      clientLegalName: legalName || undefined,
+      clientCnpj: cnpjDigits || undefined,
+      contractorName: legalName || undefined,
+    }) as TermsPayload;
+
+    if (!termsPayload?.text) {
+      termsPayload = {
+        version: termsPayload?.version ?? "unknown",
+        text:
+          "Contrato indisponÃ­vel para visualizaÃ§Ã£o no momento. " +
+          "Preencha RazÃ£o Social e CNPJ para gerar o texto, ou tente recarregar a pÃ¡gina.",
+      };
+    }
+
+    // Gera/atualiza a URL de preview HTML sempre no browser
+    if (browser) refreshContractPreviewUrl();
+  }
+
+  onDestroy(() => {
+    if (browser && contractPreviewUrl) URL.revokeObjectURL(contractPreviewUrl);
+  });
 
   // ==============================
   // Helpers base
@@ -578,7 +843,7 @@
   }
 
   /**
-   * Atualiza campo, limpando erro e removendo flag de autofill se o usuário alterou manualmente.
+   * Atualiza campo, limpando erro e removendo flag de autofill se o usuÃ¡rio alterou manualmente.
    */
   function setField<K extends keyof FormData>(
     key: K,
@@ -588,7 +853,7 @@
     formData = { ...formData, [key]: value };
     clearError(key);
 
-    // Se foi o usuário que mexeu, remove flags de autofill
+    // Se foi o usuÃ¡rio que mexeu, remove flags de autofill
     if (!options?.isAuto) {
       cnpjAutoFilledKeys.delete(key);
       cepAutoFilledKeys.delete(key);
@@ -604,8 +869,8 @@
   }
 
   /**
-   * Autofill só pode sobrescrever se:
-   * - campo está vazio, OU
+   * Autofill sÃ³ pode sobrescrever se:
+   * - campo estÃ¡ vazio, OU
    * - campo foi preenchido automaticamente antes (mesma origem).
    */
   function canAutoOverwrite(
@@ -619,7 +884,7 @@
   }
 
   // ==============================
-  // Máscaras / Formatação (com limite de dígitos)
+  // MÃ¡scaras / FormataÃ§Ã£o (com limite de dÃ­gitos)
   // ==============================
   function formatCpf(value: string): string {
     const d = limitDigits(value, 11);
@@ -676,23 +941,23 @@
     return `(${ddd}) ${p1}${p2 ? `-${p2}` : ""}`.trim();
   }
 
-  // CNAE: apenas números (7 dígitos)
+  // CNAE: apenas nÃºmeros (7 dÃ­gitos)
   function formatCnae(value: string): string {
     return limitDigits(value, 7);
   }
 
-  // RG: apenas números (limite conservador)
+  // RG: apenas nÃºmeros (limite conservador)
   function formatRg(value: string): string {
     return limitDigits(value, 14);
   }
 
-  // Número do endereço: apenas números (limite conservador)
+  // NÃºmero do endereÃ§o: apenas nÃºmeros (limite conservador)
   function formatAddressNumber(value: string): string {
     return limitDigits(value, 10);
   }
 
   // ==============================
-  // Validações reais
+  // ValidaÃ§Ãµes reais
   // ==============================
   function isEmailValid(email: string): boolean {
     const v = safeTrim(email);
@@ -767,19 +1032,19 @@
   }
 
   // ==============================
-  // Validações por etapa
+  // ValidaÃ§Ãµes por etapa
   // ==============================
   async function validateStep1(): Promise<boolean> {
     let nextErrors: FormErrors = {};
 
     if (!isCnpjValid(formData.cnpj))
-      nextErrors = addError(nextErrors, "cnpj", "CNPJ inválido.");
+      nextErrors = addError(nextErrors, "cnpj", "CNPJ invÃ¡lido.");
 
     if (!safeTrim(formData.unitLegalName))
       nextErrors = addError(
         nextErrors,
         "unitLegalName",
-        "Informe a razão social.",
+        "Informe a razÃ£o social.",
       );
 
     if (!safeTrim(formData.unitFantasyName))
@@ -789,31 +1054,31 @@
         "Informe o nome fantasia.",
       );
 
-    // CNAE: obrigatório e apenas números (7 dígitos)
+    // CNAE: obrigatÃ³rio e apenas nÃºmeros (7 dÃ­gitos)
     const cnaeDigits = onlyDigits(formData.cnaeMain);
     if (cnaeDigits.length !== 7)
       nextErrors = addError(
         nextErrors,
         "cnaeMain",
-        "CNAE inválido (7 dígitos).",
+        "CNAE invÃ¡lido (7 dÃ­gitos).",
       );
 
     const cepDigits = onlyDigits(formData.cep);
     if (cepDigits.length !== 8) {
-      nextErrors = addError(nextErrors, "cep", "CEP inválido.");
+      nextErrors = addError(nextErrors, "cep", "CEP invÃ¡lido.");
     } else {
       if (cepStatus !== "valid") {
         await lookupCepSilently(cepDigits);
       }
       if (cepStatus !== "valid")
-        nextErrors = addError(nextErrors, "cep", "CEP inválido.");
+        nextErrors = addError(nextErrors, "cep", "CEP invÃ¡lido.");
     }
 
     if (!safeTrim(formData.street))
       nextErrors = addError(nextErrors, "street", "Informe o logradouro.");
 
     if (!safeTrim(formData.number))
-      nextErrors = addError(nextErrors, "number", "Informe o número.");
+      nextErrors = addError(nextErrors, "number", "Informe o nÃºmero.");
 
     if (!safeTrim(formData.neighborhood))
       nextErrors = addError(nextErrors, "neighborhood", "Informe o bairro.");
@@ -825,7 +1090,7 @@
       nextErrors = addError(nextErrors, "state", "Informe a UF.");
 
     if (!isBrazilPhoneValid(formData.unitPhone))
-      nextErrors = addError(nextErrors, "unitPhone", "Telefone inválido.");
+      nextErrors = addError(nextErrors, "unitPhone", "Telefone invÃ¡lido.");
 
     errors = nextErrors;
     return Object.keys(nextErrors).length === 0;
@@ -838,11 +1103,11 @@
       nextErrors = addError(
         nextErrors,
         "managerName",
-        "Informe o responsável.",
+        "Informe o responsÃ¡vel.",
       );
 
     if (!isCpfValid(formData.managerCpf))
-      nextErrors = addError(nextErrors, "managerCpf", "CPF inválido.");
+      nextErrors = addError(nextErrors, "managerCpf", "CPF invÃ¡lido.");
 
     if (!safeTrim(formData.managerRg))
       nextErrors = addError(nextErrors, "managerRg", "Informe o RG.");
@@ -851,14 +1116,14 @@
       nextErrors = addError(
         nextErrors,
         "managerWhatsapp",
-        "WhatsApp inválido.",
+        "WhatsApp invÃ¡lido.",
       );
 
     if (!isEmailValid(formData.managerEmail))
-      nextErrors = addError(nextErrors, "managerEmail", "E-mail inválido.");
+      nextErrors = addError(nextErrors, "managerEmail", "E-mail invÃ¡lido.");
 
     if (!isUrlValid(formData.marketingSite))
-      nextErrors = addError(nextErrors, "marketingSite", "Site inválido.");
+      nextErrors = addError(nextErrors, "marketingSite", "Site invÃ¡lido.");
 
     errors = nextErrors;
     return Object.keys(nextErrors).length === 0;
@@ -908,7 +1173,7 @@
         setField("unitFantasyName", fantasy, { isAuto: true, source: "cnpj" });
       }
 
-      // CNAE: salvar somente números (id). Descrição vai em cnaeMainDescription.
+      // CNAE: salvar somente nÃºmeros (id). DescriÃ§Ã£o vai em cnaeMainDescription.
       const cnaeIdRaw = data?.estabelecimento?.atividade_principal?.id
         ? String(data.estabelecimento.atividade_principal.id)
         : "";
@@ -1007,7 +1272,7 @@
         void lookupCepSilently(cepDigits);
       }
     } catch {
-      // silêncio
+      // silÃªncio
     } finally {
       isCnpjLoading = false;
     }
@@ -1093,7 +1358,7 @@
   }
 
   // ==============================
-  // Navegação do Wizard
+  // NavegaÃ§Ã£o do Wizard
   // ==============================
   async function scrollPageToTop() {
     if (!browser) return;
@@ -1132,6 +1397,18 @@
       await scrollPageToTop();
       return;
     }
+
+    if (currentStep === 4) {
+      const selfie = validateSelfieStep4();
+      if (!selfie.ok) {
+        setDocMessage(selfie.message ?? "Revise a selfie.");
+        return;
+      }
+
+      currentStep = 5;
+      await scrollPageToTop();
+      return;
+    }
   }
 
   async function goBack() {
@@ -1140,6 +1417,8 @@
     if (currentStep === 2) currentStep = 1;
     else if (currentStep === 3) currentStep = 2;
     else if (currentStep === 4) currentStep = 3;
+    else if (currentStep === 5) currentStep = 4;
+
     await scrollPageToTop();
   }
 
@@ -1179,26 +1458,52 @@
       return;
     }
 
+    if (!validateContractStep5()) {
+      currentStep = 5;
+      await scrollPageToTop();
+      return;
+    }
+
     isSubmitting = true;
 
     try {
       // 1) Monta multipart com payload + arquivos
+      // 1) Monta multipart com payload + arquivos
       const fd = new FormData();
+
+      const contractSnapshotText = termsPayload.text;
+      const contractAcceptedAt = contract.acceptedAt;
+      const contractSnapshotHtml = buildContractHtml(contract.title, termsPayload);
+      const contractSnapshotFileName = buildContractFilename();
+      const contractClientMeta = getContractClientMeta();
 
       fd.append(
         "payload",
         JSON.stringify({
           ...formData,
           submittedAt: new Date().toISOString(),
+
+          contract: {
+            title: contract.title,
+            contractVersion: contract.contractVersion,
+            termsVersion: termsPayload.version,
+            accepted: contract.accepted,
+            acceptedAt: contractAcceptedAt,
+            snapshotText: contractSnapshotText,
+            snapshotHtml: contractSnapshotHtml,
+            snapshotFileName: contractSnapshotFileName,
+            signedAtClient: contractAcceptedAt,
+            signedClientMeta: contractClientMeta,
+          },
         }),
       );
 
-      // Passo 3 (múltiplos): repete o mesmo field name várias vezes
+      // Passo 3 (mÃºltiplos)
       for (const uf of docFiles.rg_cnh) fd.append("doc_rg_cnh", uf.file);
       for (const uf of docFiles.cnpj) fd.append("doc_cnpj", uf.file);
       for (const uf of docFiles.contrato) fd.append("doc_contrato", uf.file);
 
-      // Passo 4 (único)
+      // Passo 4 (Ãºnico)
       fd.append("doc_selfie", docFiles.selfie!.file);
 
       // 2) Envia para o endpoint que dispara o e-mail via Brevo
@@ -1212,7 +1517,7 @@
         const data = await res.json().catch(() => null);
         const msg =
           data?.message ||
-          "Não foi possível enviar. Verifique os dados e tente novamente.";
+          "NÃ£o foi possÃ­vel enviar. Verifique os dados e tente novamente.";
         submitMessage = msg;
         setDocMessage(msg);
         return;
@@ -1223,9 +1528,13 @@
       submitMessage = "";
       setDocMessage("");
       await scrollPageToTop();
+      if (!hasAutoDownloadedContract) {
+        hasAutoDownloadedContract = true;
+        downloadContractCopy();
+      }
     } catch {
-      submitMessage = "Não foi possível enviar. Tente novamente.";
-      setDocMessage("Não foi possível enviar. Tente novamente.");
+      submitMessage = "NÃ£o foi possÃ­vel enviar. Tente novamente.";
+      setDocMessage("NÃ£o foi possÃ­vel enviar. Tente novamente.");
     } finally {
       isSubmitting = false;
     }
@@ -1252,7 +1561,7 @@
       return "CNH: inclua a foto do QR Code. PDF ou imagem.";
     if (docType === "cnpj") return "Arquivo PDF ou imagem.";
     if (docType === "contrato") return "Arquivo PDF ou imagem.";
-    return "Foto nítida segurando o documento.";
+    return "Foto nÃ­tida segurando o documento.";
   }
 
   function docCardBorderClass(docType: DocType): string {
@@ -1298,7 +1607,7 @@
     ]}
   />
 
-  <!-- input único (controlado por activeDocType) -->
+  <!-- input Ãºnico (controlado por activeDocType) -->
   <input
     bind:this={fileInputRef}
     type="file"
@@ -1332,6 +1641,9 @@
         <div
           class={`h-2 flex-1 rounded-full ${isSuccess || currentStep >= 4 ? "bg-[var(--primary)]" : "bg-black/10"}`}
         ></div>
+        <div
+          class={`h-2 flex-1 rounded-full ${isSuccess || currentStep >= 5 ? "bg-[var(--primary)]" : "bg-black/10"}`}
+        ></div>
       </div>
 
       <div class="mt-2 text-[13px] text-black/60">
@@ -1339,9 +1651,10 @@
           Sucesso
         {:else}
           {#if currentStep === 1}Dados da unidade{/if}
-          {#if currentStep === 2}Dados do responsável{/if}
+          {#if currentStep === 2}Dados do responsÃ¡vel{/if}
           {#if currentStep === 3}Documentos{/if}
           {#if currentStep === 4}Selfie com documento{/if}
+          {#if currentStep === 5}Contrato e aceite{/if}
         {/if}
       </div>
     </header>
@@ -1364,8 +1677,8 @@
             Tudo certo!
           </h2>
           <p class="mt-2 text-[13px] text-black/60">
-            Recebemos seus dados. Assista ao vídeo abaixo para as próximas
-            orientações.
+            Recebemos seus dados. Assista ao vÃ­deo abaixo para as prÃ³ximas
+            orientaÃ§Ãµes.
           </p>
 
           <div
@@ -1375,7 +1688,7 @@
               <iframe
                 class="absolute inset-0 h-full w-full"
                 src={successVideoUrl}
-                title="Vídeo"
+                title="VÃ­deo"
                 frameborder="0"
                 allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowfullscreen
@@ -1383,7 +1696,7 @@
             </div>
           </div>
 
-          <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <a
               href={supportLink}
               target="_blank"
@@ -1392,6 +1705,14 @@
             >
               Suporte
             </a>
+
+            <button
+              type="button"
+              class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold border border-black/15 bg-white hover:bg-black/[0.03]"
+              on:click={downloadContractCopy}
+            >
+              Baixar contrato
+            </button>
 
             <a
               href={whatsappLink}
@@ -1405,10 +1726,10 @@
         </div>
       {:else}
         <!-- =======================
-             Etapa 1 — Unidade
+             Etapa 1 â€” Unidade
              ======================= -->
         {#if currentStep === 1}
-          <!-- (Etapa 1 igual ao seu código original — mantida) -->
+          <!-- (Etapa 1 igual ao seu cÃ³digo original â€” mantida) -->
           <div>
             <h2 class="text-[18px] font-semibold text-[var(--primary)]">
               Dados da unidade
@@ -1470,7 +1791,7 @@
                   <label
                     for="unitLegalName"
                     class="block text-[13px] font-medium text-black/70"
-                    >Razão Social</label
+                    >RazÃ£o Social</label
                   >
                   <input
                     id="unitLegalName"
@@ -1689,7 +2010,7 @@
                       <label
                         for="number"
                         class="block text-[13px] font-medium text-black/70"
-                        >Número</label
+                        >NÃºmero</label
                       >
                       <input
                         id="number"
@@ -1837,13 +2158,13 @@
         {/if}
 
         <!-- =======================
-             Etapa 2 — Responsável + Divulgação
+             Etapa 2 â€” ResponsÃ¡vel + DivulgaÃ§Ã£o
              ======================= -->
         {#if currentStep === 2}
-          <!-- (Etapa 2 igual ao seu código original — mantida) -->
+          <!-- (Etapa 2 igual ao seu cÃ³digo original â€” mantida) -->
           <div>
             <h2 class="text-[18px] font-semibold text-[var(--primary)]">
-              Dados do responsável
+              Dados do responsÃ¡vel
             </h2>
 
             <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1851,7 +2172,7 @@
                 <label
                   for="managerName"
                   class="block text-[13px] font-medium text-black/70"
-                  >Responsável</label
+                  >ResponsÃ¡vel</label
                 >
                 <input
                   id="managerName"
@@ -2004,7 +2325,7 @@
 
             <div class="mt-10">
               <h3 class="text-[16px] font-semibold text-[var(--primary)]">
-                Dados de divulgação
+                Dados de divulga&ccedil;&atilde;o
               </h3>
 
               <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -2100,7 +2421,7 @@
         {/if}
 
         <!-- =======================
-             Etapa 3 — Documentos (múltiplos por tipo)
+             Etapa 3 â€” Documentos (mÃºltiplos por tipo)
              ======================= -->
         {#if currentStep === 3}
           <div>
@@ -2116,8 +2437,11 @@
                   <FileText size={18} class="text-[var(--primary)]" />
                 </div>
                 <div class="text-[13px] text-black/65 space-y-1">
-                  <p>Envie os documentos obrigatórios (você pode anexar mais de um arquivo por item).</p>
-                  <p>Formatos aceitos: PDF, JPG, PNG (até 2MB por arquivo).</p>
+                  <p>
+                    Envie os documentos obrigatÃ³rios (vocÃª pode anexar mais de
+                    um arquivo por item).
+                  </p>
+                  <p>Formatos aceitos: PDF, JPG, PNG (atÃ© 2MB por arquivo).</p>
                 </div>
               </div>
             </div>
@@ -2219,7 +2543,7 @@
 
                   {#if docFiles[dt].length > 0}
                     <p class="mt-3 text-[12px] text-black/50">
-                      {docFiles[dt].length} arquivo(s) anexado(s) — limite {maxFilesPerDocType}.
+                      {docFiles[dt].length} arquivo(s) anexado(s) â€” limite {maxFilesPerDocType}.
                     </p>
                   {/if}
                 </div>
@@ -2233,7 +2557,7 @@
         {/if}
 
         <!-- =======================
-             Etapa 4 — Selfie com documento
+             Etapa 4 â€” Selfie com documento
              ======================= -->
         {#if currentStep === 4}
           <div>
@@ -2242,7 +2566,7 @@
             </h2>
 
             <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-5">
-              <!-- Card 1: instruções + status -->
+              <!-- Card 1: instruÃ§Ãµes + status -->
               <div
                 class={`rounded-2xl border ${docCardBorderClass("selfie")} bg-white p-5`}
               >
@@ -2264,12 +2588,12 @@
                 </div>
 
                 <ul class="mt-4 text-[13px] text-black/65 space-y-2">
-                  <li>• Ambiente bem iluminado (evite contraluz).</li>
+                  <li>â€¢ Ambiente bem iluminado (evite contraluz).</li>
                   <li>
-                    • Segure o documento próximo ao rosto, sem cobrir sua face.
+                    â€¢ Segure o documento prÃ³ximo ao rosto, sem cobrir sua face.
                   </li>
-                  <li>• Texto do documento legível, sem reflexo ou tremido.</li>
-                  <li>• Olhe para a câmera (foto nítida).</li>
+                  <li>â€¢ Texto do documento legÃ­vel, sem reflexo ou tremido.</li>
+                  <li>â€¢ Olhe para a cÃ¢mera (foto nÃ­tida).</li>
                 </ul>
 
                 <div
@@ -2320,7 +2644,7 @@
                 {/if}
               </div>
 
-              <!-- Card 2: ações (só 2 botões) -->
+              <!-- Card 2: acoes (camera obrigatoria) -->
               <div
                 class={`rounded-2xl border ${docCardBorderClass("selfie")} bg-white p-5`}
               >
@@ -2328,38 +2652,24 @@
                   <p class="text-[14px] font-semibold text-black/80">
                     Enviar selfie
                   </p>
-                  <Upload size={18} class="text-[var(--primary)]" />
+                  <Camera size={18} class="text-[var(--primary)]" />
                 </div>
 
                 <div
                   class="mt-4 rounded-xl border border-black/10 bg-black/[0.02] px-4 py-3"
                 >
-                  <p class="text-[13px] text-black/65">
-                    Você pode tirar na câmera ou escolher um arquivo (JPG/PNG
-                    até 2MB).
-                  </p>
+                  <p class="text-[13px] text-black/65">Tire a selfie pela camera. Upload de arquivo nao e permitido.</p>
                 </div>
 
-                <!-- Mobile: um abaixo do outro | Desktop: lado a lado -->
-                <div class="mt-4 flex flex-col sm:flex-row gap-3">
+                <!-- Camera obrigatoria -->
+                <div class="mt-4">
                   <button
                     type="button"
-                    class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold text-white bg-[var(--primary)] hover:brightness-110"
+                    class="w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold text-white bg-[var(--primary)] hover:brightness-110"
                     on:click={openCameraOverlay}
                   >
                     <Camera size={16} />
-                    {docFiles.selfie ? "Tirar outra" : "Abrir câmera"}
-                  </button>
-
-                  <button
-                    type="button"
-                    class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold border border-black/15 bg-white hover:bg-black/[0.03]"
-                    on:click={() => openFilePicker("selfie")}
-                  >
-                    <Upload size={16} />
-                    {docFiles.selfie
-                      ? "Substituir arquivo"
-                      : "Escolher arquivo"}
+                    {docFiles.selfie ? "Tirar outra" : "Abrir cÃ¢mera"}
                   </button>
                 </div>
 
@@ -2374,7 +2684,87 @@
         {/if}
 
         <!-- =======================
-             Ações do Wizard
+     Etapa 5 â€” Contrato e aceite
+     ======================= -->
+        {#if currentStep === 5}
+          <div>
+            <h2 class="text-[18px] font-semibold text-[var(--primary)]">
+              Contrato e aceite
+            </h2>
+
+            <div
+              class="mt-4 rounded-2xl bg-[var(--page-bg)] border border-black/5 p-4"
+            >
+              <p class="text-[13px] text-black/65">
+                Leia o contrato abaixo e marque o aceite para finalizar o envio.
+              </p>
+
+              <p class="mt-1 text-[12px] text-black/45">
+                VersÃ£o termos: {termsPayload.version}
+              </p>
+            </div>
+
+            <div class="mt-6 rounded-2xl border border-black/10 bg-white p-4 sm:p-6">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="text-[14px] font-semibold text-black/80">
+                  {contract.title}
+                </p>
+
+                <button
+                  type="button"
+                  class="text-[12px] font-semibold underline text-[var(--primary)]"
+                  on:click={openContractPreviewInNewTab}
+                >
+                  Abrir em nova aba
+                </button>
+              </div>
+
+              <div
+                class="mt-4 rounded-2xl border border-black/10 bg-[var(--page-bg)] p-3 sm:p-4"
+              >
+                <label
+                  for="contractAccepted"
+                  class="flex items-start gap-3 text-[13px] sm:text-[14px] text-black/75"
+                >
+                  <input
+                    id="contractAccepted"
+                    type="checkbox"
+                    checked={contract.accepted}
+                    on:change={(e) =>
+                      setContractAccepted(
+                        (e.currentTarget as HTMLInputElement).checked,
+                      )}
+                    class="mt-0.5 h-5 w-5 rounded-md border border-black/30 text-[var(--primary)] accent-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30"
+                  />
+                  <span>Li e aceito o contrato de adesao.</span>
+                </label>
+
+                {#if contract.error}
+                  <p class="mt-2 text-[12px] text-red-600">{contract.error}</p>
+                {/if}
+
+                {#if contract.acceptedAt}
+                  <p class="mt-2 text-[12px] text-black/50">
+                    Aceito em: {new Date(contract.acceptedAt).toLocaleString(
+                      "pt-BR",
+                    )}
+                  </p>
+                {/if}
+              </div>
+
+              <div
+                class="mt-4 rounded-2xl border border-black/10 bg-black/[0.02] p-3 sm:p-5 max-h-[70vh] overflow-auto"
+              >
+                <div class="text-[13px] sm:text-[14px] leading-relaxed text-black/70 font-sans">
+                  {@html termsPayload.text}
+                </div>
+              </div>
+            </div>
+          </div>
+        {/if}
+
+        <!-- =======================
+             AÃ§Ãµes do Wizard
              ======================= -->
         <div
           class="pt-2 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between"
@@ -2393,14 +2783,14 @@
               </button>
             {/if}
 
-            {#if currentStep < 4}
+            {#if currentStep < 5}
               <button
                 type="button"
                 class="rounded-xl px-6 py-3 text-[13px] font-semibold text-white bg-[var(--primary)] hover:brightness-110 disabled:opacity-60"
                 on:click={goNext}
                 disabled={isSubmitting}
               >
-                Próximo
+                Pr&oacute;ximo
               </button>
             {:else}
               <button
@@ -2419,7 +2809,7 @@
   </div>
 
   <!-- =======================
-       Câmera em tela cheia (sem zoom/crop)
+       CÃ¢mera em tela cheia (sem zoom/crop)
        ======================= -->
   {#if cameraOverlayOpen}
     <div class="fixed inset-0 z-[60] bg-black overflow-hidden">
@@ -2429,8 +2819,8 @@
           class="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/10 bg-black/60 backdrop-blur"
         >
           <p class="text-white/90 text-[13px] font-semibold">
-            {#if pendingSelfie}Prévia{/if}
-            {#if !pendingSelfie}Câmera{/if}
+            {#if pendingSelfie}PrÃ©via{/if}
+            {#if !pendingSelfie}CÃ¢mera{/if}
           </p>
 
           <button
@@ -2443,12 +2833,12 @@
           </button>
         </div>
 
-        <!-- Conteúdo -->
+        <!-- ConteÃºdo -->
         <div class="relative flex-1 min-h-0 overflow-hidden">
           {#if pendingSelfie}
             <img
               src={pendingSelfie.previewUrl}
-              alt="Prévia da selfie"
+              alt="PrÃ©via da selfie"
               class="absolute inset-0 w-full h-full object-contain bg-black"
             />
           {:else}

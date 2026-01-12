@@ -26,7 +26,7 @@
         "Quero compartilhar minha experiência: o sistema é uma ferramenta muito útil no dia a dia. Ele é intuitivo e rápido, facilita bastante os processos internos e melhora nossa tomada de decisão. Também quero falar...",
       fullText: "",
       author: "Silvia Bernardo",
-      role: "Diretora Pedagógica - Franquadora Escolas Ana Hickman",
+      role: "Diretora Pedagógica - Franqueadora Escolas Ana Hickman",
       avatar: "/avatar_silvia_eah.webp",
       videoSrc: "/depoimento_silvia_eah.mp4",
       videoType: "video/mp4",
