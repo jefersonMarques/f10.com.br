@@ -12,6 +12,7 @@ build/
 .vite/
 vite.config.ts.timestamp-*
 *.svelte-kit-tmp
+vite.config.ts
 
 # IDE / SO
 .DS_Store

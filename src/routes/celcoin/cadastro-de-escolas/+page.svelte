@@ -312,7 +312,7 @@
     if (!fileInputRef) return;
     fileInputRef.value = ""; // permite re-upload do mesmo arquivo
     fileInputRef.accept = getAcceptByDocType(docType);
-    fileInputRef.multiple = docType !== "selfie";
+    fileInputRef.multiple = true;
     fileInputRef.click();
   }
 
