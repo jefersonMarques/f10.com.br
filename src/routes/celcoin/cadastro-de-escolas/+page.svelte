@@ -17,7 +17,7 @@
   // Tipos
   // ==============================
   type FormData = {
-    // Etapa 1 â€” Unidade
+    // Etapa 1 - Unidade
     cnpj: string;
     unitLegalName: string;
     unitFantasyName: string;
@@ -31,14 +31,14 @@
     state: string;
     unitPhone: string;
 
-    // Etapa 2 â€” ResponsÃ¡vel
+    // Etapa 2 - Responsável
     managerName: string;
     managerCpf: string;
     managerRg: string;
     managerWhatsapp: string;
     managerEmail: string;
 
-    // Etapa 2 â€” DivulgaÃ§Ã£o (opcional)
+    // Etapa 2 - Divulgação (opcional)
     marketingSite: string;
     marketingInstagram: string;
     marketingFacebook: string;
@@ -57,10 +57,10 @@
   };
 
   type DocFilesMap = {
-    rg_cnh: UploadedFile[]; // mÃºltiplos
-    cnpj: UploadedFile[]; // mÃºltiplos
-    contrato: UploadedFile[]; // mÃºltiplos
-    selfie: UploadedFile | null; // Ãºnico
+    rg_cnh: UploadedFile[]; // múltiplos
+    cnpj: UploadedFile[]; // múltiplos
+    contrato: UploadedFile[]; // múltiplos
+    selfie: UploadedFile | null; // único
   };
 
   type ContractState = {
@@ -72,7 +72,7 @@
   };
 
   let contract: ContractState = {
-    title: "Contrato de AdesÃ£o",
+    title: "Contrato de Adesão",
     accepted: false,
     acceptedAt: null,
     error: "",
@@ -92,7 +92,7 @@
     if (!contract.accepted) {
       contract = {
         ...contract,
-        error: "VocÃª precisa aceitar o contrato para continuar.",
+        error: "Você precisa aceitar o contrato para continuar.",
       };
       return false;
     }
@@ -199,30 +199,30 @@
   let isCnpjLoading = false;
   let isCepLoading = false;
 
-  // Controle para nÃ£o repetir chamadas
+  // Controle para não repetir chamadas
   let lastCnpjLookup = "";
   let lastCepLookup = "";
 
   let cnpjDebounceId: ReturnType<typeof setTimeout> | null = null;
   let cepDebounceId: ReturnType<typeof setTimeout> | null = null;
 
-  // Flags de autofill (para nÃ£o sobrescrever o que o usuÃ¡rio editou)
+  // Flags de autofill (para não sobrescrever o que o usuário editou)
   const cnpjAutoFilledKeys = new Set<keyof FormData>();
   const cepAutoFilledKeys = new Set<keyof FormData>();
 
   // CEP status (validado via ViaCEP)
   let cepStatus: CepStatus = "unknown";
 
-  // Dica/descriÃ§Ã£o do CNAE (sem misturar com o valor numÃ©rico)
+  // Dica/descrição do CNAE (sem misturar com o valor numérico)
   let cnaeMainDescription = "";
 
   // ==============================
   // Documentos
-  // - Passo 3: mÃºltiplos arquivos por tipo
-  // - Passo 4: selfie Ãºnica
+  // - Passo 3: múltiplos arquivos por tipo
+  // - Passo 4: selfie única
   // ==============================
   const maxFileSizeBytes = 2 * 1024 * 1024; // 2MB por arquivo
-  const maxFilesPerDocType = 6; // proteÃ§Ã£o contra exageros (ajuste se quiser)
+  const maxFilesPerDocType = 6; // proteção contra exageros (ajuste se quiser)
 
   const step3DocTypes: Step3DocType[] = ["rg_cnh", "cnpj", "contrato"];
 
@@ -244,7 +244,7 @@
     selfie: null,
   };
 
-  // Erros por documento (borda vermelha no card que precisa atenÃ§Ã£o)
+  // Erros por documento (borda vermelha no card que precisa atenção)
   let docErrorsByType: Record<DocType, string> = {
     rg_cnh: "",
     cnpj: "",
@@ -252,7 +252,7 @@
     selfie: "",
   };
 
-  // â€œatenÃ§Ã£oâ€ por documento (ex.: faltando obrigatÃ³rio / upload invÃ¡lido)
+  // “atenção” por documento (ex.: faltando obrigatório / upload inválido)
   let docAttentionByType: Record<DocType, boolean> = {
     rg_cnh: false,
     cnpj: false,
@@ -330,12 +330,12 @@
 
     if (docType === "selfie") {
       if (!acceptedSelfieMime.has(file.type))
-        return { ok: false, reason: "Formato invÃ¡lido (use JPG/PNG)." };
+        return { ok: false, reason: "Formato inválido (use JPG/PNG)." };
       return { ok: true };
     }
 
     if (!acceptedDocMime.has(file.type))
-      return { ok: false, reason: "Formato invÃ¡lido (use PDF/JPG/PNG)." };
+      return { ok: false, reason: "Formato inválido (use PDF/JPG/PNG)." };
     return { ok: true };
   }
 
@@ -345,7 +345,7 @@
   }
 
   function addDocFile(docType: Step3DocType, file: File) {
-    // evita duplicar (heurÃ­stica simples: nome+size)
+    // evita duplicar (heurística simples: nome+size)
     const exists = docFiles[docType].some(
       (f) => f.file.name === file.name && f.file.size === file.size,
     );
@@ -384,7 +384,7 @@
 
   function clearDocFiles(docType: Step3DocType) {
     docFiles = { ...docFiles, [docType]: [] };
-    // remove o destaque agora; validaÃ§Ã£o vai recolocar quando tentar avanÃ§ar
+    // remove o destaque agora; validação vai recolocar quando tentar avançar
     clearDocTypeError(docType);
   }
 
@@ -410,7 +410,7 @@
       const validation = validateFileForDoc(docType, file);
 
       if (!validation.ok) {
-        const msg = validation.reason ?? "Arquivo invÃ¡lido (tipo/tamanho).";
+        const msg = validation.reason ?? "Arquivo inválido (tipo/tamanho).";
         setDocTypeError(docType, msg);
         setDocMessage(msg);
         return;
@@ -421,7 +421,7 @@
       return;
     }
 
-    // Passo 3: mÃºltiplos
+    // Passo 3: múltiplos
     const currentCount = docFiles[docType].length;
     const remaining = Math.max(0, maxFilesPerDocType - currentCount);
 
@@ -442,7 +442,7 @@
       if (!validation.ok) {
         if (!firstRejected)
           firstRejected =
-            validation.reason ?? "Arquivo invÃ¡lido (tipo/tamanho).";
+            validation.reason ?? "Arquivo inválido (tipo/tamanho).";
         continue;
       }
 
@@ -468,20 +468,20 @@
     for (const dt of step3DocTypes) {
       if (!hasDoc(dt)) {
         anyMissing = true;
-        markDocAttention(dt, "ObrigatÃ³rio.");
+        markDocAttention(dt, "Obrigatório.");
       } else {
         clearDocTypeError(dt);
       }
     }
 
     if (anyMissing)
-      return { ok: false, message: "Envie todos os documentos obrigatÃ³rios." };
+      return { ok: false, message: "Envie todos os documentos obrigatórios." };
     return { ok: true };
   }
 
   function validateSelfieStep4(): { ok: boolean; message?: string } {
     if (!hasDoc("selfie")) {
-      markDocAttention("selfie", "ObrigatÃ³rio.");
+      markDocAttention("selfie", "Obrigatório.");
       return { ok: false, message: "Envie a selfie com documento." };
     }
     clearDocTypeError("selfie");
@@ -489,9 +489,9 @@
   }
 
   // ==============================
-  // CÃ¢mera (Selfie) - tela cheia + preview + confirmar/cancelar
+  // Câmera (Selfie) - tela cheia + preview + confirmar/cancelar
   // ==============================
-  let cameraOverlayOpen = false; // controla tela cheia da cÃ¢mera
+  let cameraOverlayOpen = false; // controla tela cheia da câmera
   let cameraActive = false;
   let cameraStream: MediaStream | null = null;
   let videoEl: HTMLVideoElement | null = null;
@@ -529,8 +529,8 @@
       clearDocTypeError("selfie");
     } catch {
       cameraActive = false;
-      setDocTypeError("selfie", "NÃ£o foi possÃ­vel acessar a cÃ¢mera.");
-      setDocMessage("NÃ£o foi possÃ­vel acessar a cÃ¢mera.");
+      setDocTypeError("selfie", "Não foi possível acessar a câmera.");
+      setDocMessage("Não foi possível acessar a câmera.");
     }
   }
 
@@ -566,14 +566,14 @@
     closeCameraOverlay();
   }
 
-  // Captura com compressÃ£o adaptativa para caber em 2MB
+  // Captura com compressão adaptativa para caber em 2MB
   async function captureSelfie() {
     if (!videoEl || !canvasEl) return;
 
     const vW = videoEl.videoWidth || 1280;
     const vH = videoEl.videoHeight || 720;
 
-    // reduz dimensÃ£o se necessÃ¡rio (evita arquivos grandes)
+    // reduz dimensão se necessário (evita arquivos grandes)
     const maxW = 1280;
     const scale = Math.min(1, maxW / vW);
     const w = Math.max(1, Math.round(vW * scale));
@@ -618,20 +618,20 @@
 
     const validation = validateFileForDoc("selfie", file);
     if (!validation.ok) {
-      setDocTypeError("selfie", validation.reason ?? "Arquivo invÃ¡lido.");
-      setDocMessage(validation.reason ?? "Arquivo invÃ¡lido.");
+      setDocTypeError("selfie", validation.reason ?? "Arquivo inválido.");
+      setDocMessage(validation.reason ?? "Arquivo inválido.");
       return;
     }
 
-    // NÃƒO salva direto â€” abre preview e pede confirmaÃ§Ã£o
+    // NÃO salva direto - abre preview e pede confirmação
     const previewUrl = URL.createObjectURL(file);
     pendingSelfie = { file, previewUrl };
 
-    // desliga a cÃ¢mera para economizar e â€œcongelarâ€ a experiÃªncia
+    // desliga a câmera para economizar e “congelar” a experiência
     stopCamera();
   }
 
-  // Para evitar cÃ¢mera ligada quando sair do passo 4
+  // Para evitar câmera ligada quando sair do passo 4
   $: if (currentStep !== 4) {
     closeCameraOverlay();
   }
@@ -693,7 +693,7 @@
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; padding:24px; color:#111;}    h1{font-size:20px; margin:0 0 12px;}    .muted{color:#555; font-size:12px; margin-bottom:16px;}    pre{white-space:pre-wrap; line-height:1.45; font-size:13px; color:#222;}    @media print { body{padding:0} }  </style></head><body>
   <h1>${safeTitle}</h1>
-  <div class="muted">VersÃ£o termos: ${safeVersion}</div>
+  <div class="muted">Versão termos: ${safeVersion}</div>
   <div class="prose">${htmlText}</div>
 </body>
 </html>`;
@@ -759,10 +759,10 @@
   }
 
   function refreshContractPreviewUrl() {
-    // IMPORTANTE: no SSR nÃ£o existe URL.createObjectURL
+    // IMPORTANTE: no SSR não existe URL.createObjectURL
     if (!browser) return;
 
-    // Revoga URL antiga (evita vazamento de memÃ³ria)
+    // Revoga URL antiga (evita vazamento de memória)
     if (contractPreviewUrl) URL.revokeObjectURL(contractPreviewUrl);
 
     const html = buildContractHtml(contract.title, termsPayload);
@@ -777,7 +777,7 @@
     if (!contractPreviewUrl) refreshContractPreviewUrl();
 
     if (!contractPreviewUrl) {
-      setDocMessage("Contrato indisponÃ­vel para visualizaÃ§Ã£o no momento.");
+      setDocMessage("Contrato indisponível para visualização no momento.");
       return;
     }
 
@@ -799,8 +799,8 @@
       termsPayload = {
         version: termsPayload?.version ?? "unknown",
         text:
-          "Contrato indisponÃ­vel para visualizaÃ§Ã£o no momento. " +
-          "Preencha RazÃ£o Social e CNPJ para gerar o texto, ou tente recarregar a pÃ¡gina.",
+          "Contrato indisponível para visualização no momento. " +
+          "Preencha Razão Social e CNPJ para gerar o texto, ou tente recarregar a página.",
       };
     }
 
@@ -843,7 +843,7 @@
   }
 
   /**
-   * Atualiza campo, limpando erro e removendo flag de autofill se o usuÃ¡rio alterou manualmente.
+   * Atualiza campo, limpando erro e removendo flag de autofill se o usuário alterou manualmente.
    */
   function setField<K extends keyof FormData>(
     key: K,
@@ -853,7 +853,7 @@
     formData = { ...formData, [key]: value };
     clearError(key);
 
-    // Se foi o usuÃ¡rio que mexeu, remove flags de autofill
+    // Se foi o usuário que mexeu, remove flags de autofill
     if (!options?.isAuto) {
       cnpjAutoFilledKeys.delete(key);
       cepAutoFilledKeys.delete(key);
@@ -869,8 +869,8 @@
   }
 
   /**
-   * Autofill sÃ³ pode sobrescrever se:
-   * - campo estÃ¡ vazio, OU
+   * Autofill só pode sobrescrever se:
+   * - campo está vazio, OU
    * - campo foi preenchido automaticamente antes (mesma origem).
    */
   function canAutoOverwrite(
@@ -884,7 +884,7 @@
   }
 
   // ==============================
-  // MÃ¡scaras / FormataÃ§Ã£o (com limite de dÃ­gitos)
+  // Máscaras / Formatação (com limite de dígitos)
   // ==============================
   function formatCpf(value: string): string {
     const d = limitDigits(value, 11);
@@ -941,23 +941,23 @@
     return `(${ddd}) ${p1}${p2 ? `-${p2}` : ""}`.trim();
   }
 
-  // CNAE: apenas nÃºmeros (7 dÃ­gitos)
+  // CNAE: apenas números (7 dígitos)
   function formatCnae(value: string): string {
     return limitDigits(value, 7);
   }
 
-  // RG: apenas nÃºmeros (limite conservador)
+  // RG: apenas números (limite conservador)
   function formatRg(value: string): string {
     return limitDigits(value, 14);
   }
 
-  // NÃºmero do endereÃ§o: apenas nÃºmeros (limite conservador)
+  // Número do endereço: apenas números (limite conservador)
   function formatAddressNumber(value: string): string {
     return limitDigits(value, 10);
   }
 
   // ==============================
-  // ValidaÃ§Ãµes reais
+  // Validações reais
   // ==============================
   function isEmailValid(email: string): boolean {
     const v = safeTrim(email);
@@ -1032,19 +1032,19 @@
   }
 
   // ==============================
-  // ValidaÃ§Ãµes por etapa
+  // Validações por etapa
   // ==============================
   async function validateStep1(): Promise<boolean> {
     let nextErrors: FormErrors = {};
 
     if (!isCnpjValid(formData.cnpj))
-      nextErrors = addError(nextErrors, "cnpj", "CNPJ invÃ¡lido.");
+      nextErrors = addError(nextErrors, "cnpj", "CNPJ inválido.");
 
     if (!safeTrim(formData.unitLegalName))
       nextErrors = addError(
         nextErrors,
         "unitLegalName",
-        "Informe a razÃ£o social.",
+        "Informe a razão social.",
       );
 
     if (!safeTrim(formData.unitFantasyName))
@@ -1054,31 +1054,31 @@
         "Informe o nome fantasia.",
       );
 
-    // CNAE: obrigatÃ³rio e apenas nÃºmeros (7 dÃ­gitos)
+    // CNAE: obrigatório e apenas números (7 dígitos)
     const cnaeDigits = onlyDigits(formData.cnaeMain);
     if (cnaeDigits.length !== 7)
       nextErrors = addError(
         nextErrors,
         "cnaeMain",
-        "CNAE invÃ¡lido (7 dÃ­gitos).",
+        "CNAE inválido (7 dígitos).",
       );
 
     const cepDigits = onlyDigits(formData.cep);
     if (cepDigits.length !== 8) {
-      nextErrors = addError(nextErrors, "cep", "CEP invÃ¡lido.");
+      nextErrors = addError(nextErrors, "cep", "CEP inválido.");
     } else {
       if (cepStatus !== "valid") {
         await lookupCepSilently(cepDigits);
       }
       if (cepStatus !== "valid")
-        nextErrors = addError(nextErrors, "cep", "CEP invÃ¡lido.");
+        nextErrors = addError(nextErrors, "cep", "CEP inválido.");
     }
 
     if (!safeTrim(formData.street))
       nextErrors = addError(nextErrors, "street", "Informe o logradouro.");
 
     if (!safeTrim(formData.number))
-      nextErrors = addError(nextErrors, "number", "Informe o nÃºmero.");
+      nextErrors = addError(nextErrors, "number", "Informe o número.");
 
     if (!safeTrim(formData.neighborhood))
       nextErrors = addError(nextErrors, "neighborhood", "Informe o bairro.");
@@ -1090,7 +1090,7 @@
       nextErrors = addError(nextErrors, "state", "Informe a UF.");
 
     if (!isBrazilPhoneValid(formData.unitPhone))
-      nextErrors = addError(nextErrors, "unitPhone", "Telefone invÃ¡lido.");
+      nextErrors = addError(nextErrors, "unitPhone", "Telefone inválido.");
 
     errors = nextErrors;
     return Object.keys(nextErrors).length === 0;
@@ -1103,12 +1103,11 @@
       nextErrors = addError(
         nextErrors,
         "managerName",
-        "Informe o responsÃ¡vel.",
+        "Informe o responsável.",
       );
 
     if (!isCpfValid(formData.managerCpf))
-      nextErrors = addError(nextErrors, "managerCpf", "CPF invÃ¡lido.");
-
+      nextErrors = addError(nextErrors, "managerCpf", "CPF inválido.");
     if (!safeTrim(formData.managerRg))
       nextErrors = addError(nextErrors, "managerRg", "Informe o RG.");
 
@@ -1116,14 +1115,14 @@
       nextErrors = addError(
         nextErrors,
         "managerWhatsapp",
-        "WhatsApp invÃ¡lido.",
+        "WhatsApp inválido.",
       );
 
     if (!isEmailValid(formData.managerEmail))
-      nextErrors = addError(nextErrors, "managerEmail", "E-mail invÃ¡lido.");
+      nextErrors = addError(nextErrors, "managerEmail", "E-mail inválido.");
 
     if (!isUrlValid(formData.marketingSite))
-      nextErrors = addError(nextErrors, "marketingSite", "Site invÃ¡lido.");
+      nextErrors = addError(nextErrors, "marketingSite", "Site inválido.");
 
     errors = nextErrors;
     return Object.keys(nextErrors).length === 0;
@@ -1173,7 +1172,7 @@
         setField("unitFantasyName", fantasy, { isAuto: true, source: "cnpj" });
       }
 
-      // CNAE: salvar somente nÃºmeros (id). DescriÃ§Ã£o vai em cnaeMainDescription.
+      // CNAE: salvar somente números (id). Descrição vai em cnaeMainDescription.
       const cnaeIdRaw = data?.estabelecimento?.atividade_principal?.id
         ? String(data.estabelecimento.atividade_principal.id)
         : "";
@@ -1272,7 +1271,7 @@
         void lookupCepSilently(cepDigits);
       }
     } catch {
-      // silÃªncio
+      // silêncio
     } finally {
       isCnpjLoading = false;
     }
@@ -1358,7 +1357,7 @@
   }
 
   // ==============================
-  // NavegaÃ§Ã£o do Wizard
+  // Navegação do Wizard
   // ==============================
   async function scrollPageToTop() {
     if (!browser) return;
@@ -1473,7 +1472,10 @@
 
       const contractSnapshotText = termsPayload.text;
       const contractAcceptedAt = contract.acceptedAt;
-      const contractSnapshotHtml = buildContractHtml(contract.title, termsPayload);
+      const contractSnapshotHtml = buildContractHtml(
+        contract.title,
+        termsPayload,
+      );
       const contractSnapshotFileName = buildContractFilename();
       const contractClientMeta = getContractClientMeta();
 
@@ -1498,12 +1500,12 @@
         }),
       );
 
-      // Passo 3 (mÃºltiplos)
+      // Passo 3 (múltiplos)
       for (const uf of docFiles.rg_cnh) fd.append("doc_rg_cnh", uf.file);
       for (const uf of docFiles.cnpj) fd.append("doc_cnpj", uf.file);
       for (const uf of docFiles.contrato) fd.append("doc_contrato", uf.file);
 
-      // Passo 4 (Ãºnico)
+      // Passo 4 (único)
       fd.append("doc_selfie", docFiles.selfie!.file);
 
       // 2) Envia para o endpoint que dispara o e-mail via Brevo
@@ -1517,7 +1519,7 @@
         const data = await res.json().catch(() => null);
         const msg =
           data?.message ||
-          "NÃ£o foi possÃ­vel enviar. Verifique os dados e tente novamente.";
+          "Não foi possível enviar. Verifique os dados e tente novamente.";
         submitMessage = msg;
         setDocMessage(msg);
         return;
@@ -1533,8 +1535,8 @@
         downloadContractCopy();
       }
     } catch {
-      submitMessage = "NÃ£o foi possÃ­vel enviar. Tente novamente.";
-      setDocMessage("NÃ£o foi possÃ­vel enviar. Tente novamente.");
+      submitMessage = "Não foi possível enviar. Tente novamente.";
+      setDocMessage("Não foi possível enviar. Tente novamente.");
     } finally {
       isSubmitting = false;
     }
@@ -1561,7 +1563,7 @@
       return "CNH: inclua a foto do QR Code. PDF ou imagem.";
     if (docType === "cnpj") return "Arquivo PDF ou imagem.";
     if (docType === "contrato") return "Arquivo PDF ou imagem.";
-    return "Foto nÃ­tida segurando o documento.";
+    return "Foto nítida segurando o documento.";
   }
 
   function docCardBorderClass(docType: DocType): string {
@@ -1607,7 +1609,7 @@
     ]}
   />
 
-  <!-- input Ãºnico (controlado por activeDocType) -->
+  <!-- input único (controlado por activeDocType) -->
   <input
     bind:this={fileInputRef}
     type="file"
@@ -1651,7 +1653,7 @@
           Sucesso
         {:else}
           {#if currentStep === 1}Dados da unidade{/if}
-          {#if currentStep === 2}Dados do responsÃ¡vel{/if}
+          {#if currentStep === 2}Dados do responsável{/if}
           {#if currentStep === 3}Documentos{/if}
           {#if currentStep === 4}Selfie com documento{/if}
           {#if currentStep === 5}Contrato e aceite{/if}
@@ -1677,8 +1679,8 @@
             Tudo certo!
           </h2>
           <p class="mt-2 text-[13px] text-black/60">
-            Recebemos seus dados. Assista ao vÃ­deo abaixo para as prÃ³ximas
-            orientaÃ§Ãµes.
+            Recebemos seus dados. Assista ao vídeo abaixo para as próximas
+            orientações.
           </p>
 
           <div
@@ -1688,7 +1690,7 @@
               <iframe
                 class="absolute inset-0 h-full w-full"
                 src={successVideoUrl}
-                title="VÃ­deo"
+                title="Vídeo"
                 frameborder="0"
                 allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowfullscreen
@@ -1726,10 +1728,10 @@
         </div>
       {:else}
         <!-- =======================
-             Etapa 1 â€” Unidade
+             Etapa 1 - Unidade
              ======================= -->
         {#if currentStep === 1}
-          <!-- (Etapa 1 igual ao seu cÃ³digo original â€” mantida) -->
+          <!-- (Etapa 1 igual ao seu código original - mantida) -->
           <div>
             <h2 class="text-[18px] font-semibold text-[var(--primary)]">
               Dados da unidade
@@ -1791,7 +1793,7 @@
                   <label
                     for="unitLegalName"
                     class="block text-[13px] font-medium text-black/70"
-                    >RazÃ£o Social</label
+                    >Razão Social</label
                   >
                   <input
                     id="unitLegalName"
@@ -2010,7 +2012,7 @@
                       <label
                         for="number"
                         class="block text-[13px] font-medium text-black/70"
-                        >NÃºmero</label
+                        >Número</label
                       >
                       <input
                         id="number"
@@ -2158,13 +2160,13 @@
         {/if}
 
         <!-- =======================
-             Etapa 2 â€” ResponsÃ¡vel + DivulgaÃ§Ã£o
+             Etapa 2 - Responsável + Divulgação
              ======================= -->
         {#if currentStep === 2}
-          <!-- (Etapa 2 igual ao seu cÃ³digo original â€” mantida) -->
+          <!-- (Etapa 2 igual ao seu código original - mantida) -->
           <div>
             <h2 class="text-[18px] font-semibold text-[var(--primary)]">
-              Dados do responsÃ¡vel
+              Dados do responsável
             </h2>
 
             <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -2172,7 +2174,7 @@
                 <label
                   for="managerName"
                   class="block text-[13px] font-medium text-black/70"
-                  >ResponsÃ¡vel</label
+                  >Responsável</label
                 >
                 <input
                   id="managerName"
@@ -2421,7 +2423,7 @@
         {/if}
 
         <!-- =======================
-             Etapa 3 â€” Documentos (mÃºltiplos por tipo)
+             Etapa 3 - Documentos (múltiplos por tipo)
              ======================= -->
         {#if currentStep === 3}
           <div>
@@ -2438,10 +2440,12 @@
                 </div>
                 <div class="text-[13px] text-black/65 space-y-1">
                   <p>
-                    Envie os documentos obrigatÃ³rios (vocÃª pode anexar mais de
+                    Envie os documentos obrigatórios (você pode anexar mais de
                     um arquivo por item).
                   </p>
-                  <p>Formatos aceitos: PDF, JPG, PNG (atÃ© 2MB por arquivo).</p>
+                  <p>
+                    Formatos aceitos: PDF, JPG, PNG (é 2MB por arquivo).
+                  </p>
                 </div>
               </div>
             </div>
@@ -2543,7 +2547,7 @@
 
                   {#if docFiles[dt].length > 0}
                     <p class="mt-3 text-[12px] text-black/50">
-                      {docFiles[dt].length} arquivo(s) anexado(s) â€” limite {maxFilesPerDocType}.
+                      {docFiles[dt].length} arquivo(s) anexado(s) - limite {maxFilesPerDocType}.
                     </p>
                   {/if}
                 </div>
@@ -2557,7 +2561,7 @@
         {/if}
 
         <!-- =======================
-             Etapa 4 â€” Selfie com documento
+             Etapa 4 - Selfie com documento
              ======================= -->
         {#if currentStep === 4}
           <div>
@@ -2566,7 +2570,7 @@
             </h2>
 
             <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-5">
-              <!-- Card 1: instruÃ§Ãµes + status -->
+              <!-- Card 1: instruções + status -->
               <div
                 class={`rounded-2xl border ${docCardBorderClass("selfie")} bg-white p-5`}
               >
@@ -2588,12 +2592,14 @@
                 </div>
 
                 <ul class="mt-4 text-[13px] text-black/65 space-y-2">
-                  <li>â€¢ Ambiente bem iluminado (evite contraluz).</li>
+                  <li>• Ambiente bem iluminado (evite contraluz).</li>
                   <li>
-                    â€¢ Segure o documento prÃ³ximo ao rosto, sem cobrir sua face.
+                    • Segure o documento próximo ao rosto, sem cobrir sua face.
                   </li>
-                  <li>â€¢ Texto do documento legÃ­vel, sem reflexo ou tremido.</li>
-                  <li>â€¢ Olhe para a cÃ¢mera (foto nÃ­tida).</li>
+                  <li>
+                    • Texto do documento legível, sem reflexo ou tremido.
+                  </li>
+                  <li>• Olhe para a câmera (foto nítida).</li>
                 </ul>
 
                 <div
@@ -2658,7 +2664,10 @@
                 <div
                   class="mt-4 rounded-xl border border-black/10 bg-black/[0.02] px-4 py-3"
                 >
-                  <p class="text-[13px] text-black/65">Tire a selfie pela camera. Upload de arquivo nao e permitido.</p>
+                  <p class="text-[13px] text-black/65">
+                    Tire a selfie pela camera. Upload de arquivo nao e
+                    permitido.
+                  </p>
                 </div>
 
                 <!-- Camera obrigatoria -->
@@ -2669,7 +2678,7 @@
                     on:click={openCameraOverlay}
                   >
                     <Camera size={16} />
-                    {docFiles.selfie ? "Tirar outra" : "Abrir cÃ¢mera"}
+                    {docFiles.selfie ? "Tirar outra" : "Abrir câmera"}
                   </button>
                 </div>
 
@@ -2684,7 +2693,7 @@
         {/if}
 
         <!-- =======================
-     Etapa 5 â€” Contrato e aceite
+     Etapa 5 - Contrato e aceite
      ======================= -->
         {#if currentStep === 5}
           <div>
@@ -2700,11 +2709,13 @@
               </p>
 
               <p class="mt-1 text-[12px] text-black/45">
-                VersÃ£o termos: {termsPayload.version}
+                Versão termos: {termsPayload.version}
               </p>
             </div>
 
-            <div class="mt-6 rounded-2xl border border-black/10 bg-white p-4 sm:p-6">
+            <div
+              class="mt-6 rounded-2xl border border-black/10 bg-white p-4 sm:p-6"
+            >
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <p class="text-[14px] font-semibold text-black/80">
                   {contract.title}
@@ -2755,7 +2766,9 @@
               <div
                 class="mt-4 rounded-2xl border border-black/10 bg-black/[0.02] p-3 sm:p-5 max-h-[70vh] overflow-auto"
               >
-                <div class="text-[13px] sm:text-[14px] leading-relaxed text-black/70 font-sans">
+                <div
+                  class="text-[13px] sm:text-[14px] leading-relaxed text-black/70 font-sans"
+                >
                   {@html termsPayload.text}
                 </div>
               </div>
@@ -2764,7 +2777,7 @@
         {/if}
 
         <!-- =======================
-             AÃ§Ãµes do Wizard
+             Ações do Wizard
              ======================= -->
         <div
           class="pt-2 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between"
@@ -2809,7 +2822,7 @@
   </div>
 
   <!-- =======================
-       CÃ¢mera em tela cheia (sem zoom/crop)
+       Câmera em tela cheia (sem zoom/crop)
        ======================= -->
   {#if cameraOverlayOpen}
     <div class="fixed inset-0 z-[60] bg-black overflow-hidden">
@@ -2819,8 +2832,8 @@
           class="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/10 bg-black/60 backdrop-blur"
         >
           <p class="text-white/90 text-[13px] font-semibold">
-            {#if pendingSelfie}PrÃ©via{/if}
-            {#if !pendingSelfie}CÃ¢mera{/if}
+            {#if pendingSelfie}Prévia{/if}
+            {#if !pendingSelfie}Câmera{/if}
           </p>
 
           <button
@@ -2833,12 +2846,12 @@
           </button>
         </div>
 
-        <!-- ConteÃºdo -->
+        <!-- Conteúdo -->
         <div class="relative flex-1 min-h-0 overflow-hidden">
           {#if pendingSelfie}
             <img
               src={pendingSelfie.previewUrl}
-              alt="PrÃ©via da selfie"
+              alt="Prévia da selfie"
               class="absolute inset-0 w-full h-full object-contain bg-black"
             />
           {:else}

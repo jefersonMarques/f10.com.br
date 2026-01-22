@@ -39,6 +39,9 @@ const redirectRules: RedirectRule[] = [
   { from: "/f10", to: "/sobre" },
   { from: "/inovacao-digital", to: "/inovacao-na-escola" },
 
+    // ===== Páginas treinamentos =====
+  { from: "/treinamentos", to: "https://ajuda.f10.com.br/kb/pt-br/article/291730/treinamentos-novo-cliente-f10" },
+
   // ===== Soluções antigas → soluções novas =====
   { from: "/solucoes/indicadores-e-bi", to: "/solucoes/indicadores-e-bi" },
 

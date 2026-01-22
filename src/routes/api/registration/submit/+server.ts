@@ -29,7 +29,7 @@ type ContractPayload = {
 };
 
 type RegistrationPayload = {
-  // Etapa 1 â€” Unidade
+  // Etapa 1 — Unidade
   cnpj: string;
   unitLegalName: string;
   unitFantasyName: string;
@@ -43,14 +43,14 @@ type RegistrationPayload = {
   state: string;
   unitPhone: string;
 
-  // Etapa 2 â€” ResponsÃ¡vel
+  // Etapa 2 — Responsável
   managerName: string;
   managerCpf: string;
   managerRg: string;
   managerWhatsapp: string;
   managerEmail: string;
 
-  // Etapa 2 â€” Divulga\u00e7\u00e3o (opcional)
+  // Etapa 2 — Divulgação (opcional)
   marketingSite: string;
   marketingInstagram: string;
   marketingFacebook: string;
@@ -84,7 +84,7 @@ const ALLOWED_DOC_MIME = new Set([
   "image/png",
 ]);
 
-// Selfie: sÃ³ imagem (igual ao front)
+// Selfie: só imagem (igual ao front)
 const ALLOWED_SELFIE_MIME = new Set(["image/jpeg", "image/jpg", "image/png"]);
 
 const DOCS: DocConfig[] = [
@@ -150,7 +150,7 @@ function safeValue(value: unknown): string {
 
 function formatYesNo(value: unknown): string {
   if (value === true) return "sim";
-  if (value === false) return "nao";
+  if (value === false) return "não";
   return "-";
 }
 
@@ -159,21 +159,21 @@ function hashSha256(value: string): string {
 }
 
 function sanitizeFilename(name: string): string {
-  // Remove caminhos e caracteres problemÃ¡ticos
+  // Remove caminhos e caracteres problemáticos
   const base = (name || "arquivo").split(/[/\\]/).pop() || "arquivo";
   return base.replace(/[^\w.\-()+\s]/g, "_");
 }
 
 function getClientIp(headers: Headers): string {
   const xff = headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]?.trim() || "â€”";
-  return headers.get("x-real-ip") || "â€”";
+  if (xff) return xff.split(",")[0]?.trim() || "—";
+  return headers.get("x-real-ip") || "—";
 }
 
 function formatDateTimeBR(iso: string | undefined): string {
-  if (!iso) return "â€”";
+  if (!iso) return "—";
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "â€”";
+  if (Number.isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat("pt-BR", {
     timeZone: "America/Sao_Paulo",
     year: "numeric",
@@ -221,34 +221,34 @@ function buildEmailText(params: {
   const { payload, docs, meta } = params;
 
   const lines: string[] = [];
-  lines.push(`Novo cadastro â€” CELCOIN F10`);
+  lines.push(`Novo cadastro — CELCOIN F10`);
   lines.push(`Recebido em: ${meta.submittedAt}`);
   lines.push(`Token: ${meta.messageToken}`);
   lines.push("");
   lines.push("=== Dados da unidade ===");
   lines.push(`CNPJ: ${safeValue(payload.cnpj)}`);
-  lines.push(`RazÃ£o Social: ${safeValue(payload.unitLegalName)}`);
+  lines.push(`Razão Social: ${safeValue(payload.unitLegalName)}`);
   lines.push(`Nome Fantasia: ${safeValue(payload.unitFantasyName)}`);
   lines.push(`CNAE principal: ${safeValue(payload.cnaeMain)}`);
   lines.push(`Telefone Comercial: ${safeValue(payload.unitPhone)}`);
   lines.push("");
-  lines.push("=== EndereÃ§o da unidade ===");
+  lines.push("=== Endereço da unidade ===");
   lines.push(`CEP: ${safeValue(payload.cep)}`);
   lines.push(`Logradouro: ${safeValue(payload.street)}`);
-  lines.push(`NÃºmero: ${safeValue(payload.number)}`);
+  lines.push(`Número: ${safeValue(payload.number)}`);
   lines.push(`Complemento: ${safeValue(payload.complement)}`);
   lines.push(`Bairro: ${safeValue(payload.neighborhood)}`);
   lines.push(`Cidade: ${safeValue(payload.city)}`);
   lines.push(`UF: ${safeValue(payload.state)}`);
   lines.push("");
   lines.push("=== Dados do responsável ===");
-  lines.push(`ResponsÃ¡vel: ${safeValue(payload.managerName)}`);
+  lines.push(`Responsável: ${safeValue(payload.managerName)}`);
   lines.push(`CPF: ${safeValue(payload.managerCpf)}`);
   lines.push(`RG: ${safeValue(payload.managerRg)}`);
   lines.push(`WhatsApp: ${safeValue(payload.managerWhatsapp)}`);
   lines.push(`E-mail: ${safeValue(payload.managerEmail)}`);
   lines.push("");
-  lines.push("=== Divulga\u00e7\u00e3o (opcional) ===");
+  lines.push("=== Divulgação (opcional) ===");
   lines.push(`Site: ${safeValue(payload.marketingSite)}`);
   lines.push(`Instagram: ${safeValue(payload.marketingInstagram)}`);
   lines.push(`Facebook: ${safeValue(payload.marketingFacebook)}`);
@@ -278,9 +278,9 @@ function buildEmailText(params: {
   const signedMeta = contract?.signedClientMeta;
 
   lines.push("=== Contrato e aceite ===");
-  lines.push(`Titulo: ${safeValue(contract?.title)}`);
-  lines.push(`Contrato versao: ${safeValue(contract?.contractVersion)}`);
-  lines.push(`Termos versao: ${safeValue(contract?.termsVersion)}`);
+  lines.push(`Título: ${safeValue(contract?.title)}`);
+  lines.push(`Contrato versão: ${safeValue(contract?.contractVersion)}`);
+  lines.push(`Termos versão: ${safeValue(contract?.termsVersion)}`);
   lines.push(`Aceite (checkbox): ${formatYesNo(contract?.accepted)}`);
   lines.push(
     `Aceito em (cliente): ${formatDateTimeBR(
@@ -288,31 +288,27 @@ function buildEmailText(params: {
     )}`,
   );
   lines.push(`Snapshot arquivo: ${safeValue(contract?.snapshotFileName)}`);
-  lines.push(
-    `Snapshot HTML hash (sha256): ${safeValue(contractHtmlHash)}`,
-  );
+  lines.push(`Snapshot HTML hash (sha256): ${safeValue(contractHtmlHash)}`);
   lines.push(`Snapshot HTML tamanho: ${contractSnapshotHtml.length}`);
-  lines.push(
-    `Snapshot texto hash (sha256): ${safeValue(contractTextHash)}`,
-  );
+  lines.push(`Snapshot texto hash (sha256): ${safeValue(contractTextHash)}`);
   lines.push(`Snapshot texto tamanho: ${contractSnapshotText.length}`);
   lines.push("");
   lines.push("=== Dados do dispositivo (cliente) ===");
   lines.push(`User-Agent: ${safeValue(signedMeta?.userAgent)}`);
   lines.push(`Plataforma: ${safeValue(signedMeta?.platform)}`);
   lines.push(`Idioma: ${safeValue(signedMeta?.language)}`);
-  lines.push(`Fuso horario: ${safeValue(signedMeta?.timeZone)}`);
+  lines.push(`Fuso horário: ${safeValue(signedMeta?.timeZone)}`);
   lines.push(`Tela: ${safeValue(signedMeta?.screen)}`);
   lines.push(`Viewport: ${safeValue(signedMeta?.viewport)}`);
   lines.push(`Referrer: ${safeValue(signedMeta?.referrer)}`);
   lines.push("");
-  lines.push("=== Metadados tÃ©cnicos ===");
+  lines.push("=== Metadados técnicos ===");
   lines.push(`IP (proxy): ${safeValue(meta.clientIp)}`);
   lines.push(`User-Agent: ${safeValue(meta.userAgent)}`);
   lines.push(`Origem: ${safeValue(meta.origin)}`);
   lines.push(`submittedAt (payload): ${safeValue(payload.submittedAt)}`);
   lines.push("");
-  lines.push("Aviso: este e-mail contÃ©m informaÃ§Ãµes sensÃ­veis. Evite encaminhar.");
+  lines.push("Aviso: este e-mail contém informações sensíveis. Evite encaminhar.");
 
   return lines.join("\n");
 }
@@ -398,7 +394,7 @@ function buildEmailHtml(params: {
               <td style="padding:10px 12px; border-top:1px solid ${outline}; color:#111; font-size:13px;">
                 <div style="font-weight:600;">${escapeHtml(d.fileName)}</div>
                 <div style="font-size:12px; color:${muted};">
-                  ${escapeHtml(d.fileType)} â€¢ ${escapeHtml(formatBytes(d.fileSize))}
+                  ${escapeHtml(d.fileType)} • ${escapeHtml(formatBytes(d.fileSize))}
                 </div>
               </td>
             </tr>
@@ -414,9 +410,9 @@ function buildEmailHtml(params: {
     `;
 
   const contractSection = section("Contrato e aceite", [
-    ["Titulo", safeValue(contract?.title)],
-    ["Contrato versao", safeValue(contract?.contractVersion)],
-    ["Termos versao", safeValue(contract?.termsVersion)],
+    ["Título", safeValue(contract?.title)],
+    ["Contrato versão", safeValue(contract?.contractVersion)],
+    ["Termos versão", safeValue(contract?.termsVersion)],
     ["Aceite (checkbox)", formatYesNo(contract?.accepted)],
     [
       "Aceito em (cliente)",
@@ -433,7 +429,7 @@ function buildEmailHtml(params: {
     ["User-Agent", safeValue(signedMeta?.userAgent)],
     ["Plataforma", safeValue(signedMeta?.platform)],
     ["Idioma", safeValue(signedMeta?.language)],
-    ["Fuso horario", safeValue(signedMeta?.timeZone)],
+    ["Fuso horário", safeValue(signedMeta?.timeZone)],
     ["Tela", safeValue(signedMeta?.screen)],
     ["Viewport", safeValue(signedMeta?.viewport)],
     ["Referrer", safeValue(signedMeta?.referrer)],
@@ -445,7 +441,7 @@ function buildEmailHtml(params: {
         <tr>
           <td style="padding:14px 16px; background:${bg};">
             <div style="font-size:14px; font-weight:700; color:${primary};">
-              Selfie (visualizacao)
+              Selfie (visualização)
             </div>
           </td>
         </tr>
@@ -459,7 +455,7 @@ function buildEmailHtml(params: {
     : "";
 
   const preheaderText =
-    "Cadastro completo recebido (unidade, endereço, responsável, divulga\u00e7\u00e3o, documentos e metadados).";
+    "Cadastro completo recebido (unidade, endereço, responsável, divulgação, documentos e metadados).";
 
   return `
 <!doctype html>
@@ -471,7 +467,7 @@ function buildEmailHtml(params: {
   </head>
   <body style="margin:0; padding:0; background:${bg}; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif;">
     <span style="display:none !important; font-size:0; line-height:0; max-height:0; max-width:0; opacity:0; overflow:hidden; mso-hide:all; color:transparent;">
-      ${escapeHtml(preheaderText)} â€¢ ${escapeHtml(meta.messageToken)}
+      ${escapeHtml(preheaderText)} • ${escapeHtml(meta.messageToken)}
     </span>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${bg}; padding:24px 12px;">
@@ -492,10 +488,10 @@ function buildEmailHtml(params: {
                 </table>
 
                 <div style="margin-top:14px; font-size:22px; font-weight:800; color:${primary}; line-height:1.2;">
-                  Novo cadastro â€” CELCOIN F10
+                  Novo cadastro — CELCOIN F10
                 </div>
                 <div style="margin-top:6px; color:${muted}; font-size:13px;">
-                  Abaixo estÃ£o <strong>todos os dados</strong> enviados no formulÃ¡rio (incluindo campos opcionais).
+                  Abaixo estão <strong>todos os dados</strong> enviados no formulário (incluindo campos opcionais).
                 </div>
               </td>
             </tr>
@@ -504,36 +500,36 @@ function buildEmailHtml(params: {
               <td style="padding:0 18px 18px 18px;">
                 <div style="background:${surface}; border:1px solid ${outline}; border-radius:22px; padding:18px;">
                   ${section("Dados da unidade", [
-    ["CNPJ", safeValue(payload.cnpj)],
-    ["RazÃ£o Social", safeValue(payload.unitLegalName)],
-    ["Nome Fantasia", safeValue(payload.unitFantasyName)],
-    ["CNAE principal", safeValue(payload.cnaeMain)],
-    ["Telefone Comercial", safeValue(payload.unitPhone)],
-  ])}
+                    ["CNPJ", safeValue(payload.cnpj)],
+                    ["Razão Social", safeValue(payload.unitLegalName)],
+                    ["Nome Fantasia", safeValue(payload.unitFantasyName)],
+                    ["CNAE principal", safeValue(payload.cnaeMain)],
+                    ["Telefone Comercial", safeValue(payload.unitPhone)],
+                  ])}
 
-                  ${section("EndereÃ§o da unidade", [
-    ["CEP", safeValue(payload.cep)],
-    ["Logradouro", safeValue(payload.street)],
-    ["NÃºmero", safeValue(payload.number)],
-    ["Complemento", safeValue(payload.complement)],
-    ["Bairro", safeValue(payload.neighborhood)],
-    ["Cidade", safeValue(payload.city)],
-    ["UF", safeValue(payload.state)],
-  ])}
+                  ${section("Endereço da unidade", [
+                    ["CEP", safeValue(payload.cep)],
+                    ["Logradouro", safeValue(payload.street)],
+                    ["Número", safeValue(payload.number)],
+                    ["Complemento", safeValue(payload.complement)],
+                    ["Bairro", safeValue(payload.neighborhood)],
+                    ["Cidade", safeValue(payload.city)],
+                    ["UF", safeValue(payload.state)],
+                  ])}
 
                   ${section("Dados do responsável", [
-    ["ResponsÃ¡vel", safeValue(payload.managerName)],
-    ["CPF", safeValue(payload.managerCpf)],
-    ["RG", safeValue(payload.managerRg)],
-    ["WhatsApp", safeValue(payload.managerWhatsapp)],
-    ["E-mail", safeValue(payload.managerEmail)],
-  ])}
+                    ["Responsável", safeValue(payload.managerName)],
+                    ["CPF", safeValue(payload.managerCpf)],
+                    ["RG", safeValue(payload.managerRg)],
+                    ["WhatsApp", safeValue(payload.managerWhatsapp)],
+                    ["E-mail", safeValue(payload.managerEmail)],
+                  ])}
 
-                  ${section("Dados de divulga\u00e7\u00e3o (opcional)", [
-    ["Site", safeValue(payload.marketingSite)],
-    ["Instagram", safeValue(payload.marketingInstagram)],
-    ["Facebook", safeValue(payload.marketingFacebook)],
-  ])}
+                  ${section("Dados de divulgação (opcional)", [
+                    ["Site", safeValue(payload.marketingSite)],
+                    ["Instagram", safeValue(payload.marketingInstagram)],
+                    ["Facebook", safeValue(payload.marketingFacebook)],
+                  ])}
 
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${outline}; border-radius:16px; overflow:hidden; background:${surface}; margin-top:14px;">
                     <tr>
@@ -545,22 +541,23 @@ function buildEmailHtml(params: {
                     </tr>
                     ${docsRows}
                   </table>
+
                   ${contractSection}
 
                   ${deviceSection}
 
                   ${selfiePreviewHtml}
 
-                  ${section("Metadados tÃ©cnicos", [
-    ["IP (proxy)", safeValue(meta.clientIp)],
-    ["User-Agent", safeValue(meta.userAgent)],
-    ["Origem", safeValue(meta.origin)],
-    ["submittedAt (payload)", safeValue(payload.submittedAt)],
-    ["messageToken", safeValue(meta.messageToken)],
-  ])}
+                  ${section("Metadados técnicos", [
+                    ["IP (proxy)", safeValue(meta.clientIp)],
+                    ["User-Agent", safeValue(meta.userAgent)],
+                    ["Origem", safeValue(meta.origin)],
+                    ["submittedAt (payload)", safeValue(payload.submittedAt)],
+                    ["messageToken", safeValue(meta.messageToken)],
+                  ])}
 
                   <div style="margin-top:14px; font-size:12px; color:${muted}; line-height:1.5;">
-                    Aviso: este e-mail contÃ©m informaÃ§Ãµes sensÃ­veis. Evite encaminhar e mantenha em local seguro.
+                    Aviso: este e-mail contém informações sensíveis. Evite encaminhar e mantenha em local seguro.
                   </div>
 
                 </div>
@@ -569,7 +566,7 @@ function buildEmailHtml(params: {
 
             <tr>
               <td style="padding:0 18px 8px 18px; color:${muted}; font-size:11px; text-align:center;">
-                F10 â€¢ Cadastro automÃ¡tico
+                F10 • Cadastro automático
               </td>
             </tr>
 
@@ -616,8 +613,8 @@ export const GET: RequestHandler = async () => {
 };
 
 export const POST: RequestHandler = async ({ request, url }) => {
-    const contentType = request.headers.get("content-type") ?? "â€”";
-  const contentLength = request.headers.get("content-length") ?? "â€”";
+  const contentType = request.headers.get("content-type") ?? "—";
+  const contentLength = request.headers.get("content-length") ?? "—";
 
   console.log("[registration] incoming", { contentType, contentLength });
 
@@ -625,13 +622,13 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return json(
       {
         success: false,
-        message: "ConteÃºdo invÃ¡lido. Envie como multipart/form-data.",
+        message: "Conteúdo inválido. Envie como multipart/form-data.",
         details: `content-type=${contentType} content-length=${contentLength}`,
       },
       { status: 415 },
     );
   }
-  
+
   // ====== Config ======
   const apiKey = getEnv("BREVO_API_KEY");
   const toEmail = getEnv("BREVO_MAIL_TO"); // ex: cadastro@f10.com.br
@@ -644,7 +641,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
       {
         success: false,
         message:
-          "E-mail nÃ£o configurado no servidor (BREVO_API_KEY / BREVO_MAIL_TO / BREVO_FROM_EMAIL).",
+          "E-mail não configurado no servidor (BREVO_API_KEY / BREVO_MAIL_TO / BREVO_FROM_EMAIL).",
       },
       { status: 500 },
     );
@@ -660,7 +657,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return json(
       {
         success: false,
-        message: "ConteÃºdo invÃ¡lido. Envie como multipart/form-data.",
+        message: "Conteúdo inválido. Envie como multipart/form-data.",
         details:
           error instanceof Error ? error.message.slice(0, 500) : String(error),
       },
@@ -673,7 +670,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return json(
       {
         success: false,
-        message: "Payload ausente. Campo 'payload' Ã© obrigatÃ³rio.",
+        message: "Payload ausente. Campo 'payload' é obrigatório.",
       },
       { status: 400 },
     );
@@ -684,12 +681,12 @@ export const POST: RequestHandler = async ({ request, url }) => {
     payload = JSON.parse(payloadRaw) as RegistrationPayload;
   } catch {
     return json(
-      { success: false, message: "Payload invÃ¡lido (JSON malformado)." },
+      { success: false, message: "Payload inválido (JSON malformado)." },
       { status: 400 },
     );
   }
 
-  // ====== Valida docs (agora com mÃºltiplos) ======
+  // ====== Valida docs (agora com múltiplos) ======
   const docFiles: Array<{
     key: DocKey;
     label: string;
@@ -703,7 +700,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
 
     if (d.required && files.length === 0) {
       return json(
-        { success: false, message: `Documento obrigatÃ³rio ausente: ${d.label}.` },
+        { success: false, message: `Documento obrigatório ausente: ${d.label}.` },
         { status: 400 },
       );
     }
@@ -727,7 +724,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
 
       if (!fileName || !fileSize) {
         return json(
-          { success: false, message: `Arquivo invÃ¡lido em: ${d.label}.` },
+          { success: false, message: `Arquivo inválido em: ${d.label}.` },
           { status: 400 },
         );
       }
@@ -745,7 +742,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
         return json(
           {
             success: false,
-            message: `Formato invÃ¡lido em: ${d.label} (use ${allowedText}).`,
+            message: `Formato inválido em: ${d.label} (use ${allowedText}).`,
           },
           { status: 400 },
         );
@@ -814,7 +811,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const meta = {
     submittedAt: formatDateTimeBR(submittedAtIso),
     clientIp: getClientIp(request.headers),
-    userAgent: request.headers.get("user-agent") || "â€”",
+    userAgent: request.headers.get("user-agent") || "—",
     origin: siteUrl,
     messageToken,
   };
@@ -833,11 +830,11 @@ export const POST: RequestHandler = async ({ request, url }) => {
     meta,
   });
 
-  // ====== Assunto ÃšNICO (evita â€œconversaâ€ e trimming) ======
+  // ====== Assunto ÚNICO (evita “conversa” e trimming) ======
   const stampForSubject = nowIso.replace("T", " ").slice(0, 19);
-  const subject = `Novo cadastro F10 â€¢ ${safeValue(
+  const subject = `Novo cadastro F10 • ${safeValue(
     payload.unitFantasyName,
-  )} â€¢ ${cnpjDigits || "CNPJ"} â€¢ ${stampForSubject}`;
+  )} • ${cnpjDigits || "CNPJ"} • ${stampForSubject}`;
 
   // ====== Envia via Brevo ======
   try {
@@ -865,7 +862,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
         {
           success: false,
           message:
-            "Falha ao enviar e-mail via Brevo. Verifique API Key e liberaÃ§Ã£o de IP/servidor.",
+            "Falha ao enviar e-mail via Brevo. Verifique API Key e liberação de IP/servidor.",
           details: errorText.slice(0, 2000),
         },
         { status: 502 },
