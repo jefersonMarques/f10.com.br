@@ -13,7 +13,9 @@
 
   type MovideskWindow = Window & {
     mdChatClient?: string;
-    movideskChatWidgetChangeWindowState?: (state: "maximized" | "minimized") => void;
+    movideskChatWidgetChangeWindowState?: (
+      state: "maximized" | "minimized",
+    ) => void;
   };
 
   function getMovideskWindow(): MovideskWindow | null {
@@ -21,10 +23,12 @@
     return window as MovideskWindow;
   }
 
-  const movideskWidgetSrc = "https://chat.movidesk.com/Scripts/chat-widget.min.js";
+  const movideskWidgetSrc =
+    "https://chat.movidesk.com/Scripts/chat-widget.min.js";
   let movideskWidgetPromise: Promise<boolean> | null = null;
 
   let isSupportWidgetOpen = false;
+  const movideskContainerSelector = ".md-chat-widget-container";
 
   function isMovideskApiReady(w: MovideskWindow | null): boolean {
     return !!w && typeof w.movideskChatWidgetChangeWindowState === "function";
@@ -33,6 +37,8 @@
   function waitForMovideskApi(timeoutMs: number = 6000): Promise<boolean> {
     const w = getMovideskWindow();
     if (!w) return Promise.resolve(false);
+
+    w.mdChatClient = movideskChatClient;
     if (isMovideskApiReady(w)) return Promise.resolve(true);
 
     return new Promise((resolve) => {
@@ -66,20 +72,26 @@
         const hasDocument = typeof document !== "undefined";
         const alreadyLoaded =
           hasDocument &&
-          Array.from(document.scripts).some((s) => (s.src || "").includes(movideskWidgetSrc));
+          Array.from(document.scripts).some((s) =>
+            (s.src || "").includes(movideskWidgetSrc),
+          );
 
         if (hasDocument && !alreadyLoaded) {
           const script = document.createElement("script");
           script.src = movideskWidgetSrc;
           script.async = true;
           script.onload = async () => resolve(await waitForMovideskApi());
-          script.onerror = () => resolve(false);
+          script.onerror = () => {
+            movideskWidgetPromise = null;
+            resolve(false);
+          };
           document.head.appendChild(script);
           return;
         }
 
         waitForMovideskApi().then(resolve);
       } catch {
+        movideskWidgetPromise = null;
         resolve(false);
       }
     });
@@ -87,32 +99,74 @@
     return movideskWidgetPromise;
   }
 
+  function sleep(ms: number): Promise<void> {
+    return new Promise((r) => window.setTimeout(r, ms));
+  }
+
+  async function waitForMovideskContainer(
+    timeoutMs: number = 4000,
+  ): Promise<boolean> {
+    if (typeof document === "undefined") return false;
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      if (document.querySelector(movideskContainerSelector)) return true;
+      await sleep(50);
+    }
+    return false;
+  }
+
+  async function maximizeMovideskWithRetry(): Promise<boolean> {
+    const w = getMovideskWindow();
+    if (!w) return false;
+
+    // Garante client sempre antes de abrir
+    w.mdChatClient = movideskChatClient;
+
+    const ok = await ensureMovideskWidgetLoaded();
+    if (!ok || !isMovideskApiReady(w)) return false;
+
+    // Espera o container existir (primeiro clique costuma falhar aqui)
+    await waitForMovideskContainer(5000);
+
+    // Retry curto: o widget pode estar "vivo" mas ainda não pronto para maximizar
+    for (let i = 0; i < 4; i++) {
+      w.movideskChatWidgetChangeWindowState!("maximized");
+      await sleep(150);
+    }
+
+    return true;
+  }
+
   async function openMovideskSupport() {
     if (supportOpenMode === "iframe") {
       // se quiser mesmo forçar "fora", abre a URL em nova aba
-      window.open(`https://chat.movidesk.com/ChatWidget/index/${movideskChatClient}`, "_blank");
+      window.open(
+        `https://chat.movidesk.com/ChatWidget/index/${movideskChatClient}`,
+        "_blank",
+      );
       isSupportWidgetOpen = false;
       return;
     }
 
-    const ok = await ensureMovideskWidgetLoaded();
-    const w = getMovideskWindow();
-
-    if (ok && isMovideskApiReady(w)) {
-      w!.movideskChatWidgetChangeWindowState!("maximized");
+    const opened = await maximizeMovideskWithRetry();
+    if (opened) {
       isSupportWidgetOpen = true;
       return;
     }
 
     // Fallback
-    window.open(`https://chat.movidesk.com/ChatWidget/index/${movideskChatClient}`, "_blank");
+    window.open(
+      `https://chat.movidesk.com/ChatWidget/index/${movideskChatClient}`,
+      "_blank",
+    );
     isSupportWidgetOpen = false;
   }
 
   function closeMovideskSupport() {
     const w = getMovideskWindow();
     if (!w) return;
-    if (isMovideskApiReady(w)) w.movideskChatWidgetChangeWindowState!("minimized");
+    if (isMovideskApiReady(w))
+      w.movideskChatWidgetChangeWindowState!("minimized");
     isSupportWidgetOpen = false;
   }
 
@@ -139,9 +193,11 @@
   export let supportWhatsAppNumber: string = "(41) 3027-4747"; // mantido (se quiser WhatsApp no suporte no futuro)
   export let financeWhatsAppNumber: string = "(41) 99774-2363";
 
-  export let defaultMessage: string = "Olá, quero falar com a equipe da F10 sobre planos e implantação.";
+  export let defaultMessage: string =
+    "Olá, quero falar com a equipe da F10 sobre planos e implantação.";
   export let supportMessage: string = "Olá, preciso de suporte da F10.";
-  export let financeMessage: string = "Olá, preciso falar com o financeiro da F10.";
+  export let financeMessage: string =
+    "Olá, preciso falar com o financeiro da F10.";
 
   export let source: string = "";
   export let page: string | undefined;
@@ -262,14 +318,16 @@
     const trimmedSchoolName = schoolName.trim();
 
     if (!trimmedName || normalizedPhone.length < 10) {
-      errorMessage = "Preencha seu nome e um número de WhatsApp válido (com DDD).";
+      errorMessage =
+        "Preencha seu nome e um número de WhatsApp válido (com DDD).";
       return;
     }
 
     const currentPath = getCurrentPath();
 
     const resolvedPage = page && page.trim().length > 0 ? page : currentPath;
-    const resolvedSource = source && source.trim().length > 0 ? source : currentPath || "/";
+    const resolvedSource =
+      source && source.trim().length > 0 ? source : currentPath || "/";
 
     const payload: LeadPayload = {
       name: trimmedName,
@@ -280,7 +338,7 @@
       product,
       subSource,
       description: leadDescription,
-      schoolName: trimmedSchoolName.length > 0 ? trimmedSchoolName : undefined
+      schoolName: trimmedSchoolName.length > 0 ? trimmedSchoolName : undefined,
     };
 
     isSubmitting = true;
@@ -289,20 +347,21 @@
       const response = await fetch("/api/whatsapp-lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         const body = await response.json().catch(() => null);
         errorMessage =
-          body?.error || "Não conseguimos registrar seus dados agora. Tente novamente em instantes.";
+          body?.error ||
+          "Não conseguimos registrar seus dados agora. Tente novamente em instantes.";
         return;
       }
 
       dispatch("leadSent", payload);
 
       const encodedMessage = encodeURIComponent(
-        `${defaultMessage}\n\nNome: ${trimmedName}${trimmedSchoolName ? `\nEscola: ${trimmedSchoolName}` : ""}\nWhatsApp: ${normalizedPhone}`
+        `${defaultMessage}\n\nNome: ${trimmedName}${trimmedSchoolName ? `\nEscola: ${trimmedSchoolName}` : ""}\nWhatsApp: ${normalizedPhone}`,
       );
 
       const targetNumber = toWaMeNumber(whatsAppNumber);
@@ -316,7 +375,8 @@
       selectedDepartment = null;
     } catch (error) {
       console.error("Erro ao enviar lead:", error);
-      errorMessage = "Erro de conexão ao enviar seus dados. Verifique sua internet e tente de novo.";
+      errorMessage =
+        "Erro de conexão ao enviar seus dados. Verifique sua internet e tente de novo.";
     } finally {
       isSubmitting = false;
     }
@@ -369,7 +429,9 @@
 
 <!-- Overlay global -->
 <div class="fixed inset-0 z-[9999] pointer-events-none">
-  <div class="absolute bottom-4 right-4 md:bottom-6 md:right-6 pointer-events-auto">
+  <div
+    class="absolute bottom-4 right-4 md:bottom-6 md:right-6 pointer-events-auto"
+  >
     <div class="relative flex flex-col items-end gap-3">
       {#if isOpen}
         {#if selectedDepartment === null}
@@ -382,12 +444,18 @@
               <div class="text-left">
                 <div class="flex items-center gap-2">
                   <span
-                    class="inline-flex h-2 w-2 rounded-full bg-emerald-400 {isBusinessHours ? 'animate-pulse' : ''}"
+                    class="inline-flex h-2 w-2 rounded-full bg-emerald-400 {isBusinessHours
+                      ? 'animate-pulse'
+                      : ''}"
                   ></span>
-                  <p class="text-[11px] font-semibold text-slate-700">Atendimento F10</p>
+                  <p class="text-[11px] font-semibold text-slate-700">
+                    Atendimento F10
+                  </p>
                 </div>
 
-                <h3 class="mt-2 text-sm font-semibold text-slate-900">Como podemos te ajudar?</h3>
+                <h3 class="mt-2 text-sm font-semibold text-slate-900">
+                  Como podemos te ajudar?
+                </h3>
 
                 <p class="mt-1 text-xs text-slate-600">
                   Escolha um assunto e seguimos com você.
@@ -414,7 +482,9 @@
                 <div class="flex items-center justify-between gap-3">
                   <div class="min-w-0">
                     <p class="text-sm font-semibold text-slate-900">Vendas</p>
-                    <p class="mt-0.5 text-xs text-slate-600">Planos, implantação e demonstração</p>
+                    <p class="mt-0.5 text-xs text-slate-600">
+                      Planos, implantação e demonstração
+                    </p>
                   </div>
 
                   <span
@@ -435,7 +505,9 @@
                 <div class="flex items-center justify-between gap-3">
                   <div class="min-w-0">
                     <p class="text-sm font-semibold text-slate-900">Suporte</p>
-                    <p class="mt-0.5 text-xs text-slate-600">Abrir chat Movidesk</p>
+                    <p class="mt-0.5 text-xs text-slate-600">
+                      Abrir chat Movidesk
+                    </p>
                   </div>
 
                   <span
@@ -455,8 +527,12 @@
               >
                 <div class="flex items-center justify-between gap-3">
                   <div class="min-w-0">
-                    <p class="text-sm font-semibold text-slate-900">Financeiro</p>
-                    <p class="mt-0.5 text-xs text-slate-600">Boletos, pagamentos e notas fiscais</p>
+                    <p class="text-sm font-semibold text-slate-900">
+                      Financeiro
+                    </p>
+                    <p class="mt-0.5 text-xs text-slate-600">
+                      Boletos, pagamentos e notas fiscais
+                    </p>
                   </div>
 
                   <span
@@ -470,7 +546,8 @@
             </div>
 
             <p class="mt-3 text-[10px] text-slate-400 text-center">
-              Vendas abre formulário. Suporte abre Movidesk. Financeiro abre WhatsApp.
+              Vendas abre formulário. Suporte abre Movidesk. Financeiro abre
+              WhatsApp.
             </p>
           </div>
         {:else if selectedDepartment === "sales"}
@@ -481,19 +558,26 @@
           >
             <div class="flex items-start justify-between gap-3">
               <div class="text-left">
-                <p class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-[3px] text-[11px] font-semibold text-emerald-700">
+                <p
+                  class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-[3px] text-[11px] font-semibold text-emerald-700"
+                >
                   Atendimento F10 • Vendas
                 </p>
 
-                <h3 class="mt-2 text-sm font-semibold text-slate-900">Vamos acelerar seu atendimento 👇</h3>
+                <h3 class="mt-2 text-sm font-semibold text-slate-900">
+                  Vamos acelerar seu atendimento 👇
+                </h3>
 
                 {#if isBusinessHours}
                   <p class="mt-1 text-xs text-slate-600">
-                    Nossa equipe comercial está online agora. Preencha rapidinho e já continuamos a conversa pelo WhatsApp.
+                    Nossa equipe comercial está online agora. Preencha rapidinho
+                    e já continuamos a conversa pelo WhatsApp.
                   </p>
                 {:else}
                   <p class="mt-1 text-xs text-slate-600">
-                    Estamos fora do horário comercial, mas seu contato será registrado. Preencha seus dados e o time comercial vai falar com você no próximo horário útil.
+                    Estamos fora do horário comercial, mas seu contato será
+                    registrado. Preencha seus dados e o time comercial vai falar
+                    com você no próximo horário útil.
                   </p>
                 {/if}
 
@@ -516,9 +600,16 @@
               </button>
             </div>
 
-            <form class="mt-4 space-y-3" on:submit|preventDefault={handleSubmit}>
+            <form
+              class="mt-4 space-y-3"
+              on:submit|preventDefault={handleSubmit}
+            >
               <div class="text-left">
-                <label for="floating-name" class="block text-xs font-medium text-slate-700">Nome completo</label>
+                <label
+                  for="floating-name"
+                  class="block text-xs font-medium text-slate-700"
+                  >Nome completo</label
+                >
                 <input
                   id="floating-name"
                   type="text"
@@ -529,7 +620,11 @@
               </div>
 
               <div class="text-left">
-                <label for="floating-school" class="block text-xs font-medium text-slate-700">Nome da escola (opcional)</label>
+                <label
+                  for="floating-school"
+                  class="block text-xs font-medium text-slate-700"
+                  >Nome da escola (opcional)</label
+                >
                 <input
                   id="floating-school"
                   type="text"
@@ -538,12 +633,17 @@
                   placeholder="Ex.: Colégio F10"
                 />
                 <p class="mt-1 text-[11px] text-slate-500">
-                  Ajuda nossa equipe a entender o contexto do seu colégio logo no primeiro contato.
+                  Ajuda nossa equipe a entender o contexto do seu colégio logo
+                  no primeiro contato.
                 </p>
               </div>
 
               <div class="text-left">
-                <label for="floating-phone" class="block text-xs font-medium text-slate-700">WhatsApp</label>
+                <label
+                  for="floating-phone"
+                  class="block text-xs font-medium text-slate-700"
+                  >WhatsApp</label
+                >
                 <input
                   id="floating-phone"
                   type="tel"
@@ -581,7 +681,8 @@
               </button>
 
               <p class="mt-1 text-[10px] text-slate-400 text-center">
-                Seus dados são registrados internamente e nossa equipe irá tratar sua solicitação 🧡.
+                Seus dados são registrados internamente e nossa equipe irá
+                tratar sua solicitação 🧡.
               </p>
             </form>
           </div>
@@ -608,7 +709,9 @@
           class="absolute right-20 bottom-3 max-w-[200px] rounded-2xl bg-white shadow-lg shadow-slate-900/20 border border-emerald-100 px-3 py-2 text-[11px] text-slate-800"
         >
           <div class="flex items-center gap-2 whitespace-nowrap">
-            <span class="h-2.5 min-w-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span
+              class="h-2.5 min-w-2.5 rounded-full bg-emerald-400 animate-pulse"
+            ></span>
             <span>Estamos online.</span>
           </div>
         </div>
@@ -626,11 +729,11 @@
   :global(.md-chat-widget-container) {
     z-index: 10000 !important;
   }
-  :global(.md-chat-widget-container){
+  :global(.md-chat-widget-container) {
     border-radius: 24px !important;
   }
 
-  :global(.container-fluid){
+  :global(.container-fluid) {
     width: 100% !important;
   }
 </style>
