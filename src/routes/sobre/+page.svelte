@@ -12,7 +12,7 @@
   <title>F10 Software — Gestão escolar moderna e performática</title>
   <meta
     name="description"
-    content="Plataforma completa de gestão escolar: acadêmico, financeiro, CRM, marketing e aplicativo white-label. Performance, SEO e conversão."
+    content="Plataforma completa de gestão escolar: acadêmico, financeiro, CRM, marketing e aplicativo white-label. Performance e conversão."
   />
   <meta
     property="og:title"
@@ -20,7 +20,7 @@
   />
   <meta
     property="og:description"
-    content="Plataforma completa de gestão escolar com performance máxima e SEO preparado para Google e LLMs."
+    content="Plataforma completa de gestão escolar: acadêmico, financeiro, CRM, marketing e aplicativo white-label. Performance e conversão."
   />
 </svelte:head>
 
