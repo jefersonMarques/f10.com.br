@@ -218,7 +218,7 @@
         },
         {
           "@type": "ListItem",
-          "position": 3",
+          "position": "3",
           "name": "Marketing e Captação",
           "item": "https://f10.com.br/solucoes/marketing-captacao-de-alunos"
         }

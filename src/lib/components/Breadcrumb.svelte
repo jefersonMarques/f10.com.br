@@ -161,11 +161,12 @@
             </li>
         {/each}
     </ol>
-
-    <script type="application/ld+json">
-    {jsonLdStr}
-    </script>
 </nav>
+<svelte:head>
+    <script type="application/ld+json">
+     {@html jsonLdStr}
+    </script>
+</svelte:head>
 
 <style>
 </style>
