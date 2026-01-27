@@ -4,41 +4,19 @@
     import { derived } from "svelte/store";
 
     // ===== Props =====
-    // Lista editorial (melhor para SEO). Se não for passada, cai no fallback automático via URL.
     export let items: Array<{ label: string; href?: string }> | null = null;
-
-    // Mapa de paths para rótulos humanos e flags de ocultação
-    // Ex.: { "/": { label: "Início" }, "/sobre": { label: "Sobre a F10" } }
     export let routeMeta: Record<string, { label?: string; hide?: boolean }> =
         {};
-
-    // Classe utilitária opcional para <nav>
     export let className: string = "";
-
-    // Separador visual entre os itens
     export let separator: string = "•";
-
-    // URL base canônica (para JSON-LD com URLs absolutas)
     export let baseUrl: string = "https://f10.com.br";
 
-    /**=====EXEMPLO DE USO=====**/
-    //<Breadcrumb
-    //  baseUrl="https://f10.com.br"
-    //  items={[
-    //    { label: "Início", href: "/" },
-    //    { label: "Soluções", href: "/solucoes" },
-    //    { label: "Gestão Financeira" } // último sem link
-    //  ]}
-    ///>
-
     // ===== Utils =====
-    // Humaniza segmentos do path: "sobre-a-f10" -> "Sobre A F10"
     function humanize(segment: string): string {
         const s = decodeURIComponent(segment).replace(/[-_]+/g, " ").trim();
         return s.toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase());
     }
 
-    // Junta partes de URL evitando barras duplicadas e barra final desnecessária
     function joinUrl(parts: string[]): string {
         return (
             parts
@@ -46,6 +24,10 @@
                 .replace(/\/{2,}/g, "/")
                 .replace(/\/$/, "") || "/"
         );
+    }
+
+    function normalizeBaseUrl(url: string): string {
+        return url.replace(/\/+$/, "");
     }
 
     // Fallback automático de breadcrumbs a partir do path atual
@@ -67,7 +49,6 @@
 
             const label =
                 routeMeta[pathAcc]?.label ??
-                // Se parecer um ID/slug técnico, use um rótulo genérico
                 (/^[a-f0-9-]{12,}$/i.test(seg) ? "Detalhe" : humanize(seg));
 
             acc.push({ label, href: pathAcc });
@@ -92,12 +73,13 @@
         }
     }
 
-    // Gera JSON-LD (string) — chamado no <script> para o TS "ver" o uso
     function buildBreadcrumbJsonLd(
         list: Array<{ label: string; href?: string }>,
         base: string,
         pathname: string,
     ): string {
+        const baseNormalized = normalizeBaseUrl(base);
+
         const obj = {
             "@context": "https://schema.org",
             "@type": "BreadcrumbList",
@@ -106,19 +88,29 @@
                 position: idx + 1,
                 name: c.label,
                 item: c.href
-                    ? `${base}${c.href === "/" ? "" : c.href}`
-                    : `${base}${pathname || ""}`,
+                    ? `${baseNormalized}${c.href === "/" ? "" : c.href}`
+                    : `${baseNormalized}${pathname || ""}`,
             })),
         };
+
         return JSON.stringify(obj);
     }
 
-    // String reativa para injeção no <script type="application/ld+json">
-    $: jsonLdStr = buildBreadcrumbJsonLd(
-        finalCrumbs,
-        baseUrl,
-        $page?.url?.pathname || "/",
-    );
+    // Sempre declare para evitar variável implícita no TS
+    let jsonLdScriptTag = "";
+
+    $: jsonLdScriptTag = JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: finalCrumbs.map((c, idx) => ({
+            "@type": "ListItem",
+            position: idx + 1,
+            name: c.label,
+            item: c.href
+                ? `${baseUrl.replace(/\/$/, "")}${c.href === "/" ? "" : c.href}`
+                : `${baseUrl.replace(/\/$/, "")}${$page.url.pathname}`,
+        })),
+    });
 </script>
 
 <nav
@@ -162,11 +154,8 @@
         {/each}
     </ol>
 </nav>
+
 <svelte:head>
-    <script type="application/ld+json">
-     {@html jsonLdStr}
-    </script>
+  {@html `<script id="jsonld-breadcrumb" type="application/ld+json">${jsonLdScriptTag}</script>`}
 </svelte:head>
 
-<style>
-</style>
