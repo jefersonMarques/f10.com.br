@@ -22,7 +22,7 @@
   <meta name="theme-color" content="#ffffff" />
   <meta
     name="description"
-    content="F10 Software — Plataforma completa de gestão escolar com alta performance e SEO impecável."
+    content="F10 Software — Plataforma completa de gestão escolar com alta performance."
   />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="F10 Software" />
