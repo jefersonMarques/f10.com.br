@@ -9,7 +9,7 @@
 
     const planMap: Record<PlanId, { id: PlanId; name: string }> = {
         starter: { id: "starter", name: "Inicial" },
-        standard: { id: "standard", name: "Perfeito" }, // plano intermediário (principal)
+        standard: { id: "standard", name: "Essencial" }, // plano intermediário (principal)
         pro: { id: "pro", name: "Full" },
         enterprise: { id: "enterprise", name: "Multiunidades" },
     };
@@ -352,7 +352,7 @@
                 {
                     label: "Frequência, notas, avaliações e médias automáticas",
                     values: {
-                        starter: "partial",
+                        starter: "limited",
                         standard: true,
                         pro: true,
                         enterprise: true,
@@ -361,7 +361,7 @@
                 {
                     label: "Conteúdo programático e plano previsto de aulas",
                     values: {
-                        starter: "partial",
+                        starter: "limited",
                         standard: true,
                         pro: true,
                         enterprise: true,
@@ -371,7 +371,7 @@
                     label:
                         "Cursos com matérias / módulos / níveis e materiais didáticos",
                     values: {
-                        starter: "partial",
+                        starter: "limited",
                         standard: true,
                         pro: true,
                         enterprise: true,
@@ -458,7 +458,7 @@
                 {
                     label: "Contas a receber (mensalidades, produtos, serviços)",
                     values: {
-                        starter: "partial",
+                        starter: "limited",
                         standard: true,
                         pro: true,
                         enterprise: true,

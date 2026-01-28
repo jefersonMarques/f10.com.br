@@ -2,7 +2,7 @@
     import IconArrowRight from "$lib/icons/IconArrowRight.svelte";
     import { contactModalConfig } from "$lib/stores/contactModals";
     import { showForm } from "$lib/stores/formPopup";
-    import { Check, X, AlertTriangle } from "lucide-svelte";
+    import { Check, X, TriangleAlert } from "lucide-svelte";
 
     type BillingPeriod = "monthly" | "yearly";
 
@@ -32,6 +32,8 @@
         { id: "migration", label: "Migração" },
     ];
 
+    type Platforms = "Dksoft" | "Sponte" | "Totvs" | "Wpensar" | "Edukante";
+
     type Plan = {
         id: PlanId;
         name: string;
@@ -47,7 +49,9 @@
         bestFor: string;
         enterpriseNote?: string;
         modules?: ModuleId[];
-        moduleBadges?: Partial<Record<ModuleId, "limited" | "consult">>;
+        moduleBadges?: Partial<
+            Record<ModuleId, "limited" | "consult" | "migration">
+        >;
     };
 
     let billing: BillingPeriod = "monthly";
@@ -72,7 +76,7 @@
             bestFor:
                 "Escolas pequenas, pilotos em uma unidade e operações que estão dando os primeiros passos no funil.",
             enterpriseNote:
-                "Inclui até 3 usuários internos. Para adicionar mais usuários, solicite uma condição personalizada.",
+                "Inclui 1 usuário interno. Para adicionar mais usuários, solicite uma condição personalizada.",
             // Comercial + Contratos + Pedagógico essencial + Turmas/Conteúdo + Financeiro só recebimento
             modules: ["users", "sales", "pedagogy", "finance"],
         },
@@ -83,6 +87,7 @@
             moduleBadges: {
                 lms: "consult", // AVA sob consulta
                 app: "consult", // App sob consulta
+                migration: "migration", // Migração sob consulta
             },
             highlight: true,
             description:
@@ -370,7 +375,7 @@
                                                 : "text-yellow-500"
                                         }`}
                                     >
-                                        <AlertTriangle size={14} />
+                                        <TriangleAlert size={14} />
                                     </span>
                                 {:else}
                                     <span
@@ -400,10 +405,30 @@
                                     >
                                         {badgeType === "limited"
                                             ? "Limitado"
-                                            : "Sob consulta"}
+                                            : badgeType === "migration"
+                                              ? "Sob consulta"
+                                              : "Sob consulta"}
                                     </span>
                                 {/if}
                             </li>
+                            {#if badgeType == "migration"}
+                                <li>
+                                    <span
+                                        class="text-[10px] font-semibold text-slate-500"
+                                    >
+                                        Softwares que já migraram para o F10:
+                                    </span>
+                                    <span class="ml-auto  inline-flex items-center">
+                                        {#each ["Dksoft", "Sponte", "Sophia", "Totvs", "Wpensar", "Edukante"] as platform}
+                                            <span
+                                                class="ml-auto mr-1 inline-flex items-center rounded-full px-2 py-[1px] text-[10px] font-semibold bg-cyan-600/20 text-cyan-500"
+                                            >
+                                                {platform}
+                                            </span>
+                                        {/each}
+                                    </span>
+                                </li>
+                            {/if}
                         {/if}
                     {/each}
                 </ul>

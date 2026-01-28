@@ -506,7 +506,7 @@
                   <div class="min-w-0">
                     <p class="text-sm font-semibold text-slate-900">Suporte</p>
                     <p class="mt-0.5 text-xs text-slate-600">
-                      Abrir chat Movidesk
+                      Abrir chat
                     </p>
                   </div>
 
@@ -735,5 +735,9 @@
 
   :global(.container-fluid) {
     width: 100% !important;
+  }
+
+  :global(.widget-frame.md-fade-when-visible){
+    border-radius: 24px !important;
   }
 </style>
