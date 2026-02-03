@@ -71,6 +71,11 @@
       icon: LayoutGrid,
     },
     {
+      label: "WhatsApp",
+      href: "/solucoes/whatsapp",
+      icon: Smartphone,
+    },
+    {
       label: "Marketing e Captação",
       href: "/solucoes/marketing-captacao-de-alunos",
       icon: Megaphone,

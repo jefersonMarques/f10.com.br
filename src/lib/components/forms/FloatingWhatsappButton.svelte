@@ -506,7 +506,7 @@
                   <div class="min-w-0">
                     <p class="text-sm font-semibold text-slate-900">Suporte</p>
                     <p class="mt-0.5 text-xs text-slate-600">
-                      Abrir chat
+                      Equipe especializada F10
                     </p>
                   </div>
 
