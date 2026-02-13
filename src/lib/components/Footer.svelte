@@ -130,12 +130,6 @@
           <a href="/politica-de-privacidade" class="hover:text-[#EA6D0B]"
             >Políticas de privacidade</a
           >
-        </li>
-               <li>
-          <a href="/newsletter" class="hover:text-[#EA6D0B]"
-            >Newsletter</a
-          >
-        </li>
       </ul>
     </div>
 
