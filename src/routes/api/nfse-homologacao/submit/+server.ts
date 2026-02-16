@@ -589,6 +589,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
   // ====== Config ======
   const apiKey = getEnv("BREVO_API_KEY");
   const toEmail = getEnv("BREVO_MAIL_TO");
+  const copyEmail = getEnv("BREVO_COPY_TO");
   const fromEmail = getEnv("BREVO_FROM_EMAIL");
   const fromName = "HOMOLOGAÇÃO NF - F10";
   const siteUrl = getEnv("PUBLIC_SITE_URL") || url.origin;
@@ -819,6 +820,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
       body: JSON.stringify({
         sender: { email: fromEmail, name: fromName },
         to: [{ email: toEmail, name: "Homologação F10" }],
+        cc: [{ email: copyEmail, name: "Homologação F10" }],
         subject,
         htmlContent,
         textContent,
