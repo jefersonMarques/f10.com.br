@@ -642,7 +642,7 @@
         units: <NetworkPanelUnitRow[]>[
             {
                 id: "u1",
-                unit: "Colégio F10 Centro",
+                unit: "Escola F10 Centro",
                 barColorClass: "bg-[#22C55E]",
                 percent: 88,
                 value: 72,
@@ -758,7 +758,7 @@
 
     const enrollmentUnitRows: EnrollmentUnitRow[] = [
         {
-            unit: "Colégio F10 Centro",
+            unit: "Escola F10 Centro",
             segment: "Fundamental II",
             newEnrollments: 24,
             activeStudents: 312,
@@ -766,7 +766,7 @@
             retention: "98%",
         },
         {
-            unit: "Colégio F10 Zona Sul",
+            unit: "Escola F10 Zona Sul",
             segment: "Ensino Médio",
             newEnrollments: 18,
             activeStudents: 214,

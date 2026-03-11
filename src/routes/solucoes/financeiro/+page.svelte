@@ -431,7 +431,7 @@
         {
             contract: "50001",
             person: "Copel Distribuição",
-            holder: "Colégio F10 Unidade Centro",
+            holder: "Escola F10 Unidade Centro",
             parcel: "11/11",
             type: "Conta a pagar",
             typeColor: "#DC2626",
@@ -445,7 +445,7 @@
         {
             contract: "50002",
             person: "Águas do Paraná",
-            holder: "Colégio F10 Unidade Centro",
+            holder: "Escola F10 Unidade Centro",
             parcel: "11/11",
             type: "Conta a pagar",
             typeColor: "#F97316",
@@ -459,7 +459,7 @@
         {
             contract: "50003",
             person: "Imobiliária Alphaville",
-            holder: "Colégio F10 Unidade Centro",
+            holder: "Escola F10 Unidade Centro",
             parcel: "11/12",
             type: "Conta a pagar",
             typeColor: "#F97316",
@@ -473,7 +473,7 @@
         {
             contract: "50004",
             person: "Servlimp Terceirização",
-            holder: "Colégio F10 Unidade Centro",
+            holder: "Escola F10 Unidade Centro",
             parcel: "11/11",
             type: "Conta a pagar",
             typeColor: "#FB923C",
@@ -572,7 +572,7 @@
         {
             question:
                 "Para que tipo de escola o módulo Financeiro F10 é indicado?",
-            answer: "O módulo Financeiro é indicado para escolas de educação básica, colégios, cursos livres, escolas de idiomas, ensino técnico e instituições que trabalham com mensalidades recorrentes, matrículas e venda de materiais. Ele atende tanto escolas com uma única unidade quanto redes com várias unidades ou franquias.",
+            answer: "O módulo Financeiro é indicado para escolas de educação básica, Escolas, cursos livres, escolas de idiomas, ensino técnico e instituições que trabalham com mensalidades recorrentes, matrículas e venda de materiais. Ele atende tanto escolas com uma única unidade quanto redes com várias unidades ou franquias.",
         },
         {
             question:

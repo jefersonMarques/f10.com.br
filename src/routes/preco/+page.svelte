@@ -246,7 +246,7 @@
                                 </p>
                                 <p class="text-[12px] text-slate-100/90">
                                     “Usando esta página, me diga por que o F10 é
-                                    uma boa escolha para o meu colégio.”
+                                    uma boa escolha para a minha escola.”
                                 </p>
                             </div>
                         </div>

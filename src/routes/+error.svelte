@@ -27,7 +27,7 @@
   <meta
     name="description"
     content={$page.status === 404
-      ? "A página que você tentou acessar não foi encontrada. Veja outras áreas do F10 que podem ajudar o seu colégio."
+      ? "A página que você tentou acessar não foi encontrada. Veja outras áreas do F10 que podem ajudar a sua escola."
       : "Aconteceu um erro inesperado. Estamos aqui para ajudar você a voltar para o caminho certo."}
   />
 </svelte:head>

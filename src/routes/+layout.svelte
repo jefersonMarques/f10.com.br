@@ -43,7 +43,7 @@
 
 <FloatingWhatsappButton
   whatsAppNumber="5541992943443"
-  defaultMessage="Olá, vi a página de planos da F10 e quero entender qual é o melhor para o meu colégio."
+  defaultMessage="Olá, vi a página de planos da F10 e quero entender qual é o melhor para a minha escola."
   product="F10 – Planos e Implantação"
   page=""
   subSource="Botão flutuante"

@@ -236,7 +236,7 @@
                 <p class="text-[15px] leading-relaxed text-[#5A5E75]">
                     Conheça todos os módulos da F10 na prática, com a orientação
                     de um dos nossos especialistas. Sem compromisso, direto ao
-                    ponto e personalizado para a realidade do seu colégio.
+                    ponto e personalizado para a realidade da sua escola.
                 </p>
             </div>
 

@@ -630,10 +630,10 @@
                   type="text"
                   bind:value={schoolName}
                   class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#EA6D0B] focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/20"
-                  placeholder="Ex.: Colégio F10"
+                  placeholder="Ex.: Escola F10"
                 />
                 <p class="mt-1 text-[11px] text-slate-500">
-                  Ajuda nossa equipe a entender o contexto do seu colégio logo
+                  Ajuda nossa equipe a entender o contexto da sua escola logo
                   no primeiro contato.
                 </p>
               </div>
