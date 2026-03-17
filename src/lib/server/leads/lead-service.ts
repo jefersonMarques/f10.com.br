@@ -5,7 +5,7 @@ import {
   EXACT_TOKEN,
   EXACT_FUNNEL_ID,
   F10_FONTE,
-  F10_GROUP,
+  F10_UID,
   F10_MIDIA,
   F10_TOKEN,
   F10_URL,
@@ -731,7 +731,7 @@ async function sendLeadToF10(
 ): Promise<IntegrationResult> {
   const token = safeString(F10_TOKEN);
   const url = safeString(F10_URL);
-  const unitId = safeString(F10_GROUP);
+  const unitId = parseInt(F10_UID);
   const meta = getChannelMeta(channel);
 
   if (!token) {
@@ -755,12 +755,12 @@ async function sendLeadToF10(
   }
 
   if (!unitId) {
-    console.warn("[lead-service] F10_GROUP não definido. Pulando F10.");
+    console.warn("[lead-service] F10_UID não definido. Pulando F10.");
     return {
       ok: false,
       skipped: true,
       error: "missing_f10_group",
-      body: { msg: "F10_GROUP não definido." },
+      body: { msg: "F10_UID não definido." },
     };
   }
 

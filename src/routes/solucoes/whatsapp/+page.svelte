@@ -16,175 +16,180 @@
 
     type TemplateTab = "finance" | "marketing" | "office";
 
-	let templateTab: TemplateTab = "finance";
+    let templateTab: TemplateTab = "finance";
 
-	let templatePanelTitle = "Financeiro: cobrança automática com variáveis";
-	let templatePanelText =
-		"Dispare cobranças e lembretes com dados do sistema (aluno, vencimento, parcelas, links). Sem copiar/colar e com histórico por responsável.";
+    let templatePanelTitle = "Financeiro: cobrança automática com variáveis";
+    let templatePanelText =
+        "Dispare cobranças e lembretes com dados do sistema, sem copiar e colar, com histórico por responsável e rastreio de quem enviou.";
 
-	let currentImageSrc = "/wp_template_financeiro.png";
-	let nextImageSrc: string | null = null;
+    let currentImageSrc = "/wp_template_financeiro.png";
+    let nextImageSrc: string | null = null;
 
-	let isAnimating = false;
-	let pendingTab: TemplateTab | null = null;
+    let isAnimating = false;
+    let pendingTab: TemplateTab | null = null;
 
-	function getTabState(tab: TemplateTab) {
-		if (tab === "finance") {
-			return {
-				imageSrc: "/wp_template_financeiro.png",
-				panelTitle: "Financeiro: cobrança automática com variáveis",
-				panelText:
-					"Dispare cobranças e lembretes com dados do sistema (aluno, vencimento, parcelas, links). Sem copiar/colar e com histórico por responsável.",
-			};
-		}
+    function getTabState(tab: TemplateTab) {
+        if (tab === "finance") {
+            return {
+                imageSrc: "/wp_template_financeiro.png",
+                panelTitle: "Financeiro: cobrança automática com variáveis",
+                panelText:
+                    "Dispare cobranças e lembretes com dados do sistema, sem copiar e colar, com histórico por responsável e rastreio de quem enviou.",
+            };
+        }
 
-		if (tab === "marketing") {
-			return {
-				imageSrc: "/wp_template_marketing.png",
-				panelTitle: "Marketing: campanhas com personalização em escala",
-				panelText:
-					"Envie campanhas e ativações com variáveis (lead, segmento, cupom, interesse). Mais resposta com menos esforço e com rastreio no F10.",
-			};
-		}
+        if (tab === "marketing") {
+            return {
+                imageSrc: "/wp_template_marketing.png",
+                panelTitle: "Captação: campanhas com personalização em escala",
+                panelText:
+                    "Envie ativações e mensagens comerciais com nome do lead, turma de interesse e contexto da matrícula, tudo registrado no F10.",
+            };
+        }
 
-		return {
-			imageSrc: "/wp_template_secretaria.png",
-			panelTitle: "Secretaria: avisos e solicitações sem retrabalho",
-			panelText:
-				"Comunicados por turma/aluno, pedidos de documentos e confirmações com variáveis. Tudo registrado no histórico do F10.",
-		};
-	}
+        return {
+            imageSrc: "/wp_template_secretaria.png",
+            panelTitle: "Secretaria: avisos e solicitações sem retrabalho",
+            panelText:
+                "Comunicados por turma, pedidos de documentos e confirmações com histórico centralizado, continuidade entre usuários e rastreio por perfil.",
+        };
+    }
 
-	function requestTemplateTab(tab: TemplateTab) {
-		if (templateTab === tab) return;
+    function requestTemplateTab(tab: TemplateTab) {
+        if (templateTab === tab) return;
 
-		// evita “spam click” durante transição
-		if (isAnimating) {
-			pendingTab = tab;
-			return;
-		}
+        if (isAnimating) {
+            pendingTab = tab;
+            return;
+        }
 
-		const next = getTabState(tab);
+        const next = getTabState(tab);
 
-		templateTab = tab;
-		templatePanelTitle = next.panelTitle;
-		templatePanelText = next.panelText;
+        templateTab = tab;
+        templatePanelTitle = next.panelTitle;
+        templatePanelText = next.panelText;
+        nextImageSrc = next.imageSrc;
+    }
 
-		// inicia pré-carregamento da próxima imagem (crossfade só após load)
-		nextImageSrc = next.imageSrc;
-	}
+    function handleNextLoaded() {
+        if (!nextImageSrc) return;
 
-	function handleNextLoaded() {
-		if (!nextImageSrc) return;
+        isAnimating = true;
 
-		isAnimating = true;
+        window.setTimeout(() => {
+            currentImageSrc = nextImageSrc as string;
+            nextImageSrc = null;
+            isAnimating = false;
 
-		// finaliza a transição após o tempo do CSS
-		window.setTimeout(() => {
-			currentImageSrc = nextImageSrc as string;
-			nextImageSrc = null;
-			isAnimating = false;
-
-			// aplica clique pendente, se houver
-			if (pendingTab) {
-				const t = pendingTab;
-				pendingTab = null;
-				requestTemplateTab(t);
-			}
-		}, 320);
-	}
+            if (pendingTab) {
+                const nextTab = pendingTab;
+                pendingTab = null;
+                requestTemplateTab(nextTab);
+            }
+        }, 320);
+    }
 
     // =========================
-    // SEO / LLM
+    // SEO / Estrutura da página
     // =========================
     const siteName = "F10";
     const pagePath = "/solucoes/whatsapp";
     const baseUrl = "https://f10.com.br";
     const canonicalUrl = `${baseUrl}${pagePath}`;
-
-    const seoTitle =
-        "WhatsApp para Escolas no F10 | Cobranças, Matrículas e Comunicação com Pais";
-    const seoDescription =
-        "WhatsApp integrado direto no F10 para escolas: comunicação com pais, cobranças, matrículas, financeiro e comercial. API oficial + opções alternativas, histórico preservado e automação em tempo real.";
     const ogImage = `${baseUrl}/og/whatsapp-f10.webp`;
 
+    const seoTitle =
+        "WhatsApp para Escolas e Cursos no F10 | Atendimento Multiusuário, Matrículas e Cobranças";
+    const seoDescription =
+        "WhatsApp para escolas e cursos no F10: atendimento multiusuário, histórico centralizado, matrículas, cobranças, secretaria e comercial. Organize a comunicação com pais, alunos e leads sem depender do aparelho.";
+
     // HERO
-    let pillText: string = "WhatsApp para escolas";
-    let title: string =
-        "WhatsApp para escolas\nque resolvem o dia a dia por mensagem";
-    let subtitle: string =
-        "Comunicação com pais, cobranças e matrículas com automação, controle e histórico centralizado — integrado direto no F10.";
+    let pillText = "WhatsApp para escolas e cursos";
+    let title =
+        "WhatsApp para escolas e cursos\ncom atendimento compartilhado\ne histórico no F10";
+    let subtitle =
+        "Comunicação com pais, responsáveis, alunos e leads com atendimento multiusuário, histórico centralizado e gestão sem depender do aparelho — integrado direto no F10.";
 
-    let primaryCtaLabel: string = "Começar Agora";
-    let primaryCtaHref: string = "#comecar";
-
-    let secondaryCtaLabel: string = "Como funciona";
-    let secondaryCtaHref: string = "#como-funciona";
+    let primaryCtaLabel = "Quero ver funcionando na minha escola";
+    let secondaryCtaLabel = "Como funciona";
+    let secondaryCtaHref = "#como-funciona";
 
     // SECTION 2
-    let section2Title: string =
-        "WhatsApp para escolas, direto na plataforma F10";
-    let section2Text: string =
-        "Centralize comunicação com pais e alunos em um canal que todos já usam. No F10, o WhatsApp deixa de ser “ferramenta separada” e vira parte do fluxo: financeiro, matrículas, secretaria, comercial e relacionamento — com automação e controle.";
+    let section2Title =
+        "WhatsApp para escolas e cursos, direto na plataforma F10";
+    let section2Text =
+        "Centralize a comunicação com pais, responsáveis, alunos e leads em um canal compartilhado pela equipe. No F10, o WhatsApp deixa de depender do aparelho e passa a fazer parte do fluxo da instituição: secretaria escolar, financeiro escolar, matrículas, comercial e relacionamento.";
 
     let section2Bullets: Array<string> = [
-        "Cobranças e lembretes do financeiro com mensagens automáticas",
-        "Matrículas e renovações com confirmação rápida no WhatsApp",
-        "Comercial e atendimento com histórico centralizado no F10",
+        "Atendimento multiusuário com histórico centralizado no F10",
+        "Gestão acompanha conversas sem depender do aparelho",
+        "Múltiplos números por usuário e múltiplos usuários por número",
     ];
 
-    // SECTION 3
-    let section3TitleTop: string =
-        "Crie estratégias de\ncomunicação automatizada\npara sua escola";
-    let section3TextTop: string =
-        "Combine mensagens automáticas com textos personalizados. Padronize avisos, melhore resposta do atendimento e aumente o engajamento com pais e responsáveis.";
-
-    let section3TitleBottom: string =
-        "WhatsApp é a evolução do SMS\ndentro do F10";
-    let section3TextBottom: string =
-        "O WhatsApp integrado no F10 substitui fluxos antigos de SMS e “mensagens soltas”. Você dispara comunicações essenciais com contexto (aluno, responsável, financeiro, matrícula, turma) e mantém o histórico guardado dentro da plataforma.";
-
-    // SECTION 4 (FAQ)
-    let faqPill: string = "Perguntas frequentes";
-    let faqTitle: string =
-        "Perguntas frequentes\nsobre WhatsApp integrado\nno F10";
-    let faqText: string =
-        "Aqui estão respostas objetivas sobre integração, armazenamento de conversas, uso de API e aplicações práticas na escola. Se você quer reduzir trabalho manual e melhorar comunicação com pais, este é o ponto de partida.";
+    // FAQ
+    let faqPill = "Perguntas frequentes";
+    let faqTitle = "Perguntas frequentes\nsobre WhatsApp integrado\nno F10";
+    let faqText =
+        "Aqui estão respostas objetivas sobre operação multiusuário, histórico centralizado, gestão por usuário, templates e automação para a rotina da escola ou curso.";
 
     let faqs: Array<{ q: string; a: string }> = [
         {
-            q: "Para que a escola pode usar o WhatsApp no F10?",
-            a: "Para comunicação com pais e responsáveis, cobranças e lembretes do financeiro, confirmações de matrícula e renovação, avisos operacionais, suporte e comercial. Tudo com histórico e rastreio dentro do F10.",
+            q: "O atendimento depende de alguém ficar com o celular?",
+            a: "Não. O WhatsApp funciona dentro do F10 como canal de atendimento. Nem quem enviou, nem colegas do setor, nem coordenação, nem gerente precisam ficar com o aparelho para acompanhar as conversas.",
         },
         {
-            q: "O WhatsApp fica integrado no F10 mesmo, ou depende de intermediários?",
-            a: "Fica integrado direto no F10, sem depender de “painéis paralelos”. O objetivo é que o WhatsApp seja parte do fluxo da escola: secretaria, financeiro, comercial e relacionamento.",
+            q: "Mais de um usuário pode atender no mesmo número?",
+            a: "Sim. Um mesmo número pode ser acessado por múltiplos usuários, com visibilidade por perfil e continuidade do atendimento entre pessoas do mesmo setor.",
         },
         {
-            q: "Vocês usam API oficial?",
-            a: "Sim. Trabalhamos com API oficial quando a estratégia pede. Também suportamos caminhos alternativos em cenários específicos, sempre com foco em continuidade operacional e preservação de histórico.",
+            q: "Um usuário pode operar mais de um número?",
+            a: "Sim. Um mesmo usuário pode trabalhar com múltiplos números conforme a estrutura da escola ou curso e as permissões definidas.",
         },
         {
-            q: "Se ocorrer bloqueio/banimento do número, perco as conversas?",
-            a: "Não. O histórico de conversas permanece armazenado no F10. Em cenários de bloqueio do canal, você mantém os registros e consegue retomar o atendimento quando o canal for restabelecido ou substituído.",
+            q: "Como saber quem enviou cada mensagem?",
+            a: "O histórico fica identificado por usuário dentro do F10. Assim, a instituição sabe quem respondeu, quando respondeu e consegue manter gestão e auditoria do atendimento.",
+        },
+        {
+            q: "O gerente consegue acompanhar os chats sem pegar o telefone?",
+            a: "Sim. A gerência pode visualizar conversas e acompanhar o atendimento diretamente pelo sistema, sem depender de pedir o aparelho a alguém da equipe.",
+        },
+        {
+            q: "O WhatsApp do F10 serve para cursos também?",
+            a: "Sim. A solução atende escolas, cursos livres, escolas de idiomas, cursos técnicos, pré-vestibulares e outras instituições de ensino que precisam organizar comunicação, matrícula, secretaria, financeiro e comercial.",
+        },
+        {
+            q: "Posso usar o WhatsApp no financeiro escolar?",
+            a: "Sim. O F10 permite organizar cobranças, lembretes, envio de links de pagamento, confirmações e histórico por responsável, com rastreio de quem enviou cada mensagem.",
+        },
+        {
+            q: "Posso usar o WhatsApp na secretaria escolar?",
+            a: "Sim. A secretaria pode usar o WhatsApp para avisos, documentos pendentes, confirmações, matrícula, renovação e comunicação recorrente com pais, responsáveis e alunos.",
+        },
+        {
+            q: "O histórico fica salvo no sistema?",
+            a: "Sim. As conversas ficam centralizadas no F10, facilitando continuidade do atendimento, auditoria, acompanhamento da gestão e operação compartilhada pela equipe.",
+        },
+        {
+            q: "Já existem templates e envios automáticos?",
+            a: "Os templates já fazem parte da apresentação da solução e os envios automáticos estão em implantação. A proposta é permitir cobranças, lembretes, avisos e comunicações recorrentes com contexto do sistema.",
         },
     ];
 
-    // SECTION 5 (final CTA)
-    let section5Title: string =
-        "Conecte-se com pais e alunos em\ntempo real. Simples, rápido e escalável.";
-    let section5Subtitle: string =
-        "Potencialize o atendimento com mensagens automáticas:\n";
-    let section5SubtitleBold: string =
-        "cobranças, matrículas e comunicação em escala — direto no F10.";
-    let section5CtaLabel: string = "Quero WhatsApp no F10";
-    let section5CtaHref: string = "#contato";
+    // CTA final
+    let section5Title =
+        "Conecte-se com pais, alunos e leads em\ntempo real, com visão compartilhada e histórico central";
+    let section5Subtitle =
+        "Potencialize o atendimento com mensagens, templates e organização operacional:\n";
+    let section5SubtitleBold =
+        "cobranças, matrículas, secretaria e comercial — direto no F10.";
+    let section5CtaLabel = "Quero uma demonstração do WhatsApp no F10";
 
-    // SECTION 6 (use cases)
+    // Casos de uso
     const section6Pill = "Casos de uso";
-    const section6Title = "O que você automatiza com WhatsApp na sua escola";
+    const section6Title =
+        "O que você organiza e acelera com WhatsApp na sua escola ou curso";
     const section6Text =
-        "Modelos prontos e fluxos integrados aos módulos do F10. Você reduz retrabalho e garante que cada mensagem tenha contexto e rastreabilidade.";
+        "Modelos prontos e fluxos integrados aos módulos do F10 para instituições de ensino. Você reduz retrabalho, mantém contexto em cada conversa e evita depender do aparelho para continuar o atendimento.";
 
     const useCases: Array<{
         title: string;
@@ -193,78 +198,75 @@
     }> = [
         {
             title: "Cobranças e financeiro",
-            text: "Lembretes, boletos/links, negociações e confirmações com histórico por responsável. Menos inadimplência, mais controle.",
+            text: "Lembretes, links de pagamento, negociações e confirmações com histórico por responsável e rastreio de envio.",
             icon: "billing",
         },
         {
             title: "Matrículas e renovações",
-            text: "Convites, confirmações e checklist de documentos. A escola acompanha o status e evita “ida e volta” de informações.",
+            text: "Convites, confirmações e checklist de documentos com continuidade entre usuários e setores.",
             icon: "enrollment",
         },
         {
             title: "Secretaria e avisos",
-            text: "Comunicados por turma, eventos, documentos pendentes e recados urgentes. Mensagens com segmentação e rastreio.",
+            text: "Comunicados por turma, eventos, documentos pendentes e recados urgentes com histórico centralizado.",
             icon: "office",
         },
         {
             title: "Comercial e atendimento",
-            text: "Captação de leads, follow-up e suporte com contexto do aluno/prospect. Atendimento consistente, sem perder conversa.",
+            text: "Captação, follow-up e suporte com contexto do aluno ou prospect e identificação de quem enviou cada mensagem.",
             icon: "sales",
         },
     ];
 
-    // SECTION 7 (how it works)
+    // Como funciona
     const section7Pill = "Como funciona";
-    const section7Title = "Integração nativa no F10, do jeito certo";
+    const section7Title =
+        "Integração nativa no F10, com operação real de escola";
     const section7Steps: Array<{
         title: string;
         text: string;
         icon: "zap" | "workflow" | "messages" | "shield";
     }> = [
         {
-            title: "Ativação do canal",
-            text: "Configuramos o WhatsApp conforme sua estratégia (API oficial e/ou opção alternativa).",
+            title: "Configuração de usuários, números e permissões",
+            text: "Definimos quem acessa cada número, quais setores acompanham as conversas e como a gestão visualiza o atendimento.",
             icon: "zap",
         },
         {
             title: "Conexão com módulos do F10",
-            text: "Financeiro, matrículas, secretaria e comercial passam a disparar mensagens com contexto e regras.",
+            text: "Financeiro, matrículas, secretaria e comercial passam a usar o mesmo canal com contexto de aluno, responsável e turma.",
             icon: "workflow",
         },
         {
-            title: "Automação e templates",
-            text: "Você usa templates e fluxos prontos (cobrança, confirmação, lembrete) com personalização por escola.",
+            title: "Templates e rotina operacional",
+            text: "A escola padroniza mensagens, reduz retrabalho e mantém rastreio de quem enviou cada atendimento.",
             icon: "messages",
         },
         {
-            title: "Histórico centralizado",
-            text: "Conversas ficam registradas no F10. Em cenários de bloqueio do canal, o histórico permanece preservado.",
+            title: "Histórico centralizado e continuidade",
+            text: "As conversas ficam registradas no F10 para que outros usuários e a gestão acompanhem e deem sequência ao atendimento.",
             icon: "shield",
         },
     ];
 
-    // SECTION MID CTA (break de cor)
+    // CTA intermediário
     const midCtaPill = "Demonstração rápida";
     const midCtaTitle =
-        "Quer ver o WhatsApp funcionando no seu fluxo\n(financeiro, matrícula e secretaria)?";
+        "Quer ver o WhatsApp funcionando no seu fluxo\n(financeiro, matrícula, secretaria e atendimento)?";
     const midCtaText =
-        "Em poucos minutos você entende como o WhatsApp vira parte do F10: envio automatizado, rastreio e histórico centralizado — sem intermediários.";
+        "Em poucos minutos você entende como o WhatsApp vira parte do F10: atendimento compartilhado, rastreio por usuário, histórico centralizado e templates prontos para a rotina da escola.";
     const midCtaPrimaryLabel = "Quero uma demonstração";
-    const midCtaPrimaryHref = "#contato";
-    const midCtaSecondaryLabel = "Ver casos de uso";
-    const midCtaSecondaryHref = "#casos-de-uso";
 
-    // JSON-LD helpers
     function buildFaqJsonLd(items: Array<{ q: string; a: string }>) {
         return {
             "@context": "https://schema.org",
             "@type": "FAQPage",
-            mainEntity: items.map((x) => ({
+            mainEntity: items.map((item) => ({
                 "@type": "Question",
-                name: x.q,
+                name: item.q,
                 acceptedAnswer: {
                     "@type": "Answer",
-                    text: x.a,
+                    text: item.a,
                 },
             })),
         };
@@ -290,6 +292,62 @@
         },
     };
 
+    const softwareApplicationJsonLd = {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        name: "F10 WhatsApp para Escolas e Cursos",
+        applicationCategory: "BusinessApplication",
+        operatingSystem: "Web",
+        url: canonicalUrl,
+        description:
+            "Solução de WhatsApp integrada ao F10 para escolas e cursos, com atendimento multiusuário, histórico centralizado, matrículas, secretaria, financeiro e comercial.",
+        featureList: [
+            "Atendimento multiusuário",
+            "Histórico centralizado",
+            "Identificação por usuário",
+            "WhatsApp para secretaria escolar",
+            "WhatsApp para financeiro escolar",
+            "WhatsApp para matrículas",
+            "Templates de mensagens",
+            "Gestão sem depender do aparelho",
+        ],
+        audience: {
+            "@type": "Audience",
+            audienceType: "Escolas, cursos e instituições de ensino",
+        },
+        offers: {
+            "@type": "Offer",
+            price: "0",
+            priceCurrency: "BRL",
+            availability: "https://schema.org/InStock",
+        },
+    };
+
+    const breadcrumbJsonLd = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+            {
+                "@type": "ListItem",
+                position: 1,
+                name: "Início",
+                item: baseUrl,
+            },
+            {
+                "@type": "ListItem",
+                position: 2,
+                name: "Soluções",
+                item: `${baseUrl}/solucoes`,
+            },
+            {
+                "@type": "ListItem",
+                position: 3,
+                name: "WhatsApp para Escolas e Cursos",
+                item: canonicalUrl,
+            },
+        ],
+    };
+
     const faqJsonLd = buildFaqJsonLd(faqs);
 
     function iconForUseCase(
@@ -308,60 +366,17 @@
         return ShieldCheck;
     }
 
-    function openWhatsAppModal(dobra) {
+    function openWhatsAppModal(fold: number) {
         contactModalConfig.set({
-            defaultMessage: "Quero agendar uma demonstração do whatsApp",
+            defaultMessage:
+                "Quero agendar uma demonstração do WhatsApp para minha escola ou curso",
             product: "F10 – WhatsApp",
-            subSource: `Modal WhatsApp – dobra ${dobra}`,
+            subSource: `Modal WhatsApp – dobra ${fold}`,
             leadDescription: "Contato iniciado pelo formulário WhatsApp.",
         });
 
         showForm.set(true);
     }
-
-    // SECTION 8 (Oficial vs Alternativo)
-    const section8Pill = "Canais do WhatsApp";
-    const section8Title =
-        "WhatsApp oficial e alternativa\nno F10 — você escolhe a estratégia";
-    const section8Text =
-        "Trabalhamos com os dois caminhos: WhatsApp oficial e opção alternativa em cenários específicos. Você escolhe com base em volume, operação e custo. Em ambos os casos, o histórico fica no F10 — se o número for banido no canal alternativo, as conversas não são perdidas.";
-
-    const section8Cards: Array<{
-        title: string;
-        subtitle: string;
-        bullets: Array<string>;
-        badge: string;
-        tone: "official" | "alternative";
-    }> = [
-        {
-            title: "WhatsApp Oficial",
-            subtitle:
-                "Mais previsível para operação, excelente para uso em escala, ideal para uso contínuo com templates e automações robustas.",
-            badge: "Recomendado para escala",
-            tone: "official",
-            bullets: [
-                "Maior estabilidade e conformidade",
-                "Templates e automações com governança",
-                "Ideal para alta demanda e times maiores",
-            ],
-        },
-        {
-            title: "Opção alternativa",
-            subtitle:
-                "Útil em cenários pontuais e de implantação rápida. Estratégia aplicada com cuidado para continuidade operacional.",
-            badge: "Flexível para cenários específicos",
-            tone: "alternative",
-            bullets: [
-                "Ativação mais rápida em casos específicos",
-                "Boa opção para começar e validar o canal",
-                "Mesmo com banimento, histórico fica no F10",
-            ],
-        },
-    ];
-
-    const section8NoteTitle = "Histórico preservado, independente do canal";
-    const section8NoteText =
-        "Mesmo utilizando a opção alternativa, se o número for banido você não perde as conversas: o F10 mantém o histórico armazenado e você retoma o atendimento ao reativar ou substituir o canal.";
 </script>
 
 <svelte:head>
@@ -369,13 +384,11 @@
     <meta name="description" content={seoDescription} />
     <link rel="canonical" href={canonicalUrl} />
 
-    <!-- Robots -->
     <meta
         name="robots"
         content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1"
     />
 
-    <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={siteName} />
     <meta property="og:title" content={seoTitle} />
@@ -383,7 +396,6 @@
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:image" content={ogImage} />
 
-    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={seoTitle} />
     <meta name="twitter:description" content={seoDescription} />
@@ -391,18 +403,23 @@
 
     <meta
         name="keywords"
-        content="whatsapp para escolas, whatsapp integrado, cobrança whatsapp escola, matrículas whatsapp, financeiro escolar, comunicação com pais, F10, WhatsApp oficial, automação whatsapp"
+        content="whatsapp para escolas, whatsapp para cursos, whatsapp escolar, atendimento escolar whatsapp, whatsapp multiusuário escola, secretaria escolar whatsapp, financeiro escolar whatsapp, matrícula escolar whatsapp, comunicação com pais pelo whatsapp, software de gestão escolar com whatsapp, F10"
     />
 
-    <!-- JSON-LD -->
     <script type="application/ld+json">
-{JSON.stringify(organizationJsonLd)}
+		{JSON.stringify(organizationJsonLd)}
     </script>
     <script type="application/ld+json">
-{JSON.stringify(webPageJsonLd)}
+		{JSON.stringify(webPageJsonLd)}
     </script>
     <script type="application/ld+json">
-{JSON.stringify(faqJsonLd)}
+		{JSON.stringify(softwareApplicationJsonLd)}
+    </script>
+    <script type="application/ld+json">
+		{JSON.stringify(breadcrumbJsonLd)}
+    </script>
+    <script type="application/ld+json">
+		{JSON.stringify(faqJsonLd)}
     </script>
 </svelte:head>
 
@@ -410,7 +427,6 @@
   HERO
 ========================= -->
 <section id="home" class="relative isolate overflow-hidden">
-    <!-- BACKGROUND -->
     <div class="absolute inset-0 -z-10">
         <div class="absolute inset-0" style="background-color:#005843;"></div>
 
@@ -427,7 +443,6 @@
     </div>
 
     <div class="relative">
-        <!-- floating icons -->
         <div
             class="pointer-events-none absolute left-[14%] top-[18%] z-10 hidden sm:block"
         >
@@ -483,7 +498,6 @@
                 class="relative flex min-h-[857px] items-center justify-center pb-16"
             >
                 <div class="w-full">
-                    <!-- pill -->
                     <div class="flex justify-center">
                         <div
                             class="inline-flex h-9 items-center justify-center rounded-full bg-white/20 px-8 py-1 text-base font-medium text-white/95 ring-1 ring-white/10 backdrop-blur-md"
@@ -493,17 +507,17 @@
                     </div>
 
                     <h1
-                        class="mx-auto mt-10 max-w-[980px] text-center font-medium tracking-[-0.03em] text-white"
+                        class="mx-auto mt-10 max-w-[1020px] text-center font-medium tracking-[-0.03em] text-white"
                     >
                         <span
-                            class="block text-[46px] leading-[0.98] sm:text-[72px] sm:leading-[0.98] lg:text-[92px] lg:leading-[0.96]"
+                            class="block text-[44px] leading-[0.98] sm:text-[72px] sm:leading-[0.98] lg:text-[90px] lg:leading-[0.96]"
                         >
                             {title}
                         </span>
                     </h1>
 
                     <p
-                        class="mx-auto mt-8 max-w-[760px] text-center text-base font-medium leading-relaxed text-white/90 sm:text-lg"
+                        class="mx-auto mt-8 max-w-[780px] text-center text-base font-medium leading-relaxed text-white/90 sm:text-lg"
                     >
                         {subtitle}
                     </p>
@@ -512,7 +526,7 @@
                         class="relative mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row sm:gap-6"
                     >
                         <div
-                            class="pointer-events-none absolute -left-2 top-1/2 hidden -translate-y-1/2 sm:block md:left-[12%] lg:left-[18%]"
+                            class="pointer-events-none absolute ml-[-40px] top-1/2 hidden -translate-y-1/2 sm:block md:left-[12%] lg:left-[18%]"
                         >
                             <img
                                 src="/wp_message_text.svg"
@@ -537,14 +551,15 @@
                         </a>
                     </div>
 
-                    <!-- pt-BR: bloco semântico para LLMs e SEO -->
                     <div
                         class="mx-auto mt-10 max-w-[980px] text-center text-sm text-white/75"
                     >
-                        WhatsApp integrado direto na plataforma F10 para
-                        escolas: comunicação com pais, cobranças, matrículas,
-                        financeiro e comercial. Sem intermediários, com
-                        automação, rastreio e histórico centralizado.
+                        WhatsApp para escolas e cursos integrado ao F10:
+                        atendimento multiusuário, comunicação com pais,
+                        responsáveis, alunos e leads, cobranças, matrículas,
+                        secretaria, financeiro e comercial, com histórico
+                        centralizado, rastreio por usuário e operação sem
+                        depender do aparelho.
                     </div>
                 </div>
             </div>
@@ -553,10 +568,389 @@
 </section>
 
 <!-- =========================
-  SECTION (multiusuário / sem celular / gestão por departamentos)
-  - Esquerda: explicação
-  - Direita: imagem whatsApp_sem_celular.png
-  - Inclui bloco destaque com bg-emerald-700 + /patern_whatsapp.png
+  SECTION - VISÃO COMPARTILHADA
+========================= -->
+<section id="visao-compartilhada" class="bg-[#F8FAFC]">
+    <div class="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 sm:py-20">
+        <div class="mx-auto max-w-[900px] text-center">
+            <div class="flex justify-center">
+                <div
+                    class="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-6 py-2 text-sm font-semibold text-emerald-950 ring-1 ring-emerald-200"
+                >
+                    <span
+                        class="inline-flex h-2 w-2 rounded-full bg-emerald-700"
+                    ></span>
+                    Atendimento compartilhado
+                </div>
+            </div>
+
+            <h2
+                class="mt-6 text-balance text-[40px] font-semibold leading-[1.05] tracking-[-0.02em] text-slate-900 sm:text-[52px]"
+            >
+                Uma pessoa envia. O setor inteiro acompanha.
+            </h2>
+
+            <p
+                class="mx-auto mt-6 max-w-[760px] text-pretty text-base leading-relaxed text-slate-600 sm:text-lg"
+            >
+                O WhatsApp deixa de ficar preso no aparelho de alguém. A
+                mensagem pode ser enviada por um usuário, mas o histórico
+                continua visível no F10 para os demais colegas do setor e para a
+                gestão, conforme as permissões da escola ou curso.
+            </p>
+        </div>
+
+        <div class="mt-10 grid gap-6 lg:grid-cols-12 lg:items-stretch">
+            <div class="flex lg:col-span-7">
+                <div
+                    class="h-full w-full overflow-hidden rounded-[30px] bg-white ring-1 ring-slate-200 shadow-[0_20px_60px_rgba(2,6,23,0.08)]"
+                >
+                    <div
+                        class="border-b border-slate-200 bg-slate-50 px-5 py-4"
+                    >
+                        <div class="text-sm font-semibold text-slate-900">
+                            Exemplo de operação no dia a dia
+                        </div>
+                        <div class="mt-1 text-sm text-slate-500">
+                            O atendimento começa com um usuário e continua
+                            disponível para o setor.
+                        </div>
+                    </div>
+
+                    <div class="p-4 sm:p-5">
+                        <div
+                            class="overflow-hidden rounded-[28px] border border-slate-200 bg-[#E7F7ED] shadow-inner"
+                        >
+                            <div
+                                class="flex items-center justify-between bg-emerald-700 px-4 py-3 text-white sm:px-5"
+                            >
+                                <div class="flex min-w-0 items-center gap-3">
+                                    <div
+                                        class="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-sm font-bold"
+                                    >
+                                        AS
+                                    </div>
+
+                                    <div class="min-w-0">
+                                        <div
+                                            class="truncate text-sm font-semibold sm:text-base"
+                                        >
+                                            Ana Souza · Responsável
+                                        </div>
+                                        <div
+                                            class="text-[12px] text-emerald-50/90 sm:text-xs"
+                                        >
+                                            Atendimento visível para Financeiro
+                                            e Gestão
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="hidden items-center gap-2 sm:flex">
+                                    <span
+                                        class="h-2.5 w-2.5 rounded-full bg-emerald-200"
+                                    ></span>
+                                    <span
+                                        class="text-xs font-medium text-emerald-50/90"
+                                        >online</span
+                                    >
+                                </div>
+                            </div>
+
+                            <div
+                                class="space-y-3 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.55),transparent_36%),linear-gradient(180deg,rgba(255,255,255,0.28),rgba(255,255,255,0.12))] px-4 py-5 sm:px-5"
+                            >
+                                <div class="flex justify-start">
+                                    <div
+                                        class="max-w-[82%] rounded-[20px] rounded-tl-md bg-white px-4 py-3 text-sm leading-relaxed text-slate-700 shadow-[0_2px_10px_rgba(15,23,42,0.06)]"
+                                    >
+                                        <div>
+                                            Bom dia. A mensalidade de março já
+                                            está disponível?
+                                        </div>
+                                        <div
+                                            class="mt-1 text-right text-[11px] text-slate-400"
+                                        >
+                                            09:14
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end">
+                                    <div
+                                        class="max-w-[82%] rounded-[20px] rounded-tr-md bg-[#DCF8C6] px-4 py-3 text-sm leading-relaxed text-slate-800 shadow-[0_2px_10px_rgba(15,23,42,0.05)]"
+                                    >
+                                        <div>
+                                            Olá, Ana. Sim, já está disponível.
+                                            Posso te enviar o link de pagamento
+                                            por aqui.
+                                        </div>
+                                        <div
+                                            class="mt-1 flex items-center justify-end gap-1 text-[11px] text-slate-500"
+                                        >
+                                            <span>09:15</span>
+                                            <span class="text-emerald-700"
+                                                >✓✓</span
+                                            >
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-start">
+                                    <div
+                                        class="max-w-[82%] rounded-[20px] rounded-tl-md bg-white px-4 py-3 text-sm leading-relaxed text-slate-700 shadow-[0_2px_10px_rgba(15,23,42,0.06)]"
+                                    >
+                                        <div>
+                                            Pode enviar. Também preciso do
+                                            comprovante da parcela anterior.
+                                        </div>
+                                        <div
+                                            class="mt-1 text-right text-[11px] text-slate-400"
+                                        >
+                                            09:16
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-center py-1">
+                                    <div
+                                        class="rounded-full bg-white/80 px-3 py-1 text-[11px] font-medium text-slate-500 ring-1 ring-slate-200"
+                                    >
+                                        Juliana iniciou o atendimento · Camila
+                                        pode continuar no mesmo histórico
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end">
+                                    <div
+                                        class="max-w-[82%] rounded-[20px] rounded-tr-md bg-[#DCF8C6] px-4 py-3 text-sm leading-relaxed text-slate-800 shadow-[0_2px_10px_rgba(15,23,42,0.05)]"
+                                    >
+                                        <div>
+                                            Perfeito. Já te enviei o link e
+                                            também vou anexar o comprovante da
+                                            parcela anterior neste mesmo
+                                            atendimento.
+                                        </div>
+                                        <div
+                                            class="mt-2 rounded-2xl bg-white/70 px-3 py-2 text-[12px] text-slate-600 ring-1 ring-emerald-200"
+                                        >
+                                            <span
+                                                class="font-semibold text-slate-800"
+                                                >Enviado por:</span
+                                            >
+                                            Camila · Financeiro
+                                        </div>
+                                        <div
+                                            class="mt-1 flex items-center justify-end gap-1 text-[11px] text-slate-500"
+                                        >
+                                            <span>09:18</span>
+                                            <span class="text-emerald-700"
+                                                >✓✓</span
+                                            >
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-start">
+                                    <div
+                                        class="max-w-[82%] rounded-[20px] rounded-tl-md bg-white px-4 py-3 text-sm leading-relaxed text-slate-700 shadow-[0_2px_10px_rgba(15,23,42,0.06)]"
+                                    >
+                                        <div>
+                                            Recebi. Obrigada pelo retorno.
+                                        </div>
+                                        <div
+                                            class="mt-1 text-right text-[11px] text-slate-400"
+                                        >
+                                            09:19
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div
+                                class="flex flex-wrap items-center justify-between gap-3 border-t border-emerald-200 bg-white px-4 py-4 sm:px-5"
+                            >
+                                <div
+                                    class="flex items-center gap-2 text-xs text-slate-500 sm:text-sm"
+                                >
+                                    <span
+                                        class="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"
+                                    ></span>
+                                    Histórico compartilhado entre usuários autorizados
+                                </div>
+
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span
+                                        class="rounded-full bg-emerald-100 px-3 py-1 text-[12px] font-semibold text-emerald-900 ring-1 ring-emerald-200"
+                                    >
+                                        Juliana
+                                    </span>
+                                    <span
+                                        class="rounded-full bg-slate-100 px-3 py-1 text-[12px] font-semibold text-slate-700 ring-1 ring-slate-200"
+                                    >
+                                        Camila
+                                    </span>
+                                    <span
+                                        class="rounded-full bg-slate-100 px-3 py-1 text-[12px] font-semibold text-slate-700 ring-1 ring-slate-200"
+                                    >
+                                        Gestão
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex lg:col-span-5">
+                <div
+                    class="flex h-full w-full flex-col justify-between rounded-3xl bg-white p-6 ring-1 ring-slate-200 shadow-[0_12px_30px_rgba(2,6,23,0.06)] lg:p-7"
+                >
+                    <div>
+                        <div class="flex items-start gap-3">
+                            <span
+                                class="inline-flex h-11 min-w-11 items-center justify-center rounded-xl bg-emerald-700 text-white"
+                            >
+                                <ShieldCheck
+                                    class="h-5 w-5"
+                                    aria-hidden="true"
+                                />
+                            </span>
+                            <div>
+                                <div
+                                    class="text-base font-semibold text-slate-900"
+                                >
+                                    Gestão sem depender do aparelho
+                                </div>
+                                <p
+                                    class="mt-2 text-sm leading-relaxed text-slate-600"
+                                >
+                                    O gestor visualiza os chats em andamento,
+                                    acompanha histórico, verifica quem respondeu
+                                    e mantém continuidade no atendimento sem
+                                    pedir o telefone para ninguém.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="my-7 flex-1">
+                        <div class="relative pl-1">
+                            <div
+                                class="absolute left-[16px] top-2 bottom-2 border-l-2 border-dotted border-emerald-200"
+                            ></div>
+
+                            <div class="relative space-y-6">
+                                <div class="relative pl-10">
+                                    <CheckCircle2
+                                        class="absolute left-0 top-0.5 h-7 w-7 bg-emerald-50 text-emerald-700 rounded-full p-1"
+                                    />
+                                    <div
+                                        class="text-sm font-semibold text-slate-900"
+                                    >
+                                        Visualização compartilhada por setor
+                                    </div>
+                                    <div
+                                        class="mt-1 text-sm leading-relaxed text-slate-600"
+                                    >
+                                        Atendentes, financeiro e gestão
+                                        acompanham o mesmo histórico conforme as
+                                        permissões definidas no F10.
+                                    </div>
+                                </div>
+
+                                <div class="relative pl-10">
+                                    <CheckCircle2
+                                        class="absolute left-0 top-0.5 h-7 w-7 bg-emerald-50 text-emerald-700 rounded-full p-1"
+                                    />
+                                    <div
+                                        class="text-sm font-semibold text-slate-900"
+                                    >
+                                        Identificação clara de quem respondeu
+                                    </div>
+                                    <div
+                                        class="mt-1 text-sm leading-relaxed text-slate-600"
+                                    >
+                                        Cada envio fica vinculado ao usuário
+                                        responsável, facilitando controle,
+                                        rastreabilidade e acompanhamento da
+                                        operação.
+                                    </div>
+                                </div>
+
+                                <div class="relative pl-10">
+                                    <CheckCircle2
+                                        class="absolute left-0 top-0.5 h-7 w-7 bg-emerald-50 text-emerald-700 rounded-full p-1"
+                                    />
+                                    <div
+                                        class="text-sm font-semibold text-slate-900"
+                                    >
+                                        Continuidade sem troca de aparelho
+                                    </div>
+                                    <div
+                                        class="mt-1 text-sm leading-relaxed text-slate-600"
+                                    >
+                                        Se outro colaborador assumir o
+                                        atendimento, ele continua do ponto certo
+                                        sem perder contexto nem depender do
+                                        celular de alguém.
+                                    </div>
+                                </div>
+
+                                <div class="relative pl-10">
+                                    <CheckCircle2
+                                        class="absolute left-0 top-0.5 h-7 w-7 bg-emerald-50 text-emerald-700 rounded-full p-1"
+                                    />
+                                    <div
+                                        class="text-sm font-semibold text-slate-900"
+                                    >
+                                        Mais visão para coordenação e direção
+                                    </div>
+                                    <div
+                                        class="mt-1 text-sm leading-relaxed text-slate-600"
+                                    >
+                                        A liderança acompanha o fluxo real dos
+                                        atendimentos, identifica gargalos e
+                                        evita conversas espalhadas em aparelhos
+                                        pessoais.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="rounded-2xl bg-slate-50 px-4 py-4 ring-1 ring-slate-100"
+                    >
+                        <div class="text-sm font-semibold text-slate-900">
+                            O ganho prático é simples
+                        </div>
+                        <p class="mt-2 text-sm leading-relaxed text-slate-600">
+                            O atendimento continua no sistema, com histórico,
+                            contexto e responsabilidade registrada. A operação
+                            deixa de depender de um aparelho específico.
+                        </p>
+                    </div>
+
+                    <div class="mt-6 border-t border-slate-200 pt-6">
+                        <button
+                            on:click={() => openWhatsAppModal(11)}
+                            class="inline-flex h-12 w-full items-center justify-center rounded-full bg-emerald-700 px-8 text-base font-bold text-white shadow-sm transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                        >
+                            Quero ver esse fluxo
+                            <ArrowUpRight
+                                class="ml-2 min-h-5 min-w-5"
+                                aria-hidden="true"
+                            />
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+<!-- =========================
+  SECTION - MULTIUSUÁRIO / MULTINÚMERO
 ========================= -->
 <section id="multiusuario" class="bg-white overflow-hidden relative">
     <div
@@ -564,75 +958,38 @@
         style="background-image:url('/patern_whatsapp.png'); background-size: 700px auto;"
         aria-hidden="true"
     ></div>
+
     <div class="relative mx-auto max-w-[1200px] px-4 py-16 sm:px-6 sm:py-20">
-        <!-- Header centralizado -->
         <div class="mx-auto max-w-[920px] text-center">
             <div class="flex justify-center">
                 <div
                     class="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-6 py-2 text-sm font-semibold text-white ring-1 ring-emerald-200"
                 >
-                    <span
-                        class="inline-flex h-2 w-2 rounded-full bg-white text-white"
+                    <span class="inline-flex h-2 w-2 rounded-full bg-white"
                     ></span>
-                    Operação sem celular
+                    Multiusuário e multinúmero
                 </div>
             </div>
 
             <h2
                 class="mt-6 whitespace-pre-line text-balance text-[40px] font-semibold leading-[1.05] tracking-[-0.02em] text-slate-900 sm:text-[52px]"
             >
-                Agora o WhatsApp da escola não depende de celular
+                Sua operação não fica presa em uma pessoa nem em um único número
             </h2>
 
             <p
                 class="mx-auto mt-6 max-w-[820px] text-pretty text-base leading-relaxed text-slate-600 sm:text-lg"
             >
-                Cada departamento pode ter <strong class="text-slate-900"
-                    >um único número</strong
-                >
-                e
-                <strong class="text-slate-900">vários usuários atendendo</strong
-                > ao mesmo tempo. O gestor acompanha todas as conversas e, se você
-                permitir, um atendente pode ver e continuar o chat iniciado por outro.
+                No F10, um mesmo número pode ser acessado por múltiplos usuários
+                e um mesmo usuário pode operar múltiplos números. Cada envio
+                fica identificado no histórico, com visibilidade por perfil e
+                continuidade entre setores.
             </p>
         </div>
 
-        <!-- Conteúdo -->
         <div class="mt-10 grid gap-8 lg:grid-cols-12 lg:items-start">
-            <!-- LEFT: explicação -->
             <div class="lg:col-span-6">
                 <div class="grid gap-4 sm:grid-cols-2">
-                    <!-- Card 1 -->
-                    <div
-                        class="rounded-2xl bg-white p-6 ring-1 ring-slate-200 shadow-[0_12px_30px_rgba(2,6,23,0.06)]"
-                    >
-                        <div class="flex items-start gap-3">
-                            <span
-                                class="inline-flex h-10 min-w-10 items-center justify-center rounded-xl bg-emerald-700 ring-1 ring-emerald-600"
-                            >
-                                <Workflow
-                                    class="h-5 w-5 text-white"
-                                    aria-hidden="true"
-                                />
-                            </span>
-                            <div class="min-w-0">
-                                <div
-                                    class="text-base font-semibold text-slate-900"
-                                >
-                                    1 número por departamento
-                                </div>
-                                <p
-                                    class="mt-2 text-sm leading-relaxed text-slate-600"
-                                >
-                                    Secretaria, financeiro, comercial e
-                                    atendimento — cada área com um número e
-                                    filas organizadas.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Card 2 -->
                     <div
                         class="rounded-2xl bg-white p-6 ring-1 ring-slate-200 shadow-[0_12px_30px_rgba(2,6,23,0.06)]"
                     >
@@ -649,19 +1006,48 @@
                                 <div
                                     class="text-base font-semibold text-slate-900"
                                 >
-                                    Vários usuários no mesmo número
+                                    1 número com vários usuários
                                 </div>
                                 <p
                                     class="mt-2 text-sm leading-relaxed text-slate-600"
                                 >
-                                    Múltiplos atendentes atuam simultaneamente
-                                    sem “disputar” o WhatsApp.
+                                    Secretaria, financeiro ou comercial podem
+                                    compartilhar o mesmo número sem disputa de
+                                    aparelho.
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Card 3 -->
+                    <div
+                        class="rounded-2xl bg-white p-6 ring-1 ring-slate-200 shadow-[0_12px_30px_rgba(2,6,23,0.06)]"
+                    >
+                        <div class="flex items-start gap-3">
+                            <span
+                                class="inline-flex h-10 min-w-10 items-center justify-center rounded-xl bg-emerald-700 ring-1 ring-emerald-600"
+                            >
+                                <Workflow
+                                    class="h-5 w-5 text-white"
+                                    aria-hidden="true"
+                                />
+                            </span>
+                            <div class="min-w-0">
+                                <div
+                                    class="text-base font-semibold text-slate-900"
+                                >
+                                    1 usuário com vários números
+                                </div>
+                                <p
+                                    class="mt-2 text-sm leading-relaxed text-slate-600"
+                                >
+                                    O mesmo colaborador pode atuar em números
+                                    diferentes conforme a rotina e a permissão
+                                    configurada.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div
                         class="rounded-2xl bg-white p-6 ring-1 ring-slate-200 shadow-[0_12px_30px_rgba(2,6,23,0.06)]"
                     >
@@ -678,20 +1064,19 @@
                                 <div
                                     class="text-base font-semibold text-slate-900"
                                 >
-                                    Gestão e auditoria
+                                    Identificação por usuário
                                 </div>
                                 <p
                                     class="mt-2 text-sm leading-relaxed text-slate-600"
                                 >
-                                    O gestor acompanha mensagens de todos, com
-                                    rastreio por usuário e histórico
-                                    centralizado.
+                                    Cada mensagem fica vinculada ao usuário que
+                                    enviou, facilitando gestão, auditoria e
+                                    continuidade.
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Card 4 -->
                     <div
                         class="rounded-2xl bg-white p-6 ring-1 ring-slate-200 shadow-[0_12px_30px_rgba(2,6,23,0.06)]"
                     >
@@ -708,20 +1093,19 @@
                                 <div
                                     class="text-base font-semibold text-slate-900"
                                 >
-                                    Chat compartilhado (com permissão)
+                                    Gerência com visão central
                                 </div>
                                 <p
                                     class="mt-2 text-sm leading-relaxed text-slate-600"
                                 >
-                                    Se permitido, um atendente pode visualizar e
-                                    continuar conversas iniciadas por outro.
+                                    O gerente acompanha conversas sem depender
+                                    de pedir o aparelho a um atendente.
                                 </p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- BLOCO DESTAQUE (bg-emerald-700 + pattern) -->
                 <div
                     class="mt-6 overflow-hidden rounded-2xl ring-1 ring-emerald-800/30"
                 >
@@ -747,24 +1131,21 @@
                                     <div
                                         class="text-base font-semibold text-white"
                                     >
-                                        Operação sem celular, com controle total
+                                        Sem aparelho como ponto de falha
                                     </div>
+
                                     <p
                                         class="mt-2 text-sm leading-relaxed text-white"
                                     >
-                                        O WhatsApp vira um canal de atendimento
-                                        dentro do F10: multiusuário, rastreável
-                                        e com permissões por perfil. Assim, você
-                                        padroniza atendimento por departamento e
-                                        mantém a continuidade do serviço.
+                                        O WhatsApp passa a funcionar como canal
+                                        operacional do F10. Se alguém sair,
+                                        trocar de função ou estiver ausente, o
+                                        histórico e a continuidade do
+                                        atendimento continuam disponíveis no
+                                        sistema.
                                     </p>
 
                                     <div class="mt-4 flex flex-wrap gap-2">
-                                        <span
-                                            class="rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-emerald-900 ring-1 ring-emerald-200"
-                                        >
-                                            1 número por área
-                                        </span>
                                         <span
                                             class="rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-emerald-900 ring-1 ring-emerald-200"
                                         >
@@ -773,12 +1154,17 @@
                                         <span
                                             class="rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-emerald-900 ring-1 ring-emerald-200"
                                         >
-                                            Permissões
+                                            Multinúmero
                                         </span>
                                         <span
                                             class="rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-emerald-900 ring-1 ring-emerald-200"
                                         >
-                                            Gestão em tempo real
+                                            Histórico central
+                                        </span>
+                                        <span
+                                            class="rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-emerald-900 ring-1 ring-emerald-200"
+                                        >
+                                            Gestão por usuário
                                         </span>
                                     </div>
                                 </div>
@@ -787,7 +1173,6 @@
                     </div>
                 </div>
 
-                <!-- CTA -->
                 <div class="mt-8 flex flex-col items-start gap-3 sm:flex-row">
                     <button
                         on:click={() => openWhatsAppModal(10)}
@@ -809,220 +1194,23 @@
                 </div>
             </div>
 
-            <!-- RIGHT: imagem -->
             <div class="lg:col-span-6">
                 <div class="mx-auto max-w-[560px]">
                     <div class="overflow-hidden">
                         <img
                             src="/whatsApp_sem_celular.webp"
-                            alt="WhatsApp no F10 sem celular: multiusuário por departamento"
+                            alt="Atendimento multiusuário e multinúmero no F10"
                             class="h-auto w-full select-none"
                             draggable="false"
                         />
                     </div>
 
                     <div class="mt-4 text-center text-sm text-slate-500">
-                        Atendimento por departamentos, multiusuário e com
-                        permissões dentro do F10.
+                        Um número pode atender vários usuários. Um usuário pode
+                        operar vários números. Tudo com identificação de envio.
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-</section>
-
-<section id="canais" class="bg-white">
-    <div class="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 sm:py-20">
-        <!-- Header centralizado (flat, sem transparências) -->
-        <div class="mx-auto max-w-[920px] text-center">
-            <div class="flex justify-center">
-                <div
-                    class="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-6 py-2 text-sm font-semibold text-emerald-950 ring-1 ring-emerald-200"
-                >
-                    <span
-                        class="inline-flex h-2 w-2 rounded-full bg-emerald-700"
-                    ></span>
-                    {section8Pill}
-                </div>
-            </div>
-
-            <h2
-                class="mt-6 whitespace-pre-line text-balance text-[40px] font-semibold leading-[1.05] tracking-[-0.02em] text-slate-900 sm:text-[52px]"
-            >
-                {section8Title}
-            </h2>
-
-            <p
-                class="mx-auto mt-6 max-w-[760px] text-pretty text-base leading-relaxed text-slate-600 sm:text-lg"
-            >
-                {section8Text}
-            </p>
-        </div>
-
-        <!-- Colunas de comparação (flat, sem blur/transparência) -->
-        <div class="mt-10 grid gap-4 sm:grid-cols-2">
-            {#each section8Cards as card}
-                <div
-                    class="rounded-2xl bg-white p-6 text-left ring-1 ring-slate-200 shadow-[0_12px_30px_rgba(2,6,23,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgba(2,6,23,0.10)]"
-                >
-                    <div class="flex items-start justify-between gap-4">
-                        <div class="min-w-0">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span
-                                    class="text-base font-semibold text-slate-900"
-                                    >{card.title}</span
-                                >
-                            </div>
-
-                            <p
-                                class="mt-2 text-sm leading-relaxed text-slate-600"
-                            >
-                                {card.subtitle}
-                            </p>
-                        </div>
-
-                        <span
-                            class="shrink-0 rounded-full px-3 py-1 text-[12px] font-semibold ring-1"
-                            class:bg-emerald-700={card.tone === "official"}
-                            class:text-white={card.tone === "official"}
-                            class:ring-emerald-700={card.tone === "official"}
-                            class:bg-slate-100={card.tone === "alternative"}
-                            class:text-slate-900={card.tone === "alternative"}
-                            class:ring-slate-200={card.tone === "alternative"}
-                        >
-                            {card.badge}
-                        </span>
-                    </div>
-
-                    <ul class="mt-5 space-y-3">
-                        {#each card.bullets as b}
-                            <li class="flex gap-3">
-                                <span
-                                    class="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full ring-1"
-                                    class:bg-emerald-100={card.tone ===
-                                        "official"}
-                                    class:ring-emerald-200={card.tone ===
-                                        "official"}
-                                    class:bg-slate-100={card.tone ===
-                                        "alternative"}
-                                    class:ring-slate-200={card.tone ===
-                                        "alternative"}
-                                >
-                                    <CheckCircle2 class="h-5 w-5" />
-                                </span>
-                                <span class="text-sm font-medium text-slate-800"
-                                    >{b}</span
-                                >
-                            </li>
-                        {/each}
-                    </ul>
-
-                    <div
-                        class="mt-6 flex items-center gap-2 text-sm text-slate-600"
-                    >
-                        <Workflow class="h-4 w-4" aria-hidden="true" />
-                        <span>Configuração guiada conforme sua operação</span>
-                    </div>
-                </div>
-            {/each}
-        </div>
-
-        <!-- Note centralizado (flat) -->
-        <div class="mt-8 flex justify-center">
-            <div
-                class="w-full overflow-hidden rounded-2xl ring-1 ring-emerald-800/30"
-            >
-                <!-- background -->
-                <div class="relative bg-emerald-700">
-                    <div
-                        class="absolute inset-0 bg-repeat opacity-20"
-                        style="background-image:url('/patern_whatsapp.png'); background-size: 700px auto;"
-                        aria-hidden="true"
-                    ></div>
-                    <div
-                        class="absolute inset-0 bg-gradient-to-b from-black/10 via-black/0 to-black/10"
-                        aria-hidden="true"
-                    ></div>
-
-                    <!-- content -->
-                    <div class="relative p-6">
-                        <div class="flex items-start gap-3">
-                            <span
-                                class="inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl bg-white text-emerald-800 shadow-sm ring-1 ring-white/20"
-                            >
-                                <ShieldCheck
-                                    class="h-5 w-5"
-                                    aria-hidden="true"
-                                />
-                            </span>
-
-                            <div class="min-w-0">
-                                <div class="text-base font-semibold text-white">
-                                    {section8NoteTitle}
-                                </div>
-                                <p
-                                    class="mt-2 text-sm leading-relaxed text-white/90"
-                                >
-                                    {section8NoteText}
-                                </p>
-
-                                <!-- chips (flat) -->
-                                <div class="mt-4 flex flex-wrap gap-2">
-                                    <span
-                                        class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-emerald-900 ring-1 ring-emerald-200"
-                                    >
-                                        <ShieldCheck
-                                            class="h-4 w-4"
-                                            aria-hidden="true"
-                                        />
-                                        Histórico no F10
-                                    </span>
-
-                                    <span
-                                        class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-emerald-900 ring-1 ring-emerald-200"
-                                    >
-                                        <Workflow
-                                            class="h-4 w-4"
-                                            aria-hidden="true"
-                                        />
-                                        Retomada rápida
-                                    </span>
-
-                                    <span
-                                        class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-emerald-900 ring-1 ring-emerald-200"
-                                    >
-                                        <MessagesSquare
-                                            class="h-4 w-4"
-                                            aria-hidden="true"
-                                        />
-                                        Rastreio por aluno
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- CTA centralizado -->
-        <div
-            class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row"
-        >
-            <button
-                on:click={() => openWhatsAppModal(8)}
-                class="inline-flex h-12 items-center justify-center rounded-full bg-emerald-700 px-8 text-base font-bold text-white shadow-sm transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-emerald-300"
-            >
-                Quero definir a melhor estratégia
-                <ArrowUpRight class="ml-2 min-h-5 min-w-5" aria-hidden="true" />
-            </button>
-
-            <a
-                href="#faq"
-                class="inline-flex h-12 items-center justify-center rounded-full border border-slate-200 bg-white px-8 text-base font-bold text-slate-900 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
-            >
-                Ver perguntas frequentes
-            </a>
         </div>
     </div>
 </section>
@@ -1033,7 +1221,6 @@
 <section id="como-funciona" class="bg-white">
     <div class="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 sm:py-20">
         <div class="grid gap-12 lg:grid-cols-12 lg:items-center">
-            <!-- LEFT -->
             <div class="lg:col-span-6">
                 <h2
                     class="text-balance text-[40px] font-semibold leading-[1.05] tracking-[-0.02em] text-slate-900 sm:text-[52px]"
@@ -1066,7 +1253,6 @@
                 </ul>
             </div>
 
-            <!-- RIGHT -->
             <div class="lg:col-span-6">
                 <div class="relative mx-auto max-w-[560px]">
                     <div
@@ -1119,12 +1305,108 @@
                         >
                             <img
                                 src="/wp_smartphone.webp"
-                                alt="WhatsApp para escolas no F10 (mockup)"
+                                alt="WhatsApp para escolas e cursos no F10"
                                 class="h-auto w-full select-none"
                                 draggable="false"
                             />
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- =========================
+  SECTION - PARA QUEM É
+========================= -->
+<section id="para-quem-e" class="bg-[#F8FAFC]">
+    <div class="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 sm:py-20">
+        <div class="grid gap-10 lg:grid-cols-12 lg:items-start">
+            <div class="lg:col-span-5">
+                <div
+                    class="inline-flex items-center rounded-full bg-emerald-100 px-6 py-2 text-sm font-semibold text-emerald-950 ring-1 ring-emerald-200"
+                >
+                    Para quem é
+                </div>
+
+                <h2
+                    class="mt-6 text-balance text-[40px] font-semibold leading-[1.05] tracking-[-0.02em] text-slate-900 sm:text-[52px]"
+                >
+                    Ideal para escolas, cursos e instituições de ensino
+                </h2>
+
+                <p
+                    class="mt-6 max-w-[560px] text-pretty text-base leading-relaxed text-slate-600 sm:text-lg"
+                >
+                    O WhatsApp no F10 foi pensado para operações educacionais
+                    que precisam organizar atendimento, matrícula, secretaria,
+                    financeiro escolar e comunicação recorrente com pais,
+                    responsáveis, alunos e leads.
+                </p>
+            </div>
+
+            <div class="lg:col-span-7">
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div
+                        class="rounded-2xl bg-white p-6 ring-1 ring-slate-200 shadow-[0_12px_30px_rgba(2,6,23,0.06)]"
+                    >
+                        <div class="text-base font-semibold text-slate-900">
+                            Escolas particulares
+                        </div>
+                        <p class="mt-2 text-sm leading-relaxed text-slate-600">
+                            Comunicação escolar pelo WhatsApp com secretaria,
+                            financeiro, matrícula e gestão.
+                        </p>
+                    </div>
+
+                    <div
+                        class="rounded-2xl bg-white p-6 ring-1 ring-slate-200 shadow-[0_12px_30px_rgba(2,6,23,0.06)]"
+                    >
+                        <div class="text-base font-semibold text-slate-900">
+                            Cursos livres
+                        </div>
+                        <p class="mt-2 text-sm leading-relaxed text-slate-600">
+                            Atendimento comercial, confirmação de turmas, avisos
+                            e comunicação com alunos.
+                        </p>
+                    </div>
+
+                    <div
+                        class="rounded-2xl bg-white p-6 ring-1 ring-slate-200 shadow-[0_12px_30px_rgba(2,6,23,0.06)]"
+                    >
+                        <div class="text-base font-semibold text-slate-900">
+                            Escolas de idiomas
+                        </div>
+                        <p class="mt-2 text-sm leading-relaxed text-slate-600">
+                            Rotina com responsáveis, alunos, renovação,
+                            lembretes e acompanhamento de atendimento.
+                        </p>
+                    </div>
+
+                    <div
+                        class="rounded-2xl bg-white p-6 ring-1 ring-slate-200 shadow-[0_12px_30px_rgba(2,6,23,0.06)]"
+                    >
+                        <div class="text-base font-semibold text-slate-900">
+                            Cursos técnicos e pré-vestibulares
+                        </div>
+                        <p class="mt-2 text-sm leading-relaxed text-slate-600">
+                            Operação com múltiplos usuários, histórico
+                            centralizado e rastreio de quem respondeu.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-6 rounded-2xl bg-emerald-700 p-6 text-white">
+                    <div class="text-base font-semibold">
+                        Também atende instituições com secretaria, financeiro e
+                        comercial integrados
+                    </div>
+                    <p class="mt-2 text-sm leading-relaxed text-white/90">
+                        O objetivo é transformar o WhatsApp em um canal
+                        operacional da instituição de ensino, e não em um
+                        atendimento preso no celular de uma pessoa.
+                    </p>
                 </div>
             </div>
         </div>
@@ -1163,9 +1445,11 @@
                         Resumo
                     </div>
                     <p class="mt-2 text-sm leading-relaxed text-slate-600">
-                        WhatsApp integrado ao F10 para escolas: comunicação com
-                        pais, cobranças, matrículas, financeiro e comercial —
-                        com automação, rastreio e histórico centralizado.
+                        WhatsApp integrado ao F10 para escolas e cursos:
+                        comunicação com pais, responsáveis, alunos e leads,
+                        matrículas, secretaria, financeiro e comercial — com
+                        atendimento compartilhado, rastreio por usuário e
+                        histórico centralizado.
                     </p>
                 </div>
             </div>
@@ -1208,233 +1492,743 @@
 </section>
 
 <!-- =========================
-  SECTION 3 (laptop + green block) - notebook flutuando
+  SECTION - TEMPLATES EXEMPLOS
+========================= -->
+<section id="templates-exemplos" class="bg-[#F8FAFC]">
+    <div class="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 sm:py-20">
+        <div class="mx-auto max-w-[920px] text-center">
+            <div class="flex justify-center">
+                <div
+                    class="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-6 py-2 text-sm font-semibold text-emerald-950 ring-1 ring-emerald-200"
+                >
+                    <span
+                        class="inline-flex h-2 w-2 rounded-full bg-emerald-700"
+                    ></span>
+                    Templates com exemplo real
+                </div>
+            </div>
+
+            <h2
+                class="mt-6 text-balance text-[40px] font-semibold leading-[1.05] tracking-[-0.02em] text-slate-900 sm:text-[52px]"
+            >
+                Você cria o modelo. O F10 envia com os dados certos.
+            </h2>
+
+            <p
+                class="mx-auto mt-6 max-w-[760px] text-pretty text-base leading-relaxed text-slate-600 sm:text-lg"
+            >
+                O sistema substitui variáveis automaticamente e envia a mensagem
+                final pronta. Assim, a escola ou curso padroniza a comunicação
+                sem depender de copiar, colar e revisar tudo manual a cada
+                atendimento.
+            </p>
+        </div>
+
+        <div
+            class="mt-10 overflow-hidden rounded-[32px] bg-white ring-1 ring-slate-200 shadow-[0_20px_60px_rgba(2,6,23,0.08)]"
+        >
+            <div
+                class="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6"
+            >
+                <div
+                    class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <div>
+                        <div class="text-sm font-semibold text-slate-900">
+                            Exemplos de uso no dia a dia
+                        </div>
+                        <div class="mt-1 text-sm text-slate-500">
+                            O modelo fica salvo no sistema e o F10 preenche as
+                            variáveis antes do envio.
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span
+                            class="rounded-full bg-slate-100 px-3 py-1 text-[12px] font-semibold text-slate-700 ring-1 ring-slate-200"
+                        >
+                            Financeiro
+                        </span>
+                        <span
+                            class="rounded-full bg-slate-100 px-3 py-1 text-[12px] font-semibold text-slate-700 ring-1 ring-slate-200"
+                        >
+                            Secretaria
+                        </span>
+                        <span
+                            class="rounded-full bg-slate-100 px-3 py-1 text-[12px] font-semibold text-slate-700 ring-1 ring-slate-200"
+                        >
+                            Captação
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="divide-y divide-slate-200">
+                <div
+                    class="grid gap-6 px-5 py-6 sm:px-6 lg:grid-cols-12 lg:gap-8"
+                >
+                    <div class="lg:col-span-4">
+                        <div class="flex items-center gap-3">
+                            <span
+                                class="inline-flex h-10 min-w-10 items-center justify-center rounded-2xl bg-emerald-100 text-sm font-bold text-emerald-900"
+                            >
+                                R$
+                            </span>
+                            <div>
+                                <div
+                                    class="text-base font-semibold text-slate-900"
+                                >
+                                    Financeiro
+                                </div>
+                                <p
+                                    class="mt-1 text-sm leading-relaxed text-slate-600"
+                                >
+                                    Cobranças, aviso de vencimento e envio de
+                                    link para pagamento.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <div
+                                class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400"
+                            >
+                                Variáveis usadas
+                            </div>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <span
+                                    class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
+                                >
+                                    {"{{nome_responsavel}}"}
+                                </span>
+                                <span
+                                    class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
+                                >
+                                    {"{{mes_referencia}}"}
+                                </span>
+                                <span
+                                    class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
+                                >
+                                    {"{{nome_aluno}}"}
+                                </span>
+                                <span
+                                    class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
+                                >
+                                    {"{{data_vencimento}}"}
+                                </span>
+                                <span
+                                    class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
+                                >
+                                    {"{{link_pagamento}}"}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-8">
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div>
+                                <div
+                                    class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400"
+                                >
+                                    Modelo salvo no F10
+                                </div>
+                                <div
+                                    class="mt-3 rounded-[24px] bg-slate-50 px-4 py-4 text-sm leading-relaxed text-slate-700 ring-1 ring-slate-100"
+                                >
+                                    Olá, {"{{nome_responsavel}}"}! A mensalidade
+                                    de {"{{mes_referencia}}"} do aluno {"{{nome_aluno}}"}
+                                    vence em {"{{data_vencimento}}"}. Segue o
+                                    link para pagamento: {"{{link_pagamento}}"}.
+                                </div>
+                            </div>
+
+                            <div>
+                                <div
+                                    class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400"
+                                >
+                                    Como chega no WhatsApp
+                                </div>
+                                <div
+                                    class="mt-3 rounded-[24px] bg-stone-50 p-3 ring-1 ring-stone-100"
+                                >
+                                    <div
+                                        class="ml-auto max-w-[92%] rounded-[20px] rounded-tr-md bg-[#DCF8C6] px-4 py-3 text-sm leading-relaxed text-slate-800 shadow-[0_2px_10px_rgba(15,23,42,0.05)]"
+                                    >
+                                        <div>
+                                            Olá, Carla! A mensalidade de março
+                                            do aluno Pedro Henrique vence em
+                                            10/04. Segue o link para pagamento:
+                                            pagamento.escola.com/45821.
+                                        </div>
+                                        <div
+                                            class="mt-1 flex items-center justify-end gap-1 text-[11px] text-slate-500"
+                                        >
+                                            <span>09:42</span>
+                                            <span class="text-emerald-700"
+                                                >✓✓</span
+                                            >
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    class="grid gap-6 px-5 py-6 sm:px-6 lg:grid-cols-12 lg:gap-8"
+                >
+                    <div class="lg:col-span-4">
+                        <div class="flex items-center gap-3">
+                            <span
+                                class="inline-flex h-10 min-w-10 items-center justify-center rounded-2xl bg-blue-100 text-sm font-bold text-blue-900"
+                            >
+                                SC
+                            </span>
+                            <div>
+                                <div
+                                    class="text-base font-semibold text-slate-900"
+                                >
+                                    Secretaria
+                                </div>
+                                <p
+                                    class="mt-1 text-sm leading-relaxed text-slate-600"
+                                >
+                                    Lembretes de documentos pendentes e
+                                    comunicações administrativas.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <div
+                                class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400"
+                            >
+                                Variáveis usadas
+                            </div>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <span
+                                    class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
+                                >
+                                    {"{{nome_responsavel}}"}
+                                </span>
+                                <span
+                                    class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
+                                >
+                                    {"{{nome_documento}}"}
+                                </span>
+                                <span
+                                    class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
+                                >
+                                    {"{{nome_aluno}}"}
+                                </span>
+                                <span
+                                    class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
+                                >
+                                    {"{{prazo_envio}}"}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-8">
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div>
+                                <div
+                                    class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400"
+                                >
+                                    Modelo salvo no F10
+                                </div>
+                                <div
+                                    class="mt-3 rounded-[24px] bg-slate-50 px-4 py-4 text-sm leading-relaxed text-slate-700 ring-1 ring-slate-100"
+                                >
+                                    Olá, {"{{nome_responsavel}}"}! O documento {"{{nome_documento}}"}
+                                    do aluno
+                                    {"{{nome_aluno}}"} ainda está pendente. Pode
+                                    enviar até {"{{prazo_envio}}"}?
+                                </div>
+                            </div>
+
+                            <div>
+                                <div
+                                    class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400"
+                                >
+                                    Como chega no WhatsApp
+                                </div>
+                                <div
+                                    class="mt-3 rounded-[24px] bg-stone-50 p-3 ring-1 ring-stone-100"
+                                >
+                                    <div
+                                        class="ml-auto max-w-[92%] rounded-[20px] rounded-tr-md bg-[#DCF8C6] px-4 py-3 text-sm leading-relaxed text-slate-800 shadow-[0_2px_10px_rgba(15,23,42,0.05)]"
+                                    >
+                                        <div>
+                                            Olá, Rafael! O documento comprovante
+                                            de residência do aluno Lucas ainda
+                                            está pendente. Pode enviar até
+                                            15/04?
+                                        </div>
+                                        <div
+                                            class="mt-1 flex items-center justify-end gap-1 text-[11px] text-slate-500"
+                                        >
+                                            <span>10:11</span>
+                                            <span class="text-emerald-700"
+                                                >✓✓</span
+                                            >
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    class="grid gap-6 px-5 py-6 sm:px-6 lg:grid-cols-12 lg:gap-8"
+                >
+                    <div class="lg:col-span-4">
+                        <div class="flex items-center gap-3">
+                            <span
+                                class="inline-flex h-10 min-w-10 items-center justify-center rounded-2xl bg-violet-100 text-sm font-bold text-violet-900"
+                            >
+                                CP
+                            </span>
+                            <div>
+                                <div
+                                    class="text-base font-semibold text-slate-900"
+                                >
+                                    Captação
+                                </div>
+                                <p
+                                    class="mt-1 text-sm leading-relaxed text-slate-600"
+                                >
+                                    Contato inicial com leads e mensagens
+                                    padronizadas para matrícula.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <div
+                                class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400"
+                            >
+                                Variáveis usadas
+                            </div>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <span
+                                    class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
+                                >
+                                    {"{{nome_lead}}"}
+                                </span>
+                                <span
+                                    class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
+                                >
+                                    {"{{turma_interesse}}"}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-8">
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div>
+                                <div
+                                    class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400"
+                                >
+                                    Modelo salvo no F10
+                                </div>
+                                <div
+                                    class="mt-3 rounded-[24px] bg-slate-50 px-4 py-4 text-sm leading-relaxed text-slate-700 ring-1 ring-slate-100"
+                                >
+                                    Olá, {"{{nome_lead}}"}! Temos condição
+                                    especial para a turma
+                                    {"{{turma_interesse}}"}. Posso te enviar os
+                                    detalhes da matrícula?
+                                </div>
+                            </div>
+
+                            <div>
+                                <div
+                                    class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400"
+                                >
+                                    Como chega no WhatsApp
+                                </div>
+                                <div
+                                    class="mt-3 rounded-[24px] bg-stone-50 p-3 ring-1 ring-stone-100"
+                                >
+                                    <div
+                                        class="ml-auto max-w-[92%] rounded-[20px] rounded-tr-md bg-[#DCF8C6] px-4 py-3 text-sm leading-relaxed text-slate-800 shadow-[0_2px_10px_rgba(15,23,42,0.05)]"
+                                    >
+                                        <div>
+                                            Olá, Fernanda! Temos condição
+                                            especial para a turma Infantil 5.
+                                            Posso te enviar os detalhes da
+                                            matrícula?
+                                        </div>
+                                        <div
+                                            class="mt-1 flex items-center justify-end gap-1 text-[11px] text-slate-500"
+                                        >
+                                            <span>14:26</span>
+                                            <span class="text-emerald-700"
+                                                >✓✓</span
+                                            >
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div
+            class="mt-8 overflow-hidden rounded-[32px] bg-emerald-700 text-white shadow-[0_18px_50px_rgba(5,150,105,0.28)]"
+        >
+            <div
+                class="grid gap-6 px-6 py-6 lg:grid-cols-12 lg:items-center lg:px-7"
+            >
+                <div class="lg:col-span-8">
+                    <div class="text-base font-semibold">
+                        Envios automáticos em implantação
+                    </div>
+                    <p
+                        class="mt-2 max-w-[720px] text-sm leading-relaxed text-white/90"
+                    >
+                        Já estamos estruturando os envios automáticos dentro do
+                        F10 para cobranças, avisos, lembretes e comunicações
+                        recorrentes. A base de templates e a padronização do
+                        atendimento já podem ser apresentadas desde agora.
+                    </p>
+                </div>
+
+                <div class="lg:col-span-4 lg:text-right">
+                    <button
+                        on:click={() => openWhatsAppModal(12)}
+                        class="inline-flex h-12 items-center justify-center rounded-full bg-white px-8 text-base font-bold text-emerald-900 shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-white/40"
+                    >
+                        Quero conhecer os templates
+                        <ArrowUpRight
+                            class="ml-2 min-h-5 min-w-5"
+                            aria-hidden="true"
+                        />
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- =========================
+  SECTION 3 (Visual dos templates)
 ========================= -->
 <section id="comecar" class="relative bg-white">
-	<!-- Top (cinza) -->
-	<div class="mx-auto max-w-[1200px] px-4 pt-16 sm:px-6 sm:pt-20">
-		<div class="grid gap-10 lg:grid-cols-12 lg:items-start">
-			<div class="lg:col-span-7">
-				<h2
-					class="whitespace-pre-line text-balance text-[36px] font-semibold leading-[1.06] tracking-[-0.02em] text-slate-900 sm:text-[42px]"
-				>
-					WhatsApp é a evolução do SMS{"\n"}para sua escola — só que com contexto e automação
-				</h2>
+    <div class="mx-auto max-w-[1200px] px-4 pt-16 sm:px-6 sm:pt-20">
+        <div class="mx-auto max-w-[920px] text-center">
+            <div class="flex justify-center">
+                <div
+                    class="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-5 py-2 text-sm font-semibold text-emerald-950 ring-1 ring-emerald-200"
+                >
+                    <span
+                        class="inline-flex h-2 w-2 rounded-full bg-emerald-700"
+                    ></span>
+                    Templates prontos com variáveis do sistema
+                </div>
+            </div>
 
-				<p class="mt-5 max-w-[680px] text-pretty text-base leading-relaxed text-slate-600 sm:text-lg">
-					No F10, você cria <strong class="text-slate-900">templates prontos</strong> com variáveis do sistema e dispara mensagens
-					sem copiar/colar. Financeiro, secretaria e marketing usam o mesmo canal — com rastreio e histórico centralizado.
-				</p>
+            <h2
+                class="mt-6 text-balance text-[36px] font-semibold leading-[1.06] tracking-[-0.02em] text-slate-900 sm:text-[42px]"
+            >
+                Templates prontos para financeiro, secretaria e captação
+            </h2>
 
-				<div class="mt-6 grid gap-3 sm:grid-cols-2">
-					<div class="rounded-2xl bg-slate-50 p-5 ring-1 ring-slate-200">
-						<div class="text-sm font-semibold text-slate-900">Cobrança (Financeiro)</div>
-						<p class="mt-2 text-sm leading-relaxed text-slate-700">
-							Olá <span class="font-semibold text-slate-900">{"{{nome_do_aluno}}"}</span>, sua parcela
-							<span class="font-semibold text-slate-900">{"{{parcela_vencimento}}"}</span> está disponível para pagamento.
-						</p>
-					</div>
+            <p
+                class="mx-auto mt-5 max-w-[760px] text-pretty text-base leading-relaxed text-slate-600 sm:text-lg"
+            >
+                No F10, você cria modelos reutilizáveis com variáveis do sistema
+                e envia mensagens com o contexto correto em poucos cliques. O
+                resultado é mais padronização, mais agilidade na rotina e menos
+                retrabalho no WhatsApp.
+            </p>
+        </div>
 
-					<div class="rounded-2xl bg-slate-50 p-5 ring-1 ring-slate-200">
-						<div class="text-sm font-semibold text-slate-900">Marketing (Captação)</div>
-						<p class="mt-2 text-sm leading-relaxed text-slate-700">
-							<span class="font-semibold text-slate-900">{"{{nome_lead}}"}</span>, você foi escolhido!
-							Ganhou um cupom de <span class="font-semibold text-slate-900">50% de desconto</span>.
-						</p>
-					</div>
-				</div>
-			</div>
+        <div class="mx-auto mt-10 max-w-[980px]">
+            <div class="grid gap-4 md:grid-cols-3">
+                <div
+                    class="rounded-3xl bg-slate-50 px-5 py-5 text-center ring-1 ring-slate-200"
+                >
+                    <div
+                        class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-700 text-sm font-bold text-white"
+                    >
+                        1
+                    </div>
+                    <div class="mt-4 text-sm font-semibold text-slate-900">
+                        Você monta o modelo uma vez
+                    </div>
+                    <p class="mt-2 text-sm leading-relaxed text-slate-600">
+                        A equipe define a mensagem-base com campos como
+                        responsável, aluno, vencimento, documento pendente,
+                        turma de interesse e outros dados do sistema.
+                    </p>
+                </div>
 
-			<!-- Texto dinâmico (troca sem "piscada") -->
-			<div class="lg:col-span-5 lg:pt-6">
-				<div class="rounded-2xl bg-white p-6 ring-1 ring-slate-200 shadow-[0_12px_30px_rgba(2,6,23,0.06)]">
-					<div class="text-sm font-semibold text-slate-900">{templatePanelTitle}</div>
-					<p class="mt-2 text-sm leading-relaxed text-slate-600">{templatePanelText}</p>
+                <div
+                    class="rounded-3xl bg-slate-50 px-5 py-5 text-center ring-1 ring-slate-200"
+                >
+                    <div
+                        class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-700 text-sm font-bold text-white"
+                    >
+                        2
+                    </div>
+                    <div class="mt-4 text-sm font-semibold text-slate-900">
+                        O F10 preenche automaticamente
+                    </div>
+                    <p class="mt-2 text-sm leading-relaxed text-slate-600">
+                        As variáveis são substituídas pelos dados corretos,
+                        evitando erro manual, mensagem genérica e perda de
+                        contexto no atendimento.
+                    </p>
+                </div>
 
-					<div class="mt-4 flex flex-wrap gap-2">
-						<span class="rounded-full bg-emerald-100 px-3 py-1 text-[12px] font-semibold text-emerald-950 ring-1 ring-emerald-200">
-							Variáveis do sistema
-						</span>
-						<span class="rounded-full bg-slate-100 px-3 py-1 text-[12px] font-semibold text-slate-900 ring-1 ring-slate-200">
-							Templates prontos
-						</span>
-						<span class="rounded-full bg-slate-100 px-3 py-1 text-[12px] font-semibold text-slate-900 ring-1 ring-slate-200">
-							Envio em escala
-						</span>
-					</div>
+                <div
+                    class="rounded-3xl bg-slate-50 px-5 py-5 text-center ring-1 ring-slate-200"
+                >
+                    <div
+                        class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-700 text-sm font-bold text-white"
+                    >
+                        3
+                    </div>
+                    <div class="mt-4 text-sm font-semibold text-slate-900">
+                        A mensagem sai pronta e fica no histórico
+                    </div>
+                    <p class="mt-2 text-sm leading-relaxed text-slate-600">
+                        Financeiro, secretaria e captação trabalham com mais
+                        consistência, mantendo o histórico centralizado no F10.
+                    </p>
+                </div>
+            </div>
 
-					<div class="mt-5 flex items-center gap-2 text-sm text-slate-600">
-						<svg
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							class="h-4 w-4 text-emerald-700"
-							aria-hidden="true"
-						>
-							<path d="M21 15a4 4 0 0 1-4 4H7l-4 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
-						</svg>
-						<span>Mensagem certa, no momento certo, com o contexto certo.</span>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
+            <div class="mt-8 flex flex-wrap justify-center gap-2">
+                <span
+                    class="rounded-full bg-slate-100 px-3 py-1 text-[12px] font-semibold text-slate-800 ring-1 ring-slate-200"
+                >
+                    Cobrança com vencimento e link
+                </span>
+                <span
+                    class="rounded-full bg-slate-100 px-3 py-1 text-[12px] font-semibold text-slate-800 ring-1 ring-slate-200"
+                >
+                    Documentos pendentes
+                </span>
+                <span
+                    class="rounded-full bg-slate-100 px-3 py-1 text-[12px] font-semibold text-slate-800 ring-1 ring-slate-200"
+                >
+                    Captação com turma de interesse
+                </span>
+                <span
+                    class="rounded-full bg-slate-100 px-3 py-1 text-[12px] font-semibold text-slate-800 ring-1 ring-slate-200"
+                >
+                    Histórico centralizado
+                </span>
+            </div>
 
-	<!-- BROWSER FLUTUANTE + SLIDE -->
-	<div class="relative z-20 mx-auto max-w-[1200px] px-4 py-12 sm:px-6">
-		<div class="mx-auto w-full max-w-[980px] -mb-[120px] sm:-mb-[340px] lg:-mb-[340px]">
-			<!-- frame -->
-			<div class="overflow-hidden rounded-[28px] border border-slate-200 bg-slate-900 shadow-[0_40px_120px_-40px_rgba(2,6,23,.45)] ring-1 ring-black/5">
-				<!-- top bar -->
-				<div class="flex items-center gap-3 border-b border-slate-200 bg-slate-800 px-4 py-3">
-					<div class="flex items-center gap-2">
-						<span class="h-3 w-3 rounded-full bg-red-400"></span>
-						<span class="h-3 w-3 rounded-full bg-yellow-400"></span>
-						<span class="h-3 w-3 rounded-full bg-green-400"></span>
-					</div>
+            <div
+                class="mt-6 flex items-center justify-center gap-2 text-sm text-slate-600"
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="h-4 w-4 text-emerald-700"
+                    aria-hidden="true"
+                >
+                    <path
+                        d="M21 15a4 4 0 0 1-4 4H7l-4 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"
+                    />
+                </svg>
+                <span
+                    >Mensagem certa, no momento certo, com o contexto certo.</span
+                >
+            </div>
+        </div>
+    </div>
 
-					<div class="flex flex-1 justify-center">
-						<div class="flex w-full max-w-[560px] items-center gap-2 rounded-full bg-white px-4 py-1.5 text-[13px] text-slate-600 ring-1 ring-slate-200">
-							<svg
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								class="h-4 w-4 text-slate-400"
-								aria-hidden="true"
-							>
-								<path d="M16 11V7a4 4 0 0 0-8 0v4" />
-								<rect x="5" y="11" width="14" height="10" rx="2" />
-							</svg>
-							<span class="truncate">{canonicalUrl}</span>
-						</div>
-					</div>
+    <div class="relative z-20 mx-auto max-w-[1200px] px-4 py-12 sm:px-6">
+        <div
+            class="mx-auto w-full max-w-[980px] -mb-[120px] sm:-mb-[340px] lg:-mb-[340px]"
+        >
+            <div
+                class="overflow-hidden rounded-[28px] border border-slate-200 bg-slate-900 shadow-[0_40px_120px_-40px_rgba(2,6,23,.45)] ring-1 ring-black/5"
+            >
+                <div
+                    class="flex items-center gap-3 border-b border-slate-200 bg-slate-800 px-4 py-3"
+                >
+                    <div class="flex items-center gap-2">
+                        <span class="h-3 w-3 rounded-full bg-red-400"></span>
+                        <span class="h-3 w-3 rounded-full bg-yellow-400"></span>
+                        <span class="h-3 w-3 rounded-full bg-green-400"></span>
+                    </div>
 
-					<div class="hidden items-center gap-2 sm:flex">
-						<span class="h-2 w-2 rounded-full bg-slate-300"></span>
-						<span class="h-2 w-2 rounded-full bg-slate-300"></span>
-						<span class="h-2 w-2 rounded-full bg-slate-300"></span>
-					</div>
-				</div>
+                    <div class="flex flex-1 justify-center">
+                        <div
+                            class="flex w-full max-w-[560px] items-center gap-2 rounded-full bg-white px-4 py-1.5 text-[13px] text-slate-600 ring-1 ring-slate-200"
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                class="h-4 w-4 text-slate-400"
+                                aria-hidden="true"
+                            >
+                                <path d="M16 11V7a4 4 0 0 0-8 0v4" />
+                                <rect
+                                    x="5"
+                                    y="11"
+                                    width="14"
+                                    height="10"
+                                    rx="2"
+                                />
+                            </svg>
+                            <span class="truncate">{canonicalUrl}</span>
+                        </div>
+                    </div>
 
-				<!-- content (crossfade sem piscada) -->
-				<div class="relative bg-slate-50">
-					<!-- layer atual -->
-					<img
-						src={currentImageSrc}
-						alt="Templates de WhatsApp no F10"
-						class="block h-auto w-full select-none transition-opacity duration-300 ease-out"
-						class:opacity-0={isAnimating}
-						class:opacity-100={!isAnimating}
-						draggable="false"
-					/>
+                    <div class="hidden items-center gap-2 sm:flex">
+                        <span class="h-2 w-2 rounded-full bg-slate-300"></span>
+                        <span class="h-2 w-2 rounded-full bg-slate-300"></span>
+                        <span class="h-2 w-2 rounded-full bg-slate-300"></span>
+                    </div>
+                </div>
 
-					<!-- layer próxima (só aparece durante a troca) -->
-					{#if nextImageSrc}
-						<img
-							src={nextImageSrc}
-							alt="Templates de WhatsApp no F10"
-							class="pointer-events-none absolute inset-0 block h-full w-full select-none object-cover transition-opacity duration-300 ease-out"
-							class:opacity-100={isAnimating}
-							class:opacity-0={!isAnimating}
-							draggable="false"
-							on:load={handleNextLoaded}
-						/>
-					{/if}
-				</div>
-			</div>
+                <div class="relative bg-slate-50">
+                    <img
+                        src={currentImageSrc}
+                        alt="Templates de WhatsApp no F10"
+                        class="block h-auto w-full select-none transition-opacity duration-300 ease-out"
+                        class:opacity-0={isAnimating}
+                        class:opacity-100={!isAnimating}
+                        draggable="false"
+                    />
 
-			<!-- BOTÕES FORA DO FRAME (abaixo) -->
-			<div class="mt-4 flex flex-wrap justify-center gap-2">
-				<button
-					type="button"
-					on:click={() => requestTemplateTab("finance")}
-					class="inline-flex h-10 items-center justify-center rounded-full px-5 text-sm font-semibold ring-1 transition"
-					class:bg-emerald-700={templateTab === "finance"}
-					class:text-white={templateTab === "finance"}
-					class:ring-emerald-700={templateTab === "finance"}
-					class:bg-white={templateTab !== "finance"}
-					class:text-slate-900={templateTab !== "finance"}
-					class:ring-slate-200={templateTab !== "finance"}
-				>
-					Financeiro
-				</button>
+                    {#if nextImageSrc}
+                        <img
+                            src={nextImageSrc}
+                            alt="Templates de WhatsApp no F10"
+                            class="pointer-events-none absolute inset-0 block h-full w-full select-none object-cover transition-opacity duration-300 ease-out"
+                            class:opacity-100={isAnimating}
+                            class:opacity-0={!isAnimating}
+                            draggable="false"
+                            on:load={handleNextLoaded}
+                        />
+                    {/if}
+                </div>
+            </div>
 
-				<button
-					type="button"
-					on:click={() => requestTemplateTab("marketing")}
-					class="inline-flex h-10 items-center justify-center rounded-full px-5 text-sm font-semibold ring-1 transition"
-					class:bg-emerald-700={templateTab === "marketing"}
-					class:text-white={templateTab === "marketing"}
-					class:ring-emerald-700={templateTab === "marketing"}
-					class:bg-white={templateTab !== "marketing"}
-					class:text-slate-900={templateTab !== "marketing"}
-					class:ring-slate-200={templateTab !== "marketing"}
-				>
-					Marketing
-				</button>
+            <div class="mt-4 flex flex-wrap justify-center gap-2">
+                <button
+                    type="button"
+                    on:click={() => requestTemplateTab("finance")}
+                    class="inline-flex h-10 items-center justify-center rounded-full px-5 text-sm font-semibold ring-1 transition"
+                    class:bg-emerald-700={templateTab === "finance"}
+                    class:text-white={templateTab === "finance"}
+                    class:ring-emerald-700={templateTab === "finance"}
+                    class:bg-white={templateTab !== "finance"}
+                    class:text-slate-900={templateTab !== "finance"}
+                    class:ring-slate-200={templateTab !== "finance"}
+                >
+                    Financeiro
+                </button>
 
-				<button
-					type="button"
-					on:click={() => requestTemplateTab("office")}
-					class="inline-flex h-10 items-center justify-center rounded-full px-5 text-sm font-semibold ring-1 transition"
-					class:bg-emerald-700={templateTab === "office"}
-					class:text-white={templateTab === "office"}
-					class:ring-emerald-700={templateTab === "office"}
-					class:bg-white={templateTab !== "office"}
-					class:text-slate-900={templateTab !== "office"}
-					class:ring-slate-200={templateTab !== "office"}
-				>
-					Secretaria
-				</button>
-			</div>
+                <button
+                    type="button"
+                    on:click={() => requestTemplateTab("marketing")}
+                    class="inline-flex h-10 items-center justify-center rounded-full px-5 text-sm font-semibold ring-1 transition"
+                    class:bg-emerald-700={templateTab === "marketing"}
+                    class:text-white={templateTab === "marketing"}
+                    class:ring-emerald-700={templateTab === "marketing"}
+                    class:bg-white={templateTab !== "marketing"}
+                    class:text-slate-900={templateTab !== "marketing"}
+                    class:ring-slate-200={templateTab !== "marketing"}
+                >
+                    Captação
+                </button>
 
-			<!-- preload (evita flash por carregamento) -->
-			<div class="hidden" aria-hidden="true">
-				<img src="/wp_template_financeiro.png" alt="" />
-				<img src="/wp_template_marketing.png" alt="" />
-				<img src="/wp_template_secretaria.png" alt="" />
-			</div>
-		</div>
-	</div>
+                <button
+                    type="button"
+                    on:click={() => requestTemplateTab("office")}
+                    class="inline-flex h-10 items-center justify-center rounded-full px-5 text-sm font-semibold ring-1 transition"
+                    class:bg-emerald-700={templateTab === "office"}
+                    class:text-white={templateTab === "office"}
+                    class:ring-emerald-700={templateTab === "office"}
+                    class:bg-white={templateTab !== "office"}
+                    class:text-slate-900={templateTab !== "office"}
+                    class:ring-slate-200={templateTab !== "office"}
+                >
+                    Secretaria
+                </button>
+            </div>
 
-	<!-- Bottom (verde) -->
-	<div class="relative z-10 overflow-hidden bg-[#043214]">
-		<div class="absolute inset-0">
-			<div
-				class="absolute inset-0 bg-repeat"
-				style="background-image:url('/wp_patern.svg'); background-size: 760px auto;"
-				aria-hidden="true"
-			></div>
-			<div class="absolute inset-0 bg-gradient-to-b from-black/15 via-black/0 to-black/15" aria-hidden="true"></div>
-		</div>
+            <div class="hidden" aria-hidden="true">
+                <img src="/wp_template_financeiro.png" alt="" />
+                <img src="/wp_template_marketing.png" alt="" />
+                <img src="/wp_template_secretaria.png" alt="" />
+            </div>
+        </div>
+    </div>
 
-		<div class="relative z-10 mx-auto max-w-[1200px] px-4 pb-16 pt-[400px] sm:px-6 sm:pb-20 sm:pt-[360px]">
-			<div class="grid gap-12 lg:grid-cols-12 lg:items-center">
-				<div class="lg:col-span-7">
-					<h3 class="whitespace-pre-line text-balance text-[44px] font-semibold leading-[1.06] tracking-[-0.02em] text-white sm:text-[56px]">
-						Templates + automação{"\n"}com histórico centralizado no F10
-					</h3>
+    <div class="relative z-10 overflow-hidden bg-[#043214]">
+        <div class="absolute inset-0">
+            <div
+                class="absolute inset-0 bg-repeat"
+                style="background-image:url('/wp_patern.svg'); background-size: 760px auto;"
+                aria-hidden="true"
+            ></div>
+            <div
+                class="absolute inset-0 bg-gradient-to-b from-black/15 via-black/0 to-black/15"
+                aria-hidden="true"
+            ></div>
+        </div>
 
-					<p class="mt-6 max-w-[560px] text-pretty text-sm leading-relaxed text-white/85 sm:text-base">
-						Mensagens deixam de ser “texto solto” e passam a ser parte do fluxo: financeiro, secretaria e comercial.
-						Com variáveis do sistema, você escala comunicação sem perder personalização.
-					</p>
-				</div>
+        <div
+            class="relative z-10 mx-auto max-w-[1200px] px-4 pb-16 pt-[400px] sm:px-6 sm:pb-20 sm:pt-[360px]"
+        >
+            <div class="grid gap-12 lg:grid-cols-12 lg:items-center">
+                <div class="lg:col-span-7">
+                    <h3
+                        class="whitespace-pre-line text-balance text-[44px] font-semibold leading-[1.06] tracking-[-0.02em] text-white sm:text-[56px]"
+                    >
+                        Templates + operação compartilhada{"\n"}com histórico
+                        centralizado no F10
+                    </h3>
 
-				<div class="lg:col-span-5">
-					<div class="mx-auto max-w-[520px]">
-						<img src="/wp_guys.webp" alt="Equipe usando WhatsApp para escolas" class="h-auto w-full" draggable="false" />
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
+                    <p
+                        class="mt-6 max-w-[560px] text-pretty text-sm leading-relaxed text-white/85 sm:text-base"
+                    >
+                        Mensagens deixam de ser texto solto e passam a ser parte
+                        do fluxo da escola ou curso. Financeiro, secretaria e
+                        comercial usam o mesmo histórico com continuidade entre
+                        usuários e setores.
+                    </p>
+                </div>
+
+                <div class="lg:col-span-5">
+                    <div class="mx-auto max-w-[520px]">
+                        <img
+                            src="/wp_guys.webp"
+                            alt="Equipe usando WhatsApp para escolas e cursos"
+                            class="h-auto w-full"
+                            draggable="false"
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </section>
 
 <!-- =========================
@@ -1457,9 +2251,9 @@
                 <p
                     class="mt-6 max-w-[520px] text-pretty text-base leading-relaxed text-slate-600 sm:text-lg"
                 >
-                    Implementação com foco em continuidade operacional: WhatsApp
-                    oficial quando aplicável, opções alternativas quando
-                    necessário e histórico preservado no F10.
+                    Implementação com foco em operação real da escola: usuários,
+                    números, permissões, histórico, templates e continuidade do
+                    atendimento dentro do F10.
                 </p>
             </div>
 
@@ -1501,8 +2295,7 @@
 </section>
 
 <!-- =========================
-  SECTION MID CTA (break de cor) - novo
-  Quebra visual entre sessões brancas
+  CTA INTERMEDIÁRIO
 ========================= -->
 <section id="cta-meio" class="relative overflow-hidden bg-[#0A7A3A]">
     <div class="absolute inset-0 -z-10">
@@ -1591,26 +2384,26 @@
                         </div>
                         <div class="mt-2 text-sm leading-relaxed text-white/80">
                             Confirmações, documentos e avisos com histórico
-                            dentro do F10.
+                            compartilhado no F10.
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- pt-BR: bloco semântico extra (LLM/SEO), curto e objetivo -->
         <div
             class="mx-auto mt-10 max-w-[980px] text-center text-sm text-white/80"
         >
-            WhatsApp para escolas no F10: canal nativo para comunicação com
-            pais, cobranças, matrículas, financeiro e comercial. WhatsApp
-            oficial e alternativas por estratégia, com histórico preservado.
+            WhatsApp para escolas e cursos no F10: atendimento compartilhado,
+            histórico centralizado, rastreio por usuário, comunicação com pais,
+            responsáveis, alunos e leads, além de apoio para secretaria,
+            matrículas, financeiro escolar e comercial.
         </div>
     </div>
 </section>
 
 <!-- =========================
-  SECTION 4 (FAQ)
+  FAQ
 ========================= -->
 <section id="faq" class="bg-white">
     <div class="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 sm:py-20">
@@ -1637,10 +2430,10 @@
 
             <div class="lg:col-span-6">
                 <div class="space-y-4">
-                    {#each faqs as item, i}
+                    {#each faqs as item, index}
                         <details
                             class="group rounded-2xl bg-slate-50 p-6 ring-1 ring-slate-200 open:bg-emerald-50 open:ring-emerald-200"
-                            open={i === 0}
+                            open={index === 0}
                         >
                             <summary
                                 class="flex cursor-pointer list-none items-center justify-between gap-4"
@@ -1684,7 +2477,7 @@
 </section>
 
 <!-- =========================
-  SECTION 5 (CTA final)
+  CTA FINAL
 ========================= -->
 <section id="contato" class="relative overflow-hidden">
     <div class="absolute inset-0 -z-10">
@@ -1728,13 +2521,14 @@
                 </button>
             </div>
 
-            <!-- pt-BR: texto semântico final (SEO/LLM) -->
             <div
                 class="mx-auto mt-10 max-w-[920px] text-center text-sm text-white/80"
             >
-                <strong>WhatsApp para escolas</strong> no F10: comunicação com pais,
-                cobranças do financeiro, matrículas e comercial. Integração direta
-                na plataforma, com histórico centralizado e automações em tempo real.
+                <strong>WhatsApp para escolas e cursos</strong> no F10: operação
+                multiusuário, comunicação com pais, responsáveis, alunos e leads,
+                apoio para secretaria escolar, financeiro escolar, matrículas e comercial,
+                com histórico centralizado, identificação por usuário e continuidade
+                do atendimento.
             </div>
         </div>
     </div>

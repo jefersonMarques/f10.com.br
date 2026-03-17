@@ -70,11 +70,11 @@
       href: "/solucoes",
       icon: LayoutGrid,
     },
-    //{
-    //  label: "WhatsApp",
-    //  href: "/solucoes/whatsapp",
-    //  icon: Smartphone,
-    //},
+    {
+      label: "WhatsApp",
+      href: "/solucoes/whatsapp",
+      icon: Smartphone,
+    },
     {
       label: "Marketing e Captação",
       href: "/solucoes/marketing-captacao-de-alunos",
