@@ -76,93 +76,208 @@
     const next: FormErrors = {};
 
     if (step === 1) {
-      if (onlyDigits(data.cnpj).length !== 14) next.cnpj = "CNPJ inválido.";
-      if (!data.legalName.trim()) next.legalName = "Informe a Razão Social.";
-      if (!data.fantasyName.trim())
+      if (onlyDigits(data.cnpj).length !== 14) {
+        next.cnpj = "CNPJ inválido.";
+      }
+
+      if (!data.legalName.trim()) {
+        next.legalName = "Informe a Razão Social.";
+      }
+
+      if (!data.fantasyName.trim()) {
         next.fantasyName = "Informe o Nome Fantasia.";
-      if (!data.municipalRegistration.trim())
+      }
+
+      if (!data.municipalRegistration.trim()) {
         next.municipalRegistration = "Informe a Inscrição Municipal.";
-      if (data.stateRegistration && data.stateRegistration.trim().length < 2)
-        next.stateRegistration = "Inscrição Estadual inválida.";
+      }
 
-      if (onlyDigits(data.cnaeMain).length !== 7)
+      if (!data.phone?.trim()) {
+        next.phone = "Telefone é obrigatório.";
+      }
+
+      if (!data.email?.trim()) {
+        next.email = "E-mail é obrigatório.";
+      }
+
+      if (!data.website?.trim()) {
+        next.website = "Site é obrigatório.";
+      }
+
+      if (data.hasStateRegistration === true) {
+        if (!data.stateRegistration?.trim()) {
+          next.stateRegistration = "Inscrição Estadual é obrigatória.";
+        } else if (data.stateRegistration.trim().length < 2) {
+          next.stateRegistration = "Inscrição Estadual inválida.";
+        }
+      }
+
+      if (onlyDigits(data.cnaeMain).length !== 7) {
         next.cnaeMain = "CNAE inválido (7 dígitos).";
+      }
 
-      if (onlyDigits(data.cep).length !== 8) next.cep = "CEP inválido.";
-      if (!data.street.trim()) next.street = "Informe o logradouro.";
-      if (!data.number.trim()) next.number = "Informe o número.";
-      if (!data.neighborhood.trim()) next.neighborhood = "Informe o bairro.";
-      if (!data.city.trim()) next.city = "Informe a cidade.";
-      if (!data.state.trim() || data.state.length !== 2)
+      if (onlyDigits(data.cep).length !== 8) {
+        next.cep = "CEP inválido.";
+      }
+
+      if (!data.street.trim()) {
+        next.street = "Informe o logradouro.";
+      }
+
+      if (!data.number.trim()) {
+        next.number = "Informe o número.";
+      }
+
+      if (!data.neighborhood.trim()) {
+        next.neighborhood = "Informe o bairro.";
+      }
+
+      if (!data.city.trim()) {
+        next.city = "Informe a cidade.";
+      }
+
+      if (!data.state.trim() || data.state.length !== 2) {
         next.state = "Informe a UF (2 letras).";
+      }
     }
 
     if (step === 2) {
       if (data.noteKind === "service") {
-        if (!data.cityHallLogin.trim())
+        if (!data.cityHallLogin.trim()) {
           next.cityHallLogin = "Informe o login da prefeitura.";
-        const loginDigits = onlyDigits(data.cityHallLogin);
-        if (loginDigits.length === 11 && !isValidCPF(loginDigits)) {
-          next.cityHallLogin = "CPF inválido.";
+        } else {
+          const loginDigits = onlyDigits(data.cityHallLogin);
+          if (loginDigits.length === 11 && !isValidCPF(loginDigits)) {
+            next.cityHallLogin = "CPF inválido.";
+          }
         }
-        if (!data.cityHallPassword.trim())
+
+        if (!data.cityHallPassword.trim()) {
           next.cityHallPassword = "Informe a senha da prefeitura.";
-        if (!data.securityPhrase.trim())
-          next.securityPhrase = "Informe a frase secreta de segurança.";
+        }
 
-        if (!data.serviceListItem.trim())
+        // securityPhrase é opcional
+        // Se quiser validar quando preenchido, deixe uma regra específica aqui.
+
+        if (!data.serviceRpsBatchNumber.trim()) {
+          next.serviceRpsBatchNumber = "Informe a numeração do lote de RPS.";
+        }
+
+        if (!data.serviceListItem.trim()) {
           next.serviceListItem = "Informe o Item da Lista de Serviço.";
-        if (!data.taxationCode.trim())
-          next.taxationCode = "Informe o Código de Tributação.";
-        if (!isPercentValid(data.aliquotIss, false))
-          next.aliquotIss = "Alíquota ISS inválida (0..100).";
-        if (data.ibptPercent && !isPercentValid(data.ibptPercent, true))
-          next.ibptPercent = "IBPT inválido (0..100).";
-        if (!data.serviceDescription.trim())
-          next.serviceDescription = "Descreva os serviços prestados.";
+        }
 
-        if (!isPercentValid(data.aliquotPis, true))
+        if (!data.taxationCode.trim()) {
+          next.taxationCode = "Informe o Código de Tributação.";
+        }
+
+        if (!data.taxationPlace.trim()) {
+          next.taxationPlace = "Informe a Natureza da Operação.";
+        }
+
+        if (!data.specialRegime.trim()) {
+          next.specialRegime = "Informe o Regime Especial de Tributação.";
+        }
+
+        if (!data.issRequirement.trim()) {
+          next.issRequirement = "Informe a Exigibilidade do ISS.";
+        }
+
+        if (!data.issWithholding.trim()) {
+          next.issWithholding = "Informe a Retenção do ISS.";
+        }
+
+        if (!isPercentValid(data.aliquotIss, true)) {
+          next.aliquotIss = "Alíquota ISS inválida (0..100).";
+        }
+
+        if (data.ibptPercent && !isPercentValid(data.ibptPercent, true)) {
+          next.ibptPercent = "IBPT inválido (0..100).";
+        }
+
+        if (!data.serviceDescription.trim()) {
+          next.serviceDescription = "Descreva os serviços prestados.";
+        }
+
+        if (!isPercentValid(data.aliquotPis, true)) {
           next.aliquotPis = "Alíquota PIS inválida (0..100).";
-        if (!isPercentValid(data.aliquotCofins, true))
+        }
+
+        if (!isPercentValid(data.aliquotCofins, true)) {
           next.aliquotCofins = "Alíquota COFINS inválida (0..100).";
-        if (!isPercentValid(data.aliquotInss, true))
+        }
+
+        if (!isPercentValid(data.aliquotInss, true)) {
           next.aliquotInss = "Alíquota INSS inválida (0..100).";
-        if (!isPercentValid(data.aliquotIr, true))
+        }
+
+        if (!isPercentValid(data.aliquotIr, true)) {
           next.aliquotIr = "Alíquota IR inválida (0..100).";
-        if (!isPercentValid(data.aliquotCsll, true))
+        }
+
+        if (!isPercentValid(data.aliquotCsll, true)) {
           next.aliquotCsll = "Alíquota CSLL inválida (0..100).";
+        }
       } else {
-        if (!data.commerceBatchNumber.trim())
-          next.commerceBatchNumber = "Informe o Número do Lote.";
-        if (!data.commerceNumbering.trim())
-          next.commerceNumbering = "Informe a Numeração.";
-        if (!data.commerceSeries.trim())
-          next.commerceSeries = "Informe a Série.";
-        if (!data.commerceNcmCode.trim())
+        // Opcional: substituir esses 3 campos antigos por commerceLastInvoiceNumber
+        // Se for manter temporariamente, eles não devem mais ser obrigatórios pela nova regra.
+
+        if (!data.commerceNcmCode.trim()) {
           next.commerceNcmCode = "Informe o Código NCM.";
-        if (!data.commerceCfopCode.trim())
+        }
+
+        if (!data.commerceCfopCode.trim()) {
           next.commerceCfopCode = "Informe o Código CFOP.";
-        if (!data.commerceOperationNature.trim())
+        }
+
+        if (!data.commerceOperationNature.trim()) {
           next.commerceOperationNature = "Informe a Natureza da Operação.";
-        if (!isPercentValid(data.commerceIcmsAliquot, false))
+        }
+
+        if (!isPercentValid(data.commerceIcmsAliquot, false)) {
           next.commerceIcmsAliquot = "Alíquota ICMS inválida (0..100).";
-        if (!data.commerceCstIcms.trim())
+        }
+
+        if (!data.commerceCstIcms.trim()) {
           next.commerceCstIcms = "Informe o CST ICMS.";
-        if (!data.commerceCsosn.trim()) next.commerceCsosn = "Informe o CSOSN.";
-        if (!isPercentValid(data.commerceIpiAliquot, true))
+        }
+
+        // CSOSN não está na nova tabela como obrigatório
+        // if (!data.commerceCsosn.trim()) {
+        //   next.commerceCsosn = "Informe o CSOSN.";
+        // }
+
+        if (!isPercentValid(data.commerceIpiAliquot, false)) {
           next.commerceIpiAliquot = "Alíquota IPI inválida (0..100).";
-        if (!data.commerceCstIpi.trim())
+        }
+
+        if (!data.commerceCstIpi.trim()) {
           next.commerceCstIpi = "Informe o CST IPI.";
-        if (!isPercentValid(data.commercePisAliquot, true))
+        }
+
+        if (!isPercentValid(data.commercePisAliquot, false)) {
           next.commercePisAliquot = "Alíquota PIS inválida (0..100).";
-        if (!data.commerceCstPis.trim())
+        }
+
+        if (!data.commerceCstPis.trim()) {
           next.commerceCstPis = "Informe o CST PIS.";
-        if (!isPercentValid(data.commerceCofinsAliquot, true))
+        }
+
+        if (!isPercentValid(data.commerceCofinsAliquot, false)) {
           next.commerceCofinsAliquot = "Alíquota COFINS inválida (0..100).";
-        if (!data.commerceCstCofins.trim())
+        }
+
+        if (!data.commerceCstCofins.trim()) {
           next.commerceCstCofins = "Informe o CST COFINS.";
-        if (!data.commerceItemDescription.trim())
-          next.commerceItemDescription = "Descreva o item de produto.";
+        }
+
+        if (!data.commerceItemDescription.trim()) {
+          next.commerceItemDescription = "Informe a descrição da nota.";
+        }
+
+        if (!data.commerceReturnCfop.trim()) {
+          next.commerceReturnCfop = "Informe o CFOP para nota de devolução.";
+        }
       }
     }
 

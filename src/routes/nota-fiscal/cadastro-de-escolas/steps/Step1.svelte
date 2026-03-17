@@ -19,6 +19,10 @@
 
   const primaryNoteKindOptions = noteKindOptions.slice(0, 2);
   const primaryYesNoOptions = yesNoOptions.slice(0, 2);
+  const stateRegistrationOptions = [
+    { label: "Sim", value: true },
+    { label: "Não", value: false },
+  ] as const;
 
   const cnpjLookupUrl = (cnpjDigits: string) =>
     `/api/cnpj/${encodeURIComponent(cnpjDigits)}`;
@@ -36,11 +40,13 @@
     const p3 = v.slice(5, 8);
     const p4 = v.slice(8, 12);
     const p5 = v.slice(12, 14);
+
     let out = p1;
     if (p2) out += "." + p2;
     if (p3) out += "." + p3;
     if (p4) out += "/" + p4;
     if (p5) out += "-" + p5;
+
     return out;
   }
 
@@ -58,8 +64,9 @@
 
     const calcDv = (base: string, weights: number[]) => {
       let sum = 0;
-      for (let i = 0; i < weights.length; i++)
+      for (let i = 0; i < weights.length; i++) {
         sum += Number(base[i]) * weights[i];
+      }
       const mod = sum % 11;
       return mod < 2 ? 0 : 11 - mod;
     };
@@ -156,11 +163,26 @@
           .filter(Boolean)
           .join(" ")
           .trim() || "";
+
       const number = (estab?.numero || "").trim();
       const complement = (estab?.complemento || "").trim();
       const neighborhood = (estab?.bairro || "").trim();
       const city = (estab?.cidade?.nome || estab?.municipio || "").trim();
-      const state = (estab?.estado?.sigla || estab?.uf || "").trim().toUpperCase();
+      const state = (estab?.estado?.sigla || estab?.uf || "")
+        .trim()
+        .toUpperCase();
+
+      const phone =
+        [
+          String(estab?.ddd1 ?? "").trim(),
+          String(estab?.telefone1 ?? "").trim(),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .trim() || String(json?.telefone || "").trim();
+
+      const email = String(estab?.email || json?.email || "").trim();
+      const website = String(estab?.site || json?.site || "").trim();
 
       formDataStore.update((prev) => ({
         ...prev,
@@ -175,10 +197,15 @@
         neighborhood: neighborhood || prev.neighborhood,
         city: city || prev.city,
         state: state || prev.state,
+        phone: phone || prev.phone,
+        email: email || prev.email,
+        website: website || prev.website,
       }));
 
       cnpjDisplay = formatCnpj(cnpjDigits);
-      if (cepFromCnpj) cepDisplay = formatCep(cepFromCnpj);
+      if (cepFromCnpj) {
+        cepDisplay = formatCep(cepFromCnpj);
+      }
     } finally {
       isLoadingCnpj = false;
     }
@@ -191,7 +218,7 @@
   }
 
   function setNoteKind(value: NoteKind) {
-    formDataStore.update((p) => ({ ...p, noteKind: value }));
+    formDataStore.update((prev) => ({ ...prev, noteKind: value }));
   }
 
   function setYesNoField<
@@ -200,7 +227,15 @@
       | "supportsCulturalProjects"
       | "usesNationalNfseEnvironment",
   >(key: K, value: YesNo) {
-    formDataStore.update((p) => ({ ...p, [key]: value }));
+    formDataStore.update((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function setHasStateRegistration(value: boolean) {
+    formDataStore.update((prev) => ({
+      ...prev,
+      hasStateRegistration: value,
+      stateRegistration: value ? prev.stateRegistration : "",
+    }));
   }
 </script>
 
@@ -217,23 +252,26 @@
   </div>
 
   <div class="col-span-12">
-    <label for="type" class="text-[12px] font-semibold text-black/70 block mb-2"
-      >Tipo</label
+    <label
+      for=""
+      class="mb-2 block text-[12px] font-semibold text-black/70"
     >
+      Tipo
+    </label>
 
     <div class="inline-flex rounded-xl border border-black/15 bg-white p-1">
-      {#each primaryNoteKindOptions as o}
+      {#each primaryNoteKindOptions as option}
         <button
           type="button"
           class={`h-9 rounded-lg px-3 text-[13px] font-semibold transition ${
-            $formDataStore.noteKind === o.value
+            $formDataStore.noteKind === option.value
               ? "bg-[var(--primary)] text-white"
               : "bg-transparent text-black/70 hover:bg-[var(--primary)]/5"
           }`}
-          aria-pressed={$formDataStore.noteKind === o.value}
-          on:click={() => setNoteKind(o.value)}
+          aria-pressed={$formDataStore.noteKind === option.value}
+          on:click={() => setNoteKind(option.value)}
         >
-          {o.label}
+          {option.label}
         </button>
       {/each}
     </div>
@@ -246,8 +284,8 @@
           on:change={(e) =>
             setNoteKind((e.target as HTMLSelectElement).value as NoteKind)}
         >
-          {#each noteKindOptions as o}
-            <option value={o.value}>{o.label}</option>
+          {#each noteKindOptions as option}
+            <option value={option.value}>{option.label}</option>
           {/each}
         </select>
       </div>
@@ -256,9 +294,10 @@
 
   <div class="grid gap-4 sm:grid-cols-12">
     <div class="sm:col-span-4">
-      <label for="" class="text-[12px] font-semibold text-black/70 block mb-2"
-        >CNPJ</label
-      >
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
+        CNPJ
+      </label>
+
       <div class="relative">
         <input
           class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
@@ -268,18 +307,20 @@
           value={cnpjDisplay || formatCnpj($formDataStore.cnpj)}
           on:input={(e) => {
             const target = e.target as HTMLInputElement;
-            const raw = target.value;
-            const digits = onlyDigits(raw).slice(0, 14);
+            const digits = onlyDigits(target.value).slice(0, 14);
             cnpjDisplay = formatCnpj(digits);
-            formDataStore.update((p) => ({ ...p, cnpj: digits }));
+            formDataStore.update((prev) => ({ ...prev, cnpj: digits }));
           }}
           on:blur={() => {
             const digits = onlyDigits($formDataStore.cnpj).slice(0, 14);
             cnpjDisplay = formatCnpj(digits);
-            if (digits.length === 14 && isValidCnpj(digits)) lookupCnpj();
+            if (digits.length === 14 && isValidCnpj(digits)) {
+              lookupCnpj();
+            }
           }}
           inputmode="numeric"
         />
+
         {#if isLoadingCnpj}
           <div
             class="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-black/50"
@@ -288,15 +329,16 @@
           </div>
         {/if}
       </div>
-      {#if errors.cnpj}<p class="mt-1 text-[12px] text-red-600">
-          {errors.cnpj}
-        </p>{/if}
+
+      {#if errors.cnpj}
+        <p class="mt-1 text-[12px] text-red-600">{errors.cnpj}</p>
+      {/if}
     </div>
 
     <div class="sm:col-span-4">
-      <label for="" class="text-[12px] font-semibold text-black/70 block mb-2"
-        >Inscrição Municipal</label
-      >
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
+        Inscrição Municipal
+      </label>
       <input
         class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
           errors.municipalRegistration ? "border-red-300" : "border-black/15"
@@ -312,27 +354,69 @@
     </div>
 
     <div class="sm:col-span-4">
-      <label for="" class="text-[12px] font-semibold text-black/70 block mb-2"
-        >Inscrição Estadual</label
-      >
-      <input
-        class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
-          errors.stateRegistration ? "border-red-300" : "border-black/15"
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
+        Possui inscrição estadual?
+      </label>
+
+      <div
+        class={`inline-flex w-full rounded-xl border bg-white p-1 ${
+          errors.hasStateRegistration ? "border-red-300" : "border-black/15"
         }`}
-        bind:value={$formDataStore.stateRegistration}
-        placeholder="Opcional"
-      />
-      {#if errors.stateRegistration}
-        <p class="mt-1 text-[12px] text-red-600">{errors.stateRegistration}</p>
+      >
+        {#each stateRegistrationOptions as option}
+          <button
+            type="button"
+            class={`h-9 flex-1 rounded-lg px-3 text-[13px] font-semibold transition ${
+              $formDataStore.hasStateRegistration === option.value
+                ? "bg-[var(--primary)] text-white"
+                : "bg-transparent text-black/70 hover:bg-[var(--primary)]/5"
+            }`}
+            aria-pressed={$formDataStore.hasStateRegistration === option.value}
+            on:click={() => setHasStateRegistration(option.value)}
+          >
+            {option.label}
+          </button>
+        {/each}
+      </div>
+
+      {#if errors.hasStateRegistration}
+        <p class="mt-1 text-[12px] text-red-600">
+          {errors.hasStateRegistration}
+        </p>
       {/if}
     </div>
   </div>
 
+  {#if $formDataStore.hasStateRegistration === true}
+    <div class="grid gap-4 sm:grid-cols-12">
+      <div class="sm:col-span-4">
+        <label
+          for=""
+          class="mb-2 block text-[12px] font-semibold text-black/70"
+        >
+          Inscrição Estadual
+        </label>
+        <input
+          class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
+            errors.stateRegistration ? "border-red-300" : "border-black/15"
+          }`}
+          bind:value={$formDataStore.stateRegistration}
+          placeholder="Informe a inscrição estadual"
+        />
+        {#if errors.stateRegistration}
+          <p class="mt-1 text-[12px] text-red-600">
+            {errors.stateRegistration}
+          </p>
+        {/if}
+      </div>
+    </div>
+  {/if}
+
   <div class="grid gap-4 sm:grid-cols-12">
     <div class="sm:col-span-6">
-      <label for="" class="text-[12px] font-semibold text-black/70 block mb-2"
-        >Razão Social</label
-      >
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
+        Razão Social
+      </label>
       <input
         class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
           errors.legalName ? "border-red-300" : "border-black/15"
@@ -340,15 +424,15 @@
         bind:value={$formDataStore.legalName}
         placeholder="Razão Social"
       />
-      {#if errors.legalName}<p class="mt-1 text-[12px] text-red-600">
-          {errors.legalName}
-        </p>{/if}
+      {#if errors.legalName}
+        <p class="mt-1 text-[12px] text-red-600">{errors.legalName}</p>
+      {/if}
     </div>
 
     <div class="sm:col-span-4">
-      <label for="" class="text-[12px] font-semibold text-black/70 block mb-2"
-        >Nome Fantasia</label
-      >
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
+        Nome Fantasia
+      </label>
       <input
         class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
           errors.fantasyName ? "border-red-300" : "border-black/15"
@@ -356,15 +440,15 @@
         bind:value={$formDataStore.fantasyName}
         placeholder="Nome Fantasia"
       />
-      {#if errors.fantasyName}<p class="mt-1 text-[12px] text-red-600">
-          {errors.fantasyName}
-        </p>{/if}
+      {#if errors.fantasyName}
+        <p class="mt-1 text-[12px] text-red-600">{errors.fantasyName}</p>
+      {/if}
     </div>
 
     <div class="sm:col-span-2">
-      <label for="" class="text-[12px] font-semibold text-black/70 block mb-2"
-        >CNAE</label
-      >
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
+        CNAE
+      </label>
       <input
         class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
           errors.cnaeMain ? "border-red-300" : "border-black/15"
@@ -373,17 +457,73 @@
         placeholder="0000000"
         inputmode="numeric"
       />
-      {#if errors.cnaeMain}<p class="mt-1 text-[12px] text-red-600">
-          {errors.cnaeMain}
-        </p>{/if}
+      {#if errors.cnaeMain}
+        <p class="mt-1 text-[12px] text-red-600">{errors.cnaeMain}</p>
+      {/if}
+    </div>
+  </div>
+
+  <div class="grid gap-4 sm:grid-cols-12">
+    <div class="sm:col-span-4">
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
+        Telefone
+      </label>
+      <input
+        class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
+          errors.phone ? "border-red-300" : "border-black/15"
+        }`}
+        bind:value={$formDataStore.phone}
+        placeholder="(41) 99999-9999"
+        inputmode="tel"
+      />
+      {#if errors.phone}
+        <p class="mt-1 text-[12px] text-red-600">{errors.phone}</p>
+      {/if}
+    </div>
+
+    <div class="sm:col-span-4">
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
+        E-mail
+      </label>
+      <input
+        class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
+          errors.email ? "border-red-300" : "border-black/15"
+        }`}
+        bind:value={$formDataStore.email}
+        placeholder="financeiro@escola.com.br"
+        type="email"
+        inputmode="email"
+      />
+      {#if errors.email}
+        <p class="mt-1 text-[12px] text-red-600">{errors.email}</p>
+      {/if}
+    </div>
+
+    <div class="sm:col-span-4">
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
+        Site
+      </label>
+      <input
+        class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
+          errors.website ? "border-red-300" : "border-black/15"
+        }`}
+        bind:value={$formDataStore.website}
+        placeholder="https://www.escola.com.br"
+        type="url"
+        inputmode="url"
+      />
+      {#if errors.website}
+        <p class="mt-1 text-[12px] text-red-600">{errors.website}</p>
+      {/if}
     </div>
   </div>
 
   <div class="grid gap-4 sm:grid-cols-12">
     <div class="sm:col-span-3">
-      <label for="" class="text-[12px] font-semibold text-black/70 block mb-2"
-        >CEP</label
-      >
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
+        CEP
+      </label>
+
       <div class="relative">
         <input
           class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
@@ -393,18 +533,20 @@
           value={cepDisplay || formatCep($formDataStore.cep)}
           on:input={(e) => {
             const target = e.target as HTMLInputElement;
-            const raw = target.value;
-            const digits = onlyDigits(raw).slice(0, 8);
+            const digits = onlyDigits(target.value).slice(0, 8);
             cepDisplay = formatCep(digits);
-            formDataStore.update((p) => ({ ...p, cep: digits }));
+            formDataStore.update((prev) => ({ ...prev, cep: digits }));
           }}
           on:blur={() => {
             const digits = onlyDigits($formDataStore.cep).slice(0, 8);
             cepDisplay = formatCep(digits);
-            if (isValidCep(digits)) lookupCep();
+            if (isValidCep(digits)) {
+              lookupCep();
+            }
           }}
           inputmode="numeric"
         />
+
         {#if isLoadingCep}
           <div
             class="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-black/50"
@@ -413,15 +555,16 @@
           </div>
         {/if}
       </div>
-      {#if errors.cep}<p class="mt-1 text-[12px] text-red-600">
-          {errors.cep}
-        </p>{/if}
+
+      {#if errors.cep}
+        <p class="mt-1 text-[12px] text-red-600">{errors.cep}</p>
+      {/if}
     </div>
 
     <div class="sm:col-span-6">
-      <label for="" class="text-[12px] font-semibold text-black/70 block mb-2"
-        >Logradouro</label
-      >
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
+        Logradouro
+      </label>
       <input
         class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
           errors.street ? "border-red-300" : "border-black/15"
@@ -429,15 +572,15 @@
         bind:value={$formDataStore.street}
         placeholder="Rua, Avenida, etc."
       />
-      {#if errors.street}<p class="mt-1 text-[12px] text-red-600">
-          {errors.street}
-        </p>{/if}
+      {#if errors.street}
+        <p class="mt-1 text-[12px] text-red-600">{errors.street}</p>
+      {/if}
     </div>
 
     <div class="sm:col-span-3">
-      <label for="" class="text-[12px] font-semibold text-black/70 block mb-2"
-        >Número</label
-      >
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
+        Número
+      </label>
       <input
         class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
           errors.number ? "border-red-300" : "border-black/15"
@@ -445,17 +588,17 @@
         bind:value={$formDataStore.number}
         placeholder="123 ou s/n"
       />
-      {#if errors.number}<p class="mt-1 text-[12px] text-red-600">
-          {errors.number}
-        </p>{/if}
+      {#if errors.number}
+        <p class="mt-1 text-[12px] text-red-600">{errors.number}</p>
+      {/if}
     </div>
   </div>
 
   <div class="grid gap-4 sm:grid-cols-12">
     <div class="sm:col-span-6">
-      <label for="" class="text-[12px] font-semibold text-black/70 block mb-2"
-        >Complemento</label
-      >
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
+        Complemento
+      </label>
       <input
         class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
           errors.complement ? "border-red-300" : "border-black/15"
@@ -463,15 +606,15 @@
         bind:value={$formDataStore.complement}
         placeholder="Apto, sala, etc. (opcional)"
       />
-      {#if errors.complement}<p class="mt-1 text-[12px] text-red-600">
-          {errors.complement}
-        </p>{/if}
+      {#if errors.complement}
+        <p class="mt-1 text-[12px] text-red-600">{errors.complement}</p>
+      {/if}
     </div>
 
     <div class="sm:col-span-6">
-      <label for="" class="text-[12px] font-semibold text-black/70 block mb-2"
-        >Bairro</label
-      >
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
+        Bairro
+      </label>
       <input
         class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
           errors.neighborhood ? "border-red-300" : "border-black/15"
@@ -479,17 +622,17 @@
         bind:value={$formDataStore.neighborhood}
         placeholder="Bairro"
       />
-      {#if errors.neighborhood}<p class="mt-1 text-[12px] text-red-600">
-          {errors.neighborhood}
-        </p>{/if}
+      {#if errors.neighborhood}
+        <p class="mt-1 text-[12px] text-red-600">{errors.neighborhood}</p>
+      {/if}
     </div>
   </div>
 
   <div class="grid gap-4 sm:grid-cols-12">
     <div class="sm:col-span-8">
-      <label for="" class="text-[12px] font-semibold text-black/70 block mb-2"
-        >Cidade</label
-      >
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
+        Cidade
+      </label>
       <input
         class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
           errors.city ? "border-red-300" : "border-black/15"
@@ -497,17 +640,17 @@
         bind:value={$formDataStore.city}
         placeholder="Cidade"
       />
-      {#if errors.city}<p class="mt-1 text-[12px] text-red-600">
-          {errors.city}
-        </p>{/if}
+      {#if errors.city}
+        <p class="mt-1 text-[12px] text-red-600">{errors.city}</p>
+      {/if}
     </div>
 
     <div class="sm:col-span-4">
-      <label for="" class="text-[12px] font-semibold text-black/70 block mb-2"
-        >UF</label
-      >
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
+        UF
+      </label>
       <input
-        class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none uppercase ${
+        class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold uppercase outline-none ${
           errors.state ? "border-red-300" : "border-black/15"
         }`}
         bind:value={$formDataStore.state}
@@ -518,9 +661,9 @@
           target.value = target.value.toUpperCase();
         }}
       />
-      {#if errors.state}<p class="mt-1 text-[12px] text-red-600">
-          {errors.state}
-        </p>{/if}
+      {#if errors.state}
+        <p class="mt-1 text-[12px] text-red-600">{errors.state}</p>
+      {/if}
     </div>
   </div>
 
@@ -533,54 +676,60 @@
 
   <div class="grid gap-4 sm:grid-cols-12">
     <div class="sm:col-span-4">
-      <label for="" class="text-[12px] font-semibold text-black/70 block mb-2">
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
         Optante do Simples Nacional?
       </label>
+
       <div
         class="inline-flex w-full rounded-xl border border-black/15 bg-white p-1"
       >
-        {#each primaryYesNoOptions as o}
+        {#each primaryYesNoOptions as option}
           <button
             type="button"
             class={`h-9 flex-1 rounded-lg px-3 text-[13px] font-semibold transition ${
-              $formDataStore.isSimples === o.value
+              $formDataStore.isSimples === option.value
                 ? "bg-[var(--primary)] text-white"
                 : "bg-transparent text-black/70 hover:bg-[var(--primary)]/5"
             }`}
-            aria-pressed={$formDataStore.isSimples === o.value}
-            on:click={() => setYesNoField("isSimples", o.value)}
+            aria-pressed={$formDataStore.isSimples === option.value}
+            on:click={() => setYesNoField("isSimples", option.value)}
           >
-            {o.label}
+            {option.label}
           </button>
         {/each}
       </div>
-      {#if errors.isSimples}<p class="mt-1 text-[12px] text-red-600">
-          {errors.isSimples}
-        </p>{/if}
+
+      {#if errors.isSimples}
+        <p class="mt-1 text-[12px] text-red-600">{errors.isSimples}</p>
+      {/if}
     </div>
 
     <div class="sm:col-span-4">
-      <label for="" class="text-[12px] font-semibold text-black/70 block mb-2">
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
         Sua escola incentiva projetos culturais através de renúncia fiscal?
       </label>
+
       <div
         class="inline-flex w-full rounded-xl border border-black/15 bg-white p-1"
       >
-        {#each primaryYesNoOptions as o}
+        {#each primaryYesNoOptions as option}
           <button
             type="button"
             class={`h-9 flex-1 rounded-lg px-3 text-[13px] font-semibold transition ${
-              $formDataStore.supportsCulturalProjects === o.value
+              $formDataStore.supportsCulturalProjects === option.value
                 ? "bg-[var(--primary)] text-white"
                 : "bg-transparent text-black/70 hover:bg-[var(--primary)]/5"
             }`}
-            aria-pressed={$formDataStore.supportsCulturalProjects === o.value}
-            on:click={() => setYesNoField("supportsCulturalProjects", o.value)}
+            aria-pressed={$formDataStore.supportsCulturalProjects ===
+              option.value}
+            on:click={() =>
+              setYesNoField("supportsCulturalProjects", option.value)}
           >
-            {o.label}
+            {option.label}
           </button>
         {/each}
       </div>
+
       {#if errors.supportsCulturalProjects}
         <p class="mt-1 text-[12px] text-red-600">
           {errors.supportsCulturalProjects}
@@ -589,29 +738,31 @@
     </div>
 
     <div class="sm:col-span-4">
-      <label for="" class="text-[12px] font-semibold text-black/70 block mb-2">
+      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
         Sua escola emite NFS-e pelo ambiente nacional da NF-e?
       </label>
+
       <div
         class="inline-flex w-full rounded-xl border border-black/15 bg-white p-1"
       >
-        {#each primaryYesNoOptions as o}
+        {#each primaryYesNoOptions as option}
           <button
             type="button"
             class={`h-9 flex-1 rounded-lg px-3 text-[13px] font-semibold transition ${
-              $formDataStore.usesNationalNfseEnvironment === o.value
+              $formDataStore.usesNationalNfseEnvironment === option.value
                 ? "bg-[var(--primary)] text-white"
                 : "bg-transparent text-black/70 hover:bg-[var(--primary)]/5"
             }`}
             aria-pressed={$formDataStore.usesNationalNfseEnvironment ===
-              o.value}
+              option.value}
             on:click={() =>
-              setYesNoField("usesNationalNfseEnvironment", o.value)}
+              setYesNoField("usesNationalNfseEnvironment", option.value)}
           >
-            {o.label}
+            {option.label}
           </button>
         {/each}
       </div>
+
       {#if errors.usesNationalNfseEnvironment}
         <p class="mt-1 text-[12px] text-red-600">
           {errors.usesNationalNfseEnvironment}

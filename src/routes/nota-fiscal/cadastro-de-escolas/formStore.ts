@@ -202,6 +202,10 @@ export type FormData = {
   number: string;
   complement: string;
   neighborhood: string;
+  phone: string;
+  email: string;
+  website: string;
+  hasStateRegistration: boolean;
   city: string;
   state: string;
   isSimples: YesNo;
@@ -212,10 +216,13 @@ export type FormData = {
   securityPhrase: string;
   serviceListItem: string;
   taxationCode: string;
+  serviceRpsBatchNumber: string;
   taxationPlace: TaxationPlace;
   specialRegime: SpecialRegime;
   issRequirement: IssRequirement;
   issWithholding: YesNo;
+  commerceLastInvoiceNumber: string;
+  commerceReturnCfop: string;
   roundIss: YesNo;
   aliquotPis: string;
   aliquotCofins: string;
@@ -248,8 +255,11 @@ export type FormData = {
 };
 
 export type FormErrors = Partial<Record<keyof FormData, string>> & {
+  serviceRpsBatchNumber?: string;
   certificateFile?: string;
   selfieFile?: string;
+  commerceLastInvoiceNumber?: string;
+  commerceReturnCfop?: string;
 };
 
 export const formDataStore = writable<FormData>({
@@ -267,6 +277,10 @@ export const formDataStore = writable<FormData>({
   neighborhood: "",
   city: "",
   state: "",
+  phone: "",
+  email: "",
+  website: "",
+  hasStateRegistration: false,
   isSimples: "no",
   supportsCulturalProjects: "no",
   usesNationalNfseEnvironment: "no",
@@ -275,10 +289,13 @@ export const formDataStore = writable<FormData>({
   securityPhrase: "",
   serviceListItem: "",
   taxationCode: "",
+  serviceRpsBatchNumber: "",
   taxationPlace: "in_city",
   specialRegime: "none",
   issRequirement: "payable",
   issWithholding: "no",
+  commerceLastInvoiceNumber: "",
+  commerceReturnCfop: "",
   roundIss: "no",
   aliquotPis: "",
   aliquotCofins: "",
