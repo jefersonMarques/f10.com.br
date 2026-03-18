@@ -634,7 +634,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const toEmail = getEnv("BREVO_MAIL_TO"); // ex: cadastro@f10.com.br
   const fromEmail = getEnv("BREVO_FROM_EMAIL"); // ex: no-reply@f10.com.br
   const fromName = getEnv("BREVO_FROM_NAME") || "F10";
-  const siteUrl = getEnv("PUBLIC_SITE_URL") || url.origin;
+  const siteUrl = getEnv("SITE_URL") || url.origin;
 
   if (!apiKey || !toEmail || !fromEmail) {
     return json(

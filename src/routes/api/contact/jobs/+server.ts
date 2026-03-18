@@ -10,8 +10,8 @@ import {
   BREVO_FROM_NAME,
   JOBS_MAIL_TO,
   JOBS_RESUME_MAX_MB,
+  SITE_URL,
 } from "$env/static/private";
-import { PUBLIC_SITE_URL } from "$env/static/public";
 
 // =========================
 // Tipos
@@ -93,7 +93,7 @@ function escapeHtml(text: string): string {
 }
 
 function buildAbsoluteSource(rawSource: string): string {
-  const siteUrl = safeString(PUBLIC_SITE_URL) || "https://f10.com.br";
+  const siteUrl = safeString(SITE_URL) || "https://f10.com.br";
   const s = safeString(rawSource) || "/contato";
   if (s.startsWith("/")) return `${siteUrl}${s}`;
   return s;

@@ -592,7 +592,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const copyEmail = getEnv("BREVO_COPY_TO");
   const fromEmail = getEnv("BREVO_FROM_EMAIL");
   const fromName = "HOMOLOGAÇÃO NF - F10";
-  const siteUrl = getEnv("PUBLIC_SITE_URL") || url.origin;
+  const siteUrl = getEnv("SITE_URL") || url.origin;
 
   if (!apiKey || !toEmail || !fromEmail) {
     return json(
