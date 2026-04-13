@@ -2,7 +2,13 @@
 import { writable } from "svelte/store";
 
 export type YesNo = "yes" | "no";
-export type NoteKind = "service" | "commerce";
+export type NoteKind = "service" | "commerce" | "service_and_commerce";
+
+export const noteKindOptions: Array<{ value: NoteKind; label: string }> = [
+  { value: "service", label: "Serviço (NFS-e)" },
+  { value: "commerce", label: "Produto (NF-e)" },
+  { value: "service_and_commerce", label: "Serviço e produto" },
+];
 
 
 export type TaxationPlace =
@@ -35,11 +41,6 @@ export type IssRequirement =
 export const yesNoOptions: Array<{ value: YesNo; label: string }> = [
   { value: "yes", label: "Sim" },
   { value: "no", label: "Não" },
-];
-
-export const noteKindOptions: Array<{ value: NoteKind; label: string }> = [
-  { value: "service", label: "Serviço (NFS-e)" },
-  { value: "commerce", label: "Comércio (NF-e)" },
 ];
 
 export const taxationPlaceOptions: Array<{ value: TaxationPlace; label: string }> = [

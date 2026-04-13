@@ -17,7 +17,7 @@
   let cnpjDisplay = "";
   let cepDisplay = "";
 
-  const primaryNoteKindOptions = noteKindOptions.slice(0, 2);
+  const primaryNoteKindOptions = noteKindOptions;
   const primaryYesNoOptions = yesNoOptions.slice(0, 2);
   const stateRegistrationOptions = [
     { label: "Sim", value: true },
@@ -275,21 +275,6 @@
         </button>
       {/each}
     </div>
-
-    {#if noteKindOptions.length > 2}
-      <div class="mt-2">
-        <select
-          class="h-10 w-full rounded-xl border border-black/15 bg-white px-3 text-[13px] font-semibold text-black/80"
-          value={$formDataStore.noteKind}
-          on:change={(e) =>
-            setNoteKind((e.target as HTMLSelectElement).value as NoteKind)}
-        >
-          {#each noteKindOptions as option}
-            <option value={option.value}>{option.label}</option>
-          {/each}
-        </select>
-      </div>
-    {/if}
   </div>
 
   <div class="grid gap-4 sm:grid-cols-12">

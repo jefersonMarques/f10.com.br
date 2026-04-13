@@ -142,7 +142,14 @@
     }
 
     if (step === 2) {
-      if (data.noteKind === "service") {
+      const shouldValidateService =
+        data.noteKind === "service" || data.noteKind === "service_and_commerce";
+
+      const shouldValidateCommerce =
+        data.noteKind === "commerce" ||
+        data.noteKind === "service_and_commerce";
+
+      if (shouldValidateService) {
         if (!data.cityHallLogin.trim()) {
           next.cityHallLogin = "Informe o login da prefeitura.";
         } else {
@@ -155,9 +162,6 @@
         if (!data.cityHallPassword.trim()) {
           next.cityHallPassword = "Informe a senha da prefeitura.";
         }
-
-        // securityPhrase é opcional
-        // Se quiser validar quando preenchido, deixe uma regra específica aqui.
 
         if (!data.serviceRpsBatchNumber.trim()) {
           next.serviceRpsBatchNumber = "Informe a numeração do lote de RPS.";
@@ -218,10 +222,9 @@
         if (!isPercentValid(data.aliquotCsll, true)) {
           next.aliquotCsll = "Alíquota CSLL inválida (0..100).";
         }
-      } else {
-        // Opcional: substituir esses 3 campos antigos por commerceLastInvoiceNumber
-        // Se for manter temporariamente, eles não devem mais ser obrigatórios pela nova regra.
+      }
 
+      if (shouldValidateCommerce) {
         if (!data.commerceNcmCode.trim()) {
           next.commerceNcmCode = "Informe o Código NCM.";
         }
@@ -241,11 +244,6 @@
         if (!data.commerceCstIcms.trim()) {
           next.commerceCstIcms = "Informe o CST ICMS.";
         }
-
-        // CSOSN não está na nova tabela como obrigatório
-        // if (!data.commerceCsosn.trim()) {
-        //   next.commerceCsosn = "Informe o CSOSN.";
-        // }
 
         if (!isPercentValid(data.commerceIpiAliquot, false)) {
           next.commerceIpiAliquot = "Alíquota IPI inválida (0..100).";
@@ -334,6 +332,14 @@
           submittedAt: new Date().toISOString(),
           cnpjDigits: onlyDigits(data.cnpj),
           cepDigits: onlyDigits(data.cep),
+
+          hasServiceNote:
+            data.noteKind === "service" ||
+            data.noteKind === "service_and_commerce",
+
+          hasCommerceNote:
+            data.noteKind === "commerce" ||
+            data.noteKind === "service_and_commerce",
 
           aliquotPis: normalizePercent(data.aliquotPis),
           aliquotCofins: normalizePercent(data.aliquotCofins),

@@ -1911,6 +1911,11 @@
             aria-hidden="true"
           ></div>
 
+          <div
+            class="pointer-events-none absolute inset-0 rounded-[18px]
+             ring-1 ring-inset ring-white/10"
+          ></div>
+
           <!-- legenda -->
           <figcaption
             class="absolute bottom-0 inset-x-0 px-4 md:px-6 py-3 md:py-4
@@ -1923,11 +1928,6 @@
             >
             em um painel único para direção e coordenação comercial.
           </figcaption>
-
-          <div
-            class="pointer-events-none absolute inset-0 rounded-[18px]
-             ring-1 ring-inset ring-white/10"
-          ></div>
         </figure>
       </div>
     </div>

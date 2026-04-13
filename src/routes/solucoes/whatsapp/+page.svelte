@@ -1,7 +1,10 @@
 <!-- src/routes/solucoes/whatsapp/+page.svelte -->
 <script lang="ts">
+    import SeoHead from "$lib/components/SeoHead.svelte";
+
     import { contactModalConfig } from "$lib/stores/contactModals";
     import { showForm } from "$lib/stores/formPopup";
+
     import {
         ArrowUpRight,
         CheckCircle2,
@@ -15,6 +18,22 @@
     } from "lucide-svelte";
 
     type TemplateTab = "finance" | "marketing" | "office";
+
+    const baseUrl = "https://f10.com.br";
+    const canonicalUrl = `${baseUrl}/solucoes/whatsapp`;
+    const ogImage = `${baseUrl}/og/whatsapp-f10.webp`;
+
+    const seoTitle =
+        "WhatsApp para Escolas e Cursos no F10 | Atendimento Multiusuário, Matrículas e Cobranças";
+
+    const seoDescription =
+        "WhatsApp para escolas e cursos no F10: atendimento multiusuário, histórico centralizado, matrículas, cobranças, secretaria e comercial. Organize a comunicação com pais, alunos e leads sem depender do aparelho.";
+
+    const breadcrumbItems = [
+        { name: "Home", item: baseUrl },
+        { name: "Soluções", item: `${baseUrl}/solucoes` },
+        { name: "WhatsApp para Escolas e Cursos", item: canonicalUrl },
+    ];
 
     let templateTab: TemplateTab = "finance";
 
@@ -89,20 +108,6 @@
         }, 320);
     }
 
-    // =========================
-    // SEO / Estrutura da página
-    // =========================
-    const siteName = "F10";
-    const pagePath = "/solucoes/whatsapp";
-    const baseUrl = "https://f10.com.br";
-    const canonicalUrl = `${baseUrl}${pagePath}`;
-    const ogImage = `${baseUrl}/og/whatsapp-f10.webp`;
-
-    const seoTitle =
-        "WhatsApp para Escolas e Cursos no F10 | Atendimento Multiusuário, Matrículas e Cobranças";
-    const seoDescription =
-        "WhatsApp para escolas e cursos no F10: atendimento multiusuário, histórico centralizado, matrículas, cobranças, secretaria e comercial. Organize a comunicação com pais, alunos e leads sem depender do aparelho.";
-
     // HERO
     let pillText = "WhatsApp para escolas e cursos";
     let title =
@@ -120,7 +125,7 @@
     let section2Text =
         "Centralize a comunicação com pais, responsáveis, alunos e leads em um canal compartilhado pela equipe. No F10, o WhatsApp deixa de depender do aparelho e passa a fazer parte do fluxo da instituição: secretaria escolar, financeiro escolar, matrículas, comercial e relacionamento.";
 
-    let section2Bullets: Array<string> = [
+    let section2Bullets: string[] = [
         "Atendimento multiusuário com histórico centralizado no F10",
         "Gestão acompanha conversas sem depender do aparelho",
         "Múltiplos números por usuário e múltiplos usuários por número",
@@ -174,6 +179,35 @@
             a: "Os templates já fazem parte da apresentação da solução e os envios automáticos estão em implantação. A proposta é permitir cobranças, lembretes, avisos e comunicações recorrentes com contexto do sistema.",
         },
     ];
+
+    const faqItems = faqs.map((item) => ({
+        question: item.q,
+        answer: item.a,
+    }));
+
+    const softwareApplicationData = {
+        name: "F10 WhatsApp para Escolas e Cursos",
+        description:
+            "Solução de WhatsApp integrada ao F10 para escolas e cursos, com atendimento multiusuário, histórico centralizado, matrículas, secretaria, financeiro e comercial.",
+        url: canonicalUrl,
+        brandName: "F10",
+        applicationCategory: "BusinessApplication",
+        applicationSubCategory: "WhatsApp para Escolas e Cursos",
+        operatingSystem: "Web",
+        providerName: "F10",
+        publisherName: "F10",
+        featureList: [
+            "Atendimento multiusuário",
+            "Histórico centralizado",
+            "Identificação por usuário",
+            "WhatsApp para secretaria escolar",
+            "WhatsApp para financeiro escolar",
+            "WhatsApp para matrículas",
+            "Templates de mensagens",
+            "Gestão sem depender do aparelho",
+        ],
+        image: [ogImage],
+    };
 
     // CTA final
     let section5Title =
@@ -257,99 +291,6 @@
         "Em poucos minutos você entende como o WhatsApp vira parte do F10: atendimento compartilhado, rastreio por usuário, histórico centralizado e templates prontos para a rotina da escola.";
     const midCtaPrimaryLabel = "Quero uma demonstração";
 
-    function buildFaqJsonLd(items: Array<{ q: string; a: string }>) {
-        return {
-            "@context": "https://schema.org",
-            "@type": "FAQPage",
-            mainEntity: items.map((item) => ({
-                "@type": "Question",
-                name: item.q,
-                acceptedAnswer: {
-                    "@type": "Answer",
-                    text: item.a,
-                },
-            })),
-        };
-    }
-
-    const organizationJsonLd = {
-        "@context": "https://schema.org",
-        "@type": "Organization",
-        name: "F10",
-        url: baseUrl,
-    };
-
-    const webPageJsonLd = {
-        "@context": "https://schema.org",
-        "@type": "WebPage",
-        name: seoTitle,
-        description: seoDescription,
-        url: canonicalUrl,
-        isPartOf: {
-            "@type": "WebSite",
-            name: siteName,
-            url: baseUrl,
-        },
-    };
-
-    const softwareApplicationJsonLd = {
-        "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        name: "F10 WhatsApp para Escolas e Cursos",
-        applicationCategory: "BusinessApplication",
-        operatingSystem: "Web",
-        url: canonicalUrl,
-        description:
-            "Solução de WhatsApp integrada ao F10 para escolas e cursos, com atendimento multiusuário, histórico centralizado, matrículas, secretaria, financeiro e comercial.",
-        featureList: [
-            "Atendimento multiusuário",
-            "Histórico centralizado",
-            "Identificação por usuário",
-            "WhatsApp para secretaria escolar",
-            "WhatsApp para financeiro escolar",
-            "WhatsApp para matrículas",
-            "Templates de mensagens",
-            "Gestão sem depender do aparelho",
-        ],
-        audience: {
-            "@type": "Audience",
-            audienceType: "Escolas, cursos e instituições de ensino",
-        },
-        offers: {
-            "@type": "Offer",
-            price: "0",
-            priceCurrency: "BRL",
-            availability: "https://schema.org/InStock",
-        },
-    };
-
-    const breadcrumbJsonLd = {
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        itemListElement: [
-            {
-                "@type": "ListItem",
-                position: 1,
-                name: "Início",
-                item: baseUrl,
-            },
-            {
-                "@type": "ListItem",
-                position: 2,
-                name: "Soluções",
-                item: `${baseUrl}/solucoes`,
-            },
-            {
-                "@type": "ListItem",
-                position: 3,
-                name: "WhatsApp para Escolas e Cursos",
-                item: canonicalUrl,
-            },
-        ],
-    };
-
-    const faqJsonLd = buildFaqJsonLd(faqs);
-
     function iconForUseCase(
         kind: "billing" | "enrollment" | "office" | "sales",
     ) {
@@ -379,49 +320,17 @@
     }
 </script>
 
-<svelte:head>
-    <title>{seoTitle}</title>
-    <meta name="description" content={seoDescription} />
-    <link rel="canonical" href={canonicalUrl} />
-
-    <meta
-        name="robots"
-        content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1"
-    />
-
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content={siteName} />
-    <meta property="og:title" content={seoTitle} />
-    <meta property="og:description" content={seoDescription} />
-    <meta property="og:url" content={canonicalUrl} />
-    <meta property="og:image" content={ogImage} />
-
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content={seoTitle} />
-    <meta name="twitter:description" content={seoDescription} />
-    <meta name="twitter:image" content={ogImage} />
-
-    <meta
-        name="keywords"
-        content="whatsapp para escolas, whatsapp para cursos, whatsapp escolar, atendimento escolar whatsapp, whatsapp multiusuário escola, secretaria escolar whatsapp, financeiro escolar whatsapp, matrícula escolar whatsapp, comunicação com pais pelo whatsapp, software de gestão escolar com whatsapp, F10"
-    />
-
-    <script type="application/ld+json">
-		{JSON.stringify(organizationJsonLd)}
-    </script>
-    <script type="application/ld+json">
-		{JSON.stringify(webPageJsonLd)}
-    </script>
-    <script type="application/ld+json">
-		{JSON.stringify(softwareApplicationJsonLd)}
-    </script>
-    <script type="application/ld+json">
-		{JSON.stringify(breadcrumbJsonLd)}
-    </script>
-    <script type="application/ld+json">
-		{JSON.stringify(faqJsonLd)}
-    </script>
-</svelte:head>
+<SeoHead
+    title={seoTitle}
+    description={seoDescription}
+    canonical={canonicalUrl}
+    {ogImage}
+    ogTitle={seoTitle}
+    ogDescription={seoDescription}
+    {faqItems}
+    {breadcrumbItems}
+    {softwareApplicationData}
+/>
 
 <!-- =========================
   HERO

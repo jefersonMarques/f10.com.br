@@ -12,6 +12,8 @@
     MonitorPlay,
     Smartphone,
     BarChart3,
+    Kanban,
+    FileChartColumn,
   } from "lucide-svelte";
   import { contactModalConfig } from "$lib/stores/contactModals";
   import { showForm } from "$lib/stores/formPopup";
@@ -76,12 +78,17 @@
       icon: Smartphone,
     },
     {
+      label: "CRM Escolar",
+      href: "/solucoes/crm-escolar",
+      icon: Kanban, 
+    },
+    {
       label: "Marketing e Captação",
       href: "/solucoes/marketing-captacao-de-alunos",
       icon: Megaphone,
     },
     {
-      label: "Vendas / CRM",
+      label: "Vendas no F10",
       href: "/solucoes/vendas",
       icon: Handshake,
     },

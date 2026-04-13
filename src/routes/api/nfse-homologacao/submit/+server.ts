@@ -205,6 +205,27 @@ function isFileLike(value: unknown): value is File {
   );
 }
 
+function hasServiceNote(payload: SubmissionPayload): boolean {
+  return (
+    payload.noteKind === "service" ||
+    payload.noteKind === "service_and_commerce"
+  );
+}
+
+function hasCommerceNote(payload: SubmissionPayload): boolean {
+  return (
+    payload.noteKind === "commerce" ||
+    payload.noteKind === "service_and_commerce"
+  );
+}
+
+function formatNoteKind(value: SubmissionPayload["noteKind"]): string {
+  if (value === "service") return "Serviço (NFS-e)";
+  if (value === "commerce") return "Produto (NF-e)";
+  if (value === "service_and_commerce") return "Serviço e produto";
+  return safeValue(value);
+}
+
 function buildEmailText(params: {
   payload: SubmissionPayload;
   docs: Array<{
@@ -244,14 +265,16 @@ function buildEmailText(params: {
   lines.push(`Emite NFS-e pelo ambiente nacional: ${formatYesNo(payload.usesNationalNfseEnvironment)}`);
   lines.push("");
   lines.push("=== Tipo de nota ===");
-  lines.push(`Tipo: ${safeValue(payload.noteKind)}`);
+  lines.push(`Tipo: ${formatNoteKind(payload.noteKind)}`);
 
-  if (payload.noteKind === "service") {
+  if (hasServiceNote(payload)) {
     lines.push("");
     lines.push("=== Acesso prefeitura ===");
     lines.push(`Login: ${safeValue(payload.cityHallLogin)}`);
     lines.push(`Senha: ${safeValue(payload.cityHallPassword)}`);
     lines.push(`Frase secreta: ${safeValue(payload.securityPhrase)}`);
+    lines.push(`Lote de RPS: ${safeValue(payload.serviceRpsBatchNumber)}`);
+
     lines.push("");
     lines.push("=== Dados fiscais (serviço) ===");
     lines.push(`Item Lista de Serviço: ${safeValue(payload.serviceListItem)}`);
@@ -269,14 +292,18 @@ function buildEmailText(params: {
     lines.push(`Alíquota ISS: ${safeValue(payload.aliquotIss)}`);
     lines.push(`Porcentagem IBPT: ${safeValue(payload.ibptPercent)}`);
     lines.push(`Descrição dos serviços: ${safeValue(payload.serviceDescription)}`);
-  } else {
+  }
+
+  if (hasCommerceNote(payload)) {
     lines.push("");
-    lines.push("=== Dados fiscais (comércio) === ");
+    lines.push("=== Dados fiscais (comércio) ===");
+    lines.push(`Número da última nota: ${safeValue(payload.commerceLastInvoiceNumber)}`);
     lines.push(`Número do Lote: ${safeValue(payload.commerceBatchNumber)}`);
     lines.push(`Numeração: ${safeValue(payload.commerceNumbering)}`);
     lines.push(`Série: ${safeValue(payload.commerceSeries)}`);
     lines.push(`Código NCM: ${safeValue(payload.commerceNcmCode)}`);
     lines.push(`Código CFOP: ${safeValue(payload.commerceCfopCode)}`);
+    lines.push(`CFOP devolução: ${safeValue(payload.commerceReturnCfop)}`);
     lines.push(`Natureza da Operação: ${safeValue(payload.commerceOperationNature)}`);
     lines.push(`Alíquota ICMS: ${safeValue(payload.commerceIcmsAliquot)}`);
     lines.push(`CST ICMS: ${safeValue(payload.commerceCstIcms)}`);
@@ -407,52 +434,62 @@ function buildEmailHtml(params: {
     ["Optante pelo Simples Nacional", formatYesNo(payload.isSimples)],
     ["Incentiva projetos culturais (renúncia fiscal)", formatYesNo(payload.supportsCulturalProjects)],
     ["Emite NFS-e pelo ambiente nacional", formatYesNo(payload.usesNationalNfseEnvironment)],
-    ["Tipo de nota", safeValue(payload.noteKind)],
+    ["Tipo de nota", formatNoteKind(payload.noteKind)],
   ]);
 
-  let specificSection = "";
-  if (payload.noteKind === "service") {
-    specificSection = section("Dados fiscais (serviço)", [
-      ["Login Prefeitura", safeValue(payload.cityHallLogin)],
-      ["Senha", safeValue(payload.cityHallPassword)],
-      ["Frase secreta de segurança", safeValue(payload.securityPhrase)],
-      ["Item Lista de Serviço", safeValue(payload.serviceListItem)],
-      ["Código de Tributação", safeValue(payload.taxationCode)],
-      ["Local de tributação", safeValue(payload.taxationPlace)],
-      ["Regime especial", safeValue(payload.specialRegime)],
-      ["Exigibilidade do ISS", safeValue(payload.issRequirement)],
-      ["Retenção do ISS", formatYesNo(payload.issWithholding)],
-      ["Arredondar ISS", formatYesNo(payload.roundIss)],
-      ["Alíquota PIS", safeValue(payload.aliquotPis)],
-      ["Alíquota COFINS", safeValue(payload.aliquotCofins)],
-      ["Alíquota INSS", safeValue(payload.aliquotInss)],
-      ["Alíquota IR", safeValue(payload.aliquotIr)],
-      ["Alíquota CSLL", safeValue(payload.aliquotCsll)],
-      ["Alíquota ISS", safeValue(payload.aliquotIss)],
-      ["Porcentagem IBPT", safeValue(payload.ibptPercent)],
-      ["Descrição dos serviços", safeValue(payload.serviceDescription)],
-    ]);
-  } else {
-    specificSection = section("Dados fiscais (comércio)", [
-      ["Número do Lote", safeValue(payload.commerceBatchNumber)],
-      ["Numeração", safeValue(payload.commerceNumbering)],
-      ["Série", safeValue(payload.commerceSeries)],
-      ["Código NCM", safeValue(payload.commerceNcmCode)],
-      ["Código CFOP", safeValue(payload.commerceCfopCode)],
-      ["Natureza da Operação", safeValue(payload.commerceOperationNature)],
-      ["Alíquota ICMS", safeValue(payload.commerceIcmsAliquot)],
-      ["CST ICMS", safeValue(payload.commerceCstIcms)],
-      ["CSOSN", safeValue(payload.commerceCsosn)],
-      ["Alíquota IPI", safeValue(payload.commerceIpiAliquot)],
-      ["CST IPI", safeValue(payload.commerceCstIpi)],
-      ["Alíquota PIS", safeValue(payload.commercePisAliquot)],
-      ["CST PIS", safeValue(payload.commerceCstPis)],
-      ["Alíquota COFINS", safeValue(payload.commerceCofinsAliquot)],
-      ["CST COFINS", safeValue(payload.commerceCstCofins)],
-      ["Descrição do item", safeValue(payload.commerceItemDescription)],
-      ["GTIN/EAN", safeValue(payload.commerceGtin)],
-      ["Código de benefício fiscal", safeValue(payload.commerceFiscalBenefitCode)],
-    ]);
+  const specificSections: string[] = [];
+
+  if (hasServiceNote(payload)) {
+    specificSections.push(
+      section("Dados fiscais (serviço)", [
+        ["Login Prefeitura", safeValue(payload.cityHallLogin)],
+        ["Senha", safeValue(payload.cityHallPassword)],
+        ["Frase secreta de segurança", safeValue(payload.securityPhrase)],
+        ["Lote de RPS", safeValue(payload.serviceRpsBatchNumber)],
+        ["Item Lista de Serviço", safeValue(payload.serviceListItem)],
+        ["Código de Tributação", safeValue(payload.taxationCode)],
+        ["Local de tributação", safeValue(payload.taxationPlace)],
+        ["Regime especial", safeValue(payload.specialRegime)],
+        ["Exigibilidade do ISS", safeValue(payload.issRequirement)],
+        ["Retenção do ISS", formatYesNo(payload.issWithholding)],
+        ["Arredondar ISS", formatYesNo(payload.roundIss)],
+        ["Alíquota PIS", safeValue(payload.aliquotPis)],
+        ["Alíquota COFINS", safeValue(payload.aliquotCofins)],
+        ["Alíquota INSS", safeValue(payload.aliquotInss)],
+        ["Alíquota IR", safeValue(payload.aliquotIr)],
+        ["Alíquota CSLL", safeValue(payload.aliquotCsll)],
+        ["Alíquota ISS", safeValue(payload.aliquotIss)],
+        ["Porcentagem IBPT", safeValue(payload.ibptPercent)],
+        ["Descrição dos serviços", safeValue(payload.serviceDescription)],
+      ]),
+    );
+  }
+
+  if (hasCommerceNote(payload)) {
+    specificSections.push(
+      section("Dados fiscais (comércio)", [
+        ["Número da última nota", safeValue(payload.commerceLastInvoiceNumber)],
+        ["Número do Lote", safeValue(payload.commerceBatchNumber)],
+        ["Numeração", safeValue(payload.commerceNumbering)],
+        ["Série", safeValue(payload.commerceSeries)],
+        ["Código NCM", safeValue(payload.commerceNcmCode)],
+        ["Código CFOP", safeValue(payload.commerceCfopCode)],
+        ["CFOP devolução", safeValue(payload.commerceReturnCfop)],
+        ["Natureza da Operação", safeValue(payload.commerceOperationNature)],
+        ["Alíquota ICMS", safeValue(payload.commerceIcmsAliquot)],
+        ["CST ICMS", safeValue(payload.commerceCstIcms)],
+        ["CSOSN", safeValue(payload.commerceCsosn)],
+        ["Alíquota IPI", safeValue(payload.commerceIpiAliquot)],
+        ["CST IPI", safeValue(payload.commerceCstIpi)],
+        ["Alíquota PIS", safeValue(payload.commercePisAliquot)],
+        ["CST PIS", safeValue(payload.commerceCstPis)],
+        ["Alíquota COFINS", safeValue(payload.commerceCofinsAliquot)],
+        ["CST COFINS", safeValue(payload.commerceCstCofins)],
+        ["Descrição do item", safeValue(payload.commerceItemDescription)],
+        ["GTIN/EAN", safeValue(payload.commerceGtin)],
+        ["Código de benefício fiscal", safeValue(payload.commerceFiscalBenefitCode)],
+      ]),
+    );
   }
 
   const metaSection = section("Metadados técnicos", [
@@ -509,7 +546,7 @@ function buildEmailHtml(params: {
               <td style="padding:0 18px 18px 18px;">
                 <div style="background:${surface}; border:1px solid ${outline}; border-radius:22px; padding:18px;">
                   ${generalSection}
-                  ${specificSection}
+                  ${specificSections.join("")}
 
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${outline}; border-radius:16px; overflow:hidden; background:${surface}; margin-top:14px;">
                     <tr>

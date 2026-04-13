@@ -13,6 +13,14 @@
   } from "../formStore";
 
   export let errors: FormErrors = {};
+
+  $: showServiceFields =
+    $formDataStore.noteKind === "service" ||
+    $formDataStore.noteKind === "service_and_commerce";
+
+  $: showCommerceFields =
+    $formDataStore.noteKind === "commerce" ||
+    $formDataStore.noteKind === "service_and_commerce";
 </script>
 
 <div class="space-y-8">
@@ -21,11 +29,12 @@
       Acesso e dados específicos
     </h2>
     <p class="mt-1 text-[13px] text-black/60">
-      Campos obrigatórios variam conforme o tipo de nota (NFS-e ou NF-e).
+      Os campos obrigatórios variam conforme o tipo selecionado. Se escolher
+      “Serviço e produto”, será necessário preencher os dois blocos.
     </p>
   </div>
 
-  {#if $formDataStore.noteKind === "service"}
+  {#if showServiceFields}
     <!-- ==================== SERVIÇO (NFS-e) ==================== -->
     <div class="space-y-6">
       <div>
@@ -40,12 +49,16 @@
       <div class="grid gap-4 sm:grid-cols-12">
         <div class="sm:col-span-4">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Login Prefeitura</label
+            for="cityHallLogin"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Login Prefeitura
+          </label>
           <input
-            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${errors.cityHallLogin ? "border-red-300" : "border-black/15"}`}
+            id="cityHallLogin"
+            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
+              errors.cityHallLogin ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.cityHallLogin}
             placeholder="Usuário / CPF / CNPJ"
           />
@@ -56,13 +69,17 @@
 
         <div class="sm:col-span-4">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Senha</label
+            for="cityHallPassword"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Senha
+          </label>
           <input
+            id="cityHallPassword"
             type="password"
-            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${errors.cityHallPassword ? "border-red-300" : "border-black/15"}`}
+            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
+              errors.cityHallPassword ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.cityHallPassword}
             placeholder="Senha de acesso"
           />
@@ -75,12 +92,16 @@
 
         <div class="sm:col-span-4">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Frase secreta de segurança</label
+            for="securityPhrase"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Frase secreta de segurança
+          </label>
           <input
-            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${errors.securityPhrase ? "border-red-300" : "border-black/15"}`}
+            id="securityPhrase"
+            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
+              errors.securityPhrase ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.securityPhrase}
             placeholder="Frase de segurança"
           />
@@ -94,12 +115,13 @@
     <div class="grid gap-4 sm:grid-cols-12">
       <div class="sm:col-span-6">
         <label
-          for=""
-          class="text-[12px] font-semibold text-black/70 block mb-2"
+          for="serviceRpsBatchNumber"
+          class="mb-2 block text-[12px] font-semibold text-black/70"
         >
           Numeração do lote de RPS
         </label>
         <input
+          id="serviceRpsBatchNumber"
           class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
             errors.serviceRpsBatchNumber ? "border-red-300" : "border-black/15"
           }`}
@@ -130,12 +152,16 @@
       <div class="grid gap-4 sm:grid-cols-12">
         <div class="sm:col-span-6">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Item Lista de Serviço</label
+            for="serviceListItem"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Item Lista de Serviço
+          </label>
           <input
-            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${errors.serviceListItem ? "border-red-300" : "border-black/15"}`}
+            id="serviceListItem"
+            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
+              errors.serviceListItem ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.serviceListItem}
             placeholder="Ex: 7.02"
           />
@@ -148,12 +174,16 @@
 
         <div class="sm:col-span-6">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Código de Tributação</label
+            for="taxationCode"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Código de Tributação
+          </label>
           <input
-            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${errors.taxationCode ? "border-red-300" : "border-black/15"}`}
+            id="taxationCode"
+            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
+              errors.taxationCode ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.taxationCode}
             placeholder="Ex: 1234"
           />
@@ -164,92 +194,126 @@
 
         <div class="sm:col-span-4">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Natureza da Operação</label
+            for="taxationPlace"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Natureza da Operação
+          </label>
           <select
-            class="h-11 w-full rounded-xl border border-black/15 bg-white px-3 text-[13px] font-semibold"
+            id="taxationPlace"
+            class={`h-11 w-full rounded-xl border bg-white px-3 text-[13px] font-semibold ${
+              errors.taxationPlace ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.taxationPlace}
           >
-            {#each taxationPlaceOptions as o}
-              <option value={o.value}>{o.label}</option>
+            {#each taxationPlaceOptions as option}
+              <option value={option.value}>{option.label}</option>
             {/each}
           </select>
+          {#if errors.taxationPlace}
+            <p class="mt-1 text-[12px] text-red-600">{errors.taxationPlace}</p>
+          {/if}
         </div>
 
         <div class="sm:col-span-4">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Regime Especial Tributação</label
+            for="specialRegime"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Regime Especial Tributação
+          </label>
           <select
-            class="h-11 w-full rounded-xl border border-black/15 bg-white px-3 text-[13px] font-semibold"
+            id="specialRegime"
+            class={`h-11 w-full rounded-xl border bg-white px-3 text-[13px] font-semibold ${
+              errors.specialRegime ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.specialRegime}
           >
-            {#each specialRegimeOptions as o}
-              <option value={o.value}>{o.label}</option>
+            {#each specialRegimeOptions as option}
+              <option value={option.value}>{option.label}</option>
             {/each}
           </select>
+          {#if errors.specialRegime}
+            <p class="mt-1 text-[12px] text-red-600">{errors.specialRegime}</p>
+          {/if}
         </div>
 
         <div class="sm:col-span-4">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Exigibilidade do ISS</label
+            for="issRequirement"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Exigibilidade do ISS
+          </label>
           <select
-            class="h-11 w-full rounded-xl border border-black/15 bg-white px-3 text-[13px] font-semibold"
+            id="issRequirement"
+            class={`h-11 w-full rounded-xl border bg-white px-3 text-[13px] font-semibold ${
+              errors.issRequirement ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.issRequirement}
           >
-            {#each issRequirementOptions as o}
-              <option value={o.value}>{o.label}</option>
+            {#each issRequirementOptions as option}
+              <option value={option.value}>{option.label}</option>
             {/each}
           </select>
+          {#if errors.issRequirement}
+            <p class="mt-1 text-[12px] text-red-600">{errors.issRequirement}</p>
+          {/if}
         </div>
 
         <div class="sm:col-span-6">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Retenção do ISS?</label
+            for="issWithholding"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Retenção do ISS?
+          </label>
           <select
-            class="h-11 w-full rounded-xl border border-black/15 bg-white px-3 text-[13px] font-semibold"
+            id="issWithholding"
+            class={`h-11 w-full rounded-xl border bg-white px-3 text-[13px] font-semibold ${
+              errors.issWithholding ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.issWithholding}
           >
-            {#each yesNoOptions as o}
-              <option value={o.value}>{o.label}</option>
+            {#each yesNoOptions as option}
+              <option value={option.value}>{option.label}</option>
             {/each}
           </select>
+          {#if errors.issWithholding}
+            <p class="mt-1 text-[12px] text-red-600">{errors.issWithholding}</p>
+          {/if}
         </div>
 
         <div class="sm:col-span-6">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Arredondar ISS?</label
+            for="roundIss"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Arredondar ISS?
+          </label>
           <select
+            id="roundIss"
             class="h-11 w-full rounded-xl border border-black/15 bg-white px-3 text-[13px] font-semibold"
             bind:value={$formDataStore.roundIss}
           >
-            {#each yesNoOptions as o}
-              <option value={o.value}>{o.label}</option>
+            {#each yesNoOptions as option}
+              <option value={option.value}>{option.label}</option>
             {/each}
           </select>
         </div>
 
         <div class="sm:col-span-3">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Alíquota PIS (%)</label
+            for="aliquotPis"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Alíquota PIS (%)
+          </label>
           <input
-            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${errors.aliquotPis ? "border-red-300" : "border-black/15"}`}
+            id="aliquotPis"
+            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
+              errors.aliquotPis ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.aliquotPis}
             placeholder="Ex: 0.65"
           />
@@ -260,12 +324,16 @@
 
         <div class="sm:col-span-3">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Alíquota COFINS (%)</label
+            for="aliquotCofins"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Alíquota COFINS (%)
+          </label>
           <input
-            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${errors.aliquotCofins ? "border-red-300" : "border-black/15"}`}
+            id="aliquotCofins"
+            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
+              errors.aliquotCofins ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.aliquotCofins}
             placeholder="Ex: 3.00"
           />
@@ -276,12 +344,16 @@
 
         <div class="sm:col-span-3">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Alíquota INSS (%)</label
+            for="aliquotInss"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Alíquota INSS (%)
+          </label>
           <input
-            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${errors.aliquotInss ? "border-red-300" : "border-black/15"}`}
+            id="aliquotInss"
+            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
+              errors.aliquotInss ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.aliquotInss}
             placeholder="Ex: 20.00"
           />
@@ -292,12 +364,16 @@
 
         <div class="sm:col-span-3">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Alíquota IR (%)</label
+            for="aliquotIr"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Alíquota IR (%)
+          </label>
           <input
-            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${errors.aliquotIr ? "border-red-300" : "border-black/15"}`}
+            id="aliquotIr"
+            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
+              errors.aliquotIr ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.aliquotIr}
             placeholder="Ex: 1.50"
           />
@@ -308,12 +384,16 @@
 
         <div class="sm:col-span-3">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Alíquota CSLL (%)</label
+            for="aliquotCsll"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Alíquota CSLL (%)
+          </label>
           <input
-            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${errors.aliquotCsll ? "border-red-300" : "border-black/15"}`}
+            id="aliquotCsll"
+            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
+              errors.aliquotCsll ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.aliquotCsll}
             placeholder="Ex: 1.00"
           />
@@ -324,12 +404,16 @@
 
         <div class="sm:col-span-3">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Alíquota ISS (%)</label
+            for="aliquotIss"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Alíquota ISS (%)
+          </label>
           <input
-            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${errors.aliquotIss ? "border-red-300" : "border-black/15"}`}
+            id="aliquotIss"
+            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
+              errors.aliquotIss ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.aliquotIss}
             placeholder="Ex: 2.00"
           />
@@ -340,12 +424,16 @@
 
         <div class="sm:col-span-3">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Porcentagem IBPT</label
+            for="ibptPercent"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Porcentagem IBPT
+          </label>
           <input
-            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${errors.ibptPercent ? "border-red-300" : "border-black/15"}`}
+            id="ibptPercent"
+            class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
+              errors.ibptPercent ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.ibptPercent}
             placeholder="Opcional"
           />
@@ -356,12 +444,16 @@
 
         <div class="sm:col-span-12">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
-            >Descrição dos Serviços Prestados na Nota Fiscal</label
+            for="serviceDescription"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
+            Descrição dos Serviços Prestados na Nota Fiscal
+          </label>
           <textarea
-            class={`min-h-[110px] w-full rounded-xl border px-3 py-3 text-[14px] font-semibold outline-none ${errors.serviceDescription ? "border-red-300" : "border-black/15"}`}
+            id="serviceDescription"
+            class={`min-h-[110px] w-full rounded-xl border px-3 py-3 text-[14px] font-semibold outline-none ${
+              errors.serviceDescription ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.serviceDescription}
             placeholder="Descreva detalhadamente os serviços prestados..."
           ></textarea>
@@ -373,7 +465,9 @@
         </div>
       </div>
     </div>
-  {:else}
+  {/if}
+
+  {#if showCommerceFields}
     <!-- ==================== COMÉRCIO (NF-e) ==================== -->
     <div class="space-y-6">
       <div>
@@ -388,12 +482,13 @@
       <div class="grid gap-4 sm:grid-cols-12">
         <div class="sm:col-span-6">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
+            for="commerceLastInvoiceNumber"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
             Número da última nota gerada
           </label>
           <input
+            id="commerceLastInvoiceNumber"
             class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
               errors.commerceLastInvoiceNumber
                 ? "border-red-300"
@@ -414,12 +509,13 @@
 
         <div class="sm:col-span-6">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
+            for="commerceOperationNature"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
             Natureza da Operação
           </label>
           <input
+            id="commerceOperationNature"
             class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
               errors.commerceOperationNature
                 ? "border-red-300"
@@ -445,12 +541,13 @@
       <div class="grid gap-4 sm:grid-cols-12">
         <div class="sm:col-span-4">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
+            for="commerceNcmCode"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
             Código NCM
           </label>
           <input
+            id="commerceNcmCode"
             class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
               errors.commerceNcmCode ? "border-red-300" : "border-black/15"
             }`}
@@ -466,12 +563,13 @@
 
         <div class="sm:col-span-4">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
+            for="commerceCfopCode"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
             Código CFOP
           </label>
           <input
+            id="commerceCfopCode"
             class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
               errors.commerceCfopCode ? "border-red-300" : "border-black/15"
             }`}
@@ -487,12 +585,13 @@
 
         <div class="sm:col-span-4">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
+            for="commerceReturnCfop"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
             CFOP para nota de devolução
           </label>
           <input
+            id="commerceReturnCfop"
             class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
               errors.commerceReturnCfop ? "border-red-300" : "border-black/15"
             }`}
@@ -514,12 +613,13 @@
       <div class="grid gap-4 sm:grid-cols-12">
         <div class="sm:col-span-6">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
+            for="commerceIcmsAliquot"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
             Alíquota ICMS (%)
           </label>
           <input
+            id="commerceIcmsAliquot"
             class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
               errors.commerceIcmsAliquot ? "border-red-300" : "border-black/15"
             }`}
@@ -535,17 +635,20 @@
 
         <div class="sm:col-span-6">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
+            for="commerceCstIcms"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
             Código de Situação Tributária do ICMS (CST ICMS)
           </label>
           <select
-            class="h-11 w-full rounded-xl border border-black/15 bg-white px-3 text-[13px] font-semibold"
+            id="commerceCstIcms"
+            class={`h-11 w-full rounded-xl border bg-white px-3 text-[13px] font-semibold ${
+              errors.commerceCstIcms ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.commerceCstIcms}
           >
-            {#each cstIcmsOptions as o}
-              <option value={o.value}>{o.label}</option>
+            {#each cstIcmsOptions as option}
+              <option value={option.value}>{option.label}</option>
             {/each}
           </select>
           {#if errors.commerceCstIcms}
@@ -565,12 +668,13 @@
       <div class="grid gap-4 sm:grid-cols-12">
         <div class="sm:col-span-3">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
+            for="commerceIpiAliquot"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
             Alíquota IPI (%)
           </label>
           <input
+            id="commerceIpiAliquot"
             class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
               errors.commerceIpiAliquot ? "border-red-300" : "border-black/15"
             }`}
@@ -586,17 +690,20 @@
 
         <div class="sm:col-span-3">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
+            for="commerceCstIpi"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
             Código da Situação Tributária do IPI (CST IPI)
           </label>
           <select
-            class="h-11 w-full rounded-xl border border-black/15 bg-white px-3 text-[13px] font-semibold"
+            id="commerceCstIpi"
+            class={`h-11 w-full rounded-xl border bg-white px-3 text-[13px] font-semibold ${
+              errors.commerceCstIpi ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.commerceCstIpi}
           >
-            {#each cstIpiOptions as o}
-              <option value={o.value}>{o.label}</option>
+            {#each cstIpiOptions as option}
+              <option value={option.value}>{option.label}</option>
             {/each}
           </select>
           {#if errors.commerceCstIpi}
@@ -606,12 +713,13 @@
 
         <div class="sm:col-span-3">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
+            for="commercePisAliquot"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
             Alíquota PIS (%)
           </label>
           <input
+            id="commercePisAliquot"
             class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
               errors.commercePisAliquot ? "border-red-300" : "border-black/15"
             }`}
@@ -627,17 +735,20 @@
 
         <div class="sm:col-span-3">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
+            for="commerceCstPis"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
             Código da Situação Tributária do PIS (CST PIS)
           </label>
           <select
-            class="h-11 w-full rounded-xl border border-black/15 bg-white px-3 text-[13px] font-semibold"
+            id="commerceCstPis"
+            class={`h-11 w-full rounded-xl border bg-white px-3 text-[13px] font-semibold ${
+              errors.commerceCstPis ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.commerceCstPis}
           >
-            {#each cstPisCofinsOptions as o}
-              <option value={o.value}>{o.label}</option>
+            {#each cstPisCofinsOptions as option}
+              <option value={option.value}>{option.label}</option>
             {/each}
           </select>
           {#if errors.commerceCstPis}
@@ -647,12 +758,13 @@
 
         <div class="sm:col-span-3">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
+            for="commerceCofinsAliquot"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
             Alíquota COFINS (%)
           </label>
           <input
+            id="commerceCofinsAliquot"
             class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
               errors.commerceCofinsAliquot
                 ? "border-red-300"
@@ -670,17 +782,20 @@
 
         <div class="sm:col-span-3">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
+            for="commerceCstCofins"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
             Código da Situação Tributária do COFINS (CST COFINS)
           </label>
           <select
-            class="h-11 w-full rounded-xl border border-black/15 bg-white px-3 text-[13px] font-semibold"
+            id="commerceCstCofins"
+            class={`h-11 w-full rounded-xl border bg-white px-3 text-[13px] font-semibold ${
+              errors.commerceCstCofins ? "border-red-300" : "border-black/15"
+            }`}
             bind:value={$formDataStore.commerceCstCofins}
           >
-            {#each cstPisCofinsOptions as o}
-              <option value={o.value}>{o.label}</option>
+            {#each cstPisCofinsOptions as option}
+              <option value={option.value}>{option.label}</option>
             {/each}
           </select>
           {#if errors.commerceCstCofins}
@@ -700,12 +815,13 @@
       <div class="grid gap-4 sm:grid-cols-12">
         <div class="sm:col-span-8">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
+            for="commerceItemDescription"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
             Descrição da Natureza de Operação das notas de comércio
           </label>
           <input
+            id="commerceItemDescription"
             class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
               errors.commerceItemDescription
                 ? "border-red-300"
@@ -723,12 +839,13 @@
 
         <div class="sm:col-span-4">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
+            for="commerceGtin"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
             Código GTIN
           </label>
           <input
+            id="commerceGtin"
             class="h-11 w-full rounded-xl border border-black/15 px-3 text-[14px] font-semibold outline-none"
             bind:value={$formDataStore.commerceGtin}
             placeholder="Opcional"
@@ -737,12 +854,13 @@
 
         <div class="sm:col-span-12">
           <label
-            for=""
-            class="text-[12px] font-semibold text-black/70 block mb-2"
+            for="commerceFiscalBenefitCode"
+            class="mb-2 block text-[12px] font-semibold text-black/70"
           >
             Código de Benefício Fiscal
           </label>
           <input
+            id="commerceFiscalBenefitCode"
             class="h-11 w-full rounded-xl border border-black/15 px-3 text-[14px] font-semibold outline-none"
             bind:value={$formDataStore.commerceFiscalBenefitCode}
             placeholder="Opcional"

@@ -302,17 +302,13 @@
   }
 
   function openFilePicker(docType: DocType) {
-    if (docType === "selfie") {
-      const msg = "Selfie deve ser capturada pela camera.";
-      setDocTypeError("selfie", msg);
-      setDocMessage(msg);
-      return;
-    }
     activeDocType = docType;
+
     if (!fileInputRef) return;
+
     fileInputRef.value = ""; // permite re-upload do mesmo arquivo
     fileInputRef.accept = getAcceptByDocType(docType);
-    fileInputRef.multiple = true;
+    fileInputRef.multiple = docType !== "selfie";
     fileInputRef.click();
   }
 
@@ -2443,9 +2439,7 @@
                     Envie os documentos obrigatórios (você pode anexar mais de
                     um arquivo por item).
                   </p>
-                  <p>
-                    Formatos aceitos: PDF, JPG, PNG (é 2MB por arquivo).
-                  </p>
+                  <p>Formatos aceitos: PDF, JPG, PNG (é 2MB por arquivo).</p>
                 </div>
               </div>
             </div>
@@ -2561,8 +2555,8 @@
         {/if}
 
         <!-- =======================
-             Etapa 4 - Selfie com documento
-             ======================= -->
+     Etapa 4 - Selfie com documento
+     ======================= -->
         {#if currentStep === 4}
           <div>
             <h2 class="text-[18px] font-semibold text-[var(--primary)]">
@@ -2596,9 +2590,7 @@
                   <li>
                     • Segure o documento próximo ao rosto, sem cobrir sua face.
                   </li>
-                  <li>
-                    • Texto do documento legível, sem reflexo ou tremido.
-                  </li>
+                  <li>• Texto do documento legível, sem reflexo ou tremido.</li>
                   <li>• Olhe para a câmera (foto nítida).</li>
                 </ul>
 
@@ -2650,7 +2642,7 @@
                 {/if}
               </div>
 
-              <!-- Card 2: acoes (camera obrigatoria) -->
+              <!-- Card 2: ações -->
               <div
                 class={`rounded-2xl border ${docCardBorderClass("selfie")} bg-white p-5`}
               >
@@ -2665,13 +2657,12 @@
                   class="mt-4 rounded-xl border border-black/10 bg-black/[0.02] px-4 py-3"
                 >
                   <p class="text-[13px] text-black/65">
-                    Tire a selfie pela camera. Upload de arquivo nao e
-                    permitido.
+                    Você pode tirar a selfie pela câmera ou enviar uma foto já
+                    existente do dispositivo.
                   </p>
                 </div>
 
-                <!-- Camera obrigatoria -->
-                <div class="mt-4">
+                <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     type="button"
                     class="w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold text-white bg-[var(--primary)] hover:brightness-110"
@@ -2679,6 +2670,17 @@
                   >
                     <Camera size={16} />
                     {docFiles.selfie ? "Tirar outra" : "Abrir câmera"}
+                  </button>
+
+                  <button
+                    type="button"
+                    class="w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold border border-black/10 text-black/80 bg-white hover:bg-black/[0.02]"
+                    on:click={() => openFilePicker("selfie")}
+                  >
+                    <Upload size={16} />
+                    {docFiles.selfie
+                      ? "Enviar outra foto"
+                      : "Enviar do dispositivo"}
                   </button>
                 </div>
 
