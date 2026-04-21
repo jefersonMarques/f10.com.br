@@ -18,6 +18,29 @@
     ) => void;
   };
 
+  type FbqFunction = (
+    command: "track" | "trackCustom" | "init",
+    eventName: string,
+    parameters?: Record<string, unknown>,
+  ) => void;
+
+  function trackLead(payload: LeadPayload) {
+    if (typeof window === "undefined") return;
+
+    const fbq = (window as Window & { fbq?: FbqFunction }).fbq;
+    if (!fbq) return;
+
+    fbq("track", "Lead", {
+      content_name: payload.product || "Software F10",
+      content_category: "whatsapp_lead",
+      source: payload.source,
+      page_path: payload.page,
+      sub_source: payload.subSource,
+      school_name: payload.schoolName,
+      page_title: document.title,
+    });
+  }
+
   function getMovideskWindow(): MovideskWindow | null {
     if (typeof window === "undefined") return null;
     return window as MovideskWindow;
@@ -190,12 +213,12 @@
   const dispatch = createEventDispatcher<{ leadSent: LeadPayload }>();
 
   export let whatsAppNumber: string = "(41) 99294-3443"; // VENDAS
-  export let supportWhatsAppNumber: string = "(41) 3027-4747"; // mantido (se quiser WhatsApp no suporte no futuro)
+  export const supportWhatsAppNumber: string = "(41) 3027-4747"; // mantido (se quiser WhatsApp no suporte no futuro)
   export let financeWhatsAppNumber: string = "(41) 99774-2363";
 
   export let defaultMessage: string =
     "Olá, quero falar com a equipe da F10 sobre planos e implantação.";
-  export let supportMessage: string = "Olá, preciso de suporte da F10.";
+  export const supportMessage: string = "Olá, preciso de suporte da F10.";
   export let financeMessage: string =
     "Olá, preciso falar com o financeiro da F10.";
 
@@ -217,10 +240,6 @@
 
   let isBusinessHours = false;
   let showOnlineHint = false;
-
-  function normalizePhone(rawPhone: string): string {
-    return (rawPhone ?? "").replace(/\D/g, "");
-  }
 
   function toWaMeNumber(raw: string): string {
     const digits = normalizePhone(raw);
@@ -310,6 +329,40 @@
     selectedDepartment = null;
   }
 
+  function normalizePhone(rawPhone: string): string {
+    return (rawPhone ?? "").replace(/\D/g, "");
+  }
+
+  function formatPhone(value: string): string {
+    const digits = normalizePhone(value).slice(0, 11);
+
+    if (digits.length <= 2) {
+      return digits.length ? `(${digits}` : "";
+    }
+
+    if (digits.length <= 7) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    }
+
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+  }
+
+  function isValidBrazilMobilePhone(value: string): boolean {
+    const digits = normalizePhone(value);
+
+    if (digits.length !== 11) return false;
+
+    const areaCode = Number(digits.slice(0, 2));
+    const ninthDigit = digits[2];
+
+    return areaCode >= 11 && areaCode <= 99 && ninthDigit === "9";
+  }
+
+  function handlePhoneInput(event: Event) {
+    const target = event.currentTarget as HTMLInputElement;
+    phone = formatPhone(target.value);
+  }
+
   async function handleSubmit() {
     errorMessage = "";
 
@@ -317,9 +370,13 @@
     const normalizedPhone = normalizePhone(phone);
     const trimmedSchoolName = schoolName.trim();
 
-    if (!trimmedName || normalizedPhone.length < 10) {
-      errorMessage =
-        "Preencha seu nome e um número de WhatsApp válido (com DDD).";
+    if (!trimmedName) {
+      errorMessage = "Preencha seu nome.";
+      return;
+    }
+
+    if (!isValidBrazilMobilePhone(phone)) {
+      errorMessage = "Informe um WhatsApp válido no formato (XX) XXXXX-XXXX.";
       return;
     }
 
@@ -359,6 +416,7 @@
       }
 
       dispatch("leadSent", payload);
+      trackLead(payload);
 
       const encodedMessage = encodeURIComponent(
         `${defaultMessage}\n\nNome: ${trimmedName}${trimmedSchoolName ? `\nEscola: ${trimmedSchoolName}` : ""}\nWhatsApp: ${normalizedPhone}`,
@@ -607,8 +665,7 @@
               <div class="text-left">
                 <label
                   for="floating-name"
-                  class="block text-xs font-medium text-slate-700"
-                  >Nome completo</label
+                  class="block text-xs font-medium text-slate-700">Nome</label
                 >
                 <input
                   id="floating-name"
@@ -633,8 +690,8 @@
                   placeholder="Ex.: Escola F10"
                 />
                 <p class="mt-1 text-[11px] text-slate-500">
-                  Ajuda nossa equipe a entender o contexto da sua escola logo
-                  no primeiro contato.
+                  Ajuda nossa equipe a entender o contexto da sua escola logo no
+                  primeiro contato.
                 </p>
               </div>
 
@@ -648,6 +705,9 @@
                   id="floating-phone"
                   type="tel"
                   bind:value={phone}
+                  on:input={handlePhoneInput}
+                  inputmode="numeric"
+                  maxlength="15"
                   class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#EA6D0B] focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/20"
                   placeholder="(DDD) 99999-9999"
                 />
@@ -737,7 +797,7 @@
     width: 100% !important;
   }
 
-  :global(.widget-frame.md-fade-when-visible){
+  :global(.widget-frame.md-fade-when-visible) {
     border-radius: 24px !important;
   }
 </style>

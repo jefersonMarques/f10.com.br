@@ -16,6 +16,12 @@
         description?: string;
     };
 
+    type FbqFunction = (
+        command: "track" | "trackCustom" | "init",
+        eventName: string,
+        parameters?: Record<string, unknown>,
+    ) => void;
+
     const dispatch = createEventDispatcher<{
         leadSent: ModalLeadPayload;
     }>();
@@ -64,6 +70,22 @@
     function getCurrentPath(): string | undefined {
         if (typeof window === "undefined") return undefined;
         return window.location?.pathname || "/";
+    }
+
+    function trackLead(payload: ModalLeadPayload) {
+        if (typeof window === "undefined") return;
+
+        const fbq = (window as Window & { fbq?: FbqFunction }).fbq;
+        if (!fbq) return;
+
+        fbq("track", "Lead", {
+            content_name: payload.product || "Modal contato – F10",
+            content_category: "contact_form",
+            source: payload.source,
+            page_path: payload.page,
+            sub_source: payload.subSource,
+            school_name: payload.schoolName,
+        });
     }
 
     function formatPhone(value: string): string {
@@ -149,6 +171,7 @@
             }
 
             dispatch("leadSent", payload);
+            trackLead(payload);
 
             lastLead = {
                 name: trimmedName,
@@ -159,13 +182,10 @@
 
             isSuccess = true;
 
-            // 👇 aqui reduz o tamanho do popup para o estado "card de sucesso"
+            // reduz o tamanho do popup para o estado de sucesso
             onChangeSize("sm");
         } catch (error) {
-            console.error(
-                "[ContactModalForm] Erro ao enviar lead:",
-                error,
-            );
+            console.error("[ContactModalForm] Erro ao enviar lead:", error);
             errorMessage =
                 "Erro de conexão ao enviar seus dados. Verifique sua internet e tente de novo.";
         } finally {
@@ -216,8 +236,9 @@
 
     {#if !isSuccess}
         <!-- ESTADO: FORMULÁRIO -->
-        <div class="grid gap-8 px-6 py-6 md:px-8 md:py-8 md:grid-cols-2 overflow-y-auto">
-
+        <div
+            class="grid gap-8 px-6 py-6 md:px-8 md:py-8 md:grid-cols-2 overflow-y-auto"
+        >
             <!-- COLUNA ESQUERDA -->
             <div class="hidden lg:block">
                 <h3

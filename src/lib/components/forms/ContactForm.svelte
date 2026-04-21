@@ -56,6 +56,27 @@
         website: "",
     };
 
+    type FbqFunction = (
+        command: "track" | "trackCustom" | "init",
+        eventName: string,
+        parameters?: Record<string, unknown>,
+    ) => void;
+
+    function trackLead(payload: { topic: string; company: string }) {
+        if (typeof window === "undefined") return;
+
+        const fbq = (window as Window & { fbq?: FbqFunction }).fbq;
+        if (!fbq) return;
+
+        fbq("track", "Lead", {
+            content_name: title || "Formulário de contato",
+            content_category: "contact_form",
+            topic: payload.topic,
+            company: payload.company,
+            page_path: window.location?.pathname || "/",
+        });
+    }
+
     // Mantém 'topic' sincronizado quando a prop mudar
     $: form.topic = topic;
 
@@ -134,6 +155,11 @@
 
             isSuccess = true;
             dispatch("submitted", { topic: form.topic });
+
+            trackLead({
+                topic: form.topic,
+                company: form.company.trim(),
+            });
 
             // limpa os campos (mantém tópico)
             form = {
@@ -370,7 +396,7 @@
                     required
                     aria-invalid={!!errors.message}
                     aria-describedby="err-message"
-                />
+                ></textarea>
                 {#if errors.message}
                     <p id="err-message" class="mt-1 text-[12px] text-rose-600">
                         {errors.message}
