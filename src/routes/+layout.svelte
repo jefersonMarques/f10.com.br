@@ -1,24 +1,33 @@
 <script lang="ts">
   import "../app.css";
+  import { onMount } from "svelte";
+  import { afterNavigate } from "$app/navigation";
+
   import Header from "$lib/components/Header.svelte";
   import Footer from "$lib/components/Footer.svelte";
   import Popup, { type PopupSize } from "$lib/components/popup/Popup.svelte";
-  import PopupSolutionsList, { type PopupSizeSolution } from "$lib/components/popup/PopupSolutionsList.svelte";
+  import PopupSolutionsList from "$lib/components/popup/PopupSolutionsList.svelte";
 
   import ContactWhatsappModalForm from "$lib/components/forms/ContactModalForm.svelte";
   import FloatingWhatsappButton from "$lib/components/forms/FloatingWhatsappButton.svelte";
   import { contactModalConfig } from "$lib/stores/contactModals";
-    import SolutionList from "$lib/components/forms/SolutionList.svelte";
+  import SolutionList from "$lib/components/forms/SolutionList.svelte";
+
+  type FbqFunction = (...args: unknown[]) => void;
 
   let modalSize: PopupSize = "xl";
 
-  // ler o store reativo
   $: modalConfig = $contactModalConfig;
+
+  onMount(() => {
+    afterNavigate(() => {
+      const fbq = (window as Window & { fbq?: FbqFunction }).fbq;
+      fbq?.("track", "PageView");
+    });
+  });
 </script>
 
 <svelte:head>
-  <!-- SEO global básico -->
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#ffffff" />
   <meta
     name="description"
@@ -50,7 +59,6 @@
   leadDescription="Cliente interessado."
 />
 
-<!-- Modal global, lendo a config do store -->
 <Popup size={modalSize}>
   <ContactWhatsappModalForm
     whatsAppNumber="5541992943443"
@@ -63,7 +71,5 @@
 </Popup>
 
 <PopupSolutionsList size={modalSize}>
-  <SolutionList
-    
-  />
+  <SolutionList />
 </PopupSolutionsList>
