@@ -1,0 +1,58 @@
+{
+  "4372af3d30c0af4541c47d2d3afc6dbf853c46a0347f91046ad2c87743cc8d17": {
+    "token": "4372af3d30c0af4541c47d2d3afc6dbf853c46a0347f91046ad2c87743cc8d17",
+    "originalName": "doc_rg_cnh_01_melhorias_sistema.pdf",
+    "storedName": "4372af3d30c0af4541c47d2d3afc6dbf853c46a0347f91046ad2c87743cc8d17-doc_rg_cnh_01_melhorias_sistema.pdf",
+    "relativePath": "uploads\\registration\\4372af3d30c0af4541c47d2d3afc6dbf853c46a0347f91046ad2c87743cc8d17-doc_rg_cnh_01_melhorias_sistema.pdf",
+    "absolutePath": "D:\\wsl-home\\jeferson\\f10.com.br\\data\\uploads\\registration\\4372af3d30c0af4541c47d2d3afc6dbf853c46a0347f91046ad2c87743cc8d17-doc_rg_cnh_01_melhorias_sistema.pdf",
+    "mimeType": "application/pdf",
+    "size": 3841,
+    "docType": "doc_rg_cnh",
+    "createdAt": "2026-04-25T17:37:40.335Z",
+    "expiresAt": "2026-05-25T17:37:40.335Z",
+    "downloads": 0,
+    "maxDownloads": 10
+  },
+  "c883b6308f2f7e32dd1b80be639324c003b1e289b7e2752ad3eccc661fd030d1": {
+    "token": "c883b6308f2f7e32dd1b80be639324c003b1e289b7e2752ad3eccc661fd030d1",
+    "originalName": "doc_cnpj_01_AIT_TG00265309.pdf",
+    "storedName": "c883b6308f2f7e32dd1b80be639324c003b1e289b7e2752ad3eccc661fd030d1-doc_cnpj_01_AIT_TG00265309.pdf",
+    "relativePath": "uploads\\registration\\c883b6308f2f7e32dd1b80be639324c003b1e289b7e2752ad3eccc661fd030d1-doc_cnpj_01_AIT_TG00265309.pdf",
+    "absolutePath": "D:\\wsl-home\\jeferson\\f10.com.br\\data\\uploads\\registration\\c883b6308f2f7e32dd1b80be639324c003b1e289b7e2752ad3eccc661fd030d1-doc_cnpj_01_AIT_TG00265309.pdf",
+    "mimeType": "application/pdf",
+    "size": 163074,
+    "docType": "doc_cnpj",
+    "createdAt": "2026-04-25T17:37:40.340Z",
+    "expiresAt": "2026-05-25T17:37:40.340Z",
+    "downloads": 0,
+    "maxDownloads": 10
+  },
+  "b8fd2ba0281ddfcbe8ae98cd0f8851c6569b9e3478fb382844fe22e8f25fa092": {
+    "token": "b8fd2ba0281ddfcbe8ae98cd0f8851c6569b9e3478fb382844fe22e8f25fa092",
+    "originalName": "doc_contrato_01_O_livro_da_ciencias.pdf",
+    "storedName": "b8fd2ba0281ddfcbe8ae98cd0f8851c6569b9e3478fb382844fe22e8f25fa092-doc_contrato_01_O_livro_da_ciencias.pdf",
+    "relativePath": "uploads\\registration\\b8fd2ba0281ddfcbe8ae98cd0f8851c6569b9e3478fb382844fe22e8f25fa092-doc_contrato_01_O_livro_da_ciencias.pdf",
+    "absolutePath": "D:\\wsl-home\\jeferson\\f10.com.br\\data\\uploads\\registration\\b8fd2ba0281ddfcbe8ae98cd0f8851c6569b9e3478fb382844fe22e8f25fa092-doc_contrato_01_O_livro_da_ciencias.pdf",
+    "mimeType": "application/pdf",
+    "size": 76344066,
+    "docType": "doc_contrato",
+    "createdAt": "2026-04-25T17:37:40.343Z",
+    "expiresAt": "2026-05-25T17:37:40.343Z",
+    "downloads": 0,
+    "maxDownloads": 10
+  },
+  "671066a27441d6b536be384468b766282d1b176bba5e663826f11f547ecb90de": {
+    "token": "671066a27441d6b536be384468b766282d1b176bba5e663826f11f547ecb90de",
+    "originalName": "doc_selfie_ChatGPT_Image_20_de_abr._de_2026_21_17_49.png",
+    "storedName": "671066a27441d6b536be384468b766282d1b176bba5e663826f11f547ecb90de-doc_selfie_ChatGPT_Image_20_de_abr._de_2026_21_17_49.png",
+    "relativePath": "uploads\\registration\\671066a27441d6b536be384468b766282d1b176bba5e663826f11f547ecb90de-doc_selfie_ChatGPT_Image_20_de_abr._de_2026_21_17_49.png",
+    "absolutePath": "D:\\wsl-home\\jeferson\\f10.com.br\\data\\uploads\\registration\\671066a27441d6b536be384468b766282d1b176bba5e663826f11f547ecb90de-doc_selfie_ChatGPT_Image_20_de_abr._de_2026_21_17_49.png",
+    "mimeType": "image/png",
+    "size": 1522181,
+    "docType": "doc_selfie",
+    "createdAt": "2026-04-25T17:37:40.426Z",
+    "expiresAt": "2026-05-25T17:37:40.426Z",
+    "downloads": 0,
+    "maxDownloads": 10
+  }
+}
