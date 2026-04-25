@@ -221,7 +221,8 @@
   // - Passo 3: múltiplos arquivos por tipo
   // - Passo 4: selfie única
   // ==============================
-  const maxFileSizeBytes = 2 * 1024 * 1024; // 2MB por arquivo
+  const maxSmallFileSizeBytes = 2 * 1024 * 1024; // 2MB
+  const maxLargeFileSizeBytes = 2 * 1024 * 1024 * 1024; // 2GB
   const maxFilesPerDocType = 6; // proteção contra exageros (ajuste se quiser)
 
   const step3DocTypes: Step3DocType[] = ["rg_cnh", "cnpj", "contrato"];
@@ -321,17 +322,31 @@
     docType: DocType,
     file: File,
   ): { ok: boolean; reason?: string } {
-    if (file.size > maxFileSizeBytes)
-      return { ok: false, reason: "Arquivo acima de 2MB." };
+    const maxAllowedSize =
+      docType === "selfie" ? maxSmallFileSizeBytes : maxLargeFileSizeBytes;
+
+    if (file.size > maxAllowedSize) {
+      return {
+        ok: false,
+        reason:
+          docType === "selfie"
+            ? "Arquivo acima de 2MB."
+            : "Arquivo acima de 2GB.",
+      };
+    }
 
     if (docType === "selfie") {
-      if (!acceptedSelfieMime.has(file.type))
+      if (!acceptedSelfieMime.has(file.type)) {
         return { ok: false, reason: "Formato inválido (use JPG/PNG)." };
+      }
+
       return { ok: true };
     }
 
-    if (!acceptedDocMime.has(file.type))
+    if (!acceptedDocMime.has(file.type)) {
       return { ok: false, reason: "Formato inválido (use PDF/JPG/PNG)." };
+    }
+
     return { ok: true };
   }
 
@@ -590,7 +605,7 @@
       blob = await new Promise((resolve) =>
         canvasEl!.toBlob((b) => resolve(b), "image/jpeg", q),
       );
-      if (blob && blob.size <= maxFileSizeBytes) break;
+      if (blob && blob.size <= maxSmallFileSizeBytes) break;
     }
 
     if (!blob) {
@@ -599,7 +614,7 @@
       return;
     }
 
-    if (blob.size > maxFileSizeBytes) {
+    if (blob.size > maxSmallFileSizeBytes) {
       setDocTypeError(
         "selfie",
         "Selfie muito pesada. Aproxime e tente novamente.",
@@ -1555,11 +1570,19 @@
   }
 
   function docHint(docType: DocType): string {
-    if (docType === "rg_cnh")
-      return "CNH: inclua a foto do QR Code. PDF ou imagem.";
-    if (docType === "cnpj") return "Arquivo PDF ou imagem.";
-    if (docType === "contrato") return "Arquivo PDF ou imagem.";
-    return "Foto nítida segurando o documento.";
+    if (docType === "rg_cnh") {
+      return "CNH: inclua a foto do QR Code. PDF ou imagem. Até 2GB.";
+    }
+
+    if (docType === "cnpj") {
+      return "Arquivo PDF ou imagem. Até 2GB.";
+    }
+
+    if (docType === "contrato") {
+      return "Arquivo PDF ou imagem. Até 2GB.";
+    }
+
+    return "Foto nítida segurando o documento. Até 2MB.";
   }
 
   function docCardBorderClass(docType: DocType): string {

@@ -124,12 +124,14 @@
       <h4 class="text-[18px] font-semibold">Outros links</h4>
       <ul class="text-[#9B9B9C] text-[14px] leading-[24px]">
         <li>
-          <a href="/termos-de-uso" class="hover:text-[#EA6D0B]">Termos de uso</a>
+          <a href="/termos-de-uso" class="hover:text-[#EA6D0B]">Termos de uso</a
+          >
         </li>
         <li>
           <a href="/politica-de-privacidade" class="hover:text-[#EA6D0B]"
-            >Políticas de privacidade</a
-          >
+            >Políticas de privacidade
+          </a>
+        </li>
       </ul>
     </div>
 

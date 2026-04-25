@@ -2390,7 +2390,7 @@
                            text-[11px] font-semibold tracking-[0.18em] text-[#7E82A2]
                            ring-1 ring-[#E5E7EB]"
                 >
-                    <span class="h-1.5 w-1.5 rounded-full bg-[#EA6D0B]" />
+                    <span class="h-1.5 w-1.5 rounded-full bg-[#EA6D0B]" ></span>
                     CONTROLE DE INADIMPLÊNCIA
                 </p>
 
@@ -2430,7 +2430,7 @@
                         <span
                             class="mt-[7px] h-1.5 w-1.5 rounded-full
                                    bg-[#EA6D0B]"
-                        />
+                        ></span>
                         <span>
                             Visão consolidada da rede com corte rápido por
                             unidade, segmento e forma de pagamento.
@@ -2440,7 +2440,7 @@
                         <span
                             class="mt-[7px] h-1.5 w-1.5 rounded-full
                                    bg-[#EA6D0B]"
-                        />
+                        ></span>
                         <span>
                             Destaque automático para a faixa de
                             <strong>30+ dias</strong>, onde a chance de perda é
@@ -2451,7 +2451,7 @@
                         <span
                             class="mt-[7px] h-1.5 w-1.5 rounded-full
                                    bg-[#EA6D0B]"
-                        />
+                        ></span>
                         <span>
                             Base pronta para automações de cobrança e
                             renegociação, sem retrabalho de exportar dados.
@@ -2474,13 +2474,13 @@
                         <div class="flex items-center gap-1.5">
                             <span
                                 class="h-2.5 w-2.5 rounded-full bg-[#EF4444]"
-                            />
+                            ></span>
                             <span
                                 class="h-2.5 w-2.5 rounded-full bg-[#F59E0B]"
-                            />
+                            ></span>
                             <span
                                 class="h-2.5 w-2.5 rounded-full bg-[#10B981]"
-                            />
+                            ></span>
                         </div>
                         <div
                             class="flex-1 mx-4 max-w-[420px] rounded-full border border-[#D1D5DB]
@@ -2821,7 +2821,7 @@
                                 <span
                                     class="mt-[6px] h-1.5 w-1.5 rounded-full
                                            bg-[#EA6D0B]"
-                                />
+                                ></span>
                                 <span>{bullet}</span>
                             </li>
                         {/each}

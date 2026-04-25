@@ -454,7 +454,7 @@
 
         <div class="pt-2">
           <a
-            href="#"
+            href="https://f10.com.br/contato"
             class="inline-flex items-center justify-center gap-3 rounded-[70px]
             bg-[#EA6D0B] px-8 md:px-10 py-4 text-white text-[16px] font-bold
             transition hover:brightness-110 focus:outline-none focus:ring-2

@@ -4,6 +4,10 @@ import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import type { RequestHandler } from "./$types";
+import {
+  saveRegistrationFile,
+  type RegistrationFileRecord,
+} from "$lib/server/registrationFileStore";
 
 type ContractClientMeta = {
   userAgent?: string;
@@ -73,8 +77,21 @@ type DocConfig = {
   maxFiles: number;
 };
 
-const MAX_FILE_BYTES = 2 * 1024 * 1024; // 2MB (igual ao front)
-const MAX_FILES_PER_DOC_TYPE = 6; // igual ao front (passo 3)
+type EmailDocInfo = {
+  key: DocKey;
+  label: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  downloadUrl: string;
+  expiresAt: string;
+};
+
+const MAX_SMALL_FILE_BYTES = 2 * 1024 * 1024; // 2MB para selfie
+const MAX_LARGE_FILE_BYTES = 2 * 1024 * 1024 * 1024; // 2GB para documentos
+const MAX_FILES_PER_DOC_TYPE = 6;
+const FILE_EXPIRATION_DAYS = 30;
+const MAX_DOWNLOADS_PER_FILE = 10;
 
 // Docs do passo 3: PDF/JPG/PNG
 const ALLOWED_DOC_MIME = new Set([
@@ -84,7 +101,7 @@ const ALLOWED_DOC_MIME = new Set([
   "image/png",
 ]);
 
-// Selfie: só imagem (igual ao front)
+// Selfie: só imagem
 const ALLOWED_SELFIE_MIME = new Set(["image/jpeg", "image/jpg", "image/png"]);
 
 const DOCS: DocConfig[] = [
@@ -125,6 +142,7 @@ const DOCS: DocConfig[] = [
 function escapeHtml(value: unknown): string {
   const str =
     typeof value === "string" ? value : value == null ? "" : String(value);
+
   return str
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -140,7 +158,11 @@ function onlyDigits(value: string): string {
 function formatBytes(bytes: number): string {
   const kb = bytes / 1024;
   if (kb < 1024) return `${kb.toFixed(0)} KB`;
-  return `${(kb / 1024).toFixed(1)} MB`;
+
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(1)} MB`;
+
+  return `${(mb / 1024).toFixed(2)} GB`;
 }
 
 function safeValue(value: unknown): string {
@@ -159,21 +181,30 @@ function hashSha256(value: string): string {
 }
 
 function sanitizeFilename(name: string): string {
-  // Remove caminhos e caracteres problemáticos
   const base = (name || "arquivo").split(/[/\\]/).pop() || "arquivo";
-  return base.replace(/[^\w.\-()+\s]/g, "_");
+
+  return base
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w.\-()+\s]/g, "_")
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .slice(0, 160);
 }
 
 function getClientIp(headers: Headers): string {
   const xff = headers.get("x-forwarded-for");
   if (xff) return xff.split(",")[0]?.trim() || "—";
+
   return headers.get("x-real-ip") || "—";
 }
 
 function formatDateTimeBR(iso: string | undefined): string {
   if (!iso) return "—";
+
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
+
   return new Intl.DateTimeFormat("pt-BR", {
     timeZone: "America/Sao_Paulo",
     year: "numeric",
@@ -183,11 +214,6 @@ function formatDateTimeBR(iso: string | undefined): string {
     minute: "2-digit",
     second: "2-digit",
   }).format(date);
-}
-
-async function fileToBase64(file: File): Promise<string> {
-  const ab = await file.arrayBuffer();
-  return Buffer.from(ab).toString("base64");
 }
 
 function isFileLike(value: unknown): value is File {
@@ -201,15 +227,41 @@ function isFileLike(value: unknown): value is File {
   );
 }
 
+function buildDownloadUrl(siteUrl: string, token: string): string {
+  return `${siteUrl.replace(/\/$/, "")}/download/${token}`;
+}
+
+function getEnv(key: string): string | undefined {
+  const value = process.env[key];
+
+  if (typeof value === "string" && value.length > 0) {
+    return value;
+  }
+
+  return undefined;
+}
+
+function logMultipartError(error: unknown): void {
+  try {
+    const dir = resolve(process.cwd(), "data");
+
+    mkdirSync(dir, { recursive: true });
+
+    const entry = [
+      `[${new Date().toISOString()}] multipart/form-data parse failure`,
+      error instanceof Error ? error.stack || error.message : String(error),
+      "",
+    ].join("\n");
+
+    appendFileSync(resolve(dir, "registration-errors.log"), entry, "utf8");
+  } catch (logError) {
+    console.error("[registration] Falha ao registrar erro:", logError);
+  }
+}
+
 function buildEmailText(params: {
   payload: RegistrationPayload;
-  docs: Array<{
-    key: DocKey;
-    label: string;
-    fileName: string;
-    fileType: string;
-    fileSize: number;
-  }>;
+  docs: EmailDocInfo[];
   meta: {
     submittedAt: string;
     clientIp: string;
@@ -221,7 +273,8 @@ function buildEmailText(params: {
   const { payload, docs, meta } = params;
 
   const lines: string[] = [];
-  lines.push(`Novo cadastro — CELCOIN F10`);
+
+  lines.push("Novo cadastro — CELCOIN F10");
   lines.push(`Recebido em: ${meta.submittedAt}`);
   lines.push(`Token: ${meta.messageToken}`);
   lines.push("");
@@ -254,6 +307,7 @@ function buildEmailText(params: {
   lines.push(`Facebook: ${safeValue(payload.marketingFacebook)}`);
   lines.push("");
   lines.push("=== Documentos enviados ===");
+
   if (!docs.length) {
     lines.push("Nenhum documento anexado.");
   } else {
@@ -261,9 +315,13 @@ function buildEmailText(params: {
       lines.push(
         `- ${d.label}: ${d.fileName} (${d.fileType}, ${formatBytes(d.fileSize)})`,
       );
+      lines.push(`  Link: ${d.downloadUrl}`);
+      lines.push(`  Expira em: ${formatDateTimeBR(d.expiresAt)}`);
     }
   }
+
   lines.push("");
+
   const contract = payload.contract;
   const contractSnapshotHtml =
     typeof contract?.snapshotHtml === "string" ? contract.snapshotHtml : "";
@@ -315,14 +373,7 @@ function buildEmailText(params: {
 
 function buildEmailHtml(params: {
   payload: RegistrationPayload;
-  docs: Array<{
-    key: DocKey;
-    label: string;
-    fileName: string;
-    fileType: string;
-    fileSize: number;
-  }>;
-  selfieInlineDataUrl?: string | null;
+  docs: EmailDocInfo[];
   meta: {
     submittedAt: string;
     clientIp: string;
@@ -337,7 +388,7 @@ function buildEmailHtml(params: {
   const outline = "rgba(0,0,0,0.10)";
   const muted = "rgba(0,0,0,0.62)";
 
-  const { payload, docs, meta, selfieInlineDataUrl } = params;
+  const { payload, docs, meta } = params;
 
   const logoUrl = `${meta.origin}/logo_f10.png`;
   const contract = payload.contract;
@@ -385,22 +436,35 @@ function buildEmailHtml(params: {
 
   const docsRows = docs.length
     ? docs
-      .map(
-        (d) => `
+        .map(
+          (d) => `
             <tr>
               <td style="padding:10px 12px; border-top:1px solid ${outline}; color:${muted}; font-size:12px; width:220px;">
                 ${escapeHtml(d.label)}
               </td>
               <td style="padding:10px 12px; border-top:1px solid ${outline}; color:#111; font-size:13px;">
                 <div style="font-weight:600;">${escapeHtml(d.fileName)}</div>
-                <div style="font-size:12px; color:${muted};">
+                <div style="font-size:12px; color:${muted}; margin-top:2px;">
                   ${escapeHtml(d.fileType)} • ${escapeHtml(formatBytes(d.fileSize))}
+                </div>
+                <div style="font-size:12px; color:${muted}; margin-top:2px;">
+                  Expira em: ${escapeHtml(formatDateTimeBR(d.expiresAt))}
+                </div>
+                <div style="margin-top:10px;">
+                  <a
+                    href="${escapeHtml(d.downloadUrl)}"
+                    target="_blank"
+                    rel="noopener"
+                    style="display:inline-block; padding:9px 12px; border-radius:10px; background:${primary}; color:#fff; text-decoration:none; font-weight:700; font-size:12px;"
+                  >
+                    Baixar arquivo
+                  </a>
                 </div>
               </td>
             </tr>
           `,
-      )
-      .join("")
+        )
+        .join("")
     : `
       <tr>
         <td style="padding:12px; border-top:1px solid ${outline}; color:${muted}; font-size:13px;">
@@ -434,25 +498,6 @@ function buildEmailHtml(params: {
     ["Viewport", safeValue(signedMeta?.viewport)],
     ["Referrer", safeValue(signedMeta?.referrer)],
   ]);
-
-  const selfiePreviewHtml = selfieInlineDataUrl
-    ? `
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${outline}; border-radius:16px; overflow:hidden; background:${surface}; margin-top:14px;">
-        <tr>
-          <td style="padding:14px 16px; background:${bg};">
-            <div style="font-size:14px; font-weight:700; color:${primary};">
-              Selfie (visualização)
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:14px 16px;">
-            <img src="${selfieInlineDataUrl}" alt="Selfie" style="display:block; width:100%; height:auto; border-radius:12px; border:1px solid ${outline};" />
-          </td>
-        </tr>
-      </table>
-    `
-    : "";
 
   const preheaderText =
     "Cadastro completo recebido (unidade, endereço, responsável, divulgação, documentos e metadados).";
@@ -491,7 +536,7 @@ function buildEmailHtml(params: {
                   Novo cadastro — CELCOIN F10
                 </div>
                 <div style="margin-top:6px; color:${muted}; font-size:13px;">
-                  Abaixo estão <strong>todos os dados</strong> enviados no formulário (incluindo campos opcionais).
+                  Abaixo estão <strong>todos os dados</strong> enviados no formulário. Os documentos ficam disponíveis por link temporário.
                 </div>
               </td>
             </tr>
@@ -535,7 +580,7 @@ function buildEmailHtml(params: {
                     <tr>
                       <td style="padding:14px 16px; background:${bg};">
                         <div style="font-size:14px; font-weight:700; color:${primary};">
-                          Documentos enviados - anexos
+                          Documentos enviados
                         </div>
                       </td>
                     </tr>
@@ -545,8 +590,6 @@ function buildEmailHtml(params: {
                   ${contractSection}
 
                   ${deviceSection}
-
-                  ${selfiePreviewHtml}
 
                   ${section("Metadados técnicos", [
                     ["IP (proxy)", safeValue(meta.clientIp)],
@@ -559,7 +602,6 @@ function buildEmailHtml(params: {
                   <div style="margin-top:14px; font-size:12px; color:${muted}; line-height:1.5;">
                     Aviso: este e-mail contém informações sensíveis. Evite encaminhar e mantenha em local seguro.
                   </div>
-
                 </div>
               </td>
             </tr>
@@ -569,7 +611,6 @@ function buildEmailHtml(params: {
                 F10 • Cadastro automático
               </td>
             </tr>
-
           </table>
         </td>
       </tr>
@@ -579,36 +620,13 @@ function buildEmailHtml(params: {
   `.trim();
 }
 
-function getEnv(key: string): string | undefined {
-  const value = process.env[key];
-  if (typeof value === "string" && value.length > 0) {
-    return value;
-  }
-  return undefined;
-}
-
-function logMultipartError(error: unknown): void {
-  try {
-    const dir = resolve(process.cwd(), "data");
-    mkdirSync(dir, { recursive: true });
-    const entry = [
-      `[${new Date().toISOString()}] multipart/form-data parse failure`,
-      error instanceof Error ? error.stack || error.message : String(error),
-      "",
-    ].join("\n");
-    appendFileSync(resolve(dir, "registration-errors.log"), entry, "utf8");
-  } catch (logError) {
-    console.error("[registration] Falha ao registrar erro:", logError);
-  }
-}
-
 export const GET: RequestHandler = async () => {
-  // Healthcheck simples
   const isConfigured = Boolean(
     getEnv("BREVO_API_KEY") &&
       getEnv("BREVO_MAIL_TO") &&
       getEnv("BREVO_FROM_EMAIL"),
   );
+
   return json({ ok: true, emailConfigured: isConfigured });
 };
 
@@ -629,10 +647,9 @@ export const POST: RequestHandler = async ({ request, url }) => {
     );
   }
 
-  // ====== Config ======
   const apiKey = getEnv("BREVO_API_KEY");
-  const toEmail = getEnv("BREVO_MAIL_TO"); // ex: cadastro@f10.com.br
-  const fromEmail = getEnv("BREVO_FROM_EMAIL"); // ex: no-reply@f10.com.br
+  const toEmail = getEnv("BREVO_MAIL_TO");
+  const fromEmail = getEnv("BREVO_FROM_EMAIL");
   const fromName = getEnv("BREVO_FROM_NAME") || "F10";
   const siteUrl = getEnv("SITE_URL") || url.origin;
 
@@ -647,13 +664,14 @@ export const POST: RequestHandler = async ({ request, url }) => {
     );
   }
 
-  // ====== Parse multipart ======
   let form: FormData;
+
   try {
     form = await request.formData();
   } catch (error) {
     console.error("[registration] Falha ao ler multipart:", error);
     logMultipartError(error);
+
     return json(
       {
         success: false,
@@ -666,6 +684,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
   }
 
   const payloadRaw = form.get("payload");
+
   if (typeof payloadRaw !== "string" || !payloadRaw.trim()) {
     return json(
       {
@@ -677,21 +696,24 @@ export const POST: RequestHandler = async ({ request, url }) => {
   }
 
   let payload: RegistrationPayload;
+
   try {
     payload = JSON.parse(payloadRaw) as RegistrationPayload;
   } catch {
     return json(
-      { success: false, message: "Payload inválido (JSON malformado)." },
+      {
+        success: false,
+        message: "Payload inválido (JSON malformado).",
+      },
       { status: 400 },
     );
   }
 
-  // ====== Valida docs (agora com múltiplos) ======
   const docFiles: Array<{
     key: DocKey;
     label: string;
     file: File;
-    index: number; // 1-based por tipo
+    index: number;
   }> = [];
 
   for (const d of DOCS) {
@@ -700,7 +722,10 @@ export const POST: RequestHandler = async ({ request, url }) => {
 
     if (d.required && files.length === 0) {
       return json(
-        { success: false, message: `Documento obrigatório ausente: ${d.label}.` },
+        {
+          success: false,
+          message: `Documento obrigatório ausente: ${d.label}.`,
+        },
         { status: 400 },
       );
     }
@@ -724,14 +749,26 @@ export const POST: RequestHandler = async ({ request, url }) => {
 
       if (!fileName || !fileSize) {
         return json(
-          { success: false, message: `Arquivo inválido em: ${d.label}.` },
+          {
+            success: false,
+            message: `Arquivo inválido em: ${d.label}.`,
+          },
           { status: 400 },
         );
       }
 
-      if (fileSize > MAX_FILE_BYTES) {
+      const maxAllowedBytes =
+        d.key === "doc_selfie" ? MAX_SMALL_FILE_BYTES : MAX_LARGE_FILE_BYTES;
+
+      if (fileSize > maxAllowedBytes) {
         return json(
-          { success: false, message: `Arquivo acima de 2MB em: ${d.label}.` },
+          {
+            success: false,
+            message:
+              d.key === "doc_selfie"
+                ? `Arquivo acima de 2MB em: ${d.label}.`
+                : `Arquivo acima de 2GB em: ${d.label}.`,
+          },
           { status: 400 },
         );
       }
@@ -739,6 +776,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
       if (!d.allowedMime.has(fileType)) {
         const allowedText =
           d.key === "doc_selfie" ? "JPG/PNG" : "PDF/JPG/PNG";
+
         return json(
           {
             success: false,
@@ -752,48 +790,63 @@ export const POST: RequestHandler = async ({ request, url }) => {
     }
   }
 
-  // ====== Monta anexos (Brevo: content base64 + name) ======
-  const attachments: Array<{ name: string; content: string }> = [];
-  const docsInfoForHtml: Array<{
-    key: DocKey;
-    label: string;
-    fileName: string;
-    fileType: string;
-    fileSize: number;
-  }> = [];
-  let selfieInlineDataUrl: string | null = null;
+  const docsInfoForHtml: EmailDocInfo[] = [];
+  const savedFileRecords: RegistrationFileRecord[] = [];
 
-  for (const d of docFiles) {
-    const baseName = sanitizeFilename(d.file.name);
-    const numberedName =
-      d.key === "doc_selfie"
-        ? `doc_selfie_${baseName}`
-        : `${d.key}_${String(d.index).padStart(2, "0")}_${baseName}`;
+  try {
+    for (const d of docFiles) {
+      const baseName = sanitizeFilename(d.file.name);
+      const numberedName =
+        d.key === "doc_selfie"
+          ? `doc_selfie_${baseName}`
+          : `${d.key}_${String(d.index).padStart(2, "0")}_${baseName}`;
 
-    const content = await fileToBase64(d.file);
+      const fileForStorage = new File([d.file], numberedName, {
+        type: d.file.type || "application/octet-stream",
+      });
 
-    attachments.push({ name: numberedName, content });
-    if (d.key === "doc_selfie") {
-      const mime = d.file.type || "image/jpeg";
-      selfieInlineDataUrl = `data:${mime};base64,${content}`;
+      const record = await saveRegistrationFile({
+        file: fileForStorage,
+        docType: d.key,
+        expiresInDays: FILE_EXPIRATION_DAYS,
+        maxDownloads: MAX_DOWNLOADS_PER_FILE,
+      });
+
+      savedFileRecords.push(record);
+
+      docsInfoForHtml.push({
+        key: d.key,
+        label: d.label,
+        fileName: numberedName,
+        fileType: d.file.type || "application/octet-stream",
+        fileSize: d.file.size,
+        downloadUrl: buildDownloadUrl(siteUrl, record.token),
+        expiresAt: record.expiresAt,
+      });
     }
+  } catch (error) {
+    console.error("[registration] Falha ao salvar arquivos:", error);
 
-    docsInfoForHtml.push({
-      key: d.key,
-      label: d.label,
-      fileName: numberedName,
-      fileType: d.file.type || "application/octet-stream",
-      fileSize: d.file.size,
-    });
+    return json(
+      {
+        success: false,
+        message: "Não foi possível salvar os arquivos enviados.",
+      },
+      { status: 500 },
+    );
   }
+
+  const attachments: Array<{ name: string; content: string }> = [];
 
   const contractSnapshotHtml =
     typeof payload.contract?.snapshotHtml === "string"
       ? payload.contract.snapshotHtml
       : "";
+
   const contractSnapshotFileName = sanitizeFilename(
     payload.contract?.snapshotFileName || "contrato_f10.html",
   );
+
   if (contractSnapshotHtml) {
     attachments.push({
       name: contractSnapshotFileName,
@@ -801,10 +854,8 @@ export const POST: RequestHandler = async ({ request, url }) => {
     });
   }
 
-  // ====== Meta / tokens ======
   const nowIso = new Date().toISOString();
   const submittedAtIso = payload.submittedAt || nowIso;
-
   const cnpjDigits = onlyDigits(payload.cnpj);
   const messageToken = `${cnpjDigits || "CNPJ"}-${Date.now()}`;
 
@@ -816,11 +867,9 @@ export const POST: RequestHandler = async ({ request, url }) => {
     messageToken,
   };
 
-  // ====== HTML + TEXTO ======
   const htmlContent = buildEmailHtml({
     payload,
     docs: docsInfoForHtml,
-    selfieInlineDataUrl,
     meta,
   });
 
@@ -830,13 +879,11 @@ export const POST: RequestHandler = async ({ request, url }) => {
     meta,
   });
 
-  // ====== Assunto ÚNICO (evita “conversa” e trimming) ======
   const stampForSubject = nowIso.replace("T", " ").slice(0, 19);
   const subject = `Novo cadastro F10 • ${safeValue(
     payload.unitFantasyName,
   )} • ${cnpjDigits || "CNPJ"} • ${stampForSubject}`;
 
-  // ====== Envia via Brevo ======
   try {
     const brevoRes = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
@@ -858,6 +905,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
 
     if (!brevoRes.ok) {
       const errorText = await brevoRes.text().catch(() => "");
+
       return json(
         {
           success: false,
@@ -877,8 +925,16 @@ export const POST: RequestHandler = async ({ request, url }) => {
       success: true,
       message: "Cadastro recebido e e-mail enviado com sucesso.",
       messageId: data?.messageId ?? null,
+      files: savedFileRecords.map((record) => ({
+        token: record.token,
+        originalName: record.originalName,
+        size: record.size,
+        expiresAt: record.expiresAt,
+      })),
     });
-  } catch {
+  } catch (error) {
+    console.error("[registration] Erro inesperado ao enviar e-mail:", error);
+
     return json(
       {
         success: false,

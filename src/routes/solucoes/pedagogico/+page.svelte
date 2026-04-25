@@ -904,7 +904,7 @@
                             <li class="flex gap-2">
                                 <span
                                     class="mt-[6px] h-1.5 w-1.5 rounded-full bg-[#EA6D0B]"
-                                />
+                                ></span>
                                 <span>{bullet}</span>
                             </li>
                         {/each}
@@ -991,7 +991,7 @@
                                     <li class="flex gap-2">
                                         <span
                                             class="mt-[6px] h-1.5 w-1.5 rounded-full bg-[#000A57]"
-                                        />
+                                        ></span>
                                         <span>{bullet}</span>
                                     </li>
                                 {/each}
@@ -1105,7 +1105,7 @@
                             class="mt-1 h-5 w-5 rounded-full bg-[#F3F4FD]
                                    flex items-center justify-center"
                         >
-                            <span class="h-2 w-2 rounded-full bg-[#EA6D0B]" />
+                            <span class="h-2 w-2 rounded-full bg-[#EA6D0B]" ></span>
                         </div>
                         <div>
                             <p class="text-[13px] font-semibold text-[#000A57]">
@@ -1124,7 +1124,7 @@
                             class="mt-1 h-5 w-5 rounded-full bg-[#F3F4FD]
                                    flex items-center justify-center"
                         >
-                            <span class="h-2 w-2 rounded-full bg-[#4F46E5]" />
+                            <span class="h-2 w-2 rounded-full bg-[#4F46E5]" ></span>
                         </div>
                         <div>
                             <p class="text-[13px] font-semibold text-[#000A57]">
@@ -1143,7 +1143,7 @@
                             class="mt-1 h-5 w-5 rounded-full bg-[#F3F4FD]
                                    flex items-center justify-center"
                         >
-                            <span class="h-2 w-2 rounded-full bg-[#16A34A]" />
+                            <span class="h-2 w-2 rounded-full bg-[#16A34A]" ></span>
                         </div>
                         <div>
                             <p class="text-[13px] font-semibold text-[#000A57]">
@@ -1605,7 +1605,7 @@
                     <div class="flex gap-2">
                         <span
                             class="mt-[6px] h-1.5 w-1.5 rounded-full bg-[#EA6D0B]"
-                        />
+                        ></span>
                         <p class="text-[13px] text-[#000A57]/85">
                             Acesse a Jornada do Aluno pela guia
                             <span class="font-semibold"
@@ -1616,7 +1616,7 @@
                     <div class="flex gap-2">
                         <span
                             class="mt-[6px] h-1.5 w-1.5 rounded-full bg-[#4F46E5]"
-                        />
+                        ></span>
                         <p class="text-[13px] text-[#000A57]/85">
                             Clique com o botão direito sobre o aluno para abrir
                             cadastro, titular, opções do App, SMS, WhatsApp,
@@ -1626,7 +1626,7 @@
                     <div class="flex gap-2">
                         <span
                             class="mt-[6px] h-1.5 w-1.5 rounded-full bg-emerald-500"
-                        />
+                        ></span>
                         <p class="text-[13px] text-[#000A57]/85">
                             Centralize resgates pedagógicos, tarefas e
                             observações em um único fluxo para coordenação e
@@ -1675,7 +1675,7 @@
                     <div class="flex gap-2">
                         <span
                             class="mt-[6px] h-1.5 w-1.5 rounded-full bg-[#EA6D0B]"
-                        />
+                        ></span>
                         <p class="text-[13px] text-[#000A57]/85">
                             Agrupamento específico em
                             <span class="font-semibold"
@@ -1686,7 +1686,7 @@
                     <div class="flex gap-2">
                         <span
                             class="mt-[6px] h-1.5 w-1.5 rounded-full bg-[#4F46E5]"
-                        />
+                        ></span>
                         <p class="text-[13px] text-[#000A57]/85">
                             Convites exibidos diretamente no App e Portal, com
                             registro de quem confirmou e quem participou.
@@ -1695,7 +1695,7 @@
                     <div class="flex gap-2">
                         <span
                             class="mt-[6px] h-1.5 w-1.5 rounded-full bg-emerald-500"
-                        />
+                        ></span>
                         <p class="text-[13px] text-[#000A57]/85">
                             Relatório de horas em atividades extra classe para
                             pais e coordenação, sem montar filtros complexos.
