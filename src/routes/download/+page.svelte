@@ -1,6 +1,14 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { ArrowRight, Download, Home, BookOpen, Instagram, Star, X } from "lucide-svelte";
+  import {
+    ArrowRight,
+    Download,
+    Home,
+    BookOpen,
+    Instagram,
+    Star,
+    X,
+  } from "lucide-svelte";
 
   const installerUrl = "/download/installer";
   const googleReviewUrl = "https://g.page/r/CXgT5_ElMfztEAI/review";
@@ -9,27 +17,20 @@
 
   let isReviewModalOpen = false;
   let hasCompletedReview = false;
+  let hasStartedDownload = false;
 
   function startDownload() {
-    // pt-BR: Dispara o download pelo iframe para manter a página aberta.
+    if (hasStartedDownload) return;
+
+    hasStartedDownload = true;
+
+    // pt-BR: Dispara o download automaticamente sem sair da página.
     const iframe = document.createElement("iframe");
     iframe.name = "installer-download-frame";
     iframe.style.display = "none";
     iframe.src = installerUrl;
+
     document.body.appendChild(iframe);
-
-    // pt-BR: Fallback com clique em link real. Não usar download="", pois pode quebrar endpoints dinâmicos.
-    window.setTimeout(() => {
-      const downloadLink = document.createElement("a");
-      downloadLink.href = installerUrl;
-      downloadLink.target = iframe.name;
-      downloadLink.rel = "noopener noreferrer";
-      downloadLink.style.display = "none";
-
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      downloadLink.remove();
-    }, 300);
 
     window.setTimeout(() => {
       try {
@@ -69,7 +70,8 @@
   onMount(() => {
     startDownload();
 
-    hasCompletedReview = localStorage.getItem(reviewCompletedStorageKey) === "true";
+    hasCompletedReview =
+      localStorage.getItem(reviewCompletedStorageKey) === "true";
 
     window.setTimeout(() => {
       openReviewModal();
@@ -167,12 +169,16 @@
         Obrigado! Seu download deve começar automaticamente.
       </h1>
 
-      <p class="mt-3 text-[15px] leading-[1.9] text-[#000A57]/80 md:text-[16px]">
-        Se não iniciar em alguns segundos, clique no botão abaixo. Alguns navegadores bloqueiam downloads automáticos por
-        segurança.
+      <p
+        class="mt-3 text-[15px] leading-[1.9] text-[#000A57]/80 md:text-[16px]"
+      >
+        Se não iniciar em alguns segundos, clique no botão abaixo. Alguns
+        navegadores bloqueiam downloads automáticos por segurança.
       </p>
 
-      <div class="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+      <div
+        class="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row"
+      >
         <a
           href={installerUrl}
           class="inline-flex items-center justify-center gap-2 rounded-full bg-[#EA6D0B] px-7 py-3.5 text-[15px] font-semibold text-white shadow-[0_14px_40px_rgba(234,109,11,0.35)] hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/50"
@@ -199,17 +205,23 @@
           class="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md"
         >
           <div class="flex items-center gap-3">
-            <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 ring-1 ring-slate-100">
+            <span
+              class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 ring-1 ring-slate-100"
+            >
               <Home size={18} />
             </span>
 
             <div class="min-w-0">
-              <p class="font-semibold leading-tight text-[#010D28]">Página inicial</p>
+              <p class="font-semibold leading-tight text-[#010D28]">
+                Página inicial
+              </p>
               <p class="text-[13px] text-slate-600">Voltar para o site</p>
             </div>
           </div>
 
-          <div class="mt-4 text-[13px] font-semibold text-[#EA6D0B] group-hover:underline">
+          <div
+            class="mt-4 text-[13px] font-semibold text-[#EA6D0B] group-hover:underline"
+          >
             Abrir página <span aria-hidden="true">→</span>
           </div>
         </a>
@@ -221,17 +233,25 @@
           class="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md"
         >
           <div class="flex items-center gap-3">
-            <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 ring-1 ring-slate-100">
+            <span
+              class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 ring-1 ring-slate-100"
+            >
               <BookOpen size={18} />
             </span>
 
             <div class="min-w-0">
-              <p class="font-semibold leading-tight text-[#010D28]">Nosso blog</p>
-              <p class="text-[13px] text-slate-600">Conteúdos e novidades do F10</p>
+              <p class="font-semibold leading-tight text-[#010D28]">
+                Nosso blog
+              </p>
+              <p class="text-[13px] text-slate-600">
+                Conteúdos e novidades do F10
+              </p>
             </div>
           </div>
 
-          <div class="mt-4 text-[13px] font-semibold text-[#EA6D0B] group-hover:underline">
+          <div
+            class="mt-4 text-[13px] font-semibold text-[#EA6D0B] group-hover:underline"
+          >
             Abrir página <span aria-hidden="true">→</span>
           </div>
         </a>
@@ -243,17 +263,25 @@
           class="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md"
         >
           <div class="flex items-center gap-3">
-            <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 ring-1 ring-slate-100">
+            <span
+              class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 ring-1 ring-slate-100"
+            >
               <Instagram size={18} />
             </span>
 
             <div class="min-w-0">
-              <p class="font-semibold leading-tight text-[#010D28]">Nosso Instagram</p>
-              <p class="text-[13px] text-slate-600">Bastidores e atualizações</p>
+              <p class="font-semibold leading-tight text-[#010D28]">
+                Nosso Instagram
+              </p>
+              <p class="text-[13px] text-slate-600">
+                Bastidores e atualizações
+              </p>
             </div>
           </div>
 
-          <div class="mt-4 text-[13px] font-semibold text-[#EA6D0B] group-hover:underline">
+          <div
+            class="mt-4 text-[13px] font-semibold text-[#EA6D0B] group-hover:underline"
+          >
             Abrir página <span aria-hidden="true">→</span>
           </div>
         </a>
@@ -266,25 +294,32 @@
         >
           <div class="flex items-center gap-3">
             <span
-              class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-500 ring-1 ring-amber-100"
+              class="inline-flex h-10 min-w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-500 ring-1 ring-amber-100"
             >
               <Star size={18} fill="currentColor" />
             </span>
 
             <div class="min-w-0">
-              <p class="font-semibold leading-tight text-[#010D28]">Gostou do F10?</p>
+              <p class="font-semibold leading-tight text-[#010D28]">
+                Gostou do F10?
+              </p>
               <p class="text-[13px] leading-snug text-slate-600">
-                Avalie nossa empresa no Google. Sua opinião ajuda outros clientes a conhecerem nosso trabalho.
+                Avalie nossa empresa no Google.
               </p>
             </div>
           </div>
 
           <div class="mt-4 flex items-center justify-between gap-3">
-            <div class="text-[15px] leading-none text-amber-400" aria-label="Avaliação cinco estrelas">
+            <div
+              class="text-[15px] leading-none text-amber-400"
+              aria-label="Avaliação cinco estrelas"
+            >
               ★★★★★
             </div>
 
-            <span class="text-[13px] font-semibold text-[#EA6D0B] group-hover:underline">
+            <span
+              class="text-[13px] font-semibold text-[#EA6D0B] group-hover:underline"
+            >
               Avaliar agora <span aria-hidden="true">→</span>
             </span>
           </div>
@@ -292,8 +327,8 @@
       </div>
 
       <p class="mt-6 text-center text-[12px] text-slate-500">
-        Dica: se o navegador bloquear downloads automáticos, o botão “Baixar novamente” resolve porque vira ação do
-        usuário.
+        Dica: se o navegador bloquear downloads automáticos, o botão “Baixar
+        novamente” resolve porque vira ação do usuário.
       </p>
     </div>
   </div>
