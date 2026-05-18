@@ -1,7 +1,6 @@
 // src/routes/api/nfse-homologacao/submit/+server.ts
 import "$lib/server/load-env";
 import { json } from "@sveltejs/kit";
-import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import type { RequestHandler } from "./$types";
@@ -43,7 +42,7 @@ type SubmissionPayload = HomologFormData & {
   contract?: ContractPayload;
 };
 
-type DocKey = "certificate_file" | "selfie_file";
+type DocKey = "certificate_file";
 
 type DocConfig = {
   key: DocKey;
@@ -55,8 +54,6 @@ type DocConfig = {
 };
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024; // 2MB
-const MAX_FILES_PER_DOC_TYPE = 1; // Apenas um certificado
-
 const ALLOWED_DOC_MIME = new Set([
   "application/x-pkcs12",
   "application/pkcs12",
@@ -68,8 +65,6 @@ const ALLOWED_DOC_MIME = new Set([
   "application/x-x509-user-cert",
 ]);
 
-const ALLOWED_SELFIE_MIME = new Set(["image/jpeg", "image/png"]);
-
 const DOCS: DocConfig[] = [
   {
     key: "certificate_file",
@@ -77,14 +72,6 @@ const DOCS: DocConfig[] = [
     required: true,
     multiple: false,
     allowedMime: ALLOWED_DOC_MIME,
-    maxFiles: 1,
-  },
-  {
-    key: "selfie_file",
-    label: "Foto de verificação",
-    required: true,
-    multiple: false,
-    allowedMime: ALLOWED_SELFIE_MIME,
     maxFiles: 1,
   },
 ];
@@ -128,9 +115,6 @@ function formatYesNo(value: unknown): string {
   return "-";
 }
 
-function hashSha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
-}
 
 function sanitizeFilename(name: string): string {
   const base = (name || "arquivo").split(/[/\\]/).pop() || "arquivo";
@@ -252,12 +236,25 @@ function buildEmailText(params: {
   lines.push("");
   lines.push("=== Dados da unidade ===");
   lines.push(`CNPJ: ${safeValue(payload.cnpj)}`);
+  lines.push(`Inscrição Municipal: ${safeValue(payload.municipalRegistration)}`);
+  lines.push(`Inscrição Estadual: ${safeValue(payload.stateRegistration)}`);
   lines.push(`Razão Social: ${safeValue(payload.legalName)}`);
   lines.push(`Nome Fantasia: ${safeValue(payload.fantasyName)}`);
   lines.push(`CNAE principal: ${safeValue(payload.cnaeMain)}`);
   lines.push("");
   lines.push("=== Endereço da unidade ===");
   lines.push(`CEP: ${safeValue(payload.cep)}`);
+  lines.push(`Rua: ${safeValue(payload.street)}`);
+  lines.push(`Número: ${safeValue(payload.number)}`);
+  lines.push(`Complemento: ${safeValue(payload.complement)}`);
+  lines.push(`Bairro: ${safeValue(payload.neighborhood)}`);
+  lines.push(`Cidade: ${safeValue(payload.city)}`);
+  lines.push(`Estado: ${safeValue(payload.state)}`);
+  lines.push("");
+  lines.push("=== Contato ===");
+  lines.push(`Telefone com DDD: ${safeValue(payload.phone)}`);
+  lines.push(`E-mail: ${safeValue(payload.email)}`);
+  lines.push(`Site: ${safeValue(payload.website)}`);
   lines.push("");
   lines.push("=== Confirmações === ");
   lines.push(`Optante pelo Simples Nacional: ${formatYesNo(payload.isSimples)}`);
@@ -279,7 +276,7 @@ function buildEmailText(params: {
     lines.push("=== Dados fiscais (serviço) ===");
     lines.push(`Item Lista de Serviço: ${safeValue(payload.serviceListItem)}`);
     lines.push(`Código de Tributação: ${safeValue(payload.taxationCode)}`);
-    lines.push(`Local de tributação: ${safeValue(payload.taxationPlace)}`);
+    lines.push(`Natureza da operação: ${safeValue(payload.taxationPlace)}`);
     lines.push(`Regime especial: ${safeValue(payload.specialRegime)}`);
     lines.push(`Exigibilidade do ISS: ${safeValue(payload.issRequirement)}`);
     lines.push(`Retenção do ISS: ${formatYesNo(payload.issWithholding)}`);
@@ -319,6 +316,9 @@ function buildEmailText(params: {
     lines.push(`Código de benefício fiscal: ${safeValue(payload.commerceFiscalBenefitCode)}`);
   }
 
+  lines.push("");
+  lines.push("=== Certificado digital ===");
+  lines.push(`Senha do certificado digital: ${safeValue(payload.certificatePassword)}`);
   lines.push("");
   lines.push("=== Documentos enviados ===");
   if (!docs.length) {
@@ -427,10 +427,22 @@ function buildEmailHtml(params: {
 
   const generalSection = section("Dados da unidade", [
     ["CNPJ", safeValue(payload.cnpj)],
+    ["Inscrição Municipal", safeValue(payload.municipalRegistration)],
+    ["Inscrição Estadual", safeValue(payload.stateRegistration)],
     ["Razão Social", safeValue(payload.legalName)],
     ["Nome Fantasia", safeValue(payload.fantasyName)],
     ["CNAE principal", safeValue(payload.cnaeMain)],
     ["CEP", safeValue(payload.cep)],
+    ["Rua", safeValue(payload.street)],
+    ["Número", safeValue(payload.number)],
+    ["Complemento", safeValue(payload.complement)],
+    ["Bairro", safeValue(payload.neighborhood)],
+    ["Cidade", safeValue(payload.city)],
+    ["Estado", safeValue(payload.state)],
+    ["Telefone com DDD", safeValue(payload.phone)],
+    ["E-mail", safeValue(payload.email)],
+    ["Site", safeValue(payload.website)],
+    ["Senha do certificado digital", safeValue(payload.certificatePassword)],
     ["Optante pelo Simples Nacional", formatYesNo(payload.isSimples)],
     ["Incentiva projetos culturais (renúncia fiscal)", formatYesNo(payload.supportsCulturalProjects)],
     ["Emite NFS-e pelo ambiente nacional", formatYesNo(payload.usesNationalNfseEnvironment)],
@@ -448,7 +460,7 @@ function buildEmailHtml(params: {
         ["Lote de RPS", safeValue(payload.serviceRpsBatchNumber)],
         ["Item Lista de Serviço", safeValue(payload.serviceListItem)],
         ["Código de Tributação", safeValue(payload.taxationCode)],
-        ["Local de tributação", safeValue(payload.taxationPlace)],
+        ["Natureza da operação", safeValue(payload.taxationPlace)],
         ["Regime especial", safeValue(payload.specialRegime)],
         ["Exigibilidade do ISS", safeValue(payload.issRequirement)],
         ["Retenção do ISS", formatYesNo(payload.issWithholding)],
@@ -789,11 +801,6 @@ export const POST: RequestHandler = async ({ request, url }) => {
       attachmentName = zipped.name;
       attachmentType = "application/zip";
       attachmentSize = Buffer.from(attachmentContent, "base64").length;
-    } else if (d.key === "selfie_file") {
-      attachmentContent = await fileToBase64(d.file);
-      attachmentName = sanitizeFilename(d.file.name);
-      attachmentName = `${d.key}_${String(d.index).padStart(2, "0")}_${attachmentName}`;
-      attachmentType = d.file.type || "image/jpeg";
     } else {
       attachmentContent = await fileToBase64(d.file);
       attachmentName = sanitizeFilename(d.file.name);
@@ -857,7 +864,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
       body: JSON.stringify({
         sender: { email: fromEmail, name: fromName },
         to: [{ email: toEmail, name: "Homologação F10" }],
-        cc: [{ email: copyEmail, name: "Homologação F10" }],
+        ...(copyEmail ? { cc: [{ email: copyEmail, name: "Homologação F10" }] } : {}),
         subject,
         htmlContent,
         textContent,
