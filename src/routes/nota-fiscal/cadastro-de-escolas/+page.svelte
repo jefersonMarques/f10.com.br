@@ -1,19 +1,26 @@
 <!-- src/routes/nota-fiscal/cadastro-de-escolas/+page.svelte -->
 <script lang="ts">
-  import Breadcrumb from "$lib/components/Breadcrumb.svelte";
-  import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from "lucide-svelte";
+  import { onMount } from "svelte";
   import { get } from "svelte/store";
-  import { formDataStore, resetFormData, type FormErrors, type FormDataState } from "./formStore";
+
+  import Breadcrumb from "$lib/components/Breadcrumb.svelte";
+
+  import {
+    formDataStore,
+    issRequirementOptions,
+    specialRegimeOptions,
+    taxationPlaceOptions,
+    type FormErrors,
+  } from "./formStore";
   import Step0 from "./steps/Step0.svelte";
   import Step1 from "./steps/Step1.svelte";
   import Step2 from "./steps/Step2.svelte";
   import Step3 from "./steps/Step3.svelte";
   import Step4 from "./steps/Step4.svelte";
+  import { Check } from "lucide-svelte";
 
   type WizardStep = 0 | 1 | 2 | 3 | 4;
-
   type CityCheckStatus = "idle" | "checking" | "available" | "unavailable" | "error";
-
   type CityCheckResult = {
     status: CityCheckStatus;
     city: string;
@@ -25,25 +32,93 @@
     raw?: Record<string, unknown> | null;
   };
 
+  const stepTitles: Record<WizardStep, string> = {
+    0: "Verificação da cidade",
+    1: "CNPJ, endereço e confirmações",
+    2: "Acesso e dados fiscais",
+    3: "Certificado digital",
+    4: "Explicação",
+  };
+
   let currentStep: WizardStep = 0;
+
   let errors: FormErrors = {};
-  let certificateFile: File | null = null;
-  let submitMessage = "";
   let isSubmitting = false;
   let isSuccess = false;
+  let submitMessage = "";
+
+  let certificateFile: File | null = null;
   let cityCheckResult: CityCheckResult | null = null;
 
-  const steps = [
-    { label: "Cobertura", description: "Cidade" },
-    { label: "Empresa", description: "CNPJ e endereço" },
-    { label: "Tributação", description: "Regime e serviços" },
-    { label: "Certificado", description: "Arquivo e senha" },
-    { label: "Revisão", description: "Confirmação" },
-  ];
+  function onlyDigits(value: string): string {
+    return value.replace(/\D+/g, "");
+  }
+
+  function normalizePercent(value: string): string {
+    return value.replaceAll(" ", "").replaceAll("%", "").replaceAll(",", ".");
+  }
+
+  function isPercentValid(value: string, allowEmpty = true): boolean {
+    const v = normalizePercent(value);
+    if (!v) return allowEmpty;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 && n <= 100;
+  }
+
+  function isValidCPF(cpf: string): boolean {
+    const cpfDigits = onlyDigits(cpf);
+    if (cpfDigits.length !== 11) return false;
+    if (/^(\d)\1{10}$/.test(cpfDigits)) return false;
+
+    let sum = 0;
+    for (let i = 0; i < 9; i++) {
+      sum += Number(cpfDigits[i]) * (10 - i);
+    }
+    let resto = sum % 11;
+    let dv1 = resto < 2 ? 0 : 11 - resto;
+    if (Number(cpfDigits[9]) !== dv1) return false;
+
+    sum = 0;
+    for (let i = 0; i < 10; i++) {
+      sum += Number(cpfDigits[i]) * (11 - i);
+    }
+    resto = sum % 11;
+    let dv2 = resto < 2 ? 0 : 11 - resto;
+    if (Number(cpfDigits[10]) !== dv2) return false;
+
+    return true;
+  }
+
+  type EmailField = { key: string; label: string; value: string };
+  type SubmissionPayload = Record<string, unknown> & { emailFields: EmailField[] };
+
+  function getOptionLabel<T extends string>(
+    options: Array<{ value: T; label: string }>,
+    value: T,
+  ): string {
+    return options.find((option) => option.value === value)?.label ?? value;
+  }
+
+  function getCityCheckEmailFields(): EmailField[] {
+    if (!cityCheckResult) {
+      return [
+        { key: "cityCheckStatus", label: "Verificação da cidade", value: "Não realizada" },
+      ];
+    }
+
+    return [
+      { key: "cityCheckStatus", label: "Verificação da cidade", value: cityCheckResult.status },
+      { key: "cityCheckMessage", label: "Mensagem da verificação", value: cityCheckResult.message },
+      { key: "cityCheckCity", label: "Cidade verificada", value: cityCheckResult.city },
+      { key: "cityCheckState", label: "UF verificada", value: cityCheckResult.state },
+      { key: "cityCheckIbgeCode", label: "Código IBGE", value: cityCheckResult.ibgeCode },
+      { key: "cityCheckProvider", label: "Provedor NFS-e", value: cityCheckResult.provider },
+      { key: "cityCheckCheckedAt", label: "Data da verificação", value: cityCheckResult.checkedAt },
+    ];
+  }
 
   function applyCityCheckResult(result: CityCheckResult) {
     cityCheckResult = result;
-
     formDataStore.update((prev) => ({
       ...prev,
       city: result.city || prev.city,
@@ -51,82 +126,181 @@
     }));
   }
 
-  function formatYesNo(value: unknown): string {
-    if (value === true || value === "yes") return "Sim";
-    if (value === false || value === "no") return "Não";
-    return "Não informado";
+  function continueAfterCityCheck() {
+    currentStep = 1;
+    submitMessage = "";
   }
 
-  function isValidEmail(value: string): boolean {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+  function applyCachedCityCheckLead() {
+    if (typeof window === "undefined") return;
+
+    type CityCheckLeadCache = {
+      shouldSkipCityCheck?: boolean;
+      contactName?: string;
+      contactEmail?: string;
+      contactWhatsapp?: string;
+      schoolName?: string;
+      cityCheckResult?: CityCheckResult;
+    };
+
+    const raw = window.sessionStorage.getItem("nfseCityCheckLead");
+    if (!raw) return;
+
+    try {
+      const cache = JSON.parse(raw) as CityCheckLeadCache;
+      const result = cache.cityCheckResult;
+
+      if (result) {
+        cityCheckResult = result;
+        formDataStore.update((prev) => ({
+          ...prev,
+          city: result.city || prev.city,
+          state: result.state || prev.state,
+          fantasyName: cache.schoolName || prev.fantasyName,
+          email: cache.contactEmail || prev.email,
+          phone: cache.contactWhatsapp || prev.phone,
+        }));
+      }
+
+      if (cache.shouldSkipCityCheck && result) {
+        currentStep = 1;
+      }
+    } catch {
+      window.sessionStorage.removeItem("nfseCityCheckLead");
+    }
   }
 
-  function onlyDigits(value: string): string {
-    return (value ?? "").replace(/\D+/g, "");
+  onMount(() => {
+    applyCachedCityCheckLead();
+  });
+
+  function appendPayloadFields(formData: FormData, payload: SubmissionPayload) {
+    for (const [key, value] of Object.entries(payload)) {
+      if (value === undefined || value === null) continue;
+      if (Array.isArray(value) || typeof value === "object") continue;
+      formData.append(key, String(value));
+    }
+
+    for (const field of payload.emailFields) {
+      formData.append(`email_${field.key}`, field.value);
+    }
   }
 
-  function createSubmissionPayload() {
+  function createSubmissionPayload(): SubmissionPayload {
     const data = get(formDataStore);
 
-    const emailFields = [
-      { key: "cityCheckStatus", label: "Status da cidade", value: cityCheckResult?.status || "não verificado" },
-      { key: "cityCheckMessage", label: "Mensagem da verificação", value: cityCheckResult?.message || "" },
-      { key: "cityCheckProvider", label: "Provedor da verificação", value: cityCheckResult?.provider || "" },
-      { key: "cityCheckIbgeCode", label: "Código IBGE", value: cityCheckResult?.ibgeCode || "" },
-      { key: "noteKind", label: "Tipo de nota", value: data.noteKind },
-      { key: "cnpj", label: "CNPJ", value: data.cnpj },
-      { key: "legalName", label: "Razão Social", value: data.legalName },
-      { key: "fantasyName", label: "Nome Fantasia", value: data.fantasyName },
-      { key: "municipalRegistration", label: "Inscrição Municipal", value: data.municipalRegistration },
-      { key: "hasStateRegistration", label: "Possui Inscrição Estadual", value: formatYesNo(data.hasStateRegistration) },
-      { key: "stateRegistration", label: "Inscrição Estadual", value: data.stateRegistration },
-      { key: "cnaeMain", label: "CNAE Principal", value: data.cnaeMain },
-      { key: "phone", label: "Telefone", value: data.phone },
-      { key: "email", label: "E-mail", value: data.email },
-      { key: "website", label: "Site", value: data.website },
-      { key: "cep", label: "CEP", value: data.cep },
-      { key: "street", label: "Logradouro", value: data.street },
-      { key: "number", label: "Número", value: data.number },
-      { key: "complement", label: "Complemento", value: data.complement },
-      { key: "neighborhood", label: "Bairro", value: data.neighborhood },
-      { key: "city", label: "Cidade", value: data.city },
-      { key: "state", label: "UF", value: data.state },
-      { key: "isSimples", label: "Optante Simples Nacional", value: formatYesNo(data.isSimples) },
-      { key: "supportsCulturalProjects", label: "Incentiva projetos culturais", value: formatYesNo(data.supportsCulturalProjects) },
-      { key: "usesNationalNfseEnvironment", label: "Usa ambiente nacional NFS-e", value: formatYesNo(data.usesNationalNfseEnvironment) },
-      { key: "taxRegime", label: "Regime Tributário", value: data.taxRegime },
-      { key: "specialTaxRegime", label: "Regime Especial", value: data.specialTaxRegime },
-      { key: "rpsSeries", label: "Série RPS", value: data.rpsSeries },
-      { key: "lastRpsNumber", label: "Último número RPS", value: data.lastRpsNumber },
-      { key: "serviceCode", label: "Código de Serviço", value: data.serviceCode },
-      { key: "cityTaxCode", label: "Código Tributário Municipal", value: data.cityTaxCode },
-      { key: "serviceDescription", label: "Descrição do Serviço", value: data.serviceDescription },
-      { key: "serviceCnae", label: "CNAE do Serviço", value: data.serviceCnae },
-      { key: "issRate", label: "Alíquota ISS", value: data.issRate },
-      { key: "issWithheld", label: "ISS Retido", value: formatYesNo(data.issWithheld) },
-      { key: "certificateType", label: "Tipo Certificado", value: data.certificateType },
-      { key: "certificatePassword", label: "Senha Certificado", value: data.certificatePassword ? "Informada" : "Não informada" },
-      { key: "certificateValidity", label: "Validade Certificado", value: data.certificateValidity },
-      { key: "authorizedPersonName", label: "Responsável Autorizado", value: data.authorizedPersonName },
-      { key: "authorizedPersonCpf", label: "CPF Responsável", value: data.authorizedPersonCpf },
-      { key: "technicalContactName", label: "Contato Técnico", value: data.technicalContactName },
-      { key: "technicalContactEmail", label: "E-mail Técnico", value: data.technicalContactEmail },
-      { key: "technicalContactPhone", label: "Telefone Técnico", value: data.technicalContactPhone },
-      { key: "observations", label: "Observações", value: data.observations },
-    ];
+    const hasServiceNote =
+      data.noteKind === "service" || data.noteKind === "service_and_commerce";
+
+    const hasCommerceNote =
+      data.noteKind === "commerce" || data.noteKind === "service_and_commerce";
+
+    const normalized = {
+      ...data,
+      submittedAt: new Date().toISOString(),
+      cityCheckStatus: cityCheckResult?.status ?? "not_checked",
+      cityCheckMessage: cityCheckResult?.message ?? "Verificação de cidade não realizada.",
+      cityCheckCity: cityCheckResult?.city ?? data.city,
+      cityCheckState: cityCheckResult?.state ?? data.state,
+      cityCheckIbgeCode: cityCheckResult?.ibgeCode ?? "",
+      cityCheckProvider: cityCheckResult?.provider ?? "",
+      cityCheckCheckedAt: cityCheckResult?.checkedAt ?? "",
+      cityCheckRaw: cityCheckResult?.raw ?? null,
+      cnpjDigits: onlyDigits(data.cnpj),
+      cepDigits: onlyDigits(data.cep),
+      phoneDigits: onlyDigits(data.phone),
+      hasServiceNote,
+      hasCommerceNote,
+      operationNature: data.taxationPlace,
+      operationNatureLabel: getOptionLabel(taxationPlaceOptions, data.taxationPlace),
+      taxationPlaceLabel: getOptionLabel(taxationPlaceOptions, data.taxationPlace),
+      specialRegimeLabel: getOptionLabel(specialRegimeOptions, data.specialRegime),
+      issRequirementLabel: getOptionLabel(issRequirementOptions, data.issRequirement),
+      issEligibility: data.issRequirement,
+      issEligibilityLabel: getOptionLabel(issRequirementOptions, data.issRequirement),
+      aliquotPis: normalizePercent(data.aliquotPis),
+      aliquotCofins: normalizePercent(data.aliquotCofins),
+      aliquotInss: normalizePercent(data.aliquotInss),
+      aliquotIr: normalizePercent(data.aliquotIr),
+      aliquotCsll: normalizePercent(data.aliquotCsll),
+      aliquotIss: normalizePercent(data.aliquotIss),
+      ibptPercent: normalizePercent(data.ibptPercent),
+      commerceIcmsAliquot: normalizePercent(data.commerceIcmsAliquot),
+      commerceIpiAliquot: normalizePercent(data.commerceIpiAliquot),
+      commercePisAliquot: normalizePercent(data.commercePisAliquot),
+      commerceCofinsAliquot: normalizePercent(data.commerceCofinsAliquot),
+    };
 
     return {
-      submittedAt: new Date().toISOString(),
-      cityCheck: cityCheckResult,
-      data,
-      emailFields,
+      ...normalized,
+      emailFields: [
+        ...getCityCheckEmailFields(),
+        { key: "noteKind", label: "Tipo de nota", value: data.noteKind },
+        { key: "cnpj", label: "CNPJ", value: data.cnpj },
+        { key: "legalName", label: "Razão Social", value: data.legalName },
+        { key: "fantasyName", label: "Nome Fantasia", value: data.fantasyName },
+        { key: "municipalRegistration", label: "Inscrição Municipal", value: data.municipalRegistration },
+        { key: "hasStateRegistration", label: "Possui Inscrição Estadual", value: data.hasStateRegistration ? "Sim" : "Não" },
+        { key: "stateRegistration", label: "Inscrição Estadual", value: data.hasStateRegistration ? data.stateRegistration : "Não possui" },
+        { key: "cnaeMain", label: "CNAE principal", value: data.cnaeMain },
+        { key: "phone", label: "Telefone com DDD", value: data.phone },
+        { key: "email", label: "E-mail", value: data.email },
+        { key: "website", label: "Site", value: data.website },
+        { key: "cep", label: "CEP", value: data.cep },
+        { key: "street", label: "Logradouro", value: data.street },
+        { key: "number", label: "Número", value: data.number },
+        { key: "complement", label: "Complemento", value: data.complement },
+        { key: "neighborhood", label: "Bairro", value: data.neighborhood },
+        { key: "city", label: "Cidade", value: data.city },
+        { key: "state", label: "UF", value: data.state },
+        { key: "isSimples", label: "Optante pelo Simples Nacional", value: data.isSimples },
+        { key: "supportsCulturalProjects", label: "Incentivo cultural", value: data.supportsCulturalProjects },
+        { key: "usesNationalNfseEnvironment", label: "Ambiente nacional NFS-e", value: data.usesNationalNfseEnvironment },
+        { key: "cityHallLogin", label: "Login Prefeitura", value: data.cityHallLogin },
+        { key: "cityHallPassword", label: "Senha Prefeitura", value: data.cityHallPassword },
+        { key: "securityPhrase", label: "Frase de segurança", value: data.securityPhrase },
+        { key: "serviceRpsBatchNumber", label: "Lote RPS", value: data.serviceRpsBatchNumber },
+        { key: "serviceListItem", label: "Item da Lista de Serviço", value: data.serviceListItem },
+        { key: "taxationCode", label: "Código de Tributação", value: data.taxationCode },
+        { key: "operationNature", label: "Natureza da operação", value: normalized.operationNatureLabel },
+        { key: "taxationPlace", label: "Natureza da operação", value: normalized.taxationPlaceLabel },
+        { key: "specialRegime", label: "Regime especial", value: normalized.specialRegimeLabel },
+        { key: "issRequirement", label: "Exigibilidade do ISS", value: normalized.issRequirementLabel },
+        { key: "issEligibility", label: "Eligibilidade do ISS", value: normalized.issEligibilityLabel },
+        { key: "issWithholding", label: "Retenção do ISS", value: data.issWithholding },
+        { key: "roundIss", label: "Arredondar ISS", value: data.roundIss },
+        { key: "aliquotIss", label: "Alíquota ISS", value: normalized.aliquotIss },
+        { key: "aliquotPis", label: "Alíquota PIS", value: normalized.aliquotPis },
+        { key: "aliquotCofins", label: "Alíquota COFINS", value: normalized.aliquotCofins },
+        { key: "aliquotInss", label: "Alíquota INSS", value: normalized.aliquotInss },
+        { key: "aliquotIr", label: "Alíquota IR", value: normalized.aliquotIr },
+        { key: "aliquotCsll", label: "Alíquota CSLL", value: normalized.aliquotCsll },
+        { key: "ibptPercent", label: "IBPT", value: normalized.ibptPercent },
+        { key: "serviceDescription", label: "Descrição de serviços prestados", value: data.serviceDescription },
+        { key: "commerceLastInvoiceNumber", label: "Última nota de comércio", value: data.commerceLastInvoiceNumber },
+        { key: "commerceOperationNature", label: "Natureza da Operação de comércio", value: data.commerceOperationNature },
+        { key: "commerceBatchNumber", label: "Lote NF-e", value: data.commerceBatchNumber },
+        { key: "commerceNumbering", label: "Numeração NF-e", value: data.commerceNumbering },
+        { key: "commerceSeries", label: "Série NF-e", value: data.commerceSeries },
+        { key: "commerceNcmCode", label: "Código NCM", value: data.commerceNcmCode },
+        { key: "commerceCfopCode", label: "Código CFOP", value: data.commerceCfopCode },
+        { key: "commerceReturnCfop", label: "CFOP para devolução", value: data.commerceReturnCfop },
+        { key: "commerceIcmsAliquot", label: "Alíquota ICMS", value: normalized.commerceIcmsAliquot },
+        { key: "commerceCstIcms", label: "CST ICMS", value: data.commerceCstIcms },
+        { key: "commerceCsosn", label: "CSOSN", value: data.commerceCsosn },
+        { key: "commerceIpiAliquot", label: "Alíquota IPI", value: normalized.commerceIpiAliquot },
+        { key: "commerceCstIpi", label: "CST IPI", value: data.commerceCstIpi },
+        { key: "commercePisAliquot", label: "Alíquota PIS comércio", value: normalized.commercePisAliquot },
+        { key: "commerceCstPis", label: "CST PIS", value: data.commerceCstPis },
+        { key: "commerceCofinsAliquot", label: "Alíquota COFINS comércio", value: normalized.commerceCofinsAliquot },
+        { key: "commerceCstCofins", label: "CST COFINS", value: data.commerceCstCofins },
+        { key: "commerceItemDescription", label: "Descrição da nota de comércio", value: data.commerceItemDescription },
+        { key: "commerceGtin", label: "GTIN", value: data.commerceGtin },
+        { key: "commerceFiscalBenefitCode", label: "Código de benefício fiscal", value: data.commerceFiscalBenefitCode },
+        { key: "certificatePassword", label: "Senha do certificado digital", value: data.certificatePassword },
+        { key: "acceptedTerms", label: "Contrato aceito", value: data.acceptedTerms ? "Sim" : "Não" },
+      ],
     };
-  }
-
-  function appendPayloadFields(fd: FormData, payload: ReturnType<typeof createSubmissionPayload>) {
-    payload.emailFields.forEach((field) => {
-      fd.append(`email_${field.key}`, String(field.value ?? ""));
-    });
   }
 
   function validateStep(step: WizardStep): boolean {
@@ -134,60 +308,241 @@
     const next: FormErrors = {};
 
     if (step === 0) {
-      if (!data.city) next.city = "Informe a cidade.";
-      if (!data.state) next.state = "Informe a UF.";
+      if (!cityCheckResult || cityCheckResult.status === "idle") {
+        submitMessage = "Verifique a cidade antes de continuar.";
+        errors = next;
+        return false;
+      }
+
+      if (cityCheckResult.status === "checking") {
+        submitMessage = "Aguarde a conclusão da verificação.";
+        errors = next;
+        return false;
+      }
+
+      if (cityCheckResult.status === "error") {
+        submitMessage = "Não foi possível verificar a cidade. Tente novamente ou envie mesmo assim quando o alerta aparecer.";
+        errors = next;
+        return false;
+      }
     }
 
     if (step === 1) {
-      if (onlyDigits(data.cnpj).length !== 14) next.cnpj = "Informe um CNPJ válido.";
-      if (!data.legalName.trim()) next.legalName = "Informe a razão social.";
-      if (!data.fantasyName.trim()) next.fantasyName = "Informe o nome fantasia.";
-      if (!data.municipalRegistration.trim()) next.municipalRegistration = "Informe a inscrição municipal.";
-      if (data.hasStateRegistration === null) next.hasStateRegistration = "Informe se possui inscrição estadual.";
-      if (data.hasStateRegistration === true && !data.stateRegistration.trim()) next.stateRegistration = "Informe a inscrição estadual.";
-      if (!data.cnaeMain.trim()) next.cnaeMain = "Informe o CNAE.";
-      if (!data.phone.trim()) next.phone = "Informe o telefone.";
-      if (!data.email.trim() || !isValidEmail(data.email)) next.email = "Informe um e-mail válido.";
-      if (onlyDigits(data.cep).length !== 8) next.cep = "Informe um CEP válido.";
-      if (!data.street.trim()) next.street = "Informe o logradouro.";
-      if (!data.number.trim()) next.number = "Informe o número.";
-      if (!data.neighborhood.trim()) next.neighborhood = "Informe o bairro.";
-      if (!data.city.trim()) next.city = "Informe a cidade.";
-      if (!data.state.trim()) next.state = "Informe a UF.";
-      if (data.isSimples === "unknown") next.isSimples = "Informe se é optante do Simples.";
-      if (data.supportsCulturalProjects === "unknown") next.supportsCulturalProjects = "Informe esta opção.";
-      if (data.usesNationalNfseEnvironment === "unknown") next.usesNationalNfseEnvironment = "Informe esta opção.";
+      if (onlyDigits(data.cnpj).length !== 14) {
+        next.cnpj = "CNPJ inválido.";
+      }
+
+      if (!data.legalName.trim()) {
+        next.legalName = "Informe a Razão Social.";
+      }
+
+      if (!data.fantasyName.trim()) {
+        next.fantasyName = "Informe o Nome Fantasia.";
+      }
+
+      if (!data.municipalRegistration.trim()) {
+        next.municipalRegistration = "Informe a Inscrição Municipal.";
+      }
+
+      if (!data.phone?.trim()) {
+        next.phone = "Telefone é obrigatório.";
+      }
+
+      if (!data.email?.trim()) {
+        next.email = "E-mail é obrigatório.";
+      }
+
+      if (!data.website?.trim()) {
+        next.website = "Site é obrigatório.";
+      }
+
+      if (data.hasStateRegistration === true) {
+        if (!data.stateRegistration?.trim()) {
+          next.stateRegistration = "Inscrição Estadual é obrigatória.";
+        } else if (data.stateRegistration.trim().length < 2) {
+          next.stateRegistration = "Inscrição Estadual inválida.";
+        }
+      }
+
+      if (onlyDigits(data.cnaeMain).length !== 7) {
+        next.cnaeMain = "CNAE inválido (7 dígitos).";
+      }
+
+      if (onlyDigits(data.cep).length !== 8) {
+        next.cep = "CEP inválido.";
+      }
+
+      if (!data.street.trim()) {
+        next.street = "Informe o logradouro.";
+      }
+
+      if (!data.number.trim()) {
+        next.number = "Informe o número.";
+      }
+
+      if (!data.neighborhood.trim()) {
+        next.neighborhood = "Informe o bairro.";
+      }
+
+      if (!data.city.trim()) {
+        next.city = "Informe a cidade.";
+      }
+
+      if (!data.state.trim() || data.state.length !== 2) {
+        next.state = "Informe a UF (2 letras).";
+      }
     }
 
     if (step === 2) {
-      if (!data.taxRegime.trim()) next.taxRegime = "Informe o regime tributário.";
-      if (!data.specialTaxRegime.trim()) next.specialTaxRegime = "Informe o regime especial.";
-      if (!data.rpsSeries.trim()) next.rpsSeries = "Informe a série RPS.";
-      if (!data.lastRpsNumber.trim()) next.lastRpsNumber = "Informe o último número RPS.";
-      if (!data.serviceCode.trim()) next.serviceCode = "Informe o código de serviço.";
-      if (!data.cityTaxCode.trim()) next.cityTaxCode = "Informe o código tributário municipal.";
-      if (!data.serviceDescription.trim()) next.serviceDescription = "Informe a descrição do serviço.";
-      if (!data.serviceCnae.trim()) next.serviceCnae = "Informe o CNAE do serviço.";
-      if (!data.issRate.trim()) next.issRate = "Informe a alíquota ISS.";
-      if (data.issWithheld === "unknown") next.issWithheld = "Informe se há ISS retido.";
+      const shouldValidateService =
+        data.noteKind === "service" || data.noteKind === "service_and_commerce";
+
+      const shouldValidateCommerce =
+        data.noteKind === "commerce" ||
+        data.noteKind === "service_and_commerce";
+
+      if (shouldValidateService) {
+        if (!data.cityHallLogin.trim()) {
+          next.cityHallLogin = "Informe o login da prefeitura.";
+        } else {
+          const loginDigits = onlyDigits(data.cityHallLogin);
+          if (loginDigits.length === 11 && !isValidCPF(loginDigits)) {
+            next.cityHallLogin = "CPF inválido.";
+          }
+        }
+
+        if (!data.cityHallPassword.trim()) {
+          next.cityHallPassword = "Informe a senha da prefeitura.";
+        }
+
+        if (!data.serviceRpsBatchNumber.trim()) {
+          next.serviceRpsBatchNumber = "Informe a numeração do lote de RPS.";
+        }
+
+        if (!data.serviceListItem.trim()) {
+          next.serviceListItem = "Informe o Item da Lista de Serviço.";
+        }
+
+        if (!data.taxationCode.trim()) {
+          next.taxationCode = "Informe o Código de Tributação.";
+        }
+
+        if (!data.taxationPlace.trim()) {
+          next.taxationPlace = "Informe a Natureza da Operação.";
+        }
+
+        if (!data.specialRegime.trim()) {
+          next.specialRegime = "Informe o Regime Especial de Tributação.";
+        }
+
+        if (!data.issRequirement.trim()) {
+          next.issRequirement = "Informe a Exigibilidade do ISS.";
+        }
+
+        if (!data.issWithholding.trim()) {
+          next.issWithholding = "Informe a Retenção do ISS.";
+        }
+
+        if (!isPercentValid(data.aliquotIss, true)) {
+          next.aliquotIss = "Alíquota ISS inválida (0..100).";
+        }
+
+        if (data.ibptPercent && !isPercentValid(data.ibptPercent, true)) {
+          next.ibptPercent = "IBPT inválido (0..100).";
+        }
+
+        if (!data.serviceDescription.trim()) {
+          next.serviceDescription = "Descreva os serviços prestados.";
+        }
+
+        if (!isPercentValid(data.aliquotPis, true)) {
+          next.aliquotPis = "Alíquota PIS inválida (0..100).";
+        }
+
+        if (!isPercentValid(data.aliquotCofins, true)) {
+          next.aliquotCofins = "Alíquota COFINS inválida (0..100).";
+        }
+
+        if (!isPercentValid(data.aliquotInss, true)) {
+          next.aliquotInss = "Alíquota INSS inválida (0..100).";
+        }
+
+        if (!isPercentValid(data.aliquotIr, true)) {
+          next.aliquotIr = "Alíquota IR inválida (0..100).";
+        }
+
+        if (!isPercentValid(data.aliquotCsll, true)) {
+          next.aliquotCsll = "Alíquota CSLL inválida (0..100).";
+        }
+      }
+
+      if (shouldValidateCommerce) {
+        if (!data.commerceNcmCode.trim()) {
+          next.commerceNcmCode = "Informe o Código NCM.";
+        }
+
+        if (!data.commerceCfopCode.trim()) {
+          next.commerceCfopCode = "Informe o Código CFOP.";
+        }
+
+        if (!data.commerceOperationNature.trim()) {
+          next.commerceOperationNature = "Informe a Natureza da Operação.";
+        }
+
+        if (!isPercentValid(data.commerceIcmsAliquot, false)) {
+          next.commerceIcmsAliquot = "Alíquota ICMS inválida (0..100).";
+        }
+
+        if (!data.commerceCstIcms.trim()) {
+          next.commerceCstIcms = "Informe o CST ICMS.";
+        }
+
+        if (!isPercentValid(data.commerceIpiAliquot, false)) {
+          next.commerceIpiAliquot = "Alíquota IPI inválida (0..100).";
+        }
+
+        if (!data.commerceCstIpi.trim()) {
+          next.commerceCstIpi = "Informe o CST IPI.";
+        }
+
+        if (!isPercentValid(data.commercePisAliquot, false)) {
+          next.commercePisAliquot = "Alíquota PIS inválida (0..100).";
+        }
+
+        if (!data.commerceCstPis.trim()) {
+          next.commerceCstPis = "Informe o CST PIS.";
+        }
+
+        if (!isPercentValid(data.commerceCofinsAliquot, false)) {
+          next.commerceCofinsAliquot = "Alíquota COFINS inválida (0..100).";
+        }
+
+        if (!data.commerceCstCofins.trim()) {
+          next.commerceCstCofins = "Informe o CST COFINS.";
+        }
+
+        if (!data.commerceItemDescription.trim()) {
+          next.commerceItemDescription = "Informe a descrição da nota.";
+        }
+
+        if (!data.commerceReturnCfop.trim()) {
+          next.commerceReturnCfop = "Informe o CFOP para nota de devolução.";
+        }
+      }
     }
 
     if (step === 3) {
-      if (!data.certificateType.trim()) next.certificateType = "Informe o tipo de certificado.";
-      if (!data.certificatePassword.trim()) next.certificatePassword = "Informe a senha do certificado.";
-      if (!data.certificateValidity.trim()) next.certificateValidity = "Informe a validade.";
-      if (!certificateFile) next.certificateFile = "Envie o arquivo do certificado.";
-      if (!data.authorizedPersonName.trim()) next.authorizedPersonName = "Informe o responsável.";
-      if (onlyDigits(data.authorizedPersonCpf).length !== 11) next.authorizedPersonCpf = "Informe um CPF válido.";
-      if (!data.technicalContactName.trim()) next.technicalContactName = "Informe o contato técnico.";
-      if (!data.technicalContactEmail.trim() || !isValidEmail(data.technicalContactEmail)) next.technicalContactEmail = "Informe um e-mail técnico válido.";
-      if (!data.technicalContactPhone.trim()) next.technicalContactPhone = "Informe o telefone técnico.";
+      if (!certificateFile)
+        next.certificateFile = "Certificado digital é obrigatório.";
+      if (!get(formDataStore).certificatePassword.trim())
+        next.certificatePassword = "Informe a senha do certificado.";
     }
 
     if (step === 4) {
       if (!data.acceptedTerms)
         next.acceptedTerms = "Você deve aceitar os termos para continuar.";
     }
+
 
     errors = next;
     return Object.keys(next).length === 0;
@@ -222,7 +577,7 @@
       appendPayloadFields(fd, payload);
       fd.append("certificate_file", certificateFile!);
 
-      const res = await fetch("/api/nfse/nfse-homologacao/submit", {
+      const res = await fetch("/api/nfse-homologacao/submit", {
         method: "POST",
         body: fd,
       });
@@ -253,54 +608,64 @@
     items={[
       { label: "HOME", href: "/" },
       { label: "NOTA FISCAL", href: "/nota-fiscal" },
-      { label: "CADASTRO" },
+      { label: "CADASTRO DE ESCOLAS" },
     ]}
   />
 
-  <div class="container flex-1 pt-6">
-    <div class="mx-auto max-w-6xl">
-      <div class="mb-6">
-        <h1 class="text-[28px] md:text-[36px] font-semibold tracking-[-0.03em] text-[#010D28]">
-          Cadastro para habilitar Nota Fiscal
-        </h1>
-        <p class="mt-2 max-w-3xl text-[15px] leading-relaxed text-[#000A57]/70">
-          Preencha os dados para que a equipe F10 avalie o cenário fiscal da sua escola e configure o melhor fluxo de emissão possível.
-        </p>
+  <div class="container flex-1 flex flex-col justify-center">
+    <header class="mb-6">
+      <h1
+        class="text-[16px] sm:text-[16px] leading-tight font-semibold text-black/80"
+      >
+        Registro para uso do serviço NFS-e / NF-e
+      </h1>
+
+      <div class="mt-4 flex items-center gap-2">
+        {#each [0, 1, 2, 3, 4] as step}
+          <div
+            class={`h-2 flex-1 rounded-full ${isSuccess || currentStep >= step ? "bg-[var(--primary)]" : "bg-black/10"}`}
+          ></div>
+        {/each}
       </div>
 
-      <div class="rounded-[28px] bg-white shadow-[0_24px_80px_rgba(1,13,40,0.08)] ring-1 ring-black/5 overflow-hidden">
-        <div class="grid border-b border-black/5 bg-[#F8FAFF] p-4 md:grid-cols-5">
-          {#each steps as item, index}
-            <div class="flex items-center gap-3 p-2">
-              <div
-                class={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${
-                  currentStep === index
-                    ? "bg-[var(--primary)] text-white"
-                    : currentStep > index
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-white text-[#000A57]/50 ring-1 ring-black/10"
-                }`}
-              >
-                {#if currentStep > index}
-                  <CheckCircle2 size={16} />
-                {:else}
-                  {index + 1}
-                {/if}
-              </div>
-              <div class="min-w-0">
-                <p class="text-[13px] font-semibold text-[#010D28]">{item.label}</p>
-                <p class="truncate text-[12px] text-[#7E82A2]">{item.description}</p>
-              </div>
-            </div>
-          {/each}
-        </div>
+      <div class="mt-2 text-[13px] text-black/60">
+        {#if isSuccess}Sucesso{:else}{stepTitles[currentStep]}{/if}
+      </div>
+    </header>
 
-        <div class="p-5 md:p-8">
+    <div
+      class="rounded-[22px] bg-[var(--surface)] border border-[var(--outline)] shadow-sm p-5 sm:p-8 space-y-8"
+    >
+      {#if isSuccess}
+        <div class="text-center">
+          <div
+            class="mx-auto w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center relative overflow-hidden"
+          >
+            <span
+              class="absolute inset-0 rounded-2xl border border-emerald-200/60 animate-ping"
+              style="animation-duration: 1.25s;"
+            ></span>
+            <!-- Check (sem SVG externo) -->
+            <span
+              class="relative inline-flex items-center justify-center w-9 h-9 rounded-xl bg-emerald-100 border border-emerald-200 text-emerald-700 animate-[pop_420ms_ease-out]"
+            >
+              <Check />
+            </span>
+          </div>
+          <h2 class="mt-4 text-[20px] font-semibold text-black/85">
+            Enviado com sucesso
+          </h2>
+          <p class="mt-2 text-[13px] text-black/60">
+            Recebemos os dados para homologação. Em breve retornamos.
+          </p>
+        </div>
+      {:else}
+        {#key currentStep}
           {#if currentStep === 0}
             <Step0
               {cityCheckResult}
               onApplyResult={applyCityCheckResult}
-              onContinue={nextStep}
+              onContinue={continueAfterCityCheck}
             />
           {:else if currentStep === 1}
             <Step1 {errors} />
@@ -309,75 +674,71 @@
           {:else if currentStep === 3}
             <Step3 {errors} bind:certificateFile />
           {:else if currentStep === 4}
-            <Step4 {errors} {certificateFile} {cityCheckResult} />
+            <Step4 {errors} />
           {/if}
-        </div>
+        {/key}
 
-        {#if currentStep > 0}
-          <div class="flex flex-col gap-3 border-t border-black/5 bg-[#F8FAFF] p-5 sm:flex-row sm:items-center sm:justify-between">
-            <button
-              type="button"
-              class="inline-flex items-center justify-center gap-2 rounded-xl border border-black/10 bg-white px-5 py-3 text-[13px] font-semibold text-[#010D28] hover:bg-black/[0.03]"
-              on:click={prevStep}
-              disabled={isSubmitting}
-            >
-              <ArrowLeft size={16} />
-              Voltar
-            </button>
+        <div
+          class="pt-2 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between"
+        >
+          <div class="text-[13px] text-black/65"></div>
 
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div class="flex gap-3">
+            {#if currentStep > 0}
               <button
                 type="button"
-                class="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white px-5 py-3 text-[13px] font-semibold text-[#010D28] hover:bg-black/[0.03]"
-                on:click={resetFormData}
+                class="rounded-xl px-6 py-3 text-[13px] font-semibold border border-black/15 bg-white hover:bg-black/[0.03] disabled:opacity-60"
+                on:click={prevStep}
                 disabled={isSubmitting}
               >
-                Limpar formulário
+                Voltar
               </button>
+            {/if}
 
-              {#if currentStep < 4}
-                <button
-                  type="button"
-                  class="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-6 py-3 text-[13px] font-semibold text-white hover:brightness-110"
-                  on:click={nextStep}
-                  disabled={isSubmitting}
-                >
-                  Continuar
-                  <ArrowRight size={16} />
-                </button>
-              {:else}
-                <button
-                  type="button"
-                  class="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-6 py-3 text-[13px] font-semibold text-white hover:brightness-110 disabled:opacity-70"
-                  on:click={handleSubmit}
-                  disabled={isSubmitting}
-                >
-                  {#if isSubmitting}
-                    <Loader2 size={16} class="animate-spin" />
-                    Enviando...
-                  {:else}
-                    Enviar solicitação
-                    <ArrowRight size={16} />
-                  {/if}
-                </button>
-              {/if}
-            </div>
+            {#if currentStep > 0 && currentStep < 4}
+              <button
+                type="button"
+                class="rounded-xl px-6 py-3 text-[13px] font-semibold text-white bg-[var(--primary)] hover:brightness-110 disabled:opacity-60"
+                on:click={nextStep}
+                disabled={isSubmitting}
+              >
+                Próximo
+              </button>
+            {:else if currentStep === 4}
+              <button
+                type="button"
+                class="rounded-xl px-6 py-3 text-[13px] font-semibold text-white bg-[var(--primary)] hover:brightness-110 disabled:opacity-60"
+                on:click={handleSubmit}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Enviando..." : "Enviar"}
+              </button>
+            {/if}
           </div>
-        {/if}
+        </div>
 
         {#if submitMessage}
-          <div class="border-t border-black/5 bg-rose-50 px-5 py-4 text-[13px] font-semibold text-rose-700">
-            {submitMessage}
-          </div>
+          <p class="mt-3 text-[13px] text-red-600">{submitMessage}</p>
         {/if}
-
-        {#if isSuccess}
-          <div class="border-t border-black/5 bg-emerald-50 px-5 py-5 text-emerald-800">
-            <p class="font-semibold">Solicitação enviada com sucesso.</p>
-            <p class="mt-1 text-[13px]">A equipe F10 recebeu os dados e dará sequência à análise.</p>
-          </div>
-        {/if}
-      </div>
+      {/if}
     </div>
   </div>
 </section>
+
+<style>
+  /* Intenção: animação rápida e elegante ao entrar no sucesso */
+  @keyframes pop {
+    0% {
+      transform: scale(0.85);
+      opacity: 0;
+    }
+    60% {
+      transform: scale(1.08);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+</style>
