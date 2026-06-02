@@ -74,7 +74,21 @@
           .slice(0, 8)
       : [];
   $: matchedCity = findCoveredCityMatch(city);
-  $: canContinue = Boolean(state && matchedCity);
+  $: hasSelectedState = Boolean(state);
+  $: hasFilledCity = Boolean(city.trim());
+  $: isCityAvailable = Boolean(matchedCity);
+  $: hasUnavailableCity = hasSelectedState && hasFilledCity && !isCityAvailable && !isLoadingCoveredCities;
+  $: canContinue = hasSelectedState && hasFilledCity && !isLoadingCoveredCities;
+  $: resultPanelClass = isCityAvailable
+    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+    : hasUnavailableCity
+      ? "border-red-200 bg-red-50 text-red-700"
+      : "border-black/10 bg-black/[0.02] text-black/60";
+  $: continueButtonClass = isCityAvailable
+    ? "bg-emerald-700 hover:brightness-110"
+    : hasUnavailableCity
+      ? "bg-red-600 hover:brightness-110"
+      : "bg-[var(--primary)] hover:brightness-110";
   $: shouldShowCityDropdown =
     isCityDropdownOpen &&
     Boolean(state) &&
@@ -202,14 +216,24 @@
     errors = { ...errors, city: "" };
   }
 
-  function applyAvailableCity(availableCity: string) {
+  function applyCityResult() {
+    const currentMatchedCity = findCoveredCityMatch(city);
+    const resolvedCity = currentMatchedCity || city.trim();
+    const isAvailable = Boolean(currentMatchedCity);
+
+    if (currentMatchedCity) {
+      city = currentMatchedCity;
+    }
+
     const result: CityCheckResult = {
-      status: "available",
-      city: availableCity,
+      status: isAvailable ? "available" : "unavailable",
+      city: resolvedCity,
       state: normalizeState(state),
       ibgeCode: "",
       provider: "",
-      message: "Cidade disponível para continuidade do cadastro.",
+      message: isAvailable
+        ? "Sua cidade está disponível para emissão de notas fiscais. Continue o preenchimento dos dados."
+        : "Sua cidade não está elegível para emissão de notas fiscais, porém você poderá prosseguir com o preenchimento dos dados.",
       checkedAt: new Date().toISOString(),
       raw: null,
     };
@@ -221,7 +245,7 @@
     city = coveredCity;
     isCityDropdownOpen = false;
     errors = { ...errors, city: "" };
-    applyAvailableCity(coveredCity);
+    applyCityResult();
   }
 
   function normalizeSelectedCity() {
@@ -234,15 +258,14 @@
 
     if (currentMatchedCity) {
       city = currentMatchedCity;
-      applyAvailableCity(currentMatchedCity);
     }
 
+    applyCityResult();
     isCityDropdownOpen = false;
   }
 
   function validateCityFields(): boolean {
     const next: Record<string, string> = {};
-    const currentMatchedCity = findCoveredCityMatch(city);
 
     if (normalizeState(state).length !== 2) {
       next.state = "Selecione a UF.";
@@ -250,21 +273,16 @@
 
     if (!city.trim()) {
       next.city = "Informe a cidade.";
-    } else if (!currentMatchedCity) {
-      next.city = "Selecione uma cidade disponível na lista.";
-    }
-
-    if (currentMatchedCity) {
-      city = currentMatchedCity;
-      applyAvailableCity(currentMatchedCity);
     }
 
     errors = next;
     return Object.keys(next).length === 0;
   }
 
-  function continueWithAvailableCity() {
+  function continueWithCity() {
     if (!validateCityFields()) return;
+
+    applyCityResult();
 
     formDataStore.update((prev) => ({
       ...prev,
@@ -377,12 +395,16 @@
     </div>
   </div>
 
-  <div class="flex flex-col gap-3 rounded-2xl border border-black/10 bg-black/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
-    <div class="text-[13px] text-black/60">
-      {#if canContinue}
-        <span class="inline-flex items-center gap-2 text-emerald-700">
+  <div class={`flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${resultPanelClass}`}>
+    <div class="text-[13px]">
+      {#if isCityAvailable}
+        <span class="inline-flex items-center gap-2 font-semibold">
           <CheckCircle2 size={16} />
-          Cidade disponível. Continue o preenchimento.
+          Sua cidade está disponível para emissão de notas fiscais. Continue o preenchimento dos dados.
+        </span>
+      {:else if hasUnavailableCity}
+        <span class="font-semibold">
+          Sua cidade não está elegível para emissão de notas fiscais, porém você poderá prosseguir com o preenchimento dos dados.
         </span>
       {:else}
         Se a cidade aparecer na lista, ela está disponível para NFS-e.
@@ -391,15 +413,17 @@
 
     <button
       type="button"
-      class="inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-[13px] font-semibold text-white bg-[var(--primary)] hover:brightness-110 disabled:opacity-60"
-      on:click={continueWithAvailableCity}
-      disabled={!canContinue || isLoadingCoveredCities}
+      class={`inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-[13px] font-semibold text-white disabled:opacity-60 ${continueButtonClass}`}
+      on:click={continueWithCity}
+      disabled={!canContinue}
     >
       {#if isLoadingCoveredCities}
         <Loader2 size={16} class="animate-spin" />
         Carregando...
+      {:else if hasUnavailableCity}
+        Continuar mesmo assim
       {:else}
-        Continuar preenchimento
+        Continuar
       {/if}
     </button>
   </div>
