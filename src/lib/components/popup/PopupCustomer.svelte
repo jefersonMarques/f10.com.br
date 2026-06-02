@@ -1,6 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher, onMount } from "svelte";
-    import { ArrowRight, Coins, Sparkles } from "lucide-svelte";
+    import { ArrowRight, Coins, FileText, Sparkles } from "lucide-svelte";
 
     // Única prop: controla se o popup está visível
     export let open = false;
@@ -34,7 +34,6 @@
 
 {#if mounted && portal && open}
     <div bind:this={modalEl} class="fixed inset-0 z-[9999] flex items-center justify-center">
-        <!-- Overlay -->
         <button
             type="button"
             class="absolute inset-0 bg-[#020618]/70 backdrop-blur-sm z-0"
@@ -42,22 +41,19 @@
             aria-label="Fechar modal"
         ></button>
 
-        <!-- Container do popup -->
         <div
             class="relative z-10 w-[92%] max-w-xl max-h-[90vh]
                    rounded-[24px] overflow-hidden bg-white
                    shadow-[0_26px_80px_rgba(1,13,40,0.55)]
                    border border-slate-200/80 animate-fadeIn"
         >
-            <!-- glow superior (delicado) -->
             <div
                 class="absolute inset-x-0 -top-20 h-40
-                       bg-[radial-gradient(circle_at_top,_rgba(234,109,11,0.22),_transparent)]
+                       bg-[radial-gradient(circle_at_top,_rgba(234,109,11,0.18),_transparent)]
                        pointer-events-none"
                 aria-hidden="true"
             ></div>
 
-            <!-- Botão fechar -->
             <button
                 on:click={closeModal}
                 class="absolute top-3 right-4 text-slate-400 hover:text-slate-600
@@ -67,29 +63,24 @@
                 ×
             </button>
 
-            <!-- Conteúdo -->
-            <div class="relative px-6 pt-8 pb-9 md:px-9 md:pt-9 md:pb-10 bg-white">
-                <!-- Título + subtítulo -->
+            <div class="relative px-6 pt-8 pb-8 md:px-9 md:pt-9 md:pb-9 bg-white">
                 <div class="text-center space-y-3">
                     <h2 class="text-[22px] md:text-[26px] font-semibold tracking-[-0.02em] text-[#010D28]">
                         Como deseja continuar?
                     </h2>
 
                     <p class="text-[14px] md:text-[15px] leading-[1.8] text-[#000A57]/75 max-w-[520px] mx-auto">
-                        Atualize o F10 no desktop, acesse a central de ajuda ou conheça a
-                        integração Celcoin para cobranças via Pix.
+                        Acesse os principais recursos para clientes F10 ou conheça novas integrações.
                     </p>
                 </div>
 
-                <!-- Botões principais (menores e delicados) -->
                 <div class="mt-7 flex flex-col items-center gap-3">
-                    <!-- Download (laranja, destaque) -->
                     <a
                         href="/download"
                         on:click={closeModal}
                         class="group relative w-full max-w-sm h-[50px]
                                rounded-[999px] bg-[#EA6D0B] text-white font-semibold
-                               shadow-[0_16px_40px_rgba(234,109,11,0.38)]
+                               shadow-[0_16px_40px_rgba(234,109,11,0.32)]
                                hover:brightness-110 active:translate-y-[1px]
                                transition-all focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/35"
                         aria-label="Fazer download do F10"
@@ -106,7 +97,6 @@
                         </span>
                     </a>
 
-                    <!-- Ajuda (logo abaixo) -->
                     <a
                         href="https://ajuda.f10.com.br/kb"
                         class="group relative w-full max-w-sm h-[50px]
@@ -124,9 +114,26 @@
                             <ArrowRight size={18} />
                         </span>
                     </a>
+
+                    <a
+                        href="/nota-fiscal"
+                        on:click={closeModal}
+                        class="group relative w-full max-w-sm h-[50px]
+                               rounded-[999px] bg-white text-[#000A57] font-semibold
+                               border border-[#CBD5F0] shadow-sm
+                               hover:bg-[#F4F6FF] active:translate-y-[1px]
+                               transition-all focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/25"
+                        aria-label="Acessar Nota Fiscal para clientes"
+                    >
+                        <span class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                            Usar Nota Fiscal
+                        </span>
+                        <span class="absolute right-5 top-1/2 -translate-y-1/2 text-[#EA6D0B]">
+                            <ArrowRight size={18} />
+                        </span>
+                    </a>
                 </div>
 
-                <!-- Separador -->
                 <div class="mt-7 flex items-center justify-center gap-4">
                     <span class="h-px w-[120px] bg-slate-200"></span>
                     <span class="text-[11px] font-semibold text-slate-400 tracking-widest">
@@ -135,11 +142,10 @@
                     <span class="h-px w-[120px] bg-slate-200"></span>
                 </div>
 
-                <!-- Card Celcoin (compacto e delicado) -->
                 <div class="mt-6 flex justify-center">
                     <div
                         class="w-full max-w-sm rounded-[22px]
-                               border border-[#EA6D0B]/30 bg-[#F3F4FD]
+                               border border-[#EA6D0B]/25 bg-[#F3F4FD]
                                px-5 py-5 shadow-[0_10px_26px_rgba(1,13,40,0.06)]"
                     >
                         <div class="flex items-start gap-3">
@@ -168,8 +174,7 @@
                                 </div>
 
                                 <p class="mt-2 text-[#7E82A2] text-[13px] leading-relaxed">
-                                    Conheça a Celcoin e veja como ativar a integração para
-                                    simplificar a conciliação e acelerar recebimentos.
+                                    Conheça a Celcoin e veja como ativar a integração para simplificar a conciliação e acelerar recebimentos.
                                 </p>
 
                                 <a
@@ -191,14 +196,12 @@
                     </div>
                 </div>
 
-                <!-- Rodapé -->
                 <p class="mt-7 text-center text-[11px] text-[#6B7280] leading-relaxed max-w-sm mx-auto">
                     Download exclusivo para escolas e cursos que utilizam o F10 Software.
                     Em caso de dúvida sobre instalação, acesse a central de ajuda.
                 </p>
             </div>
 
-            <!-- borda interna -->
             <div class="pointer-events-none absolute inset-0 rounded-[24px] ring-1 ring-inset ring-white/10"></div>
         </div>
     </div>
