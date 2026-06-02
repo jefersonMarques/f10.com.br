@@ -1,6 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher, onMount } from "svelte";
-    import { ArrowRight, Coins, Sparkles } from "lucide-svelte";
+    import { ArrowRight, Coins, FileText, Sparkles } from "lucide-svelte";
 
     // Única prop: controla se o popup está visível
     export let open = false;
@@ -76,8 +76,7 @@
                     </h2>
 
                     <p class="text-[14px] md:text-[15px] leading-[1.8] text-[#000A57]/75 max-w-[520px] mx-auto">
-                        Atualize o F10 no desktop, acesse a central de ajuda ou conheça a
-                        integração Celcoin para cobranças via Pix.
+                        Atualize o F10 no desktop, acesse a central de ajuda ou conheça recursos financeiros integrados.
                     </p>
                 </div>
 
@@ -135,10 +134,63 @@
                     <span class="h-px w-[120px] bg-slate-200"></span>
                 </div>
 
-                <!-- Card Celcoin (compacto e delicado) -->
-                <div class="mt-6 flex justify-center">
+                <div class="mt-6 grid gap-3">
+                    <!-- Card Nota Fiscal -->
                     <div
-                        class="w-full max-w-sm rounded-[22px]
+                        class="w-full rounded-[22px]
+                               border border-[#EA6D0B]/30 bg-[#FFF7ED]
+                               px-5 py-5 shadow-[0_10px_26px_rgba(1,13,40,0.06)]"
+                    >
+                        <div class="flex items-start gap-3">
+                            <div
+                                class="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full
+                                       bg-white ring-1 ring-black/5"
+                                aria-hidden="true"
+                            >
+                                <FileText size={18} class="text-[#EA6D0B]" />
+                            </div>
+
+                            <div class="flex-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <p class="text-[#010D28] font-semibold text-[15px] leading-snug">
+                                        Quer ativar Nota Fiscal no F10?
+                                    </p>
+
+                                    <span
+                                        class="inline-flex items-center gap-1 rounded-full
+                                               bg-white text-[#EA6D0B] px-2.5 py-1
+                                               text-[10px] font-bold ring-1 ring-[#EA6D0B]/20"
+                                    >
+                                        <Sparkles size={12} />
+                                        NOVO
+                                    </span>
+                                </div>
+
+                                <p class="mt-2 text-[#7E82A2] text-[13px] leading-relaxed">
+                                    Valide a cidade da escola e inicie o cadastro para emissão fiscal integrada.
+                                </p>
+
+                                <a
+                                    href="/nota-fiscal"
+                                    on:click={closeModal}
+                                    class="mt-4 inline-flex items-center gap-2
+                                           rounded-[999px] bg-[#000A57]
+                                           px-5 py-2.5 text-white font-semibold text-[14px]
+                                           shadow-[0_14px_30px_rgba(0,10,87,0.18)]
+                                           hover:brightness-110 active:translate-y-[1px]
+                                           transition-all"
+                                    aria-label="Conhecer a página Nota Fiscal"
+                                >
+                                    <span>Conhecer Nota Fiscal</span>
+                                    <ArrowRight size={18} class="text-[#EA6D0B]" />
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card Celcoin -->
+                    <div
+                        class="w-full rounded-[22px]
                                border border-[#EA6D0B]/30 bg-[#F3F4FD]
                                px-5 py-5 shadow-[0_10px_26px_rgba(1,13,40,0.06)]"
                     >
