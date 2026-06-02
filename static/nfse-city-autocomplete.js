@@ -1,13 +1,14 @@
 (() => {
   const TARGET_PATH = "/solucoes/nota-fiscal";
   const COVERAGE_ENDPOINT = "https://backend.f10.com.br/dfe/nfse/cidades-cobertura";
-  const CITY_DATALIST_ID = "nfse-city-coverage-options";
+  const DROPDOWN_ID = "nfse-city-coverage-dropdown";
 
   if (!window.location.pathname.startsWith(TARGET_PATH)) return;
 
   let coveredCities = [];
   let currentState = "";
   let requestId = 0;
+  let isDropdownOpen = false;
 
   function normalizeState(value) {
     return String(value || "")
@@ -67,26 +68,6 @@
     return label?.querySelector("input") || null;
   }
 
-  function ensureDatalist() {
-    let datalist = document.getElementById(CITY_DATALIST_ID);
-
-    if (!datalist) {
-      datalist = document.createElement("datalist");
-      datalist.id = CITY_DATALIST_ID;
-      document.body.appendChild(datalist);
-    }
-
-    datalist.replaceChildren(
-      ...coveredCities.map((city) => {
-        const option = document.createElement("option");
-        option.value = city;
-        return option;
-      }),
-    );
-
-    return datalist;
-  }
-
   function getFields() {
     const cityInput = findInputByLabel("Cidade");
     const stateInput = findInputByLabel("Estado");
@@ -95,6 +76,80 @@
     if (!(stateInput instanceof HTMLInputElement)) return null;
 
     return { cityInput, stateInput };
+  }
+
+  function getDropdown() {
+    let dropdown = document.getElementById(DROPDOWN_ID);
+
+    if (!dropdown) {
+      dropdown = document.createElement("div");
+      dropdown.id = DROPDOWN_ID;
+      dropdown.className = "absolute z-[2147483647] hidden max-h-60 overflow-y-auto rounded-2xl border border-black/10 bg-white p-1 shadow-2xl";
+      document.body.appendChild(dropdown);
+    }
+
+    return dropdown;
+  }
+
+  function positionDropdown(cityInput) {
+    const dropdown = getDropdown();
+    const rect = cityInput.getBoundingClientRect();
+
+    dropdown.style.left = `${rect.left + window.scrollX}px`;
+    dropdown.style.top = `${rect.bottom + window.scrollY + 6}px`;
+    dropdown.style.width = `${rect.width}px`;
+  }
+
+  function hideDropdown() {
+    isDropdownOpen = false;
+    getDropdown().classList.add("hidden");
+  }
+
+  function getFilteredCities(search) {
+    const normalizedSearch = normalizeText(search);
+    if (String(search || "").trim().length < 2) return [];
+    return coveredCities
+      .filter((city) => normalizeText(city).includes(normalizedSearch))
+      .slice(0, 8);
+  }
+
+  function renderDropdown() {
+    const fields = getFields();
+    if (!fields) return;
+
+    const dropdown = getDropdown();
+    const filteredCities = getFilteredCities(fields.cityInput.value);
+
+    dropdown.replaceChildren();
+
+    if (!isDropdownOpen || fields.cityInput.value.trim().length < 2) {
+      hideDropdown();
+      return;
+    }
+
+    positionDropdown(fields.cityInput);
+
+    if (filteredCities.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "px-3 py-2 text-[13px] text-slate-500";
+      empty.textContent = "Nenhuma cidade encontrada para este termo.";
+      dropdown.appendChild(empty);
+    } else {
+      for (const city of filteredCities) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "block w-full rounded-xl px-3 py-2 text-left text-[14px] font-medium text-slate-700 hover:bg-orange-50 hover:text-slate-950";
+        button.textContent = city;
+        button.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+          setInputValue(fields.cityInput, city);
+          hideDropdown();
+        });
+        dropdown.appendChild(button);
+      }
+    }
+
+    dropdown.classList.remove("hidden");
   }
 
   function showFieldMessage(cityInput, message, tone = "muted") {
@@ -121,15 +176,16 @@
     if (!fields) return;
 
     fields.cityInput.disabled = !enabled;
-    fields.cityInput.setAttribute("list", CITY_DATALIST_ID);
+    fields.cityInput.removeAttribute("list");
     fields.cityInput.setAttribute("autocomplete", "off");
 
     if (!enabled) {
       fields.cityInput.placeholder = "Informe a UF primeiro";
+      hideDropdown();
       return;
     }
 
-    fields.cityInput.placeholder = "Digite para encontrar a cidade";
+    fields.cityInput.placeholder = "Digite ao menos 2 letras";
   }
 
   async function loadCitiesByState(stateValue) {
@@ -141,10 +197,10 @@
     if (state.length !== 2) {
       currentState = "";
       coveredCities = [];
-      ensureDatalist();
       setCityEnabled(false);
       setInputValue(fields.cityInput, "");
       clearFieldMessage();
+      hideDropdown();
       return;
     }
 
@@ -153,7 +209,6 @@
     const localRequestId = ++requestId;
     currentState = state;
     coveredCities = [];
-    ensureDatalist();
     setCityEnabled(false);
     setInputValue(fields.cityInput, "");
     showFieldMessage(fields.cityInput, "Buscando cidades com cobertura...");
@@ -170,7 +225,6 @@
       if (localRequestId !== requestId) return;
 
       coveredCities = cities;
-      ensureDatalist();
       setCityEnabled(coveredCities.length > 0);
 
       if (coveredCities.length === 0) {
@@ -196,9 +250,13 @@
     const normalizedCity = normalizeText(fields.cityInput.value);
     const matchedCity = coveredCities.find((city) => normalizeText(city) === normalizedCity);
 
-    if (!fields.cityInput.value.trim()) return;
+    if (!fields.cityInput.value.trim()) {
+      hideDropdown();
+      return;
+    }
 
     setInputValue(fields.cityInput, matchedCity || "");
+    hideDropdown();
   }
 
   function bindFields() {
@@ -214,7 +272,30 @@
       void loadCitiesByState(state);
     });
 
-    fields.cityInput.addEventListener("blur", normalizeSelectedCity);
+    fields.cityInput.addEventListener("focus", () => {
+      isDropdownOpen = true;
+      renderDropdown();
+    });
+
+    fields.cityInput.addEventListener("input", () => {
+      isDropdownOpen = true;
+      renderDropdown();
+    });
+
+    fields.cityInput.addEventListener("blur", () => {
+      setTimeout(normalizeSelectedCity, 120);
+    });
+
+    window.addEventListener("resize", renderDropdown, { passive: true });
+    window.addEventListener("scroll", renderDropdown, { passive: true });
+
+    document.addEventListener("click", (event) => {
+      const dropdown = getDropdown();
+      if (!(event.target instanceof Node)) return;
+      if (dropdown.contains(event.target) || fields.cityInput.contains(event.target)) return;
+      hideDropdown();
+    });
+
     setCityEnabled(normalizeState(getInputValue(fields.stateInput)).length === 2 && coveredCities.length > 0);
 
     const initialState = normalizeState(getInputValue(fields.stateInput));
