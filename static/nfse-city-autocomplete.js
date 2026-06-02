@@ -31,11 +31,16 @@
     return input instanceof HTMLInputElement ? input.value : "";
   }
 
-  function setInputValue(input, value) {
+  function setInputValue(input, value, options = {}) {
     if (!(input instanceof HTMLInputElement)) return;
+    if (input.value === value) return;
+
     input.value = value;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
+
+    if (options.dispatch === true) {
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
   }
 
   function extractCityNames(payload) {
@@ -154,7 +159,7 @@
       button.textContent = city;
       button.addEventListener("mousedown", (event) => {
         event.preventDefault();
-        setInputValue(fields.cityInput, city);
+        setInputValue(fields.cityInput, city, { dispatch: true });
         hideDropdown();
       });
       dropdown.appendChild(button);
