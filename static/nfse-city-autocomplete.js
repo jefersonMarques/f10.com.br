@@ -122,7 +122,7 @@
 
     dropdown.replaceChildren();
 
-    if (!isDropdownOpen || fields.cityInput.value.trim().length < 2) {
+    if (!isDropdownOpen || fields.cityInput.value.trim().length < 2 || coveredCities.length === 0) {
       hideDropdown();
       return;
     }
@@ -132,7 +132,7 @@
     if (filteredCities.length === 0) {
       const empty = document.createElement("div");
       empty.className = "px-3 py-2 text-[13px] text-slate-500";
-      empty.textContent = "Nenhuma cidade encontrada para este termo.";
+      empty.textContent = "Nenhuma sugestão encontrada. O envio ainda é permitido.";
       dropdown.appendChild(empty);
     } else {
       for (const city of filteredCities) {
@@ -171,21 +171,23 @@
     document.getElementById("nfse-city-coverage-message")?.remove();
   }
 
-  function setCityEnabled(enabled) {
+  function setCityAutocompleteReady(isReady) {
     const fields = getFields();
     if (!fields) return;
 
-    fields.cityInput.disabled = !enabled;
+    fields.cityInput.disabled = false;
     fields.cityInput.removeAttribute("list");
     fields.cityInput.setAttribute("autocomplete", "off");
 
-    if (!enabled) {
-      fields.cityInput.placeholder = "Informe a UF primeiro";
+    if (!normalizeState(getInputValue(fields.stateInput))) {
+      fields.cityInput.placeholder = "Cidade";
       hideDropdown();
       return;
     }
 
-    fields.cityInput.placeholder = "Digite ao menos 2 letras";
+    fields.cityInput.placeholder = isReady
+      ? "Digite ao menos 2 letras"
+      : "Cidade";
   }
 
   async function loadCitiesByState(stateValue) {
@@ -197,10 +199,9 @@
     if (state.length !== 2) {
       currentState = "";
       coveredCities = [];
-      setCityEnabled(false);
-      setInputValue(fields.cityInput, "");
       clearFieldMessage();
       hideDropdown();
+      setCityAutocompleteReady(false);
       return;
     }
 
@@ -209,9 +210,7 @@
     const localRequestId = ++requestId;
     currentState = state;
     coveredCities = [];
-    setCityEnabled(false);
-    setInputValue(fields.cityInput, "");
-    showFieldMessage(fields.cityInput, "Buscando cidades com cobertura...");
+    showFieldMessage(fields.cityInput, "Buscando sugestões de cidades com cobertura...");
 
     try {
       const params = new URLSearchParams({ uf: state });
@@ -225,37 +224,25 @@
       if (localRequestId !== requestId) return;
 
       coveredCities = cities;
-      setCityEnabled(coveredCities.length > 0);
+      setCityAutocompleteReady(coveredCities.length > 0);
 
       if (coveredCities.length === 0) {
-        showFieldMessage(fields.cityInput, "Nenhuma cidade com cobertura encontrada para esta UF.");
+        showFieldMessage(fields.cityInput, "Sem sugestões para esta UF. O envio ainda é permitido.");
         return;
       }
 
       showFieldMessage(
         fields.cityInput,
-        `${coveredCities.length} cidade${coveredCities.length === 1 ? "" : "s"} com cobertura disponível${coveredCities.length === 1 ? "" : "s"}.`,
+        `${coveredCities.length} sugestão${coveredCities.length === 1 ? "" : "ões"} disponível${coveredCities.length === 1 ? "" : "eis"}. Você também pode preencher manualmente.`,
       );
     } catch {
       if (localRequestId !== requestId) return;
-      setCityEnabled(false);
-      showFieldMessage(fields.cityInput, "Não foi possível consultar as cidades com cobertura.", "error");
+      setCityAutocompleteReady(false);
+      showFieldMessage(fields.cityInput, "Não foi possível carregar sugestões. O envio ainda é permitido.", "error");
     }
   }
 
-  function normalizeSelectedCity() {
-    const fields = getFields();
-    if (!fields) return;
-
-    const normalizedCity = normalizeText(fields.cityInput.value);
-    const matchedCity = coveredCities.find((city) => normalizeText(city) === normalizedCity);
-
-    if (!fields.cityInput.value.trim()) {
-      hideDropdown();
-      return;
-    }
-
-    setInputValue(fields.cityInput, matchedCity || "");
+  function closeDropdownOnly() {
     hideDropdown();
   }
 
@@ -265,6 +252,9 @@
 
     fields.stateInput.dataset.nfseCoverageBound = "true";
     fields.cityInput.dataset.nfseCoverageBound = "true";
+
+    fields.cityInput.removeAttribute("list");
+    fields.cityInput.disabled = false;
 
     fields.stateInput.addEventListener("input", () => {
       const state = normalizeState(getInputValue(fields.stateInput));
@@ -283,7 +273,7 @@
     });
 
     fields.cityInput.addEventListener("blur", () => {
-      setTimeout(normalizeSelectedCity, 120);
+      setTimeout(closeDropdownOnly, 120);
     });
 
     window.addEventListener("resize", renderDropdown, { passive: true });
@@ -296,11 +286,11 @@
       hideDropdown();
     });
 
-    setCityEnabled(normalizeState(getInputValue(fields.stateInput)).length === 2 && coveredCities.length > 0);
-
     const initialState = normalizeState(getInputValue(fields.stateInput));
     if (initialState.length === 2) {
       void loadCitiesByState(initialState);
+    } else {
+      setCityAutocompleteReady(false);
     }
   }
 
