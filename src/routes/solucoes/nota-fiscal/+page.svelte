@@ -786,7 +786,7 @@
         class="mx-auto mt-4 text-[30px] font-semibold leading-[1.1]
                        tracking-[-0.03em] text-[#010D28] sm:text-[38px] md:text-[44px]"
       >
-        Nota fiscal para escolas: emita NFS-e e NF-e direto no sistema F10
+        Nota fiscal para escolas: emita NFS-e e NF-e direto no Software F10
       </h1>
 
       <p

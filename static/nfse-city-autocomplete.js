@@ -2,7 +2,7 @@
   const TARGET_PATH = "/solucoes/nota-fiscal";
   const COVERAGE_ENDPOINT = "https://backend.f10.com.br/dfe/nfse/cidades-cobertura";
   const CHECK_ENDPOINT = "/api/nfse/nfse-city-check";
-  const SUBMIT_ENDPOINT = "/api/nfse/nfse-homologacao/submit";
+  const SUBMIT_ENDPOINT = "/api/nfse/nfse-interest/submit";
   const DROPDOWN_ID = "nfse-city-coverage-dropdown";
   const RESULT_ID = "nfse-lead-eligibility-result";
 
@@ -37,6 +37,10 @@
 
   function isEmailValid(value) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+  }
+
+  function getPlural(value, singular, plural) {
+    return value === 1 ? singular : plural;
   }
 
   function getInputValue(input) {
@@ -267,11 +271,6 @@
         clearFieldMessage();
         return;
       }
-
-      showFieldMessage(
-        fields.cityInput,
-        `${coveredCities.length} sugestão${coveredCities.length === 1 ? "" : "ões"} disponível${coveredCities.length === 1 ? "" : "eis"}. Você também pode preencher manualmente.`,
-      );
     } catch {
       if (localRequestId !== requestId) return;
       setCityAutocompleteReady(false);
@@ -395,45 +394,27 @@
 
   async function notifyTeam(values, cityCheckResult) {
     const payload = {
-      submissionKind: "nfse_city_availability_notification",
+      submissionKind: "nfse_interest_lead",
       submittedAt: new Date().toISOString(),
       city: cityCheckResult.city,
       state: cityCheckResult.state,
       ibgeCode: cityCheckResult.ibgeCode || "",
       cityCheckStatus: cityCheckResult.status,
       cityCheckMessage: cityCheckResult.message,
-      cityCheckCity: cityCheckResult.city,
-      cityCheckState: cityCheckResult.state,
-      cityCheckIbgeCode: cityCheckResult.ibgeCode || "",
-      cityCheckProvider: cityCheckResult.provider || "",
       cityCheckCheckedAt: cityCheckResult.checkedAt,
       name: values.name,
       email: values.email,
       whatsapp: values.whatsapp,
       schoolName: values.schoolName,
-      emailFields: [
-        { key: "submissionKind", label: "Tipo de solicitação", value: "Interesse no recurso de Nota Fiscal" },
-        { key: "name", label: "Nome", value: values.name },
-        { key: "email", label: "E-mail", value: values.email },
-        { key: "whatsapp", label: "WhatsApp", value: values.whatsapp },
-        { key: "schoolName", label: "Nome da escola", value: values.schoolName },
-        { key: "city", label: "Cidade", value: cityCheckResult.city },
-        { key: "state", label: "UF", value: cityCheckResult.state },
-        { key: "cityCheckStatus", label: "Status da cidade", value: cityCheckResult.status },
-        { key: "cityCheckMessage", label: "Mensagem da verificação", value: cityCheckResult.message },
-      ],
     };
-
-    const formData = new FormData();
-    formData.append("payload", JSON.stringify(payload));
-
-    for (const field of payload.emailFields) {
-      formData.append(`email_${field.key}`, field.value);
-    }
 
     const response = await fetch(SUBMIT_ENDPOINT, {
       method: "POST",
-      body: formData,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
