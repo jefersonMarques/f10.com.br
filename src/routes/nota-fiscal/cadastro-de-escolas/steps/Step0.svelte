@@ -38,6 +38,7 @@
   let isSendingNotification = false;
   let notificationSent = false;
   let isLoadingCoveredCities = false;
+  let isCityDropdownOpen = false;
   let coveredCities: string[] = [];
   let coverageMessage = "";
   let coverageRequestId = 0;
@@ -74,6 +75,20 @@
 
   const cityCoverageLookupUrl = (stateValue: string) =>
     `https://backend.f10.com.br/dfe/nfse/cidades-cobertura?uf=${encodeURIComponent(stateValue)}`;
+
+  $: normalizedCitySearch = normalizeText(city);
+  $: filteredCoveredCities =
+    city.trim().length >= 2
+      ? coveredCities
+          .filter((coveredCity) => normalizeText(coveredCity).includes(normalizedCitySearch))
+          .slice(0, 8)
+      : [];
+  $: shouldShowCityDropdown =
+    isCityDropdownOpen &&
+    Boolean(state) &&
+    !isLoadingCoveredCities &&
+    coveredCities.length > 0 &&
+    city.trim().length >= 2;
 
   function normalizeState(value: string): string {
     return value.replace(/[^a-zA-Z]/g, "").slice(0, 2).toUpperCase();
@@ -147,6 +162,7 @@
     coveredCities = [];
     coverageMessage = "";
     cityCheckResult = null;
+    isCityDropdownOpen = false;
     isNotifyFormOpen = false;
     notificationSent = false;
 
@@ -192,13 +208,25 @@
 
   function handleCityInput(value: string) {
     city = value;
+    isCityDropdownOpen = value.trim().length >= 2;
+    errors = { ...errors, city: "" };
+  }
+
+  function selectCoveredCity(coveredCity: string) {
+    city = coveredCity;
+    isCityDropdownOpen = false;
     errors = { ...errors, city: "" };
   }
 
   function normalizeSelectedCity() {
-    if (!city.trim()) return;
+    if (!city.trim()) {
+      isCityDropdownOpen = false;
+      return;
+    }
+
     const matchedCity = findCoveredCityMatch(city);
     if (matchedCity) city = matchedCity;
+    isCityDropdownOpen = false;
   }
 
   function validateCityFields(): boolean {
@@ -435,16 +463,18 @@
             errors.city ? "border-red-300" : "border-black/15"
           }`}
           value={city}
-          list="cityCheckCoverageOptions"
           autocomplete="off"
           disabled={!state || isLoadingCoveredCities || coveredCities.length === 0}
           placeholder={isLoadingCoveredCities
             ? "Carregando cidades..."
             : state
-              ? "Digite para encontrar a cidade"
+              ? "Digite ao menos 2 letras"
               : "Selecione a UF primeiro"}
+          on:focus={() => (isCityDropdownOpen = city.trim().length >= 2)}
           on:input={(event) => handleCityInput((event.target as HTMLInputElement).value)}
-          on:blur={normalizeSelectedCity}
+          on:blur={() => {
+            setTimeout(normalizeSelectedCity, 120);
+          }}
         />
 
         {#if isLoadingCoveredCities}
@@ -452,13 +482,27 @@
             Buscando...
           </div>
         {/if}
-      </div>
 
-      <datalist id="cityCheckCoverageOptions">
-        {#each coveredCities as coveredCity}
-          <option value={coveredCity}></option>
-        {/each}
-      </datalist>
+        {#if shouldShowCityDropdown}
+          <div class="absolute left-0 right-0 top-[calc(100%+6px)] z-40 max-h-60 overflow-y-auto rounded-xl border border-black/10 bg-white p-1 shadow-xl">
+            {#if filteredCoveredCities.length > 0}
+              {#each filteredCoveredCities as coveredCity}
+                <button
+                  type="button"
+                  class="block w-full rounded-lg px-3 py-2 text-left text-[14px] font-medium text-black/75 hover:bg-[var(--primary)]/10 hover:text-black"
+                  on:mousedown|preventDefault={() => selectCoveredCity(coveredCity)}
+                >
+                  {coveredCity}
+                </button>
+              {/each}
+            {:else}
+              <div class="px-3 py-2 text-[13px] text-black/50">
+                Nenhuma cidade encontrada para este termo.
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </div>
 
       {#if errors.city}
         <p class="mt-1 text-[12px] text-red-600">{errors.city}</p>
