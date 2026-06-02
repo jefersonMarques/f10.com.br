@@ -125,11 +125,8 @@
                                transition-all focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/25"
                         aria-label="Acessar Nota Fiscal para clientes"
                     >
-                        <span class="absolute left-5 top-1/2 -translate-y-1/2 text-[#EA6D0B]">
-                            <FileText size={18} />
-                        </span>
                         <span class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-                            Nota Fiscal
+                            Usar Nota Fiscal
                         </span>
                         <span class="absolute right-5 top-1/2 -translate-y-1/2 text-[#EA6D0B]">
                             <ArrowRight size={18} />
