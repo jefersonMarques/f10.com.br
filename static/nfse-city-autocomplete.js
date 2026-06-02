@@ -78,6 +78,19 @@
     return { cityInput, stateInput };
   }
 
+  function reorderLocationFields() {
+    const fields = getFields();
+    if (!fields) return;
+
+    const cityLabel = fields.cityInput.closest("label");
+    const stateLabel = fields.stateInput.closest("label");
+
+    if (!cityLabel || !stateLabel || stateLabel.dataset.nfseOrderFixed === "true") return;
+
+    cityLabel.parentElement?.insertBefore(stateLabel, cityLabel);
+    stateLabel.dataset.nfseOrderFixed = "true";
+  }
+
   function getDropdown() {
     let dropdown = document.getElementById(DROPDOWN_ID);
 
@@ -122,31 +135,29 @@
 
     dropdown.replaceChildren();
 
-    if (!isDropdownOpen || fields.cityInput.value.trim().length < 2 || coveredCities.length === 0) {
+    if (
+      !isDropdownOpen ||
+      fields.cityInput.value.trim().length < 2 ||
+      coveredCities.length === 0 ||
+      filteredCities.length === 0
+    ) {
       hideDropdown();
       return;
     }
 
     positionDropdown(fields.cityInput);
 
-    if (filteredCities.length === 0) {
-      const empty = document.createElement("div");
-      empty.className = "px-3 py-2 text-[13px] text-slate-500";
-      empty.textContent = "Nenhuma sugestão encontrada. O envio ainda é permitido.";
-      dropdown.appendChild(empty);
-    } else {
-      for (const city of filteredCities) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "block w-full rounded-xl px-3 py-2 text-left text-[14px] font-medium text-slate-700 hover:bg-orange-50 hover:text-slate-950";
-        button.textContent = city;
-        button.addEventListener("mousedown", (event) => {
-          event.preventDefault();
-          setInputValue(fields.cityInput, city);
-          hideDropdown();
-        });
-        dropdown.appendChild(button);
-      }
+    for (const city of filteredCities) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "block w-full rounded-xl px-3 py-2 text-left text-[14px] font-medium text-slate-700 hover:bg-orange-50 hover:text-slate-950";
+      button.textContent = city;
+      button.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        setInputValue(fields.cityInput, city);
+        hideDropdown();
+      });
+      dropdown.appendChild(button);
     }
 
     dropdown.classList.remove("hidden");
@@ -179,15 +190,7 @@
     fields.cityInput.removeAttribute("list");
     fields.cityInput.setAttribute("autocomplete", "off");
 
-    if (!normalizeState(getInputValue(fields.stateInput))) {
-      fields.cityInput.placeholder = "Cidade";
-      hideDropdown();
-      return;
-    }
-
-    fields.cityInput.placeholder = isReady
-      ? "Digite ao menos 2 letras"
-      : "Cidade";
+    fields.cityInput.placeholder = isReady ? "Digite ao menos 2 letras" : "Cidade";
   }
 
   async function loadCitiesByState(stateValue) {
@@ -227,7 +230,7 @@
       setCityAutocompleteReady(coveredCities.length > 0);
 
       if (coveredCities.length === 0) {
-        showFieldMessage(fields.cityInput, "Sem sugestões para esta UF. O envio ainda é permitido.");
+        clearFieldMessage();
         return;
       }
 
@@ -238,7 +241,7 @@
     } catch {
       if (localRequestId !== requestId) return;
       setCityAutocompleteReady(false);
-      showFieldMessage(fields.cityInput, "Não foi possível carregar sugestões. O envio ainda é permitido.", "error");
+      clearFieldMessage();
     }
   }
 
@@ -249,6 +252,8 @@
   function bindFields() {
     const fields = getFields();
     if (!fields || fields.stateInput.dataset.nfseCoverageBound === "true") return;
+
+    reorderLocationFields();
 
     fields.stateInput.dataset.nfseCoverageBound = "true";
     fields.cityInput.dataset.nfseCoverageBound = "true";
