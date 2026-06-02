@@ -12,6 +12,11 @@
 
   let isLoadingCnpj = false;
   let isLoadingCep = false;
+  let isLoadingCoveredCities = false;
+  let coveredCities: string[] = [];
+  let cityCoverageError = "";
+  let coverageRequestId = 0;
+  let currentCoverageState = "";
 
   // UI-only masks (store fica clean: só dígitos)
   let cnpjDisplay = "";
@@ -28,9 +33,39 @@
     `/api/cnpj/${encodeURIComponent(cnpjDigits)}`;
   const cepLookupUrl = (cepDigits: string) =>
     `/api/viacep?cep=${encodeURIComponent(cepDigits)}`;
+  const cityCoverageLookupUrl = (state: string) =>
+    `https://backend.f10.com.br/dfe/nfse/cidades-cobertura?uf=${encodeURIComponent(state)}`;
+
+  $: {
+    const state = normalizeState($formDataStore.state);
+
+    if (state.length === 2 && state !== currentCoverageState) {
+      currentCoverageState = state;
+      void loadCoveredCitiesByState(state);
+    }
+
+    if (state.length !== 2 && currentCoverageState) {
+      resetCityCoverage();
+    }
+  }
 
   function onlyDigits(value: string): string {
     return (value ?? "").replace(/\D+/g, "");
+  }
+
+  function normalizeText(value: string): string {
+    return value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase();
+  }
+
+  function normalizeState(value: string): string {
+    return (value ?? "")
+      .replace(/[^a-zA-Z]/g, "")
+      .slice(0, 2)
+      .toUpperCase();
   }
 
   function formatCnpj(value: string): string {
@@ -86,6 +121,104 @@
     return true;
   }
 
+  function extractCityNames(payload: unknown): string[] {
+    const data = payload as {
+      data?: unknown;
+      cidades?: unknown;
+      cities?: unknown;
+    };
+
+    const source = Array.isArray(payload)
+      ? payload
+      : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.cidades)
+          ? data.cidades
+          : Array.isArray(data?.cities)
+            ? data.cities
+            : [];
+
+    return Array.from(
+      new Set(
+        source
+          .map((item) => {
+            if (typeof item === "string") return item.trim();
+            if (!item || typeof item !== "object") return "";
+
+            const city = item as {
+              nome?: unknown;
+              name?: unknown;
+              cidade?: unknown;
+              city?: unknown;
+            };
+
+            return String(
+              city.nome ?? city.name ?? city.cidade ?? city.city ?? "",
+            ).trim();
+          })
+          .filter(Boolean),
+      ),
+    ).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }
+
+  function findCoveredCityMatch(value: string, cities = coveredCities): string {
+    const normalized = normalizeText(value);
+    if (!normalized) return "";
+    return cities.find((city) => normalizeText(city) === normalized) ?? "";
+  }
+
+  function resetCityCoverage() {
+    coverageRequestId += 1;
+    currentCoverageState = "";
+    coveredCities = [];
+    cityCoverageError = "";
+    isLoadingCoveredCities = false;
+    formDataStore.update((prev) => ({ ...prev, city: "" }));
+  }
+
+  async function loadCoveredCitiesByState(stateValue: string) {
+    const state = normalizeState(stateValue);
+    if (state.length !== 2) {
+      resetCityCoverage();
+      return;
+    }
+
+    const requestId = ++coverageRequestId;
+    isLoadingCoveredCities = true;
+    cityCoverageError = "";
+    coveredCities = [];
+
+    try {
+      const res = await fetch(cityCoverageLookupUrl(state));
+      if (!res.ok) {
+        throw new Error("coverage_request_failed");
+      }
+
+      const json = await res.json();
+      const cities = extractCityNames(json);
+
+      if (requestId !== coverageRequestId) return;
+
+      coveredCities = cities;
+
+      formDataStore.update((prev) => {
+        const matchedCity = findCoveredCityMatch(prev.city, cities);
+        return {
+          ...prev,
+          state,
+          city: matchedCity || "",
+        };
+      });
+    } catch {
+      if (requestId !== coverageRequestId) return;
+      cityCoverageError = "Não foi possível consultar as cidades com cobertura.";
+    } finally {
+      if (requestId === coverageRequestId) {
+        isLoadingCoveredCities = false;
+      }
+    }
+  }
+
   async function fillByCep(cepDigits: string) {
     const cep = onlyDigits(cepDigits).slice(0, 8);
     if (!isValidCep(cep)) return;
@@ -101,7 +234,7 @@
       const street = (json.logradouro as string) || "";
       const neighborhood = (json.bairro as string) || "";
       const city = (json.localidade as string) || "";
-      const state = (json.uf as string) || "";
+      const state = normalizeState((json.uf as string) || "");
 
       const current = $formDataStore;
       const number = (current.number ?? "").trim();
@@ -168,9 +301,7 @@
       const complement = (estab?.complemento || "").trim();
       const neighborhood = (estab?.bairro || "").trim();
       const city = (estab?.cidade?.nome || estab?.municipio || "").trim();
-      const state = (estab?.estado?.sigla || estab?.uf || "")
-        .trim()
-        .toUpperCase();
+      const state = normalizeState(estab?.estado?.sigla || estab?.uf || "");
 
       const phone =
         [
@@ -236,6 +367,24 @@
       hasStateRegistration: value,
       stateRegistration: value ? prev.stateRegistration : "",
     }));
+  }
+
+  function handleStateInput(value: string) {
+    const state = normalizeState(value);
+    formDataStore.update((prev) => ({
+      ...prev,
+      state,
+      city: state === prev.state ? prev.city : "",
+    }));
+  }
+
+  function handleCityInput(value: string) {
+    formDataStore.update((prev) => ({ ...prev, city: value }));
+  }
+
+  function normalizeSelectedCity() {
+    const matchedCity = findCoveredCityMatch($formDataStore.city);
+    formDataStore.update((prev) => ({ ...prev, city: matchedCity }));
   }
 </script>
 
@@ -614,22 +763,6 @@
   </div>
 
   <div class="grid gap-4 sm:grid-cols-12">
-    <div class="sm:col-span-8">
-      <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
-        Cidade
-      </label>
-      <input
-        class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
-          errors.city ? "border-red-300" : "border-black/15"
-        }`}
-        bind:value={$formDataStore.city}
-        placeholder="Cidade"
-      />
-      {#if errors.city}
-        <p class="mt-1 text-[12px] text-red-600">{errors.city}</p>
-      {/if}
-    </div>
-
     <div class="sm:col-span-4">
       <label for="" class="mb-2 block text-[12px] font-semibold text-black/70">
         UF
@@ -638,16 +771,69 @@
         class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold uppercase outline-none ${
           errors.state ? "border-red-300" : "border-black/15"
         }`}
-        bind:value={$formDataStore.state}
+        value={$formDataStore.state}
         placeholder="PR"
         maxlength="2"
-        on:input={(e) => {
-          const target = e.target as HTMLInputElement;
-          target.value = target.value.toUpperCase();
-        }}
+        on:input={(e) => handleStateInput((e.target as HTMLInputElement).value)}
+        autocomplete="off"
       />
       {#if errors.state}
         <p class="mt-1 text-[12px] text-red-600">{errors.state}</p>
+      {/if}
+    </div>
+
+    <div class="sm:col-span-8">
+      <label for="nfse-city" class="mb-2 block text-[12px] font-semibold text-black/70">
+        Cidade com cobertura NFS-e
+      </label>
+      <div class="relative">
+        <input
+          id="nfse-city"
+          class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none disabled:bg-black/[0.03] disabled:text-black/40 ${
+            errors.city ? "border-red-300" : "border-black/15"
+          }`}
+          value={$formDataStore.city}
+          placeholder={isLoadingCoveredCities
+            ? "Carregando cidades..."
+            : $formDataStore.state.length === 2
+              ? "Digite para encontrar a cidade"
+              : "Informe a UF primeiro"}
+          list="nfse-covered-cities"
+          disabled={$formDataStore.state.length !== 2 ||
+            isLoadingCoveredCities ||
+            coveredCities.length === 0}
+          autocomplete="off"
+          on:input={(e) => handleCityInput((e.target as HTMLInputElement).value)}
+          on:blur={normalizeSelectedCity}
+        />
+
+        {#if isLoadingCoveredCities}
+          <div
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-black/50"
+          >
+            Buscando...
+          </div>
+        {/if}
+      </div>
+
+      <datalist id="nfse-covered-cities">
+        {#each coveredCities as city}
+          <option value={city}></option>
+        {/each}
+      </datalist>
+
+      {#if errors.city}
+        <p class="mt-1 text-[12px] text-red-600">{errors.city}</p>
+      {:else if cityCoverageError}
+        <p class="mt-1 text-[12px] text-red-600">{cityCoverageError}</p>
+      {:else if $formDataStore.state.length === 2 && !isLoadingCoveredCities && coveredCities.length === 0}
+        <p class="mt-1 text-[12px] text-black/50">
+          Nenhuma cidade com cobertura encontrada para esta UF.
+        </p>
+      {:else if coveredCities.length > 0}
+        <p class="mt-1 text-[12px] text-black/50">
+          {coveredCities.length} cidade{coveredCities.length === 1 ? "" : "s"} com cobertura disponível{coveredCities.length === 1 ? "" : "s"}.
+        </p>
       {/if}
     </div>
   </div>
