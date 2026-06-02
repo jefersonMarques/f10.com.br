@@ -81,7 +81,7 @@ export const f10TermsHtmlTemplate = `
     <section class="space-y-4">
       <h2 class="text-[16px] font-bold text-black/85">ANEXO I – DA TABELA DE PREÇOS DA FUNCIONALIDADE DE EMISSÃO DE NOTAS FISCAIS</h2>
       <h3 class="text-[14px] font-semibold text-black/85">1. Da Precificação por Volume de Emissões</h3>
-      <p class="text-[13px] leading-relaxed text-black/75">1.1. Pela utilização da funcionalidade de emissão de Notas Fiscais de Produto (NF-e) e/ou Serviço (NFS-e) no ERP F10 Software, o USUÁRIO concorda com a cobrança baseada na quantidade de notas fiscais efetivamente emitidas, conforme a seguinte tabela: Até 50 emissões: R$ 2,00 (dois reais) por Nota Fiscal emitida; Até 100 emissões: R$ 1,50 (um real e cinquenta centavos) por Nota Fiscal emitida; Até 200 emissões: R$ 1,00 (um real) por Nota Fiscal emitida; A partir de 300 emissões: R$ 0,80 (oitenta centavos) por Nota Fiscal emitida.</p>
+      <p class="text-[13px] leading-relaxed text-black/75">1.1. Pela utilização da funcionalidade de emissão de Notas Fiscais de Produto (NF-e) e/ou Serviço (NFS-e) no ERP F10 Software, o USUÁRIO concorda com a cobrança baseada na quantidade de notas fiscais efetivamente emitidas, conforme a seguinte tabela: R$ 0,50 (cinquenta centavos) por nota fiscal emitida</p>
       <p class="text-[13px] leading-relaxed text-black/75">1.2. O enquadramento do USUÁRIO na respectiva faixa de preço ocorrerá de acordo com o volume total de emissões realizadas no período de apuração definido contratualmente.</p>
 
       <h3 class="text-[14px] font-semibold text-black/85">2. Das Condições Gerais do Anexo</h3>
