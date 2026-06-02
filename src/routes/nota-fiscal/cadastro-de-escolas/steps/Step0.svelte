@@ -15,12 +15,17 @@
     raw?: Record<string, unknown> | null;
   };
 
+  type StateOption = {
+    value: string;
+    label: string;
+  };
+
   export let cityCheckResult: CityCheckResult | null = null;
   export let onApplyResult: (result: CityCheckResult) => void = () => {};
   export let onContinue: () => void = () => {};
 
   let city = $formDataStore.city || "";
-  let state = $formDataStore.state || "";
+  let state = normalizeState($formDataStore.state || "");
   let schoolName = $formDataStore.fantasyName || "";
   let contactName = "";
   let contactEmail = $formDataStore.email || "";
@@ -32,16 +37,185 @@
   let isNotifyFormOpen = false;
   let isSendingNotification = false;
   let notificationSent = false;
+  let isLoadingCoveredCities = false;
+  let coveredCities: string[] = [];
+  let coverageMessage = "";
+  let coverageRequestId = 0;
+
+  const stateOptions: StateOption[] = [
+    { value: "AC", label: "AC" },
+    { value: "AL", label: "AL" },
+    { value: "AP", label: "AP" },
+    { value: "AM", label: "AM" },
+    { value: "BA", label: "BA" },
+    { value: "CE", label: "CE" },
+    { value: "DF", label: "DF" },
+    { value: "ES", label: "ES" },
+    { value: "GO", label: "GO" },
+    { value: "MA", label: "MA" },
+    { value: "MT", label: "MT" },
+    { value: "MS", label: "MS" },
+    { value: "MG", label: "MG" },
+    { value: "PA", label: "PA" },
+    { value: "PB", label: "PB" },
+    { value: "PR", label: "PR" },
+    { value: "PE", label: "PE" },
+    { value: "PI", label: "PI" },
+    { value: "RJ", label: "RJ" },
+    { value: "RN", label: "RN" },
+    { value: "RS", label: "RS" },
+    { value: "RO", label: "RO" },
+    { value: "RR", label: "RR" },
+    { value: "SC", label: "SC" },
+    { value: "SP", label: "SP" },
+    { value: "SE", label: "SE" },
+    { value: "TO", label: "TO" },
+  ];
+
+  const cityCoverageLookupUrl = (stateValue: string) =>
+    `https://backend.f10.com.br/dfe/nfse/cidades-cobertura?uf=${encodeURIComponent(stateValue)}`;
 
   function normalizeState(value: string): string {
     return value.replace(/[^a-zA-Z]/g, "").slice(0, 2).toUpperCase();
   }
 
+  function normalizeText(value: string): string {
+    return value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+
+  function extractCityNames(payload: unknown): string[] {
+    const data = payload as {
+      data?: unknown;
+      cidades?: unknown;
+      cities?: unknown;
+    };
+
+    const source = Array.isArray(payload)
+      ? payload
+      : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.cidades)
+          ? data.cidades
+          : Array.isArray(data?.cities)
+            ? data.cities
+            : [];
+
+    return Array.from(
+      new Set(
+        source
+          .map((item) => {
+            if (typeof item === "string") return item.trim();
+            if (!item || typeof item !== "object") return "";
+
+            const cityRecord = item as {
+              nome?: unknown;
+              name?: unknown;
+              cidade?: unknown;
+              city?: unknown;
+            };
+
+            return String(
+              cityRecord.nome ??
+                cityRecord.name ??
+                cityRecord.cidade ??
+                cityRecord.city ??
+                "",
+            ).trim();
+          })
+          .filter(Boolean),
+      ),
+    ).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }
+
+  function findCoveredCityMatch(value: string): string {
+    const normalizedCity = normalizeText(value);
+    if (!normalizedCity) return "";
+    return coveredCities.find((coveredCity) => normalizeText(coveredCity) === normalizedCity) || "";
+  }
+
+  async function loadCoveredCitiesByState(stateValue: string) {
+    const selectedState = normalizeState(stateValue);
+    const requestId = ++coverageRequestId;
+
+    city = "";
+    coveredCities = [];
+    coverageMessage = "";
+    cityCheckResult = null;
+    isNotifyFormOpen = false;
+    notificationSent = false;
+
+    if (selectedState.length !== 2) return;
+
+    isLoadingCoveredCities = true;
+
+    try {
+      const response = await fetch(cityCoverageLookupUrl(selectedState), {
+        headers: { Accept: "application/json" },
+      });
+
+      if (!response.ok) {
+        throw new Error("coverage_request_failed");
+      }
+
+      const cities = extractCityNames(await response.json());
+
+      if (requestId !== coverageRequestId) return;
+
+      coveredCities = cities;
+
+      if (cities.length === 0) {
+        coverageMessage = "Nenhuma cidade com cobertura encontrada para esta UF.";
+      } else {
+        coverageMessage = `${cities.length} cidade${cities.length === 1 ? "" : "s"} com cobertura disponível${cities.length === 1 ? "" : "s"}.`;
+      }
+    } catch {
+      if (requestId !== coverageRequestId) return;
+      coverageMessage = "Não foi possível consultar as cidades com cobertura.";
+    } finally {
+      if (requestId === coverageRequestId) {
+        isLoadingCoveredCities = false;
+      }
+    }
+  }
+
+  function handleStateChange(value: string) {
+    state = normalizeState(value);
+    errors = { ...errors, state: "", city: "" };
+    void loadCoveredCitiesByState(state);
+  }
+
+  function handleCityInput(value: string) {
+    city = value;
+    errors = { ...errors, city: "" };
+  }
+
+  function normalizeSelectedCity() {
+    if (!city.trim()) return;
+    const matchedCity = findCoveredCityMatch(city);
+    if (matchedCity) city = matchedCity;
+  }
+
   function validateCityFields(): boolean {
     const next: Record<string, string> = {};
+    const matchedCity = findCoveredCityMatch(city);
 
-    if (!city.trim()) next.city = "Informe a cidade.";
-    if (normalizeState(state).length !== 2) next.state = "Informe a UF com 2 letras.";
+    if (normalizeState(state).length !== 2) {
+      next.state = "Selecione a UF.";
+    }
+
+    if (!city.trim()) {
+      next.city = "Informe a cidade.";
+    } else if (coveredCities.length > 0 && !matchedCity) {
+      next.city = "Selecione uma cidade da lista de cobertura.";
+    }
+
+    if (matchedCity) city = matchedCity;
 
     errors = next;
     return Object.keys(next).length === 0;
@@ -63,6 +237,7 @@
     message = "";
     notificationSent = false;
     isNotifyFormOpen = false;
+    normalizeSelectedCity();
 
     if (!validateCityFields()) return;
 
@@ -208,8 +383,6 @@
       isSendingNotification = false;
     }
   }
-
-  $: state = normalizeState(state);
 </script>
 
 <div class="space-y-6">
@@ -219,7 +392,7 @@
         Verifique se a cidade já está disponível para NFS-e
       </h2>
       <p class="mt-1 text-[13px] text-black/60 max-w-[80ch]">
-        Esta etapa consulta a cobertura da ACBr antes do preenchimento completo. Se a cidade ainda não estiver disponível, o cadastro ainda poderá ser enviado.
+        Selecione a UF e escolha uma cidade da lista de cobertura antes do preenchimento completo.
       </p>
     </div>
 
@@ -229,52 +402,84 @@
   </div>
 
   <div class="grid gap-4 sm:grid-cols-12">
-    <div class="sm:col-span-8">
-      <label for="cityCheckCity" class="mb-2 block text-[12px] font-semibold text-black/70">
-        Cidade
-      </label>
-      <input
-        id="cityCheckCity"
-        class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${
-          errors.city ? "border-red-300" : "border-black/15"
-        }`}
-        bind:value={city}
-        placeholder="Ex: Curitiba"
-      />
-      {#if errors.city}
-        <p class="mt-1 text-[12px] text-red-600">{errors.city}</p>
-      {/if}
-    </div>
-
     <div class="sm:col-span-4">
       <label for="cityCheckState" class="mb-2 block text-[12px] font-semibold text-black/70">
         UF
       </label>
-      <input
+      <select
         id="cityCheckState"
-        class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold uppercase outline-none ${
+        class={`h-11 w-full rounded-xl border bg-white px-3 text-[14px] font-semibold uppercase outline-none ${
           errors.state ? "border-red-300" : "border-black/15"
         }`}
-        bind:value={state}
-        placeholder="PR"
-        maxlength="2"
-      />
+        value={state}
+        on:change={(event) => handleStateChange((event.target as HTMLSelectElement).value)}
+      >
+        <option value="">Selecione</option>
+        {#each stateOptions as option}
+          <option value={option.value}>{option.label}</option>
+        {/each}
+      </select>
       {#if errors.state}
         <p class="mt-1 text-[12px] text-red-600">{errors.state}</p>
+      {/if}
+    </div>
+
+    <div class="sm:col-span-8">
+      <label for="cityCheckCity" class="mb-2 block text-[12px] font-semibold text-black/70">
+        Cidade
+      </label>
+      <div class="relative">
+        <input
+          id="cityCheckCity"
+          class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none disabled:bg-black/[0.03] disabled:text-black/40 ${
+            errors.city ? "border-red-300" : "border-black/15"
+          }`}
+          value={city}
+          list="cityCheckCoverageOptions"
+          autocomplete="off"
+          disabled={!state || isLoadingCoveredCities || coveredCities.length === 0}
+          placeholder={isLoadingCoveredCities
+            ? "Carregando cidades..."
+            : state
+              ? "Digite para encontrar a cidade"
+              : "Selecione a UF primeiro"}
+          on:input={(event) => handleCityInput((event.target as HTMLInputElement).value)}
+          on:blur={normalizeSelectedCity}
+        />
+
+        {#if isLoadingCoveredCities}
+          <div class="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-black/50">
+            Buscando...
+          </div>
+        {/if}
+      </div>
+
+      <datalist id="cityCheckCoverageOptions">
+        {#each coveredCities as coveredCity}
+          <option value={coveredCity}></option>
+        {/each}
+      </datalist>
+
+      {#if errors.city}
+        <p class="mt-1 text-[12px] text-red-600">{errors.city}</p>
+      {:else if coverageMessage}
+        <p class={`mt-1 text-[12px] ${coveredCities.length > 0 ? "text-black/50" : "text-red-600"}`}>
+          {coverageMessage}
+        </p>
       {/if}
     </div>
   </div>
 
   <div class="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between rounded-2xl border border-black/10 bg-black/[0.02] p-4">
     <p class="text-[13px] text-black/60">
-      A consulta usa o código IBGE da cidade e valida a disponibilidade nos endpoints de NFS-e.
+      A consulta valida a cidade na cobertura atual de NFS-e da F10.
     </p>
 
     <button
       type="button"
       class="inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-[13px] font-semibold text-white bg-[var(--primary)] hover:brightness-110 disabled:opacity-60"
       on:click={checkCityAvailability}
-      disabled={isChecking}
+      disabled={isChecking || isLoadingCoveredCities || !state || !city.trim()}
     >
       {#if isChecking}
         <Loader2 size={16} class="animate-spin" />
@@ -294,12 +499,6 @@
           <p class="mt-1 text-[13px] text-emerald-800/80">
             {cityCheckResult.message || "A cidade existe na cobertura de NFS-e. O cadastro pode seguir normalmente."}
           </p>
-          {#if cityCheckResult.ibgeCode || cityCheckResult.provider}
-            <p class="mt-2 text-[12px] text-emerald-800/70">
-              {#if cityCheckResult.ibgeCode}IBGE: {cityCheckResult.ibgeCode}{/if}
-              {#if cityCheckResult.provider} · Provedor: {cityCheckResult.provider}{/if}
-            </p>
-          {/if}
 
           <button
             type="button"
