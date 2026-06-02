@@ -86,10 +86,10 @@
       },
       {
         image: "",
-        highlight: "Centro de Custos",
-        title: "Lançamentos por projeto, turma e unidade com rateios ágeis",
+        highlight: "Nota Fiscal",
+        title: "Verifique a cidade e inicie a tratativa de emissão fiscal",
         buttonText: "Conheça +",
-        href: "/solucoes/financeiro",
+        href: "/solucoes/nota-fiscal",
       },
     ],
     sales: [
@@ -155,7 +155,7 @@
   };
 
   $: cards = content[activeTab] || [];
-  $: visibleCards = cards.slice(0, 3);
+  $: visibleCards = cards.slice(0, 4);
 </script>
 
 <section class="bg-[#F3F4FD] flex items-center justify-center">
@@ -203,7 +203,7 @@
     <!-- Grid fixo de 3 cards com borda -->
     <div class="mt-10">
       <div
-        class="grid gap-6 md:gap-8 md:grid-cols-3"
+        class="grid gap-6 md:gap-8 md:grid-cols-2 lg:grid-cols-4"
         role="region"
         aria-label={`Soluções do módulo ${activeTab}`}
       >

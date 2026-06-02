@@ -10,6 +10,7 @@
     MonitorPlay,
     GraduationCap,
     Wallet,
+    ReceiptText,
     BarChart3,
     ArrowRight,
     ChevronDown,
@@ -71,6 +72,12 @@
       href: "/solucoes/financeiro",
       description: "Cobrança, inadimplência, DRE e visão de caixa.",
       icon: Wallet,
+    },
+    {
+      label: "Nota Fiscal",
+      href: "/solucoes/nota-fiscal",
+      description: "Verificação de cidade e tratativa de emissão fiscal.",
+      icon: ReceiptText,
     },
     {
       label: "Indicadores e BI",

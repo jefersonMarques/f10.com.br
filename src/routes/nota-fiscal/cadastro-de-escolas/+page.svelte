@@ -1,5 +1,6 @@
 <!-- src/routes/nota-fiscal/cadastro-de-escolas/+page.svelte -->
 <script lang="ts">
+  import { onMount } from "svelte";
   import { get } from "svelte/store";
 
   import Breadcrumb from "$lib/components/Breadcrumb.svelte";
@@ -11,22 +12,35 @@
     taxationPlaceOptions,
     type FormErrors,
   } from "./formStore";
+  import Step0 from "./steps/Step0.svelte";
   import Step1 from "./steps/Step1.svelte";
   import Step2 from "./steps/Step2.svelte";
   import Step3 from "./steps/Step3.svelte";
   import Step4 from "./steps/Step4.svelte";
   import { Check } from "lucide-svelte";
 
-  type WizardStep = 1 | 2 | 3 | 4;
+  type WizardStep = 0 | 1 | 2 | 3 | 4;
+  type CityCheckStatus = "idle" | "checking" | "available" | "unavailable" | "error";
+  type CityCheckResult = {
+    status: CityCheckStatus;
+    city: string;
+    state: string;
+    ibgeCode: string;
+    provider: string;
+    message: string;
+    checkedAt: string;
+    raw?: Record<string, unknown> | null;
+  };
 
   const stepTitles: Record<WizardStep, string> = {
+    0: "Verificação da cidade",
     1: "CNPJ, endereço e confirmações",
     2: "Acesso e dados fiscais",
     3: "Certificado digital",
     4: "Explicação",
   };
 
-  let currentStep: WizardStep = 1;
+  let currentStep: WizardStep = 0;
 
   let errors: FormErrors = {};
   let isSubmitting = false;
@@ -34,6 +48,7 @@
   let submitMessage = "";
 
   let certificateFile: File | null = null;
+  let cityCheckResult: CityCheckResult | null = null;
 
   function onlyDigits(value: string): string {
     return value.replace(/\D+/g, "");
@@ -84,6 +99,81 @@
     return options.find((option) => option.value === value)?.label ?? value;
   }
 
+  function getCityCheckEmailFields(): EmailField[] {
+    if (!cityCheckResult) {
+      return [
+        { key: "cityCheckStatus", label: "Verificação da cidade", value: "Não realizada" },
+      ];
+    }
+
+    return [
+      { key: "cityCheckStatus", label: "Verificação da cidade", value: cityCheckResult.status },
+      { key: "cityCheckMessage", label: "Mensagem da verificação", value: cityCheckResult.message },
+      { key: "cityCheckCity", label: "Cidade verificada", value: cityCheckResult.city },
+      { key: "cityCheckState", label: "UF verificada", value: cityCheckResult.state },
+      { key: "cityCheckIbgeCode", label: "Código IBGE", value: cityCheckResult.ibgeCode },
+      { key: "cityCheckProvider", label: "Provedor NFS-e", value: cityCheckResult.provider },
+      { key: "cityCheckCheckedAt", label: "Data da verificação", value: cityCheckResult.checkedAt },
+    ];
+  }
+
+  function applyCityCheckResult(result: CityCheckResult) {
+    cityCheckResult = result;
+    formDataStore.update((prev) => ({
+      ...prev,
+      city: result.city || prev.city,
+      state: result.state || prev.state,
+    }));
+  }
+
+  function continueAfterCityCheck() {
+    currentStep = 1;
+    submitMessage = "";
+  }
+
+  function applyCachedCityCheckLead() {
+    if (typeof window === "undefined") return;
+
+    type CityCheckLeadCache = {
+      shouldSkipCityCheck?: boolean;
+      contactName?: string;
+      contactEmail?: string;
+      contactWhatsapp?: string;
+      schoolName?: string;
+      cityCheckResult?: CityCheckResult;
+    };
+
+    const raw = window.sessionStorage.getItem("nfseCityCheckLead");
+    if (!raw) return;
+
+    try {
+      const cache = JSON.parse(raw) as CityCheckLeadCache;
+      const result = cache.cityCheckResult;
+
+      if (result) {
+        cityCheckResult = result;
+        formDataStore.update((prev) => ({
+          ...prev,
+          city: result.city || prev.city,
+          state: result.state || prev.state,
+          fantasyName: cache.schoolName || prev.fantasyName,
+          email: cache.contactEmail || prev.email,
+          phone: cache.contactWhatsapp || prev.phone,
+        }));
+      }
+
+      if (cache.shouldSkipCityCheck && result) {
+        currentStep = 1;
+      }
+    } catch {
+      window.sessionStorage.removeItem("nfseCityCheckLead");
+    }
+  }
+
+  onMount(() => {
+    applyCachedCityCheckLead();
+  });
+
   function appendPayloadFields(formData: FormData, payload: SubmissionPayload) {
     for (const [key, value] of Object.entries(payload)) {
       if (value === undefined || value === null) continue;
@@ -108,6 +198,14 @@
     const normalized = {
       ...data,
       submittedAt: new Date().toISOString(),
+      cityCheckStatus: cityCheckResult?.status ?? "not_checked",
+      cityCheckMessage: cityCheckResult?.message ?? "Verificação de cidade não realizada.",
+      cityCheckCity: cityCheckResult?.city ?? data.city,
+      cityCheckState: cityCheckResult?.state ?? data.state,
+      cityCheckIbgeCode: cityCheckResult?.ibgeCode ?? "",
+      cityCheckProvider: cityCheckResult?.provider ?? "",
+      cityCheckCheckedAt: cityCheckResult?.checkedAt ?? "",
+      cityCheckRaw: cityCheckResult?.raw ?? null,
       cnpjDigits: onlyDigits(data.cnpj),
       cepDigits: onlyDigits(data.cep),
       phoneDigits: onlyDigits(data.phone),
@@ -136,6 +234,7 @@
     return {
       ...normalized,
       emailFields: [
+        ...getCityCheckEmailFields(),
         { key: "noteKind", label: "Tipo de nota", value: data.noteKind },
         { key: "cnpj", label: "CNPJ", value: data.cnpj },
         { key: "legalName", label: "Razão Social", value: data.legalName },
@@ -207,6 +306,26 @@
   function validateStep(step: WizardStep): boolean {
     const data = get(formDataStore);
     const next: FormErrors = {};
+
+    if (step === 0) {
+      if (!cityCheckResult || cityCheckResult.status === "idle") {
+        submitMessage = "Verifique a cidade antes de continuar.";
+        errors = next;
+        return false;
+      }
+
+      if (cityCheckResult.status === "checking") {
+        submitMessage = "Aguarde a conclusão da verificação.";
+        errors = next;
+        return false;
+      }
+
+      if (cityCheckResult.status === "error") {
+        submitMessage = "Não foi possível verificar a cidade. Tente novamente ou envie mesmo assim quando o alerta aparecer.";
+        errors = next;
+        return false;
+      }
+    }
 
     if (step === 1) {
       if (onlyDigits(data.cnpj).length !== 14) {
@@ -436,7 +555,7 @@
   }
 
   function prevStep() {
-    currentStep = Math.max(1, currentStep - 1) as WizardStep;
+    currentStep = Math.max(0, currentStep - 1) as WizardStep;
     submitMessage = "";
   }
 
@@ -502,18 +621,11 @@
       </h1>
 
       <div class="mt-4 flex items-center gap-2">
-        <div
-          class={`h-2 flex-1 rounded-full ${isSuccess || currentStep >= 1 ? "bg-[var(--primary)]" : "bg-black/10"}`}
-        ></div>
-        <div
-          class={`h-2 flex-1 rounded-full ${isSuccess || currentStep >= 2 ? "bg-[var(--primary)]" : "bg-black/10"}`}
-        ></div>
-        <div
-          class={`h-2 flex-1 rounded-full ${isSuccess || currentStep >= 3 ? "bg-[var(--primary)]" : "bg-black/10"}`}
-        ></div>
-        <div
-          class={`h-2 flex-1 rounded-full ${isSuccess || currentStep >= 4 ? "bg-[var(--primary)]" : "bg-black/10"}`}
-        ></div>
+        {#each [0, 1, 2, 3, 4] as step}
+          <div
+            class={`h-2 flex-1 rounded-full ${isSuccess || currentStep >= step ? "bg-[var(--primary)]" : "bg-black/10"}`}
+          ></div>
+        {/each}
       </div>
 
       <div class="mt-2 text-[13px] text-black/60">
@@ -549,7 +661,13 @@
         </div>
       {:else}
         {#key currentStep}
-          {#if currentStep === 1}
+          {#if currentStep === 0}
+            <Step0
+              {cityCheckResult}
+              onApplyResult={applyCityCheckResult}
+              onContinue={continueAfterCityCheck}
+            />
+          {:else if currentStep === 1}
             <Step1 {errors} />
           {:else if currentStep === 2}
             <Step2 {errors} />
@@ -566,7 +684,7 @@
           <div class="text-[13px] text-black/65"></div>
 
           <div class="flex gap-3">
-            {#if currentStep > 1}
+            {#if currentStep > 0}
               <button
                 type="button"
                 class="rounded-xl px-6 py-3 text-[13px] font-semibold border border-black/15 bg-white hover:bg-black/[0.03] disabled:opacity-60"
@@ -577,7 +695,7 @@
               </button>
             {/if}
 
-            {#if currentStep < 4}
+            {#if currentStep > 0 && currentStep < 4}
               <button
                 type="button"
                 class="rounded-xl px-6 py-3 text-[13px] font-semibold text-white bg-[var(--primary)] hover:brightness-110 disabled:opacity-60"
@@ -586,7 +704,7 @@
               >
                 Próximo
               </button>
-            {:else}
+            {:else if currentStep === 4}
               <button
                 type="button"
                 class="rounded-xl px-6 py-3 text-[13px] font-semibold text-white bg-[var(--primary)] hover:brightness-110 disabled:opacity-60"

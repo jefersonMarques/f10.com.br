@@ -258,6 +258,7 @@ export type FormData = {
 export type FormErrors = Partial<Record<keyof FormData, string>> & {
   serviceRpsBatchNumber?: string;
   certificateFile?: string;
+  selfieFile?: string;
   commerceLastInvoiceNumber?: string;
   commerceReturnCfop?: string;
 };

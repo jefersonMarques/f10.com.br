@@ -1309,7 +1309,7 @@
 </section>
 
 <!-- ===== CONTRATOS, MATRÍCULAS E JORNADA DO ALUNO ===== -->
-<section class="relative py-14 md:py-16 bg-[#F3F4FD]">
+<section class="relative py-14 md:py-16 bg-[#F3F4FD]" id="contratos">
   <div class="container px-5 md:px-8 lg:px-20 space-y-10 md:space-y-12">
     <!-- Título + subtítulo -->
     <header class="max-w-4xl mx-auto text-center">

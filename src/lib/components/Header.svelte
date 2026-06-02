@@ -113,6 +113,11 @@
       icon: Wallet,
     },
     {
+      label: "Nota Fiscal",
+      href: "/solucoes/nota-fiscal",
+      icon: FileChartColumn,
+    },
+    {
       label: "Indicadores e BI",
       href: "/solucoes/indicadores-e-bi",
       icon: BarChart3,

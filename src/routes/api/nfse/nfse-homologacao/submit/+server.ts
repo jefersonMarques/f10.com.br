@@ -8,8 +8,7 @@ import type { RequestHandler } from "./$types";
 import archiver from "archiver";
 import { PassThrough } from "node:stream";
 
-
-import type { FormData as HomologFormData } from "../../../nota-fiscal/cadastro-de-escolas/formStore";
+import type { FormData as HomologFormData } from "../../../../nota-fiscal/cadastro-de-escolas/formStore";
 
 type ContractClientMeta = {
   userAgent?: string;
@@ -34,9 +33,35 @@ type ContractPayload = {
   signedClientMeta?: ContractClientMeta;
 };
 
+type EmailField = {
+  key: string;
+  label: string;
+  value: string;
+};
+
 type SubmissionPayload = HomologFormData & {
   // Metadata
   submittedAt?: string;
+  submissionKind?:
+    | "nfse_city_availability_notification"
+    | "nfse_homologation"
+    | string;
+
+  // Verificação de cidade ACBr
+  cityCheckStatus?: string;
+  cityCheckMessage?: string;
+  cityCheckCity?: string;
+  cityCheckState?: string;
+  cityCheckIbgeCode?: string;
+  cityCheckProvider?: string;
+  cityCheckCheckedAt?: string;
+  cityCheckRaw?: Record<string, unknown> | null;
+
+  // Aviso de cidade indisponível
+  name?: string;
+  whatsapp?: string;
+  schoolName?: string;
+  emailFields?: EmailField[];
 
   // Contrato (opcional, se houver no form)
   contract?: ContractPayload;
@@ -94,8 +119,10 @@ function escapeHtml(value: unknown): string {
     .replaceAll("'", "&#039;");
 }
 
-function onlyDigits(value: string): string {
-  return (value || "").replace(/\D+/g, "");
+function onlyDigits(value: unknown): string {
+  return (
+    typeof value === "string" ? value : value == null ? "" : String(value)
+  ).replace(/\D+/g, "");
 }
 
 function formatBytes(bytes: number): string {
@@ -115,6 +142,37 @@ function formatYesNo(value: unknown): string {
   return "-";
 }
 
+function formatCityCheckStatus(value: unknown): string {
+  if (value === "available") return "Disponível";
+  if (value === "unavailable") return "Ainda não disponível";
+  if (value === "error") return "Erro na verificação";
+  if (value === "checking") return "Verificando";
+  if (value === "not_checked") return "Não realizada";
+  return safeValue(value);
+}
+
+function isAvailabilityNotification(payload: SubmissionPayload): boolean {
+  return payload.submissionKind === "nfse_city_availability_notification";
+}
+
+function normalizeEmailFields(payload: SubmissionPayload): EmailField[] {
+  if (!Array.isArray(payload.emailFields)) return [];
+
+  return payload.emailFields
+    .filter((field): field is EmailField => {
+      return (
+        !!field &&
+        typeof field === "object" &&
+        typeof field.key === "string" &&
+        typeof field.label === "string"
+      );
+    })
+    .map((field) => ({
+      key: field.key,
+      label: field.label,
+      value: safeValue(field.value),
+    }));
+}
 
 function sanitizeFilename(name: string): string {
   const base = (name || "arquivo").split(/[/\\]/).pop() || "arquivo";
@@ -161,7 +219,9 @@ async function zipFile(file: File): Promise<{ name: string; content: string }> {
       const zipBuffer = Buffer.concat(chunks);
       const base64 = zipBuffer.toString("base64");
       const baseName = sanitizeFilename(file.name || "certificado");
-      const zipName = baseName.toLowerCase().endsWith(".zip") ? baseName : `${baseName}.zip`;
+      const zipName = baseName.toLowerCase().endsWith(".zip")
+        ? baseName
+        : `${baseName}.zip`;
       resolve({ name: zipName, content: base64 });
     });
 
@@ -171,12 +231,13 @@ async function zipFile(file: File): Promise<{ name: string; content: string }> {
     archive.pipe(out);
 
     // adiciona o arquivo original dentro do zip (mantém a extensão .cert)
-    archive.append(fileBuffer, { name: sanitizeFilename(file.name || "certificado.cert") });
+    archive.append(fileBuffer, {
+      name: sanitizeFilename(file.name || "certificado.cert"),
+    });
 
     archive.finalize();
   });
 }
-
 
 function isFileLike(value: unknown): value is File {
   return (
@@ -210,6 +271,143 @@ function formatNoteKind(value: SubmissionPayload["noteKind"]): string {
   return safeValue(value);
 }
 
+function buildAvailabilityNotificationText(params: {
+  payload: SubmissionPayload;
+  meta: {
+    submittedAt: string;
+    clientIp: string;
+    userAgent: string;
+    origin: string;
+    messageToken: string;
+  };
+}): string {
+  const { payload, meta } = params;
+  const fields = normalizeEmailFields(payload);
+
+  const lines: string[] = [];
+  lines.push("Solicitação de aviso de cidade disponível — F10");
+  lines.push(`Recebida em: ${meta.submittedAt}`);
+  lines.push(`Token: ${meta.messageToken}`);
+  lines.push("");
+  lines.push("=== Dados do solicitante ===");
+  lines.push(`Nome: ${safeValue(payload.name)}`);
+  lines.push(`E-mail: ${safeValue(payload.email)}`);
+  lines.push(`WhatsApp: ${safeValue(payload.whatsapp)}`);
+  lines.push(`Nome da escola: ${safeValue(payload.schoolName)}`);
+  lines.push("");
+  lines.push("=== Cidade solicitada ===");
+  lines.push(`Cidade: ${safeValue(payload.city)}`);
+  lines.push(`Estado: ${safeValue(payload.state)}`);
+  lines.push(`Código IBGE: ${safeValue(payload.cityCheckIbgeCode)}`);
+  lines.push(`Status: ${formatCityCheckStatus(payload.cityCheckStatus)}`);
+  lines.push(`Mensagem: ${safeValue(payload.cityCheckMessage)}`);
+
+  if (fields.length) {
+    lines.push("");
+    lines.push("=== Campos enviados ===");
+    for (const field of fields) {
+      lines.push(`${field.label}: ${safeValue(field.value)}`);
+    }
+  }
+
+  lines.push("");
+  lines.push("=== Metadados técnicos ===");
+  lines.push(`IP (proxy): ${safeValue(meta.clientIp)}`);
+  lines.push(`User-Agent: ${safeValue(meta.userAgent)}`);
+  lines.push(`Origem: ${safeValue(meta.origin)}`);
+  lines.push(`submittedAt (payload): ${safeValue(payload.submittedAt)}`);
+
+  return lines.join("\n");
+}
+
+function buildAvailabilityNotificationHtml(params: {
+  payload: SubmissionPayload;
+  meta: {
+    submittedAt: string;
+    clientIp: string;
+    userAgent: string;
+    origin: string;
+    messageToken: string;
+  };
+}): string {
+  const primary = "#ea6d0b";
+  const bg = "#FFF7EF";
+  const surface = "#FFFFFF";
+  const outline = "rgba(0,0,0,0.10)";
+  const muted = "rgba(0,0,0,0.62)";
+  const { payload, meta } = params;
+  const logoUrl = `${meta.origin}/logo_f10.png`;
+
+  const rows = [
+    ["Nome", safeValue(payload.name)],
+    ["E-mail", safeValue(payload.email)],
+    ["WhatsApp", safeValue(payload.whatsapp)],
+    ["Nome da escola", safeValue(payload.schoolName)],
+    ["Cidade", safeValue(payload.city)],
+    ["Estado", safeValue(payload.state)],
+    ["Código IBGE", safeValue(payload.cityCheckIbgeCode)],
+    ["Status da cidade", formatCityCheckStatus(payload.cityCheckStatus)],
+    ["Mensagem da verificação", safeValue(payload.cityCheckMessage)],
+    ["IP", safeValue(meta.clientIp)],
+    ["User-Agent", safeValue(meta.userAgent)],
+    ["Origem", safeValue(meta.origin)],
+    ["Token", safeValue(meta.messageToken)],
+  ];
+
+  const rowsHtml = rows
+    .map(
+      ([label, value]) => `
+        <tr>
+          <td style="padding:10px 12px; border-top:1px solid ${outline}; border-right:1px solid ${outline}; color:${muted}; font-size:12px; width:220px;">${escapeHtml(label)}</td>
+          <td style="padding:10px 12px; border-top:1px solid ${outline}; color:#111; font-size:13px;">${escapeHtml(value)}</td>
+        </tr>
+      `,
+    )
+    .join("");
+
+  return `
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Solicitação de aviso de cidade - F10</title>
+  </head>
+  <body style="margin:0; padding:0; background:${bg}; font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${bg}; padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="max-width:680px; width:100%;">
+            <tr>
+              <td style="padding:18px;">
+                <img src="${escapeHtml(logoUrl)}" alt="F10" height="34" style="display:block; height:34px; width:auto;" />
+                <div style="margin-top:14px; font-size:22px; font-weight:800; color:${primary}; line-height:1.2;">
+                  Solicitação de aviso de cidade disponível
+                </div>
+                <div style="margin-top:6px; color:${muted}; font-size:13px;">
+                  O visitante pediu para ser avisado quando a cidade estiver disponível para NFS-e.
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 18px 18px 18px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${outline}; border-radius:16px; overflow:hidden; background:${surface};">
+                  <tr>
+                    <td style="padding:14px 16px; background:${bg}; font-size:14px; font-weight:700; color:${primary};">Dados enviados</td>
+                  </tr>
+                  ${rowsHtml}
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+  `.trim();
+}
+
 function buildEmailText(params: {
   payload: SubmissionPayload;
   docs: Array<{
@@ -236,7 +434,9 @@ function buildEmailText(params: {
   lines.push("");
   lines.push("=== Dados da unidade ===");
   lines.push(`CNPJ: ${safeValue(payload.cnpj)}`);
-  lines.push(`Inscrição Municipal: ${safeValue(payload.municipalRegistration)}`);
+  lines.push(
+    `Inscrição Municipal: ${safeValue(payload.municipalRegistration)}`,
+  );
   lines.push(`Inscrição Estadual: ${safeValue(payload.stateRegistration)}`);
   lines.push(`Razão Social: ${safeValue(payload.legalName)}`);
   lines.push(`Nome Fantasia: ${safeValue(payload.fantasyName)}`);
@@ -251,15 +451,34 @@ function buildEmailText(params: {
   lines.push(`Cidade: ${safeValue(payload.city)}`);
   lines.push(`Estado: ${safeValue(payload.state)}`);
   lines.push("");
+  lines.push("=== Verificação de cidade ACBr ===");
+  lines.push(`Status: ${formatCityCheckStatus(payload.cityCheckStatus)}`);
+  lines.push(`Mensagem: ${safeValue(payload.cityCheckMessage)}`);
+  lines.push(
+    `Cidade verificada: ${safeValue(payload.cityCheckCity || payload.city)}`,
+  );
+  lines.push(
+    `UF verificada: ${safeValue(payload.cityCheckState || payload.state)}`,
+  );
+  lines.push(`Código IBGE: ${safeValue(payload.cityCheckIbgeCode)}`);
+  lines.push(`Provedor NFS-e: ${safeValue(payload.cityCheckProvider)}`);
+  lines.push(`Verificado em: ${safeValue(payload.cityCheckCheckedAt)}`);
+  lines.push("");
   lines.push("=== Contato ===");
   lines.push(`Telefone com DDD: ${safeValue(payload.phone)}`);
   lines.push(`E-mail: ${safeValue(payload.email)}`);
   lines.push(`Site: ${safeValue(payload.website)}`);
   lines.push("");
   lines.push("=== Confirmações === ");
-  lines.push(`Optante pelo Simples Nacional: ${formatYesNo(payload.isSimples)}`);
-  lines.push(`Incentiva projetos culturais (renúncia fiscal): ${formatYesNo(payload.supportsCulturalProjects)}`);
-  lines.push(`Emite NFS-e pelo ambiente nacional: ${formatYesNo(payload.usesNationalNfseEnvironment)}`);
+  lines.push(
+    `Optante pelo Simples Nacional: ${formatYesNo(payload.isSimples)}`,
+  );
+  lines.push(
+    `Incentiva projetos culturais (renúncia fiscal): ${formatYesNo(payload.supportsCulturalProjects)}`,
+  );
+  lines.push(
+    `Emite NFS-e pelo ambiente nacional: ${formatYesNo(payload.usesNationalNfseEnvironment)}`,
+  );
   lines.push("");
   lines.push("=== Tipo de nota ===");
   lines.push(`Tipo: ${formatNoteKind(payload.noteKind)}`);
@@ -288,20 +507,26 @@ function buildEmailText(params: {
     lines.push(`Alíquota CSLL: ${safeValue(payload.aliquotCsll)}`);
     lines.push(`Alíquota ISS: ${safeValue(payload.aliquotIss)}`);
     lines.push(`Porcentagem IBPT: ${safeValue(payload.ibptPercent)}`);
-    lines.push(`Descrição dos serviços: ${safeValue(payload.serviceDescription)}`);
+    lines.push(
+      `Descrição dos serviços: ${safeValue(payload.serviceDescription)}`,
+    );
   }
 
   if (hasCommerceNote(payload)) {
     lines.push("");
     lines.push("=== Dados fiscais (comércio) ===");
-    lines.push(`Número da última nota: ${safeValue(payload.commerceLastInvoiceNumber)}`);
+    lines.push(
+      `Número da última nota: ${safeValue(payload.commerceLastInvoiceNumber)}`,
+    );
     lines.push(`Número do Lote: ${safeValue(payload.commerceBatchNumber)}`);
     lines.push(`Numeração: ${safeValue(payload.commerceNumbering)}`);
     lines.push(`Série: ${safeValue(payload.commerceSeries)}`);
     lines.push(`Código NCM: ${safeValue(payload.commerceNcmCode)}`);
     lines.push(`Código CFOP: ${safeValue(payload.commerceCfopCode)}`);
     lines.push(`CFOP devolução: ${safeValue(payload.commerceReturnCfop)}`);
-    lines.push(`Natureza da Operação: ${safeValue(payload.commerceOperationNature)}`);
+    lines.push(
+      `Natureza da Operação: ${safeValue(payload.commerceOperationNature)}`,
+    );
     lines.push(`Alíquota ICMS: ${safeValue(payload.commerceIcmsAliquot)}`);
     lines.push(`CST ICMS: ${safeValue(payload.commerceCstIcms)}`);
     lines.push(`CSOSN: ${safeValue(payload.commerceCsosn)}`);
@@ -311,14 +536,20 @@ function buildEmailText(params: {
     lines.push(`CST PIS: ${safeValue(payload.commerceCstPis)}`);
     lines.push(`Alíquota COFINS: ${safeValue(payload.commerceCofinsAliquot)}`);
     lines.push(`CST COFINS: ${safeValue(payload.commerceCstCofins)}`);
-    lines.push(`Descrição do item: ${safeValue(payload.commerceItemDescription)}`);
+    lines.push(
+      `Descrição do item: ${safeValue(payload.commerceItemDescription)}`,
+    );
     lines.push(`GTIN/EAN: ${safeValue(payload.commerceGtin)}`);
-    lines.push(`Código de benefício fiscal: ${safeValue(payload.commerceFiscalBenefitCode)}`);
+    lines.push(
+      `Código de benefício fiscal: ${safeValue(payload.commerceFiscalBenefitCode)}`,
+    );
   }
 
   lines.push("");
   lines.push("=== Certificado digital ===");
-  lines.push(`Senha do certificado digital: ${safeValue(payload.certificatePassword)}`);
+  lines.push(
+    `Senha do certificado digital: ${safeValue(payload.certificatePassword)}`,
+  );
   lines.push("");
   lines.push("=== Documentos enviados ===");
   if (!docs.length) {
@@ -337,7 +568,9 @@ function buildEmailText(params: {
   lines.push(`Origem: ${safeValue(meta.origin)}`);
   lines.push(`submittedAt (payload): ${safeValue(payload.submittedAt)}`);
   lines.push("");
-  lines.push("Aviso: este e-mail contém informações sensíveis. Evite encaminhar.");
+  lines.push(
+    "Aviso: este e-mail contém informações sensíveis. Evite encaminhar.",
+  );
 
   return lines.join("\n");
 }
@@ -401,8 +634,8 @@ function buildEmailHtml(params: {
 
   const docsRows = docs.length
     ? docs
-      .map(
-        (d) => `
+        .map(
+          (d) => `
             <tr>
               <td style="padding:10px 12px; border-top:1px solid ${outline}; border-right:1px solid ${outline}; color:${muted}; font-size:12px; width:220px;">
                 ${escapeHtml(d.label)}
@@ -415,8 +648,8 @@ function buildEmailHtml(params: {
               </td>
             </tr>
           `,
-      )
-      .join("")
+        )
+        .join("")
     : `
       <tr>
         <td style="padding:12px; border-top:1px solid ${outline}; color:${muted}; font-size:13px;">
@@ -439,13 +672,26 @@ function buildEmailHtml(params: {
     ["Bairro", safeValue(payload.neighborhood)],
     ["Cidade", safeValue(payload.city)],
     ["Estado", safeValue(payload.state)],
+    ["Verificação da cidade", formatCityCheckStatus(payload.cityCheckStatus)],
+    ["Mensagem da verificação", safeValue(payload.cityCheckMessage)],
+    ["Cidade verificada", safeValue(payload.cityCheckCity || payload.city)],
+    ["UF verificada", safeValue(payload.cityCheckState || payload.state)],
+    ["Código IBGE", safeValue(payload.cityCheckIbgeCode)],
+    ["Provedor NFS-e", safeValue(payload.cityCheckProvider)],
+    ["Verificado em", safeValue(payload.cityCheckCheckedAt)],
     ["Telefone com DDD", safeValue(payload.phone)],
     ["E-mail", safeValue(payload.email)],
     ["Site", safeValue(payload.website)],
     ["Senha do certificado digital", safeValue(payload.certificatePassword)],
     ["Optante pelo Simples Nacional", formatYesNo(payload.isSimples)],
-    ["Incentiva projetos culturais (renúncia fiscal)", formatYesNo(payload.supportsCulturalProjects)],
-    ["Emite NFS-e pelo ambiente nacional", formatYesNo(payload.usesNationalNfseEnvironment)],
+    [
+      "Incentiva projetos culturais (renúncia fiscal)",
+      formatYesNo(payload.supportsCulturalProjects),
+    ],
+    [
+      "Emite NFS-e pelo ambiente nacional",
+      formatYesNo(payload.usesNationalNfseEnvironment),
+    ],
     ["Tipo de nota", formatNoteKind(payload.noteKind)],
   ]);
 
@@ -499,7 +745,10 @@ function buildEmailHtml(params: {
         ["CST COFINS", safeValue(payload.commerceCstCofins)],
         ["Descrição do item", safeValue(payload.commerceItemDescription)],
         ["GTIN/EAN", safeValue(payload.commerceGtin)],
-        ["Código de benefício fiscal", safeValue(payload.commerceFiscalBenefitCode)],
+        [
+          "Código de benefício fiscal",
+          safeValue(payload.commerceFiscalBenefitCode),
+        ],
       ]),
     );
   }
@@ -693,6 +942,9 @@ export const POST: RequestHandler = async ({ request, url }) => {
     );
   }
 
+  const isNotifyOnly = isAvailabilityNotification(payload);
+  const activeDocs = isNotifyOnly ? [] : DOCS;
+
   // ====== Valida docs ======
   const docFiles: Array<{
     key: DocKey;
@@ -701,13 +953,16 @@ export const POST: RequestHandler = async ({ request, url }) => {
     index: number; // 1-based
   }> = [];
 
-  for (const d of DOCS) {
+  for (const d of activeDocs) {
     const entries = d.multiple ? form.getAll(d.key) : [form.get(d.key)];
     const files = entries.filter(isFileLike) as File[];
 
     if (d.required && files.length === 0) {
       return json(
-        { success: false, message: `Documento obrigatório ausente: ${d.label}.` },
+        {
+          success: false,
+          message: `Documento obrigatório ausente: ${d.label}.`,
+        },
         { status: 400 },
       );
     }
@@ -834,23 +1089,29 @@ export const POST: RequestHandler = async ({ request, url }) => {
   };
 
   // ====== HTML + TEXTO ======
-  const htmlContent = buildEmailHtml({
-    payload,
-    docs: docsInfoForHtml,
-    meta,
-  });
+  const htmlContent = isNotifyOnly
+    ? buildAvailabilityNotificationHtml({ payload, meta })
+    : buildEmailHtml({
+        payload,
+        docs: docsInfoForHtml,
+        meta,
+      });
 
-  const textContent = buildEmailText({
-    payload,
-    docs: docsInfoForHtml,
-    meta,
-  });
+  const textContent = isNotifyOnly
+    ? buildAvailabilityNotificationText({ payload, meta })
+    : buildEmailText({
+        payload,
+        docs: docsInfoForHtml,
+        meta,
+      });
 
   // ====== Assunto ======
   const stampForSubject = nowIso.replace("T", " ").slice(0, 19);
-  const subject = `Nova homologação F10 • ${safeValue(
-    payload.fantasyName,
-  )} • ${cnpjDigits || "CNPJ"} • ${stampForSubject}`;
+  const subject = isNotifyOnly
+    ? `Aviso cidade NFS-e F10 • ${safeValue(payload.schoolName || payload.fantasyName)} • ${safeValue(payload.city)}/${safeValue(payload.state)} • ${stampForSubject}`
+    : `Nova homologação F10 • ${safeValue(
+        payload.fantasyName,
+      )} • ${cnpjDigits || "CNPJ"} • ${stampForSubject}`;
 
   // ====== Envia via Brevo ======
   try {
@@ -864,12 +1125,16 @@ export const POST: RequestHandler = async ({ request, url }) => {
       body: JSON.stringify({
         sender: { email: fromEmail, name: fromName },
         to: [{ email: toEmail, name: "Homologação F10" }],
-        ...(copyEmail ? { cc: [{ email: copyEmail, name: "Homologação F10" }] } : {}),
+        ...(copyEmail
+          ? { cc: [{ email: copyEmail, name: "Homologação F10" }] }
+          : {}),
         subject,
         htmlContent,
         textContent,
-        tags: ["homologacao", "f10", "NF"],
-        attachment: attachments,
+        tags: isNotifyOnly
+          ? ["cidade-nfse", "f10", "aviso"]
+          : ["homologacao", "f10", "NF"],
+        ...(attachments.length ? { attachment: attachments } : {}),
       }),
     });
 
@@ -886,13 +1151,15 @@ export const POST: RequestHandler = async ({ request, url }) => {
       );
     }
 
-    const data = (await brevoRes.json().catch(() => null)) as
-      | { messageId?: string }
-      | null;
+    const data = (await brevoRes.json().catch(() => null)) as {
+      messageId?: string;
+    } | null;
 
     return json({
       success: true,
-      message: "Homologação recebida e e-mail enviado com sucesso.",
+      message: isNotifyOnly
+        ? "Solicitação recebida e e-mail enviado com sucesso."
+        : "Homologação recebida e e-mail enviado com sucesso.",
       messageId: data?.messageId ?? null,
     });
   } catch {
