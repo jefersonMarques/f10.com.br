@@ -271,11 +271,6 @@
         clearFieldMessage();
         return;
       }
-
-      showFieldMessage(
-        fields.cityInput,
-        `${coveredCities.length} ${getPlural(coveredCities.length, "sugestão disponível", "sugestões disponíveis")}. Você também pode preencher manualmente.`,
-      );
     } catch {
       if (localRequestId !== requestId) return;
       setCityAutocompleteReady(false);

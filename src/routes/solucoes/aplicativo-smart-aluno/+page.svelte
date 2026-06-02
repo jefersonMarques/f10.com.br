@@ -253,7 +253,7 @@
   </title>
   <meta
     name="description"
-    content="Com o aplicativo escolar F10 Smart Aluno, a sua escola tem um app próprio nas lojas Apple e Android, com a sua marca, cores e menus. Conteúdos de aula, videoaulas, avisos, chat, notas, frequência, financeiro, boletos, Pix e Clube do Aluno, tudo integrado ao sistema F10 e ao AVA."
+    content="Com o aplicativo escolar F10 Smart Aluno, a sua escola tem um app próprio nas lojas Apple e Android, com a sua marca, cores e menus. Conteúdos de aula, videoaulas, avisos, chat, notas, frequência, financeiro, boletos, Pix e Clube do Aluno, tudo integrado ao Software F10 e ao AVA."
   />
   <meta
     property="og:title"
