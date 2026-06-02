@@ -20,7 +20,12 @@
   import { Check } from "lucide-svelte";
 
   type WizardStep = 0 | 1 | 2 | 3 | 4;
-  type CityCheckStatus = "idle" | "checking" | "available" | "unavailable" | "error";
+  type CityCheckStatus =
+    | "idle"
+    | "checking"
+    | "available"
+    | "unavailable"
+    | "error";
   type CityCheckResult = {
     status: CityCheckStatus;
     city: string;
@@ -90,7 +95,9 @@
   }
 
   type EmailField = { key: string; label: string; value: string };
-  type SubmissionPayload = Record<string, unknown> & { emailFields: EmailField[] };
+  type SubmissionPayload = Record<string, unknown> & {
+    emailFields: EmailField[];
+  };
 
   function getOptionLabel<T extends string>(
     options: Array<{ value: T; label: string }>,
@@ -102,18 +109,50 @@
   function getCityCheckEmailFields(): EmailField[] {
     if (!cityCheckResult) {
       return [
-        { key: "cityCheckStatus", label: "Verificação da cidade", value: "Não realizada" },
+        {
+          key: "cityCheckStatus",
+          label: "Verificação da cidade",
+          value: "Não realizada",
+        },
       ];
     }
 
     return [
-      { key: "cityCheckStatus", label: "Verificação da cidade", value: cityCheckResult.status },
-      { key: "cityCheckMessage", label: "Mensagem da verificação", value: cityCheckResult.message },
-      { key: "cityCheckCity", label: "Cidade verificada", value: cityCheckResult.city },
-      { key: "cityCheckState", label: "UF verificada", value: cityCheckResult.state },
-      { key: "cityCheckIbgeCode", label: "Código IBGE", value: cityCheckResult.ibgeCode },
-      { key: "cityCheckProvider", label: "Provedor NFS-e", value: cityCheckResult.provider },
-      { key: "cityCheckCheckedAt", label: "Data da verificação", value: cityCheckResult.checkedAt },
+      {
+        key: "cityCheckStatus",
+        label: "Verificação da cidade",
+        value: cityCheckResult.status,
+      },
+      {
+        key: "cityCheckMessage",
+        label: "Mensagem da verificação",
+        value: cityCheckResult.message,
+      },
+      {
+        key: "cityCheckCity",
+        label: "Cidade verificada",
+        value: cityCheckResult.city,
+      },
+      {
+        key: "cityCheckState",
+        label: "UF verificada",
+        value: cityCheckResult.state,
+      },
+      {
+        key: "cityCheckIbgeCode",
+        label: "Código IBGE",
+        value: cityCheckResult.ibgeCode,
+      },
+      {
+        key: "cityCheckProvider",
+        label: "Provedor NFS-e",
+        value: cityCheckResult.provider,
+      },
+      {
+        key: "cityCheckCheckedAt",
+        label: "Data da verificação",
+        value: cityCheckResult.checkedAt,
+      },
     ];
   }
 
@@ -199,7 +238,8 @@
       ...data,
       submittedAt: new Date().toISOString(),
       cityCheckStatus: cityCheckResult?.status ?? "not_checked",
-      cityCheckMessage: cityCheckResult?.message ?? "Verificação de cidade não realizada.",
+      cityCheckMessage:
+        cityCheckResult?.message ?? "Verificação de cidade não realizada.",
       cityCheckCity: cityCheckResult?.city ?? data.city,
       cityCheckState: cityCheckResult?.state ?? data.state,
       cityCheckIbgeCode: cityCheckResult?.ibgeCode ?? "",
@@ -212,12 +252,27 @@
       hasServiceNote,
       hasCommerceNote,
       operationNature: data.taxationPlace,
-      operationNatureLabel: getOptionLabel(taxationPlaceOptions, data.taxationPlace),
-      taxationPlaceLabel: getOptionLabel(taxationPlaceOptions, data.taxationPlace),
-      specialRegimeLabel: getOptionLabel(specialRegimeOptions, data.specialRegime),
-      issRequirementLabel: getOptionLabel(issRequirementOptions, data.issRequirement),
+      operationNatureLabel: getOptionLabel(
+        taxationPlaceOptions,
+        data.taxationPlace,
+      ),
+      taxationPlaceLabel: getOptionLabel(
+        taxationPlaceOptions,
+        data.taxationPlace,
+      ),
+      specialRegimeLabel: getOptionLabel(
+        specialRegimeOptions,
+        data.specialRegime,
+      ),
+      issRequirementLabel: getOptionLabel(
+        issRequirementOptions,
+        data.issRequirement,
+      ),
       issEligibility: data.issRequirement,
-      issEligibilityLabel: getOptionLabel(issRequirementOptions, data.issRequirement),
+      issEligibilityLabel: getOptionLabel(
+        issRequirementOptions,
+        data.issRequirement,
+      ),
       aliquotPis: normalizePercent(data.aliquotPis),
       aliquotCofins: normalizePercent(data.aliquotCofins),
       aliquotInss: normalizePercent(data.aliquotInss),
@@ -239,9 +294,23 @@
         { key: "cnpj", label: "CNPJ", value: data.cnpj },
         { key: "legalName", label: "Razão Social", value: data.legalName },
         { key: "fantasyName", label: "Nome Fantasia", value: data.fantasyName },
-        { key: "municipalRegistration", label: "Inscrição Municipal", value: data.municipalRegistration },
-        { key: "hasStateRegistration", label: "Possui Inscrição Estadual", value: data.hasStateRegistration ? "Sim" : "Não" },
-        { key: "stateRegistration", label: "Inscrição Estadual", value: data.hasStateRegistration ? data.stateRegistration : "Não possui" },
+        {
+          key: "municipalRegistration",
+          label: "Inscrição Municipal",
+          value: data.municipalRegistration,
+        },
+        {
+          key: "hasStateRegistration",
+          label: "Possui Inscrição Estadual",
+          value: data.hasStateRegistration ? "Sim" : "Não",
+        },
+        {
+          key: "stateRegistration",
+          label: "Inscrição Estadual",
+          value: data.hasStateRegistration
+            ? data.stateRegistration
+            : "Não possui",
+        },
         { key: "cnaeMain", label: "CNAE principal", value: data.cnaeMain },
         { key: "phone", label: "Telefone com DDD", value: data.phone },
         { key: "email", label: "E-mail", value: data.email },
@@ -253,52 +322,208 @@
         { key: "neighborhood", label: "Bairro", value: data.neighborhood },
         { key: "city", label: "Cidade", value: data.city },
         { key: "state", label: "UF", value: data.state },
-        { key: "isSimples", label: "Optante pelo Simples Nacional", value: data.isSimples },
-        { key: "supportsCulturalProjects", label: "Incentivo cultural", value: data.supportsCulturalProjects },
-        { key: "usesNationalNfseEnvironment", label: "Ambiente nacional NFS-e", value: data.usesNationalNfseEnvironment },
-        { key: "cityHallLogin", label: "Login Prefeitura", value: data.cityHallLogin },
-        { key: "cityHallPassword", label: "Senha Prefeitura", value: data.cityHallPassword },
-        { key: "securityPhrase", label: "Frase de segurança", value: data.securityPhrase },
-        { key: "serviceRpsBatchNumber", label: "Lote RPS", value: data.serviceRpsBatchNumber },
-        { key: "serviceListItem", label: "Item da Lista de Serviço", value: data.serviceListItem },
-        { key: "taxationCode", label: "Código de Tributação", value: data.taxationCode },
-        { key: "operationNature", label: "Natureza da operação", value: normalized.operationNatureLabel },
-        { key: "taxationPlace", label: "Natureza da operação", value: normalized.taxationPlaceLabel },
-        { key: "specialRegime", label: "Regime especial", value: normalized.specialRegimeLabel },
-        { key: "issRequirement", label: "Exigibilidade do ISS", value: normalized.issRequirementLabel },
-        { key: "issEligibility", label: "Eligibilidade do ISS", value: normalized.issEligibilityLabel },
-        { key: "issWithholding", label: "Retenção do ISS", value: data.issWithholding },
+        {
+          key: "isSimples",
+          label: "Optante pelo Simples Nacional",
+          value: data.isSimples,
+        },
+        {
+          key: "supportsCulturalProjects",
+          label: "Incentivo cultural",
+          value: data.supportsCulturalProjects,
+        },
+        {
+          key: "usesNationalNfseEnvironment",
+          label: "Ambiente nacional NFS-e",
+          value: data.usesNationalNfseEnvironment,
+        },
+        {
+          key: "cityHallLogin",
+          label: "Login Prefeitura",
+          value: data.cityHallLogin,
+        },
+        {
+          key: "cityHallPassword",
+          label: "Senha Prefeitura",
+          value: data.cityHallPassword,
+        },
+        {
+          key: "securityPhrase",
+          label: "Frase de segurança",
+          value: data.securityPhrase,
+        },
+        {
+          key: "serviceRpsBatchNumber",
+          label: "Lote RPS",
+          value: data.serviceRpsBatchNumber,
+        },
+        {
+          key: "serviceListItem",
+          label: "Item da Lista de Serviço",
+          value: data.serviceListItem,
+        },
+        {
+          key: "taxationCode",
+          label: "Código de Tributação",
+          value: data.taxationCode,
+        },
+        {
+          key: "operationNature",
+          label: "Natureza da operação",
+          value: normalized.operationNatureLabel,
+        },
+        {
+          key: "taxationPlace",
+          label: "Natureza da operação",
+          value: normalized.taxationPlaceLabel,
+        },
+        {
+          key: "specialRegime",
+          label: "Regime especial",
+          value: normalized.specialRegimeLabel,
+        },
+        {
+          key: "issRequirement",
+          label: "Exigibilidade do ISS",
+          value: normalized.issRequirementLabel,
+        },
+        {
+          key: "issEligibility",
+          label: "Eligibilidade do ISS",
+          value: normalized.issEligibilityLabel,
+        },
+        {
+          key: "issWithholding",
+          label: "Retenção do ISS",
+          value: data.issWithholding,
+        },
         { key: "roundIss", label: "Arredondar ISS", value: data.roundIss },
-        { key: "aliquotIss", label: "Alíquota ISS", value: normalized.aliquotIss },
-        { key: "aliquotPis", label: "Alíquota PIS", value: normalized.aliquotPis },
-        { key: "aliquotCofins", label: "Alíquota COFINS", value: normalized.aliquotCofins },
-        { key: "aliquotInss", label: "Alíquota INSS", value: normalized.aliquotInss },
+        {
+          key: "aliquotIss",
+          label: "Alíquota ISS",
+          value: normalized.aliquotIss,
+        },
+        {
+          key: "aliquotPis",
+          label: "Alíquota PIS",
+          value: normalized.aliquotPis,
+        },
+        {
+          key: "aliquotCofins",
+          label: "Alíquota COFINS",
+          value: normalized.aliquotCofins,
+        },
+        {
+          key: "aliquotInss",
+          label: "Alíquota INSS",
+          value: normalized.aliquotInss,
+        },
         { key: "aliquotIr", label: "Alíquota IR", value: normalized.aliquotIr },
-        { key: "aliquotCsll", label: "Alíquota CSLL", value: normalized.aliquotCsll },
+        {
+          key: "aliquotCsll",
+          label: "Alíquota CSLL",
+          value: normalized.aliquotCsll,
+        },
         { key: "ibptPercent", label: "IBPT", value: normalized.ibptPercent },
-        { key: "serviceDescription", label: "Descrição de serviços prestados", value: data.serviceDescription },
-        { key: "commerceLastInvoiceNumber", label: "Última nota de comércio", value: data.commerceLastInvoiceNumber },
-        { key: "commerceOperationNature", label: "Natureza da Operação de comércio", value: data.commerceOperationNature },
-        { key: "commerceBatchNumber", label: "Lote NF-e", value: data.commerceBatchNumber },
-        { key: "commerceNumbering", label: "Numeração NF-e", value: data.commerceNumbering },
-        { key: "commerceSeries", label: "Série NF-e", value: data.commerceSeries },
-        { key: "commerceNcmCode", label: "Código NCM", value: data.commerceNcmCode },
-        { key: "commerceCfopCode", label: "Código CFOP", value: data.commerceCfopCode },
-        { key: "commerceReturnCfop", label: "CFOP para devolução", value: data.commerceReturnCfop },
-        { key: "commerceIcmsAliquot", label: "Alíquota ICMS", value: normalized.commerceIcmsAliquot },
-        { key: "commerceCstIcms", label: "CST ICMS", value: data.commerceCstIcms },
+        {
+          key: "serviceDescription",
+          label: "Descrição de serviços prestados",
+          value: data.serviceDescription,
+        },
+        {
+          key: "commerceLastInvoiceNumber",
+          label: "Última nota de comércio",
+          value: data.commerceLastInvoiceNumber,
+        },
+        {
+          key: "commerceOperationNature",
+          label: "Natureza da Operação de comércio",
+          value: data.commerceOperationNature,
+        },
+        {
+          key: "commerceBatchNumber",
+          label: "Lote NF-e",
+          value: data.commerceBatchNumber,
+        },
+        {
+          key: "commerceNumbering",
+          label: "Numeração NF-e",
+          value: data.commerceNumbering,
+        },
+        {
+          key: "commerceSeries",
+          label: "Série NF-e",
+          value: data.commerceSeries,
+        },
+        {
+          key: "commerceNcmCode",
+          label: "Código NCM",
+          value: data.commerceNcmCode,
+        },
+        {
+          key: "commerceCfopCode",
+          label: "Código CFOP",
+          value: data.commerceCfopCode,
+        },
+        {
+          key: "commerceReturnCfop",
+          label: "CFOP para devolução",
+          value: data.commerceReturnCfop,
+        },
+        {
+          key: "commerceIcmsAliquot",
+          label: "Alíquota ICMS",
+          value: normalized.commerceIcmsAliquot,
+        },
+        {
+          key: "commerceCstIcms",
+          label: "CST ICMS",
+          value: data.commerceCstIcms,
+        },
         { key: "commerceCsosn", label: "CSOSN", value: data.commerceCsosn },
-        { key: "commerceIpiAliquot", label: "Alíquota IPI", value: normalized.commerceIpiAliquot },
+        {
+          key: "commerceIpiAliquot",
+          label: "Alíquota IPI",
+          value: normalized.commerceIpiAliquot,
+        },
         { key: "commerceCstIpi", label: "CST IPI", value: data.commerceCstIpi },
-        { key: "commercePisAliquot", label: "Alíquota PIS comércio", value: normalized.commercePisAliquot },
+        {
+          key: "commercePisAliquot",
+          label: "Alíquota PIS comércio",
+          value: normalized.commercePisAliquot,
+        },
         { key: "commerceCstPis", label: "CST PIS", value: data.commerceCstPis },
-        { key: "commerceCofinsAliquot", label: "Alíquota COFINS comércio", value: normalized.commerceCofinsAliquot },
-        { key: "commerceCstCofins", label: "CST COFINS", value: data.commerceCstCofins },
-        { key: "commerceItemDescription", label: "Descrição da nota de comércio", value: data.commerceItemDescription },
+        {
+          key: "commerceCofinsAliquot",
+          label: "Alíquota COFINS comércio",
+          value: normalized.commerceCofinsAliquot,
+        },
+        {
+          key: "commerceCstCofins",
+          label: "CST COFINS",
+          value: data.commerceCstCofins,
+        },
+        {
+          key: "commerceItemDescription",
+          label: "Descrição da nota de comércio",
+          value: data.commerceItemDescription,
+        },
         { key: "commerceGtin", label: "GTIN", value: data.commerceGtin },
-        { key: "commerceFiscalBenefitCode", label: "Código de benefício fiscal", value: data.commerceFiscalBenefitCode },
-        { key: "certificatePassword", label: "Senha do certificado digital", value: data.certificatePassword },
-        { key: "acceptedTerms", label: "Contrato aceito", value: data.acceptedTerms ? "Sim" : "Não" },
+        {
+          key: "commerceFiscalBenefitCode",
+          label: "Código de benefício fiscal",
+          value: data.commerceFiscalBenefitCode,
+        },
+        {
+          key: "certificatePassword",
+          label: "Senha do certificado digital",
+          value: data.certificatePassword,
+        },
+        {
+          key: "acceptedTerms",
+          label: "Contrato aceito",
+          value: data.acceptedTerms ? "Sim" : "Não",
+        },
       ],
     };
   }
@@ -321,7 +546,8 @@
       }
 
       if (cityCheckResult.status === "error") {
-        submitMessage = "Não foi possível verificar a cidade. Tente novamente ou envie mesmo assim quando o alerta aparecer.";
+        submitMessage =
+          "Não foi possível verificar a cidade. Tente novamente ou envie mesmo assim quando o alerta aparecer.";
         errors = next;
         return false;
       }
@@ -543,7 +769,6 @@
         next.acceptedTerms = "Você deve aceitar os termos para continuar.";
     }
 
-
     errors = next;
     return Object.keys(next).length === 0;
   }
@@ -577,7 +802,7 @@
       appendPayloadFields(fd, payload);
       fd.append("certificate_file", certificateFile!);
 
-      const res = await fetch("/api/nfse-homologacao/submit", {
+      const res = await fetch("/api/nfse/nfse-homologacao/submit", {
         method: "POST",
         body: fd,
       });
