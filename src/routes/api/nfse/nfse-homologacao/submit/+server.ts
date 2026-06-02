@@ -390,11 +390,8 @@ function renderSection(title: string, rows: Array<[string, string]>, colors: { b
 function getCityRows(payload: SubmissionPayload): Array<[string, string]> {
   return [
     ["Status", formatCityCheckStatus(payload.cityCheckStatus)],
-    ["Mensagem", safeValue(payload.cityCheckMessage)],
     ["Cidade informada", safeValue(payload.cityCheckCity || payload.city)],
-    ["UF", safeValue(payload.cityCheckState || payload.state)],
-    ["Código IBGE", safeValue(payload.cityCheckIbgeCode)],
-    ["Verificado em", safeValue(payload.cityCheckCheckedAt)],
+    ["UF", safeValue(payload.cityCheckState || payload.state)]
   ];
 }
 
