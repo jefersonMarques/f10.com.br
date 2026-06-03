@@ -41,6 +41,8 @@
     raw?: Record<string, unknown> | null;
   };
 
+  type CityCoverageStatus = "idle" | "loading" | "ready" | "empty" | "error";
+
   type FormErrors = Partial<
     Record<
       "name" | "email" | "whatsapp" | "schoolName" | "city" | "state",
@@ -89,6 +91,8 @@
   };
 
   const registrationUrl = "/nota-fiscal/cadastro-de-escolas";
+  const cityCoverageEndpoint =
+    "https://backend.f10.com.br/dfe/nfse/cidades-cobertura";
   const scrollXWrap =
     "overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
   const noOverflowPage = "overflow-x-hidden";
@@ -435,6 +439,11 @@
   let schoolName = "";
   let city = "";
   let state = "";
+  let cityCoverageStatus: CityCoverageStatus = "idle";
+  let cityCoverageState = "";
+  let cityCoverageRequestId = 0;
+  let coveredCities: string[] = [];
+  let isCityDropdownOpen = false;
   let lastBodyOverflow = "";
   let lastHtmlOverflow = "";
 
@@ -448,6 +457,159 @@
   function normalizeWhitespace(value: string): string {
     return value.replace(/\s+/g, " ").trim();
   }
+
+  function normalizeText(value: string): string {
+    return value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+
+  function extractCityNames(payload: unknown): string[] {
+    const data = payload as {
+      data?: unknown;
+      cidades?: unknown;
+      cities?: unknown;
+    };
+    const source = Array.isArray(payload)
+      ? payload
+      : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.cidades)
+          ? data.cidades
+          : Array.isArray(data?.cities)
+            ? data.cities
+            : [];
+
+    return Array.from(
+      new Set(
+        source
+          .map((item) => {
+            if (typeof item === "string") return item.trim();
+            if (!item || typeof item !== "object") return "";
+
+            const cityItem = item as {
+              nome?: unknown;
+              name?: unknown;
+              cidade?: unknown;
+              city?: unknown;
+            };
+
+            return String(
+              cityItem.nome ??
+                cityItem.name ??
+                cityItem.cidade ??
+                cityItem.city ??
+                "",
+            ).trim();
+          })
+          .filter(Boolean),
+      ),
+    ).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }
+
+  function normalizePhoneDigits(value: string): string {
+    return value.replace(/\D/g, "").slice(0, 11);
+  }
+
+  function formatBrazilianPhone(value: string): string {
+    const digits = normalizePhoneDigits(value);
+
+    if (digits.length <= 2) {
+      return digits ? `(${digits}` : "";
+    }
+
+    if (digits.length <= 6) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    }
+
+    if (digits.length <= 10) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    }
+
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  }
+
+  function handleWhatsappInput(event: Event) {
+    const target = event.currentTarget as HTMLInputElement;
+    whatsapp = formatBrazilianPhone(target.value);
+  }
+
+  async function loadCitiesByState(stateValue: string) {
+    const normalizedState = normalizeState(stateValue);
+
+    if (normalizedState.length !== 2) {
+      cityCoverageState = "";
+      cityCoverageStatus = "idle";
+      coveredCities = [];
+      isCityDropdownOpen = false;
+      return;
+    }
+
+    if (
+      normalizedState === cityCoverageState &&
+      cityCoverageStatus !== "error"
+    ) {
+      return;
+    }
+
+    const requestId = ++cityCoverageRequestId;
+    cityCoverageState = normalizedState;
+    cityCoverageStatus = "loading";
+    coveredCities = [];
+
+    try {
+      const params = new URLSearchParams({ uf: normalizedState });
+      const response = await fetch(`${cityCoverageEndpoint}?${params}`, {
+        headers: { Accept: "application/json" },
+      });
+
+      if (!response.ok) throw new Error("coverage_request_failed");
+
+      const cities = extractCityNames(await response.json());
+      if (requestId !== cityCoverageRequestId) return;
+
+      coveredCities = cities;
+      cityCoverageStatus = cities.length > 0 ? "ready" : "empty";
+    } catch {
+      if (requestId !== cityCoverageRequestId) return;
+
+      cityCoverageStatus = "error";
+      coveredCities = [];
+    }
+  }
+
+  function handleStateInput(event: Event) {
+    const target = event.currentTarget as HTMLInputElement;
+    state = normalizeState(target.value);
+    void loadCitiesByState(state);
+  }
+
+  function handleCityInput() {
+    isCityDropdownOpen = true;
+  }
+
+  function selectCitySuggestion(selectedCity: string) {
+    city = selectedCity;
+    isCityDropdownOpen = false;
+  }
+
+  $: filteredCities =
+    normalizeWhitespace(city).length >= 2
+      ? coveredCities
+          .filter((item) => normalizeText(item).includes(normalizeText(city)))
+          .slice(0, 8)
+      : [];
+
+  $: cityCoverageMessage =
+    cityCoverageStatus === "loading"
+      ? "Buscando sugestões de cidades com cobertura..."
+      : cityCoverageStatus === "empty"
+        ? "Nenhuma sugestão encontrada para essa UF."
+        : "";
 
   function isEmailValid(value: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -523,7 +685,8 @@
 
     if (!normalizeWhitespace(name)) next.name = "Informe o nome.";
     if (!isEmailValid(email)) next.email = "Informe um e-mail válido.";
-    if (!normalizeWhitespace(whatsapp)) next.whatsapp = "Informe o WhatsApp.";
+    if (normalizePhoneDigits(whatsapp).length < 10)
+      next.whatsapp = "Informe um WhatsApp válido.";
     if (!normalizeWhitespace(schoolName))
       next.schoolName = "Informe o nome da escola.";
     if (!normalizeWhitespace(city)) next.city = "Informe a cidade.";
@@ -591,10 +754,7 @@
       city = result.city;
       state = result.state;
 
-      if (result.status === "available") {
-        createLeadCache(result, true);
-        await goto(registrationUrl);
-      }
+      await requestAvailabilityNotification();
     } catch (error) {
       result = {
         status: "error",
@@ -655,7 +815,7 @@
         cityCheckCheckedAt: currentResult.checkedAt,
         name: normalizeWhitespace(name),
         email: email.trim(),
-        whatsapp: normalizeWhitespace(whatsapp),
+        whatsapp: formatBrazilianPhone(whatsapp),
         schoolName: normalizeWhitespace(schoolName),
         emailFields: [
           {
@@ -668,7 +828,7 @@
           {
             key: "whatsapp",
             label: "WhatsApp",
-            value: normalizeWhitespace(whatsapp),
+            value: formatBrazilianPhone(whatsapp),
           },
           {
             key: "schoolName",
@@ -1644,23 +1804,17 @@
     ></button>
 
     <div
-      class="relative z-10 flex max-h-[100dvh] w-full max-w-[720px] flex-col overflow-hidden rounded-t-[28px] bg-white shadow-[0_28px_90px_rgba(1,13,40,0.28)] sm:m-auto sm:max-h-[calc(100dvh-48px)] sm:rounded-[30px]"
+      class="relative z-10 flex max-h-[100dvh] w-full max-w-[720px] flex-col bg-white shadow-[0_28px_90px_rgba(1,13,40,0.28)] sm:m-auto sm:max-h-[calc(100dvh-48px)] sm:rounded-[30px]"
     >
       <div
-        class="flex items-start justify-between gap-3 border-b border-black/5 bg-[#FFF7EF] px-4 py-4 sm:gap-4 sm:px-5 sm:py-5 md:px-7"
+        class="flex rounded-t-[28px] items-start justify-between gap-3 border-b border-black/5 bg-[#FFF7EF] px-4 py-4 sm:gap-4 sm:px-5 sm:py-5 md:px-7"
       >
         <div>
           <p
-            class="text-[13px] font-semibold uppercase tracking-[0.14em] text-[#EA6D0B]"
+            class="text-[13px] mt-3 font-semibold uppercase tracking-[0.14em] text-[#EA6D0B]"
           >
             Verificação NFS-e
           </p>
-          <h2
-            id="city-check-title"
-            class="mt-1 text-[19px] font-semibold tracking-[-0.02em] text-[#010D28] sm:text-[22px]"
-          >
-            Verificar disponibilidade da cidade
-          </h2>
         </div>
 
         <button
@@ -1673,222 +1827,285 @@
         </button>
       </div>
 
-      <div class="flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-5 sm:py-6 md:px-7">
-        <div class="grid gap-4 md:grid-cols-2">
-          <label class="block">
-            <span class="text-[13px] font-semibold text-[#010D28]">Nome</span>
-            <input
-              bind:value={name}
-              class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
-                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
-                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
-              placeholder="Seu nome"
-            />
-            {#if errors.name}
-              <span class="mt-1 block text-[12px] text-rose-600"
-                >{errors.name}</span
-              >
-            {/if}
-          </label>
-
-          <label class="block">
-            <span class="text-[13px] font-semibold text-[#010D28]">E-mail</span>
-            <input
-              bind:value={email}
-              type="email"
-              class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
-                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
-                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
-              placeholder="email@escola.com.br"
-            />
-            {#if errors.email}
-              <span class="mt-1 block text-[12px] text-rose-600"
-                >{errors.email}</span
-              >
-            {/if}
-          </label>
-
-          <label class="block">
-            <span class="text-[13px] font-semibold text-[#010D28]"
-              >WhatsApp</span
-            >
-            <input
-              bind:value={whatsapp}
-              class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
-                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
-                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
-              placeholder="(00) 00000-0000"
-            />
-            {#if errors.whatsapp}
-              <span class="mt-1 block text-[12px] text-rose-600"
-                >{errors.whatsapp}</span
-              >
-            {/if}
-          </label>
-
-          <label class="block">
-            <span class="text-[13px] font-semibold text-[#010D28]"
-              >Nome da escola</span
-            >
-            <input
-              bind:value={schoolName}
-              class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
-                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
-                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
-              placeholder="Nome fantasia da escola"
-            />
-            {#if errors.schoolName}
-              <span class="mt-1 block text-[12px] text-rose-600"
-                >{errors.schoolName}</span
-              >
-            {/if}
-          </label>
-
-          <label class="block md:col-span-1">
-            <span class="text-[13px] font-semibold text-[#010D28]">Cidade</span>
-            <input
-              bind:value={city}
-              class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
-                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
-                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
-              placeholder="Ex.: Curitiba"
-            />
-            {#if errors.city}
-              <span class="mt-1 block text-[12px] text-rose-600"
-                >{errors.city}</span
-              >
-            {/if}
-          </label>
-
-          <label class="block md:col-span-1">
-            <span class="text-[13px] font-semibold text-[#010D28]">Estado</span>
-            <input
-              bind:value={state}
-              maxlength="2"
-              class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
-                                   text-[14px] uppercase outline-none transition focus:border-[#EA6D0B]
-                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
-              placeholder="UF"
-            />
-            {#if errors.state}
-              <span class="mt-1 block text-[12px] text-rose-600"
-                >{errors.state}</span
-              >
-            {/if}
-          </label>
-        </div>
-
-        {#if result?.status === "unavailable"}
-          <div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-            <div class="flex gap-3">
-              <TriangleAlert size={22} class="mt-0.5 shrink-0 text-amber-700" />
-              <div>
-                <p class="text-[14px] font-semibold text-amber-900">
-                  Cidade em análise para implantação
-                </p>
-                <p class="mt-1 text-[13px] leading-relaxed text-amber-800">
-                  {result.message}
-                </p>
-              </div>
-            </div>
-          </div>
-        {:else if result?.status === "error"}
-          <div class="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4">
-            <div class="flex gap-3">
-              <TriangleAlert size={22} class="mt-0.5 shrink-0 text-rose-700" />
-              <div>
-                <p class="text-[14px] font-semibold text-rose-900">
-                  Não foi possível verificar agora
-                </p>
-                <p class="mt-1 text-[13px] leading-relaxed text-rose-800">
-                  {result.message}
-                </p>
-              </div>
-            </div>
-          </div>
-        {/if}
-
+      <div
+        class="flex-1 px-4 py-5 sm:px-5 sm:py-6 md:px-7"
+      >
         {#if notificationSent}
           <div
-            class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4"
+            class="flex min-h-[360px] flex-col items-center justify-center text-center"
           >
-            <div class="flex gap-3">
-              <CheckCircle2
-                size={22}
-                class="mt-0.5 shrink-0 text-emerald-700"
+            <div
+              class={`flex h-20 w-20 items-center justify-center rounded-full ring-1 ${
+                result?.status === "available"
+                  ? "bg-emerald-50 text-emerald-600 ring-emerald-100"
+                  : "bg-amber-50 text-amber-600 ring-amber-100"
+              }`}
+            >
+              {#if result?.status === "available"}
+                <CheckCircle2 size={34} strokeWidth={2.4} />
+              {:else}
+                <TriangleAlert size={34} strokeWidth={2.4} />
+              {/if}
+            </div>
+
+            <h3
+              class="mt-6 text-[22px] font-semibold tracking-[-0.02em] text-[#010D28] sm:text-[26px]"
+            >
+              {result?.status === "available"
+                ? "Cidade elegível para emissão fiscal"
+                : "Cidade ainda não elegível"}
+            </h3>
+
+            <p
+              class="mt-3 max-w-[460px] text-[14px] leading-relaxed text-[#000A57]/70 sm:text-[15px]"
+            >
+              {result?.status === "available"
+                ? "Sua cidade está elegível para emissão de notas fiscais pelo Software F10. Nossa equipe já foi notificada e entrará em contato em breve para orientar os próximos passos."
+                : "Sua cidade ainda não está elegível para emissão de notas fiscais pelo Software F10. Mesmo assim, nossa equipe já foi notificada e entrará em contato em breve para orientar sua escola e tirar qualquer dúvida."}
+            </p>
+          </div>
+        {:else}
+          <div class="grid gap-4 md:grid-cols-2">
+            <label class="block">
+              <span class="text-[13px] font-semibold text-[#010D28]">Nome</span>
+              <input
+                bind:value={name}
+                class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
+                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
+                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
+                placeholder="Seu nome"
               />
-              <div>
-                <p class="text-[14px] font-semibold text-emerald-900">
-                  Solicitação enviada
-                </p>
-                <p class="mt-1 text-[13px] leading-relaxed text-emerald-800">
-                  A equipe F10 recebeu seus dados para acompanhar a
-                  disponibilidade da cidade.
-                </p>
+              {#if errors.name}
+                <span class="mt-1 block text-[12px] text-rose-600"
+                  >{errors.name}</span
+                >
+              {/if}
+            </label>
+
+            <label class="block">
+              <span class="text-[13px] font-semibold text-[#010D28]"
+                >E-mail</span
+              >
+              <input
+                bind:value={email}
+                type="email"
+                class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
+                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
+                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
+                placeholder="email@escola.com.br"
+              />
+              {#if errors.email}
+                <span class="mt-1 block text-[12px] text-rose-600"
+                  >{errors.email}</span
+                >
+              {/if}
+            </label>
+
+            <label class="block">
+              <span class="text-[13px] font-semibold text-[#010D28]"
+                >WhatsApp</span
+              >
+              <input
+                bind:value={whatsapp}
+                on:input={handleWhatsappInput}
+                inputmode="tel"
+                class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
+                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
+                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
+                placeholder="(00) 00000-0000"
+              />
+              {#if errors.whatsapp}
+                <span class="mt-1 block text-[12px] text-rose-600"
+                  >{errors.whatsapp}</span
+                >
+              {/if}
+            </label>
+
+            <label class="block">
+              <span class="text-[13px] font-semibold text-[#010D28]"
+                >Nome da escola</span
+              >
+              <input
+                bind:value={schoolName}
+                class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
+                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
+                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
+                placeholder="Nome fantasia da escola"
+              />
+              {#if errors.schoolName}
+                <span class="mt-1 block text-[12px] text-rose-600"
+                  >{errors.schoolName}</span
+                >
+              {/if}
+            </label>
+
+            <label class="block md:col-span-1">
+              <span class="text-[13px] font-semibold text-[#010D28]"
+                >Estado</span
+              >
+              <input
+                bind:value={state}
+                on:input={handleStateInput}
+                maxlength="2"
+                class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
+                                   text-[14px] uppercase outline-none transition focus:border-[#EA6D0B]
+                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
+                placeholder="UF"
+              />
+              {#if errors.state}
+                <span class="mt-1 block text-[12px] text-rose-600"
+                  >{errors.state}</span
+                >
+              {/if}
+            </label>
+
+            <label class="relative block md:col-span-1">
+              <span class="text-[13px] font-semibold text-[#010D28]"
+                >Cidade</span
+              >
+              <input
+                bind:value={city}
+                on:focus={() => (isCityDropdownOpen = true)}
+                on:input={handleCityInput}
+                on:blur={() =>
+                  window.setTimeout(() => (isCityDropdownOpen = false), 120)}
+                autocomplete="off"
+                class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
+                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
+                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
+                placeholder={cityCoverageStatus === "ready"
+                  ? "Digite ao menos 2 letras"
+                  : "Ex.: Curitiba"}
+              />
+              {#if isCityDropdownOpen && filteredCities.length > 0}
+                <div
+                  class="absolute left-0 right-0 top-full z-[2147483647] mt-2 max-h-60 overflow-y-auto rounded-2xl border border-black/10 bg-white p-1 shadow-2xl"
+                >
+                  {#each filteredCities as cityOption}
+                    <button
+                      type="button"
+                      class="block w-full rounded-xl px-3 py-2 text-left text-[14px] font-medium text-slate-700 hover:bg-orange-50 hover:text-slate-950"
+                      on:mousedown|preventDefault={() =>
+                        selectCitySuggestion(cityOption)}
+                    >
+                      {cityOption}
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+              {#if cityCoverageMessage}
+                <span class="mt-1 block text-[12px] text-slate-500">
+                  {cityCoverageMessage}
+                </span>
+              {/if}
+              {#if errors.city}
+                <span class="mt-1 block text-[12px] text-rose-600"
+                  >{errors.city}</span
+                >
+              {/if}
+            </label>
+          </div>
+
+          {#if result?.status === "unavailable"}
+            <div
+              class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4"
+            >
+              <div class="flex gap-3">
+                <TriangleAlert
+                  size={22}
+                  class="mt-0.5 shrink-0 text-amber-700"
+                />
+                <div>
+                  <p class="text-[14px] font-semibold text-amber-900">
+                    Cidade em análise para implantação
+                  </p>
+                  <p class="mt-1 text-[13px] leading-relaxed text-amber-800">
+                    {result.message}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        {/if}
+          {:else if result?.status === "error"}
+            <div class="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4">
+              <div class="flex gap-3">
+                <TriangleAlert
+                  size={22}
+                  class="mt-0.5 shrink-0 text-rose-700"
+                />
+                <div>
+                  <p class="text-[14px] font-semibold text-rose-900">
+                    Não foi possível verificar agora
+                  </p>
+                  <p class="mt-1 text-[13px] leading-relaxed text-rose-800">
+                    {result.message}
+                  </p>
+                </div>
+              </div>
+            </div>
+          {/if}
 
-        {#if formMessage}
-          <p class="mt-4 text-[13px] text-rose-600">{formMessage}</p>
-        {/if}
+          {#if formMessage}
+            <p class="mt-4 text-[13px] text-rose-600">{formMessage}</p>
+          {/if}
 
-        <div class="sticky bottom-0 -mx-4 mt-6 flex flex-col gap-3 border-t border-black/5 bg-white/95 px-4 py-4 backdrop-blur sm:static sm:mx-0 sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-0">
-          {#if result?.status === "unavailable" || result?.status === "error"}
-            <button
-              type="button"
-              on:click={continueAnyway}
-              disabled={isChecking || isSendingNotification}
-              class="inline-flex w-full items-center justify-center rounded-full border border-black/10
+          <div
+            class="sticky bottom-0 -mx-4 mt-6 flex flex-col gap-3 border-t border-black/5 bg-white/95 px-4 py-4 backdrop-blur sm:static sm:mx-0 sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-0"
+          >
+            {#if result?.status === "unavailable" || result?.status === "error"}
+              <button
+                type="button"
+                on:click={continueAnyway}
+                disabled={isChecking || isSendingNotification}
+                class="inline-flex w-full items-center justify-center rounded-full border border-black/10
                                    bg-white px-5 py-3 text-[14px] sm:w-auto font-semibold text-[#010D28]
                                    transition hover:bg-black/[0.03] disabled:opacity-60"
-            >
-              Enviar assim mesmo
-            </button>
+              >
+                Enviar assim mesmo
+              </button>
 
-            <button
-              type="button"
-              on:click={requestAvailabilityNotification}
-              disabled={isChecking || isSendingNotification}
-              class="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#010D28]
+              <button
+                type="button"
+                on:click={requestAvailabilityNotification}
+                disabled={isChecking || isSendingNotification}
+                class="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#010D28]
                                    px-5 py-3 text-[14px] sm:w-auto font-semibold text-white transition
                                    hover:bg-[#000A57] disabled:opacity-60"
-            >
-              {#if isSendingNotification}
-                <Loader2 size={17} class="animate-spin" />
-              {:else}
-                <Bell size={17} />
-              {/if}
-              <span
-                >{isSendingNotification
-                  ? "Enviando..."
-                  : "Me avise quando disponível"}</span
               >
-            </button>
-          {:else}
-            <button
-              type="button"
-              on:click={checkCityAvailability}
-              disabled={isChecking || isSendingNotification}
-              class="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#EA6D0B]
+                {#if isSendingNotification}
+                  <Loader2 size={17} class="animate-spin" />
+                {:else}
+                  <Bell size={17} />
+                {/if}
+                <span
+                  >{isSendingNotification
+                    ? "Enviando..."
+                    : "Me avise quando disponível"}</span
+                >
+              </button>
+            {:else}
+              <button
+                type="button"
+                on:click={checkCityAvailability}
+                disabled={isChecking || isSendingNotification}
+                class="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#EA6D0B]
                                    px-6 py-3 text-[14px] sm:w-auto font-semibold text-white
                                    shadow-[0_14px_34px_rgba(234,109,11,0.28)] transition
                                    hover:brightness-110 disabled:opacity-60"
-            >
-              {#if isChecking}
-                <Loader2 size={18} class="animate-spin" />
-              {:else}
-                <MapPin size={18} />
-              {/if}
-              <span
-                >{isChecking
-                  ? "Verificando..."
-                  : "Verificar minha cidade"}</span
               >
-            </button>
-          {/if}
-        </div>
+                {#if isChecking}
+                  <Loader2 size={18} class="animate-spin" />
+                {:else}
+                  <MapPin size={18} />
+                {/if}
+                <span
+                  >{isChecking
+                    ? "Verificando..."
+                    : "Verificar minha cidade"}</span
+                >
+              </button>
+            {/if}
+          </div>
+        {/if}
       </div>
     </div>
   </div>
