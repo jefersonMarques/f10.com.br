@@ -801,7 +801,7 @@
 
     try {
       const payload = {
-        submissionKind: "nfse_city_availability_notification",
+        submissionKind: "nfse_interest_lead",
         submittedAt: new Date().toISOString(),
         city: currentResult.city,
         state: currentResult.state,
@@ -855,16 +855,13 @@
         ],
       };
 
-      const formData = new FormData();
-      formData.append("payload", JSON.stringify(payload));
-
-      for (const field of payload.emailFields) {
-        formData.append(`email_${field.key}`, field.value);
-      }
-
-      const response = await fetch("/api/nfse/nfse-homologacao/submit", {
+      const response = await fetch("/api/nfse/nfse-interest/submit", {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
