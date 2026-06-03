@@ -1673,222 +1673,243 @@
         </button>
       </div>
 
-      <div class="flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-5 sm:py-6 md:px-7">
-        <div class="grid gap-4 md:grid-cols-2">
-          <label class="block">
-            <span class="text-[13px] font-semibold text-[#010D28]">Nome</span>
-            <input
-              bind:value={name}
-              class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
-                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
-                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
-              placeholder="Seu nome"
-            />
-            {#if errors.name}
-              <span class="mt-1 block text-[12px] text-rose-600"
-                >{errors.name}</span
-              >
-            {/if}
-          </label>
-
-          <label class="block">
-            <span class="text-[13px] font-semibold text-[#010D28]">E-mail</span>
-            <input
-              bind:value={email}
-              type="email"
-              class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
-                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
-                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
-              placeholder="email@escola.com.br"
-            />
-            {#if errors.email}
-              <span class="mt-1 block text-[12px] text-rose-600"
-                >{errors.email}</span
-              >
-            {/if}
-          </label>
-
-          <label class="block">
-            <span class="text-[13px] font-semibold text-[#010D28]"
-              >WhatsApp</span
-            >
-            <input
-              bind:value={whatsapp}
-              class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
-                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
-                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
-              placeholder="(00) 00000-0000"
-            />
-            {#if errors.whatsapp}
-              <span class="mt-1 block text-[12px] text-rose-600"
-                >{errors.whatsapp}</span
-              >
-            {/if}
-          </label>
-
-          <label class="block">
-            <span class="text-[13px] font-semibold text-[#010D28]"
-              >Nome da escola</span
-            >
-            <input
-              bind:value={schoolName}
-              class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
-                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
-                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
-              placeholder="Nome fantasia da escola"
-            />
-            {#if errors.schoolName}
-              <span class="mt-1 block text-[12px] text-rose-600"
-                >{errors.schoolName}</span
-              >
-            {/if}
-          </label>
-
-          <label class="block md:col-span-1">
-            <span class="text-[13px] font-semibold text-[#010D28]">Cidade</span>
-            <input
-              bind:value={city}
-              class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
-                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
-                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
-              placeholder="Ex.: Curitiba"
-            />
-            {#if errors.city}
-              <span class="mt-1 block text-[12px] text-rose-600"
-                >{errors.city}</span
-              >
-            {/if}
-          </label>
-
-          <label class="block md:col-span-1">
-            <span class="text-[13px] font-semibold text-[#010D28]">Estado</span>
-            <input
-              bind:value={state}
-              maxlength="2"
-              class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
-                                   text-[14px] uppercase outline-none transition focus:border-[#EA6D0B]
-                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
-              placeholder="UF"
-            />
-            {#if errors.state}
-              <span class="mt-1 block text-[12px] text-rose-600"
-                >{errors.state}</span
-              >
-            {/if}
-          </label>
-        </div>
-
-        {#if result?.status === "unavailable"}
-          <div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-            <div class="flex gap-3">
-              <TriangleAlert size={22} class="mt-0.5 shrink-0 text-amber-700" />
-              <div>
-                <p class="text-[14px] font-semibold text-amber-900">
-                  Cidade em análise para implantação
-                </p>
-                <p class="mt-1 text-[13px] leading-relaxed text-amber-800">
-                  {result.message}
-                </p>
-              </div>
-            </div>
-          </div>
-        {:else if result?.status === "error"}
-          <div class="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4">
-            <div class="flex gap-3">
-              <TriangleAlert size={22} class="mt-0.5 shrink-0 text-rose-700" />
-              <div>
-                <p class="text-[14px] font-semibold text-rose-900">
-                  Não foi possível verificar agora
-                </p>
-                <p class="mt-1 text-[13px] leading-relaxed text-rose-800">
-                  {result.message}
-                </p>
-              </div>
-            </div>
-          </div>
-        {/if}
-
+      <div
+        class="flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-5 sm:py-6 md:px-7"
+      >
         {#if notificationSent}
           <div
-            class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4"
+            class="flex min-h-[360px] flex-col items-center justify-center text-center"
           >
-            <div class="flex gap-3">
-              <CheckCircle2
-                size={22}
-                class="mt-0.5 shrink-0 text-emerald-700"
+            <div
+              class="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
+            >
+              <CheckCircle2 size={44} strokeWidth={2.4} />
+            </div>
+
+            <h3
+              class="mt-6 text-[22px] font-semibold tracking-[-0.02em] text-[#010D28] sm:text-[26px]"
+            >
+              Solicitação enviada com sucesso
+            </h3>
+
+            <p
+              class="mt-3 max-w-[420px] text-[14px] leading-relaxed text-[#000A57]/70 sm:text-[15px]"
+            >
+              A equipe F10 recebeu seus dados e vai acompanhar a disponibilidade
+              de nota fiscal para sua cidade.
+            </p>
+          </div>
+        {:else}
+          <div class="grid gap-4 md:grid-cols-2">
+            <label class="block">
+              <span class="text-[13px] font-semibold text-[#010D28]">Nome</span>
+              <input
+                bind:value={name}
+                class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
+                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
+                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
+                placeholder="Seu nome"
               />
-              <div>
-                <p class="text-[14px] font-semibold text-emerald-900">
-                  Solicitação enviada
-                </p>
-                <p class="mt-1 text-[13px] leading-relaxed text-emerald-800">
-                  A equipe F10 recebeu seus dados para acompanhar a
-                  disponibilidade da cidade.
-                </p>
+              {#if errors.name}
+                <span class="mt-1 block text-[12px] text-rose-600"
+                  >{errors.name}</span
+                >
+              {/if}
+            </label>
+
+            <label class="block">
+              <span class="text-[13px] font-semibold text-[#010D28]"
+                >E-mail</span
+              >
+              <input
+                bind:value={email}
+                type="email"
+                class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
+                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
+                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
+                placeholder="email@escola.com.br"
+              />
+              {#if errors.email}
+                <span class="mt-1 block text-[12px] text-rose-600"
+                  >{errors.email}</span
+                >
+              {/if}
+            </label>
+
+            <label class="block">
+              <span class="text-[13px] font-semibold text-[#010D28]"
+                >WhatsApp</span
+              >
+              <input
+                bind:value={whatsapp}
+                class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
+                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
+                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
+                placeholder="(00) 00000-0000"
+              />
+              {#if errors.whatsapp}
+                <span class="mt-1 block text-[12px] text-rose-600"
+                  >{errors.whatsapp}</span
+                >
+              {/if}
+            </label>
+
+            <label class="block">
+              <span class="text-[13px] font-semibold text-[#010D28]"
+                >Nome da escola</span
+              >
+              <input
+                bind:value={schoolName}
+                class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
+                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
+                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
+                placeholder="Nome fantasia da escola"
+              />
+              {#if errors.schoolName}
+                <span class="mt-1 block text-[12px] text-rose-600"
+                  >{errors.schoolName}</span
+                >
+              {/if}
+            </label>
+
+            <label class="block md:col-span-1">
+              <span class="text-[13px] font-semibold text-[#010D28]"
+                >Cidade</span
+              >
+              <input
+                bind:value={city}
+                class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
+                                   text-[14px] outline-none transition focus:border-[#EA6D0B]
+                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
+                placeholder="Ex.: Curitiba"
+              />
+              {#if errors.city}
+                <span class="mt-1 block text-[12px] text-rose-600"
+                  >{errors.city}</span
+                >
+              {/if}
+            </label>
+
+            <label class="block md:col-span-1">
+              <span class="text-[13px] font-semibold text-[#010D28]"
+                >Estado</span
+              >
+              <input
+                bind:value={state}
+                maxlength="2"
+                class="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 sm:px-4 sm:py-3
+                                   text-[14px] uppercase outline-none transition focus:border-[#EA6D0B]
+                                   focus:ring-4 focus:ring-[#EA6D0B]/10"
+                placeholder="UF"
+              />
+              {#if errors.state}
+                <span class="mt-1 block text-[12px] text-rose-600"
+                  >{errors.state}</span
+                >
+              {/if}
+            </label>
+          </div>
+
+          {#if result?.status === "unavailable"}
+            <div
+              class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4"
+            >
+              <div class="flex gap-3">
+                <TriangleAlert
+                  size={22}
+                  class="mt-0.5 shrink-0 text-amber-700"
+                />
+                <div>
+                  <p class="text-[14px] font-semibold text-amber-900">
+                    Cidade em análise para implantação
+                  </p>
+                  <p class="mt-1 text-[13px] leading-relaxed text-amber-800">
+                    {result.message}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        {/if}
+          {:else if result?.status === "error"}
+            <div class="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4">
+              <div class="flex gap-3">
+                <TriangleAlert
+                  size={22}
+                  class="mt-0.5 shrink-0 text-rose-700"
+                />
+                <div>
+                  <p class="text-[14px] font-semibold text-rose-900">
+                    Não foi possível verificar agora
+                  </p>
+                  <p class="mt-1 text-[13px] leading-relaxed text-rose-800">
+                    {result.message}
+                  </p>
+                </div>
+              </div>
+            </div>
+          {/if}
 
-        {#if formMessage}
-          <p class="mt-4 text-[13px] text-rose-600">{formMessage}</p>
-        {/if}
+          {#if formMessage}
+            <p class="mt-4 text-[13px] text-rose-600">{formMessage}</p>
+          {/if}
 
-        <div class="sticky bottom-0 -mx-4 mt-6 flex flex-col gap-3 border-t border-black/5 bg-white/95 px-4 py-4 backdrop-blur sm:static sm:mx-0 sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-0">
-          {#if result?.status === "unavailable" || result?.status === "error"}
-            <button
-              type="button"
-              on:click={continueAnyway}
-              disabled={isChecking || isSendingNotification}
-              class="inline-flex w-full items-center justify-center rounded-full border border-black/10
+          <div
+            class="sticky bottom-0 -mx-4 mt-6 flex flex-col gap-3 border-t border-black/5 bg-white/95 px-4 py-4 backdrop-blur sm:static sm:mx-0 sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-0"
+          >
+            {#if result?.status === "unavailable" || result?.status === "error"}
+              <button
+                type="button"
+                on:click={continueAnyway}
+                disabled={isChecking || isSendingNotification}
+                class="inline-flex w-full items-center justify-center rounded-full border border-black/10
                                    bg-white px-5 py-3 text-[14px] sm:w-auto font-semibold text-[#010D28]
                                    transition hover:bg-black/[0.03] disabled:opacity-60"
-            >
-              Enviar assim mesmo
-            </button>
+              >
+                Enviar assim mesmo
+              </button>
 
-            <button
-              type="button"
-              on:click={requestAvailabilityNotification}
-              disabled={isChecking || isSendingNotification}
-              class="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#010D28]
+              <button
+                type="button"
+                on:click={requestAvailabilityNotification}
+                disabled={isChecking || isSendingNotification}
+                class="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#010D28]
                                    px-5 py-3 text-[14px] sm:w-auto font-semibold text-white transition
                                    hover:bg-[#000A57] disabled:opacity-60"
-            >
-              {#if isSendingNotification}
-                <Loader2 size={17} class="animate-spin" />
-              {:else}
-                <Bell size={17} />
-              {/if}
-              <span
-                >{isSendingNotification
-                  ? "Enviando..."
-                  : "Me avise quando disponível"}</span
               >
-            </button>
-          {:else}
-            <button
-              type="button"
-              on:click={checkCityAvailability}
-              disabled={isChecking || isSendingNotification}
-              class="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#EA6D0B]
+                {#if isSendingNotification}
+                  <Loader2 size={17} class="animate-spin" />
+                {:else}
+                  <Bell size={17} />
+                {/if}
+                <span
+                  >{isSendingNotification
+                    ? "Enviando..."
+                    : "Me avise quando disponível"}</span
+                >
+              </button>
+            {:else}
+              <button
+                type="button"
+                on:click={checkCityAvailability}
+                disabled={isChecking || isSendingNotification}
+                class="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#EA6D0B]
                                    px-6 py-3 text-[14px] sm:w-auto font-semibold text-white
                                    shadow-[0_14px_34px_rgba(234,109,11,0.28)] transition
                                    hover:brightness-110 disabled:opacity-60"
-            >
-              {#if isChecking}
-                <Loader2 size={18} class="animate-spin" />
-              {:else}
-                <MapPin size={18} />
-              {/if}
-              <span
-                >{isChecking
-                  ? "Verificando..."
-                  : "Verificar minha cidade"}</span
               >
-            </button>
-          {/if}
-        </div>
+                {#if isChecking}
+                  <Loader2 size={18} class="animate-spin" />
+                {:else}
+                  <MapPin size={18} />
+                {/if}
+                <span
+                  >{isChecking
+                    ? "Verificando..."
+                    : "Verificar minha cidade"}</span
+                >
+              </button>
+            {/if}
+          </div>
+        {/if}
       </div>
     </div>
   </div>
