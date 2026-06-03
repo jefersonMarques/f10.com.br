@@ -213,18 +213,6 @@
     applyCachedCityCheckLead();
   });
 
-  function appendPayloadFields(formData: FormData, payload: SubmissionPayload) {
-    for (const [key, value] of Object.entries(payload)) {
-      if (value === undefined || value === null) continue;
-      if (Array.isArray(value) || typeof value === "object") continue;
-      formData.append(key, String(value));
-    }
-
-    for (const field of payload.emailFields) {
-      formData.append(`email_${field.key}`, field.value);
-    }
-  }
-
   function createSubmissionPayload(): SubmissionPayload {
     const data = get(formDataStore);
 
@@ -799,7 +787,6 @@
       const payload = createSubmissionPayload();
 
       fd.append("payload", JSON.stringify(payload));
-      appendPayloadFields(fd, payload);
       fd.append("certificate_file", certificateFile!);
 
       const res = await fetch("/api/nfse/nfse-homologacao/submit", {

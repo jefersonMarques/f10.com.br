@@ -326,6 +326,21 @@ function logMultipartError(error: unknown): void {
   }
 }
 
+function getMultipartParseErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const lowerMessage = message.toLowerCase();
+
+  if (lowerMessage.includes("body size") || lowerMessage.includes("request body size")) {
+    return "Arquivo muito grande para o limite atual do servidor. Recarregue o PM2 com BODY_SIZE_LIMIT=100M e tente novamente.";
+  }
+
+  if (lowerMessage.includes("multipart") || lowerMessage.includes("boundary")) {
+    return "Não foi possível ler o formulário enviado. Reenvie o formulário com o certificado anexado.";
+  }
+
+  return "Conteúdo inválido. Envie como multipart/form-data.";
+}
+
 async function fileToBase64(file: File): Promise<string> {
   const ab = await file.arrayBuffer();
   return Buffer.from(ab).toString("base64");
@@ -682,7 +697,12 @@ export const POST: RequestHandler = async ({ request, url }) => {
     form = await request.formData();
   } catch (error) {
     logMultipartError(error);
-    return json({ success: false, message: "Conteúdo inválido. Envie como multipart/form-data." }, { status: 400 });
+    console.error("[homologacao] multipart/form-data parse failure", {
+      contentType,
+      contentLength,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return json({ success: false, message: getMultipartParseErrorMessage(error) }, { status: 400 });
   }
 
   const payloadRaw = form.get("payload");
