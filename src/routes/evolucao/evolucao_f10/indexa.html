@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F10 System Evolution</title>
+    <!-- Google Fonts: Open Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Open Sans', sans-serif;
+            color: #333; /* Default text color */
+        }
+
+        /* Custom Tailwind Colors */
+        .bg-f10-purple { background-color: #800DA8; }
+        .text-f10-purple { color: #800DA8; }
+        .bg-f10-orange { background-color: #fe5858; }
+        .text-f10-orange { color: #fe5858; }
+
+        /* Gradient Button Style */
+        .btn-gradient {
+            background-image: linear-gradient(to right, #fe5858, #ff8c8c); /* Orange to a softer pink */
+            transition: all 0.3s ease-in-out;
+        }
+        .btn-gradient:hover {
+            box-shadow: 0 8px 15px rgba(254, 88, 88, 0.4);
+            transform: translateY(-2px);
+        }
+
+        /* Timeline specific styles */
+        .timeline-container {
+            position: relative;
+        }
+        .timeline-container::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background-color: #e0e0e0;
+            transform: translateX(-50%);
+            z-index: 0;
+        }
+        @media (max-width: 767px) {
+            .timeline-container::before {
+                left: 20px; /* Adjust for mobile */
+            }
+            .timeline-item-left {
+                margin-right: 0;
+                padding-right: 0;
+                border-right: none;
+            }
+            .timeline-item-right {
+                margin-left: 0;
+                padding-left: 0;
+                border-left: none;
+            }
+        }
+
+        /* Kanban Column Backgrounds */
+        .kanban-col-todo { background-color: #f3e5f5; /* Light purple */ }
+        .kanban-col-progress { background-color: #e3f2fd; /* Light blue */ }
+        .kanban-col-done { background-color: #e8f5e9; /* Light green */ }
+
+        /* Smooth transitions for hover effects */
+        .transition-all-ease {
+            transition: all 0.3s ease-in-out;
+        }
+
+        /* Responsive table styling */
+        .table-responsive {
+            display: block;
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .table-responsive table {
+            width: 100%;
+            min-width: 600px; /* Ensure tables don't get too narrow */
+        }
+        @media (max-width: 767px) {
+            .table-stack-mobile > div {
+                width: 100%;
+                margin-bottom: 1rem;
+            }
+        }
+
+        /* Custom scrollbar for Kanban on mobile */
+        .kanban-board-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin; /* Firefox */
+            scrollbar-color: #800DA8 #f1f1f1; /* Firefox */
+        }
+        .kanban-board-scroll::-webkit-scrollbar {
+            height: 8px;
+        }
+        .kanban-board-scroll::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .kanban-board-scroll::-webkit-scrollbar-thumb {
+            background: #800DA8;
+            border-radius: 10px;
+        }
+        .kanban-board-scroll::-webkit-scrollbar-thumb:hover {
+            background: #6a0b8a;
+        }
+
+        /* Animation for newly completed card */
+        @keyframes pulse-highlight {
+            0% {
+                box-shadow: 0 0 0 0 rgba(128, 13, 168, 0.4);
+                transform: scale(1);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(128, 13, 168, 0);
+                transform: scale(1.02);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(128, 13, 168, 0);
+                transform: scale(1);
+            }
+        }
+
+        .animate-pulse-highlight {
+            animation: pulse-highlight 1.5s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <!-- Header -->
+    <header class="fixed top-0 left-0 w-full bg-white shadow-md z-50 py-4 px-6 md:px-12 flex justify-between items-center">
+        <!-- F10 Logo -->
+        <div class="text-2xl font-bold text-f10-purple">
+            <a href="#" class="hover:opacity-80 transition-all-ease">F10</a>
+        </div>
+
+        <!-- Desktop Navigation -->
+        <nav class="hidden md:flex space-x-8">
+            <a href="#evolucao" class="text-gray-700 hover:text-f10-orange font-semibold transition-all-ease">Nossa evolução</a>
+            <a href="#trabalhando" class="text-gray-700 hover:text-f10-orange font-semibold transition-all-ease">O que estamos planejando</a>
+            <a href="#muda" class="text-gray-700 hover:text-f10-orange font-semibold transition-all-ease">O que muda</a>
+            <a href="#termos" class="text-gray-700 hover:text-f10-orange font-semibold transition-all-ease">Termos de Uso</a>
+        </nav>
+
+        <!-- Mobile Hamburger Menu -->
+        <div class="md:hidden">
+            <button id="mobile-menu-button" class="text-gray-700 hover:text-f10-orange focus:outline-none">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Mobile Menu Overlay -->
+    <div id="mobile-menu-overlay" class="fixed inset-0 bg-white z-40 hidden flex-col items-center justify-center space-y-6 transition-all duration-300 ease-in-out">
+        <button id="close-mobile-menu" class="absolute top-6 right-6 text-gray-700 hover:text-f10-orange focus:outline-none">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+        <a href="#evolucao" class="text-2xl text-gray-700 hover:text-f10-orange font-semibold transition-all-ease" onclick="document.getElementById('mobile-menu-overlay').classList.add('hidden')">Nossa evolução</a>
+        <a href="#trabalhando" class="text-2xl text-gray-700 hover:text-f10-orange font-semibold transition-all-ease" onclick="document.getElementById('mobile-menu-overlay').classList.add('hidden')">O que estamos planejando</a>
+        <a href="#muda" class="text-2xl text-gray-700 hover:text-f10-orange font-semibold transition-all-ease" onclick="document.getElementById('mobile-menu-overlay').classList.add('hidden')">O que muda</a>
+        <a href="#termos" class="text-2xl text-gray-700 hover:text-f10-orange font-semibold transition-all-ease" onclick="document.getElementById('mobile-menu-overlay').classList.add('hidden')">Termos de Uso</a>
+    </div>
+
+    <main class="pt-24 pb-12"> <!-- Padding top to clear fixed header -->
+
+        <!-- SECTION 1 – “Evolução dos produtos F10” -->
+        <section id="evolucao" class="container mx-auto px-6 py-16">
+            <h2 class="text-4xl font-bold text-center text-f10-purple mb-16">Evolução dos produtos F10</h2>
+
+            <div class="timeline-container relative max-w-4xl mx-auto">
+                <!-- Timeline Item 1 -->
+                <div class="flex flex-col md:flex-row items-center md:items-start justify-center md:justify-between mb-12">
+                    <div class="md:w-1/2 text-right md:pr-12 mb-4 md:mb-0">
+                        <span class="text-lg font-semibold text-gray-600">Janeiro/2023</span>
+                    </div>
+                    <div class="md:w-1/2 bg-white rounded-lg shadow-md p-6 relative z-10 hover:shadow-xl transition-all-ease">
+                        <h3 class="text-2xl font-semibold text-f10-purple mb-2">Lançamento do Módulo Financeiro 📈</h3>
+                        <p class="text-gray-600 mb-4">Nova interface para controle de contas a pagar e receber.</p>
+                        <ul class="list-disc list-inside text-gray-700 space-y-2 mb-4">
+                            <li>📎 Anexos de comprovantes.</li>
+                            <li>📊 Relatórios personalizados de fluxo de caixa.</li>
+                            <li>🔁 Integração com bancos parceiros.</li>
+                        </ul>
+                        <button class="btn-gradient text-white font-semibold py-2 px-6 rounded-full">Saiba mais</button>
+                    </div>
+                </div>
+
+                <!-- Timeline Item 2 -->
+                <div class="flex flex-col md:flex-row items-center md:items-start justify-center md:justify-between mb-12 flex-row-reverse">
+                    <div class="md:w-1/2 text-left md:pl-12 mb-4 md:mb-0">
+                        <span class="text-lg font-semibold text-gray-600">Abril/2023</span>
+                    </div>
+                    <div class="md:w-1/2 bg-white rounded-lg shadow-md p-6 relative z-10 hover:shadow-xl transition-all-ease">
+                        <h3 class="text-2xl font-semibold text-f10-purple mb-2">Atualização de CRM 💬</h3>
+                        <p class="text-gray-600 mb-4">Melhorias na gestão de clientes e comunicação.</p>
+                        <ul class="list-disc list-inside text-gray-700 space-y-2 mb-4">
+                            <li>💬 Integração direta com WhatsApp Business.</li>
+                            <li>📧 Automação de e-mails de acompanhamento.</li>
+                            <li>🏷️ Segmentação avançada de clientes.</li>
+                        </ul>
+                        <button class="btn-gradient text-white font-semibold py-2 px-6 rounded-full">Ver detalhes</button>
+                    </div>
+                </div>
+
+                <!-- Timeline Item 3 -->
+                <div class="flex flex-col md:flex-row items-center md:items-start justify-center md:justify-between mb-12">
+                    <div class="md:w-1/2 text-right md:pr-12 mb-4 md:mb-0">
+                        <span class="text-lg font-semibold text-gray-600">Agosto/2023</span>
+                    </div>
+                    <div class="md:w-1/2 bg-white rounded-lg shadow-md p-6 relative z-10 hover:shadow-xl transition-all-ease">
+                        <h3 class="text-2xl font-semibold text-f10-purple mb-2">Otimização de Performance 🚀</h3>
+                        <p class="text-gray-600 mb-4">Aumento significativo na velocidade de carregamento.</p>
+                        <ul class="list-disc list-inside text-gray-700 space-y-2 mb-4">
+                            <li>⚡ Redução do tempo de resposta do servidor em 30%.</li>
+                            <li>✅ Otimização de consultas ao banco de dados.</li>
+                            <li>🌐 Melhoria na experiência do usuário em redes lentas.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Timeline Item 4 -->
+                <div class="flex flex-col md:flex-row items-center md:items-start justify-center md:justify-between mb-12 flex-row-reverse">
+                    <div class="md:w-1/2 text-left md:pl-12 mb-4 md:mb-0">
+                        <span class="text-lg font-semibold text-gray-600">Dezembro/2023</span>
+                    </div>
+                    <div class="md:w-1/2 bg-white rounded-lg shadow-md p-6 relative z-10 hover:shadow-xl transition-all-ease">
+                        <h3 class="text-2xl font-semibold text-f10-purple mb-2">Novas Funcionalidades de Relatórios 📈</h3>
+                        <p class="text-gray-600 mb-4">Introdução de novos modelos de relatórios e dashboards.</p>
+                        <ul class="list-disc list-inside text-gray-700 space-y-2 mb-4">
+                            <li>📈 Dashboards interativos personalizáveis.</li>
+                            <li>🔄 Exportação de dados em diversos formatos.</li>
+                            <li>🔍 Filtros avançados para análises detalhadas.</li>
+                        </ul>
+                        <button class="btn-gradient text-white font-semibold py-2 px-6 rounded-full">Saiba mais</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2 – “No que estamos trabalhando” -->
+        <section id="trabalhando" class="container mx-auto px-6 py-16 bg-gray-100 rounded-lg shadow-inner">
+            <h2 class="text-4xl font-bold text-center text-f10-purple mb-12">No que estamos trabalhando</h2>
+
+            <div class="kanban-board-scroll flex flex-col md:flex-row md:space-x-6 space-y-6 md:space-y-0 p-4">
+                <!-- Column: Para Fazer -->
+                <div class="flex-1 kanban-col-todo rounded-lg p-6 shadow-md min-w-[280px]">
+                    <h3 class="text-2xl font-semibold text-f10-purple mb-6 text-center">Para Fazer</h3>
+                    <div class="space-y-4">
+                        <!-- Card: IA -->
+                        <div class="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-all-ease">
+                            <h4 class="font-bold text-gray-800 text-lg mb-1">IA 🧠</h4>
+                            <p class="text-gray-600 text-sm">Implementação de recursos de Inteligência Artificial para otimização de processos.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column: Em Progresso -->
+                <div class="flex-1 kanban-col-progress rounded-lg p-6 shadow-md min-w-[280px]">
+                    <h3 class="text-2xl font-semibold text-f10-purple mb-6 text-center">Em Progresso</h3>
+                    <div class="space-y-4">
+                        <!-- Card: Integração com WhatsApp -->
+                        <div class="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-all-ease">
+                            <h4 class="font-bold text-gray-800 text-lg mb-1">Integração com WhatsApp (oficial e não oficial) 💬</h4>
+                            <p class="text-gray-600 text-sm">Desenvolvimento de integração com APIs oficiais e não oficiais do WhatsApp.</p>
+                        </div>
+                        <!-- Card: Novo F10 -->
+                        <div class="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-all-ease">
+                            <h4 class="font-bold text-gray-800 text-lg mb-1">Novo F10 ✨</h4>
+                            <p class="text-gray-600 text-sm">Revisão completa e implementação de uma nova versão do sistema F10.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column: Feito -->
+                <div class="flex-1 kanban-col-done rounded-lg p-6 shadow-md min-w-[280px]">
+                    <h3 class="text-2xl font-semibold text-f10-purple mb-6 text-center">Feito</h3>
+                    <div class="space-y-4">
+                        <!-- Card: App Professor para lançamento de Pautas -->
+                        <div class="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-all-ease">
+                            <h4 class="font-bold text-gray-800 text-lg mb-1">App Professor para lançamento de Pautas 🧑‍🏫</h4>
+                            <p class="text-gray-600 text-sm">Lançamento do aplicativo para professores registrarem pautas.</p>
+                        </div>
+                        <!-- Card: Novos Indicadores -->
+                        <div class="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-all-ease">
+                            <h4 class="font-bold text-gray-800 text-lg mb-1">Novos Indicadores 📊</h4>
+                            <p class="text-gray-600 text-sm">Adição de novos indicadores de desempenho e métricas.</p>
+                        </div>
+                        <!-- Card: API para integração de dados -->
+                        <div class="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-all-ease">
+                            <h4 class="font-bold text-gray-800 text-lg mb-1">API para integração de dados 🔗</h4>
+                            <p class="text-gray-600 text-sm">API para facilitar a integração de dados com outras plataformas.</p>
+                        </div>
+                        <!-- Card: Atividades no Portal do Aluno com imagens, vídeos e áudios -->
+                        <div class="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-all-ease">
+                            <h4 class="font-bold text-gray-800 text-lg mb-1">Atividades no Portal do Aluno (mídia) 🖼️</h4>
+                            <p class="text-gray-600 text-sm">Suporte a atividades no portal do aluno com imagens, vídeos e áudios.</p>
+                        </div>
+                        <!-- Card: Atividades no Portal do Aluno do tipo prova -->
+                        <div class="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-all-ease">
+                            <h4 class="font-bold text-gray-800 text-lg mb-1">Atividades no Portal do Aluno (prova) 📝</h4>
+                            <p class="text-gray-600 text-sm">Implementação de atividades do tipo prova no portal do aluno.</p>
+                        </div>
+                        <!-- Card: Autenticação de Materiais para novas matrículas -->
+                        <div class="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-all-ease">
+                            <h4 class="font-bold text-gray-800 text-lg mb-1">Autenticação de Materiais para novas matrículas ✅</h4>
+                            <p class="text-gray-600 text-sm">Sistema de autenticação para materiais de novas matrículas.</p>
+                        </div>
+                        <!-- Card: Anexos para gestão de documentos -->
+                        <div class="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-all-ease">
+                            <h4 class="font-bold text-gray-800 text-lg mb-1">Anexos para gestão de documentos 📎</h4>
+                            <p class="text-gray-600 text-sm">Funcionalidade de anexos para melhor gestão de documentos.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3 – “O que muda” -->
+        <section id="muda" class="container mx-auto px-6 py-16 flex flex-col md:flex-row items-center justify-between space-y-8 md:space-y-0 md:space-x-12">
+            <div class="md:w-1/2">
+                <h2 class="text-4xl font-bold text-f10-purple mb-6 text-center md:text-left">O que muda no sistema F10</h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    Estamos constantemente evoluindo para oferecer a melhor experiência e as ferramentas mais eficientes para o seu negócio. As próximas atualizações trarão uma série de melhorias significativas, focadas em otimizar seus processos diários e expandir as capacidades do sistema.
+                </p>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    Você notará uma interface mais intuitiva, com fluxos de trabalho simplificados e novas funcionalidades que foram desenvolvidas com base no feedback de nossos usuários. Nosso objetivo é tornar o F10 ainda mais poderoso e fácil de usar.
+                </p>
+                <p class="text-gray-700 leading-relaxed">
+                    Os <span class="relative group font-semibold text-f10-purple cursor-help">recursos já utilizados
+                        <span class="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-xs rounded-md shadow-lg transition-all-ease opacity-0 group-hover:opacity-100">
+                            Seus dados e configurações existentes serão mantidos e migrados automaticamente.
+                        </span>
+                    </span> permanecerão acessíveis e com compatibilidade garantida, assegurando uma transição suave e sem interrupções para a sua operação.
+                </p>
+            </div>
+            <div class="md:w-1/2 flex justify-center items-center">
+                <!-- Complementary Visual: Abstract background shape / Minimal illustration -->
+                <div class="relative w-full max-w-md h-64 bg-gradient-to-br from-f10-purple to-f10-orange rounded-3xl shadow-2xl overflow-hidden animate-pulse-subtle">
+                    <svg class="absolute inset-0 w-full h-full opacity-20" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="#FFFFFF" d="M44.5,-63.3C57.4,-50.7,67.6,-35.1,70.9,-18.2C74.3,-1.3,70.8,17.9,61.6,31.7C52.4,45.5,37.5,53.9,21.5,59.3C5.6,64.7,-11.3,67.1,-27.3,63.1C-43.3,59.1,-58.3,48.7,-64.7,34.7C-71.1,20.7,-68.9,3.1,-62.7,-11.6C-56.5,-26.3,-46.3,-38.1,-34.5,-50.7C-22.7,-63.4,-9.9,-77,2.8,-79.6C15.5,-82.2,31.7,-73,44.5,-63.3Z" transform="translate(100 100)" />
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <p class="text-white text-xl font-bold text-center p-4">Sua evolução, nossa prioridade.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4 – “Mensalidade F10” -->
+        <section id="mensalidade" class="container mx-auto px-6 py-16 bg-gray-50">
+            <h2 class="text-4xl font-bold text-center text-f10-purple mb-12">Mensalidade F10</h2>
+
+            <!-- Tables -->
+            <div class="flex flex-col md:flex-row justify-center items-stretch md:space-x-8 space-y-8 md:space-y-0 table-stack-mobile mb-16">
+                <!-- IPCA Table -->
+                <div class="flex-1 bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
+                    <table class="w-full text-left text-gray-700">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="py-3 px-4 text-lg font-semibold text-f10-purple">IPCA</th>
+                                <th class="py-3 px-4 text-lg font-semibold text-f10-purple text-right">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-gray-200">
+                                <td class="py-2 px-4">2021</td>
+                                <td class="py-2 px-4 text-right">10.06%</td>
+                            </tr>
+                            <tr class="bg-gray-50 border-b border-gray-200">
+                                <td class="py-2 px-4">2022</td>
+                                <td class="py-2 px-4 text-right">5.79%</td>
+                            </tr>
+                            <tr class="border-b border-gray-200">
+                                <td class="py-2 px-4">2023</td>
+                                <td class="py-2 px-4 text-right">4.62%</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="py-2 px-4">2024 (Estimado)</td>
+                                <td class="py-2 px-4 text-right">3.80%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- IGP-M Table -->
+                <div class="flex-1 bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
+                    <table class="w-full text-left text-gray-700">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="py-3 px-4 text-lg font-semibold text-f10-purple">IGP-M</th>
+                                <th class="py-3 px-4 text-lg font-semibold text-f10-purple text-right">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-gray-200">
+                                <td class="py-2 px-4">2021</td>
+                                <td class="py-2 px-4 text-right">17.78%</td>
+                            </tr>
+                            <tr class="bg-gray-50 border-b border-gray-200">
+                                <td class="py-2 px-4">2022</td>
+                                <td class="py-2 px-4 text-right">5.45%</td>
+                            </tr>
+                            <tr class="border-b border-gray-200">
+                                <td class="py-2 px-4">2023</td>
+                                <td class="py-2 px-4 text-right">-3.18%</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="py-2 px-4">2024 (Estimado)</td>
+                                <td class="py-2 px-4 text-right">4.50%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- F10 Table -->
+                <div class="flex-1 bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
+                    <table class="w-full text-left text-gray-700">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="py-3 px-4 text-lg font-semibold text-f10-purple">F10</th>
+                                <th class="py-3 px-4 text-lg font-semibold text-f10-purple text-right">Reajuste</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-gray-200">
+                                <td class="py-2 px-4">2021</td>
+                                <td class="py-2 px-4 text-right">8.00%</td>
+                            </tr>
+                            <tr class="bg-gray-50 border-b border-gray-200">
+                                <td class="py-2 px-4">2022</td>
+                                <td class="py-2 px-4 text-right">5.00%</td>
+                            </tr>
+                            <tr class="border-b border-gray-200">
+                                <td class="py-2 px-4">2023</td>
+                                <td class="py-2 px-4 text-right">4.00%</td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <td class="py-2 px-4">2024 (Estimado)</td>
+                                <td class="py-2 px-4 text-right">3.50%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Horizontal Timeline -->
+            <div class="relative w-full max-w-5xl mx-auto mt-16">
+                <h3 class="text-2xl font-bold text-f10-purple text-center mb-8">Linha do Tempo Financeira</h3>
+                <div class="flex justify-between items-center relative h-1 bg-gray-300 rounded-full">
+                    <!-- Timeline Dots and Labels -->
+                    <div class="absolute flex justify-between w-full -top-10 md:-top-16">
+                        <!-- Dez/2019 -->
+                        <div class="flex flex-col items-center w-[10%]">
+                            <div class="w-4 h-4 bg-f10-purple rounded-full shadow-md"></div>
+                            <span class="mt-2 text-sm text-gray-600 font-semibold text-center">Dez/2019</span>
+                            <div class="bg-white border border-gray-200 rounded-md p-2 text-xs text-center mt-2 shadow-sm hidden md:block">Início F10</div>
+                        </div>
+                        <!-- Jan/2021 -->
+                        <div class="flex flex-col items-center w-[10%]">
+                            <div class="w-4 h-4 bg-f10-purple rounded-full shadow-md"></div>
+                            <span class="mt-2 text-sm text-gray-600 font-semibold text-center">Jan/2021</span>
+                            <div class="bg-white border border-gray-200 rounded-md p-2 text-xs text-center mt-2 shadow-sm hidden md:block">1º Reajuste</div>
+                        </div>
+                        <!-- Jan/2023 -->
+                        <div class="flex flex-col items-center w-[10%]">
+                            <div class="w-4 h-4 bg-f10-purple rounded-full shadow-md"></div>
+                            <span class="mt-2 text-sm text-gray-600 font-semibold text-center">Jan/2023</span>
+                            <div class="bg-white border border-gray-200 rounded-md p-2 text-xs text-center mt-2 shadow-sm hidden md:block">2º Reajuste</div>
+                        </div>
+                        <!-- Jan/2025 (Próximo Reajuste) -->
+                        <div class="flex flex-col items-center w-[10%]">
+                            <div class="w-4 h-4 bg-f10-orange rounded-full shadow-md animate-pulse"></div>
+                            <span class="mt-2 text-sm text-f10-orange font-bold text-center">Jan/2025</span>
+                            <div class="bg-white border border-f10-orange rounded-md p-2 text-xs text-center mt-2 shadow-sm font-bold hidden md:block">Próximo Reajuste</div>
+                        </div>
+                        <!-- Jan/2027 -->
+                        <div class="flex flex-col items-center w-[10%]">
+                            <div class="w-4 h-4 bg-f10-purple rounded-full shadow-md"></div>
+                            <span class="mt-2 text-sm text-gray-600 font-semibold text-center">Jan/2027</span>
+                            <div class="bg-white border border-gray-200 rounded-md p-2 text-xs text-center mt-2 shadow-sm hidden md:block">Previsão</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-center text-gray-700 leading-relaxed mt-24 max-w-3xl mx-auto">
+                A partir de <strong>Janeiro de 2025</strong>, o novo valor da mensalidade F10 será de <strong>R$ 805,07</strong>. Este reajuste reflete a contínua evolução do nosso sistema, os investimentos em novas tecnologias e a manutenção da qualidade e segurança dos nossos serviços, garantindo que você continue tendo acesso a uma plataforma robusta e atualizada.
+            </p>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white py-8 px-6 text-center text-gray-600 shadow-inner">
+        <p class="mb-2">Rafael Moreira - COO F10</p>
+        <p>&copy; 2025 F10. All rights reserved.</p>
+    </footer>
+
+    <script>
+        // JavaScript for Mobile Menu Toggle
+        const mobileMenuButton = document.getElementById('mobile-menu-button');
+        const mobileMenuOverlay = document.getElementById('mobile-menu-overlay');
+        const closeMobileMenuButton = document.getElementById('close-mobile-menu');
+
+        mobileMenuButton.addEventListener('click', () => {
+            mobileMenuOverlay.classList.remove('hidden');
+            mobileMenuOverlay.classList.add('flex');
+        });
+
+        closeMobileMenuButton.addEventListener('click', () => {
+            mobileMenuOverlay.classList.add('hidden');
+            mobileMenuOverlay.classList.remove('flex');
+        });
+
+        // Close menu when a link is clicked (for smoother navigation)
+        document.querySelectorAll('#mobile-menu-overlay a').forEach(link => {
+            link.addEventListener('click', () => {
+                mobileMenuOverlay.classList.add('hidden');
+                mobileMenuOverlay.classList.remove('flex');
+            });
+        });
+    </script>
+</body>
+</html>

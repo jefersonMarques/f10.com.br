@@ -331,14 +331,14 @@ function getMultipartParseErrorMessage(error: unknown): string {
   const lowerMessage = message.toLowerCase();
 
   if (lowerMessage.includes("body size") || lowerMessage.includes("request body size")) {
-    return "Arquivo muito grande para o limite atual do servidor. Recarregue o PM2 com BODY_SIZE_LIMIT=100M e tente novamente.";
+    return `Arquivo muito grande para o limite atual do servidor. Detalhe: ${message}`;
   }
 
   if (lowerMessage.includes("multipart") || lowerMessage.includes("boundary")) {
-    return "Não foi possível ler o formulário enviado. Reenvie o formulário com o certificado anexado.";
+    return `Não foi possível ler o formulário enviado. Detalhe: ${message}`;
   }
 
-  return "Conteúdo inválido. Envie como multipart/form-data.";
+  return `Conteúdo inválido. Detalhe: ${message}`;
 }
 
 async function fileToBase64(file: File): Promise<string> {
