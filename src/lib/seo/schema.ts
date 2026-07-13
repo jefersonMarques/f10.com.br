@@ -75,6 +75,7 @@ export type WebsiteSchemaInput = {
 
 export type WebPageSchemaInput = {
   id?: string;
+  pageType?: "WebPage" | "AboutPage" | "CollectionPage" | "ContactPage";
   name: string;
   description: string;
   url: string;
@@ -176,7 +177,7 @@ export function buildWebsiteSchema(input: WebsiteSchemaInput): JsonLdObject {
 
 export function buildWebPageSchema(input: WebPageSchemaInput): JsonLdObject {
   const schema: JsonLdObject = {
-    "@type": "WebPage",
+    "@type": input.pageType ?? "WebPage",
     name: input.name,
     description: input.description,
     url: input.url,
