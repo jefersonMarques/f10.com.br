@@ -1,112 +1,127 @@
 // src/hooks.server.ts
-// Comentários (pt-BR): Redirecionamentos 301 do site antigo → site novo.
-// Objetivo: zerar 404 de URLs legadas e preservar SEO.
+// Redirecionamentos de URLs antigas para preservar autoridade, tráfego e indexação.
 
 import { redirect, type Handle } from "@sveltejs/kit";
 
 type RedirectRule = {
-  from: string;          // pathname antigo
-  to: string;            // pathname novo (ou URL absoluta)
-  permanent?: boolean;   // default true (301)
+  from: string;
+  to: string;
+  permanent?: boolean;
 };
 
 function normalizePath(pathname: string): string {
-  // Remove barra final (exceto root)
-  if (pathname.length > 1 && pathname.endsWith("/")) return pathname.slice(0, -1);
+  if (pathname.length > 1 && pathname.endsWith("/")) {
+    return pathname.slice(0, -1);
+  }
+
   return pathname;
 }
 
-function buildRedirectMap(rules: RedirectRule[]): Map<string, { to: string; status: number }> {
+function buildRedirectMap(
+  rules: RedirectRule[],
+): Map<string, { to: string; status: number }> {
   const map = new Map<string, { to: string; status: number }>();
+
   for (const rule of rules) {
-    const status = rule.permanent === false ? 302 : 301;
-    map.set(normalizePath(rule.from), { to: rule.to, status });
+    map.set(normalizePath(rule.from), {
+      to: rule.to,
+      status: rule.permanent === false ? 302 : 301,
+    });
   }
+
   return map;
 }
 
-/**
- * ✅ Mapeamento COMPLETO baseado no sitemap antigo que você colou.
- * Site antigo:
- *  /, /blog, /contato, /f10, /inovacao-digital, /solucoes, ...
- * Site novo (pelas rotas existentes no tree):
- *  /contato, /sobre, /preco, /inovacao-na-escola(/marketing-educacional), /solucoes/(...)
- */
 const redirectRules: RedirectRule[] = [
-
-  // ===== Páginas principais do sitemap antigo =====
-  { from: "/blog", to: "/inovacao-na-escola" },
+  // ===== Páginas principais e URLs institucionais antigas =====
+  { from: "/home", to: "/" },
   { from: "/f10", to: "/sobre" },
   { from: "/inovacao-digital", to: "/inovacao-na-escola" },
+  { from: "/f10-smart-aluno", to: "/solucoes/aplicativo-smart-aluno" },
 
-    // ===== Páginas treinamentos =====
-  { from: "/treinamentos", to: "https://ajuda.f10.com.br/kb/pt-br/article/291730/treinamentos-novo-cliente-f10" },
+  // Destino temporário até o artigo equivalente ser publicado no blog F10.
+  // Depois da publicação, trocar por um redirecionamento 301 para a URL definitiva.
+  {
+    from: "/cursos-profissionalizantes-crescimento-em-2018-e-um-mundo-de-possibilidades-para-2019",
+    to: "/inovacao-na-escola/marketing-educacional",
+    permanent: false,
+  },
 
-  // ===== Soluções antigas → soluções novas =====
-  { from: "/solucoes/indicadores-e-bi", to: "/solucoes/indicadores-e-bi" },
+  // ===== Treinamentos =====
+  {
+    from: "/treinamentos",
+    to: "https://ajuda.f10.com.br/kb/pt-br/article/291730/treinamentos-novo-cliente-f10",
+  },
 
-  // (essas NÃO existem no novo; mandando pra equivalente mais próxima)
-  { from: "/solucoes/envio-de-sms", to: "/solucoes/marketing-captacao-de-alunos" },
+  // ===== Soluções antigas =====
+  {
+    from: "/solucoes/envio-de-sms",
+    to: "/solucoes/marketing-captacao-de-alunos",
+  },
   { from: "/solucoes/funil-de-vendas", to: "/solucoes/vendas" },
-  { from: "/solucoes/app-e-portal-do-aluno", to: "/solucoes/aplicativo-smart-aluno" },
-  { from: "/solucoes/pagamento-recorrente", to: "/solucoes/financeiro" },
+  {
+    from: "/solucoes/app-e-portal-do-aluno",
+    to: "/solucoes/aplicativo-smart-aluno",
+  },
+  {
+    from: "/solucoes/pagamento-recorrente",
+    to: "/solucoes/financeiro",
+  },
   { from: "/cel_cash", to: "/celcoin/cadastro-de-escolas" },
 
   // ===== Categorias antigas do blog =====
+  { from: "/blog", to: "/inovacao-na-escola" },
   { from: "/blog/gestao-escolar", to: "/solucoes" },
-  { from: "/blog/captacao-de-alunos", to: "/solucoes/marketing-captacao-de-alunos" },
+  {
+    from: "/blog/captacao-de-alunos",
+    to: "/solucoes/marketing-captacao-de-alunos",
+  },
   { from: "/blog/pedagogico", to: "/solucoes/pedagogico" },
   { from: "/blog/inovacao", to: "/inovacao-na-escola" },
 
-  // ===== Posts antigos do blog (os 4 do sitemap) =====
+  // ===== Posts antigos do blog =====
   {
     from: "/blog/4-dicas-de-controle-de-frequencia-de-alunos-que-voce-deveria-adotar",
-    to: "/solucoes/pedagogico"
+    to: "/solucoes/pedagogico",
   },
   {
     from: "/blog/4-reais-beneficios-da-automacao-escolar-na-rotina-da-escola",
-    to: "/inovacao-na-escola"
+    to: "/inovacao-na-escola",
   },
   {
     from: "/blog/como-melhorar-o-atendimento-ao-aluno-com-um-sistema-de-gestao",
-    to: "/solucoes/aplicativo-smart-aluno"
+    to: "/solucoes/aplicativo-smart-aluno",
   },
   {
     from: "/blog/conheca-5-maiores-desafios-da-gestao-escolar-e-como-supera-los",
-    to: "/solucoes"
+    to: "/solucoes",
   },
-  {
-    from: "/download/InstaladorF10.exe",
-    to: "/download"
-  }
+  { from: "/download/InstaladorF10.exe", to: "/download" },
 ];
 
 const redirectMap = buildRedirectMap(redirectRules);
 
 export const handle: Handle = async ({ event, resolve }) => {
   const pathname = normalizePath(event.url.pathname);
-
-  // 1) Redirect exato (URLs antigas específicas)
   const direct = redirectMap.get(pathname);
+
   if (direct) {
-    const toNormalized = normalizePath(direct.to);
-    // proteção anti-loop
-    if (toNormalized !== pathname) {
+    const destinationPath = direct.to.startsWith("http")
+      ? direct.to
+      : normalizePath(direct.to);
+
+    if (destinationPath !== pathname) {
       throw redirect(direct.status, direct.to);
     }
   }
 
-  // 2) Tenta servir a rota normalmente
   const response = await resolve(event);
 
-  // 3) Só aplica "airbag" se realmente for 404
   if (response.status === 404) {
-    // blog antigo: manda pra página útil
     if (pathname.startsWith("/blog/")) {
       throw redirect(301, "/inovacao-na-escola/marketing-educacional");
     }
 
-    // soluções antigas desconhecidas: manda pro hub
     if (pathname.startsWith("/solucoes/")) {
       throw redirect(301, "/solucoes");
     }
@@ -114,4 +129,3 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   return response;
 };
-
