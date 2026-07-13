@@ -48,6 +48,50 @@
     { name: "Inovação na escola", item: canonicalUrl },
   ];
 
+  const relatedSolutions = [
+    {
+      name: "CRM escolar e captação de alunos",
+      description:
+        "Organize o funil de matrículas, tarefas comerciais, histórico e atendimento aos interessados.",
+      href: "/solucoes/crm-escolar",
+    },
+    {
+      name: "AVA e Portal do Aluno",
+      description:
+        "Integre conteúdos, aulas, atividades, documentos e comunicação da jornada acadêmica.",
+      href: "/solucoes/ambiente-virtual-de-aprendizado-ava",
+    },
+    {
+      name: "Indicadores e Business Intelligence",
+      description:
+        "Acompanhe dados financeiros, acadêmicos, comerciais e operacionais para tomar decisões.",
+      href: "/solucoes/indicadores-e-bi",
+    },
+    {
+      name: "WhatsApp integrado à gestão escolar",
+      description:
+        "Centralize atendimento, cobranças, avisos e comunicação com alunos e responsáveis.",
+      href: "/solucoes/whatsapp",
+    },
+  ];
+
+  const relatedSolutionsSchema = {
+    "@type": "ItemList",
+    "@id": `${canonicalUrl}#related-solutions`,
+    name: "Soluções relacionadas à inovação na escola",
+    numberOfItems: relatedSolutions.length,
+    itemListElement: relatedSolutions.map((solution, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      item: {
+        "@type": "WebPage",
+        name: solution.name,
+        description: solution.description,
+        url: `${SITE_URL}${solution.href}`,
+      },
+    })),
+  };
+
   const webPageData = buildWebPageData({
     path: "/inovacao-na-escola",
     title: seoTitle,
@@ -73,6 +117,46 @@
   softwareApplicationData={SOFTWARE_APPLICATION_DATA}
   {faqItems}
   {breadcrumbItems}
+  additionalStructuredData={[relatedSolutionsSchema]}
 />
 
 <slot />
+
+<section class="bg-white py-12 md:py-16" aria-labelledby="related-solutions-title">
+  <div class="container px-5 md:px-8 lg:px-20">
+    <div class="max-w-3xl">
+      <p class="text-[13px] font-semibold uppercase tracking-[0.16em] text-[#EA6D0B]">
+        Soluções relacionadas
+      </p>
+      <h2
+        id="related-solutions-title"
+        class="mt-3 text-[28px] font-semibold leading-tight text-[#000A57] md:text-[36px]"
+      >
+        Recursos para colocar a inovação em prática
+      </h2>
+      <p class="mt-3 text-[15px] leading-relaxed text-[#7E82A2] md:text-[16px]">
+        Conheça as áreas da plataforma F10 que conectam captação, ensino,
+        indicadores e comunicação escolar.
+      </p>
+    </div>
+
+    <div class="mt-8 grid gap-5 md:grid-cols-2">
+      {#each relatedSolutions as solution}
+        <a
+          href={solution.href}
+          class="rounded-[22px] border border-[#E7EAF8] bg-[#F8F9FE] p-6 transition hover:-translate-y-0.5 hover:border-[#EA6D0B]/40 hover:shadow-[0_12px_32px_rgba(1,13,40,0.08)]"
+        >
+          <h3 class="text-[19px] font-semibold text-[#000A57]">
+            {solution.name}
+          </h3>
+          <p class="mt-2 text-[14px] leading-relaxed text-[#7E82A2]">
+            {solution.description}
+          </p>
+          <span class="mt-4 inline-flex text-[14px] font-semibold text-[#EA6D0B]">
+            Conhecer solução
+          </span>
+        </a>
+      {/each}
+    </div>
+  </div>
+</section>
