@@ -8,6 +8,10 @@ Idioma principal: português do Brasil
 Contato comercial: vendas@f10.com.br
 WhatsApp comercial: +55 41 99294-3443
 
+## Para quem a F10 é indicada
+
+A F10 atende escolas de cursos livres, escolas de idiomas, instituições de ensino profissionalizante, cursos técnicos, redes educacionais, franquias e operações com múltiplas unidades.
+
 ## O que a F10 oferece
 
 A plataforma F10 centraliza a gestão pedagógica, financeira, administrativa, comercial e de marketing de instituições de ensino.
@@ -23,10 +27,17 @@ Principais recursos:
 - Matrícula online, contratos e assinatura digital
 - Marketing, captação de alunos, relatórios e Business Intelligence
 
-## Páginas principais
+## Páginas institucionais
 
 - Página inicial: https://f10.com.br/
-- Sobre a F10: https://f10.com.br/sobre
+- Sobre a F10 Software: https://f10.com.br/sobre
+- Inovação na escola: https://f10.com.br/inovacao-na-escola
+- Marketing educacional e inovação: https://f10.com.br/inovacao-na-escola/marketing-educacional
+- Planos e preços: https://f10.com.br/preco
+- Contato: https://f10.com.br/contato
+
+## Soluções da plataforma
+
 - Todas as soluções: https://f10.com.br/solucoes
 - CRM escolar: https://f10.com.br/solucoes/crm-escolar
 - WhatsApp para escolas: https://f10.com.br/solucoes/whatsapp
@@ -38,8 +49,6 @@ Principais recursos:
 - Gestão financeira: https://f10.com.br/solucoes/financeiro
 - Nota fiscal: https://f10.com.br/solucoes/nota-fiscal
 - Indicadores e BI: https://f10.com.br/solucoes/indicadores-e-bi
-- Preços: https://f10.com.br/preco
-- Contato: https://f10.com.br/contato
 
 ## Conteúdo e suporte
 
