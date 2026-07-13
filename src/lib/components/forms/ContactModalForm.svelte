@@ -64,7 +64,18 @@
     });
 
     function normalizePhone(rawPhone: string): string {
-        return rawPhone.replace(/\D/g, "");
+        const digits = rawPhone.replace(/\D/g, "");
+        if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+            return digits.slice(2);
+        }
+        return digits;
+    }
+
+    function toWaMeNumber(rawPhone: string): string {
+        const digits = rawPhone.replace(/\D/g, "");
+        if (digits.startsWith("55") && digits.length >= 12) return digits;
+        if (digits.length === 10 || digits.length === 11) return `55${digits}`;
+        return digits;
     }
 
     function getCurrentPath(): string | undefined {
@@ -89,7 +100,7 @@
     }
 
     function formatPhone(value: string): string {
-        const digits = value.replace(/\D/g, "").slice(0, 11);
+        const digits = normalizePhone(value).slice(0, 11);
         if (digits.length <= 10) {
             return digits.replace(/(\d{0,2})(\d{0,4})(\d{0,4})/, (_, a, b, c) =>
                 [a && `(${a}`, a && ") ", b, c && `-${c}`]
@@ -209,7 +220,7 @@
                 "\n",
             )}`,
         );
-        const targetNumber = normalizePhone(whatsAppNumber);
+        const targetNumber = toWaMeNumber(whatsAppNumber);
         const whatsAppUrl = `https://wa.me/${targetNumber}?text=${encodedMessage}`;
 
         if (typeof window !== "undefined") {

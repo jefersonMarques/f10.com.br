@@ -30,6 +30,12 @@ export type ReviewInput = {
   };
 };
 
+export type OrganizationSchemaInput = {
+  "@type"?: "Organization";
+  name: string;
+  url?: string;
+};
+
 export type SoftwareApplicationSchemaInput = {
   name: string;
   description: string;
@@ -43,6 +49,8 @@ export type SoftwareApplicationSchemaInput = {
 
   providerName?: string;
   publisherName?: string;
+  provider?: OrganizationSchemaInput;
+  publisher?: OrganizationSchemaInput;
 
   featureList?: string[];
   screenshot?: string[];
@@ -79,14 +87,24 @@ export function buildSoftwareApplicationSchema(
     schema.softwareVersion = input.softwareVersion;
   }
 
-  if (input.providerName) {
+  if (input.provider) {
+    schema.provider = {
+      "@type": "Organization",
+      ...input.provider,
+    };
+  } else if (input.providerName) {
     schema.provider = {
       "@type": "Organization",
       name: input.providerName,
     };
   }
 
-  if (input.publisherName) {
+  if (input.publisher) {
+    schema.publisher = {
+      "@type": "Organization",
+      ...input.publisher,
+    };
+  } else if (input.publisherName) {
     schema.publisher = {
       "@type": "Organization",
       name: input.publisherName,

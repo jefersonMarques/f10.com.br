@@ -89,7 +89,7 @@
         if (!form.name.trim()) errors.name = "Informe seu nome completo.";
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
             errors.email = "Informe um e-mail válido.";
-        if (!form.phone.trim() || form.phone.replace(/\D/g, "").length < 10)
+        if (!isValidPhone(form.phone))
             errors.phone = "Informe um WhatsApp/telefone válido.";
         if (!form.company.trim())
             errors.company = "Informe sua escola/empresa.";
@@ -105,7 +105,7 @@
 
     // Formata telefone enquanto digita (BR)
     function formatPhone(value: string): string {
-        const digits = value.replace(/\D/g, "").slice(0, 11);
+        const digits = normalizePhone(value).slice(0, 11);
         if (digits.length <= 10) {
             return digits.replace(/(\d{0,2})(\d{0,4})(\d{0,4})/, (_, a, b, c) =>
                 [a && `(${a}`, a && ") ", b, c && `-${c}`]
@@ -119,6 +119,19 @@
     function onPhoneInput(e: Event) {
         const el = e.target as HTMLInputElement;
         form.phone = formatPhone(el.value);
+    }
+
+    function normalizePhone(value: string): string {
+        const digits = String(value || "").replace(/\D/g, "");
+        if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+            return digits.slice(2);
+        }
+        return digits;
+    }
+
+    function isValidPhone(value: string): boolean {
+        const digits = normalizePhone(value);
+        return (digits.length === 10 || digits.length === 11) && !/^(\d)\1+$/.test(digits);
     }
 
     // ===== Envio =====

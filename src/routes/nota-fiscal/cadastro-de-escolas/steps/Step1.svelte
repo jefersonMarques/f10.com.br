@@ -33,6 +33,22 @@
     return (value ?? "").replace(/\D+/g, "");
   }
 
+  function normalizeBrazilPhoneDigits(value: string): string {
+    const digits = onlyDigits(value);
+    if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+      return digits.slice(2);
+    }
+    return digits;
+  }
+
+  function formatBrazilPhone(value: string): string {
+    const digits = normalizeBrazilPhoneDigits(value).slice(0, 11);
+    if (digits.length <= 2) return digits ? `(${digits}` : "";
+    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  }
+
   function normalizeState(value: string): string {
     return (value ?? "")
       .replace(/[^a-zA-Z]/g, "")
@@ -202,7 +218,7 @@
         neighborhood: neighborhood || prev.neighborhood,
         city: city || prev.city,
         state: state || prev.state,
-        phone: phone || prev.phone,
+        phone: normalizeBrazilPhoneDigits(phone).slice(0, 11) || prev.phone,
         email: email || prev.email,
         website: website || prev.website,
       }));
@@ -250,6 +266,13 @@
 
   function handleCityInput(value: string) {
     formDataStore.update((prev) => ({ ...prev, city: value }));
+  }
+
+  function handlePhoneInput(value: string) {
+    formDataStore.update((prev) => ({
+      ...prev,
+      phone: normalizeBrazilPhoneDigits(value).slice(0, 11),
+    }));
   }
 </script>
 
@@ -392,7 +415,7 @@
   <div class="grid gap-4 sm:grid-cols-12">
     <div class="sm:col-span-4">
       <label class="mb-2 block text-[12px] font-semibold text-black/70">Telefone</label>
-      <input class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${errors.phone ? "border-red-300" : "border-black/15"}`} bind:value={$formDataStore.phone} placeholder="(41) 99999-9999" inputmode="tel" />
+      <input class={`h-11 w-full rounded-xl border px-3 text-[14px] font-semibold outline-none ${errors.phone ? "border-red-300" : "border-black/15"}`} value={formatBrazilPhone($formDataStore.phone)} on:input={(event) => handlePhoneInput((event.currentTarget as HTMLInputElement).value)} placeholder="(41) 99999-9999" inputmode="tel" />
       {#if errors.phone}<p class="mt-1 text-[12px] text-red-600">{errors.phone}</p>{/if}
     </div>
 

@@ -834,6 +834,14 @@
     return onlyDigits(value).slice(0, maxDigits);
   }
 
+  function normalizeBrazilPhoneDigits(value: string): string {
+    const digits = onlyDigits(value);
+    if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+      return digits.slice(2);
+    }
+    return digits;
+  }
+
   function safeTrim(value: unknown): string {
     return typeof value === "string" ? value.trim() : "";
   }
@@ -935,7 +943,7 @@
   }
 
   function formatBrPhone(value: string): string {
-    const d = limitDigits(value, 11);
+    const d = normalizeBrazilPhoneDigits(value).slice(0, 11);
     const ddd = d.slice(0, 2);
     const rest = d.slice(2);
 
@@ -1019,7 +1027,7 @@
   }
 
   function isBrazilPhoneValid(value: string): boolean {
-    const d = onlyDigits(value);
+    const d = normalizeBrazilPhoneDigits(value);
     if (d.length !== 10 && d.length !== 11) return false;
     if (/^(\d)\1+$/.test(d)) return false;
     const ddd = Number(d.slice(0, 2));

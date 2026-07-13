@@ -54,11 +54,15 @@
   let errorMessage = "";
 
   function normalizePhone(rawPhone: string): string {
-    return rawPhone.replace(/\D/g, "");
+    const digits = rawPhone.replace(/\D/g, "");
+    if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+      return digits.slice(2);
+    }
+    return digits;
   }
 
   function formatPhone(value: string): string {
-    const digits = value.replace(/\D/g, "").slice(0, 11);
+    const digits = normalizePhone(value).slice(0, 11);
 
     if (digits.length <= 10) {
       return digits.replace(/(\d{0,2})(\d{0,4})(\d{0,4})/, (_, a, b, c) =>

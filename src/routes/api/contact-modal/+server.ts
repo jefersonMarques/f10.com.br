@@ -3,6 +3,7 @@ import type { RequestHandler } from "./$types";
 import { json } from "@sveltejs/kit";
 import {
   buildAbsoluteSource,
+  isValidBrazilPhone,
   isValidEmail,
   normalizePhone,
   processLead,
@@ -25,7 +26,7 @@ export const POST: RequestHandler = async ({ request }) => {
   const subSource = safeString(body?.subSource) || undefined;
   const description = safeString(body?.description) || undefined;
 
-  if (!name || phone.length < 10 || !isValidEmail(email)) {
+  if (!name || !isValidBrazilPhone(phone) || !isValidEmail(email)) {
     return json(
       {
         ok: false,

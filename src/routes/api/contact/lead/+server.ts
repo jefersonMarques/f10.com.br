@@ -3,6 +3,7 @@ import type { RequestHandler } from "./$types";
 import { json } from "@sveltejs/kit";
 import {
   buildAbsoluteSource,
+  isValidBrazilPhone,
   isValidEmail,
   normalizePhone,
   processLead,
@@ -31,7 +32,7 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ ok: false, error: "Nome é obrigatório." }, { status: 400 });
   }
 
-  if (phone.length < 10) {
+  if (!isValidBrazilPhone(phone)) {
     return json({ ok: false, error: "WhatsApp com DDD é obrigatório." }, { status: 400 });
   }
 

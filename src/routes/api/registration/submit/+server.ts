@@ -155,6 +155,22 @@ function onlyDigits(value: string): string {
   return (value || "").replace(/\D+/g, "");
 }
 
+function normalizeBrazilPhoneDigits(value: string): string {
+  const digits = onlyDigits(value);
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+    return digits.slice(2);
+  }
+  return digits;
+}
+
+function isBrazilPhoneValid(value: string): boolean {
+  const digits = normalizeBrazilPhoneDigits(value);
+  if (digits.length !== 10 && digits.length !== 11) return false;
+  if (/^(\d)\1+$/.test(digits)) return false;
+  const areaCode = Number(digits.slice(0, 2));
+  return areaCode >= 11 && areaCode <= 99;
+}
+
 function formatBytes(bytes: number): string {
   const kb = bytes / 1024;
   if (kb < 1024) return `${kb.toFixed(0)} KB`;
@@ -708,6 +724,22 @@ export const POST: RequestHandler = async ({ request, url }) => {
       { status: 400 },
     );
   }
+
+  if (!isBrazilPhoneValid(payload.unitPhone) || !isBrazilPhoneValid(payload.managerWhatsapp)) {
+    return json(
+      {
+        success: false,
+        message: "Telefone/WhatsApp inválido. Informe DDD + número, sem DDI.",
+      },
+      { status: 400 },
+    );
+  }
+
+  payload = {
+    ...payload,
+    unitPhone: normalizeBrazilPhoneDigits(payload.unitPhone),
+    managerWhatsapp: normalizeBrazilPhoneDigits(payload.managerWhatsapp),
+  };
 
   const docFiles: Array<{
     key: DocKey;

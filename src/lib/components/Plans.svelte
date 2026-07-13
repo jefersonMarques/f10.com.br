@@ -70,7 +70,7 @@
             priceMonthly: "R$ 549",
             priceYearly: "R$ 5.490", // ~10x
             priceSuffix: "por unidade escolar",
-            note: "Implantação a partir de R$ 799, inclui trilha em vídeo, suporte por WhatsApp e até 3 usuários internos.",
+            note: "Implantação a partir de R$ 799, inclui trilha em vídeo, suporte por WhatsApp.",
             ctaLabel: "Começar agora",
             ctaHref: "/contato?plano=inicial",
             bestFor:
