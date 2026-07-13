@@ -2,6 +2,7 @@
   import "../app.css";
   import { onMount } from "svelte";
   import { afterNavigate } from "$app/navigation";
+  import { page } from "$app/stores";
 
   import Header from "$lib/components/Header.svelte";
   import Footer from "$lib/components/Footer.svelte";
@@ -15,9 +16,12 @@
 
   type FbqFunction = (...args: unknown[]) => void;
 
+  const standalonePaths = new Set(["/apresentacao/cebrac-crm-whatsapp"]);
+
   let modalSize: PopupSize = "xl";
 
   $: modalConfig = $contactModalConfig;
+  $: isStandalonePage = standalonePaths.has($page.url.pathname);
 
   onMount(() => {
     afterNavigate(() => {
@@ -32,38 +36,44 @@
   <link rel="icon" href="/favicon.png" />
 </svelte:head>
 
-<div
-  class="min-h-screen text-slate-900 flex flex-col
-         bg-[#dfe1f5]/[0.20]
-         backdrop-blur-[2px] supports-[backdrop-filter]:backdrop-blur-[0.5px]"
->
-  <Header />
-  <main class="flex-1">
+{#if isStandalonePage}
+  <main class="min-h-screen bg-white">
     <slot />
   </main>
-  <Footer />
-</div>
+{:else}
+  <div
+    class="min-h-screen text-slate-900 flex flex-col
+           bg-[#dfe1f5]/[0.20]
+           backdrop-blur-[2px] supports-[backdrop-filter]:backdrop-blur-[0.5px]"
+  >
+    <Header />
+    <main class="flex-1">
+      <slot />
+    </main>
+    <Footer />
+  </div>
 
-<FloatingWhatsappButton
-  whatsAppNumber="5541992943443"
-  defaultMessage="Olá, vi a página de planos da F10 e quero entender qual é o melhor para a minha escola."
-  product="F10 – Planos e Implantação"
-  page=""
-  subSource="Botão flutuante"
-  leadDescription="Cliente interessado."
-/>
-
-<Popup size={modalSize}>
-  <ContactWhatsappModalForm
+  <FloatingWhatsappButton
     whatsAppNumber="5541992943443"
-    defaultMessage={modalConfig.defaultMessage}
-    product={modalConfig.product}
-    subSource={modalConfig.subSource}
-    leadDescription={modalConfig.leadDescription}
-    onChangeSize={(s) => (modalSize = s)}
+    defaultMessage="Olá, vi a página de planos da F10 e quero entender qual é o melhor para a minha escola."
+    product="F10 – Planos e Implantação"
+    page=""
+    subSource="Botão flutuante"
+    leadDescription="Cliente interessado."
   />
-</Popup>
 
-<PopupSolutionsList size={modalSize}>
-  <SolutionList />
-</PopupSolutionsList>
+  <Popup size={modalSize}>
+    <ContactWhatsappModalForm
+      whatsAppNumber="5541992943443"
+      defaultMessage={modalConfig.defaultMessage}
+      product={modalConfig.product}
+      subSource={modalConfig.subSource}
+      leadDescription={modalConfig.leadDescription}
+      onChangeSize={(size) => (modalSize = size)}
+    />
+  </Popup>
+
+  <PopupSolutionsList size={modalSize}>
+    <SolutionList />
+  </PopupSolutionsList>
+{/if}
