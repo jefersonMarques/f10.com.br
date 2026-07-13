@@ -6,6 +6,7 @@
     WEBSITE_DATA,
     buildWebPageData,
   } from "$lib/seo/site";
+  import { onMount } from "svelte";
 
   const canonicalUrl = `${SITE_URL}/contato`;
   const ogImageUrl = `${SITE_URL}/bg_contact.webp`;
@@ -25,6 +26,19 @@
     pageType: "ContactPage",
     mainEntityId: ORGANIZATION_DATA.id,
     imageUrl: ogImageUrl,
+  });
+
+  onMount(() => {
+    const whatsappLinks = document.querySelectorAll<HTMLAnchorElement>(
+      'a[href="https://wa.me/5541992943443"]',
+    );
+
+    whatsappLinks.forEach((link) => {
+      if (link.textContent?.includes("9294-3443")) {
+        link.textContent = "(41) 99294-3443";
+        link.setAttribute("aria-label", "WhatsApp comercial: (41) 99294-3443");
+      }
+    });
   });
 </script>
 
