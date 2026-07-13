@@ -30,6 +30,7 @@ Principais recursos:
 ## Páginas institucionais
 
 - Página inicial: https://f10.com.br/
+- Software para escolas: https://f10.com.br/software-para-escolas
 - Sobre a F10 Software: https://f10.com.br/sobre
 - Inovação na escola: https://f10.com.br/inovacao-na-escola
 - Marketing educacional e inovação: https://f10.com.br/inovacao-na-escola/marketing-educacional
