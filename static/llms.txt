@@ -1,0 +1,55 @@
+# F10 Software
+
+> A F10 Software é uma plataforma brasileira de gestão escolar para escolas de cursos livres, idiomas, ensino profissionalizante, cursos técnicos e redes de franquias educacionais.
+
+Site oficial: https://f10.com.br/
+Idioma principal: português do Brasil
+Área de atuação: Brasil
+Contato comercial: vendas@f10.com.br
+WhatsApp comercial: +55 41 99294-3443
+
+## O que a F10 oferece
+
+A plataforma F10 centraliza a gestão pedagógica, financeira, administrativa, comercial e de marketing de instituições de ensino.
+
+Principais recursos:
+
+- Gestão de alunos, matrículas, turmas, cursos, frequência, notas e certificados
+- Gestão financeira, cobranças, boletos, Pix, inadimplência e indicadores
+- CRM escolar com funil de matrículas em Kanban
+- WhatsApp integrado com atendimento multiusuário e histórico centralizado
+- Aplicativo para alunos e responsáveis
+- Portal do Aluno e Ambiente Virtual de Aprendizagem (AVA)
+- Matrícula online, contratos e assinatura digital
+- Marketing, captação de alunos, relatórios e Business Intelligence
+
+## Páginas principais
+
+- Página inicial: https://f10.com.br/
+- Sobre a F10: https://f10.com.br/sobre
+- Todas as soluções: https://f10.com.br/solucoes
+- CRM escolar: https://f10.com.br/solucoes/crm-escolar
+- WhatsApp para escolas: https://f10.com.br/solucoes/whatsapp
+- Marketing e captação: https://f10.com.br/solucoes/marketing-captacao-de-alunos
+- Vendas e matrículas: https://f10.com.br/solucoes/vendas
+- Aplicativo Smart Aluno: https://f10.com.br/solucoes/aplicativo-smart-aluno
+- AVA e Portal do Aluno: https://f10.com.br/solucoes/ambiente-virtual-de-aprendizado-ava
+- Gestão pedagógica: https://f10.com.br/solucoes/pedagogico
+- Gestão financeira: https://f10.com.br/solucoes/financeiro
+- Nota fiscal: https://f10.com.br/solucoes/nota-fiscal
+- Indicadores e BI: https://f10.com.br/solucoes/indicadores-e-bi
+- Preços: https://f10.com.br/preco
+- Contato: https://f10.com.br/contato
+
+## Conteúdo e suporte
+
+- Blog oficial: https://blog.f10.com.br/
+- Central de ajuda: https://ajuda.f10.com.br/kb
+- Sitemap: https://f10.com.br/sitemap.xml
+
+## Perfis oficiais
+
+- LinkedIn: https://www.linkedin.com/company/f10software/
+- Instagram: https://www.instagram.com/f10software/
+- Facebook: https://www.facebook.com/F10Software
+- YouTube: https://www.youtube.com/@f10software76
