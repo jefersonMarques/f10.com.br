@@ -1,15 +1,25 @@
 <script lang="ts">
-    import IconArrowRight from "$lib/icons/IconArrowRight.svelte";
-    import FaqAccordion from "$lib/components/FaqAccordion.svelte";
-    import { ExternalLink } from "lucide-svelte";
     import ComparisonPlans from "$lib/components/ComparisonPlans.svelte";
+    import FaqAccordion from "$lib/components/FaqAccordion.svelte";
     import Plans from "$lib/components/Plans.svelte";
+    import SeoHead from "$lib/components/SeoHead.svelte";
     import Testimonial from "$lib/components/Testimonial.svelte";
+    import IconArrowRight from "$lib/icons/IconArrowRight.svelte";
+    import type { FaqItem } from "$lib/seo/schema";
+    import {
+        DEFAULT_OG_IMAGE,
+        ORGANIZATION_DATA,
+        SITE_URL,
+        SOFTWARE_APPLICATION_DATA,
+        WEBSITE_DATA,
+        buildWebPageData,
+    } from "$lib/seo/site";
+    import { ExternalLink } from "lucide-svelte";
 
-    type FaqItem = {
-        question: string;
-        answer: string;
-    };
+    const canonicalUrl = `${SITE_URL}/preco`;
+    const seoTitle = "Planos e Preços F10 | Software de Gestão Escolar";
+    const seoDescription =
+        "Compare os planos da F10 para gestão escolar, CRM, marketing, financeiro, pedagógico, WhatsApp, aplicativo e indicadores. Encontre a opção ideal para sua escola.";
 
     const faqItems: FaqItem[] = [
         {
@@ -37,16 +47,37 @@
             answer: "Sim. A implantação inclui configuração inicial do ambiente, perfis de usuários, funis de atendimento e exemplos práticos adaptados à sua escola. Depois disso, você conta com suporte contínuo para ajustes, novas campanhas e dúvidas do dia a dia, sem custo extra por chamada.",
         },
     ];
+
+    const breadcrumbItems = [
+        { name: "Início", item: `${SITE_URL}/` },
+        { name: "Planos e preços", item: canonicalUrl },
+    ];
+
+    const webPageData = buildWebPageData({
+        path: "/preco",
+        title: seoTitle,
+        description: seoDescription,
+    });
 </script>
 
-<svelte:head>
-    <title>Planos e preços — Marketing e CRM educacional | F10 Software</title>
-    <meta
-        name="description"
-        content="Compare os planos da F10 para marketing, captação de alunos e CRM educacional. Escolha o plano ideal para a sua escola e tenha previsibilidade de matrículas com funis organizados e indicadores de conversão."
-    />
-    <link rel="canonical" href="https://f10.com.br/precos" />
-</svelte:head>
+<SeoHead
+    title={seoTitle}
+    description={seoDescription}
+    canonical={canonicalUrl}
+    ogImage={DEFAULT_OG_IMAGE}
+    ogTitle={seoTitle}
+    ogDescription={seoDescription}
+    ogImageAlt="Planos do software de gestão escolar F10"
+    ogImageType="image/png"
+    ogImageWidth={1200}
+    ogImageHeight={630}
+    organizationData={ORGANIZATION_DATA}
+    websiteData={WEBSITE_DATA}
+    {webPageData}
+    softwareApplicationData={SOFTWARE_APPLICATION_DATA}
+    {faqItems}
+    {breadcrumbItems}
+/>
 
 <!-- HERO / TOGGLE -->
 <section
@@ -76,12 +107,12 @@
             </p>
         </div>
 
-        <!-- aqui entram toggle + cards + enterprise -->
         <Plans />
     </div>
 </section>
 
 <ComparisonPlans />
+
 <section
     class="relative py-12 md:py-14 bg-white"
     aria-label="Falar com a equipe F10 sobre planos"
@@ -91,19 +122,16 @@
             <article
                 class="relative w-full rounded-3xl bg-[#010D28] px-6 py-8 md:px-10 md:py-9 text-center text-white border border-slate-900/70 shadow-[0_18px_40px_rgba(1,13,40,0.35)] overflow-hidden"
             >
-                <!-- Fundo com textura -->
                 <div
                     class="pointer-events-none absolute inset-0 bg-[url('/booble_bg.webp')] bg-cover bg-center opacity-40"
                     aria-hidden="true"
                 ></div>
 
-                <!-- Overlay leve pra reforçar contraste -->
                 <div
                     class="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#010D28]/90 via-[#010D28]/85 to-[#010D28]/92"
                     aria-hidden="true"
                 ></div>
 
-                <!-- Conteúdo -->
                 <div class="relative z-10">
                     <h2
                         class="text-[20px] md:text-[22px] font-semibold leading-snug"
@@ -218,10 +246,10 @@
                 </div>
 
                 <div class="space-y-3">
-                    <!-- IMPORTANTE: troque a URL "https://f10.com.br/precos" depois que a página estiver publicada -->
                     <a
-                        href="https://chatgpt.com/?prompt=Usando+esta+p%C3%A1gina%2C+me+diga+por+que+o+F10+%C3%A9+uma+boa+escolha+para+o+meu+col%C3%A9gio%3A+https%3A%2F%2Ff10.com.br%2Fprecos"
+                        href="https://chatgpt.com/?prompt=Usando+esta+p%C3%A1gina%2C+me+diga+por+que+o+F10+%C3%A9+uma+boa+escolha+para+o+meu+col%C3%A9gio%3A+https%3A%2F%2Ff10.com.br%2Fpreco"
                         target="_blank"
+                        rel="noreferrer"
                         class="flex items-center justify-between rounded-2xl bg-white/10 px-4 py-3 text-[14px] hover:bg-white/15"
                     >
                         <div class="flex items-center gap-3">
@@ -257,8 +285,9 @@
                     </a>
 
                     <a
-                        href="https://www.perplexity.ai/search/new?q=usando-esta-pagina-me-diga-por-que-o-F10-e-uma-boa-escolha-para-a-minha-escola-https-f10-com-br-precos"
+                        href="https://www.perplexity.ai/search/new?q=usando-esta-pagina-me-diga-por-que-o-F10-e-uma-boa-escolha-para-a-minha-escola-https-f10-com-br-preco"
                         target="_blank"
+                        rel="noreferrer"
                         class="flex items-center justify-between rounded-2xl bg-white/10 px-4 py-3 text-[14px] hover:bg-white/15"
                     >
                         <div class="flex items-center gap-3">
@@ -294,7 +323,7 @@
                     </a>
 
                     <a
-                        href="https://claude.ai/new?q=usando-esta-pagina-me-diga-por-que-o-F10-e-uma-boa-escolha-para-a-minha-escola-https-f10-com-br-precos"
+                        href="https://claude.ai/new?q=usando-esta-pagina-me-diga-por-que-o-F10-e-uma-boa-escolha-para-a-minha-escola-https-f10-com-br-preco"
                         target="_blank"
                         rel="noreferrer"
                         class="flex items-center justify-between rounded-2xl bg-white/10 px-4 py-3 text-[14px] hover:bg-white/15"
@@ -337,4 +366,3 @@
 <section class="container pb-12">
     <Testimonial />
 </section>
-
