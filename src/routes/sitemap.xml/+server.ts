@@ -1,56 +1,54 @@
-// src/routes/sitemap.xml/+server.ts
 import type { RequestHandler } from "./$types";
 
-const BASE_URL = "https://f10.com.br"; // troca se estiver usando outro domínio
+const BASE_URL = "https://f10.com.br";
 
-// se quiser que o sitemap seja gerado no build (adapter-static):
 export const prerender = true;
 
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function normalizeRoute(path: string): string {
+  const route = path
+    .replace("../", "/")
+    .replace("/+page.svelte", "")
+    .replace("/index", "");
+
+  return route || "/";
+}
+
 export const GET: RequestHandler = async () => {
-  // Pega todos os +page.svelte (menos /api, porque não tem page lá mesmo)
   const modules = import.meta.glob("../**/+page.svelte", { eager: true });
 
-  const now = new Date().toISOString();
-
   const routes = Object.keys(modules)
-    .map((path) => {
-      // "../+page.svelte"           -> "/"
-      // "../contato/+page.svelte"   -> "/contato"
-      // "../solucoes/+page.svelte"  -> "/solucoes"
-      let route = path
-        .replace("../", "/") // "../contato/+page.svelte" -> "/contato/+page.svelte"
-        .replace("/+page.svelte", "") // "/contato/+page.svelte" -> "/contato"
-        .replace("/index", ""); // se algum dia tiver /index/+page.svelte
-
-      if (route === "") route = "/";
-
-      return route;
-    })
-    // garante que não vai nada estranho
+    .map(normalizeRoute)
     .filter((route) => !route.startsWith("/api"))
-    // remove duplicados só por garantia
-    .filter((route, index, self) => self.indexOf(route) === index)
+    .filter((route) => !route.includes("["))
+    .filter((route, index, allRoutes) => allRoutes.indexOf(route) === index)
     .sort();
 
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${routes
   .map((route) => {
-    const priority = route === "/" ? "1.0" : "0.8";
+    const url = route === "/" ? `${BASE_URL}/` : `${BASE_URL}${route}`;
     return `  <url>
-    <loc>${BASE_URL}${route}</loc>
-    <lastmod>${now}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>${priority}</priority>
+    <loc>${escapeXml(url)}</loc>
   </url>`;
   })
   .join("\n")}
-</urlset>`.trim();
+</urlset>`;
 
   return new Response(sitemap, {
     status: 200,
     headers: {
       "Content-Type": "application/xml; charset=utf-8",
+      "Cache-Control": "public, max-age=3600",
     },
   });
 };
