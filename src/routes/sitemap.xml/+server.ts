@@ -28,6 +28,7 @@ export const GET: RequestHandler = async () => {
   const routes = Object.keys(modules)
     .map(normalizeRoute)
     .filter((route) => !route.startsWith("/api"))
+    .filter((route) => !route.startsWith("/apresentacao"))
     .filter((route) => !route.includes("["))
     .filter((route, index, allRoutes) => allRoutes.indexOf(route) === index)
     .sort();
