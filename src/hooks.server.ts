@@ -115,7 +115,13 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
   }
 
-  const response = await resolve(event);
+  const response = await resolve(event, {
+    transformPageChunk: ({ html }) => {
+      if (pathname !== "/contato") return html;
+
+      return html.replace(/\(41\) 9294-3443/g, "(41) 99294-3443");
+    },
+  });
 
   if (response.status === 404) {
     if (pathname.startsWith("/blog/")) {
