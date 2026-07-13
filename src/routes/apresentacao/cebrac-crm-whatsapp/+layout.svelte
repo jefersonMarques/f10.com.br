@@ -4,7 +4,7 @@
 
 <style>
   :global(.cebrac-presentation-route .presentation-page > section:first-child) {
-    background-image: url('/apresentacao/cebrac-crm-whatsapp/hero-background.webp');
+    background-image: url('/background-hero-cebrac.png');
     background-position: center;
     background-repeat: no-repeat;
     background-size: cover;
@@ -23,7 +23,7 @@
   }
 
   :global(.cebrac-presentation-route .presentation-page > section:first-child > div:nth-child(2) > div > div:nth-child(2)::after) {
-    background-image: url('/apresentacao/cebrac-crm-whatsapp/hero-crm-whatsapp.webp');
+    background-image: url('/hero-cebrac.webp');
     background-position: center;
     background-repeat: no-repeat;
     background-size: contain;

@@ -14,6 +14,10 @@ export default defineConfig({
     watch: {
       usePolling: true,    // <- chave no WSL/NTFS
       interval: 150        // ajuste fino (100–300ms)
+    },
+    dev:{
+      port: 5179,
+      strictPort: true
     }
   },
   preview: {

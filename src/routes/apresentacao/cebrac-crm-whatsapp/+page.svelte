@@ -252,242 +252,54 @@
 </svelte:head>
 
 <div class="presentation-page overflow-hidden bg-white text-[#07163a]">
-  <section class="relative isolate min-h-[100svh] overflow-hidden bg-white">
-    <div class="pointer-events-none absolute inset-0 -z-10">
-      <div class="absolute -right-[16rem] -top-[18rem] h-[48rem] w-[48rem] rounded-full bg-[#edf3ff]"></div>
-      <div class="absolute -right-[9rem] -top-[11rem] h-[38rem] w-[38rem] rounded-full border-[72px] border-[#dce8ff]/80"></div>
-      <div class="absolute bottom-[-20rem] left-[12%] h-[39rem] w-[39rem] rounded-full bg-[#f6f8fc]"></div>
-      <div class="absolute right-[17%] top-5 grid grid-cols-6 gap-3 opacity-60">
-        {#each Array(30) as _}
-          <span class="h-1.5 w-1.5 rounded-full bg-[#9cb6e9]"></span>
-        {/each}
-      </div>
-    </div>
-
-    <div class="mx-auto flex min-h-[100svh] max-w-[1540px] items-center px-5 py-10 sm:px-8 lg:px-12 xl:px-16">
-      <div class="grid w-full items-center gap-12 lg:grid-cols-[0.88fr_1.12fr] xl:gap-16">
-        <div class="relative z-20 max-w-[690px]">
-          <div class="mb-12 flex items-center gap-5 sm:gap-7">
-            <div class="flex items-center gap-2.5" aria-label="Cebrac">
-              <svg class="h-10 w-16 sm:h-12 sm:w-20" viewBox="0 0 76 44" aria-hidden="true">
-                <path d="M4 22 24 4h27L31 22l20 18H24L4 22Z" fill="#21854a" />
-                <path d="m31 22 20-18 21 18-21 18-20-18Z" fill="#f4bd20" />
-                <circle cx="31" cy="22" r="10.5" fill="white" />
-              </svg>
-              <div class="leading-none">
-                <div class="text-[26px] font-extrabold tracking-[-0.06em] text-[#0d3678] sm:text-[31px]">
-                  cebrac
-                </div>
-                <div class="mt-1 text-[9px] font-semibold italic tracking-tight text-[#0d3678] sm:text-[10px]">
-                  Você profissional.
-                </div>
-              </div>
-            </div>
-
-            <span class="h-14 w-px bg-slate-300"></span>
-
-            <img src="/logo_f10.svg" alt="F10 Software" class="h-12 w-auto sm:h-14" />
-          </div>
-
-          <div class="mb-5 inline-flex items-center gap-2 rounded-full border border-orange-100 bg-orange-50 px-4 py-2 text-xs font-bold uppercase tracking-[0.13em] text-[#ea6d0b]">
-            <span class="h-2 w-2 rounded-full bg-[#ea6d0b]"></span>
-            Nova etapa
-          </div>
-
-          <h1 class="max-w-[660px] text-[42px] font-bold leading-[1.03] tracking-[-0.048em] text-[#07163a] sm:text-[56px] xl:text-[66px]">
-            Uma nova etapa na
-            <span class="text-[#ea6d0b]">gestão comercial</span>
-            da rede Cebrac.
-          </h1>
-
-          <p class="mt-7 max-w-[650px] text-[20px] font-semibold leading-[1.45] tracking-[-0.02em] text-[#0c2d69] sm:text-[22px]">
-            CRM de Leads + <span class="text-[#18a45f]">WhatsApp integrado</span> no F10:
-            <span class="font-medium text-[#263c66]">mais organização, continuidade, produtividade, controle e matrículas.</span>
-          </p>
-
-          <p class="mt-7 max-w-[625px] text-base leading-7 text-slate-600 sm:text-lg">
-            Esta iniciativa traz um método comercial estruturado, apoiado por tecnologia, para que nenhum lead se perca e a operação não dependa de uma única pessoa.
-          </p>
-
-          <div class="mt-10 grid gap-3 rounded-3xl border border-slate-200/80 bg-white/70 p-3 shadow-[0_24px_60px_rgba(15,35,75,0.10)] backdrop-blur sm:grid-cols-2 xl:grid-cols-4">
-            {#each heroFeatures as feature}
-              <article class="min-h-[175px] rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6">
-                <div class={`flex h-11 w-11 items-center justify-center rounded-2xl ring-1 ${feature.iconClass}`}>
-                  <svelte:component this={feature.icon} size={23} strokeWidth={2} />
-                </div>
-                <h2 class="mt-4 text-base font-bold leading-tight text-[#0b285f]">{feature.title}</h2>
-                <p class="mt-2 text-sm leading-5 text-slate-500">{feature.description}</p>
-              </article>
-            {/each}
-          </div>
-        </div>
-
-        <div class="relative min-h-[610px] lg:min-h-[700px]">
-          <div class="absolute right-0 top-0 hidden h-44 w-64 items-end justify-end gap-4 lg:flex">
-            {#each [36, 56, 78, 105] as height}
-              <span class="w-9 rounded-t-md bg-gradient-to-t from-[#86a9e7] to-[#aac3ef]" style={`height:${height}px`}></span>
-            {/each}
-            <svg class="absolute -right-4 top-0 h-32 w-72" viewBox="0 0 288 128" fill="none" aria-hidden="true">
-              <path d="M12 108C83 98 142 75 198 43c25-14 46-26 74-29" stroke="#f49a4e" stroke-width="7" stroke-linecap="round" />
-              <path d="m255 8 22 4-12 19" stroke="#f49a4e" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- === HERO SIMPLIFICADO PARA TESTE === -->
+<section class="relative isolate min-h-[100svh] overflow-hidden bg-white pt-8 lg:pt-0">
+  <div class="mx-auto flex min-h-[100svh] max-w-[1540px] items-center px-5 py-10 sm:px-8 lg:px-12 xl:px-16">
+    <div class="grid w-full items-center gap-12 lg:grid-cols-[1fr_1.12fr] xl:gap-16">
+      
+      <!-- Lado esquerdo -->
+      <div class="relative z-20 max-w-[680px]">
+        <!-- Logos -->
+        <div class="mb-10 flex items-center gap-5">
+          <div class="flex items-center gap-2.5">
+            <svg class="h-10 w-16 sm:h-12 sm:w-20" viewBox="0 0 76 44" aria-hidden="true">
+              <path d="M4 22 24 4h27L31 22l20 18H24L4 22Z" fill="#21854a" />
+              <path d="m31 22 20-18 21 18-21 18-20-18Z" fill="#f4bd20" />
+              <circle cx="31" cy="22" r="10.5" fill="white" />
             </svg>
-          </div>
-
-          <div class="absolute left-0 right-4 top-24 rounded-[30px] bg-[#0a1020] p-2.5 shadow-[0_40px_90px_rgba(9,24,58,0.30)] sm:right-14 lg:top-28">
-            <div class="overflow-hidden rounded-[22px] bg-[#f7faff]">
-              <div class="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-5">
-                <div class="flex items-center gap-3">
-                  <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-[#07163a] text-[10px] font-extrabold text-[#ff8311]">
-                    F10
-                  </div>
-                  <div>
-                    <p class="text-[11px] font-bold text-[#132a5c] sm:text-xs">F10 CRM</p>
-                    <p class="text-[8px] text-slate-400 sm:text-[9px]">Unidade Cebrac Centro</p>
-                  </div>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class="hidden rounded-lg border border-slate-200 px-3 py-1.5 text-[9px] font-semibold text-slate-500 sm:inline">Filtros</span>
-                  <div class="h-7 w-7 rounded-full bg-gradient-to-br from-[#f3ad73] to-[#d17948]"></div>
-                </div>
-              </div>
-
-              <div class="p-3.5 sm:p-5">
-                <div class="mb-3 flex items-center justify-between">
-                  <div>
-                    <p class="text-[9px] font-medium uppercase tracking-[0.16em] text-slate-400">Gestão comercial</p>
-                    <h3 class="mt-1 text-sm font-bold text-[#102b62] sm:text-base">Funil de matrículas</h3>
-                  </div>
-                  <span class="rounded-full bg-blue-50 px-3 py-1 text-[8px] font-bold text-blue-700 sm:text-[9px]">Este mês</span>
-                </div>
-
-                <div class="mb-4 grid grid-cols-4 gap-2">
-                  {#each [
-                    { label: "Leads totais", value: "1.248" },
-                    { label: "Novos", value: "312" },
-                    { label: "Conversões", value: "96" },
-                    { label: "Taxa", value: "7,7%" },
-                  ] as metric}
-                    <div class="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3">
-                      <p class="truncate text-[7px] font-semibold text-slate-400 sm:text-[8px]">{metric.label}</p>
-                      <p class="mt-1 text-xs font-extrabold text-[#173c7a] sm:text-base">{metric.value}</p>
-                    </div>
-                  {/each}
-                </div>
-
-                <div class="grid grid-cols-5 gap-1.5 sm:gap-2">
-                  {#each kanbanColumns as column}
-                    <div class="min-w-0 rounded-xl bg-[#edf2f9] p-1.5 sm:p-2">
-                      <div class="mb-2 flex items-center justify-between gap-1">
-                        <div class="min-w-0">
-                          <p class="truncate text-[6px] font-bold text-[#233a68] sm:text-[8px]">{column.title}</p>
-                          <p class="mt-0.5 text-[5px] text-slate-400 sm:text-[7px]">{column.total} leads</p>
-                        </div>
-                        <span class={`h-1.5 w-1.5 shrink-0 rounded-full ${column.accentClass}`}></span>
-                      </div>
-
-                      <div class="space-y-1.5">
-                        {#each column.cards as card}
-                          <div class="rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm sm:p-2">
-                            <div class="flex items-start justify-between gap-1">
-                              <p class="truncate text-[5.5px] font-bold text-[#1f3157] sm:text-[7px]">{card.name}</p>
-                              {#if card.whatsapp}
-                                <MessageCircleMore size={7} class="shrink-0 text-emerald-500 sm:h-2.5 sm:w-2.5" />
-                              {/if}
-                            </div>
-                            <p class="mt-1 truncate text-[4.5px] text-slate-400 sm:text-[6px]">{card.course}</p>
-                            <p class="mt-1 truncate text-[4px] text-slate-300 sm:text-[5px]">{card.time}</p>
-                          </div>
-                        {/each}
-                      </div>
-                    </div>
-                  {/each}
-                </div>
-
-                <div class="mt-4 grid grid-cols-[1.15fr_0.85fr] gap-2 sm:gap-3">
-                  <div class="rounded-xl border border-slate-200 bg-white p-3">
-                    <div class="flex items-center justify-between">
-                      <p class="text-[7px] font-bold text-[#243d6d] sm:text-[8px]">Leads por período</p>
-                      <span class="text-[6px] text-slate-300">Últimos 30 dias</span>
-                    </div>
-                    <svg class="mt-2 h-12 w-full" viewBox="0 0 240 48" preserveAspectRatio="none" aria-hidden="true">
-                      <defs>
-                        <linearGradient id="areaGradient" x1="0" x2="0" y1="0" y2="1">
-                          <stop offset="0%" stop-color="#6b9de8" stop-opacity="0.34" />
-                          <stop offset="100%" stop-color="#6b9de8" stop-opacity="0" />
-                        </linearGradient>
-                      </defs>
-                      <path d="M0 40 28 30 54 34 82 19 108 25 136 9 164 15 190 30 218 21 240 24V48H0Z" fill="url(#areaGradient)" />
-                      <path d="M0 40 28 30 54 34 82 19 108 25 136 9 164 15 190 30 218 21 240 24" fill="none" stroke="#4e86d8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                  </div>
-
-                  <div class="rounded-xl border border-slate-200 bg-white p-3">
-                    <p class="text-[7px] font-bold text-[#243d6d] sm:text-[8px]">Conversões</p>
-                    <div class="mt-3 flex h-12 items-end gap-2">
-                      {#each [42, 72, 55, 88, 100] as height}
-                        <span class="flex-1 rounded-t-sm bg-gradient-to-t from-[#6a94d4] to-[#a7c1ed]" style={`height:${height}%`}></span>
-                      {/each}
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div class="leading-none">
+              <div class="text-[26px] font-extrabold tracking-[-0.06em] text-[#0d3678]">cebrac</div>
+              <div class="text-[9px] font-semibold italic text-[#0d3678]">Você profissional.</div>
             </div>
           </div>
-
-          <div class="absolute bottom-2 left-[7%] right-[15%] h-8 rounded-[50%] bg-slate-300/35 blur-xl"></div>
-          <div class="absolute left-[5%] right-[9%] top-[80%] h-5 rounded-b-[70px] bg-gradient-to-b from-[#dbe0e8] to-[#aeb6c4] shadow-lg sm:top-[78%]"></div>
-
-          <div class="absolute bottom-4 right-0 z-20 w-[238px] overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_28px_70px_rgba(13,37,78,0.24)] sm:bottom-10 sm:w-[270px] lg:bottom-16 lg:w-[285px]">
-            <div class="flex items-center gap-2 bg-[#19a963] px-4 py-3 text-white">
-              <MessageCircleMore size={18} />
-              <div>
-                <p class="text-xs font-bold">WhatsApp</p>
-                <p class="text-[8px] text-white/75">Atendimento integrado</p>
-              </div>
-            </div>
-
-            <div class="bg-[#f2f6f3] p-3.5">
-              <div class="flex items-center gap-2 border-b border-emerald-100 pb-3">
-                <div class="h-8 w-8 rounded-full bg-gradient-to-br from-[#f0b88e] to-[#be7549]"></div>
-                <div>
-                  <p class="text-[10px] font-bold text-[#26354d]">Ana Beatriz Lima</p>
-                  <p class="text-[8px] text-emerald-600">online</p>
-                </div>
-              </div>
-
-              <div class="mt-3 space-y-2.5">
-                <div class="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-[#d9fdd3] px-3 py-2 text-[9px] leading-4 text-[#334155] shadow-sm">
-                  Olá! Gostaria de saber mais sobre o curso de Inglês Flex.
-                </div>
-                <div class="max-w-[88%] rounded-2xl rounded-bl-md bg-white px-3 py-2 text-[9px] leading-4 text-[#334155] shadow-sm">
-                  Olá, Ana. Claro, vou enviar as informações e organizar o próximo contato.
-                </div>
-                <div class="max-w-[92%] rounded-2xl rounded-bl-md bg-white p-2.5 shadow-sm">
-                  <div class="flex items-center gap-2">
-                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#102d68] text-[8px] font-bold text-white">ING</div>
-                    <div>
-                      <p class="text-[9px] font-bold text-[#26354d]">Inglês Flex — Cebrac</p>
-                      <p class="mt-0.5 text-[7px] text-slate-400">Informações registradas no lead</p>
-                    </div>
-                  </div>
-                </div>
-                <div class="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-[#d9fdd3] px-3 py-2 text-[9px] leading-4 text-[#334155] shadow-sm">
-                  Perfeito. Vamos marcar uma visita.
-                </div>
-              </div>
-
-              <div class="mt-3 flex items-center gap-2 rounded-full bg-white px-3 py-2 shadow-sm">
-                <span class="flex-1 text-[8px] text-slate-400">Mensagem</span>
-                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-[#19a963] text-white">
-                  <MessageCircleMore size={12} />
-                </span>
-              </div>
-            </div>
-          </div>
+          <span class="h-12 w-px bg-slate-300"></span>
+          <img src="/logo_f10.svg" alt="F10" class="h-11" />
         </div>
+
+        <div class="mb-6 inline-flex rounded-3xl bg-orange-50 px-5 py-1.5 text-sm font-bold text-[#ea6d0b]">
+          F10 CRM
+        </div>
+
+        <h1 class="text-[42px] font-bold leading-[1.05] tracking-[-0.045em] text-[#07163a] sm:text-[54px]">
+          CRM e <span class="text-[#10b981]">WhatsApp</span> integrados
+        </h1>
+
+        <p class="mt-6 text-[21px] font-medium text-[#0c2d69]">
+          Mais organização, rapidez no atendimento e controle completo do funil de matrículas.
+        </p>
+      </div>
+
+      <!-- Lado direito - Apenas a imagem -->
+      <div class="relative">
+        <img 
+          src="/static/hero-cebrac.webp" 
+          alt="Mockup F10 CRM" 
+          class="w-full rounded-3xl shadow-2xl"
+        >
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
   <section class="relative bg-[#f4f7fc] px-5 py-24 sm:px-8 lg:px-12 lg:py-32">
     <div class="mx-auto max-w-[1320px]">

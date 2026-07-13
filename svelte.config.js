@@ -7,6 +7,13 @@ const config = {
 
   kit: {
     adapter: adapter(),
+    csrf: {
+      trustedOrigins: [
+        'https://f10.com.br',
+        'https://www.f10.com.br',
+        'http://147.93.35.138:5980'
+      ]
+    },
     alias: {
       $lib: './src/lib',
       $components: './src/lib/components',

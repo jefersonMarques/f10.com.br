@@ -14,6 +14,10 @@ module.exports = {
         NODE_ENV: "production",
         BODY_SIZE_LIMIT: "100M",
       },
+      env_production: {
+        NODE_ENV: "production",
+        BODY_SIZE_LIMIT: "100M",
+      },
     },
   ],
 };
