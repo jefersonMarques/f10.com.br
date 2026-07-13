@@ -43,14 +43,25 @@
                 assinatura digital e indicadores gerenciais.
             </p>
 
-            <a
-                href="/sobre"
-                class="mt-8 inline-flex items-center gap-3 font-semibold text-[#010D28] underline decoration-2 underline-offset-[6px] transition hover:text-[#EA6D0B]"
-                aria-label="Conheça mais sobre a F10 Software"
-            >
-                Conheça a F10 Software
-                <span aria-hidden="true">→</span>
-            </a>
+            <div class="mt-8 flex flex-wrap gap-x-8 gap-y-4">
+                <a
+                    href="/sobre"
+                    class="inline-flex items-center gap-3 font-semibold text-[#010D28] underline decoration-2 underline-offset-[6px] transition hover:text-[#EA6D0B]"
+                    aria-label="Conheça mais sobre a F10 Software"
+                >
+                    Conheça a F10 Software
+                    <span aria-hidden="true">→</span>
+                </a>
+
+                <a
+                    href="/software-para-escolas"
+                    class="inline-flex items-center gap-3 font-semibold text-[#010D28] underline decoration-2 underline-offset-[6px] transition hover:text-[#EA6D0B]"
+                    aria-label="Conheça o software para escolas da F10"
+                >
+                    Software para escolas
+                    <span aria-hidden="true">→</span>
+                </a>
+            </div>
         </div>
     </div>
 </section>
