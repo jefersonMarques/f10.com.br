@@ -6,8 +6,10 @@
     BookOpen,
     CalendarCheck,
     CheckCircle2,
+    CircleDot,
     Clock3,
     Database,
+    Gauge,
     GraduationCap,
     History,
     Kanban,
@@ -16,7 +18,9 @@
     MessageCircle,
     PhoneCall,
     PieChart,
+    Repeat2,
     Rocket,
+    Send,
     Settings,
     ShieldCheck,
     Target,
@@ -27,96 +31,182 @@
     XCircle,
   } from "lucide-svelte";
 
-  const problems = [
+  const objectives = [
     {
-      title: "Leads esquecidos",
+      title: "Padronizar o método comercial",
       description:
-        "Sem um processo visível, oportunidades ficam sem retorno, follow-up ou próximo passo definido.",
-      icon: AlertTriangle,
-      tone: "bg-amber-50 text-amber-600",
+        "Criar uma rotina clara para captação, contato, acompanhamento e conversão em todas as unidades.",
+      icon: Workflow,
+      tone: "bg-blue-50 text-blue-700",
     },
     {
-      title: "Falta de acompanhamento",
+      title: "Reduzir perdas invisíveis",
       description:
-        "A operação depende da memória e da rotina individual de cada pessoa do time comercial.",
-      icon: PhoneCall,
+        "Evitar que leads já captados fiquem sem retorno, sem responsável ou sem próximo passo definido.",
+      icon: Target,
       tone: "bg-orange-50 text-[#e96f0b]",
     },
     {
-      title: "Perda de conhecimento",
+      title: "Preservar o conhecimento",
       description:
-        "Quando alguém deixa a equipe, histórico, objeções e negociações podem desaparecer junto.",
-      icon: Users,
-      tone: "bg-emerald-50 text-emerald-600",
+        "Manter histórico, negociações e objeções acessíveis mesmo quando houver mudanças na equipe.",
+      icon: BookOpen,
+      tone: "bg-emerald-50 text-emerald-700",
     },
     {
-      title: "Pouca visão dos indicadores",
+      title: "Dar escala à operação",
       description:
-        "Sem dados centralizados, fica difícil comparar unidades, campanhas, equipes e etapas do funil.",
+        "Permitir que a rede cresça mantendo controle, qualidade, produtividade e previsibilidade.",
+      icon: TrendingUp,
+      tone: "bg-violet-50 text-violet-700",
+    },
+  ];
+
+  const challenges = [
+    {
+      number: "01",
+      title: "Leads esquecidos",
+      description:
+        "Sem um processo visual, oportunidades podem ficar paradas entre uma tentativa de contato e outra.",
+      icon: AlertTriangle,
+      accent: "text-amber-600",
+      iconBackground: "bg-amber-50",
+    },
+    {
+      number: "02",
+      title: "Falta de acompanhamento",
+      description:
+        "A operação depende da memória e da disciplina individual, dificultando a gestão do funil.",
+      icon: PhoneCall,
+      accent: "text-[#e96f0b]",
+      iconBackground: "bg-orange-50",
+    },
+    {
+      number: "03",
+      title: "Perda de conhecimento",
+      description:
+        "Quando alguém sai da equipe, negociações, objeções e contexto podem desaparecer junto.",
+      icon: Users,
+      accent: "text-emerald-600",
+      iconBackground: "bg-emerald-50",
+    },
+    {
+      number: "04",
+      title: "Pouca visibilidade dos dados",
+      description:
+        "Sem indicadores centralizados, comparar unidades, campanhas e vendedores se torna trabalhoso.",
       icon: BarChart3,
-      tone: "bg-blue-50 text-blue-600",
+      accent: "text-blue-600",
+      iconBackground: "bg-blue-50",
     },
   ];
 
   const crmFeatures = [
-    "Funil comercial visual em formato Kanban",
+    "Funil visual em formato Kanban",
     "Follow-ups, tarefas e próximos passos",
-    "Histórico completo por lead e oportunidade",
-    "Workflow comercial padronizado para a rede",
+    "Histórico completo por oportunidade",
+    "Workflow comercial padronizado",
     "Indicadores de conversão e produtividade",
   ];
 
   const whatsappFeatures = [
-    "Conversas centralizadas dentro do sistema",
-    "Histórico vinculado ao lead ou ao aluno",
-    "Atendimento comercial e comunicação acadêmica",
+    "Conversas centralizadas no sistema",
+    "Histórico vinculado ao lead ou aluno",
+    "Atendimento comercial e acadêmico",
     "Avisos, lembretes e mensagens organizadas",
     "Até 5 números por unidade, conforme implantação",
   ];
 
-  const benefits = [
+  const practicalFlow = [
     {
-      title: "Aumento da conversão",
-      description:
-        "Mais oportunidades acompanhadas até a decisão e menos leads desperdiçados.",
-      icon: TrendingUp,
-      tone: "bg-emerald-50 text-emerald-600",
+      number: "1",
+      title: "Lead entra na unidade",
+      description: "A oportunidade chega por campanha, indicação, site ou atendimento direto.",
+      icon: Send,
     },
     {
-      title: "Organização do funil",
+      number: "2",
+      title: "Atendimento é registrado",
+      description: "O lead recebe responsável, etapa atual e histórico centralizado.",
+      icon: Database,
+    },
+    {
+      number: "3",
+      title: "Follow-up é programado",
+      description: "Tarefas e retornos passam a fazer parte de uma cadência organizada.",
+      icon: CalendarCheck,
+    },
+    {
+      number: "4",
+      title: "WhatsApp apoia a comunicação",
+      description: "As conversas ficam integradas ao contexto da oportunidade.",
+      icon: MessageCircle,
+    },
+    {
+      number: "5",
+      title: "Matrícula e acompanhamento",
+      description: "A gestão visualiza resultado, conversão e próximos passos da jornada.",
+      icon: GraduationCap,
+    },
+  ];
+
+  const impacts = [
+    {
+      title: "Mais controle do funil",
       description:
-        "Visibilidade clara de cada etapa, responsável e oportunidade que precisa de atenção.",
+        "Cada lead passa a ter etapa, responsável, histórico e ação seguinte claramente definidos.",
       icon: Kanban,
       tone: "bg-orange-50 text-[#e96f0b]",
     },
     {
-      title: "Disciplina comercial",
+      title: "Mais disciplina comercial",
       description:
-        "Cadências, tarefas e retornos programados sustentam uma rotina comercial consistente.",
-      icon: CalendarCheck,
-      tone: "bg-blue-50 text-blue-600",
+        "Cadências, tarefas e retornos programados ajudam a manter uma rotina consistente.",
+      icon: Clock3,
+      tone: "bg-blue-50 text-blue-700",
     },
     {
       title: "Preservação do conhecimento",
       description:
-        "O histórico permanece na unidade e o próximo responsável continua de onde o atendimento parou.",
-      icon: BookOpen,
-      tone: "bg-violet-50 text-violet-600",
+        "O relacionamento não fica preso ao celular ou à memória de uma única pessoa.",
+      icon: History,
+      tone: "bg-emerald-50 text-emerald-700",
     },
     {
-      title: "Automação e produtividade",
+      title: "Acompanhamento da equipe",
       description:
-        "Lembretes, atividades e comunicação integrada reduzem retrabalho e tarefas manuais.",
-      icon: Settings,
-      tone: "bg-lime-50 text-lime-700",
+        "Gestores conseguem visualizar atividades, gargalos e necessidades de apoio.",
+      icon: UserCheck,
+      tone: "bg-violet-50 text-violet-700",
     },
     {
-      title: "Gestão por indicadores",
+      title: "Menos retrabalho",
       description:
-        "Dados em tempo real ajudam a identificar gargalos, boas práticas e oportunidades de melhoria.",
+        "Informações centralizadas reduzem buscas manuais, duplicidade e perda de contexto.",
+      icon: Repeat2,
+      tone: "bg-amber-50 text-amber-700",
+    },
+    {
+      title: "Decisão baseada em dados",
+      description:
+        "Indicadores ajudam a entender campanhas, cursos, equipes e etapas com maior conversão.",
       icon: PieChart,
-      tone: "bg-amber-50 text-amber-600",
+      tone: "bg-cyan-50 text-cyan-700",
     },
+  ];
+
+  const beforeItems = [
+    "Informações espalhadas entre planilhas, celulares e memória da equipe.",
+    "Leads sem retorno quando a rotina muda ou o responsável se ausenta.",
+    "Troca de colaborador interrompendo negociações em andamento.",
+    "Gestão reativa, baseada em conferências e levantamentos manuais.",
+  ];
+
+  const afterItems = [
+    "Histórico centralizado e acessível para os responsáveis da unidade.",
+    "Cada oportunidade com etapa, responsável e próximo passo definido.",
+    "Continuidade das negociações mesmo quando houver mudança na equipe.",
+    "Indicadores atualizados para orientar decisões e prioridades comerciais.",
   ];
 
   const implementationSteps = [
@@ -124,7 +214,7 @@
       label: "1",
       title: "Comunicação oficial",
       description:
-        "Apresentação da evolução, dos objetivos do projeto e das responsabilidades de cada unidade.",
+        "Apresentação da evolução, dos objetivos do projeto e do que muda para cada unidade.",
       icon: Megaphone,
     },
     {
@@ -138,14 +228,14 @@
       label: "3",
       title: "Configuração inicial",
       description:
-        "Parametrização do CRM, usuários, funil, regras comerciais e números de WhatsApp.",
+        "Parametrização de usuários, funil, regras comerciais e números de WhatsApp.",
       icon: Settings,
     },
     {
       label: "4",
       title: "Treinamento",
       description:
-        "Capacitação das equipes para uso do sistema e aplicação do método comercial da rede.",
+        "Capacitação das equipes para uso do sistema e aplicação da rotina comercial.",
       icon: GraduationCap,
     },
     {
@@ -157,23 +247,32 @@
     },
   ];
 
-  const withoutCrm = [
-    "Informações ficam espalhadas ou concentradas na memória do vendedor.",
-    "Leads podem ficar sem retorno quando a rotina muda.",
-    "A troca de colaborador pode interromper negociações em andamento.",
-    "A gestão depende de planilhas e verificações manuais.",
-  ];
-
-  const withCrm = [
-    "Todo histórico fica registrado e acessível para a unidade.",
-    "Cada oportunidade possui responsável, etapa e próximo passo.",
-    "Negociações continuam mesmo com mudanças na equipe.",
-    "Indicadores ajudam a acompanhar a operação em tempo real.",
+  const visualMaterials = [
+    {
+      title: "Print do CRM em uso",
+      dimensions: "1400 × 900 px",
+      description: "Preferência por uma tela real com funil, etapas e oportunidades.",
+    },
+    {
+      title: "Print do WhatsApp integrado",
+      dimensions: "1200 × 900 px",
+      description: "Exemplo de conversa vinculada ao histórico de um contato.",
+    },
+    {
+      title: "Comparativo sem CRM × com CRM",
+      dimensions: "1400 × 900 px",
+      description: "Peça visual resumindo continuidade, produtividade e controle.",
+    },
+    {
+      title: "Linha do tempo da implantação",
+      dimensions: "1400 × 700 px",
+      description: "Imagem complementar com fases, responsáveis e marcos do projeto.",
+    },
   ];
 </script>
 
 <svelte:head>
-  <title>Cebrac + F10 | Evolução da gestão comercial da rede</title>
+  <title>Cebrac + F10 | Apresentação da evolução comercial</title>
   <meta
     name="description"
     content="Apresentação interna sobre a implantação do CRM de Leads e do WhatsApp integrado ao F10 para as unidades Cebrac."
@@ -190,630 +289,587 @@
 </svelte:head>
 
 <div class="min-h-screen overflow-hidden bg-white text-[#071735]">
-  <header class="border-b border-slate-200/80 bg-white/95">
+  <header class="border-b border-slate-200/80 bg-white">
     <div
-      class="mx-auto flex max-w-[1180px] items-center justify-between gap-5 px-5 py-5 sm:px-8 lg:px-10"
+      class="mx-auto flex max-w-[1180px] flex-col gap-5 px-5 py-5 sm:px-8 md:flex-row md:items-center md:justify-between lg:px-10"
     >
-      <div class="flex items-center gap-4 sm:gap-5">
+      <div class="flex items-center gap-4 sm:gap-6">
+        <img src="/logo_f10.svg" alt="F10 Software" class="h-9 w-auto sm:h-11" />
+        <span class="h-10 w-px bg-slate-200"></span>
         <img
-          src="/logo_f10.svg"
-          alt="F10 Software"
-          class="h-10 w-auto sm:h-12"
+          src="/cebrac-logo.svg"
+          alt="Cebrac"
+          class="h-12 w-auto object-contain sm:h-14"
         />
-        <span class="h-9 w-px bg-slate-200"></span>
-        <div>
-          <p class="text-lg font-extrabold tracking-tight text-[#071735] sm:text-xl">
-            Cebrac
-          </p>
-          <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-            Rede parceira
-          </p>
-        </div>
       </div>
 
-      <div class="text-right">
-        <p class="text-xs font-bold uppercase tracking-[0.16em] text-[#e96f0b]">
-          Apresentação interna
-        </p>
-        <p class="mt-1 text-xs text-slate-500">Julho de 2026</p>
+      <div class="flex items-center gap-3 md:justify-end">
+        <span
+          class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.14em] text-blue-700"
+        >
+          Implantação CRM + WhatsApp
+        </span>
+        <div class="hidden text-right sm:block">
+          <p class="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#e96f0b]">
+            Apresentação interna
+          </p>
+          <p class="mt-1 text-xs text-slate-500">Julho de 2026</p>
+        </div>
       </div>
     </div>
   </header>
 
-  <section class="relative border-b border-slate-200 bg-[#f7f8fc]">
-    <div
-      class="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_18%_12%,rgba(233,111,11,0.12),transparent_34%),radial-gradient(circle_at_82%_8%,rgba(37,99,235,0.10),transparent_32%)]"
-    ></div>
-
-    <div
-      class="relative mx-auto grid max-w-[1180px] items-center gap-12 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[0.92fr_1.08fr] lg:px-10 lg:py-24"
-    >
-      <div>
-        <div
-          class="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-blue-700"
-        >
-          <ShieldCheck size={16} strokeWidth={2} />
-          Comunicado para a rede Cebrac
-        </div>
-
-        <h1
-          class="mt-7 max-w-[660px] text-4xl font-black leading-[1.08] tracking-[-0.035em] text-[#071735] sm:text-5xl lg:text-[62px]"
-        >
-          Uma nova etapa na
-          <span class="text-[#e96f0b]">gestão comercial</span>
-          da rede
-        </h1>
-
-        <p class="mt-7 max-w-[620px] text-lg leading-8 text-slate-600 sm:text-xl">
-          CRM de Leads e WhatsApp integrado ao F10 para trazer mais
-          organização, produtividade, continuidade e matrículas para as unidades.
-        </p>
-
-        <div class="mt-8 flex flex-wrap gap-3">
-          <span
-            class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"
-            >Mais organização</span
-          >
-          <span
-            class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"
-            >Mais produtividade</span
-          >
-          <span
-            class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"
-            >Mais matrículas</span
-          >
-          <span
-            class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"
-            >Mais previsibilidade</span
-          >
-        </div>
-      </div>
+  <main>
+    <section class="relative border-b border-slate-200 bg-[#f7f8fc]">
+      <div
+        class="pointer-events-none absolute inset-x-0 top-0 h-96 bg-[radial-gradient(circle_at_16%_12%,rgba(233,111,11,0.12),transparent_34%),radial-gradient(circle_at_84%_8%,rgba(37,99,235,0.11),transparent_32%)]"
+      ></div>
 
       <div
-        class="relative flex aspect-[14/9] min-h-[330px] items-center justify-center overflow-hidden rounded-[32px] border border-slate-300 bg-slate-200 p-8 shadow-[0_30px_70px_-38px_rgba(7,23,53,0.45)]"
+        class="relative mx-auto grid max-w-[1180px] items-center gap-12 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[0.92fr_1.08fr] lg:px-10 lg:py-24"
       >
-        <div class="text-center text-slate-500">
-          <Layers class="mx-auto h-12 w-12" strokeWidth={1.5} />
-          <p class="mt-4 text-base font-bold text-slate-600">
-            Imagem principal: CRM no notebook + WhatsApp no celular
-          </p>
-          <p class="mt-2 text-sm">Tamanho recomendado: 1400 × 900 px</p>
-          <p class="mt-1 text-xs">Proporção 14:9 • fundo transparente ou claro</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-    <div class="mx-auto max-w-[780px] text-center">
-      <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-[#e96f0b]">
-        O ponto de partida
-      </p>
-      <h2 class="mt-4 text-3xl font-black tracking-[-0.025em] sm:text-4xl">
-        Por que a rede precisa dessa evolução?
-      </h2>
-      <p class="mt-5 text-lg leading-8 text-slate-600">
-        O projeto nasceu para reduzir perdas invisíveis, organizar o método
-        comercial e dar continuidade aos atendimentos em todas as unidades.
-      </p>
-    </div>
-
-    <div class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-      {#each problems as item}
-        <article
-          class="rounded-[24px] border border-slate-200 bg-white p-6 shadow-[0_16px_40px_-32px_rgba(7,23,53,0.45)]"
-        >
-          <div class={`flex h-12 w-12 items-center justify-center rounded-2xl ${item.tone}`}>
-            <svelte:component this={item.icon} size={24} strokeWidth={1.9} />
-          </div>
-          <h3 class="mt-5 text-lg font-extrabold text-[#071735]">{item.title}</h3>
-          <p class="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>
-        </article>
-      {/each}
-    </div>
-  </section>
-
-  <section class="px-5 pb-16 sm:px-8 sm:pb-20 lg:px-10">
-    <div
-      class="mx-auto max-w-[1180px] overflow-hidden rounded-[34px] bg-[#071735] px-6 py-12 text-white shadow-[0_30px_80px_-45px_rgba(7,23,53,0.75)] sm:px-10 lg:px-14 lg:py-16"
-    >
-      <div class="mx-auto max-w-[780px] text-center">
-        <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-orange-300">
-          O que muda para as unidades
-        </p>
-        <h2 class="mt-4 text-3xl font-black tracking-[-0.025em] sm:text-4xl">
-          Duas frentes integradas em uma única operação
-        </h2>
-        <p class="mt-5 text-base leading-7 text-blue-100/80 sm:text-lg">
-          O CRM organiza a jornada comercial. O WhatsApp conecta as conversas ao
-          histórico de leads e alunos dentro do ecossistema F10.
-        </p>
-      </div>
-
-      <div class="mt-12 grid gap-6 lg:grid-cols-2">
-        <article
-          class="rounded-[26px] border border-white/10 bg-white/[0.06] p-6 sm:p-8"
-        >
-          <div class="flex items-center gap-4">
-            <div
-              class="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-400/15 text-orange-300"
-            >
-              <Kanban size={25} strokeWidth={1.9} />
-            </div>
-            <div>
-              <p class="text-xs font-bold uppercase tracking-[0.15em] text-orange-300">
-                Frente comercial
-              </p>
-              <h3 class="mt-1 text-2xl font-black">CRM de Leads</h3>
-            </div>
-          </div>
-
-          <p class="mt-5 leading-7 text-blue-100/80">
-            Uma visão completa do funil para organizar a rotina comercial,
-            acompanhar oportunidades e transformar processo em resultado.
-          </p>
-
-          <div
-            class="mt-7 flex aspect-[3/2] items-center justify-center rounded-[22px] border border-white/15 bg-slate-300/20 p-6"
-          >
-            <div class="text-center text-blue-100/65">
-              <Kanban class="mx-auto h-10 w-10" strokeWidth={1.5} />
-              <p class="mt-3 text-sm font-bold text-blue-50">
-                Imagem do CRM de Leads / Funil Kanban
-              </p>
-              <p class="mt-1 text-xs">Tamanho recomendado: 1200 × 800 px</p>
-            </div>
-          </div>
-
-          <ul class="mt-7 space-y-3">
-            {#each crmFeatures as feature}
-              <li class="flex items-start gap-3 text-sm leading-6 text-blue-50/90">
-                <CheckCircle2
-                  class="mt-0.5 h-5 w-5 shrink-0 text-emerald-400"
-                  strokeWidth={2}
-                />
-                <span>{feature}</span>
-              </li>
-            {/each}
-          </ul>
-        </article>
-
-        <article
-          class="rounded-[26px] border border-white/10 bg-white/[0.06] p-6 sm:p-8"
-        >
-          <div class="flex items-center gap-4">
-            <div
-              class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300"
-            >
-              <MessageCircle size={25} strokeWidth={1.9} />
-            </div>
-            <div>
-              <p class="text-xs font-bold uppercase tracking-[0.15em] text-emerald-300">
-                Comunicação integrada
-              </p>
-              <h3 class="mt-1 text-2xl font-black">WhatsApp no CRM e no F10</h3>
-            </div>
-          </div>
-
-          <p class="mt-5 leading-7 text-blue-100/80">
-            Conversas comerciais e acadêmicas organizadas dentro do sistema, com
-            histórico, contexto e continuidade para cada atendimento.
-          </p>
-
-          <div
-            class="mt-7 flex aspect-[3/2] items-center justify-center rounded-[22px] border border-white/15 bg-slate-300/20 p-6"
-          >
-            <div class="text-center text-blue-100/65">
-              <MessageCircle class="mx-auto h-10 w-10" strokeWidth={1.5} />
-              <p class="mt-3 text-sm font-bold text-blue-50">
-                Imagem do WhatsApp integrado ao CRM e ao F10
-              </p>
-              <p class="mt-1 text-xs">Tamanho recomendado: 1200 × 800 px</p>
-            </div>
-          </div>
-
-          <ul class="mt-7 space-y-3">
-            {#each whatsappFeatures as feature}
-              <li class="flex items-start gap-3 text-sm leading-6 text-blue-50/90">
-                <CheckCircle2
-                  class="mt-0.5 h-5 w-5 shrink-0 text-emerald-400"
-                  strokeWidth={2}
-                />
-                <span>{feature}</span>
-              </li>
-            {/each}
-          </ul>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <section class="border-y border-slate-200 bg-[#f7f8fc]">
-    <div class="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-      <div class="grid items-center gap-12 lg:grid-cols-2">
         <div>
-          <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-[#e96f0b]">
-            Problema 1
+          <div
+            class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-600 shadow-sm"
+          >
+            <ShieldCheck size={16} strokeWidth={2} />
+            Comunicado para a rede Cebrac
+          </div>
+
+          <h1
+            class="mt-7 max-w-[660px] text-4xl font-black leading-[1.06] tracking-[-0.04em] text-[#071735] sm:text-5xl lg:text-[62px]"
+          >
+            Uma nova etapa na
+            <span class="text-[#e96f0b]">gestão comercial</span>
+            da rede
+          </h1>
+
+          <p class="mt-7 max-w-[620px] text-lg leading-8 text-slate-600 sm:text-xl">
+            CRM de Leads e WhatsApp integrado ao F10 para trazer mais organização,
+            continuidade, produtividade e matrículas para todas as unidades.
           </p>
-          <h2 class="mt-4 text-3xl font-black tracking-[-0.025em] sm:text-4xl">
-            Esgotamento inteligente das tentativas com cada lead
+
+          <div class="mt-8 flex flex-wrap gap-3">
+            {#each ["Mais organização", "Mais produtividade", "Mais matrículas", "Mais previsibilidade"] as benefit}
+              <span
+                class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"
+              >
+                {benefit}
+              </span>
+            {/each}
+          </div>
+        </div>
+
+        <div
+          class="relative flex aspect-[14/9] min-h-[330px] items-center justify-center overflow-hidden rounded-[32px] border border-slate-300 bg-slate-200 p-8 shadow-[0_30px_70px_-38px_rgba(7,23,53,0.45)]"
+        >
+          <div class="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.4),transparent_60%)]"></div>
+          <div class="relative text-center text-slate-500">
+            <Layers class="mx-auto h-12 w-12" strokeWidth={1.5} />
+            <p class="mt-4 text-base font-bold text-slate-600">
+              Imagem principal: CRM no notebook + WhatsApp no celular
+            </p>
+            <p class="mt-2 text-sm">Tamanho recomendado: 1400 × 900 px</p>
+            <p class="mt-1 text-xs">Proporção 14:9 • fundo transparente ou claro</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+      <div class="grid gap-10 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
+        <div>
+          <div class="flex items-center gap-3">
+            <span
+              class="flex h-9 w-9 items-center justify-center rounded-full bg-[#071735] text-sm font-black text-white"
+              >01</span
+            >
+            <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-[#e96f0b]">
+              Objetivo da implantação
+            </p>
+          </div>
+          <h2 class="mt-5 text-3xl font-black tracking-[-0.03em] sm:text-4xl">
+            Tecnologia para sustentar um método comercial comum à rede
           </h2>
           <p class="mt-5 text-lg leading-8 text-slate-600">
-            Cada lead representa investimento e oportunidade. Com método e CRM,
-            os contatos seguem uma cadência definida até que haja resposta,
-            matrícula ou encerramento consciente da oportunidade.
+            Esta apresentação explica por que a evolução está sendo realizada, o que será
+            implantado e como a nova rotina ajudará as unidades a aproveitar melhor cada
+            oportunidade comercial.
           </p>
-
-          <div class="mt-7 space-y-4">
-            <div class="flex gap-4">
-              <div
-                class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-[#e96f0b]"
-              >
-                <Workflow size={19} />
-              </div>
-              <div>
-                <h3 class="font-extrabold">Sequência de contatos programada</h3>
-                <p class="mt-1 text-sm leading-6 text-slate-600">
-                  Ligações, mensagens, tarefas e retornos deixam de depender da memória.
-                </p>
-              </div>
-            </div>
-            <div class="flex gap-4">
-              <div
-                class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600"
-              >
-                <Clock3 size={19} />
-              </div>
-              <div>
-                <h3 class="font-extrabold">Follow-up no momento certo</h3>
-                <p class="mt-1 text-sm leading-6 text-slate-600">
-                  O responsável sabe o que precisa fazer, quando e com qual oportunidade.
-                </p>
-              </div>
-            </div>
-            <div class="flex gap-4">
-              <div
-                class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"
-              >
-                <Target size={19} />
-              </div>
-              <div>
-                <h3 class="font-extrabold">Mais conversão, menos desperdício</h3>
-                <p class="mt-1 text-sm leading-6 text-slate-600">
-                  A unidade aproveita melhor os leads que já foram captados pelas campanhas.
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
 
-        <div
-          class="flex aspect-[5/4] items-center justify-center rounded-[30px] border border-slate-300 bg-slate-200 p-8"
-        >
-          <div class="text-center text-slate-500">
-            <Target class="mx-auto h-12 w-12" strokeWidth={1.5} />
-            <p class="mt-4 font-bold text-slate-600">
-              Infográfico: funil de leads até a matrícula
-            </p>
-            <p class="mt-2 text-sm">Tamanho recomendado: 1250 × 1000 px</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="my-16 h-px bg-slate-200 sm:my-20"></div>
-
-      <div class="grid items-center gap-12 lg:grid-cols-2">
-        <div
-          class="order-2 flex aspect-[5/4] items-center justify-center rounded-[30px] border border-slate-300 bg-slate-200 p-8 lg:order-1"
-        >
-          <div class="text-center text-slate-500">
-            <History class="mx-auto h-12 w-12" strokeWidth={1.5} />
-            <p class="mt-4 font-bold text-slate-600">
-              Infográfico: continuidade com troca de equipe
-            </p>
-            <p class="mt-2 text-sm">Tamanho recomendado: 1250 × 1000 px</p>
-          </div>
-        </div>
-
-        <div class="order-1 lg:order-2">
-          <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-[#e96f0b]">
-            Problema 2
-          </p>
-          <h2 class="mt-4 text-3xl font-black tracking-[-0.025em] sm:text-4xl">
-            Continuidade mesmo quando a equipe muda
-          </h2>
-          <p class="mt-5 text-lg leading-8 text-slate-600">
-            O conhecimento comercial deixa de ficar apenas na cabeça de uma pessoa.
-            Histórico, negociações, objeções e próximos passos permanecem registrados
-            para que a unidade continue operando sem voltar ao ponto zero.
-          </p>
-
-          <div
-            class="mt-8 rounded-[24px] border border-emerald-200 bg-emerald-50 p-6"
-          >
-            <div class="flex items-start gap-4">
-              <ShieldCheck
-                class="mt-0.5 h-7 w-7 shrink-0 text-emerald-600"
-                strokeWidth={1.9}
-              />
-              <div>
-                <h3 class="text-lg font-extrabold text-emerald-950">
-                  O relacionamento pertence à unidade
-                </h3>
-                <p class="mt-2 leading-7 text-emerald-900/75">
-                  O novo responsável encontra contexto, atividades realizadas e o
-                  estágio exato de cada negociação.
-                </p>
+        <div class="grid gap-4 sm:grid-cols-2">
+          {#each objectives as item}
+            <article
+              class="rounded-[24px] border border-slate-200 bg-white p-6 shadow-[0_16px_44px_-34px_rgba(7,23,53,0.5)]"
+            >
+              <div class={`flex h-12 w-12 items-center justify-center rounded-2xl ${item.tone}`}>
+                <svelte:component this={item.icon} size={24} strokeWidth={1.9} />
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-    <div class="mx-auto max-w-[760px] text-center">
-      <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-[#e96f0b]">
-        Método + tecnologia
-      </p>
-      <h2 class="mt-4 text-3xl font-black tracking-[-0.025em] sm:text-4xl">
-        Benefícios diretos para a operação
-      </h2>
-      <p class="mt-5 text-lg leading-8 text-slate-600">
-        Mais do que implantar uma ferramenta, a proposta é criar uma rotina
-        comercial previsível, mensurável e replicável em toda a rede.
-      </p>
-    </div>
-
-    <div class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-      {#each benefits as item}
-        <article
-          class="rounded-[24px] border border-slate-200 bg-white p-6 shadow-[0_16px_45px_-34px_rgba(7,23,53,0.5)]"
-        >
-          <div class={`flex h-12 w-12 items-center justify-center rounded-2xl ${item.tone}`}>
-            <svelte:component this={item.icon} size={24} strokeWidth={1.9} />
-          </div>
-          <h3 class="mt-5 text-lg font-extrabold">{item.title}</h3>
-          <p class="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>
-        </article>
-      {/each}
-    </div>
-  </section>
-
-  <section class="border-y border-slate-200 bg-[#f7f8fc]">
-    <div class="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-      <div class="mx-auto max-w-[760px] text-center">
-        <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-[#e96f0b]">
-          Comparação prática
-        </p>
-        <h2 class="mt-4 text-3xl font-black tracking-[-0.025em] sm:text-4xl">
-          Sem CRM x com CRM e método
-        </h2>
-        <p class="mt-5 text-lg leading-8 text-slate-600">
-          A principal diferença está na continuidade do processo e na capacidade
-          de transformar rotina em informação de gestão.
-        </p>
-      </div>
-
-      <div class="mt-12 grid gap-6 lg:grid-cols-[1fr_auto_1fr] lg:items-stretch">
-        <article class="rounded-[26px] border border-red-100 bg-white p-7 sm:p-8">
-          <div
-            class="inline-flex rounded-full bg-[#071735] px-4 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-white"
-          >
-            Sem CRM e método
-          </div>
-          <ul class="mt-7 space-y-4">
-            {#each withoutCrm as item}
-              <li class="flex items-start gap-3 text-sm leading-6 text-slate-600">
-                <XCircle class="mt-0.5 h-5 w-5 shrink-0 text-red-500" strokeWidth={2} />
-                <span>{item}</span>
-              </li>
-            {/each}
-          </ul>
-        </article>
-
-        <div class="flex items-center justify-center">
-          <span
-            class="flex h-12 w-12 items-center justify-center rounded-full bg-[#071735] text-xs font-black text-white shadow-lg"
-            >VS</span
-          >
-        </div>
-
-        <article class="rounded-[26px] border border-emerald-200 bg-white p-7 sm:p-8">
-          <div
-            class="inline-flex rounded-full bg-emerald-600 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.12em] text-white"
-          >
-            Com CRM e método
-          </div>
-          <ul class="mt-7 space-y-4">
-            {#each withCrm as item}
-              <li class="flex items-start gap-3 text-sm leading-6 text-slate-600">
-                <CheckCircle2
-                  class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600"
-                  strokeWidth={2}
-                />
-                <span>{item}</span>
-              </li>
-            {/each}
-          </ul>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <section class="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-    <div class="grid gap-8 lg:grid-cols-[0.82fr_1.18fr]">
-      <div>
-        <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-[#e96f0b]">
-          Escopo da evolução
-        </p>
-        <h2 class="mt-4 text-3xl font-black tracking-[-0.025em] sm:text-4xl">
-          O que passa a fazer parte da operação
-        </h2>
-        <p class="mt-5 text-lg leading-8 text-slate-600">
-          Os novos recursos conectam captação, atendimento, gestão comercial e
-          comunicação em uma experiência única para a equipe.
-        </p>
-      </div>
-
-      <div class="grid gap-5 sm:grid-cols-2">
-        <article class="rounded-[24px] border border-slate-200 bg-white p-6">
-          <div
-            class="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-50 text-[#e96f0b]"
-          >
-            <Workflow size={23} />
-          </div>
-          <h3 class="mt-5 text-lg font-extrabold">CRM + workflow comercial</h3>
-          <p class="mt-3 text-sm leading-6 text-slate-600">
-            Funil, tarefas, atividades, histórico, regras de atendimento e gestão
-            das oportunidades até a matrícula.
-          </p>
-        </article>
-
-        <article class="rounded-[24px] border border-slate-200 bg-white p-6">
-          <div
-            class="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600"
-          >
-            <MessageCircle size={23} />
-          </div>
-          <h3 class="mt-5 text-lg font-extrabold">WhatsApp integrado</h3>
-          <p class="mt-3 text-sm leading-6 text-slate-600">
-            Até 5 números por unidade, distribuídos entre CRM e F10 de acordo com
-            a configuração definida na implantação.
-          </p>
-        </article>
-
-        <article class="rounded-[24px] border border-slate-200 bg-white p-6">
-          <div
-            class="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"
-          >
-            <Database size={23} />
-          </div>
-          <h3 class="mt-5 text-lg font-extrabold">Histórico centralizado</h3>
-          <p class="mt-3 text-sm leading-6 text-slate-600">
-            Informações comerciais e conversas organizadas para consulta,
-            continuidade e acompanhamento da gestão.
-          </p>
-        </article>
-
-        <article class="rounded-[24px] border border-slate-200 bg-white p-6">
-          <div
-            class="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-50 text-violet-600"
-          >
-            <BarChart3 size={23} />
-          </div>
-          <h3 class="mt-5 text-lg font-extrabold">Indicadores da operação</h3>
-          <p class="mt-3 text-sm leading-6 text-slate-600">
-            Acompanhamento de etapas, atividades, conversão, produtividade e
-            oportunidades que precisam de atenção.
-          </p>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <section class="border-y border-slate-200 bg-[#f7f8fc]">
-    <div class="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-      <div class="mx-auto max-w-[760px] text-center">
-        <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-[#e96f0b]">
-          Implantação
-        </p>
-        <h2 class="mt-4 text-3xl font-black tracking-[-0.025em] sm:text-4xl">
-          Como essa evolução chega às unidades
-        </h2>
-        <p class="mt-5 text-lg leading-8 text-slate-600">
-          O processo será conduzido em etapas, com orientação, configuração e
-          acompanhamento para que a tecnologia entre na rotina de forma organizada.
-        </p>
-      </div>
-
-      <div class="relative mt-14">
-        <div
-          class="absolute left-[10%] right-[10%] top-8 hidden border-t-2 border-dashed border-blue-200 lg:block"
-        ></div>
-
-        <div class="relative grid gap-7 sm:grid-cols-2 lg:grid-cols-5">
-          {#each implementationSteps as step}
-            <article class="text-center">
-              <div
-                class="mx-auto flex h-16 w-16 items-center justify-center rounded-full border-4 border-white bg-[#071735] text-white shadow-lg"
-              >
-                <svelte:component this={step.icon} size={25} strokeWidth={1.8} />
-              </div>
-              <div
-                class="mx-auto -mt-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#e96f0b] text-[11px] font-black text-white ring-4 ring-[#f7f8fc]"
-              >
-                {step.label}
-              </div>
-              <h3 class="mt-4 font-extrabold">{step.title}</h3>
-              <p class="mt-2 text-sm leading-6 text-slate-600">{step.description}</p>
+              <h3 class="mt-5 text-lg font-extrabold">{item.title}</h3>
+              <p class="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>
             </article>
           {/each}
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
-    <div
-      class="overflow-hidden rounded-[32px] bg-[#071735] px-6 py-12 text-white sm:px-10 lg:px-14"
-    >
-      <div class="grid items-center gap-10 lg:grid-cols-[1fr_0.78fr]">
-        <div>
-          <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-orange-300">
-            Resultado esperado
-          </p>
-          <h2 class="mt-4 text-3xl font-black tracking-[-0.025em] sm:text-4xl">
-            Uma operação comercial mais previsível, organizada e escalável
+    <section class="border-y border-slate-200 bg-[#f7f8fc]">
+      <div class="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+        <div class="mx-auto max-w-[800px] text-center">
+          <div class="flex items-center justify-center gap-3">
+            <span
+              class="flex h-9 w-9 items-center justify-center rounded-full bg-[#071735] text-sm font-black text-white"
+              >02</span
+            >
+            <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-[#e96f0b]">
+              Ponto de partida
+            </p>
+          </div>
+          <h2 class="mt-5 text-3xl font-black tracking-[-0.03em] sm:text-4xl">
+            Quais desafios essa evolução resolve?
           </h2>
-          <p class="mt-5 max-w-[720px] text-lg leading-8 text-blue-100/80">
-            O objetivo é garantir que nenhuma oportunidade fique para trás, que o
-            conhecimento permaneça na unidade e que cada equipe tenha clareza sobre
-            o que precisa fazer para transformar leads em matrículas.
+          <p class="mt-5 text-lg leading-8 text-slate-600">
+            O objetivo não é apenas adicionar uma nova ferramenta, mas reduzir situações que
+            hoje geram desperdício, descontinuidade e perda de oportunidades.
           </p>
+        </div>
 
-          <div class="mt-8 grid gap-4 sm:grid-cols-3">
-            <div class="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
-              <TrendingUp class="h-6 w-6 text-emerald-400" />
-              <p class="mt-3 text-sm font-bold">Mais conversão</p>
+        <div class="mt-12 grid gap-5 md:grid-cols-2">
+          {#each challenges as item}
+            <article
+              class="group grid gap-5 rounded-[26px] border border-slate-200 bg-white p-6 shadow-[0_18px_46px_-36px_rgba(7,23,53,0.5)] sm:grid-cols-[auto_1fr] sm:p-7"
+            >
+              <div class={`flex h-14 w-14 items-center justify-center rounded-2xl ${item.iconBackground} ${item.accent}`}>
+                <svelte:component this={item.icon} size={27} strokeWidth={1.8} />
+              </div>
+              <div>
+                <p class={`text-xs font-black tracking-[0.18em] ${item.accent}`}>{item.number}</p>
+                <h3 class="mt-2 text-xl font-black">{item.title}</h3>
+                <p class="mt-3 leading-7 text-slate-600">{item.description}</p>
+              </div>
+            </article>
+          {/each}
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-[#071735] text-white">
+      <div class="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+        <div class="mx-auto max-w-[820px] text-center">
+          <div class="flex items-center justify-center gap-3">
+            <span
+              class="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-black text-[#071735]"
+              >03</span
+            >
+            <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-orange-300">
+              Solução integrada
+            </p>
+          </div>
+          <h2 class="mt-5 text-3xl font-black tracking-[-0.03em] sm:text-4xl">
+            O que está sendo implantado?
+          </h2>
+          <p class="mt-5 text-lg leading-8 text-slate-300">
+            Duas frentes conectadas: organização do processo comercial e centralização da
+            comunicação com leads e alunos.
+          </p>
+        </div>
+
+        <div class="mt-12 grid gap-6 lg:grid-cols-2">
+          <article
+            class="overflow-hidden rounded-[30px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur sm:p-8"
+          >
+            <div class="flex items-start justify-between gap-5">
+              <div>
+                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-300">
+                  <Kanban size={28} strokeWidth={1.8} />
+                </div>
+                <p class="mt-6 text-xs font-black uppercase tracking-[0.18em] text-orange-300">
+                  Frente 1
+                </p>
+                <h3 class="mt-2 text-3xl font-black">CRM de Leads</h3>
+              </div>
+              <span class="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-slate-300">
+                Gestão comercial
+              </span>
             </div>
-            <div class="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
-              <Clock3 class="h-6 w-6 text-blue-300" />
-              <p class="mt-3 text-sm font-bold">Mais produtividade</p>
+
+            <p class="mt-5 leading-7 text-slate-300">
+              Estrutura o funil, registra atividades e cria uma visão única das oportunidades
+              comerciais da unidade.
+            </p>
+
+            <ul class="mt-7 space-y-3">
+              {#each crmFeatures as feature}
+                <li class="flex items-start gap-3 text-sm leading-6 text-slate-200">
+                  <CheckCircle2 class="mt-0.5 h-5 w-5 shrink-0 text-orange-300" strokeWidth={2} />
+                  <span>{feature}</span>
+                </li>
+              {/each}
+            </ul>
+
+            <div
+              class="mt-8 flex aspect-[14/9] items-center justify-center rounded-[22px] border border-dashed border-white/20 bg-white/10 p-6 text-center"
+            >
+              <div>
+                <Layers class="mx-auto h-9 w-9 text-slate-400" strokeWidth={1.5} />
+                <p class="mt-3 font-bold text-white">Tela do CRM</p>
+                <p class="mt-1 text-sm text-slate-400">Tamanho recomendado: 1400 × 900 px</p>
+              </div>
             </div>
-            <div class="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
-              <BarChart3 class="h-6 w-6 text-orange-300" />
-              <p class="mt-3 text-sm font-bold">Mais gestão</p>
+          </article>
+
+          <article
+            class="overflow-hidden rounded-[30px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur sm:p-8"
+          >
+            <div class="flex items-start justify-between gap-5">
+              <div>
+                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300">
+                  <MessageCircle size={28} strokeWidth={1.8} />
+                </div>
+                <p class="mt-6 text-xs font-black uppercase tracking-[0.18em] text-emerald-300">
+                  Frente 2
+                </p>
+                <h3 class="mt-2 text-3xl font-black">WhatsApp integrado</h3>
+              </div>
+              <span class="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-slate-300">
+                Comunicação
+              </span>
+            </div>
+
+            <p class="mt-5 leading-7 text-slate-300">
+              Mantém as conversas conectadas ao contexto do atendimento e reduz a dependência
+              de históricos isolados em aparelhos.
+            </p>
+
+            <ul class="mt-7 space-y-3">
+              {#each whatsappFeatures as feature}
+                <li class="flex items-start gap-3 text-sm leading-6 text-slate-200">
+                  <CheckCircle2 class="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" strokeWidth={2} />
+                  <span>{feature}</span>
+                </li>
+              {/each}
+            </ul>
+
+            <div
+              class="mt-8 flex aspect-[4/3] items-center justify-center rounded-[22px] border border-dashed border-white/20 bg-white/10 p-6 text-center"
+            >
+              <div>
+                <MessageCircle class="mx-auto h-9 w-9 text-slate-400" strokeWidth={1.5} />
+                <p class="mt-3 font-bold text-white">Tela do WhatsApp integrado</p>
+                <p class="mt-1 text-sm text-slate-400">Tamanho recomendado: 1200 × 900 px</p>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+      <div class="mx-auto max-w-[820px] text-center">
+        <div class="flex items-center justify-center gap-3">
+          <span
+            class="flex h-9 w-9 items-center justify-center rounded-full bg-[#071735] text-sm font-black text-white"
+            >04</span
+          >
+          <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-[#e96f0b]">
+            Rotina operacional
+          </p>
+        </div>
+        <h2 class="mt-5 text-3xl font-black tracking-[-0.03em] sm:text-4xl">
+          Como isso funciona na prática?
+        </h2>
+        <p class="mt-5 text-lg leading-8 text-slate-600">
+          O sistema acompanha a jornada desde a entrada do lead até a matrícula, mantendo
+          responsáveis, atividades e comunicação em um único fluxo.
+        </p>
+      </div>
+
+      <div class="mt-14 grid gap-4 lg:grid-cols-5">
+        {#each practicalFlow as item, index}
+          <article class="relative rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+            {#if index < practicalFlow.length - 1}
+              <ArrowRight
+                class="absolute -right-5 top-8 z-10 hidden h-6 w-6 text-slate-300 lg:block"
+                strokeWidth={1.8}
+              />
+            {/if}
+            <div class="flex items-center justify-between gap-3">
+              <span
+                class="flex h-10 w-10 items-center justify-center rounded-full bg-[#071735] text-sm font-black text-white"
+              >
+                {item.number}
+              </span>
+              <svelte:component this={item.icon} size={23} class="text-[#e96f0b]" strokeWidth={1.8} />
+            </div>
+            <h3 class="mt-5 text-base font-black leading-6">{item.title}</h3>
+            <p class="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>
+          </article>
+        {/each}
+      </div>
+
+      <div class="mt-10 grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+        <div
+          class="flex aspect-[14/9] items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-slate-100 p-8 text-center"
+        >
+          <div class="text-slate-500">
+            <Workflow class="mx-auto h-11 w-11" strokeWidth={1.5} />
+            <p class="mt-4 font-bold text-slate-700">Fluxo comercial ilustrado</p>
+            <p class="mt-2 text-sm">Tamanho recomendado: 1400 × 900 px</p>
+          </div>
+        </div>
+        <div
+          class="flex aspect-[3/2] items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-slate-100 p-8 text-center lg:aspect-auto"
+        >
+          <div class="text-slate-500">
+            <MessageCircle class="mx-auto h-11 w-11" strokeWidth={1.5} />
+            <p class="mt-4 font-bold text-slate-700">Exemplo de jornada no WhatsApp</p>
+            <p class="mt-2 text-sm">Tamanho recomendado: 1200 × 800 px</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="border-y border-slate-200 bg-[#f7f8fc]">
+      <div class="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+        <div class="grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:items-start">
+          <div>
+            <div class="flex items-center gap-3">
+              <span
+                class="flex h-9 w-9 items-center justify-center rounded-full bg-[#071735] text-sm font-black text-white"
+                >05</span
+              >
+              <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-[#e96f0b]">
+                Impactos esperados
+              </p>
+            </div>
+            <h2 class="mt-5 text-3xl font-black tracking-[-0.03em] sm:text-4xl">
+              O que muda para a unidade?
+            </h2>
+            <p class="mt-5 text-lg leading-8 text-slate-600">
+              A principal mudança está na rotina: menos dependência de controles paralelos e
+              mais clareza sobre o que precisa ser feito em cada oportunidade.
+            </p>
+            <div
+              class="mt-8 rounded-[24px] border border-blue-100 bg-blue-50 p-6 text-sm leading-7 text-blue-900"
+            >
+              <div class="flex items-start gap-3">
+                <Gauge class="mt-0.5 h-5 w-5 shrink-0" strokeWidth={1.9} />
+                <p>
+                  O CRM não substitui o trabalho comercial. Ele organiza o método, registra o
+                  histórico e dá visibilidade para que a equipe atue com mais consistência.
+                </p>
+              </div>
             </div>
           </div>
+
+          <div class="grid gap-4 sm:grid-cols-2">
+            {#each impacts as item}
+              <article
+                class="rounded-[24px] border border-slate-200 bg-white p-6 shadow-[0_16px_44px_-34px_rgba(7,23,53,0.5)]"
+              >
+                <div class={`flex h-12 w-12 items-center justify-center rounded-2xl ${item.tone}`}>
+                  <svelte:component this={item.icon} size={24} strokeWidth={1.9} />
+                </div>
+                <h3 class="mt-5 text-lg font-extrabold">{item.title}</h3>
+                <p class="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>
+              </article>
+            {/each}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+      <div class="mx-auto max-w-[820px] text-center">
+        <div class="flex items-center justify-center gap-3">
+          <span
+            class="flex h-9 w-9 items-center justify-center rounded-full bg-[#071735] text-sm font-black text-white"
+            >06</span
+          >
+          <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-[#e96f0b]">
+            Visão comparativa
+          </p>
+        </div>
+        <h2 class="mt-5 text-3xl font-black tracking-[-0.03em] sm:text-4xl">
+          Antes e depois da implantação
+        </h2>
+        <p class="mt-5 text-lg leading-8 text-slate-600">
+          A mudança central é sair de uma operação dependente de controles individuais para um
+          processo compartilhado, rastreável e orientado por dados.
+        </p>
+      </div>
+
+      <div class="mt-12 grid gap-6 lg:grid-cols-2">
+        <article class="rounded-[30px] border border-orange-200 bg-orange-50/60 p-6 sm:p-8">
+          <div class="flex items-center gap-4">
+            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-orange-600 shadow-sm">
+              <XCircle size={25} strokeWidth={1.9} />
+            </div>
+            <div>
+              <p class="text-xs font-black uppercase tracking-[0.16em] text-orange-600">
+                Cenário anterior
+              </p>
+              <h3 class="mt-1 text-2xl font-black">Antes</h3>
+            </div>
+          </div>
+          <ul class="mt-7 space-y-4">
+            {#each beforeItems as item}
+              <li class="flex items-start gap-3 leading-7 text-slate-700">
+                <CircleDot class="mt-1 h-5 w-5 shrink-0 text-orange-500" strokeWidth={1.9} />
+                <span>{item}</span>
+              </li>
+            {/each}
+          </ul>
+        </article>
+
+        <article class="rounded-[30px] border border-emerald-200 bg-emerald-50/60 p-6 sm:p-8">
+          <div class="flex items-center gap-4">
+            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-emerald-600 shadow-sm">
+              <CheckCircle2 size={25} strokeWidth={1.9} />
+            </div>
+            <div>
+              <p class="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                Novo cenário
+              </p>
+              <h3 class="mt-1 text-2xl font-black">Depois</h3>
+            </div>
+          </div>
+          <ul class="mt-7 space-y-4">
+            {#each afterItems as item}
+              <li class="flex items-start gap-3 leading-7 text-slate-700">
+                <CheckCircle2 class="mt-1 h-5 w-5 shrink-0 text-emerald-600" strokeWidth={1.9} />
+                <span>{item}</span>
+              </li>
+            {/each}
+          </ul>
+        </article>
+      </div>
+
+      <div
+        class="mt-8 flex aspect-[2/1] min-h-[300px] items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-slate-100 p-8 text-center sm:aspect-[14/7]"
+      >
+        <div class="text-slate-500">
+          <Layers class="mx-auto h-11 w-11" strokeWidth={1.5} />
+          <p class="mt-4 font-bold text-slate-700">Comparativo visual / quadro explicativo</p>
+          <p class="mt-2 text-sm">Tamanho recomendado: 1400 × 700 px</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="border-y border-slate-200 bg-[#f7f8fc]">
+      <div class="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+        <div class="mx-auto max-w-[820px] text-center">
+          <div class="flex items-center justify-center gap-3">
+            <span
+              class="flex h-9 w-9 items-center justify-center rounded-full bg-[#071735] text-sm font-black text-white"
+              >07</span
+            >
+            <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-[#e96f0b]">
+              Implantação
+            </p>
+          </div>
+          <h2 class="mt-5 text-3xl font-black tracking-[-0.03em] sm:text-4xl">
+            Etapas previstas para colocar a operação em funcionamento
+          </h2>
+          <p class="mt-5 text-lg leading-8 text-slate-600">
+            A adoção será conduzida em fases para alinhar responsáveis, preparar o ambiente e
+            apoiar as equipes no início da nova rotina.
+          </p>
+        </div>
+
+        <div class="mt-14 grid gap-5 lg:grid-cols-5">
+          {#each implementationSteps as item, index}
+            <article class="relative rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+              {#if index < implementationSteps.length - 1}
+                <ArrowRight
+                  class="absolute -right-5 top-8 z-10 hidden h-6 w-6 text-slate-300 lg:block"
+                  strokeWidth={1.8}
+                />
+              {/if}
+              <div class="flex items-center justify-between gap-3">
+                <span
+                  class="flex h-10 w-10 items-center justify-center rounded-full bg-[#e96f0b] text-sm font-black text-white"
+                >
+                  {item.label}
+                </span>
+                <svelte:component this={item.icon} size={23} class="text-[#071735]" strokeWidth={1.8} />
+              </div>
+              <h3 class="mt-5 text-base font-black leading-6">{item.title}</h3>
+              <p class="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>
+            </article>
+          {/each}
         </div>
 
         <div
-          class="flex aspect-[4/3] items-center justify-center rounded-[24px] border border-white/15 bg-slate-300/20 p-6"
+          class="mt-10 rounded-[26px] border border-blue-100 bg-blue-50 px-6 py-5 text-sm leading-7 text-blue-900 sm:px-8"
         >
-          <div class="text-center text-blue-100/65">
-            <BarChart3 class="mx-auto h-11 w-11" strokeWidth={1.5} />
-            <p class="mt-4 font-bold text-white">
-              Imagem final: indicadores e crescimento da rede
+          <div class="flex items-start gap-3">
+            <ShieldCheck class="mt-0.5 h-5 w-5 shrink-0" strokeWidth={1.9} />
+            <p>
+              Esta página funciona como material de apoio à implantação. Novas imagens, exemplos
+              de tela e orientações operacionais poderão ser incorporados conforme o projeto avançar.
             </p>
-            <p class="mt-2 text-sm">Tamanho recomendado: 1200 × 900 px</p>
           </div>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <footer class="border-t border-slate-200 bg-white">
-    <div
-      class="mx-auto flex max-w-[1180px] flex-col gap-5 px-5 py-8 text-sm text-slate-500 sm:px-8 md:flex-row md:items-center md:justify-between lg:px-10"
-    >
-      <div class="flex items-center gap-4">
-        <img src="/logo_f10.svg" alt="F10 Software" class="h-8 w-auto" />
-        <span class="h-7 w-px bg-slate-200"></span>
-        <span class="font-bold text-[#071735]">Cebrac</span>
+    <section class="mx-auto max-w-[1180px] px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+      <div class="grid gap-10 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
+        <div>
+          <div class="flex items-center gap-3">
+            <span
+              class="flex h-9 w-9 items-center justify-center rounded-full bg-[#071735] text-sm font-black text-white"
+              >08</span
+            >
+            <p class="text-sm font-extrabold uppercase tracking-[0.18em] text-[#e96f0b]">
+              Material complementar
+            </p>
+          </div>
+          <h2 class="mt-5 text-3xl font-black tracking-[-0.03em] sm:text-4xl">
+            Imagens previstas para enriquecer a apresentação
+          </h2>
+          <p class="mt-5 text-lg leading-8 text-slate-600">
+            Os quadros ao lado indicam os materiais visuais mais úteis para demonstrar a solução
+            de forma prática às unidades.
+          </p>
+        </div>
+
+        <div class="grid gap-5 sm:grid-cols-2">
+          {#each visualMaterials as material}
+            <article
+              class="flex min-h-[250px] flex-col items-center justify-center rounded-[26px] border border-dashed border-slate-300 bg-slate-100 p-7 text-center"
+            >
+              <Layers class="h-10 w-10 text-slate-400" strokeWidth={1.5} />
+              <h3 class="mt-4 text-lg font-black text-slate-700">{material.title}</h3>
+              <p class="mt-2 text-sm font-bold text-[#e96f0b]">{material.dimensions}</p>
+              <p class="mt-3 max-w-[280px] text-sm leading-6 text-slate-500">
+                {material.description}
+              </p>
+            </article>
+          {/each}
+        </div>
       </div>
-      <p>Material de apresentação interna para apoio à implantação.</p>
+    </section>
+  </main>
+
+  <footer class="bg-[#071735] text-white">
+    <div
+      class="mx-auto flex max-w-[1180px] flex-col gap-5 px-5 py-8 sm:px-8 md:flex-row md:items-center md:justify-between lg:px-10"
+    >
+      <div class="flex items-center gap-5">
+        <img src="/logo_f10.svg" alt="F10 Software" class="h-8 w-auto brightness-0 invert" />
+        <span class="h-8 w-px bg-white/20"></span>
+        <img
+          src="/cebrac-logo-white.svg"
+          alt="Cebrac"
+          class="h-8 w-auto object-contain"
+        />
+      </div>
+      <p class="text-xs leading-5 text-slate-400 md:text-right">
+        Material interno de apoio à implantação<br />CRM de Leads + WhatsApp integrado
+      </p>
     </div>
   </footer>
 </div>
