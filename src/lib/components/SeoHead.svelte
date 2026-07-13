@@ -41,6 +41,9 @@
     export let twitterDescription: string | undefined = undefined;
     export let twitterImage: string | undefined = undefined;
 
+    export let renderPrimaryMeta = true;
+    export let renderCanonicalLink = true;
+
     export let faqItems: FaqItem[] = [];
     export let breadcrumbItems: BreadcrumbItem[] = [];
     export let organizationData: OrganizationSchemaInput | null = null;
@@ -96,21 +99,26 @@
 </script>
 
 <svelte:head>
-    <title>{title}</title>
+    {#if renderPrimaryMeta}
+        <title>{title}</title>
+        <meta name="description" content={description} />
+        <meta name="author" content={author} />
+        <meta name="language" content={language} />
+        <meta name="application-name" content={ogSiteName} />
+        <meta property="og:title" content={ogTitle ?? title} />
+        <meta property="og:description" content={ogDescription ?? description} />
+    {/if}
 
-    <meta name="description" content={description} />
     <meta name="robots" content={robots} />
     <meta name="googlebot" content={robots} />
-    <meta name="author" content={author} />
-    <meta name="language" content={language} />
-    <meta name="application-name" content={ogSiteName} />
 
-    <link rel="canonical" href={canonical} />
+    {#if renderCanonicalLink}
+        <link rel="canonical" href={canonical} />
+    {/if}
+
     <link rel="alternate" hreflang={language} href={canonical} />
     <link rel="alternate" hreflang="x-default" href={canonical} />
 
-    <meta property="og:title" content={ogTitle ?? title} />
-    <meta property="og:description" content={ogDescription ?? description} />
     <meta property="og:type" content={ogType} />
     <meta property="og:url" content={canonical} />
     <meta property="og:site_name" content={ogSiteName} />
