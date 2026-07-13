@@ -76,7 +76,19 @@ function safeString(value: unknown): string {
 }
 
 function normalizePhone(rawPhone: string): string {
-  return String(rawPhone ?? "").replace(/\D/g, "");
+  const digits = String(rawPhone ?? "").replace(/\D/g, "");
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+    return digits.slice(2);
+  }
+  return digits;
+}
+
+function isValidBrazilPhone(rawPhone: string): boolean {
+  const digits = normalizePhone(rawPhone);
+  if (digits.length !== 10 && digits.length !== 11) return false;
+  if (/^(\d)\1+$/.test(digits)) return false;
+  const areaCode = Number(digits.slice(0, 2));
+  return areaCode >= 11 && areaCode <= 99;
 }
 
 function isValidEmail(email: string): boolean {
@@ -333,7 +345,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
   // Validações
   if (!name) return json({ ok: false, error: "Nome é obrigatório." }, { status: 400 });
-  if (phone.length < 10) return json({ ok: false, error: "WhatsApp com DDD é obrigatório." }, { status: 400 });
+  if (!isValidBrazilPhone(phone)) return json({ ok: false, error: "WhatsApp com DDD é obrigatório." }, { status: 400 });
   if (!email || !isValidEmail(email)) return json({ ok: false, error: "E-mail válido é obrigatório." }, { status: 400 });
   if (!message) return json({ ok: false, error: "Mensagem é obrigatória." }, { status: 400 });
 

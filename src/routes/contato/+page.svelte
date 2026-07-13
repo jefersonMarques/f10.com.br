@@ -48,7 +48,11 @@
   // Helpers
   // =========================
   function normalizePhone(value: string): string {
-    return String(value || "").replace(/\D/g, "");
+    const digits = String(value || "").replace(/\D/g, "");
+    if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+      return digits.slice(2);
+    }
+    return digits;
   }
 
   function isValidEmail(value: string): boolean {

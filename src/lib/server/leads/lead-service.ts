@@ -5,6 +5,7 @@ import {
   EXACT_TOKEN,
   EXACT_FUNNEL_ID,
   F10_FONTE,
+  F10_TIPO_API,
   F10_UID,
   F10_MIDIA,
   F10_TOKEN,
@@ -47,24 +48,6 @@ export type ProcessLeadResult = {
   exactResult: IntegrationResult;
   leadEmailResult?: IntegrationResult;
   alertEmailResult?: IntegrationResult;
-};
-
-type JwtPayload = {
-  exp?: number;
-  iat?: number;
-  [key: string]: unknown;
-};
-
-type JwtStatus = {
-  present: boolean;
-  decodable: boolean;
-  expired: boolean;
-  exp?: number;
-  expIso?: string;
-  iat?: number;
-  iatIso?: string;
-  payload?: JwtPayload | null;
-  reason?: string;
 };
 
 const DEFAULT_SITE_URL = "https://f10.com.br";
@@ -123,7 +106,19 @@ export function safeString(value: unknown): string {
 }
 
 export function normalizePhone(rawPhone: string): string {
-  return String(rawPhone ?? "").replace(/\D/g, "");
+  const digits = String(rawPhone ?? "").replace(/\D/g, "");
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+    return digits.slice(2);
+  }
+  return digits;
+}
+
+export function isValidBrazilPhone(rawPhone: string): boolean {
+  const digits = normalizePhone(rawPhone);
+  if (digits.length !== 10 && digits.length !== 11) return false;
+  if (/^(\d)\1+$/.test(digits)) return false;
+  const areaCode = Number(digits.slice(0, 2));
+  return areaCode >= 11 && areaCode <= 99;
 }
 
 export function isValidEmail(email: string): boolean {
@@ -184,77 +179,6 @@ function formatDateIso(value?: string): string {
   if (Number.isNaN(date.getTime())) return value;
 
   return date.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
-}
-
-// =========================
-// JWT helpers
-// =========================
-
-function decodeJwtPayload(token: string): JwtPayload | null {
-  try {
-    const parts = token.split(".");
-    if (parts.length < 2) return null;
-
-    const payloadPart = parts[1];
-    const normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
-    const json = Buffer.from(padded, "base64").toString("utf-8");
-
-    return JSON.parse(json) as JwtPayload;
-  } catch {
-    return null;
-  }
-}
-
-function inspectJwt(token: string): JwtStatus {
-  const normalizedToken = safeString(token);
-
-  if (!normalizedToken) {
-    return {
-      present: false,
-      decodable: false,
-      expired: false,
-      reason: "missing_token",
-      payload: null,
-    };
-  }
-
-  const payload = decodeJwtPayload(normalizedToken);
-
-  if (!payload) {
-    return {
-      present: true,
-      decodable: false,
-      expired: false,
-      reason: "invalid_jwt_payload",
-      payload: null,
-    };
-  }
-
-  const exp =
-    typeof payload.exp === "number" && Number.isFinite(payload.exp)
-      ? payload.exp
-      : undefined;
-
-  const iat =
-    typeof payload.iat === "number" && Number.isFinite(payload.iat)
-      ? payload.iat
-      : undefined;
-
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  const expired = typeof exp === "number" ? exp <= nowSeconds : false;
-
-  return {
-    present: true,
-    decodable: true,
-    expired,
-    exp,
-    expIso: typeof exp === "number" ? new Date(exp * 1000).toISOString() : undefined,
-    iat,
-    iatIso: typeof iat === "number" ? new Date(iat * 1000).toISOString() : undefined,
-    payload,
-    reason: expired ? "jwt_expired" : undefined,
-  };
 }
 
 // =========================
@@ -465,50 +389,9 @@ function buildLeadRows(lead: BaseLead): Array<[string, string]> {
   ].filter(([, value]) => safeString(value).length > 0) as Array<[string, string]>;
 }
 
-function buildJwtStatusHtml(jwtStatus: JwtStatus): string {
-  const statusLabel = !jwtStatus.present
-    ? "Token ausente"
-    : !jwtStatus.decodable
-      ? "Token inválido"
-      : jwtStatus.expired
-        ? "Token vencido"
-        : "Token válido";
-
-  const rows = [
-    ["Status JWT", statusLabel],
-    ["Expira em", jwtStatus.expIso ? formatDateIso(jwtStatus.expIso) : "—"],
-    ["Emitido em", jwtStatus.iatIso ? formatDateIso(jwtStatus.iatIso) : "—"],
-  ];
-
-  const rowsHtml = rows
-    .map(
-      ([key, value]) => `
-      <tr>
-        <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#0f172a;width:140px;">${escapeHtml(
-          key,
-        )}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;color:#334155;">${escapeHtml(
-          value,
-        )}</td>
-      </tr>
-    `,
-    )
-    .join("");
-
-  return `
-    <div style="margin-top:16px;padding:14px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;">
-      <div style="font-weight:800;color:#0f172a;margin-bottom:8px;">Status do token F10</div>
-      <table style="width:100%;border-collapse:collapse;">
-        ${rowsHtml}
-      </table>
-    </div>
-  `;
-}
-
 function buildLeadReceivedEmailHtml(
   channel: LeadChannel,
   lead: BaseLead,
-  jwtStatus: JwtStatus,
 ): string {
   const meta = getChannelMeta(channel);
   const rowsHtml = buildLeadRows(lead)
@@ -548,8 +431,6 @@ function buildLeadReceivedEmailHtml(
     `
     : "";
 
-  const jwtBlock = buildJwtStatusHtml(jwtStatus);
-
   return `
     <div style="font-family:Arial,Helvetica,sans-serif;background:#f6f8ff;padding:24px;">
       <div style="max-width:760px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
@@ -567,7 +448,6 @@ function buildLeadReceivedEmailHtml(
 
           ${messageBlock}
           ${descriptionBlock}
-          ${jwtBlock}
         </div>
       </div>
     </div>
@@ -589,7 +469,6 @@ function stringifyErrorBody(body: unknown): string {
 function buildLeadFailureEmailHtml(params: {
   channel: LeadChannel;
   lead: BaseLead;
-  jwtStatus: JwtStatus;
   f10Result: IntegrationResult;
   exactResult: IntegrationResult;
 }): string {
@@ -654,8 +533,6 @@ function buildLeadFailureEmailHtml(params: {
             ${rowsHtml}
           </table>
 
-          ${buildJwtStatusHtml(params.jwtStatus)}
-
           <div style="margin-top:16px;padding:14px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;">
             <div style="font-weight:800;color:#0f172a;margin-bottom:8px;">Resumo da falha</div>
             <table style="width:100%;border-collapse:collapse;">
@@ -691,13 +568,12 @@ function buildLeadFailureEmailHtml(params: {
 async function sendLeadReceivedEmail(
   channel: LeadChannel,
   lead: BaseLead,
-  jwtStatus: JwtStatus,
 ): Promise<IntegrationResult> {
   const subject = `[Lead] Novo lead recebido - ${lead.name}`;
 
   return sendEmailBrevo({
     subject,
-    htmlContent: buildLeadReceivedEmailHtml(channel, lead, jwtStatus),
+    htmlContent: buildLeadReceivedEmailHtml(channel, lead),
     replyToEmail: lead.email,
     replyToName: lead.name,
   });
@@ -706,7 +582,6 @@ async function sendLeadReceivedEmail(
 async function sendLeadFailureAlertEmail(params: {
   channel: LeadChannel;
   lead: BaseLead;
-  jwtStatus: JwtStatus;
   f10Result: IntegrationResult;
   exactResult: IntegrationResult;
 }): Promise<IntegrationResult> {
@@ -727,11 +602,11 @@ async function sendLeadFailureAlertEmail(params: {
 async function sendLeadToF10(
   channel: LeadChannel,
   lead: BaseLead,
-  jwtStatus: JwtStatus,
 ): Promise<IntegrationResult> {
   const token = safeString(F10_TOKEN);
   const url = safeString(F10_URL);
-  const unitId = parseInt(F10_UID);
+  const tipoApi = safeString(F10_TIPO_API);
+  const unitId = safeString(F10_UID);
   const meta = getChannelMeta(channel);
 
   if (!token) {
@@ -764,28 +639,14 @@ async function sendLeadToF10(
     };
   }
 
-  if (!jwtStatus.present || !jwtStatus.decodable) {
-    console.warn("[lead-service] JWT do F10 ausente ou inválido. Pulando F10.");
+  if (!tipoApi) {
+    console.warn("[lead-service] F10_TIPO_API não definido. Pulando F10.");
     return {
       ok: false,
       skipped: true,
-      error: jwtStatus.reason || "invalid_f10_jwt",
+      error: "missing_f10_tipo_api",
       body: {
-        msg: "JWT do F10 ausente ou inválido.",
-        jwtStatus,
-      },
-    };
-  }
-
-  if (jwtStatus.expired) {
-    console.warn("[lead-service] JWT do F10 vencido. Pulando F10.");
-    return {
-      ok: false,
-      skipped: true,
-      error: "jwt_expired",
-      body: {
-        msg: "JWT do F10 vencido.",
-        jwtStatus,
+        msg: "F10_TIPO_API não definido.",
       },
     };
   }
@@ -793,65 +654,43 @@ async function sendLeadToF10(
   const normalizedPhone = normalizePhone(lead.phone);
   const note = buildLeadDescription(channel, lead);
 
-  const f10Body = [
-    {
-      unidade_id: unitId,
-      fontes: [
-        {
-          fonte: safeString(F10_FONTE) || "Site",
-          midia:
-            safeString(F10_MIDIA) ||
-            safeString(lead.subSource) ||
-            meta.defaultF10Media,
-          digitacoes: [
-            {
-              nome: lead.name,
-              curso: safeString(lead.product),
-              telefone: normalizedPhone,
-              celular: normalizedPhone,
-              comercial: "",
-              email: safeString(lead.email),
-              nascimento: "",
-              sexo: "",
-              endereco: "",
-              bairro: "",
-              cidade: "",
-              estado: "",
-              cep: "",
-              colegio: safeString(lead.schoolName),
-              turma: "",
-              serie: "",
-              anoletivo: "",
-              turno: "",
-              pai: "",
-              mae: "",
-              obs: note,
-              extra1: safeString(lead.page),
-              extra2: safeString(lead.source),
-            },
-          ],
-        },
-      ],
-    },
-  ];
-
-  debugLog("F10 token payload", jwtStatus.payload);
+  const parsedTipoApi = Number(tipoApi);
+  const f10Body = {
+    token,
+    tipo_api: Number.isFinite(parsedTipoApi) ? parsedTipoApi : tipoApi,
+    unidade_id: unitId,
+    fonte: safeString(F10_FONTE) || "Site",
+    midia:
+      safeString(F10_MIDIA) ||
+      safeString(lead.subSource) ||
+      meta.defaultF10Media,
+    nome: lead.name,
+    curso: safeString(lead.product),
+    telefone: normalizedPhone,
+    celular: normalizedPhone,
+    email: safeString(lead.email),
+    colegio: safeString(lead.schoolName),
+    obs: note,
+    extra1: safeString(lead.page),
+    extra2: safeString(lead.source),
+  };
 
   debugLog("F10 request", {
     channel,
     url,
     headers: {
-      "content-type": "application/json",
-      Authorization: `Bearer ${maskToken(token)}`,
+      "Content-Type": "application/json",
     },
-    body: f10Body,
+    body: {
+      ...f10Body,
+      token: maskToken(token),
+    },
   });
 
   const response = await fetch(url, {
     method: "POST",
     headers: {
-      "content-type": "application/json",
-      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
     body: JSON.stringify(f10Body),
   });
@@ -972,18 +811,6 @@ export async function processLead(
     debugEnabled: isDebugEnabled(),
   });
 
-  const jwtStatus = inspectJwt(F10_TOKEN);
-
-  debugLog("F10 JWT status", {
-    present: jwtStatus.present,
-    decodable: jwtStatus.decodable,
-    expired: jwtStatus.expired,
-    expIso: jwtStatus.expIso,
-    iatIso: jwtStatus.iatIso,
-    reason: jwtStatus.reason,
-    payload: jwtStatus.payload,
-  });
-
   try {
     await saveLeadBackup(channel, lead);
   } catch (error) {
@@ -993,7 +820,7 @@ export async function processLead(
 
   let leadEmailResult: IntegrationResult = { ok: false, skipped: true };
   try {
-    leadEmailResult = await sendLeadReceivedEmail(channel, lead, jwtStatus);
+    leadEmailResult = await sendLeadReceivedEmail(channel, lead);
   } catch (error) {
     console.error("[lead-service] Erro inesperado ao enviar e-mail de lead:", error);
     debugError("Erro inesperado no e-mail de lead", error);
@@ -1002,7 +829,7 @@ export async function processLead(
 
   let f10Result: IntegrationResult = { ok: false, skipped: true };
   try {
-    f10Result = await sendLeadToF10(channel, lead, jwtStatus);
+    f10Result = await sendLeadToF10(channel, lead);
   } catch (error) {
     console.error("[lead-service] Erro inesperado ao enviar para F10:", error);
     debugError("Erro inesperado no envio para F10", error);
@@ -1029,7 +856,6 @@ export async function processLead(
       alertEmailResult = await sendLeadFailureAlertEmail({
         channel,
         lead,
-        jwtStatus,
         f10Result,
         exactResult,
       });

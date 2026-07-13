@@ -330,7 +330,11 @@
   }
 
   function normalizePhone(rawPhone: string): string {
-    return (rawPhone ?? "").replace(/\D/g, "");
+    const digits = (rawPhone ?? "").replace(/\D/g, "");
+    if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+      return digits.slice(2);
+    }
+    return digits;
   }
 
   function formatPhone(value: string): string {

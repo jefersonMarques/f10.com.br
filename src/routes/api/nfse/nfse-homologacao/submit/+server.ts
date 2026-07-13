@@ -183,6 +183,22 @@ function onlyDigits(value: unknown): string {
   return (typeof value === "string" ? value : value == null ? "" : String(value)).replace(/\D+/g, "");
 }
 
+function normalizeBrazilPhoneDigits(value: unknown): string {
+  const digits = onlyDigits(value);
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+    return digits.slice(2);
+  }
+  return digits;
+}
+
+function isBrazilPhoneValid(value: unknown): boolean {
+  const digits = normalizeBrazilPhoneDigits(value);
+  if (digits.length !== 10 && digits.length !== 11) return false;
+  if (/^(\d)\1+$/.test(digits)) return false;
+  const areaCode = Number(digits.slice(0, 2));
+  return areaCode >= 11 && areaCode <= 99;
+}
+
 function safeValue(value: unknown): string {
   const str = typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
   return str ? str : "-";
@@ -716,6 +732,15 @@ export const POST: RequestHandler = async ({ request, url }) => {
   } catch {
     return json({ success: false, message: "Payload inválido (JSON malformado)." }, { status: 400 });
   }
+
+  if (!isAvailabilityNotification(payload) && !isBrazilPhoneValid(payload.phone)) {
+    return json({ success: false, message: "Telefone inválido. Informe DDD + número, sem DDI." }, { status: 400 });
+  }
+
+  payload = {
+    ...payload,
+    phone: normalizeBrazilPhoneDigits(payload.phone),
+  };
 
   const isNotifyOnly = isAvailabilityNotification(payload);
   const activeDocs = isNotifyOnly ? [] : DOCS;

@@ -59,6 +59,22 @@
     return value.replace(/\D+/g, "");
   }
 
+  function normalizeBrazilPhoneDigits(value: string): string {
+    const digits = onlyDigits(value);
+    if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+      return digits.slice(2);
+    }
+    return digits;
+  }
+
+  function isBrazilPhoneValid(value: string): boolean {
+    const digits = normalizeBrazilPhoneDigits(value);
+    if (digits.length !== 10 && digits.length !== 11) return false;
+    if (/^(\d)\1+$/.test(digits)) return false;
+    const areaCode = Number(digits.slice(0, 2));
+    return areaCode >= 11 && areaCode <= 99;
+  }
+
   function normalizePercent(value: string): string {
     return value.replaceAll(" ", "").replaceAll("%", "").replaceAll(",", ".");
   }
@@ -236,7 +252,8 @@
       cityCheckRaw: cityCheckResult?.raw ?? null,
       cnpjDigits: onlyDigits(data.cnpj),
       cepDigits: onlyDigits(data.cep),
-      phoneDigits: onlyDigits(data.phone),
+      phone: normalizeBrazilPhoneDigits(data.phone),
+      phoneDigits: normalizeBrazilPhoneDigits(data.phone),
       hasServiceNote,
       hasCommerceNote,
       operationNature: data.taxationPlace,
@@ -558,8 +575,8 @@
         next.municipalRegistration = "Informe a Inscrição Municipal.";
       }
 
-      if (!data.phone?.trim()) {
-        next.phone = "Telefone é obrigatório.";
+      if (!isBrazilPhoneValid(data.phone)) {
+        next.phone = "Telefone inválido.";
       }
 
       if (!data.email?.trim()) {
