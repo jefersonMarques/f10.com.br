@@ -206,14 +206,30 @@ body::after {
   height: 520px;
 }
 
-.presentation-page #problemas .grid.grid-cols-2 > div:last-child > span {
-  display: inline-block;
+.presentation-page #problemas .mt-14 > .grid.grid-cols-2.border-t > div {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.presentation-page #problemas .mt-14 > .grid.grid-cols-2.border-t > div:first-child::before {
+  content: "";
+  flex: 0 0 20px;
   width: 20px;
   height: 20px;
-  margin-right: 8px;
+  margin-top: 2px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%232B4091' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 8v4'/%3E%3Cpath d='M12 16h.01'/%3E%3C/svg%3E") center / contain no-repeat;
+  opacity: 0.48;
+}
+
+.presentation-page #problemas .mt-14 > .grid.grid-cols-2.border-t > div:last-child > span {
+  display: block;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2361CE70' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 11.08V12a10 10 0 1 1-5.93-9.14'/%3E%3Cpath d='m9 11 3 3L22 4'/%3E%3C/svg%3E") center / contain no-repeat;
   font-size: 0;
-  vertical-align: -4px;
 }
 
 .presentation-page #crm .media-frame-light {
@@ -321,18 +337,53 @@ body::after {
 
   .presentation-page .hero-copy > div:first-child {
     display: flex;
-    width: min(100%, 340px);
-    margin-inline: auto;
+    width: 100%;
+    max-width: none;
+    margin-inline: 0;
   }
 
   .presentation-page .hero-copy > div:first-child > div:first-child {
-    flex: 0 0 44%;
+    flex: 0 0 40%;
     min-width: 0;
   }
 
   .presentation-page .hero-copy > div:first-child > div:last-child {
-    flex: 1 1 56%;
+    flex: 1 1 60%;
     min-width: 0;
+  }
+
+  .presentation-page .hero-copy > div:first-child > div:last-child::before {
+    width: 118px;
+    height: 36px;
+  }
+
+  .presentation-page #problemas .mt-14 > .grid.grid-cols-2.border-t > div {
+    gap: 6px;
+    padding-inline: 1rem;
+  }
+
+  .presentation-page #problemas .mt-14 > .grid.grid-cols-2.border-t > div:first-child::before,
+  .presentation-page #problemas .mt-14 > .grid.grid-cols-2.border-t > div:last-child > span {
+    flex-basis: 18px;
+    width: 18px;
+    height: 18px;
+  }
+
+  .presentation-page #implantacao .mt-18 {
+    gap: 1.25rem;
+  }
+
+  .presentation-page #implantacao .mt-18 > div:last-child {
+    display: flex;
+    width: 100%;
+    min-height: 58px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 18px;
+    padding: 0.9rem 1rem;
+    text-align: center;
+    line-height: 1.35;
+    text-wrap: balance;
   }
 }
 
