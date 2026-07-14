@@ -274,44 +274,30 @@ body::after {
   animation: cebrac-fade-up 0.9s 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@supports (animation-timeline: view()) {
-  .presentation-page :is(
-    #resumo .section-label,
-    #resumo .section-title,
-    #resumo ol > li,
-    #crm .section-label,
-    #crm h2,
-    #crm .journey-step,
-    #crm .media-frame,
-    #whatsapp .whatsapp-heading > div,
-    #whatsapp .whatsapp-side-inner,
-    #whatsapp .whatsapp-bridge,
-    #problemas .section-label,
-    #problemas .section-title,
-    #problemas .relative > p,
-    #problemas .relative > .mt-14,
-    #gestao .section-label,
-    #gestao .section-title,
-    #gestao .metric-line,
-    #gestao .responsibility-column,
-    #implantacao .section-label,
-    #implantacao h2,
-    #implantacao .implementation-step,
-    #implantacao .mt-18,
-    footer > div
-  ) {
-    animation: cebrac-fade-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
-    animation-timeline: view();
-    animation-range: entry 5% cover 28%;
-  }
+.presentation-page[data-reveal-ready="true"] .cebrac-reveal {
+  opacity: 0;
+  transform: translate3d(0, 34px, 0);
+  transition:
+    opacity 0.72s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.72s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--cebrac-reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.presentation-page[data-reveal-ready="true"] .cebrac-reveal.is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .presentation-page .hero-copy > *,
-  .presentation-page .hero-visual,
-  .presentation-page section *,
-  .presentation-page footer * {
+  .presentation-page .hero-visual {
     animation: none !important;
+  }
+
+  .presentation-page[data-reveal-ready="true"] .cebrac-reveal {
+    opacity: 1 !important;
     transform: none !important;
+    transition: none !important;
   }
 }
