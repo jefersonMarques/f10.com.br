@@ -438,7 +438,7 @@
         <div class="media-frame media-frame-light aspect-[16/11]">
           <div class="media-toolbar">
             <span></span><span></span><span></span>
-            <small>Captura da visão Kanban</small>
+            <small>Visão Kanban</small>
           </div>
           <div class="media-canvas">
             <Funnel size={42} strokeWidth={1.4} />

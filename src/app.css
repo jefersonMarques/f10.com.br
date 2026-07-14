@@ -219,11 +219,11 @@ body::after {
 .presentation-page #crm .media-canvas::before {
   content: "";
   position: absolute;
-  inset: 16px;
+  inset: 4px;
   background-image: url("/f10_kanban.png");
   background-position: center;
   background-repeat: no-repeat;
-  background-size: contain;
+  background-size: cover;
 }
 
 .presentation-page #crm .media-canvas > * {
