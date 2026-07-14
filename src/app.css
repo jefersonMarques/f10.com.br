@@ -160,6 +160,7 @@ body::after {
 
 .presentation-page .hero-section .hero-orbit {
   border-width: 42px;
+  border-color: rgba(43, 64, 145, 0.10);
 }
 
 .presentation-page .hero-section .hero-orbit-left {
@@ -174,6 +175,7 @@ body::after {
   bottom: -60px;
   width: 600px;
   height: 600px;
+  border-color: rgba(43, 64, 145, 0.08);
 }
 
 .presentation-page #crm .crm-sun {
@@ -182,10 +184,12 @@ body::after {
   width: 520px;
   height: 520px;
   border-width: 72px;
+  border-color: rgba(20, 31, 78, 0.38);
 }
 
 .presentation-page #problemas .comparison-ring {
   border-width: 52px;
+  border-color: rgba(178, 135, 18, 0.22);
 }
 
 .presentation-page #problemas .comparison-ring-one {
@@ -200,4 +204,36 @@ body::after {
   bottom: -100px;
   width: 520px;
   height: 520px;
+}
+
+.presentation-page #crm .media-frame-light {
+  background: #fff;
+}
+
+.presentation-page #crm .media-canvas {
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+}
+
+.presentation-page #crm .media-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 16px;
+  background-image: url("/f10_kanban.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.presentation-page #crm .media-canvas > * {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
