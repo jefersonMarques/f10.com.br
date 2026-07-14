@@ -11,7 +11,6 @@
     Funnel,
     MessageCircleMore,
     MessagesSquare,
-    Phone,
     ShieldCheck,
     Target,
     TimerReset,
@@ -33,20 +32,6 @@
     title: string;
     description: string;
     icon: IconComponent;
-  };
-
-  type KanbanCard = {
-    name: string;
-    source: string;
-    status: string;
-    time: string;
-  };
-
-  type KanbanColumn = {
-    title: string;
-    total: number;
-    color: string;
-    cards: KanbanCard[];
   };
 
   const heroFeatures: FeatureItem[] = [
@@ -167,68 +152,6 @@
     },
   ];
 
-  const kanbanColumns: KanbanColumn[] = [
-    {
-      title: "Novos cadastros",
-      total: 18,
-      color: "#ff7900",
-      cards: [
-        { name: "Francieli", source: "Faixa de Rua", status: "Novo lead", time: "11:04" },
-        { name: "Sheila Monteiro", source: "Landing page", status: "WhatsApp", time: "13:04" },
-        { name: "Massao", source: "Facebook", status: "Novo", time: "14:18" },
-      ],
-    },
-    {
-      title: "Sem resposta",
-      total: 6,
-      color: "#f7b500",
-      cards: [
-        { name: "Flaviana", source: "Faixa de Rua", status: "Retomar contato", time: "Hoje" },
-        { name: "Andrieli", source: "WhatsApp", status: "Sem resposta", time: "12:26" },
-        { name: "Leani Lima", source: "Indicação", status: "Ligação", time: "16:40" },
-      ],
-    },
-    {
-      title: "Interessado",
-      total: 3,
-      color: "#25a95b",
-      cards: [
-        { name: "Maria Luiza", source: "Relacionamento", status: "WhatsApp", time: "15:36" },
-        { name: "Asd", source: "Facebook", status: "Ligação", time: "16:18" },
-        { name: "Borges", source: "Faixa de Rua", status: "Retorno", time: "18:12" },
-      ],
-    },
-    {
-      title: "Visitas",
-      total: 9,
-      color: "#0b78e3",
-      cards: [
-        { name: "Beatriz Nagem", source: "Curso: ADM", status: "Visita confirmada", time: "16:29" },
-        { name: "Maria das Graças", source: "Curso: ADM", status: "Agendado", time: "15:25" },
-        { name: "Renata Santos", source: "Indicação", status: "Visita", time: "Amanhã" },
-      ],
-    },
-    {
-      title: "Contratos",
-      total: 4,
-      color: "#17a85b",
-      cards: [
-        { name: "Beatriz Pereira", source: "Curso: ADM", status: "Contrato", time: "16:58" },
-        { name: "Carlos Henrique", source: "Curso: Inglês", status: "Documentos", time: "17:20" },
-      ],
-    },
-  ];
-
-  const chatMessages = [
-    { text: "Olá! Gostaria de saber mais sobre o curso de Administração.", sent: true },
-    { text: "Olá, Ana! Claro, vou te passar todas as informações.", sent: false },
-    { text: "O curso tem duração de 2 anos e oferece estágio supervisionado.", sent: false },
-    { text: "Posso te enviar a grade completa e os valores?", sent: false },
-    { text: "Sim, por favor!", sent: true },
-    { text: "Pronto! Segue o material em anexo.", sent: false },
-    { text: "Perfeito! Vou analisar e retorno em breve.", sent: true },
-  ];
-
   const implementationSteps = [
     {
       number: "01",
@@ -265,25 +188,23 @@
     content="Apresentação institucional do CRM de Leads e WhatsApp integrado para a rede Cebrac."
   />
   <meta name="robots" content="noindex,nofollow,noarchive,nosnippet" />
+  <link rel="preload" as="image" href="/background-hero-cebrac.png" />
+  <link rel="preload" as="image" href="/hero-cebrac.webp" type="image/webp" />
 </svelte:head>
 
 <div class="presentation-page overflow-hidden bg-white text-[#06173e]">
   <section id="inicio" class="relative isolate min-h-[100svh] overflow-hidden bg-white">
-    <div class="pointer-events-none absolute inset-0 -z-10">
-      <div class="absolute -right-[18%] -top-[34%] h-[78rem] w-[78rem] rounded-full bg-[#edf3ff]"></div>
-      <div class="absolute right-[4%] top-[7%] h-[43rem] w-[43rem] rounded-full border-[92px] border-[#dce7ff]/70"></div>
-      <div class="absolute -bottom-16 -left-24 h-56 w-56 rounded-full border border-[#d9e5fb]"></div>
-      <div class="absolute -bottom-24 -left-16 h-56 w-56 rounded-full border border-[#d9e5fb]"></div>
-      <div class="absolute left-[36%] top-12 grid grid-cols-5 gap-3 opacity-70">
-        {#each Array(25) as _}
-          <span class="h-1.5 w-1.5 rounded-full bg-[#a8bee8]"></span>
-        {/each}
-      </div>
-    </div>
+    <img
+      src="/background-hero-cebrac.png"
+      alt=""
+      aria-hidden="true"
+      class="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover object-center"
+      fetchpriority="high"
+    />
 
-    <div class="mx-auto grid min-h-[100svh] w-full max-w-[1660px] items-center gap-10 px-5 py-14 sm:px-8 lg:grid-cols-[0.82fr_1.18fr] lg:px-10 lg:py-10 xl:px-14">
+    <div class="mx-auto grid min-h-[100svh] w-full max-w-[1660px] items-center gap-8 px-5 py-12 sm:px-8 lg:grid-cols-[0.82fr_1.18fr] lg:px-10 lg:py-8 xl:px-14">
       <div class="relative z-20 max-w-[690px] lg:py-12">
-        <div class="inline-flex items-center rounded-xl border border-[#ffd3b3] bg-white/75 px-5 py-2.5 text-base font-extrabold tracking-[0.02em] text-[#ff7900] shadow-sm backdrop-blur">
+        <div class="inline-flex items-center rounded-xl border border-[#ffd3b3] bg-white/80 px-5 py-2.5 text-base font-extrabold tracking-[0.02em] text-[#ff7900] shadow-sm backdrop-blur">
           F10 CRM
         </div>
 
@@ -316,133 +237,13 @@
         </div>
       </div>
 
-      <div class="relative z-10 -mx-3 mt-2 min-h-[540px] self-end sm:-mx-5 sm:min-h-[650px] lg:-ml-20 lg:-mr-24 lg:mt-0 lg:min-h-[780px] xl:-ml-24 xl:-mr-28">
-        <div class="absolute inset-x-[4%] top-[3%] h-[78%] rounded-[48%] bg-gradient-to-br from-[#f8fbff] via-[#e7efff] to-[#d8e5ff]"></div>
-        <div class="absolute right-[4%] top-[12%] h-[68%] w-[68%] rounded-full bg-white/35"></div>
-
-        <div class="absolute left-[1%] right-[6%] top-[13%]">
-          <div class="relative rounded-[28px] border-[10px] border-[#101217] bg-[#101217] p-1 shadow-[0_34px_80px_rgba(11,28,68,0.28)] sm:border-[13px] lg:rounded-[34px]">
-            <div class="overflow-hidden rounded-[16px] bg-[#f7f9fb] lg:rounded-[20px]">
-              <div class="flex h-10 items-center border-b border-slate-200 bg-white px-3 sm:h-12 sm:px-4">
-                <div class="flex items-center gap-2">
-                  <div class="flex h-6 w-6 items-center justify-center rounded-md bg-[#07173e] text-[9px] font-extrabold text-[#ff7900] sm:h-7 sm:w-7 sm:text-[10px]">
-                    F10
-                  </div>
-                  <span class="text-[8px] font-extrabold text-[#0a2c67] sm:text-[10px]">Minha Escola</span>
-                </div>
-                <div class="ml-auto flex items-center gap-2">
-                  <span class="h-2 w-2 rounded-full bg-slate-300"></span>
-                  <span class="h-2 w-2 rounded-full bg-slate-300"></span>
-                  <span class="h-2 w-2 rounded-full bg-[#ff5a4f]"></span>
-                </div>
-              </div>
-
-              <div class="flex min-h-[310px] sm:min-h-[390px] lg:min-h-[500px]">
-                <aside class="hidden w-10 shrink-0 flex-col items-center gap-4 bg-[#07173e] py-4 text-white/75 sm:flex lg:w-12">
-                  <span class="h-2.5 w-2.5 rounded-full bg-[#ff7900]"></span>
-                  <span class="h-4 w-4 rounded border border-white/35"></span>
-                  <span class="h-4 w-4 rounded border border-white/35"></span>
-                  <span class="h-4 w-4 rounded border border-white/35"></span>
-                  <span class="h-4 w-4 rounded border border-white/35"></span>
-                </aside>
-
-                <div class="min-w-0 flex-1 p-2 sm:p-3 lg:p-4">
-                  <div class="mb-2 flex items-center gap-2 sm:mb-3">
-                    <div class="rounded-md bg-emerald-50 px-2 py-1 text-[7px] font-extrabold text-emerald-700 sm:text-[9px]">
-                      Funil: Prospecção Ativa
-                    </div>
-                    <div class="flex gap-1">
-                      <span class="h-3 w-3 rounded-full bg-red-500 sm:h-4 sm:w-4"></span>
-                      <span class="h-3 w-3 rounded-full bg-amber-400 sm:h-4 sm:w-4"></span>
-                      <span class="h-3 w-3 rounded-full bg-blue-500 sm:h-4 sm:w-4"></span>
-                    </div>
-                    <div class="ml-auto h-5 w-[28%] rounded-full border border-slate-200 bg-white sm:h-6"></div>
-                  </div>
-
-                  <div class="grid grid-cols-5 gap-1 sm:gap-2">
-                    {#each kanbanColumns as column}
-                      <div class="min-w-0 rounded-lg bg-[#eef1f3] p-1 sm:rounded-xl sm:p-1.5">
-                        <div class="mb-1.5 flex items-center justify-between gap-1 px-0.5">
-                          <span class="truncate text-[5px] font-extrabold text-[#263650] sm:text-[7px] lg:text-[9px]">
-                            {column.title}
-                          </span>
-                          <span class="text-[5px] font-bold text-slate-500 sm:text-[7px]">{column.total}</span>
-                        </div>
-
-                        <div class="space-y-1 sm:space-y-1.5">
-                          {#each column.cards as card}
-                            <article
-                              class="rounded-md border-l-2 bg-white p-1 shadow-sm sm:rounded-lg sm:p-1.5 lg:p-2"
-                              style:border-left-color={column.color}
-                            >
-                              <p class="truncate text-[5px] font-extrabold text-[#1f2937] sm:text-[7px] lg:text-[8px]">
-                                {card.name}
-                              </p>
-                              <p class="mt-0.5 truncate text-[4px] text-slate-500 sm:text-[6px] lg:text-[7px]">
-                                {card.source}
-                              </p>
-                              <p class="mt-1 truncate text-[4px] font-semibold text-emerald-700 sm:text-[6px]">
-                                {card.status}
-                              </p>
-                              <p class="mt-0.5 text-[4px] text-slate-400 sm:text-[5px]">{card.time}</p>
-                            </article>
-                          {/each}
-                        </div>
-                      </div>
-                    {/each}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <span class="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-[#31343a] sm:h-2 sm:w-2"></span>
-          </div>
-
-          <div class="relative mx-auto h-7 w-[108%] -translate-x-[4%] rounded-b-[55%] bg-gradient-to-b from-[#d9dde2] to-[#9aa2ad] shadow-[0_15px_25px_rgba(14,30,60,0.2)] sm:h-10">
-            <div class="absolute left-1/2 top-0 h-2 w-[18%] -translate-x-1/2 rounded-b-xl bg-[#aeb5bf] sm:h-3"></div>
-          </div>
-        </div>
-
-        <div class="absolute bottom-[4%] right-[1%] w-[31%] min-w-[160px] max-w-[265px] rotate-[1deg] rounded-[30px] border-[8px] border-[#111318] bg-[#111318] p-1 shadow-[0_28px_55px_rgba(8,25,61,0.35)] sm:bottom-[3%] sm:border-[10px] lg:rounded-[38px]">
-          <div class="overflow-hidden rounded-[22px] bg-[#efeae2] lg:rounded-[28px]">
-            <div class="flex h-9 items-center bg-[#1f2c34] px-2 text-white sm:h-11 sm:px-3">
-              <div class="flex h-5 w-5 items-center justify-center rounded-full bg-white text-[7px] font-extrabold text-[#0a2c67] sm:h-6 sm:w-6">
-                F10
-              </div>
-              <div class="ml-2">
-                <p class="text-[7px] font-bold sm:text-[9px]">F10 Escola</p>
-                <p class="text-[5px] text-white/60 sm:text-[6px]">online</p>
-              </div>
-              <span class="ml-auto text-[12px] text-white/70">•••</span>
-            </div>
-
-            <div class="space-y-1.5 px-2 py-2 sm:px-3 sm:py-3">
-              {#each chatMessages as message}
-                <div class:ml-auto={message.sent} class="max-w-[88%]">
-                  <p
-                    class={`rounded-lg px-2 py-1.5 text-[6px] leading-[1.35] shadow-sm sm:text-[8px] ${
-                      message.sent ? "bg-[#d9fdd3]" : "bg-white"
-                    }`}
-                  >
-                    {message.text}
-                  </p>
-                </div>
-              {/each}
-            </div>
-
-            <div class="m-2 flex h-7 items-center rounded-full bg-white px-2 text-[6px] text-slate-400 sm:h-8 sm:text-[7px]">
-              Mensagem
-              <span class="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-[#16a05d] text-white">●</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="absolute bottom-[5%] right-[27%] flex h-16 w-16 items-center justify-center rounded-[18px] border border-slate-200 bg-white shadow-[0_16px_35px_rgba(8,36,75,0.18)] sm:h-20 sm:w-20 sm:rounded-[22px]">
-          <span class="flex h-11 w-11 items-center justify-center rounded-full bg-[#18a45f] text-white sm:h-14 sm:w-14">
-            <Phone size={27} fill="currentColor" strokeWidth={1.5} class="sm:hidden" />
-            <Phone size={34} fill="currentColor" strokeWidth={1.5} class="hidden sm:block" />
-          </span>
-        </div>
+      <div class="relative z-10 flex min-h-[420px] items-center justify-center lg:min-h-[760px] lg:justify-end">
+        <img
+          src="/hero-cebrac.webp"
+          alt="CRM F10 exibido em um computador com atendimento integrado pelo WhatsApp em um smartphone"
+          class="h-auto w-full max-w-[980px] object-contain drop-shadow-[0_32px_42px_rgba(14,37,83,0.18)]"
+          fetchpriority="high"
+        />
       </div>
     </div>
   </section>
