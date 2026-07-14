@@ -289,6 +289,32 @@ body::after {
   transform: translate3d(0, 0, 0);
 }
 
+.presentation-page .hero-copy > div:first-child > div:last-child {
+  min-width: 140px;
+  justify-content: center;
+  font-size: 0;
+  letter-spacing: 0;
+}
+
+.presentation-page .hero-copy > div:first-child > div:last-child::before {
+  content: "";
+  display: block;
+  width: 104px;
+  height: 34px;
+  background: url("/logo_f10.svg") center / contain no-repeat;
+}
+
+@media (min-width: 640px) {
+  .presentation-page .hero-copy > div:first-child > div:last-child {
+    min-width: 174px;
+  }
+
+  .presentation-page .hero-copy > div:first-child > div:last-child::before {
+    width: 116px;
+    height: 38px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .presentation-page .hero-copy > *,
   .presentation-page .hero-visual {
