@@ -1,61 +1,45 @@
-/* ========================================================================
-   Tailwind setup
-   ======================================================================== */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 @import "@fontsource/plus-jakarta-sans/400.css";
 @import "@fontsource/plus-jakarta-sans/600.css";
 @import "@fontsource/plus-jakarta-sans/700.css";
-
 @import "@fontsource/manrope/600.css";
 @import "@fontsource/manrope/700.css";
 
-
-/* ========================================================================
-   Design tokens (cores, intensidades, etc.)
-   ======================================================================== */
 :root {
-  /* Opacidades e tamanhos do background */
-  --noise-opacity: 0.25;   /* 0.15–0.35 fica bom */
-  --noise-size: 256px;     /* 128–512px são bons valores */
-  --tint-opacity: 0.18;    /* intensidade da “tinta” #E9EAF3 sobre o noise */
-
-  /* Brand tokens (mantém compat com código existente) */
-  --brand: #EA6D0B;  /* primary/detalhes */
-  --text:  #000A57;  /* texto principal */
-  --dark:  #010D28;  /* azul escuro */
-  --card:  #F0F0F0;  /* card flutuante */
+  --noise-opacity: 0.25;
+  --noise-size: 256px;
+  --tint-opacity: 0.18;
+  --brand: #EA6D0B;
+  --text: #000A57;
+  --dark: #010D28;
+  --card: #F0F0F0;
   --text-soft: #878C91;
 }
 
-/* ========================================================================
-   Fundo global: noise + tinta por cima (atrás do conteúdo)
-   ======================================================================== */
-/* Noise no fundo (camada mais baixa) */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: -2; /* atrás da tinta e do conteúdo */
+  z-index: -2;
   background-image: url("/noise.svg");
   background-repeat: repeat;
   background-size: var(--noise-size) var(--noise-size);
   opacity: 0.8;
-  pointer-events: none; /* não bloqueia cliques/scroll */
+  pointer-events: none;
 }
 
-/* Tinta #E9EAF3 por cima do noise (sutil) */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: -1; /* acima do noise, abaixo do conteúdo */
-  background-color: rgba(233, 234, 243, var(--tint-opacity)); /* #E9EAF3 com alpha */
+  z-index: -1;
+  background-color: rgba(233, 234, 243, var(--tint-opacity));
   pointer-events: none;
 }
 
-.text-soft{
+.text-soft {
   color: var(--text-soft);
   font-weight: 400;
   font-size: 18px;
@@ -93,9 +77,6 @@ body::after {
   animation: fade-up 0.8s ease-out forwards;
 }
 
-
-
-/* Retina-friendly opcional para o noise */
 @supports (background-image: image-set(url("") 1x)) {
   body::before {
     background-image: image-set(
@@ -105,41 +86,31 @@ body::after {
   }
 }
 
-/* ========================================================================
-   Utilities
-   ======================================================================== */
-/* h1-display: Plus Jakarta Sans 72px, 600, 110%, -3% */
 @layer utilities {
   .h1-display {
     font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-    font-weight: 600;        /* SemiBold */
-    font-size: 72px;         /* 72px */
-    line-height: 1.1;        /* 110% */
-    letter-spacing: -0.03em; /* -3% */
+    font-weight: 600;
+    font-size: 72px;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
   }
 
-  /* Vertical trim por cap height (progressivo, sem quebrar nos demais) */
   @supports (text-box-trim: both) and (text-box-edge: cap) {
     .h1-display {
-      text-box-trim: both;           /* remove excesso acima/abaixo */
-      text-box-edge: cap alphabetic; /* alinha por cap-height */
+      text-box-trim: both;
+      text-box-edge: cap alphabetic;
     }
   }
 }
 
-/* ========================================================================
-   Base (fontes globais e tipografia de botões)
-   ======================================================================== */
-/* OBS: Carregue as fontes no app.html via <link> (Google Fonts) */
 @layer base {
   html {
     font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
     color: var(--text);
-    background-color: #fff; /* base branca; tints por seção/camada */
+    background-color: #fff;
   }
 
-  /* TIPOGRAFIA PADRÃO DOS BOTÕES (Figma: Manrope, 700, 16px, 140%, -2%) */
-   button,
+  button,
   [type="button"],
   [type="submit"],
   [role="button"],
@@ -148,18 +119,14 @@ body::after {
   .btn-ghost,
   .btn-link {
     font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
-    font-weight: 600;       /* SemiBold */
+    font-weight: 600;
     font-size: 16px;
-    line-height: 1.4;       /* 140% */
-    letter-spacing: -0.02em;/* -2% */
+    line-height: 1.4;
+    letter-spacing: -0.02em;
   }
 }
 
-/* ========================================================================
-   Components (botões e cartões reutilizáveis)
-   ======================================================================== */
 @layer components {
-  /* Botão cheio (primary) */
   .btn {
     @apply inline-flex items-center justify-center rounded-full
            px-6 py-3 text-base
@@ -167,7 +134,6 @@ body::after {
            transition hover:brightness-95 active:brightness-90;
   }
 
-  /* Botão vazado (texto/borda text) */
   .btn-outline {
     @apply inline-flex items-center justify-center rounded-full
            px-6 py-3 text-base
@@ -175,29 +141,23 @@ body::after {
            transition hover:bg-text hover:text-white;
   }
 
-  /* Botão ghost (sem borda/fill) */
   .btn-ghost {
     @apply inline-flex items-center justify-center rounded-full
            px-6 py-3 text-base
            text-text hover:bg-slate-100;
   }
 
-  /* Botão link (texto com hover underline) */
   .btn-link {
     @apply inline-flex items-center justify-center
            px-2 py-1 text-base
            text-primary hover:underline;
   }
 
-  /* Card flutuante */
   .card-float {
     @apply rounded-2xl border border-slate-200 bg-card shadow-md;
   }
 }
 
-/* ========================================================================
-   Apresentação Cebrac: composição do hero
-   ======================================================================== */
 @media (min-width: 1024px) {
   .presentation-page #inicio > .mx-auto {
     grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr);
@@ -220,7 +180,7 @@ body::after {
   }
 
   .presentation-page #inicio > .mx-auto > :last-child img {
-    width: 120%;
+    width: 105%;
     max-width: none;
     transform: translateX(-1.5%);
     transform-origin: center right;
@@ -236,4 +196,15 @@ body::after {
   .presentation-page #inicio > .mx-auto > :last-child {
     display: none !important;
   }
+}
+
+.presentation-page #inicio > .mx-auto > :first-child > :first-child > :last-child {
+  font-size: 0;
+}
+
+.presentation-page #inicio > .mx-auto > :first-child > :first-child > :last-child::after {
+  content: "Uma evolução para toda a Rede Cebrac";
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  letter-spacing: 0.14em;
 }
