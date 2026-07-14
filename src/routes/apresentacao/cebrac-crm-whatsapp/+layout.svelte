@@ -1,3 +1,30 @@
+<svelte:head>
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="F10 Software" />
+  <meta property="og:title" content="CRM e WhatsApp integrados | Rede Cebrac + F10" />
+  <meta
+    property="og:description"
+    content="Uma nova rotina comercial para acompanhar leads até a matrícula e manter o relacionamento com alunos dentro do F10."
+  />
+  <meta property="og:url" content="https://f10.com.br/apresentacao/cebrac-crm-whatsapp" />
+  <meta property="og:image" content="https://f10.com.br/cebrac-crm-whatsapp-og.jpg" />
+  <meta property="og:image:secure_url" content="https://f10.com.br/cebrac-crm-whatsapp-og.jpg" />
+  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:width" content="600" />
+  <meta property="og:image:height" content="315" />
+  <meta
+    property="og:image:alt"
+    content="CRM e WhatsApp integrados para a Rede Cebrac e F10"
+  />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="CRM e WhatsApp integrados | Rede Cebrac + F10" />
+  <meta
+    name="twitter:description"
+    content="Uma nova rotina comercial para acompanhar leads até a matrícula e manter o relacionamento com alunos dentro do F10."
+  />
+  <meta name="twitter:image" content="https://f10.com.br/cebrac-crm-whatsapp-og.jpg" />
+</svelte:head>
+
 <div class="cebrac-presentation-route">
   <slot />
 </div>
