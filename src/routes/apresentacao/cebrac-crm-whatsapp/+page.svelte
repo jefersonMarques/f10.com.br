@@ -3,6 +3,7 @@
     ArrowRight,
     ArrowUp,
     BarChart3,
+    BellRing,
     CalendarCheck2,
     CheckCircle2,
     Clock3,
@@ -20,137 +21,161 @@
 
   type IconComponent = typeof Target;
 
-  type JourneyStep = {
+  type FeatureItem = {
     title: string;
     description: string;
     icon: IconComponent;
   };
 
-  type ChangeItem = {
-    area: string;
+  type ComparisonItem = {
+    label: string;
     current: string;
     future: string;
   };
 
-  type BenefitItem = {
-    title: string;
-    description: string;
-    outcome: string;
-    icon: IconComponent;
-  };
-
-  type MetricItem = {
-    title: string;
-    description: string;
-    icon: IconComponent;
-  };
-
-  type ResourceGroup = {
-    label: string;
-    title: string;
-    description: string;
-    icon: IconComponent;
-    items: string[];
-  };
-
-  type CashExample = {
-    share: string;
-    value: string;
+  type InvestmentRow = {
+    cashShare: string;
+    discount: string;
+    monthlyValue: string;
+    highlighted?: boolean;
   };
 
   type ImplementationStep = {
     number: string;
-    owner: string;
     title: string;
     description: string;
+    owner: string;
   };
 
-  const journeySteps: JourneyStep[] = [
+  const journeySteps = [
+    "Lead recebido",
+    "Distribuição",
+    "Primeiro contato",
+    "Follow-ups",
+    "Negociação",
+    "Matrícula",
+    "Relacionamento no F10",
+  ];
+
+  const operationRisks: FeatureItem[] = [
     {
-      title: "Lead recebido",
-      description: "Origem e dados entram no processo comercial.",
-      icon: Target,
+      title: "Retorno sem prazo definido",
+      description: "O lead esfria quando ninguém sabe qual é a próxima ação ou quando ela deve acontecer.",
+      icon: Clock3,
     },
     {
-      title: "Responsável definido",
-      description: "A oportunidade passa a ter um dono e um prazo.",
-      icon: UserCheck,
-    },
-    {
-      title: "Contato pelo WhatsApp",
-      description: "A conversa permanece vinculada ao atendimento.",
+      title: "Conversa fora da operação",
+      description: "O histórico fica preso em aparelhos, planilhas e canais que a gestão não acompanha.",
       icon: MessagesSquare,
     },
     {
-      title: "Próxima ação registrada",
-      description: "Tarefas e retornos deixam de depender da memória.",
+      title: "Troca de colaboradores",
+      description: "A negociação perde continuidade quando o contexto depende da memória de uma pessoa.",
+      icon: UserCheck,
+    },
+    {
+      title: "Gestão sem visibilidade",
+      description: "Gargalos e oportunidades paradas só aparecem quando o momento de agir já passou.",
+      icon: BarChart3,
+    },
+  ];
+
+  const crmFeatures: FeatureItem[] = [
+    {
+      title: "Funil visual",
+      description: "Cada oportunidade fica posicionada em uma etapa clara até a matrícula.",
+      icon: Funnel,
+    },
+    {
+      title: "Responsáveis e tarefas",
+      description: "A equipe sabe quem deve agir, quando retornar e qual é a próxima ação.",
       icon: CalendarCheck2,
     },
     {
-      title: "Gestão acompanha",
-      description: "Atrasos, gargalos e conversões ficam visíveis.",
+      title: "Histórico preservado",
+      description: "Mensagens, observações, objeções e negociações permanecem na unidade.",
+      icon: FileText,
+    },
+    {
+      title: "Indicadores comerciais",
+      description: "A gestão acompanha produtividade, conversão, atrasos e oportunidades paradas.",
       icon: BarChart3,
     },
+  ];
+
+  const whatsappFeatures: FeatureItem[] = [
     {
-      title: "Matrícula e continuidade",
-      description: "O relacionamento segue dentro do F10.",
-      icon: CheckCircle2,
+      title: "Atendimento comercial",
+      description: "Conversas com leads dentro do contexto da oportunidade no CRM.",
+      icon: MessagesSquare,
+    },
+    {
+      title: "Continuidade entre atendentes",
+      description: "O atendimento não depende de um aparelho ou colaborador específico.",
+      icon: UsersRound,
+    },
+    {
+      title: "Relacionamento pós-matrícula",
+      description: "Comunicação com alunos e responsáveis dentro do F10.",
+      icon: MessageCircleMore,
+    },
+    {
+      title: "Comunicação administrativa",
+      description: "Avisos, orientações, cobranças e acordos em um canal organizado.",
+      icon: BellRing,
     },
   ];
 
-  const changeItems: ChangeItem[] = [
-    {
-      area: "Atendimento",
-      current: "Conversas distribuídas entre celulares, planilhas e anotações.",
-      future: "Histórico centralizado e vinculado a cada oportunidade.",
-    },
-    {
-      area: "Follow-up",
-      current: "Retornos dependem da memória e da organização individual.",
-      future: "Próxima atividade, prazo e responsável ficam registrados.",
-    },
-    {
-      area: "Gestão",
-      current: "O gestor descobre atrasos quando a oportunidade já esfriou.",
-      future: "Funil e indicadores mostram onde a equipe precisa agir.",
-    },
-    {
-      area: "Troca de equipe",
-      current: "Parte do contexto desaparece quando um colaborador sai.",
-      future: "Outro profissional continua a negociação sem começar do zero.",
-    },
-    {
-      area: "Padrão da rede",
-      current: "Cada unidade organiza a operação de uma maneira diferente.",
-      future: "Toda a rede passa a trabalhar com um processo comum e mensurável.",
-    },
-  ];
-
-  const benefits: BenefitItem[] = [
+  const benefits: FeatureItem[] = [
     {
       title: "Melhor aproveitamento dos leads",
       description:
-        "Mais oportunidades acompanhadas até uma conclusão, sem depender apenas de aumentar o investimento em mídia.",
-      outcome: "Menos desperdício do marketing já realizado",
+        "Mais oportunidades acompanhadas até uma conclusão e melhor uso do investimento que a unidade já realiza em marketing.",
       icon: Target,
     },
     {
       title: "Continuidade da operação",
       description:
-        "Históricos, objeções, propostas e próximos passos permanecem disponíveis para a unidade.",
-      outcome: "Menos perda de contexto e retrabalho",
+        "Históricos, negociações e próximas ações permanecem na unidade mesmo quando a equipe muda.",
       icon: ShieldCheck,
     },
     {
       title: "Gestão mais previsível",
       description:
-        "Produtividade, conversão, tempo de resposta e oportunidades paradas passam a ser acompanhados com clareza.",
-      outcome: "Decisões baseadas na rotina real da equipe",
+        "Produtividade, conversão, atrasos e gargalos passam a ser acompanhados com o mesmo padrão em toda a rede.",
       icon: TrendingUp,
     },
   ];
 
-  const metrics: MetricItem[] = [
+  const comparisonItems: ComparisonItem[] = [
+    {
+      label: "Atendimento",
+      current: "Informações espalhadas em celulares, planilhas e anotações.",
+      future: "Histórico centralizado e vinculado à oportunidade.",
+    },
+    {
+      label: "Follow-up",
+      current: "Retornos dependem da memória e da organização individual.",
+      future: "Próxima atividade, responsável e prazo ficam registrados.",
+    },
+    {
+      label: "Gestão",
+      current: "Oportunidades paradas são percebidas tarde demais.",
+      future: "Indicadores mostram atrasos, gargalos e prioridades.",
+    },
+    {
+      label: "Troca de equipe",
+      current: "Parte do contexto desaparece quando um colaborador sai.",
+      future: "Outro profissional continua com o histórico preservado.",
+    },
+    {
+      label: "Padronização",
+      current: "Cada unidade utiliza controles e rotinas diferentes.",
+      future: "A rede adota um processo comum, visível e mensurável.",
+    },
+  ];
+
+  const metrics: FeatureItem[] = [
     {
       title: "Primeiro atendimento",
       description: "Tempo entre a entrada do lead e o primeiro retorno.",
@@ -158,94 +183,74 @@
     },
     {
       title: "Próxima atividade",
-      description: "Oportunidades sem ação ou prazo definido.",
+      description: "Oportunidades sem ação futura definida.",
       icon: CalendarCheck2,
     },
     {
-      title: "Conversão por etapa",
-      description: "Avanço do lead ao longo do funil comercial.",
+      title: "Conversão",
+      description: "Avanço entre as etapas até a matrícula.",
       icon: Funnel,
     },
     {
       title: "Produtividade",
-      description: "Contatos e acompanhamentos executados no período.",
+      description: "Atividades e acompanhamentos realizados no período.",
       icon: BarChart3,
     },
   ];
 
-  const resourceGroups: ResourceGroup[] = [
+  const investmentRows: InvestmentRow[] = [
     {
-      label: "CRM de Leads",
-      title: "Cada oportunidade com etapa, responsável e próxima ação.",
-      description:
-        "O CRM reúne o histórico comercial e oferece uma visão única do que está acontecendo em cada unidade.",
-      icon: Funnel,
-      items: [
-        "Funil visual até a matrícula",
-        "Responsáveis, tarefas e prazos",
-        "Histórico de mensagens e negociações",
-        "Indicadores para gestores e franqueadora",
-      ],
+      cashShare: "100% via F10 Cash",
+      discount: "R$ 200 de desconto",
+      monthlyValue: "R$ 199",
+      highlighted: true,
     },
     {
-      label: "Workflow comercial",
-      title: "Uma rotina comum para orientar o trabalho da equipe.",
-      description:
-        "As etapas e os acompanhamentos deixam de ser controles individuais e passam a fazer parte do processo oficial.",
-      icon: Workflow,
-      items: [
-        "Etapas padronizadas para a rede",
-        "Cadências e retornos organizados",
-        "Critérios claros para avanço do lead",
-        "Acompanhamento das oportunidades paradas",
-      ],
+      cashShare: "80% via F10 Cash",
+      discount: "R$ 160 de desconto",
+      monthlyValue: "R$ 239",
     },
     {
-      label: "WhatsApp integrado",
-      title: "Cinco números por unidade, distribuídos conforme a operação.",
-      description:
-        "Os números poderão ser utilizados no CRM de Leads e no F10, conforme a definição realizada durante a implantação.",
-      icon: MessageCircleMore,
-      items: [
-        "Atendimento comercial vinculado ao lead",
-        "Continuidade entre diferentes atendentes",
-        "Relacionamento com alunos e responsáveis",
-        "Avisos, orientações, cobranças e acordos",
-      ],
+      cashShare: "40% via F10 Cash",
+      discount: "R$ 80 de desconto",
+      monthlyValue: "R$ 319",
     },
-  ];
-
-  const cashExamples: CashExample[] = [
-    { share: "20%", value: "R$ 359" },
-    { share: "40%", value: "R$ 319" },
-    { share: "80%", value: "R$ 239" },
-    { share: "100%", value: "R$ 199" },
+    {
+      cashShare: "20% via F10 Cash",
+      discount: "R$ 40 de desconto",
+      monthlyValue: "R$ 359",
+    },
+    {
+      cashShare: "Sem uso do F10 Cash",
+      discount: "Valor-base do upgrade",
+      monthlyValue: "R$ 399",
+    },
   ];
 
   const implementationSteps: ImplementationStep[] = [
     {
       number: "01",
-      owner: "Unidade",
-      title: "Preparação",
+      title: "Preparar",
       description: "Indicar o responsável local, os usuários e os números que participarão da operação.",
+      owner: "Unidade",
     },
     {
       number: "02",
-      owner: "F10 + unidade",
-      title: "Configuração",
+      title: "Configurar",
       description: "Estruturar acessos, workflow comercial e distribuição dos números de WhatsApp.",
+      owner: "F10 + unidade",
     },
     {
       number: "03",
+      title: "Treinar",
+      description: "Capacitar vendedores, gestores e responsáveis pela operação.",
       owner: "F10",
-      title: "Treinamento",
-      description: "Capacitar gestores, vendedores e demais responsáveis pela rotina comercial.",
     },
     {
       number: "04",
+      title: "Operar",
+      description: "Iniciar o uso com acompanhamento dos indicadores e ajustes necessários.",
       owner: "Rede + F10 + unidade",
-      title: "Início assistido",
-      description: "Colocar o novo modelo em operação, acompanhar indicadores e realizar os ajustes iniciais.",
     },
   ];
 </script>
@@ -259,1621 +264,1069 @@
   <meta name="robots" content="noindex,nofollow,noarchive,nosnippet" />
   <link rel="preload" as="image" href="/background-hero-cebrac.png" />
   <link rel="preload" as="image" href="/hero-cebrac.webp" type="image/webp" />
-  <link rel="preload" as="image" href="/f10_kanban.png" />
+  <link rel="preload" as="image" href="/Logo-Cebrac.png" />
 </svelte:head>
 
-<div class="page-shell" id="inicio">
-  <header class="hero-section">
-    <img class="hero-background" src="/background-hero-cebrac.png" alt="" aria-hidden="true" />
+<div class="page-shell overflow-hidden bg-white text-[#2B4091]">
+  <section id="inicio" class="hero-section relative isolate overflow-hidden bg-white">
+    <img
+      src="/background-hero-cebrac.png"
+      alt=""
+      aria-hidden="true"
+      class="pointer-events-none absolute inset-0 -z-20 h-full w-full object-cover object-center"
+      fetchpriority="high"
+    />
 
-    <div class="hero-container">
-      <div class="hero-copy">
-        <div class="brand-lockup" aria-label="Cebrac e F10 Software">
-          <span class="brand-cebrac"><img src="/Logo-Cebrac.png" alt="Cebrac" /></span>
-          <span class="brand-divider"></span>
-          <img class="brand-f10" src="/logo_f10.svg" alt="F10 Software" />
+    <div class="hero-grid relative mx-auto grid w-full max-w-[1740px] items-center px-5 py-12 sm:px-8 sm:py-16 lg:min-h-[820px] lg:px-12 lg:py-14 xl:px-16">
+      <div class="hero-copy relative z-30 max-w-[760px] lg:py-8">
+        <div class="brand-lockup inline-flex max-w-full items-stretch overflow-hidden border border-[#2B4091]/15 bg-white/95 shadow-[0_14px_36px_rgba(43,64,145,0.12)] backdrop-blur-md">
+          <div class="flex min-w-[150px] items-center justify-center bg-[#2B4091] px-5 py-3 sm:min-w-[180px] sm:px-7">
+            <img src="/Logo-Cebrac.png" alt="Cebrac" class="h-9 w-auto object-contain sm:h-10" />
+          </div>
+          <div class="flex items-center px-5 py-3">
+            <img src="/logo_f10.svg" alt="F10 Software" class="h-8 w-auto sm:h-9" />
+          </div>
         </div>
 
-        <p class="eyebrow eyebrow-orange">Comunicado às unidades Cebrac</p>
-        <h1>Um novo padrão para acompanhar cada oportunidade até a matrícula.</h1>
-        <p class="hero-description">
-          A Rede Cebrac adotará CRM de Leads, workflow comercial e WhatsApp integrado ao F10 para organizar a rotina, preservar os históricos e dar mais visibilidade à gestão.
+        <p class="mt-8 text-xs font-extrabold uppercase tracking-[0.22em] text-[#f36b21]">
+          Comunicado às unidades Cebrac
         </p>
 
-        <dl class="hero-facts">
+        <h1 class="mt-5 max-w-[730px] text-[42px] font-semibold leading-[1.03] tracking-[-0.05em] text-[#2B4091] sm:text-[56px] lg:text-[62px] xl:text-[70px]">
+          Um novo padrão para acompanhar cada oportunidade até a matrícula.
+        </h1>
+
+        <p class="mt-7 max-w-[690px] text-lg font-medium leading-8 text-[#2B4091]/80 sm:text-[20px] sm:leading-9">
+          A Rede Cebrac adotará CRM de Leads, workflow comercial e WhatsApp integrado ao F10 para padronizar a operação, preservar os históricos e ampliar a visibilidade da gestão.
+        </p>
+
+        <div class="hero-notes mt-9 grid gap-4 border-t border-[#2B4091]/15 pt-6 sm:grid-cols-3">
           <div>
-            <dt>Aplicação</dt>
-            <dd>Todas as unidades da rede</dd>
+            <span>Aplicação</span>
+            <strong>Toda a rede</strong>
           </div>
           <div>
-            <dt>WhatsApp no F10</dt>
-            <dd>A partir de agosto de 2026</dd>
+            <span>Implantação</span>
+            <strong>Progressiva</strong>
           </div>
           <div>
-            <dt>Implantação</dt>
-            <dd>Progressiva e acompanhada</dd>
+            <span>WhatsApp no F10</span>
+            <strong>Agosto de 2026</strong>
           </div>
-        </dl>
+        </div>
       </div>
 
-      <div class="hero-visual">
+      <div class="hero-visual pointer-events-none relative z-0 hidden items-center justify-end lg:flex" aria-hidden="true">
+        <div class="hero-image-fade"></div>
         <img
           src="/hero-cebrac.webp"
-          alt="CRM F10 exibido em notebook e atendimento integrado pelo WhatsApp"
+          alt=""
+          class="relative z-0 h-auto w-full max-w-none object-contain drop-shadow-[0_28px_42px_rgba(43,64,145,0.18)]"
           fetchpriority="high"
         />
       </div>
     </div>
-  </header>
+  </section>
 
-  <nav class="page-nav" aria-label="Navegação do comunicado">
-    <div class="page-nav-inner">
-      <img src="/Logo-Cebrac.png" alt="" aria-hidden="true" />
-      <div class="page-nav-links">
-        <a href="#motivo">Por que muda</a>
-        <a href="#modelo">Novo modelo</a>
-        <a href="#mudancas">O que muda</a>
-        <a href="#beneficios">Benefícios</a>
-        <a href="#recursos">Recursos</a>
-        <a href="#investimento">Investimento</a>
-        <a href="#implantacao">Implantação</a>
+  <nav class="sticky top-0 z-40 border-b border-white/10 bg-[#2B4091]" aria-label="Navegação do comunicado">
+    <div class="mx-auto flex max-w-[1480px] items-center justify-between gap-8 overflow-x-auto px-5 py-3 sm:px-8 lg:px-10">
+      <img src="/Logo-Cebrac.png" alt="Cebrac" class="h-8 w-auto shrink-0" />
+      <div class="nav-links ml-auto flex min-w-max items-center justify-end gap-1">
+        <a href="#motivo" class="nav-link">Por que muda</a>
+        <a href="#modelo" class="nav-link">Novo modelo</a>
+        <a href="#beneficios" class="nav-link">Benefícios</a>
+        <a href="#comparacao" class="nav-link">Hoje × novo padrão</a>
+        <a href="#investimento" class="nav-link">Investimento</a>
+        <a href="#implantacao" class="nav-link">Implantação</a>
       </div>
     </div>
   </nav>
 
-  <main>
-    <section class="section section-light" id="motivo">
-      <div class="section-container context-layout">
-        <div class="section-heading context-heading">
-          <p class="eyebrow">Por que a rede está mudando</p>
-          <h2>Gerar oportunidades não é suficiente. É necessário garantir continuidade.</h2>
-          <p>
-            A unidade já investe para atrair interessados. O novo padrão foi criado para reduzir perdas entre a entrada do lead e a matrícula, especialmente quando faltam prazo, responsável, histórico ou acompanhamento.
+  <section id="motivo" class="scroll-mt-16 bg-white px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
+    <div class="mx-auto max-w-[1480px]">
+      <div class="grid gap-14 lg:grid-cols-[0.72fr_1.28fr] lg:items-start lg:gap-24">
+        <div>
+          <p class="section-label">Por que a rede está mudando</p>
+          <h2 class="section-title mt-4">Gerar leads não é suficiente. É necessário garantir continuidade.</h2>
+          <p class="mt-6 max-w-[560px] text-lg leading-8 text-[#2B4091]/70">
+            A unidade já investe para gerar oportunidades. O novo padrão organiza o caminho entre a entrada do lead e a matrícula para reduzir perdas que hoje acontecem durante a operação.
           </p>
         </div>
 
-        <div class="journey-panel">
-          <div class="journey-line" aria-hidden="true"></div>
-          <ol class="journey-list">
-            {#each journeySteps as step, index}
-              <li class="journey-item">
-                <span class="journey-number">0{index + 1}</span>
-                <span class="journey-icon"><svelte:component this={step.icon} size={21} strokeWidth={1.9} /></span>
-                <div>
-                  <h3>{step.title}</h3>
-                  <p>{step.description}</p>
+        <div>
+          <div class="journey-panel border border-[#2B4091]/12 bg-[#f6f8fc] px-6 py-7 sm:px-8 sm:py-8">
+            <span class="text-xs font-extrabold uppercase tracking-[0.16em] text-[#f36b21]">Jornada acompanhada</span>
+            <div class="journey-flow mt-7">
+              {#each journeySteps as step, index}
+                <div class="journey-item">
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <strong>{step}</strong>
+                  {#if index < journeySteps.length - 1}
+                    <span class="journey-arrow" aria-hidden="true">
+                      <ArrowRight size={18} strokeWidth={1.9} />
+                    </span>
+                  {/if}
                 </div>
-              </li>
+              {/each}
+            </div>
+          </div>
+
+          <div class="mt-8 grid gap-x-10 gap-y-0 sm:grid-cols-2">
+            {#each operationRisks as risk}
+              <article class="risk-row">
+                <svelte:component this={risk.icon} size={24} strokeWidth={1.8} />
+                <div>
+                  <h3>{risk.title}</h3>
+                  <p>{risk.description}</p>
+                </div>
+              </article>
             {/each}
-          </ol>
-
-          <div class="context-note">
-            <strong>Onde as perdas aparecem hoje</strong>
-            <span>Retorno atrasado</span>
-            <span>Lead sem próxima ação</span>
-            <span>Conversa em canal pessoal</span>
-            <span>Troca de vendedor sem histórico</span>
           </div>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section class="section section-blue" id="modelo">
-      <div class="section-container">
-        <div class="model-intro">
-          <div class="section-heading section-heading-light">
-            <p class="eyebrow eyebrow-yellow">O novo modelo comercial</p>
-            <h2>Uma operação visível do primeiro contato ao relacionamento com o aluno.</h2>
+  <section id="modelo" class="scroll-mt-16 bg-[#2B4091] px-5 py-20 text-white sm:px-8 lg:px-12 lg:py-24">
+    <div class="mx-auto max-w-[1480px]">
+      <header class="mx-auto max-w-[900px] text-center">
+        <p class="section-label text-[#ffcd40]">O novo modelo comercial</p>
+        <h2 class="mt-4 text-[38px] font-semibold leading-[1.08] tracking-[-0.045em] text-white sm:text-[50px] lg:text-[58px]">
+          Uma única operação, da entrada do lead ao relacionamento depois da matrícula.
+        </h2>
+        <p class="mx-auto mt-6 max-w-[820px] text-lg leading-8 text-white/70">
+          CRM, workflow comercial e WhatsApp passam a trabalhar juntos para registrar cada etapa, orientar a equipe e entregar informação objetiva para a gestão.
+        </p>
+      </header>
+
+      <div class="mt-16 grid gap-12 lg:grid-cols-[0.82fr_1.18fr] lg:items-center lg:gap-20">
+        <div>
+          <p class="section-label text-[#ffcd40]">CRM e workflow</p>
+          <h3 class="mt-4 max-w-[570px] text-[34px] font-semibold leading-[1.12] tracking-[-0.04em] text-white sm:text-[44px]">
+            Cada oportunidade com etapa, responsável e próxima ação.
+          </h3>
+
+          <div class="mt-8 border-t border-white/15">
+            {#each crmFeatures as feature}
+              <article class="feature-line feature-line-dark">
+                <div class="feature-icon feature-icon-yellow">
+                  <svelte:component this={feature.icon} size={22} strokeWidth={1.9} />
+                </div>
+                <div>
+                  <h4>{feature.title}</h4>
+                  <p>{feature.description}</p>
+                </div>
+              </article>
+            {/each}
           </div>
-          <p>
-            O CRM organiza a oportunidade, o workflow orienta a rotina e o WhatsApp mantém a conversa dentro do contexto. Depois da matrícula, o relacionamento continua no F10.
-          </p>
         </div>
 
-        <div class="model-showcase">
-          <div class="model-copy">
-            <div class="model-statement">
-              <span>01</span>
-              <div>
-                <strong>O lead entra com origem e responsável.</strong>
-                <p>Nenhuma oportunidade começa sem contexto ou sem uma pessoa definida para agir.</p>
-              </div>
-            </div>
-            <div class="model-statement">
-              <span>02</span>
-              <div>
-                <strong>A equipe trabalha com prazo e próxima ação.</strong>
-                <p>Retornos, tarefas e follow-ups passam a fazer parte do processo, não da memória.</p>
-              </div>
-            </div>
-            <div class="model-statement">
-              <span>03</span>
-              <div>
-                <strong>A gestão acompanha o que está avançando e o que parou.</strong>
-                <p>O funil apresenta volume, tempo em etapa, produtividade e gargalos.</p>
-              </div>
-            </div>
-          </div>
-
-          <figure class="crm-figure">
-            <div class="browser-bar">
-              <span></span><span></span><span></span>
-              <small>Visão Kanban do CRM</small>
-            </div>
-            <img src="/f10_kanban.png" alt="Visão Kanban real do CRM de Leads F10" />
-            <figcaption>Exemplo da visão utilizada para acompanhar etapas, responsáveis e próximas ações.</figcaption>
-          </figure>
-        </div>
+        <figure class="crm-figure overflow-hidden border border-white/20 bg-white shadow-[0_28px_70px_rgba(0,0,0,0.24)]">
+          <figcaption class="flex items-center gap-2 border-b border-[#2B4091]/10 bg-[#f6f8fc] px-5 py-3 text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#2B4091]/55">
+            <span class="h-2 w-2 rounded-full bg-[#61CE70]"></span>
+            <span class="h-2 w-2 rounded-full bg-[#ffcd40]"></span>
+            <span class="h-2 w-2 rounded-full bg-[#f36b21]"></span>
+            <span class="ml-2">Visão Kanban do CRM</span>
+          </figcaption>
+          <img src="/f10_kanban.png" alt="Funil Kanban do CRM F10 com etapas, responsáveis e atividades" class="block h-auto w-full" />
+        </figure>
       </div>
-    </section>
 
-    <section class="section section-paper" id="mudancas">
-      <div class="section-container change-layout">
-        <div class="section-heading change-heading">
-          <p class="eyebrow">O que muda na rotina</p>
-          <h2>Menos dependência de controles individuais. Mais continuidade de processo.</h2>
-          <p>
-            A mudança não elimina a responsabilidade da equipe. Ela cria uma estrutura para que a rotina seja executada, acompanhada e preservada.
+      <div class="mt-16 grid gap-12 border-t border-white/15 pt-14 lg:grid-cols-[0.72fr_1.28fr] lg:gap-20">
+        <div>
+          <p class="section-label text-[#ffcd40]">WhatsApp integrado</p>
+          <h3 class="mt-4 max-w-[520px] text-[34px] font-semibold leading-[1.12] tracking-[-0.04em] text-white sm:text-[44px]">
+            Cinco números por unidade, distribuídos conforme a operação.
+          </h3>
+          <p class="mt-6 max-w-[560px] text-lg leading-8 text-white/70">
+            Os números poderão ser utilizados no CRM de Leads ou no F10. A distribuição será definida pela unidade durante a implantação.
           </p>
+
+          <div class="distribution-example mt-8">
+            <span>Exemplo de distribuição</span>
+            <div>
+              <strong>2</strong><small>números no CRM</small>
+            </div>
+            <div>
+              <strong>3</strong><small>números no F10</small>
+            </div>
+          </div>
         </div>
 
-        <div class="change-list">
-          <div class="change-header" aria-hidden="true">
-            <span>Área</span>
-            <span>Hoje</span>
-            <span>Novo padrão</span>
-          </div>
-          {#each changeItems as item}
-            <article class="change-row">
-              <strong>{item.area}</strong>
-              <p>{item.current}</p>
-              <div class="change-future">
-                <ArrowRight size={19} strokeWidth={2} />
-                <p>{item.future}</p>
+        <div class="grid gap-x-10 gap-y-0 sm:grid-cols-2">
+          {#each whatsappFeatures as feature}
+            <article class="feature-line feature-line-dark">
+              <div class="feature-icon feature-icon-green">
+                <svelte:component this={feature.icon} size={22} strokeWidth={1.9} />
+              </div>
+              <div>
+                <h4>{feature.title}</h4>
+                <p>{feature.description}</p>
               </div>
             </article>
           {/each}
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section class="section section-light" id="beneficios">
-      <div class="section-container">
-        <div class="benefit-intro">
-          <div class="section-heading">
-            <p class="eyebrow">Benefícios esperados</p>
-            <h2>O ganho vem da combinação entre método, disciplina comercial e informação.</h2>
-          </div>
-          <p>
-            A tecnologia fornece a estrutura. O resultado depende da adoção do processo pelas unidades e do acompanhamento contínuo da gestão.
+  <section id="beneficios" class="scroll-mt-16 bg-[#f7f8fc] px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
+    <div class="mx-auto max-w-[1480px]">
+      <div class="grid gap-12 lg:grid-cols-[0.62fr_1.38fr] lg:items-start lg:gap-24">
+        <div>
+          <p class="section-label">Benefícios esperados</p>
+          <h2 class="section-title mt-4">O benefício vem do processo. A tecnologia fornece a estrutura.</h2>
+          <p class="mt-6 max-w-[560px] text-lg leading-8 text-[#2B4091]/70">
+            Os resultados dependerão da combinação entre método comercial, rotina de acompanhamento, disciplina da equipe e informação disponível para a gestão.
           </p>
         </div>
 
-        <div class="benefit-grid">
+        <div class="benefit-columns">
           {#each benefits as benefit, index}
-            <article class="benefit-item">
-              <div class="benefit-meta">
-                <span>0{index + 1}</span>
-                <svelte:component this={benefit.icon} size={25} strokeWidth={1.8} />
+            <article class="benefit-column">
+              <span class="benefit-number">0{index + 1}</span>
+              <div class="feature-icon feature-icon-green">
+                <svelte:component this={benefit.icon} size={24} strokeWidth={1.9} />
               </div>
               <h3>{benefit.title}</h3>
               <p>{benefit.description}</p>
-              <strong>{benefit.outcome}</strong>
             </article>
           {/each}
         </div>
-
-        <div class="metric-band">
-          <div class="metric-band-heading">
-            <span>Gestão</span>
-            <strong>Quatro perguntas simples para acompanhar a operação.</strong>
-          </div>
-          <div class="metric-grid">
-            {#each metrics as metric}
-              <article>
-                <svelte:component this={metric.icon} size={22} strokeWidth={1.9} />
-                <div>
-                  <h3>{metric.title}</h3>
-                  <p>{metric.description}</p>
-                </div>
-              </article>
-            {/each}
-          </div>
-        </div>
       </div>
-    </section>
 
-    <section class="section section-resources" id="recursos">
-      <div class="section-container">
-        <div class="resources-intro">
-          <div class="section-heading">
-            <p class="eyebrow">O que será entregue</p>
-            <h2>Três recursos trabalhando como uma única operação.</h2>
+      <div class="mt-16 grid gap-5 border-y border-[#2B4091]/12 py-8 sm:grid-cols-2 lg:grid-cols-4">
+        {#each metrics as metric}
+          <article class="metric-item">
+            <svelte:component this={metric.icon} size={22} strokeWidth={1.9} />
+            <div>
+              <strong>{metric.title}</strong>
+              <span>{metric.description}</span>
+            </div>
+          </article>
+        {/each}
+      </div>
+    </div>
+  </section>
+
+  <section id="comparacao" class="scroll-mt-16 bg-white px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
+    <div class="mx-auto max-w-[1480px]">
+      <div class="grid gap-10 lg:grid-cols-[0.62fr_1.38fr] lg:items-end lg:gap-24">
+        <div>
+          <p class="section-label">Hoje × novo padrão</p>
+          <h2 class="section-title mt-4">O que deixa de depender das pessoas e passa a fazer parte do processo.</h2>
+        </div>
+        <p class="max-w-[760px] text-lg leading-8 text-[#2B4091]/70 lg:pb-1">
+          A mudança substitui controles individuais por uma operação visível, contínua e padronizada em toda a rede.
+        </p>
+      </div>
+
+      <div class="comparison-list mt-12 border-t border-[#2B4091]/14">
+        <div class="comparison-header">
+          <span>Área</span>
+          <span>Hoje</span>
+          <span>Com o novo padrão</span>
+        </div>
+        {#each comparisonItems as item}
+          <article class="comparison-row">
+            <strong>{item.label}</strong>
+            <p>{item.current}</p>
+            <p class="comparison-future"><CheckCircle2 size={18} strokeWidth={2} />{item.future}</p>
+          </article>
+        {/each}
+      </div>
+    </div>
+  </section>
+
+  <section id="investimento" class="scroll-mt-16 bg-[#fff8e8] px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
+    <div class="mx-auto max-w-[1480px]">
+      <div class="grid gap-12 lg:grid-cols-[0.74fr_1.26fr] lg:items-start lg:gap-20">
+        <div>
+          <p class="section-label">Investimento e benefício F10 Cash</p>
+          <h2 class="section-title mt-4">Um único valor, reduzido conforme o uso do F10 Cash.</h2>
+          <p class="mt-6 max-w-[580px] text-lg leading-8 text-[#2B4091]/70">
+            O upgrade inclui CRM de Leads, workflow comercial, cinco números de WhatsApp, configuração, treinamento e acompanhamento inicial da operação.
+          </p>
+
+          <div class="price-highlight mt-9">
+            <span>A partir de</span>
+            <strong>R$ 199<small>/mês</small></strong>
+            <p>com 100% dos recebimentos via F10 Cash</p>
           </div>
-          <p>
-            CRM, workflow e WhatsApp não serão módulos isolados. Eles foram organizados para sustentar a mesma jornada comercial e administrativa.
+
+          <div class="base-price mt-6">
+            <span>Valor-base sem desconto</span>
+            <strong>R$ 399 por unidade/mês</strong>
+          </div>
+
+          <p class="mt-6 max-w-[580px] text-sm leading-6 text-[#2B4091]/60">
+            O reajuste anual previsto para o período será substituído pelo valor do upgrade. Número adicional de WhatsApp: R$ 49,00 por mês.
           </p>
         </div>
 
-        <div class="resource-list">
-          {#each resourceGroups as group, index}
-            <article class="resource-row">
-              <div class="resource-index">0{index + 1}</div>
-              <div class="resource-title">
-                <span class="resource-icon"><svelte:component this={group.icon} size={24} strokeWidth={1.8} /></span>
-                <div>
-                  <small>{group.label}</small>
-                  <h3>{group.title}</h3>
-                </div>
-              </div>
-              <div class="resource-content">
-                <p>{group.description}</p>
-                <ul>
-                  {#each group.items as item}
-                    <li><CheckCircle2 size={17} strokeWidth={2} />{item}</li>
-                  {/each}
-                </ul>
-              </div>
-            </article>
+        <div class="investment-table overflow-hidden border border-[#2B4091]/12 bg-white shadow-[0_22px_60px_rgba(43,64,145,0.10)]">
+          <div class="investment-table-title">
+            <div>
+              <span>Quanto maior o uso, menor o valor</span>
+              <strong>Faixas recorrentes do upgrade</strong>
+            </div>
+            <Workflow size={28} strokeWidth={1.8} />
+          </div>
+
+          <div class="investment-table-header">
+            <span>Recebimentos</span>
+            <span>Benefício</span>
+            <span>Valor mensal</span>
+          </div>
+
+          {#each investmentRows as row}
+            <div class:investment-row-highlighted={row.highlighted} class="investment-row">
+              <strong>{row.cashShare}</strong>
+              <span>{row.discount}</span>
+              <strong>{row.monthlyValue}</strong>
+            </div>
           {/each}
-        </div>
 
-        <div class="whatsapp-distribution">
-          <div>
-            <span>5</span>
-            <strong>números de WhatsApp incluídos por unidade</strong>
-          </div>
-          <p>
-            A distribuição entre CRM de Leads e F10 será definida durante a implantação, de acordo com a operação de cada unidade.
-          </p>
-          <div class="distribution-example" aria-label="Exemplo de distribuição">
-            <span><strong>2</strong> no CRM</span>
-            <span><strong>3</strong> no F10</span>
+          <div class="investment-note">
+            Os percentuais e descontos seguem as regras da campanha oficial e consideram os recebimentos do período anterior.
           </div>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section class="section section-investment" id="investimento">
-      <div class="section-container investment-layout">
-        <div class="investment-main">
-          <p class="eyebrow eyebrow-orange">Investimento do novo modelo</p>
-          <div class="price-line">
-            <span>R$</span>
-            <strong>399</strong>
-            <span>,00</span>
-          </div>
-          <p class="price-period">por unidade/mês</p>
-          <p class="investment-description">
-            O valor reúne tecnologia, configuração, treinamento e acompanhamento inicial para implantação do novo padrão em toda a rede.
-          </p>
-
-          <ul class="included-list">
-            <li><CheckCircle2 size={19} />CRM de Leads e workflow comercial</li>
-            <li><CheckCircle2 size={19} />Cinco números de WhatsApp</li>
-            <li><CheckCircle2 size={19} />Configuração de acessos e processo</li>
-            <li><CheckCircle2 size={19} />Treinamento e início assistido</li>
-          </ul>
-
-          <div class="investment-notes">
-            <p><strong>Vigência financeira:</strong> vencimento de julho de 2026.</p>
-            <p><strong>Número adicional:</strong> R$ 49,00 por mês.</p>
-            <p>O reajuste anual previsto para o período será substituído pelo valor do upgrade.</p>
-          </div>
+  <section id="implantacao" class="scroll-mt-16 bg-[#2B4091] px-5 py-20 text-white sm:px-8 lg:px-12 lg:py-24">
+    <div class="mx-auto max-w-[1480px]">
+      <div class="grid gap-10 lg:grid-cols-[0.55fr_1.45fr] lg:items-end lg:gap-24">
+        <div>
+          <p class="section-label text-[#ffcd40]">Como começa</p>
+          <h2 class="mt-4 text-[38px] font-semibold leading-[1.08] tracking-[-0.045em] text-white sm:text-[50px]">
+            Quatro etapas até a operação.
+          </h2>
         </div>
-
-        <div class="cash-panel">
-          <div class="cash-heading">
-            <span>F10 Cash</span>
-            <h3>O percentual de recebimentos pode reduzir o valor mensal do upgrade.</h3>
-            <p>
-              O desconto acompanha a participação dos recebimentos via F10 Cash e pode chegar a R$ 200 por mês, conforme as regras da campanha vigente.
-            </p>
-          </div>
-
-          <div class="cash-examples">
-            {#each cashExamples as example}
-              <article>
-                <span>{example.share} via F10 Cash</span>
-                <strong>{example.value}</strong>
-              </article>
-            {/each}
-          </div>
-
-          <div class="cash-launch-note">
-            <strong>Condição de lançamento</strong>
-            <p>
-              Nos quatro primeiros meses, a campanha prevê faixas adicionais de incentivo. Percentuais, períodos e critérios seguem a comunicação oficial da Rede Cebrac e consideram os recebimentos do período anterior.
-            </p>
-          </div>
-        </div>
+        <p class="max-w-[780px] text-lg leading-8 text-white/70 lg:pb-1">
+          A implantação será progressiva, com preparação da unidade, configuração, treinamento e início assistido.
+        </p>
       </div>
-    </section>
 
-    <section class="section section-blue implementation-section" id="implantacao">
-      <div class="section-container">
-        <div class="implementation-intro">
-          <div class="section-heading section-heading-light">
-            <p class="eyebrow eyebrow-yellow">Como começa</p>
-            <h2>Implantação progressiva, com responsabilidades definidas.</h2>
-          </div>
-          <p>
-            Cada unidade será preparada antes do início da operação. O cronograma oficial e as orientações serão comunicados pela Rede Cebrac.
+      <div class="implementation-grid mt-14">
+        {#each implementationSteps as step}
+          <article class="implementation-step">
+            <span class="implementation-number">{step.number}</span>
+            <small>{step.owner}</small>
+            <h3>{step.title}</h3>
+            <p>{step.description}</p>
+          </article>
+        {/each}
+      </div>
+
+      <div class="mt-14 flex flex-col gap-6 border-t border-white/15 pt-9 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <span class="text-xs font-extrabold uppercase tracking-[0.17em] text-[#ffcd40]">O que cada unidade deverá preparar</span>
+          <p class="mt-3 max-w-[920px] text-xl font-semibold leading-8 text-white">
+            Indicar o responsável local, informar os usuários, definir os cinco números de WhatsApp e participar dos treinamentos previstos.
           </p>
         </div>
-
-        <ol class="implementation-list">
-          {#each implementationSteps as step}
-            <li>
-              <span class="implementation-number">{step.number}</span>
-              <small>{step.owner}</small>
-              <h3>{step.title}</h3>
-              <p>{step.description}</p>
-            </li>
-          {/each}
-        </ol>
-
-        <div class="implementation-summary">
-          <strong>O que cada unidade deverá preparar</strong>
-          <p>
-            Responsável local, usuários, cinco números de WhatsApp e participação nos treinamentos previstos no cronograma oficial.
-          </p>
+        <div class="shrink-0 bg-[#ffcd40] px-6 py-4 text-sm font-extrabold text-[#2B4091]">
+          Cronograma oficial será comunicado pela Rede Cebrac
         </div>
       </div>
-    </section>
-  </main>
+    </div>
+  </section>
 
-  <footer class="page-footer">
-    <div class="footer-container">
-      <div class="footer-brands">
-        <span class="footer-cebrac"><img src="/Logo-Cebrac.png" alt="Cebrac" /></span>
-        <span></span>
-        <img src="/logo_f10.svg" alt="F10 Software" />
+  <footer class="bg-white px-5 py-14 sm:px-8 lg:px-12">
+    <div class="mx-auto flex max-w-[1480px] flex-col gap-8 border-t border-[#2B4091]/12 pt-10 md:flex-row md:items-center md:justify-between">
+      <div class="flex items-center gap-5">
+        <img src="/Logo-Cebrac.png" alt="Cebrac" class="h-11 w-auto bg-[#2B4091] px-3 py-2" />
+        <div class="h-8 w-px bg-[#2B4091]/15"></div>
+        <img src="/logo_f10.svg" alt="F10 Software" class="h-9 w-auto" />
       </div>
-      <p>
+      <p class="max-w-[760px] text-base font-semibold leading-7 text-[#2B4091]/70">
         O objetivo da mudança é criar uma operação comercial mais organizada, contínua e mensurável em toda a Rede Cebrac.
       </p>
-      <a href="#inicio">Voltar ao início <ArrowUp size={17} /></a>
+      <a href="#inicio" class="inline-flex items-center gap-2 text-sm font-extrabold text-[#2B4091] transition hover:text-[#61CE70]">
+        Voltar ao início <ArrowUp size={18} />
+      </a>
     </div>
   </footer>
 </div>
 
 <style>
-  :global(html) {
-    scroll-behavior: smooth;
-  }
-
   .page-shell {
-    --blue: #2b4091;
-    --blue-dark: #1f3078;
-    --orange: #f36b21;
-    --yellow: #ffcd40;
-    --green: #61ce70;
-    --ink: #18265f;
-    --muted: #6773a4;
-    --line: rgba(43, 64, 145, 0.15);
-    --paper: #f7f8fc;
     font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-    color: var(--ink);
-    background: white;
   }
 
-  .hero-section {
-    position: relative;
-    min-height: 720px;
-    overflow: hidden;
-    background: white;
+  .hero-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .hero-background {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    opacity: 0.86;
+  .brand-lockup,
+  .journey-panel,
+  .crm-figure,
+  .investment-table,
+  .price-highlight,
+  .base-price {
+    border-radius: 22px;
   }
 
-  .hero-container {
-    position: relative;
-    z-index: 1;
+  .hero-notes div {
     display: grid;
-    width: min(1460px, calc(100% - 2.5rem));
-    min-height: 720px;
-    margin: 0 auto;
-    align-items: center;
-    gap: 2rem;
-    padding: 4.5rem 0 3.5rem;
+    gap: 0.3rem;
   }
 
-  .hero-copy {
-    max-width: 740px;
+  .hero-notes span {
+    color: rgba(43, 64, 145, 0.52);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
   }
 
-  .brand-lockup {
-    display: inline-flex;
-    min-height: 58px;
-    align-items: center;
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.94);
-    box-shadow: 0 16px 45px rgba(43, 64, 145, 0.12);
+  .hero-notes strong {
+    color: #2b4091;
+    font-size: 0.95rem;
   }
 
-  .brand-cebrac {
-    display: flex;
-    min-height: 58px;
-    align-items: center;
-    background: var(--blue);
-    padding: 0 1.35rem;
+  .hero-image-fade {
+    position: absolute;
+    inset: 0 auto 0 -12%;
+    z-index: 1;
+    width: 30%;
+    background: linear-gradient(90deg, #ffffff 8%, rgba(255, 255, 255, 0.92) 38%, rgba(255, 255, 255, 0));
   }
 
-  .brand-cebrac img {
-    width: 170px;
-    height: 38px;
-    object-fit: contain;
+  .nav-links {
+    scrollbar-width: none;
   }
 
-  .brand-divider {
-    width: 1px;
-    height: 30px;
-    background: var(--line);
+  .nav-links::-webkit-scrollbar {
+    display: none;
   }
 
-  .brand-f10 {
-    width: 78px;
-    height: 36px;
-    margin: 0 1.4rem;
-    object-fit: contain;
+  .nav-link {
+    flex: 0 0 auto;
+    border-radius: 9999px;
+    padding: 0.58rem 0.88rem;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 0.74rem;
+    font-weight: 800;
+    transition: background-color 160ms ease, color 160ms ease;
   }
 
-  .eyebrow {
-    margin: 0;
-    color: var(--blue);
-    font-size: 0.72rem;
+  .nav-link:hover,
+  .nav-link:focus-visible {
+    background: #ffcd40;
+    color: #2b4091;
+    outline: none;
+  }
+
+  .section-label {
+    color: #2b4091;
+    font-size: 0.74rem;
     font-weight: 800;
     letter-spacing: 0.19em;
     text-transform: uppercase;
   }
 
-  .eyebrow-orange {
-    margin-top: 2.2rem;
-    color: var(--orange);
-  }
-
-  .eyebrow-yellow {
-    color: var(--yellow);
-  }
-
-  .hero-copy h1 {
-    max-width: 720px;
-    margin: 1rem 0 0;
-    color: var(--blue);
-    font-size: clamp(2.75rem, 5.2vw, 5.2rem);
-    font-weight: 600;
-    letter-spacing: -0.055em;
-    line-height: 0.99;
-  }
-
-  .hero-description {
-    max-width: 670px;
-    margin: 1.65rem 0 0;
-    color: rgba(43, 64, 145, 0.78);
-    font-size: 1.15rem;
-    line-height: 1.85;
-  }
-
-  .hero-facts {
-    display: grid;
-    max-width: 720px;
-    margin: 2rem 0 0;
-    border-top: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
-  }
-
-  .hero-facts div {
-    padding: 1rem 0;
-  }
-
-  .hero-facts dt {
-    color: var(--orange);
-    font-size: 0.66rem;
-    font-weight: 800;
-    letter-spacing: 0.13em;
-    text-transform: uppercase;
-  }
-
-  .hero-facts dd {
-    margin: 0.35rem 0 0;
-    color: var(--blue);
-    font-size: 0.92rem;
-    font-weight: 700;
-  }
-
-  .hero-visual {
-    display: none;
-  }
-
-  .hero-visual img {
-    display: block;
-    width: 112%;
-    max-width: none;
-    filter: drop-shadow(0 34px 45px rgba(43, 64, 145, 0.2));
-  }
-
-  .page-nav {
-    position: sticky;
-    z-index: 40;
-    top: 0;
-    background: var(--blue);
-    box-shadow: 0 8px 30px rgba(25, 39, 104, 0.14);
-  }
-
-  .page-nav-inner {
-    display: flex;
-    width: min(1280px, calc(100% - 2rem));
-    margin: 0 auto;
-    align-items: center;
-    gap: 1.5rem;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .page-nav-inner::-webkit-scrollbar,
-  .page-nav-links::-webkit-scrollbar {
-    display: none;
-  }
-
-  .page-nav-inner > img {
-    display: none;
-    width: 132px;
-    height: 32px;
-    flex: 0 0 auto;
-    object-fit: contain;
-  }
-
-  .page-nav-links {
-    display: flex;
-    min-width: max-content;
-    align-items: center;
-    gap: 0.2rem;
-    overflow-x: auto;
-    padding: 0.62rem 0;
-    scrollbar-width: none;
-  }
-
-  .page-nav-links a {
-    border-radius: 999px;
-    color: rgba(255, 255, 255, 0.76);
-    font-size: 0.72rem;
-    font-weight: 700;
-    padding: 0.55rem 0.78rem;
-    text-decoration: none;
-    transition: background 160ms ease, color 160ms ease;
-  }
-
-  .page-nav-links a:hover,
-  .page-nav-links a:focus-visible {
-    background: rgba(255, 255, 255, 0.12);
-    color: white;
-    outline: none;
-  }
-
-  .section {
-    scroll-margin-top: 56px;
-    padding: 5.5rem 1.25rem;
-  }
-
-  .section-container {
-    width: min(1200px, 100%);
-    margin: 0 auto;
-  }
-
-  .section-light {
-    background: white;
-  }
-
-  .section-paper {
-    background: var(--paper);
-  }
-
-  .section-blue {
-    background: var(--blue);
-    color: white;
-  }
-
-  .section-heading h2 {
-    margin: 0.8rem 0 0;
-    color: var(--blue);
-    font-size: clamp(2.2rem, 4vw, 3.65rem);
+  .section-title {
+    color: #2b4091;
+    font-size: clamp(2.35rem, 3.7vw, 3.7rem);
     font-weight: 600;
     letter-spacing: -0.045em;
-    line-height: 1.05;
+    line-height: 1.08;
   }
 
-  .section-heading > p:last-child,
-  .section-heading + p {
-    color: var(--muted);
-    font-size: 1.02rem;
-    line-height: 1.85;
-  }
-
-  .section-heading-light h2 {
-    color: white;
-  }
-
-  .context-layout {
+  .journey-flow {
     display: grid;
-    gap: 3.5rem;
-  }
-
-  .context-heading p:last-child {
-    margin: 1.5rem 0 0;
-  }
-
-  .journey-panel {
-    position: relative;
-    border-top: 3px solid var(--blue);
-    padding-top: 1.5rem;
-  }
-
-  .journey-line {
-    display: none;
-  }
-
-  .journey-list {
-    display: grid;
-    margin: 0;
-    padding: 0;
-    list-style: none;
+    gap: 0;
   }
 
   .journey-item {
+    position: relative;
     display: grid;
-    grid-template-columns: 36px 44px 1fr;
-    gap: 0.75rem;
-    align-items: start;
-    padding: 1.25rem 0;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .journey-number {
-    padding-top: 0.7rem;
-    color: var(--orange);
-    font-size: 0.72rem;
-    font-weight: 800;
-  }
-
-  .journey-icon {
-    display: flex;
-    width: 42px;
-    height: 42px;
+    grid-template-columns: 38px 1fr;
+    gap: 0.85rem;
     align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    background: rgba(97, 206, 112, 0.17);
-    color: var(--blue);
+    min-height: 56px;
+    border-bottom: 1px solid rgba(43, 64, 145, 0.1);
   }
 
-  .journey-item h3 {
-    margin: 0;
-    color: var(--blue);
-    font-size: 1rem;
+  .journey-item:last-child {
+    border-bottom: 0;
   }
 
-  .journey-item p {
-    margin: 0.35rem 0 0;
-    color: var(--muted);
-    font-size: 0.85rem;
-    line-height: 1.55;
-  }
-
-  .context-note {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.65rem;
-    margin-top: 1.5rem;
-    align-items: center;
-  }
-
-  .context-note strong {
-    width: 100%;
-    color: var(--blue);
-    font-size: 0.82rem;
-  }
-
-  .context-note span {
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    color: var(--muted);
+  .journey-item > span {
+    color: #f36b21;
     font-size: 0.75rem;
-    padding: 0.45rem 0.65rem;
-  }
-
-  .model-intro,
-  .benefit-intro,
-  .resources-intro,
-  .implementation-intro {
-    display: grid;
-    gap: 1.5rem;
-    align-items: end;
-  }
-
-  .model-intro > p,
-  .implementation-intro > p {
-    margin: 0;
-    color: rgba(255, 255, 255, 0.68);
-    font-size: 1rem;
-    line-height: 1.8;
-  }
-
-  .model-showcase {
-    display: grid;
-    gap: 2.5rem;
-    margin-top: 3.5rem;
-    align-items: center;
-  }
-
-  .model-copy {
-    border-top: 1px solid rgba(255, 255, 255, 0.18);
-  }
-
-  .model-statement {
-    display: grid;
-    grid-template-columns: 46px 1fr;
-    gap: 0.9rem;
-    padding: 1.4rem 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
-  }
-
-  .model-statement > span {
-    color: var(--yellow);
-    font-size: 0.78rem;
     font-weight: 800;
   }
 
-  .model-statement strong {
-    color: white;
-    font-size: 1.05rem;
+  .journey-item strong {
+    color: #2b4091;
+    font-size: 0.95rem;
   }
 
-  .model-statement p {
-    margin: 0.45rem 0 0;
-    color: rgba(255, 255, 255, 0.64);
-    font-size: 0.86rem;
-    line-height: 1.6;
-  }
-
-  .crm-figure {
-    overflow: hidden;
-    margin: 0;
-    border: 1px solid rgba(255, 255, 255, 0.19);
-    border-radius: 18px;
-    background: white;
-    box-shadow: 0 26px 70px rgba(8, 18, 67, 0.32);
-  }
-
-  .browser-bar {
-    display: flex;
-    min-height: 42px;
-    align-items: center;
-    gap: 0.4rem;
-    border-bottom: 1px solid var(--line);
-    background: #f2f4fa;
-    padding: 0 1rem;
-  }
-
-  .browser-bar span {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--green);
-  }
-
-  .browser-bar span:nth-child(2) {
-    background: var(--yellow);
-  }
-
-  .browser-bar span:nth-child(3) {
-    background: var(--orange);
-  }
-
-  .browser-bar small {
-    margin-left: 0.4rem;
-    color: var(--muted);
-    font-size: 0.63rem;
-    font-weight: 800;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
-  .crm-figure img {
-    display: block;
-    width: 100%;
-  }
-
-  .crm-figure figcaption {
-    border-top: 1px solid var(--line);
-    color: var(--muted);
-    font-size: 0.72rem;
-    line-height: 1.5;
-    padding: 0.8rem 1rem;
-  }
-
-  .change-layout {
-    display: grid;
-    gap: 3rem;
-  }
-
-  .change-heading p:last-child {
-    margin: 1.4rem 0 0;
-  }
-
-  .change-list {
-    border-top: 3px solid var(--blue);
-  }
-
-  .change-header {
+  .journey-arrow {
     display: none;
   }
 
-  .change-row {
-    display: grid;
-    gap: 0.75rem;
-    padding: 1.35rem 0;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .change-row > strong {
-    color: var(--orange);
-    font-size: 0.72rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  .change-row p {
-    margin: 0;
-    color: var(--muted);
-    font-size: 0.88rem;
-    line-height: 1.6;
-  }
-
-  .change-future {
-    display: grid;
-    grid-template-columns: 24px 1fr;
-    gap: 0.5rem;
-    color: var(--green);
-  }
-
-  .change-future p {
-    color: var(--blue);
-    font-weight: 700;
-  }
-
-  .benefit-intro > p,
-  .resources-intro > p {
-    margin: 0;
-    color: var(--muted);
-    font-size: 1rem;
-    line-height: 1.8;
-  }
-
-  .benefit-grid {
-    display: grid;
-    gap: 2rem;
-    margin-top: 3.25rem;
-  }
-
-  .benefit-item {
-    border-top: 4px solid var(--blue);
-    padding-top: 1.2rem;
-  }
-
-  .benefit-item:nth-child(2) {
-    border-color: var(--green);
-  }
-
-  .benefit-item:nth-child(3) {
-    border-color: var(--orange);
-  }
-
-  .benefit-meta {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    color: var(--blue);
-  }
-
-  .benefit-meta span {
-    color: rgba(43, 64, 145, 0.25);
-    font-size: 2rem;
-    font-weight: 700;
-  }
-
-  .benefit-item h3 {
-    margin: 1rem 0 0;
-    color: var(--blue);
-    font-size: 1.35rem;
-    line-height: 1.25;
-  }
-
-  .benefit-item > p {
-    margin: 0.8rem 0 0;
-    color: var(--muted);
-    font-size: 0.9rem;
-    line-height: 1.7;
-  }
-
-  .benefit-item > strong {
-    display: block;
-    margin-top: 1.1rem;
-    color: var(--ink);
-    font-size: 0.78rem;
-    line-height: 1.5;
-  }
-
-  .metric-band {
-    margin-top: 4rem;
-    background: var(--blue);
-    color: white;
-    padding: 1.5rem;
-  }
-
-  .metric-band-heading span {
-    color: var(--yellow);
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-  }
-
-  .metric-band-heading strong {
-    display: block;
-    margin-top: 0.45rem;
-    font-size: 1.15rem;
-  }
-
-  .metric-grid {
-    display: grid;
-    gap: 1rem;
-    margin-top: 1.5rem;
-  }
-
-  .metric-grid article {
-    display: grid;
-    grid-template-columns: 34px 1fr;
-    gap: 0.7rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.17);
-    padding-top: 1rem;
-  }
-
-  .metric-grid article > :global(svg) {
-    color: var(--green);
-  }
-
-  .metric-grid h3 {
-    margin: 0;
-    color: white;
-    font-size: 0.88rem;
-  }
-
-  .metric-grid p {
-    margin: 0.3rem 0 0;
-    color: rgba(255, 255, 255, 0.62);
-    font-size: 0.75rem;
-    line-height: 1.5;
-  }
-
-  .section-resources {
-    background: #f2f4fa;
-  }
-
-  .resource-list {
-    margin-top: 3.25rem;
-    border-top: 3px solid var(--blue);
-  }
-
-  .resource-row {
-    display: grid;
-    gap: 1rem;
-    padding: 1.75rem 0;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .resource-index {
-    color: rgba(43, 64, 145, 0.25);
-    font-size: 1.6rem;
-    font-weight: 700;
-  }
-
-  .resource-title {
+  .risk-row,
+  .feature-line {
     display: grid;
     grid-template-columns: 44px 1fr;
-    gap: 0.85rem;
+    gap: 1rem;
     align-items: start;
+    padding: 1.35rem 0;
+    border-bottom: 1px solid rgba(43, 64, 145, 0.12);
   }
 
-  .resource-icon {
+  .risk-row > :global(svg) {
+    margin-top: 0.15rem;
+    color: #2b4091;
+  }
+
+  .risk-row h3,
+  .feature-line h4 {
+    color: #2b4091;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .risk-row p,
+  .feature-line p {
+    margin-top: 0.35rem;
+    color: rgba(43, 64, 145, 0.65);
+    font-size: 0.88rem;
+    line-height: 1.55rem;
+  }
+
+  .feature-line-dark {
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .feature-line-dark h4 {
+    color: white;
+  }
+
+  .feature-line-dark p {
+    color: rgba(255, 255, 255, 0.63);
+  }
+
+  .feature-icon {
     display: flex;
     width: 42px;
     height: 42px;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
-    background: rgba(97, 206, 112, 0.18);
-    color: var(--blue);
+    border-radius: 12px;
+    color: #2b4091;
   }
 
-  .resource-title small {
-    color: var(--orange);
-    font-size: 0.66rem;
+  .feature-icon-yellow {
+    background: #ffcd40;
+  }
+
+  .feature-icon-green {
+    background: rgba(97, 206, 112, 0.2);
+  }
+
+  .feature-line-dark .feature-icon-green {
+    background: #61ce70;
+  }
+
+  .distribution-example {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    max-width: 470px;
+    padding: 1.1rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+  }
+
+  .distribution-example > span {
+    grid-column: 1 / -1;
+    color: #ffcd40;
+    font-size: 0.7rem;
     font-weight: 800;
-    letter-spacing: 0.13em;
+    letter-spacing: 0.15em;
     text-transform: uppercase;
   }
 
-  .resource-title h3 {
-    margin: 0.35rem 0 0;
-    color: var(--blue);
-    font-size: 1.3rem;
-    line-height: 1.3;
-  }
-
-  .resource-content > p {
-    margin: 0;
-    color: var(--muted);
-    font-size: 0.88rem;
-    line-height: 1.7;
-  }
-
-  .resource-content ul {
+  .distribution-example > div {
     display: grid;
-    gap: 0.65rem;
-    margin: 1rem 0 0;
-    padding: 0;
-    list-style: none;
+    gap: 0.25rem;
+    padding: 0.9rem;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
   }
 
-  .resource-content li {
-    display: flex;
-    gap: 0.55rem;
-    color: var(--blue);
-    font-size: 0.82rem;
-    font-weight: 700;
+  .distribution-example strong {
+    color: #ffcd40;
+    font-size: 2rem;
+    line-height: 1;
   }
 
-  .resource-content li :global(svg) {
-    flex: 0 0 auto;
-    color: var(--green);
+  .distribution-example small {
+    color: rgba(255, 255, 255, 0.68);
   }
 
-  .whatsapp-distribution {
+  .benefit-columns {
     display: grid;
-    gap: 1.25rem;
-    margin-top: 2.5rem;
-    align-items: center;
-    border-left: 5px solid var(--green);
-    background: white;
-    padding: 1.5rem;
-    box-shadow: 0 18px 45px rgba(43, 64, 145, 0.08);
+    gap: 2.2rem;
   }
 
-  .whatsapp-distribution > div:first-child {
-    display: flex;
-    gap: 0.8rem;
-    align-items: center;
+  .benefit-column {
+    position: relative;
+    padding: 0 0 2rem;
+    border-bottom: 1px solid rgba(43, 64, 145, 0.12);
   }
 
-  .whatsapp-distribution > div:first-child span {
-    color: var(--blue);
-    font-size: 3rem;
+  .benefit-number {
+    position: absolute;
+    right: 0;
+    top: -0.35rem;
+    color: rgba(43, 64, 145, 0.08);
+    font-size: 3.5rem;
     font-weight: 700;
     line-height: 1;
   }
 
-  .whatsapp-distribution > div:first-child strong {
-    color: var(--blue);
-    font-size: 1rem;
-    line-height: 1.4;
-  }
-
-  .whatsapp-distribution > p {
-    margin: 0;
-    color: var(--muted);
-    font-size: 0.85rem;
-    line-height: 1.65;
-  }
-
-  .distribution-example {
-    display: flex;
-    gap: 0.7rem;
-  }
-
-  .distribution-example span {
-    min-width: 96px;
-    background: var(--paper);
-    color: var(--muted);
-    font-size: 0.75rem;
-    padding: 0.7rem 0.8rem;
-  }
-
-  .distribution-example strong {
-    display: block;
-    color: var(--orange);
-    font-size: 1.5rem;
-  }
-
-  .section-investment {
-    background: #fffaf5;
-  }
-
-  .investment-layout {
-    display: grid;
-    gap: 3rem;
-  }
-
-  .investment-main {
-    border-top: 4px solid var(--orange);
-    padding-top: 1.5rem;
-  }
-
-  .price-line {
-    display: flex;
-    margin-top: 1.2rem;
-    align-items: flex-end;
-    color: var(--orange);
-  }
-
-  .price-line span {
-    padding-bottom: 0.65rem;
-    font-size: 1.15rem;
-    font-weight: 800;
-  }
-
-  .price-line strong {
-    font-size: clamp(4rem, 9vw, 6.5rem);
-    font-weight: 600;
-    letter-spacing: -0.07em;
-    line-height: 0.85;
-  }
-
-  .price-period {
-    margin: 0.7rem 0 0;
-    color: var(--blue);
-    font-size: 0.85rem;
+  .benefit-column h3 {
+    margin-top: 1.25rem;
+    color: #2b4091;
+    font-size: 1.35rem;
     font-weight: 700;
   }
 
-  .investment-description {
-    margin: 1.5rem 0 0;
-    color: var(--muted);
-    font-size: 0.95rem;
-    line-height: 1.75;
+  .benefit-column p {
+    margin-top: 0.75rem;
+    max-width: 410px;
+    color: rgba(43, 64, 145, 0.66);
+    line-height: 1.75rem;
   }
 
-  .included-list {
+  .metric-item {
     display: grid;
+    grid-template-columns: 34px 1fr;
     gap: 0.8rem;
-    margin: 1.6rem 0 0;
-    padding: 0;
-    list-style: none;
+    color: #2b4091;
   }
 
-  .included-list li {
-    display: flex;
-    gap: 0.6rem;
-    color: var(--blue);
-    font-size: 0.86rem;
-    font-weight: 700;
+  .metric-item strong,
+  .metric-item span {
+    display: block;
   }
 
-  .included-list :global(svg) {
-    flex: 0 0 auto;
-    color: var(--green);
+  .metric-item strong {
+    font-size: 0.95rem;
   }
 
-  .investment-notes {
+  .metric-item span {
+    margin-top: 0.25rem;
+    color: rgba(43, 64, 145, 0.6);
+    font-size: 0.8rem;
+    line-height: 1.3rem;
+  }
+
+  .comparison-header,
+  .comparison-row {
     display: grid;
-    gap: 0.45rem;
-    margin-top: 1.6rem;
-    border-top: 1px solid var(--line);
-    padding-top: 1.2rem;
+    grid-template-columns: 0.36fr 0.82fr 0.82fr;
+    gap: 1.4rem;
+    align-items: center;
   }
 
-  .investment-notes p {
-    margin: 0;
-    color: var(--muted);
-    font-size: 0.78rem;
-    line-height: 1.6;
+  .comparison-header {
+    padding: 0.9rem 1.2rem;
+    background: #2b4091;
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
   }
 
-  .investment-notes strong {
-    color: var(--blue);
+  .comparison-row {
+    padding: 1.35rem 1.2rem;
+    border-bottom: 1px solid rgba(43, 64, 145, 0.11);
   }
 
-  .cash-panel {
-    background: white;
-    border: 1px solid var(--line);
-    padding: 1.5rem;
-    box-shadow: 0 22px 60px rgba(43, 64, 145, 0.09);
+  .comparison-row > strong {
+    color: #2b4091;
+    font-size: 0.9rem;
   }
 
-  .cash-heading > span {
-    color: var(--green);
+  .comparison-row p {
+    color: rgba(43, 64, 145, 0.62);
+    font-size: 0.88rem;
+    line-height: 1.5rem;
+  }
+
+  .comparison-future {
+    display: flex;
+    gap: 0.65rem;
+    align-items: flex-start;
+    color: #2b4091 !important;
+    font-weight: 650;
+  }
+
+  .comparison-future :global(svg) {
+    flex: 0 0 auto;
+    margin-top: 0.18rem;
+    color: #61ce70;
+  }
+
+  .price-highlight {
+    max-width: 520px;
+    padding: 1.6rem 1.8rem;
+    background: #2b4091;
+    color: white;
+    box-shadow: 0 20px 48px rgba(43, 64, 145, 0.18);
+  }
+
+  .price-highlight > span {
+    display: block;
+    color: #ffcd40;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .price-highlight strong {
+    display: block;
+    margin-top: 0.45rem;
+    font-size: clamp(3.2rem, 6vw, 5.2rem);
+    font-weight: 600;
+    letter-spacing: -0.06em;
+    line-height: 1;
+  }
+
+  .price-highlight small {
+    margin-left: 0.3rem;
+    font-size: 1.1rem;
+    letter-spacing: 0;
+  }
+
+  .price-highlight p {
+    margin-top: 0.65rem;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 0.95rem;
+  }
+
+  .base-price {
+    display: grid;
+    gap: 0.25rem;
+    max-width: 520px;
+    padding: 1rem 1.2rem;
+    border: 1px solid rgba(43, 64, 145, 0.14);
+    background: rgba(255, 255, 255, 0.72);
+  }
+
+  .base-price span {
+    color: rgba(43, 64, 145, 0.55);
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .base-price strong {
+    color: #2b4091;
+    font-size: 1.1rem;
+  }
+
+  .investment-table-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.4rem 1.5rem;
+    color: #2b4091;
+  }
+
+  .investment-table-title span,
+  .investment-table-title strong {
+    display: block;
+  }
+
+  .investment-table-title span {
+    color: #f36b21;
     font-size: 0.7rem;
     font-weight: 800;
     letter-spacing: 0.14em;
     text-transform: uppercase;
   }
 
-  .cash-heading h3 {
-    margin: 0.65rem 0 0;
-    color: var(--blue);
-    font-size: 1.65rem;
-    line-height: 1.25;
+  .investment-table-title strong {
+    margin-top: 0.3rem;
+    font-size: 1.15rem;
   }
 
-  .cash-heading p {
-    margin: 0.9rem 0 0;
-    color: var(--muted);
-    font-size: 0.86rem;
-    line-height: 1.7;
-  }
-
-  .cash-examples {
+  .investment-table-header,
+  .investment-row {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-top: 1.5rem;
-    border-top: 1px solid var(--line);
-    border-left: 1px solid var(--line);
-  }
-
-  .cash-examples article {
-    border-right: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
-    padding: 1rem;
-  }
-
-  .cash-examples span {
-    display: block;
-    color: var(--muted);
-    font-size: 0.68rem;
-  }
-
-  .cash-examples strong {
-    display: block;
-    margin-top: 0.35rem;
-    color: var(--blue);
-    font-size: 1.25rem;
-  }
-
-  .cash-launch-note {
-    margin-top: 1.4rem;
-    border-left: 4px solid var(--yellow);
-    background: #fffbec;
-    padding: 1rem;
-  }
-
-  .cash-launch-note strong {
-    color: var(--blue);
-    font-size: 0.82rem;
-  }
-
-  .cash-launch-note p {
-    margin: 0.35rem 0 0;
-    color: var(--muted);
-    font-size: 0.74rem;
-    line-height: 1.6;
-  }
-
-  .implementation-list {
-    display: grid;
-    gap: 2rem;
-    margin: 3.25rem 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .implementation-list li {
-    position: relative;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
-    padding-top: 1.35rem;
-  }
-
-  .implementation-number {
-    display: inline-flex;
-    width: 44px;
-    height: 44px;
+    grid-template-columns: 1fr 0.9fr 0.48fr;
+    gap: 1rem;
     align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    background: var(--yellow);
-    color: var(--blue);
-    font-size: 0.72rem;
-    font-weight: 800;
   }
 
-  .implementation-list small {
-    display: block;
-    margin-top: 1rem;
-    color: var(--green);
-    font-size: 0.65rem;
+  .investment-table-header {
+    padding: 0.85rem 1.5rem;
+    background: #2b4091;
+    color: white;
+    font-size: 0.68rem;
     font-weight: 800;
     letter-spacing: 0.12em;
     text-transform: uppercase;
   }
 
-  .implementation-list h3 {
-    margin: 0.4rem 0 0;
-    color: white;
-    font-size: 1.2rem;
+  .investment-row {
+    min-height: 66px;
+    padding: 0.95rem 1.5rem;
+    border-bottom: 1px solid rgba(43, 64, 145, 0.1);
+    color: #2b4091;
   }
 
-  .implementation-list p {
-    margin: 0.6rem 0 0;
-    color: rgba(255, 255, 255, 0.62);
-    font-size: 0.83rem;
-    line-height: 1.65;
+  .investment-row > strong:last-child {
+    color: #f36b21;
+    font-size: 1.12rem;
+    text-align: right;
   }
 
-  .implementation-summary {
+  .investment-row span {
+    color: rgba(43, 64, 145, 0.58);
+    font-size: 0.82rem;
+  }
+
+  .investment-row-highlighted {
+    background: rgba(97, 206, 112, 0.12);
+  }
+
+  .investment-row-highlighted > strong:first-child::after {
+    content: "Melhor condição";
+    display: inline-block;
+    margin-left: 0.65rem;
+    padding: 0.25rem 0.45rem;
+    border-radius: 9999px;
+    background: #61ce70;
+    color: #12346f;
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    vertical-align: middle;
+  }
+
+  .investment-note {
+    padding: 1rem 1.5rem;
+    background: #f6f8fc;
+    color: rgba(43, 64, 145, 0.65);
+    font-size: 0.78rem;
+    line-height: 1.35rem;
+  }
+
+  .implementation-grid {
     display: grid;
-    gap: 0.5rem;
-    margin-top: 3rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.18);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
-    padding: 1.4rem 0;
+    gap: 2rem;
   }
 
-  .implementation-summary strong {
-    color: var(--yellow);
-    font-size: 0.72rem;
-    letter-spacing: 0.13em;
+  .implementation-step {
+    position: relative;
+    padding-top: 1.3rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+  }
+
+  .implementation-number {
+    display: flex;
+    width: 48px;
+    height: 48px;
+    align-items: center;
+    justify-content: center;
+    margin-top: -3rem;
+    border-radius: 9999px;
+    background: #ffcd40;
+    color: #2b4091;
+    font-size: 0.75rem;
+    font-weight: 800;
+  }
+
+  .implementation-step small {
+    display: block;
+    margin-top: 1rem;
+    color: #61ce70;
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
   }
 
-  .implementation-summary p {
-    margin: 0;
+  .implementation-step h3 {
+    margin-top: 0.35rem;
     color: white;
-    font-size: 1rem;
-    line-height: 1.6;
+    font-size: 1.35rem;
+    font-weight: 650;
   }
 
-  .page-footer {
-    background: white;
-    padding: 3rem 1.25rem;
-  }
-
-  .footer-container {
-    display: grid;
-    width: min(1200px, 100%);
-    margin: 0 auto;
-    gap: 1.5rem;
-    align-items: center;
-    border-top: 1px solid var(--line);
-    padding-top: 2rem;
-  }
-
-  .footer-brands {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .footer-brands > span:nth-child(2) {
-    width: 1px;
-    height: 34px;
-    background: var(--line);
-  }
-
-  .footer-cebrac {
-    display: flex;
-    align-items: center;
-    background: var(--blue);
-    padding: 0.45rem 0.7rem;
-  }
-
-  .footer-cebrac img {
-    width: 135px;
-    height: 31px;
-    object-fit: contain;
-  }
-
-  .footer-brands > img {
-    width: 68px;
-    height: 36px;
-    object-fit: contain;
-  }
-
-  .footer-container > p {
-    margin: 0;
-    color: var(--muted);
-    font-size: 0.85rem;
-    line-height: 1.7;
-  }
-
-  .footer-container > a {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    color: var(--blue);
-    font-size: 0.78rem;
-    font-weight: 800;
-    text-decoration: none;
+  .implementation-step p {
+    margin-top: 0.6rem;
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 0.88rem;
+    line-height: 1.55rem;
   }
 
   @media (min-width: 640px) {
-    .hero-facts {
+    .journey-flow {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      background: rgba(43, 64, 145, 0.1);
+    }
+
+    .journey-item {
+      display: flex;
+      min-height: 100px;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 0.45rem;
+      padding: 1rem;
+      border: 0;
+      background: #f6f8fc;
+    }
+
+    .journey-item:nth-child(n + 5) {
+      min-height: 90px;
+    }
+
+    .benefit-columns {
       grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0;
     }
 
-    .hero-facts div {
-      padding: 1rem 1.1rem;
-      border-right: 1px solid var(--line);
+    .benefit-column {
+      min-height: 280px;
+      padding: 0 2rem 0;
+      border-right: 1px solid rgba(43, 64, 145, 0.12);
+      border-bottom: 0;
     }
 
-    .hero-facts div:first-child {
+    .benefit-column:first-child {
       padding-left: 0;
     }
 
-    .hero-facts div:last-child {
+    .benefit-column:last-child {
+      padding-right: 0;
       border-right: 0;
-    }
-
-    .metric-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .whatsapp-distribution {
-      grid-template-columns: 0.8fr 1.3fr auto;
-    }
-  }
-
-  @media (min-width: 768px) {
-    .section {
-      padding: 6.5rem 2rem;
-    }
-
-    .benefit-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    .metric-band {
-      display: grid;
-      grid-template-columns: 0.7fr 1.3fr;
-      gap: 2rem;
-      padding: 1.8rem 2rem;
-    }
-
-    .metric-grid {
-      margin-top: 0;
-    }
-
-    .resource-row {
-      grid-template-columns: 60px minmax(0, 0.9fr) minmax(0, 1.1fr);
-      gap: 1.5rem;
-      align-items: start;
-    }
-
-    .investment-layout {
-      grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
-      gap: 4rem;
-      align-items: start;
-    }
-
-    .cash-panel {
-      padding: 2rem;
-    }
-
-    .implementation-list {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .footer-container {
-      grid-template-columns: auto 1fr auto;
-      gap: 2rem;
     }
   }
 
   @media (min-width: 1024px) {
-    .hero-container {
-      grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
+    .hero-grid {
+      grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
+      column-gap: 0;
     }
 
     .hero-visual {
-      display: flex;
-      min-height: 620px;
-      margin-left: -7rem;
-      margin-right: -5rem;
-      align-items: center;
-      justify-content: flex-end;
-      pointer-events: none;
+      min-height: 720px;
+      margin-left: -10rem;
+      margin-right: -8rem;
     }
 
-    .page-nav-inner > img {
+    .hero-visual img {
+      width: 112%;
+      transform: translateX(2%);
+      transform-origin: center right;
+    }
+
+    .journey-flow {
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+
+    .journey-item,
+    .journey-item:nth-child(n + 5) {
+      min-height: 118px;
+    }
+
+    .journey-arrow {
+      position: absolute;
+      right: -10px;
+      top: 50%;
+      z-index: 2;
       display: block;
+      color: #f36b21;
+      transform: translateY(-50%);
     }
 
-    .context-layout {
-      grid-template-columns: minmax(0, 0.62fr) minmax(0, 1.38fr);
-      gap: 5rem;
-      align-items: start;
+    .implementation-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 2.5rem;
+      padding-top: 3rem;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .comparison-header {
+      display: none;
     }
 
-    .context-heading {
-      position: sticky;
-      top: 92px;
+    .comparison-row {
+      grid-template-columns: 1fr;
+      gap: 0.65rem;
+      padding: 1.25rem 0;
     }
 
-    .model-intro,
-    .benefit-intro,
-    .resources-intro,
-    .implementation-intro {
-      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-      gap: 5rem;
-    }
-
-    .model-showcase {
-      grid-template-columns: minmax(0, 0.68fr) minmax(0, 1.32fr);
-      gap: 4rem;
-    }
-
-    .change-layout {
-      grid-template-columns: minmax(0, 0.55fr) minmax(0, 1.45fr);
-      gap: 5rem;
-      align-items: start;
-    }
-
-    .change-heading {
-      position: sticky;
-      top: 92px;
-    }
-
-    .change-header {
-      display: grid;
-      grid-template-columns: 0.45fr 1fr 1fr;
-      gap: 1.4rem;
-      padding: 0.8rem 0;
-      border-bottom: 1px solid var(--line);
-      color: var(--muted);
-      font-size: 0.65rem;
-      font-weight: 800;
+    .comparison-row > strong {
+      color: #f36b21;
+      font-size: 0.72rem;
       letter-spacing: 0.12em;
       text-transform: uppercase;
     }
 
-    .change-row {
-      grid-template-columns: 0.45fr 1fr 1fr;
-      gap: 1.4rem;
-      align-items: center;
+    .comparison-row p::before {
+      display: block;
+      margin-bottom: 0.25rem;
+      color: rgba(43, 64, 145, 0.45);
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
     }
 
-    .benefit-grid {
-      gap: 3rem;
+    .comparison-row p:nth-child(2)::before {
+      content: "Hoje";
     }
 
-    .implementation-list {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 2.5rem;
+    .comparison-future::before {
+      content: "Com o novo padrão";
     }
 
-    .implementation-summary {
-      grid-template-columns: 0.45fr 1.55fr;
-      gap: 2rem;
-      align-items: center;
+    .investment-table-header,
+    .investment-row {
+      grid-template-columns: 1fr auto;
+    }
+
+    .investment-table-header span:nth-child(2),
+    .investment-row span {
+      display: none;
+    }
+
+    .investment-row > strong:last-child {
+      text-align: right;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    :global(html) {
-      scroll-behavior: auto;
-    }
-
     .page-shell *,
     .page-shell *::before,
     .page-shell *::after {
+      scroll-behavior: auto !important;
       transition-duration: 0.01ms !important;
     }
+  }
+
+  :global(html) {
+    scroll-behavior: smooth;
   }
 </style>
