@@ -6,7 +6,6 @@
     Building2,
     CalendarCheck2,
     CheckCircle2,
-    ClipboardCheck,
     Clock3,
     FileText,
     Funnel,
@@ -18,13 +17,11 @@
     TrendingUp,
     UserCheck,
     UsersRound,
-    Workflow,
   } from "lucide-svelte";
 
   type IconComponent = typeof Target;
 
   type FeatureItem = {
-    number?: string;
     title: string;
     description: string;
     icon: IconComponent;
@@ -35,11 +32,12 @@
     future: string;
   };
 
-  type ResponsibilityItem = {
-    title: string;
-    subtitle: string;
-    icon: IconComponent;
-    items: string[];
+  type CampaignRow = {
+    month: string;
+    f10CashShare: string;
+    turbo: string;
+    totalDiscount: string;
+    finalValue: string;
   };
 
   type ImplementationStep = {
@@ -49,132 +47,122 @@
     owner: string;
   };
 
-  const projectSummary: FeatureItem[] = [
+  const benefits: FeatureItem[] = [
     {
-      number: "01",
-      title: "CRM de Leads",
-      description: "Organiza o funil, os responsáveis, as tarefas e o histórico comercial até a matrícula.",
-      icon: Workflow,
-    },
-    {
-      number: "02",
-      title: "WhatsApp integrado",
-      description: "Mantém as conversas dentro do contexto do lead e continua o relacionamento com o aluno.",
-      icon: MessageCircleMore,
-    },
-    {
-      number: "03",
-      title: "Cinco números por unidade",
-      description: "Os números podem ser distribuídos entre o CRM e o F10 conforme a necessidade da operação.",
-      icon: MessagesSquare,
-    },
-  ];
-
-  const journeySteps: FeatureItem[] = [
-    {
-      number: "01",
-      title: "Atrair",
-      description: "O lead entra com origem, responsável e contexto inicial.",
+      title: "Menos desperdício de marketing",
+      description:
+        "Mais oportunidades acompanhadas até uma conclusão, sem aumentar o investimento para gerar novos leads.",
       icon: Target,
     },
     {
-      number: "02",
-      title: "Nutrir",
-      description: "Tarefas, mensagens e lembretes orientam a sequência de contatos.",
-      icon: BellRing,
-    },
-    {
-      number: "03",
-      title: "Converter",
-      description: "A equipe acompanha prioridades, negociações e oportunidades paradas.",
-      icon: TrendingUp,
-    },
-    {
-      number: "04",
-      title: "Matricular",
-      description: "A conversão encerra o ciclo comercial e inicia a jornada do aluno.",
-      icon: CheckCircle2,
-    },
-  ];
-
-  const crmPracticeRows: FeatureItem[] = [
-    {
-      number: "A",
-      title: "A equipe sabe o que fazer hoje",
-      description: "Tarefas e lembretes mostram os retornos, contatos e follow-ups que não podem esperar.",
-      icon: CalendarCheck2,
-    },
-    {
-      number: "B",
-      title: "O histórico permanece na unidade",
-      description: "Mensagens, observações e negociações continuam disponíveis mesmo quando o responsável muda.",
+      title: "Mais continuidade comercial",
+      description:
+        "O histórico permanece na unidade mesmo quando vendedores, gestores ou responsáveis mudam.",
       icon: ShieldCheck,
     },
     {
-      number: "C",
-      title: "A gestão enxerga onde agir",
-      description: "A visão Kanban mostra gargalos, volume por etapa, oportunidades paradas e produtividade.",
-      icon: Funnel,
-    },
-  ];
-
-  const leadWhatsAppUses: FeatureItem[] = [
-    {
-      title: "Conversa vinculada ao lead",
-      description: "Cada mensagem permanece dentro do histórico da oportunidade.",
-      icon: MessagesSquare,
-    },
-    {
-      title: "Retorno mais rápido",
-      description: "A equipe responde com contexto, modelos e informações organizadas.",
+      title: "Mais produtividade",
+      description:
+        "A equipe enxerga quem precisa de retorno, qual é a próxima ação e há quanto tempo o lead está parado.",
       icon: Clock3,
     },
     {
-      title: "Continuidade comercial",
-      description: "A negociação não depende de um único aparelho ou colaborador.",
-      icon: ShieldCheck,
-    },
-  ];
-
-  const studentWhatsAppUses: FeatureItem[] = [
-    {
-      title: "Checklist pós-matrícula",
-      description: "Orientações, documentos e próximas etapas depois da venda.",
-      icon: ClipboardCheck,
+      title: "Mais controle para a gestão",
+      description:
+        "Responsáveis, atividades, gargalos e conversões passam a ser acompanhados em uma única operação.",
+      icon: BarChart3,
     },
     {
-      title: "Avisos aos faltantes",
-      description: "Comunicações e lembretes para apoiar a permanência do aluno.",
-      icon: BellRing,
+      title: "Mais previsibilidade",
+      description:
+        "A rede passa a trabalhar com um processo comercial comum, mensurável e mais fácil de evoluir.",
+      icon: TrendingUp,
     },
     {
-      title: "Cobranças e acordos",
-      description: "Boletos, lembretes financeiros e negociações com mais agilidade.",
-      icon: FileText,
-    },
-    {
-      title: "Comunicação administrativa",
-      description: "Um canal direto para assuntos acadêmicos e operacionais.",
-      icon: MessageCircleMore,
+      title: "Maior potencial de matrículas",
+      description:
+        "O ganho esperado vem do melhor aproveitamento dos leads já captados e pagos pela unidade.",
+      icon: CheckCircle2,
     },
   ];
 
   const comparisonItems: ComparisonItem[] = [
     {
-      current: "Informações espalhadas em planilhas, anotações e celulares",
+      current: "Conversas espalhadas em celulares, planilhas e anotações",
       future: "Histórico centralizado e vinculado à operação da unidade",
     },
     {
-      current: "Follow-ups dependentes da memória do vendedor",
-      future: "Tarefas, alertas e próximas ações organizadas pelo sistema",
+      current: "Retornos dependem da memória e da organização individual",
+      future: "Tarefas, alertas e próximas ações organizam os follow-ups",
     },
     {
-      current: "Dificuldade para saber onde cada lead está",
-      future: "Funil visual com responsáveis, prioridades e gargalos",
+      current: "O gestor descobre atrasos quando a oportunidade já esfriou",
+      future: "Indicadores mostram leads parados, atrasos e gargalos",
     },
     {
-      current: "Trocas na equipe interrompem negociações",
-      future: "O atendimento continua com todo o contexto preservado",
+      current: "A saída de um colaborador interrompe negociações",
+      future: "Outro profissional continua com todo o contexto preservado",
+    },
+    {
+      current: "Parte dos leads pagos pelo marketing não recebe continuidade",
+      future: "Cada oportunidade possui responsável e próxima atividade",
+    },
+    {
+      current: "Cada unidade trabalha com controles e rotinas diferentes",
+      future: "A rede adota um padrão comercial comum e mensurável",
+    },
+  ];
+
+  const crmFeatures: FeatureItem[] = [
+    {
+      title: "Funil visual",
+      description:
+        "Cada lead fica posicionado em uma etapa clara até a matrícula.",
+      icon: Funnel,
+    },
+    {
+      title: "Responsáveis e tarefas",
+      description:
+        "A equipe sabe quem deve agir, quando retornar e qual é a próxima ação.",
+      icon: CalendarCheck2,
+    },
+    {
+      title: "Histórico preservado",
+      description:
+        "Mensagens, observações, objeções e negociações permanecem na unidade.",
+      icon: FileText,
+    },
+    {
+      title: "Indicadores comerciais",
+      description:
+        "A gestão acompanha produtividade, conversão e oportunidades paradas.",
+      icon: BarChart3,
+    },
+  ];
+
+  const whatsappFeatures: FeatureItem[] = [
+    {
+      title: "Atendimento comercial",
+      description:
+        "Conversas com leads dentro do contexto da oportunidade no CRM.",
+      icon: MessagesSquare,
+    },
+    {
+      title: "Continuidade entre atendentes",
+      description:
+        "O atendimento não depende de um aparelho ou colaborador específico.",
+      icon: UsersRound,
+    },
+    {
+      title: "Relacionamento pós-matrícula",
+      description: "Comunicação com alunos e responsáveis dentro do F10.",
+      icon: MessageCircleMore,
+    },
+    {
+      title: "Comunicação administrativa",
+      description:
+        "Avisos, orientações, cobranças e acordos em um canal organizado.",
+      icon: BellRing,
     },
   ];
 
@@ -186,7 +174,8 @@
     },
     {
       title: "Leads sem próxima atividade",
-      description: "Oportunidades que precisam de uma ação definida pela equipe.",
+      description:
+        "Oportunidades que precisam de uma ação definida pela equipe.",
       icon: CalendarCheck2,
     },
     {
@@ -196,44 +185,40 @@
     },
     {
       title: "Produtividade da equipe",
-      description: "Atividades, contatos e acompanhamentos executados no período.",
+      description:
+        "Atividades, contatos e acompanhamentos executados no período.",
       icon: BarChart3,
     },
   ];
 
-  const responsibilities: ResponsibilityItem[] = [
+  const campaignRows: CampaignRow[] = [
     {
-      title: "F10",
-      subtitle: "Tecnologia e implantação",
-      icon: Workflow,
-      items: [
-        "Configurar acessos, permissões e workflow",
-        "Apoiar a distribuição dos números de WhatsApp",
-        "Treinar gestores e equipes comerciais",
-        "Acompanhar o início da operação",
-      ],
+      month: "Julho",
+      f10CashShare: "0%",
+      turbo: "20%",
+      totalDiscount: "20%",
+      finalValue: "R$ 359",
     },
     {
-      title: "Rede Cebrac",
-      subtitle: "Diretriz e acompanhamento",
-      icon: Building2,
-      items: [
-        "Conduzir a comunicação oficial",
-        "Alinhar diretrizes do processo comercial",
-        "Acompanhar a adesão das unidades",
-        "Consolidar aprendizados da rede",
-      ],
+      month: "Agosto",
+      f10CashShare: "20%",
+      turbo: "15%",
+      totalDiscount: "35%",
+      finalValue: "R$ 329",
     },
     {
-      title: "Unidade Cebrac",
-      subtitle: "Adoção no dia a dia",
-      icon: UserCheck,
-      items: [
-        "Indicar o responsável local",
-        "Informar usuários e números de WhatsApp",
-        "Participar dos treinamentos",
-        "Registrar os atendimentos e próximas ações",
-      ],
+      month: "Setembro",
+      f10CashShare: "50%",
+      turbo: "10%",
+      totalDiscount: "60%",
+      finalValue: "R$ 279",
+    },
+    {
+      month: "Outubro",
+      f10CashShare: "70%",
+      turbo: "5%",
+      totalDiscount: "75%",
+      finalValue: "R$ 245",
     },
   ];
 
@@ -241,35 +226,39 @@
     {
       number: "01",
       title: "Preparar",
-      description: "Indicar o responsável, os usuários e os números que participarão da operação.",
+      description:
+        "Indicar o responsável local, os usuários e os números que participarão da operação.",
       owner: "Unidade",
     },
     {
       number: "02",
       title: "Configurar",
-      description: "Estruturar acessos, workflow comercial e distribuição dos números de WhatsApp.",
+      description:
+        "Estruturar acessos, workflow comercial e distribuição dos números de WhatsApp.",
       owner: "F10 + unidade",
     },
     {
       number: "03",
       title: "Treinar",
-      description: "Capacitar vendedores, gestores e responsáveis pela operação.",
+      description:
+        "Capacitar vendedores, gestores e responsáveis pela operação.",
       owner: "F10",
     },
     {
       number: "04",
       title: "Operar",
-      description: "Iniciar o uso com acompanhamento dos indicadores e ajustes necessários.",
-      owner: "Todos",
+      description:
+        "Iniciar o uso com acompanhamento dos indicadores e ajustes necessários.",
+      owner: "Rede + F10 + unidade",
     },
   ];
 </script>
 
 <svelte:head>
-  <title>Rede Cebrac | CRM de Leads e WhatsApp integrado ao F10</title>
+  <title>Rede Cebrac | Novo padrão comercial com CRM e WhatsApp</title>
   <meta
     name="description"
-    content="Apresentação institucional para as unidades Cebrac sobre CRM de Leads, WhatsApp integrado e implantação do novo modelo operacional."
+    content="Comunicado às unidades Cebrac sobre o novo padrão comercial, investimento adicional, CRM de Leads, WhatsApp integrado e implantação na rede."
   />
   <meta name="robots" content="noindex,nofollow,noarchive,nosnippet" />
   <link rel="preload" as="image" href="/background-hero-cebrac.png" />
@@ -278,7 +267,10 @@
 </svelte:head>
 
 <div class="presentation-page overflow-hidden bg-white text-[#2B4091]">
-  <section id="inicio" class="hero-section relative isolate overflow-hidden bg-white">
+  <section
+    id="inicio"
+    class="hero-section relative isolate overflow-hidden bg-white"
+  >
     <img
       src="/background-hero-cebrac.png"
       alt=""
@@ -289,47 +281,86 @@
     <div class="hero-orbit hero-orbit-left"></div>
     <div class="hero-orbit hero-orbit-right"></div>
 
-    <div class="hero-grid mx-auto grid w-full max-w-[1660px] items-center px-5 py-12 sm:px-8 sm:py-16 lg:min-h-[100svh] lg:px-10 lg:py-10 xl:px-14">
-      <div class="hero-copy relative z-20 max-w-[720px] lg:py-10">
-        <div class="inline-flex max-w-full items-stretch overflow-hidden rounded-[20px] border border-[#2B4091]/15 bg-white/95 shadow-[0_16px_40px_rgba(43,64,145,0.14)] backdrop-blur-md">
-          <div class="flex min-w-[145px] items-center justify-center bg-[#2B4091] px-5 py-3 sm:min-w-[174px] sm:px-7">
-            <img src="/Logo-Cebrac.png" alt="Cebrac" class="h-9 w-auto object-contain sm:h-10" />
+    <div
+      class="hero-grid mx-auto grid w-full max-w-[1660px] items-center px-5 py-12 sm:px-8 sm:py-16 lg:min-h-[100svh] lg:px-10 lg:py-10 xl:px-14"
+    >
+      <div class="hero-copy relative z-20 max-w-[760px] lg:py-10">
+        <div
+          class="inline-flex max-w-full items-stretch overflow-hidden rounded-[20px] border border-[#2B4091]/[0.15] bg-white/95 shadow-[0_16px_40px_rgba(43,64,145,0.14)] backdrop-blur-md"
+        >
+          <div
+            class="flex min-w-[145px] items-center justify-center bg-[#2B4091] px-5 py-3 sm:min-w-[174px] sm:px-7"
+          >
+            <img
+              src="/Logo-Cebrac.png"
+              alt="Cebrac"
+              class="h-9 w-auto object-contain sm:h-10"
+            />
           </div>
-          <div class="flex items-center px-4 py-3 text-[10px] font-extrabold uppercase leading-5 tracking-[0.13em] text-[#2B4091] sm:px-6 sm:text-xs">
-            Evolução comercial da rede
+          <div
+            class="flex items-center px-4 py-3 text-[10px] font-extrabold uppercase leading-5 tracking-[0.13em] text-[#2B4091] sm:px-6 sm:text-xs"
+          >
+            Comunicado às unidades Cebrac
           </div>
         </div>
 
-        <p class="mt-8 text-xs font-extrabold uppercase tracking-[0.22em] text-[#2B4091]">
-          Novos recursos para as unidades Cebrac
+        <p
+          class="mt-8 text-xs font-extrabold uppercase tracking-[0.22em] text-[#f36b21]"
+        >
+          Novo padrão comercial da rede
         </p>
 
-        <h1 class="mt-5 text-[42px] font-semibold leading-[1.04] tracking-[-0.05em] text-[#2B4091] sm:text-[56px] lg:text-[59px] xl:text-[68px]">
-          CRM e WhatsApp<br />
-          <span class="relative inline-block">
-            integrados.
-            <span class="absolute -bottom-1 left-0 h-3 w-full -rotate-1 rounded-full bg-[#ffcd40]/80 -z-10"></span>
+        <h1
+          class="mt-5 text-[42px] font-semibold leading-[1.02] tracking-[-0.05em] text-[#2B4091] sm:text-[56px] lg:text-[61px] xl:text-[70px]"
+        >
+          Mais controle sobre cada lead.
+          <span class="relative mt-2 inline-block">
+            Menos oportunidades perdidas.
+            <span
+              class="absolute -bottom-1 left-0 -z-10 h-3 w-full -rotate-1 rounded-full bg-[#ffcd40]/80"
+            ></span>
           </span>
         </h1>
 
-        <p class="mt-7 max-w-[650px] text-lg font-medium leading-8 text-[#2B4091]/80 sm:text-[21px] sm:leading-9">
-          Uma nova rotina para acompanhar cada lead até a matrícula e manter o relacionamento com o aluno dentro do F10.
+        <p
+          class="mt-7 max-w-[700px] text-lg font-medium leading-8 text-[#2B4091]/80 sm:text-[21px] sm:leading-9"
+        >
+          A Rede Cebrac adotará CRM de Leads, workflow comercial e WhatsApp
+          integrado ao F10 para padronizar a operação, preservar o histórico e
+          aumentar o aproveitamento dos leads já captados pelas unidades.
         </p>
 
-        <div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 border-l-4 border-[#61CE70] pl-5">
-          <div>
-            <strong class="block text-sm font-extrabold text-[#2B4091]">5 números de WhatsApp</strong>
-            <span class="text-sm text-[#2B4091]/65">incluídos por unidade</span>
-          </div>
-          <div class="hidden h-10 w-px bg-[#2B4091]/15 sm:block"></div>
-          <div>
-            <strong class="block text-sm font-extrabold text-[#2B4091]">Agosto de 2026</strong>
-            <span class="text-sm text-[#2B4091]/65">WhatsApp disponível no F10</span>
+        <div
+          class="mt-8 rounded-[24px] border border-[#2B4091]/[0.12] bg-white/90 p-5 shadow-[0_18px_48px_rgba(43,64,145,0.12)] backdrop-blur-md sm:p-6"
+        >
+          <div class="grid gap-5 sm:grid-cols-[1fr_auto] sm:items-center">
+            <div>
+              <span
+                class="block text-xs font-extrabold uppercase tracking-[0.16em] text-[#f36b21]"
+                >Aplicação em toda a rede</span
+              >
+              <p class="mt-2 text-base font-semibold leading-7 text-[#2B4091]">
+                Esta atualização será incorporada ao modelo operacional das
+                unidades. Não se trata de uma contratação opcional ou de um
+                módulo isolado.
+              </p>
+            </div>
+            <div class="rounded-[18px] bg-[#2B4091] px-5 py-4 text-white">
+              <span
+                class="block text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#ffcd40]"
+                >Vigência financeira</span
+              >
+              <strong class="mt-1 block text-lg"
+                >Vencimento de julho/2026</strong
+              >
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="hero-visual relative z-10 hidden items-center justify-end lg:flex">
+      <div
+        class="hero-visual relative z-10 hidden items-center justify-end lg:flex"
+      >
         <img
           src="/hero-cebrac.webp"
           alt="CRM F10 para a Rede Cebrac exibido em computador e atendimento integrado pelo WhatsApp"
@@ -340,205 +371,345 @@
     </div>
   </section>
 
-  <nav class="presentation-nav sticky top-0 z-40 bg-[#2B4091]" aria-label="Navegação da apresentação">
-    <div class="mx-auto flex max-w-[1260px] items-center gap-5 overflow-x-auto px-5 py-3 sm:px-8">
-      <img src="/Logo-Cebrac.png" alt="" aria-hidden="true" class="hidden h-8 w-auto shrink-0 lg:block" />
+  <nav
+    class="presentation-nav sticky top-0 z-40 bg-[#2B4091]"
+    aria-label="Navegação do comunicado"
+  >
+    <div
+      class="mx-auto flex max-w-[1320px] items-center gap-5 overflow-x-auto px-5 py-3 sm:px-8"
+    >
+      <img
+        src="/Logo-Cebrac.png"
+        alt=""
+        aria-hidden="true"
+        class="hidden h-8 w-auto shrink-0 lg:block"
+      />
       <div class="presentation-nav-links flex min-w-max items-center gap-1">
-        <a href="#resumo" class="presentation-nav-link">O que muda</a>
-        <a href="#crm" class="presentation-nav-link">Como funciona</a>
-        <a href="#whatsapp" class="presentation-nav-link">WhatsApp</a>
-        <a href="#problemas" class="presentation-nav-link">Problemas resolvidos</a>
-        <a href="#gestao" class="presentation-nav-link">Gestão</a>
+        <a href="#investimento" class="presentation-nav-link">Investimento</a>
+        <a href="#porque" class="presentation-nav-link">Por que muda</a>
+        <a href="#beneficios" class="presentation-nav-link">Benefícios</a>
+        <a href="#comparacao" class="presentation-nav-link"
+          >Hoje × novo padrão</a
+        >
+        <a href="#recursos" class="presentation-nav-link">Recursos</a>
+        <a href="#incentivo" class="presentation-nav-link">Incentivo</a>
         <a href="#implantacao" class="presentation-nav-link">Implantação</a>
       </div>
     </div>
   </nav>
 
-  <section id="resumo" class="relative scroll-mt-16 bg-white px-5 py-20 sm:px-8 lg:px-12 lg:py-28">
+  <section
+    id="investimento"
+    class="relative scroll-mt-16 overflow-hidden bg-[#2B4091] px-5 py-20 text-white sm:px-8 lg:px-12 lg:py-28"
+  >
+    <div class="investment-glow investment-glow-one"></div>
+    <div class="investment-glow investment-glow-two"></div>
+
+    <div class="relative mx-auto max-w-[1260px]">
+      <div
+        class="grid gap-12 lg:grid-cols-[0.82fr_1.18fr] lg:items-center lg:gap-20"
+      >
+        <div>
+          <p class="section-label section-label-light">
+            O que muda no investimento
+          </p>
+          <h2
+            class="mt-4 text-[40px] font-semibold leading-[1.05] tracking-[-0.045em] text-white sm:text-[52px] lg:text-[60px]"
+          >
+            Um novo valor para uma nova estrutura comercial.
+          </h2>
+          <p class="mt-6 max-w-[570px] text-lg leading-8 text-white/70">
+            O investimento adicional financia uma mudança de operação: processo
+            comercial padronizado, tecnologia integrada, implantação,
+            treinamento e acompanhamento inicial.
+          </p>
+
+          <div class="mt-8 border-l-4 border-[#f36b21] pl-5">
+            <p class="text-base font-semibold leading-7 text-white">
+              O reajuste anual previsto para o período será substituído pelo
+              valor do upgrade.
+            </p>
+          </div>
+        </div>
+
+        <div
+          class="investment-card overflow-hidden rounded-[34px] bg-white text-[#2B4091] shadow-[0_34px_90px_rgba(0,0,0,0.24)]"
+        >
+          <div
+            class="border-b border-[#2B4091]/10 px-6 py-5 sm:px-8"
+          >
+            <span
+              class="text-xs font-extrabold uppercase tracking-[0.17em] text-[#f36b21]"
+              >Investimento adicional</span
+            >
+          </div>
+
+          <div class="grid gap-0 lg:grid-cols-[0.92fr_1.08fr]">
+            <div class="bg-[#fff7f1] px-6 py-8 sm:px-8">
+              <div class="flex items-end gap-2">
+                <span class="pb-2 text-lg font-extrabold text-[#f36b21]"
+                  >R$</span
+                >
+                <strong
+                  class="text-[72px] font-semibold leading-none tracking-[-0.065em] text-[#f36b21] sm:text-[84px]"
+                  >399</strong
+                >
+                <span class="pb-2 text-lg font-extrabold text-[#f36b21]"
+                  >,00</span
+                >
+              </div>
+              <p class="mt-2 text-sm font-semibold text-[#2B4091]/[0.65]">
+                por unidade/mês
+              </p>
+
+              <div
+                class="mt-7 rounded-[18px] bg-white p-4 shadow-[0_12px_30px_rgba(43,64,145,0.08)]"
+              >
+                <span
+                  class="block text-xs font-extrabold uppercase tracking-[0.14em] text-[#2B4091]/[0.55]"
+                  >Número adicional</span
+                >
+                <strong class="mt-1 block text-2xl text-[#2B4091]"
+                  >R$ 49,00/mês</strong
+                >
+                <span class="mt-1 block text-sm text-[#2B4091]/60"
+                  >por número extra no CRM ou F10</span
+                >
+              </div>
+            </div>
+
+            <div class="px-6 py-8 sm:px-8">
+              <p
+                class="text-sm font-extrabold uppercase tracking-[0.14em] text-[#2B4091]"
+              >
+                Incluído no novo valor
+              </p>
+              <ul class="mt-5 space-y-4">
+                <li class="investment-list-item">
+                  <CheckCircle2 size={20} />CRM de Leads e workflow comercial
+                </li>
+                <li class="investment-list-item">
+                  <CheckCircle2 size={20} />Cinco números de WhatsApp por unidade
+                </li>
+                <li class="investment-list-item">
+                  <CheckCircle2 size={20} />Configuração de acessos e processo
+                </li>
+                <li class="investment-list-item">
+                  <CheckCircle2 size={20} />Treinamento de gestores e equipes
+                </li>
+                <li class="investment-list-item">
+                  <CheckCircle2 size={20} />Acompanhamento inicial da operação
+                </li>
+              </ul>
+
+              <div
+                class="mt-7 rounded-[18px] border border-[#2B4091]/[0.12] bg-[#f7f8fc] p-4"
+              >
+                <span
+                  class="block text-xs font-extrabold uppercase tracking-[0.14em] text-[#2B4091]/[0.55]"
+                  >Disponibilidade do WhatsApp no F10</span
+                >
+                <strong class="mt-1 block text-lg text-[#2B4091]"
+                  >A partir de agosto de 2026</strong
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section
+    id="porque"
+    class="relative scroll-mt-16 overflow-hidden bg-white px-5 py-20 sm:px-8 lg:px-12 lg:py-28"
+  >
     <div class="summary-shape"></div>
     <div class="relative mx-auto max-w-[1260px]">
-      <div class="grid gap-14 lg:grid-cols-[0.7fr_1.3fr] lg:items-start lg:gap-24">
+      <div
+        class="grid gap-14 lg:grid-cols-[0.72fr_1.28fr] lg:items-start lg:gap-24"
+      >
         <div class="lg:sticky lg:top-24">
-          <p class="section-label">O projeto em 30 segundos</p>
-          <h2 class="section-title mt-4">Três recursos.<br />Uma única jornada.</h2>
-          <p class="mt-6 max-w-[480px] text-lg leading-8 text-[#2B4091]/72">
-            O CRM organiza a operação comercial. O WhatsApp registra as conversas. O F10 continua o relacionamento depois da matrícula.
+          <p class="section-label">Por que existe um investimento adicional</p>
+          <h2 class="section-title mt-4">
+            O custo do CRM é visível. O custo dos leads perdidos normalmente não
+            é.
+          </h2>
+          <p
+            class="mt-6 max-w-[520px] text-lg leading-8 text-[#2B4091]/[0.72]"
+          >
+            A unidade já investe para gerar oportunidades. O novo modelo foi
+            criado para reduzir perdas durante o caminho entre a captação e a
+            matrícula.
           </p>
         </div>
 
-        <ol class="divide-y divide-[#2B4091]/15 border-y border-[#2B4091]/15">
-          {#each projectSummary as item}
-            <li class="group grid gap-5 py-8 sm:grid-cols-[90px_1fr] sm:items-start sm:gap-8 lg:py-10">
-              <span class="text-[48px] font-semibold leading-none tracking-[-0.06em] text-[#ffcd40] sm:text-[64px]">{item.number}</span>
-              <div class="grid gap-4 sm:grid-cols-[1fr_1.2fr] sm:items-start sm:gap-8">
-                <div class="flex items-center gap-4">
-                  <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#61CE70]/20 text-[#2B4091]">
-                    <svelte:component this={item.icon} size={24} strokeWidth={1.9} />
-                  </div>
-                  <h3 class="text-2xl font-semibold tracking-[-0.03em] text-[#2B4091]">{item.title}</h3>
-                </div>
-                <p class="text-base leading-7 text-[#2B4091]/70">{item.description}</p>
-              </div>
-            </li>
-          {/each}
-        </ol>
+        <div>
+          <div
+            class="rounded-[30px] border border-[#2B4091]/[0.12] bg-[#f7f8fc] p-6 shadow-[0_22px_60px_rgba(43,64,145,0.08)] sm:p-8"
+          >
+            <span
+              class="text-xs font-extrabold uppercase tracking-[0.15em] text-[#f36b21]"
+              >Exemplo ilustrativo</span
+            >
+            <div class="mt-6 grid gap-4 sm:grid-cols-3">
+              <article class="impact-card">
+                <strong>R$ 10 mil</strong>
+                <span>investidos em marketing</span>
+              </article>
+              <article class="impact-card">
+                <strong>500</strong>
+                <span>leads captados</span>
+              </article>
+              <article class="impact-card impact-card-alert">
+                <strong>40</strong>
+                <span
+                  >oportunidades sem continuidade se 8% forem esquecidas</span
+                >
+              </article>
+            </div>
+
+            <div
+              class="mt-7 rounded-[22px] bg-[#2B4091] px-5 py-5 text-white sm:px-6"
+            >
+              <p class="text-lg font-semibold leading-8">
+                A atualização não tem como objetivo apenas gerar mais leads. Ela
+                busca aumentar o aproveitamento das oportunidades que a unidade
+                já recebe.
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-10 grid gap-5 sm:grid-cols-2">
+            <article class="problem-card">
+              <TimerReset size={28} />
+              <h3>Retornos fora do prazo</h3>
+              <p>
+                O lead esfria quando não existe uma próxima ação definida.
+              </p>
+            </article>
+            <article class="problem-card">
+              <MessagesSquare size={28} />
+              <h3>Conversas fora da operação</h3>
+              <p>
+                Históricos ficam presos em celulares pessoais e canais
+                separados.
+              </p>
+            </article>
+            <article class="problem-card">
+              <UserCheck size={28} />
+              <h3>Troca de colaboradores</h3>
+              <p>
+                Negociações perdem continuidade quando o contexto não está
+                registrado.
+              </p>
+            </article>
+            <article class="problem-card">
+              <Building2 size={28} />
+              <h3>Gestão sem visibilidade</h3>
+              <p>
+                O gestor não enxerga gargalos, atrasos e oportunidades paradas.
+              </p>
+            </article>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 
-  <section id="crm" class="relative scroll-mt-16 overflow-hidden bg-[#2B4091] px-5 py-20 text-white sm:px-8 lg:px-12 lg:py-28">
-    <div class="crm-sun"></div>
+  <section
+    id="beneficios"
+    class="relative scroll-mt-16 overflow-hidden bg-[#fff8e4] px-5 py-20 sm:px-8 lg:px-12 lg:py-28"
+  >
+    <div class="benefit-ring benefit-ring-one"></div>
+    <div class="benefit-ring benefit-ring-two"></div>
+
     <div class="relative mx-auto max-w-[1260px]">
-      <div class="mx-auto max-w-[820px] text-center">
-        <p class="section-label section-label-light">Como o CRM funciona</p>
-        <h2 class="mt-4 text-[38px] font-semibold leading-[1.06] tracking-[-0.045em] text-white sm:text-[50px] lg:text-[60px]">
-          O lead entra, avança e chega à matrícula.
+      <div class="mx-auto max-w-[900px] text-center">
+        <p class="section-label">O que a unidade passa a ganhar</p>
+        <h2 class="section-title mt-4">
+          O benefício vem do processo. A tecnologia é o meio.
         </h2>
-        <p class="mx-auto mt-6 max-w-[720px] text-lg leading-8 text-white/72">
-          Em cada etapa, a equipe enxerga o responsável, a próxima ação e o tempo que a oportunidade está parada.
+        <p
+          class="mx-auto mt-6 max-w-[760px] text-lg leading-8 text-[#2B4091]/[0.72]"
+        >
+          O resultado não depende apenas de instalar um sistema. Ele vem da
+          combinação entre método comercial, rotina de acompanhamento e
+          informação disponível para a gestão.
         </p>
       </div>
 
-      <div class="journey-track mt-16">
-        {#each journeySteps as step, index}
-          <article class="journey-step">
-            <div class="journey-node">
-              <svelte:component this={step.icon} size={26} strokeWidth={1.9} />
+      <div class="mt-14 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {#each benefits as benefit, index}
+          <article class="benefit-card">
+            <div class="benefit-card-topline"></div>
+            <span class="benefit-index">0{index + 1}</span>
+            <div class="benefit-icon">
+              <svelte:component
+                this={benefit.icon}
+                size={25}
+                strokeWidth={1.9}
+              />
             </div>
-            <span class="mt-5 block text-xs font-extrabold tracking-[0.16em] text-[#ffcd40]">{step.number}</span>
-            <h3 class="mt-2 text-2xl font-semibold text-white">{step.title}</h3>
-            <p class="mt-3 text-sm leading-6 text-white/62">{step.description}</p>
-            {#if index < journeySteps.length - 1}
-              <div class="journey-arrow" aria-hidden="true">→</div>
-            {/if}
+            <h3>{benefit.title}</h3>
+            <p>{benefit.description}</p>
           </article>
         {/each}
       </div>
-
-      <div class="mt-20 grid items-center gap-14 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
-        <div>
-          <p class="section-label section-label-light">Na prática</p>
-          <h3 class="mt-4 text-[34px] font-semibold leading-[1.08] tracking-[-0.04em] text-white sm:text-[44px]">
-            A equipe deixa de depender da memória.
-          </h3>
-
-          <div class="mt-8 divide-y divide-white/15 border-y border-white/15">
-            {#each crmPracticeRows as row}
-              <div class="grid gap-4 py-6 sm:grid-cols-[52px_1fr] sm:gap-5">
-                <span class="text-3xl font-semibold text-[#ffcd40]">{row.number}</span>
-                <div>
-                  <h4 class="text-lg font-semibold text-white">{row.title}</h4>
-                  <p class="mt-2 text-sm leading-6 text-white/62">{row.description}</p>
-                </div>
-              </div>
-            {/each}
-          </div>
-        </div>
-
-        <div class="media-frame media-frame-light aspect-[16/11]">
-          <div class="media-toolbar">
-            <span></span><span></span><span></span>
-            <small>Visão Kanban</small>
-          </div>
-          <div class="media-canvas">
-            <Funnel size={42} strokeWidth={1.4} />
-            <strong>Imagem do CRM</strong>
-            <p>Inserir a tela real com etapas, leads, responsáveis e próximas ações.</p>
-          </div>
-        </div>
-      </div>
     </div>
   </section>
 
-  <section id="whatsapp" class="relative scroll-mt-16 overflow-hidden bg-white">
-    <div class="whatsapp-heading px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
-      <div class="mx-auto max-w-[900px] text-center">
-        <p class="section-label">Onde o WhatsApp será usado</p>
-        <h2 class="section-title mt-4">Antes e depois da matrícula.</h2>
-        <p class="mx-auto mt-5 max-w-[760px] text-lg leading-8 text-[#2B4091]/72">
-          Os cinco números incluídos por unidade podem ser distribuídos entre o CRM de Leads e o F10 conforme a necessidade da operação.
-        </p>
-      </div>
-    </div>
-
-    <div class="whatsapp-split">
-      <section class="whatsapp-side whatsapp-before">
-        <div class="whatsapp-side-inner">
-          <span class="whatsapp-kicker">Antes da matrícula</span>
-          <h3>WhatsApp no CRM de Leads</h3>
-          <p class="whatsapp-intro">A conversa comercial passa a fazer parte do processo de matrícula.</p>
-
-          <div class="whatsapp-list">
-            {#each leadWhatsAppUses as item}
-              <div class="whatsapp-list-item">
-                <svelte:component this={item.icon} size={22} strokeWidth={1.9} />
-                <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.description}</p>
-                </div>
-              </div>
-            {/each}
-          </div>
-        </div>
-      </section>
-
-      <div class="whatsapp-bridge">
-        <span>5</span>
-        <strong>números</strong>
-        <small>por unidade</small>
-      </div>
-
-      <section class="whatsapp-side whatsapp-after">
-        <div class="whatsapp-side-inner">
-          <span class="whatsapp-kicker">Depois da matrícula</span>
-          <h3>WhatsApp dentro do F10</h3>
-          <p class="whatsapp-intro">O relacionamento continua com alunos, responsáveis e equipe administrativa.</p>
-
-          <div class="whatsapp-list whatsapp-list-grid">
-            {#each studentWhatsAppUses as item}
-              <div class="whatsapp-list-item">
-                <svelte:component this={item.icon} size={22} strokeWidth={1.9} />
-                <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.description}</p>
-                </div>
-              </div>
-            {/each}
-          </div>
-
-          <div class="mt-8 inline-flex items-center gap-3 rounded-full bg-white/15 px-4 py-2.5 text-sm font-semibold text-white">
-            <CalendarCheck2 size={18} />
-            Disponível a partir de agosto de 2026
-          </div>
-        </div>
-      </section>
-    </div>
-  </section>
-
-  <section id="problemas" class="relative scroll-mt-16 overflow-hidden bg-[#ffcd40] px-5 py-20 sm:px-8 lg:px-12 lg:py-28">
+  <section
+    id="comparacao"
+    class="relative scroll-mt-16 overflow-hidden bg-[#ffcd40] px-5 py-20 sm:px-8 lg:px-12 lg:py-28"
+  >
     <div class="comparison-ring comparison-ring-one"></div>
     <div class="comparison-ring comparison-ring-two"></div>
 
     <div class="relative mx-auto max-w-[1260px]">
-      <div class="grid gap-8 lg:grid-cols-[0.7fr_1.3fr] lg:items-end lg:gap-20">
+      <div
+        class="grid gap-8 lg:grid-cols-[0.7fr_1.3fr] lg:items-end lg:gap-20"
+      >
         <div>
-          <p class="section-label">Problemas que o projeto resolve</p>
-          <h2 class="section-title mt-4">O que muda na rotina comercial.</h2>
+          <p class="section-label">Hoje × novo padrão</p>
+          <h2 class="section-title mt-4">
+            O que deixa de depender das pessoas e passa a fazer parte do
+            processo.
+          </h2>
         </div>
-        <p class="max-w-[760px] text-lg leading-8 text-[#2B4091]/75 lg:pb-1">
-          A proposta substitui controles individuais por um processo visível, contínuo e fácil de acompanhar.
+        <p
+          class="max-w-[760px] text-lg leading-8 text-[#2B4091]/75 lg:pb-1"
+        >
+          A mudança substitui controles individuais por uma operação visível,
+          contínua e padronizada em toda a rede.
         </p>
       </div>
 
-      <div class="mt-14 overflow-hidden rounded-[32px] bg-white/95 shadow-[0_24px_60px_rgba(43,64,145,0.16)]">
+      <div
+        class="mt-14 overflow-hidden rounded-[32px] bg-white/95 shadow-[0_24px_60px_rgba(43,64,145,0.16)]"
+      >
         <div class="grid grid-cols-2 bg-[#2B4091] text-white">
-          <div class="border-r border-white/15 px-5 py-4 text-sm font-extrabold uppercase tracking-[0.14em] sm:px-8">Hoje</div>
-          <div class="px-5 py-4 text-sm font-extrabold uppercase tracking-[0.14em] text-[#ffcd40] sm:px-8">Com o novo modelo</div>
+          <div
+            class="border-r border-white/[0.15] px-5 py-4 text-sm font-extrabold uppercase tracking-[0.14em] sm:px-8"
+          >
+            Hoje
+          </div>
+          <div
+            class="px-5 py-4 text-sm font-extrabold uppercase tracking-[0.14em] text-[#ffcd40] sm:px-8"
+          >
+            Com o novo padrão
+          </div>
         </div>
         {#each comparisonItems as item}
           <div class="grid grid-cols-2 border-t border-[#2B4091]/10">
-            <div class="border-r border-[#2B4091]/10 px-5 py-6 text-sm leading-6 text-[#2B4091]/65 sm:px-8">{item.current}</div>
-            <div class="px-5 py-6 text-sm font-semibold leading-6 text-[#2B4091] sm:px-8">
+            <div
+              class="border-r border-[#2B4091]/10 px-5 py-6 text-sm leading-6 text-[#2B4091]/[0.65] sm:px-8"
+            >
+              {item.current}
+            </div>
+            <div
+              class="px-5 py-6 text-sm font-semibold leading-6 text-[#2B4091] sm:px-8"
+            >
               <span class="mr-2 text-[#61CE70]">✓</span>{item.future}
             </div>
           </div>
@@ -547,14 +718,191 @@
     </div>
   </section>
 
-  <section id="gestao" class="scroll-mt-16 bg-white px-5 py-20 sm:px-8 lg:px-12 lg:py-28">
+  <section
+    class="scroll-mt-16 bg-white px-5 py-20 sm:px-8 lg:px-12 lg:py-28"
+  >
+    <div class="mx-auto max-w-[1260px]">
+      <div
+        class="grid gap-12 lg:grid-cols-[0.78fr_1.22fr] lg:items-center lg:gap-20"
+      >
+        <div>
+          <p class="section-label">Continuidade comercial</p>
+          <h2 class="section-title mt-4">
+            Quando um vendedor sai, as negociações não podem sair com ele.
+          </h2>
+          <p class="mt-6 text-lg leading-8 text-[#2B4091]/[0.72]">
+            Sem uma operação centralizada, parte do conhecimento comercial fica
+            na memória do vendedor, em conversas pessoais ou em anotações
+            individuais.
+          </p>
+          <p class="mt-4 text-lg leading-8 text-[#2B4091]/[0.72]">
+            Com o CRM, históricos, objeções, propostas, atividades e próximos
+            passos permanecem na unidade. Outro colaborador consegue assumir a
+            negociação sem começar do zero.
+          </p>
+        </div>
+
+        <div class="turnover-board">
+          <div class="turnover-column turnover-column-current">
+            <span>Sem CRM e método</span>
+            <div class="turnover-flow">
+              <UserCheck size={28} />
+              <strong>Colaborador sai</strong>
+              <span>→</span>
+              <strong>Contexto desaparece</strong>
+              <span>→</span>
+              <strong>Negociação é interrompida</strong>
+            </div>
+          </div>
+          <div class="turnover-column turnover-column-future">
+            <span>Com CRM e método</span>
+            <div class="turnover-flow">
+              <ShieldCheck size={28} />
+              <strong>Colaborador sai</strong>
+              <span>→</span>
+              <strong>Histórico permanece</strong>
+              <span>→</span>
+              <strong>Atendimento continua</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section
+    id="recursos"
+    class="relative scroll-mt-16 overflow-hidden bg-[#2B4091] px-5 py-20 text-white sm:px-8 lg:px-12 lg:py-28"
+  >
+    <div class="crm-sun"></div>
+    <div class="relative mx-auto max-w-[1260px]">
+      <div class="mx-auto max-w-[900px] text-center">
+        <p class="section-label section-label-light">O que será entregue</p>
+        <h2
+          class="mt-4 text-[40px] font-semibold leading-[1.05] tracking-[-0.045em] text-white sm:text-[52px] lg:text-[60px]"
+        >
+          CRM de Leads, workflow comercial e WhatsApp integrado.
+        </h2>
+        <p
+          class="mx-auto mt-6 max-w-[760px] text-lg leading-8 text-white/70"
+        >
+          Os recursos foram organizados para acompanhar a jornada desde a
+          entrada do lead até o relacionamento com o aluno depois da matrícula.
+        </p>
+      </div>
+
+      <div
+        class="mt-16 grid items-center gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16"
+      >
+        <div>
+          <p class="section-label section-label-light">CRM e workflow</p>
+          <h3
+            class="mt-4 text-[34px] font-semibold leading-[1.08] tracking-[-0.04em] text-white sm:text-[44px]"
+          >
+            Cada oportunidade com etapa, responsável e próxima ação.
+          </h3>
+
+          <div
+            class="mt-8 divide-y divide-white/[0.15] border-y border-white/[0.15]"
+          >
+            {#each crmFeatures as feature}
+              <div class="resource-row">
+                <div class="resource-icon">
+                  <svelte:component
+                    this={feature.icon}
+                    size={22}
+                    strokeWidth={1.9}
+                  />
+                </div>
+                <div>
+                  <h4>{feature.title}</h4>
+                  <p>{feature.description}</p>
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
+
+        <div class="kanban-frame">
+          <div class="media-toolbar">
+            <span></span><span></span><span></span>
+            <small>Visão Kanban do CRM</small>
+          </div>
+          <img
+            src="/f10_kanban.png"
+            alt="Tela real do CRM F10 com etapas do funil comercial em formato Kanban"
+            loading="lazy"
+          />
+        </div>
+      </div>
+
+      <div class="mt-24 border-t border-white/[0.15] pt-16">
+        <div
+          class="grid gap-12 lg:grid-cols-[0.72fr_1.28fr] lg:items-start lg:gap-20"
+        >
+          <div>
+            <p class="section-label section-label-light">WhatsApp integrado</p>
+            <h3
+              class="mt-4 text-[34px] font-semibold leading-[1.08] tracking-[-0.04em] text-white sm:text-[44px]"
+            >
+              Cinco números por unidade, distribuídos conforme a operação.
+            </h3>
+            <p class="mt-6 text-lg leading-8 text-white/70">
+              Os números poderão ser utilizados no CRM de Leads ou no F10. A
+              distribuição será definida pela unidade durante a implantação.
+            </p>
+
+            <div class="mt-7 rounded-[20px] bg-white/10 p-5">
+              <span
+                class="text-xs font-extrabold uppercase tracking-[0.15em] text-[#ffcd40]"
+                >Exemplo de distribuição</span
+              >
+              <div class="mt-4 grid grid-cols-2 gap-3">
+                <div class="distribution-box">
+                  <strong>2</strong><span>números no CRM</span>
+                </div>
+                <div class="distribution-box">
+                  <strong>3</strong><span>números no F10</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid gap-5 sm:grid-cols-2">
+            {#each whatsappFeatures as feature}
+              <article class="whatsapp-feature-card">
+                <div class="whatsapp-feature-icon">
+                  <svelte:component
+                    this={feature.icon}
+                    size={24}
+                    strokeWidth={1.9}
+                  />
+                </div>
+                <h4>{feature.title}</h4>
+                <p>{feature.description}</p>
+              </article>
+            {/each}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section
+    class="scroll-mt-16 bg-white px-5 py-20 sm:px-8 lg:px-12 lg:py-28"
+  >
     <div class="mx-auto max-w-[1260px]">
       <div class="grid gap-14 lg:grid-cols-[0.65fr_1.35fr] lg:gap-24">
         <div>
           <p class="section-label">Como a gestão acompanha</p>
-          <h2 class="section-title mt-4">Poucos indicadores. Perguntas claras.</h2>
-          <p class="mt-6 max-w-[500px] text-lg leading-8 text-[#2B4091]/72">
-            O acompanhamento mostra onde a equipe precisa agir e se o processo está realmente avançando.
+          <h2 class="section-title mt-4">
+            Poucos indicadores. Perguntas claras.
+          </h2>
+          <p
+            class="mt-6 max-w-[500px] text-lg leading-8 text-[#2B4091]/[0.72]"
+          >
+            O acompanhamento mostra onde a equipe precisa agir e se o processo
+            está realmente avançando.
           </p>
         </div>
 
@@ -563,7 +911,11 @@
             <div class="metric-line">
               <span class="metric-index">0{index + 1}</span>
               <div class="metric-icon">
-                <svelte:component this={metric.icon} size={24} strokeWidth={1.9} />
+                <svelte:component
+                  this={metric.icon}
+                  size={24}
+                  strokeWidth={1.9}
+                />
               </div>
               <div>
                 <h3>{metric.title}</h3>
@@ -573,47 +925,132 @@
           {/each}
         </div>
       </div>
+    </div>
+  </section>
 
-      <div class="mt-24 border-y border-[#2B4091]/15 py-12">
-        <div class="grid gap-10 lg:grid-cols-[0.55fr_1.45fr] lg:gap-20">
-          <div>
-            <p class="section-label">Quem faz o quê</p>
-            <h3 class="mt-4 text-[34px] font-semibold leading-[1.08] tracking-[-0.04em] text-[#2B4091] sm:text-[42px]">Responsabilidades sem dúvida.</h3>
-          </div>
+  <section
+    id="incentivo"
+    class="relative scroll-mt-16 overflow-hidden bg-[#f5f7ff] px-5 py-20 sm:px-8 lg:px-12 lg:py-28"
+  >
+    <div class="incentive-shape"></div>
+    <div class="relative mx-auto max-w-[1260px]">
+      <div
+        class="grid gap-12 lg:grid-cols-[0.72fr_1.28fr] lg:items-start lg:gap-20"
+      >
+        <div>
+          <p class="section-label">Campanha de incentivo</p>
+          <h2 class="section-title mt-4">
+            Como a unidade pode reduzir o impacto do novo valor.
+          </h2>
+          <p class="mt-6 text-lg leading-8 text-[#2B4091]/[0.72]">
+            O valor-base do upgrade é de R$ 399 por mês. Unidades que concentram
+            recebimentos no F10 Cash poderão obter desconto conforme as regras
+            da campanha vigente.
+          </p>
 
-          <div class="responsibility-columns">
-            {#each responsibilities as responsibility}
-              <article class="responsibility-column">
-                <div class="responsibility-heading">
-                  <svelte:component this={responsibility.icon} size={24} strokeWidth={1.9} />
-                  <div>
-                    <span>{responsibility.subtitle}</span>
-                    <h4>{responsibility.title}</h4>
-                  </div>
-                </div>
-                <ul>
-                  {#each responsibility.items as item}
-                    <li><span></span>{item}</li>
-                  {/each}
-                </ul>
-              </article>
-            {/each}
+          <div
+            class="mt-8 rounded-[24px] bg-[#2B4091] p-6 text-white shadow-[0_18px_45px_rgba(43,64,145,0.18)]"
+          >
+            <span
+              class="text-xs font-extrabold uppercase tracking-[0.14em] text-[#ffcd40]"
+              >Desconto recorrente</span
+            >
+            <strong
+              class="mt-2 block text-[42px] font-semibold leading-none"
+              >Até R$ 200</strong
+            >
+            <p class="mt-3 text-sm leading-6 text-white/70">
+              O desconto regular acompanha o percentual de recebimentos via F10
+              Cash, respeitando o limite máximo mensal.
+            </p>
           </div>
         </div>
+
+        <div
+          class="overflow-hidden rounded-[30px] bg-white shadow-[0_22px_60px_rgba(43,64,145,0.12)]"
+        >
+          <div
+            class="border-b border-[#2B4091]/10 px-6 py-5 sm:px-8"
+          >
+            <span
+              class="text-xs font-extrabold uppercase tracking-[0.15em] text-[#f36b21]"
+              >Condição de lançamento — primeiros quatro meses</span
+            >
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="campaign-table">
+              <thead>
+                <tr>
+                  <th>Mês</th>
+                  <th>% F10 Cash</th>
+                  <th>Turbo</th>
+                  <th>Desconto total</th>
+                  <th>Valor final</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each campaignRows as row}
+                  <tr>
+                    <td>{row.month}</td>
+                    <td>{row.f10CashShare}</td>
+                    <td>{row.turbo}</td>
+                    <td>{row.totalDiscount}</td>
+                    <td><strong>{row.finalValue}</strong></td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+
+          <div
+            class="border-t border-[#2B4091]/10 bg-[#fff8e4] px-6 py-5 sm:px-8"
+          >
+            <p class="text-sm font-semibold leading-6 text-[#2B4091]">
+              Os percentuais, faixas e descontos seguem as regras da campanha
+              oficial e consideram os recebimentos do período anterior.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <article class="discount-example">
+          <span>20% via F10 Cash</span><strong>R$ 359</strong>
+        </article>
+        <article class="discount-example">
+          <span>40% via F10 Cash</span><strong>R$ 319</strong>
+        </article>
+        <article class="discount-example">
+          <span>80% via F10 Cash</span><strong>R$ 239</strong>
+        </article>
+        <article class="discount-example">
+          <span>100% via F10 Cash</span><strong>R$ 199</strong>
+        </article>
       </div>
     </div>
   </section>
 
-  <section id="implantacao" class="relative scroll-mt-16 overflow-hidden bg-[#2B4091] px-5 py-20 text-white sm:px-8 lg:px-12 lg:py-28">
+  <section
+    id="implantacao"
+    class="relative scroll-mt-16 overflow-hidden bg-[#2B4091] px-5 py-20 text-white sm:px-8 lg:px-12 lg:py-28"
+  >
     <div class="implementation-wave"></div>
     <div class="relative mx-auto max-w-[1260px]">
-      <div class="grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:items-end lg:gap-20">
+      <div
+        class="grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:items-end lg:gap-20"
+      >
         <div>
           <p class="section-label section-label-light">Como começa</p>
-          <h2 class="mt-4 text-[38px] font-semibold leading-[1.06] tracking-[-0.045em] text-white sm:text-[50px] lg:text-[58px]">Quatro etapas até a operação.</h2>
+          <h2
+            class="mt-4 text-[40px] font-semibold leading-[1.05] tracking-[-0.045em] text-white sm:text-[52px] lg:text-[58px]"
+          >
+            Quatro etapas até a operação.
+          </h2>
         </div>
         <p class="max-w-[760px] text-lg leading-8 text-white/70 lg:pb-1">
-          A implantação será progressiva, com preparação, configuração, treinamento e início assistido.
+          A implantação será progressiva, com preparação, configuração,
+          treinamento e início assistido.
         </p>
       </div>
 
@@ -630,31 +1067,96 @@
         {/each}
       </div>
 
-      <div class="mt-18 grid gap-8 border-t border-white/15 pt-12 lg:grid-cols-[1fr_auto] lg:items-center">
+      <div
+        class="mt-16 grid gap-8 border-t border-white/[0.15] pt-12 lg:grid-cols-[1fr_auto] lg:items-center"
+      >
         <div>
-          <p class="text-xs font-extrabold uppercase tracking-[0.2em] text-[#ffcd40]">O que a unidade precisa organizar agora</p>
-          <p class="mt-4 max-w-[820px] text-2xl font-semibold leading-9 text-white">
-            Indicar o responsável, mapear os usuários e definir os cinco números de WhatsApp da operação.
+          <p
+            class="text-xs font-extrabold uppercase tracking-[0.2em] text-[#ffcd40]"
+          >
+            O que cada unidade deverá preparar
+          </p>
+          <p
+            class="mt-4 max-w-[850px] text-2xl font-semibold leading-9 text-white"
+          >
+            Indicar o responsável local, informar os usuários, definir os cinco
+            números de WhatsApp e participar dos treinamentos previstos no
+            cronograma oficial.
           </p>
         </div>
-        <div class="rounded-full bg-[#ffcd40] px-6 py-4 text-sm font-extrabold text-[#2B4091]">
+        <div
+          class="rounded-[20px] bg-[#ffcd40] px-6 py-4 text-sm font-extrabold leading-6 text-[#2B4091]"
+        >
           Cronograma oficial será comunicado pela Rede Cebrac
         </div>
       </div>
     </div>
   </section>
 
+  <section class="bg-white px-5 py-16 sm:px-8 lg:px-12 lg:py-20">
+    <div
+      class="mx-auto max-w-[1260px] overflow-hidden rounded-[32px] border border-[#2B4091]/[0.12] bg-[#f7f8fc] shadow-[0_22px_60px_rgba(43,64,145,0.08)]"
+    >
+      <div class="grid lg:grid-cols-[0.8fr_1.2fr]">
+        <div class="bg-[#2B4091] p-7 text-white sm:p-9">
+          <p
+            class="text-xs font-extrabold uppercase tracking-[0.18em] text-[#ffcd40]"
+          >
+            Resumo do comunicado
+          </p>
+          <h2
+            class="mt-4 text-[34px] font-semibold leading-[1.08] tracking-[-0.04em] sm:text-[42px]"
+          >
+            O valor muda. A estrutura comercial da unidade também.
+          </h2>
+        </div>
+
+        <div class="grid gap-5 p-7 sm:grid-cols-2 sm:p-9">
+          <div class="summary-item">
+            <span>Novo investimento</span
+            ><strong>R$ 399 por unidade/mês</strong>
+          </div>
+          <div class="summary-item">
+            <span>Incluído</span
+            ><strong>CRM, workflow e 5 números de WhatsApp</strong>
+          </div>
+          <div class="summary-item">
+            <span>Objetivo</span
+            ><strong>Reduzir desperdícios e preservar o histórico</strong>
+          </div>
+          <div class="summary-item">
+            <span>Aplicação</span
+            ><strong>Todas as unidades da Rede Cebrac</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <footer class="bg-white px-5 py-14 sm:px-8 lg:px-12">
-    <div class="mx-auto flex max-w-[1180px] flex-col gap-8 border-t border-[#2B4091]/15 pt-10 md:flex-row md:items-center md:justify-between">
+    <div
+      class="mx-auto flex max-w-[1180px] flex-col gap-8 border-t border-[#2B4091]/[0.15] pt-10 md:flex-row md:items-center md:justify-between"
+    >
       <div class="flex items-center gap-6">
-        <img src="/Logo-Cebrac.png" alt="Cebrac" class="h-12 w-auto rounded-xl bg-[#2B4091] px-3 py-2 object-contain" />
-        <div class="h-9 w-px bg-[#2B4091]/15"></div>
+        <img
+          src="/Logo-Cebrac.png"
+          alt="Cebrac"
+          class="h-12 w-auto rounded-xl bg-[#2B4091] px-3 py-2 object-contain"
+        />
+        <div class="h-9 w-px bg-[#2B4091]/[0.15]"></div>
         <img src="/logo_f10.svg" alt="F10 Software" class="h-10 w-auto" />
       </div>
-      <p class="max-w-[640px] text-base font-semibold leading-7 text-[#2B4091]/75">
-        Método comercial, tecnologia integrada e uma operação preparada para crescer com continuidade e controle.
+      <p
+        class="max-w-[650px] text-base font-semibold leading-7 text-[#2B4091]/75"
+      >
+        A unidade já investe para gerar oportunidades. O novo modelo foi criado
+        para que menos oportunidades sejam perdidas durante o caminho até a
+        matrícula.
       </p>
-      <a href="#inicio" class="inline-flex items-center gap-2 text-sm font-extrabold text-[#2B4091] transition hover:text-[#61CE70]">
+      <a
+        href="#inicio"
+        class="inline-flex items-center gap-2 text-sm font-extrabold text-[#2B4091] transition hover:text-[#61CE70]"
+      >
         Voltar ao início
         <ArrowUp size={18} />
       </a>
@@ -730,7 +1232,9 @@
     font-size: 0.75rem;
     font-weight: 800;
     letter-spacing: 0.025em;
-    transition: background-color 160ms ease, color 160ms ease;
+    transition:
+      background-color 160ms ease,
+      color 160ms ease;
   }
 
   .presentation-nav-link:hover,
@@ -738,6 +1242,46 @@
     background: #ffcd40;
     color: #2b4091;
     outline: none;
+  }
+
+  .investment-glow,
+  .benefit-ring,
+  .comparison-ring {
+    position: absolute;
+    border-radius: 9999px;
+    pointer-events: none;
+  }
+
+  .investment-glow-one {
+    right: -140px;
+    top: -170px;
+    width: 410px;
+    height: 410px;
+    border: 58px solid rgba(255, 205, 64, 0.1);
+  }
+
+  .investment-glow-two {
+    left: -120px;
+    bottom: -180px;
+    width: 340px;
+    height: 340px;
+    background: rgba(243, 107, 33, 0.08);
+  }
+
+  .investment-list-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    color: rgba(43, 64, 145, 0.78);
+    font-size: 0.92rem;
+    font-weight: 650;
+    line-height: 1.5rem;
+  }
+
+  .investment-list-item :global(svg) {
+    flex: 0 0 auto;
+    margin-top: 0.1rem;
+    color: #61ce70;
   }
 
   .summary-shape {
@@ -751,6 +1295,225 @@
     transform: rotate(18deg);
   }
 
+  .impact-card {
+    min-height: 150px;
+    border-radius: 22px;
+    background: white;
+    padding: 1.3rem;
+    box-shadow: 0 14px 34px rgba(43, 64, 145, 0.08);
+  }
+
+  .impact-card strong {
+    display: block;
+    color: #2b4091;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+  }
+
+  .impact-card span {
+    display: block;
+    margin-top: 0.6rem;
+    color: rgba(43, 64, 145, 0.65);
+    font-size: 0.86rem;
+    line-height: 1.4rem;
+  }
+
+  .impact-card-alert {
+    background: #fff0e7;
+  }
+
+  .impact-card-alert strong {
+    color: #f36b21;
+  }
+
+  .problem-card {
+    border-top: 4px solid #2b4091;
+    border-radius: 0 0 22px 22px;
+    background: #f7f8fc;
+    padding: 1.4rem;
+    color: #2b4091;
+  }
+
+  .problem-card:nth-child(2) {
+    border-top-color: #61ce70;
+  }
+
+  .problem-card:nth-child(3) {
+    border-top-color: #ffcd40;
+  }
+
+  .problem-card:nth-child(4) {
+    border-top-color: #f36b21;
+  }
+
+  .problem-card h3 {
+    margin-top: 1rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .problem-card p {
+    margin-top: 0.45rem;
+    color: rgba(43, 64, 145, 0.66);
+    font-size: 0.88rem;
+    line-height: 1.5rem;
+  }
+
+  .benefit-ring-one {
+    left: -90px;
+    top: 80px;
+    width: 240px;
+    height: 240px;
+    border: 32px solid rgba(43, 64, 145, 0.06);
+  }
+
+  .benefit-ring-two {
+    right: -120px;
+    bottom: 40px;
+    width: 320px;
+    height: 320px;
+    border: 42px solid rgba(97, 206, 112, 0.1);
+  }
+
+  .benefit-card {
+    position: relative;
+    min-height: 280px;
+    overflow: hidden;
+    border: 1px solid rgba(43, 64, 145, 0.1);
+    border-radius: 26px;
+    background: rgba(255, 255, 255, 0.94);
+    padding: 1.65rem;
+    box-shadow: 0 18px 45px rgba(43, 64, 145, 0.08);
+  }
+
+  .benefit-card-topline {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 5px;
+    background: #2b4091;
+  }
+
+  .benefit-card:nth-child(2) .benefit-card-topline,
+  .benefit-card:nth-child(5) .benefit-card-topline {
+    background: #61ce70;
+  }
+
+  .benefit-card:nth-child(3) .benefit-card-topline,
+  .benefit-card:nth-child(6) .benefit-card-topline {
+    background: #f36b21;
+  }
+
+  .benefit-index {
+    position: absolute;
+    right: 1.25rem;
+    top: 1.15rem;
+    color: rgba(43, 64, 145, 0.12);
+    font-size: 2.7rem;
+    font-weight: 700;
+    letter-spacing: -0.06em;
+  }
+
+  .benefit-icon {
+    display: flex;
+    width: 54px;
+    height: 54px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 18px;
+    background: rgba(97, 206, 112, 0.18);
+    color: #2b4091;
+  }
+
+  .benefit-card h3 {
+    margin-top: 1.5rem;
+    color: #2b4091;
+    font-size: 1.28rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .benefit-card p {
+    margin-top: 0.75rem;
+    color: rgba(43, 64, 145, 0.67);
+    font-size: 0.92rem;
+    line-height: 1.6rem;
+  }
+
+  .comparison-ring {
+    border: 34px solid rgba(43, 64, 145, 0.08);
+  }
+
+  .comparison-ring-one {
+    left: -110px;
+    top: 30px;
+    width: 280px;
+    height: 280px;
+  }
+
+  .comparison-ring-two {
+    right: -140px;
+    bottom: -40px;
+    width: 360px;
+    height: 360px;
+  }
+
+  .turnover-board {
+    overflow: hidden;
+    border-radius: 30px;
+    box-shadow: 0 24px 65px rgba(43, 64, 145, 0.14);
+  }
+
+  .turnover-column {
+    padding: 2rem;
+  }
+
+  .turnover-column > span {
+    display: inline-flex;
+    border-radius: 9999px;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .turnover-column-current {
+    background: #f1f3f9;
+    color: #2b4091;
+  }
+
+  .turnover-column-current > span {
+    background: rgba(43, 64, 145, 0.1);
+  }
+
+  .turnover-column-future {
+    background: #2b4091;
+    color: white;
+  }
+
+  .turnover-column-future > span {
+    background: #61ce70;
+    color: #123d1d;
+  }
+
+  .turnover-flow {
+    display: grid;
+    gap: 0.9rem;
+    margin-top: 1.5rem;
+  }
+
+  .turnover-flow strong {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+
+  .turnover-flow > span {
+    color: #f36b21;
+    font-size: 1.2rem;
+    font-weight: 800;
+  }
+
   .crm-sun {
     position: absolute;
     right: -120px;
@@ -761,47 +1524,49 @@
     border: 52px solid rgba(255, 205, 64, 0.14);
   }
 
-  .journey-track {
-    position: relative;
+  .resource-row {
     display: grid;
-    gap: 2rem;
+    grid-template-columns: 48px 1fr;
+    gap: 1rem;
+    padding: 1.35rem 0;
   }
 
-  .journey-step {
-    position: relative;
-    text-align: center;
-  }
-
-  .journey-node {
-    position: relative;
-    z-index: 2;
+  .resource-icon {
     display: flex;
-    width: 72px;
-    height: 72px;
+    width: 44px;
+    height: 44px;
     align-items: center;
     justify-content: center;
-    margin: 0 auto;
     border-radius: 9999px;
     background: #ffcd40;
     color: #2b4091;
-    box-shadow: 0 0 0 14px rgba(255, 255, 255, 0.08);
   }
 
-  .journey-arrow {
-    display: none;
+  .resource-row h4 {
+    color: white;
+    font-size: 1.05rem;
+    font-weight: 700;
   }
 
-  .media-frame {
+  .resource-row p {
+    margin-top: 0.35rem;
+    color: rgba(255, 255, 255, 0.64);
+    font-size: 0.88rem;
+    line-height: 1.5rem;
+  }
+
+  .kanban-frame {
     overflow: hidden;
-    border: 1px solid rgba(43, 64, 145, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.22);
     border-radius: 30px;
-    background: rgba(43, 64, 145, 0.06);
-    box-shadow: 0 22px 55px rgba(43, 64, 145, 0.16);
+    background: white;
+    box-shadow: 0 28px 70px rgba(0, 0, 0, 0.24);
   }
 
-  .media-frame-light {
-    border-color: rgba(255, 255, 255, 0.22);
-    background: rgba(255, 255, 255, 0.95);
+  .kanban-frame img {
+    display: block;
+    width: 100%;
+    height: auto;
   }
 
   .media-toolbar {
@@ -826,7 +1591,7 @@
   }
 
   .media-toolbar > span:nth-child(3) {
-    background: #2b4091;
+    background: #f36b21;
   }
 
   .media-toolbar small {
@@ -838,158 +1603,58 @@
     text-transform: uppercase;
   }
 
-  .media-canvas {
-    display: flex;
-    min-height: calc(100% - 44px);
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 32px;
-    color: #2b4091;
-    text-align: center;
+  .distribution-box {
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 1rem;
   }
 
-  .media-canvas strong {
-    margin-top: 16px;
-    font-size: 0.8rem;
-    font-weight: 800;
-    letter-spacing: 0.13em;
-    text-transform: uppercase;
-  }
-
-  .media-canvas p {
-    margin-top: 8px;
-    max-width: 380px;
-    color: rgba(43, 64, 145, 0.62);
-    font-size: 0.82rem;
-    line-height: 1.5rem;
-  }
-
-  .whatsapp-heading {
-    background: linear-gradient(180deg, rgba(97, 206, 112, 0.12), rgba(255, 255, 255, 1));
-  }
-
-  .whatsapp-split {
-    position: relative;
-    display: grid;
-  }
-
-  .whatsapp-side {
-    padding: 4.5rem 1.25rem;
-    color: white;
-  }
-
-  .whatsapp-before {
-    background: #2b4091;
-  }
-
-  .whatsapp-after {
-    background: #61ce70;
-  }
-
-  .whatsapp-side-inner {
-    max-width: 560px;
-    margin: 0 auto;
-  }
-
-  .whatsapp-kicker {
-    font-size: 0.75rem;
-    font-weight: 800;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
+  .distribution-box strong {
+    display: block;
     color: #ffcd40;
-  }
-
-  .whatsapp-side h3 {
-    margin-top: 0.85rem;
-    font-size: clamp(2rem, 4vw, 3.1rem);
-    font-weight: 600;
-    letter-spacing: -0.04em;
-    line-height: 1.06;
-  }
-
-  .whatsapp-intro {
-    margin-top: 1.2rem;
-    max-width: 520px;
-    color: rgba(255, 255, 255, 0.78);
-    font-size: 1.05rem;
-    line-height: 1.8rem;
-  }
-
-  .whatsapp-list {
-    margin-top: 2rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
-  }
-
-  .whatsapp-list-item {
-    display: grid;
-    grid-template-columns: 32px 1fr;
-    gap: 0.8rem;
-    padding: 1.15rem 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  }
-
-  .whatsapp-list-item strong {
-    font-size: 0.95rem;
-  }
-
-  .whatsapp-list-item p {
-    margin-top: 0.25rem;
-    color: rgba(255, 255, 255, 0.68);
-    font-size: 0.85rem;
-    line-height: 1.45rem;
-  }
-
-  .whatsapp-bridge {
-    position: relative;
-    z-index: 5;
-    display: flex;
-    width: 132px;
-    height: 132px;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    margin: -38px auto;
-    border: 10px solid white;
-    border-radius: 9999px;
-    background: #ffcd40;
-    color: #2b4091;
-    box-shadow: 0 18px 45px rgba(43, 64, 145, 0.18);
-  }
-
-  .whatsapp-bridge span {
-    font-size: 2.5rem;
-    font-weight: 700;
+    font-size: 2rem;
     line-height: 1;
   }
 
-  .whatsapp-bridge strong {
-    font-size: 0.95rem;
+  .distribution-box span {
+    display: block;
+    margin-top: 0.4rem;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 0.78rem;
   }
 
-  .whatsapp-bridge small {
-    font-size: 0.7rem;
-    opacity: 0.72;
+  .whatsapp-feature-card {
+    min-height: 230px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 1.5rem;
+    backdrop-filter: blur(8px);
   }
 
-  .comparison-ring {
-    position: absolute;
-    border-radius: 9999px;
-    border: 34px solid rgba(43, 64, 145, 0.08);
+  .whatsapp-feature-icon {
+    display: flex;
+    width: 50px;
+    height: 50px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 18px;
+    background: #61ce70;
+    color: #153e1d;
   }
 
-  .comparison-ring-one {
-    left: -110px;
-    top: 30px;
-    width: 280px;
-    height: 280px;
+  .whatsapp-feature-card h4 {
+    margin-top: 1.3rem;
+    color: white;
+    font-size: 1.15rem;
+    font-weight: 700;
   }
 
-  .comparison-ring-two {
-    right: -140px;
-    bottom: -40px;
-    width: 360px;
-    height: 360px;
+  .whatsapp-feature-card p {
+    margin-top: 0.6rem;
+    color: rgba(255, 255, 255, 0.64);
+    font-size: 0.88rem;
+    line-height: 1.55rem;
   }
 
   .metric-lines {
@@ -1037,67 +1702,69 @@
     line-height: 1.55rem;
   }
 
-  .responsibility-columns {
-    display: grid;
-    gap: 2rem;
+  .incentive-shape {
+    position: absolute;
+    right: -120px;
+    top: 60px;
+    width: 330px;
+    height: 330px;
+    border-radius: 46% 54% 64% 36% / 43% 39% 61% 57%;
+    background: rgba(255, 205, 64, 0.18);
+    transform: rotate(18deg);
   }
 
-  .responsibility-column {
-    position: relative;
-    padding-left: 1.25rem;
-    border-left: 5px solid #61ce70;
+  .campaign-table {
+    width: 100%;
+    min-width: 720px;
+    border-collapse: collapse;
   }
 
-  .responsibility-column:nth-child(2) {
-    border-left-color: #2b4091;
+  .campaign-table th,
+  .campaign-table td {
+    border-bottom: 1px solid rgba(43, 64, 145, 0.1);
+    padding: 1rem 1.2rem;
+    text-align: left;
   }
 
-  .responsibility-column:nth-child(3) {
-    border-left-color: #ffcd40;
-  }
-
-  .responsibility-heading {
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-    color: #2b4091;
-  }
-
-  .responsibility-heading span {
-    display: block;
-    color: rgba(43, 64, 145, 0.55);
-    font-size: 0.68rem;
+  .campaign-table th {
+    background: #2b4091;
+    color: white;
+    font-size: 0.72rem;
     font-weight: 800;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.09em;
     text-transform: uppercase;
   }
 
-  .responsibility-heading h4 {
-    margin-top: 0.15rem;
-    font-size: 1.35rem;
+  .campaign-table td {
+    color: rgba(43, 64, 145, 0.76);
+    font-size: 0.9rem;
+  }
+
+  .campaign-table td strong {
+    color: #f36b21;
+    font-size: 1rem;
+  }
+
+  .discount-example {
+    border: 1px solid rgba(43, 64, 145, 0.1);
+    border-radius: 20px;
+    background: white;
+    padding: 1.25rem;
+    box-shadow: 0 12px 30px rgba(43, 64, 145, 0.06);
+  }
+
+  .discount-example span {
+    display: block;
+    color: rgba(43, 64, 145, 0.6);
+    font-size: 0.78rem;
     font-weight: 700;
   }
 
-  .responsibility-column ul {
-    margin-top: 1.2rem;
-  }
-
-  .responsibility-column li {
-    display: flex;
-    gap: 0.65rem;
-    padding: 0.45rem 0;
-    color: rgba(43, 64, 145, 0.72);
-    font-size: 0.85rem;
-    line-height: 1.45rem;
-  }
-
-  .responsibility-column li span {
-    width: 6px;
-    height: 6px;
-    flex: 0 0 auto;
-    margin-top: 0.48rem;
-    border-radius: 9999px;
-    background: #61ce70;
+  .discount-example strong {
+    display: block;
+    margin-top: 0.35rem;
+    color: #2b4091;
+    font-size: 1.6rem;
   }
 
   .implementation-wave {
@@ -1164,11 +1831,27 @@
     line-height: 1.55rem;
   }
 
+  .summary-item span {
+    display: block;
+    color: rgba(43, 64, 145, 0.54);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .summary-item strong {
+    display: block;
+    margin-top: 0.4rem;
+    color: #2b4091;
+    font-size: 1rem;
+    line-height: 1.55rem;
+  }
+
   @media (min-width: 768px) {
-    .whatsapp-list-grid {
+    .turnover-board {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      column-gap: 2rem;
     }
 
     .implementation-track {
@@ -1180,78 +1863,22 @@
 
   @media (min-width: 1024px) {
     .hero-grid {
-      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr);
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr);
       column-gap: 0;
     }
 
     .hero-visual {
       min-height: 780px;
-      margin-left: -9rem;
+      margin-left: -8rem;
       margin-right: -6rem;
       pointer-events: none;
     }
 
     .hero-visual img {
-      width: 105%;
+      width: 104%;
       max-width: none;
-      transform: translateX(-1.5%);
+      transform: translateX(-1%);
       transform-origin: center right;
-    }
-
-    .journey-track {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 3rem;
-    }
-
-    .journey-track::before {
-      content: "";
-      position: absolute;
-      left: 10%;
-      right: 10%;
-      top: 35px;
-      height: 2px;
-      background: rgba(255, 255, 255, 0.18);
-    }
-
-    .journey-arrow {
-      position: absolute;
-      right: -2rem;
-      top: 21px;
-      z-index: 3;
-      display: block;
-      color: #ffcd40;
-      font-size: 1.6rem;
-    }
-
-    .whatsapp-split {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .whatsapp-side {
-      padding: 6rem 4rem;
-    }
-
-    .whatsapp-before .whatsapp-side-inner {
-      margin-left: auto;
-      margin-right: 4rem;
-    }
-
-    .whatsapp-after .whatsapp-side-inner {
-      margin-left: 4rem;
-      margin-right: auto;
-    }
-
-    .whatsapp-bridge {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      margin: 0;
-      transform: translate(-50%, -50%);
-    }
-
-    .responsibility-columns {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 2.5rem;
     }
 
     .implementation-track {
