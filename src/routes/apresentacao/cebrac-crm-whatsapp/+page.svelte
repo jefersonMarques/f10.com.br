@@ -325,17 +325,24 @@
           fetchpriority="high"
         />
       </div>
+
+      <figure class="hero-mobile-visual mt-10 lg:hidden">
+        <img
+          src="/hero-cebrac.webp"
+          alt="CRM de Leads F10 e atendimento por WhatsApp integrados à operação Cebrac"
+          class="block h-auto w-full object-contain"
+        />
+      </figure>
     </div>
   </section>
 
   <nav class="sticky top-0 z-40 border-b border-white/10 bg-[#2B4091]" aria-label="Navegação do comunicado">
-    <div class="mx-auto flex max-w-[1480px] items-center justify-between gap-8 overflow-x-auto px-5 py-3 sm:px-8 lg:px-10">
+    <div class="mx-auto flex max-w-[1480px] items-center justify-between gap-6 overflow-x-auto px-5 py-3 sm:px-8 lg:px-10">
       <img src="/Logo-Cebrac.png" alt="Cebrac" class="h-8 w-auto shrink-0" />
       <div class="nav-links ml-auto flex min-w-max items-center justify-end gap-1">
         <a href="#motivo" class="nav-link">Por que muda</a>
-        <a href="#modelo" class="nav-link">Novo modelo</a>
+        <a href="#modelo" class="nav-link">Como funciona</a>
         <a href="#beneficios" class="nav-link">Benefícios</a>
-        <a href="#comparacao" class="nav-link">Hoje × novo padrão</a>
         <a href="#investimento" class="nav-link">Investimento</a>
         <a href="#implantacao" class="nav-link">Implantação</a>
       </div>
@@ -431,18 +438,22 @@
           <img src="/f10_kanban.png" alt="Funil Kanban do CRM F10 com etapas, responsáveis e atividades" class="block h-auto w-full" />
         </figure>
       </div>
+    </div>
+  </section>
 
-      <div class="mt-16 grid gap-12 border-t border-white/15 pt-14 lg:grid-cols-[0.72fr_1.28fr] lg:gap-20">
+  <section class="model-whatsapp-section bg-[#eef2fb] px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
+    <div class="mx-auto max-w-[1480px]">
+      <div class="grid gap-12 lg:grid-cols-[0.72fr_1.28fr] lg:items-start lg:gap-20">
         <div>
-          <p class="section-label text-[#ffcd40]">WhatsApp integrado</p>
-          <h3 class="mt-4 max-w-[520px] text-[34px] font-semibold leading-[1.12] tracking-[-0.04em] text-white sm:text-[44px]">
+          <p class="section-label">WhatsApp integrado</p>
+          <h3 class="mt-4 max-w-[540px] text-[34px] font-semibold leading-[1.12] tracking-[-0.04em] text-[#2B4091] sm:text-[44px]">
             Cinco números por unidade, distribuídos conforme a operação.
           </h3>
-          <p class="mt-6 max-w-[560px] text-lg leading-8 text-white/70">
+          <p class="mt-6 max-w-[560px] text-lg leading-8 text-[#2B4091]/70">
             Os números poderão ser utilizados no CRM de Leads ou no F10. A distribuição será definida pela unidade durante a implantação.
           </p>
 
-          <div class="distribution-example mt-8">
+          <div class="distribution-example distribution-example-light mt-8">
             <span>Exemplo de distribuição</span>
             <div>
               <strong>2</strong><small>números no CRM</small>
@@ -455,7 +466,7 @@
 
         <div class="grid gap-x-10 gap-y-0 sm:grid-cols-2">
           {#each whatsappFeatures as feature}
-            <article class="feature-line feature-line-dark">
+            <article class="feature-line feature-line-light">
               <div class="feature-icon feature-icon-green">
                 <svelte:component this={feature.icon} size={22} strokeWidth={1.9} />
               </div>
@@ -475,9 +486,9 @@
       <div class="grid gap-12 lg:grid-cols-[0.62fr_1.38fr] lg:items-start lg:gap-24">
         <div>
           <p class="section-label">Benefícios esperados</p>
-          <h2 class="section-title mt-4">O benefício vem do processo. A tecnologia fornece a estrutura.</h2>
+          <h2 class="section-title mt-4">Benefícios esperados na operação.</h2>
           <p class="mt-6 max-w-[560px] text-lg leading-8 text-[#2B4091]/70">
-            Os resultados dependerão da combinação entre método comercial, rotina de acompanhamento, disciplina da equipe e informação disponível para a gestão.
+            O novo padrão melhora o aproveitamento dos leads, preserva o histórico e dá mais previsibilidade à gestão. Os resultados dependem da combinação entre processo, acompanhamento e disciplina comercial.
           </p>
         </div>
 
@@ -514,10 +525,10 @@
       <div class="grid gap-10 lg:grid-cols-[0.68fr_1.32fr] lg:items-end lg:gap-24">
         <div>
           <p class="section-label">Hoje × novo padrão</p>
-          <h2 class="section-title mt-4 max-w-[610px]">O que deixa de depender das pessoas e passa a fazer parte do processo.</h2>
+          <h2 class="section-title mt-4 max-w-[610px]">O que muda na prática.</h2>
         </div>
         <p class="max-w-[780px] text-lg leading-8 text-[#2B4091]/70 lg:pb-1">
-          A mudança substitui controles individuais por uma operação visível, contínua e padronizada em toda a rede.
+          Atividades que hoje dependem da organização individual passam a fazer parte do processo oficial da rede, com histórico, responsáveis, prazos e acompanhamento.
         </p>
       </div>
 
@@ -558,15 +569,24 @@
             <p>R$ 200 de desconto sobre o valor-base.</p>
           </div>
 
-          <div class="investment-base">
-            <span>Valor-base sem uso do F10 Cash</span>
-            <strong>R$ 399<small>/mês</small></strong>
-            <p>Valor integral por unidade.</p>
-          </div>
-
           <div class="investment-included">
             <span>Incluído no upgrade</span>
             <p>CRM de Leads, workflow comercial, cinco números de WhatsApp, configuração, treinamento e acompanhamento inicial.</p>
+          </div>
+        </div>
+
+        <div class="investment-context">
+          <div>
+            <span>Valor-base sem desconto</span>
+            <strong>R$ 399 por unidade/mês</strong>
+          </div>
+          <div>
+            <span>Vigência financeira</span>
+            <strong>Vencimento de julho de 2026</strong>
+          </div>
+          <div>
+            <span>WhatsApp no F10</span>
+            <strong>Disponível a partir de agosto de 2026</strong>
           </div>
         </div>
 
@@ -586,9 +606,12 @@
 
         {#each investmentRows as row}
           <div class:investment-row-highlighted={row.highlighted} class="investment-row">
-            <strong>{row.cashShare}</strong>
+            <div class="investment-share">
+              <strong>{row.cashShare}</strong>
+              <small>{row.discount === "—" ? "Sem desconto" : `${row.discount} de desconto`}</small>
+            </div>
             <span>{row.discount}</span>
-            <strong>{row.monthlyValue}</strong>
+            <strong>{row.monthlyValue}<small>/mês</small></strong>
           </div>
         {/each}
 
@@ -668,8 +691,18 @@
   .brand-lockup,
   .journey-panel,
   .crm-figure,
+  .hero-mobile-visual,
   .investment-panel {
     border-radius: 22px;
+  }
+
+  .hero-mobile-visual {
+    position: relative;
+    z-index: 2;
+    overflow: hidden;
+    border: 1px solid rgba(43, 64, 145, 0.12);
+    background: rgba(255, 255, 255, 0.88);
+    box-shadow: 0 22px 50px rgba(43, 64, 145, 0.14);
   }
 
   .hero-notes div {
@@ -815,6 +848,10 @@
     color: rgba(255, 255, 255, 0.63);
   }
 
+  .feature-line-light {
+    border-color: rgba(43, 64, 145, 0.12);
+  }
+
   .feature-icon {
     display: flex;
     width: 42px;
@@ -843,14 +880,11 @@
     gap: 0.75rem;
     max-width: 470px;
     padding: 1.1rem;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(255, 255, 255, 0.08);
     border-radius: 18px;
   }
 
   .distribution-example > span {
     grid-column: 1 / -1;
-    color: #ffcd40;
     font-size: 0.7rem;
     font-weight: 800;
     letter-spacing: 0.15em;
@@ -861,18 +895,33 @@
     display: grid;
     gap: 0.25rem;
     padding: 0.9rem;
-    background: rgba(255, 255, 255, 0.08);
     border-radius: 12px;
   }
 
   .distribution-example strong {
-    color: #ffcd40;
     font-size: 2rem;
     line-height: 1;
   }
 
-  .distribution-example small {
-    color: rgba(255, 255, 255, 0.68);
+  .distribution-example-light {
+    border: 1px solid rgba(43, 64, 145, 0.12);
+    background: rgba(255, 255, 255, 0.64);
+  }
+
+  .distribution-example-light > span {
+    color: #2b4091;
+  }
+
+  .distribution-example-light > div {
+    background: white;
+  }
+
+  .distribution-example-light strong {
+    color: #2b4091;
+  }
+
+  .distribution-example-light small {
+    color: rgba(43, 64, 145, 0.65);
   }
 
   .benefit-columns {
@@ -994,7 +1043,6 @@
   }
 
   .investment-best,
-  .investment-base,
   .investment-included {
     padding: 1.75rem;
   }
@@ -1004,19 +1052,14 @@
     color: white;
   }
 
-  .investment-base {
-    background: #eef2fb;
-    color: #2b4091;
-  }
-
   .investment-included {
     background: white;
     color: #2b4091;
   }
 
   .investment-best > span,
-  .investment-base > span,
-  .investment-included > span {
+  .investment-included > span,
+  .investment-context span {
     display: block;
     font-size: 0.7rem;
     font-weight: 800;
@@ -1028,13 +1071,12 @@
     color: #ffcd40;
   }
 
-  .investment-base > span,
-  .investment-included > span {
+  .investment-included > span,
+  .investment-context span {
     color: rgba(43, 64, 145, 0.55);
   }
 
-  .investment-best strong,
-  .investment-base strong {
+  .investment-best strong {
     display: block;
     margin-top: 0.55rem;
     font-size: clamp(2.8rem, 5vw, 4.5rem);
@@ -1043,15 +1085,13 @@
     line-height: 1;
   }
 
-  .investment-best small,
-  .investment-base small {
+  .investment-best small {
     margin-left: 0.28rem;
     font-size: 1rem;
     letter-spacing: 0;
   }
 
   .investment-best p,
-  .investment-base p,
   .investment-included p {
     margin-top: 0.7rem;
     font-size: 0.9rem;
@@ -1062,9 +1102,30 @@
     color: rgba(255, 255, 255, 0.68);
   }
 
-  .investment-base p,
   .investment-included p {
     color: rgba(43, 64, 145, 0.63);
+  }
+
+  .investment-context {
+    display: grid;
+    border-bottom: 1px solid rgba(43, 64, 145, 0.1);
+    background: #eef2fb;
+  }
+
+  .investment-context > div {
+    padding: 1.15rem 1.5rem;
+    border-bottom: 1px solid rgba(43, 64, 145, 0.08);
+  }
+
+  .investment-context > div:last-child {
+    border-bottom: 0;
+  }
+
+  .investment-context strong {
+    display: block;
+    margin-top: 0.35rem;
+    color: #2b4091;
+    font-size: 0.95rem;
   }
 
   .investment-table-title {
@@ -1119,13 +1180,31 @@
     color: #2b4091;
   }
 
+  .investment-share {
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .investment-share small {
+    display: none;
+    color: rgba(43, 64, 145, 0.56);
+    font-size: 0.72rem;
+    font-weight: 500;
+  }
+
   .investment-row > strong:last-child {
     color: #f36b21;
     font-size: 1.12rem;
     text-align: right;
   }
 
-  .investment-row span {
+  .investment-row > strong:last-child small {
+    margin-left: 0.18rem;
+    color: rgba(243, 107, 33, 0.72);
+    font-size: 0.72rem;
+  }
+
+  .investment-row > span {
     color: rgba(43, 64, 145, 0.58);
     font-size: 0.82rem;
   }
@@ -1238,12 +1317,24 @@
     }
 
     .investment-summary {
-      grid-template-columns: 0.82fr 0.68fr 1.5fr;
+      grid-template-columns: 0.82fr 1.68fr;
     }
 
-    .investment-base,
     .investment-included {
       border-left: 1px solid rgba(43, 64, 145, 0.1);
+    }
+
+    .investment-context {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .investment-context > div {
+      border-right: 1px solid rgba(43, 64, 145, 0.08);
+      border-bottom: 0;
+    }
+
+    .investment-context > div:last-child {
+      border-right: 0;
     }
   }
 
@@ -1288,6 +1379,18 @@
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 2.5rem;
       padding-top: 3rem;
+    }
+  }
+
+  @media (max-width: 1023px) {
+    .hero-grid {
+      padding-bottom: 2.5rem;
+    }
+
+    .hero-mobile-visual img {
+      width: 112%;
+      max-width: none;
+      transform: translateX(-4%);
     }
   }
 
@@ -1338,12 +1441,20 @@
     }
 
     .investment-table-header span:nth-child(2),
-    .investment-row span {
+    .investment-row > span {
       display: none;
+    }
+
+    .investment-share small {
+      display: block;
     }
 
     .investment-row > strong:last-child {
       text-align: right;
+    }
+
+    .investment-table-title :global(svg) {
+      display: none;
     }
   }
 
