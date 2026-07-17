@@ -1,9 +1,8 @@
 <script lang="ts">
   import {
+    ArrowRight,
     ArrowUp,
     BarChart3,
-    BellRing,
-    Building2,
     CalendarCheck2,
     CheckCircle2,
     Clock3,
@@ -13,243 +12,240 @@
     MessagesSquare,
     ShieldCheck,
     Target,
-    TimerReset,
     TrendingUp,
     UserCheck,
     UsersRound,
+    Workflow,
   } from "lucide-svelte";
 
   type IconComponent = typeof Target;
 
-  type FeatureItem = {
+  type JourneyStep = {
     title: string;
     description: string;
     icon: IconComponent;
   };
 
-  type ComparisonItem = {
+  type ChangeItem = {
+    area: string;
     current: string;
     future: string;
   };
 
-  type CampaignRow = {
-    month: string;
-    f10CashShare: string;
-    turbo: string;
-    totalDiscount: string;
-    finalValue: string;
+  type BenefitItem = {
+    title: string;
+    description: string;
+    outcome: string;
+    icon: IconComponent;
+  };
+
+  type MetricItem = {
+    title: string;
+    description: string;
+    icon: IconComponent;
+  };
+
+  type ResourceGroup = {
+    label: string;
+    title: string;
+    description: string;
+    icon: IconComponent;
+    items: string[];
+  };
+
+  type CashExample = {
+    share: string;
+    value: string;
   };
 
   type ImplementationStep = {
     number: string;
+    owner: string;
     title: string;
     description: string;
-    owner: string;
   };
 
-  const benefits: FeatureItem[] = [
+  const journeySteps: JourneyStep[] = [
     {
-      title: "Menos desperdício de marketing",
-      description:
-        "Mais oportunidades acompanhadas até uma conclusão, sem aumentar o investimento para gerar novos leads.",
+      title: "Lead recebido",
+      description: "Origem e dados entram no processo comercial.",
       icon: Target,
     },
     {
-      title: "Mais continuidade comercial",
-      description:
-        "O histórico permanece na unidade mesmo quando vendedores, gestores ou responsáveis mudam.",
-      icon: ShieldCheck,
+      title: "Responsável definido",
+      description: "A oportunidade passa a ter um dono e um prazo.",
+      icon: UserCheck,
     },
     {
-      title: "Mais produtividade",
-      description:
-        "A equipe enxerga quem precisa de retorno, qual é a próxima ação e há quanto tempo o lead está parado.",
-      icon: Clock3,
+      title: "Contato pelo WhatsApp",
+      description: "A conversa permanece vinculada ao atendimento.",
+      icon: MessagesSquare,
     },
     {
-      title: "Mais controle para a gestão",
-      description:
-        "Responsáveis, atividades, gargalos e conversões passam a ser acompanhados em uma única operação.",
+      title: "Próxima ação registrada",
+      description: "Tarefas e retornos deixam de depender da memória.",
+      icon: CalendarCheck2,
+    },
+    {
+      title: "Gestão acompanha",
+      description: "Atrasos, gargalos e conversões ficam visíveis.",
       icon: BarChart3,
     },
     {
-      title: "Mais previsibilidade",
-      description:
-        "A rede passa a trabalhar com um processo comercial comum, mensurável e mais fácil de evoluir.",
-      icon: TrendingUp,
-    },
-    {
-      title: "Maior potencial de matrículas",
-      description:
-        "O ganho esperado vem do melhor aproveitamento dos leads já captados e pagos pela unidade.",
+      title: "Matrícula e continuidade",
+      description: "O relacionamento segue dentro do F10.",
       icon: CheckCircle2,
     },
   ];
 
-  const comparisonItems: ComparisonItem[] = [
+  const changeItems: ChangeItem[] = [
     {
-      current: "Conversas espalhadas em celulares, planilhas e anotações",
-      future: "Histórico centralizado e vinculado à operação da unidade",
+      area: "Atendimento",
+      current: "Conversas distribuídas entre celulares, planilhas e anotações.",
+      future: "Histórico centralizado e vinculado a cada oportunidade.",
     },
     {
-      current: "Retornos dependem da memória e da organização individual",
-      future: "Tarefas, alertas e próximas ações organizam os follow-ups",
+      area: "Follow-up",
+      current: "Retornos dependem da memória e da organização individual.",
+      future: "Próxima atividade, prazo e responsável ficam registrados.",
     },
     {
-      current: "O gestor descobre atrasos quando a oportunidade já esfriou",
-      future: "Indicadores mostram leads parados, atrasos e gargalos",
+      area: "Gestão",
+      current: "O gestor descobre atrasos quando a oportunidade já esfriou.",
+      future: "Funil e indicadores mostram onde a equipe precisa agir.",
     },
     {
-      current: "A saída de um colaborador interrompe negociações",
-      future: "Outro profissional continua com todo o contexto preservado",
+      area: "Troca de equipe",
+      current: "Parte do contexto desaparece quando um colaborador sai.",
+      future: "Outro profissional continua a negociação sem começar do zero.",
     },
     {
-      current: "Parte dos leads pagos pelo marketing não recebe continuidade",
-      future: "Cada oportunidade possui responsável e próxima atividade",
-    },
-    {
-      current: "Cada unidade trabalha com controles e rotinas diferentes",
-      future: "A rede adota um padrão comercial comum e mensurável",
-    },
-  ];
-
-  const crmFeatures: FeatureItem[] = [
-    {
-      title: "Funil visual",
-      description:
-        "Cada lead fica posicionado em uma etapa clara até a matrícula.",
-      icon: Funnel,
-    },
-    {
-      title: "Responsáveis e tarefas",
-      description:
-        "A equipe sabe quem deve agir, quando retornar e qual é a próxima ação.",
-      icon: CalendarCheck2,
-    },
-    {
-      title: "Histórico preservado",
-      description:
-        "Mensagens, observações, objeções e negociações permanecem na unidade.",
-      icon: FileText,
-    },
-    {
-      title: "Indicadores comerciais",
-      description:
-        "A gestão acompanha produtividade, conversão e oportunidades paradas.",
-      icon: BarChart3,
+      area: "Padrão da rede",
+      current: "Cada unidade organiza a operação de uma maneira diferente.",
+      future: "Toda a rede passa a trabalhar com um processo comum e mensurável.",
     },
   ];
 
-  const whatsappFeatures: FeatureItem[] = [
+  const benefits: BenefitItem[] = [
     {
-      title: "Atendimento comercial",
+      title: "Melhor aproveitamento dos leads",
       description:
-        "Conversas com leads dentro do contexto da oportunidade no CRM.",
-      icon: MessagesSquare,
+        "Mais oportunidades acompanhadas até uma conclusão, sem depender apenas de aumentar o investimento em mídia.",
+      outcome: "Menos desperdício do marketing já realizado",
+      icon: Target,
     },
     {
-      title: "Continuidade entre atendentes",
+      title: "Continuidade da operação",
       description:
-        "O atendimento não depende de um aparelho ou colaborador específico.",
-      icon: UsersRound,
+        "Históricos, objeções, propostas e próximos passos permanecem disponíveis para a unidade.",
+      outcome: "Menos perda de contexto e retrabalho",
+      icon: ShieldCheck,
     },
     {
-      title: "Relacionamento pós-matrícula",
-      description: "Comunicação com alunos e responsáveis dentro do F10.",
-      icon: MessageCircleMore,
-    },
-    {
-      title: "Comunicação administrativa",
+      title: "Gestão mais previsível",
       description:
-        "Avisos, orientações, cobranças e acordos em um canal organizado.",
-      icon: BellRing,
+        "Produtividade, conversão, tempo de resposta e oportunidades paradas passam a ser acompanhados com clareza.",
+      outcome: "Decisões baseadas na rotina real da equipe",
+      icon: TrendingUp,
     },
   ];
 
-  const metrics: FeatureItem[] = [
+  const metrics: MetricItem[] = [
     {
-      title: "Tempo do primeiro atendimento",
-      description: "Quanto tempo o lead espera até receber o primeiro retorno.",
+      title: "Primeiro atendimento",
+      description: "Tempo entre a entrada do lead e o primeiro retorno.",
       icon: Clock3,
     },
     {
-      title: "Leads sem próxima atividade",
-      description:
-        "Oportunidades que precisam de uma ação definida pela equipe.",
+      title: "Próxima atividade",
+      description: "Oportunidades sem ação ou prazo definido.",
       icon: CalendarCheck2,
     },
     {
-      title: "Conversão entre etapas",
-      description: "Avanço do lead ao longo do funil até a matrícula.",
+      title: "Conversão por etapa",
+      description: "Avanço do lead ao longo do funil comercial.",
       icon: Funnel,
     },
     {
-      title: "Produtividade da equipe",
-      description:
-        "Atividades, contatos e acompanhamentos executados no período.",
+      title: "Produtividade",
+      description: "Contatos e acompanhamentos executados no período.",
       icon: BarChart3,
     },
   ];
 
-  const campaignRows: CampaignRow[] = [
+  const resourceGroups: ResourceGroup[] = [
     {
-      month: "Julho",
-      f10CashShare: "0%",
-      turbo: "20%",
-      totalDiscount: "20%",
-      finalValue: "R$ 359",
+      label: "CRM de Leads",
+      title: "Cada oportunidade com etapa, responsável e próxima ação.",
+      description:
+        "O CRM reúne o histórico comercial e oferece uma visão única do que está acontecendo em cada unidade.",
+      icon: Funnel,
+      items: [
+        "Funil visual até a matrícula",
+        "Responsáveis, tarefas e prazos",
+        "Histórico de mensagens e negociações",
+        "Indicadores para gestores e franqueadora",
+      ],
     },
     {
-      month: "Agosto",
-      f10CashShare: "20%",
-      turbo: "15%",
-      totalDiscount: "35%",
-      finalValue: "R$ 329",
+      label: "Workflow comercial",
+      title: "Uma rotina comum para orientar o trabalho da equipe.",
+      description:
+        "As etapas e os acompanhamentos deixam de ser controles individuais e passam a fazer parte do processo oficial.",
+      icon: Workflow,
+      items: [
+        "Etapas padronizadas para a rede",
+        "Cadências e retornos organizados",
+        "Critérios claros para avanço do lead",
+        "Acompanhamento das oportunidades paradas",
+      ],
     },
     {
-      month: "Setembro",
-      f10CashShare: "50%",
-      turbo: "10%",
-      totalDiscount: "60%",
-      finalValue: "R$ 279",
+      label: "WhatsApp integrado",
+      title: "Cinco números por unidade, distribuídos conforme a operação.",
+      description:
+        "Os números poderão ser utilizados no CRM de Leads e no F10, conforme a definição realizada durante a implantação.",
+      icon: MessageCircleMore,
+      items: [
+        "Atendimento comercial vinculado ao lead",
+        "Continuidade entre diferentes atendentes",
+        "Relacionamento com alunos e responsáveis",
+        "Avisos, orientações, cobranças e acordos",
+      ],
     },
-    {
-      month: "Outubro",
-      f10CashShare: "70%",
-      turbo: "5%",
-      totalDiscount: "75%",
-      finalValue: "R$ 245",
-    },
+  ];
+
+  const cashExamples: CashExample[] = [
+    { share: "20%", value: "R$ 359" },
+    { share: "40%", value: "R$ 319" },
+    { share: "80%", value: "R$ 239" },
+    { share: "100%", value: "R$ 199" },
   ];
 
   const implementationSteps: ImplementationStep[] = [
     {
       number: "01",
-      title: "Preparar",
-      description:
-        "Indicar o responsável local, os usuários e os números que participarão da operação.",
       owner: "Unidade",
+      title: "Preparação",
+      description: "Indicar o responsável local, os usuários e os números que participarão da operação.",
     },
     {
       number: "02",
-      title: "Configurar",
-      description:
-        "Estruturar acessos, workflow comercial e distribuição dos números de WhatsApp.",
       owner: "F10 + unidade",
+      title: "Configuração",
+      description: "Estruturar acessos, workflow comercial e distribuição dos números de WhatsApp.",
     },
     {
       number: "03",
-      title: "Treinar",
-      description:
-        "Capacitar vendedores, gestores e responsáveis pela operação.",
       owner: "F10",
+      title: "Treinamento",
+      description: "Capacitar gestores, vendedores e demais responsáveis pela rotina comercial.",
     },
     {
       number: "04",
-      title: "Operar",
-      description:
-        "Iniciar o uso com acompanhamento dos indicadores e ajustes necessários.",
       owner: "Rede + F10 + unidade",
+      title: "Início assistido",
+      description: "Colocar o novo modelo em operação, acompanhar indicadores e realizar os ajustes iniciais.",
     },
   ];
 </script>
@@ -258,1665 +254,1626 @@
   <title>Rede Cebrac | Novo padrão comercial com CRM e WhatsApp</title>
   <meta
     name="description"
-    content="Comunicado às unidades Cebrac sobre o novo padrão comercial, investimento adicional, CRM de Leads, WhatsApp integrado e implantação na rede."
+    content="Comunicado às unidades Cebrac sobre o novo padrão comercial, CRM de Leads, workflow, WhatsApp integrado, investimento e implantação na rede."
   />
   <meta name="robots" content="noindex,nofollow,noarchive,nosnippet" />
   <link rel="preload" as="image" href="/background-hero-cebrac.png" />
   <link rel="preload" as="image" href="/hero-cebrac.webp" type="image/webp" />
-  <link rel="preload" as="image" href="/Logo-Cebrac.png" />
+  <link rel="preload" as="image" href="/f10_kanban.png" />
 </svelte:head>
 
-<div class="presentation-page overflow-hidden bg-white text-[#2B4091]">
-  <section
-    id="inicio"
-    class="hero-section relative isolate overflow-hidden bg-white"
-  >
-    <img
-      src="/background-hero-cebrac.png"
-      alt=""
-      aria-hidden="true"
-      class="pointer-events-none absolute inset-0 -z-20 h-full w-full object-cover object-center"
-      fetchpriority="high"
-    />
-    <div class="hero-orbit hero-orbit-left"></div>
-    <div class="hero-orbit hero-orbit-right"></div>
+<div class="page-shell" id="inicio">
+  <header class="hero-section">
+    <img class="hero-background" src="/background-hero-cebrac.png" alt="" aria-hidden="true" />
 
-    <div
-      class="hero-grid mx-auto grid w-full max-w-[1660px] items-center px-5 py-12 sm:px-8 sm:py-16 lg:min-h-[100svh] lg:px-10 lg:py-10 xl:px-14"
-    >
-      <div class="hero-copy relative z-20 max-w-[760px] lg:py-10">
-        <div
-          class="inline-flex max-w-full items-stretch overflow-hidden rounded-[20px] border border-[#2B4091]/[0.15] bg-white/95 shadow-[0_16px_40px_rgba(43,64,145,0.14)] backdrop-blur-md"
-        >
-          <div
-            class="flex min-w-[145px] items-center justify-center bg-[#2B4091] px-5 py-3 sm:min-w-[174px] sm:px-7"
-          >
-            <img
-              src="/Logo-Cebrac.png"
-              alt="Cebrac"
-              class="h-9 w-auto object-contain sm:h-10"
-            />
-          </div>
-          <div
-            class="flex items-center px-4 py-3 text-[10px] font-extrabold uppercase leading-5 tracking-[0.13em] text-[#2B4091] sm:px-6 sm:text-xs"
-          >
-            Comunicado às unidades Cebrac
-          </div>
+    <div class="hero-container">
+      <div class="hero-copy">
+        <div class="brand-lockup" aria-label="Cebrac e F10 Software">
+          <span class="brand-cebrac"><img src="/Logo-Cebrac.png" alt="Cebrac" /></span>
+          <span class="brand-divider"></span>
+          <img class="brand-f10" src="/logo_f10.svg" alt="F10 Software" />
         </div>
 
-        <p
-          class="mt-8 text-xs font-extrabold uppercase tracking-[0.22em] text-[#f36b21]"
-        >
-          Novo padrão comercial da rede
+        <p class="eyebrow eyebrow-orange">Comunicado às unidades Cebrac</p>
+        <h1>Um novo padrão para acompanhar cada oportunidade até a matrícula.</h1>
+        <p class="hero-description">
+          A Rede Cebrac adotará CRM de Leads, workflow comercial e WhatsApp integrado ao F10 para organizar a rotina, preservar os históricos e dar mais visibilidade à gestão.
         </p>
 
-        <h1
-          class="mt-5 text-[42px] font-semibold leading-[1.02] tracking-[-0.05em] text-[#2B4091] sm:text-[56px] lg:text-[61px] xl:text-[70px]"
-        >
-          Mais controle sobre cada lead.
-          <span class="relative mt-2 inline-block">
-            Menos oportunidades perdidas.
-            <span
-              class="absolute -bottom-1 left-0 -z-10 h-3 w-full -rotate-1 rounded-full bg-[#ffcd40]/80"
-            ></span>
-          </span>
-        </h1>
-
-        <p
-          class="mt-7 max-w-[700px] text-lg font-medium leading-8 text-[#2B4091]/80 sm:text-[21px] sm:leading-9"
-        >
-          A Rede Cebrac adotará CRM de Leads, workflow comercial e WhatsApp
-          integrado ao F10 para padronizar a operação, preservar o histórico e
-          aumentar o aproveitamento dos leads já captados pelas unidades.
-        </p>
-
-        <div
-          class="mt-8 rounded-[24px] border border-[#2B4091]/[0.12] bg-white/90 p-5 shadow-[0_18px_48px_rgba(43,64,145,0.12)] backdrop-blur-md sm:p-6"
-        >
-          <div class="grid gap-5 sm:grid-cols-[1fr_auto] sm:items-center">
-            <div>
-              <span
-                class="block text-xs font-extrabold uppercase tracking-[0.16em] text-[#f36b21]"
-                >Aplicação em toda a rede</span
-              >
-              <p class="mt-2 text-base font-semibold leading-7 text-[#2B4091]">
-                Esta atualização será incorporada ao modelo operacional das
-                unidades. Não se trata de uma contratação opcional ou de um
-                módulo isolado.
-              </p>
-            </div>
-            <div class="rounded-[18px] bg-[#2B4091] px-5 py-4 text-white">
-              <span
-                class="block text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#ffcd40]"
-                >Vigência financeira</span
-              >
-              <strong class="mt-1 block text-lg"
-                >Vencimento de julho/2026</strong
-              >
-            </div>
+        <dl class="hero-facts">
+          <div>
+            <dt>Aplicação</dt>
+            <dd>Todas as unidades da rede</dd>
           </div>
-        </div>
+          <div>
+            <dt>WhatsApp no F10</dt>
+            <dd>A partir de agosto de 2026</dd>
+          </div>
+          <div>
+            <dt>Implantação</dt>
+            <dd>Progressiva e acompanhada</dd>
+          </div>
+        </dl>
       </div>
 
-      <div
-        class="hero-visual relative z-10 hidden items-center justify-end lg:flex"
-      >
+      <div class="hero-visual">
         <img
           src="/hero-cebrac.webp"
-          alt="CRM F10 para a Rede Cebrac exibido em computador e atendimento integrado pelo WhatsApp"
-          class="h-auto object-contain drop-shadow-[0_34px_48px_rgba(43,64,145,0.20)]"
+          alt="CRM F10 exibido em notebook e atendimento integrado pelo WhatsApp"
           fetchpriority="high"
         />
       </div>
     </div>
-  </section>
+  </header>
 
-  <nav
-    class="presentation-nav sticky top-0 z-40 bg-[#2B4091]"
-    aria-label="Navegação do comunicado"
-  >
-    <div
-      class="mx-auto flex max-w-[1320px] items-center gap-5 overflow-x-auto px-5 py-3 sm:px-8"
-    >
-      <img
-        src="/Logo-Cebrac.png"
-        alt=""
-        aria-hidden="true"
-        class="hidden h-8 w-auto shrink-0 lg:block"
-      />
-      <div class="presentation-nav-links flex min-w-max items-center gap-1">
-        <a href="#investimento" class="presentation-nav-link">Investimento</a>
-        <a href="#porque" class="presentation-nav-link">Por que muda</a>
-        <a href="#beneficios" class="presentation-nav-link">Benefícios</a>
-        <a href="#comparacao" class="presentation-nav-link"
-          >Hoje × novo padrão</a
-        >
-        <a href="#recursos" class="presentation-nav-link">Recursos</a>
-        <a href="#incentivo" class="presentation-nav-link">Incentivo</a>
-        <a href="#implantacao" class="presentation-nav-link">Implantação</a>
+  <nav class="page-nav" aria-label="Navegação do comunicado">
+    <div class="page-nav-inner">
+      <img src="/Logo-Cebrac.png" alt="" aria-hidden="true" />
+      <div class="page-nav-links">
+        <a href="#motivo">Por que muda</a>
+        <a href="#modelo">Novo modelo</a>
+        <a href="#mudancas">O que muda</a>
+        <a href="#beneficios">Benefícios</a>
+        <a href="#recursos">Recursos</a>
+        <a href="#investimento">Investimento</a>
+        <a href="#implantacao">Implantação</a>
       </div>
     </div>
   </nav>
 
-  <section
-    id="investimento"
-    class="relative scroll-mt-16 overflow-hidden bg-[#2B4091] px-5 py-20 text-white sm:px-8 lg:px-12 lg:py-28"
-  >
-    <div class="investment-glow investment-glow-one"></div>
-    <div class="investment-glow investment-glow-two"></div>
-
-    <div class="relative mx-auto max-w-[1260px]">
-      <div
-        class="grid gap-12 lg:grid-cols-[0.82fr_1.18fr] lg:items-center lg:gap-20"
-      >
-        <div>
-          <p class="section-label section-label-light">
-            O que muda no investimento
-          </p>
-          <h2
-            class="mt-4 text-[40px] font-semibold leading-[1.05] tracking-[-0.045em] text-white sm:text-[52px] lg:text-[60px]"
-          >
-            Um novo valor para uma nova estrutura comercial.
-          </h2>
-          <p class="mt-6 max-w-[570px] text-lg leading-8 text-white/70">
-            O investimento adicional financia uma mudança de operação: processo
-            comercial padronizado, tecnologia integrada, implantação,
-            treinamento e acompanhamento inicial.
-          </p>
-
-          <div class="mt-8 border-l-4 border-[#f36b21] pl-5">
-            <p class="text-base font-semibold leading-7 text-white">
-              O reajuste anual previsto para o período será substituído pelo
-              valor do upgrade.
-            </p>
-          </div>
-        </div>
-
-        <div
-          class="investment-card overflow-hidden rounded-[34px] bg-white text-[#2B4091] shadow-[0_34px_90px_rgba(0,0,0,0.24)]"
-        >
-          <div
-            class="border-b border-[#2B4091]/10 px-6 py-5 sm:px-8"
-          >
-            <span
-              class="text-xs font-extrabold uppercase tracking-[0.17em] text-[#f36b21]"
-              >Investimento adicional</span
-            >
-          </div>
-
-          <div class="grid gap-0 lg:grid-cols-[0.92fr_1.08fr]">
-            <div class="bg-[#fff7f1] px-6 py-8 sm:px-8">
-              <div class="flex items-end gap-2">
-                <span class="pb-2 text-lg font-extrabold text-[#f36b21]"
-                  >R$</span
-                >
-                <strong
-                  class="text-[72px] font-semibold leading-none tracking-[-0.065em] text-[#f36b21] sm:text-[84px]"
-                  >399</strong
-                >
-                <span class="pb-2 text-lg font-extrabold text-[#f36b21]"
-                  >,00</span
-                >
-              </div>
-              <p class="mt-2 text-sm font-semibold text-[#2B4091]/[0.65]">
-                por unidade/mês
-              </p>
-
-              <div
-                class="mt-7 rounded-[18px] bg-white p-4 shadow-[0_12px_30px_rgba(43,64,145,0.08)]"
-              >
-                <span
-                  class="block text-xs font-extrabold uppercase tracking-[0.14em] text-[#2B4091]/[0.55]"
-                  >Número adicional</span
-                >
-                <strong class="mt-1 block text-2xl text-[#2B4091]"
-                  >R$ 49,00/mês</strong
-                >
-                <span class="mt-1 block text-sm text-[#2B4091]/60"
-                  >por número extra no CRM ou F10</span
-                >
-              </div>
-            </div>
-
-            <div class="px-6 py-8 sm:px-8">
-              <p
-                class="text-sm font-extrabold uppercase tracking-[0.14em] text-[#2B4091]"
-              >
-                Incluído no novo valor
-              </p>
-              <ul class="mt-5 space-y-4">
-                <li class="investment-list-item">
-                  <CheckCircle2 size={20} />CRM de Leads e workflow comercial
-                </li>
-                <li class="investment-list-item">
-                  <CheckCircle2 size={20} />Cinco números de WhatsApp por unidade
-                </li>
-                <li class="investment-list-item">
-                  <CheckCircle2 size={20} />Configuração de acessos e processo
-                </li>
-                <li class="investment-list-item">
-                  <CheckCircle2 size={20} />Treinamento de gestores e equipes
-                </li>
-                <li class="investment-list-item">
-                  <CheckCircle2 size={20} />Acompanhamento inicial da operação
-                </li>
-              </ul>
-
-              <div
-                class="mt-7 rounded-[18px] border border-[#2B4091]/[0.12] bg-[#f7f8fc] p-4"
-              >
-                <span
-                  class="block text-xs font-extrabold uppercase tracking-[0.14em] text-[#2B4091]/[0.55]"
-                  >Disponibilidade do WhatsApp no F10</span
-                >
-                <strong class="mt-1 block text-lg text-[#2B4091]"
-                  >A partir de agosto de 2026</strong
-                >
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section
-    id="porque"
-    class="relative scroll-mt-16 overflow-hidden bg-white px-5 py-20 sm:px-8 lg:px-12 lg:py-28"
-  >
-    <div class="summary-shape"></div>
-    <div class="relative mx-auto max-w-[1260px]">
-      <div
-        class="grid gap-14 lg:grid-cols-[0.72fr_1.28fr] lg:items-start lg:gap-24"
-      >
-        <div class="lg:sticky lg:top-24">
-          <p class="section-label">Por que existe um investimento adicional</p>
-          <h2 class="section-title mt-4">
-            O custo do CRM é visível. O custo dos leads perdidos normalmente não
-            é.
-          </h2>
-          <p
-            class="mt-6 max-w-[520px] text-lg leading-8 text-[#2B4091]/[0.72]"
-          >
-            A unidade já investe para gerar oportunidades. O novo modelo foi
-            criado para reduzir perdas durante o caminho entre a captação e a
-            matrícula.
+  <main>
+    <section class="section section-light" id="motivo">
+      <div class="section-container context-layout">
+        <div class="section-heading context-heading">
+          <p class="eyebrow">Por que a rede está mudando</p>
+          <h2>Gerar oportunidades não é suficiente. É necessário garantir continuidade.</h2>
+          <p>
+            A unidade já investe para atrair interessados. O novo padrão foi criado para reduzir perdas entre a entrada do lead e a matrícula, especialmente quando faltam prazo, responsável, histórico ou acompanhamento.
           </p>
         </div>
 
-        <div>
-          <div
-            class="rounded-[30px] border border-[#2B4091]/[0.12] bg-[#f7f8fc] p-6 shadow-[0_22px_60px_rgba(43,64,145,0.08)] sm:p-8"
-          >
-            <span
-              class="text-xs font-extrabold uppercase tracking-[0.15em] text-[#f36b21]"
-              >Exemplo ilustrativo</span
-            >
-            <div class="mt-6 grid gap-4 sm:grid-cols-3">
-              <article class="impact-card">
-                <strong>R$ 10 mil</strong>
-                <span>investidos em marketing</span>
-              </article>
-              <article class="impact-card">
-                <strong>500</strong>
-                <span>leads captados</span>
-              </article>
-              <article class="impact-card impact-card-alert">
-                <strong>40</strong>
-                <span
-                  >oportunidades sem continuidade se 8% forem esquecidas</span
-                >
-              </article>
-            </div>
-
-            <div
-              class="mt-7 rounded-[22px] bg-[#2B4091] px-5 py-5 text-white sm:px-6"
-            >
-              <p class="text-lg font-semibold leading-8">
-                A atualização não tem como objetivo apenas gerar mais leads. Ela
-                busca aumentar o aproveitamento das oportunidades que a unidade
-                já recebe.
-              </p>
-            </div>
-          </div>
-
-          <div class="mt-10 grid gap-5 sm:grid-cols-2">
-            <article class="problem-card">
-              <TimerReset size={28} />
-              <h3>Retornos fora do prazo</h3>
-              <p>
-                O lead esfria quando não existe uma próxima ação definida.
-              </p>
-            </article>
-            <article class="problem-card">
-              <MessagesSquare size={28} />
-              <h3>Conversas fora da operação</h3>
-              <p>
-                Históricos ficam presos em celulares pessoais e canais
-                separados.
-              </p>
-            </article>
-            <article class="problem-card">
-              <UserCheck size={28} />
-              <h3>Troca de colaboradores</h3>
-              <p>
-                Negociações perdem continuidade quando o contexto não está
-                registrado.
-              </p>
-            </article>
-            <article class="problem-card">
-              <Building2 size={28} />
-              <h3>Gestão sem visibilidade</h3>
-              <p>
-                O gestor não enxerga gargalos, atrasos e oportunidades paradas.
-              </p>
-            </article>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section
-    id="beneficios"
-    class="relative scroll-mt-16 overflow-hidden bg-[#fff8e4] px-5 py-20 sm:px-8 lg:px-12 lg:py-28"
-  >
-    <div class="benefit-ring benefit-ring-one"></div>
-    <div class="benefit-ring benefit-ring-two"></div>
-
-    <div class="relative mx-auto max-w-[1260px]">
-      <div class="mx-auto max-w-[900px] text-center">
-        <p class="section-label">O que a unidade passa a ganhar</p>
-        <h2 class="section-title mt-4">
-          O benefício vem do processo. A tecnologia é o meio.
-        </h2>
-        <p
-          class="mx-auto mt-6 max-w-[760px] text-lg leading-8 text-[#2B4091]/[0.72]"
-        >
-          O resultado não depende apenas de instalar um sistema. Ele vem da
-          combinação entre método comercial, rotina de acompanhamento e
-          informação disponível para a gestão.
-        </p>
-      </div>
-
-      <div class="mt-14 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {#each benefits as benefit, index}
-          <article class="benefit-card">
-            <div class="benefit-card-topline"></div>
-            <span class="benefit-index">0{index + 1}</span>
-            <div class="benefit-icon">
-              <svelte:component
-                this={benefit.icon}
-                size={25}
-                strokeWidth={1.9}
-              />
-            </div>
-            <h3>{benefit.title}</h3>
-            <p>{benefit.description}</p>
-          </article>
-        {/each}
-      </div>
-    </div>
-  </section>
-
-  <section
-    id="comparacao"
-    class="relative scroll-mt-16 overflow-hidden bg-[#ffcd40] px-5 py-20 sm:px-8 lg:px-12 lg:py-28"
-  >
-    <div class="comparison-ring comparison-ring-one"></div>
-    <div class="comparison-ring comparison-ring-two"></div>
-
-    <div class="relative mx-auto max-w-[1260px]">
-      <div
-        class="grid gap-8 lg:grid-cols-[0.7fr_1.3fr] lg:items-end lg:gap-20"
-      >
-        <div>
-          <p class="section-label">Hoje × novo padrão</p>
-          <h2 class="section-title mt-4">
-            O que deixa de depender das pessoas e passa a fazer parte do
-            processo.
-          </h2>
-        </div>
-        <p
-          class="max-w-[760px] text-lg leading-8 text-[#2B4091]/75 lg:pb-1"
-        >
-          A mudança substitui controles individuais por uma operação visível,
-          contínua e padronizada em toda a rede.
-        </p>
-      </div>
-
-      <div
-        class="mt-14 overflow-hidden rounded-[32px] bg-white/95 shadow-[0_24px_60px_rgba(43,64,145,0.16)]"
-      >
-        <div class="grid grid-cols-2 bg-[#2B4091] text-white">
-          <div
-            class="border-r border-white/[0.15] px-5 py-4 text-sm font-extrabold uppercase tracking-[0.14em] sm:px-8"
-          >
-            Hoje
-          </div>
-          <div
-            class="px-5 py-4 text-sm font-extrabold uppercase tracking-[0.14em] text-[#ffcd40] sm:px-8"
-          >
-            Com o novo padrão
-          </div>
-        </div>
-        {#each comparisonItems as item}
-          <div class="grid grid-cols-2 border-t border-[#2B4091]/10">
-            <div
-              class="border-r border-[#2B4091]/10 px-5 py-6 text-sm leading-6 text-[#2B4091]/[0.65] sm:px-8"
-            >
-              {item.current}
-            </div>
-            <div
-              class="px-5 py-6 text-sm font-semibold leading-6 text-[#2B4091] sm:px-8"
-            >
-              <span class="mr-2 text-[#61CE70]">✓</span>{item.future}
-            </div>
-          </div>
-        {/each}
-      </div>
-    </div>
-  </section>
-
-  <section
-    class="scroll-mt-16 bg-white px-5 py-20 sm:px-8 lg:px-12 lg:py-28"
-  >
-    <div class="mx-auto max-w-[1260px]">
-      <div
-        class="grid gap-12 lg:grid-cols-[0.78fr_1.22fr] lg:items-center lg:gap-20"
-      >
-        <div>
-          <p class="section-label">Continuidade comercial</p>
-          <h2 class="section-title mt-4">
-            Quando um vendedor sai, as negociações não podem sair com ele.
-          </h2>
-          <p class="mt-6 text-lg leading-8 text-[#2B4091]/[0.72]">
-            Sem uma operação centralizada, parte do conhecimento comercial fica
-            na memória do vendedor, em conversas pessoais ou em anotações
-            individuais.
-          </p>
-          <p class="mt-4 text-lg leading-8 text-[#2B4091]/[0.72]">
-            Com o CRM, históricos, objeções, propostas, atividades e próximos
-            passos permanecem na unidade. Outro colaborador consegue assumir a
-            negociação sem começar do zero.
-          </p>
-        </div>
-
-        <div class="turnover-board">
-          <div class="turnover-column turnover-column-current">
-            <span>Sem CRM e método</span>
-            <div class="turnover-flow">
-              <UserCheck size={28} />
-              <strong>Colaborador sai</strong>
-              <span>→</span>
-              <strong>Contexto desaparece</strong>
-              <span>→</span>
-              <strong>Negociação é interrompida</strong>
-            </div>
-          </div>
-          <div class="turnover-column turnover-column-future">
-            <span>Com CRM e método</span>
-            <div class="turnover-flow">
-              <ShieldCheck size={28} />
-              <strong>Colaborador sai</strong>
-              <span>→</span>
-              <strong>Histórico permanece</strong>
-              <span>→</span>
-              <strong>Atendimento continua</strong>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section
-    id="recursos"
-    class="relative scroll-mt-16 overflow-hidden bg-[#2B4091] px-5 py-20 text-white sm:px-8 lg:px-12 lg:py-28"
-  >
-    <div class="crm-sun"></div>
-    <div class="relative mx-auto max-w-[1260px]">
-      <div class="mx-auto max-w-[900px] text-center">
-        <p class="section-label section-label-light">O que será entregue</p>
-        <h2
-          class="mt-4 text-[40px] font-semibold leading-[1.05] tracking-[-0.045em] text-white sm:text-[52px] lg:text-[60px]"
-        >
-          CRM de Leads, workflow comercial e WhatsApp integrado.
-        </h2>
-        <p
-          class="mx-auto mt-6 max-w-[760px] text-lg leading-8 text-white/70"
-        >
-          Os recursos foram organizados para acompanhar a jornada desde a
-          entrada do lead até o relacionamento com o aluno depois da matrícula.
-        </p>
-      </div>
-
-      <div
-        class="mt-16 grid items-center gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16"
-      >
-        <div>
-          <p class="section-label section-label-light">CRM e workflow</p>
-          <h3
-            class="mt-4 text-[34px] font-semibold leading-[1.08] tracking-[-0.04em] text-white sm:text-[44px]"
-          >
-            Cada oportunidade com etapa, responsável e próxima ação.
-          </h3>
-
-          <div
-            class="mt-8 divide-y divide-white/[0.15] border-y border-white/[0.15]"
-          >
-            {#each crmFeatures as feature}
-              <div class="resource-row">
-                <div class="resource-icon">
-                  <svelte:component
-                    this={feature.icon}
-                    size={22}
-                    strokeWidth={1.9}
-                  />
-                </div>
+        <div class="journey-panel">
+          <div class="journey-line" aria-hidden="true"></div>
+          <ol class="journey-list">
+            {#each journeySteps as step, index}
+              <li class="journey-item">
+                <span class="journey-number">0{index + 1}</span>
+                <span class="journey-icon"><svelte:component this={step.icon} size={21} strokeWidth={1.9} /></span>
                 <div>
-                  <h4>{feature.title}</h4>
-                  <p>{feature.description}</p>
+                  <h3>{step.title}</h3>
+                  <p>{step.description}</p>
                 </div>
-              </div>
+              </li>
             {/each}
-          </div>
-        </div>
+          </ol>
 
-        <div class="kanban-frame">
-          <div class="media-toolbar">
-            <span></span><span></span><span></span>
-            <small>Visão Kanban do CRM</small>
-          </div>
-          <img
-            src="/f10_kanban.png"
-            alt="Tela real do CRM F10 com etapas do funil comercial em formato Kanban"
-            loading="lazy"
-          />
-        </div>
-      </div>
-
-      <div class="mt-24 border-t border-white/[0.15] pt-16">
-        <div
-          class="grid gap-12 lg:grid-cols-[0.72fr_1.28fr] lg:items-start lg:gap-20"
-        >
-          <div>
-            <p class="section-label section-label-light">WhatsApp integrado</p>
-            <h3
-              class="mt-4 text-[34px] font-semibold leading-[1.08] tracking-[-0.04em] text-white sm:text-[44px]"
-            >
-              Cinco números por unidade, distribuídos conforme a operação.
-            </h3>
-            <p class="mt-6 text-lg leading-8 text-white/70">
-              Os números poderão ser utilizados no CRM de Leads ou no F10. A
-              distribuição será definida pela unidade durante a implantação.
-            </p>
-
-            <div class="mt-7 rounded-[20px] bg-white/10 p-5">
-              <span
-                class="text-xs font-extrabold uppercase tracking-[0.15em] text-[#ffcd40]"
-                >Exemplo de distribuição</span
-              >
-              <div class="mt-4 grid grid-cols-2 gap-3">
-                <div class="distribution-box">
-                  <strong>2</strong><span>números no CRM</span>
-                </div>
-                <div class="distribution-box">
-                  <strong>3</strong><span>números no F10</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="grid gap-5 sm:grid-cols-2">
-            {#each whatsappFeatures as feature}
-              <article class="whatsapp-feature-card">
-                <div class="whatsapp-feature-icon">
-                  <svelte:component
-                    this={feature.icon}
-                    size={24}
-                    strokeWidth={1.9}
-                  />
-                </div>
-                <h4>{feature.title}</h4>
-                <p>{feature.description}</p>
-              </article>
-            {/each}
+          <div class="context-note">
+            <strong>Onde as perdas aparecem hoje</strong>
+            <span>Retorno atrasado</span>
+            <span>Lead sem próxima ação</span>
+            <span>Conversa em canal pessoal</span>
+            <span>Troca de vendedor sem histórico</span>
           </div>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section
-    class="scroll-mt-16 bg-white px-5 py-20 sm:px-8 lg:px-12 lg:py-28"
-  >
-    <div class="mx-auto max-w-[1260px]">
-      <div class="grid gap-14 lg:grid-cols-[0.65fr_1.35fr] lg:gap-24">
-        <div>
-          <p class="section-label">Como a gestão acompanha</p>
-          <h2 class="section-title mt-4">
-            Poucos indicadores. Perguntas claras.
-          </h2>
-          <p
-            class="mt-6 max-w-[500px] text-lg leading-8 text-[#2B4091]/[0.72]"
-          >
-            O acompanhamento mostra onde a equipe precisa agir e se o processo
-            está realmente avançando.
+    <section class="section section-blue" id="modelo">
+      <div class="section-container">
+        <div class="model-intro">
+          <div class="section-heading section-heading-light">
+            <p class="eyebrow eyebrow-yellow">O novo modelo comercial</p>
+            <h2>Uma operação visível do primeiro contato ao relacionamento com o aluno.</h2>
+          </div>
+          <p>
+            O CRM organiza a oportunidade, o workflow orienta a rotina e o WhatsApp mantém a conversa dentro do contexto. Depois da matrícula, o relacionamento continua no F10.
           </p>
         </div>
 
-        <div class="metric-lines">
-          {#each metrics as metric, index}
-            <div class="metric-line">
-              <span class="metric-index">0{index + 1}</span>
-              <div class="metric-icon">
-                <svelte:component
-                  this={metric.icon}
-                  size={24}
-                  strokeWidth={1.9}
-                />
-              </div>
+        <div class="model-showcase">
+          <div class="model-copy">
+            <div class="model-statement">
+              <span>01</span>
               <div>
-                <h3>{metric.title}</h3>
-                <p>{metric.description}</p>
+                <strong>O lead entra com origem e responsável.</strong>
+                <p>Nenhuma oportunidade começa sem contexto ou sem uma pessoa definida para agir.</p>
               </div>
             </div>
+            <div class="model-statement">
+              <span>02</span>
+              <div>
+                <strong>A equipe trabalha com prazo e próxima ação.</strong>
+                <p>Retornos, tarefas e follow-ups passam a fazer parte do processo, não da memória.</p>
+              </div>
+            </div>
+            <div class="model-statement">
+              <span>03</span>
+              <div>
+                <strong>A gestão acompanha o que está avançando e o que parou.</strong>
+                <p>O funil apresenta volume, tempo em etapa, produtividade e gargalos.</p>
+              </div>
+            </div>
+          </div>
+
+          <figure class="crm-figure">
+            <div class="browser-bar">
+              <span></span><span></span><span></span>
+              <small>Visão Kanban do CRM</small>
+            </div>
+            <img src="/f10_kanban.png" alt="Visão Kanban real do CRM de Leads F10" />
+            <figcaption>Exemplo da visão utilizada para acompanhar etapas, responsáveis e próximas ações.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-paper" id="mudancas">
+      <div class="section-container change-layout">
+        <div class="section-heading change-heading">
+          <p class="eyebrow">O que muda na rotina</p>
+          <h2>Menos dependência de controles individuais. Mais continuidade de processo.</h2>
+          <p>
+            A mudança não elimina a responsabilidade da equipe. Ela cria uma estrutura para que a rotina seja executada, acompanhada e preservada.
+          </p>
+        </div>
+
+        <div class="change-list">
+          <div class="change-header" aria-hidden="true">
+            <span>Área</span>
+            <span>Hoje</span>
+            <span>Novo padrão</span>
+          </div>
+          {#each changeItems as item}
+            <article class="change-row">
+              <strong>{item.area}</strong>
+              <p>{item.current}</p>
+              <div class="change-future">
+                <ArrowRight size={19} strokeWidth={2} />
+                <p>{item.future}</p>
+              </div>
+            </article>
           {/each}
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section
-    id="incentivo"
-    class="relative scroll-mt-16 overflow-hidden bg-[#f5f7ff] px-5 py-20 sm:px-8 lg:px-12 lg:py-28"
-  >
-    <div class="incentive-shape"></div>
-    <div class="relative mx-auto max-w-[1260px]">
-      <div
-        class="grid gap-12 lg:grid-cols-[0.72fr_1.28fr] lg:items-start lg:gap-20"
-      >
-        <div>
-          <p class="section-label">Campanha de incentivo</p>
-          <h2 class="section-title mt-4">
-            Como a unidade pode reduzir o impacto do novo valor.
-          </h2>
-          <p class="mt-6 text-lg leading-8 text-[#2B4091]/[0.72]">
-            O valor-base do upgrade é de R$ 399 por mês. Unidades que concentram
-            recebimentos no F10 Cash poderão obter desconto conforme as regras
-            da campanha vigente.
+    <section class="section section-light" id="beneficios">
+      <div class="section-container">
+        <div class="benefit-intro">
+          <div class="section-heading">
+            <p class="eyebrow">Benefícios esperados</p>
+            <h2>O ganho vem da combinação entre método, disciplina comercial e informação.</h2>
+          </div>
+          <p>
+            A tecnologia fornece a estrutura. O resultado depende da adoção do processo pelas unidades e do acompanhamento contínuo da gestão.
+          </p>
+        </div>
+
+        <div class="benefit-grid">
+          {#each benefits as benefit, index}
+            <article class="benefit-item">
+              <div class="benefit-meta">
+                <span>0{index + 1}</span>
+                <svelte:component this={benefit.icon} size={25} strokeWidth={1.8} />
+              </div>
+              <h3>{benefit.title}</h3>
+              <p>{benefit.description}</p>
+              <strong>{benefit.outcome}</strong>
+            </article>
+          {/each}
+        </div>
+
+        <div class="metric-band">
+          <div class="metric-band-heading">
+            <span>Gestão</span>
+            <strong>Quatro perguntas simples para acompanhar a operação.</strong>
+          </div>
+          <div class="metric-grid">
+            {#each metrics as metric}
+              <article>
+                <svelte:component this={metric.icon} size={22} strokeWidth={1.9} />
+                <div>
+                  <h3>{metric.title}</h3>
+                  <p>{metric.description}</p>
+                </div>
+              </article>
+            {/each}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-resources" id="recursos">
+      <div class="section-container">
+        <div class="resources-intro">
+          <div class="section-heading">
+            <p class="eyebrow">O que será entregue</p>
+            <h2>Três recursos trabalhando como uma única operação.</h2>
+          </div>
+          <p>
+            CRM, workflow e WhatsApp não serão módulos isolados. Eles foram organizados para sustentar a mesma jornada comercial e administrativa.
+          </p>
+        </div>
+
+        <div class="resource-list">
+          {#each resourceGroups as group, index}
+            <article class="resource-row">
+              <div class="resource-index">0{index + 1}</div>
+              <div class="resource-title">
+                <span class="resource-icon"><svelte:component this={group.icon} size={24} strokeWidth={1.8} /></span>
+                <div>
+                  <small>{group.label}</small>
+                  <h3>{group.title}</h3>
+                </div>
+              </div>
+              <div class="resource-content">
+                <p>{group.description}</p>
+                <ul>
+                  {#each group.items as item}
+                    <li><CheckCircle2 size={17} strokeWidth={2} />{item}</li>
+                  {/each}
+                </ul>
+              </div>
+            </article>
+          {/each}
+        </div>
+
+        <div class="whatsapp-distribution">
+          <div>
+            <span>5</span>
+            <strong>números de WhatsApp incluídos por unidade</strong>
+          </div>
+          <p>
+            A distribuição entre CRM de Leads e F10 será definida durante a implantação, de acordo com a operação de cada unidade.
+          </p>
+          <div class="distribution-example" aria-label="Exemplo de distribuição">
+            <span><strong>2</strong> no CRM</span>
+            <span><strong>3</strong> no F10</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-investment" id="investimento">
+      <div class="section-container investment-layout">
+        <div class="investment-main">
+          <p class="eyebrow eyebrow-orange">Investimento do novo modelo</p>
+          <div class="price-line">
+            <span>R$</span>
+            <strong>399</strong>
+            <span>,00</span>
+          </div>
+          <p class="price-period">por unidade/mês</p>
+          <p class="investment-description">
+            O valor reúne tecnologia, configuração, treinamento e acompanhamento inicial para implantação do novo padrão em toda a rede.
           </p>
 
-          <div
-            class="mt-8 rounded-[24px] bg-[#2B4091] p-6 text-white shadow-[0_18px_45px_rgba(43,64,145,0.18)]"
-          >
-            <span
-              class="text-xs font-extrabold uppercase tracking-[0.14em] text-[#ffcd40]"
-              >Desconto recorrente</span
-            >
-            <strong
-              class="mt-2 block text-[42px] font-semibold leading-none"
-              >Até R$ 200</strong
-            >
-            <p class="mt-3 text-sm leading-6 text-white/70">
-              O desconto regular acompanha o percentual de recebimentos via F10
-              Cash, respeitando o limite máximo mensal.
-            </p>
+          <ul class="included-list">
+            <li><CheckCircle2 size={19} />CRM de Leads e workflow comercial</li>
+            <li><CheckCircle2 size={19} />Cinco números de WhatsApp</li>
+            <li><CheckCircle2 size={19} />Configuração de acessos e processo</li>
+            <li><CheckCircle2 size={19} />Treinamento e início assistido</li>
+          </ul>
+
+          <div class="investment-notes">
+            <p><strong>Vigência financeira:</strong> vencimento de julho de 2026.</p>
+            <p><strong>Número adicional:</strong> R$ 49,00 por mês.</p>
+            <p>O reajuste anual previsto para o período será substituído pelo valor do upgrade.</p>
           </div>
         </div>
 
-        <div
-          class="overflow-hidden rounded-[30px] bg-white shadow-[0_22px_60px_rgba(43,64,145,0.12)]"
-        >
-          <div
-            class="border-b border-[#2B4091]/10 px-6 py-5 sm:px-8"
-          >
-            <span
-              class="text-xs font-extrabold uppercase tracking-[0.15em] text-[#f36b21]"
-              >Condição de lançamento — primeiros quatro meses</span
-            >
+        <div class="cash-panel">
+          <div class="cash-heading">
+            <span>F10 Cash</span>
+            <h3>O percentual de recebimentos pode reduzir o valor mensal do upgrade.</h3>
+            <p>
+              O desconto acompanha a participação dos recebimentos via F10 Cash e pode chegar a R$ 200 por mês, conforme as regras da campanha vigente.
+            </p>
           </div>
 
-          <div class="overflow-x-auto">
-            <table class="campaign-table">
-              <thead>
-                <tr>
-                  <th>Mês</th>
-                  <th>% F10 Cash</th>
-                  <th>Turbo</th>
-                  <th>Desconto total</th>
-                  <th>Valor final</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each campaignRows as row}
-                  <tr>
-                    <td>{row.month}</td>
-                    <td>{row.f10CashShare}</td>
-                    <td>{row.turbo}</td>
-                    <td>{row.totalDiscount}</td>
-                    <td><strong>{row.finalValue}</strong></td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
+          <div class="cash-examples">
+            {#each cashExamples as example}
+              <article>
+                <span>{example.share} via F10 Cash</span>
+                <strong>{example.value}</strong>
+              </article>
+            {/each}
           </div>
 
-          <div
-            class="border-t border-[#2B4091]/10 bg-[#fff8e4] px-6 py-5 sm:px-8"
-          >
-            <p class="text-sm font-semibold leading-6 text-[#2B4091]">
-              Os percentuais, faixas e descontos seguem as regras da campanha
-              oficial e consideram os recebimentos do período anterior.
+          <div class="cash-launch-note">
+            <strong>Condição de lançamento</strong>
+            <p>
+              Nos quatro primeiros meses, a campanha prevê faixas adicionais de incentivo. Percentuais, períodos e critérios seguem a comunicação oficial da Rede Cebrac e consideram os recebimentos do período anterior.
             </p>
           </div>
         </div>
       </div>
+    </section>
 
-      <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <article class="discount-example">
-          <span>20% via F10 Cash</span><strong>R$ 359</strong>
-        </article>
-        <article class="discount-example">
-          <span>40% via F10 Cash</span><strong>R$ 319</strong>
-        </article>
-        <article class="discount-example">
-          <span>80% via F10 Cash</span><strong>R$ 239</strong>
-        </article>
-        <article class="discount-example">
-          <span>100% via F10 Cash</span><strong>R$ 199</strong>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <section
-    id="implantacao"
-    class="relative scroll-mt-16 overflow-hidden bg-[#2B4091] px-5 py-20 text-white sm:px-8 lg:px-12 lg:py-28"
-  >
-    <div class="implementation-wave"></div>
-    <div class="relative mx-auto max-w-[1260px]">
-      <div
-        class="grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:items-end lg:gap-20"
-      >
-        <div>
-          <p class="section-label section-label-light">Como começa</p>
-          <h2
-            class="mt-4 text-[40px] font-semibold leading-[1.05] tracking-[-0.045em] text-white sm:text-[52px] lg:text-[58px]"
-          >
-            Quatro etapas até a operação.
-          </h2>
+    <section class="section section-blue implementation-section" id="implantacao">
+      <div class="section-container">
+        <div class="implementation-intro">
+          <div class="section-heading section-heading-light">
+            <p class="eyebrow eyebrow-yellow">Como começa</p>
+            <h2>Implantação progressiva, com responsabilidades definidas.</h2>
+          </div>
+          <p>
+            Cada unidade será preparada antes do início da operação. O cronograma oficial e as orientações serão comunicados pela Rede Cebrac.
+          </p>
         </div>
-        <p class="max-w-[760px] text-lg leading-8 text-white/70 lg:pb-1">
-          A implantação será progressiva, com preparação, configuração,
-          treinamento e início assistido.
-        </p>
-      </div>
 
-      <div class="implementation-track mt-16">
-        {#each implementationSteps as step}
-          <article class="implementation-step">
-            <div class="implementation-number">{step.number}</div>
-            <div class="implementation-content">
-              <span>{step.owner}</span>
+        <ol class="implementation-list">
+          {#each implementationSteps as step}
+            <li>
+              <span class="implementation-number">{step.number}</span>
+              <small>{step.owner}</small>
               <h3>{step.title}</h3>
               <p>{step.description}</p>
-            </div>
-          </article>
-        {/each}
-      </div>
+            </li>
+          {/each}
+        </ol>
 
-      <div
-        class="mt-16 grid gap-8 border-t border-white/[0.15] pt-12 lg:grid-cols-[1fr_auto] lg:items-center"
-      >
-        <div>
-          <p
-            class="text-xs font-extrabold uppercase tracking-[0.2em] text-[#ffcd40]"
-          >
-            O que cada unidade deverá preparar
-          </p>
-          <p
-            class="mt-4 max-w-[850px] text-2xl font-semibold leading-9 text-white"
-          >
-            Indicar o responsável local, informar os usuários, definir os cinco
-            números de WhatsApp e participar dos treinamentos previstos no
-            cronograma oficial.
+        <div class="implementation-summary">
+          <strong>O que cada unidade deverá preparar</strong>
+          <p>
+            Responsável local, usuários, cinco números de WhatsApp e participação nos treinamentos previstos no cronograma oficial.
           </p>
         </div>
-        <div
-          class="rounded-[20px] bg-[#ffcd40] px-6 py-4 text-sm font-extrabold leading-6 text-[#2B4091]"
-        >
-          Cronograma oficial será comunicado pela Rede Cebrac
-        </div>
       </div>
-    </div>
-  </section>
+    </section>
+  </main>
 
-  <section class="bg-white px-5 py-16 sm:px-8 lg:px-12 lg:py-20">
-    <div
-      class="mx-auto max-w-[1260px] overflow-hidden rounded-[32px] border border-[#2B4091]/[0.12] bg-[#f7f8fc] shadow-[0_22px_60px_rgba(43,64,145,0.08)]"
-    >
-      <div class="grid lg:grid-cols-[0.8fr_1.2fr]">
-        <div class="bg-[#2B4091] p-7 text-white sm:p-9">
-          <p
-            class="text-xs font-extrabold uppercase tracking-[0.18em] text-[#ffcd40]"
-          >
-            Resumo do comunicado
-          </p>
-          <h2
-            class="mt-4 text-[34px] font-semibold leading-[1.08] tracking-[-0.04em] sm:text-[42px]"
-          >
-            O valor muda. A estrutura comercial da unidade também.
-          </h2>
-        </div>
-
-        <div class="grid gap-5 p-7 sm:grid-cols-2 sm:p-9">
-          <div class="summary-item">
-            <span>Novo investimento</span
-            ><strong>R$ 399 por unidade/mês</strong>
-          </div>
-          <div class="summary-item">
-            <span>Incluído</span
-            ><strong>CRM, workflow e 5 números de WhatsApp</strong>
-          </div>
-          <div class="summary-item">
-            <span>Objetivo</span
-            ><strong>Reduzir desperdícios e preservar o histórico</strong>
-          </div>
-          <div class="summary-item">
-            <span>Aplicação</span
-            ><strong>Todas as unidades da Rede Cebrac</strong>
-          </div>
-        </div>
+  <footer class="page-footer">
+    <div class="footer-container">
+      <div class="footer-brands">
+        <span class="footer-cebrac"><img src="/Logo-Cebrac.png" alt="Cebrac" /></span>
+        <span></span>
+        <img src="/logo_f10.svg" alt="F10 Software" />
       </div>
-    </div>
-  </section>
-
-  <footer class="bg-white px-5 py-14 sm:px-8 lg:px-12">
-    <div
-      class="mx-auto flex max-w-[1180px] flex-col gap-8 border-t border-[#2B4091]/[0.15] pt-10 md:flex-row md:items-center md:justify-between"
-    >
-      <div class="flex items-center gap-6">
-        <img
-          src="/Logo-Cebrac.png"
-          alt="Cebrac"
-          class="h-12 w-auto rounded-xl bg-[#2B4091] px-3 py-2 object-contain"
-        />
-        <div class="h-9 w-px bg-[#2B4091]/[0.15]"></div>
-        <img src="/logo_f10.svg" alt="F10 Software" class="h-10 w-auto" />
-      </div>
-      <p
-        class="max-w-[650px] text-base font-semibold leading-7 text-[#2B4091]/75"
-      >
-        A unidade já investe para gerar oportunidades. O novo modelo foi criado
-        para que menos oportunidades sejam perdidas durante o caminho até a
-        matrícula.
+      <p>
+        O objetivo da mudança é criar uma operação comercial mais organizada, contínua e mensurável em toda a Rede Cebrac.
       </p>
-      <a
-        href="#inicio"
-        class="inline-flex items-center gap-2 text-sm font-extrabold text-[#2B4091] transition hover:text-[#61CE70]"
-      >
-        Voltar ao início
-        <ArrowUp size={18} />
-      </a>
+      <a href="#inicio">Voltar ao início <ArrowUp size={17} /></a>
     </div>
   </footer>
 </div>
 
 <style>
-  .presentation-page {
+  :global(html) {
+    scroll-behavior: smooth;
+  }
+
+  .page-shell {
+    --blue: #2b4091;
+    --blue-dark: #1f3078;
+    --orange: #f36b21;
+    --yellow: #ffcd40;
+    --green: #61ce70;
+    --ink: #18265f;
+    --muted: #6773a4;
+    --line: rgba(43, 64, 145, 0.15);
+    --paper: #f7f8fc;
     font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  }
-
-  .hero-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .hero-orbit {
-    position: absolute;
-    z-index: -10;
-    border-radius: 9999px;
-    border: 28px solid rgba(255, 205, 64, 0.22);
-    pointer-events: none;
-  }
-
-  .hero-orbit-left {
-    left: -150px;
-    top: 110px;
-    width: 340px;
-    height: 340px;
-  }
-
-  .hero-orbit-right {
-    right: -190px;
-    bottom: 20px;
-    width: 440px;
-    height: 440px;
-    border-color: rgba(97, 206, 112, 0.16);
-  }
-
-  .section-label {
-    color: #2b4091;
-    font-size: 0.75rem;
-    font-weight: 800;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-  }
-
-  .section-label-light {
-    color: #ffcd40;
-  }
-
-  .section-title {
-    color: #2b4091;
-    font-size: clamp(2.3rem, 4vw, 3.75rem);
-    font-weight: 600;
-    letter-spacing: -0.045em;
-    line-height: 1.06;
-  }
-
-  .presentation-nav-links {
-    scrollbar-width: none;
-  }
-
-  .presentation-nav-links::-webkit-scrollbar {
-    display: none;
-  }
-
-  .presentation-nav-link {
-    flex: 0 0 auto;
-    border-radius: 9999px;
-    padding: 0.58rem 0.9rem;
-    color: rgba(255, 255, 255, 0.72);
-    font-size: 0.75rem;
-    font-weight: 800;
-    letter-spacing: 0.025em;
-    transition:
-      background-color 160ms ease,
-      color 160ms ease;
-  }
-
-  .presentation-nav-link:hover,
-  .presentation-nav-link:focus-visible {
-    background: #ffcd40;
-    color: #2b4091;
-    outline: none;
-  }
-
-  .investment-glow,
-  .benefit-ring,
-  .comparison-ring {
-    position: absolute;
-    border-radius: 9999px;
-    pointer-events: none;
-  }
-
-  .investment-glow-one {
-    right: -140px;
-    top: -170px;
-    width: 410px;
-    height: 410px;
-    border: 58px solid rgba(255, 205, 64, 0.1);
-  }
-
-  .investment-glow-two {
-    left: -120px;
-    bottom: -180px;
-    width: 340px;
-    height: 340px;
-    background: rgba(243, 107, 33, 0.08);
-  }
-
-  .investment-list-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-    color: rgba(43, 64, 145, 0.78);
-    font-size: 0.92rem;
-    font-weight: 650;
-    line-height: 1.5rem;
-  }
-
-  .investment-list-item :global(svg) {
-    flex: 0 0 auto;
-    margin-top: 0.1rem;
-    color: #61ce70;
-  }
-
-  .summary-shape {
-    position: absolute;
-    right: -110px;
-    top: 60px;
-    width: 280px;
-    height: 280px;
-    border-radius: 52% 48% 61% 39% / 43% 57% 43% 57%;
-    background: rgba(97, 206, 112, 0.12);
-    transform: rotate(18deg);
-  }
-
-  .impact-card {
-    min-height: 150px;
-    border-radius: 22px;
+    color: var(--ink);
     background: white;
-    padding: 1.3rem;
-    box-shadow: 0 14px 34px rgba(43, 64, 145, 0.08);
   }
 
-  .impact-card strong {
-    display: block;
-    color: #2b4091;
-    font-size: 2rem;
-    font-weight: 700;
-    letter-spacing: -0.04em;
-  }
-
-  .impact-card span {
-    display: block;
-    margin-top: 0.6rem;
-    color: rgba(43, 64, 145, 0.65);
-    font-size: 0.86rem;
-    line-height: 1.4rem;
-  }
-
-  .impact-card-alert {
-    background: #fff0e7;
-  }
-
-  .impact-card-alert strong {
-    color: #f36b21;
-  }
-
-  .problem-card {
-    border-top: 4px solid #2b4091;
-    border-radius: 0 0 22px 22px;
-    background: #f7f8fc;
-    padding: 1.4rem;
-    color: #2b4091;
-  }
-
-  .problem-card:nth-child(2) {
-    border-top-color: #61ce70;
-  }
-
-  .problem-card:nth-child(3) {
-    border-top-color: #ffcd40;
-  }
-
-  .problem-card:nth-child(4) {
-    border-top-color: #f36b21;
-  }
-
-  .problem-card h3 {
-    margin-top: 1rem;
-    font-size: 1.1rem;
-    font-weight: 700;
-  }
-
-  .problem-card p {
-    margin-top: 0.45rem;
-    color: rgba(43, 64, 145, 0.66);
-    font-size: 0.88rem;
-    line-height: 1.5rem;
-  }
-
-  .benefit-ring-one {
-    left: -90px;
-    top: 80px;
-    width: 240px;
-    height: 240px;
-    border: 32px solid rgba(43, 64, 145, 0.06);
-  }
-
-  .benefit-ring-two {
-    right: -120px;
-    bottom: 40px;
-    width: 320px;
-    height: 320px;
-    border: 42px solid rgba(97, 206, 112, 0.1);
-  }
-
-  .benefit-card {
+  .hero-section {
     position: relative;
-    min-height: 280px;
+    min-height: 720px;
     overflow: hidden;
-    border: 1px solid rgba(43, 64, 145, 0.1);
-    border-radius: 26px;
-    background: rgba(255, 255, 255, 0.94);
-    padding: 1.65rem;
-    box-shadow: 0 18px 45px rgba(43, 64, 145, 0.08);
-  }
-
-  .benefit-card-topline {
-    position: absolute;
-    inset: 0 0 auto;
-    height: 5px;
-    background: #2b4091;
-  }
-
-  .benefit-card:nth-child(2) .benefit-card-topline,
-  .benefit-card:nth-child(5) .benefit-card-topline {
-    background: #61ce70;
-  }
-
-  .benefit-card:nth-child(3) .benefit-card-topline,
-  .benefit-card:nth-child(6) .benefit-card-topline {
-    background: #f36b21;
-  }
-
-  .benefit-index {
-    position: absolute;
-    right: 1.25rem;
-    top: 1.15rem;
-    color: rgba(43, 64, 145, 0.12);
-    font-size: 2.7rem;
-    font-weight: 700;
-    letter-spacing: -0.06em;
-  }
-
-  .benefit-icon {
-    display: flex;
-    width: 54px;
-    height: 54px;
-    align-items: center;
-    justify-content: center;
-    border-radius: 18px;
-    background: rgba(97, 206, 112, 0.18);
-    color: #2b4091;
-  }
-
-  .benefit-card h3 {
-    margin-top: 1.5rem;
-    color: #2b4091;
-    font-size: 1.28rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-
-  .benefit-card p {
-    margin-top: 0.75rem;
-    color: rgba(43, 64, 145, 0.67);
-    font-size: 0.92rem;
-    line-height: 1.6rem;
-  }
-
-  .comparison-ring {
-    border: 34px solid rgba(43, 64, 145, 0.08);
-  }
-
-  .comparison-ring-one {
-    left: -110px;
-    top: 30px;
-    width: 280px;
-    height: 280px;
-  }
-
-  .comparison-ring-two {
-    right: -140px;
-    bottom: -40px;
-    width: 360px;
-    height: 360px;
-  }
-
-  .turnover-board {
-    overflow: hidden;
-    border-radius: 30px;
-    box-shadow: 0 24px 65px rgba(43, 64, 145, 0.14);
-  }
-
-  .turnover-column {
-    padding: 2rem;
-  }
-
-  .turnover-column > span {
-    display: inline-flex;
-    border-radius: 9999px;
-    padding: 0.55rem 0.9rem;
-    font-size: 0.72rem;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  .turnover-column-current {
-    background: #f1f3f9;
-    color: #2b4091;
-  }
-
-  .turnover-column-current > span {
-    background: rgba(43, 64, 145, 0.1);
-  }
-
-  .turnover-column-future {
-    background: #2b4091;
-    color: white;
-  }
-
-  .turnover-column-future > span {
-    background: #61ce70;
-    color: #123d1d;
-  }
-
-  .turnover-flow {
-    display: grid;
-    gap: 0.9rem;
-    margin-top: 1.5rem;
-  }
-
-  .turnover-flow strong {
-    font-size: 1rem;
-    line-height: 1.5rem;
-  }
-
-  .turnover-flow > span {
-    color: #f36b21;
-    font-size: 1.2rem;
-    font-weight: 800;
-  }
-
-  .crm-sun {
-    position: absolute;
-    right: -120px;
-    top: -120px;
-    width: 360px;
-    height: 360px;
-    border-radius: 9999px;
-    border: 52px solid rgba(255, 205, 64, 0.14);
-  }
-
-  .resource-row {
-    display: grid;
-    grid-template-columns: 48px 1fr;
-    gap: 1rem;
-    padding: 1.35rem 0;
-  }
-
-  .resource-icon {
-    display: flex;
-    width: 44px;
-    height: 44px;
-    align-items: center;
-    justify-content: center;
-    border-radius: 9999px;
-    background: #ffcd40;
-    color: #2b4091;
-  }
-
-  .resource-row h4 {
-    color: white;
-    font-size: 1.05rem;
-    font-weight: 700;
-  }
-
-  .resource-row p {
-    margin-top: 0.35rem;
-    color: rgba(255, 255, 255, 0.64);
-    font-size: 0.88rem;
-    line-height: 1.5rem;
-  }
-
-  .kanban-frame {
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    border-radius: 30px;
     background: white;
-    box-shadow: 0 28px 70px rgba(0, 0, 0, 0.24);
   }
 
-  .kanban-frame img {
-    display: block;
-    width: 100%;
-    height: auto;
-  }
-
-  .media-toolbar {
-    display: flex;
-    min-height: 44px;
-    align-items: center;
-    gap: 7px;
-    border-bottom: 1px solid rgba(43, 64, 145, 0.14);
-    background: rgba(43, 64, 145, 0.06);
-    padding: 0 18px;
-  }
-
-  .media-toolbar > span {
-    width: 8px;
-    height: 8px;
-    border-radius: 9999px;
-    background: #61ce70;
-  }
-
-  .media-toolbar > span:nth-child(2) {
-    background: #ffcd40;
-  }
-
-  .media-toolbar > span:nth-child(3) {
-    background: #f36b21;
-  }
-
-  .media-toolbar small {
-    margin-left: 8px;
-    color: rgba(43, 64, 145, 0.58);
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .distribution-box {
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.1);
-    padding: 1rem;
-  }
-
-  .distribution-box strong {
-    display: block;
-    color: #ffcd40;
-    font-size: 2rem;
-    line-height: 1;
-  }
-
-  .distribution-box span {
-    display: block;
-    margin-top: 0.4rem;
-    color: rgba(255, 255, 255, 0.72);
-    font-size: 0.78rem;
-  }
-
-  .whatsapp-feature-card {
-    min-height: 230px;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    border-radius: 24px;
-    background: rgba(255, 255, 255, 0.08);
-    padding: 1.5rem;
-    backdrop-filter: blur(8px);
-  }
-
-  .whatsapp-feature-icon {
-    display: flex;
-    width: 50px;
-    height: 50px;
-    align-items: center;
-    justify-content: center;
-    border-radius: 18px;
-    background: #61ce70;
-    color: #153e1d;
-  }
-
-  .whatsapp-feature-card h4 {
-    margin-top: 1.3rem;
-    color: white;
-    font-size: 1.15rem;
-    font-weight: 700;
-  }
-
-  .whatsapp-feature-card p {
-    margin-top: 0.6rem;
-    color: rgba(255, 255, 255, 0.64);
-    font-size: 0.88rem;
-    line-height: 1.55rem;
-  }
-
-  .metric-lines {
-    border-top: 1px solid rgba(43, 64, 145, 0.16);
-  }
-
-  .metric-line {
-    display: grid;
-    grid-template-columns: 52px 48px 1fr;
-    gap: 1rem;
-    align-items: start;
-    padding: 1.7rem 0;
-    border-bottom: 1px solid rgba(43, 64, 145, 0.16);
-  }
-
-  .metric-index {
-    padding-top: 0.7rem;
-    color: #ffcd40;
-    font-size: 1.7rem;
-    font-weight: 700;
-    letter-spacing: -0.04em;
-  }
-
-  .metric-icon {
-    display: flex;
-    width: 46px;
-    height: 46px;
-    align-items: center;
-    justify-content: center;
-    border-radius: 9999px;
-    background: rgba(97, 206, 112, 0.18);
-    color: #2b4091;
-  }
-
-  .metric-line h3 {
-    color: #2b4091;
-    font-size: 1.15rem;
-    font-weight: 700;
-  }
-
-  .metric-line p {
-    margin-top: 0.35rem;
-    color: rgba(43, 64, 145, 0.68);
-    font-size: 0.9rem;
-    line-height: 1.55rem;
-  }
-
-  .incentive-shape {
+  .hero-background {
     position: absolute;
-    right: -120px;
-    top: 60px;
-    width: 330px;
-    height: 330px;
-    border-radius: 46% 54% 64% 36% / 43% 39% 61% 57%;
-    background: rgba(255, 205, 64, 0.18);
-    transform: rotate(18deg);
-  }
-
-  .campaign-table {
+    inset: 0;
     width: 100%;
-    min-width: 720px;
-    border-collapse: collapse;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.86;
   }
 
-  .campaign-table th,
-  .campaign-table td {
-    border-bottom: 1px solid rgba(43, 64, 145, 0.1);
-    padding: 1rem 1.2rem;
-    text-align: left;
-  }
-
-  .campaign-table th {
-    background: #2b4091;
-    color: white;
-    font-size: 0.72rem;
-    font-weight: 800;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-  }
-
-  .campaign-table td {
-    color: rgba(43, 64, 145, 0.76);
-    font-size: 0.9rem;
-  }
-
-  .campaign-table td strong {
-    color: #f36b21;
-    font-size: 1rem;
-  }
-
-  .discount-example {
-    border: 1px solid rgba(43, 64, 145, 0.1);
-    border-radius: 20px;
-    background: white;
-    padding: 1.25rem;
-    box-shadow: 0 12px 30px rgba(43, 64, 145, 0.06);
-  }
-
-  .discount-example span {
-    display: block;
-    color: rgba(43, 64, 145, 0.6);
-    font-size: 0.78rem;
-    font-weight: 700;
-  }
-
-  .discount-example strong {
-    display: block;
-    margin-top: 0.35rem;
-    color: #2b4091;
-    font-size: 1.6rem;
-  }
-
-  .implementation-wave {
-    position: absolute;
-    left: -10%;
-    right: -10%;
-    bottom: -180px;
-    height: 360px;
-    border-radius: 50%;
-    background: rgba(97, 206, 112, 0.12);
-  }
-
-  .implementation-track {
+  .hero-container {
     position: relative;
+    z-index: 1;
     display: grid;
+    width: min(1460px, calc(100% - 2.5rem));
+    min-height: 720px;
+    margin: 0 auto;
+    align-items: center;
     gap: 2rem;
+    padding: 4.5rem 0 3.5rem;
   }
 
-  .implementation-step {
-    display: grid;
-    grid-template-columns: 72px 1fr;
-    gap: 1.1rem;
-    align-items: start;
+  .hero-copy {
+    max-width: 740px;
   }
 
-  .implementation-number {
-    display: flex;
-    width: 64px;
-    height: 64px;
+  .brand-lockup {
+    display: inline-flex;
+    min-height: 58px;
     align-items: center;
-    justify-content: center;
-    border-radius: 9999px;
-    background: #ffcd40;
-    color: #2b4091;
-    font-size: 0.95rem;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 16px 45px rgba(43, 64, 145, 0.12);
+  }
+
+  .brand-cebrac {
+    display: flex;
+    min-height: 58px;
+    align-items: center;
+    background: var(--blue);
+    padding: 0 1.35rem;
+  }
+
+  .brand-cebrac img {
+    width: 170px;
+    height: 38px;
+    object-fit: contain;
+  }
+
+  .brand-divider {
+    width: 1px;
+    height: 30px;
+    background: var(--line);
+  }
+
+  .brand-f10 {
+    width: 78px;
+    height: 36px;
+    margin: 0 1.4rem;
+    object-fit: contain;
+  }
+
+  .eyebrow {
+    margin: 0;
+    color: var(--blue);
+    font-size: 0.72rem;
     font-weight: 800;
+    letter-spacing: 0.19em;
+    text-transform: uppercase;
   }
 
-  .implementation-content {
-    padding-top: 0.2rem;
+  .eyebrow-orange {
+    margin-top: 2.2rem;
+    color: var(--orange);
   }
 
-  .implementation-content span {
-    display: block;
-    color: #61ce70;
-    font-size: 0.68rem;
+  .eyebrow-yellow {
+    color: var(--yellow);
+  }
+
+  .hero-copy h1 {
+    max-width: 720px;
+    margin: 1rem 0 0;
+    color: var(--blue);
+    font-size: clamp(2.75rem, 5.2vw, 5.2rem);
+    font-weight: 600;
+    letter-spacing: -0.055em;
+    line-height: 0.99;
+  }
+
+  .hero-description {
+    max-width: 670px;
+    margin: 1.65rem 0 0;
+    color: rgba(43, 64, 145, 0.78);
+    font-size: 1.15rem;
+    line-height: 1.85;
+  }
+
+  .hero-facts {
+    display: grid;
+    max-width: 720px;
+    margin: 2rem 0 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .hero-facts div {
+    padding: 1rem 0;
+  }
+
+  .hero-facts dt {
+    color: var(--orange);
+    font-size: 0.66rem;
     font-weight: 800;
     letter-spacing: 0.13em;
     text-transform: uppercase;
   }
 
-  .implementation-content h3 {
-    margin-top: 0.25rem;
-    color: white;
-    font-size: 1.55rem;
-    font-weight: 600;
+  .hero-facts dd {
+    margin: 0.35rem 0 0;
+    color: var(--blue);
+    font-size: 0.92rem;
+    font-weight: 700;
   }
 
-  .implementation-content p {
-    margin-top: 0.5rem;
-    max-width: 520px;
-    color: rgba(255, 255, 255, 0.64);
-    font-size: 0.9rem;
-    line-height: 1.55rem;
+  .hero-visual {
+    display: none;
   }
 
-  .summary-item span {
+  .hero-visual img {
     display: block;
-    color: rgba(43, 64, 145, 0.54);
+    width: 112%;
+    max-width: none;
+    filter: drop-shadow(0 34px 45px rgba(43, 64, 145, 0.2));
+  }
+
+  .page-nav {
+    position: sticky;
+    z-index: 40;
+    top: 0;
+    background: var(--blue);
+    box-shadow: 0 8px 30px rgba(25, 39, 104, 0.14);
+  }
+
+  .page-nav-inner {
+    display: flex;
+    width: min(1280px, calc(100% - 2rem));
+    margin: 0 auto;
+    align-items: center;
+    gap: 1.5rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .page-nav-inner::-webkit-scrollbar,
+  .page-nav-links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .page-nav-inner > img {
+    display: none;
+    width: 132px;
+    height: 32px;
+    flex: 0 0 auto;
+    object-fit: contain;
+  }
+
+  .page-nav-links {
+    display: flex;
+    min-width: max-content;
+    align-items: center;
+    gap: 0.2rem;
+    overflow-x: auto;
+    padding: 0.62rem 0;
+    scrollbar-width: none;
+  }
+
+  .page-nav-links a {
+    border-radius: 999px;
+    color: rgba(255, 255, 255, 0.76);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.55rem 0.78rem;
+    text-decoration: none;
+    transition: background 160ms ease, color 160ms ease;
+  }
+
+  .page-nav-links a:hover,
+  .page-nav-links a:focus-visible {
+    background: rgba(255, 255, 255, 0.12);
+    color: white;
+    outline: none;
+  }
+
+  .section {
+    scroll-margin-top: 56px;
+    padding: 5.5rem 1.25rem;
+  }
+
+  .section-container {
+    width: min(1200px, 100%);
+    margin: 0 auto;
+  }
+
+  .section-light {
+    background: white;
+  }
+
+  .section-paper {
+    background: var(--paper);
+  }
+
+  .section-blue {
+    background: var(--blue);
+    color: white;
+  }
+
+  .section-heading h2 {
+    margin: 0.8rem 0 0;
+    color: var(--blue);
+    font-size: clamp(2.2rem, 4vw, 3.65rem);
+    font-weight: 600;
+    letter-spacing: -0.045em;
+    line-height: 1.05;
+  }
+
+  .section-heading > p:last-child,
+  .section-heading + p {
+    color: var(--muted);
+    font-size: 1.02rem;
+    line-height: 1.85;
+  }
+
+  .section-heading-light h2 {
+    color: white;
+  }
+
+  .context-layout {
+    display: grid;
+    gap: 3.5rem;
+  }
+
+  .context-heading p:last-child {
+    margin: 1.5rem 0 0;
+  }
+
+  .journey-panel {
+    position: relative;
+    border-top: 3px solid var(--blue);
+    padding-top: 1.5rem;
+  }
+
+  .journey-line {
+    display: none;
+  }
+
+  .journey-list {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .journey-item {
+    display: grid;
+    grid-template-columns: 36px 44px 1fr;
+    gap: 0.75rem;
+    align-items: start;
+    padding: 1.25rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .journey-number {
+    padding-top: 0.7rem;
+    color: var(--orange);
+    font-size: 0.72rem;
+    font-weight: 800;
+  }
+
+  .journey-icon {
+    display: flex;
+    width: 42px;
+    height: 42px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(97, 206, 112, 0.17);
+    color: var(--blue);
+  }
+
+  .journey-item h3 {
+    margin: 0;
+    color: var(--blue);
+    font-size: 1rem;
+  }
+
+  .journey-item p {
+    margin: 0.35rem 0 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+    line-height: 1.55;
+  }
+
+  .context-note {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 1.5rem;
+    align-items: center;
+  }
+
+  .context-note strong {
+    width: 100%;
+    color: var(--blue);
+    font-size: 0.82rem;
+  }
+
+  .context-note span {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 0.75rem;
+    padding: 0.45rem 0.65rem;
+  }
+
+  .model-intro,
+  .benefit-intro,
+  .resources-intro,
+  .implementation-intro {
+    display: grid;
+    gap: 1.5rem;
+    align-items: end;
+  }
+
+  .model-intro > p,
+  .implementation-intro > p {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 1rem;
+    line-height: 1.8;
+  }
+
+  .model-showcase {
+    display: grid;
+    gap: 2.5rem;
+    margin-top: 3.5rem;
+    align-items: center;
+  }
+
+  .model-copy {
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .model-statement {
+    display: grid;
+    grid-template-columns: 46px 1fr;
+    gap: 0.9rem;
+    padding: 1.4rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .model-statement > span {
+    color: var(--yellow);
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+
+  .model-statement strong {
+    color: white;
+    font-size: 1.05rem;
+  }
+
+  .model-statement p {
+    margin: 0.45rem 0 0;
+    color: rgba(255, 255, 255, 0.64);
+    font-size: 0.86rem;
+    line-height: 1.6;
+  }
+
+  .crm-figure {
+    overflow: hidden;
+    margin: 0;
+    border: 1px solid rgba(255, 255, 255, 0.19);
+    border-radius: 18px;
+    background: white;
+    box-shadow: 0 26px 70px rgba(8, 18, 67, 0.32);
+  }
+
+  .browser-bar {
+    display: flex;
+    min-height: 42px;
+    align-items: center;
+    gap: 0.4rem;
+    border-bottom: 1px solid var(--line);
+    background: #f2f4fa;
+    padding: 0 1rem;
+  }
+
+  .browser-bar span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+
+  .browser-bar span:nth-child(2) {
+    background: var(--yellow);
+  }
+
+  .browser-bar span:nth-child(3) {
+    background: var(--orange);
+  }
+
+  .browser-bar small {
+    margin-left: 0.4rem;
+    color: var(--muted);
+    font-size: 0.63rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .crm-figure img {
+    display: block;
+    width: 100%;
+  }
+
+  .crm-figure figcaption {
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.72rem;
+    line-height: 1.5;
+    padding: 0.8rem 1rem;
+  }
+
+  .change-layout {
+    display: grid;
+    gap: 3rem;
+  }
+
+  .change-heading p:last-child {
+    margin: 1.4rem 0 0;
+  }
+
+  .change-list {
+    border-top: 3px solid var(--blue);
+  }
+
+  .change-header {
+    display: none;
+  }
+
+  .change-row {
+    display: grid;
+    gap: 0.75rem;
+    padding: 1.35rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .change-row > strong {
+    color: var(--orange);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .change-row p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.6;
+  }
+
+  .change-future {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 0.5rem;
+    color: var(--green);
+  }
+
+  .change-future p {
+    color: var(--blue);
+    font-weight: 700;
+  }
+
+  .benefit-intro > p,
+  .resources-intro > p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 1rem;
+    line-height: 1.8;
+  }
+
+  .benefit-grid {
+    display: grid;
+    gap: 2rem;
+    margin-top: 3.25rem;
+  }
+
+  .benefit-item {
+    border-top: 4px solid var(--blue);
+    padding-top: 1.2rem;
+  }
+
+  .benefit-item:nth-child(2) {
+    border-color: var(--green);
+  }
+
+  .benefit-item:nth-child(3) {
+    border-color: var(--orange);
+  }
+
+  .benefit-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--blue);
+  }
+
+  .benefit-meta span {
+    color: rgba(43, 64, 145, 0.25);
+    font-size: 2rem;
+    font-weight: 700;
+  }
+
+  .benefit-item h3 {
+    margin: 1rem 0 0;
+    color: var(--blue);
+    font-size: 1.35rem;
+    line-height: 1.25;
+  }
+
+  .benefit-item > p {
+    margin: 0.8rem 0 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.7;
+  }
+
+  .benefit-item > strong {
+    display: block;
+    margin-top: 1.1rem;
+    color: var(--ink);
+    font-size: 0.78rem;
+    line-height: 1.5;
+  }
+
+  .metric-band {
+    margin-top: 4rem;
+    background: var(--blue);
+    color: white;
+    padding: 1.5rem;
+  }
+
+  .metric-band-heading span {
+    color: var(--yellow);
     font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .metric-band-heading strong {
+    display: block;
+    margin-top: 0.45rem;
+    font-size: 1.15rem;
+  }
+
+  .metric-grid {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+
+  .metric-grid article {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 0.7rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.17);
+    padding-top: 1rem;
+  }
+
+  .metric-grid article > :global(svg) {
+    color: var(--green);
+  }
+
+  .metric-grid h3 {
+    margin: 0;
+    color: white;
+    font-size: 0.88rem;
+  }
+
+  .metric-grid p {
+    margin: 0.3rem 0 0;
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+
+  .section-resources {
+    background: #f2f4fa;
+  }
+
+  .resource-list {
+    margin-top: 3.25rem;
+    border-top: 3px solid var(--blue);
+  }
+
+  .resource-row {
+    display: grid;
+    gap: 1rem;
+    padding: 1.75rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .resource-index {
+    color: rgba(43, 64, 145, 0.25);
+    font-size: 1.6rem;
+    font-weight: 700;
+  }
+
+  .resource-title {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 0.85rem;
+    align-items: start;
+  }
+
+  .resource-icon {
+    display: flex;
+    width: 42px;
+    height: 42px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(97, 206, 112, 0.18);
+    color: var(--blue);
+  }
+
+  .resource-title small {
+    color: var(--orange);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+
+  .resource-title h3 {
+    margin: 0.35rem 0 0;
+    color: var(--blue);
+    font-size: 1.3rem;
+    line-height: 1.3;
+  }
+
+  .resource-content > p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.7;
+  }
+
+  .resource-content ul {
+    display: grid;
+    gap: 0.65rem;
+    margin: 1rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .resource-content li {
+    display: flex;
+    gap: 0.55rem;
+    color: var(--blue);
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .resource-content li :global(svg) {
+    flex: 0 0 auto;
+    color: var(--green);
+  }
+
+  .whatsapp-distribution {
+    display: grid;
+    gap: 1.25rem;
+    margin-top: 2.5rem;
+    align-items: center;
+    border-left: 5px solid var(--green);
+    background: white;
+    padding: 1.5rem;
+    box-shadow: 0 18px 45px rgba(43, 64, 145, 0.08);
+  }
+
+  .whatsapp-distribution > div:first-child {
+    display: flex;
+    gap: 0.8rem;
+    align-items: center;
+  }
+
+  .whatsapp-distribution > div:first-child span {
+    color: var(--blue);
+    font-size: 3rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .whatsapp-distribution > div:first-child strong {
+    color: var(--blue);
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  .whatsapp-distribution > p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+    line-height: 1.65;
+  }
+
+  .distribution-example {
+    display: flex;
+    gap: 0.7rem;
+  }
+
+  .distribution-example span {
+    min-width: 96px;
+    background: var(--paper);
+    color: var(--muted);
+    font-size: 0.75rem;
+    padding: 0.7rem 0.8rem;
+  }
+
+  .distribution-example strong {
+    display: block;
+    color: var(--orange);
+    font-size: 1.5rem;
+  }
+
+  .section-investment {
+    background: #fffaf5;
+  }
+
+  .investment-layout {
+    display: grid;
+    gap: 3rem;
+  }
+
+  .investment-main {
+    border-top: 4px solid var(--orange);
+    padding-top: 1.5rem;
+  }
+
+  .price-line {
+    display: flex;
+    margin-top: 1.2rem;
+    align-items: flex-end;
+    color: var(--orange);
+  }
+
+  .price-line span {
+    padding-bottom: 0.65rem;
+    font-size: 1.15rem;
+    font-weight: 800;
+  }
+
+  .price-line strong {
+    font-size: clamp(4rem, 9vw, 6.5rem);
+    font-weight: 600;
+    letter-spacing: -0.07em;
+    line-height: 0.85;
+  }
+
+  .price-period {
+    margin: 0.7rem 0 0;
+    color: var(--blue);
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  .investment-description {
+    margin: 1.5rem 0 0;
+    color: var(--muted);
+    font-size: 0.95rem;
+    line-height: 1.75;
+  }
+
+  .included-list {
+    display: grid;
+    gap: 0.8rem;
+    margin: 1.6rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .included-list li {
+    display: flex;
+    gap: 0.6rem;
+    color: var(--blue);
+    font-size: 0.86rem;
+    font-weight: 700;
+  }
+
+  .included-list :global(svg) {
+    flex: 0 0 auto;
+    color: var(--green);
+  }
+
+  .investment-notes {
+    display: grid;
+    gap: 0.45rem;
+    margin-top: 1.6rem;
+    border-top: 1px solid var(--line);
+    padding-top: 1.2rem;
+  }
+
+  .investment-notes p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.78rem;
+    line-height: 1.6;
+  }
+
+  .investment-notes strong {
+    color: var(--blue);
+  }
+
+  .cash-panel {
+    background: white;
+    border: 1px solid var(--line);
+    padding: 1.5rem;
+    box-shadow: 0 22px 60px rgba(43, 64, 145, 0.09);
+  }
+
+  .cash-heading > span {
+    color: var(--green);
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .cash-heading h3 {
+    margin: 0.65rem 0 0;
+    color: var(--blue);
+    font-size: 1.65rem;
+    line-height: 1.25;
+  }
+
+  .cash-heading p {
+    margin: 0.9rem 0 0;
+    color: var(--muted);
+    font-size: 0.86rem;
+    line-height: 1.7;
+  }
+
+  .cash-examples {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 1.5rem;
+    border-top: 1px solid var(--line);
+    border-left: 1px solid var(--line);
+  }
+
+  .cash-examples article {
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 1rem;
+  }
+
+  .cash-examples span {
+    display: block;
+    color: var(--muted);
+    font-size: 0.68rem;
+  }
+
+  .cash-examples strong {
+    display: block;
+    margin-top: 0.35rem;
+    color: var(--blue);
+    font-size: 1.25rem;
+  }
+
+  .cash-launch-note {
+    margin-top: 1.4rem;
+    border-left: 4px solid var(--yellow);
+    background: #fffbec;
+    padding: 1rem;
+  }
+
+  .cash-launch-note strong {
+    color: var(--blue);
+    font-size: 0.82rem;
+  }
+
+  .cash-launch-note p {
+    margin: 0.35rem 0 0;
+    color: var(--muted);
+    font-size: 0.74rem;
+    line-height: 1.6;
+  }
+
+  .implementation-list {
+    display: grid;
+    gap: 2rem;
+    margin: 3.25rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .implementation-list li {
+    position: relative;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    padding-top: 1.35rem;
+  }
+
+  .implementation-number {
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--yellow);
+    color: var(--blue);
+    font-size: 0.72rem;
+    font-weight: 800;
+  }
+
+  .implementation-list small {
+    display: block;
+    margin-top: 1rem;
+    color: var(--green);
+    font-size: 0.65rem;
     font-weight: 800;
     letter-spacing: 0.12em;
     text-transform: uppercase;
   }
 
-  .summary-item strong {
-    display: block;
-    margin-top: 0.4rem;
-    color: #2b4091;
-    font-size: 1rem;
-    line-height: 1.55rem;
+  .implementation-list h3 {
+    margin: 0.4rem 0 0;
+    color: white;
+    font-size: 1.2rem;
   }
 
-  @media (min-width: 768px) {
-    .turnover-board {
-      display: grid;
+  .implementation-list p {
+    margin: 0.6rem 0 0;
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 0.83rem;
+    line-height: 1.65;
+  }
+
+  .implementation-summary {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 3rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+    padding: 1.4rem 0;
+  }
+
+  .implementation-summary strong {
+    color: var(--yellow);
+    font-size: 0.72rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+
+  .implementation-summary p {
+    margin: 0;
+    color: white;
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  .page-footer {
+    background: white;
+    padding: 3rem 1.25rem;
+  }
+
+  .footer-container {
+    display: grid;
+    width: min(1200px, 100%);
+    margin: 0 auto;
+    gap: 1.5rem;
+    align-items: center;
+    border-top: 1px solid var(--line);
+    padding-top: 2rem;
+  }
+
+  .footer-brands {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .footer-brands > span:nth-child(2) {
+    width: 1px;
+    height: 34px;
+    background: var(--line);
+  }
+
+  .footer-cebrac {
+    display: flex;
+    align-items: center;
+    background: var(--blue);
+    padding: 0.45rem 0.7rem;
+  }
+
+  .footer-cebrac img {
+    width: 135px;
+    height: 31px;
+    object-fit: contain;
+  }
+
+  .footer-brands > img {
+    width: 68px;
+    height: 36px;
+    object-fit: contain;
+  }
+
+  .footer-container > p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+    line-height: 1.7;
+  }
+
+  .footer-container > a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--blue);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-decoration: none;
+  }
+
+  @media (min-width: 640px) {
+    .hero-facts {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .hero-facts div {
+      padding: 1rem 1.1rem;
+      border-right: 1px solid var(--line);
+    }
+
+    .hero-facts div:first-child {
+      padding-left: 0;
+    }
+
+    .hero-facts div:last-child {
+      border-right: 0;
+    }
+
+    .metric-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .implementation-track {
+    .whatsapp-distribution {
+      grid-template-columns: 0.8fr 1.3fr auto;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .section {
+      padding: 6.5rem 2rem;
+    }
+
+    .benefit-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .metric-band {
+      display: grid;
+      grid-template-columns: 0.7fr 1.3fr;
+      gap: 2rem;
+      padding: 1.8rem 2rem;
+    }
+
+    .metric-grid {
+      margin-top: 0;
+    }
+
+    .resource-row {
+      grid-template-columns: 60px minmax(0, 0.9fr) minmax(0, 1.1fr);
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    .investment-layout {
+      grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+      gap: 4rem;
+      align-items: start;
+    }
+
+    .cash-panel {
+      padding: 2rem;
+    }
+
+    .implementation-list {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      column-gap: 4rem;
-      row-gap: 3rem;
+    }
+
+    .footer-container {
+      grid-template-columns: auto 1fr auto;
+      gap: 2rem;
     }
   }
 
   @media (min-width: 1024px) {
-    .hero-grid {
-      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr);
-      column-gap: 0;
+    .hero-container {
+      grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
     }
 
     .hero-visual {
-      min-height: 780px;
-      margin-left: -8rem;
-      margin-right: -6rem;
+      display: flex;
+      min-height: 620px;
+      margin-left: -7rem;
+      margin-right: -5rem;
+      align-items: center;
+      justify-content: flex-end;
       pointer-events: none;
     }
 
-    .hero-visual img {
-      width: 104%;
-      max-width: none;
-      transform: translateX(-1%);
-      transform-origin: center right;
-    }
-
-    .implementation-track {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 2rem;
-    }
-
-    .implementation-track::before {
-      content: "";
-      position: absolute;
-      left: 32px;
-      right: 10%;
-      top: 31px;
-      height: 2px;
-      background: rgba(255, 255, 255, 0.16);
-    }
-
-    .implementation-step {
-      position: relative;
-      z-index: 2;
+    .page-nav-inner > img {
       display: block;
     }
 
-    .implementation-content {
-      padding-top: 1.5rem;
+    .context-layout {
+      grid-template-columns: minmax(0, 0.62fr) minmax(0, 1.38fr);
+      gap: 5rem;
+      align-items: start;
+    }
+
+    .context-heading {
+      position: sticky;
+      top: 92px;
+    }
+
+    .model-intro,
+    .benefit-intro,
+    .resources-intro,
+    .implementation-intro {
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+      gap: 5rem;
+    }
+
+    .model-showcase {
+      grid-template-columns: minmax(0, 0.68fr) minmax(0, 1.32fr);
+      gap: 4rem;
+    }
+
+    .change-layout {
+      grid-template-columns: minmax(0, 0.55fr) minmax(0, 1.45fr);
+      gap: 5rem;
+      align-items: start;
+    }
+
+    .change-heading {
+      position: sticky;
+      top: 92px;
+    }
+
+    .change-header {
+      display: grid;
+      grid-template-columns: 0.45fr 1fr 1fr;
+      gap: 1.4rem;
+      padding: 0.8rem 0;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .change-row {
+      grid-template-columns: 0.45fr 1fr 1fr;
+      gap: 1.4rem;
+      align-items: center;
+    }
+
+    .benefit-grid {
+      gap: 3rem;
+    }
+
+    .implementation-list {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 2.5rem;
+    }
+
+    .implementation-summary {
+      grid-template-columns: 0.45fr 1.55fr;
+      gap: 2rem;
+      align-items: center;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .presentation-page *,
-    .presentation-page *::before,
-    .presentation-page *::after {
-      scroll-behavior: auto !important;
+    :global(html) {
+      scroll-behavior: auto;
+    }
+
+    .page-shell *,
+    .page-shell *::before,
+    .page-shell *::after {
       transition-duration: 0.01ms !important;
     }
-  }
-
-  :global(html) {
-    scroll-behavior: smooth;
   }
 </style>
