@@ -1,0 +1,46 @@
+.page-shell #investimento {
+  background: #f3faf5;
+}
+
+.page-shell #investimento .section-label {
+  color: #23844d;
+}
+
+.page-shell #investimento .investment-panel {
+  border-color: rgba(35, 132, 77, 0.18);
+  box-shadow: 0 22px 60px rgba(35, 132, 77, 0.14);
+}
+
+.page-shell #investimento .investment-best {
+  background: #23844d;
+}
+
+.page-shell #investimento .investment-best > span {
+  color: #dff9e6;
+}
+
+.page-shell #investimento .investment-context {
+  background: #edf8f0;
+}
+
+.page-shell #investimento .investment-table-title span,
+.page-shell #investimento .investment-table-title > svg {
+  color: #23844d;
+}
+
+.page-shell #investimento .investment-table-header {
+  background: #23844d;
+}
+
+.page-shell #investimento .investment-row > strong:last-child {
+  color: #23844d;
+}
+
+.page-shell #investimento .investment-row > strong:last-child small {
+  color: rgba(35, 132, 77, 0.72);
+}
+
+.page-shell #investimento .investment-row-highlighted {
+  background: #e7f7ec;
+  box-shadow: inset 4px 0 0 #61ce70;
+}
