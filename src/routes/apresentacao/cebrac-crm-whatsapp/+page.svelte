@@ -200,29 +200,29 @@
 
   const investmentRows: InvestmentRow[] = [
     {
-      cashShare: "100% via F10 Cash",
-      discount: "R$ 200 de desconto",
+      cashShare: "100%",
+      discount: "R$ 200",
       monthlyValue: "R$ 199",
       highlighted: true,
     },
     {
-      cashShare: "80% via F10 Cash",
-      discount: "R$ 160 de desconto",
+      cashShare: "80%",
+      discount: "R$ 160",
       monthlyValue: "R$ 239",
     },
     {
-      cashShare: "40% via F10 Cash",
-      discount: "R$ 80 de desconto",
+      cashShare: "40%",
+      discount: "R$ 80",
       monthlyValue: "R$ 319",
     },
     {
-      cashShare: "20% via F10 Cash",
-      discount: "R$ 40 de desconto",
+      cashShare: "20%",
+      discount: "R$ 40",
       monthlyValue: "R$ 359",
     },
     {
-      cashShare: "Sem uso do F10 Cash",
-      discount: "Valor-base do upgrade",
+      cashShare: "0%",
+      discount: "—",
       monthlyValue: "R$ 399",
     },
   ];
@@ -509,19 +509,19 @@
     </div>
   </section>
 
-  <section id="comparacao" class="scroll-mt-16 bg-white px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
-    <div class="mx-auto max-w-[1480px]">
-      <div class="grid gap-10 lg:grid-cols-[0.62fr_1.38fr] lg:items-end lg:gap-24">
+  <section id="comparacao" class="comparison-section scroll-mt-16 bg-white px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
+    <div class="mx-auto w-full max-w-[1480px]">
+      <div class="grid gap-10 lg:grid-cols-[0.68fr_1.32fr] lg:items-end lg:gap-24">
         <div>
           <p class="section-label">Hoje × novo padrão</p>
-          <h2 class="section-title mt-4">O que deixa de depender das pessoas e passa a fazer parte do processo.</h2>
+          <h2 class="section-title mt-4 max-w-[610px]">O que deixa de depender das pessoas e passa a fazer parte do processo.</h2>
         </div>
-        <p class="max-w-[760px] text-lg leading-8 text-[#2B4091]/70 lg:pb-1">
+        <p class="max-w-[780px] text-lg leading-8 text-[#2B4091]/70 lg:pb-1">
           A mudança substitui controles individuais por uma operação visível, contínua e padronizada em toda a rede.
         </p>
       </div>
 
-      <div class="comparison-list mt-12 border-t border-[#2B4091]/14">
+      <div class="comparison-list mt-14 border-t border-[#2B4091]/14">
         <div class="comparison-header">
           <span>Área</span>
           <span>Hoje</span>
@@ -538,58 +538,63 @@
     </div>
   </section>
 
-  <section id="investimento" class="scroll-mt-16 bg-[#fff8e8] px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
+  <section id="investimento" class="scroll-mt-16 bg-[#f3f5fa] px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
     <div class="mx-auto max-w-[1480px]">
-      <div class="grid gap-12 lg:grid-cols-[0.74fr_1.26fr] lg:items-start lg:gap-20">
+      <div class="mb-12 grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-end lg:gap-20">
         <div>
           <p class="section-label">Investimento e benefício F10 Cash</p>
-          <h2 class="section-title mt-4">Um único valor, reduzido conforme o uso do F10 Cash.</h2>
-          <p class="mt-6 max-w-[580px] text-lg leading-8 text-[#2B4091]/70">
-            O upgrade inclui CRM de Leads, workflow comercial, cinco números de WhatsApp, configuração, treinamento e acompanhamento inicial da operação.
-          </p>
+          <h2 class="section-title mt-4">Investimento mensal do novo modelo.</h2>
+        </div>
+        <p class="max-w-[760px] text-lg leading-8 text-[#2B4091]/70 lg:pb-1">
+          O valor-base é reduzido conforme o percentual de recebimentos processados pelo F10 Cash. Quanto maior a participação, menor o valor mensal do upgrade.
+        </p>
+      </div>
 
-          <div class="price-highlight mt-9">
-            <span>A partir de</span>
+      <div class="investment-panel overflow-hidden border border-[#2B4091]/12 bg-white shadow-[0_22px_60px_rgba(43,64,145,0.10)]">
+        <div class="investment-summary">
+          <div class="investment-best">
+            <span>Com 100% via F10 Cash</span>
             <strong>R$ 199<small>/mês</small></strong>
-            <p>com 100% dos recebimentos via F10 Cash</p>
+            <p>R$ 200 de desconto sobre o valor-base.</p>
           </div>
 
-          <div class="base-price mt-6">
-            <span>Valor-base sem desconto</span>
-            <strong>R$ 399 por unidade/mês</strong>
+          <div class="investment-base">
+            <span>Valor-base sem uso do F10 Cash</span>
+            <strong>R$ 399<small>/mês</small></strong>
+            <p>Valor integral por unidade.</p>
           </div>
 
-          <p class="mt-6 max-w-[580px] text-sm leading-6 text-[#2B4091]/60">
-            O reajuste anual previsto para o período será substituído pelo valor do upgrade. Número adicional de WhatsApp: R$ 49,00 por mês.
-          </p>
+          <div class="investment-included">
+            <span>Incluído no upgrade</span>
+            <p>CRM de Leads, workflow comercial, cinco números de WhatsApp, configuração, treinamento e acompanhamento inicial.</p>
+          </div>
         </div>
 
-        <div class="investment-table overflow-hidden border border-[#2B4091]/12 bg-white shadow-[0_22px_60px_rgba(43,64,145,0.10)]">
-          <div class="investment-table-title">
-            <div>
-              <span>Quanto maior o uso, menor o valor</span>
-              <strong>Faixas recorrentes do upgrade</strong>
-            </div>
-            <Workflow size={28} strokeWidth={1.8} />
+        <div class="investment-table-title">
+          <div>
+            <span>Faixas recorrentes</span>
+            <strong>Quanto maior o uso do F10 Cash, menor o valor</strong>
           </div>
+          <Workflow size={28} strokeWidth={1.8} />
+        </div>
 
-          <div class="investment-table-header">
-            <span>Recebimentos</span>
-            <span>Benefício</span>
-            <span>Valor mensal</span>
+        <div class="investment-table-header">
+          <span>Recebimentos via F10 Cash</span>
+          <span>Desconto mensal</span>
+          <span>Valor mensal</span>
+        </div>
+
+        {#each investmentRows as row}
+          <div class:investment-row-highlighted={row.highlighted} class="investment-row">
+            <strong>{row.cashShare}</strong>
+            <span>{row.discount}</span>
+            <strong>{row.monthlyValue}</strong>
           </div>
+        {/each}
 
-          {#each investmentRows as row}
-            <div class:investment-row-highlighted={row.highlighted} class="investment-row">
-              <strong>{row.cashShare}</strong>
-              <span>{row.discount}</span>
-              <strong>{row.monthlyValue}</strong>
-            </div>
-          {/each}
-
-          <div class="investment-note">
-            Os percentuais e descontos seguem as regras da campanha oficial e consideram os recebimentos do período anterior.
-          </div>
+        <div class="investment-note">
+          <p>Os percentuais e descontos seguem as regras da campanha oficial e consideram os recebimentos do período anterior.</p>
+          <p>O reajuste anual previsto para o período será substituído pelo valor do upgrade. Número adicional de WhatsApp: R$ 49,00 por mês.</p>
         </div>
       </div>
     </div>
@@ -663,9 +668,7 @@
   .brand-lockup,
   .journey-panel,
   .crm-figure,
-  .investment-table,
-  .price-highlight,
-  .base-price {
+  .investment-panel {
     border-radius: 22px;
   }
 
@@ -930,6 +933,12 @@
     line-height: 1.3rem;
   }
 
+  .comparison-section {
+    display: flex;
+    align-items: center;
+    min-height: 50svh;
+  }
+
   .comparison-header,
   .comparison-row {
     display: grid;
@@ -939,7 +948,7 @@
   }
 
   .comparison-header {
-    padding: 0.9rem 1.2rem;
+    padding: 0.95rem 1.35rem;
     background: #2b4091;
     color: white;
     font-size: 0.7rem;
@@ -949,19 +958,20 @@
   }
 
   .comparison-row {
-    padding: 1.35rem 1.2rem;
+    min-height: 76px;
+    padding: 1.45rem 1.35rem;
     border-bottom: 1px solid rgba(43, 64, 145, 0.11);
   }
 
   .comparison-row > strong {
     color: #2b4091;
-    font-size: 0.9rem;
+    font-size: 0.92rem;
   }
 
   .comparison-row p {
     color: rgba(43, 64, 145, 0.62);
-    font-size: 0.88rem;
-    line-height: 1.5rem;
+    font-size: 0.9rem;
+    line-height: 1.55rem;
   }
 
   .comparison-future {
@@ -978,64 +988,83 @@
     color: #61ce70;
   }
 
-  .price-highlight {
-    max-width: 520px;
-    padding: 1.6rem 1.8rem;
-    background: #2b4091;
-    color: white;
-    box-shadow: 0 20px 48px rgba(43, 64, 145, 0.18);
+  .investment-summary {
+    display: grid;
+    border-bottom: 1px solid rgba(43, 64, 145, 0.1);
   }
 
-  .price-highlight > span {
+  .investment-best,
+  .investment-base,
+  .investment-included {
+    padding: 1.75rem;
+  }
+
+  .investment-best {
+    background: #2b4091;
+    color: white;
+  }
+
+  .investment-base {
+    background: #eef2fb;
+    color: #2b4091;
+  }
+
+  .investment-included {
+    background: white;
+    color: #2b4091;
+  }
+
+  .investment-best > span,
+  .investment-base > span,
+  .investment-included > span {
     display: block;
-    color: #ffcd40;
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     font-weight: 800;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.13em;
     text-transform: uppercase;
   }
 
-  .price-highlight strong {
+  .investment-best > span {
+    color: #ffcd40;
+  }
+
+  .investment-base > span,
+  .investment-included > span {
+    color: rgba(43, 64, 145, 0.55);
+  }
+
+  .investment-best strong,
+  .investment-base strong {
     display: block;
-    margin-top: 0.45rem;
-    font-size: clamp(3.2rem, 6vw, 5.2rem);
+    margin-top: 0.55rem;
+    font-size: clamp(2.8rem, 5vw, 4.5rem);
     font-weight: 600;
     letter-spacing: -0.06em;
     line-height: 1;
   }
 
-  .price-highlight small {
-    margin-left: 0.3rem;
-    font-size: 1.1rem;
+  .investment-best small,
+  .investment-base small {
+    margin-left: 0.28rem;
+    font-size: 1rem;
     letter-spacing: 0;
   }
 
-  .price-highlight p {
-    margin-top: 0.65rem;
-    color: rgba(255, 255, 255, 0.72);
-    font-size: 0.95rem;
+  .investment-best p,
+  .investment-base p,
+  .investment-included p {
+    margin-top: 0.7rem;
+    font-size: 0.9rem;
+    line-height: 1.55rem;
   }
 
-  .base-price {
-    display: grid;
-    gap: 0.25rem;
-    max-width: 520px;
-    padding: 1rem 1.2rem;
-    border: 1px solid rgba(43, 64, 145, 0.14);
-    background: rgba(255, 255, 255, 0.72);
+  .investment-best p {
+    color: rgba(255, 255, 255, 0.68);
   }
 
-  .base-price span {
-    color: rgba(43, 64, 145, 0.55);
-    font-size: 0.7rem;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  .base-price strong {
-    color: #2b4091;
-    font-size: 1.1rem;
+  .investment-base p,
+  .investment-included p {
+    color: rgba(43, 64, 145, 0.63);
   }
 
   .investment-table-title {
@@ -1105,22 +1134,9 @@
     background: rgba(97, 206, 112, 0.12);
   }
 
-  .investment-row-highlighted > strong:first-child::after {
-    content: "Melhor condição";
-    display: inline-block;
-    margin-left: 0.65rem;
-    padding: 0.25rem 0.45rem;
-    border-radius: 9999px;
-    background: #61ce70;
-    color: #12346f;
-    font-size: 0.58rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    vertical-align: middle;
-  }
-
   .investment-note {
+    display: grid;
+    gap: 0.35rem;
     padding: 1rem 1.5rem;
     background: #f6f8fc;
     color: rgba(43, 64, 145, 0.65);
@@ -1220,6 +1236,15 @@
       padding-right: 0;
       border-right: 0;
     }
+
+    .investment-summary {
+      grid-template-columns: 0.82fr 0.68fr 1.5fr;
+    }
+
+    .investment-base,
+    .investment-included {
+      border-left: 1px solid rgba(43, 64, 145, 0.1);
+    }
   }
 
   @media (min-width: 1024px) {
@@ -1267,6 +1292,10 @@
   }
 
   @media (max-width: 767px) {
+    .comparison-section {
+      min-height: auto;
+    }
+
     .comparison-header {
       display: none;
     }
@@ -1274,6 +1303,7 @@
     .comparison-row {
       grid-template-columns: 1fr;
       gap: 0.65rem;
+      min-height: 0;
       padding: 1.25rem 0;
     }
 
