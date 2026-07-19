@@ -8,8 +8,8 @@
 
 .page-shell #motivo .journey-flow {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: clamp(2rem, 4vw, 4rem);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: clamp(1.5rem, 3vw, 3rem);
   row-gap: 0;
   padding-top: 0.85rem;
   border-top: 1px solid rgba(43, 64, 145, 0.12);
@@ -20,17 +20,29 @@
 .page-shell #motivo .journey-item:nth-child(n + 5) {
   position: relative;
   display: grid !important;
-  grid-template-columns: 46px minmax(0, 1fr);
-  gap: 0.85rem;
+  grid-template-columns: 30px 34px minmax(0, 1fr);
+  gap: 0.7rem;
   align-items: center;
   min-width: 0;
   min-height: 82px !important;
-  padding: 1.25rem 0 !important;
+  padding: 1.2rem 0 !important;
   border: 0 !important;
   border-bottom: 1px solid rgba(43, 64, 145, 0.12) !important;
   border-radius: 0;
   background: transparent !important;
   box-shadow: none;
+}
+
+.page-shell #motivo .journey-item::before {
+  content: "";
+  display: block;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background-color: rgba(43, 64, 145, 0.08);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%232B4091' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14'/%3E%3Cpath d='m13 6 6 6-6 6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
 }
 
 .page-shell #motivo .journey-item > span:first-child {
@@ -42,9 +54,9 @@
   border-radius: 0;
   background: transparent;
   color: #f36b21;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 850;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   line-height: 1;
   box-shadow: none;
 }
@@ -56,30 +68,22 @@
   border: 0;
   background: transparent;
   color: #2b4091;
-  font-size: 1rem;
+  font-size: 0.98rem;
   font-weight: 750;
-  line-height: 1.45rem;
+  line-height: 1.4rem;
   box-shadow: none;
 }
 
 .page-shell #motivo .journey-item:nth-child(7) {
   grid-column: 1 / -1;
-  grid-template-columns: 46px minmax(0, 1fr);
-  min-height: 88px !important;
+  grid-template-columns: 30px 34px minmax(0, 1fr);
+  min-height: 86px !important;
   border-bottom-color: rgba(97, 206, 112, 0.34) !important;
 }
 
 .page-shell #motivo .journey-item:nth-child(7)::before {
-  content: "CONTINUIDADE APÓS A MATRÍCULA";
-  position: absolute;
-  top: 0.55rem;
-  left: calc(46px + 0.85rem);
-  color: #237b47;
-  font-size: 0.62rem;
-  font-weight: 850;
-  letter-spacing: 0.13em;
-  line-height: 1;
-  text-transform: uppercase;
+  background-color: rgba(97, 206, 112, 0.16);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23235F43' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z'/%3E%3Cpath d='M8 8h8'/%3E%3Cpath d='M8 12h5'/%3E%3C/svg%3E");
 }
 
 .page-shell #motivo .journey-item:nth-child(7) > span:first-child,
@@ -87,12 +91,14 @@
   color: #235f43;
 }
 
-.page-shell #motivo .journey-item:nth-child(7) > strong {
-  padding-top: 0.85rem;
-}
-
 .page-shell #motivo .journey-arrow {
   display: none !important;
+}
+
+@media (max-width: 1099px) {
+  .page-shell #motivo .journey-flow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 767px) {
@@ -105,13 +111,9 @@
   .page-shell #motivo .journey-item:nth-child(n + 5),
   .page-shell #motivo .journey-item:nth-child(7) {
     grid-column: 1;
-    grid-template-columns: 40px minmax(0, 1fr);
+    grid-template-columns: 30px 34px minmax(0, 1fr);
     min-height: 72px !important;
     padding: 1.05rem 0 !important;
-  }
-
-  .page-shell #motivo .journey-item:nth-child(7)::before {
-    left: calc(40px + 0.85rem);
   }
 
   .page-shell #motivo .journey-item > strong {
