@@ -3,6 +3,7 @@
   import "../cebrac-presentation.css";
   import "../cebrac-journey.css";
   import "../cebrac-investment.css";
+  import "../cebrac-investment-solid.css";
   import { onMount } from "svelte";
   import { afterNavigate } from "$app/navigation";
   import { page } from "$app/stores";
@@ -39,29 +40,26 @@
   <link rel="icon" href="/favicon.png" />
 </svelte:head>
 
-{#if isStandalonePage}
-  <slot />
-{:else}
+{#if !isStandalonePage}
   <Header />
-  <main>
-    <slot />
-  </main>
-  <Footer />
-  <FloatingWhatsappButton />
+{/if}
 
-  <Popup
-    open={modalConfig.open}
-    title={modalConfig.title}
-    description={modalConfig.description}
-    size={modalSize}
-    on:close={() => contactModalConfig.close()}
-  >
+<slot />
+
+{#if !isStandalonePage}
+  <Footer />
+
+  <FloatingWhatsappButton
+    url="https://api.whatsapp.com/send?phone=554130333300&text=Ol%C3%A1%2C%20gostaria%20de%20saber%20mais%20sobre%20a%20F10%20Software."
+  />
+
+  <Popup bind:size={modalSize} open={$contactModalConfig.open} on:close={() => contactModalConfig.close()}>
     {#if modalConfig.type === "contact"}
       <ContactWhatsappModalForm />
     {:else if modalConfig.type === "solutions"}
-      <SolutionList />
-    {:else if modalConfig.type === "solutions-popup"}
       <PopupSolutionsList />
+    {:else}
+      <SolutionList />
     {/if}
   </Popup>
 {/if}
