@@ -1,93 +1,116 @@
 .page-shell #motivo .journey-panel {
   padding: clamp(1.5rem, 2.4vw, 2.4rem);
   border-color: rgba(43, 64, 145, 0.1);
-  border-radius: 28px;
+  border-radius: 26px;
   background: #f8faff;
-  box-shadow: 0 20px 52px rgba(43, 64, 145, 0.07);
+  box-shadow: 0 18px 48px rgba(43, 64, 145, 0.06);
 }
 
 .page-shell #motivo .journey-flow {
-  position: relative;
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: clamp(0.7rem, 1vw, 1rem);
-  padding-top: 0.2rem;
-  background: transparent;
-}
-
-.page-shell #motivo .journey-flow::before {
-  content: "";
-  position: absolute;
-  top: 22px;
-  left: 6.5%;
-  right: 6.5%;
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    rgba(243, 107, 33, 0.22) 0%,
-    rgba(243, 107, 33, 0.58) 48%,
-    rgba(97, 206, 112, 0.32) 100%
-  );
+  grid-template-columns: repeat(6, minmax(0, 1fr)) minmax(210px, 1.35fr);
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid rgba(43, 64, 145, 0.11);
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 14px 36px rgba(43, 64, 145, 0.055);
 }
 
 .page-shell #motivo .journey-item,
 .page-shell #motivo .journey-item:nth-child(n + 5) {
   position: relative;
-  z-index: 1;
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) !important;
-  grid-template-rows: 44px minmax(104px, 1fr);
-  gap: 0.7rem;
-  min-height: 0 !important;
-  padding: 0 !important;
+  display: flex !important;
+  min-width: 0;
+  min-height: 132px !important;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 1.35rem 1.15rem !important;
   border: 0 !important;
+  border-right: 1px solid rgba(43, 64, 145, 0.1) !important;
   background: transparent !important;
 }
 
-.page-shell #motivo .journey-item > span:first-child {
-  position: relative;
-  z-index: 2;
+.page-shell #motivo .journey-item:nth-child(-n + 6)::after {
+  content: "›";
+  position: absolute;
+  top: 50%;
+  right: -0.68rem;
+  z-index: 3;
   display: flex;
-  width: 44px;
-  height: 44px;
+  width: 1.35rem;
+  height: 1.35rem;
   align-items: center;
   justify-content: center;
-  margin-left: 1rem;
-  border: 1px solid rgba(243, 107, 33, 0.25);
+  border: 1px solid rgba(243, 107, 33, 0.18);
   border-radius: 9999px;
   background: #ffffff;
   color: #f36b21;
-  font-size: 0.72rem;
-  font-weight: 800;
-  box-shadow: 0 9px 24px rgba(43, 64, 145, 0.1);
+  font-size: 1.15rem;
+  font-weight: 500;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.page-shell #motivo .journey-item > span:first-child {
+  display: block;
+  width: auto;
+  height: auto;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #f36b21;
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  box-shadow: none;
 }
 
 .page-shell #motivo .journey-item > strong {
-  display: flex;
+  display: block;
   min-width: 0;
-  min-height: 104px;
-  align-items: flex-start;
-  padding: 1.25rem 1.05rem;
-  border: 1px solid rgba(43, 64, 145, 0.1);
-  border-radius: 18px;
-  background: #ffffff;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: #2b4091;
-  font-size: 0.94rem;
+  font-size: 0.96rem;
   font-weight: 750;
   line-height: 1.45rem;
-  box-shadow: 0 13px 30px rgba(43, 64, 145, 0.055);
+  box-shadow: none;
+}
+
+.page-shell #motivo .journey-item:last-child {
+  min-height: 132px !important;
+  padding: 1.35rem 1.4rem !important;
+  border-right: 0 !important;
+  border-left: 3px solid rgba(97, 206, 112, 0.68) !important;
+  background: linear-gradient(135deg, #f4fbf6 0%, #ecf8f0 100%) !important;
+}
+
+.page-shell #motivo .journey-item:last-child::before {
+  content: "CONTINUIDADE";
+  display: block;
+  margin-bottom: 0.1rem;
+  color: #237b47;
+  font-size: 0.62rem;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+  line-height: 1;
 }
 
 .page-shell #motivo .journey-item:last-child > span:first-child {
-  border-color: rgba(97, 206, 112, 0.45);
-  background: #eaf8ee;
   color: #237b47;
 }
 
 .page-shell #motivo .journey-item:last-child > strong {
-  border-color: rgba(97, 206, 112, 0.3);
-  background: linear-gradient(180deg, #ffffff 0%, #f0faf3 100%);
   color: #235f43;
+  font-size: 1rem;
 }
 
 .page-shell #motivo .journey-arrow {
@@ -96,64 +119,100 @@
 
 @media (max-width: 1279px) {
   .page-shell #motivo .journey-flow {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1.15rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .page-shell #motivo .journey-flow::before {
+  .page-shell #motivo .journey-item,
+  .page-shell #motivo .journey-item:nth-child(n + 5) {
+    min-height: 112px !important;
+    border-bottom: 1px solid rgba(43, 64, 145, 0.1) !important;
+  }
+
+  .page-shell #motivo .journey-item:nth-child(3),
+  .page-shell #motivo .journey-item:nth-child(6) {
+    border-right: 0 !important;
+  }
+
+  .page-shell #motivo .journey-item:nth-child(3)::after,
+  .page-shell #motivo .journey-item:nth-child(6)::after {
     display: none;
   }
 
-  .page-shell #motivo .journey-item > strong {
-    min-height: 92px;
+  .page-shell #motivo .journey-item:last-child {
+    grid-column: 1 / -1;
+    min-height: 96px !important;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 1rem;
+    border-bottom: 0 !important;
+    border-left: 0 !important;
+    border-top: 3px solid rgba(97, 206, 112, 0.68) !important;
+  }
+
+  .page-shell #motivo .journey-item:last-child::before {
+    margin: 0 0 0 auto;
+    order: 3;
   }
 }
 
 @media (max-width: 767px) {
   .page-shell #motivo .journey-panel {
-    padding: 1.35rem;
+    padding: 1.25rem;
     border-radius: 22px;
   }
 
   .page-shell #motivo .journey-flow {
     grid-template-columns: minmax(0, 1fr);
-    gap: 0.85rem;
-    padding-left: 0.1rem;
-  }
-
-  .page-shell #motivo .journey-flow::before {
-    display: block;
-    top: 22px;
-    bottom: 22px;
-    left: 22px;
-    right: auto;
-    width: 2px;
-    height: auto;
-    background: linear-gradient(
-      180deg,
-      rgba(243, 107, 33, 0.28) 0%,
-      rgba(243, 107, 33, 0.5) 58%,
-      rgba(97, 206, 112, 0.34) 100%
-    );
+    border-radius: 16px;
   }
 
   .page-shell #motivo .journey-item,
   .page-shell #motivo .journey-item:nth-child(n + 5) {
-    grid-template-columns: 44px minmax(0, 1fr) !important;
-    grid-template-rows: minmax(76px, auto);
-    gap: 0.9rem;
-    align-items: stretch;
+    min-height: 0 !important;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 1rem;
+    padding: 1rem 1.05rem !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid rgba(43, 64, 145, 0.1) !important;
+  }
+
+  .page-shell #motivo .journey-item:nth-child(-n + 6)::after {
+    content: "↓";
+    top: auto;
+    right: auto;
+    bottom: -0.72rem;
+    left: 1.05rem;
+    transform: none;
   }
 
   .page-shell #motivo .journey-item > span:first-child {
-    grid-column: 1;
-    margin-left: 0;
+    flex: 0 0 34px;
+    color: #f36b21;
+    font-size: 0.72rem;
   }
 
   .page-shell #motivo .journey-item > strong {
-    grid-column: 2;
-    min-height: 76px;
-    align-items: center;
-    padding: 1rem 1.05rem;
+    font-size: 0.95rem;
+    line-height: 1.35rem;
+  }
+
+  .page-shell #motivo .journey-item:last-child {
+    grid-column: auto;
+    min-height: 0 !important;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.45rem;
+    padding: 1.15rem 1.05rem !important;
+    border-top: 0 !important;
+    border-bottom: 0 !important;
+    border-left: 3px solid rgba(97, 206, 112, 0.68) !important;
+  }
+
+  .page-shell #motivo .journey-item:last-child::before {
+    margin: 0;
+    order: initial;
   }
 }
