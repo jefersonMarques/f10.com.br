@@ -128,21 +128,21 @@
 
   const benefits: FeatureItem[] = [
     {
-      title: "Melhor aproveitamento dos leads",
+      title: "Menos desperdício do investimento em marketing",
       description:
-        "Mais oportunidades acompanhadas até uma conclusão e melhor uso do investimento que a unidade já realiza em marketing.",
+        "Mais oportunidades acompanhadas até uma conclusão e melhor aproveitamento do investimento que a unidade já realiza para gerar leads.",
       icon: Target,
     },
     {
-      title: "Continuidade da operação",
+      title: "Histórico que permanece na unidade",
       description:
-        "Históricos, negociações e próximas ações permanecem na unidade mesmo quando a equipe muda.",
+        "Conversas, objeções, negociações e próximas ações continuam disponíveis mesmo quando a equipe muda.",
       icon: ShieldCheck,
     },
     {
-      title: "Gestão mais previsível",
+      title: "Gestão com prioridades mais claras",
       description:
-        "Produtividade, conversão, atrasos e gargalos passam a ser acompanhados com o mesmo padrão em toda a rede.",
+        "Indicadores mostram atrasos, gargalos e oportunidades que precisam de ação.",
       icon: TrendingUp,
     },
   ];
@@ -171,7 +171,7 @@
     {
       label: "Padronização",
       current: "Cada unidade utiliza controles e rotinas diferentes.",
-      future: "A rede adota um processo comum, visível e mensurável.",
+      future: "A rede passa a operar com um processo comum, visível e mensurável.",
     },
   ];
 
@@ -221,7 +221,7 @@
       monthlyValue: "R$ 359",
     },
     {
-      cashShare: "0%",
+      cashShare: "Sem uso",
       discount: "—",
       monthlyValue: "R$ 399",
     },
@@ -259,7 +259,7 @@
   <title>Rede Cebrac | Novo padrão comercial com CRM e WhatsApp</title>
   <meta
     name="description"
-    content="Comunicado às unidades Cebrac sobre o novo padrão comercial, CRM de Leads, workflow, WhatsApp integrado, investimento e implantação na rede."
+    content="Comunicado às unidades Cebrac sobre a incorporação do CRM de Leads F10, workflow comercial e WhatsApp integrado ao modelo operacional da rede."
   />
   <meta name="robots" content="noindex,nofollow,noarchive,nosnippet" />
   <link rel="preload" as="image" href="/background-hero-cebrac.png" />
@@ -297,7 +297,11 @@
         </h1>
 
         <p class="mt-7 max-w-[690px] text-lg font-medium leading-8 text-[#2B4091]/80 sm:text-[20px] sm:leading-9">
-          A Rede Cebrac adotará CRM de Leads, workflow comercial e WhatsApp integrado ao F10 para padronizar a operação, preservar os históricos e ampliar a visibilidade da gestão.
+          A Rede Cebrac passa a incorporar ao modelo operacional das unidades o CRM de Leads F10, o workflow comercial e o WhatsApp integrado ao CRM e ao F10. O objetivo é criar um processo comum para acompanhar oportunidades, preservar históricos e ampliar a visibilidade da gestão.
+        </p>
+
+        <p class="mt-6 max-w-[690px] border-l-4 border-[#f36b21] bg-white/75 px-5 py-4 text-sm font-bold leading-6 text-[#2B4091] shadow-[0_12px_30px_rgba(43,64,145,0.08)] backdrop-blur-sm">
+          Esta atualização será incorporada ao modelo operacional de todas as unidades da Rede Cebrac. Não se trata da contratação opcional de um módulo isolado.
         </p>
 
         <div class="hero-notes mt-9 grid gap-4 border-t border-[#2B4091]/15 pt-6 sm:grid-cols-3">
@@ -307,7 +311,7 @@
           </div>
           <div>
             <span>Implantação</span>
-            <strong>Progressiva</strong>
+            <strong>Por etapas</strong>
           </div>
           <div>
             <span>WhatsApp no F10</span>
@@ -354,9 +358,9 @@
       <div class="grid gap-14 lg:grid-cols-[0.72fr_1.28fr] lg:items-start lg:gap-24">
         <div>
           <p class="section-label">Por que a rede está mudando</p>
-          <h2 class="section-title mt-4">Gerar leads não é suficiente. É necessário garantir continuidade.</h2>
+          <h2 class="section-title mt-4">Gerar leads não basta. Cada oportunidade precisa ter responsável, prazo e próxima ação.</h2>
           <p class="mt-6 max-w-[560px] text-lg leading-8 text-[#2B4091]/70">
-            A unidade já investe para gerar oportunidades. O novo padrão organiza o caminho entre a entrada do lead e a matrícula para reduzir perdas que hoje acontecem durante a operação.
+            A unidade já investe para gerar oportunidades. O novo modelo foi estruturado para reduzir perdas entre a captação e a matrícula, organizando atendimentos e follow-ups em uma operação visível para a equipe e para a gestão.
           </p>
         </div>
 
@@ -399,10 +403,10 @@
       <header class="mx-auto max-w-[900px] text-center">
         <p class="section-label text-[#ffcd40]">O novo modelo comercial</p>
         <h2 class="mt-4 text-[38px] font-semibold leading-[1.08] tracking-[-0.045em] text-white sm:text-[50px] lg:text-[58px]">
-          Uma única operação, da entrada do lead ao relacionamento depois da matrícula.
+          Uma única operação para acompanhar o lead da entrada à matrícula — e manter o relacionamento depois dela.
         </h2>
         <p class="mx-auto mt-6 max-w-[820px] text-lg leading-8 text-white/70">
-          CRM, workflow comercial e WhatsApp passam a trabalhar juntos para registrar cada etapa, orientar a equipe e entregar informação objetiva para a gestão.
+          CRM de Leads, workflow comercial e WhatsApp integrado conectam duas frentes de atendimento: a operação comercial no CRM e o relacionamento com alunos e responsáveis dentro do F10.
         </p>
       </header>
 
@@ -447,10 +451,10 @@
         <div>
           <p class="section-label">WhatsApp integrado</p>
           <h3 class="mt-4 max-w-[540px] text-[34px] font-semibold leading-[1.12] tracking-[-0.04em] text-[#2B4091] sm:text-[44px]">
-            Cinco números por unidade, distribuídos conforme a operação.
+            Um único canal, duas frentes de atendimento e cinco números incluídos por unidade.
           </h3>
           <p class="mt-6 max-w-[560px] text-lg leading-8 text-[#2B4091]/70">
-            Os números poderão ser utilizados no CRM de Leads ou no F10. A distribuição será definida pela unidade durante a implantação.
+            Os cinco números poderão ser distribuídos entre o CRM de Leads e o F10 conforme a estrutura de atendimento da unidade. A definição será realizada durante a implantação.
           </p>
 
           <div class="distribution-example distribution-example-light mt-8">
@@ -485,10 +489,10 @@
     <div class="mx-auto max-w-[1480px]">
       <div class="grid gap-12 lg:grid-cols-[0.62fr_1.38fr] lg:items-start lg:gap-24">
         <div>
-          <p class="section-label">Benefícios esperados</p>
-          <h2 class="section-title mt-4">Benefícios esperados na operação.</h2>
+          <p class="section-label">O que a unidade passa a ganhar</p>
+          <h2 class="section-title mt-4">Mais continuidade, controle e aproveitamento das oportunidades já captadas.</h2>
           <p class="mt-6 max-w-[560px] text-lg leading-8 text-[#2B4091]/70">
-            O novo padrão melhora o aproveitamento dos leads, preserva o histórico e dá mais previsibilidade à gestão. Os resultados dependem da combinação entre processo, acompanhamento e disciplina comercial.
+            O ganho esperado não vem apenas da tecnologia. Ele vem de um processo mais consistente: menos oportunidades sem continuidade, histórico preservado e indicadores que mostram onde a equipe precisa agir.
           </p>
         </div>
 
@@ -528,7 +532,7 @@
           <h2 class="section-title mt-4 max-w-[610px]">O que muda na prática.</h2>
         </div>
         <p class="max-w-[780px] text-lg leading-8 text-[#2B4091]/70 lg:pb-1">
-          Atividades que hoje dependem da organização individual passam a fazer parte do processo oficial da rede, com histórico, responsáveis, prazos e acompanhamento.
+          Controles que hoje dependem da memória, dos aparelhos e da organização individual passam a fazer parte de um processo oficial, com histórico, responsáveis, prazos e acompanhamento.
         </p>
       </div>
 
@@ -554,10 +558,10 @@
       <div class="mb-12 grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-end lg:gap-20">
         <div>
           <p class="section-label">Investimento e benefício F10 Cash</p>
-          <h2 class="section-title mt-4">Investimento mensal do novo modelo.</h2>
+          <h2 class="section-title mt-4">Investimento mensal e desconto recorrente via F10 Cash.</h2>
         </div>
         <p class="max-w-[760px] text-lg leading-8 text-[#2B4091]/70 lg:pb-1">
-          O valor-base é reduzido conforme o percentual de recebimentos processados pelo F10 Cash. Quanto maior a participação, menor o valor mensal do upgrade.
+          O upgrade tem valor-base de R$ 399 por unidade/mês. O desconto recorrente é calculado conforme o percentual de recebimentos processados via F10 Cash no período anterior, limitado a R$ 200 por mês.
         </p>
       </div>
 
@@ -571,7 +575,7 @@
 
           <div class="investment-included">
             <span>Incluído no upgrade</span>
-            <p>CRM de Leads, workflow comercial, cinco números de WhatsApp, configuração, treinamento e acompanhamento inicial.</p>
+            <p>CRM de Leads, workflow comercial e cinco números de WhatsApp, que poderão ser distribuídos entre o CRM e o F10 conforme a operação da unidade.</p>
           </div>
         </div>
 
@@ -582,7 +586,7 @@
           </div>
           <div>
             <span>Vigência financeira</span>
-            <strong>Vencimento de julho de 2026</strong>
+            <strong>A partir do vencimento de julho de 2026</strong>
           </div>
           <div>
             <span>WhatsApp no F10</span>
@@ -593,7 +597,7 @@
         <div class="investment-table-title">
           <div>
             <span>Faixas recorrentes</span>
-            <strong>Quanto maior o uso do F10 Cash, menor o valor</strong>
+            <strong>Quanto maior o percentual de recebimentos via F10 Cash, menor o valor mensal</strong>
           </div>
           <Workflow size={28} strokeWidth={1.8} />
         </div>
@@ -616,8 +620,8 @@
         {/each}
 
         <div class="investment-note">
-          <p>Os percentuais e descontos seguem as regras da campanha oficial e consideram os recebimentos do período anterior.</p>
-          <p>O reajuste anual previsto para o período será substituído pelo valor do upgrade. Número adicional de WhatsApp: R$ 49,00 por mês.</p>
+          <p>As faixas acima representam o desconto recorrente do upgrade, calculado conforme o percentual de recebimentos via F10 Cash no período anterior. As condições especiais de lançamento serão comunicadas pela Rede Cebrac.</p>
+          <p>O reajuste anual previsto para o período será substituído pelo valor do upgrade. Número adicional de WhatsApp: R$ 49,00 por número/mês, para uso no CRM ou no F10.</p>
         </div>
       </div>
     </div>
@@ -633,7 +637,7 @@
           </h2>
         </div>
         <p class="max-w-[780px] text-lg leading-8 text-white/70 lg:pb-1">
-          A implantação será progressiva, com preparação da unidade, configuração, treinamento e início assistido.
+          A implantação será realizada por etapas, com preparação das unidades, configuração da operação, treinamento das equipes e início acompanhado.
         </p>
       </div>
 
@@ -670,7 +674,7 @@
         <img src="/logo_f10.svg" alt="F10 Software" class="h-9 w-auto" />
       </div>
       <p class="max-w-[760px] text-base font-semibold leading-7 text-[#2B4091]/70">
-        O objetivo da mudança é criar uma operação comercial mais organizada, contínua e mensurável em toda a Rede Cebrac.
+        A mudança incorpora à Rede Cebrac uma operação comercial comum, com mais continuidade, visibilidade e capacidade de acompanhamento.
       </p>
       <a href="#inicio" class="inline-flex items-center gap-2 text-sm font-extrabold text-[#2B4091] transition hover:text-[#61CE70]">
         Voltar ao início <ArrowUp size={18} />
