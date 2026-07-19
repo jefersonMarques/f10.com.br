@@ -3,7 +3,6 @@
   import "../cebrac-presentation.css";
   import "../cebrac-journey.css";
   import "../cebrac-investment.css";
-  import "../cebrac-investment-solid.css";
   import { onMount } from "svelte";
   import { afterNavigate } from "$app/navigation";
   import { page } from "$app/stores";
@@ -28,35 +27,38 @@
   $: isStandalonePage = standalonePaths.has($page.url.pathname);
 
   onMount(() => {
-    afterNavigate(() => {
-      const fbq = (window as Window & { fbq?: FbqFunction }).fbq;
-      fbq?.("track", "PageView");
+    const win = window as typeof window & { fbq?: FbqFunction };
+
+    const trackPageView = () => {
+      if (typeof win.fbq === "function") {
+        win.fbq("track", "PageView");
+      }
+    };
+
+    trackPageView();
+
+    const unsubscribe = afterNavigate(() => {
+      trackPageView();
     });
+
+    return unsubscribe;
   });
 </script>
 
-<svelte:head>
-  <meta name="theme-color" content="#ffffff" />
-  <link rel="icon" href="/favicon.png" />
-</svelte:head>
-
-{#if !isStandalonePage}
+{#if isStandalonePage}
+  <slot />
+{:else}
   <Header />
-{/if}
-
-<slot />
-
-{#if !isStandalonePage}
+  <main>
+    <slot />
+  </main>
   <Footer />
+  <FloatingWhatsappButton />
 
-  <FloatingWhatsappButton
-    url="https://api.whatsapp.com/send?phone=554130333300&text=Ol%C3%A1%2C%20gostaria%20de%20saber%20mais%20sobre%20a%20F10%20Software."
-  />
-
-  <Popup bind:size={modalSize} open={$contactModalConfig.open} on:close={() => contactModalConfig.close()}>
-    {#if modalConfig.type === "contact"}
+  <Popup bind:size={modalSize}>
+    {#if modalConfig?.type === "contact"}
       <ContactWhatsappModalForm />
-    {:else if modalConfig.type === "solutions"}
+    {:else if modalConfig?.type === "solutions"}
       <PopupSolutionsList />
     {:else}
       <SolutionList />
