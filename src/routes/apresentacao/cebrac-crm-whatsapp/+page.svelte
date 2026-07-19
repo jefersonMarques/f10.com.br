@@ -321,7 +321,6 @@
       </div>
 
       <div class="hero-visual pointer-events-none relative z-0 hidden items-center justify-end lg:flex" aria-hidden="true">
-        <div class="hero-image-fade"></div>
         <img
           src="/hero-cebrac.webp"
           alt=""
