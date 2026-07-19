@@ -1,6 +1,7 @@
 <script lang="ts">
   import "../app.css";
   import "../cebrac-presentation.css";
+  import "../cebrac-journey.css";
   import { onMount } from "svelte";
   import { afterNavigate } from "$app/navigation";
   import { page } from "$app/stores";
