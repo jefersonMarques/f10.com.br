@@ -2,6 +2,7 @@
   import "../app.css";
   import "../cebrac-presentation.css";
   import "../cebrac-journey.css";
+  import "../cebrac-investment.css";
   import { onMount } from "svelte";
   import { afterNavigate } from "$app/navigation";
   import { page } from "$app/stores";
@@ -39,43 +40,28 @@
 </svelte:head>
 
 {#if isStandalonePage}
-  <main class="min-h-screen bg-white">
+  <slot />
+{:else}
+  <Header />
+  <main>
     <slot />
   </main>
-{:else}
-  <div
-    class="min-h-screen text-slate-900 flex flex-col
-           bg-[#dfe1f5]/[0.20]
-           backdrop-blur-[2px] supports-[backdrop-filter]:backdrop-blur-[0.5px]"
+  <Footer />
+  <FloatingWhatsappButton />
+
+  <Popup
+    open={modalConfig.open}
+    title={modalConfig.title}
+    description={modalConfig.description}
+    size={modalSize}
+    on:close={() => contactModalConfig.close()}
   >
-    <Header />
-    <main class="flex-1">
-      <slot />
-    </main>
-    <Footer />
-  </div>
-
-  <FloatingWhatsappButton
-    whatsAppNumber="5541992943443"
-    defaultMessage="Olá, vi a página de planos da F10 e quero entender qual é o melhor para a minha escola."
-    product="F10 – Planos e Implantação"
-    page=""
-    subSource="Botão flutuante"
-    leadDescription="Cliente interessado."
-  />
-
-  <Popup size={modalSize}>
-    <ContactWhatsappModalForm
-      whatsAppNumber="5541992943443"
-      defaultMessage={modalConfig.defaultMessage}
-      product={modalConfig.product}
-      subSource={modalConfig.subSource}
-      leadDescription={modalConfig.leadDescription}
-      onChangeSize={(size) => (modalSize = size)}
-    />
+    {#if modalConfig.type === "contact"}
+      <ContactWhatsappModalForm />
+    {:else if modalConfig.type === "solutions"}
+      <SolutionList />
+    {:else if modalConfig.type === "solutions-popup"}
+      <PopupSolutionsList />
+    {/if}
   </Popup>
-
-  <PopupSolutionsList size={modalSize}>
-    <SolutionList />
-  </PopupSolutionsList>
 {/if}
