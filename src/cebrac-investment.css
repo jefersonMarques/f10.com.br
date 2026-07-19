@@ -1,0 +1,170 @@
+.page-shell #investimento {
+  background: #f8faf9;
+}
+
+.page-shell #investimento .investment-panel {
+  overflow: visible !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.page-shell #investimento .investment-summary {
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+  gap: clamp(2.5rem, 5vw, 5rem);
+  border-top: 1px solid rgba(43, 64, 145, 0.14);
+  border-bottom: 1px solid rgba(43, 64, 145, 0.14);
+  background: transparent;
+}
+
+.page-shell #investimento .investment-best,
+.page-shell #investimento .investment-included {
+  min-height: 0;
+  padding: 2.35rem 0;
+  background: transparent !important;
+}
+
+.page-shell #investimento .investment-best {
+  position: relative;
+  color: #2b4091;
+  border-right: 1px solid rgba(43, 64, 145, 0.12);
+}
+
+.page-shell #investimento .investment-best > span,
+.page-shell #investimento .investment-included > span {
+  color: #23844d;
+}
+
+.page-shell #investimento .investment-best strong {
+  color: #23844d;
+  font-size: clamp(3.2rem, 5.4vw, 5.4rem);
+}
+
+.page-shell #investimento .investment-best p {
+  color: rgba(43, 64, 145, 0.62);
+}
+
+.page-shell #investimento .investment-included {
+  justify-content: center;
+  padding-left: 0;
+}
+
+.page-shell #investimento .investment-included p {
+  max-width: 900px;
+  margin-top: 0.85rem;
+  color: #2b4091;
+  font-size: 1.04rem;
+  font-weight: 650;
+  line-height: 1.85rem;
+}
+
+.page-shell #investimento .investment-context {
+  border-bottom: 1px solid rgba(43, 64, 145, 0.14);
+  background: transparent !important;
+}
+
+.page-shell #investimento .investment-context > div {
+  min-height: 94px;
+  padding: 1.45rem 0;
+  border-right: 1px solid rgba(43, 64, 145, 0.1);
+  border-bottom: 0;
+}
+
+.page-shell #investimento .investment-context > div:not(:first-child) {
+  padding-left: clamp(1.5rem, 3vw, 3rem);
+}
+
+.page-shell #investimento .investment-context > div:last-child {
+  border-right: 0;
+}
+
+.page-shell #investimento .investment-table-title {
+  min-height: 0;
+  padding: 2.4rem 0 1.2rem;
+  border-bottom: 1px solid rgba(43, 64, 145, 0.14);
+}
+
+.page-shell #investimento .investment-table-title span,
+.page-shell #investimento .investment-table-title > svg {
+  color: #23844d;
+}
+
+.page-shell #investimento .investment-table-header {
+  padding: 1rem 0;
+  border-bottom: 1px solid rgba(43, 64, 145, 0.16);
+  background: transparent !important;
+  color: rgba(43, 64, 145, 0.58);
+}
+
+.page-shell #investimento .investment-row {
+  min-height: 76px;
+  padding: 1.15rem 0;
+  border-bottom: 1px solid rgba(43, 64, 145, 0.11);
+  background: transparent !important;
+}
+
+.page-shell #investimento .investment-row-highlighted {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.page-shell #investimento .investment-row-highlighted .investment-share strong,
+.page-shell #investimento .investment-row-highlighted > strong:last-child {
+  color: #23844d;
+}
+
+.page-shell #investimento .investment-row > strong:last-child {
+  color: #23844d;
+}
+
+.page-shell #investimento .investment-note {
+  gap: 0.45rem;
+  padding: 1.35rem 0 0;
+  border: 0;
+  background: transparent !important;
+  color: rgba(43, 64, 145, 0.58);
+}
+
+@media (max-width: 1023px) {
+  .page-shell #investimento .investment-summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .page-shell #investimento .investment-best {
+    border-right: 0;
+    border-bottom: 1px solid rgba(43, 64, 145, 0.12);
+  }
+
+  .page-shell #investimento .investment-included {
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 639px) {
+  .page-shell #investimento .investment-best,
+  .page-shell #investimento .investment-included {
+    padding: 1.65rem 0;
+  }
+
+  .page-shell #investimento .investment-context {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page-shell #investimento .investment-context > div,
+  .page-shell #investimento .investment-context > div:not(:first-child) {
+    min-height: 0;
+    padding: 1rem 0;
+    border-right: 0;
+    border-bottom: 1px solid rgba(43, 64, 145, 0.1);
+  }
+
+  .page-shell #investimento .investment-context > div:last-child {
+    border-bottom: 0;
+  }
+
+  .page-shell #investimento .investment-table-title {
+    padding-top: 2rem;
+  }
+}
