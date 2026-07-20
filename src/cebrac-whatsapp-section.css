@@ -157,7 +157,7 @@
   display: grid;
   grid-template-columns: 46px minmax(0, 1fr);
   gap: 0.9rem;
-  align-items: start;
+  align-items: center;
   min-height: 104px;
   padding: 1.25rem 1.35rem;
   border-right: 1px solid rgba(43, 64, 145, 0.11);
@@ -179,8 +179,8 @@
 .page-shell .cebrac-whatsapp-detail-icon {
   width: 44px;
   height: 44px;
-  align-self: start;
-  margin-top: 0.15rem;
+  align-self: center;
+  justify-self: center;
   border: 1px solid rgba(81, 184, 76, 0.2);
   border-radius: 12px;
   line-height: 0;
