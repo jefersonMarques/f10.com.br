@@ -1,1 +1,1 @@
-one-time trigger
+run compact WhatsApp update
