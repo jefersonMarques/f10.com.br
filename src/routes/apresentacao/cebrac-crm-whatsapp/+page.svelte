@@ -267,7 +267,7 @@
         </p>
 
         <h1 class="mt-5 max-w-[730px] text-[42px] font-semibold leading-[1.03] tracking-[-0.05em] text-[#2B4091] sm:text-[56px] lg:text-[62px] xl:text-[70px]">
-          Um novo padrão para acompanhar cada oportunidade até a matrícula.
+          Um novo padrão para acompanhar cada oportunidade, até a matrícula.
         </h1>
 
         <p class="mt-7 max-w-[690px] text-lg font-medium leading-8 text-[#2B4091]/80 sm:text-[20px] sm:leading-9">
