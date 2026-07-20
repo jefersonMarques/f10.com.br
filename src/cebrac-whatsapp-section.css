@@ -235,7 +235,7 @@
   color: #17356f;
 }
 
-.page-shell .cebrac-whatsapp-distribution > :global(svg) {
+.page-shell .cebrac-whatsapp-distribution > svg {
   color: rgba(49, 152, 59, 0.45);
 }
 
@@ -321,7 +321,7 @@
     grid-template-columns: 44px minmax(0, 1fr);
   }
 
-  .page-shell .cebrac-whatsapp-distribution > :global(svg) {
+  .page-shell .cebrac-whatsapp-distribution > svg {
     display: none;
   }
 }
