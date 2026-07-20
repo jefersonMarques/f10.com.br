@@ -686,16 +686,14 @@
   .crm-figure,
   .hero-mobile-visual,
   .investment-panel {
-    border-radius: 22px;
+    border-radius: 0px;
   }
 
   .hero-mobile-visual {
     position: relative;
     z-index: 2;
-    overflow: hidden;
-    border: 1px solid rgba(43, 64, 145, 0.12);
-    background: rgba(255, 255, 255, 0.88);
-    box-shadow: 0 22px 50px rgba(43, 64, 145, 0.14);
+    background: none;
+    
   }
 
   .hero-notes div {

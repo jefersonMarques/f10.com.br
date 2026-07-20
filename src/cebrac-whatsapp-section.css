@@ -86,6 +86,7 @@
 .page-shell .cebrac-whatsapp-intro > p {
   max-width: 760px;
   margin: 0;
+  margin-top: 4rem;
   color: rgba(43, 64, 145, 0.72);
   font-size: 1.05rem;
   line-height: 1.88rem;
