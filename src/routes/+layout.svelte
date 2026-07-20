@@ -16,6 +16,7 @@
   import FloatingWhatsappButton from "$lib/components/forms/FloatingWhatsappButton.svelte";
   import { contactModalConfig } from "$lib/stores/contactModals";
   import SolutionList from "$lib/components/forms/SolutionList.svelte";
+  import CebracWhatsAppSection from "$lib/components/CebracWhatsAppSection.svelte";
 
   type FbqFunction = (...args: unknown[]) => void;
 
@@ -47,6 +48,7 @@
 
 {#if isStandalonePage}
   <slot />
+  <CebracWhatsAppSection />
 {:else}
   <Header />
   <main>
