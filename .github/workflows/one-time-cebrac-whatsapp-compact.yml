@@ -1,0 +1,436 @@
+name: One-time Cebrac WhatsApp compact layout
+
+on:
+  push:
+    branches:
+      - development
+
+permissions:
+  contents: write
+
+jobs:
+  apply-layout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: development
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update WhatsApp section
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          page_path = Path('src/routes/apresentacao/cebrac-crm-whatsapp/+page.svelte')
+          css_path = Path('src/cebrac-investment.css')
+          workflow_path = Path('.github/workflows/one-time-cebrac-whatsapp-compact.yml')
+
+          page = page_path.read_text(encoding='utf-8')
+          start = page.index('  <section id="whatsapp" class="model-whatsapp-section scroll-mt-16">')
+          end = page.index('  <section id="investimento"', start)
+
+          section = '''  <section id="whatsapp" class="model-whatsapp-section scroll-mt-16">
+    <div class="whatsapp-container">
+      <div class="whatsapp-heading">
+        <div class="whatsapp-heading-copy">
+          <p class="whatsapp-kicker">
+            <img src="/icon_whatsapp_color.svg" alt="" aria-hidden="true" />
+            <span>WhatsApp integrado · incluído no upgrade</span>
+          </p>
+          <h2>Cinco números incluídos para atender em equipe e manter cada conversa dentro da operação.</h2>
+        </div>
+
+        <div class="whatsapp-intro">
+          <p>
+            Os números poderão ser distribuídos entre o CRM de Leads e o F10 conforme a rotina da unidade. O atendimento deixa de depender de um aparelho específico e passa a ter histórico centralizado, continuidade entre usuários e identificação de quem respondeu.
+          </p>
+
+          <div class="whatsapp-highlights">
+            <div>
+              <UserCheck size={22} strokeWidth={1.9} />
+              <span><strong>Atendimento compartilhado</strong> por usuários autorizados, sem disputa pelo celular.</span>
+            </div>
+            <div>
+              <FileText size={22} strokeWidth={1.9} />
+              <span><strong>Histórico preservado</strong> para a equipe e para a gestão acompanharem cada conversa.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="whatsapp-package">
+        <div class="whatsapp-total">
+          <strong>5</strong>
+          <span>números incluídos</span>
+          <small>por unidade</small>
+        </div>
+
+        <article class="whatsapp-channel">
+          <div class="whatsapp-channel-icon">
+            <MessagesSquare size={25} strokeWidth={1.8} />
+          </div>
+          <div>
+            <small>No CRM de Leads</small>
+            <strong class="whatsapp-channel-title">Atendimento comercial</strong>
+            <p>Leads, negociações e follow-ups ficam vinculados à oportunidade, com contexto preservado até a matrícula.</p>
+          </div>
+        </article>
+
+        <article class="whatsapp-channel">
+          <div class="whatsapp-channel-icon">
+            <Workflow size={25} strokeWidth={1.8} />
+          </div>
+          <div>
+            <small>No F10</small>
+            <strong class="whatsapp-channel-title">Relacionamento e rotina da unidade</strong>
+            <p>Alunos e responsáveis podem ser atendidos em cobranças, secretaria, avisos, documentos, matrículas e relacionamento pós-matrícula.</p>
+          </div>
+        </article>
+      </div>
+
+      <div class="whatsapp-meta" aria-label="Condições do WhatsApp integrado">
+        <div>
+          <span>Distribuição dos 5 números</span>
+          <strong>Definida com a unidade durante a implantação</strong>
+        </div>
+        <div>
+          <span>Disponibilidade no F10</span>
+          <strong>Agosto de 2026</strong>
+        </div>
+        <div>
+          <span>Número adicional</span>
+          <strong>R$ 49,00 por número/mês · CRM ou F10</strong>
+        </div>
+      </div>
+    </div>
+  </section>
+
+'''
+          page = page[:start] + section + page[end:]
+          page_path.write_text(page, encoding='utf-8')
+
+          css = css_path.read_text(encoding='utf-8')
+          css_start = css.index('/* WhatsApp: seção estrutural entre comparação e investimento */')
+          css_end = css.index('/* Investimento */', css_start)
+
+          whatsapp_css = '''/* WhatsApp: seção compacta entre comparação e investimento */
+.page-shell > .model-whatsapp-section {
+  width: 100%;
+  padding: clamp(4.5rem, 6vw, 6rem) clamp(1.25rem, 3vw, 3rem) !important;
+  border-top: 1px solid rgba(81, 184, 76, 0.28);
+  border-bottom: 1px solid rgba(43, 64, 145, 0.12);
+  background: #eef8ef !important;
+}
+
+.page-shell .whatsapp-container {
+  width: 100%;
+  max-width: 1480px;
+  margin-inline: auto;
+}
+
+.page-shell .whatsapp-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: clamp(3rem, 6vw, 6rem);
+  align-items: start;
+}
+
+.page-shell .whatsapp-kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 0 0 1.15rem;
+  color: #31983b;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.page-shell .whatsapp-kicker img {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+}
+
+.page-shell .whatsapp-heading h2 {
+  max-width: 720px;
+  margin: 0;
+  color: #17356f;
+  font-size: clamp(2.35rem, 3.35vw, 3.85rem);
+  font-weight: 650;
+  letter-spacing: -0.05em;
+  line-height: 1.06;
+}
+
+.page-shell .whatsapp-intro {
+  padding-top: 0.25rem;
+}
+
+.page-shell .whatsapp-intro > p {
+  max-width: 760px;
+  margin: 0;
+  color: rgba(43, 64, 145, 0.72);
+  font-size: 1.06rem;
+  line-height: 1.9rem;
+}
+
+.page-shell .whatsapp-highlights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(43, 64, 145, 0.13);
+}
+
+.page-shell .whatsapp-highlights > div {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: start;
+  color: rgba(43, 64, 145, 0.66);
+  font-size: 0.86rem;
+  line-height: 1.5rem;
+}
+
+.page-shell .whatsapp-highlights svg {
+  width: 36px;
+  height: 36px;
+  padding: 7px;
+  border: 1px solid rgba(81, 184, 76, 0.24);
+  background: rgba(81, 184, 76, 0.1);
+  color: #31983b;
+}
+
+.page-shell .whatsapp-highlights strong {
+  color: #17356f;
+}
+
+.page-shell .whatsapp-package {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.34fr) repeat(2, minmax(0, 1fr));
+  margin-top: clamp(2.5rem, 4vw, 3.5rem);
+  border: 1px solid rgba(43, 64, 145, 0.13);
+  background: #ffffff;
+}
+
+.page-shell .whatsapp-total {
+  display: flex;
+  min-height: 226px;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(1.5rem, 2.5vw, 2.25rem);
+  background: #51b84c;
+  color: #ffffff;
+}
+
+.page-shell .whatsapp-total strong {
+  font-size: clamp(4.25rem, 6vw, 6rem);
+  font-weight: 720;
+  letter-spacing: -0.08em;
+  line-height: 0.82;
+}
+
+.page-shell .whatsapp-total span {
+  margin-top: 1.15rem;
+  font-size: 0.82rem;
+  font-weight: 820;
+  letter-spacing: 0.06em;
+  line-height: 1.25rem;
+  text-transform: uppercase;
+}
+
+.page-shell .whatsapp-total small {
+  margin-top: 0.25rem;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.page-shell .whatsapp-channel {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 1.1rem;
+  align-items: start;
+  min-height: 226px;
+  padding: clamp(1.75rem, 2.7vw, 2.6rem);
+  border-left: 1px solid rgba(43, 64, 145, 0.1);
+}
+
+.page-shell .whatsapp-channel-icon {
+  display: flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  background: rgba(81, 184, 76, 0.12);
+  color: #31983b;
+}
+
+.page-shell .whatsapp-channel:nth-child(3) .whatsapp-channel-icon {
+  background: rgba(43, 64, 145, 0.08);
+  color: #2b4091;
+}
+
+.page-shell .whatsapp-channel small {
+  display: block;
+  color: #31983b;
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.page-shell .whatsapp-channel-title {
+  display: block;
+  margin-top: 0.55rem;
+  color: #17356f;
+  font-size: 1.28rem;
+  font-weight: 760;
+  line-height: 1.4;
+}
+
+.page-shell .whatsapp-channel p {
+  max-width: 470px;
+  margin: 0.75rem 0 0;
+  color: rgba(43, 64, 145, 0.66);
+  font-size: 0.9rem;
+  line-height: 1.62rem;
+}
+
+.page-shell .whatsapp-meta {
+  display: grid;
+  grid-template-columns: 1.25fr 0.72fr 1fr;
+  border-right: 1px solid rgba(43, 64, 145, 0.13);
+  border-bottom: 1px solid rgba(43, 64, 145, 0.13);
+  border-left: 1px solid rgba(43, 64, 145, 0.13);
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.page-shell .whatsapp-meta > div {
+  min-height: 88px;
+  padding: 1.25rem 1.45rem;
+  border-right: 1px solid rgba(43, 64, 145, 0.1);
+}
+
+.page-shell .whatsapp-meta > div:last-child {
+  border-right: 0;
+}
+
+.page-shell .whatsapp-meta span,
+.page-shell .whatsapp-meta strong {
+  display: block;
+}
+
+.page-shell .whatsapp-meta span {
+  color: rgba(43, 64, 145, 0.5);
+  font-size: 0.64rem;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.page-shell .whatsapp-meta strong {
+  margin-top: 0.42rem;
+  color: #17356f;
+  font-size: 0.9rem;
+  line-height: 1.35rem;
+}
+
+@media (max-width: 1023px) {
+  .page-shell .whatsapp-heading {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.75rem;
+  }
+
+  .page-shell .whatsapp-package {
+    grid-template-columns: minmax(150px, 0.45fr) minmax(0, 1fr);
+  }
+
+  .page-shell .whatsapp-total {
+    grid-row: 1 / 3;
+  }
+
+  .page-shell .whatsapp-channel {
+    grid-column: 2;
+    min-height: 0;
+  }
+
+  .page-shell .whatsapp-channel + .whatsapp-channel {
+    border-top: 1px solid rgba(43, 64, 145, 0.1);
+  }
+
+  .page-shell .whatsapp-meta {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page-shell .whatsapp-meta > div {
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid rgba(43, 64, 145, 0.1);
+  }
+
+  .page-shell .whatsapp-meta > div:last-child {
+    border-bottom: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .page-shell > .model-whatsapp-section {
+    padding: 4rem 1.25rem !important;
+  }
+
+  .page-shell .whatsapp-heading h2 {
+    font-size: 2.25rem;
+  }
+
+  .page-shell .whatsapp-intro > p {
+    font-size: 1rem;
+    line-height: 1.75rem;
+  }
+
+  .page-shell .whatsapp-highlights {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page-shell .whatsapp-package {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page-shell .whatsapp-total,
+  .page-shell .whatsapp-channel {
+    grid-column: 1;
+    grid-row: auto;
+    border-left: 0;
+  }
+
+  .page-shell .whatsapp-total {
+    min-height: 180px;
+  }
+
+  .page-shell .whatsapp-channel {
+    min-height: 0;
+    padding: 1.6rem 1.35rem;
+    border-top: 1px solid rgba(43, 64, 145, 0.1);
+  }
+}
+
+'''
+          css = css[:css_start] + whatsapp_css + css[css_end:]
+          css_path.write_text(css, encoding='utf-8')
+
+          workflow_path.unlink(missing_ok=True)
+          PY
+
+      - name: Commit changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/routes/apresentacao/cebrac-crm-whatsapp/+page.svelte src/cebrac-investment.css .github/workflows/one-time-cebrac-whatsapp-compact.yml
+          git commit -m "Compact and clarify Cebrac WhatsApp section"
+          git push origin development
