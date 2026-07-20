@@ -1,18 +1,70 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount, tick } from "svelte";
   import {
     CalendarDays,
     History,
     MessageCircle,
     MessagesSquare,
+    Play,
     Smartphone,
     Users,
+    X,
   } from "lucide-svelte";
   import "../../../cebrac-presentation.css";
   import "../../../cebrac-journey.css";
   import "../../../cebrac-whatsapp-section.css";
 
   let whatsappSection: HTMLElement;
+  let videoElement: HTMLVideoElement;
+  let videoTrigger: HTMLButtonElement;
+  let videoCloseButton: HTMLButtonElement;
+  let videoModalOpen = false;
+  let previousBodyOverflow = "";
+
+  async function openVideoModal(): Promise<void> {
+    if (videoModalOpen) {
+      return;
+    }
+
+    previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    videoModalOpen = true;
+
+    await tick();
+    videoCloseButton?.focus();
+    void videoElement?.play().catch(() => undefined);
+  }
+
+  function closeVideoModal(): void {
+    if (!videoModalOpen) {
+      return;
+    }
+
+    videoElement?.pause();
+
+    if (videoElement) {
+      videoElement.currentTime = 0;
+    }
+
+    videoModalOpen = false;
+    document.body.style.overflow = previousBodyOverflow;
+
+    requestAnimationFrame(() => {
+      videoTrigger?.focus();
+    });
+  }
+
+  function handleVideoModalKeydown(event: KeyboardEvent): void {
+    if (videoModalOpen && event.key === "Escape") {
+      closeVideoModal();
+    }
+  }
+
+  onDestroy(() => {
+    if (typeof document !== "undefined" && videoModalOpen) {
+      document.body.style.overflow = previousBodyOverflow;
+    }
+  });
 
   onMount(() => {
     const shell = document.querySelector<HTMLElement>(
@@ -164,6 +216,16 @@
         <p>
           A equipe visualiza as conversas em uma lista centralizada, atende alunos e responsáveis e mantém o histórico disponível para dar continuidade ao relacionamento.
         </p>
+
+        <button
+          bind:this={videoTrigger}
+          type="button"
+          class="cebrac-whatsapp-video-button"
+          on:click={openVideoModal}
+        >
+          <Play size={20} strokeWidth={2} fill="currentColor" aria-hidden="true" />
+          <span>Ver vídeo</span>
+        </button>
       </header>
 
       <figure class="cebrac-whatsapp-visual">
@@ -248,6 +310,58 @@
     </div>
   </section>
 </div>
+
+{#if videoModalOpen}
+  <svelte:window on:keydown={handleVideoModalKeydown} />
+
+  <div class="cebrac-video-modal">
+    <button
+      type="button"
+      class="cebrac-video-modal-backdrop"
+      aria-label="Fechar vídeo"
+      on:click={closeVideoModal}
+    ></button>
+
+    <section
+      class="cebrac-video-modal-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cebrac-video-modal-title"
+    >
+      <header class="cebrac-video-modal-header">
+        <div>
+          <span>Demonstração F10</span>
+          <h2 id="cebrac-video-modal-title">WhatsApp integrado ao sistema</h2>
+        </div>
+
+        <button
+          bind:this={videoCloseButton}
+          type="button"
+          class="cebrac-video-modal-close"
+          aria-label="Fechar vídeo"
+          on:click={closeVideoModal}
+        >
+          <X size={23} strokeWidth={2} aria-hidden="true" />
+        </button>
+      </header>
+
+      <div class="cebrac-video-modal-content">
+        <video
+          bind:this={videoElement}
+          controls
+          playsinline
+          preload="metadata"
+        >
+          <source
+            src="/apresentacao/cebrac-crm-whatsapp/f10_whatsapp.mp4"
+            type="video/mp4"
+          />
+          Seu navegador não suporta a reprodução deste vídeo.
+        </video>
+      </div>
+    </section>
+  </div>
+{/if}
 
 <style>
   :global(.cebrac-presentation-route #investimento),
