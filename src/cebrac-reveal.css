@@ -1,3 +1,28 @@
+.cebrac-presentation-route .page-shell .hero-visual,
+.cebrac-presentation-route .page-shell .hero-mobile-visual {
+  position: relative;
+  background-image: none !important;
+}
+
+.cebrac-presentation-route .page-shell .hero-visual > img,
+.cebrac-presentation-route .page-shell .hero-mobile-visual > img {
+  visibility: hidden !important;
+}
+
+.cebrac-presentation-route .page-shell .hero-visual::after,
+.cebrac-presentation-route .page-shell .hero-mobile-visual::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  content: '';
+  pointer-events: none;
+  background-image: url('/apresentacao/cebrac-crm-whatsapp/mock-minhaescola.webp');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  filter: drop-shadow(0 28px 42px rgba(43, 64, 145, 0.18));
+}
+
 .cebrac-presentation-route .cebrac-reveal {
   opacity: 0;
   filter: blur(3px);
