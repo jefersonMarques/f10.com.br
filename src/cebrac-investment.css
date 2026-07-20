@@ -84,10 +84,12 @@
   width: 48px;
   height: 48px;
   margin-bottom: 1.2rem;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%2351B84C' stroke-width='1.65' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 11.5a8.4 8.4 0 0 1-9 8.5 9.5 9.5 0 0 1-4-.9L3 21l1.8-4.5A8.4 8.4 0 1 1 21 11.5Z'/%3E%3Cpath d='M8.5 9.5c.5 2 2 3.5 4 4l1.2-1.2c.2-.2.5-.3.8-.2l2 .7'/%3E%3C/svg%3E");
+  border-radius: 12px;
+  background-color: #51b84c;
+  background-image: url("/icon_whatsapp_white.svg");
   background-repeat: no-repeat;
   background-position: center;
-  background-size: contain;
+  background-size: 25px 25px;
 }
 
 .page-shell .model-whatsapp-section h3 + p {
