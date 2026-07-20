@@ -1,0 +1,38 @@
+.cebrac-presentation-route .page-shell #inicio .hero-notes > div {
+  grid-template-rows: auto auto;
+  align-content: center;
+  row-gap: 0.22rem;
+}
+
+.cebrac-presentation-route .page-shell #inicio .hero-notes > div::before {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+  justify-self: center;
+}
+
+.cebrac-presentation-route .page-shell #inicio .hero-notes > div > span {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  margin: 0;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.cebrac-presentation-route .page-shell #inicio .hero-notes > div > strong {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  margin: 0;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+@media (max-width: 639px) {
+  .cebrac-presentation-route .page-shell #inicio .hero-notes > div > strong {
+    white-space: normal;
+  }
+}
