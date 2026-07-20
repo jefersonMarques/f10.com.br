@@ -167,6 +167,8 @@
   });
 </script>
 
+<svelte:window on:keydown={handleVideoModalKeydown} />
+
 <svelte:head>
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="F10 Software" />
@@ -312,8 +314,6 @@
 </div>
 
 {#if videoModalOpen}
-  <svelte:window on:keydown={handleVideoModalKeydown} />
-
   <div class="cebrac-video-modal">
     <button
       type="button"
