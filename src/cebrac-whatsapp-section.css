@@ -126,15 +126,15 @@
 
 .page-shell .cebrac-whatsapp-phone-image {
   position: absolute;
-  top: 50%;
-  left: 50%;
+  left: 46%;
+  bottom: clamp(10px, 2vw, 28px);
   z-index: 3;
   display: block;
   width: clamp(210px, 25vw, 370px);
-  max-width: 38%;
+  max-width: 34%;
   max-height: 92%;
   object-fit: contain;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   filter: drop-shadow(0 30px 35px rgba(10, 24, 55, 0.3));
 }
 
@@ -161,7 +161,7 @@
   display: grid;
   grid-template-columns: 46px minmax(0, 1fr);
   gap: 0.9rem;
-  align-items: center;
+  align-items: start;
   min-height: 104px;
   padding: 1.25rem 1.35rem;
   border-right: 1px solid rgba(43, 64, 145, 0.11);
@@ -183,8 +183,17 @@
 .page-shell .cebrac-whatsapp-detail-icon {
   width: 44px;
   height: 44px;
+  align-self: start;
+  margin-top: 0.15rem;
   border: 1px solid rgba(81, 184, 76, 0.2);
   border-radius: 12px;
+  line-height: 0;
+}
+
+.page-shell .cebrac-whatsapp-detail-icon svg {
+  display: block;
+  width: 22px;
+  height: 22px;
 }
 
 .page-shell .cebrac-whatsapp-detail span,
@@ -249,8 +258,10 @@
   }
 
   .page-shell .cebrac-whatsapp-phone-image {
-    width: clamp(190px, 31vw, 310px);
-    max-width: 44%;
+    left: 47%;
+    bottom: 12px;
+    width: clamp(185px, 29vw, 280px);
+    max-width: 40%;
   }
 
   .page-shell .cebrac-whatsapp-details {
@@ -292,9 +303,11 @@
   }
 
   .page-shell .cebrac-whatsapp-phone-image {
-    width: clamp(160px, 48vw, 230px);
-    max-width: 52%;
-    max-height: 96%;
+    left: 50%;
+    bottom: -2px;
+    width: clamp(150px, 46vw, 220px);
+    max-width: 48%;
+    max-height: 94%;
   }
 
   .page-shell .cebrac-whatsapp-visual figcaption {
