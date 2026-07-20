@@ -1336,8 +1336,8 @@
 
     .hero-visual {
       min-height: 720px;
-      margin-left: -10rem;
-      margin-right: -8rem;
+      margin-left: -2rem;
+      margin-right: -10rem;
     }
 
     .hero-visual img {

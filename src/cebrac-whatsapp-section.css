@@ -23,11 +23,22 @@
   z-index: 10;
   content: '';
   pointer-events: none;
-  background-image: url('/hero-cebrac.webp');
+  background-image: url('/apresentacao/cebrac-crm-whatsapp/mock-minhaescola.webp');
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
   filter: drop-shadow(0 30px 45px rgba(15, 35, 75, 0.22));
+}
+
+.cebrac-presentation-route .hero-mobile-visual {
+  background-image: url('/apresentacao/cebrac-crm-whatsapp/mock-minhaescola.webp');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.cebrac-presentation-route .hero-mobile-visual > img {
+  visibility: hidden;
 }
 
 .whatsapp-section-pending {
