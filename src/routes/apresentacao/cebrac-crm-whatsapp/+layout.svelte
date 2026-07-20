@@ -248,3 +248,14 @@
     </div>
   </section>
 </div>
+
+<style>
+  :global(.cebrac-presentation-route #investimento),
+  :global(.cebrac-presentation-route .model-whatsapp-section) {
+    display: none !important;
+  }
+
+  :global(.cebrac-presentation-route a[href="#investimento"]) {
+    display: none;
+  }
+</style>
