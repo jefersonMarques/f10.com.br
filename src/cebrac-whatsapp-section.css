@@ -84,12 +84,48 @@
   line-height: 1.04;
 }
 
-.page-shell .cebrac-whatsapp-heading > p:last-child {
+.page-shell .cebrac-whatsapp-heading > h2 + p {
   max-width: 790px;
   margin: 1.45rem auto 0;
   color: rgba(43, 64, 145, 0.7);
   font-size: 1.06rem;
   line-height: 1.85rem;
+}
+
+.page-shell .cebrac-whatsapp-video-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  min-height: 48px;
+  margin-top: 1.75rem;
+  padding: 0.8rem 1.4rem;
+  border: 1px solid #17356f;
+  border-radius: 999px;
+  background: #17356f;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.page-shell .cebrac-whatsapp-video-button:hover {
+  border-color: #2b4091;
+  background: #2b4091;
+  box-shadow: 0 12px 28px rgba(23, 53, 111, 0.2);
+  transform: translateY(-2px);
+}
+
+.page-shell .cebrac-whatsapp-video-button:focus-visible {
+  outline: 3px solid rgba(81, 184, 76, 0.35);
+  outline-offset: 4px;
 }
 
 .page-shell .cebrac-whatsapp-visual {
@@ -244,6 +280,113 @@
   color: rgba(49, 152, 59, 0.45);
 }
 
+.cebrac-video-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: clamp(1rem, 3vw, 2.5rem);
+}
+
+.cebrac-video-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: rgba(4, 12, 31, 0.82);
+  cursor: pointer;
+  backdrop-filter: blur(7px);
+}
+
+.cebrac-video-modal-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(1120px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 22px;
+  background: #07142e;
+  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.48);
+}
+
+.cebrac-video-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 78px;
+  padding: 1rem 1rem 1rem 1.4rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.11);
+  color: #ffffff;
+}
+
+.cebrac-video-modal-header span {
+  display: block;
+  color: #70cf69;
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.cebrac-video-modal-header h2 {
+  margin: 0.35rem 0 0;
+  color: #ffffff;
+  font-size: clamp(1rem, 2vw, 1.35rem);
+  font-weight: 720;
+  letter-spacing: -0.02em;
+}
+
+.cebrac-video-modal-close {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.cebrac-video-modal-close:hover {
+  border-color: rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.04);
+}
+
+.cebrac-video-modal-close:focus-visible {
+  outline: 3px solid rgba(112, 207, 105, 0.52);
+  outline-offset: 3px;
+}
+
+.cebrac-video-modal-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000000;
+}
+
+.cebrac-video-modal-content video {
+  display: block;
+  width: 100%;
+  max-height: calc(100vh - 130px);
+  aspect-ratio: 16 / 9;
+  background: #000000;
+  object-fit: contain;
+}
+
 @media (max-width: 1023px) {
   .cebrac-presentation-route .presentation-page > section:first-child > div:nth-child(2) > div > div:nth-child(2)::after {
     inset: 8% 0 4%;
@@ -286,9 +429,14 @@
     font-size: 2.25rem;
   }
 
-  .page-shell .cebrac-whatsapp-heading > p:last-child {
+  .page-shell .cebrac-whatsapp-heading > h2 + p {
     font-size: 0.98rem;
     line-height: 1.7rem;
+  }
+
+  .page-shell .cebrac-whatsapp-video-button {
+    width: 100%;
+    max-width: 260px;
   }
 
   .page-shell .cebrac-whatsapp-visual-stage {
@@ -335,5 +483,24 @@
 
   .page-shell .cebrac-whatsapp-distribution > svg {
     display: none;
+  }
+
+  .cebrac-video-modal {
+    padding: 0.75rem;
+  }
+
+  .cebrac-video-modal-dialog {
+    width: calc(100vw - 1.5rem);
+    max-height: calc(100vh - 1.5rem);
+    border-radius: 16px;
+  }
+
+  .cebrac-video-modal-header {
+    min-height: 70px;
+    padding: 0.85rem 0.85rem 0.85rem 1rem;
+  }
+
+  .cebrac-video-modal-content video {
+    max-height: calc(100vh - 100px);
   }
 }
