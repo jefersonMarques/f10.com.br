@@ -13,6 +13,7 @@
   import "../../../cebrac-presentation.css";
   import "../../../cebrac-journey.css";
   import "../../../cebrac-whatsapp-section.css";
+  import "../../../cebrac-reveal.css";
 
   let whatsappSection: HTMLElement;
   let videoElement: HTMLVideoElement;
@@ -119,6 +120,7 @@
       "#whatsapp .cebrac-whatsapp-heading",
       "#whatsapp .cebrac-whatsapp-visual",
       "#whatsapp .cebrac-whatsapp-details",
+      "#whatsapp .cebrac-whatsapp-distribution",
       "#implantacao .implementation-step",
     ].join(",");
 
