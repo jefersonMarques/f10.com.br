@@ -3,19 +3,16 @@
     ArrowRight,
     ArrowUp,
     BarChart3,
-    BellRing,
     CalendarCheck2,
     CheckCircle2,
     Clock3,
     FileText,
     Funnel,
-    MessageCircleMore,
     MessagesSquare,
     ShieldCheck,
     Target,
     TrendingUp,
     UserCheck,
-    UsersRound,
     Workflow,
   } from "lucide-svelte";
 
@@ -100,29 +97,6 @@
       title: "Indicadores comerciais",
       description: "A gestão acompanha produtividade, conversão, atrasos e oportunidades paradas.",
       icon: BarChart3,
-    },
-  ];
-
-  const whatsappFeatures: FeatureItem[] = [
-    {
-      title: "Atendimento comercial",
-      description: "Conversas com leads dentro do contexto da oportunidade no CRM.",
-      icon: MessagesSquare,
-    },
-    {
-      title: "Continuidade entre atendentes",
-      description: "O atendimento não depende de um aparelho ou colaborador específico.",
-      icon: UsersRound,
-    },
-    {
-      title: "Relacionamento pós-matrícula",
-      description: "Comunicação com alunos e responsáveis dentro do F10.",
-      icon: MessageCircleMore,
-    },
-    {
-      title: "Comunicação administrativa",
-      description: "Avisos, orientações, cobranças e acordos em um canal organizado.",
-      icon: BellRing,
     },
   ];
 
@@ -444,46 +418,6 @@
     </div>
   </section>
 
-  <section class="model-whatsapp-section bg-[#eef2fb] px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
-    <div class="mx-auto max-w-[1480px]">
-      <div class="grid gap-12 lg:grid-cols-[0.72fr_1.28fr] lg:items-start lg:gap-20">
-        <div>
-          <p class="section-label">WhatsApp integrado</p>
-          <h3 class="mt-4 max-w-[540px] text-[34px] font-semibold leading-[1.12] tracking-[-0.04em] text-[#2B4091] sm:text-[44px]">
-            Um único canal, duas frentes de atendimento e cinco números incluídos por unidade.
-          </h3>
-          <p class="mt-6 max-w-[560px] text-lg leading-8 text-[#2B4091]/70">
-            Os cinco números poderão ser distribuídos entre o CRM de Leads e o F10 conforme a estrutura de atendimento da unidade. A definição será realizada durante a implantação.
-          </p>
-
-          <div class="distribution-example distribution-example-light mt-8">
-            <span>Exemplo de distribuição</span>
-            <div>
-              <strong>2</strong><small>números no CRM</small>
-            </div>
-            <div>
-              <strong>3</strong><small>números no F10</small>
-            </div>
-          </div>
-        </div>
-
-        <div class="grid gap-x-10 gap-y-0 sm:grid-cols-2">
-          {#each whatsappFeatures as feature}
-            <article class="feature-line feature-line-light">
-              <div class="feature-icon feature-icon-green">
-                <svelte:component this={feature.icon} size={22} strokeWidth={1.9} />
-              </div>
-              <div>
-                <h4>{feature.title}</h4>
-                <p>{feature.description}</p>
-              </div>
-            </article>
-          {/each}
-        </div>
-      </div>
-    </div>
-  </section>
-
   <section id="beneficios" class="scroll-mt-16 bg-[#f7f8fc] px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
     <div class="mx-auto max-w-[1480px]">
       <div class="grid gap-12 lg:grid-cols-[0.62fr_1.38fr] lg:items-start lg:gap-24">
@@ -551,6 +485,62 @@
       </div>
     </div>
   </section>
+
+  <section id="whatsapp" class="model-whatsapp-section scroll-mt-16">
+  <div class="whatsapp-container">
+    <div class="whatsapp-heading">
+      <div class="whatsapp-heading-copy">
+        <p class="whatsapp-kicker">
+          <img src="/icon_whatsapp_color.svg" alt="" aria-hidden="true" />
+          <span>WhatsApp integrado · incluído no upgrade</span>
+        </p>
+        <h2>Cinco números incluídos para conectar o atendimento comercial ao relacionamento com alunos.</h2>
+      </div>
+
+      <p class="whatsapp-intro">
+        Cada unidade receberá cinco números de WhatsApp. Durante a implantação, eles serão distribuídos entre o CRM de Leads e o F10 conforme a estrutura de atendimento da unidade.
+      </p>
+    </div>
+
+    <div class="whatsapp-package">
+      <div class="whatsapp-total">
+        <strong>5</strong>
+        <span>números de WhatsApp incluídos por unidade</span>
+      </div>
+
+      <div class="whatsapp-channel">
+        <small>No CRM de Leads</small>
+        <strong class="whatsapp-channel-title">Atendimento comercial</strong>
+        <p>Novos leads, negociações e follow-ups ficam vinculados à oportunidade e ao histórico comercial.</p>
+      </div>
+
+      <div class="whatsapp-channel">
+        <small>No F10</small>
+        <strong class="whatsapp-channel-title">Relacionamento pós-matrícula</strong>
+        <p>Alunos e responsáveis recebem avisos, orientações, cobranças e demais comunicações da unidade.</p>
+      </div>
+
+      <p class="whatsapp-distribution">
+        <strong>Distribuição flexível.</strong> A unidade poderá usar, por exemplo, dois números no CRM e três no F10. A configuração será definida durante a implantação e poderá seguir a necessidade da operação.
+      </p>
+    </div>
+
+    <div class="whatsapp-meta" aria-label="Condições do WhatsApp integrado">
+      <div>
+        <span>Disponibilidade no F10</span>
+        <strong>Agosto de 2026</strong>
+      </div>
+      <div>
+        <span>Número adicional</span>
+        <strong>R$ 49,00 por número/mês</strong>
+      </div>
+      <div>
+        <span>Uso dos números adicionais</span>
+        <strong>CRM de Leads ou F10</strong>
+      </div>
+    </div>
+  </div>
+</section>
 
   <section id="investimento" class="scroll-mt-16 bg-[#f3f5fa] px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
     <div class="mx-auto max-w-[1480px]">
