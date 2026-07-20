@@ -1,3 +1,214 @@
+.page-shell {
+  display: flex;
+  flex-direction: column;
+}
+
+.page-shell > #inicio {
+  order: 1;
+}
+
+.page-shell > nav {
+  order: 2;
+}
+
+.page-shell > #motivo {
+  order: 3;
+}
+
+.page-shell > #modelo {
+  order: 4;
+}
+
+.page-shell > #beneficios {
+  order: 5;
+}
+
+.page-shell > #comparacao {
+  order: 6;
+}
+
+.page-shell > .model-whatsapp-section {
+  order: 7;
+}
+
+.page-shell > #investimento {
+  order: 8;
+}
+
+.page-shell > #implantacao {
+  order: 9;
+}
+
+.page-shell > footer {
+  order: 10;
+}
+
+/* WhatsApp: seção flat, acima do investimento */
+.page-shell > .model-whatsapp-section {
+  padding: 5rem 1.25rem !important;
+  background: #ffffff !important;
+}
+
+.page-shell .model-whatsapp-section > div {
+  width: 100%;
+  max-width: 1480px;
+  margin-inline: auto;
+}
+
+.page-shell .model-whatsapp-section > div > .grid {
+  display: grid !important;
+  grid-template-columns: minmax(300px, 0.72fr) minmax(0, 1.28fr) !important;
+  gap: clamp(3rem, 6vw, 6.5rem) !important;
+  align-items: start !important;
+  padding-block: 3.5rem;
+  border-top: 1px solid rgba(43, 64, 145, 0.14);
+  border-bottom: 1px solid rgba(43, 64, 145, 0.14);
+}
+
+.page-shell .model-whatsapp-section .section-label {
+  color: #51b84c !important;
+}
+
+.page-shell .model-whatsapp-section h3 {
+  max-width: 600px !important;
+  color: #17356f !important;
+  font-size: clamp(2.35rem, 4vw, 4rem) !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.045em !important;
+  line-height: 1.08 !important;
+}
+
+.page-shell .model-whatsapp-section h3::before {
+  content: "";
+  display: block;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 1.2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%2351B84C' stroke-width='1.65' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 11.5a8.4 8.4 0 0 1-9 8.5 9.5 9.5 0 0 1-4-.9L3 21l1.8-4.5A8.4 8.4 0 1 1 21 11.5Z'/%3E%3Cpath d='M8.5 9.5c.5 2 2 3.5 4 4l1.2-1.2c.2-.2.5-.3.8-.2l2 .7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.page-shell .model-whatsapp-section h3 + p {
+  max-width: 610px !important;
+  color: rgba(43, 64, 145, 0.7) !important;
+  font-size: 1.05rem !important;
+  line-height: 1.85rem !important;
+}
+
+.page-shell .model-whatsapp-section h3 + p::after {
+  content: "Disponível no F10 a partir de agosto de 2026. Números adicionais: R$ 49,00 por número/mês.";
+  display: block;
+  margin-top: 1.4rem;
+  padding: 0.85rem 0 0.85rem 1.15rem;
+  border-left: 3px solid #51b84c;
+  color: #2b4091;
+  font-size: 0.88rem;
+  font-weight: 750;
+  line-height: 1.45rem;
+}
+
+.page-shell .model-whatsapp-section .distribution-example-light {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 0 !important;
+  max-width: 600px !important;
+  margin-top: 2rem !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-top: 1px solid rgba(43, 64, 145, 0.14) !important;
+  border-bottom: 1px solid rgba(43, 64, 145, 0.14) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.page-shell .model-whatsapp-section .distribution-example-light > span {
+  grid-column: 1 / -1;
+  padding: 1rem 0 0.8rem;
+  color: rgba(43, 64, 145, 0.52) !important;
+}
+
+.page-shell .model-whatsapp-section .distribution-example-light > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: center;
+  padding: 1rem 1.2rem 1.25rem 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.page-shell .model-whatsapp-section .distribution-example-light > div + div {
+  padding-left: 1.4rem !important;
+  border-left: 1px solid rgba(43, 64, 145, 0.12);
+}
+
+.page-shell .model-whatsapp-section .distribution-example-light strong {
+  color: #51b84c !important;
+  font-size: 2.6rem !important;
+  font-weight: 750;
+  letter-spacing: -0.05em;
+}
+
+.page-shell .model-whatsapp-section .distribution-example-light small {
+  color: #17356f !important;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.3rem;
+}
+
+.page-shell .model-whatsapp-section > div > .grid > div:last-child {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  column-gap: 2.5rem !important;
+  row-gap: 0 !important;
+  border-top: 1px solid rgba(43, 64, 145, 0.14);
+}
+
+.page-shell .model-whatsapp-section .feature-line-light {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+  min-height: 148px;
+  padding: 1.5rem 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(43, 64, 145, 0.12) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.page-shell .model-whatsapp-section .feature-line-light .feature-icon {
+  display: flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgba(81, 184, 76, 0.14) !important;
+  color: #31983b !important;
+}
+
+.page-shell .model-whatsapp-section .feature-line-light:nth-child(even) .feature-icon {
+  background: rgba(43, 64, 145, 0.09) !important;
+  color: #2b4091 !important;
+}
+
+.page-shell .model-whatsapp-section .feature-line-light h4 {
+  color: #17356f !important;
+  font-size: 1.05rem !important;
+  font-weight: 750 !important;
+}
+
+.page-shell .model-whatsapp-section .feature-line-light p {
+  margin-top: 0.45rem !important;
+  color: rgba(43, 64, 145, 0.66) !important;
+  font-size: 0.9rem !important;
+  line-height: 1.6rem !important;
+}
+
+/* Investimento */
 .page-shell #investimento {
   background: #f4f7fb !important;
 }
@@ -63,14 +274,7 @@
 }
 
 .page-shell #investimento > div > .mb-12 > p::after {
-  content: "Incluído no upgrade: CRM de Leads, workflow comercial e cinco números de WhatsApp, distribuídos entre o CRM e o F10 conforme a operação da unidade.";
-  display: block;
-  max-width: 900px;
-  margin: 0.85rem auto 0;
-  color: rgba(43, 64, 145, 0.62);
-  font-size: 0.9rem;
-  font-weight: 550;
-  line-height: 1.5rem;
+  display: none;
 }
 
 .page-shell #investimento .investment-panel {
@@ -106,7 +310,7 @@
   justify-content: center;
   padding: clamp(2rem, 4vw, 3.5rem) 2rem;
   border: 0 !important;
-  border-radius: 0px;
+  border-radius: 0;
   background: #51b84c !important;
   box-shadow: 0 18px 45px rgba(43, 64, 145, 0.14);
   color: #ffffff;
@@ -249,7 +453,6 @@
 }
 
 .page-shell #investimento .investment-row:nth-last-child(2) {
-  border-radius: 0;
   box-shadow: 0 18px 42px rgba(43, 64, 145, 0.11);
 }
 
@@ -377,7 +580,7 @@
   min-height: 116px;
   padding: 1.4rem 1.55rem;
   border: 1px solid rgba(43, 64, 145, 0.11) !important;
-  border-radius: 0px;
+  border-radius: 0;
   background: #ffffff;
   box-shadow: 0 12px 30px rgba(43, 64, 145, 0.08);
 }
@@ -445,7 +648,7 @@
   margin-top: 18px;
   padding: 1.25rem 1.6rem 1.25rem 6.6rem;
   border: 1px solid rgba(43, 64, 145, 0.11) !important;
-  border-radius: 0px;
+  border-radius: 0;
   background: #ffffff !important;
   box-shadow: 0 12px 30px rgba(43, 64, 145, 0.07);
   color: rgba(43, 64, 145, 0.68);
@@ -478,6 +681,15 @@
 }
 
 @media (max-width: 1023px) {
+  .page-shell .model-whatsapp-section > div > .grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 2.5rem !important;
+  }
+
+  .page-shell .model-whatsapp-section > div > .grid > div:last-child {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
   .page-shell #investimento .investment-panel {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto repeat(5, minmax(72px, auto)) auto auto;
@@ -531,6 +743,37 @@
 }
 
 @media (max-width: 767px) {
+  .page-shell > .model-whatsapp-section {
+    padding: 4rem 1.25rem !important;
+  }
+
+  .page-shell .model-whatsapp-section > div > .grid {
+    padding-block: 2.5rem;
+  }
+
+  .page-shell .model-whatsapp-section h3 {
+    font-size: 2.25rem !important;
+  }
+
+  .page-shell .model-whatsapp-section .distribution-example-light {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .page-shell .model-whatsapp-section .distribution-example-light > div + div {
+    padding-left: 0 !important;
+    border-top: 1px solid rgba(43, 64, 145, 0.1);
+    border-left: 0;
+  }
+
+  .page-shell .model-whatsapp-section > div > .grid > div:last-child {
+    grid-template-columns: minmax(0, 1fr) !important;
+    column-gap: 0 !important;
+  }
+
+  .page-shell .model-whatsapp-section .feature-line-light {
+    min-height: 0;
+  }
+
   .page-shell #investimento > div > .mb-12 h2::after {
     font-size: 2rem;
   }
@@ -538,11 +781,6 @@
   .page-shell #investimento > div > .mb-12 > p::before {
     font-size: 0.96rem;
     line-height: 1.5rem;
-  }
-
-  .page-shell #investimento > div > .mb-12 > p::after {
-    font-size: 0.82rem;
-    line-height: 1.4rem;
   }
 
   .page-shell #investimento .investment-best {
@@ -613,12 +851,10 @@
   .page-shell #investimento .investment-context > div {
     min-height: 98px;
     padding: 1.15rem 1.25rem;
-    border-radius: 18px;
   }
 
   .page-shell #investimento .investment-note {
     padding: 5.25rem 1.25rem 1.2rem;
-    border-radius: 18px;
   }
 
   .page-shell #investimento .investment-note::before {
