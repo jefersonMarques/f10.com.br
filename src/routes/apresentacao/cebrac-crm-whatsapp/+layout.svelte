@@ -1,26 +1,117 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { FileText, MessagesSquare, UserCheck, Workflow } from "lucide-svelte";
+  import {
+    CalendarDays,
+    History,
+    MessageCircle,
+    MessagesSquare,
+    Smartphone,
+    Users,
+  } from "lucide-svelte";
+  import "../../../cebrac-presentation.css";
+  import "../../../cebrac-journey.css";
   import "../../../cebrac-whatsapp-section.css";
 
   let whatsappSection: HTMLElement;
 
   onMount(() => {
-    const shell = document.querySelector<HTMLElement>(".cebrac-presentation-route .page-shell");
-    const investmentSection = shell?.querySelector<HTMLElement>("#investimento");
-    const previousSection = shell?.querySelector<HTMLElement>("#whatsapp, .model-whatsapp-section");
+    const shell = document.querySelector<HTMLElement>(
+      ".cebrac-presentation-route .page-shell",
+    );
 
-    if (!shell || !investmentSection || !whatsappSection) {
+    if (!shell || !whatsappSection) {
       return;
     }
 
-    if (previousSection && previousSection !== whatsappSection) {
-      previousSection.remove();
+    const previousWhatsappSection = shell.querySelector<HTMLElement>(
+      "#whatsapp, .model-whatsapp-section",
+    );
+    const investmentSection = shell.querySelector<HTMLElement>("#investimento");
+    const implementationSection = shell.querySelector<HTMLElement>("#implantacao");
+    const investmentNavLink = shell.querySelector<HTMLAnchorElement>(
+      'a[href="#investimento"]',
+    );
+
+    if (previousWhatsappSection && previousWhatsappSection !== whatsappSection) {
+      previousWhatsappSection.remove();
+    }
+
+    investmentSection?.remove();
+
+    if (investmentNavLink) {
+      investmentNavLink.href = "#whatsapp";
+      investmentNavLink.textContent = "WhatsApp";
     }
 
     whatsappSection.id = "whatsapp";
-    investmentSection.before(whatsappSection);
+
+    if (implementationSection) {
+      implementationSection.before(whatsappSection);
+    } else {
+      shell.appendChild(whatsappSection);
+    }
+
     whatsappSection.classList.remove("whatsapp-section-pending");
+
+    const revealSelector = [
+      "#motivo .section-label",
+      "#motivo .section-title",
+      "#motivo .journey-panel",
+      "#modelo .section-label",
+      "#modelo h2",
+      "#modelo .feature-line",
+      "#beneficios .section-label",
+      "#beneficios .section-title",
+      "#beneficios .benefit-column",
+      "#comparacao .comparison-row",
+      "#whatsapp .cebrac-whatsapp-heading",
+      "#whatsapp .cebrac-whatsapp-visual",
+      "#whatsapp .cebrac-whatsapp-details",
+      "#implantacao .implementation-step",
+    ].join(",");
+
+    const elements = Array.from(
+      shell.querySelectorAll<HTMLElement>(revealSelector),
+    );
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+
+    elements.forEach((element, index) => {
+      element.classList.add("cebrac-reveal");
+      element.style.setProperty(
+        "--cebrac-reveal-delay",
+        `${(index % 4) * 70}ms`,
+      );
+    });
+
+    if (reduceMotion || !("IntersectionObserver" in window)) {
+      elements.forEach((element) => element.classList.add("is-visible"));
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) {
+            return;
+          }
+
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        });
+      },
+      {
+        threshold: 0.12,
+        rootMargin: "0px 0px -8% 0px",
+      },
+    );
+
+    requestAnimationFrame(() => {
+      elements.forEach((element) => observer.observe(element));
+    });
+
+    return () => observer.disconnect();
   });
 </script>
 
@@ -60,92 +151,99 @@
     aria-labelledby="cebrac-whatsapp-title"
   >
     <div class="cebrac-whatsapp-container">
-      <div class="cebrac-whatsapp-heading">
-        <div>
-          <p class="cebrac-whatsapp-kicker">
-            <img src="/icon_whatsapp_color.svg" alt="" aria-hidden="true" />
-            <span>WhatsApp integrado · incluído no upgrade</span>
-          </p>
+      <header class="cebrac-whatsapp-heading">
+        <p class="cebrac-whatsapp-kicker">
+          <img src="/icon_whatsapp_color.svg" alt="" aria-hidden="true" />
+          <span>WhatsApp integrado ao F10</span>
+        </p>
 
-          <h2 id="cebrac-whatsapp-title">
-            Cinco números incluídos para atender em equipe e manter cada conversa dentro da operação.
-          </h2>
+        <h2 id="cebrac-whatsapp-title">
+          Atendimento organizado no sistema e a conversa acompanhada também pelo celular.
+        </h2>
+
+        <p>
+          A equipe visualiza as conversas em uma lista centralizada, atende alunos e responsáveis e mantém o histórico disponível para dar continuidade ao relacionamento.
+        </p>
+      </header>
+
+      <figure class="cebrac-whatsapp-visual">
+        <div class="cebrac-whatsapp-visual-stage">
+          <img
+            class="cebrac-whatsapp-list-image"
+            src="/apresentacao/cebrac-crm-whatsapp/lista_chat_whatsapp_f10.png"
+            alt="Lista de conversas do WhatsApp integrada à tela do sistema F10"
+            loading="lazy"
+            decoding="async"
+          />
+
+          <img
+            class="cebrac-whatsapp-phone-image"
+            src="/apresentacao/cebrac-crm-whatsapp/celular_chat_f10.png"
+            alt="Conversa de um aluno no WhatsApp exibida em um smartphone"
+            loading="lazy"
+            decoding="async"
+          />
         </div>
 
-        <div class="cebrac-whatsapp-intro">
-          <p>
-            Os números poderão ser distribuídos entre o CRM de Leads e o F10 conforme a rotina da unidade. O atendimento deixa de depender de um aparelho específico e passa a ter histórico centralizado, continuidade entre usuários e identificação de quem respondeu.
-          </p>
+        <figcaption>
+          A lista permanece ao fundo para representar a operação da unidade, enquanto o smartphone mostra a experiência do aluno ou responsável.
+        </figcaption>
+      </figure>
 
-          <div class="cebrac-whatsapp-highlights">
-            <div class="cebrac-whatsapp-highlight">
-              <span class="cebrac-whatsapp-highlight-icon">
-                <UserCheck size={21} strokeWidth={1.9} />
-              </span>
-              <span>
-                <strong>Atendimento compartilhado.</strong> Usuários autorizados acompanham o mesmo número sem disputar o celular.
-              </span>
-            </div>
+      <div
+        class="cebrac-whatsapp-details"
+        role="table"
+        aria-label="Detalhes do WhatsApp integrado"
+      >
+        <div class="cebrac-whatsapp-detail" role="cell">
+          <span class="cebrac-whatsapp-detail-icon">
+            <MessagesSquare size={23} strokeWidth={1.8} />
+          </span>
+          <div>
+            <span>Números incluídos</span>
+            <strong>5 por unidade</strong>
+          </div>
+        </div>
 
-            <div class="cebrac-whatsapp-highlight">
-              <span class="cebrac-whatsapp-highlight-icon">
-                <FileText size={21} strokeWidth={1.9} />
-              </span>
-              <span>
-                <strong>Histórico preservado.</strong> A equipe e a gestão continuam cada conversa com contexto e responsabilidade.
-              </span>
-            </div>
+        <div class="cebrac-whatsapp-detail" role="cell">
+          <span class="cebrac-whatsapp-detail-icon">
+            <Users size={23} strokeWidth={1.8} />
+          </span>
+          <div>
+            <span>Atendimento</span>
+            <strong>Compartilhado pela equipe</strong>
+          </div>
+        </div>
+
+        <div class="cebrac-whatsapp-detail" role="cell">
+          <span class="cebrac-whatsapp-detail-icon">
+            <History size={23} strokeWidth={1.8} />
+          </span>
+          <div>
+            <span>Histórico</span>
+            <strong>Preservado no sistema</strong>
+          </div>
+        </div>
+
+        <div class="cebrac-whatsapp-detail" role="cell">
+          <span class="cebrac-whatsapp-detail-icon">
+            <CalendarDays size={23} strokeWidth={1.8} />
+          </span>
+          <div>
+            <span>Disponibilidade no F10</span>
+            <strong>Agosto de 2026</strong>
           </div>
         </div>
       </div>
 
-      <div class="cebrac-whatsapp-package">
-        <div class="cebrac-whatsapp-total">
-          <strong>5</strong>
-          <span>Números incluídos</span>
-          <small>por unidade</small>
-        </div>
-
-        <article class="cebrac-whatsapp-channel">
-          <span class="cebrac-whatsapp-channel-icon">
-            <MessagesSquare size={24} strokeWidth={1.8} />
-          </span>
-          <div>
-            <small>No CRM de Leads</small>
-            <h3>Atendimento comercial</h3>
-            <p>
-              Leads, negociações e follow-ups ficam vinculados à oportunidade, com o contexto preservado durante toda a jornada até a matrícula.
-            </p>
-          </div>
-        </article>
-
-        <article class="cebrac-whatsapp-channel">
-          <span class="cebrac-whatsapp-channel-icon">
-            <Workflow size={24} strokeWidth={1.8} />
-          </span>
-          <div>
-            <small>No F10</small>
-            <h3>Relacionamento e rotina da unidade</h3>
-            <p>
-              Alunos e responsáveis podem ser atendidos em cobranças, secretaria, avisos, documentos, matrículas e relacionamento pós-matrícula.
-            </p>
-          </div>
-        </article>
-      </div>
-
-      <div class="cebrac-whatsapp-meta" aria-label="Condições do WhatsApp integrado">
-        <div>
-          <span>Distribuição dos cinco números</span>
-          <strong>Definida com a unidade durante a implantação</strong>
-        </div>
-        <div>
-          <span>Disponibilidade no F10</span>
-          <strong>Agosto de 2026</strong>
-        </div>
-        <div>
-          <span>Número adicional</span>
-          <strong>R$ 49,00 por número/mês · CRM ou F10</strong>
-        </div>
+      <div class="cebrac-whatsapp-distribution">
+        <span class="cebrac-whatsapp-distribution-icon">
+          <Smartphone size={24} strokeWidth={1.8} />
+        </span>
+        <p>
+          <strong>Distribuição flexível.</strong> Os cinco números poderão ser organizados entre o CRM de Leads e o F10 durante a implantação, conforme a estrutura de atendimento de cada unidade.
+        </p>
+        <MessageCircle size={28} strokeWidth={1.7} aria-hidden="true" />
       </div>
     </div>
   </section>
