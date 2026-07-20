@@ -107,9 +107,6 @@
   padding: clamp(1rem, 2.5vw, 2.5rem);
   border-top: 1px solid rgba(43, 64, 145, 0.12);
   border-bottom: 1px solid rgba(43, 64, 145, 0.12);
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.74)),
-    #ffffff;
 }
 
 .page-shell .cebrac-whatsapp-list-image {
