@@ -881,9 +881,8 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.75rem;
-    max-width: 470px;
     padding: 1.1rem;
-    border-radius: 18px;
+    border-radius: 0px;
   }
 
   .distribution-example > span {
