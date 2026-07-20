@@ -192,7 +192,7 @@
   height: 22px;
 }
 
-.page-shell .cebrac-whatsapp-detail span,
+.page-shell .cebrac-whatsapp-detail > div > span,
 .page-shell .cebrac-whatsapp-detail strong {
   display: block;
 }
