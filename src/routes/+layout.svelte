@@ -85,8 +85,8 @@
   });
 </script>
 
-{#if seoOverride}
-  <svelte:head>
+<svelte:head>
+  {#if seoOverride}
     {#if seoOverride.renderPrimary !== false}
       <title>{seoOverride.title}</title>
       <meta name="description" content={seoOverride.description} />
@@ -115,8 +115,8 @@
     <meta name="twitter:title" content={seoOverride.title} />
     <meta name="twitter:description" content={seoOverride.description} />
     <meta name="twitter:image" content={defaultOgImage} />
-  </svelte:head>
-{/if}
+  {/if}
+</svelte:head>
 
 {#if isStandalonePage}
   <slot />
