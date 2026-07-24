@@ -1,6 +1,7 @@
 import type { RequestHandler } from "./$types";
 
 const BASE_URL = "https://f10.com.br";
+const EXCLUDED_ROUTES = new Set(["/download"]);
 
 export const prerender = true;
 
@@ -29,6 +30,7 @@ export const GET: RequestHandler = async () => {
     .map(normalizeRoute)
     .filter((route) => !route.startsWith("/api"))
     .filter((route) => !route.startsWith("/apresentacao"))
+    .filter((route) => !EXCLUDED_ROUTES.has(route))
     .filter((route) => !route.includes("["))
     .filter((route, index, allRoutes) => allRoutes.indexOf(route) === index)
     .sort();

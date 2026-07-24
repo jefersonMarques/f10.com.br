@@ -9,7 +9,9 @@ type RedirectRule = {
   permanent?: boolean;
 };
 
+const CANONICAL_ORIGIN = "https://f10.com.br";
 const BLOG_BASE_URL = "https://blog.f10.com.br";
+const ALTERNATE_HOSTS = new Set(["www.f10.com.br", "www2.f10.com.br"]);
 
 function normalizePath(pathname: string): string {
   if (pathname.length > 1 && pathname.endsWith("/")) {
@@ -17,6 +19,10 @@ function normalizePath(pathname: string): string {
   }
 
   return pathname;
+}
+
+function buildCanonicalUrl(url: URL): string {
+  return `${CANONICAL_ORIGIN}${url.pathname}${url.search}`;
 }
 
 function buildRedirectMap(
@@ -184,6 +190,10 @@ function isGoneSpamPath(pathname: string): boolean {
 const redirectMap = buildRedirectMap(redirectRules);
 
 export const handle: Handle = async ({ event, resolve }) => {
+  if (ALTERNATE_HOSTS.has(event.url.hostname)) {
+    throw redirect(308, buildCanonicalUrl(event.url));
+  }
+
   const pathname = normalizePath(event.url.pathname);
 
   if (isGoneSpamPath(pathname)) {
