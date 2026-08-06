@@ -19,10 +19,13 @@
 +    }
 +}
 +
+ /**
+  * Carrega o CSS do tema pai Astra.
+  */
 @@ -71,6 +86,42 @@
  }, 20);
  
-+/**
+ /**
 + * Carrega os estilos compartilhados dos perfis de autores.
 + */
 +add_action('wp_enqueue_scripts', function () {
@@ -58,11 +61,20 @@
 +    );
 +}, 25);
 +
++/**
+  * Insere um CTA contextual da F10 no meio dos posts.
+  *
+  * Estratégia:
 @@ -92,8 +143,7 @@
+         return $content;
+     }
+ 
 -    $plainText = wp_strip_all_tags($content);
 -    $wordCount = str_word_count($plainText);
 +    $wordCount = f10_count_words($content);
  
+     if ($wordCount < 450) {
+         return $content;
 --- a/single-post.php
 +++ b/single-post.php
 @@ -34,7 +34,7 @@
@@ -72,6 +84,8 @@
 -        $wordCount = str_word_count(wp_strip_all_tags($content));
 +        $wordCount = f10_count_words((string) $content);
          $minutes = (int) ceil($wordCount / 220);
+ 
+         return max(1, $minutes);
 @@ -60,14 +60,26 @@
          $postId = $post->ID;
          $title = get_the_title($postId);
@@ -100,14 +114,24 @@
 +                            ]
 +                        );
 +                        ?>
+                     <?php else : ?>
+                         <span>F10</span>
+                     <?php endif; ?>
 @@ -191,7 +203,9 @@
+     $excerpt = get_the_excerpt($postId);
      $readingTime = f10_single_get_reading_time($postId);
      $primaryCategory = f10_single_get_primary_category($postId);
 -    $featuredImageUrl = get_the_post_thumbnail_url($postId, 'full');
 +    $featuredImageId = get_post_thumbnail_id($postId);
 +    $authorId = (int) get_post_field('post_author', $postId);
 +    $authorProfile = f10_get_author_profile_data($authorId);
+ 
+     $categoryIds = wp_get_post_categories($postId);
+ 
 @@ -230,10 +244,16 @@
+                     <?php endif; ?>
+ 
+                     <div class="f10-single-meta">
 -                        <span>
 -                            <i><?php echo f10_single_get_icon_svg('user'); ?></i>
 -                            F10 Software
@@ -122,7 +146,13 @@
 +                            </span>
 +                            <span>Por <strong><?php echo esc_html($authorProfile['name']); ?></strong></span>
 +                        </a>
+ 
+                         <span>
+                             <i><?php echo f10_single_get_icon_svg('calendar'); ?></i>
 @@ -247,18 +267,26 @@
+                     </div>
+                 </div>
+ 
 -                <?php if (!empty($featuredImageUrl)) : ?>
 +                <?php if ($featuredImageId > 0) : ?>
                      <figure class="f10-single-hero__image">
@@ -154,7 +184,12 @@
 +                            ]
 +                        );
 +                        ?>
+                     </figure>
+                 <?php endif; ?>
+             </div>
 @@ -311,6 +339,14 @@
+                                 </div>
+                             </div>
                          <?php endif; ?>
 +
 +                        <?php
@@ -166,6 +201,7 @@
 +                        ?>
                      </article>
  
+                     <aside class="f10-single-sidebar">
 --- a/style.css
 +++ b/style.css
 @@ -1,5 +1,11 @@
@@ -178,18 +214,23 @@
  Template: astra
 -Version: 1.0.0
 -*/
+\ No newline at end of file
 +Version: 1.1.0
 +Text Domain: f10-child
 +Requires PHP: 7.4
 +*/
-
 --- a/assets/css/f10-single-post.css
 +++ b/assets/css/f10-single-post.css
 @@ -1259,4 +1259,173 @@
      .f10-related-heading h2 {
          font-size: 28px;
      }
- }
+-}
+\ No newline at end of file
++}
++/* ============================================================
++   Autoria, acessibilidade e robustez mobile
++============================================================ */
 +
 +.f10-single-meta a {
 +    color: inherit;
