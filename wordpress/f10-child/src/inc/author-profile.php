@@ -171,6 +171,114 @@ function f10_get_avatar_user_id($idOrEmail): int
 }
 
 /**
+ * Converte um caminho do diretório de uploads em URL pública.
+ */
+function f10_get_upload_url_from_path(string $filePath): string
+{
+    $uploads = wp_get_upload_dir();
+
+    if (!empty($uploads['error']) || empty($uploads['basedir']) || empty($uploads['baseurl'])) {
+        return '';
+    }
+
+    $baseDirectory = untrailingslashit(wp_normalize_path((string) $uploads['basedir']));
+    $normalizedPath = wp_normalize_path($filePath);
+    $expectedPrefix = $baseDirectory . '/';
+
+    if (strpos($normalizedPath, $expectedPrefix) !== 0) {
+        return '';
+    }
+
+    $relativePath = ltrim(substr($normalizedPath, strlen($expectedPrefix)), '/');
+    $encodedPath = implode('/', array_map('rawurlencode', explode('/', $relativePath)));
+
+    return trailingslashit((string) $uploads['baseurl']) . $encodedPath;
+}
+
+/**
+ * Localiza uma versão realmente existente do arquivo de avatar.
+ *
+ * Corrige anexos cujo metadado ainda aponta para um recorte removido do disco.
+ *
+ * @return array{url: string, width: int, height: int}|null
+ */
+function f10_get_author_avatar_source(int $attachmentId): ?array
+{
+    if ($attachmentId < 1 || !wp_attachment_is_image($attachmentId)) {
+        return null;
+    }
+
+    $attachedFile = (string) get_attached_file($attachmentId, true);
+    $metadata = wp_get_attachment_metadata($attachmentId);
+    $candidatePaths = [];
+
+    if ($attachedFile !== '') {
+        $directory = dirname($attachedFile);
+
+        if (is_array($metadata) && !empty($metadata['sizes']) && is_array($metadata['sizes'])) {
+            foreach (['f10-author-avatar', 'medium_large', 'medium', 'thumbnail'] as $imageSize) {
+                $sizeData = $metadata['sizes'][$imageSize] ?? null;
+
+                if (is_array($sizeData) && !empty($sizeData['file'])) {
+                    $candidatePaths[] = $directory . '/' . wp_basename((string) $sizeData['file']);
+                }
+            }
+        }
+
+        $candidatePaths[] = $attachedFile;
+
+        if (is_array($metadata) && !empty($metadata['original_image'])) {
+            $candidatePaths[] = $directory . '/' . wp_basename((string) $metadata['original_image']);
+        }
+
+        $attachedBasename = wp_basename($attachedFile);
+
+        if (strpos($attachedBasename, 'cropped-') === 0) {
+            $candidatePaths[] = $directory . '/' . substr($attachedBasename, strlen('cropped-'));
+        }
+    }
+
+    $candidatePaths = array_values(array_unique(array_filter($candidatePaths)));
+
+    foreach ($candidatePaths as $candidatePath) {
+        if (!is_readable($candidatePath)) {
+            continue;
+        }
+
+        $imageSize = wp_getimagesize($candidatePath);
+        $imageUrl = f10_get_upload_url_from_path($candidatePath);
+
+        if (!is_array($imageSize) || empty($imageSize[0]) || empty($imageSize[1]) || $imageUrl === '') {
+            continue;
+        }
+
+        return [
+            'url' => $imageUrl,
+            'width' => (int) $imageSize[0],
+            'height' => (int) $imageSize[1],
+        ];
+    }
+
+    $attachmentUrl = (string) wp_get_attachment_url($attachmentId);
+    $attachmentPath = (string) wp_parse_url($attachmentUrl, PHP_URL_PATH);
+    $attachmentBasename = wp_basename($attachmentPath);
+
+    if ($attachmentUrl !== '' && strpos($attachmentBasename, 'cropped-') !== 0) {
+        $fullImage = wp_get_attachment_image_src($attachmentId, 'full');
+
+        if (is_array($fullImage) && !empty($fullImage[0])) {
+            return [
+                'url' => (string) $fullImage[0],
+                'width' => max(1, (int) ($fullImage[1] ?? 1)),
+                'height' => max(1, (int) ($fullImage[2] ?? 1)),
+            ];
+        }
+    }
+
+    return null;
+}
+
+/**
  * Substitui o Gravatar pela foto local cadastrada no perfil do autor.
  *
  * @param array<string, mixed> $args
@@ -191,14 +299,13 @@ function f10_filter_avatar_data(array $args, $idOrEmail): array
         return $args;
     }
 
-    $requestedSize = isset($args['size']) ? max(32, absint($args['size'])) : 96;
-    $image = wp_get_attachment_image_src($avatarId, [$requestedSize, $requestedSize]);
+    $image = f10_get_author_avatar_source($avatarId);
 
-    if (!is_array($image) || empty($image[0])) {
+    if ($image === null) {
         return $args;
     }
 
-    $args['url'] = esc_url_raw((string) $image[0]);
+    $args['url'] = esc_url_raw($image['url']);
     $args['found_avatar'] = true;
 
     return $args;
@@ -238,22 +345,37 @@ function f10_get_author_avatar_html(int $userId, int $size = 320, array $attribu
     $baseClass = trim('f10-author-avatar ' . ($attributes['class'] ?? ''));
     $loading = $attributes['loading'] ?? 'lazy';
     $decoding = $attributes['decoding'] ?? 'async';
+    $image = f10_get_author_avatar_source($avatarId);
 
-    if ($avatarId > 0 && wp_attachment_is_image($avatarId)) {
+    if ($image !== null) {
         $imageAttributes = array_merge($attributes, [
+            'src' => $image['url'],
             'class' => $baseClass,
             'alt' => sprintf('%s, %s', $profile['name'], $profile['role']),
+            'width' => (string) $image['width'],
+            'height' => (string) $image['height'],
             'loading' => $loading,
             'decoding' => $decoding,
-            'sizes' => sprintf('%dpx', $size),
         ]);
+        $renderedAttributes = [];
 
-        return (string) wp_get_attachment_image(
-            $avatarId,
-            'f10-author-avatar',
-            false,
-            $imageAttributes
-        );
+        foreach ($imageAttributes as $attributeName => $attributeValue) {
+            if (!is_string($attributeName) || preg_match('/^[a-zA-Z_:][-a-zA-Z0-9_:.]*$/', $attributeName) !== 1) {
+                continue;
+            }
+
+            if (!is_scalar($attributeValue) || $attributeValue === '') {
+                continue;
+            }
+
+            $renderedAttributes[] = sprintf(
+                '%s="%s"',
+                esc_attr($attributeName),
+                esc_attr((string) $attributeValue)
+            );
+        }
+
+        return '<img ' . implode(' ', $renderedAttributes) . '>';
     }
 
     return sprintf(
@@ -276,7 +398,6 @@ function f10_sanitize_linkedin_url(string $url): string
     }
 
     $host = strtolower((string) wp_parse_url($sanitizedUrl, PHP_URL_HOST));
-
     $isLinkedInHost = $host === 'linkedin.com'
         || preg_match('/\.linkedin\.com$/', $host) === 1;
 
