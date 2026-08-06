@@ -1,0 +1,358 @@
+--- a/functions.php
++++ b/functions.php
+@@ -4,6 +4,21 @@
+     exit;
+ }
+ 
++require_once get_stylesheet_directory() . '/inc/author-profile.php';
++
++if (!function_exists('f10_count_words')) {
++    /**
++     * Conta palavras com suporte a caracteres Unicode.
++     */
++    function f10_count_words(string $content): int
++    {
++        $plainText = wp_strip_all_tags($content);
++        $matchCount = preg_match_all("/[\\p{L}\\p{N}]+(?:[’'][\\p{L}\\p{N}]+)*/u", $plainText, $matches);
++
++        return $matchCount === false ? 0 : $matchCount;
++    }
++}
++
+@@ -71,6 +86,42 @@
+ }, 20);
+ 
++/**
++ * Carrega os estilos compartilhados dos perfis de autores.
++ */
++add_action('wp_enqueue_scripts', function () {
++    $isSinglePost = is_single() && get_post_type() === 'post';
++    $isAuthorArchive = is_author();
++    $isAuthorsPage = is_page_template('template-f10-authors.php');
++
++    if (!$isSinglePost && !$isAuthorArchive && !$isAuthorsPage) {
++        return;
++    }
++
++    $cssRelativePath = '/assets/css/f10-author.css';
++    $cssAbsolutePath = get_stylesheet_directory() . $cssRelativePath;
++    $cssVersion = file_exists($cssAbsolutePath) ? filemtime($cssAbsolutePath) : '1.0.0';
++    $dependencies = $isSinglePost
++        ? ['f10-single-post']
++        : ['astra-parent-style', 'f10-author-fonts'];
++
++    if (!$isSinglePost) {
++        wp_enqueue_style(
++            'f10-author-fonts',
++            'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap',
++            [],
++            null
++        );
++    }
++
++    wp_enqueue_style(
++        'f10-author',
++        get_stylesheet_directory_uri() . $cssRelativePath,
++        $dependencies,
++        $cssVersion
++    );
++}, 25);
++
+@@ -92,8 +143,7 @@
+-    $plainText = wp_strip_all_tags($content);
+-    $wordCount = str_word_count($plainText);
++    $wordCount = f10_count_words($content);
+ 
+--- a/single-post.php
++++ b/single-post.php
+@@ -34,7 +34,7 @@
+     function f10_single_get_reading_time(int $postId): int
+     {
+         $content = get_post_field('post_content', $postId);
+-        $wordCount = str_word_count(wp_strip_all_tags($content));
++        $wordCount = f10_count_words((string) $content);
+         $minutes = (int) ceil($wordCount / 220);
+@@ -60,14 +60,26 @@
+         $postId = $post->ID;
+         $title = get_the_title($postId);
+         $permalink = get_permalink($postId);
+-        $imageUrl = get_the_post_thumbnail_url($postId, 'medium_large');
++        $thumbnailId = get_post_thumbnail_id($postId);
+         $category = f10_single_get_primary_category($postId);
+         ?>
+         <article class="f10-related-card">
+             <a href="<?php echo esc_url($permalink); ?>">
+-                <div class="f10-related-card__media<?php echo empty($imageUrl) ? ' f10-related-card__media--placeholder' : ''; ?>">
+-                    <?php if (!empty($imageUrl)) : ?>
+-                        <img src="<?php echo esc_url($imageUrl); ?>" alt="<?php echo esc_attr($title); ?>" loading="lazy">
++                <div class="f10-related-card__media<?php echo $thumbnailId < 1 ? ' f10-related-card__media--placeholder' : ''; ?>">
++                    <?php if ($thumbnailId > 0) : ?>
++                        <?php
++                        echo wp_get_attachment_image(
++                            $thumbnailId,
++                            'medium_large',
++                            false,
++                            [
++                                'alt' => $title,
++                                'loading' => 'lazy',
++                                'decoding' => 'async',
++                                'sizes' => '(max-width: 720px) calc(100vw - 24px), (max-width: 1120px) 50vw, 380px',
++                            ]
++                        );
++                        ?>
+@@ -191,7 +203,9 @@
+     $readingTime = f10_single_get_reading_time($postId);
+     $primaryCategory = f10_single_get_primary_category($postId);
+-    $featuredImageUrl = get_the_post_thumbnail_url($postId, 'full');
++    $featuredImageId = get_post_thumbnail_id($postId);
++    $authorId = (int) get_post_field('post_author', $postId);
++    $authorProfile = f10_get_author_profile_data($authorId);
+@@ -230,10 +244,16 @@
+-                        <span>
+-                            <i><?php echo f10_single_get_icon_svg('user'); ?></i>
+-                            F10 Software
+-                        </span>
++                        <a
++                            href="<?php echo esc_url($authorProfile['archive_url']); ?>"
++                            class="f10-single-meta__author"
++                            rel="author"
++                        >
++                            <span class="f10-single-meta__author-avatar" aria-hidden="true">
++                                <?php echo f10_get_author_avatar_html($authorId, 64); ?>
++                            </span>
++                            <span>Por <strong><?php echo esc_html($authorProfile['name']); ?></strong></span>
++                        </a>
+@@ -247,18 +267,26 @@
+-                <?php if (!empty($featuredImageUrl)) : ?>
++                <?php if ($featuredImageId > 0) : ?>
+                     <figure class="f10-single-hero__image">
+-                        <img
+-                            src="<?php echo esc_url($featuredImageUrl); ?>"
+-                            alt="<?php echo esc_attr($title); ?>"
+-                            width="1200"
+-                            height="675"
+-                            loading="eager"
+-                            fetchpriority="high"
+-                            decoding="async"
+-                            data-no-lazy="1"
+-                        >
++                        <?php
++                        $featuredImageAlt = trim((string) get_post_meta($featuredImageId, '_wp_attachment_image_alt', true));
++
++                        echo wp_get_attachment_image(
++                            $featuredImageId,
++                            'full',
++                            false,
++                            [
++                                'class' => 'f10-single-hero__image-element',
++                                'alt' => $featuredImageAlt !== '' ? $featuredImageAlt : $title,
++                                'loading' => 'eager',
++                                'fetchpriority' => 'high',
++                                'decoding' => 'async',
++                                'sizes' => '(max-width: 720px) calc(100vw - 24px), (max-width: 1120px) calc(100vw - 36px), 1040px',
++                                'data-no-lazy' => '1',
++                            ]
++                        );
++                        ?>
+@@ -311,6 +339,14 @@
+                         <?php endif; ?>
++
++                        <?php
++                        get_template_part(
++                            'template-parts/post-author-box',
++                            null,
++                            ['author_id' => $authorId]
++                        );
++                        ?>
+                     </article>
+ 
+--- a/style.css
++++ b/style.css
+@@ -1,5 +1,11 @@
+ /*
+ Theme Name: F10 Child
++Theme URI: https://blog.f10.com.br/
++Description: Tema filho do Astra para o Blog F10, com templates editoriais, autores e componentes responsivos.
++Author: F10 Software
++Author URI: https://f10.com.br/
+ Template: astra
+-Version: 1.0.0
+-*/
++Version: 1.1.0
++Text Domain: f10-child
++Requires PHP: 7.4
++*/
+
+--- a/assets/css/f10-single-post.css
++++ b/assets/css/f10-single-post.css
+@@ -1259,4 +1259,173 @@
+     .f10-related-heading h2 {
+         font-size: 28px;
+     }
+ }
++
++.f10-single-meta a {
++    color: inherit;
++}
++
++.f10-single-meta__author {
++    display: inline-flex;
++    align-items: center;
++    gap: 9px;
++    min-height: 36px;
++    padding: 3px 9px 3px 4px;
++    border: 1px solid rgba(6, 20, 47, 0.08);
++    border-radius: 999px;
++    background: rgba(255, 255, 255, 0.72);
++    transition: border-color 0.18s ease, background 0.18s ease;
++}
++
++.f10-single-meta__author:hover {
++    border-color: rgba(255, 107, 0, 0.3);
++    background: #fff;
++    color: var(--f10-navy);
++}
++
++.f10-single-meta__author strong {
++    color: var(--f10-navy);
++    font-weight: 700;
++}
++
++.f10-single-meta__author-avatar {
++    display: inline-flex;
++    width: 28px;
++    height: 28px;
++    flex: 0 0 28px;
++    overflow: hidden;
++    border-radius: 50%;
++    background: var(--f10-soft);
++}
++
++.f10-single-meta__author-avatar .f10-author-avatar {
++    width: 100%;
++    height: 100%;
++    object-fit: cover;
++    font-size: 9px;
++}
++
++.f10-single-post a:focus-visible,
++.f10-single-post button:focus-visible,
++.f10-single-post input:focus-visible {
++    outline: 3px solid rgba(255, 107, 0, 0.4);
++    outline-offset: 3px;
++}
++
++.f10-single-content__inner {
++    overflow-wrap: break-word;
++}
++
++.f10-single-content__inner figure,
++.f10-single-content__inner video,
++.f10-single-content__inner iframe,
++.f10-single-content__inner embed,
++.f10-single-content__inner object {
++    max-width: 100%;
++}
++
++.f10-single-content__inner iframe,
++.f10-single-content__inner video {
++    width: 100%;
++}
++
++.f10-single-content__inner pre {
++    max-width: 100%;
++    overflow-x: auto;
++    padding: 18px;
++    border-radius: 16px;
++    background: #0b1730;
++    color: #fff;
++    font-size: 14px;
++    line-height: 1.65;
++    -webkit-overflow-scrolling: touch;
++}
++
++.f10-single-content__inner code {
++    overflow-wrap: normal;
++}
++
++.f10-single-content__inner table {
++    -webkit-overflow-scrolling: touch;
++}
++
++.f10-single-content__inner table th,
++.f10-single-content__inner table td {
++    min-width: 130px;
++}
++
++@media (max-width: 720px) {
++    .f10-single-meta__author {
++        min-height: 44px;
++    }
++
++    .f10-single-content__inner blockquote {
++        padding: 20px;
++        font-size: 18px;
++    }
++
++    .f10-single-content__inner img {
++        margin: 1.5em 0;
++        border-radius: 18px;
++    }
++
++    .f10-single-content__inner table th,
++    .f10-single-content__inner table td {
++        min-width: 120px;
++        padding: 12px 14px;
++    }
++
++    .f10-single-tags a,
++    .f10-sidebar-solutions a,
++    .f10-sidebar-links a {
++        min-height: 44px;
++    }
++}
++
++@media (max-width: 480px) {
++    :root {
++        --f10-shell-space: 20px;
++    }
++
++    .f10-single-hero {
++        padding-top: 42px;
++    }
++
++    .f10-single-hero__content h1 {
++        font-size: 30px;
++        letter-spacing: -0.04em;
++    }
++
++    .f10-single-hero__image {
++        border-radius: 18px;
++    }
++
++    .f10-single-content__inner h2 {
++        font-size: 26px;
++    }
++
++    .f10-single-content__inner h3 {
++        font-size: 22px;
++    }
++
++    .f10-article-cta,
++    .f10-inline-ad,
++    .f10-sidebar-card {
++        padding: 20px;
++        border-radius: 20px;
++    }
++}
++
++@media (prefers-reduced-motion: reduce) {
++    .f10-single-post *,
++    .f10-single-post *::before,
++    .f10-single-post *::after {
++        scroll-behavior: auto !important;
++        transition-duration: 0.01ms !important;
++        animation-duration: 0.01ms !important;
++        animation-iteration-count: 1 !important;
++    }
++}
