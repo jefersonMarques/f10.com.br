@@ -1,15 +1,15 @@
-# F10 WordPress Child Theme
+# F10 WordPress Child Theme — Authors
 
-Tema filho do Astra utilizado no Blog F10, preparado para autoria profissional, páginas públicas de autores e experiência responsiva.
+Projeto de evolução do tema filho Astra utilizado no Blog F10, com autoria profissional, páginas públicas de autores e melhorias responsivas.
 
-## Versão
+## Versão alvo
 
 `1.1.0`
 
 ## Principais recursos
 
 - perfil editorial próprio para cada usuário do WordPress;
-- foto local pela Biblioteca de Mídia, sem dependência obrigatória do Gravatar;
+- foto local pela Biblioteca de Mídia e substituição do Gravatar pela API padrão de avatares;
 - nome real do autor no cabeçalho de cada post;
 - caixa profissional de autor ao final do artigo;
 - página individual de autor usando `author.php`;
@@ -18,33 +18,39 @@ Tema filho do Astra utilizado no Blog F10, preparado para autoria profissional, 
 - ajustes para smartphone, tablet, teclado e redução de movimento;
 - sanitização, nonce, validação de permissão e validação de anexos.
 
-## Restaurar o pacote instalável
+## Estrutura
 
-O pacote ZIP foi dividido em partes de texto para permitir seu versionamento pelo conector GitHub. Execute na raiz deste diretório:
+```text
+src/
+  assets/
+    css/
+      f10-author.css
+      f10-author-admin.css
+    js/
+      f10-author-profile-admin.js
+  inc/
+    author-profile.php
+  template-parts/
+    author-card.php
+    post-author-box.php
+  author.php
+  template-f10-authors.php
+patches/
+  integration.patch
+```
+
+Os arquivos de `src/` são adicionados ao tema filho existente. O arquivo `patches/integration.patch` contém as alterações necessárias em `functions.php`, `single-post.php`, `style.css` e `assets/css/f10-single-post.css`.
+
+## Aplicação sobre o child atual
+
+Na raiz do tema filho:
 
 ```bash
-bash scripts/restore-package.sh
+cp -R wordpress/f10-child/src/. ./
+git apply wordpress/f10-child/patches/integration.patch
 ```
 
-O comando gera:
-
-```text
-dist/f10-child-1.1.0.zip
-```
-
-SHA-256 esperado:
-
-```text
-559e7f03091b3c9ef781f48ad994f409ad2e0979c4d3722b61805dbee3f3f659
-```
-
-## Instalação
-
-1. Restaure o ZIP com o script acima.
-2. No WordPress, acesse **Aparência → Temas → Adicionar tema → Enviar tema**.
-3. Envie `dist/f10-child-1.1.0.zip`.
-4. Ative o tema **F10 Child**.
-5. Acesse **Configurações → Links permanentes** e salve novamente.
+Antes da aplicação em produção, faça backup do diretório atual e valide a alteração em homologação.
 
 ## Configuração de Rodrigo Fonseca
 
