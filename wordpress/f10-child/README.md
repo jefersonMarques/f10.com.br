@@ -4,12 +4,13 @@ Projeto de evolução do tema filho Astra utilizado no Blog F10, com autoria pro
 
 ## Versão alvo
 
-`1.1.0`
+`1.1.1`
 
 ## Principais recursos
 
 - perfil editorial próprio para cada usuário do WordPress;
 - foto local pela Biblioteca de Mídia e substituição do Gravatar pela API padrão de avatares;
+- recuperação segura quando o WordPress mantém referência para um arquivo `cropped-*` removido;
 - nome real do autor no cabeçalho de cada post;
 - caixa profissional de autor ao final do artigo;
 - página individual de autor usando `author.php`;
@@ -68,6 +69,12 @@ O e-mail não é exibido publicamente pelo tema.
 ## Lista de autores
 
 Crie uma página no WordPress e selecione o modelo **F10 - Autores**. A página lista usuários com posts publicados e visibilidade pública habilitada.
+
+## Correção de avatar 404
+
+A versão 1.1.1 verifica o arquivo físico antes de renderizar a foto. Quando o banco ainda aponta para um recorte removido, por exemplo `cropped-1708005052642.jpeg`, o tema procura tamanhos existentes, a imagem original e a variante sem o prefixo `cropped-`. Se nenhuma versão existir, exibe as iniciais em vez de gerar uma imagem quebrada.
+
+Depois da atualização, limpe o cache do WordPress, do servidor e da CDN. Caso o arquivo original também tenha sido removido, envie novamente a foto no perfil do autor.
 
 ## Validação realizada
 
