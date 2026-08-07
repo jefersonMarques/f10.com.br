@@ -77,7 +77,7 @@
         on:click={handleDownload}
       >
         <Download size={20} aria-hidden="true" />
-        Não apareceu, baixar novamente
+        Baixar novamente
       </a>
     </div>
   {:else}
