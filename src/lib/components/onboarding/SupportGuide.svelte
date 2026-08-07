@@ -33,7 +33,7 @@
         class="mx-auto inline-flex items-center gap-2 rounded-full bg-[#000A57]/5 px-4 py-2 text-[13px] font-semibold text-[#000A57]"
       >
         <LifeBuoy size={18} aria-hidden="true" />
-        Terceiro passo
+        Suporte durante a trilha
       </div>
 
       <h2

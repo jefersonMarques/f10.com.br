@@ -1,11 +1,14 @@
 <script lang="ts">
-  import { ArrowDown, Check, Download, GraduationCap, LifeBuoy } from "lucide-svelte";
+  import { ArrowDown, CheckCircle2, Clock3, LifeBuoy, Route } from "lucide-svelte";
   import Breadcrumb from "$lib/components/Breadcrumb.svelte";
   import FaqAccordion from "$lib/components/FaqAccordion.svelte";
-  import SeoHead from "$lib/components/SeoHead.svelte";
-  import DownloadGuide from "$lib/components/onboarding/DownloadGuide.svelte";
+  import GettingStartedJourney from "$lib/components/onboarding/GettingStartedJourney.svelte";
   import SupportGuide from "$lib/components/onboarding/SupportGuide.svelte";
-  import TrainingGuide from "$lib/components/onboarding/TrainingGuide.svelte";
+  import SeoHead from "$lib/components/SeoHead.svelte";
+  import {
+    getYoutubeUrl,
+    trainingVideos,
+  } from "$lib/onboarding/trainingCatalog";
   import type { FaqItem } from "$lib/seo/schema";
   import {
     DEFAULT_OG_IMAGE,
@@ -17,31 +20,30 @@
   } from "$lib/seo/site";
 
   const canonicalUrl = `${SITE_URL}/primeiros-passos-f10`;
-  const seoTitle = "Primeiros Passos no F10 | Download, Treinamentos e Suporte";
+  const seoTitle = "Primeiros Passos no F10 | Guia e Treinamentos";
   const seoDescription =
-    "Comece a usar o F10: baixe o instalador, acesse os treinamentos para novos clientes e aprenda a solicitar ajuda ao suporte F10.";
+    "Siga a trilha de primeiros passos no F10: instalação, primeiro acesso, cadastro de usuários, direitos de acesso e treinamentos em vídeo.";
 
   const journeySteps = [
     {
-      number: "01",
-      title: "Instale o F10",
-      description: "Baixe o instalador oficial para Windows e siga o passo a passo.",
-      href: "#download",
-      icon: Download,
+      title: "Baixar e instalar o F10",
+      description: "Baixe o instalador oficial no computador Windows.",
     },
     {
-      number: "02",
-      title: "Faça os treinamentos",
-      description: "Aprenda primeiro as rotinas essenciais para sua função na escola.",
-      href: "#training",
-      icon: GraduationCap,
+      title: "Fazer o primeiro acesso",
+      description: "Entre com o usuário e a senha recebidos por e-mail.",
     },
     {
-      number: "03",
-      title: "Conte com o suporte",
-      description: "Saiba como explicar sua dúvida para receber ajuda mais rapidamente.",
-      href: "#support",
-      icon: LifeBuoy,
+      title: "Criar usuários e funcionários",
+      description: "Assista ao treinamento essencial e cadastre sua equipe.",
+    },
+    {
+      title: "Definir os direitos dos usuários",
+      description: "Configure o que cada pessoa poderá acessar no sistema.",
+    },
+    {
+      title: "Escolher uma rotina para aprender",
+      description: "Selecione entre 16 treinamentos e assista sem sair da página.",
     },
   ];
 
@@ -49,22 +51,27 @@
     {
       question: "Onde posso baixar o F10?",
       answer:
-        'O instalador oficial está disponível em <a href="/download">f10.com.br/download</a>. Você pode retornar a essa página sempre que precisar instalar o F10 novamente.',
+        'Utilize o botão da primeira etapa ou acesse <a href="/download">f10.com.br/download</a>. O instalador oficial está disponível para computadores Windows.',
     },
     {
-      question: "Onde encontro os treinamentos para novos clientes?",
+      question: "Onde encontro meu usuário e minha senha?",
       answer:
-        'Acesse a página de <a href="/treinamentos">treinamentos do novo cliente F10</a> e siga a sequência recomendada para aprender as principais rotinas do sistema.',
+        "Os dados do primeiro acesso são enviados por e-mail durante a implantação. Procure também nas pastas Spam, Lixo eletrônico ou Promoções. Esta página nunca solicita sua senha.",
     },
     {
-      question: "Como entrar em contato com o suporte F10?",
+      question: "Preciso assistir a todos os treinamentos?",
       answer:
-        'Clique no botão azul de suporte exibido no canto inferior direito desta página ou acesse a <a href="https://f10.movidesk.com/kb" target="_blank" rel="noopener noreferrer">Central de Ajuda F10</a>.',
+        "Comece pelos treinamentos de cadastro de usuários e direitos de acesso. Depois, escolha apenas as rotinas relacionadas ao trabalho que deseja realizar no F10.",
     },
     {
-      question: "Quais informações devo enviar ao suporte?",
+      question: "Posso parar e continuar a trilha depois?",
       answer:
-        "Informe seu nome, a escola ou unidade, o menu acessado, o que estava tentando fazer e a mensagem apresentada. Uma captura da tela pode acelerar a análise. Nunca envie sua senha.",
+        "Sim. O progresso fica salvo neste navegador. Ao retornar usando o mesmo dispositivo e navegador, a página abre na última etapa acessada.",
+    },
+    {
+      question: "Como pedir ajuda ao suporte F10?",
+      answer:
+        'Clique no botão azul de suporte no canto inferior direito ou acesse a <a href="https://f10.movidesk.com/kb" target="_blank" rel="noopener noreferrer">Central de Ajuda F10</a>. Informe seu nome, sua escola e a rotina em que surgiu a dúvida.',
     },
   ];
 
@@ -76,14 +83,33 @@
   const quickStartSchema = {
     "@type": "ItemList",
     "@id": `${canonicalUrl}#steps`,
-    name: "Primeiros passos para começar a usar o F10",
+    name: "Trilha de primeiros passos no F10",
     numberOfItems: journeySteps.length,
     itemListElement: journeySteps.map((step, index) => ({
       "@type": "ListItem",
       position: index + 1,
       name: step.title,
       description: step.description,
-      url: `${canonicalUrl}${step.href}`,
+      url: `${canonicalUrl}#onboarding-journey`,
+    })),
+  };
+
+  const trainingLibrarySchema = {
+    "@type": "ItemList",
+    "@id": `${canonicalUrl}#training-library`,
+    name: "Treinamentos em vídeo do F10",
+    numberOfItems: trainingVideos.length,
+    itemListElement: trainingVideos.map((training, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      item: {
+        "@type": "LearningResource",
+        name: training.title,
+        description: training.description,
+        learningResourceType: "Video",
+        inLanguage: "pt-BR",
+        url: getYoutubeUrl(training.videoId),
+      },
     })),
   };
 
@@ -101,7 +127,7 @@
   ogImage={DEFAULT_OG_IMAGE}
   ogTitle={seoTitle}
   ogDescription={seoDescription}
-  ogImageAlt="Guia de primeiros passos para clientes F10 Software"
+  ogImageAlt="Trilha guiada de primeiros passos no F10 Software"
   ogImageType="image/png"
   ogImageWidth={1200}
   ogImageHeight={630}
@@ -111,7 +137,7 @@
   softwareApplicationData={SOFTWARE_APPLICATION_DATA}
   {faqItems}
   {breadcrumbItems}
-  additionalStructuredData={[quickStartSchema]}
+  additionalStructuredData={[quickStartSchema, trainingLibrarySchema]}
 />
 
 <section class="relative isolate overflow-hidden bg-white">
@@ -125,30 +151,27 @@
     items={[{ label: "INÍCIO", href: "/" }, { label: "PRIMEIROS PASSOS NO F10" }]}
   />
 
-  <div class="container pb-16 pt-2 md:pb-24">
+  <div class="container pb-14 pt-2 md:pb-20">
     <div class="mx-auto max-w-4xl text-center">
       <p class="text-[13px] font-semibold uppercase tracking-[0.2em] text-[#EA6D0B]">
-        Guia para novos clientes
+        Onboarding guiado para novos clientes
       </p>
 
-      <h1
-        class="mt-5 text-[40px] font-semibold leading-[1.06] tracking-[-0.04em] text-[#010D28] sm:text-[52px] lg:text-[64px]"
-      >
-        Primeiros passos para começar bem com o F10
+      <h1 class="mt-5 text-[38px] font-semibold leading-[1.06] tracking-[-0.04em] text-[#010D28] sm:text-[50px] lg:text-[60px]">
+        Vamos dar os primeiros passos no F10 juntos
       </h1>
 
       <p class="mx-auto mt-7 max-w-3xl text-[17px] leading-[1.8] text-[#5F6475] sm:text-[18px]">
-        Nesta página você encontra o instalador oficial, os treinamentos para
-        novos clientes e o caminho mais rápido para solicitar ajuda ao suporte
-        F10.
+        Siga uma etapa por vez: instale o F10, faça seu primeiro acesso,
+        configure os usuários e aprenda as rotinas que fazem parte do seu trabalho.
       </p>
 
       <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
         <a
-          href="#download"
-          class="inline-flex items-center justify-center gap-2 rounded-full bg-[#EA6D0B] px-7 py-3.5 text-[15px] font-semibold text-white shadow-[0_16px_38px_rgba(234,109,11,0.3)] transition hover:brightness-105 focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/40"
+          href="#onboarding-journey"
+          class="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#EA6D0B] px-7 py-3.5 text-[15px] font-semibold text-white shadow-[0_16px_38px_rgba(234,109,11,0.3)] transition hover:brightness-105 focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/40 sm:w-auto"
         >
-          Começar agora
+          Iniciar trilha guiada
           <ArrowDown size={18} aria-hidden="true" />
         </a>
 
@@ -156,41 +179,32 @@
           href="https://f10.movidesk.com/kb"
           target="_blank"
           rel="noopener noreferrer"
-          class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-7 py-3.5 text-[15px] font-semibold text-[#010D28] transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300/60"
+          class="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-7 py-3.5 text-[15px] font-semibold text-[#010D28] transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300/60 sm:w-auto"
         >
-          Consultar Central de Ajuda
+          <LifeBuoy size={18} aria-hidden="true" />
+          Preciso de ajuda
         </a>
       </div>
+
+      <div class="mx-auto mt-10 grid max-w-3xl gap-3 text-left sm:grid-cols-3">
+        <div class="flex items-center gap-3 rounded-2xl border border-[#E7EAF3] bg-white/85 p-4 shadow-sm">
+          <Route class="min-w-5 text-[#EA6D0B]" size={20} aria-hidden="true" />
+          <span class="text-[13px] font-semibold text-[#010D28]">5 etapas simples</span>
+        </div>
+        <div class="flex items-center gap-3 rounded-2xl border border-[#E7EAF3] bg-white/85 p-4 shadow-sm">
+          <CheckCircle2 class="min-w-5 text-emerald-600" size={20} aria-hidden="true" />
+          <span class="text-[13px] font-semibold text-[#010D28]">16 vídeos práticos</span>
+        </div>
+        <div class="flex items-center gap-3 rounded-2xl border border-[#E7EAF3] bg-white/85 p-4 shadow-sm">
+          <Clock3 class="min-w-5 text-[#000A57]" size={20} aria-hidden="true" />
+          <span class="text-[13px] font-semibold text-[#010D28]">Continue quando quiser</span>
+        </div>
+      </div>
     </div>
-
-    <nav class="mx-auto mt-14 grid max-w-6xl gap-4 md:grid-cols-3" aria-label="Etapas dos primeiros passos">
-      {#each journeySteps as step}
-        <a
-          href={step.href}
-          class="group rounded-[24px] border border-[#E7EAF8] bg-white/90 p-6 shadow-[0_18px_50px_rgba(1,13,40,0.07)] backdrop-blur transition hover:-translate-y-1 hover:border-[#EA6D0B]/25 hover:shadow-[0_24px_55px_rgba(1,13,40,0.1)]"
-        >
-          <div class="flex items-center justify-between gap-4">
-            <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F3F4FD] text-[#000A57] transition group-hover:bg-[#EA6D0B]/10 group-hover:text-[#EA6D0B]">
-              <svelte:component this={step.icon} size={22} aria-hidden="true" />
-            </span>
-            <span class="text-[12px] font-bold tracking-[0.16em] text-[#000A57]/35">{step.number}</span>
-          </div>
-
-          <h2 class="mt-5 text-[19px] font-semibold text-[#010D28]">{step.title}</h2>
-          <p class="mt-2 text-[14px] leading-[1.65] text-[#5F6475]">{step.description}</p>
-
-          <span class="mt-5 inline-flex items-center gap-2 text-[13px] font-semibold text-[#EA6D0B]">
-            Ver esta etapa
-            <Check size={15} aria-hidden="true" />
-          </span>
-        </a>
-      {/each}
-    </nav>
   </div>
 </section>
 
-<DownloadGuide />
-<TrainingGuide />
+<GettingStartedJourney />
 <SupportGuide />
 
 <section class="bg-[#F7F8FE] py-16 md:py-24">
@@ -200,11 +214,10 @@
         Dúvidas frequentes
       </p>
       <h2 class="mt-4 text-[30px] font-semibold tracking-[-0.03em] text-[#010D28] sm:text-[38px]">
-        Respostas rápidas para começar
+        Respostas rápidas para continuar
       </h2>
       <p class="mt-4 text-[15px] leading-[1.75] text-[#5F6475]">
-        Consulte as orientações essenciais sobre instalação, treinamentos e
-        atendimento.
+        Consulte as orientações sobre instalação, primeiro acesso, treinamentos e suporte.
       </p>
     </div>
 
