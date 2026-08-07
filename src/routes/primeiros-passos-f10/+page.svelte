@@ -19,16 +19,28 @@
   const canonicalUrl = `${SITE_URL}/primeiros-passos-f10`;
   const seoTitle = "Primeiros Passos no F10 | Guia e Treinamentos";
   const seoDescription =
-    "Siga a trilha guiada de primeiros passos no F10: instalação, primeiro acesso, cadastro de usuários, direitos de acesso e treinamentos em vídeo.";
+    "Siga a trilha guiada de primeiros passos no F10 para Windows: download, instalação, primeiro acesso, troca de senha, usuários e treinamentos.";
 
   const journeySteps = [
     {
-      title: "Baixar e instalar o F10",
-      description: "Baixe o instalador oficial e instale o F10 em um computador Windows.",
+      title: "Baixar o F10",
+      description: "Baixe o instalador oficial em um computador com Windows.",
     },
     {
-      title: "Fazer o primeiro acesso",
-      description: "Entre no F10 com o usuário e a senha recebidos por e-mail.",
+      title: "Instalar o F10",
+      description: "Abra o instalador e siga cada tela do assistente de instalação.",
+    },
+    {
+      title: "Entrar com a senha provisória",
+      description: "Utilize o login e a senha provisória recebidos por e-mail.",
+    },
+    {
+      title: "Criar uma nova senha",
+      description: "Troque a senha provisória por uma senha pessoal.",
+    },
+    {
+      title: "Entrar novamente no F10",
+      description: "Após a tela recarregar, faça o login utilizando a nova senha.",
     },
     {
       title: "Criar usuários e funcionários",
@@ -49,7 +61,7 @@
     "@id": `${canonicalUrl}#steps`,
     name: "Trilha guiada de primeiros passos no F10",
     description:
-      "Sequência de cinco etapas para instalar, acessar, configurar e começar a utilizar o F10 Software.",
+      "Sequência de oito etapas para baixar, instalar, acessar, configurar e começar a utilizar o F10 Software no Windows.",
     numberOfItems: journeySteps.length,
     itemListOrder: "https://schema.org/ItemListOrderAscending",
     itemListElement: journeySteps.map((step, index) => ({

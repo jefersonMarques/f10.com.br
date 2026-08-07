@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onDestroy, onMount } from "svelte";
   import { ArrowRight, LifeBuoy } from "lucide-svelte";
+  import { openSupportEventName } from "$lib/support/supportEvents";
 
   // =========================
   // Movidesk Chat Widget (Suporte) - FORA do seu popup
@@ -184,6 +185,14 @@
       "_blank",
     );
     isSupportWidgetOpen = false;
+  }
+
+  function handleOpenSupportRequest(): void {
+    if (variant !== "support") return;
+
+    isOpen = false;
+    selectedDepartment = null;
+    void openMovideskSupport();
   }
 
   function closeMovideskSupport() {
@@ -490,6 +499,14 @@
     await openMovideskSupport();
   });
 
+  onMount(() => {
+    window.addEventListener(openSupportEventName, handleOpenSupportRequest);
+
+    return () => {
+      window.removeEventListener(openSupportEventName, handleOpenSupportRequest);
+    };
+  });
+
   onDestroy(() => {
     // se quiser sempre fechar ao sair da página
     // closeMovideskSupport();
@@ -501,7 +518,7 @@
 <!-- Overlay global -->
 <div class="fixed inset-0 z-[9999] pointer-events-none">
   <div
-    class={`absolute right-4 pointer-events-auto md:right-6 ${variant === "support" ? "bottom-24 md:bottom-24" : "bottom-4 md:bottom-6"}`}
+    class={`absolute right-4 pointer-events-auto md:right-6 ${variant === "support" ? "bottom-36 md:bottom-24" : "bottom-4 md:bottom-6"}`}
   >
     <div class="relative flex flex-col items-end gap-3">
       {#if isOpen}

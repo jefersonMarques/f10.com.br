@@ -11,22 +11,33 @@
     Sparkles,
     X,
   } from "lucide-svelte";
+  import DownloadStep from "$lib/components/onboarding/DownloadStep.svelte";
   import EssentialTrainingStep from "$lib/components/onboarding/EssentialTrainingStep.svelte";
+  import FinalAccessStep from "$lib/components/onboarding/FinalAccessStep.svelte";
   import FirstAccessStep from "$lib/components/onboarding/FirstAccessStep.svelte";
   import InstallationStep from "$lib/components/onboarding/InstallationStep.svelte";
+  import PasswordSetupStep from "$lib/components/onboarding/PasswordSetupStep.svelte";
   import TrainingLibrary from "$lib/components/onboarding/TrainingLibrary.svelte";
   import TrainingVideoDialog from "$lib/components/onboarding/TrainingVideoDialog.svelte";
+  import TroubleshootingDialog from "$lib/components/onboarding/TroubleshootingDialog.svelte";
+  import { troubleshootingGuides } from "$lib/onboarding/setupGuide";
   import {
     trainingVideos,
     type TrainingVideo,
   } from "$lib/onboarding/trainingCatalog";
+  import { requestSupportWidget } from "$lib/support/supportEvents";
 
   type JourneyStepId =
+    | "download"
     | "installation"
-    | "first-access"
+    | "provisional-access"
+    | "password-setup"
+    | "final-access"
     | "user-registration"
     | "user-permissions"
     | "training-library";
+
+  type TroubleshootingGuideId = keyof typeof troubleshootingGuides;
 
   type JourneyStep = {
     id: JourneyStepId;
@@ -39,24 +50,40 @@
     completedStepIds?: JourneyStepId[];
     completedTrainingIds?: string[];
     selectedTrainingId?: string | null;
+    downloadStarted?: boolean;
   };
 
-  const storageKey = "f10-getting-started-progress-v1";
+  const storageKey = "f10-getting-started-progress-v2";
   const journeySteps: JourneyStep[] = [
+    {
+      id: "download",
+      shortTitle: "Baixar o F10",
+      objective: "Baixar o instalador em um computador com Windows.",
+    },
     {
       id: "installation",
       shortTitle: "Instalar o F10",
-      objective: "Baixar e instalar o sistema no computador.",
+      objective: "Abrir o instalador e concluir cada tela do assistente.",
     },
     {
-      id: "first-access",
-      shortTitle: "Primeiro acesso",
-      objective: "Entrar usando os dados recebidos por e-mail.",
+      id: "provisional-access",
+      shortTitle: "Acesso provisório",
+      objective: "Entrar com o login e a senha recebidos por e-mail.",
+    },
+    {
+      id: "password-setup",
+      shortTitle: "Criar nova senha",
+      objective: "Trocar a senha provisória por uma senha pessoal.",
+    },
+    {
+      id: "final-access",
+      shortTitle: "Entrar no F10",
+      objective: "Fazer o segundo login utilizando a nova senha.",
     },
     {
       id: "user-registration",
       shortTitle: "Criar usuários",
-      objective: "Cadastrar as pessoas que usarão o F10.",
+      objective: "Cadastrar as pessoas que utilizarão o F10.",
     },
     {
       id: "user-permissions",
@@ -75,6 +102,8 @@
   let completedTrainingIds: string[] = [];
   let selectedTrainingId: string | null = null;
   let activeTraining: TrainingVideo | null = null;
+  let activeTroubleshootingGuideId: TroubleshootingGuideId | null = null;
+  let downloadStarted = false;
   let hasStarted = false;
   let hasSavedProgress = false;
   let showCompletion = false;
@@ -93,6 +122,10 @@
       : currentStep?.id === "user-permissions"
         ? trainingVideos[1]
         : null;
+  $: currentTroubleshootingGuideId = getTroubleshootingGuideId(currentStep?.id);
+  $: activeTroubleshootingGuide = activeTroubleshootingGuideId
+    ? troubleshootingGuides[activeTroubleshootingGuideId]
+    : null;
   $: primaryActionLabel = getPrimaryActionLabel();
 
   onMount(() => {
@@ -129,6 +162,7 @@
       );
       if (storedStepIndex >= 0) currentStepIndex = storedStepIndex;
 
+      downloadStarted = storedProgress.downloadStarted === true;
       hasSavedProgress = true;
     } catch {
       window.localStorage.removeItem(storageKey);
@@ -143,6 +177,7 @@
       completedStepIds,
       completedTrainingIds,
       selectedTrainingId,
+      downloadStarted,
     };
 
     try {
@@ -171,6 +206,8 @@
     completedTrainingIds = [];
     selectedTrainingId = null;
     activeTraining = null;
+    activeTroubleshootingGuideId = null;
+    downloadStarted = false;
     showCompletion = false;
     hasStarted = true;
 
@@ -181,6 +218,7 @@
 
   function returnToIntroduction(): void {
     activeTraining = null;
+    activeTroubleshootingGuideId = null;
     showCompletion = false;
     hasStarted = false;
   }
@@ -193,6 +231,10 @@
   function addCompletedTraining(trainingId: string): void {
     if (completedTrainingIds.includes(trainingId)) return;
     completedTrainingIds = [...completedTrainingIds, trainingId];
+  }
+
+  function findStepIndex(stepId: JourneyStepId): number {
+    return journeySteps.findIndex((step) => step.id === stepId);
   }
 
   function openStep(stepIndex: number): void {
@@ -233,11 +275,23 @@
     void focusCurrentContent();
   }
 
+  function markDownloadStarted(): void {
+    downloadStarted = true;
+    persistProgress();
+  }
+
   function getPrimaryActionLabel(): string | null {
     if (!currentStep) return null;
 
-    if (currentStep.id === "installation") return "Já instalei o F10";
-    if (currentStep.id === "first-access") return "Consegui entrar no F10";
+    if (currentStep.id === "download") {
+      return downloadStarted ? "Continuar para instalação" : null;
+    }
+    if (currentStep.id === "installation") return "Concluí a instalação";
+    if (currentStep.id === "provisional-access") {
+      return "A tela para criar senha apareceu";
+    }
+    if (currentStep.id === "password-setup") return "Criei minha nova senha";
+    if (currentStep.id === "final-access") return "Consegui entrar no F10";
 
     if (currentEssentialTraining) {
       return completedTrainingIds.includes(currentEssentialTraining.id)
@@ -249,22 +303,49 @@
   }
 
   function handlePrimaryAction(): void {
-    if (
-      currentStep.id === "installation" ||
-      currentStep.id === "first-access"
-    ) {
-      completeStepAndContinue();
+    if (currentEssentialTraining) {
+      if (completedTrainingIds.includes(currentEssentialTraining.id)) {
+        completeStepAndContinue();
+        return;
+      }
+
+      openTraining(currentEssentialTraining);
       return;
     }
 
-    if (!currentEssentialTraining) return;
+    if (currentStep.id !== "training-library") completeStepAndContinue();
+  }
 
-    if (completedTrainingIds.includes(currentEssentialTraining.id)) {
-      completeStepAndContinue();
-      return;
-    }
+  function getTroubleshootingGuideId(
+    stepId: JourneyStepId | undefined,
+  ): TroubleshootingGuideId | null {
+    if (stepId === "download") return "download";
+    if (stepId === "installation") return "installation";
+    if (stepId === "provisional-access") return "provisionalAccess";
+    if (stepId === "password-setup") return "passwordSetup";
+    if (stepId === "final-access") return "finalAccess";
+    return null;
+  }
 
-    openTraining(currentEssentialTraining);
+  function openTroubleshooting(): void {
+    if (!currentTroubleshootingGuideId) return;
+    activeTroubleshootingGuideId = currentTroubleshootingGuideId;
+  }
+
+  function closeTroubleshooting(): void {
+    activeTroubleshootingGuideId = null;
+  }
+
+  function resolveTroubleshooting(): void {
+    activeTroubleshootingGuideId = null;
+    completeStepAndContinue();
+  }
+
+  function requestSupport(): void {
+    activeTroubleshootingGuideId = null;
+
+    if (!browser) return;
+    window.setTimeout(requestSupportWidget, 180);
   }
 
   function openTraining(training: TrainingVideo): void {
@@ -288,13 +369,13 @@
       completedTraining.id === trainingVideos[0].id
     ) {
       addCompletedStep("user-registration");
-      currentStepIndex = 3;
+      currentStepIndex = findStepIndex("user-permissions");
     } else if (
       currentStep.id === "user-permissions" &&
       completedTraining.id === trainingVideos[1].id
     ) {
       addCompletedStep("user-permissions");
-      currentStepIndex = 4;
+      currentStepIndex = findStepIndex("training-library");
     } else if (currentStep.id === "training-library") {
       addCompletedStep("training-library");
       showCompletion = true;
@@ -333,13 +414,13 @@
         </h1>
 
         <p class="mx-auto mt-4 max-w-lg text-[14px] leading-[1.7] text-[#5F6475] sm:text-[16px]">
-          Você não precisa aprender tudo agora. Mostraremos somente uma ação por vez e salvaremos seu progresso neste navegador.
+          Mostraremos uma ação por vez: baixar, instalar, entrar com a senha provisória e criar sua senha definitiva.
         </p>
 
         <div class="mx-auto mt-6 flex max-w-md items-center justify-center gap-3 rounded-2xl bg-[#F6F7FB] px-4 py-3 text-left ring-1 ring-[#E3E6F0]">
           <CheckCircle2 class="min-w-5 text-emerald-600" size={20} aria-hidden="true" />
           <p class="text-[12px] font-semibold leading-relaxed text-[#41475A] sm:text-[13px]">
-            Instalar, entrar, configurar sua equipe e escolher o primeiro treinamento.
+            Seu progresso ficará salvo neste navegador para você continuar quando quiser.
           </p>
         </div>
 
@@ -370,7 +451,7 @@
         <div class="mx-auto flex max-w-7xl items-center justify-between gap-4">
           <div class="flex min-w-0 items-center gap-3">
             <img src="/logo_f10.svg" alt="F10 Software" class="h-7 w-auto sm:h-8" />
-            <span class="h-7 w-px bg-[#DFE3ED]" aria-hidden="true"></span>
+            <span class="h-8 w-px bg-[#DFE3ED]" aria-hidden="true"></span>
             <div class="min-w-0">
               <p class="text-[10px] font-bold uppercase tracking-[0.13em] text-[#EA6D0B]">
                 Etapa {currentStepIndex + 1} de {journeySteps.length}
@@ -397,23 +478,15 @@
 
       <div class="shrink-0 border-b border-[#E7E9F1] bg-white/75 px-4 py-2.5 sm:px-6">
         <div class="mx-auto flex max-w-7xl items-center gap-4">
-          <ol class="flex flex-1 items-center gap-1.5" aria-label="Progresso dos primeiros passos">
+          <ol class="grid flex-1 grid-cols-8 gap-1.5" aria-label="Progresso dos primeiros passos">
             {#each journeySteps as step, index}
-              <li class="flex flex-1 items-center gap-1.5">
+              <li>
                 <span
-                  class={`inline-flex h-6 min-w-6 items-center justify-center rounded-full text-[10px] font-bold transition ${completedStepIds.includes(step.id) ? "bg-emerald-600 text-white" : currentStepIndex === index ? "bg-[#EA6D0B] text-white" : "bg-[#E7E9F1] text-[#000A57]/55"}`}
+                  class={`block h-2 rounded-full transition ${completedStepIds.includes(step.id) ? "bg-emerald-500" : currentStepIndex === index ? "bg-[#EA6D0B]" : "bg-[#DDE0E9]"}`}
                   aria-current={currentStepIndex === index ? "step" : undefined}
                 >
-                  {#if completedStepIds.includes(step.id)}
-                    <Check size={13} aria-hidden="true" />
-                  {:else}
-                    {index + 1}
-                  {/if}
-                  <span class="sr-only">{step.shortTitle}</span>
+                  <span class="sr-only">Etapa {index + 1}: {step.shortTitle}</span>
                 </span>
-                {#if index < journeySteps.length - 1}
-                  <span class={`h-1 flex-1 rounded-full ${completedStepIds.includes(step.id) ? "bg-emerald-500" : "bg-[#E7E9F1]"}`} aria-hidden="true"></span>
-                {/if}
               </li>
             {/each}
           </ol>
@@ -446,7 +519,7 @@
                 Você concluiu seus primeiros passos no F10
               </h1>
               <p class="mx-auto mt-4 max-w-xl text-[14px] leading-[1.7] text-[#5F6475] sm:text-[16px]">
-                Agora você já sabe acessar o sistema, organizar os usuários e encontrar treinamentos para cada rotina.
+                Agora você já sabe instalar, acessar, organizar os usuários e encontrar treinamentos para cada rotina.
               </p>
 
               <div class="mx-auto mt-7 grid max-w-xl gap-3 sm:grid-cols-2">
@@ -472,10 +545,19 @@
           {:else}
             {#key currentStep.id}
               <div class="step-transition w-full">
-                {#if currentStep.id === "installation"}
+                {#if currentStep.id === "download"}
+                  <DownloadStep
+                    {downloadStarted}
+                    onDownloadStarted={markDownloadStarted}
+                  />
+                {:else if currentStep.id === "installation"}
                   <InstallationStep />
-                {:else if currentStep.id === "first-access"}
+                {:else if currentStep.id === "provisional-access"}
                   <FirstAccessStep />
+                {:else if currentStep.id === "password-setup"}
+                  <PasswordSetupStep />
+                {:else if currentStep.id === "final-access"}
+                  <FinalAccessStep />
                 {:else if currentStep.id === "user-registration"}
                   <EssentialTrainingStep
                     training={trainingVideos[0]}
@@ -508,28 +590,39 @@
       </main>
 
       {#if !showCompletion}
-        <footer class="shrink-0 border-t border-[#E1E4ED] bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
-          <div class="mx-auto flex max-w-7xl items-center justify-between gap-3">
+        <footer class="shrink-0 border-t border-[#D9DDE7] bg-white/98 px-4 py-3 shadow-[0_-12px_35px_rgba(1,13,40,0.08)] backdrop-blur sm:px-6">
+          <div class="mx-auto grid max-w-7xl grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-between sm:gap-3">
             <button
               type="button"
-              class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[#DDE1EC] bg-white px-4 py-2.5 text-[13px] font-semibold text-[#000A57] transition hover:bg-[#F6F7FA] focus:outline-none focus:ring-2 focus:ring-[#000A57]/20 sm:px-5"
+              class="order-2 inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full border-2 border-[#000A57] bg-white px-4 py-3 text-[13px] font-semibold text-[#000A57] shadow-sm transition hover:bg-[#F3F4FA] focus:outline-none focus:ring-2 focus:ring-[#000A57]/25 sm:order-1 sm:min-w-[150px] sm:px-6 sm:text-[14px]"
               on:click={goBack}
             >
-              <ArrowLeft size={17} aria-hidden="true" />
+              <ArrowLeft size={18} aria-hidden="true" />
               <span>{currentStepIndex === 0 ? "Introdução" : "Voltar"}</span>
             </button>
+
+            {#if currentTroubleshootingGuideId}
+              <button
+                type="button"
+                class="order-3 inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full border-2 border-[#EA6D0B] bg-[#FFF8F2] px-4 py-3 text-[13px] font-semibold text-[#C95717] transition hover:bg-[#FFF0E4] focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/30 sm:order-2 sm:min-w-[170px] sm:px-6 sm:text-[14px]"
+                on:click={openTroubleshooting}
+              >
+                <LifeBuoy size={18} aria-hidden="true" />
+                Não consegui
+              </button>
+            {/if}
 
             {#if primaryActionLabel}
               <button
                 type="button"
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#000A57] px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_10px_25px_rgba(0,10,87,0.2)] transition hover:bg-[#111B71] focus:outline-none focus:ring-2 focus:ring-[#000A57]/40 sm:px-6 sm:text-[14px]"
+                class="primary-navigation order-1 col-span-2 inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#EA6D0B] px-6 py-3.5 text-[15px] font-semibold text-white shadow-[0_14px_34px_rgba(234,109,11,0.34)] transition hover:brightness-105 focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/45 sm:order-3 sm:ml-auto sm:min-w-[260px] sm:px-8 sm:text-[16px]"
                 on:click={handlePrimaryAction}
               >
                 {primaryActionLabel}
-                <ArrowRight size={17} aria-hidden="true" />
+                <ArrowRight size={19} aria-hidden="true" />
               </button>
-            {:else}
-              <p class="hidden text-right text-[12px] font-semibold text-[#5F6475] sm:block">
+            {:else if currentStep.id === "training-library"}
+              <p class="order-1 col-span-2 hidden text-right text-[12px] font-semibold text-[#5F6475] sm:order-3 sm:ml-auto sm:block">
                 Escolha uma área e depois um vídeo para concluir.
               </p>
             {/if}
@@ -549,13 +642,23 @@
   onComplete={completeActiveTraining}
 />
 
+<TroubleshootingDialog
+  guide={activeTroubleshootingGuide}
+  guideId={activeTroubleshootingGuideId}
+  isOpen={activeTroubleshootingGuideId !== null}
+  onClose={closeTroubleshooting}
+  onResolved={resolveTroubleshooting}
+  onRequestSupport={requestSupport}
+/>
+
 <style>
-  .welcome-action {
+  .welcome-action,
+  .primary-navigation {
     animation: onboarding-float 2.8s ease-in-out infinite;
   }
 
   .step-transition {
-    animation: step-enter 240ms ease-out;
+    animation: step-enter 220ms ease-out;
   }
 
   @keyframes onboarding-float {
@@ -563,14 +666,14 @@
       transform: translateY(0);
     }
     50% {
-      transform: translateY(-6px);
+      transform: translateY(-5px);
     }
   }
 
   @keyframes step-enter {
     from {
       opacity: 0;
-      transform: translateX(12px);
+      transform: translateX(10px);
     }
     to {
       opacity: 1;
@@ -580,6 +683,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .welcome-action,
+    .primary-navigation,
     .step-transition {
       animation: none;
     }
