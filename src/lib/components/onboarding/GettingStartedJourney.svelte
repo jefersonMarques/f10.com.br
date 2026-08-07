@@ -2,7 +2,6 @@
   import { browser } from "$app/environment";
   import { onMount, tick } from "svelte";
   import {
-    ArrowLeft,
     ArrowRight,
     Check,
     CheckCircle2,
@@ -20,8 +19,6 @@
   import SupportChatDialog from "$lib/components/onboarding/SupportChatDialog.svelte";
   import TrainingLibrary from "$lib/components/onboarding/TrainingLibrary.svelte";
   import TrainingVideoDialog from "$lib/components/onboarding/TrainingVideoDialog.svelte";
-  import TroubleshootingDialog from "$lib/components/onboarding/TroubleshootingDialog.svelte";
-  import { troubleshootingGuides } from "$lib/onboarding/setupGuide";
   import {
     trainingVideos,
     type TrainingVideo,
@@ -36,8 +33,6 @@
     | "user-registration"
     | "user-permissions"
     | "training-library";
-
-  type TroubleshootingGuideId = keyof typeof troubleshootingGuides;
 
   type JourneyStep = {
     id: JourneyStepId;
@@ -102,7 +97,6 @@
   let completedTrainingIds: string[] = [];
   let selectedTrainingId: string | null = null;
   let activeTraining: TrainingVideo | null = null;
-  let activeTroubleshootingGuideId: TroubleshootingGuideId | null = null;
   let supportDialogOpen = false;
   let downloadStarted = false;
   let hasStarted = false;
@@ -117,22 +111,6 @@
   $: activeTrainingIsCompleted = activeTraining
     ? completedTrainingIds.includes(activeTraining.id)
     : false;
-  $: currentEssentialTraining =
-    currentStep?.id === "user-registration"
-      ? trainingVideos[0]
-      : currentStep?.id === "user-permissions"
-        ? trainingVideos[1]
-        : null;
-  $: currentTroubleshootingGuideId = getTroubleshootingGuideId(currentStep?.id);
-  $: activeTroubleshootingGuide = activeTroubleshootingGuideId
-    ? troubleshootingGuides[activeTroubleshootingGuideId]
-    : null;
-  $: primaryActionLabel = getPrimaryActionLabel(
-    currentStep?.id,
-    downloadStarted,
-    currentEssentialTraining,
-    completedTrainingIds,
-  );
 
   onMount(() => {
     restoreProgress();
@@ -212,7 +190,6 @@
     completedTrainingIds = [];
     selectedTrainingId = null;
     activeTraining = null;
-    activeTroubleshootingGuideId = null;
     supportDialogOpen = false;
     downloadStarted = false;
     showCompletion = false;
@@ -225,7 +202,6 @@
 
   function returnToIntroduction(): void {
     activeTraining = null;
-    activeTroubleshootingGuideId = null;
     supportDialogOpen = false;
     showCompletion = false;
     hasStarted = false;
@@ -243,25 +219,6 @@
 
   function findStepIndex(stepId: JourneyStepId): number {
     return journeySteps.findIndex((step) => step.id === stepId);
-  }
-
-  function openStep(stepIndex: number): void {
-    currentStepIndex = Math.min(
-      Math.max(stepIndex, 0),
-      journeySteps.length - 1,
-    );
-    showCompletion = false;
-    persistProgress();
-    void focusCurrentContent();
-  }
-
-  function goBack(): void {
-    if (currentStepIndex === 0) {
-      returnToIntroduction();
-      return;
-    }
-
-    openStep(currentStepIndex - 1);
   }
 
   function completeStepAndContinue(): void {
@@ -303,77 +260,9 @@
     void focusCurrentContent();
   }
 
-  function getPrimaryActionLabel(
-    stepId: JourneyStepId | undefined,
-    hasDownloadStarted: boolean,
-    essentialTraining: TrainingVideo | null,
-    completedTraining: string[],
-  ): string | null {
-    if (!stepId) return null;
-
-    if (stepId === "download") {
-      return hasDownloadStarted ? "O arquivo apareceu — prosseguir" : null;
-    }
-    if (stepId === "installation") return "Concluí a instalação";
-    if (stepId === "provisional-access") {
-      return "A tela para criar senha apareceu";
-    }
-    if (stepId === "password-setup") return "Criei minha nova senha";
-    if (stepId === "final-access") return "Consegui entrar no F10";
-
-    if (essentialTraining) {
-      return completedTraining.includes(essentialTraining.id)
-        ? "Continuar"
-        : "Assistir ao vídeo";
-    }
-
-    return null;
-  }
-
-  function handlePrimaryAction(): void {
-    if (currentEssentialTraining) {
-      if (completedTrainingIds.includes(currentEssentialTraining.id)) {
-        completeStepAndContinue();
-        return;
-      }
-
-      openTraining(currentEssentialTraining);
-      return;
-    }
-
-    if (currentStep.id !== "training-library") completeStepAndContinue();
-  }
-
-  function getTroubleshootingGuideId(
-    stepId: JourneyStepId | undefined,
-  ): TroubleshootingGuideId | null {
-    if (stepId === "download") return "download";
-    if (stepId === "installation") return "installation";
-    if (stepId === "provisional-access") return "provisionalAccess";
-    if (stepId === "password-setup") return "passwordSetup";
-    if (stepId === "final-access") return "finalAccess";
-    return null;
-  }
-
-  function openTroubleshooting(): void {
-    if (!currentTroubleshootingGuideId) return;
-    activeTroubleshootingGuideId = currentTroubleshootingGuideId;
-  }
-
-  function closeTroubleshooting(): void {
-    activeTroubleshootingGuideId = null;
-  }
-
-  function resolveTroubleshooting(): void {
-    activeTroubleshootingGuideId = null;
-    completeStepAndContinue();
-  }
-
   function requestSupport(): void {
-    activeTroubleshootingGuideId = null;
-
     if (!browser) return;
-    window.setTimeout(openSupportDialog, 180);
+    openSupportDialog();
   }
 
   function openSupportDialog(): void {
@@ -585,16 +474,29 @@
                   <DownloadStep
                     {downloadStarted}
                     onDownloadStarted={markDownloadStarted}
+                    onComplete={completeStepAndContinue}
                     onAlreadyInstalled={skipSetupAndOpenTraining}
                   />
                 {:else if currentStep.id === "installation"}
-                  <InstallationStep onComplete={completeStepAndContinue} />
+                  <InstallationStep
+                    onComplete={completeStepAndContinue}
+                    onRequestSupport={requestSupport}
+                  />
                 {:else if currentStep.id === "provisional-access"}
-                  <FirstAccessStep onComplete={completeStepAndContinue} />
+                  <FirstAccessStep
+                    onComplete={completeStepAndContinue}
+                    onRequestSupport={requestSupport}
+                  />
                 {:else if currentStep.id === "password-setup"}
-                  <PasswordSetupStep onComplete={completeStepAndContinue} />
+                  <PasswordSetupStep
+                    onComplete={completeStepAndContinue}
+                    onRequestSupport={requestSupport}
+                  />
                 {:else if currentStep.id === "final-access"}
-                  <FinalAccessStep onComplete={completeStepAndContinue} />
+                  <FinalAccessStep
+                    onComplete={completeStepAndContinue}
+                    onRequestSupport={requestSupport}
+                  />
                 {:else if currentStep.id === "user-registration"}
                   <EssentialTrainingStep
                     training={trainingVideos[0]}
@@ -626,46 +528,6 @@
         </div>
       </main>
 
-      {#if !showCompletion}
-        <footer class="shrink-0 border-t border-[#D9DDE7] bg-white/98 px-4 py-3 shadow-[0_-12px_35px_rgba(1,13,40,0.08)] backdrop-blur sm:px-6">
-          <div class="mx-auto grid max-w-7xl grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-between sm:gap-3">
-            <button
-              type="button"
-              class="order-2 inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full border-2 border-[#000A57] bg-white px-4 py-3 text-[13px] font-semibold text-[#000A57] shadow-sm transition hover:bg-[#F3F4FA] focus:outline-none focus:ring-2 focus:ring-[#000A57]/25 sm:order-1 sm:min-w-[150px] sm:px-6 sm:text-[14px]"
-              on:click={goBack}
-            >
-              <ArrowLeft size={18} aria-hidden="true" />
-              <span>{currentStepIndex === 0 ? "Introdução" : "Voltar"}</span>
-            </button>
-
-            {#if currentTroubleshootingGuideId}
-              <button
-                type="button"
-                class="order-3 inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full border-2 border-[#EA6D0B] bg-[#FFF8F2] px-4 py-3 text-[13px] font-semibold text-[#C95717] transition hover:bg-[#FFF0E4] focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/30 sm:order-2 sm:min-w-[170px] sm:px-6 sm:text-[14px]"
-                on:click={openTroubleshooting}
-              >
-                <LifeBuoy size={18} aria-hidden="true" />
-                Preciso de ajuda
-              </button>
-            {/if}
-
-            {#if primaryActionLabel}
-              <button
-                type="button"
-                class="primary-navigation order-1 col-span-2 inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#EA6D0B] px-6 py-3.5 text-[15px] font-semibold text-white shadow-[0_14px_34px_rgba(234,109,11,0.34)] transition hover:brightness-105 focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/45 sm:order-3 sm:ml-auto sm:min-w-[260px] sm:px-8 sm:text-[16px]"
-                on:click={handlePrimaryAction}
-              >
-                {primaryActionLabel}
-                <ArrowRight size={19} aria-hidden="true" />
-              </button>
-            {:else if currentStep.id === "training-library"}
-              <p class="order-1 col-span-2 hidden text-right text-[12px] font-semibold text-[#5F6475] sm:order-3 sm:ml-auto sm:block">
-                Escolha uma área e depois um vídeo para concluir.
-              </p>
-            {/if}
-          </div>
-        </footer>
-      {/if}
     </div>
   {/if}
 </section>
@@ -679,23 +541,13 @@
   onComplete={completeActiveTraining}
 />
 
-<TroubleshootingDialog
-  guide={activeTroubleshootingGuide}
-  guideId={activeTroubleshootingGuideId}
-  isOpen={activeTroubleshootingGuideId !== null}
-  onClose={closeTroubleshooting}
-  onResolved={resolveTroubleshooting}
-  onRequestSupport={requestSupport}
-/>
-
 <SupportChatDialog
   isOpen={supportDialogOpen}
   onClose={closeSupportDialog}
 />
 
 <style>
-  .welcome-action,
-  .primary-navigation {
+  .welcome-action {
     animation: onboarding-float 2.8s ease-in-out infinite;
   }
 
@@ -725,7 +577,6 @@
 
   @media (prefers-reduced-motion: reduce) {
     .welcome-action,
-    .primary-navigation,
     .step-transition {
       animation: none;
     }

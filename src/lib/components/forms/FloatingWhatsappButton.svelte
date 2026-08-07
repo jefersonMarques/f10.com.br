@@ -519,7 +519,7 @@
 <!-- Overlay global -->
 <div class="fixed inset-0 z-[9999] pointer-events-none">
   <div
-    class={`absolute right-4 pointer-events-auto md:right-6 ${variant === "support" ? "bottom-36 md:bottom-24" : "bottom-4 md:bottom-6"}`}
+    class={`absolute right-4 pointer-events-auto md:right-6 ${variant === "support" ? "bottom-6" : "bottom-4 md:bottom-6"}`}
   >
     <div class="relative flex flex-col items-end gap-3">
       {#if isOpen}
