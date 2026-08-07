@@ -126,7 +126,9 @@
     <slot />
   </main>
   <Footer />
-  <FloatingWhatsappButton />
+  <FloatingWhatsappButton
+    variant={pathname === "/primeiros-passos-f10" ? "support" : "contact"}
+  />
 
   <Popup bind:size={modalSize}>
     {#if modalConfig?.type === "contact"}
