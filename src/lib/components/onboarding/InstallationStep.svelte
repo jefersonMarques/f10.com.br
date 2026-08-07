@@ -203,18 +203,31 @@
       {:else if stage === "open-installer"}
         <CenteredChoice
           titleId="open-installer-title"
-          title="Dê dois cliques neste ícone"
-          description="Depois, clique em Avançar até aparecer o botão Concluir."
+          title="No seu computador, abra o InstaladorF10.exe"
+          description="O arquivo está na pasta Downloads."
           primaryLabel="Consegui instalar"
           secondaryLabel="Não consegui"
           onPrimary={onComplete}
           onSecondary={showErrorQuestion}
         >
           <img
-            src="/onboarding/f10-installer-icon.webp"
-            alt="Ícone do instalador do F10"
-            class="mx-auto h-24 w-24 rounded-[22px] shadow-[0_14px_32px_rgba(1,13,40,0.18)]"
+            src="/onboarding/f10-installer-download.webp"
+            alt="Pasta Downloads do Windows mostrando o arquivo InstaladorF10.exe"
+            class="mx-auto max-h-[210px] w-full max-w-3xl rounded-[22px] object-contain shadow-[0_16px_38px_rgba(1,13,40,0.15)] sm:max-h-[300px] lg:max-h-[340px]"
           />
+
+          <div
+            slot="detail"
+            class="mx-auto mt-4 flex w-fit max-w-full items-center justify-center gap-3 rounded-2xl bg-white px-4 py-2.5 text-left text-[14px] leading-snug text-[#3F4658] shadow-[0_8px_24px_rgba(1,13,40,0.08)] sm:text-[15px]"
+          >
+            <span>No seu computador, dê dois cliques em um ícone como este:</span>
+            <img
+              src="/onboarding/f10-installer-icon.webp"
+              alt=""
+              class="h-10 w-10 shrink-0 rounded-[10px]"
+            />
+            <strong class="hidden shrink-0 text-[#010D28] sm:inline">InstaladorF10.exe</strong>
+          </div>
         </CenteredChoice>
       {:else if stage === "error-question"}
         <CenteredChoice

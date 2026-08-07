@@ -30,6 +30,8 @@
     </p>
   {/if}
 
+  <slot name="detail" />
+
   <div class={`mx-auto mt-7 grid max-w-xl gap-3 ${secondaryLabel ? "sm:grid-cols-2" : "grid-cols-1"}`}>
     <button
       type="button"

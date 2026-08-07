@@ -64,7 +64,7 @@
           <img
             src="/onboarding/f10-password-change.webp"
             alt="Janela para criar a nova senha do F10"
-            class="mx-auto max-h-[180px] w-full max-w-md rounded-[18px] object-contain shadow-[0_16px_38px_rgba(1,13,40,0.15)]"
+            class="mx-auto max-h-[210px] w-full max-w-2xl rounded-[18px] object-contain shadow-[0_16px_38px_rgba(1,13,40,0.15)] sm:max-h-[300px] lg:max-h-[340px]"
           />
         </CenteredChoice>
       {:else if stage === "window"}
