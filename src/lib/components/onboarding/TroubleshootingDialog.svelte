@@ -16,6 +16,11 @@
   let checkedItemIndexes: number[] = [];
   let previousGuideId: string | null = null;
 
+  $: allChecklistItemsChecked = Boolean(
+    guide?.checklistItems.length &&
+      checkedItemIndexes.length === guide.checklistItems.length,
+  );
+
   $: if (guideId !== previousGuideId) {
     previousGuideId = guideId;
     checkedItemIndexes = [];
@@ -93,7 +98,7 @@
           {guide.description}
         </p>
         <p class="mt-2 text-[12px] font-semibold text-[#000A57]">
-          Marque cada item que já verificou:
+          Marque cada tentativa que você já realizou:
         </p>
 
         <div class="mt-4 space-y-2.5">
@@ -119,17 +124,29 @@
             on:click={onResolved}
           >
             <CheckCircle2 size={19} aria-hidden="true" />
-            Consegui avançar
+            Consegui resolver
           </button>
           <button
             type="button"
-            class="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full bg-[#000A57] px-5 py-3 text-[14px] font-semibold text-white shadow-[0_10px_25px_rgba(0,10,87,0.2)] transition hover:bg-[#111B71] focus:outline-none focus:ring-2 focus:ring-[#000A57]/35"
+            class="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full bg-[#000A57] px-5 py-3 text-[14px] font-semibold text-white shadow-[0_10px_25px_rgba(0,10,87,0.2)] transition hover:bg-[#111B71] focus:outline-none focus:ring-2 focus:ring-[#000A57]/35 disabled:cursor-not-allowed disabled:bg-[#C5C8D2] disabled:text-white disabled:shadow-none"
             on:click={onRequestSupport}
+            disabled={!allChecklistItemsChecked}
+            aria-describedby="support-unlock-description"
           >
             <LifeBuoy size={19} aria-hidden="true" />
             Ainda não consigo
           </button>
         </div>
+
+        <p
+          id="support-unlock-description"
+          class={`mt-3 text-center text-[11px] font-medium ${allChecklistItemsChecked ? "text-emerald-700" : "text-[#74798A]"}`}
+          aria-live="polite"
+        >
+          {allChecklistItemsChecked
+            ? "Atendimento liberado. Clique em Ainda não consigo para falar com o suporte."
+            : "O atendimento será liberado depois que todas as tentativas forem marcadas."}
+        </p>
       </div>
     </section>
   {/if}

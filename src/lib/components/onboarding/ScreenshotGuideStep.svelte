@@ -6,6 +6,8 @@
   export let title: string;
   export let description: string;
   export let slides: SetupGuideSlide[];
+  export let completionLabel = "Concluí esta etapa";
+  export let onComplete: () => void = () => undefined;
 
   let activeSlideIndex = 0;
 
@@ -18,6 +20,11 @@
   }
 
   function showNextSlide(): void {
+    if (isLastSlide) {
+      onComplete();
+      return;
+    }
+
     activeSlideIndex = Math.min(activeSlideIndex + 1, slides.length - 1);
   }
 </script>
@@ -57,8 +64,8 @@
         </p>
       </div>
 
-      {#if slides.length > 1}
-        <div class="mt-4 grid grid-cols-2 gap-2">
+      <div class={`mt-4 grid gap-2 ${slides.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+        {#if slides.length > 1}
           <button
             type="button"
             class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border-2 border-[#000A57] bg-white px-4 py-2.5 text-[12px] font-semibold text-[#000A57] transition hover:bg-[#F4F5FA] focus:outline-none focus:ring-2 focus:ring-[#000A57]/25 disabled:cursor-not-allowed disabled:border-[#D6D9E2] disabled:text-[#A1A5B1]"
@@ -68,19 +75,16 @@
             <ArrowLeft size={16} aria-hidden="true" />
             Imagem anterior
           </button>
-          <button
-            type="button"
-            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#000A57] px-4 py-2.5 text-[12px] font-semibold text-white transition hover:bg-[#111B71] focus:outline-none focus:ring-2 focus:ring-[#000A57]/35 disabled:cursor-not-allowed disabled:bg-emerald-600"
-            on:click={showNextSlide}
-            disabled={isLastSlide}
-          >
-            {isLastSlide ? "Orientações concluídas" : "Próxima imagem"}
-            {#if !isLastSlide}
-              <ArrowRight size={16} aria-hidden="true" />
-            {/if}
-          </button>
-        </div>
-      {/if}
+        {/if}
+        <button
+          type="button"
+          class={`inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[12px] font-semibold text-white shadow-sm transition focus:outline-none focus:ring-2 ${isLastSlide ? "bg-[#EA6D0B] hover:brightness-105 focus:ring-[#EA6D0B]/40" : "bg-[#000A57] hover:bg-[#111B71] focus:ring-[#000A57]/35"}`}
+          on:click={showNextSlide}
+        >
+          {isLastSlide ? completionLabel : "Próxima imagem"}
+          <ArrowRight size={16} aria-hidden="true" />
+        </button>
+      </div>
     </div>
 
     <figure class="overflow-hidden rounded-[22px] border border-[#D8DCE6] bg-[#E9E9E9] shadow-[0_22px_60px_rgba(1,13,40,0.14)]">

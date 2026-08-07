@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onDestroy, onMount } from "svelte";
   import { ArrowRight, LifeBuoy } from "lucide-svelte";
+  import { supportChatClientId } from "$lib/support/supportConfig";
   import { openSupportEventName } from "$lib/support/supportEvents";
 
   // =========================
@@ -8,7 +9,7 @@
   // - Ao clicar em Suporte: abre o modal/widget do Movidesk (maximized)
   // - Ao clicar no botão WhatsApp flutuante: se o Movidesk estiver aberto, ele fecha (minimize)
   // =========================
-  export let movideskChatClient: string = "F907BBDD336B4365A1CE3C5176E1C082";
+  export let movideskChatClient: string = supportChatClientId;
   export let supportOpenMode: "widget" | "iframe" = "widget"; // mantido por compatibilidade
   export let supportStartOpen: boolean = false;
   export let variant: "contact" | "support" = "contact";

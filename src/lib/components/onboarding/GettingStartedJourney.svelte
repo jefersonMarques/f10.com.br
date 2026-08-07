@@ -17,6 +17,7 @@
   import FirstAccessStep from "$lib/components/onboarding/FirstAccessStep.svelte";
   import InstallationStep from "$lib/components/onboarding/InstallationStep.svelte";
   import PasswordSetupStep from "$lib/components/onboarding/PasswordSetupStep.svelte";
+  import SupportChatDialog from "$lib/components/onboarding/SupportChatDialog.svelte";
   import TrainingLibrary from "$lib/components/onboarding/TrainingLibrary.svelte";
   import TrainingVideoDialog from "$lib/components/onboarding/TrainingVideoDialog.svelte";
   import TroubleshootingDialog from "$lib/components/onboarding/TroubleshootingDialog.svelte";
@@ -25,7 +26,6 @@
     trainingVideos,
     type TrainingVideo,
   } from "$lib/onboarding/trainingCatalog";
-  import { requestSupportWidget } from "$lib/support/supportEvents";
 
   type JourneyStepId =
     | "download"
@@ -103,6 +103,7 @@
   let selectedTrainingId: string | null = null;
   let activeTraining: TrainingVideo | null = null;
   let activeTroubleshootingGuideId: TroubleshootingGuideId | null = null;
+  let supportDialogOpen = false;
   let downloadStarted = false;
   let hasStarted = false;
   let hasSavedProgress = false;
@@ -126,7 +127,12 @@
   $: activeTroubleshootingGuide = activeTroubleshootingGuideId
     ? troubleshootingGuides[activeTroubleshootingGuideId]
     : null;
-  $: primaryActionLabel = getPrimaryActionLabel();
+  $: primaryActionLabel = getPrimaryActionLabel(
+    currentStep?.id,
+    downloadStarted,
+    currentEssentialTraining,
+    completedTrainingIds,
+  );
 
   onMount(() => {
     restoreProgress();
@@ -207,6 +213,7 @@
     selectedTrainingId = null;
     activeTraining = null;
     activeTroubleshootingGuideId = null;
+    supportDialogOpen = false;
     downloadStarted = false;
     showCompletion = false;
     hasStarted = true;
@@ -219,6 +226,7 @@
   function returnToIntroduction(): void {
     activeTraining = null;
     activeTroubleshootingGuideId = null;
+    supportDialogOpen = false;
     showCompletion = false;
     hasStarted = false;
   }
@@ -280,21 +288,41 @@
     persistProgress();
   }
 
-  function getPrimaryActionLabel(): string | null {
-    if (!currentStep) return null;
+  function skipSetupAndOpenTraining(): void {
+    const trainingStepIndex = findStepIndex("user-registration");
+    const setupStepIds = journeySteps
+      .slice(0, trainingStepIndex)
+      .map((step) => step.id);
 
-    if (currentStep.id === "download") {
-      return downloadStarted ? "Continuar para instalação" : null;
+    completedStepIds = Array.from(
+      new Set([...completedStepIds, ...setupStepIds]),
+    );
+    currentStepIndex = trainingStepIndex;
+    showCompletion = false;
+    persistProgress();
+    void focusCurrentContent();
+  }
+
+  function getPrimaryActionLabel(
+    stepId: JourneyStepId | undefined,
+    hasDownloadStarted: boolean,
+    essentialTraining: TrainingVideo | null,
+    completedTraining: string[],
+  ): string | null {
+    if (!stepId) return null;
+
+    if (stepId === "download") {
+      return hasDownloadStarted ? "O arquivo apareceu — prosseguir" : null;
     }
-    if (currentStep.id === "installation") return "Concluí a instalação";
-    if (currentStep.id === "provisional-access") {
+    if (stepId === "installation") return "Concluí a instalação";
+    if (stepId === "provisional-access") {
       return "A tela para criar senha apareceu";
     }
-    if (currentStep.id === "password-setup") return "Criei minha nova senha";
-    if (currentStep.id === "final-access") return "Consegui entrar no F10";
+    if (stepId === "password-setup") return "Criei minha nova senha";
+    if (stepId === "final-access") return "Consegui entrar no F10";
 
-    if (currentEssentialTraining) {
-      return completedTrainingIds.includes(currentEssentialTraining.id)
+    if (essentialTraining) {
+      return completedTraining.includes(essentialTraining.id)
         ? "Continuar"
         : "Assistir ao vídeo";
     }
@@ -345,7 +373,15 @@
     activeTroubleshootingGuideId = null;
 
     if (!browser) return;
-    window.setTimeout(requestSupportWidget, 180);
+    window.setTimeout(openSupportDialog, 180);
+  }
+
+  function openSupportDialog(): void {
+    supportDialogOpen = true;
+  }
+
+  function closeSupportDialog(): void {
+    supportDialogOpen = false;
   }
 
   function openTraining(training: TrainingVideo): void {
@@ -549,15 +585,16 @@
                   <DownloadStep
                     {downloadStarted}
                     onDownloadStarted={markDownloadStarted}
+                    onAlreadyInstalled={skipSetupAndOpenTraining}
                   />
                 {:else if currentStep.id === "installation"}
-                  <InstallationStep />
+                  <InstallationStep onComplete={completeStepAndContinue} />
                 {:else if currentStep.id === "provisional-access"}
-                  <FirstAccessStep />
+                  <FirstAccessStep onComplete={completeStepAndContinue} />
                 {:else if currentStep.id === "password-setup"}
-                  <PasswordSetupStep />
+                  <PasswordSetupStep onComplete={completeStepAndContinue} />
                 {:else if currentStep.id === "final-access"}
-                  <FinalAccessStep />
+                  <FinalAccessStep onComplete={completeStepAndContinue} />
                 {:else if currentStep.id === "user-registration"}
                   <EssentialTrainingStep
                     training={trainingVideos[0]}
@@ -608,7 +645,7 @@
                 on:click={openTroubleshooting}
               >
                 <LifeBuoy size={18} aria-hidden="true" />
-                Não consegui
+                Preciso de ajuda
               </button>
             {/if}
 
@@ -649,6 +686,11 @@
   onClose={closeTroubleshooting}
   onResolved={resolveTroubleshooting}
   onRequestSupport={requestSupport}
+/>
+
+<SupportChatDialog
+  isOpen={supportDialogOpen}
+  onClose={closeSupportDialog}
 />
 
 <style>

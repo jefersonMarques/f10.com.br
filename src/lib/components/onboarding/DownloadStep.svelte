@@ -4,6 +4,7 @@
 
   export let downloadStarted = false;
   export let onDownloadStarted: () => void = () => undefined;
+  export let onAlreadyInstalled: () => void = () => undefined;
 
   type NavigatorWithUserAgentData = Navigator & {
     userAgentData?: {
@@ -59,31 +60,56 @@
     </div>
   </div>
 
-  {#if isWindows === false}
-    <div class="mx-auto mt-6 flex max-w-xl items-start gap-3 rounded-2xl bg-amber-50 p-4 text-left text-amber-950 ring-1 ring-amber-200">
-      <TriangleAlert class="mt-0.5 min-w-5" size={20} aria-hidden="true" />
-      <p class="text-[13px] leading-[1.6]">
-        Este dispositivo não parece utilizar Windows. Abra esta página no computador em que o F10 será instalado.
-      </p>
-    </div>
-  {:else}
-    <a
-      href="/download/installer"
-      class={`${downloadStarted ? "" : "download-action"} mt-7 inline-flex min-h-16 w-full items-center justify-center gap-3 rounded-full px-8 py-4 text-[17px] font-semibold text-white shadow-[0_18px_42px_rgba(234,109,11,0.34)] transition focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/45 focus:ring-offset-2 sm:w-auto ${isWindows === null ? "pointer-events-none bg-[#B8BBC5]" : "bg-[#EA6D0B] hover:brightness-105"}`}
-      aria-disabled={isWindows !== true}
-      on:click={handleDownload}
-    >
-      <Download size={22} aria-hidden="true" />
-      Baixar o F10 agora
-    </a>
-  {/if}
+  <div class="mx-auto mt-6 min-h-[132px] max-w-xl">
+    {#if isWindows === false}
+      <div class="flex items-start gap-3 rounded-2xl bg-amber-50 p-4 text-left text-amber-950 ring-1 ring-amber-200">
+        <TriangleAlert class="mt-0.5 min-w-5" size={20} aria-hidden="true" />
+        <p class="text-[13px] leading-[1.6]">
+          Este dispositivo não parece utilizar Windows. Abra esta página no computador em que o F10 será instalado.
+        </p>
+      </div>
+    {:else if downloadStarted}
+      <div class="rounded-[22px] bg-emerald-50 px-5 py-4 text-left ring-1 ring-emerald-200" aria-live="polite">
+        <div class="flex items-start gap-3">
+          <CheckCircle2 class="mt-0.5 min-w-5 text-emerald-700" size={20} aria-hidden="true" />
+          <div>
+            <p class="text-[14px] font-semibold text-emerald-900">
+              A solicitação de download foi enviada
+            </p>
+            <p class="mt-1 text-[12px] leading-[1.6] text-emerald-800">
+              Confira se o arquivo InstaladorF10.exe apareceu na pasta Downloads. Depois, use o botão laranja abaixo para prosseguir.
+            </p>
+          </div>
+        </div>
+        <a
+          href="/download/installer"
+          class="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-4 py-2 text-[12px] font-semibold text-emerald-800 underline decoration-emerald-400 underline-offset-4 transition hover:text-emerald-950 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+          on:click={handleDownload}
+        >
+          <Download size={16} aria-hidden="true" />
+          Baixar novamente
+        </a>
+      </div>
+    {:else}
+      <a
+        href="/download/installer"
+        class={`download-action inline-flex min-h-16 w-full items-center justify-center gap-3 rounded-full px-8 py-4 text-[17px] font-semibold text-white shadow-[0_18px_42px_rgba(234,109,11,0.34)] transition focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/45 focus:ring-offset-2 sm:w-auto ${isWindows === null ? "pointer-events-none bg-[#B8BBC5]" : "bg-[#EA6D0B] hover:brightness-105"}`}
+        aria-disabled={isWindows !== true}
+        on:click={handleDownload}
+      >
+        <Download size={22} aria-hidden="true" />
+        Baixar o F10 agora
+      </a>
+    {/if}
+  </div>
 
-  {#if downloadStarted}
-    <p class="mx-auto mt-5 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-[12px] font-semibold text-emerald-700 ring-1 ring-emerald-200">
-      <CheckCircle2 size={17} aria-hidden="true" />
-      Download iniciado. Aguarde o arquivo terminar de baixar.
-    </p>
-  {/if}
+  <button
+    type="button"
+    class="mt-1 inline-flex min-h-11 items-center justify-center rounded-full px-5 py-2.5 text-[13px] font-semibold text-[#000A57] underline decoration-[#000A57]/30 underline-offset-4 transition hover:bg-white hover:decoration-[#000A57] focus:outline-none focus:ring-2 focus:ring-[#000A57]/20"
+    on:click={onAlreadyInstalled}
+  >
+    Já tenho o F10 instalado
+  </button>
 </section>
 
 <style>

@@ -1,6 +1,8 @@
 <script lang="ts">
   import ScreenshotGuideStep from "$lib/components/onboarding/ScreenshotGuideStep.svelte";
   import { passwordSetupSlides } from "$lib/onboarding/setupGuide";
+
+  export let onComplete: () => void = () => undefined;
 </script>
 
 <ScreenshotGuideStep
@@ -8,4 +10,6 @@
   title="Crie uma nova senha pessoal"
   description="A senha provisória funciona somente para iniciar o primeiro acesso. Depois de criar a nova senha, o F10 voltará para a tela de login."
   slides={passwordSetupSlides}
+  completionLabel="Criei minha nova senha"
+  {onComplete}
 />
