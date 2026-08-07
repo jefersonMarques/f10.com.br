@@ -8,6 +8,7 @@ export type TrainingCategoryId =
 export type TrainingCategory = {
   id: TrainingCategoryId;
   label: string;
+  description: string;
 };
 
 export type TrainingVideo = {
@@ -24,22 +25,27 @@ export const trainingCategories: TrainingCategory[] = [
   {
     id: "essential",
     label: "Comece aqui",
+    description: "Configurações essenciais para preparar o acesso da equipe.",
   },
   {
     id: "sales",
     label: "Comercial e matrículas",
+    description: "Leads, oportunidades, matrículas e contratos.",
   },
   {
     id: "pedagogy",
     label: "Pedagógico",
+    description: "Turmas, pautas, notas e andamento dos alunos.",
   },
   {
     id: "finance",
     label: "Financeiro",
+    description: "Mensalidades, Pix, contas a pagar e caixa.",
   },
   {
     id: "operations",
     label: "Operação",
+    description: "Listagens, campos, produtos, compras e vendas.",
   },
 ];
 
@@ -165,6 +171,14 @@ export function getYoutubeUrl(videoId: string): string {
   return `https://www.youtube.com/watch?v=${videoId}`;
 }
 
-export function getYoutubeEmbedUrl(videoId: string): string {
-  return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0`;
+export function getYoutubeEmbedUrl(
+  videoId: string,
+  autoplay = false,
+): string {
+  const autoplayParameter = autoplay ? "&autoplay=1" : "";
+  return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0${autoplayParameter}`;
+}
+
+export function getYoutubeThumbnailUrl(videoId: string): string {
+  return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
 }

@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { browser } from "$app/environment";
   import {
     ArrowLeft,
     ArrowRight,
     Check,
-    CheckCircle2,
-    Circle,
+    GraduationCap,
+    Handshake,
+    LayoutGrid,
+    PackageOpen,
     PlayCircle,
-    Sparkles,
+    Wallet,
   } from "lucide-svelte";
-  import TrainingVideoPlayer from "$lib/components/onboarding/TrainingVideoPlayer.svelte";
   import {
     trainingCategories,
     trainingVideos,
@@ -19,170 +19,177 @@
 
   export let selectedTrainingId: string | null = null;
   export let completedTrainingIds: string[] = [];
-  export let isActive = false;
   export let onSelect: (training: TrainingVideo) => void = () => undefined;
-  export let onComplete: (training: TrainingVideo) => void = () => undefined;
-  export let onBack: () => void = () => undefined;
 
-  let activeCategoryId: TrainingCategoryId | "all" = "all";
-  let playerElement: HTMLElement;
+  let selectedCategoryId: TrainingCategoryId | null = null;
+  let showAllTrainings = false;
 
-  $: selectedTraining =
-    trainingVideos.find((training) => training.id === selectedTrainingId) ?? null;
-  $: visibleTrainingVideos =
-    activeCategoryId === "all"
-      ? trainingVideos
-      : trainingVideos.filter(
-          (training) => training.categoryId === activeCategoryId,
-        );
+  const choiceCategories = trainingCategories.filter(
+    (category) => category.id !== "essential",
+  );
 
-  function selectTraining(training: TrainingVideo): void {
-    onSelect(training);
+  $: selectedCategory =
+    trainingCategories.find((category) => category.id === selectedCategoryId) ??
+    null;
+  $: visibleTrainingVideos = showAllTrainings
+    ? trainingVideos
+    : selectedCategoryId
+      ? trainingVideos.filter(
+          (training) => training.categoryId === selectedCategoryId,
+        )
+      : [];
+  $: isChoosingArea = !selectedCategoryId && !showAllTrainings;
 
-    if (!browser || window.innerWidth >= 1024) return;
-
-    window.requestAnimationFrame(() => {
-      playerElement?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+  function selectCategory(categoryId: TrainingCategoryId): void {
+    selectedCategoryId = categoryId;
+    showAllTrainings = false;
   }
 
-  function completeSelectedTraining(): void {
-    if (!selectedTraining) return;
-    onComplete(selectedTraining);
+  function showAll(): void {
+    selectedCategoryId = null;
+    showAllTrainings = true;
+  }
+
+  function returnToCategories(): void {
+    selectedCategoryId = null;
+    showAllTrainings = false;
+  }
+
+  function getCategoryTrainingCount(categoryId: TrainingCategoryId): number {
+    return trainingVideos.filter(
+      (training) => training.categoryId === categoryId,
+    ).length;
   }
 </script>
 
-<section aria-labelledby="training-library-title">
-  <div class="text-center">
-    <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EA6D0B]/10 text-[#EA6D0B]">
-      <Sparkles size={28} aria-hidden="true" />
-    </span>
-    <p class="mt-5 text-[12px] font-bold uppercase tracking-[0.15em] text-[#EA6D0B]">
-      Aprenda no seu ritmo
-    </p>
-    <h2
-      id="training-library-title"
-      class="mt-3 text-[30px] font-semibold leading-tight tracking-[-0.03em] text-[#010D28] sm:text-[38px]"
-    >
-      O que você deseja fazer no F10?
-    </h2>
-    <p class="mx-auto mt-4 max-w-2xl text-[16px] leading-[1.75] text-[#5F6475]">
-      Escolha uma opção. O vídeo correspondente será exibido nesta página.
-    </p>
-  </div>
+<section class="mx-auto w-full max-w-6xl" aria-labelledby="training-library-title">
+  {#if isChoosingArea}
+    <div class="text-center">
+      <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-[#EA6D0B]">
+        Escolha pelo que você quer fazer
+      </p>
+      <h1
+        id="training-library-title"
+        class="mt-2 text-[27px] font-semibold leading-tight tracking-[-0.035em] text-[#010D28] sm:text-[34px] lg:text-[40px]"
+      >
+        O que você precisa aprender agora?
+      </h1>
+      <p class="mx-auto mt-3 max-w-2xl text-[14px] leading-relaxed text-[#5F6475] sm:text-[15px]">
+        Primeiro escolha uma área. Na próxima tela aparecerão somente os vídeos relacionados.
+      </p>
+    </div>
 
-  <div class="mt-8 flex gap-2 overflow-x-auto pb-2" aria-label="Filtrar treinamentos">
-    <button
-      type="button"
-      class={`min-h-11 min-w-fit rounded-full px-4 py-2.5 text-[13px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/35 ${activeCategoryId === "all" ? "bg-[#000A57] text-white" : "border border-[#DFE3F2] bg-white text-[#000A57] hover:bg-[#F7F8FE]"}`}
-      on:click={() => (activeCategoryId = "all")}
-      aria-pressed={activeCategoryId === "all"}
-    >
-      Todos os treinamentos
-    </button>
-    {#each trainingCategories as category}
+    <div class="mx-auto mt-6 grid max-w-4xl gap-3 sm:grid-cols-2 lg:mt-8">
+      {#each choiceCategories as category}
+        <button
+          type="button"
+          class="group flex min-h-[112px] items-center gap-4 rounded-[20px] border border-[#E1E4EF] bg-white p-4 text-left shadow-[0_10px_30px_rgba(1,13,40,0.05)] transition hover:-translate-y-0.5 hover:border-[#EA6D0B]/50 hover:shadow-[0_16px_35px_rgba(1,13,40,0.08)] focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/40 sm:p-5"
+          on:click={() => selectCategory(category.id)}
+        >
+          <span class="inline-flex h-12 min-w-12 items-center justify-center rounded-2xl bg-[#F1F3FA] text-[#000A57] transition group-hover:bg-[#FFF2E8] group-hover:text-[#EA6D0B]">
+            {#if category.id === "sales"}
+              <Handshake size={24} aria-hidden="true" />
+            {:else if category.id === "pedagogy"}
+              <GraduationCap size={24} aria-hidden="true" />
+            {:else if category.id === "finance"}
+              <Wallet size={24} aria-hidden="true" />
+            {:else}
+              <PackageOpen size={24} aria-hidden="true" />
+            {/if}
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="block text-[16px] font-semibold text-[#010D28]">
+              {category.label}
+            </span>
+            <span class="mt-1 block text-[12px] leading-[1.5] text-[#5F6475] sm:text-[13px]">
+              {category.description}
+            </span>
+            <span class="mt-2 block text-[11px] font-bold uppercase tracking-[0.08em] text-[#000A57]/45">
+              {getCategoryTrainingCount(category.id)} treinamentos
+            </span>
+          </span>
+          <ArrowRight class="min-w-5 text-[#000A57]/30 transition group-hover:translate-x-1 group-hover:text-[#EA6D0B]" size={20} aria-hidden="true" />
+        </button>
+      {/each}
+    </div>
+
+    <div class="mt-5 text-center">
       <button
         type="button"
-        class={`min-h-11 min-w-fit rounded-full px-4 py-2.5 text-[13px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/35 ${activeCategoryId === category.id ? "bg-[#000A57] text-white" : "border border-[#DFE3F2] bg-white text-[#000A57] hover:bg-[#F7F8FE]"}`}
-        on:click={() => (activeCategoryId = category.id)}
-        aria-pressed={activeCategoryId === category.id}
+        class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold text-[#000A57] underline decoration-[#EA6D0B]/50 underline-offset-4 transition hover:text-[#EA6D0B] focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/35"
+        on:click={showAll}
       >
-        {category.label}
+        <LayoutGrid size={17} aria-hidden="true" />
+        Ver todos os 16 treinamentos
       </button>
-    {/each}
-  </div>
+    </div>
+  {:else}
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <button
+          type="button"
+          class="inline-flex min-h-10 items-center gap-2 rounded-full px-3 py-2 text-[13px] font-semibold text-[#000A57] transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/35"
+          on:click={returnToCategories}
+        >
+          <ArrowLeft size={17} aria-hidden="true" />
+          Escolher outra área
+        </button>
+        <h1
+          id="training-library-title"
+          class="mt-2 text-[25px] font-semibold leading-tight tracking-[-0.03em] text-[#010D28] sm:text-[32px]"
+        >
+          {showAllTrainings ? "Todos os treinamentos" : selectedCategory?.label}
+        </h1>
+        <p class="mt-2 text-[13px] leading-relaxed text-[#5F6475] sm:text-[14px]">
+          Clique no treinamento desejado. O vídeo abrirá no centro da tela.
+        </p>
+      </div>
 
-  <div class="mt-6 grid gap-7 lg:grid-cols-12 lg:items-start">
-    <div class="lg:col-span-5">
-      <div class="max-h-[720px] space-y-3 overflow-y-auto pr-1">
-        {#each visibleTrainingVideos as training}
-          <button
-            type="button"
-            class={`group flex min-h-[88px] w-full items-start gap-3 rounded-[20px] border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/35 ${selectedTrainingId === training.id ? "border-[#EA6D0B] bg-[#FFF7F0] shadow-sm" : "border-[#E4E7F1] bg-white hover:border-[#C9CDDC] hover:bg-[#FAFBFD]"}`}
-            on:click={() => selectTraining(training)}
-            aria-pressed={selectedTrainingId === training.id}
-          >
-            <span
-              class={`mt-0.5 inline-flex h-8 min-w-8 items-center justify-center rounded-full ${completedTrainingIds.includes(training.id) ? "bg-emerald-600 text-white" : selectedTrainingId === training.id ? "bg-[#EA6D0B] text-white" : "bg-[#F0F2F8] text-[#000A57]"}`}
-            >
-              {#if completedTrainingIds.includes(training.id)}
-                <Check size={17} aria-hidden="true" />
-              {:else}
-                <PlayCircle size={17} aria-hidden="true" />
+      <p class="shrink-0 rounded-full bg-white px-4 py-2 text-[12px] font-semibold text-[#000A57] ring-1 ring-[#E1E4EF]">
+        {visibleTrainingVideos.length} opções
+      </p>
+    </div>
+
+    <div class="mt-5 grid gap-3 md:grid-cols-2">
+      {#each visibleTrainingVideos as training}
+        <button
+          type="button"
+          class={`group flex min-h-[82px] w-full items-center gap-3 rounded-[18px] border p-3 text-left transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/40 sm:p-4 ${selectedTrainingId === training.id ? "border-[#EA6D0B] bg-[#FFF7F0]" : "border-[#E1E4EF] bg-white hover:border-[#C9CDDC]"}`}
+          on:click={() => onSelect(training)}
+          aria-label={`Assistir ao treinamento ${training.title}`}
+        >
+          <span class={`inline-flex h-10 min-w-10 items-center justify-center rounded-full ${completedTrainingIds.includes(training.id) ? "bg-emerald-600 text-white" : "bg-[#F1F3FA] text-[#000A57] group-hover:bg-[#EA6D0B] group-hover:text-white"}`}>
+            {#if completedTrainingIds.includes(training.id)}
+              <Check size={18} aria-hidden="true" />
+            {:else}
+              <PlayCircle size={20} aria-hidden="true" />
+            {/if}
+          </span>
+
+          <span class="min-w-0 flex-1">
+            <span class="flex flex-wrap items-center gap-2">
+              <span class="text-[10px] font-bold text-[#000A57]/35">
+                {String(trainingVideos.indexOf(training) + 1).padStart(2, "0")}
+              </span>
+              {#if training.isEssential}
+                <span class="rounded-full bg-[#EA6D0B]/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-[#C95717]">
+                  Essencial
+                </span>
+              {/if}
+              {#if training.isNew}
+                <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-emerald-700">
+                  Novo
+                </span>
               {/if}
             </span>
-
-            <span class="min-w-0 flex-1">
-              <span class="flex flex-wrap items-center gap-2">
-                <span class="text-[12px] font-bold text-[#000A57]/40">
-                  {String(trainingVideos.indexOf(training) + 1).padStart(2, "0")}
-                </span>
-                {#if training.isEssential}
-                  <span class="rounded-full bg-[#EA6D0B]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[#C95717]">
-                    Essencial
-                  </span>
-                {/if}
-                {#if training.isNew}
-                  <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-emerald-700">
-                    Novo
-                  </span>
-                {/if}
-              </span>
-              <span class="mt-1.5 block text-[14px] font-semibold leading-snug text-[#010D28]">
-                {training.title}
-              </span>
+            <span class="mt-1 block text-[13px] font-semibold leading-snug text-[#010D28] sm:text-[14px]">
+              {training.title}
             </span>
-
-            <ArrowRight class="mt-2 min-w-4 text-[#000A57]/30 transition group-hover:translate-x-0.5 group-hover:text-[#EA6D0B]" size={17} aria-hidden="true" />
-          </button>
-        {/each}
-      </div>
-    </div>
-
-    <div
-      id="training-player"
-      bind:this={playerElement}
-      class="scroll-mt-24 lg:sticky lg:top-24 lg:col-span-7"
-    >
-      {#if selectedTraining && isActive}
-        <TrainingVideoPlayer
-          training={selectedTraining}
-          isCompleted={completedTrainingIds.includes(selectedTraining.id)}
-          onComplete={completeSelectedTraining}
-        />
-      {:else}
-        <div class="flex min-h-[420px] flex-col items-center justify-center rounded-[24px] border border-dashed border-[#C9CDDC] bg-[#F9FAFD] p-8 text-center">
-          <span class="inline-flex h-16 w-16 items-center justify-center rounded-full bg-white text-[#EA6D0B] shadow-sm ring-1 ring-black/5">
-            <PlayCircle size={31} aria-hidden="true" />
           </span>
-          <h3 class="mt-5 text-[21px] font-semibold text-[#010D28]">
-            Escolha um treinamento
-          </h3>
-          <p class="mt-2 max-w-md text-[14px] leading-[1.7] text-[#5F6475]">
-            Clique em uma das opções para assistir ao vídeo sem sair desta página.
-          </p>
-        </div>
-      {/if}
-    </div>
-  </div>
 
-  <div class="mt-8 flex flex-col-reverse items-center justify-between gap-4 border-t border-[#EDF0F7] pt-6 sm:flex-row">
-    <button
-      type="button"
-      class="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3 text-[15px] font-semibold text-[#000A57] transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 sm:w-auto"
-      on:click={onBack}
-    >
-      <ArrowLeft size={18} aria-hidden="true" />
-      Voltar
-    </button>
-
-    <div class="flex items-center gap-2 text-[13px] font-semibold text-[#5F6475]">
-      {#if completedTrainingIds.length > 0}
-        <CheckCircle2 size={18} class="text-emerald-600" aria-hidden="true" />
-      {:else}
-        <Circle size={18} aria-hidden="true" />
-      {/if}
-      {completedTrainingIds.length} de {trainingVideos.length} treinamentos concluídos
+          <ArrowRight class="min-w-4 text-[#000A57]/25 transition group-hover:translate-x-0.5 group-hover:text-[#EA6D0B]" size={17} aria-hidden="true" />
+        </button>
+      {/each}
     </div>
-  </div>
+  {/if}
 </section>

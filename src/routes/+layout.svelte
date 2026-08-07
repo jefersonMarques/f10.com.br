@@ -64,6 +64,7 @@
   $: modalConfig = $contactModalConfig;
   $: pathname = $page.url.pathname;
   $: isStandalonePage = standalonePaths.has(pathname);
+  $: isOnboardingPage = pathname === "/primeiros-passos-f10";
   $: seoOverride = seoOverrides[pathname];
 
   onMount(() => {
@@ -120,15 +121,18 @@
 
 {#if isStandalonePage}
   <slot />
+{:else if isOnboardingPage}
+  <main class="h-[100dvh] overflow-hidden">
+    <slot />
+  </main>
+  <FloatingWhatsappButton variant="support" />
 {:else}
   <Header />
   <main>
     <slot />
   </main>
   <Footer />
-  <FloatingWhatsappButton
-    variant={pathname === "/primeiros-passos-f10" ? "support" : "contact"}
-  />
+  <FloatingWhatsappButton variant="contact" />
 
   <Popup bind:size={modalSize}>
     {#if modalConfig?.type === "contact"}
