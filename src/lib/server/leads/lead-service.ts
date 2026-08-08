@@ -1,11 +1,11 @@
 import fs from "fs/promises";
 import path from "path";
+import { env } from "$env/dynamic/private";
 import {
   DEBUG,
   EXACT_TOKEN,
   EXACT_FUNNEL_ID,
   F10_FONTE,
-  F10_TIPO_API,
   F10_UID,
   F10_MIDIA,
   F10_TOKEN,
@@ -605,7 +605,7 @@ async function sendLeadToF10(
 ): Promise<IntegrationResult> {
   const token = safeString(F10_TOKEN);
   const url = safeString(F10_URL);
-  const tipoApi = safeString(F10_TIPO_API);
+  const tipoApi = safeString(env.F10_TIPO_API);
   const unitId = safeString(F10_UID);
   const meta = getChannelMeta(channel);
 
