@@ -1,8 +1,14 @@
 <script lang="ts">
   import "../app.css";
+  import plusJakartaSansSemiBoldUrl from "@fontsource/plus-jakarta-sans/files/plus-jakarta-sans-latin-600-normal.woff2?url";
   import { onMount } from "svelte";
   import { afterNavigate } from "$app/navigation";
   import { page } from "$app/stores";
+  import {
+    initializeAnalytics,
+    trackFacebookPageView,
+  } from "$lib/analytics/thirdPartyAnalytics";
+  import { salesContact } from "$lib/config/contactConfig";
 
   import Header from "$lib/components/Header.svelte";
   import Footer from "$lib/components/Footer.svelte";
@@ -13,8 +19,6 @@
   import FloatingWhatsappButton from "$lib/components/forms/FloatingWhatsappButton.svelte";
   import { contactModalConfig } from "$lib/stores/contactModals";
   import SolutionList from "$lib/components/forms/SolutionList.svelte";
-
-  type FbqFunction = (...args: unknown[]) => void;
 
   type SeoOverride = {
     title: string;
@@ -68,26 +72,19 @@
   $: isHelpPage = pathname === "/ajuda-f10";
   $: seoOverride = seoOverrides[pathname];
 
-  onMount(() => {
-    const win = window as typeof window & { fbq?: FbqFunction };
-
-    const trackPageView = () => {
-      if (typeof win.fbq === "function") {
-        win.fbq("track", "PageView");
-      }
-    };
-
-    trackPageView();
-
-    const unsubscribe = afterNavigate(() => {
-      trackPageView();
-    });
-
-    return unsubscribe;
-  });
+  onMount(initializeAnalytics);
+  afterNavigate(trackFacebookPageView);
 </script>
 
 <svelte:head>
+  <link
+    rel="preload"
+    href={plusJakartaSansSemiBoldUrl}
+    as="font"
+    type="font/woff2"
+    crossorigin="anonymous"
+  />
+
   {#if seoOverride}
     {#if seoOverride.renderPrimary !== false}
       <title>{seoOverride.title}</title>
@@ -140,12 +137,17 @@
   <FloatingWhatsappButton variant="contact" />
 
   <Popup bind:size={modalSize}>
-    {#if modalConfig?.type === "contact"}
-      <ContactWhatsappModalForm />
-    {:else if modalConfig?.type === "solutions"}
-      <PopupSolutionsList />
-    {:else}
-      <SolutionList />
-    {/if}
+    <ContactWhatsappModalForm
+      whatsAppNumber={salesContact.whatsappNumber}
+      defaultMessage={modalConfig.defaultMessage}
+      product={modalConfig.product}
+      subSource={modalConfig.subSource}
+      leadDescription={modalConfig.leadDescription}
+      onChangeSize={(size) => (modalSize = size)}
+    />
   </Popup>
+
+  <PopupSolutionsList>
+    <SolutionList />
+  </PopupSolutionsList>
 {/if}

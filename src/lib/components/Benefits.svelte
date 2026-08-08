@@ -1,14 +1,20 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
+    import anaHickmannLogoUrl from "$lib/assets/home/ana-hickmann-logo-160.webp?url&no-inline";
+    import bubbleBackgroundUrl from "$lib/assets/home/bubble-background-1600.webp?url&no-inline";
+    import cebracLogoUrl from "$lib/assets/home/cebrac-logo-160.webp?url&no-inline";
+    import microcampLogoUrl from "$lib/assets/home/microcamp-logo-160.webp?url&no-inline";
+    import sagaLogoUrl from "$lib/assets/home/saga-logo-160.webp?url&no-inline";
+    import videoThumbnailUrl from "$lib/assets/home/f10-video-thumbnail.webp?url&no-inline";
 
     const videoUrl =
         "https://www.youtube.com/embed/lk4OLZjLFCM?rel=0&autoplay=1";
 
     const schools = [
-        { alt: "CEBRAC", src: "/icon_cebrac.webp" },
-        { alt: "Ana Hickmann", src: "/icon_ah.webp" },
-        { alt: "SAGA", src: "/icon_saga.webp" },
-        { alt: "Microcamp", src: "/icon_microcamp.webp" },
+        { alt: "CEBRAC", src: cebracLogoUrl },
+        { alt: "Ana Hickmann", src: anaHickmannLogoUrl },
+        { alt: "SAGA", src: sagaLogoUrl },
+        { alt: "Microcamp", src: microcampLogoUrl },
     ];
 
     let metricEl: HTMLElement | null = null;
@@ -76,7 +82,7 @@
             </h2>
 
             <p
-                class="md:col-span-6 max-w-[620px] text-[18px] leading-relaxed text-[#878C91]"
+                class="md:col-span-6 max-w-[620px] text-[18px] leading-relaxed text-[#5F6475]"
             >
                 Na F10 Software, a tecnologia é parceira da educação. Nossos
                 sistemas integram setores, reduzem custos, aumentam a
@@ -116,8 +122,10 @@
                 >
                     <!-- A imagem ocupa 100% da caixa e mantém COVER sem deformar -->
                     <img
-                        src="/booble_bg.webp"
+                        src={bubbleBackgroundUrl}
                         alt=""
+                        width="1600"
+                        height="1067"
                         aria-hidden="true"
                         class="absolute inset-0 w-full h-full object-cover opacity-30 transform-gpu origin-center"
                         style="/* ROTACIONE E ZOOME A IMAGEM (não a caixa) */ transform: rotate(-246.48deg) scale(1.24);"
@@ -152,6 +160,8 @@
                         <img
                             src={s.src}
                             alt={s.alt}
+                            width="160"
+                            height="160"
                             class="h-[80px] w-[80px] rounded-full object-cover ring-2 ring-white shadow-sm
                {i === 0 ? 'ml-0' : '-ml-6'}"
                             style="z-index:{10 + i}"
@@ -177,7 +187,7 @@
                         title="+ 500 redes e escolas"
                     >
                         <span
-                            class="text-[13px] font-semibold leading-tight text-[#EA6D0B] text-center"
+                            class="text-[13px] font-semibold leading-tight text-[#B64E00] text-center"
                         >
                             + 500<br />redes e<br />escolas
                         </span>
@@ -192,8 +202,10 @@
                 aria-label="Conheça a F10 em 1 minuto"
             >
                 <img
-                    src="/t_f10_1_minuto.webp"
+                    src={videoThumbnailUrl}
                     alt="Conheça a F10 em 1 minuto"
+                    width="1024"
+                    height="594"
                     class="w-full h-[320px] md:h-[360px] lg:h-[382px] object-cover"
                     loading="lazy"
                 />

@@ -6,6 +6,7 @@
   import IconEmail from "$lib/icons/IconEmail.svelte";
   import IconMapPin from "$lib/icons/IconMapPin.svelte";
   import IconWhatsApp from "$lib/icons/IconWhatsApp.svelte";
+  import { salesContact } from "$lib/config/contactConfig";
   import { browser } from "$app/environment";
 
   // ===== Estado dos botões de assunto (tabs) =====
@@ -16,7 +17,6 @@
   // ===== Dados estáticos do card de contato =====
   const address =
     "R. Comendador Araújo, 143 – 3º andar\nCentro, Curitiba – PR, 80420-900";
-  const phoneMain = "(41) 9294-3443";
   const phoneAlt = "(41) 99774-2363";
   const email = "vendas@f10.com.br";
   const schedule = "Seg - Sex: 08h15 - 18h | Sáb: 08h15h - 13h";
@@ -344,8 +344,8 @@
               <div>
                 <p>Fale com a nossa equipe de vendas:</p>
                 <p class="text-[#000A57] font-semibold">
-                  <a href="https://wa.me/5541992943443" class="hover:underline"
-                    >{phoneMain}</a
+                  <a href={salesContact.whatsappUrl} class="hover:underline"
+                    >{salesContact.whatsappDisplay}</a
                   >
                 </p>
               </div>

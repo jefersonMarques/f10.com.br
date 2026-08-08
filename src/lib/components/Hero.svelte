@@ -1,15 +1,23 @@
 <script lang="ts">
     import IconArrowRight from "$lib/icons/IconArrowRight.svelte";
+    import celcoinLogoUrl from "$lib/assets/home/celcoin-logo.webp?url&no-inline";
+    import googleCloudLogoUrl from "$lib/assets/home/google-cloud-logo.webp?url&no-inline";
+    import growthIconUrl from "$lib/assets/home/growth-icon.svg?url&no-inline";
+    import heroAvifUrl from "$lib/assets/home/hero-1200.avif?url&no-inline";
+    import heroWebpUrl from "$lib/assets/home/hero-1200.webp?url&no-inline";
+    import oracleCloudLogoUrl from "$lib/assets/home/oracle-cloud-logo.webp?url&no-inline";
+    import pizzaTailUrl from "$lib/assets/home/pizza-tail.svg?url&no-inline";
+    import zenviaLogoUrl from "$lib/assets/home/zenvia-logo-180.webp?url&no-inline";
     import { onMount, onDestroy } from "svelte";
     import { showForm } from "$lib/stores/formPopup";
-    import { Banknote, GraduationCap, BriefcaseBusiness } from "lucide-svelte";
-    import type { ComponentType } from "svelte";
     import { contactModalConfig } from "$lib/stores/contactModals";
     import { showSolutionsPopUp } from "$lib/stores/solutionsPopup";
 
     type Partner = {
         name: string;
         logoSrc: string;
+        width: number;
+        height: number;
         alt?: string;
         pyClass?: "py-0" | "py-0.5" | "py-1" | "py-1.5" | "py-2";
     };
@@ -18,25 +26,33 @@
         {
             name: "Google Cloud Platform & API",
             pyClass: "py-1",
-            logoSrc: "/logo_google.webp",
+            logoSrc: googleCloudLogoUrl,
+            width: 128,
+            height: 44,
             alt: "Google Cloud",
         },
         {
             name: "Oracle Cloud",
             pyClass: "py-2",
-            logoSrc: "/logo_oracle.webp",
+            logoSrc: oracleCloudLogoUrl,
+            width: 128,
+            height: 17,
             alt: "Oracle Cloud",
         },
         {
             name: "Celcoin",
             pyClass: "py-0",
-            logoSrc: "/logo_celcoin.webp",
+            logoSrc: celcoinLogoUrl,
+            width: 500,
+            height: 145,
             alt: "Celcoin",
         },
         {
             name: "Zenvia",
             pyClass: "py-0",
-            logoSrc: "/logo_zenvia.webp",
+            logoSrc: zenviaLogoUrl,
+            width: 180,
+            height: 23,
             alt: "Zenvia",
         },
     ];
@@ -132,7 +148,7 @@
                     data-location="hero_section"
                     on:click={openPlansDemoModal}
                     class="inline-flex h-[52px] items-center justify-center rounded-full bg-primary
-                    px-8 text-[16px] font-semibold leading-[22px] tracking-[-0.02em] text-white
+                    px-8 text-[16px] font-semibold leading-[22px] tracking-[-0.02em] text-[#010D28]
                     hover:brightness-95 active:brightness-90 transition w-full md:w-auto"
                 >
                     Quero uma demonstração
@@ -177,6 +193,8 @@
                                         src={partner.logoSrc}
                                         alt={partner.alt ?? partner.name}
                                         title={partner.name}
+                                        width={partner.width}
+                                        height={partner.height}
                                         class={`partner-logo h-7 md:h-8 w-auto max-w-[90px] object-contain select-none ${partner.pyClass ?? "py-0"}`}
                                         loading="lazy"
                                         decoding="async"
@@ -193,7 +211,7 @@
         <div class="relative md:col-span-6">
             <!-- meia-pizza AO FUNDO, alinhada à esquerda -->
             <img
-                src="/tail_pizza.svg"
+                src={pizzaTailUrl}
                 alt=""
                 class="pointer-events-none absolute left-8 hidden md:block
                 w-[300px] lg:w-[300px] z-0"
@@ -203,7 +221,7 @@
 
             <!-- badge -->
             <img
-                src="/icon_growt_hero.svg"
+                src={growthIconUrl}
                 alt="Tendência de crescimento"
                 class="absolute left-[25%] top-[-50px] hidden md:block
                 w-24 lg:w-[180px] z-[2]"
@@ -211,12 +229,27 @@
             />
 
             <!-- monitor/devices -->
-            <img
-                src="/hero_image.webp"
-                alt="Painéis F10 — telas do sistema"
-                class="relative z-[1] lg:w-[725px] mt-24 rounded-xl object-cover hidden lg:block"
-                fetchpriority="high"
-            />
+            <picture class="relative z-[1] mt-24 hidden lg:block">
+                <source
+                    media="(min-width: 1024px)"
+                    srcset={heroAvifUrl}
+                    type="image/avif"
+                />
+                <source
+                    media="(min-width: 1024px)"
+                    srcset={heroWebpUrl}
+                    type="image/webp"
+                />
+                <img
+                    src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="
+                    alt="Painéis F10 — telas do sistema"
+                    width="1200"
+                    height="744"
+                    class="w-full rounded-xl object-cover"
+                    fetchpriority="high"
+                    decoding="async"
+                />
+            </picture>
 
             <!-- CARD 230% -->
             <aside

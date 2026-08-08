@@ -2,6 +2,11 @@
   import TestimonialCard from "$lib/components/TestimonialCard.svelte";
   import TestimonialPopup from "$lib/components/popup/TestimonialPopup.svelte";
   import TestimonialPopupContent from "$lib/components/TestimonialPopupContent.svelte";
+  import cristianoAvatarUrl from "$lib/assets/home/cristiano-ebp-avatar-160.webp?url&no-inline";
+  import elisonAvatarUrl from "$lib/assets/home/elison-zion-avatar-160.webp?url&no-inline";
+  import raquelAvatarUrl from "$lib/assets/home/raquel-epic-avatar-160.webp?url&no-inline";
+  import silviaAvatarUrl from "$lib/assets/home/silvia-eah-avatar-160.webp?url&no-inline";
+  import talitaAvatarUrl from "$lib/assets/home/talita-zion-avatar-160.webp?url&no-inline";
 
   import { showTestimonialPopup, testimonialPopupData } from "$lib/stores/testimonialPopup";
   import type { VideoOrientation } from "$lib/stores/testimonialPopup";
@@ -27,7 +32,7 @@
       fullText: "",
       author: "Silvia Bernardo",
       role: "Diretora Pedagógica - Franqueadora Escolas Ana Hickmann",
-      avatar: "/avatar_silvia_eah.webp",
+      avatar: silviaAvatarUrl,
       videoSrc: "/depoimento_silvia_eah.mp4",
       videoType: "video/mp4",
       poster: "",
@@ -39,7 +44,7 @@
       fullText: "",
       author: "Cristiano",
       role: "Sócio Diretor — EBP (MG)",
-      avatar: "/avatar_cristiano_ebp.webp",
+      avatar: cristianoAvatarUrl,
       videoSrc: "/depoimento_cristiano_ebp.mp4",
       videoType: "video/mp4",
       poster: "",
@@ -51,7 +56,7 @@
       fullText: "Gostaria de expressar minha sincera gratidão ao F10 pela facilidade em organizar as finanças da escola. A agilidade do sistema é incrível! O suporte do Jesse é nota 10, sempre prestativo e atencioso, nunca me deixou esperando. Todas as questões são resolvidas rapidamente. A equipe F10 realmente é 10, e esperamos continuar essa parceria em 2026. Parabéns pelo excelente serviço prestado!✨👏",
       author: "Raquel Kelly",
       role: "Supervisora comercial — Epic School (SC)",
-      avatar: "/avatar_raquel_epic.webp",
+      avatar: raquelAvatarUrl,
       videoSrc: "",
       videoType: "",
       poster: "",
@@ -63,7 +68,7 @@
       fullText: "Sou suspeito para falar. Utilizo o F10 nas empresas em que trabalho desde 2008 e posso afirmar que acompanhei de perto toda a evolução da plataforma ao longo desses anos. O crescimento foi constante, sempre alinhado às necessidades do mercado, trazendo soluções cada vez mais eficientes para a gestão do dia a dia. Outro grande diferencial sempre foi o suporte. A equipe é extremamente solícita, ágil e disposta a resolver qualquer situação com profissionalismo. Além disso, ao longo do tempo, o F10 também desenvolveu soluções exclusivas para nossa empresa, o que demonstra um cuidado real com as necessidades do cliente. Sem dúvida, é uma parceria sólida, construída com confiança, inovação e resultados.",
       author: "Elison Arruda",
       role: "Diretor de TI — Zion Escola de Entretenimento",
-      avatar: "/avatar_elison_zion.webp",
+      avatar: elisonAvatarUrl,
       videoSrc: "",
       videoType: "",
       poster: "",
@@ -75,7 +80,7 @@
       fullText: "",
       author: "Talita",
       role: "Escolas profissionalizante Ana Hickmann",
-      avatar: "/avatar_talita_zion.webp",
+      avatar: talitaAvatarUrl,
       videoSrc: "/depoimento_talita_eah.mp4",
       videoType: "video/mp4",
       poster: "",

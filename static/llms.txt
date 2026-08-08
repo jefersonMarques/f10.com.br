@@ -2,7 +2,7 @@
 
 > A F10 Software é uma plataforma brasileira de gestão escolar para escolas de cursos livres, idiomas, ensino profissionalizante, cursos técnicos e redes de franquias educacionais.
 
-Site oficial: https://f10.com.br/
+Site oficial: [F10 Software](https://f10.com.br/)
 Idioma principal: português do Brasil
 Área de atuação: Brasil
 Contato comercial: vendas@f10.com.br
@@ -29,37 +29,37 @@ Principais recursos:
 
 ## Páginas institucionais
 
-- Página inicial: https://f10.com.br/
-- Software para escolas: https://f10.com.br/software-para-escolas
-- Sobre a F10 Software: https://f10.com.br/sobre
-- Inovação na escola: https://f10.com.br/inovacao-na-escola
-- Marketing educacional e inovação: https://f10.com.br/inovacao-na-escola/marketing-educacional
-- Planos e preços: https://f10.com.br/preco
-- Contato: https://f10.com.br/contato
+- [Página inicial](https://f10.com.br/)
+- [Software para escolas](https://f10.com.br/software-para-escolas)
+- [Sobre a F10 Software](https://f10.com.br/sobre)
+- [Inovação na escola](https://f10.com.br/inovacao-na-escola)
+- [Marketing educacional e inovação](https://f10.com.br/inovacao-na-escola/marketing-educacional)
+- [Planos e preços](https://f10.com.br/preco)
+- [Contato](https://f10.com.br/contato)
 
 ## Soluções da plataforma
 
-- Todas as soluções: https://f10.com.br/solucoes
-- CRM escolar: https://f10.com.br/solucoes/crm-escolar
-- WhatsApp para escolas: https://f10.com.br/solucoes/whatsapp
-- Marketing e captação: https://f10.com.br/solucoes/marketing-captacao-de-alunos
-- Vendas e matrículas: https://f10.com.br/solucoes/vendas
-- Aplicativo Smart Aluno: https://f10.com.br/solucoes/aplicativo-smart-aluno
-- AVA e Portal do Aluno: https://f10.com.br/solucoes/ambiente-virtual-de-aprendizado-ava
-- Gestão pedagógica: https://f10.com.br/solucoes/pedagogico
-- Gestão financeira: https://f10.com.br/solucoes/financeiro
-- Nota fiscal: https://f10.com.br/solucoes/nota-fiscal
-- Indicadores e BI: https://f10.com.br/solucoes/indicadores-e-bi
+- [Todas as soluções](https://f10.com.br/solucoes)
+- [CRM escolar](https://f10.com.br/solucoes/crm-escolar)
+- [WhatsApp para escolas](https://f10.com.br/solucoes/whatsapp)
+- [Marketing e captação](https://f10.com.br/solucoes/marketing-captacao-de-alunos)
+- [Vendas e matrículas](https://f10.com.br/solucoes/vendas)
+- [Aplicativo Smart Aluno](https://f10.com.br/solucoes/aplicativo-smart-aluno)
+- [AVA e Portal do Aluno](https://f10.com.br/solucoes/ambiente-virtual-de-aprendizado-ava)
+- [Gestão pedagógica](https://f10.com.br/solucoes/pedagogico)
+- [Gestão financeira](https://f10.com.br/solucoes/financeiro)
+- [Nota fiscal](https://f10.com.br/solucoes/nota-fiscal)
+- [Indicadores e BI](https://f10.com.br/solucoes/indicadores-e-bi)
 
 ## Conteúdo e suporte
 
-- Blog oficial: https://blog.f10.com.br/
-- Central de ajuda: https://ajuda.f10.com.br/kb
-- Sitemap: https://f10.com.br/sitemap.xml
+- [Blog oficial](https://blog.f10.com.br/)
+- [Central de ajuda](https://ajuda.f10.com.br/kb)
+- [Sitemap](https://f10.com.br/sitemap.xml)
 
 ## Perfis oficiais
 
-- LinkedIn: https://www.linkedin.com/company/f10software/
-- Instagram: https://www.instagram.com/f10software/
-- Facebook: https://www.facebook.com/F10Software
-- YouTube: https://www.youtube.com/@f10software76
+- [LinkedIn](https://www.linkedin.com/company/f10software/)
+- [Instagram](https://www.instagram.com/f10software/)
+- [Facebook](https://www.facebook.com/F10Software)
+- [YouTube](https://www.youtube.com/@f10software76)

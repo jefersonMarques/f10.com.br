@@ -1,6 +1,8 @@
 <script lang="ts">
   import { createEventDispatcher, onDestroy, onMount } from "svelte";
   import { ArrowRight, LifeBuoy } from "lucide-svelte";
+  import whatsappIconUrl from "$lib/assets/brand/whatsapp-white-icon.svg?url&no-inline";
+  import { salesContact } from "$lib/config/contactConfig";
   import { supportChatClientId } from "$lib/support/supportConfig";
   import { openSupportEventName } from "$lib/support/supportEvents";
 
@@ -223,7 +225,7 @@
 
   const dispatch = createEventDispatcher<{ leadSent: LeadPayload }>();
 
-  export let whatsAppNumber: string = "(41) 99294-3443"; // VENDAS
+  export let whatsAppNumber: string = salesContact.whatsappDisplay;
   export const supportWhatsAppNumber: string = "(41) 3027-4747"; // mantido (se quiser WhatsApp no suporte no futuro)
   export let financeWhatsAppNumber: string = "(41) 99774-2363";
 
@@ -799,7 +801,7 @@
         {#if variant === "support"}
           <LifeBuoy size={30} strokeWidth={2.2} aria-hidden="true" />
         {:else}
-          <img src="/icon_whatsapp_white.svg" alt="WhatsApp" class="h-10 w-10" />
+          <img src={whatsappIconUrl} alt="WhatsApp" class="h-10 w-10" />
         {/if}
       </button>
 

@@ -1,21 +1,22 @@
+@import "@fontsource/plus-jakarta-sans/latin-400.css";
+@import "@fontsource/plus-jakarta-sans/latin-600.css";
+@import "@fontsource/plus-jakarta-sans/latin-700.css";
+@import "@fontsource/manrope/latin-600.css";
+@import "@fontsource/manrope/latin-700.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@import "@fontsource/plus-jakarta-sans/400.css";
-@import "@fontsource/plus-jakarta-sans/600.css";
-@import "@fontsource/plus-jakarta-sans/700.css";
-@import "@fontsource/manrope/600.css";
-@import "@fontsource/manrope/700.css";
 
 :root {
   --noise-opacity: 0.25;
   --noise-size: 256px;
   --tint-opacity: 0.18;
   --brand: #EA6D0B;
+  --brand-accessible: #B64E00;
   --text: #000A57;
   --dark: #010D28;
   --card: #F0F0F0;
-  --text-soft: #878C91;
+  --text-soft: #5F6475;
 }
 
 body::before {
@@ -23,7 +24,7 @@ body::before {
   position: fixed;
   inset: 0;
   z-index: -2;
-  background-image: url("/noise.svg");
+  background-image: url("./lib/assets/shared/noise.svg");
   background-repeat: repeat;
   background-size: var(--noise-size) var(--noise-size);
   opacity: 0.8;
@@ -80,8 +81,8 @@ body::after {
 @supports (background-image: image-set(url("") 1x)) {
   body::before {
     background-image: image-set(
-      url("/noise.svg") 1x,
-      url("/noise.svg") 2x
+      url("./lib/assets/shared/noise.svg") 1x,
+      url("./lib/assets/shared/noise.svg") 2x
     );
   }
 }
