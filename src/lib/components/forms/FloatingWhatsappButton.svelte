@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onDestroy, onMount } from "svelte";
-  import { ArrowRight, LifeBuoy } from "lucide-svelte";
+  import ArrowRight from "lucide-svelte/icons/arrow-right";
+  import LifeBuoy from "lucide-svelte/icons/life-buoy";
   import whatsappIconUrl from "$lib/assets/brand/whatsapp-white-icon.svg?url&no-inline";
   import { salesContact } from "$lib/config/contactConfig";
   import { supportChatClientId } from "$lib/support/supportConfig";

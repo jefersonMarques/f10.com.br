@@ -78,6 +78,11 @@ body::after {
   animation: fade-up 0.8s ease-out forwards;
 }
 
+.deferred-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
+}
+
 @supports (background-image: image-set(url("") 1x)) {
   body::before {
     background-image: image-set(

@@ -26,7 +26,7 @@
 </script>
 
 <section
-  class="relative flex flex-col items-start px-6 sm:px-10 md:px-20 py-12 md:py-16 bg-white/10 isolate overflow-hidden text-center md:text-left"
+  class="deferred-section relative flex flex-col items-start px-6 sm:px-10 md:px-20 py-12 md:py-16 bg-white/10 isolate overflow-hidden text-center md:text-left"
   style="font-family: 'Plus Jakarta Sans', sans-serif;"
   aria-labelledby="blog-f10-title"
 >

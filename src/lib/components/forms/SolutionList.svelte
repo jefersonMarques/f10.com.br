@@ -2,19 +2,17 @@
   import { page } from "$app/stores";
   import { onMount, onDestroy, tick } from "svelte";
   import { showSolutionsPopUp } from "$lib/stores/solutionsPopup";
-  import {
-    LayoutGrid,
-    Megaphone,
-    Handshake,
-    Smartphone,
-    MonitorPlay,
-    GraduationCap,
-    Wallet,
-    ReceiptText,
-    BarChart3,
-    ArrowRight,
-    ChevronDown,
-  } from "lucide-svelte";
+  import ArrowRight from "lucide-svelte/icons/arrow-right";
+  import BarChart3 from "lucide-svelte/icons/bar-chart-3";
+  import ChevronDown from "lucide-svelte/icons/chevron-down";
+  import GraduationCap from "lucide-svelte/icons/graduation-cap";
+  import Handshake from "lucide-svelte/icons/handshake";
+  import LayoutGrid from "lucide-svelte/icons/layout-grid";
+  import Megaphone from "lucide-svelte/icons/megaphone";
+  import MonitorPlay from "lucide-svelte/icons/monitor-play";
+  import ReceiptText from "lucide-svelte/icons/receipt-text";
+  import Smartphone from "lucide-svelte/icons/smartphone";
+  import Wallet from "lucide-svelte/icons/wallet";
 
   // ===== Props =====
   export let title: string = "Soluções da F10";

@@ -174,7 +174,7 @@
 </script>
 
 <section
-  class="mt-12 flex min-h-screen items-center justify-center bg-white/50 lg:mt-0 lg:p-12"
+  class="deferred-section mt-12 flex min-h-screen items-center justify-center bg-white/50 lg:mt-0 lg:p-12"
   aria-label="Soluções de gestão escolar da F10"
 >
   <div

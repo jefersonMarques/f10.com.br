@@ -7,19 +7,17 @@
   import linkedinIconUrl from "$lib/assets/brand/linkedin-icon.svg?url&no-inline";
   import youtubeIconUrl from "$lib/assets/brand/youtube-icon.svg?url&no-inline";
   import SocialLinks from "$lib/components/SocialLinks.svelte";
-  import {
-    ChevronDown,
-    LayoutGrid,
-    Megaphone,
-    GraduationCap,
-    Wallet,
-    Handshake,
-    MonitorPlay,
-    Smartphone,
-    BarChart3,
-    Kanban,
-    FileChartColumn,
-  } from "lucide-svelte";
+  import BarChart3 from "lucide-svelte/icons/bar-chart-3";
+  import ChevronDown from "lucide-svelte/icons/chevron-down";
+  import FileChartColumn from "lucide-svelte/icons/file-chart-column";
+  import GraduationCap from "lucide-svelte/icons/graduation-cap";
+  import Handshake from "lucide-svelte/icons/handshake";
+  import Kanban from "lucide-svelte/icons/kanban";
+  import LayoutGrid from "lucide-svelte/icons/layout-grid";
+  import Megaphone from "lucide-svelte/icons/megaphone";
+  import MonitorPlay from "lucide-svelte/icons/monitor-play";
+  import Smartphone from "lucide-svelte/icons/smartphone";
+  import Wallet from "lucide-svelte/icons/wallet";
   import { contactModalConfig } from "$lib/stores/contactModals";
   import { showForm } from "$lib/stores/formPopup";
   import PopupCustomer from "./popup/PopupCustomer.svelte";

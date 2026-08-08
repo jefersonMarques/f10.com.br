@@ -90,6 +90,7 @@
 
   let idx = 0;
   const total = items.length;
+  $: activeItem = items[idx];
 
   function goNext() {
     idx = (idx + 1) % total;
@@ -160,7 +161,7 @@
 </TestimonialPopup>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<section class="relative py-16 md:py-24" aria-label="O que nossos clientes acham" on:keydown={onKeydown}>
+<section class="deferred-section relative py-16 md:py-24" aria-label="O que nossos clientes acham" on:keydown={onKeydown}>
   <div class="container">
     <!-- Carrossel com altura fixa e sobreposição -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -169,6 +170,7 @@
       role="region"
       aria-roledescription="carousel"
       aria-label="Depoimentos"
+      aria-live="polite"
       tabindex="0"
       on:pointerdown={onPointerDown}
       on:pointermove={onPointerMove}
@@ -177,26 +179,23 @@
       on:pointerleave={onPointerUp}
       style="touch-action: pan-y;"
     >
-      {#each items as item, i}
-        <div
-          class="absolute inset-0 transition-opacity duration-400 ease-[cubic-bezier(0.65,0,0.35,1)]"
-          style={`opacity:${i === idx ? 1 : 0}; pointer-events:${i === idx ? "auto" : "none"}`}
-        >
+      {#key idx}
+        <div class="testimonial-slide absolute inset-0">
           <TestimonialCard
             title="O que nossos clientes acham"
-            quote={item.quote}
-            author={item.author}
-            role={item.role}
-            avatar={item.avatar}
+            quote={activeItem.quote}
+            author={activeItem.author}
+            role={activeItem.role}
+            avatar={activeItem.avatar}
             index={idx + 1}
             {total}
             onPrev={goPrev}
             onNext={goNext}
-            onOpenDetails={() => openDetails(item)}
-            hasVideo={!!item.videoSrc}
+            onOpenDetails={() => openDetails(activeItem)}
+            hasVideo={!!activeItem.videoSrc}
           />
         </div>
-      {/each}
+      {/key}
     </div>
   </div>
 </section>
@@ -208,5 +207,24 @@
     margin-right: auto;
     padding-left: 1.25rem;
     padding-right: 1.25rem;
+  }
+
+  .testimonial-slide {
+    animation: testimonial-slide-in 400ms cubic-bezier(0.65, 0, 0.35, 1);
+  }
+
+  @keyframes testimonial-slide-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .testimonial-slide {
+      animation: none;
+    }
   }
 </style>

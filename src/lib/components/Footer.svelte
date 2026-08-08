@@ -182,7 +182,7 @@
 </script>
 
 <footer
-  class="relative flex flex-col items-center py-16 gap-16 bg-white/20 overflow-hidden"
+  class="deferred-section relative flex flex-col items-center py-16 gap-16 bg-white/20 overflow-hidden"
   style="font-family: 'Plus Jakarta Sans', sans-serif;"
 >
   <!-- ===== BLOCO SUPERIOR: Captura de Lead ===== -->
