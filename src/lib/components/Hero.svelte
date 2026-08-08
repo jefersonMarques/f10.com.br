@@ -3,7 +3,6 @@
     import celcoinLogoUrl from "$lib/assets/home/celcoin-logo.webp?url&no-inline";
     import googleCloudLogoUrl from "$lib/assets/home/google-cloud-logo.webp?url&no-inline";
     import growthIconUrl from "$lib/assets/home/growth-icon.svg?url&no-inline";
-    import heroAvifUrl from "$lib/assets/home/hero-1200.avif?url&no-inline";
     import heroWebpUrl from "$lib/assets/home/hero-1200.webp?url&no-inline";
     import oracleCloudLogoUrl from "$lib/assets/home/oracle-cloud-logo.webp?url&no-inline";
     import pizzaTailUrl from "$lib/assets/home/pizza-tail.svg?url&no-inline";
@@ -230,11 +229,6 @@
 
             <!-- monitor/devices -->
             <picture class="relative z-[1] mt-24 hidden lg:block">
-                <source
-                    media="(min-width: 1024px)"
-                    srcset={heroAvifUrl}
-                    type="image/avif"
-                />
                 <source
                     media="(min-width: 1024px)"
                     srcset={heroWebpUrl}
