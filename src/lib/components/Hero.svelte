@@ -147,7 +147,7 @@
                     data-location="hero_section"
                     on:click={openPlansDemoModal}
                     class="inline-flex h-[52px] items-center justify-center rounded-full bg-primary
-                    px-8 text-[16px] font-semibold leading-[22px] tracking-[-0.02em] text-[#010D28]
+                    px-8 text-[16px] font-semibold leading-[22px] tracking-[-0.02em] text-white
                     hover:brightness-95 active:brightness-90 transition w-full md:w-auto"
                 >
                     Quero uma demonstração
