@@ -763,8 +763,6 @@
     if (step === 3) {
       if (!certificateFile)
         next.certificateFile = "Certificado digital é obrigatório.";
-      if (!invoiceXmlFile)
-        next.invoiceXmlFile = "Envie um XML recente emitido pela prefeitura ou Portal Nacional.";
       if (!get(formDataStore).certificatePassword.trim())
         next.certificatePassword = "Informe a senha do certificado.";
     }
@@ -805,7 +803,9 @@
 
       fd.append("payload", JSON.stringify(payload));
       fd.append("certificate_file", certificateFile!);
-      fd.append("invoice_xml_file", invoiceXmlFile!);
+      if (invoiceXmlFile) {
+        fd.append("invoice_xml_file", invoiceXmlFile);
+      }
 
       const res = await fetch("/api/nfse/nfse-homologacao/submit", {
         method: "POST",
