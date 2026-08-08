@@ -146,7 +146,7 @@ const DOCS: DocConfig[] = [
   {
     key: "invoice_xml_file",
     label: "XML recente de nota fiscal emitida",
-    required: true,
+    required: false,
     multiple: false,
     allowedMime: ALLOWED_XML_MIME,
     maxFiles: 1,
