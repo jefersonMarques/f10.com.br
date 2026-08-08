@@ -1,7 +1,7 @@
 import adapter from '@sveltejs/adapter-node';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
-const cebracPresentationPath = '/src/routes/apresentacao/cebrac-crm-whatsapp/+page.svelte';
+const cebracPresentationPath = 'src/routes/apresentacao/cebrac-crm-whatsapp/+page.svelte';
 const ignoredCebracUnusedSelectors = [
   '.hero-image-fade',
   '.feature-line-light',
@@ -20,7 +20,7 @@ const ignoredCebracUnusedSelectors = [
 function isKnownCebracUnusedSelectorWarning(warning) {
   if (warning.code !== 'css_unused_selector') return false;
 
-  const filename = warning.filename?.replaceAll('\\', '/') ?? '';
+  const filename = (warning.filename ?? '').replaceAll('\\', '/');
   if (!filename.endsWith(cebracPresentationPath)) return false;
 
   return ignoredCebracUnusedSelectors.some((selector) =>
