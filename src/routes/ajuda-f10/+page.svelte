@@ -4,9 +4,9 @@
   import {
     getYoutubeThumbnailUrl,
     getYoutubeUrl,
-    trainingCategories,
     trainingVideos,
   } from "$lib/help/trainingCatalog";
+  import { helpDestinations } from "$lib/help/helpDecisionTree";
   import {
     DEFAULT_OG_IMAGE,
     ORGANIZATION_DATA,
@@ -18,29 +18,15 @@
   } from "$lib/seo/site";
 
   const canonicalUrl = `${SITE_URL}/ajuda-f10`;
-  const seoTitle = "Ajuda F10 | Instalação, Primeiro Acesso e Treinamentos";
+  const seoTitle = "Ajuda F10 | Orientação Guiada e Treinamentos";
   const seoDescription =
-    "Encontre ajuda para instalar o F10, fazer o primeiro acesso e aprender as principais rotinas de gestão escolar com treinamentos em vídeo.";
+    "Responda perguntas simples para encontrar a orientação certa para instalar, acessar ou utilizar as principais rotinas do F10.";
 
-  const helpTopics = [
-    {
-      title: "Instalar o F10",
-      description:
-        "Baixe o instalador oficial e siga a orientação de instalação em um computador com Windows.",
-      url: `${SITE_URL}/primeiros-passos-f10`,
-    },
-    {
-      title: "Fazer o primeiro acesso ao F10",
-      description:
-        "Entre com a senha provisória recebida por e-mail, crie uma nova senha e faça o segundo login.",
-      url: `${SITE_URL}/primeiros-passos-f10?etapa=primeiro-acesso`,
-    },
-    ...trainingCategories.map((category) => ({
-      title: `Treinamentos de ${category.label}`,
-      description: category.description,
-      url: `${canonicalUrl}#treinamentos-f10`,
-    })),
-  ];
+  const helpTopics = helpDestinations.map((destination) => ({
+    title: destination.title,
+    description: destination.description,
+    url: `${canonicalUrl}?goal=${destination.id}`,
+  }));
 
   const helpTopicsSchema = {
     "@type": "ItemList",
@@ -78,7 +64,8 @@
         inLanguage: "pt-BR",
         isAccessibleForFree: true,
         thumbnailUrl: getYoutubeThumbnailUrl(training.videoId),
-        url: getYoutubeUrl(training.videoId),
+        url: `${canonicalUrl}?goal=${training.id}`,
+        sameAs: getYoutubeUrl(training.videoId),
         provider: { "@id": ORGANIZATION_ID },
       },
     })),
@@ -98,7 +85,7 @@
   ogImage={DEFAULT_OG_IMAGE}
   ogTitle={seoTitle}
   ogDescription={seoDescription}
-  ogImageAlt="Central de ajuda e treinamentos do F10 Software"
+  ogImageAlt="Orientação guiada e treinamentos do F10 Software"
   ogImageType="image/png"
   ogImageWidth={1200}
   ogImageHeight={630}
