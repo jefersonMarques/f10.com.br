@@ -34,9 +34,10 @@
       Certificado digital e XML recente
     </h2>
     <p class="mt-1 text-[13px] text-black/60">
-      Anexe o certificado digital e um XML recente de uma nota fiscal já emitida
-      diretamente no site da prefeitura ou no Portal Nacional. O tamanho máximo
-      é de 2 MB por arquivo.
+      Anexe o certificado digital. Se tiver um XML recente de uma nota fiscal já
+      emitida diretamente no site da prefeitura ou no Portal Nacional, você também
+      pode enviá-lo para facilitar a homologação. O XML é opcional. O tamanho
+      máximo é de 2 MB por arquivo.
     </p>
   </div>
 
@@ -119,6 +120,7 @@
           class="mb-2 block text-[12px] font-semibold text-black/70"
         >
           XML recente de uma nota fiscal emitida
+          <span class="font-normal text-black/45">(opcional)</span>
         </label>
         <div class="relative">
           <input
@@ -161,7 +163,7 @@
 
       <div class="sm:col-span-5">
         <p class="text-[12px] leading-relaxed text-black/55">
-          Envie o arquivo XML original baixado diretamente da prefeitura ou do
+          Se enviar, use o XML original baixado diretamente da prefeitura ou do
           Portal Nacional (gov.br). Não envie PDF, DANFSe ou arquivo convertido.
         </p>
       </div>
