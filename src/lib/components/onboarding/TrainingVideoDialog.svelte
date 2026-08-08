@@ -9,6 +9,7 @@
   export let training: TrainingVideo | null = null;
   export let isOpen = false;
   export let isCompleted = false;
+  export let showCompletionAction = true;
   export let completeActionLabel = "Concluí este treinamento";
   export let onClose: () => void = () => undefined;
   export let onComplete: () => void = () => undefined;
@@ -106,14 +107,16 @@
           Use os controles do vídeo para pausar, voltar ou ativar a tela cheia.
         </p>
 
-        <button
-          type="button"
-          class={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full px-6 py-3 text-[14px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#07112D] sm:w-auto ${isCompleted ? "bg-emerald-500 text-[#03160D] focus:ring-emerald-300" : "bg-[#EA6D0B] text-white shadow-[0_12px_30px_rgba(234,109,11,0.3)] hover:brightness-105 focus:ring-[#FF9A49]"}`}
-          on:click={isCompleted ? closeDialog : onComplete}
-        >
-          <Check size={18} aria-hidden="true" />
-          {isCompleted ? "Treinamento concluído" : completeActionLabel}
-        </button>
+        {#if showCompletionAction}
+          <button
+            type="button"
+            class={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full px-6 py-3 text-[14px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#07112D] sm:w-auto ${isCompleted ? "bg-emerald-500 text-[#03160D] focus:ring-emerald-300" : "bg-[#EA6D0B] text-white shadow-[0_12px_30px_rgba(234,109,11,0.3)] hover:brightness-105 focus:ring-[#FF9A49]"}`}
+            on:click={isCompleted ? closeDialog : onComplete}
+          >
+            <Check size={18} aria-hidden="true" />
+            {isCompleted ? "Treinamento concluído" : completeActionLabel}
+          </button>
+        {/if}
       </footer>
     </article>
   {/if}

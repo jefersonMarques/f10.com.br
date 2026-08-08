@@ -11,28 +11,20 @@
     X,
   } from "lucide-svelte";
   import DownloadStep from "$lib/components/onboarding/DownloadStep.svelte";
-  import EssentialTrainingStep from "$lib/components/onboarding/EssentialTrainingStep.svelte";
   import FinalAccessStep from "$lib/components/onboarding/FinalAccessStep.svelte";
   import FirstAccessStep from "$lib/components/onboarding/FirstAccessStep.svelte";
   import InstallationStep from "$lib/components/onboarding/InstallationStep.svelte";
   import PasswordSetupStep from "$lib/components/onboarding/PasswordSetupStep.svelte";
   import SupportChatDialog from "$lib/components/onboarding/SupportChatDialog.svelte";
-  import TrainingLibrary from "$lib/components/onboarding/TrainingLibrary.svelte";
-  import TrainingVideoDialog from "$lib/components/onboarding/TrainingVideoDialog.svelte";
-  import {
-    trainingVideos,
-    type TrainingVideo,
-  } from "$lib/onboarding/trainingCatalog";
+
+  export let startAtFirstAccess = false;
 
   type JourneyStepId =
     | "download"
     | "installation"
     | "provisional-access"
     | "password-setup"
-    | "final-access"
-    | "user-registration"
-    | "user-permissions"
-    | "training-library";
+    | "final-access";
 
   type JourneyStep = {
     id: JourneyStepId;
@@ -41,14 +33,19 @@
   };
 
   type StoredJourneyProgress = {
-    currentStepId?: JourneyStepId;
-    completedStepIds?: JourneyStepId[];
-    completedTrainingIds?: string[];
-    selectedTrainingId?: string | null;
+    currentStepId?: string;
+    completedStepIds?: string[];
     downloadStarted?: boolean;
+    isCompleted?: boolean;
   };
 
-  const storageKey = "f10-getting-started-progress-v2";
+  const storageKey = "f10-getting-started-progress-v3";
+  const legacyStorageKey = "f10-getting-started-progress-v2";
+  const removedStepIds = new Set([
+    "user-registration",
+    "user-permissions",
+    "training-library",
+  ]);
   const journeySteps: JourneyStep[] = [
     {
       id: "download",
@@ -75,44 +72,35 @@
       shortTitle: "Entrar no F10",
       objective: "Fazer o segundo login utilizando a nova senha.",
     },
-    {
-      id: "user-registration",
-      shortTitle: "Criar usuários",
-      objective: "Cadastrar as pessoas que utilizarão o F10.",
-    },
-    {
-      id: "user-permissions",
-      shortTitle: "Organizar acessos",
-      objective: "Definir o que cada pessoa poderá acessar.",
-    },
-    {
-      id: "training-library",
-      shortTitle: "Aprender uma rotina",
-      objective: "Escolher o que você precisa fazer agora.",
-    },
   ];
 
-  let currentStepIndex = 0;
-  let completedStepIds: JourneyStepId[] = [];
-  let completedTrainingIds: string[] = [];
-  let selectedTrainingId: string | null = null;
-  let activeTraining: TrainingVideo | null = null;
+  const firstAccessStepIndex = journeySteps.findIndex(
+    (step) => step.id === "provisional-access",
+  );
+  const firstAccessCompletedSteps: JourneyStepId[] = [
+    "download",
+    "installation",
+  ];
+
+  let currentStepIndex = startAtFirstAccess ? firstAccessStepIndex : 0;
+  let completedStepIds: JourneyStepId[] = startAtFirstAccess
+    ? firstAccessCompletedSteps
+    : [];
   let supportDialogOpen = false;
   let downloadStarted = false;
   let hasStarted = false;
   let hasSavedProgress = false;
   let showCompletion = false;
+  let shouldResumeCompletion = false;
   let contentElement: HTMLElement;
 
   $: currentStep = journeySteps[currentStepIndex];
   $: completedStepCount = journeySteps.filter((step) =>
     completedStepIds.includes(step.id),
   ).length;
-  $: activeTrainingIsCompleted = activeTraining
-    ? completedTrainingIds.includes(activeTraining.id)
-    : false;
 
   onMount(() => {
+    if (startAtFirstAccess) return;
     restoreProgress();
   });
 
@@ -120,36 +108,40 @@
     if (!browser) return;
 
     try {
-      const storedValue = window.localStorage.getItem(storageKey);
+      const storedValue =
+        window.localStorage.getItem(storageKey) ??
+        window.localStorage.getItem(legacyStorageKey);
       if (!storedValue) return;
 
       const storedProgress = JSON.parse(storedValue) as StoredJourneyProgress;
       const knownStepIds = new Set(journeySteps.map((step) => step.id));
-      const knownTrainingIds = new Set(trainingVideos.map((training) => training.id));
 
       completedStepIds = (storedProgress.completedStepIds ?? []).filter(
-        (stepId) => knownStepIds.has(stepId),
+        (stepId): stepId is JourneyStepId => knownStepIds.has(stepId as JourneyStepId),
       );
-      completedTrainingIds = (
-        storedProgress.completedTrainingIds ?? []
-      ).filter((trainingId) => knownTrainingIds.has(trainingId));
-
-      if (
-        storedProgress.selectedTrainingId &&
-        knownTrainingIds.has(storedProgress.selectedTrainingId)
-      ) {
-        selectedTrainingId = storedProgress.selectedTrainingId;
-      }
 
       const storedStepIndex = journeySteps.findIndex(
         (step) => step.id === storedProgress.currentStepId,
       );
-      if (storedStepIndex >= 0) currentStepIndex = storedStepIndex;
+
+      if (storedStepIndex >= 0) {
+        currentStepIndex = storedStepIndex;
+      } else if (
+        storedProgress.currentStepId &&
+        removedStepIds.has(storedProgress.currentStepId)
+      ) {
+        currentStepIndex = journeySteps.length - 1;
+        completedStepIds = journeySteps.map((step) => step.id);
+        shouldResumeCompletion = true;
+      }
 
       downloadStarted = storedProgress.downloadStarted === true;
+      shouldResumeCompletion =
+        shouldResumeCompletion || storedProgress.isCompleted === true;
       hasSavedProgress = true;
     } catch {
       window.localStorage.removeItem(storageKey);
+      window.localStorage.removeItem(legacyStorageKey);
     }
   }
 
@@ -159,13 +151,13 @@
     const progress: StoredJourneyProgress = {
       currentStepId: journeySteps[currentStepIndex].id,
       completedStepIds,
-      completedTrainingIds,
-      selectedTrainingId,
       downloadStarted,
+      isCompleted: showCompletion,
     };
 
     try {
       window.localStorage.setItem(storageKey, JSON.stringify(progress));
+      window.localStorage.removeItem(legacyStorageKey);
       hasSavedProgress = true;
     } catch {
       return;
@@ -179,7 +171,7 @@
 
   function startExperience(): void {
     hasStarted = true;
-    showCompletion = false;
+    showCompletion = shouldResumeCompletion;
     persistProgress();
     void focusCurrentContent();
   }
@@ -187,21 +179,22 @@
   function restartExperience(): void {
     currentStepIndex = 0;
     completedStepIds = [];
-    completedTrainingIds = [];
-    selectedTrainingId = null;
-    activeTraining = null;
     supportDialogOpen = false;
     downloadStarted = false;
     showCompletion = false;
+    shouldResumeCompletion = false;
     hasStarted = true;
 
-    if (browser) window.localStorage.removeItem(storageKey);
+    if (browser) {
+      window.localStorage.removeItem(storageKey);
+      window.localStorage.removeItem(legacyStorageKey);
+    }
+
     persistProgress();
     void focusCurrentContent();
   }
 
   function returnToIntroduction(): void {
-    activeTraining = null;
     supportDialogOpen = false;
     showCompletion = false;
     hasStarted = false;
@@ -212,30 +205,18 @@
     completedStepIds = [...completedStepIds, stepId];
   }
 
-  function addCompletedTraining(trainingId: string): void {
-    if (completedTrainingIds.includes(trainingId)) return;
-    completedTrainingIds = [...completedTrainingIds, trainingId];
-  }
-
-  function findStepIndex(stepId: JourneyStepId): number {
-    return journeySteps.findIndex((step) => step.id === stepId);
-  }
-
   function completeStepAndContinue(): void {
     addCompletedStep(currentStep.id);
 
-    if (currentStep.id === "user-registration") {
-      addCompletedTraining(trainingVideos[0].id);
+    if (currentStepIndex === journeySteps.length - 1) {
+      showCompletion = true;
+      shouldResumeCompletion = true;
+      persistProgress();
+      void focusCurrentContent();
+      return;
     }
 
-    if (currentStep.id === "user-permissions") {
-      addCompletedTraining(trainingVideos[1].id);
-    }
-
-    currentStepIndex = Math.min(
-      currentStepIndex + 1,
-      journeySteps.length - 1,
-    );
+    currentStepIndex += 1;
     persistProgress();
     void focusCurrentContent();
   }
@@ -245,24 +226,15 @@
     persistProgress();
   }
 
-  function skipSetupAndOpenTraining(): void {
-    const trainingStepIndex = findStepIndex("user-registration");
-    const setupStepIds = journeySteps
-      .slice(0, trainingStepIndex)
-      .map((step) => step.id);
-
+  function skipToFirstAccess(): void {
     completedStepIds = Array.from(
-      new Set([...completedStepIds, ...setupStepIds]),
+      new Set([...completedStepIds, ...firstAccessCompletedSteps]),
     );
-    currentStepIndex = trainingStepIndex;
+    currentStepIndex = firstAccessStepIndex;
     showCompletion = false;
+    shouldResumeCompletion = false;
     persistProgress();
     void focusCurrentContent();
-  }
-
-  function requestSupport(): void {
-    if (!browser) return;
-    openSupportDialog();
   }
 
   function openSupportDialog(): void {
@@ -272,47 +244,12 @@
   function closeSupportDialog(): void {
     supportDialogOpen = false;
   }
-
-  function openTraining(training: TrainingVideo): void {
-    selectedTrainingId = training.id;
-    activeTraining = training;
-    persistProgress();
-  }
-
-  function closeTraining(): void {
-    activeTraining = null;
-  }
-
-  function completeActiveTraining(): void {
-    if (!activeTraining) return;
-
-    const completedTraining = activeTraining;
-    addCompletedTraining(completedTraining.id);
-
-    if (
-      currentStep.id === "user-registration" &&
-      completedTraining.id === trainingVideos[0].id
-    ) {
-      addCompletedStep("user-registration");
-      currentStepIndex = findStepIndex("user-permissions");
-    } else if (
-      currentStep.id === "user-permissions" &&
-      completedTraining.id === trainingVideos[1].id
-    ) {
-      addCompletedStep("user-permissions");
-      currentStepIndex = findStepIndex("training-library");
-    } else if (currentStep.id === "training-library") {
-      addCompletedStep("training-library");
-      showCompletion = true;
-    }
-
-    activeTraining = null;
-    persistProgress();
-    void focusCurrentContent();
-  }
 </script>
 
-<section id="onboarding-journey" class="relative h-[100dvh] overflow-hidden bg-[#F5F6FB] text-[#010D28]">
+<section
+  id="onboarding-journey"
+  class="relative h-[100dvh] overflow-hidden bg-[#F5F6FB] text-[#010D28]"
+>
   <div
     class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_15%,rgba(234,109,11,0.12),transparent_28%),radial-gradient(circle_at_85%_82%,rgba(0,10,87,0.1),transparent_30%)]"
     aria-hidden="true"
@@ -328,18 +265,22 @@
 
         <p class="mx-auto mt-6 inline-flex items-center gap-2 rounded-full bg-[#FFF3E9] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#C95717]">
           <Sparkles size={15} aria-hidden="true" />
-          Introdução ao F10
+          {startAtFirstAccess ? "Primeiro acesso ao F10" : "Introdução ao F10"}
         </p>
 
         <h1
           id="welcome-title"
           class="mx-auto mt-4 max-w-xl text-[31px] font-semibold leading-[1.08] tracking-[-0.04em] text-[#010D28] sm:text-[43px]"
         >
-          Vamos preparar seu primeiro acesso, passo a passo
+          {startAtFirstAccess
+            ? "Vamos fazer seu primeiro acesso, passo a passo"
+            : "Vamos preparar seu primeiro acesso, passo a passo"}
         </h1>
 
         <p class="mx-auto mt-4 max-w-lg text-[14px] leading-[1.7] text-[#5F6475] sm:text-[16px]">
-          Mostraremos uma ação por vez: baixar, instalar, entrar com a senha provisória e criar sua senha definitiva.
+          {startAtFirstAccess
+            ? "Você usará o login e a senha provisória recebidos por e-mail para criar sua nova senha."
+            : "Mostraremos uma ação por vez: baixar, instalar, entrar com a senha provisória e criar sua senha definitiva."}
         </p>
 
         <div class="mx-auto mt-6 flex max-w-md items-center justify-center gap-3 rounded-2xl bg-[#F6F7FB] px-4 py-3 text-left ring-1 ring-[#E3E6F0]">
@@ -354,11 +295,15 @@
           class="welcome-action mt-7 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-[#EA6D0B] px-7 py-3.5 text-[16px] font-semibold text-white shadow-[0_18px_42px_rgba(234,109,11,0.35)] transition hover:brightness-105 focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/45 focus:ring-offset-2 sm:w-auto"
           on:click={startExperience}
         >
-          {hasSavedProgress ? "Continuar de onde parei" : "Começar meus primeiros passos"}
+          {startAtFirstAccess
+            ? "Começar primeiro acesso"
+            : hasSavedProgress
+              ? "Continuar de onde parei"
+              : "Começar meus primeiros passos"}
           <ArrowRight size={19} aria-hidden="true" />
         </button>
 
-        {#if hasSavedProgress}
+        {#if hasSavedProgress && !startAtFirstAccess}
           <button
             type="button"
             class="mx-auto mt-4 flex min-h-10 items-center justify-center gap-2 rounded-full px-4 py-2 text-[12px] font-semibold text-[#5F6475] transition hover:bg-[#F4F5F9] hover:text-[#000A57] focus:outline-none focus:ring-2 focus:ring-[#000A57]/20"
@@ -403,7 +348,7 @@
 
       <div class="shrink-0 border-b border-[#E7E9F1] bg-white/75 px-4 py-2.5 sm:px-6">
         <div class="mx-auto flex max-w-7xl items-center gap-4">
-          <ol class="grid flex-1 grid-cols-8 gap-1.5" aria-label="Progresso dos primeiros passos">
+          <ol class="grid flex-1 grid-cols-5 gap-1.5" aria-label="Progresso dos primeiros passos">
             {#each journeySteps as step, index}
               <li>
                 <span
@@ -435,36 +380,34 @@
                 <Check size={30} strokeWidth={3} aria-hidden="true" />
               </span>
               <p class="mt-6 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700">
-                Trilha concluída
+                Primeiro acesso concluído
               </p>
               <h1
                 id="completion-title"
                 class="mt-2 text-[30px] font-semibold leading-tight tracking-[-0.04em] text-[#010D28] sm:text-[42px]"
               >
-                Você concluiu seus primeiros passos no F10
+                Tudo pronto para usar o F10
               </h1>
               <p class="mx-auto mt-4 max-w-xl text-[14px] leading-[1.7] text-[#5F6475] sm:text-[16px]">
-                Agora você já sabe instalar, acessar, organizar os usuários e encontrar treinamentos para cada rotina.
+                Agora escolha na Ajuda F10 a rotina que deseja aprender.
               </p>
 
               <div class="mx-auto mt-7 grid max-w-xl gap-3 sm:grid-cols-2">
+                <a
+                  href="/ajuda-f10#treinamentos-f10"
+                  class="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#000A57] px-6 py-3 text-[14px] font-semibold text-white transition hover:bg-[#111B71] focus:outline-none focus:ring-2 focus:ring-[#000A57]/40"
+                >
+                  Acessar a Ajuda F10
+                  <ArrowRight size={18} aria-hidden="true" />
+                </a>
                 <button
                   type="button"
-                  class="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#000A57] px-6 py-3 text-[14px] font-semibold text-white transition hover:bg-[#111B71] focus:outline-none focus:ring-2 focus:ring-[#000A57]/40"
-                  on:click={() => (showCompletion = false)}
-                >
-                  Escolher outro treinamento
-                  <ArrowRight size={18} aria-hidden="true" />
-                </button>
-                <a
-                  href="https://f10.movidesk.com/kb"
-                  target="_blank"
-                  rel="noopener noreferrer"
                   class="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#DDE1EC] bg-white px-6 py-3 text-[14px] font-semibold text-[#000A57] transition hover:bg-[#F8F9FC] focus:outline-none focus:ring-2 focus:ring-[#000A57]/20"
+                  on:click={openSupportDialog}
                 >
                   <LifeBuoy size={18} aria-hidden="true" />
-                  Abrir Central de Ajuda
-                </a>
+                  Falar com o suporte
+                </button>
               </div>
             </section>
           {:else}
@@ -475,51 +418,27 @@
                     {downloadStarted}
                     onDownloadStarted={markDownloadStarted}
                     onComplete={completeStepAndContinue}
-                    onAlreadyInstalled={skipSetupAndOpenTraining}
+                    onAlreadyInstalled={skipToFirstAccess}
                   />
                 {:else if currentStep.id === "installation"}
                   <InstallationStep
                     onComplete={completeStepAndContinue}
-                    onRequestSupport={requestSupport}
+                    onRequestSupport={openSupportDialog}
                   />
                 {:else if currentStep.id === "provisional-access"}
                   <FirstAccessStep
                     onComplete={completeStepAndContinue}
-                    onRequestSupport={requestSupport}
+                    onRequestSupport={openSupportDialog}
                   />
                 {:else if currentStep.id === "password-setup"}
                   <PasswordSetupStep
                     onComplete={completeStepAndContinue}
-                    onRequestSupport={requestSupport}
-                  />
-                {:else if currentStep.id === "final-access"}
-                  <FinalAccessStep
-                    onComplete={completeStepAndContinue}
-                    onRequestSupport={requestSupport}
-                  />
-                {:else if currentStep.id === "user-registration"}
-                  <EssentialTrainingStep
-                    training={trainingVideos[0]}
-                    variant="users"
-                    title="Cadastre as pessoas da sua equipe"
-                    description="Neste vídeo você verá onde criar usuários e funcionários. Assista com calma e repita os passos no F10."
-                    isCompleted={completedTrainingIds.includes(trainingVideos[0].id)}
-                    onWatch={() => openTraining(trainingVideos[0])}
-                  />
-                {:else if currentStep.id === "user-permissions"}
-                  <EssentialTrainingStep
-                    training={trainingVideos[1]}
-                    variant="permissions"
-                    title="Proteja e organize os acessos"
-                    description="Aprenda a escolher quais menus e informações cada pessoa da equipe poderá acessar."
-                    isCompleted={completedTrainingIds.includes(trainingVideos[1].id)}
-                    onWatch={() => openTraining(trainingVideos[1])}
+                    onRequestSupport={openSupportDialog}
                   />
                 {:else}
-                  <TrainingLibrary
-                    {selectedTrainingId}
-                    {completedTrainingIds}
-                    onSelect={openTraining}
+                  <FinalAccessStep
+                    onComplete={completeStepAndContinue}
+                    onRequestSupport={openSupportDialog}
                   />
                 {/if}
               </div>
@@ -527,24 +446,11 @@
           {/if}
         </div>
       </main>
-
     </div>
   {/if}
 </section>
 
-<TrainingVideoDialog
-  training={activeTraining}
-  isOpen={activeTraining !== null}
-  isCompleted={activeTrainingIsCompleted}
-  completeActionLabel={currentStep?.id === "training-library" ? "Concluir treinamento" : "Concluir e continuar"}
-  onClose={closeTraining}
-  onComplete={completeActiveTraining}
-/>
-
-<SupportChatDialog
-  isOpen={supportDialogOpen}
-  onClose={closeSupportDialog}
-/>
+<SupportChatDialog isOpen={supportDialogOpen} onClose={closeSupportDialog} />
 
 <style>
   .welcome-action {

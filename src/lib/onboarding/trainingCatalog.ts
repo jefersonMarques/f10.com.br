@@ -17,6 +17,7 @@ export type TrainingVideo = {
   description: string;
   videoId: string;
   categoryId: TrainingCategoryId;
+  audience?: "manager";
   isEssential?: boolean;
   isNew?: boolean;
 };
@@ -24,8 +25,8 @@ export type TrainingVideo = {
 export const trainingCategories: TrainingCategory[] = [
   {
     id: "essential",
-    label: "Comece aqui",
-    description: "Configurações essenciais para preparar o acesso da equipe.",
+    label: "Configuração da equipe",
+    description: "Usuários, funcionários e permissões de acesso.",
   },
   {
     id: "sales",
@@ -56,6 +57,7 @@ export const trainingVideos: TrainingVideo[] = [
     description: "Cadastre as pessoas que utilizarão o F10 na rotina da escola.",
     videoId: "GMlLpOf5jhM",
     categoryId: "essential",
+    audience: "manager",
     isEssential: true,
   },
   {
@@ -64,6 +66,7 @@ export const trainingVideos: TrainingVideo[] = [
     description: "Defina quais menus e rotinas cada usuário poderá acessar.",
     videoId: "RBkrzecwEno",
     categoryId: "essential",
+    audience: "manager",
     isEssential: true,
   },
   {

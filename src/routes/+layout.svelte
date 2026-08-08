@@ -65,6 +65,7 @@
   $: pathname = $page.url.pathname;
   $: isStandalonePage = standalonePaths.has(pathname);
   $: isOnboardingPage = pathname === "/primeiros-passos-f10";
+  $: isHelpPage = pathname === "/ajuda-f10";
   $: seoOverride = seoOverrides[pathname];
 
   onMount(() => {
@@ -123,6 +124,11 @@
   <slot />
 {:else if isOnboardingPage}
   <main class="h-[100dvh] overflow-hidden">
+    <slot />
+  </main>
+  <FloatingWhatsappButton variant="support" />
+{:else if isHelpPage}
+  <main>
     <slot />
   </main>
   <FloatingWhatsappButton variant="support" />
