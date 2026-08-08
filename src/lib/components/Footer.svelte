@@ -3,6 +3,12 @@
   import IconEmail from "$lib/icons/IconEmail.svelte";
   import IconPhone from "$lib/icons/IconPhone.svelte";
   import IconWhatsApp from "$lib/icons/IconWhatsApp.svelte";
+  import f10LogoUrl from "$lib/assets/brand/f10-logo.svg?url&no-inline";
+  import facebookIconUrl from "$lib/assets/brand/facebook-icon.svg?url&no-inline";
+  import instagramIconUrl from "$lib/assets/brand/instagram-icon.svg?url&no-inline";
+  import linkedinIconUrl from "$lib/assets/brand/linkedin-icon.svg?url&no-inline";
+  import youtubeIconUrl from "$lib/assets/brand/youtube-icon.svg?url&no-inline";
+  import { salesContact } from "$lib/config/contactConfig";
   import SocialLinks from "./SocialLinks.svelte";
 
   type FooterLeadPayload = {
@@ -26,22 +32,22 @@
   const socialLinks = [
     {
       alt: "Facebook",
-      src: "/social_facebook.svg",
+      src: facebookIconUrl,
       href: "https://www.facebook.com/F10Software",
     },
     {
       alt: "LinkedIn",
-      src: "/social_linkedin.svg",
+      src: linkedinIconUrl,
       href: "https://www.linkedin.com/company/f10software/",
     },
     {
       alt: "YouTube",
-      src: "/social_youtube.svg",
+      src: youtubeIconUrl,
       href: "https://www.youtube.com/@f10software76",
     },
     {
       alt: "Instagram",
-      src: "/social_instagram.svg",
+      src: instagramIconUrl,
       href: "https://www.instagram.com/f10software/",
     },
   ];
@@ -176,7 +182,7 @@
 </script>
 
 <footer
-  class="relative flex flex-col items-center py-16 gap-16 bg-white/20 overflow-hidden"
+  class="deferred-section relative flex flex-col items-center py-16 gap-16 bg-white/20 overflow-hidden"
   style="font-family: 'Plus Jakarta Sans', sans-serif;"
 >
   <!-- ===== BLOCO SUPERIOR: Captura de Lead ===== -->
@@ -243,7 +249,7 @@
       <button
         type="submit"
         class="flex justify-center items-center gap-3 h-[56px] px-8 bg-[#EA6D0B]
-               text-white font-bold text-[16px] rounded-[70px] transition hover:bg-[#FF7F20]
+               text-[#010D28] font-bold text-[16px] rounded-[70px] transition hover:bg-[#FF7F20]
                disabled:cursor-not-allowed disabled:opacity-70"
         disabled={isSubmitting}
       >
@@ -281,8 +287,10 @@
     <!-- Coluna 1 -->
     <div class="flex flex-col items-start gap-6">
       <img
-        src="/logo_f10.svg"
+        src={f10LogoUrl}
         alt="F10 Software"
+        width="106"
+        height="60"
         class="h-[60px] w-auto object-contain"
       />
 
@@ -290,7 +298,7 @@
         class="font-bold text-[14px] leading-[24px] text-[#000A57] max-w-[420px]"
       >
         F10 Software – Soluções Digitais para Gestão Escolar<br />
-        <span class="font-normal text-[#9B9B9C]">
+        <span class="font-normal text-[#5F6475]">
           Transforme a administração da sua escola com tecnologia de ponta.
         </span>
       </p>
@@ -300,9 +308,9 @@
 
     <!-- Coluna 2 -->
     <div class="flex flex-col gap-3">
-      <h4 class="text-[18px] font-semibold">Acesso rápido</h4>
+      <h3 class="text-[18px] font-semibold">Acesso rápido</h3>
 
-      <ul class="text-[#9B9B9C] text-[14px] leading-[24px]">
+      <ul class="text-[#5F6475] text-[14px] leading-[24px]">
         <li><a href="/" class="hover:text-[#EA6D0B]">Início</a></li>
 
         <li><a href="/solucoes" class="hover:text-[#EA6D0B]">Soluções</a></li>
@@ -325,9 +333,9 @@
 
     <!-- Coluna 3 -->
     <div class="flex flex-col gap-3">
-      <h4 class="text-[18px] font-semibold">Outros links</h4>
+      <h3 class="text-[18px] font-semibold">Outros links</h3>
 
-      <ul class="text-[#9B9B9C] text-[14px] leading-[24px]">
+      <ul class="text-[#5F6475] text-[14px] leading-[24px]">
         <li>
           <a href="/termos-de-uso" class="hover:text-[#EA6D0B]">
             Termos de uso
@@ -343,10 +351,10 @@
     </div>
 
     <!-- Coluna 4 -->
-    <div class="flex flex-col gap-3 text-[#9B9B9C] text-[14px]">
+    <div class="flex flex-col gap-3 text-[#5F6475] text-[14px]">
       <div class="flex items-center gap-2">
         <IconPhone size={19} />
-        <span>(41) 99294-3443</span>
+        <span>{salesContact.whatsappDisplay}</span>
       </div>
 
       <div class="flex items-center gap-2">
@@ -357,7 +365,7 @@
       <div class="flex items-center gap-2">
         <IconWhatsApp size={20} />
 
-        <a href="https://wa.me/5541992943443" class="hover:underline">
+        <a href={salesContact.whatsappUrl} class="hover:underline">
           <span>Fale com o vendas</span>
         </a>
       </div>

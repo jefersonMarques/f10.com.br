@@ -1,20 +1,23 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { onMount, onDestroy } from "svelte";
+  import f10LogoUrl from "$lib/assets/brand/f10-logo.svg?url&no-inline";
+  import facebookIconUrl from "$lib/assets/brand/facebook-icon.svg?url&no-inline";
+  import instagramIconUrl from "$lib/assets/brand/instagram-icon.svg?url&no-inline";
+  import linkedinIconUrl from "$lib/assets/brand/linkedin-icon.svg?url&no-inline";
+  import youtubeIconUrl from "$lib/assets/brand/youtube-icon.svg?url&no-inline";
   import SocialLinks from "$lib/components/SocialLinks.svelte";
-  import {
-    ChevronDown,
-    LayoutGrid,
-    Megaphone,
-    GraduationCap,
-    Wallet,
-    Handshake,
-    MonitorPlay,
-    Smartphone,
-    BarChart3,
-    Kanban,
-    FileChartColumn,
-  } from "lucide-svelte";
+  import BarChart3 from "lucide-svelte/icons/bar-chart-3";
+  import ChevronDown from "lucide-svelte/icons/chevron-down";
+  import FileChartColumn from "lucide-svelte/icons/file-chart-column";
+  import GraduationCap from "lucide-svelte/icons/graduation-cap";
+  import Handshake from "lucide-svelte/icons/handshake";
+  import Kanban from "lucide-svelte/icons/kanban";
+  import LayoutGrid from "lucide-svelte/icons/layout-grid";
+  import Megaphone from "lucide-svelte/icons/megaphone";
+  import MonitorPlay from "lucide-svelte/icons/monitor-play";
+  import Smartphone from "lucide-svelte/icons/smartphone";
+  import Wallet from "lucide-svelte/icons/wallet";
   import { contactModalConfig } from "$lib/stores/contactModals";
   import { showForm } from "$lib/stores/formPopup";
   import PopupCustomer from "./popup/PopupCustomer.svelte";
@@ -45,22 +48,22 @@
   const socialLinks = [
     {
       alt: "Facebook",
-      src: "/social_facebook.svg",
+      src: facebookIconUrl,
       href: "https://www.facebook.com/F10Software",
     },
     {
       alt: "LinkedIn",
-      src: "/social_linkedin.svg",
+      src: linkedinIconUrl,
       href: "https://www.linkedin.com/company/f10software/",
     },
     {
       alt: "YouTube",
-      src: "/social_youtube.svg",
+      src: youtubeIconUrl,
       href: "https://www.youtube.com/@f10software76",
     },
     {
       alt: "Instagram",
-      src: "/social_instagram.svg",
+      src: instagramIconUrl,
       href: "https://www.instagram.com/f10software/",
     },
   ];
@@ -310,7 +313,13 @@
         class="relative flex h-[50px] lg:h-[60px] items-center"
         aria-label="F10 Software — Início"
       >
-        <img src="/logo_f10.svg" alt="F10 Software" class="max-h-full w-auto" />
+        <img
+          src={f10LogoUrl}
+          alt="F10 Software"
+          width="106"
+          height="60"
+          class="max-h-full w-auto"
+        />
       </a>
 
       <!-- NAV DESKTOP -->

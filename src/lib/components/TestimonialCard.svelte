@@ -21,7 +21,7 @@
 <div class="absolute inset-0 flex flex-col justify-between px-2">
   <!-- TÍTULO -->
   <div
-    class="flex items-center text-left gap-4 text-[#010d286b] text-[16px]"
+    class="flex items-center text-left gap-4 text-[#5F6475] text-[16px]"
     in:fade={{ duration: 250, easing: cubicOut }}
     out:fade={{ duration: 200, easing: cubicOut }}
   >
@@ -118,6 +118,8 @@
           <img
             src={avatar}
             alt=""
+            width="160"
+            height="160"
             class="h-full w-full object-cover"
             loading="lazy"
           />
@@ -128,7 +130,7 @@
         <p class="text-[22px] font-semibold text-[#010D28] truncate">
           {author}
         </p>
-        <p class="text-[16px] text-[#8A9099]">{role}</p>
+        <p class="text-[16px] text-[#5F6475]">{role}</p>
       </div>
     </div>
 
@@ -158,7 +160,7 @@
         <span class="underline underline-offset-4 decoration-2">
           {String(index).padStart(2, "0")}
         </span>
-        <span class="text-[#A7AAB3]">/{String(total).padStart(2, "0")}</span>
+        <span class="text-[#6B7280]">/{String(total).padStart(2, "0")}</span>
       </div>
 
       <button

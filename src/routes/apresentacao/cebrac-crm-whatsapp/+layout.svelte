@@ -324,7 +324,7 @@
       on:click={closeVideoModal}
     ></button>
 
-    <section
+    <div
       class="cebrac-video-modal-dialog"
       role="dialog"
       aria-modal="true"
@@ -348,6 +348,8 @@
       </header>
 
       <div class="cebrac-video-modal-content">
+        <!-- O arquivo de legendas deve ser adicionado quando a transcrição do vídeo estiver disponível. -->
+        <!-- svelte-ignore a11y_media_has_caption -->
         <video
           bind:this={videoElement}
           controls
@@ -361,7 +363,7 @@
           Seu navegador não suporta a reprodução deste vídeo.
         </video>
       </div>
-    </section>
+    </div>
   </div>
 {/if}
 

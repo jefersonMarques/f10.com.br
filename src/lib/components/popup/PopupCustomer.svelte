@@ -1,6 +1,9 @@
 <script lang="ts">
     import { createEventDispatcher, onMount } from "svelte";
-    import { ArrowRight, Coins, FileText, Sparkles } from "lucide-svelte";
+    import ArrowRight from "lucide-svelte/icons/arrow-right";
+    import Coins from "lucide-svelte/icons/coins";
+    import FileText from "lucide-svelte/icons/file-text";
+    import Sparkles from "lucide-svelte/icons/sparkles";
 
     // Única prop: controla se o popup está visível
     export let open = false;

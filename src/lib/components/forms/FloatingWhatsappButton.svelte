@@ -1,15 +1,21 @@
 <script lang="ts">
   import { createEventDispatcher, onDestroy, onMount } from "svelte";
-  import { ArrowRight } from "lucide-svelte";
+  import ArrowRight from "lucide-svelte/icons/arrow-right";
+  import LifeBuoy from "lucide-svelte/icons/life-buoy";
+  import whatsappIconUrl from "$lib/assets/brand/whatsapp-white-icon.svg?url&no-inline";
+  import { salesContact } from "$lib/config/contactConfig";
+  import { supportChatClientId } from "$lib/support/supportConfig";
+  import { openSupportEventName } from "$lib/support/supportEvents";
 
   // =========================
   // Movidesk Chat Widget (Suporte) - FORA do seu popup
   // - Ao clicar em Suporte: abre o modal/widget do Movidesk (maximized)
   // - Ao clicar no botão WhatsApp flutuante: se o Movidesk estiver aberto, ele fecha (minimize)
   // =========================
-  export let movideskChatClient: string = "F907BBDD336B4365A1CE3C5176E1C082";
+  export let movideskChatClient: string = supportChatClientId;
   export let supportOpenMode: "widget" | "iframe" = "widget"; // mantido por compatibilidade
   export let supportStartOpen: boolean = false;
+  export let variant: "contact" | "support" = "contact";
 
   type MovideskWindow = Window & {
     mdChatClient?: string;
@@ -185,6 +191,14 @@
     isSupportWidgetOpen = false;
   }
 
+  function handleOpenSupportRequest(): void {
+    if (variant !== "support") return;
+
+    isOpen = false;
+    selectedDepartment = null;
+    void openMovideskSupport();
+  }
+
   function closeMovideskSupport() {
     const w = getMovideskWindow();
     if (!w) return;
@@ -212,7 +226,7 @@
 
   const dispatch = createEventDispatcher<{ leadSent: LeadPayload }>();
 
-  export let whatsAppNumber: string = "(41) 99294-3443"; // VENDAS
+  export let whatsAppNumber: string = salesContact.whatsappDisplay;
   export const supportWhatsAppNumber: string = "(41) 3027-4747"; // mantido (se quiser WhatsApp no suporte no futuro)
   export let financeWhatsAppNumber: string = "(41) 99774-2363";
 
@@ -223,7 +237,7 @@
     "Olá, preciso falar com o financeiro da F10.";
 
   export let source: string = "";
-  export let page: string | undefined;
+  export let page: string | undefined = undefined;
 
   export let product: string = "Software F10";
   export let subSource: string = "Botão flutuante site";
@@ -281,11 +295,19 @@
   // REGRA PRINCIPAL:
   // - Se o suporte (Movidesk) estiver aberto: clicar no botão WhatsApp fecha ele.
   // - Senão: o botão WhatsApp alterna seu popup (seletor/vendas).
-  function toggleOpen() {
+  async function toggleOpen() {
     errorMessage = "";
 
     if (isSupportWidgetOpen) {
       closeMovideskSupport();
+      return;
+    }
+
+    if (variant === "support") {
+      isOpen = false;
+      selectedDepartment = null;
+      showOnlineHint = false;
+      await openMovideskSupport();
       return;
     }
 
@@ -481,6 +503,14 @@
     await openMovideskSupport();
   });
 
+  onMount(() => {
+    window.addEventListener(openSupportEventName, handleOpenSupportRequest);
+
+    return () => {
+      window.removeEventListener(openSupportEventName, handleOpenSupportRequest);
+    };
+  });
+
   onDestroy(() => {
     // se quiser sempre fechar ao sair da página
     // closeMovideskSupport();
@@ -492,7 +522,7 @@
 <!-- Overlay global -->
 <div class="fixed inset-0 z-[9999] pointer-events-none">
   <div
-    class="absolute bottom-4 right-4 md:bottom-6 md:right-6 pointer-events-auto"
+    class={`absolute right-4 pointer-events-auto md:right-6 ${variant === "support" ? "bottom-6" : "bottom-4 md:bottom-6"}`}
   >
     <div class="relative flex flex-col items-end gap-3">
       {#if isOpen}
@@ -757,15 +787,23 @@
       <button
         type="button"
         data-track="1"
-        data-event="whatsapp_click"
+        data-event={variant === "support" ? "support_click" : "whatsapp_click"}
         data-page={dataPage}
-        data-cta="cta_whatsapp_floating_button"
-        class="relative flex h-16 w-16 items-center justify-center rounded-full bg-[#25D366] text-white shadow-xl shadow-emerald-500/35 hover:bg-[#20bd59] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 transition"
+        data-cta={variant === "support"
+          ? "cta_support_floating_button"
+          : "cta_whatsapp_floating_button"}
+        class={`relative flex h-16 w-16 items-center justify-center rounded-full text-white shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white transition ${variant === "support" ? "bg-[#000A57] shadow-[#000A57]/30 hover:bg-[#111B71] focus-visible:ring-[#000A57]/60" : "bg-[#25D366] shadow-emerald-500/35 hover:bg-[#20bd59] focus-visible:ring-[#25D366]/70"}`}
         on:click={toggleOpen}
-        aria-label="Falar com a F10"
+        aria-label={variant === "support"
+          ? "Abrir suporte F10"
+          : "Falar com a F10"}
         aria-expanded={isOpen || isSupportWidgetOpen}
       >
-        <img src="/icon_whatsapp_white.svg" alt="WhatsApp" class="h-10 w-10" />
+        {#if variant === "support"}
+          <LifeBuoy size={30} strokeWidth={2.2} aria-hidden="true" />
+        {:else}
+          <img src={whatsappIconUrl} alt="WhatsApp" class="h-10 w-10" />
+        {/if}
       </button>
 
       {#if showOnlineHint && !isOpen && !isSupportWidgetOpen}
@@ -776,7 +814,7 @@
             <span
               class="h-2.5 min-w-2.5 rounded-full bg-emerald-400 animate-pulse"
             ></span>
-            <span>Estamos online.</span>
+            <span>{variant === "support" ? "Suporte F10 online." : "Estamos online."}</span>
           </div>
         </div>
       {/if}

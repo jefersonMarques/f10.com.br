@@ -7,7 +7,7 @@
     >
         <div class="md:col-span-5">
             <p
-                class="text-[12px] font-semibold uppercase tracking-[0.22em] text-[#EA6D0B]"
+                class="text-[12px] font-semibold uppercase tracking-[0.22em] text-[#B64E00]"
             >
                 Sobre a plataforma
             </p>

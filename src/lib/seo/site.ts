@@ -4,6 +4,7 @@ import type {
   WebPageSchemaInput,
   WebsiteSchemaInput,
 } from "$lib/seo/schema";
+import { salesContact } from "$lib/config/contactConfig";
 
 export const SITE_URL = "https://f10.com.br";
 export const SITE_NAME = "F10 Software";
@@ -24,7 +25,7 @@ export const ORGANIZATION_DATA: OrganizationSchemaInput = {
   logo: `${SITE_URL}/logo_f10.svg`,
   image: [DEFAULT_OG_IMAGE],
   email: "vendas@f10.com.br",
-  telephone: "+55 41 99294-3443",
+  telephone: salesContact.schemaTelephone,
   sameAs: [
     "https://www.facebook.com/F10Software",
     "https://www.linkedin.com/company/f10software/",
@@ -41,7 +42,7 @@ export const ORGANIZATION_DATA: OrganizationSchemaInput = {
   contactPoint: [
     {
       contactType: "sales",
-      telephone: "+55 41 99294-3443",
+      telephone: salesContact.schemaTelephone,
       email: "vendas@f10.com.br",
       areaServed: "BR",
       availableLanguage: SITE_LANGUAGE,

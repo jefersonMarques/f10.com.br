@@ -26,7 +26,7 @@
 </script>
 
 <section
-  class="relative flex flex-col items-start px-6 sm:px-10 md:px-20 py-12 md:py-16 bg-white/10 isolate overflow-hidden text-center md:text-left"
+  class="deferred-section relative flex flex-col items-start px-6 sm:px-10 md:px-20 py-12 md:py-16 bg-white/10 isolate overflow-hidden text-center md:text-left"
   style="font-family: 'Plus Jakarta Sans', sans-serif;"
   aria-labelledby="blog-f10-title"
 >
@@ -39,7 +39,7 @@
       <div class="w-[40px] md:w-[54px] h-[1px] bg-[#AEB3D9]"></div>
       <span
         id="blog-f10-title"
-        class="text-[#AEB3D9] font-semibold text-[15px] md:text-[17px] tracking-[-0.03em]"
+        class="text-[#5F6475] font-semibold text-[15px] md:text-[17px] tracking-[-0.03em]"
       >
         Blog F10
       </span>
@@ -60,7 +60,7 @@
 
         <div class="max-w-[557px] flex flex-col justify-start gap-8 md:gap-12">
           <p
-            class="text-[#878C91] text-[15px] md:text-[16px] font-medium leading-[180%]"
+            class="text-[#5F6475] text-[15px] md:text-[16px] font-medium leading-[180%]"
           >
             {hero.excerpt}
           </p>
@@ -95,7 +95,7 @@
                   style={`background:${post.color}`}
                 ></div>
                 <time
-                  class="text-[#878C91] text-[13px] md:text-[14px] leading-[160%] font-medium"
+                  class="text-[#5F6475] text-[13px] md:text-[14px] leading-[160%] font-medium"
                 >
                   {post.date}
                 </time>
@@ -112,7 +112,7 @@
               class="flex flex-col md:flex-row justify-between items-center gap-4 md:gap-10 mt-4 md:mt-6"
             >
               <p
-                class="text-[#878C91] text-[14px] leading-[160%] font-medium w-full md:w-[220px] text-center md:text-left"
+                class="text-[#5F6475] text-[14px] leading-[160%] font-medium w-full md:w-[220px] text-center md:text-left"
               >
                 {post.excerpt}
               </p>
@@ -153,7 +153,7 @@
         {/each}
       </div>
     {:else if error}
-      <p class="text-[#878C91] text-center w-full py-8">{error}</p>
+      <p class="text-[#5F6475] text-center w-full py-8">{error}</p>
     {/if}
   </div>
 </section>

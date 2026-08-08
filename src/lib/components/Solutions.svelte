@@ -1,5 +1,6 @@
 <script lang="ts">
   import SolutionCard from "$lib/components/SolutionCard.svelte";
+  import bubbleBackgroundUrl from "$lib/assets/home/bubble-background-1600.webp?url&no-inline";
 
   type TabId = "finance" | "pedagogy" | "sales" | "marketing";
   type Tab = { id: TabId; label: string; el?: HTMLButtonElement | null };
@@ -173,7 +174,7 @@
 </script>
 
 <section
-  class="mt-12 flex min-h-screen items-center justify-center bg-white/50 lg:mt-0 lg:p-12"
+  class="deferred-section mt-12 flex min-h-screen items-center justify-center bg-white/50 lg:mt-0 lg:p-12"
   aria-label="Soluções de gestão escolar da F10"
 >
   <div
@@ -181,8 +182,10 @@
   >
     <div class="absolute inset-0 z-0 overflow-hidden">
       <img
-        src="/booble_bg.webp"
+        src={bubbleBackgroundUrl}
         alt=""
+        width="1600"
+        height="1067"
         aria-hidden="true"
         class="pointer-events-none absolute inset-0 left-[280px] top-[400px] h-full w-full rotate-[-250deg] scale-[1.8] select-none object-cover opacity-[0.3] blur-[7px]"
       />
