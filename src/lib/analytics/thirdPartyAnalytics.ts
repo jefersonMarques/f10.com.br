@@ -1,6 +1,6 @@
 const googleTagManagerId = "GTM-KCD6KHP2";
 const metaPixelId = "715834075272190";
-const fallbackDelayMs = 8_000;
+const fallbackDelayMs = 15_000;
 
 type FacebookPixelFunction = ((...args: unknown[]) => void) & {
   callMethod?: (...args: unknown[]) => void;
