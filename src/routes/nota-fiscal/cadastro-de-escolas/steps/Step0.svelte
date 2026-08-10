@@ -1,7 +1,19 @@
 <!-- src/routes/nota-fiscal/cadastro-de-escolas/steps/Step0.svelte -->
 <script lang="ts">
+  import { onMount } from "svelte";
   import { formDataStore } from "../formStore";
-  import { CheckCircle2, Loader2, MapPin } from "lucide-svelte";
+  import {
+    invoiceXmlFileStore,
+    parseInvoiceXml,
+    type XmlPrefillResult,
+  } from "../xmlPrefill";
+  import {
+    CheckCircle2,
+    FileUp,
+    Loader2,
+    MapPin,
+    Sparkles,
+  } from "lucide-svelte";
 
   type CityCheckStatus = "idle" | "checking" | "available" | "unavailable" | "error";
   type CityCheckResult = {
@@ -32,6 +44,12 @@
   let coveredCities: string[] = [];
   let coverageMessage = "";
   let coverageRequestId = 0;
+
+  let xmlFileInput: HTMLInputElement;
+  let isReadingXml = false;
+  let xmlResult: XmlPrefillResult | null = null;
+  let xmlMessage = "";
+  let xmlError = "";
 
   const stateOptions: StateOption[] = [
     { value: "AC", label: "AC" },
@@ -229,13 +247,18 @@
       status: isAvailable ? "available" : "unavailable",
       city: resolvedCity,
       state: normalizeState(state),
-      ibgeCode: "",
+      ibgeCode: xmlResult?.ibgeCode ?? "",
       provider: "",
       message: isAvailable
         ? "Sua cidade está disponível para emissão de notas fiscais. Continue o preenchimento dos dados."
         : "Sua cidade não está elegível para emissão de notas fiscais, porém você poderá prosseguir com o preenchimento dos dados.",
       checkedAt: new Date().toISOString(),
-      raw: null,
+      raw: xmlResult
+        ? {
+            xmlKind: xmlResult.kind,
+            fieldsPrefilled: xmlResult.detectedFields,
+          }
+        : null,
     };
 
     onApplyResult(result);
@@ -292,21 +315,222 @@
 
     onContinue();
   }
+
+  function triggerXmlFileInput() {
+    xmlFileInput.click();
+  }
+
+  function applyPrefillData(result: XmlPrefillResult) {
+    formDataStore.update((prev) => ({
+      ...prev,
+      ...result.data,
+      phone: result.data.phone || prev.phone,
+      email: result.data.email || prev.email,
+      website: prev.website,
+    }));
+  }
+
+  async function processXmlFile(file: File) {
+    xmlError = "";
+    xmlMessage = "";
+    xmlResult = null;
+
+    if (!file.name.toLowerCase().endsWith(".xml")) {
+      throw new Error("Selecione um arquivo XML original da nota fiscal.");
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      throw new Error("O XML deve ter no máximo 2 MB.");
+    }
+
+    const result = parseInvoiceXml(await file.text());
+    xmlResult = result;
+    applyPrefillData(result);
+
+    const parsedState = normalizeState(String(result.data.state ?? ""));
+    const parsedCity = String(result.data.city ?? "").trim();
+
+    if (parsedState) {
+      state = parsedState;
+      await loadCoveredCitiesByState(parsedState);
+
+      if (parsedCity) {
+        city = findCoveredCityMatch(parsedCity) || parsedCity;
+        applyCityResult();
+      }
+    } else if (parsedCity) {
+      city = parsedCity;
+    }
+
+    xmlMessage = result.detectedFields.length
+      ? `${result.kindLabel} identificado. Preenchemos ${result.detectedFields.length} informaç${result.detectedFields.length === 1 ? "ão" : "ões"} automaticamente. Revise os dados nas próximas etapas.`
+      : "XML válido selecionado. Não encontramos campos compatíveis para preencher automaticamente, mas o arquivo será enviado junto com o cadastro.";
+  }
+
+  async function handleXmlFileChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+
+    invoiceXmlFileStore.set(file);
+    xmlError = "";
+    xmlMessage = "";
+
+    if (!file) {
+      xmlResult = null;
+      return;
+    }
+
+    isReadingXml = true;
+    try {
+      await processXmlFile(file);
+    } catch (error) {
+      invoiceXmlFileStore.set(null);
+      xmlResult = null;
+      input.value = "";
+      xmlError = error instanceof Error ? error.message : "Não foi possível ler o XML.";
+    } finally {
+      isReadingXml = false;
+    }
+  }
+
+  function removeXml() {
+    invoiceXmlFileStore.set(null);
+    xmlResult = null;
+    xmlMessage = "";
+    xmlError = "";
+    if (xmlFileInput) xmlFileInput.value = "";
+  }
+
+  onMount(() => {
+    const existingFile = $invoiceXmlFileStore;
+    if (!existingFile) return;
+
+    isReadingXml = true;
+    void processXmlFile(existingFile)
+      .catch((error) => {
+        xmlError = error instanceof Error ? error.message : "Não foi possível ler o XML.";
+      })
+      .finally(() => {
+        isReadingXml = false;
+      });
+  });
 </script>
 
 <div class="space-y-6">
-  <div class="flex items-start justify-between gap-4">
-    <div>
-      <h2 class="text-[18px] font-semibold text-black/85">
-        Verifique se a cidade já está disponível para NFS-e
-      </h2>
-      <p class="mt-1 text-[13px] text-black/60 max-w-[80ch]">
-        Selecione a UF e escolha uma cidade da lista de cobertura antes do preenchimento completo.
-      </p>
+  <div class="rounded-2xl border border-orange-200 bg-orange-50/60 p-4 sm:p-5">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-start gap-3">
+        <div class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--primary)] shadow-sm ring-1 ring-orange-100">
+          <Sparkles size={19} />
+        </div>
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h2 class="text-[16px] font-semibold text-black/85">
+              Preencha automaticamente usando um XML
+            </h2>
+            <span class="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-black/45 ring-1 ring-black/5">
+              Opcional
+            </span>
+          </div>
+          <p class="mt-1 max-w-[76ch] text-[13px] leading-relaxed text-black/60">
+            Se você já emitiu uma NF-e ou NFS-e, envie o XML original. Vamos aproveitar os dados fiscais que encontrarmos para reduzir o preenchimento manual.
+          </p>
+        </div>
+      </div>
+
+      <div class="shrink-0">
+        <input
+          bind:this={xmlFileInput}
+          type="file"
+          class="hidden"
+          accept=".xml,application/xml,text/xml"
+          on:change={handleXmlFileChange}
+        />
+        <button
+          type="button"
+          class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-5 py-3 text-[13px] font-semibold text-white hover:brightness-110 disabled:opacity-60 sm:w-auto"
+          on:click={triggerXmlFileInput}
+          disabled={isReadingXml}
+        >
+          {#if isReadingXml}
+            <Loader2 size={16} class="animate-spin" />
+            Lendo XML...
+          {:else}
+            <FileUp size={16} />
+            {$invoiceXmlFileStore ? "Trocar XML" : "Selecionar XML"}
+          {/if}
+        </button>
+      </div>
     </div>
 
-    <div class="hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-orange-50 border border-orange-100 text-[var(--primary)]">
-      <MapPin size={20} />
+    {#if $invoiceXmlFileStore}
+      <div class="mt-4 flex flex-col gap-2 rounded-xl border border-black/10 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0">
+          <div class="truncate text-[13px] font-semibold text-black/75">
+            {$invoiceXmlFileStore.name}
+          </div>
+          <div class="mt-0.5 text-[11px] text-black/45">
+            Este arquivo continuará anexado e será enviado ao servidor e no e-mail de homologação.
+          </div>
+        </div>
+        <button
+          type="button"
+          class="shrink-0 text-[12px] font-semibold text-black/50 underline underline-offset-4 hover:text-red-600"
+          on:click={removeXml}
+        >
+          Remover XML
+        </button>
+      </div>
+    {/if}
+
+    {#if xmlMessage}
+      <div class="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-[12px] text-emerald-800">
+        <div class="flex items-start gap-2">
+          <CheckCircle2 size={16} class="mt-0.5 shrink-0" />
+          <div>
+            <div class="font-semibold">{xmlMessage}</div>
+            {#if xmlResult && xmlResult.detectedFields.length > 0}
+              <div class="mt-2 flex flex-wrap gap-1.5">
+                {#each xmlResult.detectedFields.slice(0, 10) as field}
+                  <span class="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-emerald-800 ring-1 ring-emerald-100">
+                    {field}
+                  </span>
+                {/each}
+                {#if xmlResult.detectedFields.length > 10}
+                  <span class="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-emerald-800 ring-1 ring-emerald-100">
+                    +{xmlResult.detectedFields.length - 10}
+                  </span>
+                {/if}
+              </div>
+            {/if}
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    {#if xmlError}
+      <p class="mt-3 text-[12px] font-medium text-red-600">{xmlError}</p>
+    {/if}
+
+    <p class="mt-3 text-[11px] leading-relaxed text-black/45">
+      Use o XML original baixado da prefeitura, Portal Nacional ou SEFAZ. O preenchimento automático é uma ajuda: os dados devem ser revisados antes do envio.
+    </p>
+  </div>
+
+  <div class="border-t border-black/10 pt-6">
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h2 class="text-[18px] font-semibold text-black/85">
+          Verifique se a cidade já está disponível para NFS-e
+        </h2>
+        <p class="mt-1 text-[13px] text-black/60 max-w-[80ch]">
+          Se o XML trouxe a cidade, ela já aparece abaixo. Caso contrário, selecione a UF e escolha uma cidade da lista de cobertura.
+        </p>
+      </div>
+
+      <div class="hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-orange-50 border border-orange-100 text-[var(--primary)]">
+        <MapPin size={20} />
+      </div>
     </div>
   </div>
 

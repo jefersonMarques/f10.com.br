@@ -89,7 +89,7 @@ type SubmissionPayload = Record<string, unknown> & {
   schoolName?: string;
 };
 
-type DocKey = "certificate_file";
+type DocKey = "certificate_file" | "invoice_xml_file";
 
 type DocConfig = {
   key: DocKey;
@@ -127,6 +127,12 @@ const ALLOWED_DOC_MIME = new Set([
   "application/pkix-cert",
   "application/x-x509-user-cert",
 ]);
+const ALLOWED_XML_MIME = new Set([
+  "application/xml",
+  "text/xml",
+  "application/x-xml",
+  "application/octet-stream",
+]);
 
 const DOCS: DocConfig[] = [
   {
@@ -135,6 +141,14 @@ const DOCS: DocConfig[] = [
     required: true,
     multiple: false,
     allowedMime: ALLOWED_DOC_MIME,
+    maxFiles: 1,
+  },
+  {
+    key: "invoice_xml_file",
+    label: "XML recente de nota fiscal emitida",
+    required: false,
+    multiple: false,
+    allowedMime: ALLOWED_XML_MIME,
     maxFiles: 1,
   },
 ];
@@ -764,7 +778,10 @@ export const POST: RequestHandler = async ({ request, url }) => {
       const fileType = file.type || "";
       const fileSize = file.size || 0;
       const ext = getFileExtLower(fileName);
-      const isCertByExt = ext === "cert";
+      const isAllowedByExt =
+        doc.key === "certificate_file"
+          ? ["cert", "pfx", "p12", "p7b", "p7s"].includes(ext)
+          : ext === "xml";
       const isAllowedByMime = doc.allowedMime.has(fileType);
 
       if (!fileName || !fileSize) {
@@ -775,8 +792,9 @@ export const POST: RequestHandler = async ({ request, url }) => {
         return json({ success: false, message: `Arquivo acima de 2MB em: ${doc.label}.` }, { status: 400 });
       }
 
-      if (!isAllowedByMime && !isCertByExt) {
-        return json({ success: false, message: `Formato inválido em: ${doc.label}. Envie .cert ou PFX/P12.` }, { status: 400 });
+      if (!isAllowedByMime && !isAllowedByExt) {
+        const expectedFormat = doc.key === "invoice_xml_file" ? ".xml" : ".cert, .pfx, .p12, .p7b ou .p7s";
+        return json({ success: false, message: `Formato inválido em: ${doc.label}. Envie ${expectedFormat}.` }, { status: 400 });
       }
 
       docFiles.push({ key: doc.key, label: doc.label, file, index: i + 1 });

@@ -20,6 +20,7 @@
   import { Check } from "lucide-svelte";
 
   type WizardStep = 0 | 1 | 2 | 3 | 4;
+  type ExtendedFormErrors = FormErrors & { invoiceXmlFile?: string };
   type CityCheckStatus =
     | "idle"
     | "checking"
@@ -41,18 +42,19 @@
     0: "Verificação da cidade",
     1: "CNPJ, endereço e confirmações",
     2: "Acesso e dados fiscais",
-    3: "Certificado digital",
+    3: "Certificado e XML fiscal",
     4: "Explicação",
   };
 
   let currentStep: WizardStep = 0;
 
-  let errors: FormErrors = {};
+  let errors: ExtendedFormErrors = {};
   let isSubmitting = false;
   let isSuccess = false;
   let submitMessage = "";
 
   let certificateFile: File | null = null;
+  let invoiceXmlFile: File | null = null;
   let cityCheckResult: CityCheckResult | null = null;
 
   function onlyDigits(value: string): string {
@@ -535,7 +537,7 @@
 
   function validateStep(step: WizardStep): boolean {
     const data = get(formDataStore);
-    const next: FormErrors = {};
+    const next: ExtendedFormErrors = {};
 
     if (step === 0) {
       if (!cityCheckResult || cityCheckResult.status === "idle") {
@@ -644,10 +646,6 @@
 
         if (!data.cityHallPassword.trim()) {
           next.cityHallPassword = "Informe a senha da prefeitura.";
-        }
-
-        if (!data.serviceRpsBatchNumber.trim()) {
-          next.serviceRpsBatchNumber = "Informe a numeração do lote de RPS.";
         }
 
         if (!data.serviceListItem.trim()) {
@@ -805,6 +803,9 @@
 
       fd.append("payload", JSON.stringify(payload));
       fd.append("certificate_file", certificateFile!);
+      if (invoiceXmlFile) {
+        fd.append("invoice_xml_file", invoiceXmlFile);
+      }
 
       const res = await fetch("/api/nfse/nfse-homologacao/submit", {
         method: "POST",
@@ -901,7 +902,7 @@
           {:else if currentStep === 2}
             <Step2 {errors} />
           {:else if currentStep === 3}
-            <Step3 {errors} bind:certificateFile />
+            <Step3 {errors} bind:certificateFile bind:invoiceXmlFile />
           {:else if currentStep === 4}
             <Step4 {errors} />
           {/if}
