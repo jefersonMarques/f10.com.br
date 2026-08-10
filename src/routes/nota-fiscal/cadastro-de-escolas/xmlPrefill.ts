@@ -123,6 +123,20 @@ function normalizedRate(value: string): string {
   const normalized = value.replace(",", ".").replace("%", "").trim();
   const number = Number(normalized);
   if (!Number.isFinite(number)) return normalized;
+  return String(Number(number.toFixed(4)));
+}
+
+function normalizedIssRate(doc: Document): string {
+  const nationalRate = firstText(doc, ["pAliq"]);
+  if (nationalRate) return normalizedRate(nationalRate);
+
+  const legacyRate = firstText(doc, ["Aliquota"]);
+  if (!legacyRate) return "";
+
+  const normalized = legacyRate.replace(",", ".").replace("%", "").trim();
+  const number = Number(normalized);
+  if (!Number.isFinite(number)) return normalized;
+
   const percent = number > 0 && number <= 1 ? number * 100 : number;
   return String(Number(percent.toFixed(4)));
 }
@@ -298,7 +312,7 @@ function parseNfse(doc: Document): { data: Partial<FormData>; ibgeCode: string }
   const retainedIss = yesNo(firstText(doc, ["IssRetido"]));
   if (retainedIss) data.issWithholding = retainedIss;
 
-  setString(data, "aliquotIss", normalizedRate(firstText(doc, ["pAliq", "Aliquota"])));
+  setString(data, "aliquotIss", normalizedIssRate(doc));
 
   return { data, ibgeCode };
 }
