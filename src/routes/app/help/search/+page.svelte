@@ -79,7 +79,7 @@
               </div>
 
               <form method="POST" action="?/select" class="shrink-0">
-                <input type="hidden" name="searchEventId" value={form.searchEventId ?? ""} />
+                <input type="hidden" name="searchEventId" value={"searchEventId" in form ? form.searchEventId ?? "" : ""} />
                 <input type="hidden" name="contentId" value={result.contentId} />
                 <button type="submit" class="min-h-10 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[10px] font-semibold text-[#000A57] transition hover:bg-[#F8F9FF]">Abrir conteúdo</button>
               </form>
