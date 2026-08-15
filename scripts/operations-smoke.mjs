@@ -30,6 +30,7 @@ const protectedRoutes = [
   "/app",
   "/app/help",
   "/app/help/content",
+  "/app/help/content/import",
   "/app/help/search",
   "/app/help/insights",
   "/app/help/flows",
@@ -38,6 +39,7 @@ const protectedRoutes = [
   "/app/tickets",
   "/app/chat",
   "/app/chat/lab",
+  "/app/chat/preview",
 ];
 
 function absoluteUrl(pathname) {
