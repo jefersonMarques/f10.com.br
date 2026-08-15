@@ -6,6 +6,7 @@
     CircleAlert,
     FilePlus2,
     Layers3,
+    UploadCloud,
   } from "lucide-svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -39,6 +40,13 @@
         Crie procedimentos em passos. Cada passo pode combinar texto, imagem e vídeo e manter contexto exclusivo para a IA.
       </p>
     </div>
+
+    {#if data.canEdit}
+      <a href="/app/help/content/import" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57] transition hover:bg-[#F8F9FF]">
+        <UploadCloud size={16} aria-hidden="true" />
+        Importar conteúdos
+      </a>
+    {/if}
   </div>
 
   {#if form?.message}
