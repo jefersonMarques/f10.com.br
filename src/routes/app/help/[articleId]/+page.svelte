@@ -7,11 +7,15 @@
     Save,
   } from "lucide-svelte";
   import type { ActionData, PageData } from "./$types";
+  import type { HelpArticleFormValues } from "$lib/server/help/helpArticleForm";
 
   export let data: PageData;
   export let form: ActionData;
 
-  $: failedValues = form && "values" in form ? form.values : null;
+  $: failedValues =
+    form && "values" in form
+      ? ((form.values as HelpArticleFormValues | undefined) ?? null)
+      : null;
   $: values = failedValues ?? data.article;
 </script>
 
