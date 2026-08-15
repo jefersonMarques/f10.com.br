@@ -22,6 +22,18 @@
       timeStyle: "short",
     }).format(new Date(value));
   }
+
+  function formatDuration(value: number | null): string {
+    if (value === null) return "—";
+    if (value < 60) return `${value}s`;
+
+    const hours = Math.floor(value / 3600);
+    const minutes = Math.floor((value % 3600) / 60);
+    const seconds = value % 60;
+
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  }
 </script>
 
 <svelte:head><title>Acesso remoto | F10 Operations</title></svelte:head>
@@ -61,6 +73,83 @@
       <span class="text-[10px] text-[#858B99]">computadores online</span>
     </div>
   </section>
+
+  {#if data.canManage && data.sla}
+    <section class="mt-6 overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
+      <header class="border-b border-[#EEF0F5] px-5 py-4">
+        <div class="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+          <div>
+            <h2 class="text-[14px] font-semibold">SLA do atendimento remoto</h2>
+            <p class="mt-1 text-[9px] text-[#9297A5]">Últimos {data.sla.windowDays} dias. A espera do cliente para autorizar é separada do tempo que o atendente leva para iniciar após a autorização.</p>
+          </div>
+          <span class="text-[8px] text-[#A0A5B0]">Atribuição direta: {data.sla.totals.attributionCoveragePercent}%</span>
+        </div>
+      </header>
+
+      <div class="grid gap-px bg-[#EEF0F5] sm:grid-cols-2 xl:grid-cols-5">
+        <div class="bg-white p-4">
+          <span class="text-[8px] font-semibold uppercase tracking-[0.08em] text-[#9297A5]">Solicitações</span>
+          <strong class="mt-2 block text-[20px] text-[#202636]">{data.sla.totals.requests}</strong>
+          <span class="mt-1 block text-[8px] text-[#A0A5B0]">{data.sla.totals.started} iniciadas · {data.sla.totals.completed} concluídas</span>
+        </div>
+        <div class="bg-white p-4">
+          <span class="text-[8px] font-semibold uppercase tracking-[0.08em] text-[#9297A5]">Cliente autoriza</span>
+          <strong class="mt-2 block text-[20px] text-[#202636]">{formatDuration(data.sla.totals.avgCustomerConsentSeconds)}</strong>
+          <span class="mt-1 block text-[8px] text-[#A0A5B0]">média solicitação → autorização</span>
+        </div>
+        <div class="bg-white p-4">
+          <span class="text-[8px] font-semibold uppercase tracking-[0.08em] text-[#9297A5]">Atendente inicia</span>
+          <strong class="mt-2 block text-[20px] text-[#202636]">{formatDuration(data.sla.totals.avgOperatorPickupSeconds)}</strong>
+          <span class="mt-1 block text-[8px] text-[#A0A5B0]">P90 {formatDuration(data.sla.totals.p90OperatorPickupSeconds)}</span>
+        </div>
+        <div class="bg-white p-4">
+          <span class="text-[8px] font-semibold uppercase tracking-[0.08em] text-[#9297A5]">Tempo até acesso</span>
+          <strong class="mt-2 block text-[20px] text-[#202636]">{formatDuration(data.sla.totals.avgRequestToStartSeconds)}</strong>
+          <span class="mt-1 block text-[8px] text-[#A0A5B0]">média solicitação → início</span>
+        </div>
+        <div class="bg-white p-4">
+          <span class="text-[8px] font-semibold uppercase tracking-[0.08em] text-[#9297A5]">Duração remota</span>
+          <strong class="mt-2 block text-[20px] text-[#202636]">{formatDuration(data.sla.totals.avgHandleSeconds)}</strong>
+          <span class="mt-1 block text-[8px] text-[#A0A5B0]">média início → encerramento</span>
+        </div>
+      </div>
+
+      {#if data.sla.agents.length > 0}
+        <div class="overflow-x-auto border-t border-[#EEF0F5]">
+          <table class="w-full min-w-[760px] text-left">
+            <thead class="bg-[#FAFAFC] text-[8px] uppercase tracking-[0.08em] text-[#9297A5]">
+              <tr>
+                <th class="px-5 py-3 font-semibold">Atendente</th>
+                <th class="px-4 py-3 font-semibold">Iniciadas</th>
+                <th class="px-4 py-3 font-semibold">Concluídas</th>
+                <th class="px-4 py-3 font-semibold">Após autorização</th>
+                <th class="px-4 py-3 font-semibold">P90</th>
+                <th class="px-4 py-3 font-semibold">Duração média</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[#EEF0F5] text-[9px] text-[#505666]">
+              {#each data.sla.agents as agent}
+                <tr>
+                  <td class="px-5 py-3 font-semibold text-[#303645]">{agent.userName}</td>
+                  <td class="px-4 py-3">{agent.startedSessions}</td>
+                  <td class="px-4 py-3">{agent.completedSessions}</td>
+                  <td class="px-4 py-3">{formatDuration(agent.avgPickupSeconds)}</td>
+                  <td class="px-4 py-3">{formatDuration(agent.p90PickupSeconds)}</td>
+                  <td class="px-4 py-3">{formatDuration(agent.avgHandleSeconds)}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {:else}
+        <p class="border-t border-[#EEF0F5] px-5 py-6 text-[9px] text-[#9297A5]">Ainda não existem sessões iniciadas no período para calcular SLA por atendente.</p>
+      {/if}
+
+      {#if data.sla.totals.historicalFallbackSessions > 0}
+        <p class="border-t border-[#EEF0F5] bg-[#FFF9F3] px-5 py-3 text-[8px] leading-4 text-[#91603A]">{data.sla.totals.historicalFallbackSessions} sessão(ões) anterior(es) à migration 0018 usam o solicitante como atribuição histórica. Novas sessões registram quem efetivamente iniciou o acesso.</p>
+      {/if}
+    </section>
+  {/if}
 
   <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
     <section class="overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
