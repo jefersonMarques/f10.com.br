@@ -1,4 +1,5 @@
-import { error, type PageServerLoad } from "@sveltejs/kit";
+import { error } from "@sveltejs/kit";
+import type { PageServerLoad } from "./$types";
 import { hasPermission } from "$lib/server/auth/permissions";
 import { listInternalChatMessages } from "$lib/server/support/internalChatRepository";
 
