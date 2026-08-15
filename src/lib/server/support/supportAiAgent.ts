@@ -285,6 +285,7 @@ export async function runSupportAiLab(
       throw new OpenAiResponseError("OPENAI_INVALID_SUPPORT_OUTPUT");
     }
 
+    const modelAnswer = response.data.answer.trim();
     const validSourceIndexes = Array.from(
       new Set(
         response.data.citedSourceIndexes.filter(
@@ -292,9 +293,14 @@ export async function runSupportAiLab(
         ),
       ),
     );
-    const grounded = response.data.resolved && validSourceIndexes.length > 0;
-    const answer = response.data.answer.trim();
+    const grounded =
+      response.data.resolved &&
+      modelAnswer.length > 0 &&
+      validSourceIndexes.length > 0;
     const resolution = grounded ? "answered" : "escalate";
+    const answer = grounded
+      ? modelAnswer
+      : "Não encontrei sustentação suficiente na Base de Conhecimento publicada para responder essa dúvida com segurança. O atendimento deve seguir para análise humana.";
     const escalationReason = grounded
       ? ""
       : response.data.escalationReason.trim() ||
@@ -330,9 +336,7 @@ export async function runSupportAiLab(
       runId,
       searchEventId: search.searchEventId,
       resolution,
-      answer:
-        answer ||
-        "Não foi possível formular uma resposta segura com o conteúdo publicado.",
+      answer,
       escalationReason,
       sources: citedSources,
       model: response.model,
