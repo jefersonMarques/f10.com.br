@@ -17,6 +17,12 @@ function normalizeBasePath(pathname: string): string {
   return pathname.endsWith("/") ? pathname : `${pathname}/`;
 }
 
+function meshCentralNodeId(providerDeviceId: string): string {
+  const nodeId = providerDeviceId.trim().split("/").filter(Boolean).at(-1) ?? "";
+  if (!nodeId) throw new Error("REMOTE_PROVIDER_DEVICE_ID_INVALID");
+  return nodeId;
+}
+
 function readMeshCentralConfiguration() {
   const provider = env.REMOTE_SUPPORT_PROVIDER?.trim() === "meshcentral" ? "meshcentral" : "disabled";
   const baseUrl = env.MESHCENTRAL_BASE_URL?.trim() ?? "";
@@ -53,7 +59,8 @@ class MeshCentralProvider implements RemoteSupportProvider {
 
   getLaunchUrl(providerDeviceId: string): string {
     if (!this.config.configured || !this.config.parsedBase) throw new Error("REMOTE_PROVIDER_NOT_CONFIGURED");
-    const raw = this.config.deviceUrlTemplate.replaceAll("{deviceId}", encodeURIComponent(providerDeviceId));
+    const nodeId = meshCentralNodeId(providerDeviceId);
+    const raw = this.config.deviceUrlTemplate.replaceAll("{deviceId}", encodeURIComponent(nodeId));
     const url = new URL(raw, this.config.parsedBase);
     if (url.origin !== this.config.parsedBase.origin) throw new Error("REMOTE_PROVIDER_URL_ORIGIN_MISMATCH");
 
