@@ -44,8 +44,8 @@ try {
     if (!existingUser) {
       const passwordHash = await hashPassword(password);
       const [createdUser] = await transaction`
-        INSERT INTO users (name, email, password_hash, status)
-        VALUES (${name}, ${email}, ${passwordHash}, 'active')
+        INSERT INTO users (name, email, password_hash, status, activated_at)
+        VALUES (${name}, ${email}, ${passwordHash}, 'active', now())
         RETURNING id
       `;
       userId = createdUser.id;
@@ -53,13 +53,13 @@ try {
       const passwordHash = await hashPassword(password);
       await transaction`
         UPDATE users
-        SET name = ${name}, password_hash = ${passwordHash}, status = 'active', updated_at = now()
+        SET name = ${name}, password_hash = ${passwordHash}, status = 'active', activated_at = COALESCE(activated_at, now()), updated_at = now()
         WHERE id = ${userId}
       `;
     } else {
       await transaction`
         UPDATE users
-        SET name = ${name}, status = 'active', updated_at = now()
+        SET name = ${name}, status = 'active', activated_at = COALESCE(activated_at, now()), updated_at = now()
         WHERE id = ${userId}
       `;
     }
