@@ -48,12 +48,12 @@
     disabled: "IA desativada",
   };
 
-  function saveSession(): void {
-    if (!session) {
+  function saveSession(value: PreviewSession | null = session): void {
+    if (!value) {
       sessionStorage.removeItem(STORAGE_KEY);
       return;
     }
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(value));
   }
 
   function formatTime(value: string): string {
@@ -64,14 +64,15 @@
   }
 
   async function loadMessages(): Promise<void> {
-    if (!session) return;
+    const activeSession = session;
+    if (!activeSession) return;
 
     try {
       const response = await fetch(
-        `/api/support/chat/${session.sessionId}/messages`,
+        `/api/support/chat/${activeSession.sessionId}/messages`,
         {
           headers: {
-            Authorization: `Bearer ${session.token}`,
+            Authorization: `Bearer ${activeSession.token}`,
             Accept: "application/json",
           },
         },
@@ -85,11 +86,12 @@
       };
       messages = payload.messages ?? [];
       if (payload.aiState) {
-        session = { ...session, aiState: payload.aiState };
-        saveSession();
+        const nextSession = { ...activeSession, aiState: payload.aiState };
+        session = nextSession;
+        saveSession(nextSession);
       }
     } catch {
-      // O preview continua utilizável mesmo se um ciclo de polling falhar.
+      // Falhas transitórias de polling não interrompem o preview.
     }
   }
 
@@ -121,13 +123,16 @@
         return;
       }
 
-      session = {
+      const nextSession: PreviewSession = {
         sessionId: String(payload.sessionId),
         token: String(payload.token),
         ticketNumber: Number(payload.ticketNumber),
-        aiState: (payload.aiState as PreviewSession["aiState"]) ?? "disabled",
+        aiState:
+          (payload.aiState as PreviewSession["aiState"] | undefined) ??
+          "disabled",
       };
-      saveSession();
+      session = nextSession;
+      saveSession(nextSession);
       firstMessage = "";
       await loadMessages();
     } catch {
@@ -138,19 +143,20 @@
   }
 
   async function sendMessage(): Promise<void> {
+    const activeSession = session;
     const body = messageBody.trim();
-    if (!session || !body || loading) return;
+    if (!activeSession || !body || loading) return;
 
     loading = true;
     errorMessage = "";
 
     try {
       const response = await fetch(
-        `/api/support/chat/${session.sessionId}/messages`,
+        `/api/support/chat/${activeSession.sessionId}/messages`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${session.token}`,
+            Authorization: `Bearer ${activeSession.token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ body }),
@@ -164,11 +170,12 @@
       }
 
       if (typeof payload.aiState === "string") {
-        session = {
-          ...session,
+        const nextSession: PreviewSession = {
+          ...activeSession,
           aiState: payload.aiState as PreviewSession["aiState"],
         };
-        saveSession();
+        session = nextSession;
+        saveSession(nextSession);
       }
       messageBody = "";
       await loadMessages();
@@ -184,7 +191,7 @@
     messages = [];
     messageBody = "";
     errorMessage = "";
-    saveSession();
+    saveSession(null);
   }
 
   onMount(() => {
