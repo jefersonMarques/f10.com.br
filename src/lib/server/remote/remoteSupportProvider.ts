@@ -9,7 +9,7 @@ export type RemoteProviderStatus = {
 export interface RemoteSupportProvider {
   readonly name: "meshcentral";
   testConnection(): Promise<boolean>;
-  getLaunchUrl(providerDeviceId: string): never;
+  getLaunchUrl(providerDeviceId: string): string;
 }
 
 function readMeshCentralConfiguration() {
@@ -54,7 +54,7 @@ class MeshCentralProvider implements RemoteSupportProvider {
     }
   }
 
-  getLaunchUrl(_providerDeviceId: string): never {
+  getLaunchUrl(_providerDeviceId: string): string {
     throw new Error("REMOTE_PROVIDER_DIRECT_LAUNCH_DISABLED");
   }
 }
