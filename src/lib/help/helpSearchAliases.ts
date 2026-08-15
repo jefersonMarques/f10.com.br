@@ -3,7 +3,7 @@ import {
   type HelpDestination,
 } from "$lib/help/helpDecisionTree";
 
-const destinationAliases: Record<string, string[]> = {
+export const destinationAliases: Record<string, string[]> = {
   "install-f10": ["baixar", "download", "instalar", "instalador", "windows"],
   "first-access": ["primeiro acesso", "entrar", "login", "senha provisoria", "email"],
   "create-password": ["alterar senha", "criar senha", "nova senha", "senha provisoria"],
