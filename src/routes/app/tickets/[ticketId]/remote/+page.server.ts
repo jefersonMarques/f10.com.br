@@ -1,6 +1,7 @@
 import { error, fail, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
+import { hasPermission } from "$lib/server/auth/permissions";
 import {
   createKnownDeviceRemoteSession,
   createRemoteDeviceEnrollment,
@@ -20,10 +21,42 @@ function readString(formData: FormData, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-async function requireTicketAccess(cookies: Parameters<typeof requireAppPermission>[0], ticketId: string) {
-  const auth = await requireAppPermission(cookies, "remote.request", `/app/tickets/${ticketId}/remote`);
+async function requireTicketRequestAccess(
+  cookies: Parameters<typeof requireAppPermission>[0],
+  ticketId: string,
+) {
+  const auth = await requireAppPermission(
+    cookies,
+    "remote.request",
+    `/app/tickets/${ticketId}/remote`,
+  );
   try {
-    const details = await getSupportTicket(auth.session.user.id, auth.permissions, ticketId);
+    const details = await getSupportTicket(
+      auth.session.user.id,
+      auth.permissions,
+      ticketId,
+    );
+    return { ...auth, details };
+  } catch {
+    throw error(404, "Ticket não encontrado ou fora do seu escopo.");
+  }
+}
+
+async function requireTicketUseAccess(
+  cookies: Parameters<typeof requireAppPermission>[0],
+  ticketId: string,
+) {
+  const auth = await requireAppPermission(
+    cookies,
+    "remote.use",
+    `/app/tickets/${ticketId}/remote`,
+  );
+  try {
+    const details = await getSupportTicket(
+      auth.session.user.id,
+      auth.permissions,
+      ticketId,
+    );
     return { ...auth, details };
   } catch {
     throw error(404, "Ticket não encontrado ou fora do seu escopo.");
@@ -32,7 +65,10 @@ async function requireTicketAccess(cookies: Parameters<typeof requireAppPermissi
 
 export const load: PageServerLoad = async ({ params, cookies }) => {
   if (!isUuid(params.ticketId)) throw error(404, "Ticket não encontrado.");
-  const { details } = await requireTicketAccess(cookies, params.ticketId);
+  const { details, permissions } = await requireTicketRequestAccess(
+    cookies,
+    params.ticketId,
+  );
   const provider = getRemoteProviderStatus();
   const control = getMeshCentralControlStatus();
   let syncError = "";
@@ -51,6 +87,7 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
     provider,
     control,
     syncError,
+    canUseRemote: hasPermission(permissions, "remote.use"),
   };
 };
 
@@ -68,10 +105,14 @@ export const actions: Actions = {
         message: "O MeshCentral ainda não está pronto para gerar o instalador de suporte.",
       });
     }
-    const { session } = await requireTicketAccess(cookies, params.ticketId);
+    const { session } = await requireTicketRequestAccess(cookies, params.ticketId);
 
     try {
-      await createRemoteDeviceEnrollment(session.user.id, params.ticketId, url.origin);
+      await createRemoteDeviceEnrollment(
+        session.user.id,
+        params.ticketId,
+        url.origin,
+      );
       return {
         success: true,
         action: "enroll",
@@ -90,7 +131,7 @@ export const actions: Actions = {
     if (!isUuid(params.ticketId)) {
       return fail(404, { success: false, message: "Ticket não encontrado." });
     }
-    await requireTicketAccess(cookies, params.ticketId);
+    await requireTicketRequestAccess(cookies, params.ticketId);
     try {
       const devices = await syncRemoteDevicesForTicket(params.ticketId);
       return {
@@ -113,11 +154,15 @@ export const actions: Actions = {
     if (!isUuid(params.ticketId)) {
       return fail(404, { success: false, message: "Ticket não encontrado." });
     }
-    const { session } = await requireTicketAccess(cookies, params.ticketId);
+    const { session } = await requireTicketUseAccess(cookies, params.ticketId);
     const formData = await request.formData();
     const deviceId = readString(formData, "deviceId");
     if (!isUuid(deviceId)) {
-      return fail(400, { success: false, action: "start", message: "Selecione um computador válido." });
+      return fail(400, {
+        success: false,
+        action: "start",
+        message: "Selecione um computador válido.",
+      });
     }
 
     try {
@@ -129,10 +174,18 @@ export const actions: Actions = {
       );
       throw redirect(303, `/app/remote/${remoteSessionId}/launch`);
     } catch (cause) {
-      if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
-      const message = cause instanceof Error && cause.message === "REMOTE_DEVICE_OFFLINE"
-        ? "Este computador está offline. Peça ao cliente para ligá-lo e tente novamente."
-        : "Não foi possível iniciar o acesso remoto neste computador.";
+      if (
+        cause &&
+        typeof cause === "object" &&
+        "status" in cause &&
+        cause.status === 303
+      ) {
+        throw cause;
+      }
+      const message =
+        cause instanceof Error && cause.message === "REMOTE_DEVICE_OFFLINE"
+          ? "Este computador está offline. Peça ao cliente para ligá-lo e tente novamente."
+          : "Não foi possível iniciar o acesso remoto neste computador.";
       return fail(409, { success: false, action: "start", message });
     }
   },
