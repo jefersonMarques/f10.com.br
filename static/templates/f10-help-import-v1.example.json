@@ -1,0 +1,58 @@
+{
+  "format": "f10-help-import",
+  "version": 1,
+  "source": "movidesk",
+  "contents": [
+    {
+      "externalId": "movidesk-article-123",
+      "title": "Como cadastrar uma turma",
+      "slug": "como-cadastrar-uma-turma",
+      "summary": "Passo a passo para cadastrar uma nova turma no F10.",
+      "category": "Acadêmico",
+      "aiGeneralKnowledge": "Use este procedimento somente para criação de novas turmas. Se o usuário não visualizar a opção de cadastro, verifique permissões de acesso antes de orientar outros caminhos.",
+      "steps": [
+        {
+          "title": "Acesse o cadastro de turmas",
+          "description": "Entre no módulo acadêmico e abra a área de turmas.",
+          "aiKnowledge": "Se a opção não aparecer, o usuário pode não possuir permissão para cadastrar turmas.",
+          "blocks": [
+            {
+              "type": "text",
+              "text": "No menu principal, acesse a área Acadêmico e depois Turmas."
+            },
+            {
+              "type": "image",
+              "url": "https://example.com/imagens/turmas.png",
+              "altText": "Tela do cadastro de turmas",
+              "aiSummary": "A imagem mostra a opção Turmas dentro da área Acadêmico."
+            }
+          ]
+        },
+        {
+          "title": "Preencha os dados da turma",
+          "description": "Informe os campos necessários e salve o cadastro.",
+          "aiKnowledge": "Campos e regras específicas que não precisam aparecer no texto público podem ser documentados aqui.",
+          "blocks": [
+            {
+              "type": "video",
+              "url": "https://example.com/videos/cadastro-turma.mp4",
+              "altText": "Vídeo demonstrando o cadastro de uma turma",
+              "transcript": "Transcrição completa do áudio do vídeo produzida pela ferramenta de transcrição.",
+              "aiSummary": "O vídeo demonstra a abertura do formulário, preenchimento dos dados e salvamento da nova turma."
+            },
+            {
+              "type": "notice",
+              "variant": "info",
+              "text": "Revise os dados antes de salvar."
+            },
+            {
+              "type": "link",
+              "url": "https://f10.com.br",
+              "label": "Abrir referência relacionada"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
