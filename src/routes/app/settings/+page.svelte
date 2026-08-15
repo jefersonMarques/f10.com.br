@@ -46,18 +46,19 @@
     </section>
 
     <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
-      <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF4E9] text-[#A9510D]"><MonitorCog size={18}/></span><div><h2 class="text-[14px] font-semibold">Acesso remoto</h2><p class="mt-1 text-[9px] text-[#9297A5]">MeshCentral externo + identificação automática de computadores.</p></div></div>
+      <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF4E9] text-[#A9510D]"><MonitorCog size={18}/></span><div><h2 class="text-[14px] font-semibold">Acesso remoto</h2><p class="mt-1 text-[9px] text-[#9297A5]">MeshCentral como motor do desktop embutido no Operations.</p></div></div>
 
       <div class="mt-5 space-y-3 text-[10px]">
         <div class="flex justify-between"><span class="text-[#858B99]">Provider</span><strong>{data.remote.provider}</strong></div>
         <div class="flex justify-between gap-3"><span class="text-[#858B99]">URL pública</span><strong class="max-w-[280px] truncate">{data.remote.baseUrl || "—"}</strong></div>
-        <div class="flex justify-between"><span class="text-[#858B99]">Link por dispositivo</span><strong>{data.remote.hasDeviceTemplate ? "Configurado" : "Pendente"}</strong></div>
+        <div class="flex justify-between"><span class="text-[#858B99]">Desktop</span><strong>Embutido no F10</strong></div>
         <div class="border-t border-[#EEF0F5] pt-3"></div>
         <div class="flex justify-between gap-3"><span class="text-[#858B99]">Integração automática</span><strong>{data.remoteControl.configured ? "Configurada" : "Pendente"}</strong></div>
         <div class="flex justify-between gap-3"><span class="text-[#858B99]">Usuário de integração</span><strong>{data.remoteControl.loginUser || "—"}</strong></div>
         <div class="flex justify-between gap-3"><span class="text-[#858B99]">Autenticação</span><strong>{data.remoteControl.usesLoginKey ? "Login key" : "Credencial protegida"}</strong></div>
         <div class="flex justify-between gap-3"><span class="text-[#858B99]">Agente Windows</span><strong>Tipo {data.remoteControl.windowsAgentType}</strong></div>
         <div class="flex justify-between gap-3"><span class="text-[#858B99]">Consentimento local</span><strong>{data.remoteControl.deviceConsentFlags === 8 ? "Desktop Prompt" : `Flags ${data.remoteControl.deviceConsentFlags}`}</strong></div>
+        <div class="flex justify-between gap-3"><span class="text-[#858B99]">Compartilhamento</span><strong>{data.remoteControl.shareMinutes} min por link</strong></div>
       </div>
 
       <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
