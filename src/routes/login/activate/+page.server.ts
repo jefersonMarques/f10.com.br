@@ -1,4 +1,5 @@
-import { fail, redirect, type Actions, type PageServerLoad } from "@sveltejs/kit";
+import { fail, redirect, type Actions } from "@sveltejs/kit";
+import type { PageServerLoad } from "./$types";
 import { activateInvitedUser } from "$lib/server/users/userManagementRepository";
 
 function isValidToken(token: string): boolean {
