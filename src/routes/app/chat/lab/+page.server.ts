@@ -10,6 +10,7 @@ import {
   listRecentSupportAiRuns,
   runSupportAiLab,
 } from "$lib/server/support/supportAiAgent";
+import { enforceSupportAiRateLimit } from "$lib/server/support/supportAiRateLimit";
 
 function createPermissionMap(
   permissions: Array<{ code: string; scope: "own" | "team" | "all" }>,
@@ -61,6 +62,7 @@ export const actions: Actions = {
     }
 
     try {
+      await enforceSupportAiRateLimit(session.user.id);
       const result = await runSupportAiLab(session.user.id, question);
       const message =
         result.resolution === "answered"
@@ -75,7 +77,17 @@ export const actions: Actions = {
         question,
         result,
       };
-    } catch {
+    } catch (cause) {
+      if (cause instanceof Error && cause.message === "SUPPORT_AI_RATE_LIMIT") {
+        return fail(429, {
+          success: false,
+          message:
+            "Muitas execuções do agente em poucos minutos. Aguarde um pouco antes de testar novamente.",
+          question,
+          result: null,
+        });
+      }
+
       return fail(500, {
         success: false,
         message: "Não foi possível executar o laboratório de IA.",
