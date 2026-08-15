@@ -17,7 +17,7 @@ Com a aplicação em execução:
 npm run operations:smoke
 ```
 
-O banco deve possuir as migrations até `0016_help_asset_delete_guard.sql`.
+O banco deve possuir as migrations até `0017_remote_device_enrollment.sql`.
 
 ## 2. MinIO / S3
 
@@ -68,24 +68,6 @@ pacote.zip
     └── modelo.xlsx
 ```
 
-O manifest pode usar:
-
-```json
-{
-  "type": "image",
-  "file": "assets/tela.png",
-  "altText": "Tela do sistema"
-}
-```
-
-```json
-{
-  "type": "file",
-  "file": "assets/modelo.xlsx",
-  "label": "Baixar modelo"
-}
-```
-
 Valide:
 
 - todos os conteúdos entram como rascunho;
@@ -100,7 +82,6 @@ Valide:
 - `/ajuda-f10/:slug` mostra somente o snapshot publicado;
 - editar sem republicar não altera a página pública;
 - o botão **Ver artigo** continua abrindo o slug da publicação anterior mesmo quando o slug do rascunho foi alterado;
-- assets privados/rastreáveis não são expostos apenas por conhecer o UUID;
 - a rota pública de asset retorna objeto somente quando ele pertence ao snapshot publicado daquele slug.
 
 ## 6. Configurações
@@ -110,59 +91,139 @@ Acesse `/app/settings` como Super Admin.
 Valide:
 
 - configurações gerais salvam no PostgreSQL;
-- credenciais MinIO/OpenAI não aparecem em HTML;
+- credenciais MinIO/OpenAI/MeshCentral não aparecem em HTML;
 - status de OpenAI e chat são exibidos;
 - teste de MinIO funciona;
-- status/teste de MeshCentral funciona após configuração;
+- **Testar interface** confirma o endereço público do MeshCentral;
+- **Testar integração** autentica via MeshCtrl e lista grupos;
 - usuário sem `system.settings.manage` recebe bloqueio server-side.
 
-## 7. MeshCentral
+## 7. MeshCentral em `/acesso-remoto/`
 
-Configure:
+Configuração de produção:
 
 ```env
 REMOTE_SUPPORT_PROVIDER=meshcentral
-MESHCENTRAL_BASE_URL=https://remote.example.com
-MESHCENTRAL_DEVICE_URL_TEMPLATE=https://remote.example.com/?viewmode=13&gotonode={deviceId}
+MESHCENTRAL_BASE_URL=https://f10.com.br/acesso-remoto/
+MESHCENTRAL_DEVICE_URL_TEMPLATE=https://f10.com.br/acesso-remoto/?viewmode=13&gotonode={deviceId}
+
+MESHCENTRAL_MESHCTRL_PATH=/opt/meshcentral/node_modules/meshcentral/meshctrl.js
+MESHCENTRAL_CONTROL_URL=ws://127.0.0.1:4430/acesso-remoto/
+MESHCENTRAL_CONTROL_USER=f10-operations
+MESHCENTRAL_CONTROL_DOMAIN=acesso-remoto
+MESHCENTRAL_CONTROL_LOGIN_KEY_FILE=/etc/f10/meshcentral-login.key
+MESHCENTRAL_WINDOWS_AGENT_TYPE=4
+MESHCENTRAL_DEVICE_CONSENT_FLAGS=8
+REMOTE_ENROLLMENT_HOURS=24
+
 OPERATIONS_DOCTOR_REQUIRE_REMOTE=true
 ```
 
-Em `/app/remote` como Super Admin:
+Valide:
 
-1. cadastre um node ID real do MeshCentral;
-2. associe ao e-mail de um cliente já existente;
-3. confirme que usuários sem `remote.manage` não recebem o catálogo global de dispositivos.
+- `operations:doctor` exige login key file quando o gate remoto está habilitado;
+- `/app/settings` mostra provider e integração automática como prontos;
+- `/acesso-remoto/` abre pelo HTTPS do domínio principal;
+- portas internas do MeshCentral não ficam expostas diretamente;
+- o usuário técnico da integração não é o usuário administrador humano.
 
-## 8. Consentimento remoto ponta a ponta
+## 8. Primeiro atendimento — enrollment
 
-Em um ticket do mesmo cliente:
+Use um cliente que ainda não tenha dispositivo conhecido.
 
-1. abra **Solicitar acesso remoto**;
-2. selecione o computador;
-3. confirme evento `remote.requested` e mensagem pública com link temporário;
-4. abra `/suporte-remoto/:token` como cliente;
-5. teste **Recusar** e confirme `remote.denied`;
-6. gere outra solicitação e teste **Autorizar**;
-7. confirme `remote.authorized`;
-8. internamente, abra a sessão e clique **Iniciar acesso no MeshCentral**;
-9. confirme que somente o primeiro start vence se duas abas tentarem iniciar simultaneamente;
-10. confirme evento `remote.started`;
-11. encerre e confirme `remote.ended`.
+No ticket ou chat:
 
-Uma solicitação expirada ou já respondida não pode ser autorizada novamente.
+1. confirme que aparece **Instalar suporte remoto** / **Enviar instalador de Suporte Remoto F10**;
+2. clique;
+3. confirme evento `remote.enrollment.requested`;
+4. confirme mensagem pública com `/suporte-remoto/instalar/:token`;
+5. abra o link como cliente;
+6. clique **Baixar Suporte Remoto F10**;
+7. confirme que o download é o agente pertencente ao grupo daquele cliente;
+8. instale no Windows;
+9. volte ao ticket e clique **Verificar agora**;
+10. confirme que o novo computador é descoberto automaticamente;
+11. confirme `remote_devices` preenchido sem digitar Node ID;
+12. confirme evento `remote.device.enrolled`;
+13. confirme que o enrollment passa para `completed`.
 
-## 9. Escopos
+Também teste:
+
+- token expirado retorna indisponível;
+- gerar novo enrollment cancela o anterior aberto do mesmo grupo;
+- outro dispositivo já existente no grupo não é confundido com o novo graças ao baseline;
+- organização com vários contatos reutiliza o mesmo grupo/dispositivos.
+
+## 9. Atendimento recorrente
+
+Com o agente já instalado:
+
+1. abra novo chat/ticket do mesmo cliente;
+2. confirme que o Operations reconhece o computador;
+3. se estiver online, deve aparecer **Iniciar acesso remoto**;
+4. se estiver offline, o botão deve permanecer indisponível;
+5. ao iniciar, confirme evento `remote.requested` com `consentMode=meshcentral-local-prompt`;
+6. confirme a mensagem pública orientando o cliente a aceitar no próprio computador;
+7. o MeshCentral deve exibir o Desktop Prompt local;
+8. recuse e confirme que o desktop não é liberado;
+9. tente novamente e autorize;
+10. confirme `remote.started` no Operations;
+11. encerre o atendimento e confirme `remote.ended`.
+
+O agente permanecer instalado não deve permitir desktop silencioso.
+
+## 10. Comportamento do Chat
+
+Valide os três estados:
+
+```text
+0 computadores online
+→ Instalar suporte remoto
+
+1 computador online
+→ Iniciar acesso remoto
+
+2+ computadores online
+→ Escolher computador
+```
+
+O botão de primeiro uso precisa inserir o link de instalação na própria conversa.
+
+## 11. Tela geral `/app/remote`
+
+- não existe mais formulário normal para cadastrar Node ID;
+- mostra sessões remotas;
+- Super Admin/`remote.manage` vê computadores conhecidos;
+- mostra online/offline e última conexão;
+- mostra cliente/organização associados;
+- usuário `remote.use=own` continua vendo apenas as próprias sessões.
+
+## 12. Escopos
 
 Teste usuários diferentes:
 
-- `remote.request`: pode solicitar pelo ticket dentro do próprio escopo;
-- `remote.use=own`: vê somente sessões solicitadas por si na tela geral;
+- `remote.request`: pode iniciar enrollment/acesso pelo ticket dentro do próprio escopo;
+- `remote.use=own`: vê somente sessões solicitadas por si;
 - `remote.use=all`: vê todas as sessões;
-- `remote.manage`: vê/cadastra catálogo de dispositivos;
+- `remote.manage`: recebe catálogo global dos dispositivos já reconhecidos;
 - sem `remote.use`: `/app/remote` bloqueado;
 - sem `system.settings.manage`: `/app/settings` bloqueado.
 
-## 10. Critério de aceite
+## 13. Segurança do enrollment
+
+Confirme:
+
+- token público não é salvo em texto puro;
+- enrollment possui expiração;
+- vínculo do dispositivo deriva do grupo exclusivo daquele cliente/organização;
+- somente dispositivos daquele cliente podem ser iniciados no ticket;
+- `MESHCENTRAL_CONTROL_LOGIN_KEY_FILE` fica fora do repositório;
+- segredo não aparece na página Configurações;
+- comando MeshCtrl é executado sem shell intermediário;
+- Windows deve exibir consentimento local para o desktop;
+- RDP/3389 não está aberto.
+
+## 14. Critério de aceite
 
 A tranche é aprovada quando:
 
@@ -172,8 +233,10 @@ A tranche é aprovada quando:
 - artigo público usa somente snapshot publicado;
 - assets publicados não podem ser apagados;
 - Configurações funciona sem expor secrets;
-- acesso remoto exige consentimento explícito;
-- transições de consentimento/start/end são atômicas;
-- MeshCentral só é aberto após autorização;
-- tickets registram toda a trilha remota;
+- `/acesso-remoto/` funciona no mesmo domínio;
+- primeiro suporte entrega o instalador externamente pelo chat/ticket;
+- agente instalado é associado automaticamente ao cliente;
+- atendimento seguinte reconhece a máquina sem novo download;
+- desktop remoto exige confirmação local do cliente;
+- tickets registram enrollment, vínculo, início e fim;
 - Movidesk e widget público atual permanecem sem cutover.
