@@ -5,6 +5,7 @@ import { users } from "$lib/server/db/schema";
 import {
   taskActivities,
   taskAssignees,
+  taskProjects,
   taskStatuses,
   tasks,
 } from "$lib/server/db/taskSchema";
@@ -38,26 +39,15 @@ export async function getTaskBoard(
   const db = getDatabase();
   const [project] = await db
     .select({
-      id: tasks.projectId,
+      id: taskProjects.id,
+      name: taskProjects.name,
+      description: taskProjects.description,
     })
-    .from(tasks)
-    .where(eq(tasks.projectId, projectId))
+    .from(taskProjects)
+    .where(and(eq(taskProjects.id, projectId), eq(taskProjects.active, true)))
     .limit(1);
 
-  const [projectRow] = await db.query.taskProjects.findMany
-    ? []
-    : [];
-
-  const projectData = await db.execute<{
-    id: string;
-    name: string;
-    description: string;
-  }>(
-    `select id, name, description from task_projects where id = '${projectId.replace(/'/g, "''")}' and active = true limit 1`,
-  );
-
-  const projectRecord = Array.from(projectData)[0];
-  if (!projectRecord) throw new Error("PROJECT_NOT_FOUND");
+  if (!project) throw new Error("PROJECT_NOT_FOUND");
 
   const [statuses, taskRows, assigneeRows] = await Promise.all([
     db
@@ -123,15 +113,7 @@ export async function getTaskBoard(
       assignees: assigneesByTask.get(task.id) ?? [],
     }));
 
-  return {
-    project: {
-      id: projectRecord.id,
-      name: projectRecord.name,
-      description: projectRecord.description,
-    },
-    statuses,
-    tasks: visibleTasks,
-  };
+  return { project, statuses, tasks: visibleTasks };
 }
 
 export async function createTask(
