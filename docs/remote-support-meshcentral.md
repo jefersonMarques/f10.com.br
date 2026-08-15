@@ -1,43 +1,160 @@
 # Acesso remoto — F10 Operations + MeshCentral
 
-O F10 Operations não implementa protocolo de desktop remoto. Ele controla o fluxo de atendimento, consentimento e auditoria; o MeshCentral é o provedor que mantém os agentes Windows e abre a sessão remota no navegador.
+O componente de acesso remoto é **externo ao Software F10**. Ele não faz parte do instalador nem do updater do F10. O cliente só recebe o componente quando um atendimento realmente precisa de acesso remoto.
+
+Depois da primeira instalação, o agente pode permanecer no Windows para facilitar atendimentos futuros. O Operations reconhece o computador automaticamente e permite iniciar uma nova solicitação sem novo download. O acesso ao desktop continua dependendo da confirmação local exibida pelo MeshCentral no computador do cliente.
 
 ## Arquitetura
 
 ```text
-Cliente Windows
-  └─ Agente MeshCentral
-       ↓ conexão de saída
-https://f10.com.br/acesso-remoto/
-       ↓ reverse proxy
-MeshCentral local
-       ↑
-F10 Operations
-  ├─ ticket/chat
-  ├─ solicitação
-  ├─ consentimento temporário
-  └─ auditoria
+Primeiro atendimento
+
+Chat / Ticket F10
+   ↓
+Enviar instalador de Suporte Remoto F10
+   ↓
+/suporte-remoto/instalar/:token
+   ↓
+Agente MeshCentral específico do grupo do cliente
+   ↓
+Cliente instala
+   ↓
+MeshCentral registra o dispositivo
+   ↓
+Operations sincroniza e vincula automaticamente
 ```
 
-Não é necessário expor RDP/3389 na internet e não é necessário criar subdomínio para o MeshCentral.
+Nos próximos atendimentos:
 
-## Endereço público adotado
+```text
+Cliente identificado
+   ↓
+Computador conhecido
+   ├─ Online  → Iniciar acesso remoto
+   └─ Offline → informar que o computador precisa estar ligado
+                    ↓
+             MeshCentral Desktop Prompt
+                    ↓
+              cliente confirma
+                    ↓
+               desktop remoto
+```
 
-O endereço público do provider é:
+O agente é uma ferramenta de suporte separada. Portanto esse fluxo funciona inclusive quando o chamado existe justamente porque o cliente ainda não conseguiu instalar o Software F10.
+
+## Endereço público
+
+O endereço adotado é:
 
 ```text
 https://f10.com.br/acesso-remoto/
 ```
 
-O MeshCentral suporta domínios virtuais identificados pelo primeiro segmento do caminho. Para esta implantação, use uma domain section chamada `acesso-remoto`, de forma que a interface e os agentes utilizem o mesmo caminho público.
+Não é necessário criar subdomínio. O Nginx encaminha somente `/acesso-remoto/` para o MeshCentral e preserva WebSocket.
 
-Não configure o F10 para abrir o MeshCentral na raiz `/`: o provider valida que a URL final continua dentro do caminho configurado em `MESHCENTRAL_BASE_URL`.
+O provider do Operations também valida que URLs de lançamento permaneçam dentro desse mesmo origin e caminho-base.
+
+## Modelo de associação automática
+
+O Operations cria um grupo de dispositivos do MeshCentral por organização. Quando não existe organização, cria por contato.
+
+Exemplos internos:
+
+```text
+F10-ORG-aabbccddeeff...
+F10-CONTATO-aabbccddeeff...
+```
+
+O nome é técnico e não depende do nome comercial do cliente, evitando colisões quando escolas possuem nomes iguais.
+
+Quando o atendente escolhe **Enviar instalador de Suporte Remoto F10**:
+
+1. o Operations resolve ou cria o grupo daquele cliente no MeshCentral;
+2. registra quais dispositivos já existiam naquele grupo;
+3. cria um enrollment temporário e armazena somente SHA-256 do token público;
+4. envia `/suporte-remoto/instalar/:token` na conversa;
+5. o botão de download redireciona para o agente do grupo correto;
+6. depois da instalação, o Operations consulta o grupo;
+7. o novo `nodeId` que não existia no baseline é identificado;
+8. `remote_devices` é preenchido automaticamente;
+9. o enrollment fica `completed`;
+10. o ticket recebe `remote.device.enrolled`.
+
+O cadastro manual de Node ID não faz mais parte do fluxo normal.
+
+## Agente persistente e consentimento
+
+O download inicial usa o agente Windows do MeshCentral com `installflags=2`, ou seja, o fluxo de background/install é usado para permitir instalação persistente.
+
+O grupo criado pelo Operations usa por padrão:
+
+```text
+MESHCENTRAL_DEVICE_CONSENT_FLAGS=8
+```
+
+Esse valor corresponde ao **Desktop Prompt** na configuração de consentimento usada pelo MeshCentral. Assim, ter o agente instalado e online não significa que a equipe F10 pode abrir silenciosamente o desktop.
+
+A experiência desejada é:
+
+```text
+Atendente clica em "Iniciar acesso remoto"
+   ↓
+Operations registra remote.requested
+   ↓
+MeshCentral abre o dispositivo
+   ↓
+Computador do cliente mostra confirmação local
+   ↓
+cliente autoriza
+   ↓
+sessão ocorre
+```
+
+A confirmação local é a autorização efetiva do desktop. O estado `authorized` criado pelo Operations antes do lançamento significa que o dispositivo está elegível tecnicamente para abrir o provider; não substitui o prompt local do MeshCentral.
+
+## Integração via MeshCtrl
+
+O Operations usa o `meshctrl.js` fornecido pelo próprio MeshCentral para:
+
+- listar grupos;
+- criar o grupo do cliente;
+- listar dispositivos;
+- identificar online/offline;
+- construir o download de agente para aquele grupo.
+
+O processo é executado com `execFile`, sem shell intermediário.
+
+### Credencial
+
+Em produção prefira um **login key file** dedicado à integração. O fallback por senha existe para homologação, mas a senha precisaria ser passada ao processo filho e é menos adequado para produção.
+
+O gate de produção (`OPERATIONS_DOCTOR_REQUIRE_REMOTE=true`) exige `MESHCENTRAL_CONTROL_LOGIN_KEY_FILE` existente.
+
+## `.env` do F10
+
+```env
+REMOTE_SUPPORT_PROVIDER=meshcentral
+MESHCENTRAL_BASE_URL=https://f10.com.br/acesso-remoto/
+MESHCENTRAL_DEVICE_URL_TEMPLATE=https://f10.com.br/acesso-remoto/?viewmode=13&gotonode={deviceId}
+
+MESHCENTRAL_MESHCTRL_PATH=/opt/meshcentral/node_modules/meshcentral/meshctrl.js
+MESHCENTRAL_CONTROL_URL=ws://127.0.0.1:4430/acesso-remoto/
+MESHCENTRAL_CONTROL_USER=f10-operations
+MESHCENTRAL_CONTROL_DOMAIN=acesso-remoto
+MESHCENTRAL_CONTROL_LOGIN_KEY_FILE=/etc/f10/meshcentral-login.key
+MESHCENTRAL_CONTROL_PASSWORD=
+MESHCENTRAL_WINDOWS_AGENT_TYPE=4
+MESHCENTRAL_DEVICE_CONSENT_FLAGS=8
+REMOTE_ENROLLMENT_HOURS=24
+
+OPERATIONS_DOCTOR_REQUIRE_REMOTE=true
+```
+
+Não versionar a login key, senha ou qualquer outra credencial real.
 
 ## Configuração conceitual do MeshCentral
 
-A porta interna é apenas um exemplo; pode ser alterada conforme a VPS. O importante é manter o serviço local atrás do Nginx e informar ao MeshCentral que o endereço externo usa HTTPS/443.
-
-Exemplo de `meshcentral-data/config.json`:
+A porta interna é apenas um exemplo. Confirme as opções contra o schema e exemplos da versão efetivamente instalada antes de reiniciar o serviço.
 
 ```json
 {
@@ -48,8 +165,7 @@ Exemplo de `meshcentral-data/config.json`:
     "port": 4430,
     "aliasPort": 443,
     "TLSOffload": "127.0.0.1",
-    "trustedProxy": "127.0.0.1",
-    "newAccounts": false
+    "trustedProxy": "127.0.0.1"
   },
   "domains": {
     "acesso-remoto": {
@@ -62,13 +178,11 @@ Exemplo de `meshcentral-data/config.json`:
 }
 ```
 
-Confirme os nomes/opções contra o `sample-config.json`, `sample-config-advanced.json` e schema da versão efetivamente instalada antes de reiniciar o serviço.
+Crie um usuário técnico `f10-operations` com somente os direitos necessários para os grupos/dispositivos utilizados pela integração. Não reutilize o usuário administrador humano.
 
 ## Nginx
 
-O Nginx deve encaminhar `/acesso-remoto/` ao MeshCentral preservando o caminho e permitindo WebSocket. Como o domínio virtual do MeshCentral se chama `acesso-remoto`, não remova esse prefixo no proxy.
-
-Exemplo inicial:
+O Nginx deve encaminhar `/acesso-remoto/` preservando o prefixo e permitindo WebSocket:
 
 ```nginx
 location ^~ /acesso-remoto/ {
@@ -88,76 +202,87 @@ location ^~ /acesso-remoto/ {
 }
 ```
 
-Depois valide e recarregue o Nginx:
+Depois:
 
 ```bash
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## `.env` do F10
+## Experiência no Chat
 
-```env
-REMOTE_SUPPORT_PROVIDER=meshcentral
-MESHCENTRAL_BASE_URL=https://f10.com.br/acesso-remoto/
-MESHCENTRAL_DEVICE_URL_TEMPLATE=https://f10.com.br/acesso-remoto/?viewmode=13&gotonode={deviceId}
-OPERATIONS_DOCTOR_REQUIRE_REMOTE=true
-```
-
-O F10 exige que a URL final permaneça no mesmo origin e, agora, também dentro do mesmo caminho-base configurado.
-
-## Implantação
-
-1. instale o MeshCentral na VPS seguindo o projeto/documentação oficial;
-2. mantenha a porta do processo acessível apenas localmente/firewall interno;
-3. configure o domain `acesso-remoto`;
-4. configure o bloco Nginx acima;
-5. reinicie MeshCentral;
-6. valide `https://f10.com.br/acesso-remoto/` no navegador;
-7. instale um agente de teste a partir dessa instalação;
-8. confirme que o dispositivo fica online;
-9. configure o `.env` do F10;
-10. execute `npm run operations:doctor` e use **Testar MeshCentral** em `/app/settings`.
-
-Depois de criar um dispositivo no MeshCentral, copie o identificador do nó e registre-o em `/app/remote`, associando-o ao cliente correspondente.
-
-## Fluxo
-
-1. funcionário abre um ticket ou chat;
-2. seleciona **Solicitar acesso remoto**;
-3. escolhe um dispositivo já vinculado ao cliente/organização;
-4. o F10 cria uma sessão `requested` e gera token aleatório;
-5. somente SHA-256 do token é persistido;
-6. o cliente recebe um link temporário `/suporte-remoto/:token`;
-7. cliente autoriza ou recusa;
-8. somente uma sessão `authorized` pode ser iniciada;
-9. o F10 registra `remote.started` e abre o dispositivo no MeshCentral;
-10. ao terminar, o atendente encerra a sessão no F10, registrando `remote.ended`.
-
-## Estados
+O botão se adapta ao estado do cliente:
 
 ```text
-requested
-  ├─ authorized → active → ended
-  ├─ denied
-  ├─ expired
-  └─ cancelled
+Nenhum computador online
+→ Instalar suporte remoto
+
+1 computador online
+→ Iniciar acesso remoto
+
+2+ computadores online
+→ Escolher computador
 ```
 
-Falhas operacionais podem ser registradas como `failed`.
+No primeiro caso, o sistema já coloca o link de instalação dentro da conversa.
+
+## Tela do Ticket
+
+`/app/tickets/:ticketId/remote` mostra todos os computadores conhecidos daquele cliente/organização:
+
+```text
+SECRETARIA-PC       Online     [ Iniciar acesso remoto ]
+NOTEBOOK-JOAO       Offline
+```
+
+Também oferece:
+
+```text
+[ Verificar agora ]
+[ Adicionar outro computador ]
+```
+
+## Tela geral
+
+`/app/remote` deixa de ser formulário para digitar Node ID. Ela passa a mostrar:
+
+- sessões;
+- computadores conhecidos;
+- online/offline;
+- última conexão;
+- cliente/organização vinculados.
+
+Somente `remote.manage` recebe o catálogo global de dispositivos.
+
+## Auditoria
+
+Novos eventos relevantes:
+
+```text
+remote.enrollment.requested
+remote.device.enrolled
+remote.requested
+remote.started
+remote.ended
+```
+
+O enrollment e as sessões continuam vinculados ao ticket/chat quando aplicável.
 
 ## Segurança
 
-- consentimento é explícito e temporário;
-- token de consentimento não é armazenado em texto puro;
-- o cliente não recebe credenciais administrativas do MeshCentral;
-- `remote.request`, `remote.use` e `remote.manage` continuam separados;
-- iniciar uma sessão exige autorização anterior;
-- todos os eventos relevantes são vinculados ao ticket quando aplicável;
-- o F10 não abre porta RDP;
-- o MeshCentral fica atrás do HTTPS existente do domínio F10;
-- a console/gestão do MeshCentral deve ser protegida separadamente.
+- componente de suporte é separado do Software F10;
+- nenhum Node ID precisa ser digitado pelo cliente;
+- token público do enrollment é armazenado apenas como SHA-256;
+- enrollment expira e um novo pedido cancela o anterior aberto daquele grupo;
+- dispositivo só é iniciado se estiver associado ao cliente/organização do ticket;
+- dispositivo precisa estar online;
+- atendimento depende de permissão `remote.request` / `remote.use`;
+- acesso ao desktop pede confirmação local pelo MeshCentral;
+- o cliente não recebe credenciais administrativas;
+- RDP/3389 não é exposto;
+- MeshCentral permanece atrás do HTTPS existente;
+- credencial de automação fica somente no servidor.
 
-## Limite atual do provider
+## Limite atual
 
-A primeira integração abre o nó correspondente no MeshCentral depois do consentimento. O encerramento no F10 registra o encerramento lógico/auditoria da sessão. Uma integração futura com a API/eventos do MeshCentral poderá sincronizar automaticamente conexão/desconexão do provider sem alterar o modelo de domínio do F10.
+O encerramento no Operations registra `remote.ended`, mas ainda não força via API o encerramento físico de uma conexão que continue aberta no MeshCentral. Depois da homologação com a versão real instalada, essa sincronização provider → Operations pode ser adicionada sem mudar o modelo de clientes/dispositivos/enrollment.
