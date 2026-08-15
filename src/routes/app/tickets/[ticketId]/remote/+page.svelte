@@ -67,6 +67,13 @@
     </div>
   {/if}
 
+  {#if !data.canUseRemote}
+    <div class="mt-5 flex items-start gap-2 rounded-xl bg-[#FFF7EA] px-4 py-3 text-[10px] leading-5 text-[#8B5A12]">
+      <ShieldCheck size={15} class="mt-0.5 shrink-0"/>
+      Você pode enviar o instalador ao cliente, mas não possui a permissão <strong>remote.use</strong> para abrir o desktop remoto.
+    </div>
+  {/if}
+
   <section class="mt-5 rounded-[24px] border border-[#E2E5ED] bg-white p-6">
     <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
       <div>
@@ -103,7 +110,7 @@
             </div>
             <form method="POST" action="?/start">
               <input type="hidden" name="deviceId" value={device.id}/>
-              <button type="submit" disabled={!device.online || !data.provider.configured} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[9px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#C7CAD3]">
+              <button type="submit" disabled={!data.canUseRemote || !device.online || !data.provider.configured} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[9px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#C7CAD3]">
                 <MonitorCog size={14}/>
                 Iniciar acesso remoto
               </button>
