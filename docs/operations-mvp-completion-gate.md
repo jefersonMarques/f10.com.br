@@ -17,7 +17,7 @@ Com a aplicação em execução:
 npm run operations:smoke
 ```
 
-O banco deve possuir as migrations até `0017_remote_device_enrollment.sql`.
+O banco deve possuir as migrations até `0019_remote_embedded_sessions.sql`.
 
 ## 2. MinIO / S3
 
@@ -100,31 +100,37 @@ Valide:
 
 ## 7. MeshCentral em `/acesso-remoto/`
 
-Configuração de produção:
+Configuração de produção para a topologia atual, com Nginx Proxy Manager em Docker e MeshCentral no host:
 
 ```env
 REMOTE_SUPPORT_PROVIDER=meshcentral
 MESHCENTRAL_BASE_URL=https://f10.com.br/acesso-remoto/
-MESHCENTRAL_DEVICE_URL_TEMPLATE=https://f10.com.br/acesso-remoto/?viewmode=13&gotonode={deviceId}
 
 MESHCENTRAL_MESHCTRL_PATH=/opt/meshcentral/node_modules/meshcentral/meshctrl.js
-MESHCENTRAL_CONTROL_URL=ws://127.0.0.1:4430/acesso-remoto/
+MESHCENTRAL_CONTROL_URL=ws://172.17.0.1:4430/acesso-remoto/
 MESHCENTRAL_CONTROL_USER=f10-operations
 MESHCENTRAL_CONTROL_DOMAIN=acesso-remoto
-MESHCENTRAL_CONTROL_LOGIN_KEY_FILE=/etc/f10/meshcentral-login.key
+MESHCENTRAL_CONTROL_LOGIN_KEY_FILE=
+MESHCENTRAL_CONTROL_PASSWORD=...
 MESHCENTRAL_WINDOWS_AGENT_TYPE=4
 MESHCENTRAL_DEVICE_CONSENT_FLAGS=8
+MESHCENTRAL_SHARE_MINUTES=30
 REMOTE_ENROLLMENT_HOURS=24
 
 OPERATIONS_DOCTOR_REQUIRE_REMOTE=true
 ```
 
+O domínio `acesso-remoto` do MeshCentral deve limitar guest sharing a 60 minutos e permitir framing somente pelo domínio F10. A resposta HTTP deve conter `frame-ancestors 'self' https://f10.com.br`.
+
 Valide:
 
-- `operations:doctor` exige login key file quando o gate remoto está habilitado;
-- `/app/settings` mostra provider e integração automática como prontos;
+- `operations:doctor` aceita credencial técnica configurada por password ou login key;
+- `/app/settings` mostra provider, integração automática e duração do compartilhamento;
 - `/acesso-remoto/` abre pelo HTTPS do domínio principal;
-- portas internas do MeshCentral não ficam expostas diretamente;
+- `172.17.0.1:4430` é alcançável pelo Nginx Proxy Manager, mas não fica exposto na interface pública da VPS;
+- WebSocket do MeshCentral funciona pelo caminho `/acesso-remoto/`;
+- o usuário `f10-operations` possui `siteadmin: 0`;
+- o usuário técnico enxerga e controla somente grupos aos quais recebeu direito ou que criou;
 - o usuário técnico da integração não é o usuário administrador humano.
 
 ## 8. Primeiro atendimento — enrollment
@@ -154,7 +160,7 @@ Também teste:
 - outro dispositivo já existente no grupo não é confundido com o novo graças ao baseline;
 - organização com vários contatos reutiliza o mesmo grupo/dispositivos.
 
-## 9. Atendimento recorrente
+## 9. Atendimento recorrente e desktop embutido
 
 Com o agente já instalado:
 
@@ -162,15 +168,19 @@ Com o agente já instalado:
 2. confirme que o Operations reconhece o computador;
 3. se estiver online, deve aparecer **Iniciar acesso remoto**;
 4. se já for conhecido mas estiver offline, o chat deve mostrar **Computador offline**, e não sugerir nova instalação;
-5. ao iniciar, confirme evento `remote.requested` com `consentMode=meshcentral-local-prompt`;
-6. confirme a mensagem pública orientando o cliente a aceitar no próprio computador;
-7. o MeshCentral deve exibir o Desktop Prompt local;
-8. recuse e confirme que o desktop não é liberado;
-9. tente novamente e autorize;
-10. confirme `remote.started` no Operations;
-11. encerre o atendimento e confirme `remote.ended`.
+5. solicite o acesso e conclua a autorização do fluxo F10;
+6. na sessão, clique **Iniciar acesso remoto**;
+7. confirme que o Operations cria `DeviceSharing` temporário somente com `desktop` e `prompt`;
+8. confirme que o desktop aparece dentro de `/app/remote/:sessionId`, sem abrir o painel MeshCentral em outra aba;
+9. o Windows deve exibir o Desktop Prompt local;
+10. recuse e confirme que o desktop não é liberado;
+11. tente novamente e autorize;
+12. valide mouse, teclado, resolução e tela cheia;
+13. confirme `remote.started` no Operations;
+14. atualize a página e use **Reconectar desktop**; o share anterior deve ser revogado antes de criar outro;
+15. encerre o atendimento e confirme que o share atual é revogado e o evento `remote.ended` é registrado.
 
-O agente permanecer instalado não deve permitir desktop silencioso.
+O agente permanecer instalado não deve permitir desktop silencioso. O link `DeviceSharing` não deve ser persistido no banco; apenas o identificador do share e sua expiração são persistidos.
 
 ## 10. Comportamento do Chat
 
@@ -199,7 +209,10 @@ O botão de primeiro uso precisa inserir o link de instalação na própria conv
 - Super Admin/`remote.manage` vê computadores conhecidos;
 - mostra online/offline e última conexão;
 - mostra cliente/organização associados;
-- usuário `remote.use=own` continua vendo apenas as próprias sessões.
+- usuário `remote.use=own` continua vendo apenas as próprias sessões;
+- `remote.manage` vê os indicadores de SLA dos últimos 30 dias;
+- SLA separa tempo do cliente para autorizar do tempo do atendente para iniciar;
+- por atendente, ficam disponíveis volume iniciado/concluído, média/P90 de pickup e duração média.
 
 ## 12. Escopos
 
@@ -208,23 +221,27 @@ Teste usuários diferentes:
 - `remote.request`: pode gerar enrollment, enviar o instalador e sincronizar computadores no ticket dentro do próprio escopo;
 - `remote.use=own`: pode abrir o desktop somente das próprias sessões elegíveis e vê somente sessões solicitadas por si;
 - `remote.use=all`: pode abrir e visualizar todas as sessões elegíveis;
-- `remote.manage`: recebe catálogo global dos dispositivos já reconhecidos;
+- `remote.manage`: recebe catálogo global dos dispositivos já reconhecidos e visão agregada de SLA;
 - usuário com `remote.request` mas sem `remote.use` consegue enviar o instalador, porém não iniciar o desktop;
 - sem `remote.use`: `/app/remote` bloqueado;
 - sem `system.settings.manage`: `/app/settings` bloqueado.
 
-## 13. Segurança do enrollment
+## 13. Segurança do enrollment e da sessão
 
 Confirme:
 
-- token público não é salvo em texto puro;
+- token público de enrollment/consentimento não é salvo em texto puro;
 - enrollment possui expiração;
 - vínculo do dispositivo deriva do grupo exclusivo daquele cliente/organização;
 - somente dispositivos daquele cliente podem ser iniciados no ticket;
-- `MESHCENTRAL_CONTROL_LOGIN_KEY_FILE` fica fora do repositório;
+- credencial `f10-operations` permanece fora do repositório;
 - segredo não aparece na página Configurações;
-- comando MeshCtrl é executado sem shell intermediário;
-- download do agente é obtido pela interface local do MeshCentral e entregue ao cliente pelo Operations;
+- comando MeshCtrl é executado com `execFile`, sem shell intermediário;
+- URL secreta de `DeviceSharing` não é gravada no PostgreSQL nem em eventos/auditoria;
+- `provider_session_id` guarda somente o identificador revogável do share;
+- cada reconexão revoga o share anterior antes de criar outro;
+- encerramento revoga o share antes de marcar a sessão como encerrada;
+- download do agente é obtido pela interface do MeshCentral e entregue ao cliente pelo Operations;
 - Windows deve exibir consentimento local para o desktop;
 - RDP/3389 não está aberto.
 
@@ -242,6 +259,10 @@ A tranche é aprovada quando:
 - primeiro suporte entrega o instalador externamente pelo chat/ticket;
 - agente instalado é associado automaticamente ao cliente;
 - atendimento seguinte reconhece a máquina sem novo download;
+- desktop remoto é exibido dentro do F10 Operations;
+- atendente não precisa de conta ou painel MeshCentral;
 - desktop remoto exige confirmação local do cliente;
-- tickets registram enrollment, vínculo, início e fim;
+- share temporário expira e pode ser revogado;
+- tickets registram enrollment, vínculo, início, reconexão e fim;
+- SLA remoto atribui início/fim aos atendentes corretos;
 - Movidesk e widget público atual permanecem sem cutover.
