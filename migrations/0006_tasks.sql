@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   title text NOT NULL,
   description text NOT NULL DEFAULT '',
   priority task_priority NOT NULL DEFAULT 'normal',
-  due_at timestamptz,
+  due_on date,
   completed_at timestamptz,
   created_by uuid REFERENCES users(id) ON DELETE SET NULL,
   updated_by uuid REFERENCES users(id) ON DELETE SET NULL,
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 
 CREATE INDEX IF NOT EXISTS tasks_project_idx ON tasks(project_id);
 CREATE INDEX IF NOT EXISTS tasks_status_idx ON tasks(status_id);
-CREATE INDEX IF NOT EXISTS tasks_due_idx ON tasks(due_at);
+CREATE INDEX IF NOT EXISTS tasks_due_idx ON tasks(due_on);
 CREATE INDEX IF NOT EXISTS tasks_created_by_idx ON tasks(created_by);
 
 CREATE TABLE IF NOT EXISTS task_assignees (
