@@ -139,7 +139,7 @@ No ticket ou chat:
 4. confirme mensagem pública com `/suporte-remoto/instalar/:token`;
 5. abra o link como cliente;
 6. clique **Baixar Suporte Remoto F10**;
-7. confirme que o download é o agente pertencente ao grupo daquele cliente;
+7. confirme que o arquivo recebido se chama `F10-Suporte-Remoto.exe` e pertence ao grupo daquele cliente;
 8. instale no Windows;
 9. volte ao ticket e clique **Verificar agora**;
 10. confirme que o novo computador é descoberto automaticamente;
@@ -161,7 +161,7 @@ Com o agente já instalado:
 1. abra novo chat/ticket do mesmo cliente;
 2. confirme que o Operations reconhece o computador;
 3. se estiver online, deve aparecer **Iniciar acesso remoto**;
-4. se estiver offline, o botão deve permanecer indisponível;
+4. se já for conhecido mas estiver offline, o chat deve mostrar **Computador offline**, e não sugerir nova instalação;
 5. ao iniciar, confirme evento `remote.requested` com `consentMode=meshcentral-local-prompt`;
 6. confirme a mensagem pública orientando o cliente a aceitar no próprio computador;
 7. o MeshCentral deve exibir o Desktop Prompt local;
@@ -174,10 +174,10 @@ O agente permanecer instalado não deve permitir desktop silencioso.
 
 ## 10. Comportamento do Chat
 
-Valide os três estados:
+Valide os estados:
 
 ```text
-0 computadores online
+nenhum computador conhecido
 → Instalar suporte remoto
 
 1 computador online
@@ -185,9 +185,12 @@ Valide os três estados:
 
 2+ computadores online
 → Escolher computador
+
+computador conhecido, porém offline
+→ Computador offline
 ```
 
-O botão de primeiro uso precisa inserir o link de instalação na própria conversa.
+O botão de primeiro uso precisa inserir o link de instalação na própria conversa e o preview do cliente precisa renderizar **Baixar Suporte Remoto F10** como ação clicável.
 
 ## 11. Tela geral `/app/remote`
 
@@ -202,10 +205,11 @@ O botão de primeiro uso precisa inserir o link de instalação na própria conv
 
 Teste usuários diferentes:
 
-- `remote.request`: pode iniciar enrollment/acesso pelo ticket dentro do próprio escopo;
-- `remote.use=own`: vê somente sessões solicitadas por si;
-- `remote.use=all`: vê todas as sessões;
+- `remote.request`: pode gerar enrollment, enviar o instalador e sincronizar computadores no ticket dentro do próprio escopo;
+- `remote.use=own`: pode abrir o desktop somente das próprias sessões elegíveis e vê somente sessões solicitadas por si;
+- `remote.use=all`: pode abrir e visualizar todas as sessões elegíveis;
 - `remote.manage`: recebe catálogo global dos dispositivos já reconhecidos;
+- usuário com `remote.request` mas sem `remote.use` consegue enviar o instalador, porém não iniciar o desktop;
 - sem `remote.use`: `/app/remote` bloqueado;
 - sem `system.settings.manage`: `/app/settings` bloqueado.
 
@@ -220,6 +224,7 @@ Confirme:
 - `MESHCENTRAL_CONTROL_LOGIN_KEY_FILE` fica fora do repositório;
 - segredo não aparece na página Configurações;
 - comando MeshCtrl é executado sem shell intermediário;
+- download do agente é obtido pela interface local do MeshCentral e entregue ao cliente pelo Operations;
 - Windows deve exibir consentimento local para o desktop;
 - RDP/3389 não está aberto.
 
