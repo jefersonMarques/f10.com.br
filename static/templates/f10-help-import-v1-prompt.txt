@@ -1,45 +1,77 @@
 Converta os materiais fornecidos para o formato F10 Help Import v1.
 
-Use como referência estrutural o arquivo f10-help-import-v1.example.json.
+Há dois modos de entrega:
+
+A) JSON simples: use quando imagens/documentos continuarão por URL e vídeos usam YouTube.
+B) Pacote ZIP: use quando houver imagens ou documentos locais que precisam ser migrados. Nesse caso entregue:
+   pacote.zip
+   ├── manifest.json
+   └── assets/
+       ├── imagem-01.png
+       └── documento.pdf
 
 REGRAS OBRIGATÓRIAS
 
-1. Retorne somente JSON válido, sem markdown e sem explicações fora do JSON.
-2. Use exatamente:
+1. O conteúdo do JSON/manifest deve usar exatamente:
    "format": "f10-help-import"
    "version": 1
    "source": "movidesk"
-3. Cada artigo, tutorial ou material original deve virar um item de "contents".
-4. Preserve um identificador estável do material original em "externalId". Se houver ID do Movidesk, use-o. Não invente IDs diferentes para o mesmo material em execuções futuras.
-5. Organize cada procedimento em passos independentes e em ordem cronológica.
-6. Não crie um único passo gigante quando houver ações claramente separáveis.
-7. Em "description" e blocos "text", escreva somente informação adequada para o usuário final.
-8. Em "aiGeneralKnowledge" e "aiKnowledge", coloque contexto útil ao agente de suporte que não precisa ser exibido ao usuário, como pré-requisitos, permissões, exceções, erros comuns, nomenclaturas antigas, condições especiais e formas de diagnóstico.
-9. Para vídeos, preencha "transcript" com a transcrição fornecida e "aiSummary" com um resumo operacional preciso do que o vídeo ensina.
-10. Se o conteúdo importante existir apenas no vídeo, garanta que transcript e/ou aiSummary contenham informação suficiente para o agente responder sem precisar assistir ao vídeo.
-11. Não invente informação ausente no material original. Quando algo não estiver disponível, deixe o campo opcional ausente ou vazio.
-12. Para imagens, descreva em "altText" o que o usuário precisa identificar visualmente e, quando útil, use "aiSummary" para explicar o que a imagem demonstra ao agente.
-13. Use blocos somente dos tipos: text, image, video, notice e link.
-14. Para notice, variant só pode ser: info, warning, success ou danger.
-15. Mantenha URLs originais válidas para imagens, vídeos e links.
-16. Gere títulos e slugs claros, mas não altere o significado do conteúdo original.
-17. Evite repetição entre aiGeneralKnowledge e aiKnowledge. O primeiro é geral ao conteúdo; o segundo deve ser específico daquele passo.
-18. Não misture conhecimento inferido com fatos do material. Se uma conclusão for incerta, não a inclua como instrução.
-19. Não marque nenhum conteúdo como publicado; o sistema F10 sempre importará como rascunho.
-20. Antes de responder, valide mentalmente que:
+2. Cada artigo, tutorial ou material original deve virar um item de "contents".
+3. Preserve um identificador estável do material original em "externalId". Se houver ID do Movidesk, use-o. Não invente IDs diferentes para o mesmo material em execuções futuras.
+4. Organize cada procedimento em passos independentes e em ordem cronológica.
+5. Não crie um único passo gigante quando houver ações claramente separáveis.
+6. Em "description" e blocos "text", escreva somente informação adequada para o usuário final.
+7. Em "aiGeneralKnowledge" e "aiKnowledge", coloque contexto útil ao agente de suporte que não precisa ser exibido ao usuário, como pré-requisitos, permissões, exceções, erros comuns, nomenclaturas antigas, condições especiais e formas de diagnóstico.
+8. Para vídeos do YouTube, use bloco "video" com "url". Preencha "transcript" com a transcrição fornecida e "aiSummary" com um resumo operacional preciso.
+9. Se o conteúdo importante existir apenas no vídeo, garanta que transcript e/ou aiSummary contenham informação suficiente para o agente responder sem precisar assistir ao vídeo.
+10. Não invente informação ausente no material original. Quando algo não estiver disponível, deixe o campo opcional ausente ou vazio.
+11. Para imagens, descreva em "altText" o que o usuário precisa identificar visualmente e, quando útil, use "aiSummary" para explicar o que a imagem demonstra ao agente.
+12. Blocos suportados: text, image, video, notice, link e file.
+13. Para notice, variant só pode ser: info, warning, success ou danger.
+14. Para image no JSON simples, use "url". No pacote ZIP, prefira "file": "assets/nome.png".
+15. Para file no JSON simples, use "url" e "label". No pacote ZIP, use "file": "assets/nome.ext" e "label".
+16. Nunca informe simultaneamente "url" e "file" no mesmo bloco image/file.
+17. Vídeos permanecem por URL; não coloque vídeo dentro de assets/.
+18. Formatos locais esperados no pacote: png, jpg/jpeg, webp, gif, pdf, docx, xlsx, xls, csv e txt.
+19. Use nomes seguros e simples dentro de assets/. Não use caminhos absolutos, ../ ou arquivos executáveis.
+20. Gere títulos e slugs claros, mas não altere o significado do conteúdo original.
+21. Evite repetição entre aiGeneralKnowledge e aiKnowledge. O primeiro é geral ao conteúdo; o segundo deve ser específico daquele passo.
+22. Não misture conhecimento inferido com fatos do material. Se uma conclusão for incerta, não a inclua como instrução.
+23. Não marque nenhum conteúdo como publicado; o sistema F10 sempre importará como rascunho.
+24. Antes de entregar, valide:
     - todos os contents possuem externalId, title e ao menos um step;
     - todos os steps possuem title e ao menos um block;
-    - URLs usam http ou https;
     - não há externalId duplicado;
     - não há slug duplicado;
-    - o resultado final é JSON parseável.
+    - URLs usam http ou https;
+    - todo caminho informado em "file" existe dentro do ZIP;
+    - o manifest.json é JSON parseável.
+
+EXEMPLO DE IMAGEM LOCAL NO ZIP
+
+{
+  "type": "image",
+  "file": "assets/crm-proxima-acao.png",
+  "altText": "Área Próxima Ação do CRM F10",
+  "aiSummary": "A imagem mostra onde o operador identifica a próxima atividade do lead."
+}
+
+EXEMPLO DE DOCUMENTO LOCAL NO ZIP
+
+{
+  "type": "file",
+  "file": "assets/modelo-importacao.xlsx",
+  "label": "Baixar modelo de importação",
+  "aiSummary": "Planilha modelo utilizada no procedimento de importação."
+}
 
 OBJETIVO
 
-O arquivo será usado simultaneamente para:
+O material importado será usado simultaneamente para:
 - montar a Central de Ajuda visual em passos;
 - indexar a pesquisa de suporte;
-- alimentar um agente de suporte com IA;
+- alimentar o agente de suporte com IA;
+- oferecer imagens/documentos pela biblioteca MinIO;
 - identificar lacunas de conhecimento e melhorar a documentação.
 
-Por isso preserve a fidelidade ao material original e separe corretamente conteúdo público de conhecimento interno destinado à IA.
+Preserve a fidelidade ao material original e separe corretamente conteúdo público de conhecimento interno destinado à IA.
