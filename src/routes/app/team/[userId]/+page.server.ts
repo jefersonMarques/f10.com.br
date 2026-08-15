@@ -1,4 +1,5 @@
-import { error, fail, type Actions, type PageServerLoad } from "@sveltejs/kit";
+import { error, fail, type Actions } from "@sveltejs/kit";
+import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import {
   PERMISSION_CODES,
