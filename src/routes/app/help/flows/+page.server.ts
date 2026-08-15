@@ -56,24 +56,15 @@ export const actions: Actions = {
       });
     }
 
+    let createdId: string;
+
     try {
-      const createdId = await createHelpQuestion(
+      createdId = await createHelpQuestion(
         session.user.id,
         questionId,
         title,
       );
-
-      throw redirect(303, `/app/help/flows/${createdId}`);
-    } catch (cause) {
-      if (
-        cause &&
-        typeof cause === "object" &&
-        "status" in cause &&
-        cause.status === 303
-      ) {
-        throw cause;
-      }
-
+    } catch {
       return fail(409, {
         success: false,
         message:
@@ -81,5 +72,7 @@ export const actions: Actions = {
         values: { title, questionId },
       });
     }
+
+    throw redirect(303, `/app/help/flows/${createdId}`);
   },
 };
