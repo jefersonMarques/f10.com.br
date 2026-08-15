@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowLeft, LockKeyhole } from "lucide-svelte";
+  import { ArrowLeft, CheckCircle2, LockKeyhole } from "lucide-svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -54,6 +54,13 @@
           <p class="mt-2 text-[15px] leading-6 text-[#6C7282]">
             Use suas credenciais internas para continuar.
           </p>
+
+          {#if data.activated}
+            <div class="mt-6 flex items-start gap-3 rounded-xl border border-[#B9E6C9] bg-[#F1FBF4] px-4 py-3 text-[12px] leading-5 text-[#176B35]">
+              <CheckCircle2 size={18} class="mt-0.5 shrink-0" aria-hidden="true" />
+              <span>Acesso ativado. Entre com a senha que você acabou de criar.</span>
+            </div>
+          {/if}
 
           <form method="POST" class="mt-8 space-y-5">
             <input type="hidden" name="returnTo" value={form?.returnTo ?? data.returnTo} />
