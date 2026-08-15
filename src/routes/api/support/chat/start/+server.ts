@@ -1,3 +1,4 @@
+import { dev } from "$app/environment";
 import { json, type RequestHandler } from "@sveltejs/kit";
 import {
   isSupportAiChatEnabled,
@@ -6,6 +7,12 @@ import {
 import { startPublicChat } from "$lib/server/support/publicChatRepository";
 
 const MAX_BODY_BYTES = 20 * 1024;
+
+type ChatStartDiagnosticCode =
+  | "RATE_LIMIT_NOT_CONFIGURED"
+  | "SUPPORT_QUEUE_UNAVAILABLE"
+  | "DATABASE_UNAVAILABLE"
+  | "CHAT_START_FAILED";
 
 function isBodyTooLarge(request: Request): boolean {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
@@ -34,6 +41,24 @@ function sanitizeContextUrl(value: string): string {
   } catch {
     return "";
   }
+}
+
+function diagnoseChatStartFailure(cause: unknown): ChatStartDiagnosticCode {
+  if (!(cause instanceof Error)) return "CHAT_START_FAILED";
+  if (cause.message.includes("SUPPORT_RATE_LIMIT_SECRET")) {
+    return "RATE_LIMIT_NOT_CONFIGURED";
+  }
+  if (cause.message === "CHAT_QUEUE_NOT_FOUND") {
+    return "SUPPORT_QUEUE_UNAVAILABLE";
+  }
+  if (
+    cause.message.includes("DATABASE_URL") ||
+    cause.name === "PostgresError" ||
+    cause.name === "PostgresConnectionError"
+  ) {
+    return "DATABASE_UNAVAILABLE";
+  }
+  return "CHAT_START_FAILED";
 }
 
 export const POST: RequestHandler = async ({ request, getClientAddress }) => {
@@ -113,6 +138,18 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
       return json({ error: "RATE_LIMITED" }, { status: 429 });
     }
 
-    return json({ error: "CHAT_UNAVAILABLE" }, { status: 503 });
+    const diagnosticCode = diagnoseChatStartFailure(cause);
+    console.error("[support.chat.start]", {
+      diagnosticCode,
+      causeType: cause instanceof Error ? cause.name : typeof cause,
+    });
+
+    return json(
+      {
+        error: "CHAT_UNAVAILABLE",
+        ...(dev ? { diagnosticCode } : {}),
+      },
+      { status: 503 },
+    );
   }
 };

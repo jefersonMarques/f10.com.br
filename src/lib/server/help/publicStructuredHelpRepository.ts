@@ -39,6 +39,16 @@ export type PublishedStructuredHelp = {
   publishedAt: Date;
 };
 
+export type PublishedStructuredHelpSummary = {
+  contentId: string;
+  slug: string;
+  title: string;
+  summary: string;
+  category: string;
+  stepCount: number;
+  publishedAt: Date;
+};
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -47,6 +57,15 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function readString(record: Record<string, unknown>, key: string): string {
   return typeof record[key] === "string" ? record[key] as string : "";
+}
+
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function parseAsset(value: unknown): PublishedHelpAsset | null {
@@ -124,6 +143,59 @@ function parsePublication(
     steps,
     publishedAt,
   };
+}
+
+function publicationSearchText(content: PublishedStructuredHelp): string {
+  return normalizeSearchText([
+    content.title,
+    content.summary,
+    content.category,
+    ...content.steps.flatMap((step) => [
+      step.title,
+      step.description,
+      ...step.blocks.map((block) => block.textContent),
+    ]),
+  ].join(" "));
+}
+
+export async function listPublishedStructuredHelpCatalog(
+  query = "",
+): Promise<PublishedStructuredHelpSummary[]> {
+  const db = getDatabase();
+  const rows = await db
+    .select({
+      entityId: helpPublications.entityId,
+      snapshot: helpPublications.snapshot,
+      publishedAt: helpPublications.publishedAt,
+    })
+    .from(helpPublications)
+    .where(eq(helpPublications.entityType, "content"));
+
+  const normalizedQuery = normalizeSearchText(query);
+  const terms = normalizedQuery.split(" ").filter(Boolean);
+
+  return rows
+    .map((row) => parsePublication(row.entityId, row.publishedAt, row.snapshot))
+    .filter((content): content is PublishedStructuredHelp => Boolean(content))
+    .filter((content) => {
+      if (terms.length === 0) return true;
+      const searchable = publicationSearchText(content);
+      return terms.every((term) => searchable.includes(term));
+    })
+    .map((content) => ({
+      contentId: content.contentId,
+      slug: content.slug,
+      title: content.title,
+      summary: content.summary,
+      category: content.category,
+      stepCount: content.steps.length,
+      publishedAt: content.publishedAt,
+    }))
+    .sort((left, right) => {
+      const categoryComparison = left.category.localeCompare(right.category, "pt-BR");
+      if (categoryComparison !== 0) return categoryComparison;
+      return left.title.localeCompare(right.title, "pt-BR");
+    });
 }
 
 export async function listPublishedStructuredHelpLinks() {
