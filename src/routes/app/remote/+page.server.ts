@@ -19,11 +19,12 @@ export const load: PageServerLoad = async ({ parent }) => {
   const permissions = new Map(layout.permissions.map((permission) => [permission.code, permission.scope]));
   if (!hasPermission(permissions, "remote.use")) throw error(403, "Acesso não autorizado.");
   const scope = getPermissionScope(permissions, "remote.use") ?? "own";
+  const canManage = hasPermission(permissions, "remote.manage");
   return {
     sessions: await listRemoteSessions(layout.user.id, scope),
-    devices: await listRemoteDevices(),
+    devices: canManage ? await listRemoteDevices() : [],
     provider: getRemoteProviderStatus(),
-    canManage: hasPermission(permissions, "remote.manage"),
+    canManage,
   };
 };
 
