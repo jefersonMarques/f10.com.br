@@ -1,12 +1,12 @@
-import { and, asc, eq, max } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
 import {
   helpArticles,
-  helpContentVersions,
   type HelpArticleBlock,
 } from "$lib/server/db/schema";
+import { saveHelpContentVersion } from "$lib/server/help/helpVersionRepository";
 
 export type HelpArticleInput = {
   title: string;
@@ -56,32 +56,18 @@ async function getArticle(articleId: string) {
   return article ?? null;
 }
 
-async function saveArticleVersion(
+async function saveCurrentArticleVersion(
   articleId: string,
   actorUserId: string,
 ): Promise<void> {
-  const db = getDatabase();
   const article = await getArticle(articleId);
 
   if (!article) return;
 
-  const versionResult = await db
-    .select({ version: max(helpContentVersions.version) })
-    .from(helpContentVersions)
-    .where(
-      and(
-        eq(helpContentVersions.entityType, "article"),
-        eq(helpContentVersions.entityId, articleId),
-      ),
-    );
-
-  const nextVersion = Number(versionResult[0]?.version ?? 0) + 1;
-
-  await db.insert(helpContentVersions).values({
-    entityType: "article",
-    entityId: articleId,
-    version: nextVersion,
-    snapshot: {
+  await saveHelpContentVersion(
+    "article",
+    articleId,
+    {
       slug: article.slug,
       title: article.title,
       summary: article.summary,
@@ -89,8 +75,8 @@ async function saveArticleVersion(
       status: article.status,
       publishedAt: article.publishedAt?.toISOString() ?? null,
     },
-    createdBy: actorUserId,
-  });
+    actorUserId,
+  );
 }
 
 export async function listHelpArticles() {
@@ -164,7 +150,7 @@ export async function createHelpArticle(
 
   if (!article) throw new Error("ARTICLE_NOT_CREATED");
 
-  await saveArticleVersion(article.id, actorUserId);
+  await saveCurrentArticleVersion(article.id, actorUserId);
   await recordAuditEvent({
     actorUserId,
     action: "help.article.created",
@@ -206,7 +192,7 @@ export async function updateHelpArticle(
 
   if (!updated) throw new Error("ARTICLE_NOT_FOUND");
 
-  await saveArticleVersion(articleId, actorUserId);
+  await saveCurrentArticleVersion(articleId, actorUserId);
   await recordAuditEvent({
     actorUserId,
     action: "help.article.updated",
@@ -268,7 +254,7 @@ export async function publishHelpArticle(
       });
   });
 
-  await saveArticleVersion(articleId, actorUserId);
+  await saveCurrentArticleVersion(articleId, actorUserId);
   await recordAuditEvent({
     actorUserId,
     action: "help.article.published",
