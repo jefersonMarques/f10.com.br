@@ -3,8 +3,8 @@ import {
   fail,
   redirect,
   type Actions,
-  type PageServerLoad,
 } from "@sveltejs/kit";
+import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import {
