@@ -32,6 +32,10 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 export const actions: Actions = {
   request: async ({ params, cookies, request, url }) => {
     if (!isUuid(params.ticketId)) return fail(404, { success: false, message: "Ticket não encontrado." });
+    const provider = getRemoteProviderStatus();
+    if (!provider.configured) {
+      return fail(503, { success: false, message: "O MeshCentral ainda não está configurado para este ambiente." });
+    }
     const { session, permissions } = await requireAppPermission(cookies, "remote.request", `/app/tickets/${params.ticketId}/remote`);
     try { await getSupportTicket(session.user.id, permissions, params.ticketId); }
     catch { return fail(404, { success: false, message: "Ticket fora do seu escopo." }); }
