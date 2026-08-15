@@ -40,6 +40,10 @@ function absoluteUrl(pathname) {
   return new URL(pathname, baseUrl).toString();
 }
 
+function describeError(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function assertStatus(response, acceptedStatuses, label) {
   if (!acceptedStatuses.includes(response.status)) {
     throw new Error(
@@ -179,22 +183,28 @@ async function login() {
   return sessionCookie;
 }
 
-async function verifyProtectedRoutes(sessionCookie) {
+async function verifyProtectedRoutes(sessionCookie, failures) {
   const discoveredRoutes = new Set();
 
   for (const route of protectedRoutes) {
-    const page = await fetchAuthenticatedPage(route, sessionCookie);
-    process.stdout.write(`[OK] ${route}\n`);
+    try {
+      const page = await fetchAuthenticatedPage(route, sessionCookie);
+      process.stdout.write(`[OK] ${route}\n`);
 
-    for (const link of page.links) {
-      discoveredRoutes.add(link);
+      for (const link of page.links) {
+        discoveredRoutes.add(link);
+      }
+    } catch (error) {
+      const message = describeError(error);
+      failures.push(message);
+      process.stderr.write(`[FAIL] ${message}\n`);
     }
   }
 
   return discoveredRoutes;
 }
 
-async function crawlOperationsPages(sessionCookie, initialRoutes) {
+async function crawlOperationsPages(sessionCookie, initialRoutes, failures) {
   const visited = new Set(protectedRoutes);
   const queued = new Set(initialRoutes);
   const queue = [...initialRoutes];
@@ -205,14 +215,21 @@ async function crawlOperationsPages(sessionCookie, initialRoutes) {
     if (!route || visited.has(route)) continue;
 
     visited.add(route);
-    const page = await fetchAuthenticatedPage(route, sessionCookie);
-    crawled += 1;
-    process.stdout.write(`[OK] crawl ${route}\n`);
 
-    for (const link of page.links) {
-      if (visited.has(link) || queued.has(link)) continue;
-      queued.add(link);
-      queue.push(link);
+    try {
+      const page = await fetchAuthenticatedPage(route, sessionCookie);
+      crawled += 1;
+      process.stdout.write(`[OK] crawl ${route}\n`);
+
+      for (const link of page.links) {
+        if (visited.has(link) || queued.has(link)) continue;
+        queued.add(link);
+        queue.push(link);
+      }
+    } catch (error) {
+      const message = describeError(error);
+      failures.push(message);
+      process.stderr.write(`[FAIL] crawl ${message}\n`);
     }
   }
 
@@ -243,13 +260,20 @@ async function logout(sessionCookie) {
 
 async function main() {
   let sessionCookie = "";
+  const failures = [];
 
   try {
     await verifyUnauthenticatedProtection();
     sessionCookie = await login();
 
-    const discoveredRoutes = await verifyProtectedRoutes(sessionCookie);
-    await crawlOperationsPages(sessionCookie, discoveredRoutes);
+    const discoveredRoutes = await verifyProtectedRoutes(sessionCookie, failures);
+    await crawlOperationsPages(sessionCookie, discoveredRoutes, failures);
+
+    if (failures.length > 0) {
+      throw new Error(
+        `${failures.length} Operations route(s) failed smoke testing. Review the [FAIL] lines above.`,
+      );
+    }
 
     process.stdout.write("Operations HTTP smoke test passed.\n");
   } finally {
@@ -262,8 +286,6 @@ async function main() {
 try {
   await main();
 } catch (error) {
-  process.stderr.write(
-    `[FAIL] ${error instanceof Error ? error.message : String(error)}\n`,
-  );
+  process.stderr.write(`[FAIL] ${describeError(error)}\n`);
   process.exitCode = 1;
 }
