@@ -30,6 +30,35 @@ npm run admin:bootstrap
 
 No servidor, as variáveis podem ser carregadas antes dos comandos ou fornecidas pelo ambiente do processo. Segredos não devem ser versionados no Git.
 
+## Validação do ambiente
+
+Depois das migrations e do bootstrap, valide banco, migrations, tabelas críticas, papéis e permissões:
+
+```bash
+DATABASE_URL="postgres://..." npm run operations:doctor
+```
+
+O comando é somente leitura. Por padrão também exige ao menos um `SUPER_ADMIN` ativo. Para diagnosticar um banco antes do bootstrap:
+
+```bash
+OPERATIONS_DOCTOR_REQUIRE_SUPER_ADMIN=false \
+DATABASE_URL="postgres://..." \
+npm run operations:doctor
+```
+
+Com a aplicação de homologação em execução, valide autenticação e as rotas principais:
+
+```bash
+OPERATIONS_BASE_URL="https://homolog.example.com" \
+OPERATIONS_SMOKE_EMAIL="admin@f10.com.br" \
+OPERATIONS_SMOKE_PASSWORD="..." \
+npm run operations:smoke
+```
+
+O smoke test cria uma sessão temporária, verifica as rotas protegidas e executa logout ao final.
+
+O roteiro manual completo está em `docs/operations-test-plan.md`.
+
 ## Autorização
 
 O modelo combina papéis e permissões individuais.
