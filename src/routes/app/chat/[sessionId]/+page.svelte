@@ -104,20 +104,20 @@
     <div class="flex flex-wrap gap-2">
       {#if chat.contextUrl}<a href={chat.contextUrl} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#666C7B]">Página de origem<ExternalLink size={13}/></a>{/if}
 
-      {#if data.canRemote && data.remoteReady}
-        {#if onlineRemoteDevices.length === 1}
+      {#if data.remoteReady}
+        {#if onlineRemoteDevices.length === 1 && data.canUseRemote}
           <form method="POST" action="?/startRemote">
             <input type="hidden" name="deviceId" value={onlineRemoteDevices[0].id}/>
             <button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><MonitorCog size={14}/>Iniciar acesso remoto</button>
           </form>
-        {:else if onlineRemoteDevices.length > 1}
+        {:else if onlineRemoteDevices.length > 0 && data.canRequestRemote}
           <a href={`/app/tickets/${chat.ticketId}/remote`} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><MonitorCog size={14}/>Escolher computador</a>
-        {:else}
+        {:else if onlineRemoteDevices.length === 0 && data.canRequestRemote}
           <form method="POST" action="?/enrollRemote">
             <button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><Download size={14}/>Instalar suporte remoto</button>
           </form>
         {/if}
-      {:else if data.canRemote}
+      {:else if data.canRequestRemote}
         <a href={`/app/tickets/${chat.ticketId}/remote`} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#777D8D]"><MonitorCog size={14}/>Acesso remoto</a>
       {/if}
 
