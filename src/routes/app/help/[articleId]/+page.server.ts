@@ -62,6 +62,7 @@ export const actions: Actions = {
         success: false,
         action: "save",
         message: parsed.message,
+        values: parsed.values,
       });
     }
 
@@ -79,6 +80,7 @@ export const actions: Actions = {
         action: "save",
         message:
           "Não foi possível salvar. Verifique se o endereço já está sendo utilizado por outro conteúdo.",
+        values: parsed.input,
       });
     }
   },
