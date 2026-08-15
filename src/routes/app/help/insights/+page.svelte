@@ -3,6 +3,7 @@
     ArrowLeft,
     BarChart3,
     BrainCircuit,
+    CheckCircle2,
     MousePointerClick,
     Search,
     SearchX,
@@ -32,13 +33,14 @@
   <div class="mt-5">
     <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Evolução contínua</p>
     <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Insights da Central</h1>
-    <p class="mt-2 max-w-[800px] text-[14px] leading-6 text-[#6F7585]">Veja o que as pessoas realmente procuram, onde a base não responde e quais conteúdos são escolhidos. Esta mesma telemetria será alimentada pelo agente de IA e pelos atendimentos.</p>
+    <p class="mt-2 max-w-[800px] text-[14px] leading-6 text-[#6F7585]">Veja o que as pessoas realmente procuram, onde a base não responde, quais conteúdos são escolhidos e quantas dúvidas o agente consegue responder sem atendimento humano.</p>
   </div>
 
-  <section class="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  <section class="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><Search size={20} class="text-[#000A57]" aria-hidden="true" /><strong class="mt-4 block text-[26px] font-semibold">{data.summary.searches}</strong><span class="text-[11px] text-[#858A98]">pesquisas registradas</span></div>
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><SearchX size={20} class="text-[#A9510D]" aria-hidden="true" /><strong class="mt-4 block text-[26px] font-semibold">{data.summary.withoutResults}</strong><span class="text-[11px] text-[#858A98]">sem resultado</span></div>
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><MousePointerClick size={20} class="text-[#2F7045]" aria-hidden="true" /><strong class="mt-4 block text-[26px] font-semibold">{data.summary.selections}</strong><span class="text-[11px] text-[#858A98]">resultados escolhidos</span></div>
+    <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><CheckCircle2 size={20} class="text-[#2F7045]" aria-hidden="true" /><strong class="mt-4 block text-[26px] font-semibold">{data.summary.aiAnswers}</strong><span class="text-[11px] text-[#858A98]">respondidas pela IA</span></div>
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><BrainCircuit size={20} class="text-[#EA6D0B]" aria-hidden="true" /><strong class="mt-4 block text-[26px] font-semibold">{data.summary.escalations}</strong><span class="text-[11px] text-[#858A98]">escalamentos para humano</span></div>
   </section>
 
