@@ -1,0 +1,82 @@
+<script lang="ts">
+  import { FileText, HardDrive, Image, Trash2, UploadCloud } from "lucide-svelte";
+  import type { ActionData, PageData } from "./$types";
+
+  export let data: PageData;
+  export let form: ActionData;
+
+  function formatBytes(value: number | null): string {
+    if (!value) return "—";
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+</script>
+
+<svelte:head><title>Biblioteca de arquivos | F10 Operations</title></svelte:head>
+
+<div class="mx-auto max-w-[1380px] px-5 py-7 sm:px-8 sm:py-9">
+  <div class="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+    <div>
+      <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Base de Conhecimento</p>
+      <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Biblioteca de arquivos</h1>
+      <p class="mt-2 max-w-[760px] text-[14px] leading-6 text-[#6F7585]">Imagens e documentos ficam no armazenamento S3/MinIO e podem ser reutilizados em diferentes procedimentos.</p>
+    </div>
+    <a href="/app/help/content" class="inline-flex min-h-10 items-center rounded-xl border border-[#DDE1EA] bg-white px-4 text-[10px] font-semibold text-[#626979]">Voltar para conteúdos</a>
+  </div>
+
+  <section class="mt-6 flex items-center gap-3 rounded-2xl border border-[#E2E5ED] bg-white px-4 py-3">
+    <HardDrive size={18} class="text-[#000A57]" aria-hidden="true" />
+    <div class="min-w-0 flex-1">
+      <strong class="block text-[11px] text-[#303645]">{data.storage.provider === "s3" ? "S3 / MinIO" : "Armazenamento desativado"}</strong>
+      <span class="block truncate text-[9px] text-[#9297A5]">{data.storage.configured ? `${data.storage.bucket} · ${data.storage.endpoint}` : "Configure em Configurações > Armazenamento"}</span>
+    </div>
+    <span class={`rounded-full px-2 py-1 text-[8px] font-bold ${data.storage.configured ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>{data.storage.configured ? "Configurado" : "Pendente"}</span>
+  </section>
+
+  {#if form?.message}
+    <div class={`mt-5 rounded-xl px-4 py-3 text-[10px] font-medium ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>{form.message}</div>
+  {/if}
+
+  <div class="mt-6 grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+    {#if data.canEdit}
+      <section class="h-fit rounded-[24px] border border-[#E2E5ED] bg-white p-5">
+        <div class="flex items-center gap-3"><UploadCloud size={19} class="text-[#000A57]"/><div><h2 class="text-[14px] font-semibold">Novo arquivo</h2><p class="mt-1 text-[9px] text-[#9297A5]">Imagens até 10 MB; documentos até 25 MB.</p></div></div>
+        <form method="POST" action="?/upload" enctype="multipart/form-data" class="mt-5 space-y-4">
+          <label class="block rounded-2xl border border-dashed border-[#C9CEDA] bg-[#FAFAFC] p-5 text-center">
+            <span class="block text-[10px] font-semibold text-[#555B6B]">Selecionar arquivo</span>
+            <input name="file" type="file" required accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.docx,.xlsx,.xls,.csv,.txt" class="mt-3 block w-full text-[9px] text-[#777D8D]" />
+          </label>
+          <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6B]">Texto alternativo</span><input name="altText" maxlength="500" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]" /></label>
+          <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6B]">Resumo para IA</span><textarea name="aiSummary" maxlength="20000" rows="4" class="w-full rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[10px] leading-5"></textarea></label>
+          <button type="submit" disabled={!data.storage.configured} class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:bg-[#C8CBD5]"><UploadCloud size={16}/>Enviar para biblioteca</button>
+        </form>
+      </section>
+    {/if}
+
+    <section class="overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
+      <header class="border-b border-[#EEF0F5] px-5 py-4"><h2 class="text-[14px] font-semibold">Arquivos ({data.assets.length})</h2></header>
+      {#if data.assets.length === 0}
+        <div class="py-16 text-center text-[10px] text-[#9297A5]">Nenhum arquivo na biblioteca.</div>
+      {:else}
+        <div class="grid gap-px bg-[#EEF0F5] sm:grid-cols-2 lg:grid-cols-3">
+          {#each data.assets as asset}
+            <article class="bg-white p-4">
+              <div class="flex h-24 items-center justify-center rounded-xl bg-[#F7F8FB]">
+                {#if asset.assetType === "image"}<Image size={30} class="text-[#000A57]"/>{:else}<FileText size={30} class="text-[#EA6D0B]"/>{/if}
+              </div>
+              <strong class="mt-3 block truncate text-[10px] text-[#303645]">{asset.originalName ?? asset.id}</strong>
+              <p class="mt-1 text-[8px] text-[#9297A5]">{asset.mimeType ?? asset.assetType} · {formatBytes(asset.sizeBytes)}</p>
+              <div class="mt-3 flex items-center justify-between gap-2">
+                <a href={`/api/app/help/assets/${asset.id}`} target="_blank" class="text-[9px] font-semibold text-[#000A57]">Abrir</a>
+                {#if data.canEdit}
+                  <form method="POST" action="?/delete"><input type="hidden" name="assetId" value={asset.id}/><button type="submit" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#A34242] hover:bg-[#FFF0F0]" aria-label="Excluir"><Trash2 size={14}/></button></form>
+                {/if}
+              </div>
+            </article>
+          {/each}
+        </div>
+      {/if}
+    </section>
+  </div>
+</div>
