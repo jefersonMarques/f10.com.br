@@ -15,32 +15,36 @@
 
   const modules = [
     {
-      title: "Central de Ajuda",
-      description: "Conteúdo, fluxos interativos, treinamentos e publicação.",
+      title: "Base de Conhecimento",
+      description: "Conteúdo estruturado em passos, mídia e contexto exclusivo para IA.",
       icon: BookOpen,
       permission: "help.view",
-      phase: "Próxima fase",
+      phase: "Disponível",
+      href: "/app/help/content",
     },
     {
       title: "Tarefas",
       description: "Projetos, responsáveis, prioridades e visão Kanban.",
       icon: CheckSquare2,
       permission: "tasks.view",
-      phase: "Planejado",
+      phase: "Disponível",
+      href: "/app/tasks",
     },
     {
       title: "Tickets",
-      description: "Filas, SLA, histórico, responsáveis e atendimento.",
+      description: "Filas, histórico, responsáveis e atendimento.",
       icon: Headphones,
       permission: "tickets.view",
-      phase: "Planejado",
+      phase: "Disponível",
+      href: "/app/tickets",
     },
     {
       title: "Chat",
-      description: "Atendimento nativo integrado aos tickets e à Central de Ajuda.",
+      description: "Atendimento nativo integrado aos tickets; agente de IA entra na próxima etapa.",
       icon: MessageCircleMore,
       permission: "chat.view",
-      phase: "Planejado",
+      phase: "MVP disponível",
+      href: "/app/chat",
     },
     {
       title: "Acesso remoto",
@@ -48,6 +52,7 @@
       icon: MonitorCog,
       permission: "remote.use",
       phase: "PoC planejada",
+      href: null,
     },
   ];
 
@@ -70,8 +75,8 @@
         <h1 class="mt-5 text-[32px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[40px]">
           Olá, {data.user.name.split(" ")[0]}.
         </h1>
-        <p class="mt-3 max-w-[720px] text-[15px] leading-7 text-[#686E7E]">
-          A base do F10 Operations está preparada para receber a Central de Ajuda dinâmica e os módulos operacionais sem alterar o site público.
+        <p class="mt-3 max-w-[760px] text-[15px] leading-7 text-[#686E7E]">
+          O F10 Operations reúne conhecimento, tarefas e atendimento em uma única área interna. A Base de Conhecimento passa a ser a fonte para pesquisa e para o agente de suporte.
         </p>
       </div>
 
@@ -94,22 +99,35 @@
     <div class="mb-4 flex items-end justify-between gap-4">
       <div>
         <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#959AA8]">Módulos</p>
-        <h2 class="mt-1 text-[22px] font-semibold tracking-[-0.02em]">Evolução da plataforma</h2>
+        <h2 class="mt-1 text-[22px] font-semibold tracking-[-0.02em]">Operação F10</h2>
       </div>
     </div>
 
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {#each visibleModules as module}
-        <article class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 shadow-[0_8px_24px_rgba(1,13,40,0.035)]">
-          <div class="flex items-start justify-between gap-4">
-            <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F1F3F8] text-[#000A57]">
-              <svelte:component this={module.icon} size={20} aria-hidden="true" />
-            </span>
-            <span class="rounded-full bg-[#FFF0E4] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[#C75B08]">{module.phase}</span>
-          </div>
-          <h3 class="mt-5 text-[17px] font-semibold text-[#161C2C]">{module.title}</h3>
-          <p class="mt-2 text-[13px] leading-6 text-[#737989]">{module.description}</p>
-        </article>
+        {#if module.href}
+          <a href={module.href} class="group rounded-[22px] border border-[#E2E5ED] bg-white p-5 shadow-[0_8px_24px_rgba(1,13,40,0.035)] transition hover:-translate-y-0.5 hover:border-[#C9CEDA] hover:shadow-[0_12px_30px_rgba(1,13,40,0.07)]">
+            <div class="flex items-start justify-between gap-4">
+              <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F1F3F8] text-[#000A57]">
+                <svelte:component this={module.icon} size={20} aria-hidden="true" />
+              </span>
+              <span class="rounded-full bg-[#EEF8F1] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[#2F7045]">{module.phase}</span>
+            </div>
+            <h3 class="mt-5 text-[17px] font-semibold text-[#161C2C]">{module.title}</h3>
+            <p class="mt-2 text-[13px] leading-6 text-[#737989]">{module.description}</p>
+          </a>
+        {:else}
+          <article class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 shadow-[0_8px_24px_rgba(1,13,40,0.035)]">
+            <div class="flex items-start justify-between gap-4">
+              <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F1F3F8] text-[#000A57]">
+                <svelte:component this={module.icon} size={20} aria-hidden="true" />
+              </span>
+              <span class="rounded-full bg-[#FFF0E4] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[#C75B08]">{module.phase}</span>
+            </div>
+            <h3 class="mt-5 text-[17px] font-semibold text-[#161C2C]">{module.title}</h3>
+            <p class="mt-2 text-[13px] leading-6 text-[#737989]">{module.description}</p>
+          </article>
+        {/if}
       {/each}
     </div>
   </section>
