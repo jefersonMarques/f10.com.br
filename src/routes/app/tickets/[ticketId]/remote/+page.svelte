@@ -1,29 +1,130 @@
 <script lang="ts">
-  import { ArrowLeft, CheckCircle2, MonitorCog, ShieldCheck } from "lucide-svelte";
+  import {
+    ArrowLeft,
+    CheckCircle2,
+    CircleAlert,
+    Download,
+    MonitorCog,
+    RefreshCw,
+    ShieldCheck,
+  } from "lucide-svelte";
   import type { ActionData, PageData } from "./$types";
+
   export let data: PageData;
   export let form: ActionData;
+
+  function formatDateTime(value: string | Date | null): string {
+    if (!value) return "Ainda não conectado";
+    return new Intl.DateTimeFormat("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(new Date(value));
+  }
 </script>
 
-<svelte:head><title>Solicitar acesso remoto | F10 Operations</title></svelte:head>
+<svelte:head><title>Acesso remoto | F10 Operations</title></svelte:head>
 
-<div class="mx-auto max-w-[820px] px-5 py-7 sm:px-8 sm:py-9">
-  <a href={`/app/tickets/${data.ticket.id}`} class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[11px] font-semibold text-[#5F6575]"><ArrowLeft size={16}/>Voltar ao ticket</a>
-  <header class="mt-5 rounded-[24px] border border-[#E2E5ED] bg-white p-6"><div class="flex items-center gap-3"><span class="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><MonitorCog size={20}/></span><div><p class="text-[9px] font-bold uppercase tracking-[0.1em] text-[#EA6D0B]">Ticket #{data.ticket.ticketNumber}</p><h1 class="mt-1 text-[20px] font-semibold">Solicitar acesso remoto</h1></div></div><p class="mt-4 text-[11px] leading-6 text-[#707788]">O cliente receberá uma mensagem no ticket com um link de autorização. O MeshCentral só poderá ser aberto depois da confirmação.</p></header>
+<div class="mx-auto max-w-[920px] px-5 py-7 sm:px-8 sm:py-9">
+  <a href={`/app/tickets/${data.ticket.id}`} class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[11px] font-semibold text-[#5F6575]">
+    <ArrowLeft size={16}/>
+    Voltar ao ticket
+  </a>
 
-  {#if form?.message}<div class={`mt-5 flex items-center gap-2 rounded-xl px-4 py-3 text-[10px] ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>{#if form.success}<CheckCircle2 size={15}/>{/if}{form.message}</div>{/if}
+  <header class="mt-5 rounded-[24px] border border-[#E2E5ED] bg-white p-6">
+    <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+      <div class="flex items-center gap-3">
+        <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><MonitorCog size={20}/></span>
+        <div>
+          <p class="text-[9px] font-bold uppercase tracking-[0.1em] text-[#EA6D0B]">Ticket #{data.ticket.ticketNumber}</p>
+          <h1 class="mt-1 text-[20px] font-semibold">Acesso remoto</h1>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <span class={`rounded-full px-2.5 py-1.5 text-[8px] font-bold ${data.provider.configured ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>
+          {data.provider.configured ? "MeshCentral online" : "Provider pendente"}
+        </span>
+        <span class={`rounded-full px-2.5 py-1.5 text-[8px] font-bold ${data.control.configured ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>
+          {data.control.configured ? "Integração automática" : "Controle pendente"}
+        </span>
+      </div>
+    </div>
+    <p class="mt-4 max-w-[760px] text-[11px] leading-6 text-[#707788]">
+      Na primeira vez, o cliente instala o Suporte Remoto F10 pelo link enviado na conversa. Depois, este computador fica reconhecido para os próximos atendimentos. O acesso continua dependendo da confirmação exibida no próprio computador.
+    </p>
+  </header>
+
+  {#if form?.message}
+    <div class={`mt-5 flex items-center gap-2 rounded-xl px-4 py-3 text-[10px] ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>
+      {#if form.success}<CheckCircle2 size={15}/>{:else}<CircleAlert size={15}/>{/if}
+      {form.message}
+    </div>
+  {/if}
+
+  {#if data.syncError}
+    <div class="mt-5 flex items-center gap-2 rounded-xl bg-[#FFF7EA] px-4 py-3 text-[10px] text-[#8B5A12]">
+      <CircleAlert size={15}/>
+      {data.syncError}
+    </div>
+  {/if}
 
   <section class="mt-5 rounded-[24px] border border-[#E2E5ED] bg-white p-6">
-    <div class="flex items-center justify-between gap-3"><div><h2 class="text-[13px] font-semibold">Computador</h2><p class="mt-1 text-[9px] text-[#9297A5]">Somente dispositivos vinculados a este cliente ou organização aparecem aqui.</p></div><span class={`rounded-full px-2 py-1 text-[8px] font-bold ${data.provider.configured ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>{data.provider.configured ? "MeshCentral pronto" : "MeshCentral pendente"}</span></div>
+    <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+      <div>
+        <h2 class="text-[13px] font-semibold">Computadores conhecidos</h2>
+        <p class="mt-1 text-[9px] text-[#9297A5]">A lista é sincronizada automaticamente com o grupo deste cliente no MeshCentral.</p>
+      </div>
+      <form method="POST" action="?/sync">
+        <button type="submit" disabled={!data.control.configured} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[9px] font-semibold text-[#000A57] disabled:cursor-not-allowed disabled:opacity-50">
+          <RefreshCw size={13}/>
+          Verificar agora
+        </button>
+      </form>
+    </div>
 
     {#if data.devices.length === 0}
-      <div class="mt-5 rounded-2xl bg-[#F7F8FB] px-4 py-5 text-center"><p class="text-[10px] text-[#777E8E]">Nenhum dispositivo remoto está vinculado a este cliente.</p><a href="/app/remote" class="mt-3 inline-flex min-h-9 items-center rounded-lg border border-[#DDE1EA] bg-white px-3 text-[9px] font-semibold text-[#000A57]">Gerenciar dispositivos</a></div>
+      <div class="mt-5 rounded-2xl border border-dashed border-[#D5D9E2] bg-[#FAFAFC] px-5 py-8 text-center">
+        <MonitorCog size={30} class="mx-auto text-[#A8AEBB]"/>
+        <p class="mt-4 text-[11px] font-semibold text-[#555C6D]">Este cliente ainda não possui um computador de suporte vinculado.</p>
+        <p class="mx-auto mt-2 max-w-[520px] text-[9px] leading-5 text-[#8A909E]">Envie o instalador pelo próprio atendimento. Depois que o cliente instalar, o computador será identificado automaticamente.</p>
+      </div>
     {:else}
-      <form method="POST" action="?/request" class="mt-5">
-        <div class="space-y-2">{#each data.devices as device}<label class="flex cursor-pointer items-center gap-3 rounded-2xl border border-[#E1E4EC] px-4 py-3 hover:bg-[#FAFAFC]"><input type="radio" name="deviceId" value={device.id} required class="h-4 w-4"/><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><MonitorCog size={16}/></span><span><strong class="block text-[10px]">{device.name}</strong><small class="mt-1 block text-[8px] text-[#9297A5]">ID MeshCentral: {device.providerDeviceId}</small></span></label>{/each}</div>
-        <div class="mt-5 flex items-start gap-3 rounded-2xl border border-[#D8DEF2] bg-[#F8F9FF] px-4 py-3"><ShieldCheck size={16} class="mt-0.5 shrink-0 text-[#000A57]"/><p class="text-[9px] leading-5 text-[#626A7E]">A solicitação não inicia acesso. Ela apenas cria um pedido temporário que o cliente precisa autorizar explicitamente.</p></div>
-        <button type="submit" class="mt-4 min-h-11 w-full rounded-xl bg-[#000A57] text-[10px] font-semibold text-white">Enviar solicitação de acesso</button>
-      </form>
+      <div class="mt-5 space-y-3">
+        {#each data.devices as device}
+          <article class="flex flex-col justify-between gap-4 rounded-2xl border border-[#E1E4EC] px-4 py-4 sm:flex-row sm:items-center">
+            <div class="flex min-w-0 items-center gap-3">
+              <span class={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${device.online ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#F3F4F7] text-[#858B99]"}`}><MonitorCog size={17}/></span>
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <strong class="truncate text-[11px] text-[#303645]">{device.name}</strong>
+                  <span class={`rounded-full px-2 py-1 text-[8px] font-bold ${device.online ? "bg-[#E8F7EE] text-[#27633B]" : "bg-[#F1F2F5] text-[#777D8D]"}`}>{device.online ? "Online" : "Offline"}</span>
+                </div>
+                <p class="mt-1 text-[8px] text-[#9297A5]">Última conexão: {formatDateTime(device.lastOnlineAt ?? device.lastSeenAt)}</p>
+              </div>
+            </div>
+            <form method="POST" action="?/start">
+              <input type="hidden" name="deviceId" value={device.id}/>
+              <button type="submit" disabled={!device.online || !data.provider.configured} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[9px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#C7CAD3]">
+                <MonitorCog size={14}/>
+                Iniciar acesso remoto
+              </button>
+            </form>
+          </article>
+        {/each}
+      </div>
     {/if}
+
+    <div class="mt-6 border-t border-[#EEF0F5] pt-5">
+      <div class="flex items-start gap-3 rounded-2xl border border-[#D8DEF2] bg-[#F8F9FF] px-4 py-3">
+        <ShieldCheck size={16} class="mt-0.5 shrink-0 text-[#000A57]"/>
+        <p class="text-[9px] leading-5 text-[#626A7E]">O agente pode permanecer instalado para próximos atendimentos, mas isso não libera acesso silencioso. O MeshCentral deve solicitar a confirmação local do usuário antes do desktop remoto.</p>
+      </div>
+
+      <form method="POST" action="?/enroll" class="mt-4">
+        <button type="submit" disabled={!data.control.configured} class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#D9DDE7] bg-white px-4 text-[10px] font-semibold text-[#000A57] transition hover:bg-[#F8F9FF] disabled:cursor-not-allowed disabled:opacity-50">
+          <Download size={15}/>
+          {data.devices.length === 0 ? "Enviar instalador de Suporte Remoto F10" : "Adicionar outro computador"}
+        </button>
+      </form>
+    </div>
   </section>
 </div>
