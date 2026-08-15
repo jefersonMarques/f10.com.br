@@ -32,6 +32,16 @@ async function requireVisibleSession(
   return actor;
 }
 
+function actionFailure(status: number, action: "start" | "end", message: string) {
+  return fail(status, {
+    success: false,
+    action,
+    message,
+    desktopUrl: undefined,
+    desktopExpiresAt: undefined,
+  });
+}
+
 export const load: PageServerLoad = async ({ params, parent }) => {
   if (!isUuid(params.sessionId)) throw error(404, "Sessão não encontrada.");
   const layout = await parent();
@@ -54,7 +64,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 export const actions = {
   start: async ({ cookies, params }) => {
     if (!isUuid(params.sessionId)) {
-      return fail(404, { success: false, message: "Sessão não encontrada." });
+      return actionFailure(404, "start", "Sessão não encontrada.");
     }
     const actor = await requireVisibleSession(cookies, params.sessionId);
     try {
@@ -64,38 +74,40 @@ export const actions = {
       );
       return {
         success: true,
-        action: "start",
+        action: "start" as const,
         message: "Desktop remoto iniciado dentro do F10 Operations.",
         desktopUrl: desktop.desktopUrl,
         desktopExpiresAt: desktop.expiresAt.toISOString(),
       };
     } catch {
-      return fail(409, {
-        success: false,
-        action: "start",
-        message: "Não foi possível iniciar o desktop remoto. Confirme autorização, dispositivo online e integração MeshCentral.",
-      });
+      return actionFailure(
+        409,
+        "start",
+        "Não foi possível iniciar o desktop remoto. Confirme autorização, dispositivo online e integração MeshCentral.",
+      );
     }
   },
 
   end: async ({ cookies, params }) => {
     if (!isUuid(params.sessionId)) {
-      return fail(404, { success: false, message: "Sessão não encontrada." });
+      return actionFailure(404, "end", "Sessão não encontrada.");
     }
     const actor = await requireVisibleSession(cookies, params.sessionId);
     try {
       await endRemoteSupportSessionAtomic(actor.user.id, params.sessionId);
       return {
         success: true,
-        action: "end",
+        action: "end" as const,
         message: "Sessão remota encerrada e compartilhamento revogado.",
+        desktopUrl: undefined,
+        desktopExpiresAt: undefined,
       };
     } catch {
-      return fail(409, {
-        success: false,
-        action: "end",
-        message: "Não foi possível revogar ou encerrar a sessão remota.",
-      });
+      return actionFailure(
+        409,
+        "end",
+        "Não foi possível revogar ou encerrar a sessão remota.",
+      );
     }
   },
 } satisfies Actions;
