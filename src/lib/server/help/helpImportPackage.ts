@@ -15,7 +15,8 @@ import { deleteAssetObject, putAssetObject } from "$lib/server/storage/assetStor
 
 const MAX_ZIP_BYTES = 40 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024;
-const MAX_ENTRIES = 1000;
+const MAX_ENTRY_BYTES = 30 * 1024 * 1024;
+const MAX_ENTRIES = 1_000;
 const MAX_CONTENTS = 250;
 const MAX_STEPS = 80;
 const MAX_BLOCKS = 80;
@@ -34,7 +35,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   txt: "text/plain",
 };
 
-const ALLOWED_FILE_EXTENSIONS = new Set(Object.keys(MIME_BY_EXTENSION));
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif"]);
 
 type ZipEntry = { name: string; bytes: Uint8Array };
 type PackageBlock =
@@ -45,13 +46,7 @@ type PackageBlock =
   | { type: "image"; url?: string; file?: string; altText: string; aiSummary: string }
   | { type: "file"; url?: string; file?: string; label: string; aiSummary: string };
 
-type PackageStep = {
-  title: string;
-  description: string;
-  aiKnowledge: string;
-  blocks: PackageBlock[];
-};
-
+type PackageStep = { title: string; description: string; aiKnowledge: string; blocks: PackageBlock[] };
 type PackageContent = {
   externalId: string;
   title: string;
@@ -61,7 +56,6 @@ type PackageContent = {
   aiGeneralKnowledge: string;
   steps: PackageStep[];
 };
-
 type PackageManifest = {
   format: "f10-help-import";
   version: 1;
@@ -82,13 +76,17 @@ export type HelpPackageValidation = {
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
 }
-
-function text(record: Record<string, unknown>, key: string): string {
+function readText(record: Record<string, unknown>, key: string): string {
   return typeof record[key] === "string" ? record[key].trim() : "";
 }
-
+function isHttpUrl(value: string): boolean {
+  try { const url = new URL(value); return url.protocol === "http:" || url.protocol === "https:"; }
+  catch { return false; }
+}
 function safeZipPath(value: string): string {
   const normalized = value.replace(/\\/g, "/").replace(/^\.\//, "");
   if (!normalized || normalized.startsWith("/") || /^[A-Za-z]:/.test(normalized)) throw new Error("ZIP_UNSAFE_PATH");
@@ -96,15 +94,14 @@ function safeZipPath(value: string): string {
   if (parts.some((part) => !part || part === "." || part === "..")) throw new Error("ZIP_UNSAFE_PATH");
   return parts.join("/");
 }
-
 function findEocd(bytes: Uint8Array): number {
-  const min = Math.max(0, bytes.length - 65_557);
-  for (let offset = bytes.length - 22; offset >= min; offset -= 1) {
-    if (new DataView(bytes.buffer, bytes.byteOffset + offset, 4).getUint32(0, true) === 0x06054b50) return offset;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const minimum = Math.max(0, bytes.length - 65_557);
+  for (let offset = bytes.length - 22; offset >= minimum; offset -= 1) {
+    if (view.getUint32(offset, true) === 0x06054b50) return offset;
   }
   return -1;
 }
-
 function extractZip(bytes: Uint8Array): Map<string, Uint8Array> {
   if (bytes.byteLength > MAX_ZIP_BYTES) throw new Error("ZIP_TOO_LARGE");
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -115,9 +112,9 @@ function extractZip(bytes: Uint8Array): Map<string, Uint8Array> {
   if (entriesCount > MAX_ENTRIES) throw new Error("ZIP_TOO_MANY_ENTRIES");
 
   const result = new Map<string, Uint8Array>();
+  const decoder = new TextDecoder();
   let cursor = centralOffset;
   let totalUncompressed = 0;
-  const decoder = new TextDecoder();
 
   for (let index = 0; index < entriesCount; index += 1) {
     if (cursor + 46 > bytes.length || view.getUint32(cursor, true) !== 0x02014b50) throw new Error("ZIP_INVALID_CENTRAL_DIRECTORY");
@@ -135,7 +132,7 @@ function extractZip(bytes: Uint8Array): Map<string, Uint8Array> {
     if (rawName.endsWith("/")) continue;
     if ((flags & 0x1) !== 0) throw new Error("ZIP_ENCRYPTED_NOT_ALLOWED");
     if (method !== 0 && method !== 8) throw new Error("ZIP_COMPRESSION_NOT_SUPPORTED");
-    if (uncompressedSize > 30 * 1024 * 1024) throw new Error("ZIP_ENTRY_TOO_LARGE");
+    if (uncompressedSize > MAX_ENTRY_BYTES) throw new Error("ZIP_ENTRY_TOO_LARGE");
     totalUncompressed += uncompressedSize;
     if (totalUncompressed > MAX_UNCOMPRESSED_BYTES) throw new Error("ZIP_UNCOMPRESSED_TOO_LARGE");
     if (compressedSize > 0 && uncompressedSize / compressedSize > 200) throw new Error("ZIP_COMPRESSION_RATIO_TOO_HIGH");
@@ -155,60 +152,60 @@ function extractZip(bytes: Uint8Array): Map<string, Uint8Array> {
   return result;
 }
 
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function parseBlock(value: unknown, path: string, entries: Map<string, Uint8Array>, issues: string[]): PackageBlock | null {
+function parseBlock(
+  value: unknown,
+  path: string,
+  entries: Map<string, Uint8Array>,
+  issues: string[],
+): PackageBlock | null {
   const record = asRecord(value);
   if (!record) { issues.push(`${path}: bloco inválido.`); return null; }
-  const type = text(record, "type");
+  const type = readText(record, "type");
+
   if (type === "text") {
-    const valueText = text(record, "text");
-    if (!valueText || valueText.length > 30_000) issues.push(`${path}: texto inválido.`);
-    return valueText ? { type, text: valueText } : null;
+    const text = readText(record, "text");
+    if (!text || text.length > 30_000) { issues.push(`${path}: texto inválido.`); return null; }
+    return { type, text };
   }
   if (type === "notice") {
-    const valueText = text(record, "text");
-    const variant = text(record, "variant") || "info";
-    if (!valueText || !["info", "warning", "success", "danger"].includes(variant)) issues.push(`${path}: aviso inválido.`);
-    return valueText ? { type, text: valueText, variant } : null;
+    const text = readText(record, "text");
+    const variant = readText(record, "variant") || "info";
+    if (!text || !["info", "warning", "success", "danger"].includes(variant)) { issues.push(`${path}: aviso inválido.`); return null; }
+    return { type, text, variant };
   }
   if (type === "link") {
-    const url = text(record, "url"); const label = text(record, "label");
-    if (!isHttpUrl(url) || !label) issues.push(`${path}: link inválido.`);
-    return isHttpUrl(url) && label ? { type, url, label } : null;
+    const url = readText(record, "url"); const label = readText(record, "label");
+    if (!isHttpUrl(url) || !label || label.length > 240) { issues.push(`${path}: link inválido.`); return null; }
+    return { type, url, label };
   }
   if (type === "video") {
-    const url = text(record, "url");
-    if (!isHttpUrl(url)) issues.push(`${path}: vídeo precisa de URL http/https.`);
-    return isHttpUrl(url) ? { type, url, altText: text(record, "altText"), transcript: text(record, "transcript"), aiSummary: text(record, "aiSummary") } : null;
+    const url = readText(record, "url");
+    if (!isHttpUrl(url)) { issues.push(`${path}: vídeo precisa de URL http/https.`); return null; }
+    const transcript = readText(record, "transcript"); const aiSummary = readText(record, "aiSummary");
+    if (transcript.length > 100_000 || aiSummary.length > 20_000) { issues.push(`${path}: conhecimento do vídeo excede o limite.`); return null; }
+    return { type, url, altText: readText(record, "altText").slice(0, 500), transcript, aiSummary };
   }
   if (type === "image" || type === "file") {
-    const url = text(record, "url");
-    const file = text(record, "file");
+    const url = readText(record, "url");
+    let file = readText(record, "file");
     if (Boolean(url) === Boolean(file)) { issues.push(`${path}: informe exatamente um de url ou file.`); return null; }
     if (url && !isHttpUrl(url)) { issues.push(`${path}: URL inválida.`); return null; }
     if (file) {
-      let safe = "";
-      try { safe = safeZipPath(file); } catch { issues.push(`${path}: caminho de arquivo inválido.`); return null; }
-      if (!entries.has(safe)) { issues.push(`${path}: arquivo ${safe} não existe no ZIP.`); return null; }
-      const ext = safe.split(".").pop()?.toLowerCase() ?? "";
-      if (!ALLOWED_FILE_EXTENSIONS.has(ext)) { issues.push(`${path}: extensão .${ext} não permitida.`); return null; }
-      if (type === "image" && !["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) { issues.push(`${path}: arquivo de imagem inválido.`); return null; }
-      if (type === "file" && ["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) { issues.push(`${path}: use type=image para imagens.`); return null; }
-      file = safe;
+      try { file = safeZipPath(file); } catch { issues.push(`${path}: caminho de arquivo inválido.`); return null; }
+      if (!entries.has(file)) { issues.push(`${path}: arquivo ${file} não existe no ZIP.`); return null; }
+      const extension = file.split(".").pop()?.toLowerCase() ?? "";
+      if (!MIME_BY_EXTENSION[extension]) { issues.push(`${path}: extensão .${extension} não permitida.`); return null; }
+      if (type === "image" && !IMAGE_EXTENSIONS.has(extension)) { issues.push(`${path}: use uma imagem válida.`); return null; }
+      if (type === "file" && IMAGE_EXTENSIONS.has(extension)) { issues.push(`${path}: use type=image para imagens.`); return null; }
     }
-    if (type === "image") return { type, url: url || undefined, file: file || undefined, altText: text(record, "altText"), aiSummary: text(record, "aiSummary") };
-    const label = text(record, "label");
-    if (!label) issues.push(`${path}: label do arquivo é obrigatório.`);
-    return label ? { type, url: url || undefined, file: file || undefined, label, aiSummary: text(record, "aiSummary") } : null;
+    const aiSummary = readText(record, "aiSummary");
+    if (aiSummary.length > 20_000) { issues.push(`${path}: aiSummary excede o limite.`); return null; }
+    if (type === "image") return { type, url: url || undefined, file: file || undefined, altText: readText(record, "altText").slice(0, 500), aiSummary };
+    const label = readText(record, "label");
+    if (!label || label.length > 240) { issues.push(`${path}: label do arquivo é obrigatório.`); return null; }
+    return { type, url: url || undefined, file: file || undefined, label, aiSummary };
   }
+
   issues.push(`${path}: tipo ${type || "vazio"} não suportado.`);
   return null;
 }
@@ -216,60 +213,72 @@ function parseBlock(value: unknown, path: string, entries: Map<string, Uint8Arra
 export function validateHelpImportPackage(zipBytes: Uint8Array): HelpPackageValidation {
   const issues: string[] = [];
   let entries = new Map<string, Uint8Array>();
-  try { entries = extractZip(zipBytes); } catch (cause) {
+  try { entries = extractZip(zipBytes); }
+  catch (cause) {
     return { valid: false, source: "", contentCount: 0, stepCount: 0, blockCount: 0, assetCount: 0, issues: [cause instanceof Error ? cause.message : "ZIP_INVALID"], manifest: null, entries };
   }
+
   const manifestBytes = entries.get("manifest.json");
   if (!manifestBytes) return { valid: false, source: "", contentCount: 0, stepCount: 0, blockCount: 0, assetCount: 0, issues: ["manifest.json não encontrado na raiz do ZIP."], manifest: null, entries };
 
   let root: Record<string, unknown> | null = null;
-  try { root = asRecord(JSON.parse(new TextDecoder().decode(manifestBytes))); } catch { issues.push("manifest.json contém JSON inválido."); }
+  try { root = asRecord(JSON.parse(new TextDecoder().decode(manifestBytes))); }
+  catch { issues.push("manifest.json contém JSON inválido."); }
   if (!root) return { valid: false, source: "", contentCount: 0, stepCount: 0, blockCount: 0, assetCount: 0, issues, manifest: null, entries };
-  const source = text(root, "source");
-  if (text(root, "format") !== "f10-help-import") issues.push('format deve ser "f10-help-import".');
+
+  const source = readText(root, "source");
+  if (readText(root, "format") !== "f10-help-import") issues.push('format deve ser "f10-help-import".');
   if (root.version !== 1) issues.push("version deve ser 1.");
   if (!source || source.length > 80) issues.push("source inválido.");
   const rawContents = root.contents;
   if (!Array.isArray(rawContents) || rawContents.length < 1 || rawContents.length > MAX_CONTENTS) issues.push("contents inválido.");
 
   const contents: PackageContent[] = [];
+  const externalIds = new Set<string>(); const slugs = new Set<string>();
   let stepCount = 0; let blockCount = 0; let assetCount = 0;
-  const ids = new Set<string>(); const slugs = new Set<string>();
+
   for (const [contentIndex, rawContent] of (Array.isArray(rawContents) ? rawContents : []).entries()) {
     const record = asRecord(rawContent); const path = `contents[${contentIndex}]`;
     if (!record) { issues.push(`${path}: conteúdo inválido.`); continue; }
-    const externalId = text(record, "externalId"); const title = text(record, "title");
-    const slug = normalizeHelpSlug(text(record, "slug") || title);
-    if (!externalId || externalId.length > 240 || ids.has(externalId)) issues.push(`${path}: externalId ausente/duplicado.`);
+    const externalId = readText(record, "externalId"); const title = readText(record, "title"); const slug = normalizeHelpSlug(readText(record, "slug") || title);
+    if (!externalId || externalId.length > 240 || externalIds.has(externalId)) issues.push(`${path}: externalId ausente/duplicado.`);
     if (title.length < 4 || title.length > 160) issues.push(`${path}: título inválido.`);
     if (!slug || slugs.has(slug)) issues.push(`${path}: slug inválido/duplicado.`);
-    ids.add(externalId); slugs.add(slug);
+    externalIds.add(externalId); slugs.add(slug);
+    const summary = readText(record, "summary"); const category = readText(record, "category"); const aiGeneralKnowledge = readText(record, "aiGeneralKnowledge");
+    if (summary.length > 320 || category.length > 120 || aiGeneralKnowledge.length > 40_000) issues.push(`${path}: resumo, categoria ou conhecimento geral excede o limite.`);
+
     const rawSteps = record.steps;
     if (!Array.isArray(rawSteps) || rawSteps.length < 1 || rawSteps.length > MAX_STEPS) { issues.push(`${path}: steps inválido.`); continue; }
     const steps: PackageStep[] = [];
     for (const [stepIndex, rawStep] of rawSteps.entries()) {
       const stepRecord = asRecord(rawStep); const stepPath = `${path}.steps[${stepIndex}]`;
       if (!stepRecord) { issues.push(`${stepPath}: passo inválido.`); continue; }
-      const stepTitle = text(stepRecord, "title"); const rawBlocks = stepRecord.blocks;
-      if (!stepTitle || stepTitle.length > 180) issues.push(`${stepPath}: título inválido.`);
+      const stepTitle = readText(stepRecord, "title"); const description = readText(stepRecord, "description"); const aiKnowledge = readText(stepRecord, "aiKnowledge");
+      if (!stepTitle || stepTitle.length > 180 || description.length > 10_000 || aiKnowledge.length > 30_000) issues.push(`${stepPath}: dados do passo inválidos.`);
+      const rawBlocks = stepRecord.blocks;
       if (!Array.isArray(rawBlocks) || rawBlocks.length < 1 || rawBlocks.length > MAX_BLOCKS) { issues.push(`${stepPath}: blocks inválido.`); continue; }
       const blocks = rawBlocks.map((block, blockIndex) => parseBlock(block, `${stepPath}.blocks[${blockIndex}]`, entries, issues)).filter((block): block is PackageBlock => Boolean(block));
-      blockCount += blocks.length; assetCount += blocks.filter((block) => block.type === "image" || block.type === "file" || block.type === "video").length;
-      steps.push({ title: stepTitle, description: text(stepRecord, "description"), aiKnowledge: text(stepRecord, "aiKnowledge"), blocks });
+      blockCount += blocks.length;
+      assetCount += blocks.filter((block) => block.type === "image" || block.type === "file" || block.type === "video").length;
+      steps.push({ title: stepTitle, description, aiKnowledge, blocks });
     }
     stepCount += steps.length;
-    contents.push({ externalId, title, slug, summary: text(record, "summary"), category: text(record, "category"), aiGeneralKnowledge: text(record, "aiGeneralKnowledge"), steps });
+    contents.push({ externalId, title, slug, summary, category, aiGeneralKnowledge, steps });
   }
-  const manifest = issues.length === 0 ? { format: "f10-help-import" as const, version: 1 as const, source, contents } : null;
+
+  const manifest: PackageManifest | null = issues.length === 0
+    ? { format: "f10-help-import", version: 1, source, contents }
+    : null;
   return { valid: Boolean(manifest), source, contentCount: contents.length, stepCount, blockCount, assetCount, issues: issues.slice(0, 100), manifest, entries };
 }
 
 function digest(bytes: Uint8Array): string { return createHash("sha256").update(bytes).digest("hex"); }
 function fileInfo(path: string) {
-  const ext = path.split(".").pop()?.toLowerCase() ?? "";
-  const mimeType = MIME_BY_EXTENSION[ext];
+  const rawExtension = path.split(".").pop()?.toLowerCase() ?? "";
+  const mimeType = MIME_BY_EXTENSION[rawExtension];
   if (!mimeType) throw new Error("IMPORT_ASSET_EXTENSION_NOT_ALLOWED");
-  return { ext: ext === "jpeg" ? "jpg" : ext, mimeType, assetType: mimeType.startsWith("image/") ? "image" as const : "file" as const };
+  return { extension: rawExtension === "jpeg" ? "jpg" : rawExtension, mimeType, assetType: mimeType.startsWith("image/") ? "image" as const : "file" as const };
 }
 
 export async function importStructuredHelpPackage(actorUserId: string, validation: HelpPackageValidation) {
@@ -284,16 +293,17 @@ export async function importStructuredHelpPackage(actorUserId: string, validatio
   if (existingIds.length) throw new Error(`IMPORT_EXTERNAL_ID_CONFLICT:${existingIds.map((row) => row.id).filter(Boolean).join(",")}`);
 
   const localPaths = Array.from(new Set(manifest.contents.flatMap((content) => content.steps.flatMap((step) => step.blocks.flatMap((block) => "file" in block && block.file ? [block.file] : [])))));
-  const prepared = new Map<string, { storageKey: string; checksum: string; size: number; mimeType: string; assetType: "image" | "file"; originalName: string; newlyUploaded: boolean }>();
+  const prepared = new Map<string, { storageKey: string; checksum: string; size: number; mimeType: string; assetType: "image" | "file"; originalName: string }>();
   const uploadedKeys: string[] = [];
+
   try {
     for (const path of localPaths) {
       const bytes = validation.entries.get(path); if (!bytes) throw new Error(`IMPORT_ASSET_MISSING:${path}`);
-      const info = fileInfo(path); const checksum = digest(bytes); const storageKey = `help-assets/${checksum.slice(0, 2)}/${checksum.slice(2, 4)}/${checksum}.${info.ext}`;
+      const info = fileInfo(path); const checksum = digest(bytes);
+      const storageKey = `help-assets/${checksum.slice(0, 2)}/${checksum.slice(2, 4)}/${checksum}.${info.extension}`;
       const [existing] = await db.select({ storageKey: helpAssets.storageKey }).from(helpAssets).where(eq(helpAssets.checksumSha256, checksum)).limit(1);
-      let newlyUploaded = false;
-      if (!existing?.storageKey) { await putAssetObject(storageKey, bytes, info.mimeType); uploadedKeys.push(storageKey); newlyUploaded = true; }
-      prepared.set(path, { storageKey: existing?.storageKey ?? storageKey, checksum, size: bytes.byteLength, mimeType: info.mimeType, assetType: info.assetType, originalName: path.split("/").pop() ?? path, newlyUploaded });
+      if (!existing?.storageKey) { await putAssetObject(storageKey, bytes, info.mimeType); uploadedKeys.push(storageKey); }
+      prepared.set(path, { storageKey: existing?.storageKey ?? storageKey, checksum, size: bytes.byteLength, mimeType: info.mimeType, assetType: info.assetType, originalName: path.split("/").pop() ?? path });
     }
 
     const imported = await db.transaction(async (tx) => {
@@ -301,9 +311,11 @@ export async function importStructuredHelpPackage(actorUserId: string, validatio
       for (const content of manifest.contents) {
         const [createdContent] = await tx.insert(helpContents).values({ slug: content.slug, title: content.title, summary: content.summary, category: content.category, aiGeneralKnowledge: content.aiGeneralKnowledge, status: "draft", importSource: manifest.source, importExternalId: content.externalId, createdBy: actorUserId, updatedBy: actorUserId }).returning({ id: helpContents.id });
         if (!createdContent) throw new Error("IMPORT_CONTENT_NOT_CREATED");
+
         for (const [stepIndex, step] of content.steps.entries()) {
           const [createdStep] = await tx.insert(helpContentSteps).values({ contentId: createdContent.id, title: step.title, description: step.description, aiKnowledge: step.aiKnowledge, sortOrder: (stepIndex + 1) * 10 }).returning({ id: helpContentSteps.id });
           if (!createdStep) throw new Error("IMPORT_STEP_NOT_CREATED");
+
           for (const [blockIndex, block] of step.blocks.entries()) {
             let assetId: string | null = null;
             if (block.type === "image" || block.type === "file" || block.type === "video") {
@@ -318,14 +330,33 @@ export async function importStructuredHelpPackage(actorUserId: string, validatio
               }
               if (!assetId) throw new Error("IMPORT_ASSET_NOT_CREATED");
             }
-            await tx.insert(helpStepBlocks).values({ stepId: createdStep.id, blockType: block.type, textContent: block.type === "text" || block.type === "notice" ? block.text : "", assetId, linkUrl: block.type === "link" ? block.url : null, linkLabel: block.type === "link" ? block.label : block.type === "file" ? block.label : null, noticeVariant: block.type === "notice" ? block.variant : null, metadata: { importedFrom: manifest.source }, sortOrder: (blockIndex + 1) * 10 });
+
+            await tx.insert(helpStepBlocks).values({
+              stepId: createdStep.id,
+              blockType: block.type,
+              textContent: block.type === "text" || block.type === "notice" ? block.text : "",
+              assetId,
+              linkUrl: block.type === "link" ? block.url : null,
+              linkLabel: block.type === "link" ? block.label : block.type === "file" ? block.label : null,
+              noticeVariant: block.type === "notice" ? block.variant : null,
+              metadata: { importedFrom: manifest.source },
+              sortOrder: (blockIndex + 1) * 10,
+            });
           }
         }
-        await tx.insert(helpContentVersions).values({ entityType: "content", entityId: createdContent.id, version: 1, snapshot: { import: { source: manifest.source, externalId: content.externalId }, title: content.title, slug: content.slug, summary: content.summary, category: content.category, aiGeneralKnowledge: content.aiGeneralKnowledge, status: "draft", steps: content.steps }, createdBy: actorUserId });
+
+        await tx.insert(helpContentVersions).values({
+          entityType: "content",
+          entityId: createdContent.id,
+          version: 1,
+          snapshot: { import: { source: manifest.source, externalId: content.externalId }, title: content.title, slug: content.slug, summary: content.summary, category: content.category, aiGeneralKnowledge: content.aiGeneralKnowledge, status: "draft", steps: content.steps },
+          createdBy: actorUserId,
+        });
         result.push({ id: createdContent.id, title: content.title, externalId: content.externalId });
       }
       return result;
     });
+
     await recordAuditEvent({ actorUserId, action: "help.content.package.imported", entityType: "help_content_import", metadata: { source: manifest.source, contentCount: imported.length, assetCount: validation.assetCount } });
     return { imported, source: manifest.source, contentCount: imported.length, stepCount: validation.stepCount, blockCount: validation.blockCount, assetCount: validation.assetCount };
   } catch (cause) {
