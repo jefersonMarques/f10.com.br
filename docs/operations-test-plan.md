@@ -2,7 +2,7 @@
 
 ## Objective
 
-Validate the Operations foundation and the new structured Knowledge Base before any public cutover of Help Center or native chat.
+Validate the Operations foundation, structured Knowledge Base, search intelligence and grounded support AI agent before any public cutover of Help Center or native chat.
 
 This plan intentionally keeps the current public Help Center and Movidesk flow unchanged during the validation cycle.
 
@@ -27,10 +27,10 @@ npm run admin:bootstrap
 Validate database readiness:
 
 ```bash
-DATABASE_URL="postgres://..." npm run operations:doctor
+npm run operations:doctor
 ```
 
-Expected result: every line must report `[OK]`, including migrations, critical tables and `pg_trgm`, and the process must exit with status `0`.
+Expected result: migrations, critical tables and `pg_trgm` must report `[OK]`. When `OPENAI_API_KEY` is configured, the doctor reports the selected model. To make the key mandatory in a specific environment, set `OPERATIONS_DOCTOR_REQUIRE_OPENAI=true`.
 
 ## 2. Application quality gates
 
@@ -48,9 +48,6 @@ Type errors are blockers. Existing non-blocking CSS warnings from unrelated publ
 After the application is running in homologation:
 
 ```bash
-OPERATIONS_BASE_URL="https://homolog.example.com" \
-OPERATIONS_SMOKE_EMAIL="admin@f10.com.br" \
-OPERATIONS_SMOKE_PASSWORD="..." \
 npm run operations:smoke
 ```
 
@@ -68,8 +65,11 @@ The smoke test validates:
 - `/app/tasks` loads;
 - `/app/tickets` loads;
 - `/app/chat` loads;
+- `/app/chat/lab` loads;
 - discovered detail pages load;
 - logout revokes the temporary session.
+
+The smoke test must not submit a laboratory question or call OpenAI.
 
 ## 4. Authentication and authorization
 
@@ -95,6 +95,8 @@ The smoke test validates:
 - Confirm the corresponding module/action is blocked server-side.
 - Remove the override and confirm inherited access returns.
 - Confirm an Admin cannot grant a permission or scope greater than their own.
+- Confirm a user without `chat.respond` cannot execute the AI lab.
+- Confirm users without global `chat.view` do not receive the global AI run history.
 
 ## 5. Structured Knowledge Base
 
@@ -133,7 +135,7 @@ Use `/app/help/search`.
 - Confirm drafts do not enter search until publication.
 - Publish an edited content item and confirm the search document updates automatically.
 - Confirm internal search can use AI-only knowledge.
-- Confirm future public search code paths must exclude AI-only knowledge.
+- Confirm future public search code paths exclude AI-only knowledge.
 
 Use `/app/help/insights`.
 
@@ -141,8 +143,60 @@ Use `/app/help/insights`.
 - Confirm no-result queries appear under knowledge gaps.
 - Confirm repeated equivalent normalized queries aggregate.
 - Confirm selected content counts update after opening search results.
+- Confirm successful AI answers increase the `respondidas pela IA` counter.
+- Confirm unsupported/failed AI attempts increase the human escalation counter.
 
-## 7. Team management
+## 7. Grounded support AI lab
+
+Configure a real test key in `.env`:
+
+```bash
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-5-mini
+OPENAI_TIMEOUT_MS=25000
+```
+
+Use `/app/chat/lab`.
+
+### Supported question
+
+- Publish a content item containing a distinctive procedure.
+- Ask a question that clearly matches that procedure.
+- Confirm the answer is marked `Respondido pela IA`.
+- Confirm at least one source is shown.
+- Confirm every shown source links to the corresponding content editor.
+- Confirm a `support_ai_runs` row is created with `resolution=answered`.
+- Confirm the linked `help_search_events` row has `ai_answered=true` and `escalated=false`.
+- Confirm model, provider response ID, input/output tokens and latency are recorded when returned by the provider.
+
+### Unsupported question
+
+- Ask something unrelated to every published content item.
+- Confirm OpenAI is not needed when zero sources are retrieved.
+- Confirm the result is escalated instead of inventing a procedure.
+- Confirm `support_ai_runs.resolution=escalate` and `help_search_events.escalated=true`.
+
+### Weak or ambiguous grounding
+
+- Ask a question for which the retrieved documents are incomplete or conflicting.
+- Confirm the agent can return `resolved=false`.
+- Confirm a model response without a valid cited source index is forced to escalation by the application.
+
+### Provider failure
+
+- Temporarily remove or invalidate `OPENAI_API_KEY` in a non-production test environment.
+- Ask a question that does retrieve sources.
+- Confirm the user receives a human-escalation response rather than an unhandled error.
+- Confirm the run records `resolution=failed` and a technical failure code.
+
+### Draft isolation
+
+- Edit a published procedure without republishing it.
+- Ask the agent about the changed detail.
+- Confirm the agent still receives only the previous published snapshot.
+- Republish and confirm the new detail becomes available.
+
+## 8. Team management
 
 - Invite an employee.
 - Reissue an expired/cancelled invitation if applicable.
@@ -153,7 +207,7 @@ Use `/app/help/insights`.
 - Reactivate an account that had previously completed activation.
 - Confirm an account that never completed activation cannot bypass the activation flow.
 
-## 8. Tasks
+## 9. Tasks
 
 - Create a project.
 - Add project members.
@@ -167,7 +221,7 @@ Use `/app/help/insights`.
 - Confirm activity history records the relevant changes.
 - Test `own`, `team` and `all` scopes with different users.
 
-## 9. Tickets
+## 10. Tickets
 
 - Create or load a test ticket.
 - Change priority.
@@ -179,17 +233,16 @@ Use `/app/help/insights`.
 - Convert a ticket into a linked task and confirm the relation is persisted when that bridge is enabled.
 - Test ticket visibility using `own`, `team` and `all` scopes.
 
-## 10. Native chat
+## 11. Native chat
 
 Keep Movidesk as the production widget during this validation.
 
 - Confirm existing internal chat routes remain functional.
 - Do not expose the native widget publicly yet.
-- The next chat milestone must introduce the AI support agent and `/app/chat/lab` before public cutover.
-- The agent must retrieve only published Knowledge Base snapshots.
-- When the agent cannot support an answer from the base, it must not invent an F10 procedure and must be able to escalate with conversation/retrieval context.
+- Validate the AI agent only through `/app/chat/lab` in this cycle.
+- The next public-chat milestone must connect the same grounded agent pipeline to a real web-chat session and create/link a ticket when human handoff is required.
 
-## 11. Security regression checks
+## 12. Security regression checks
 
 - Confirm `/app/*` pages include noindex directives.
 - Confirm public site analytics do not run inside `/app` or `/login`.
@@ -197,10 +250,13 @@ Keep Movidesk as the production widget during this validation.
 - Confirm disabled users cannot keep using an old session.
 - Confirm Knowledge Base drafts do not replace the last published snapshot.
 - Confirm AI-only knowledge is not present in the `public` portion of publication snapshots.
+- Confirm `OPENAI_API_KEY` never appears in HTML or client-side JavaScript.
+- Confirm AI runs request provider-side storage disabled by the application adapter.
+- Confirm a source containing prompt-like text cannot override the agent's grounding rules.
 - Confirm public chat payload limits reject oversized requests.
 - Confirm internal POST endpoints reject invalid origins where origin validation is required.
 
-## 12. Go / no-go criteria
+## 13. Go / no-go criteria
 
 The current homologation cycle is approved only when:
 
@@ -212,8 +268,11 @@ The current homologation cycle is approved only when:
 - employee activation and permission boundaries work;
 - structured content draft/publish isolation works;
 - search telemetry records successful and no-result searches;
+- AI lab answers grounded questions with sources;
+- AI lab escalates unsupported questions without inventing procedures;
+- AI provider failures fail closed to escalation;
 - task scope restrictions work;
 - ticket scope restrictions work;
 - no public Help Center or Movidesk cutover has occurred unintentionally.
 
-Any failure involving authentication, authorization, publication isolation, private AI knowledge exposure or data visibility is a release blocker.
+Any failure involving authentication, authorization, publication isolation, grounding, private AI knowledge exposure, secret exposure or data visibility is a release blocker.
