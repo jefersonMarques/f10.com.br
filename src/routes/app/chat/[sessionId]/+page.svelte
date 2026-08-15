@@ -112,10 +112,12 @@
           </form>
         {:else if onlineRemoteDevices.length > 0 && data.canRequestRemote}
           <a href={`/app/tickets/${chat.ticketId}/remote`} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><MonitorCog size={14}/>Escolher computador</a>
-        {:else if onlineRemoteDevices.length === 0 && data.canRequestRemote}
+        {:else if data.remoteDevices.length === 0 && data.canRequestRemote}
           <form method="POST" action="?/enrollRemote">
             <button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><Download size={14}/>Instalar suporte remoto</button>
           </form>
+        {:else if data.remoteDevices.length > 0 && data.canRequestRemote}
+          <a href={`/app/tickets/${chat.ticketId}/remote`} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#E4E6EC] bg-[#F7F8FA] px-3 text-[10px] font-semibold text-[#777D8D]"><MonitorCog size={14}/>Computador offline</a>
         {/if}
       {:else if data.canRequestRemote}
         <a href={`/app/tickets/${chat.ticketId}/remote`} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#777D8D]"><MonitorCog size={14}/>Acesso remoto</a>
