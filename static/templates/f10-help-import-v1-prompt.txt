@@ -1,0 +1,45 @@
+Converta os materiais fornecidos para o formato F10 Help Import v1.
+
+Use como referência estrutural o arquivo f10-help-import-v1.example.json.
+
+REGRAS OBRIGATÓRIAS
+
+1. Retorne somente JSON válido, sem markdown e sem explicações fora do JSON.
+2. Use exatamente:
+   "format": "f10-help-import"
+   "version": 1
+   "source": "movidesk"
+3. Cada artigo, tutorial ou material original deve virar um item de "contents".
+4. Preserve um identificador estável do material original em "externalId". Se houver ID do Movidesk, use-o. Não invente IDs diferentes para o mesmo material em execuções futuras.
+5. Organize cada procedimento em passos independentes e em ordem cronológica.
+6. Não crie um único passo gigante quando houver ações claramente separáveis.
+7. Em "description" e blocos "text", escreva somente informação adequada para o usuário final.
+8. Em "aiGeneralKnowledge" e "aiKnowledge", coloque contexto útil ao agente de suporte que não precisa ser exibido ao usuário, como pré-requisitos, permissões, exceções, erros comuns, nomenclaturas antigas, condições especiais e formas de diagnóstico.
+9. Para vídeos, preencha "transcript" com a transcrição fornecida e "aiSummary" com um resumo operacional preciso do que o vídeo ensina.
+10. Se o conteúdo importante existir apenas no vídeo, garanta que transcript e/ou aiSummary contenham informação suficiente para o agente responder sem precisar assistir ao vídeo.
+11. Não invente informação ausente no material original. Quando algo não estiver disponível, deixe o campo opcional ausente ou vazio.
+12. Para imagens, descreva em "altText" o que o usuário precisa identificar visualmente e, quando útil, use "aiSummary" para explicar o que a imagem demonstra ao agente.
+13. Use blocos somente dos tipos: text, image, video, notice e link.
+14. Para notice, variant só pode ser: info, warning, success ou danger.
+15. Mantenha URLs originais válidas para imagens, vídeos e links.
+16. Gere títulos e slugs claros, mas não altere o significado do conteúdo original.
+17. Evite repetição entre aiGeneralKnowledge e aiKnowledge. O primeiro é geral ao conteúdo; o segundo deve ser específico daquele passo.
+18. Não misture conhecimento inferido com fatos do material. Se uma conclusão for incerta, não a inclua como instrução.
+19. Não marque nenhum conteúdo como publicado; o sistema F10 sempre importará como rascunho.
+20. Antes de responder, valide mentalmente que:
+    - todos os contents possuem externalId, title e ao menos um step;
+    - todos os steps possuem title e ao menos um block;
+    - URLs usam http ou https;
+    - não há externalId duplicado;
+    - não há slug duplicado;
+    - o resultado final é JSON parseável.
+
+OBJETIVO
+
+O arquivo será usado simultaneamente para:
+- montar a Central de Ajuda visual em passos;
+- indexar a pesquisa de suporte;
+- alimentar um agente de suporte com IA;
+- identificar lacunas de conhecimento e melhorar a documentação.
+
+Por isso preserve a fidelidade ao material original e separe corretamente conteúdo público de conhecimento interno destinado à IA.
