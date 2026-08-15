@@ -13,7 +13,6 @@ import { webChatSessions } from "$lib/server/db/chatSchema";
 import {
   customerContacts,
   customerOrganizations,
-  supportQueues,
   ticketEvents,
   ticketMessages,
   tickets,
@@ -64,6 +63,8 @@ export async function listInternalChats(
       ticketNumber: tickets.ticketNumber,
       subject: tickets.subject,
       status: tickets.status,
+      aiState: webChatSessions.aiState,
+      aiHandoffReason: webChatSessions.aiHandoffReason,
       assignedUserName: users.name,
       customerName: customerContacts.name,
       organizationName: customerOrganizations.name,
@@ -98,6 +99,9 @@ export async function getInternalChat(
       ticketNumber: tickets.ticketNumber,
       subject: tickets.subject,
       status: tickets.status,
+      aiState: webChatSessions.aiState,
+      aiHandoffReason: webChatSessions.aiHandoffReason,
+      aiHandoffAt: webChatSessions.aiHandoffAt,
       assignedUserId: tickets.assignedUserId,
       assignedUserName: users.name,
       customerName: customerContacts.name,
@@ -179,6 +183,16 @@ export async function respondToInternalChat(
 
   const now = new Date();
   await db.transaction(async (tx) => {
+    await tx
+      .update(webChatSessions)
+      .set({
+        aiState: "human",
+        aiHandoffReason: "Conversa assumida por um atendente humano.",
+        aiHandoffAt: now,
+        aiProcessingAt: null,
+      })
+      .where(eq(webChatSessions.id, sessionId));
+
     await tx.insert(ticketMessages).values({
       ticketId: chat.ticketId,
       authorType: "user",
@@ -202,7 +216,7 @@ export async function respondToInternalChat(
       ticketId: chat.ticketId,
       actorUserId,
       eventType: "chat.agent.message",
-      metadata: {},
+      metadata: { aiState: "human" },
     });
   });
 }
