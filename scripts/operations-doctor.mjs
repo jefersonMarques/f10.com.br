@@ -170,6 +170,16 @@ try {
     );
     hasFailure ||= !trigramOk;
 
+    const rateLimitSecretOk = supportRateLimitSecret.length >= 32;
+    printResult(
+      "native chat rate limit",
+      rateLimitSecretOk,
+      rateLimitSecretOk
+        ? "configured"
+        : "SUPPORT_RATE_LIMIT_SECRET must have at least 32 characters",
+    );
+    hasFailure ||= !rateLimitSecretOk;
+
     const openAiOk = openAiConfigured || !requireOpenAi;
     printResult(
       "OpenAI support agent",
@@ -182,16 +192,14 @@ try {
     );
     hasFailure ||= !openAiOk;
 
-    const chatAiOk =
-      !chatAiEnabled ||
-      (openAiConfigured && supportRateLimitSecret.length >= 32);
+    const chatAiOk = !chatAiEnabled || openAiConfigured;
     printResult(
       "native chat AI",
       chatAiOk,
       chatAiEnabled
         ? chatAiOk
           ? `enabled; model=${openAiModel}`
-          : "SUPPORT_AI_CHAT_ENABLED requires OPENAI_API_KEY and SUPPORT_RATE_LIMIT_SECRET with at least 32 characters"
+          : "SUPPORT_AI_CHAT_ENABLED requires OPENAI_API_KEY"
         : "disabled by feature flag",
     );
     hasFailure ||= !chatAiOk;
