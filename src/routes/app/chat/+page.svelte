@@ -42,10 +42,16 @@
       </p>
     </div>
 
-    <a href="/app/chat/lab" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white transition hover:bg-[#111B71]">
-      <Sparkles size={16} aria-hidden="true" />
-      Testar agente IA
-    </a>
+    <div class="flex flex-wrap gap-2">
+      <a href="/app/chat/preview" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-5 text-[11px] font-semibold text-[#000A57] transition hover:bg-[#F8F9FF]">
+        <MessageCircleMore size={16} aria-hidden="true" />
+        Preview do cliente
+      </a>
+      <a href="/app/chat/lab" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white transition hover:bg-[#111B71]">
+        <Sparkles size={16} aria-hidden="true" />
+        Testar agente IA
+      </a>
+    </div>
   </div>
 
   <section class="mt-7 rounded-[22px] border border-[#DDE1F0] bg-[#F8F9FF] px-5 py-4 sm:px-6">
