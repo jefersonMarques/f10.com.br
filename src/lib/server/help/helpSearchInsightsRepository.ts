@@ -15,6 +15,7 @@ export async function getHelpSearchInsights() {
           searches: sql<number>`count(*)::integer`,
           withoutResults: sql<number>`count(*) filter (where ${helpSearchEvents.resultCount} = 0)::integer`,
           selections: sql<number>`count(*) filter (where ${helpSearchEvents.selectedContentId} is not null)::integer`,
+          aiAnswers: sql<number>`count(*) filter (where ${helpSearchEvents.aiAnswered} = true)::integer`,
           escalations: sql<number>`count(*) filter (where ${helpSearchEvents.escalated} = true)::integer`,
         })
         .from(helpSearchEvents),
@@ -59,6 +60,7 @@ export async function getHelpSearchInsights() {
     searches: 0,
     withoutResults: 0,
     selections: 0,
+    aiAnswers: 0,
     escalations: 0,
   };
 
@@ -67,6 +69,7 @@ export async function getHelpSearchInsights() {
       searches: Number(summary.searches ?? 0),
       withoutResults: Number(summary.withoutResults ?? 0),
       selections: Number(summary.selections ?? 0),
+      aiAnswers: Number(summary.aiAnswers ?? 0),
       escalations: Number(summary.escalations ?? 0),
     },
     topQueries: topQueries.map((row) => ({
