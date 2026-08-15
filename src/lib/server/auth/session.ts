@@ -1,7 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { dev } from "$app/environment";
 import { and, eq, gt, isNull } from "drizzle-orm";
-import type { CookieSerializeOptions } from "cookie";
 import { getDatabase } from "$lib/server/db";
 import { roles, sessions, userRoles, users } from "$lib/server/db/schema";
 
@@ -12,11 +11,11 @@ function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export function getSessionCookieOptions(): CookieSerializeOptions & { path: string } {
+export function getSessionCookieOptions() {
   return {
     path: "/",
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "lax" as const,
     secure: !dev,
     maxAge: SESSION_TTL_SECONDS,
   };
