@@ -2,9 +2,9 @@
 
 ## Objective
 
-Validate the Operations foundation before any public cutover of Help Center or native chat.
+Validate the Operations foundation and the new structured Knowledge Base before any public cutover of Help Center or native chat.
 
-This plan intentionally keeps the current public Help Center and Movidesk flow unchanged during the first validation cycle.
+This plan intentionally keeps the current public Help Center and Movidesk flow unchanged during the validation cycle.
 
 ## 1. Database preparation
 
@@ -30,9 +30,20 @@ Validate database readiness:
 DATABASE_URL="postgres://..." npm run operations:doctor
 ```
 
-Expected result: every line must report `[OK]` and the process must exit with status `0`.
+Expected result: every line must report `[OK]`, including migrations, critical tables and `pg_trgm`, and the process must exit with status `0`.
 
-## 2. Application smoke test
+## 2. Application quality gates
+
+Run:
+
+```bash
+npm run check
+npm run build
+```
+
+Type errors are blockers. Existing non-blocking CSS warnings from unrelated public presentation pages can be reviewed separately.
+
+## 3. Application smoke test
 
 After the application is running in homologation:
 
@@ -49,14 +60,18 @@ The smoke test validates:
 - login creates a valid Operations session;
 - `/app` loads;
 - `/app/help` loads;
-- `/app/help/flows` loads;
+- `/app/help/content` loads;
+- `/app/help/search` loads;
+- `/app/help/insights` loads;
+- legacy `/app/help/flows` still loads;
 - `/app/team` loads;
 - `/app/tasks` loads;
 - `/app/tickets` loads;
 - `/app/chat` loads;
+- discovered detail pages load;
 - logout revokes the temporary session.
 
-## 3. Authentication and authorization
+## 4. Authentication and authorization
 
 ### Super Admin
 
@@ -81,22 +96,53 @@ The smoke test validates:
 - Remove the override and confirm inherited access returns.
 - Confirm an Admin cannot grant a permission or scope greater than their own.
 
-## 4. Help Center administration
+## 5. Structured Knowledge Base
 
-- Import the current Help Center structure.
-- Confirm question, destination and training counts are populated.
-- Create a draft article.
-- Edit the draft.
-- Publish it.
-- Edit the published article again.
-- Confirm the edit returns to draft while the previous publication remains available in the publication snapshot.
-- Create a help question with options.
-- Try to create a cycle between questions and confirm the server rejects it.
-- Publish a valid question flow.
+Use `/app/help/content`.
 
-Do not switch `/ajuda-f10` to database-backed content during this test cycle.
+- Create a new content item.
+- Confirm `Passo 1` is created automatically.
+- Edit title, slug, category and public summary.
+- Add general AI-only knowledge.
+- Edit `Passo 1` and add step-specific AI knowledge.
+- Add a text block.
+- Add an image block with URL, alt text and AI summary.
+- Add a video block with URL and transcript or AI summary.
+- Add another step.
+- Confirm the last remaining step cannot be removed.
+- Confirm an empty step blocks publication.
+- Confirm a step containing only media blocks publication when neither step AI knowledge nor media transcript/AI summary exists.
+- Publish a valid content item.
+- Edit the published content again.
+- Confirm the edit returns to draft while the previous publication snapshot remains available.
+- Confirm the public and AI sections of the publication snapshot are separated.
 
-## 5. Team management
+Legacy Help Center routes remain available for comparison, but the flow editor is no longer the primary knowledge authoring path.
+
+Do not switch `/ajuda-f10` to database-backed structured content during this test cycle.
+
+## 6. Support search and telemetry
+
+Use `/app/help/search`.
+
+- Search for terms contained in a published content item.
+- Confirm the content appears.
+- Open a result and confirm the selection is recorded.
+- Search for a phrase with no matching content.
+- Confirm the no-result search is recorded instead of silently discarded.
+- Confirm drafts do not enter search until publication.
+- Publish an edited content item and confirm the search document updates automatically.
+- Confirm internal search can use AI-only knowledge.
+- Confirm future public search code paths must exclude AI-only knowledge.
+
+Use `/app/help/insights`.
+
+- Confirm total searches increase.
+- Confirm no-result queries appear under knowledge gaps.
+- Confirm repeated equivalent normalized queries aggregate.
+- Confirm selected content counts update after opening search results.
+
+## 7. Team management
 
 - Invite an employee.
 - Reissue an expired/cancelled invitation if applicable.
@@ -107,7 +153,7 @@ Do not switch `/ajuda-f10` to database-backed content during this test cycle.
 - Reactivate an account that had previously completed activation.
 - Confirm an account that never completed activation cannot bypass the activation flow.
 
-## 6. Tasks
+## 8. Tasks
 
 - Create a project.
 - Add project members.
@@ -121,7 +167,7 @@ Do not switch `/ajuda-f10` to database-backed content during this test cycle.
 - Confirm activity history records the relevant changes.
 - Test `own`, `team` and `all` scopes with different users.
 
-## 7. Tickets
+## 9. Tickets
 
 - Create or load a test ticket.
 - Change priority.
@@ -130,44 +176,44 @@ Do not switch `/ajuda-f10` to database-backed content during this test cycle.
 - Add a public response.
 - Change ticket status through the normal lifecycle.
 - Confirm ticket events are recorded.
-- Convert a ticket into a linked task and confirm the relation is persisted.
+- Convert a ticket into a linked task and confirm the relation is persisted when that bridge is enabled.
 - Test ticket visibility using `own`, `team` and `all` scopes.
 
-## 8. Native chat preview
+## 10. Native chat
 
 Keep Movidesk as the production widget during this validation.
 
-- Start a native web chat in the preview flow.
-- Confirm a `web_chat` ticket is created.
-- Confirm the conversation appears in `/app/chat`.
-- Reply from the Operations interface.
-- Confirm the public session receives the reply.
-- Send multiple customer messages and confirm rate limiting does not affect normal use.
-- Confirm an invalid/expired chat token cannot read or write messages.
+- Confirm existing internal chat routes remain functional.
+- Do not expose the native widget publicly yet.
+- The next chat milestone must introduce the AI support agent and `/app/chat/lab` before public cutover.
+- The agent must retrieve only published Knowledge Base snapshots.
+- When the agent cannot support an answer from the base, it must not invent an F10 procedure and must be able to escalate with conversation/retrieval context.
 
-## 9. Security regression checks
+## 11. Security regression checks
 
 - Confirm `/app/*` pages include noindex directives.
 - Confirm public site analytics do not run inside `/app` or `/login`.
 - Confirm session cookies are `HttpOnly` and `Secure` under HTTPS.
 - Confirm disabled users cannot keep using an old session.
-- Confirm Help Center drafts do not replace the last published snapshot.
+- Confirm Knowledge Base drafts do not replace the last published snapshot.
+- Confirm AI-only knowledge is not present in the `public` portion of publication snapshots.
 - Confirm public chat payload limits reject oversized requests.
-- Confirm public chat context URLs cannot inject arbitrary external origins.
 - Confirm internal POST endpoints reject invalid origins where origin validation is required.
 
-## 10. Go / no-go criteria
+## 12. Go / no-go criteria
 
-The first homologation cycle is approved only when:
+The current homologation cycle is approved only when:
 
 - `npm run operations:doctor` passes;
 - `npm run operations:smoke` passes;
+- `npm run check` passes without errors;
+- `npm run build` passes;
 - Super Admin login/logout works;
 - employee activation and permission boundaries work;
-- Help Center draft/publish isolation works;
+- structured content draft/publish isolation works;
+- search telemetry records successful and no-result searches;
 - task scope restrictions work;
 - ticket scope restrictions work;
-- native chat works end to end in preview;
-- no public cutover has occurred unintentionally.
+- no public Help Center or Movidesk cutover has occurred unintentionally.
 
-Any failure involving authentication, authorization, publication isolation or data visibility is a release blocker.
+Any failure involving authentication, authorization, publication isolation, private AI knowledge exposure or data visibility is a release blocker.
