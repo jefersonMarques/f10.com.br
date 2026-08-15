@@ -29,6 +29,7 @@ if (baseUrl.protocol !== "https:" && !isLocalHost) {
 const protectedRoutes = [
   "/app",
   "/app/help",
+  "/app/help/content",
   "/app/help/flows",
   "/app/team",
   "/app/tasks",
