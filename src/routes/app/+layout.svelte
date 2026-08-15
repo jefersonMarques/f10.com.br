@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import {
+    BarChart3,
     BookOpen,
     CheckSquare2,
     ChevronRight,
@@ -24,6 +25,7 @@
     { label: "Visão geral", icon: LayoutDashboard, enabled: true, href: "/app" },
     { label: "Base de Conhecimento", icon: BookOpen, enabled: true, href: "/app/help/content", permission: "help.view" },
     { label: "Pesquisa de Suporte", icon: Search, enabled: true, href: "/app/help/search", permission: "help.view" },
+    { label: "Insights da Central", icon: BarChart3, enabled: true, href: "/app/help/insights", permission: "help.view" },
     { label: "Tarefas", icon: CheckSquare2, enabled: true, href: "/app/tasks", permission: "tasks.view" },
     { label: "Tickets", icon: Headphones, enabled: true, href: "/app/tickets", permission: "tickets.view" },
     { label: "Chat", icon: MessageCircleMore, enabled: true, href: "/app/chat", permission: "chat.view" },
