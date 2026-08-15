@@ -38,6 +38,8 @@
     "ticket.status.changed": "alterou o status",
     "ticket.priority.changed": "alterou a prioridade",
     "ticket.assignee.changed": "alterou o responsável",
+    "remote.enrollment.requested": "enviou o instalador de suporte remoto",
+    "remote.device.enrolled": "vinculou um computador ao suporte remoto",
     "remote.requested": "solicitou acesso remoto",
     "remote.authorized": "teve o acesso remoto autorizado",
     "remote.denied": "teve o acesso remoto recusado",
@@ -61,7 +63,7 @@
       <h1 class="mt-3 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">{data.details.ticket.subject}</h1>
       <p class="mt-2 text-[11px] text-[#808695]">{data.details.ticket.queueName} · aberto em {formatDateTime(data.details.ticket.createdAt)}</p>
     </div>
-    <a href={`/app/tickets/${data.details.ticket.id}/remote`} class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[10px] font-semibold text-[#000A57] transition hover:bg-[#F8F9FF]"><MonitorCog size={16}/>Solicitar acesso remoto</a>
+    <a href={`/app/tickets/${data.details.ticket.id}/remote`} class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[10px] font-semibold text-[#000A57] transition hover:bg-[#F8F9FF]"><MonitorCog size={16}/>Acesso remoto</a>
   </div>
 
   {#if form?.message}<div class={`mt-6 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{#if form.success}<CheckCircle2 size={18} class="mt-0.5 shrink-0"/>{:else}<CircleAlert size={18} class="mt-0.5 shrink-0"/>{/if}<span>{form.message}</span></div>{/if}
@@ -91,7 +93,7 @@
         <div class="mt-5 border-t border-[#EEF0F5] pt-4"><span class="text-[10px] font-semibold text-[#555B6A]">Responsável</span><p class="mt-2 text-[11px] font-medium text-[#333948]">{data.details.ticket.assignedUserName ?? "Sem responsável"}</p>{#if data.canAssign}<form method="POST" action="?/assign" class="mt-3 flex gap-2"><select name="assignedUserId" required class="h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2 text-[10px]">{#each data.agents as agent}<option value={agent.id} selected={agent.id === data.details.ticket.assignedUserId}>{agent.name}</option>{/each}</select><button type="submit" class="h-10 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white">Atribuir</button></form>{/if}</div>
       </section>
 
-      <section class="rounded-[24px] border border-[#D8DEF2] bg-[#F8F9FF] p-5"><div class="flex items-center gap-3"><MonitorCog size={18} class="text-[#000A57]"/><h2 class="text-[14px] font-semibold">Suporte remoto</h2></div><p class="mt-3 text-[10px] leading-5 text-[#697187]">Gere uma solicitação de consentimento para um computador vinculado a este cliente.</p><a href={`/app/tickets/${data.details.ticket.id}/remote`} class="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-[#000A57] text-[10px] font-semibold text-white">Solicitar acesso</a></section>
+      <section class="rounded-[24px] border border-[#D8DEF2] bg-[#F8F9FF] p-5"><div class="flex items-center gap-3"><MonitorCog size={18} class="text-[#000A57]"/><h2 class="text-[14px] font-semibold">Suporte remoto</h2></div><p class="mt-3 text-[10px] leading-5 text-[#697187]">Use um computador já reconhecido ou envie o instalador de suporte ao cliente na primeira vez.</p><a href={`/app/tickets/${data.details.ticket.id}/remote`} class="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-[#000A57] text-[10px] font-semibold text-white">Abrir acesso remoto</a></section>
 
       <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5"><div class="flex items-center gap-3"><UserRound size={18} class="text-[#EA6D0B]"/><h2 class="text-[14px] font-semibold text-[#11182C]">Cliente</h2></div><dl class="mt-4 space-y-3 text-[10px]"><div><dt class="text-[#8D929F]">Nome</dt><dd class="mt-1 font-medium text-[#4E5463]">{data.details.ticket.customerName ?? "Não informado"}</dd></div><div><dt class="text-[#8D929F]">E-mail</dt><dd class="mt-1 break-all font-medium text-[#4E5463]">{data.details.ticket.customerEmail ?? "Não informado"}</dd></div><div><dt class="text-[#8D929F]">Telefone</dt><dd class="mt-1 font-medium text-[#4E5463]">{data.details.ticket.customerPhone ?? "Não informado"}</dd></div></dl></section>
 
