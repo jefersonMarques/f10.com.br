@@ -1,3 +1,4 @@
+import { env } from "$env/dynamic/private";
 import {
   createHash,
   createHmac,
@@ -47,7 +48,7 @@ export function createPublicLimitKey(
   scope: string,
   clientAddress: string,
 ): string {
-  const secret = process.env.SUPPORT_RATE_LIMIT_SECRET?.trim();
+  const secret = env.SUPPORT_RATE_LIMIT_SECRET?.trim();
   if (!secret || secret.length < 32) {
     throw new Error("SUPPORT_RATE_LIMIT_SECRET must have at least 32 characters.");
   }
