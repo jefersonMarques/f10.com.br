@@ -8,7 +8,9 @@ O F10 Operations não implementa protocolo de desktop remoto. Ele controla o flu
 Cliente Windows
   └─ Agente MeshCentral
        ↓ conexão de saída
-MeshCentral
+https://f10.com.br/acesso-remoto/
+       ↓ reverse proxy
+MeshCentral local
        ↑
 F10 Operations
   ├─ ticket/chat
@@ -17,30 +19,107 @@ F10 Operations
   └─ auditoria
 ```
 
-Não é necessário expor RDP/3389 na internet.
+Não é necessário expor RDP/3389 na internet e não é necessário criar subdomínio para o MeshCentral.
 
-## Implantação inicial
+## Endereço público adotado
 
-O MeshCentral deve usar um endereço HTTPS próprio, por exemplo:
+O endereço público do provider é:
 
 ```text
-https://remote.f10.com.br
+https://f10.com.br/acesso-remoto/
 ```
 
-A instalação e atualização do MeshCentral devem seguir o repositório/documentação oficial do projeto. O agente deve ser instalado apenas nos computadores que participarão do suporte remoto.
+O MeshCentral suporta domínios virtuais identificados pelo primeiro segmento do caminho. Para esta implantação, use uma domain section chamada `acesso-remoto`, de forma que a interface e os agentes utilizem o mesmo caminho público.
 
-Depois de criar um dispositivo no MeshCentral, copie o identificador do nó e registre-o em `/app/remote`, associando-o ao cliente correspondente.
+Não configure o F10 para abrir o MeshCentral na raiz `/`: o provider valida que a URL final continua dentro do caminho configurado em `MESHCENTRAL_BASE_URL`.
+
+## Configuração conceitual do MeshCentral
+
+A porta interna é apenas um exemplo; pode ser alterada conforme a VPS. O importante é manter o serviço local atrás do Nginx e informar ao MeshCentral que o endereço externo usa HTTPS/443.
+
+Exemplo de `meshcentral-data/config.json`:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/Ylianst/MeshCentral/master/meshcentral-config-schema.json",
+  "settings": {
+    "cert": "f10.com.br",
+    "WANonly": true,
+    "port": 4430,
+    "aliasPort": 443,
+    "TLSOffload": "127.0.0.1",
+    "trustedProxy": "127.0.0.1",
+    "newAccounts": false
+  },
+  "domains": {
+    "acesso-remoto": {
+      "title": "F10 Acesso Remoto",
+      "newAccounts": false,
+      "userNameIsEmail": true,
+      "certUrl": "https://f10.com.br/"
+    }
+  }
+}
+```
+
+Confirme os nomes/opções contra o `sample-config.json`, `sample-config-advanced.json` e schema da versão efetivamente instalada antes de reiniciar o serviço.
+
+## Nginx
+
+O Nginx deve encaminhar `/acesso-remoto/` ao MeshCentral preservando o caminho e permitindo WebSocket. Como o domínio virtual do MeshCentral se chama `acesso-remoto`, não remova esse prefixo no proxy.
+
+Exemplo inicial:
+
+```nginx
+location ^~ /acesso-remoto/ {
+    proxy_pass http://127.0.0.1:4430;
+    proxy_http_version 1.1;
+
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+
+    proxy_read_timeout 330s;
+    proxy_send_timeout 330s;
+}
+```
+
+Depois valide e recarregue o Nginx:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
 
 ## `.env` do F10
 
 ```env
 REMOTE_SUPPORT_PROVIDER=meshcentral
-MESHCENTRAL_BASE_URL=https://remote.f10.com.br
-MESHCENTRAL_DEVICE_URL_TEMPLATE=https://remote.f10.com.br/?viewmode=13&gotonode={deviceId}
+MESHCENTRAL_BASE_URL=https://f10.com.br/acesso-remoto/
+MESHCENTRAL_DEVICE_URL_TEMPLATE=https://f10.com.br/acesso-remoto/?viewmode=13&gotonode={deviceId}
 OPERATIONS_DOCTOR_REQUIRE_REMOTE=true
 ```
 
-O template é configurável para permitir ajustar a navegação caso a instalação do MeshCentral utilize outro caminho. O F10 exige que a URL final permaneça no mesmo origin de `MESHCENTRAL_BASE_URL`.
+O F10 exige que a URL final permaneça no mesmo origin e, agora, também dentro do mesmo caminho-base configurado.
+
+## Implantação
+
+1. instale o MeshCentral na VPS seguindo o projeto/documentação oficial;
+2. mantenha a porta do processo acessível apenas localmente/firewall interno;
+3. configure o domain `acesso-remoto`;
+4. configure o bloco Nginx acima;
+5. reinicie MeshCentral;
+6. valide `https://f10.com.br/acesso-remoto/` no navegador;
+7. instale um agente de teste a partir dessa instalação;
+8. confirme que o dispositivo fica online;
+9. configure o `.env` do F10;
+10. execute `npm run operations:doctor` e use **Testar MeshCentral** em `/app/settings`.
+
+Depois de criar um dispositivo no MeshCentral, copie o identificador do nó e registre-o em `/app/remote`, associando-o ao cliente correspondente.
 
 ## Fluxo
 
@@ -71,11 +150,12 @@ Falhas operacionais podem ser registradas como `failed`.
 
 - consentimento é explícito e temporário;
 - token de consentimento não é armazenado em texto puro;
-- o cliente não recebe credenciais ou URL administrativa do MeshCentral;
+- o cliente não recebe credenciais administrativas do MeshCentral;
 - `remote.request`, `remote.use` e `remote.manage` continuam separados;
 - iniciar uma sessão exige autorização anterior;
 - todos os eventos relevantes são vinculados ao ticket quando aplicável;
 - o F10 não abre porta RDP;
+- o MeshCentral fica atrás do HTTPS existente do domínio F10;
 - a console/gestão do MeshCentral deve ser protegida separadamente.
 
 ## Limite atual do provider
