@@ -325,7 +325,15 @@ export async function startRemoteSupportSession(actorUserId: string, sessionId: 
   const launchUrl = provider.getLaunchUrl(row.providerDeviceId);
   const now = new Date();
   await db.transaction(async (tx) => {
-    await tx.update(remoteSupportSessions).set({ status: "active", startedAt: now, updatedAt: now }).where(and(eq(remoteSupportSessions.id, sessionId), eq(remoteSupportSessions.status, "authorized")));
+    await tx
+      .update(remoteSupportSessions)
+      .set({
+        status: "active",
+        startedByUserId: actorUserId,
+        startedAt: now,
+        updatedAt: now,
+      })
+      .where(and(eq(remoteSupportSessions.id, sessionId), eq(remoteSupportSessions.status, "authorized")));
     if (row.ticketId) await tx.insert(ticketEvents).values({ ticketId: row.ticketId, actorUserId, eventType: "remote.started", metadata: { remoteSessionId: sessionId, deviceId: row.deviceId } });
   });
   await recordAuditEvent({ actorUserId, action: "remote.started", entityType: "remote_support_session", entityId: sessionId, metadata: { ticketId: row.ticketId } });
@@ -342,7 +350,15 @@ export async function endRemoteSupportSession(actorUserId: string, sessionId: st
   if (!row) throw new Error("REMOTE_SESSION_NOT_ACTIVE");
   const now = new Date();
   await db.transaction(async (tx) => {
-    await tx.update(remoteSupportSessions).set({ status: "ended", endedAt: now, updatedAt: now }).where(eq(remoteSupportSessions.id, sessionId));
+    await tx
+      .update(remoteSupportSessions)
+      .set({
+        status: "ended",
+        endedByUserId: actorUserId,
+        endedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(remoteSupportSessions.id, sessionId));
     if (row.ticketId) await tx.insert(ticketEvents).values({ ticketId: row.ticketId, actorUserId, eventType: "remote.ended", metadata: { remoteSessionId: sessionId } });
   });
   await recordAuditEvent({ actorUserId, action: "remote.ended", entityType: "remote_support_session", entityId: sessionId, metadata: { ticketId: row.ticketId } });
