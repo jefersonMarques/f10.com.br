@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, count, desc, eq, isNotNull } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
@@ -187,7 +187,10 @@ export async function deleteManagedHelpAsset(actorUserId: string, assetId: strin
   if (usageCount > 0 || published) throw new Error("ASSET_IN_USE");
 
   if (asset.storageKey) await deleteAssetObject(asset.storageKey);
-  await db.delete(helpAssets).where(eq(helpAssets.id, assetId));
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_config('f10.allow_managed_asset_delete', 'on', true)`);
+    await tx.delete(helpAssets).where(eq(helpAssets.id, assetId));
+  });
   await recordAuditEvent({
     actorUserId,
     action: "help.asset.deleted",
