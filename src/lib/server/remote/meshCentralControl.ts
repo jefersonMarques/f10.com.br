@@ -240,6 +240,10 @@ function validateShareUrl(rawUrl: string, baseUrl: URL): string {
   return shareUrl.toString();
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export function getMeshCentralControlStatus() {
   const config = readConfig();
   return {
@@ -332,7 +336,7 @@ export async function createMeshCentralDesktopShare(
     throw new Error("MESHCENTRAL_CONTROL_NOT_CONFIGURED");
   }
 
-  // Listing first also lets MeshCentral clean expired guest shares before creating a new one.
+  // A listagem também faz o MeshCentral limpar shares expirados antes da criação.
   await runMeshCtrl("DeviceSharing", ["--id", providerDeviceId]);
 
   const output = await runMeshCtrl("DeviceSharing", [
@@ -373,7 +377,11 @@ export async function revokeMeshCentralDesktopShare(
   ]);
 
   const remaining = await runMeshCtrl("DeviceSharing", ["--id", providerDeviceId]);
-  if (remaining.includes(`Identifier:   ${safeShareId}`)) {
+  const identifierPattern = new RegExp(
+    `^Identifier:\\s*${escapeRegExp(safeShareId)}\\s*$`,
+    "m",
+  );
+  if (identifierPattern.test(remaining)) {
     throw new Error("MESHCENTRAL_SHARE_NOT_REVOKED");
   }
 }
