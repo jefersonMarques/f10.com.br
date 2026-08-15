@@ -337,6 +337,10 @@ export async function setManagedUserStatus(
     throw new Error("SELF_DEACTIVATION_NOT_ALLOWED");
   }
 
+  if (target.status === "invited" && status === "active") {
+    throw new Error("INVITED_USER_REQUIRES_ACTIVATION");
+  }
+
   await db.transaction(async (tx) => {
     await tx
       .update(users)
