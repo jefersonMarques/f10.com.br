@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { FileText, HardDrive, Image, Trash2, UploadCloud } from "lucide-svelte";
+  import { FileText, HardDrive, Image, Link2, Trash2, UploadCloud } from "lucide-svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -20,7 +20,7 @@
     <div>
       <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Base de Conhecimento</p>
       <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Biblioteca de arquivos</h1>
-      <p class="mt-2 max-w-[760px] text-[14px] leading-6 text-[#6F7585]">Imagens e documentos ficam no armazenamento S3/MinIO e podem ser reutilizados em diferentes procedimentos.</p>
+      <p class="mt-2 max-w-[760px] text-[14px] leading-6 text-[#6F7585]">Imagens e documentos ficam no armazenamento S3/MinIO, podem ser reutilizados e vinculados diretamente a qualquer passo.</p>
     </div>
     <a href="/app/help/content" class="inline-flex min-h-10 items-center rounded-xl border border-[#DDE1EA] bg-white px-4 text-[10px] font-semibold text-[#626979]">Voltar para conteúdos</a>
   </div>
@@ -55,7 +55,7 @@
     {/if}
 
     <section class="overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
-      <header class="border-b border-[#EEF0F5] px-5 py-4"><h2 class="text-[14px] font-semibold">Arquivos ({data.assets.length})</h2></header>
+      <header class="border-b border-[#EEF0F5] px-5 py-4"><h2 class="text-[14px] font-semibold">Arquivos ({data.assets.length})</h2><p class="mt-1 text-[9px] text-[#9297A5]">Vincular um arquivo a um passo transforma o conteúdo em rascunho até nova publicação.</p></header>
       {#if data.assets.length === 0}
         <div class="py-16 text-center text-[10px] text-[#9297A5]">Nenhum arquivo na biblioteca.</div>
       {:else}
@@ -67,8 +67,26 @@
               </div>
               <strong class="mt-3 block truncate text-[10px] text-[#303645]">{asset.originalName ?? asset.id}</strong>
               <p class="mt-1 text-[8px] text-[#9297A5]">{asset.mimeType ?? asset.assetType} · {formatBytes(asset.sizeBytes)}</p>
+
+              {#if data.canEdit && (asset.assetType === "image" || asset.assetType === "file") && data.targets.length > 0}
+                <details class="mt-3 rounded-xl border border-[#E1E4EC] bg-[#FAFAFC] p-3">
+                  <summary class="flex cursor-pointer list-none items-center gap-2 text-[9px] font-semibold text-[#000A57]"><Link2 size={13}/>Usar em um passo</summary>
+                  <form method="POST" action="?/attach" class="mt-3 space-y-2">
+                    <input type="hidden" name="assetId" value={asset.id} />
+                    <select name="stepId" required class="h-9 w-full rounded-lg border border-[#DDE1EA] bg-white px-2 text-[9px]">
+                      <option value="" disabled selected>Selecione conteúdo / passo</option>
+                      {#each data.targets as target}
+                        <option value={target.stepId}>{target.contentTitle} — {target.stepTitle}</option>
+                      {/each}
+                    </select>
+                    {#if asset.assetType === "file"}<input name="label" maxlength="240" value={asset.originalName ?? "Baixar arquivo"} class="h-9 w-full rounded-lg border border-[#DDE1EA] bg-white px-2 text-[9px]" />{/if}
+                    <button type="submit" class="min-h-9 w-full rounded-lg bg-[#000A57] text-[9px] font-semibold text-white">Adicionar ao passo</button>
+                  </form>
+                </details>
+              {/if}
+
               <div class="mt-3 flex items-center justify-between gap-2">
-                <a href={`/api/app/help/assets/${asset.id}`} target="_blank" class="text-[9px] font-semibold text-[#000A57]">Abrir</a>
+                <a href={`/api/app/help/assets/${asset.id}`} target="_blank" rel="noopener noreferrer" class="text-[9px] font-semibold text-[#000A57]">Abrir</a>
                 {#if data.canEdit}
                   <form method="POST" action="?/delete"><input type="hidden" name="assetId" value={asset.id}/><button type="submit" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#A34242] hover:bg-[#FFF0F0]" aria-label="Excluir"><Trash2 size={14}/></button></form>
                 {/if}
