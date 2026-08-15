@@ -1,7 +1,10 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
-import { hasPermission } from "$lib/server/auth/permissions";
+import {
+  getPermissionScope,
+  hasPermission,
+} from "$lib/server/auth/permissions";
 import {
   getSupportAiLabConfiguration,
   listRecentSupportAiRuns,
@@ -29,9 +32,11 @@ export const load: PageServerLoad = async ({ parent }) => {
     throw error(403, "Acesso não autorizado.");
   }
 
+  const chatScope = getPermissionScope(permissions, "chat.view");
+
   return {
     configuration: getSupportAiLabConfiguration(),
-    recentRuns: await listRecentSupportAiRuns(12),
+    recentRuns: chatScope === "all" ? await listRecentSupportAiRuns(12) : [],
     canAsk: hasPermission(permissions, "chat.respond"),
   };
 };
