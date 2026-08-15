@@ -1,0 +1,204 @@
+import { readdir } from "node:fs/promises";
+import { join } from "node:path";
+import postgres from "postgres";
+
+const databaseUrl = process.env.DATABASE_URL?.trim();
+const requireSuperAdmin =
+  process.env.OPERATIONS_DOCTOR_REQUIRE_SUPER_ADMIN !== "false";
+
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is required.");
+}
+
+const requiredRoles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE"];
+const requiredPermissions = [
+  "help.view",
+  "help.edit",
+  "help.publish",
+  "tasks.view",
+  "tasks.create",
+  "tasks.update",
+  "tasks.assign",
+  "tasks.manage",
+  "tickets.view",
+  "tickets.create",
+  "tickets.reply",
+  "tickets.assign",
+  "tickets.manage",
+  "chat.view",
+  "chat.respond",
+  "chat.manage",
+  "customers.view",
+  "customers.manage",
+  "users.view",
+  "users.manage",
+  "roles.manage",
+  "reports.view",
+  "audit.view",
+  "integrations.view",
+  "integrations.manage",
+  "secrets.manage",
+  "remote.request",
+  "remote.use",
+  "remote.manage",
+  "system.settings.manage",
+];
+const criticalTables = [
+  "users",
+  "roles",
+  "permissions",
+  "role_permissions",
+  "sessions",
+  "audit_logs",
+  "help_articles",
+  "help_questions",
+  "help_publications",
+  "user_invites",
+  "task_projects",
+  "tasks",
+  "support_queues",
+  "tickets",
+  "ticket_messages",
+  "web_chat_sessions",
+  "support_public_limits",
+];
+
+function printResult(label, ok, detail) {
+  const marker = ok ? "OK" : "FAIL";
+  process.stdout.write(`[${marker}] ${label}${detail ? `: ${detail}` : ""}\n`);
+}
+
+function difference(expectedValues, actualValues) {
+  const actual = new Set(actualValues);
+  return expectedValues.filter((value) => !actual.has(value));
+}
+
+async function listExpectedMigrations() {
+  const migrationDirectory = join(process.cwd(), "migrations");
+  return (await readdir(migrationDirectory))
+    .filter((fileName) => /^\d{4}_.+\.sql$/.test(fileName))
+    .sort();
+}
+
+const sql = postgres(databaseUrl, {
+  max: 1,
+  connect_timeout: 10,
+  idle_timeout: 5,
+  prepare: false,
+});
+
+let hasFailure = false;
+
+try {
+  const [migrationTable] = await sql`
+    SELECT to_regclass('public.schema_migrations')::text AS name
+  `;
+
+  if (!migrationTable?.name) {
+    printResult("schema_migrations", false, "execute npm run db:migrate first");
+    process.exitCode = 1;
+  } else {
+    printResult("schema_migrations", true);
+
+    const expectedMigrations = await listExpectedMigrations();
+    const appliedRows = await sql`
+      SELECT name
+      FROM schema_migrations
+      ORDER BY name
+    `;
+    const appliedMigrations = appliedRows.map((row) => row.name);
+    const missingMigrations = difference(
+      expectedMigrations,
+      appliedMigrations,
+    );
+    const unknownMigrations = difference(
+      appliedMigrations,
+      expectedMigrations,
+    );
+
+    const migrationsOk =
+      missingMigrations.length === 0 && unknownMigrations.length === 0;
+    printResult(
+      "migrations",
+      migrationsOk,
+      migrationsOk
+        ? `${appliedMigrations.length} applied`
+        : `missing=${missingMigrations.join(",") || "none"}; unknown=${unknownMigrations.join(",") || "none"}`,
+    );
+    hasFailure ||= !migrationsOk;
+
+    const tableRows = await Promise.all(
+      criticalTables.map(async (tableName) => {
+        const [row] = await sql`
+          SELECT to_regclass(${`public.${tableName}`})::text AS name
+        `;
+        return { tableName, exists: Boolean(row?.name) };
+      }),
+    );
+    const missingTables = tableRows
+      .filter((row) => !row.exists)
+      .map((row) => row.tableName);
+    const tablesOk = missingTables.length === 0;
+    printResult(
+      "critical tables",
+      tablesOk,
+      tablesOk ? `${criticalTables.length} available` : missingTables.join(","),
+    );
+    hasFailure ||= !tablesOk;
+
+    const roleRows = await sql`SELECT code FROM roles`;
+    const missingRoles = difference(
+      requiredRoles,
+      roleRows.map((row) => row.code),
+    );
+    const rolesOk = missingRoles.length === 0;
+    printResult(
+      "system roles",
+      rolesOk,
+      rolesOk ? requiredRoles.join(", ") : `missing=${missingRoles.join(",")}`,
+    );
+    hasFailure ||= !rolesOk;
+
+    const permissionRows = await sql`SELECT code FROM permissions`;
+    const missingPermissions = difference(
+      requiredPermissions,
+      permissionRows.map((row) => row.code),
+    );
+    const permissionsOk = missingPermissions.length === 0;
+    printResult(
+      "permissions",
+      permissionsOk,
+      permissionsOk
+        ? `${requiredPermissions.length} available`
+        : `missing=${missingPermissions.join(",")}`,
+    );
+    hasFailure ||= !permissionsOk;
+
+    const [superAdminRow] = await sql`
+      SELECT count(*)::integer AS count
+      FROM users
+      INNER JOIN user_roles ON user_roles.user_id = users.id
+      INNER JOIN roles ON roles.id = user_roles.role_id
+      WHERE roles.code = 'SUPER_ADMIN'
+        AND users.status = 'active'
+    `;
+    const activeSuperAdminCount = Number(superAdminRow?.count ?? 0);
+    const superAdminOk = !requireSuperAdmin || activeSuperAdminCount > 0;
+    printResult(
+      "active super admin",
+      superAdminOk,
+      requireSuperAdmin
+        ? `${activeSuperAdminCount} found`
+        : `${activeSuperAdminCount} found; requirement disabled`,
+    );
+    hasFailure ||= !superAdminOk;
+  }
+} finally {
+  await sql.end({ timeout: 5 });
+}
+
+if (hasFailure) {
+  process.exitCode = 1;
+} else if (!process.exitCode) {
+  process.stdout.write("Operations environment is ready for smoke testing.\n");
+}
