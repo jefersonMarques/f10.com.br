@@ -4,6 +4,7 @@
     ArrowLeft,
     Bot,
     CircleAlert,
+    Download,
     MessageCircleMore,
     RefreshCw,
     Send,
@@ -29,6 +30,8 @@
   };
 
   const STORAGE_KEY = "f10_native_chat_preview";
+  const REMOTE_INSTALL_PATTERN = /\/suporte-remoto\/instalar\/[A-Za-z0-9_-]{40,120}/;
+  const REMOTE_INSTALL_URL_PATTERN = /https?:\/\/[^\s]+\/suporte-remoto\/instalar\/[A-Za-z0-9_-]{40,120}/;
 
   let name = "Cliente de teste";
   let email = "cliente.teste@example.com";
@@ -61,6 +64,18 @@
       hour: "2-digit",
       minute: "2-digit",
     }).format(new Date(value));
+  }
+
+  function remoteInstallPath(body: string): string {
+    return body.match(REMOTE_INSTALL_PATTERN)?.[0] ?? "";
+  }
+
+  function visibleMessageBody(body: string): string {
+    const cleaned = body
+      .replace(REMOTE_INSTALL_URL_PATTERN, "")
+      .replace(/\s+:/g, ":")
+      .trim();
+    return cleaned || "A equipe F10 enviou o instalador de suporte remoto.";
   }
 
   async function loadMessages(): Promise<void> {
@@ -226,7 +241,7 @@
     <div>
       <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Homologação ponta a ponta</p>
       <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Preview do chat do cliente</h1>
-      <p class="mt-2 max-w-[780px] text-[14px] leading-6 text-[#6F7585]">Esta tela usa as mesmas APIs públicas do futuro widget. Permite testar criação do ticket, agente IA, continuidade da conversa, escalonamento e resposta humana sem alterar o site público.</p>
+      <p class="mt-2 max-w-[780px] text-[14px] leading-6 text-[#6F7585]">Esta tela usa as mesmas APIs públicas do futuro widget. Permite testar criação do ticket, agente IA, continuidade da conversa, escalonamento, resposta humana e entrega do instalador remoto sem alterar o site público.</p>
     </div>
 
     <div class="rounded-2xl border border-[#E2E5ED] bg-white px-4 py-3 text-right">
@@ -272,7 +287,13 @@
                 <article class={`max-w-[84%] rounded-2xl px-4 py-3 ${message.authorType === "customer" ? "rounded-br-md bg-[#000A57] text-white" : message.authorType === "system" ? "rounded-bl-md border border-[#D9D4F5] bg-[#F2F0FF] text-[#403878]" : "rounded-bl-md border border-[#E0E3EA] bg-white text-[#565C6B]"}`}>
                   {#if message.authorType === "system"}<div class="mb-2 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-[0.08em] text-[#6255A8]"><Bot size={12} aria-hidden="true" />Agente IA</div>{/if}
                   {#if message.authorType === "user"}<div class="mb-2 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-[0.08em] text-[#606676]"><ShieldCheck size={12} aria-hidden="true" />Equipe F10</div>{/if}
-                  <p class="whitespace-pre-wrap text-[12px] leading-5">{message.body}</p>
+                  <p class="whitespace-pre-wrap text-[12px] leading-5">{visibleMessageBody(message.body)}</p>
+                  {#if remoteInstallPath(message.body)}
+                    <a href={remoteInstallPath(message.body)} target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white">
+                      <Download size={15} aria-hidden="true" />
+                      Baixar Suporte Remoto F10
+                    </a>
+                  {/if}
                   <p class={`mt-2 text-[8px] ${message.authorType === "customer" ? "text-white/60" : "text-[#999EAA]"}`}>{formatTime(message.createdAt)}</p>
                 </article>
               </div>
