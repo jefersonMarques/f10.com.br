@@ -7,7 +7,10 @@ import {
   remoteSupportSessions,
 } from "$lib/server/db/operationsSettingsSchema";
 import { ticketEvents } from "$lib/server/db/supportSchema";
-import { getRemoteSupportProvider } from "$lib/server/remote/remoteSupportProvider";
+import {
+  createMeshCentralDesktopShare,
+  revokeMeshCentralDesktopShare,
+} from "$lib/server/remote/meshCentralControl";
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -69,55 +72,110 @@ export async function startRemoteSupportSessionAtomic(
   const db = getDatabase();
   const [candidate] = await db
     .select({
+      status: remoteSupportSessions.status,
+      providerSessionId: remoteSupportSessions.providerSessionId,
       providerDeviceId: remoteDevices.providerDeviceId,
+      deviceName: remoteDevices.name,
       active: remoteDevices.active,
     })
     .from(remoteSupportSessions)
     .leftJoin(remoteDevices, eq(remoteSupportSessions.deviceId, remoteDevices.id))
-    .where(and(eq(remoteSupportSessions.id, sessionId), eq(remoteSupportSessions.status, "authorized")))
+    .where(eq(remoteSupportSessions.id, sessionId))
     .limit(1);
 
-  if (!candidate?.active || !candidate.providerDeviceId) {
+  if (
+    !candidate?.active ||
+    !candidate.providerDeviceId ||
+    !["authorized", "active"].includes(candidate.status)
+  ) {
     throw new Error("REMOTE_SESSION_NOT_AUTHORIZED");
   }
-  const launchUrl = getRemoteSupportProvider().getLaunchUrl(candidate.providerDeviceId);
+
+  if (candidate.providerSessionId) {
+    await revokeMeshCentralDesktopShare(
+      candidate.providerDeviceId,
+      candidate.providerSessionId,
+    );
+  }
+
+  const share = await createMeshCentralDesktopShare(
+    candidate.providerDeviceId,
+    `F10 - ${candidate.deviceName || sessionId.slice(0, 8)}`,
+  );
   const now = new Date();
+  const firstStart = candidate.status === "authorized";
 
-  const changed = await db.transaction(async (tx) => {
-    const [session] = await tx
-      .update(remoteSupportSessions)
-      .set({
-        status: "active",
-        startedByUserId: actorUserId,
-        startedAt: now,
-        updatedAt: now,
-      })
-      .where(and(eq(remoteSupportSessions.id, sessionId), eq(remoteSupportSessions.status, "authorized")))
-      .returning({
-        id: remoteSupportSessions.id,
-        ticketId: remoteSupportSessions.ticketId,
-        deviceId: remoteSupportSessions.deviceId,
-      });
-    if (!session) throw new Error("REMOTE_SESSION_ALREADY_STARTED");
-    if (session.ticketId) {
-      await tx.insert(ticketEvents).values({
-        ticketId: session.ticketId,
-        actorUserId,
-        eventType: "remote.started",
-        metadata: { remoteSessionId: session.id, deviceId: session.deviceId },
-      });
+  try {
+    const changed = await db.transaction(async (tx) => {
+      const values = firstStart
+        ? {
+            status: "active" as const,
+            startedByUserId: actorUserId,
+            startedAt: now,
+            providerSessionId: share.id,
+            providerSessionExpiresAt: share.expiresAt,
+            updatedAt: now,
+          }
+        : {
+            providerSessionId: share.id,
+            providerSessionExpiresAt: share.expiresAt,
+            updatedAt: now,
+          };
+
+      const [session] = await tx
+        .update(remoteSupportSessions)
+        .set(values)
+        .where(
+          and(
+            eq(remoteSupportSessions.id, sessionId),
+            eq(remoteSupportSessions.status, candidate.status),
+          ),
+        )
+        .returning({
+          id: remoteSupportSessions.id,
+          ticketId: remoteSupportSessions.ticketId,
+          deviceId: remoteSupportSessions.deviceId,
+        });
+      if (!session) throw new Error("REMOTE_SESSION_STATE_CHANGED");
+
+      if (session.ticketId) {
+        await tx.insert(ticketEvents).values({
+          ticketId: session.ticketId,
+          actorUserId,
+          eventType: firstStart ? "remote.started" : "remote.reconnected",
+          metadata: {
+            remoteSessionId: session.id,
+            deviceId: session.deviceId,
+            providerSessionExpiresAt: share.expiresAt.toISOString(),
+          },
+        });
+      }
+      return session;
+    });
+
+    await recordAuditEvent({
+      actorUserId,
+      action: firstStart ? "remote.started" : "remote.reconnected",
+      entityType: "remote_support_session",
+      entityId: changed.id,
+      metadata: {
+        ticketId: changed.ticketId,
+        providerSessionExpiresAt: share.expiresAt.toISOString(),
+      },
+    });
+  } catch (cause) {
+    try {
+      await revokeMeshCentralDesktopShare(candidate.providerDeviceId, share.id);
+    } catch {
+      // The new share will still expire automatically if rollback revocation fails.
     }
-    return session;
-  });
+    throw cause;
+  }
 
-  await recordAuditEvent({
-    actorUserId,
-    action: "remote.started",
-    entityType: "remote_support_session",
-    entityId: changed.id,
-    metadata: { ticketId: changed.ticketId },
-  });
-  return launchUrl;
+  return {
+    desktopUrl: share.url,
+    expiresAt: share.expiresAt,
+  };
 }
 
 export async function endRemoteSupportSessionAtomic(
@@ -125,6 +183,31 @@ export async function endRemoteSupportSessionAtomic(
   sessionId: string,
 ): Promise<void> {
   const db = getDatabase();
+  const [candidate] = await db
+    .select({
+      status: remoteSupportSessions.status,
+      providerSessionId: remoteSupportSessions.providerSessionId,
+      providerDeviceId: remoteDevices.providerDeviceId,
+    })
+    .from(remoteSupportSessions)
+    .leftJoin(remoteDevices, eq(remoteSupportSessions.deviceId, remoteDevices.id))
+    .where(
+      and(
+        eq(remoteSupportSessions.id, sessionId),
+        inArray(remoteSupportSessions.status, ["active", "authorized"]),
+      ),
+    )
+    .limit(1);
+
+  if (!candidate) throw new Error("REMOTE_SESSION_NOT_ACTIVE");
+  if (candidate.providerSessionId) {
+    if (!candidate.providerDeviceId) throw new Error("REMOTE_PROVIDER_DEVICE_MISSING");
+    await revokeMeshCentralDesktopShare(
+      candidate.providerDeviceId,
+      candidate.providerSessionId,
+    );
+  }
+
   const now = new Date();
   const changed = await db.transaction(async (tx) => {
     const [session] = await tx
@@ -132,6 +215,8 @@ export async function endRemoteSupportSessionAtomic(
       .set({
         status: "ended",
         endedByUserId: actorUserId,
+        providerSessionId: null,
+        providerSessionExpiresAt: null,
         endedAt: now,
         updatedAt: now,
       })
