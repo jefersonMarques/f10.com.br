@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { Bot, CheckCircle2, HardDrive, MessageCircleMore, MonitorCog, Save, Settings, ShieldCheck } from "lucide-svelte";
+  import { Bot, HardDrive, MonitorCog, Save, Settings, ShieldCheck } from "lucide-svelte";
   import type { ActionData, PageData } from "./$types";
+
   export let data: PageData;
   export let form: ActionData;
 </script>
@@ -8,17 +9,26 @@
 <svelte:head><title>Configurações | F10 Operations</title></svelte:head>
 
 <div class="mx-auto max-w-[1260px] px-5 py-7 sm:px-8 sm:py-9">
-  <div><p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Administração</p><h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Configurações</h1><p class="mt-2 max-w-[760px] text-[14px] leading-6 text-[#6F7585]">Parâmetros operacionais e diagnóstico das integrações. Segredos permanecem no ambiente seguro do servidor.</p></div>
+  <div>
+    <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Administração</p>
+    <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Configurações</h1>
+    <p class="mt-2 max-w-[760px] text-[14px] leading-6 text-[#6F7585]">Parâmetros operacionais e diagnóstico das integrações. Segredos permanecem no ambiente seguro do servidor.</p>
+  </div>
 
-  {#if form?.message}<div class={`mt-6 rounded-2xl border px-4 py-3 text-[10px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{form.message}</div>{/if}
+  {#if form?.message}
+    <div class={`mt-6 rounded-2xl border px-4 py-3 text-[10px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{form.message}</div>
+  {/if}
 
   <div class="mt-7 grid gap-5 lg:grid-cols-2">
     <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
-      <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Settings size={18}/></span><div><h2 class="text-[14px] font-semibold">Geral</h2><p class="mt-1 text-[9px] text-[#9297A5]">Valores não secretos persistidos no PostgreSQL.</p></div></div>
+      <div class="flex items-center gap-3">
+        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Settings size={18}/></span>
+        <div><h2 class="text-[14px] font-semibold">Geral</h2><p class="mt-1 text-[9px] text-[#9297A5]">Valores não secretos persistidos no PostgreSQL.</p></div>
+      </div>
       <form method="POST" action="?/saveGeneral" class="mt-5 space-y-4">
         <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6B]">Nome exibido do suporte</span><input name="supportDisplayName" value={data.general.supportDisplayName} maxlength="120" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]" /></label>
         <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6B]">Timezone</span><input name="timezone" value={data.general.timezone} maxlength="80" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]" /></label>
-        <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6B]">Validade do consentimento remoto</span><div class="flex items-center gap-2"><input name="remoteConsentMinutes" type="number" min="5" max="120" value={data.general.remoteConsentMinutes} class="h-10 w-28 rounded-xl border border-[#DDE1EA] px-3 text-[11px]" /><span class="text-[10px] text-[#858B99]">minutos</span></div></label>
+        <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6B]">Janela de autorização remota</span><div class="flex items-center gap-2"><input name="remoteConsentMinutes" type="number" min="5" max="120" value={data.general.remoteConsentMinutes} class="h-10 w-28 rounded-xl border border-[#DDE1EA] px-3 text-[11px]" /><span class="text-[10px] text-[#858B99]">minutos</span></div><span class="mt-1 block text-[8px] leading-4 text-[#979CA8]">Usada pelos fluxos de sessão do Operations. O consentimento do desktop também é solicitado localmente pelo MeshCentral.</span></label>
         <button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white"><Save size={14}/>Salvar</button>
       </form>
     </section>
@@ -36,11 +46,29 @@
     </section>
 
     <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
-      <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF4E9] text-[#A9510D]"><MonitorCog size={18}/></span><div><h2 class="text-[14px] font-semibold">Acesso remoto</h2><p class="mt-1 text-[9px] text-[#9297A5]">Orquestração F10 + MeshCentral.</p></div></div>
-      <div class="mt-5 space-y-3 text-[10px]"><div class="flex justify-between"><span class="text-[#858B99]">Provider</span><strong>{data.remote.provider}</strong></div><div class="flex justify-between gap-3"><span class="text-[#858B99]">URL</span><strong class="max-w-[280px] truncate">{data.remote.baseUrl || "—"}</strong></div><div class="flex justify-between"><span class="text-[#858B99]">Template por dispositivo</span><strong>{data.remote.hasDeviceTemplate ? "Configurado" : "Pendente"}</strong></div></div>
-      <div class="mt-5 flex items-center justify-between gap-3"><span class={`rounded-full px-2.5 py-1 text-[8px] font-bold ${data.remote.configured ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>{data.remote.configured ? "Configurado" : "Incompleto"}</span><form method="POST" action="?/testRemote"><button type="submit" class="min-h-9 rounded-lg border border-[#DDE1EA] px-3 text-[9px] font-semibold">Testar MeshCentral</button></form></div>
+      <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF4E9] text-[#A9510D]"><MonitorCog size={18}/></span><div><h2 class="text-[14px] font-semibold">Acesso remoto</h2><p class="mt-1 text-[9px] text-[#9297A5]">MeshCentral externo + identificação automática de computadores.</p></div></div>
+
+      <div class="mt-5 space-y-3 text-[10px]">
+        <div class="flex justify-between"><span class="text-[#858B99]">Provider</span><strong>{data.remote.provider}</strong></div>
+        <div class="flex justify-between gap-3"><span class="text-[#858B99]">URL pública</span><strong class="max-w-[280px] truncate">{data.remote.baseUrl || "—"}</strong></div>
+        <div class="flex justify-between"><span class="text-[#858B99]">Link por dispositivo</span><strong>{data.remote.hasDeviceTemplate ? "Configurado" : "Pendente"}</strong></div>
+        <div class="border-t border-[#EEF0F5] pt-3"></div>
+        <div class="flex justify-between gap-3"><span class="text-[#858B99]">Integração automática</span><strong>{data.remoteControl.configured ? "Configurada" : "Pendente"}</strong></div>
+        <div class="flex justify-between gap-3"><span class="text-[#858B99]">Usuário de integração</span><strong>{data.remoteControl.loginUser || "—"}</strong></div>
+        <div class="flex justify-between gap-3"><span class="text-[#858B99]">Autenticação</span><strong>{data.remoteControl.usesLoginKey ? "Login key" : "Credencial protegida"}</strong></div>
+        <div class="flex justify-between gap-3"><span class="text-[#858B99]">Agente Windows</span><strong>Tipo {data.remoteControl.windowsAgentType}</strong></div>
+        <div class="flex justify-between gap-3"><span class="text-[#858B99]">Consentimento local</span><strong>{data.remoteControl.deviceConsentFlags === 8 ? "Desktop Prompt" : `Flags ${data.remoteControl.deviceConsentFlags}`}</strong></div>
+      </div>
+
+      <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
+        <span class={`rounded-full px-2.5 py-1 text-[8px] font-bold ${data.remote.configured && data.remoteControl.configured ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>{data.remote.configured && data.remoteControl.configured ? "Pronto" : "Incompleto"}</span>
+        <div class="flex flex-wrap gap-2">
+          <form method="POST" action="?/testRemote"><button type="submit" class="min-h-9 rounded-lg border border-[#DDE1EA] px-3 text-[9px] font-semibold">Testar interface</button></form>
+          <form method="POST" action="?/testRemoteControl"><button type="submit" class="min-h-9 rounded-lg bg-[#000A57] px-3 text-[9px] font-semibold text-white">Testar integração</button></form>
+        </div>
+      </div>
     </section>
   </div>
 
-  <section class="mt-5 flex items-start gap-3 rounded-2xl border border-[#DDE1F0] bg-[#F8F9FF] px-4 py-3 text-[10px] leading-5 text-[#626A7E]"><ShieldCheck size={16} class="mt-0.5 shrink-0 text-[#000A57]"/><span>Chaves OpenAI, Access Key/Secret do MinIO e eventuais credenciais do provedor remoto não são gravadas em <code>operations_settings</code> nem devolvidas ao navegador. A tela apenas informa se a configuração do ambiente está completa.</span></section>
+  <section class="mt-5 flex items-start gap-3 rounded-2xl border border-[#DDE1F0] bg-[#F8F9FF] px-4 py-3 text-[10px] leading-5 text-[#626A7E]"><ShieldCheck size={16} class="mt-0.5 shrink-0 text-[#000A57]"/><span>Chaves OpenAI, Access Key/Secret do MinIO e credenciais do MeshCentral não são gravadas em <code>operations_settings</code> nem devolvidas ao navegador. A tela expõe apenas o estado operacional da configuração.</span></section>
 </div>
