@@ -66,7 +66,12 @@
   let modalSize: PopupSize = "xl";
 
   function isInternalPath(pathname: string): boolean {
-    return pathname === "/login" || pathname === "/app" || pathname.startsWith("/app/");
+    return (
+      pathname === "/login" ||
+      pathname.startsWith("/login/") ||
+      pathname === "/app" ||
+      pathname.startsWith("/app/")
+    );
   }
 
   $: modalConfig = $contactModalConfig;
