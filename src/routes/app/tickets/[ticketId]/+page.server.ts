@@ -2,6 +2,7 @@ import { error, fail, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
+import { markTicketChatHumanTakeover } from "$lib/server/support/supportAiHandoff";
 import {
   addTicketMessage,
   assignTicket,
@@ -36,7 +37,12 @@ function isTicketStatus(value: string): value is TicketStatus {
 }
 
 function isTicketPriority(value: string): value is TicketPriority {
-  return value === "low" || value === "normal" || value === "high" || value === "urgent";
+  return (
+    value === "low" ||
+    value === "normal" ||
+    value === "high" ||
+    value === "urgent"
+  );
 }
 
 export const load: PageServerLoad = async ({ params, parent }) => {
@@ -67,14 +73,20 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       canAssign,
     };
   } catch {
-    throw error(404, "Ticket não encontrado ou fora do seu escopo de acesso.");
+    throw error(
+      404,
+      "Ticket não encontrado ou fora do seu escopo de acesso.",
+    );
   }
 };
 
 export const actions: Actions = {
   reply: async ({ cookies, params, request }) => {
     if (!isUuid(params.ticketId)) {
-      return fail(404, { success: false, message: "Ticket não encontrado." });
+      return fail(404, {
+        success: false,
+        message: "Ticket não encontrado.",
+      });
     }
 
     const { session, permissions } = await requireAppPermission(
@@ -101,7 +113,16 @@ export const actions: Actions = {
         body,
         "public",
       );
-      return { success: true, action: "reply", message: "Resposta registrada." };
+      await markTicketChatHumanTakeover(
+        params.ticketId,
+        session.user.id,
+        "Atendente respondeu pelo ticket.",
+      );
+      return {
+        success: true,
+        action: "reply",
+        message: "Resposta registrada.",
+      };
     } catch {
       return fail(403, {
         success: false,
@@ -113,7 +134,10 @@ export const actions: Actions = {
 
   note: async ({ cookies, params, request }) => {
     if (!isUuid(params.ticketId)) {
-      return fail(404, { success: false, message: "Ticket não encontrado." });
+      return fail(404, {
+        success: false,
+        message: "Ticket não encontrado.",
+      });
     }
 
     const { session, permissions } = await requireAppPermission(
@@ -140,7 +164,11 @@ export const actions: Actions = {
         body,
         "internal",
       );
-      return { success: true, action: "note", message: "Nota interna adicionada." };
+      return {
+        success: true,
+        action: "note",
+        message: "Nota interna adicionada.",
+      };
     } catch {
       return fail(403, {
         success: false,
@@ -152,7 +180,10 @@ export const actions: Actions = {
 
   status: async ({ cookies, params, request }) => {
     if (!isUuid(params.ticketId)) {
-      return fail(404, { success: false, message: "Ticket não encontrado." });
+      return fail(404, {
+        success: false,
+        message: "Ticket não encontrado.",
+      });
     }
 
     const { session, permissions } = await requireAppPermission(
@@ -174,7 +205,11 @@ export const actions: Actions = {
         params.ticketId,
         status,
       );
-      return { success: true, action: "status", message: "Status atualizado." };
+      return {
+        success: true,
+        action: "status",
+        message: "Status atualizado.",
+      };
     } catch {
       return fail(403, {
         success: false,
@@ -186,7 +221,10 @@ export const actions: Actions = {
 
   priority: async ({ cookies, params, request }) => {
     if (!isUuid(params.ticketId)) {
-      return fail(404, { success: false, message: "Ticket não encontrado." });
+      return fail(404, {
+        success: false,
+        message: "Ticket não encontrado.",
+      });
     }
 
     const { session, permissions } = await requireAppPermission(
@@ -198,7 +236,10 @@ export const actions: Actions = {
     const priority = readFormValue(formData, "priority");
 
     if (!isTicketPriority(priority)) {
-      return fail(400, { success: false, message: "Prioridade inválida." });
+      return fail(400, {
+        success: false,
+        message: "Prioridade inválida.",
+      });
     }
 
     try {
@@ -208,7 +249,11 @@ export const actions: Actions = {
         params.ticketId,
         priority,
       );
-      return { success: true, action: "priority", message: "Prioridade atualizada." };
+      return {
+        success: true,
+        action: "priority",
+        message: "Prioridade atualizada.",
+      };
     } catch {
       return fail(403, {
         success: false,
@@ -220,7 +265,10 @@ export const actions: Actions = {
 
   assign: async ({ cookies, params, request }) => {
     if (!isUuid(params.ticketId)) {
-      return fail(404, { success: false, message: "Ticket não encontrado." });
+      return fail(404, {
+        success: false,
+        message: "Ticket não encontrado.",
+      });
     }
 
     const { session, permissions } = await requireAppPermission(
@@ -232,7 +280,10 @@ export const actions: Actions = {
     const assignedUserId = readFormValue(formData, "assignedUserId");
 
     if (!isUuid(assignedUserId)) {
-      return fail(400, { success: false, message: "Responsável inválido." });
+      return fail(400, {
+        success: false,
+        message: "Responsável inválido.",
+      });
     }
 
     try {
@@ -242,7 +293,16 @@ export const actions: Actions = {
         params.ticketId,
         assignedUserId,
       );
-      return { success: true, action: "assign", message: "Responsável atualizado." };
+      await markTicketChatHumanTakeover(
+        params.ticketId,
+        session.user.id,
+        "Ticket atribuído a um atendente humano.",
+      );
+      return {
+        success: true,
+        action: "assign",
+        message: "Responsável atualizado.",
+      };
     } catch {
       return fail(403, {
         success: false,
