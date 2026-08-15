@@ -36,6 +36,7 @@ export type StartPublicChatInput = {
   message: string;
   contextUrl: string;
   contextData: Record<string, unknown>;
+  enableAi: boolean;
 };
 
 function hashSessionToken(token: string): string {
@@ -174,7 +175,9 @@ export async function startPublicChat(
   const [queue] = await db
     .select({ id: supportQueues.id })
     .from(supportQueues)
-    .where(and(eq(supportQueues.code, "support"), eq(supportQueues.active, true)))
+    .where(
+      and(eq(supportQueues.code, "support"), eq(supportQueues.active, true)),
+    )
     .limit(1);
 
   if (!queue) throw new Error("CHAT_QUEUE_NOT_FOUND");
@@ -212,6 +215,7 @@ export async function startPublicChat(
       body: input.message.trim(),
     });
 
+    const aiState = input.enableAi ? "active" : "disabled";
     const [session] = await tx
       .insert(webChatSessions)
       .values({
@@ -220,6 +224,7 @@ export async function startPublicChat(
         expiresAt,
         contextUrl: input.contextUrl || null,
         contextData: input.contextData,
+        aiState,
       })
       .returning({ id: webChatSessions.id });
 
@@ -230,6 +235,7 @@ export async function startPublicChat(
       eventType: "chat.started",
       metadata: {
         contextUrl: input.contextUrl || null,
+        aiState,
       },
     });
 
@@ -237,6 +243,8 @@ export async function startPublicChat(
       sessionId: session.id,
       ticketId: ticket.id,
       ticketNumber: ticket.ticketNumber,
+      customerContactId,
+      aiState,
     };
   });
 
@@ -254,6 +262,7 @@ export async function authorizePublicChatSession(
       id: webChatSessions.id,
       ticketId: webChatSessions.ticketId,
       expiresAt: webChatSessions.expiresAt,
+      aiState: webChatSessions.aiState,
     })
     .from(webChatSessions)
     .where(
@@ -305,7 +314,7 @@ export async function addPublicChatMessage(
   sessionId: string,
   token: string,
   body: string,
-): Promise<void> {
+): Promise<{ ticketId: string; aiState: "active" | "escalated" | "human" | "disabled" }> {
   const session = await authorizePublicChatSession(sessionId, token);
   const limitKey = createPublicLimitKey(
     `chat-message:${sessionId}`,
@@ -349,7 +358,8 @@ export async function addPublicChatMessage(
       .update(tickets)
       .set({
         status:
-          ticket.status === "resolved" || ticket.status === "waiting_customer"
+          ticket.status === "resolved" ||
+          ticket.status === "waiting_customer"
             ? "open"
             : ticket.status,
         updatedAt: now,
@@ -359,7 +369,9 @@ export async function addPublicChatMessage(
     await tx.insert(ticketEvents).values({
       ticketId: session.ticketId,
       eventType: "chat.customer.message",
-      metadata: {},
+      metadata: { aiState: session.aiState },
     });
   });
+
+  return { ticketId: session.ticketId, aiState: session.aiState };
 }
