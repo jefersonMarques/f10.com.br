@@ -10,6 +10,7 @@
     Trash2,
   } from "lucide-svelte";
   import type { ActionData, PageData } from "./$types";
+  import type { HelpQuestionFormValues } from "$lib/server/help/helpQuestionForm";
 
   type EditableOption = {
     key: string;
@@ -36,7 +37,9 @@
   ];
 
   $: failedValues =
-    form && "values" in form && form.values ? form.values : null;
+    form && "values" in form && form.values
+      ? (form.values as HelpQuestionFormValues)
+      : null;
   $: initialValues = failedValues ?? data.question;
 
   let options: EditableOption[] = data.question.options.map((option) => ({
