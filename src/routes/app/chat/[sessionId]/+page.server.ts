@@ -41,11 +41,13 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       permissions,
       params.sessionId,
     );
-    const canRemote = hasPermission(permissions, "remote.request");
+    const canRequestRemote = hasPermission(permissions, "remote.request");
+    const canUseRemote = hasPermission(permissions, "remote.use");
     const provider = getRemoteProviderStatus();
     const control = getMeshCentralControlStatus();
+    const remoteVisible = canRequestRemote || canUseRemote;
 
-    if (canRemote && provider.configured && control.configured) {
+    if (remoteVisible && provider.configured && control.configured) {
       try {
         await syncRemoteDevicesForTicket(initial.chat.ticketId);
       } catch {
@@ -56,8 +58,9 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     return {
       initial,
       canRespond: hasPermission(permissions, "chat.respond"),
-      canRemote,
-      remoteDevices: canRemote
+      canRequestRemote,
+      canUseRemote,
+      remoteDevices: remoteVisible
         ? await listKnownRemoteDevicesForTicket(initial.chat.ticketId)
         : [],
       remoteReady: provider.configured && control.configured,
@@ -70,7 +73,11 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 export const actions: Actions = {
   enrollRemote: async ({ params, cookies, url }) => {
     if (!isUuid(params.sessionId)) {
-      return fail(404, { success: false, action: "enrollRemote", message: "Conversa não encontrada." });
+      return fail(404, {
+        success: false,
+        action: "enrollRemote",
+        message: "Conversa não encontrada.",
+      });
     }
     const { session, permissions } = await requireAppPermission(
       cookies,
@@ -79,8 +86,16 @@ export const actions: Actions = {
     );
 
     try {
-      const initial = await listInternalChatMessages(session.user.id, permissions, params.sessionId);
-      await createRemoteDeviceEnrollment(session.user.id, initial.chat.ticketId, url.origin);
+      const initial = await listInternalChatMessages(
+        session.user.id,
+        permissions,
+        params.sessionId,
+      );
+      await createRemoteDeviceEnrollment(
+        session.user.id,
+        initial.chat.ticketId,
+        url.origin,
+      );
       return {
         success: true,
         action: "enrollRemote",
@@ -97,21 +112,33 @@ export const actions: Actions = {
 
   startRemote: async ({ params, cookies, request }) => {
     if (!isUuid(params.sessionId)) {
-      return fail(404, { success: false, action: "startRemote", message: "Conversa não encontrada." });
+      return fail(404, {
+        success: false,
+        action: "startRemote",
+        message: "Conversa não encontrada.",
+      });
     }
     const { session, permissions } = await requireAppPermission(
       cookies,
-      "remote.request",
+      "remote.use",
       `/app/chat/${params.sessionId}`,
     );
     const formData = await request.formData();
     const deviceId = readString(formData, "deviceId");
     if (!isUuid(deviceId)) {
-      return fail(400, { success: false, action: "startRemote", message: "Computador inválido." });
+      return fail(400, {
+        success: false,
+        action: "startRemote",
+        message: "Computador inválido.",
+      });
     }
 
     try {
-      const initial = await listInternalChatMessages(session.user.id, permissions, params.sessionId);
+      const initial = await listInternalChatMessages(
+        session.user.id,
+        permissions,
+        params.sessionId,
+      );
       await syncRemoteDevicesForTicket(initial.chat.ticketId);
       const remoteSessionId = await createKnownDeviceRemoteSession(
         session.user.id,
@@ -120,13 +147,21 @@ export const actions: Actions = {
       );
       throw redirect(303, `/app/remote/${remoteSessionId}/launch`);
     } catch (cause) {
-      if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
+      if (
+        cause &&
+        typeof cause === "object" &&
+        "status" in cause &&
+        cause.status === 303
+      ) {
+        throw cause;
+      }
       return fail(409, {
         success: false,
         action: "startRemote",
-        message: cause instanceof Error && cause.message === "REMOTE_DEVICE_OFFLINE"
-          ? "Este computador está offline."
-          : "Não foi possível iniciar o acesso remoto.",
+        message:
+          cause instanceof Error && cause.message === "REMOTE_DEVICE_OFFLINE"
+            ? "Este computador está offline."
+            : "Não foi possível iniciar o acesso remoto.",
       });
     }
   },
