@@ -179,7 +179,6 @@ async function saveRun(input: {
 
 async function finishWithoutModel(input: {
   actorUserId?: string | null;
-  customerContactId?: string | null;
   ticketId?: string | null;
   searchEventId: string | null;
   question: string;
@@ -258,7 +257,6 @@ export async function runSupportAi(
   if (sources.length === 0) {
     return finishWithoutModel({
       actorUserId: input.actorUserId,
-      customerContactId: input.customerContactId,
       ticketId: input.ticketId,
       searchEventId: search.searchEventId,
       question,
@@ -277,7 +275,6 @@ export async function runSupportAi(
   if (contexts.length === 0) {
     return finishWithoutModel({
       actorUserId: input.actorUserId,
-      customerContactId: input.customerContactId,
       ticketId: input.ticketId,
       searchEventId: search.searchEventId,
       question,
@@ -443,7 +440,8 @@ export async function listRecentSupportAiRuns(
 ) {
   const db = getDatabase();
   const safeLimit = Math.min(Math.max(limit, 1), 50);
-  const query = db
+
+  return db
     .select({
       id: supportAiRuns.id,
       question: supportAiRuns.question,
@@ -459,10 +457,9 @@ export async function listRecentSupportAiRuns(
       createdAt: supportAiRuns.createdAt,
     })
     .from(supportAiRuns)
+    .where(
+      actorUserId ? eq(supportAiRuns.actorUserId, actorUserId) : undefined,
+    )
     .orderBy(desc(supportAiRuns.createdAt))
     .limit(safeLimit);
-
-  return actorUserId
-    ? query.where(eq(supportAiRuns.actorUserId, actorUserId))
-    : query;
 }
