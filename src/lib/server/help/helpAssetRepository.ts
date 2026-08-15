@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { and, count, desc, eq, isNotNull } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
+import { helpPublications } from "$lib/server/db/helpPublications";
 import { helpAssets, helpStepBlocks } from "$lib/server/db/structuredHelpSchema";
 import {
   deleteAssetObject,
@@ -47,6 +48,26 @@ function checksum(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+function snapshotReferencesAsset(snapshot: Record<string, unknown>, assetId: string): boolean {
+  const publicSnapshot = snapshot.public;
+  if (!publicSnapshot || typeof publicSnapshot !== "object" || Array.isArray(publicSnapshot)) return false;
+  const steps = (publicSnapshot as Record<string, unknown>).steps;
+  if (!Array.isArray(steps)) return false;
+
+  for (const stepValue of steps) {
+    if (!stepValue || typeof stepValue !== "object" || Array.isArray(stepValue)) continue;
+    const blocks = (stepValue as Record<string, unknown>).blocks;
+    if (!Array.isArray(blocks)) continue;
+    for (const blockValue of blocks) {
+      if (!blockValue || typeof blockValue !== "object" || Array.isArray(blockValue)) continue;
+      const assetValue = (blockValue as Record<string, unknown>).asset;
+      if (!assetValue || typeof assetValue !== "object" || Array.isArray(assetValue)) continue;
+      if ((assetValue as Record<string, unknown>).id === assetId) return true;
+    }
+  }
+  return false;
+}
+
 export type CreateManagedHelpAssetInput = {
   fileName: string;
   mimeType: string;
@@ -63,12 +84,8 @@ export async function createManagedHelpAsset(
   const mimeType = normalizeMimeType(input.mimeType);
   const rule = ALLOWED_MIME_TYPES.get(mimeType);
   if (!rule) throw new Error("ASSET_MIME_NOT_ALLOWED");
-  if (input.bytes.byteLength < 1 || input.bytes.byteLength > rule.maxBytes) {
-    throw new Error("ASSET_SIZE_NOT_ALLOWED");
-  }
-  if (!validateMagicBytes(mimeType, input.bytes)) {
-    throw new Error("ASSET_CONTENT_MISMATCH");
-  }
+  if (input.bytes.byteLength < 1 || input.bytes.byteLength > rule.maxBytes) throw new Error("ASSET_SIZE_NOT_ALLOWED");
+  if (!validateMagicBytes(mimeType, input.bytes)) throw new Error("ASSET_CONTENT_MISMATCH");
 
   const digest = checksum(input.bytes);
   const db = getDatabase();
@@ -150,15 +167,27 @@ export async function getHelpAssetUsageCount(assetId: string): Promise<number> {
   return Number(row?.value ?? 0);
 }
 
+export async function isHelpAssetPublished(assetId: string): Promise<boolean> {
+  const db = getDatabase();
+  const publications = await db
+    .select({ snapshot: helpPublications.snapshot })
+    .from(helpPublications)
+    .where(eq(helpPublications.entityType, "content"));
+  return publications.some((publication) => snapshotReferencesAsset(publication.snapshot, assetId));
+}
+
 export async function deleteManagedHelpAsset(actorUserId: string, assetId: string): Promise<void> {
   const db = getDatabase();
   const asset = await getHelpAsset(assetId);
   if (!asset) throw new Error("ASSET_NOT_FOUND");
-  const usageCount = await getHelpAssetUsageCount(assetId);
-  if (usageCount > 0) throw new Error("ASSET_IN_USE");
+  const [usageCount, published] = await Promise.all([
+    getHelpAssetUsageCount(assetId),
+    isHelpAssetPublished(assetId),
+  ]);
+  if (usageCount > 0 || published) throw new Error("ASSET_IN_USE");
 
-  await db.delete(helpAssets).where(eq(helpAssets.id, assetId));
   if (asset.storageKey) await deleteAssetObject(asset.storageKey);
+  await db.delete(helpAssets).where(eq(helpAssets.id, assetId));
   await recordAuditEvent({
     actorUserId,
     action: "help.asset.deleted",
