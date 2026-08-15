@@ -1,4 +1,8 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
+import {
+  isSupportAiChatEnabled,
+  processSupportAiChatMessage,
+} from "$lib/server/support/supportAiChat";
 import { startPublicChat } from "$lib/server/support/publicChatRepository";
 
 const MAX_BODY_BYTES = 20 * 1024;
@@ -13,7 +17,10 @@ function readString(value: unknown): string {
 }
 
 function isValidEmail(value: string): boolean {
-  return !value || (value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
+  return (
+    !value ||
+    (value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
+  );
 }
 
 function sanitizeContextUrl(value: string): string {
@@ -21,7 +28,9 @@ function sanitizeContextUrl(value: string): string {
 
   try {
     const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : "";
+    return url.protocol === "https:" || url.protocol === "http:"
+      ? url.toString()
+      : "";
   } catch {
     return "";
   }
@@ -68,6 +77,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
   }
 
   try {
+    const enableAi = isSupportAiChatEnabled();
     const session = await startPublicChat(clientAddress, {
       name,
       email,
@@ -78,7 +88,11 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
         pageTitle: pageTitle || null,
         helpContext: helpContext || null,
       },
+      enableAi,
     });
+    const ai = enableAi
+      ? await processSupportAiChatMessage(session.sessionId, message)
+      : null;
 
     return json(
       {
@@ -86,6 +100,8 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
         token: session.token,
         ticketNumber: session.ticketNumber,
         expiresAt: session.expiresAt.toISOString(),
+        aiState: ai?.state ?? session.aiState,
+        aiProcessed: ai?.processed ?? false,
       },
       {
         status: 201,
