@@ -32,6 +32,23 @@ function getSaveErrorMessage(cause: unknown): string {
   }
 }
 
+function getPublishErrorMessage(cause: unknown): string {
+  if (!(cause instanceof Error)) {
+    return "Não foi possível publicar esta pergunta.";
+  }
+
+  switch (cause.message) {
+    case "QUESTION_WITHOUT_OPTIONS":
+      return "Adicione ao menos uma opção antes de publicar.";
+    case "UNPUBLISHED_QUESTION_TARGET":
+      return "Uma das opções leva para outra pergunta que ainda não foi publicada. Publique primeiro a etapa de destino.";
+    case "UNPUBLISHED_DESTINATION_TARGET":
+      return "Uma das opções leva para uma orientação que ainda não possui versão publicada.";
+    default:
+      return "Não foi possível publicar esta pergunta.";
+  }
+}
+
 export const load: PageServerLoad = async ({ params, parent }) => {
   const layout = await parent();
   const permissionMap = new Map(
@@ -132,15 +149,10 @@ export const actions: Actions = {
         message: "Versão atual do fluxo publicada.",
       };
     } catch (cause) {
-      const message =
-        cause instanceof Error && cause.message === "QUESTION_WITHOUT_OPTIONS"
-          ? "Adicione ao menos uma opção antes de publicar."
-          : "Não foi possível publicar esta pergunta.";
-
       return fail(409, {
         success: false,
         action: "publish",
-        message,
+        message: getPublishErrorMessage(cause),
       });
     }
   },
