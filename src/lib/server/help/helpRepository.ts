@@ -1,4 +1,4 @@
-import { and, asc, count, eq, max } from "drizzle-orm";
+import { count } from "drizzle-orm";
 import {
   helpDestinations as legacyDestinations,
   helpQuestions as legacyQuestions,
@@ -13,33 +13,23 @@ import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
 import {
   helpArticles,
-  helpContentVersions,
   helpDestinations,
   helpOptions,
   helpQuestions,
   helpSearchAliases,
   helpTrainingCategories,
   helpTrainingVideos,
-  type HelpArticleBlock,
 } from "$lib/server/db/schema";
 
-export type CreateHelpArticleInput = {
-  title: string;
-  slug: string;
-  summary: string;
-  bodyText: string;
-};
-
-export function normalizeHelpSlug(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 120);
-}
+export {
+  createHelpArticle,
+  getHelpArticleForEdit,
+  listHelpArticles,
+  normalizeHelpSlug,
+  publishHelpArticle,
+  updateHelpArticle,
+  type HelpArticleInput,
+} from "$lib/server/help/helpArticleRepository";
 
 function normalizeSearchAlias(value: string): string {
   return value
@@ -47,14 +37,6 @@ function normalizeSearchAlias(value: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
-}
-
-function buildArticleBlocks(bodyText: string): HelpArticleBlock[] {
-  return bodyText
-    .split(/\n\s*\n/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean)
-    .map((text) => ({ type: "paragraph" as const, text }));
 }
 
 export async function getHelpAdminSummary() {
@@ -73,164 +55,6 @@ export async function getHelpAdminSummary() {
     questions: questionsResult[0]?.value ?? 0,
     trainings: trainingsResult[0]?.value ?? 0,
   };
-}
-
-export async function listHelpArticles() {
-  const db = getDatabase();
-
-  return db
-    .select({
-      id: helpArticles.id,
-      slug: helpArticles.slug,
-      title: helpArticles.title,
-      summary: helpArticles.summary,
-      status: helpArticles.status,
-      publishedAt: helpArticles.publishedAt,
-      updatedAt: helpArticles.updatedAt,
-    })
-    .from(helpArticles)
-    .orderBy(asc(helpArticles.title));
-}
-
-async function getArticle(articleId: string) {
-  const db = getDatabase();
-  const [article] = await db
-    .select()
-    .from(helpArticles)
-    .where(eq(helpArticles.id, articleId))
-    .limit(1);
-
-  return article ?? null;
-}
-
-async function saveArticleVersion(
-  articleId: string,
-  actorUserId: string,
-): Promise<void> {
-  const db = getDatabase();
-  const article = await getArticle(articleId);
-
-  if (!article) return;
-
-  const versionResult = await db
-    .select({ version: max(helpContentVersions.version) })
-    .from(helpContentVersions)
-    .where(
-      and(
-        eq(helpContentVersions.entityType, "article"),
-        eq(helpContentVersions.entityId, articleId),
-      ),
-    );
-
-  const nextVersion = Number(versionResult[0]?.version ?? 0) + 1;
-
-  await db.insert(helpContentVersions).values({
-    entityType: "article",
-    entityId: articleId,
-    version: nextVersion,
-    snapshot: {
-      slug: article.slug,
-      title: article.title,
-      summary: article.summary,
-      body: article.body,
-      status: article.status,
-      publishedAt: article.publishedAt?.toISOString() ?? null,
-    },
-    createdBy: actorUserId,
-  });
-}
-
-export async function createHelpArticle(
-  actorUserId: string,
-  input: CreateHelpArticleInput,
-) {
-  const db = getDatabase();
-  const slug = normalizeHelpSlug(input.slug || input.title);
-
-  if (!slug) throw new Error("INVALID_SLUG");
-
-  const [article] = await db
-    .insert(helpArticles)
-    .values({
-      slug,
-      title: input.title.trim(),
-      summary: input.summary.trim(),
-      body: buildArticleBlocks(input.bodyText),
-      status: "draft",
-      createdBy: actorUserId,
-      updatedBy: actorUserId,
-    })
-    .returning({ id: helpArticles.id, slug: helpArticles.slug });
-
-  if (!article) throw new Error("ARTICLE_NOT_CREATED");
-
-  await saveArticleVersion(article.id, actorUserId);
-  await recordAuditEvent({
-    actorUserId,
-    action: "help.article.created",
-    entityType: "help_article",
-    entityId: article.id,
-    metadata: { slug: article.slug },
-  });
-
-  return article;
-}
-
-export async function publishHelpArticle(
-  actorUserId: string,
-  articleId: string,
-): Promise<void> {
-  const db = getDatabase();
-  const article = await getArticle(articleId);
-
-  if (!article) throw new Error("ARTICLE_NOT_FOUND");
-
-  const publishedAt = new Date();
-  const snapshot = {
-    slug: article.slug,
-    title: article.title,
-    summary: article.summary,
-    body: article.body,
-  };
-
-  await db.transaction(async (tx) => {
-    await tx
-      .update(helpArticles)
-      .set({
-        status: "published",
-        publishedAt,
-        updatedBy: actorUserId,
-        updatedAt: publishedAt,
-      })
-      .where(eq(helpArticles.id, articleId));
-
-    await tx
-      .insert(helpPublications)
-      .values({
-        entityType: "article",
-        entityId: articleId,
-        snapshot,
-        publishedBy: actorUserId,
-        publishedAt,
-      })
-      .onConflictDoUpdate({
-        target: [helpPublications.entityType, helpPublications.entityId],
-        set: {
-          snapshot,
-          publishedBy: actorUserId,
-          publishedAt,
-        },
-      });
-  });
-
-  await saveArticleVersion(articleId, actorUserId);
-  await recordAuditEvent({
-    actorUserId,
-    action: "help.article.published",
-    entityType: "help_article",
-    entityId: articleId,
-    metadata: { slug: article.slug },
-  });
 }
 
 export async function importLegacyHelpContent(actorUserId: string) {
