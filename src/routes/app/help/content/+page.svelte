@@ -66,7 +66,7 @@
                 </a>
                 <div class="flex shrink-0 flex-wrap items-center gap-2">
                   <a href={`/app/help/content/${content.id}/preview`} class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-3 text-[9px] font-semibold text-[#626979]"><Eye size={13}/>Preview</a>
-                  {#if content.status === "published"}
+                  {#if content.publishedAt}
                     <a href={`/ajuda-f10/${content.slug}`} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 text-[9px] font-semibold text-white">Ver artigo<ExternalLink size={12}/></a>
                   {:else}
                     <a href={`/app/help/content/${content.id}`} class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#777D8D]" aria-label="Editar"><ArrowRight size={14}/></a>
