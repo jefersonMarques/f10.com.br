@@ -13,6 +13,13 @@
     closed: "Fechado",
   };
 
+  const aiLabels: Record<string, string> = {
+    active: "IA atendendo",
+    escalated: "Precisa de humano",
+    human: "Humano assumiu",
+    disabled: "IA desativada",
+  };
+
   function formatDateTime(value: string | Date): string {
     return new Intl.DateTimeFormat("pt-BR", {
       dateStyle: "short",
@@ -45,8 +52,8 @@
     <div class="flex items-start gap-3">
       <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[#000A57] shadow-sm"><BrainCircuit size={17} aria-hidden="true" /></span>
       <div>
-        <strong class="text-[12px] font-semibold text-[#303645]">Agente de suporte em homologação</strong>
-        <p class="mt-1 text-[10px] leading-5 text-[#747B8D]">O laboratório usa apenas a Base de Conhecimento publicada e marca automaticamente dúvidas sem sustentação para atendimento humano. O Movidesk continua sendo o canal público.</p>
+        <strong class="text-[12px] font-semibold text-[#303645]">Agente de suporte conectado ao chat nativo</strong>
+        <p class="mt-1 text-[10px] leading-5 text-[#747B8D]">Quando o feature flag estiver habilitado, a IA responde usando somente a Base publicada. Sem sustentação, a conversa muda para atendimento humano e a IA não volta a responder naquela sessão.</p>
       </div>
     </div>
   </section>
@@ -81,9 +88,13 @@
                   <div class="flex flex-wrap items-center gap-2">
                     <strong class="truncate text-[12px] font-semibold text-[#303645]">{chat.customerName ?? "Cliente"}</strong>
                     <span class="rounded-full bg-[#EEF0FF] px-2 py-1 text-[8px] font-bold text-[#000A57]">{statusLabels[chat.status]}</span>
+                    <span class={`rounded-full px-2 py-1 text-[8px] font-bold ${chat.aiState === "active" ? "bg-[#F0EEFF] text-[#5142A6]" : chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#9B3C3C]" : "bg-[#F3F4F7] text-[#777D8D]"}`}>{aiLabels[chat.aiState]}</span>
                     <span class="text-[9px] font-bold text-[#EA6D0B]">#{chat.ticketNumber}</span>
                   </div>
                   <p class="mt-1 truncate text-[10px] text-[#858B99]">{chat.organizationName ?? chat.subject}</p>
+                  {#if chat.aiState === "escalated" && chat.aiHandoffReason}
+                    <p class="mt-1 line-clamp-1 text-[9px] text-[#A05C5C]">{chat.aiHandoffReason}</p>
+                  {/if}
                 </div>
               </div>
               <div class="shrink-0 text-left sm:text-right">
