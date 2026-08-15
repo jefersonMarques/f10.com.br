@@ -59,6 +59,23 @@ function extractSessionCookie(response) {
   return sessionCookie.split(";", 1)[0];
 }
 
+function decodeHtml(value) {
+  return value
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function extractLoginMessage(html) {
+  const match = html.match(/role=["']alert["'][^>]*>([\s\S]*?)<\/div>/i);
+  if (!match?.[1]) return "";
+
+  return decodeHtml(match[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+}
+
 function extractOperationsLinks(html) {
   const routes = new Set();
   const hrefPattern = /\bhref\s*=\s*["']([^"']+)["']/gi;
@@ -134,13 +151,24 @@ async function login() {
     method: "POST",
     redirect: "manual",
     headers: {
+      Accept: "text/html",
       "Content-Type": "application/x-www-form-urlencoded",
       "User-Agent": "F10-Operations-Smoke/1.0",
     },
     body: formData,
   });
 
-  assertStatus(response, [303], "Operations login");
+  if (response.status !== 303) {
+    const html = await response.text();
+    const loginMessage = extractLoginMessage(html);
+    const detail = loginMessage
+      ? ` Server message: ${loginMessage}`
+      : " Check OPERATIONS_SMOKE_EMAIL and OPERATIONS_SMOKE_PASSWORD.";
+
+    throw new Error(
+      `Operations login failed with HTTP ${response.status}.${detail}`,
+    );
+  }
 
   const sessionCookie = extractSessionCookie(response);
   if (!sessionCookie) {
@@ -213,14 +241,29 @@ async function logout(sessionCookie) {
   process.stdout.write("[OK] session revoked by logout\n");
 }
 
-await verifyUnauthenticatedProtection();
-const sessionCookie = await login();
+async function main() {
+  let sessionCookie = "";
 
-try {
-  const discoveredRoutes = await verifyProtectedRoutes(sessionCookie);
-  await crawlOperationsPages(sessionCookie, discoveredRoutes);
-} finally {
-  await logout(sessionCookie);
+  try {
+    await verifyUnauthenticatedProtection();
+    sessionCookie = await login();
+
+    const discoveredRoutes = await verifyProtectedRoutes(sessionCookie);
+    await crawlOperationsPages(sessionCookie, discoveredRoutes);
+
+    process.stdout.write("Operations HTTP smoke test passed.\n");
+  } finally {
+    if (sessionCookie) {
+      await logout(sessionCookie);
+    }
+  }
 }
 
-process.stdout.write("Operations HTTP smoke test passed.\n");
+try {
+  await main();
+} catch (error) {
+  process.stderr.write(
+    `[FAIL] ${error instanceof Error ? error.message : String(error)}\n`,
+  );
+  process.exitCode = 1;
+}
