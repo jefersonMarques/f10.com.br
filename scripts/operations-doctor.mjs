@@ -8,6 +8,8 @@ const requireSuperAdmin =
 const requireOpenAi = process.env.OPERATIONS_DOCTOR_REQUIRE_OPENAI === "true";
 const openAiConfigured = Boolean(process.env.OPENAI_API_KEY?.trim());
 const openAiModel = process.env.OPENAI_MODEL?.trim() || "gpt-5-mini";
+const chatAiEnabled = process.env.SUPPORT_AI_CHAT_ENABLED === "true";
+const supportRateLimitSecret = process.env.SUPPORT_RATE_LIMIT_SECRET?.trim() ?? "";
 
 if (!databaseUrl) {
   throw new Error("DATABASE_URL is required.");
@@ -179,6 +181,20 @@ try {
           : "not configured; AI lab will fail closed to human escalation",
     );
     hasFailure ||= !openAiOk;
+
+    const chatAiOk =
+      !chatAiEnabled ||
+      (openAiConfigured && supportRateLimitSecret.length >= 32);
+    printResult(
+      "native chat AI",
+      chatAiOk,
+      chatAiEnabled
+        ? chatAiOk
+          ? `enabled; model=${openAiModel}`
+          : "SUPPORT_AI_CHAT_ENABLED requires OPENAI_API_KEY and SUPPORT_RATE_LIMIT_SECRET with at least 32 characters"
+        : "disabled by feature flag",
+    );
+    hasFailure ||= !chatAiOk;
 
     const roleRows = await sql`SELECT code FROM roles`;
     const missingRoles = difference(
