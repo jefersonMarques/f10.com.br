@@ -149,6 +149,9 @@ export async function syncRemoteDevicesForTicket(ticketId: string) {
   const providerDevices = await listMeshCentralDevices(group.providerGroupName);
   const db = getDatabase();
   const now = new Date();
+  const deviceContactId = subject.customerOrganizationId
+    ? null
+    : subject.customerContactId;
 
   await db
     .update(remoteDevices)
@@ -171,7 +174,7 @@ export async function syncRemoteDevicesForTicket(ticketId: string) {
     const [device] = await db
       .insert(remoteDevices)
       .values({
-        customerContactId: subject.customerContactId,
+        customerContactId: deviceContactId,
         customerOrganizationId: subject.customerOrganizationId,
         name: providerDevice.name.slice(0, 160),
         provider: "meshcentral",
@@ -186,7 +189,7 @@ export async function syncRemoteDevicesForTicket(ticketId: string) {
       .onConflictDoUpdate({
         target: [remoteDevices.provider, remoteDevices.providerDeviceId],
         set: {
-          customerContactId: subject.customerContactId,
+          customerContactId: deviceContactId,
           customerOrganizationId: subject.customerOrganizationId,
           name: providerDevice.name.slice(0, 160),
           providerGroupId: group.providerGroupId,
