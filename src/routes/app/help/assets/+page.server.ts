@@ -7,22 +7,31 @@ import {
   deleteManagedHelpAsset,
   listManagedHelpAssets,
 } from "$lib/server/help/helpAssetRepository";
+import {
+  attachHelpAssetToStep,
+  listHelpAssetAttachmentTargets,
+} from "$lib/server/help/helpAssetAttachment";
 import { getAssetStorageStatus } from "$lib/server/storage/assetStorage";
 
 function readString(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === "string" ? value.trim() : "";
 }
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
 
 export const load: PageServerLoad = async ({ parent }) => {
   const layout = await parent();
   const permissions = new Map(layout.permissions.map((permission) => [permission.code, permission.scope]));
   if (!hasPermission(permissions, "help.view")) throw error(403, "Acesso não autorizado.");
+  const canEdit = hasPermission(permissions, "help.edit");
 
   return {
     assets: await listManagedHelpAssets(),
+    targets: canEdit ? await listHelpAssetAttachmentTargets() : [],
     storage: getAssetStorageStatus(),
-    canEdit: hasPermission(permissions, "help.edit"),
+    canEdit,
   };
 };
 
@@ -63,6 +72,23 @@ export const actions: Actions = {
     }
   },
 
+  attach: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(cookies, "help.edit", "/app/help/assets");
+    const formData = await request.formData();
+    const assetId = readString(formData, "assetId");
+    const stepId = readString(formData, "stepId");
+    const label = readString(formData, "label");
+    if (!isUuid(assetId) || !isUuid(stepId)) {
+      return fail(400, { success: false, action: "attach", message: "Selecione um conteúdo e passo válidos." });
+    }
+    try {
+      await attachHelpAssetToStep(session.user.id, assetId, stepId, label);
+      return { success: true, action: "attach", message: "Arquivo adicionado ao passo. O conteúdo voltou para rascunho até nova publicação." };
+    } catch {
+      return fail(409, { success: false, action: "attach", message: "Não foi possível vincular o arquivo ao passo." });
+    }
+  },
+
   delete: async ({ cookies, request }) => {
     const { session } = await requireAppPermission(cookies, "help.edit", "/app/help/assets");
     const formData = await request.formData();
@@ -75,7 +101,7 @@ export const actions: Actions = {
         success: false,
         action: "delete",
         message: cause instanceof Error && cause.message === "ASSET_IN_USE"
-          ? "Este arquivo está sendo usado em um conteúdo e não pode ser removido."
+          ? "Este arquivo está sendo usado em um rascunho ou publicação e não pode ser removido."
           : "Não foi possível remover o arquivo.",
       });
     }
