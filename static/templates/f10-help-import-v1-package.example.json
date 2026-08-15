@@ -1,0 +1,52 @@
+{
+  "format": "f10-help-import",
+  "version": 1,
+  "source": "movidesk",
+  "contents": [
+    {
+      "externalId": "movidesk-exemplo-001",
+      "title": "Como realizar um procedimento com arquivos",
+      "slug": "como-realizar-procedimento-com-arquivos",
+      "summary": "Exemplo de manifest para pacote ZIP com imagem, documento e vídeo do YouTube.",
+      "category": "Treinamentos",
+      "aiGeneralKnowledge": "Use apenas as informações confirmadas no material de origem.",
+      "steps": [
+        {
+          "title": "Localize a opção no sistema",
+          "description": "Abra a tela indicada no treinamento.",
+          "aiKnowledge": "A imagem deste passo ajuda a localizar visualmente a opção.",
+          "blocks": [
+            {
+              "type": "text",
+              "text": "Acesse a tela correspondente e localize a opção indicada na imagem."
+            },
+            {
+              "type": "image",
+              "file": "assets/tela-exemplo.png",
+              "altText": "Tela do sistema com a opção destacada",
+              "aiSummary": "Mostra a posição da opção utilizada neste passo."
+            }
+          ]
+        },
+        {
+          "title": "Consulte o material complementar",
+          "blocks": [
+            {
+              "type": "file",
+              "file": "assets/modelo-exemplo.xlsx",
+              "label": "Baixar planilha modelo",
+              "aiSummary": "Planilha complementar citada no treinamento."
+            },
+            {
+              "type": "video",
+              "url": "https://www.youtube.com/watch?v=VIDEO_ID",
+              "altText": "Treinamento em vídeo",
+              "transcript": "Insira aqui a transcrição real do vídeo.",
+              "aiSummary": "Resuma aqui somente o que o vídeo efetivamente ensina."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
