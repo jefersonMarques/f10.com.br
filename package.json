@@ -13,7 +13,8 @@
     "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
     "admin:bootstrap": "node --env-file-if-exists=.env scripts/bootstrap-super-admin.mjs",
     "operations:doctor": "node --env-file-if-exists=.env scripts/operations-doctor.mjs",
-    "operations:smoke": "node --env-file-if-exists=.env scripts/operations-smoke.mjs"
+    "operations:smoke": "node --env-file-if-exists=.env scripts/operations-smoke.mjs",
+    "support:doctor": "node --env-file-if-exists=.env scripts/support-doctor.mjs"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^3.3.1",
