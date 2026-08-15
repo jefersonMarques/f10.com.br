@@ -6,6 +6,7 @@ import {
   type PermissionCode,
   type PermissionScope,
 } from "$lib/server/auth/permissions";
+import { regenerateManagedUserInvite } from "$lib/server/users/userInviteManagement";
 import {
   getManagedUserDetails,
   setManagedUserPermission,
@@ -57,11 +58,17 @@ export const load: PageServerLoad = async ({ params, parent }) => {
         layout.roles,
         params.userId,
       ),
-      canManage: hasPermission(permissionMap, "users.manage"),
+      canManage:
+        hasPermission(permissionMap, "users.manage") &&
+        layout.user.id !== params.userId,
+      isSelf: layout.user.id === params.userId,
     };
   } catch (cause) {
     if (cause instanceof Error && cause.message === "USER_NOT_MANAGEABLE") {
-      throw error(403, "Este usuário não pode ser administrado pelo seu perfil.");
+      throw error(
+        403,
+        "Este usuário não pode ser administrado pelo seu perfil.",
+      );
     }
 
     throw error(404, "Usuário não encontrado.");
@@ -71,7 +78,10 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 export const actions: Actions = {
   permission: async ({ cookies, params, request }) => {
     if (!isUuid(params.userId)) {
-      return fail(404, { success: false, message: "Usuário não encontrado." });
+      return fail(404, {
+        success: false,
+        message: "Usuário não encontrado.",
+      });
     }
 
     const { session } = await requireAppPermission(
@@ -124,7 +134,10 @@ export const actions: Actions = {
 
   status: async ({ cookies, params, request }) => {
     if (!isUuid(params.userId)) {
-      return fail(404, { success: false, message: "Usuário não encontrado." });
+      return fail(404, {
+        success: false,
+        message: "Usuário não encontrado.",
+      });
     }
 
     const { session } = await requireAppPermission(
@@ -156,12 +169,51 @@ export const actions: Actions = {
       };
     } catch (cause) {
       const message =
-        cause instanceof Error &&
-        cause.message === "INVITED_USER_REQUIRES_ACTIVATION"
-          ? "O usuário precisa concluir o link de ativação para ficar ativo."
+        cause instanceof Error && cause.message === "USER_REQUIRES_ACTIVATION"
+          ? "Este usuário ainda precisa concluir a ativação da conta."
           : "Não foi possível alterar o status deste usuário.";
 
       return fail(409, { success: false, message });
+    }
+  },
+
+  regenerateInvite: async ({ cookies, params, url }) => {
+    if (!isUuid(params.userId)) {
+      return fail(404, {
+        success: false,
+        message: "Usuário não encontrado.",
+      });
+    }
+
+    const { session } = await requireAppPermission(
+      cookies,
+      "users.manage",
+      `/app/team/${params.userId}`,
+    );
+
+    try {
+      const invitation = await regenerateManagedUserInvite(
+        session.user.id,
+        session.roles,
+        params.userId,
+      );
+      const inviteUrl = new URL(
+        `/login/activate?token=${encodeURIComponent(invitation.token)}`,
+        url.origin,
+      ).toString();
+
+      return {
+        success: true,
+        message: "Novo link de ativação criado. O link anterior foi invalidado.",
+        inviteUrl,
+        expiresAt: invitation.expiresAt.toISOString(),
+      };
+    } catch {
+      return fail(409, {
+        success: false,
+        message:
+          "Não foi possível gerar um novo convite para este usuário.",
+      });
     }
   },
 };
