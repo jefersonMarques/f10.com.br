@@ -17,9 +17,11 @@ const MAX_STEPS_PER_CONTENT = 80;
 const MAX_BLOCKS_PER_STEP = 80;
 const MAX_TOTAL_BLOCKS = 8_000;
 
+type NoticeVariant = "info" | "warning" | "success" | "danger";
+
 export type HelpImportBlock =
   | { type: "text"; text: string }
-  | { type: "notice"; text: string; variant?: "info" | "warning" | "success" | "danger" }
+  | { type: "notice"; text: string; variant?: NoticeVariant }
   | { type: "link"; url: string; label: string }
   | {
       type: "image";
@@ -79,7 +81,10 @@ function readString(record: Record<string, unknown>, key: string): string {
   return typeof record[key] === "string" ? record[key].trim() : "";
 }
 
-function optionalString(record: Record<string, unknown>, key: string): string | undefined {
+function optionalString(
+  record: Record<string, unknown>,
+  key: string,
+): string | undefined {
   const value = readString(record, key);
   return value || undefined;
 }
@@ -93,7 +98,11 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
-function parseBlock(value: unknown, path: string, issues: string[]): HelpImportBlock | null {
+function parseBlock(
+  value: unknown,
+  path: string,
+  issues: string[],
+): HelpImportBlock | null {
   const record = asRecord(value);
   if (!record) {
     issues.push(`${path}: bloco inválido.`);
@@ -105,7 +114,9 @@ function parseBlock(value: unknown, path: string, issues: string[]): HelpImportB
   if (type === "text") {
     const text = readString(record, "text");
     if (!text || text.length > 30_000) {
-      issues.push(`${path}: bloco de texto deve ter entre 1 e 30.000 caracteres.`);
+      issues.push(
+        `${path}: bloco de texto deve ter entre 1 e 30.000 caracteres.`,
+      );
       return null;
     }
     return { type, text };
@@ -113,17 +124,29 @@ function parseBlock(value: unknown, path: string, issues: string[]): HelpImportB
 
   if (type === "notice") {
     const text = readString(record, "text");
-    const variant = optionalString(record, "variant");
-    const allowed = new Set(["info", "warning", "success", "danger"]);
+    const variantValue = optionalString(record, "variant");
+    const allowedVariants: NoticeVariant[] = [
+      "info",
+      "warning",
+      "success",
+      "danger",
+    ];
+
     if (!text || text.length > 15_000) {
       issues.push(`${path}: aviso deve ter entre 1 e 15.000 caracteres.`);
       return null;
     }
-    if (variant && !allowed.has(variant)) {
+
+    if (
+      variantValue &&
+      !allowedVariants.includes(variantValue as NoticeVariant)
+    ) {
       issues.push(`${path}: variant inválido.`);
       return null;
     }
-    return { type, text, variant: variant as HelpImportBlock & never } as HelpImportBlock;
+
+    const variant = variantValue as NoticeVariant | undefined;
+    return { type, text, variant };
   }
 
   if (type === "link") {
@@ -159,11 +182,17 @@ function parseBlock(value: unknown, path: string, issues: string[]): HelpImportB
     return { type, url, altText, transcript, aiSummary };
   }
 
-  issues.push(`${path}: tipo de bloco não suportado: ${type || "vazio"}.`);
+  issues.push(
+    `${path}: tipo de bloco não suportado: ${type || "vazio"}.`,
+  );
   return null;
 }
 
-function parseStep(value: unknown, path: string, issues: string[]): HelpImportStep | null {
+function parseStep(
+  value: unknown,
+  path: string,
+  issues: string[],
+): HelpImportStep | null {
   const record = asRecord(value);
   if (!record) {
     issues.push(`${path}: passo inválido.`);
@@ -175,27 +204,43 @@ function parseStep(value: unknown, path: string, issues: string[]): HelpImportSt
   const aiKnowledge = optionalString(record, "aiKnowledge");
   const blocksValue = record.blocks;
 
-  if (!title || title.length > 180) issues.push(`${path}: título do passo é obrigatório e deve ter até 180 caracteres.`);
-  if ((description?.length ?? 0) > 10_000) issues.push(`${path}: descrição excede 10.000 caracteres.`);
-  if ((aiKnowledge?.length ?? 0) > 30_000) issues.push(`${path}: conhecimento da IA excede 30.000 caracteres.`);
+  if (!title || title.length > 180) {
+    issues.push(
+      `${path}: título do passo é obrigatório e deve ter até 180 caracteres.`,
+    );
+  }
+  if ((description?.length ?? 0) > 10_000) {
+    issues.push(`${path}: descrição excede 10.000 caracteres.`);
+  }
+  if ((aiKnowledge?.length ?? 0) > 30_000) {
+    issues.push(`${path}: conhecimento da IA excede 30.000 caracteres.`);
+  }
   if (!Array.isArray(blocksValue) || blocksValue.length === 0) {
     issues.push(`${path}: cada passo deve ter ao menos um bloco.`);
     return null;
   }
   if (blocksValue.length > MAX_BLOCKS_PER_STEP) {
-    issues.push(`${path}: máximo de ${MAX_BLOCKS_PER_STEP} blocos por passo.`);
+    issues.push(
+      `${path}: máximo de ${MAX_BLOCKS_PER_STEP} blocos por passo.`,
+    );
     return null;
   }
 
   const blocks = blocksValue
-    .map((block, index) => parseBlock(block, `${path}.blocks[${index}]`, issues))
+    .map((block, index) =>
+      parseBlock(block, `${path}.blocks[${index}]`, issues),
+    )
     .filter((block): block is HelpImportBlock => Boolean(block));
 
   if (!title || blocks.length !== blocksValue.length) return null;
   return { title, description, aiKnowledge, blocks };
 }
 
-function parseContent(value: unknown, index: number, issues: string[]): HelpImportContent | null {
+function parseContent(
+  value: unknown,
+  index: number,
+  issues: string[],
+): HelpImportContent | null {
   const path = `contents[${index}]`;
   const record = asRecord(value);
   if (!record) {
@@ -211,27 +256,58 @@ function parseContent(value: unknown, index: number, issues: string[]): HelpImpo
   const aiGeneralKnowledge = optionalString(record, "aiGeneralKnowledge");
   const stepsValue = record.steps;
 
-  if (!externalId || externalId.length > 240) issues.push(`${path}: externalId é obrigatório e deve ter até 240 caracteres.`);
-  if (!title || title.length < 4 || title.length > 160) issues.push(`${path}: título deve ter entre 4 e 160 caracteres.`);
-  if ((slug?.length ?? 0) > 160) issues.push(`${path}: slug excede 160 caracteres.`);
-  if ((summary?.length ?? 0) > 320) issues.push(`${path}: resumo excede 320 caracteres.`);
-  if ((category?.length ?? 0) > 120) issues.push(`${path}: categoria excede 120 caracteres.`);
-  if ((aiGeneralKnowledge?.length ?? 0) > 40_000) issues.push(`${path}: conhecimento geral da IA excede 40.000 caracteres.`);
+  if (!externalId || externalId.length > 240) {
+    issues.push(
+      `${path}: externalId é obrigatório e deve ter até 240 caracteres.`,
+    );
+  }
+  if (!title || title.length < 4 || title.length > 160) {
+    issues.push(`${path}: título deve ter entre 4 e 160 caracteres.`);
+  }
+  if ((slug?.length ?? 0) > 160) {
+    issues.push(`${path}: slug excede 160 caracteres.`);
+  }
+  if ((summary?.length ?? 0) > 320) {
+    issues.push(`${path}: resumo excede 320 caracteres.`);
+  }
+  if ((category?.length ?? 0) > 120) {
+    issues.push(`${path}: categoria excede 120 caracteres.`);
+  }
+  if ((aiGeneralKnowledge?.length ?? 0) > 40_000) {
+    issues.push(
+      `${path}: conhecimento geral da IA excede 40.000 caracteres.`,
+    );
+  }
   if (!Array.isArray(stepsValue) || stepsValue.length === 0) {
     issues.push(`${path}: conteúdo deve possuir ao menos um passo.`);
     return null;
   }
   if (stepsValue.length > MAX_STEPS_PER_CONTENT) {
-    issues.push(`${path}: máximo de ${MAX_STEPS_PER_CONTENT} passos por conteúdo.`);
+    issues.push(
+      `${path}: máximo de ${MAX_STEPS_PER_CONTENT} passos por conteúdo.`,
+    );
     return null;
   }
 
   const steps = stepsValue
-    .map((step, stepIndex) => parseStep(step, `${path}.steps[${stepIndex}]`, issues))
+    .map((step, stepIndex) =>
+      parseStep(step, `${path}.steps[${stepIndex}]`, issues),
+    )
     .filter((step): step is HelpImportStep => Boolean(step));
 
-  if (!externalId || !title || steps.length !== stepsValue.length) return null;
-  return { externalId, title, slug, summary, category, aiGeneralKnowledge, steps };
+  if (!externalId || !title || steps.length !== stepsValue.length) {
+    return null;
+  }
+
+  return {
+    externalId,
+    title,
+    slug,
+    summary,
+    category,
+    aiGeneralKnowledge,
+    steps,
+  };
 }
 
 export function validateHelpImportJson(rawJson: string): HelpImportValidation {
@@ -270,9 +346,15 @@ export function validateHelpImportJson(rawJson: string): HelpImportValidation {
   const source = readString(root, "source");
   const contentsValue = root.contents;
 
-  if (format !== IMPORT_FORMAT) issues.push(`format deve ser "${IMPORT_FORMAT}".`);
-  if (version !== IMPORT_VERSION) issues.push(`version deve ser ${IMPORT_VERSION}.`);
-  if (!source || source.length > 80) issues.push("source é obrigatório e deve ter até 80 caracteres.");
+  if (format !== IMPORT_FORMAT) {
+    issues.push(`format deve ser "${IMPORT_FORMAT}".`);
+  }
+  if (version !== IMPORT_VERSION) {
+    issues.push(`version deve ser ${IMPORT_VERSION}.`);
+  }
+  if (!source || source.length > 80) {
+    issues.push("source é obrigatório e deve ter até 80 caracteres.");
+  }
   if (!Array.isArray(contentsValue) || contentsValue.length === 0) {
     issues.push("contents deve possuir ao menos um conteúdo.");
   } else if (contentsValue.length > MAX_CONTENTS) {
@@ -292,20 +374,45 @@ export function validateHelpImportJson(rawJson: string): HelpImportValidation {
 
   for (const [index, content] of contents.entries()) {
     const slug = normalizeHelpSlug(content.slug || content.title);
-    if (!slug) issues.push(`contents[${index}]: não foi possível gerar slug válido.`);
-    if (externalIds.has(content.externalId)) issues.push(`contents[${index}]: externalId duplicado no arquivo.`);
-    if (slug && slugs.has(slug)) issues.push(`contents[${index}]: slug duplicado no arquivo: ${slug}.`);
+    if (!slug) {
+      issues.push(`contents[${index}]: não foi possível gerar slug válido.`);
+    }
+    if (externalIds.has(content.externalId)) {
+      issues.push(`contents[${index}]: externalId duplicado no arquivo.`);
+    }
+    if (slug && slugs.has(slug)) {
+      issues.push(
+        `contents[${index}]: slug duplicado no arquivo: ${slug}.`,
+      );
+    }
     externalIds.add(content.externalId);
     if (slug) slugs.add(slug);
     stepCount += content.steps.length;
-    blockCount += content.steps.reduce((total, step) => total + step.blocks.length, 0);
+    blockCount += content.steps.reduce(
+      (total, step) => total + step.blocks.length,
+      0,
+    );
   }
 
-  if (blockCount > MAX_TOTAL_BLOCKS) issues.push(`Máximo de ${MAX_TOTAL_BLOCKS} blocos por arquivo.`);
+  if (blockCount > MAX_TOTAL_BLOCKS) {
+    issues.push(`Máximo de ${MAX_TOTAL_BLOCKS} blocos por arquivo.`);
+  }
 
+  const contentArrayLength = Array.isArray(contentsValue)
+    ? contentsValue.length
+    : 0;
   const parsed: HelpImportFile | null =
-    issues.length === 0 && format === IMPORT_FORMAT && version === IMPORT_VERSION && source && contents.length === contentsValue?.length
-      ? { format: IMPORT_FORMAT, version: IMPORT_VERSION, source, contents }
+    issues.length === 0 &&
+    format === IMPORT_FORMAT &&
+    version === IMPORT_VERSION &&
+    Boolean(source) &&
+    contents.length === contentArrayLength
+      ? {
+          format: IMPORT_FORMAT,
+          version: IMPORT_VERSION,
+          source,
+          contents,
+        }
       : null;
 
   return {
@@ -319,13 +426,14 @@ export function validateHelpImportJson(rawJson: string): HelpImportValidation {
   };
 }
 
-function blockSnapshot(block: HelpImportBlock) {
-  return block;
-}
-
-export async function importStructuredHelpFile(actorUserId: string, file: HelpImportFile) {
+export async function importStructuredHelpFile(
+  actorUserId: string,
+  file: HelpImportFile,
+) {
   const db = getDatabase();
-  const normalizedSlugs = file.contents.map((content) => normalizeHelpSlug(content.slug || content.title));
+  const normalizedSlugs = file.contents.map((content) =>
+    normalizeHelpSlug(content.slug || content.title),
+  );
   const externalIds = file.contents.map((content) => content.externalId);
 
   const [existingSlugs, existingExternalIds] = await Promise.all([
@@ -344,15 +452,26 @@ export async function importStructuredHelpFile(actorUserId: string, file: HelpIm
       ),
   ]);
 
-  if (existingSlugs.length > 0) throw new Error(`IMPORT_SLUG_CONFLICT:${existingSlugs.map((row) => row.slug).join(",")}`);
+  if (existingSlugs.length > 0) {
+    throw new Error(
+      `IMPORT_SLUG_CONFLICT:${existingSlugs.map((row) => row.slug).join(",")}`,
+    );
+  }
   if (existingExternalIds.length > 0) {
     throw new Error(
-      `IMPORT_EXTERNAL_ID_CONFLICT:${existingExternalIds.map((row) => row.externalId).filter(Boolean).join(",")}`,
+      `IMPORT_EXTERNAL_ID_CONFLICT:${existingExternalIds
+        .map((row) => row.externalId)
+        .filter(Boolean)
+        .join(",")}`,
     );
   }
 
   const imported = await db.transaction(async (tx) => {
-    const result: Array<{ id: string; title: string; externalId: string }> = [];
+    const result: Array<{
+      id: string;
+      title: string;
+      externalId: string;
+    }> = [];
 
     for (const content of file.contents) {
       const slug = normalizeHelpSlug(content.slug || content.title);
@@ -399,12 +518,14 @@ export async function importStructuredHelpFile(actorUserId: string, file: HelpIm
                 assetType: block.type,
                 sourceUrl: block.url,
                 altText: block.altText ?? "",
-                transcript: block.type === "video" ? block.transcript ?? "" : "",
+                transcript:
+                  block.type === "video" ? block.transcript ?? "" : "",
                 aiSummary: block.aiSummary ?? "",
                 metadata: { importedFrom: file.source },
                 createdBy: actorUserId,
               })
               .returning({ id: helpAssets.id });
+
             assetId = asset?.id ?? null;
             if (!assetId) throw new Error("IMPORT_ASSET_NOT_CREATED");
           }
@@ -412,11 +533,15 @@ export async function importStructuredHelpFile(actorUserId: string, file: HelpIm
           await tx.insert(helpStepBlocks).values({
             stepId: createdStep.id,
             blockType: block.type,
-            textContent: block.type === "text" || block.type === "notice" ? block.text : "",
+            textContent:
+              block.type === "text" || block.type === "notice"
+                ? block.text
+                : "",
             assetId,
             linkUrl: block.type === "link" ? block.url : null,
             linkLabel: block.type === "link" ? block.label : null,
-            noticeVariant: block.type === "notice" ? block.variant ?? "info" : null,
+            noticeVariant:
+              block.type === "notice" ? block.variant ?? "info" : null,
             metadata: { importedFrom: file.source },
             sortOrder: (blockIndex + 1) * 10,
           });
@@ -428,7 +553,10 @@ export async function importStructuredHelpFile(actorUserId: string, file: HelpIm
         entityId: createdContent.id,
         version: 1,
         snapshot: {
-          import: { source: file.source, externalId: content.externalId },
+          import: {
+            source: file.source,
+            externalId: content.externalId,
+          },
           title: content.title,
           slug,
           summary: content.summary ?? "",
@@ -440,17 +568,35 @@ export async function importStructuredHelpFile(actorUserId: string, file: HelpIm
             description: step.description ?? "",
             aiKnowledge: step.aiKnowledge ?? "",
             sortOrder: (stepIndex + 1) * 10,
-            blocks: step.blocks.map(blockSnapshot),
+            blocks: step.blocks,
           })),
         },
         createdBy: actorUserId,
       });
 
-      result.push({ id: createdContent.id, title: content.title, externalId: content.externalId });
+      result.push({
+        id: createdContent.id,
+        title: content.title,
+        externalId: content.externalId,
+      });
     }
 
     return result;
   });
+
+  const stepCount = file.contents.reduce(
+    (total, content) => total + content.steps.length,
+    0,
+  );
+  const blockCount = file.contents.reduce(
+    (total, content) =>
+      total +
+      content.steps.reduce(
+        (stepTotal, step) => stepTotal + step.blocks.length,
+        0,
+      ),
+    0,
+  );
 
   await recordAuditEvent({
     actorUserId,
@@ -459,14 +605,17 @@ export async function importStructuredHelpFile(actorUserId: string, file: HelpIm
     metadata: {
       source: file.source,
       contentCount: file.contents.length,
-      stepCount: file.contents.reduce((total, content) => total + content.steps.length, 0),
-      blockCount: file.contents.reduce(
-        (total, content) => total + content.steps.reduce((stepTotal, step) => stepTotal + step.blocks.length, 0),
-        0,
-      ),
+      stepCount,
+      blockCount,
       externalIds: imported.map((item) => item.externalId),
     },
   });
 
-  return imported;
+  return {
+    imported,
+    source: file.source,
+    contentCount: file.contents.length,
+    stepCount,
+    blockCount,
+  };
 }
