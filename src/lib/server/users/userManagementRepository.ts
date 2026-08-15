@@ -81,6 +81,7 @@ async function requireManageableTarget(
       name: users.name,
       email: users.email,
       status: users.status,
+      activatedAt: users.activatedAt,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
     })
@@ -337,8 +338,8 @@ export async function setManagedUserStatus(
     throw new Error("SELF_DEACTIVATION_NOT_ALLOWED");
   }
 
-  if (target.status === "invited" && status === "active") {
-    throw new Error("INVITED_USER_REQUIRES_ACTIVATION");
+  if (status === "active" && !target.activatedAt) {
+    throw new Error("USER_REQUIRES_ACTIVATION");
   }
 
   await db.transaction(async (tx) => {
@@ -416,6 +417,7 @@ export async function activateInvitedUser(
       .set({
         passwordHash,
         status: "active",
+        activatedAt: now,
         updatedAt: now,
       })
       .where(eq(users.id, invite.userId));
