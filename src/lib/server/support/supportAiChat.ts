@@ -18,7 +18,10 @@ import {
   ticketMessages,
   tickets,
 } from "$lib/server/db/supportSchema";
-import { runSupportAi, type SupportAiResult } from "$lib/server/support/supportAiAgent";
+import {
+  runSupportAi,
+  type SupportAiResult,
+} from "$lib/server/support/supportAiAgent";
 
 const PROCESSING_STALE_MS = 60_000;
 const AI_WINDOW_MS = 30 * 60 * 1000;
@@ -26,14 +29,27 @@ const AI_MAX_RUNS_PER_WINDOW = 15;
 const MAX_HISTORY_MESSAGES = 10;
 const MAX_HISTORY_BODY_CHARS = 1_500;
 
+type ChatAiState = "active" | "escalated" | "human" | "disabled";
+
 export type SupportAiChatProcessResult = {
   processed: boolean;
-  state: "active" | "escalated" | "human" | "disabled";
+  state: ChatAiState;
   result: SupportAiResult | null;
 };
 
 export function isSupportAiChatEnabled(): boolean {
   return env.SUPPORT_AI_CHAT_ENABLED === "true" && isOpenAiConfigured();
+}
+
+async function getSessionState(sessionId: string): Promise<ChatAiState> {
+  const db = getDatabase();
+  const [session] = await db
+    .select({ aiState: webChatSessions.aiState })
+    .from(webChatSessions)
+    .where(eq(webChatSessions.id, sessionId))
+    .limit(1);
+
+  return session?.aiState ?? "disabled";
 }
 
 async function claimAiProcessing(sessionId: string) {
@@ -56,7 +72,6 @@ async function claimAiProcessing(sessionId: string) {
     .returning({
       id: webChatSessions.id,
       ticketId: webChatSessions.ticketId,
-      aiState: webChatSessions.aiState,
     });
 
   return session ?? null;
@@ -86,7 +101,10 @@ async function getAiRunCount(ticketId: string): Promise<number> {
   return Number(row?.value ?? 0);
 }
 
-async function getConversationContext(ticketId: string, currentQuestion: string) {
+async function getConversationContext(
+  ticketId: string,
+  currentQuestion: string,
+) {
   const db = getDatabase();
   const messages = await db
     .select({
@@ -106,7 +124,8 @@ async function getConversationContext(ticketId: string, currentQuestion: string)
   const recent = messages.slice(-MAX_HISTORY_MESSAGES);
   const last = recent.at(-1);
   const history =
-    last?.authorType === "customer" && last.body.trim() === currentQuestion.trim()
+    last?.authorType === "customer" &&
+    last.body.trim() === currentQuestion.trim()
       ? recent.slice(0, -1)
       : recent;
 
@@ -134,16 +153,8 @@ async function escalateWithoutModel(
   const message =
     "Vou encaminhar esta conversa para a equipe de suporte para continuar o atendimento.";
 
-  await db.transaction(async (tx) => {
-    await tx.insert(ticketMessages).values({
-      ticketId,
-      authorType: "system",
-      visibility: "public",
-      channel: "web_chat",
-      body: message,
-    });
-
-    await tx
+  const accepted = await db.transaction(async (tx) => {
+    const [session] = await tx
       .update(webChatSessions)
       .set({
         aiState: "escalated",
@@ -151,7 +162,23 @@ async function escalateWithoutModel(
         aiHandoffAt: now,
         aiProcessingAt: null,
       })
-      .where(eq(webChatSessions.id, sessionId));
+      .where(
+        and(
+          eq(webChatSessions.id, sessionId),
+          eq(webChatSessions.aiState, "active"),
+        ),
+      )
+      .returning({ id: webChatSessions.id });
+
+    if (!session) return false;
+
+    await tx.insert(ticketMessages).values({
+      ticketId,
+      authorType: "system",
+      visibility: "public",
+      channel: "web_chat",
+      body: message,
+    });
 
     await tx
       .update(tickets)
@@ -163,7 +190,17 @@ async function escalateWithoutModel(
       eventType: "chat.ai.escalated",
       metadata: { reason, withoutModel: true },
     });
+
+    return true;
   });
+
+  if (!accepted) {
+    return {
+      processed: false,
+      state: await getSessionState(sessionId),
+      result: null,
+    };
+  }
 
   return { processed: true, state: "escalated", result: null };
 }
@@ -177,16 +214,8 @@ async function persistAiResult(
   const now = new Date();
   const answered = result.resolution === "answered";
 
-  await db.transaction(async (tx) => {
-    await tx.insert(ticketMessages).values({
-      ticketId,
-      authorType: "system",
-      visibility: "public",
-      channel: "web_chat",
-      body: result.answer,
-    });
-
-    await tx
+  const accepted = await db.transaction(async (tx) => {
+    const [session] = await tx
       .update(webChatSessions)
       .set({
         aiState: answered ? "active" : "escalated",
@@ -195,7 +224,23 @@ async function persistAiResult(
         aiProcessingAt: null,
         aiLastRunId: result.runId,
       })
-      .where(eq(webChatSessions.id, sessionId));
+      .where(
+        and(
+          eq(webChatSessions.id, sessionId),
+          eq(webChatSessions.aiState, "active"),
+        ),
+      )
+      .returning({ id: webChatSessions.id });
+
+    if (!session) return false;
+
+    await tx.insert(ticketMessages).values({
+      ticketId,
+      authorType: "system",
+      visibility: "public",
+      channel: "web_chat",
+      body: result.answer,
+    });
 
     const [ticket] = await tx
       .select({ firstResponseAt: tickets.firstResponseAt })
@@ -222,7 +267,17 @@ async function persistAiResult(
         escalationReason: result.escalationReason || null,
       },
     });
+
+    return true;
   });
+
+  if (!accepted) {
+    return {
+      processed: false,
+      state: await getSessionState(sessionId),
+      result: null,
+    };
+  }
 
   return {
     processed: true,
@@ -240,25 +295,21 @@ export async function processSupportAiChatMessage(
     return { processed: false, state: "disabled", result: null };
   }
 
-  const db = getDatabase();
-  const [current] = await db
-    .select({ aiState: webChatSessions.aiState })
-    .from(webChatSessions)
-    .where(eq(webChatSessions.id, sessionId))
-    .limit(1);
-
-  if (!current || current.aiState !== "active") {
-    return {
-      processed: false,
-      state: current?.aiState ?? "disabled",
-      result: null,
-    };
+  const currentState = await getSessionState(sessionId);
+  if (currentState !== "active") {
+    return { processed: false, state: currentState, result: null };
   }
 
   const claimed = await claimAiProcessing(sessionId);
   if (!claimed) {
-    return { processed: false, state: "active", result: null };
+    return {
+      processed: false,
+      state: await getSessionState(sessionId),
+      result: null,
+    };
   }
+
+  const db = getDatabase();
 
   try {
     const [ticket] = await db
@@ -288,7 +339,12 @@ export async function processSupportAiChatMessage(
           aiHandoffAt: new Date(),
           aiProcessingAt: null,
         })
-        .where(eq(webChatSessions.id, sessionId));
+        .where(
+          and(
+            eq(webChatSessions.id, sessionId),
+            eq(webChatSessions.aiState, "active"),
+          ),
+        );
       return { processed: false, state: "human", result: null };
     }
 
