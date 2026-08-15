@@ -1,6 +1,7 @@
 const baseUrlValue = process.env.OPERATIONS_BASE_URL?.trim();
 const email = process.env.OPERATIONS_SMOKE_EMAIL?.trim();
 const password = process.env.OPERATIONS_SMOKE_PASSWORD ?? "";
+const maxPagesValue = Number(process.env.OPERATIONS_SMOKE_MAX_PAGES ?? "100");
 
 if (!baseUrlValue) {
   throw new Error("OPERATIONS_BASE_URL is required.");
@@ -10,6 +11,10 @@ if (!email || !password) {
   throw new Error(
     "OPERATIONS_SMOKE_EMAIL and OPERATIONS_SMOKE_PASSWORD are required.",
   );
+}
+
+if (!Number.isInteger(maxPagesValue) || maxPagesValue < 1 || maxPagesValue > 250) {
+  throw new Error("OPERATIONS_SMOKE_MAX_PAGES must be an integer from 1 to 250.");
 }
 
 const baseUrl = new URL(baseUrlValue);
@@ -52,6 +57,53 @@ function extractSessionCookie(response) {
 
   if (!sessionCookie) return "";
   return sessionCookie.split(";", 1)[0];
+}
+
+function extractOperationsLinks(html) {
+  const routes = new Set();
+  const hrefPattern = /\bhref\s*=\s*["']([^"']+)["']/gi;
+
+  for (const match of html.matchAll(hrefPattern)) {
+    const href = match[1]?.trim();
+    if (!href || href.startsWith("#")) continue;
+
+    let url;
+
+    try {
+      url = new URL(href, baseUrl);
+    } catch {
+      continue;
+    }
+
+    if (url.origin !== baseUrl.origin) continue;
+    if (!url.pathname.startsWith("/app")) continue;
+    if (url.pathname === "/app/logout") continue;
+
+    routes.add(`${url.pathname}${url.search}`);
+  }
+
+  return routes;
+}
+
+async function fetchAuthenticatedPage(route, sessionCookie) {
+  const response = await fetch(absoluteUrl(route), {
+    redirect: "manual",
+    headers: {
+      Accept: "text/html",
+      Cookie: sessionCookie,
+      "User-Agent": "F10-Operations-Smoke/1.0",
+    },
+  });
+
+  assertStatus(response, [200], route);
+
+  const contentType = response.headers.get("content-type") ?? "";
+  const html = contentType.includes("text/html") ? await response.text() : "";
+
+  return {
+    html,
+    links: extractOperationsLinks(html),
+  };
 }
 
 async function verifyUnauthenticatedProtection() {
@@ -100,17 +152,50 @@ async function login() {
 }
 
 async function verifyProtectedRoutes(sessionCookie) {
-  for (const route of protectedRoutes) {
-    const response = await fetch(absoluteUrl(route), {
-      redirect: "manual",
-      headers: {
-        Cookie: sessionCookie,
-        "User-Agent": "F10-Operations-Smoke/1.0",
-      },
-    });
+  const discoveredRoutes = new Set();
 
-    assertStatus(response, [200], route);
+  for (const route of protectedRoutes) {
+    const page = await fetchAuthenticatedPage(route, sessionCookie);
     process.stdout.write(`[OK] ${route}\n`);
+
+    for (const link of page.links) {
+      discoveredRoutes.add(link);
+    }
+  }
+
+  return discoveredRoutes;
+}
+
+async function crawlOperationsPages(sessionCookie, initialRoutes) {
+  const visited = new Set(protectedRoutes);
+  const queued = new Set(initialRoutes);
+  const queue = [...initialRoutes];
+  let crawled = 0;
+
+  while (queue.length > 0 && visited.size < maxPagesValue) {
+    const route = queue.shift();
+    if (!route || visited.has(route)) continue;
+
+    visited.add(route);
+    const page = await fetchAuthenticatedPage(route, sessionCookie);
+    crawled += 1;
+    process.stdout.write(`[OK] crawl ${route}\n`);
+
+    for (const link of page.links) {
+      if (visited.has(link) || queued.has(link)) continue;
+      queued.add(link);
+      queue.push(link);
+    }
+  }
+
+  if (queue.length > 0) {
+    process.stdout.write(
+      `[WARN] authenticated crawl stopped at ${maxPagesValue} pages; ${queue.length} route(s) remain queued\n`,
+    );
+  } else {
+    process.stdout.write(
+      `[OK] authenticated crawl completed: ${visited.size} unique Operations page(s), ${crawled} discovered detail page(s)\n`,
+    );
   }
 }
 
@@ -132,7 +217,8 @@ await verifyUnauthenticatedProtection();
 const sessionCookie = await login();
 
 try {
-  await verifyProtectedRoutes(sessionCookie);
+  const discoveredRoutes = await verifyProtectedRoutes(sessionCookie);
+  await crawlOperationsPages(sessionCookie, discoveredRoutes);
 } finally {
   await logout(sessionCookie);
 }
