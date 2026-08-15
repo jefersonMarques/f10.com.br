@@ -1,5 +1,6 @@
 import {
   boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -91,7 +92,7 @@ export const tasks = pgTable(
     title: text("title").notNull(),
     description: text("description").notNull().default(""),
     priority: taskPriority("priority").notNull().default("normal"),
-    dueAt: timestamp("due_at", { withTimezone: true }),
+    dueOn: date("due_on"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -101,7 +102,7 @@ export const tasks = pgTable(
   (table) => [
     index("tasks_project_idx").on(table.projectId),
     index("tasks_status_idx").on(table.statusId),
-    index("tasks_due_idx").on(table.dueAt),
+    index("tasks_due_idx").on(table.dueOn),
     index("tasks_created_by_idx").on(table.createdBy),
   ],
 );
