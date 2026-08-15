@@ -86,7 +86,12 @@ export async function startRemoteSupportSessionAtomic(
   const changed = await db.transaction(async (tx) => {
     const [session] = await tx
       .update(remoteSupportSessions)
-      .set({ status: "active", startedAt: now, updatedAt: now })
+      .set({
+        status: "active",
+        startedByUserId: actorUserId,
+        startedAt: now,
+        updatedAt: now,
+      })
       .where(and(eq(remoteSupportSessions.id, sessionId), eq(remoteSupportSessions.status, "authorized")))
       .returning({
         id: remoteSupportSessions.id,
@@ -124,7 +129,12 @@ export async function endRemoteSupportSessionAtomic(
   const changed = await db.transaction(async (tx) => {
     const [session] = await tx
       .update(remoteSupportSessions)
-      .set({ status: "ended", endedAt: now, updatedAt: now })
+      .set({
+        status: "ended",
+        endedByUserId: actorUserId,
+        endedAt: now,
+        updatedAt: now,
+      })
       .where(
         and(
           eq(remoteSupportSessions.id, sessionId),
