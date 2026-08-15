@@ -153,6 +153,17 @@ try {
     );
     hasFailure ||= !tablesOk;
 
+    const [trigramExtension] = await sql`
+      SELECT extname FROM pg_extension WHERE extname = 'pg_trgm' LIMIT 1
+    `;
+    const trigramOk = trigramExtension?.extname === "pg_trgm";
+    printResult(
+      "pg_trgm extension",
+      trigramOk,
+      trigramOk ? "available" : "required by help search intelligence",
+    );
+    hasFailure ||= !trigramOk;
+
     const roleRows = await sql`SELECT code FROM roles`;
     const missingRoles = difference(
       requiredRoles,
