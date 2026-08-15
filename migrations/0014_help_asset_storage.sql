@@ -1,6 +1,7 @@
 ALTER TYPE help_block_type ADD VALUE IF NOT EXISTS 'file';
 
 ALTER TABLE help_assets
+  ALTER COLUMN content_id DROP NOT NULL,
   ADD COLUMN IF NOT EXISTS size_bytes bigint,
   ADD COLUMN IF NOT EXISTS checksum_sha256 text;
 
