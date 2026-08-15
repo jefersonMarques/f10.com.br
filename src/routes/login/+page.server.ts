@@ -71,7 +71,7 @@ export const actions: Actions = {
       clientAddress,
     );
 
-    if (!authentication.ok) {
+    if (authentication.ok === false) {
       return fail(authentication.reason === "throttled" ? 429 : 400, {
         email,
         returnTo,
