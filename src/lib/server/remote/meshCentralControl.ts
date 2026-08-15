@@ -16,16 +16,24 @@ export type MeshCentralDeviceGroup = {
   name: string;
 };
 
+export type MeshCentralDesktopShare = {
+  id: string;
+  url: string;
+  expiresAt: Date;
+};
+
 type MeshCentralControlConfig = {
   configured: boolean;
   meshCtrlPath: string;
   url: string;
+  baseUrl: URL | null;
   loginUser: string;
   loginKeyFile: string;
   loginPassword: string;
   loginDomain: string;
   windowsAgentType: number;
   deviceConsentFlags: number;
+  shareMinutes: number;
 };
 
 function parseInteger(
@@ -41,9 +49,22 @@ function parseInteger(
   return parsed;
 }
 
+function parsePublicBaseUrl(value: string): URL | null {
+  try {
+    const url = new URL(value);
+    const allowed =
+      url.protocol === "https:" ||
+      (url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname));
+    return allowed ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 function readConfig(): MeshCentralControlConfig {
   const meshCtrlPath = env.MESHCENTRAL_MESHCTRL_PATH?.trim() ?? "";
   const url = env.MESHCENTRAL_CONTROL_URL?.trim() ?? "";
+  const baseUrl = parsePublicBaseUrl(env.MESHCENTRAL_BASE_URL?.trim() ?? "");
   const loginUser = env.MESHCENTRAL_CONTROL_USER?.trim() || "f10-operations";
   const loginKeyFile = env.MESHCENTRAL_CONTROL_LOGIN_KEY_FILE?.trim() ?? "";
   const loginPassword = env.MESHCENTRAL_CONTROL_PASSWORD ?? "";
@@ -63,11 +84,13 @@ function readConfig(): MeshCentralControlConfig {
       Boolean(meshCtrlPath) &&
       existsSync(meshCtrlPath) &&
       validUrl &&
+      Boolean(baseUrl) &&
       Boolean(loginUser) &&
       hasCredential &&
       (!loginKeyFile || existsSync(loginKeyFile)),
     meshCtrlPath,
     url,
+    baseUrl,
     loginUser,
     loginKeyFile,
     loginPassword,
@@ -84,6 +107,7 @@ function readConfig(): MeshCentralControlConfig {
       0,
       0x7fffffff,
     ),
+    shareMinutes: parseInteger(env.MESHCENTRAL_SHARE_MINUTES, 30, 5, 60),
   };
 }
 
@@ -100,6 +124,23 @@ function authenticationArgs(config: MeshCentralControlConfig): string[] {
     args.push("--loginpass", config.loginPassword);
   }
   return args;
+}
+
+function sanitizeMeshCtrlOutput(value: string): string {
+  return value
+    .replace(/URL:\s*\S+/gi, "URL: [redacted]")
+    .replace(/(sharing\?c=)[^\s]+/gi, "$1[redacted]");
+}
+
+function assertMeshCtrlOutput(output: string): void {
+  const normalized = output.toLowerCase();
+  if (
+    normalized.includes("unable to connect") ||
+    normalized.includes("invalid login") ||
+    normalized.includes("access denied")
+  ) {
+    throw new Error(`MESHCENTRAL_CONTROL_FAILED:${sanitizeMeshCtrlOutput(output)}`);
+  }
 }
 
 function runMeshCtrl(
@@ -128,15 +169,21 @@ function runMeshCtrl(
         maxBuffer: 2 * 1024 * 1024,
       },
       (error, stdout, stderr) => {
+        const output = stdout.trim();
         if (error) {
           reject(
             new Error(
-              `MESHCENTRAL_CONTROL_FAILED:${stderr.trim() || stdout.trim() || error.message}`,
+              `MESHCENTRAL_CONTROL_FAILED:${sanitizeMeshCtrlOutput(stderr.trim() || output || error.message)}`,
             ),
           );
           return;
         }
-        resolve(stdout.trim());
+        try {
+          assertMeshCtrlOutput(output);
+          resolve(output);
+        } catch (cause) {
+          reject(cause);
+        }
       },
     );
   });
@@ -179,6 +226,20 @@ function agentDownloadBaseUrl(controlUrl: string): URL {
   return url;
 }
 
+function validateShareUrl(rawUrl: string, baseUrl: URL): string {
+  const shareUrl = new URL(rawUrl);
+  if (shareUrl.origin !== baseUrl.origin) {
+    throw new Error("MESHCENTRAL_SHARE_URL_ORIGIN_MISMATCH");
+  }
+  const basePath = baseUrl.pathname.endsWith("/")
+    ? baseUrl.pathname
+    : `${baseUrl.pathname}/`;
+  if (!shareUrl.pathname.startsWith(basePath)) {
+    throw new Error("MESHCENTRAL_SHARE_URL_PATH_MISMATCH");
+  }
+  return shareUrl.toString();
+}
+
 export function getMeshCentralControlStatus() {
   const config = readConfig();
   return {
@@ -189,6 +250,7 @@ export function getMeshCentralControlStatus() {
     usesLoginKey: Boolean(config.loginKeyFile),
     windowsAgentType: config.windowsAgentType,
     deviceConsentFlags: config.deviceConsentFlags,
+    shareMinutes: config.shareMinutes,
   };
 }
 
@@ -259,6 +321,61 @@ export async function listMeshCentralDevices(
       };
     })
     .filter((device): device is MeshCentralDevice => Boolean(device));
+}
+
+export async function createMeshCentralDesktopShare(
+  providerDeviceId: string,
+  guestName: string,
+): Promise<MeshCentralDesktopShare> {
+  const config = readConfig();
+  if (!config.configured || !config.baseUrl) {
+    throw new Error("MESHCENTRAL_CONTROL_NOT_CONFIGURED");
+  }
+
+  // Listing first also lets MeshCentral clean expired guest shares before creating a new one.
+  await runMeshCtrl("DeviceSharing", ["--id", providerDeviceId]);
+
+  const output = await runMeshCtrl("DeviceSharing", [
+    "--id",
+    providerDeviceId,
+    "--add",
+    guestName.trim().slice(0, 80) || "F10 Operations",
+    "--type",
+    "desktop",
+    "--consent",
+    "prompt",
+    "--duration",
+    String(config.shareMinutes),
+  ]);
+  const id = output.match(/^ID:\s*(.+)$/m)?.[1]?.trim() ?? "";
+  const rawUrl = output.match(/^URL:\s*(.+)$/m)?.[1]?.trim() ?? "";
+  if (!id || !rawUrl) throw new Error("MESHCENTRAL_SHARE_NOT_CREATED");
+
+  return {
+    id,
+    url: validateShareUrl(rawUrl, config.baseUrl),
+    expiresAt: new Date(Date.now() + config.shareMinutes * 60_000),
+  };
+}
+
+export async function revokeMeshCentralDesktopShare(
+  providerDeviceId: string,
+  shareId: string,
+): Promise<void> {
+  const safeShareId = shareId.trim();
+  if (!safeShareId) return;
+
+  await runMeshCtrl("DeviceSharing", [
+    "--id",
+    providerDeviceId,
+    "--remove",
+    safeShareId,
+  ]);
+
+  const remaining = await runMeshCtrl("DeviceSharing", ["--id", providerDeviceId]);
+  if (remaining.includes(`Identifier:   ${safeShareId}`)) {
+    throw new Error("MESHCENTRAL_SHARE_NOT_REVOKED");
+  }
 }
 
 export function buildMeshCentralAgentDownloadUrl(groupId: string): string {
