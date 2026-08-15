@@ -5,6 +5,7 @@ import { listRemoteDeviceDashboard } from "$lib/server/remote/remoteDeviceDashbo
 import { getMeshCentralControlStatus } from "$lib/server/remote/meshCentralControl";
 import { listRemoteSessions } from "$lib/server/remote/remoteSupportRepository";
 import { getRemoteProviderStatus } from "$lib/server/remote/remoteSupportProvider";
+import { getRemoteSupportSlaSnapshot } from "$lib/server/remote/remoteSupportSlaRepository";
 
 export const load: PageServerLoad = async ({ parent }) => {
   const layout = await parent();
@@ -14,9 +15,16 @@ export const load: PageServerLoad = async ({ parent }) => {
   const scope = getPermissionScope(permissions, "remote.use") ?? "own";
   const canManage = hasPermission(permissions, "remote.manage");
 
+  const [sessions, devices, sla] = await Promise.all([
+    listRemoteSessions(layout.user.id, scope),
+    canManage ? listRemoteDeviceDashboard() : Promise.resolve([]),
+    canManage ? getRemoteSupportSlaSnapshot(30) : Promise.resolve(null),
+  ]);
+
   return {
-    sessions: await listRemoteSessions(layout.user.id, scope),
-    devices: canManage ? await listRemoteDeviceDashboard() : [],
+    sessions,
+    devices,
+    sla,
     provider: getRemoteProviderStatus(),
     control: getMeshCentralControlStatus(),
     canManage,
