@@ -1,11 +1,9 @@
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { getPermissionScope, hasPermission } from "$lib/server/auth/permissions";
+import { listRemoteDeviceDashboard } from "$lib/server/remote/remoteDeviceDashboardRepository";
 import { getMeshCentralControlStatus } from "$lib/server/remote/meshCentralControl";
-import {
-  listRemoteDevices,
-  listRemoteSessions,
-} from "$lib/server/remote/remoteSupportRepository";
+import { listRemoteSessions } from "$lib/server/remote/remoteSupportRepository";
 import { getRemoteProviderStatus } from "$lib/server/remote/remoteSupportProvider";
 
 export const load: PageServerLoad = async ({ parent }) => {
@@ -18,7 +16,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 
   return {
     sessions: await listRemoteSessions(layout.user.id, scope),
-    devices: canManage ? await listRemoteDevices() : [],
+    devices: canManage ? await listRemoteDeviceDashboard() : [],
     provider: getRemoteProviderStatus(),
     control: getMeshCentralControlStatus(),
     canManage,
