@@ -68,6 +68,7 @@ export const actions: Actions = {
         success: false,
         action: "createArticle",
         message: parsed.message,
+        values: parsed.values,
       });
     }
 
@@ -85,6 +86,7 @@ export const actions: Actions = {
         action: "createArticle",
         message:
           "Não foi possível criar o conteúdo. Verifique se o endereço já está em uso.",
+        values: parsed.input,
       });
     }
   },
