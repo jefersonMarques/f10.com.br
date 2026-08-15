@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { page } from "$app/stores";
   import {
     BookOpen,
     CheckSquare2,
     ChevronRight,
+    GitBranch,
     Headphones,
     LayoutDashboard,
     LogOut,
@@ -21,6 +23,7 @@
   const navigationItems = [
     { label: "Visão geral", icon: LayoutDashboard, enabled: true, href: "/app" },
     { label: "Central de Ajuda", icon: BookOpen, enabled: true, href: "/app/help", permission: "help.view" },
+    { label: "Fluxos de ajuda", icon: GitBranch, enabled: true, href: "/app/help/flows", permission: "help.view" },
     { label: "Tarefas", icon: CheckSquare2, enabled: false, permission: "tasks.view" },
     { label: "Tickets", icon: Headphones, enabled: false, permission: "tickets.view" },
     { label: "Chat", icon: MessageCircleMore, enabled: false, permission: "chat.view" },
@@ -32,6 +35,13 @@
   $: visibleNavigationItems = navigationItems.filter(
     (item) => !item.permission || permissionCodes.has(item.permission),
   );
+  $: pathname = $page.url.pathname;
+
+  function isActiveNavigationItem(href?: string): boolean {
+    if (!href) return false;
+    if (href === "/app") return pathname === href;
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
 </script>
 
 <svelte:head>
@@ -62,7 +72,11 @@
             {#if item.enabled && item.href}
               <a
                 href={item.href}
-                class="flex min-h-11 items-center gap-3 rounded-xl bg-[#EEF0FF] px-3 text-[13px] font-semibold text-[#000A57]"
+                class={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-[13px] font-semibold transition ${
+                  isActiveNavigationItem(item.href)
+                    ? "bg-[#EEF0FF] text-[#000A57]"
+                    : "text-[#676D7D] hover:bg-[#F7F8FB] hover:text-[#000A57]"
+                }`}
               >
                 <svelte:component this={item.icon} size={19} aria-hidden="true" />
                 <span class="flex-1">{item.label}</span>
