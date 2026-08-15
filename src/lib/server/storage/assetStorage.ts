@@ -160,11 +160,12 @@ async function signedFetch(
     region: config.region,
     contentType,
   });
+  const requestBody = body && method === "PUT" ? new Uint8Array(body) : undefined;
 
   return fetch(url, {
     method,
     headers,
-    body: body && method === "PUT" ? body : undefined,
+    body: requestBody,
     redirect: "manual",
   });
 }

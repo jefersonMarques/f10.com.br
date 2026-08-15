@@ -1,5 +1,5 @@
-import { error, fail, type Actions } from "@sveltejs/kit";
-import type { PageServerLoad } from "./$types";
+import { error, fail } from "@sveltejs/kit";
+import type { Actions, PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import {
@@ -77,7 +77,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   };
 };
 
-export const actions: Actions = {
+export const actions = {
   save: async ({ cookies, params, request }) => {
     if (!isValidQuestionId(params.questionId)) {
       return fail(404, {
@@ -157,4 +157,4 @@ export const actions: Actions = {
       });
     }
   },
-};
+} satisfies Actions;
