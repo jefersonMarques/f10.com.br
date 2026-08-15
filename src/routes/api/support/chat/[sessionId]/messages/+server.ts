@@ -1,6 +1,8 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
+import { processSupportAiChatMessage } from "$lib/server/support/supportAiChat";
 import {
   addPublicChatMessage,
+  authorizePublicChatSession,
   listPublicChatMessages,
 } from "$lib/server/support/publicChatRepository";
 
@@ -34,9 +36,12 @@ export const GET: RequestHandler = async ({ params, request }) => {
   }
 
   try {
-    const messages = await listPublicChatMessages(sessionId, token);
+    const [session, messages] = await Promise.all([
+      authorizePublicChatSession(sessionId, token),
+      listPublicChatMessages(sessionId, token),
+    ]);
     return json(
-      { messages },
+      { messages, aiState: session.aiState },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch {
@@ -81,8 +86,25 @@ export const POST: RequestHandler = async ({
   }
 
   try {
-    await addPublicChatMessage(clientAddress, sessionId, token, body);
-    return json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+    const messageResult = await addPublicChatMessage(
+      clientAddress,
+      sessionId,
+      token,
+      body,
+    );
+    const ai =
+      messageResult.aiState === "active"
+        ? await processSupportAiChatMessage(sessionId, body)
+        : null;
+
+    return json(
+      {
+        ok: true,
+        aiState: ai?.state ?? messageResult.aiState,
+        aiProcessed: ai?.processed ?? false,
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (cause) {
     if (cause instanceof Error && cause.message === "CHAT_RATE_LIMITED") {
       return json({ error: "RATE_LIMITED" }, { status: 429 });
