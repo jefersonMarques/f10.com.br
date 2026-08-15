@@ -126,6 +126,24 @@ function parsePublication(
   };
 }
 
+export async function listPublishedStructuredHelpLinks() {
+  const db = getDatabase();
+  const rows = await db
+    .select({
+      entityId: helpPublications.entityId,
+      snapshot: helpPublications.snapshot,
+      publishedAt: helpPublications.publishedAt,
+    })
+    .from(helpPublications)
+    .where(eq(helpPublications.entityType, "content"));
+
+  return rows.flatMap((row) => {
+    const publicSnapshot = asRecord(row.snapshot.public);
+    const slug = publicSnapshot ? readString(publicSnapshot, "slug") : "";
+    return slug ? [{ entityId: row.entityId, slug, publishedAt: row.publishedAt }] : [];
+  });
+}
+
 export async function getPublishedStructuredHelpBySlug(slug: string) {
   const db = getDatabase();
   const [row] = await db
