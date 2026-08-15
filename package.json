@@ -10,10 +10,10 @@
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "postinstall": "svelte-kit sync",
-    "db:migrate": "node scripts/migrate.mjs",
-    "admin:bootstrap": "node scripts/bootstrap-super-admin.mjs",
-    "operations:doctor": "node scripts/operations-doctor.mjs",
-    "operations:smoke": "node scripts/operations-smoke.mjs"
+    "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
+    "admin:bootstrap": "node --env-file-if-exists=.env scripts/bootstrap-super-admin.mjs",
+    "operations:doctor": "node --env-file-if-exists=.env scripts/operations-doctor.mjs",
+    "operations:smoke": "node --env-file-if-exists=.env scripts/operations-smoke.mjs"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^3.3.1",
