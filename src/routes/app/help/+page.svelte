@@ -202,8 +202,9 @@
               name="summary"
               maxlength="320"
               rows="3"
+              value={createValues?.summary ?? ""}
               class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"
-            >{createValues?.summary ?? ""}</textarea>
+            ></textarea>
           </label>
 
           <label class="block">
@@ -213,9 +214,10 @@
               required
               maxlength="50000"
               rows="9"
+              value={createValues?.bodyText ?? ""}
               placeholder="Separe os parágrafos com uma linha em branco."
               class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[13px] leading-6 outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"
-            >{createValues?.bodyText ?? ""}</textarea>
+            ></textarea>
           </label>
 
           <button
