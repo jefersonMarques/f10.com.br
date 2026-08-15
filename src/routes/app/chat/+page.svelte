@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { MessageCircleMore, UserRound } from "lucide-svelte";
+  import { BrainCircuit, MessageCircleMore, Sparkles, UserRound } from "lucide-svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;
@@ -26,15 +26,32 @@
 </svelte:head>
 
 <div class="mx-auto max-w-[1260px] px-5 py-7 sm:px-8 sm:py-9">
-  <div>
-    <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Atendimento em tempo real</p>
-    <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Chat</h1>
-    <p class="mt-2 max-w-[760px] text-[14px] leading-6 text-[#6F7585]">
-      Conversas iniciadas pelo novo widget nativo aparecem aqui e permanecem vinculadas ao ticket correspondente.
-    </p>
+  <div class="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+    <div>
+      <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Atendimento em tempo real</p>
+      <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Chat</h1>
+      <p class="mt-2 max-w-[760px] text-[14px] leading-6 text-[#6F7585]">
+        Conversas iniciadas pelo novo widget nativo aparecem aqui e permanecem vinculadas ao ticket correspondente.
+      </p>
+    </div>
+
+    <a href="/app/chat/lab" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white transition hover:bg-[#111B71]">
+      <Sparkles size={16} aria-hidden="true" />
+      Testar agente IA
+    </a>
   </div>
 
-  <section class="mt-7 overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
+  <section class="mt-7 rounded-[22px] border border-[#DDE1F0] bg-[#F8F9FF] px-5 py-4 sm:px-6">
+    <div class="flex items-start gap-3">
+      <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[#000A57] shadow-sm"><BrainCircuit size={17} aria-hidden="true" /></span>
+      <div>
+        <strong class="text-[12px] font-semibold text-[#303645]">Agente de suporte em homologação</strong>
+        <p class="mt-1 text-[10px] leading-5 text-[#747B8D]">O laboratório usa apenas a Base de Conhecimento publicada e marca automaticamente dúvidas sem sustentação para atendimento humano. O Movidesk continua sendo o canal público.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="mt-6 overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
     <header class="flex items-center gap-3 border-b border-[#EEF0F5] px-5 py-4 sm:px-6">
       <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]">
         <MessageCircleMore size={19} aria-hidden="true" />
