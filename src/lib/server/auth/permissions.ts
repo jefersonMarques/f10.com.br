@@ -44,12 +44,31 @@ const SCOPE_RANK: Record<PermissionScope, number> = {
   all: 3,
 };
 
-function highestScope(current: PermissionScope | undefined, candidate: PermissionScope): PermissionScope {
-  if (!current) return candidate;
-  return SCOPE_RANK[candidate] > SCOPE_RANK[current] ? candidate : current;
+export function getPermissionScope(
+  permissions: Map<string, PermissionScope>,
+  permissionCode: string,
+): PermissionScope | undefined {
+  return permissions.get(permissionCode);
 }
 
-export async function resolveUserPermissions(userId: string): Promise<Map<string, PermissionScope>> {
+export function isScopeAtLeast(
+  grantedScope: PermissionScope,
+  requiredScope: PermissionScope,
+): boolean {
+  return SCOPE_RANK[grantedScope] >= SCOPE_RANK[requiredScope];
+}
+
+function highestScope(
+  current: PermissionScope | undefined,
+  candidate: PermissionScope,
+): PermissionScope {
+  if (!current) return candidate;
+  return isScopeAtLeast(candidate, current) ? candidate : current;
+}
+
+export async function resolveUserPermissions(
+  userId: string,
+): Promise<Map<string, PermissionScope>> {
   const db = getDatabase();
   const grants = new Map<string, PermissionScope>();
 
@@ -63,7 +82,10 @@ export async function resolveUserPermissions(userId: string): Promise<Map<string
     .where(eq(userRoles.userId, userId));
 
   for (const grant of roleGrants) {
-    grants.set(grant.permissionCode, highestScope(grants.get(grant.permissionCode), grant.scope));
+    grants.set(
+      grant.permissionCode,
+      highestScope(grants.get(grant.permissionCode), grant.scope),
+    );
   }
 
   const overrides = await db
@@ -92,7 +114,7 @@ export function hasPermission(
   permissionCode: string,
   requiredScope: PermissionScope = "own",
 ): boolean {
-  const grantedScope = permissions.get(permissionCode);
+  const grantedScope = getPermissionScope(permissions, permissionCode);
   if (!grantedScope) return false;
-  return SCOPE_RANK[grantedScope] >= SCOPE_RANK[requiredScope];
+  return isScopeAtLeast(grantedScope, requiredScope);
 }
