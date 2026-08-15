@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { webChatSessions } from "$lib/server/db/chatSchema";
 import { ticketEvents } from "$lib/server/db/supportSchema";
@@ -23,7 +23,10 @@ export async function markTicketChatHumanTakeover(
       .where(
         and(
           eq(webChatSessions.ticketId, ticketId),
-          inArray(webChatSessions.aiState, ["active", "escalated"]),
+          or(
+            eq(webChatSessions.aiState, "active"),
+            eq(webChatSessions.aiState, "escalated"),
+          ),
         ),
       )
       .returning({ id: webChatSessions.id });
