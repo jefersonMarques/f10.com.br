@@ -28,7 +28,7 @@
     { label: "Tickets", icon: Headphones, enabled: false, permission: "tickets.view" },
     { label: "Chat", icon: MessageCircleMore, enabled: false, permission: "chat.view" },
     { label: "Acesso remoto", icon: MonitorCog, enabled: false, permission: "remote.use" },
-    { label: "Equipe", icon: Users, enabled: false, permission: "users.view" },
+    { label: "Equipe", icon: Users, enabled: true, href: "/app/team", permission: "users.view" },
     { label: "Configurações", icon: Settings, enabled: false, permission: "system.settings.manage" },
   ];
 
@@ -40,6 +40,13 @@
   function isActiveNavigationItem(href?: string): boolean {
     if (!href) return false;
     if (href === "/app") return pathname === href;
+    if (href === "/app/help") {
+      return (
+        pathname === href ||
+        (pathname.startsWith("/app/help/") &&
+          !pathname.startsWith("/app/help/flows"))
+      );
+    }
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 </script>
