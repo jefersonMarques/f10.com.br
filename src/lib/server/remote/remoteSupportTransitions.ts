@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
@@ -104,6 +104,9 @@ export async function startRemoteSupportSessionAtomic(
   );
   const now = new Date();
   const firstStart = candidate.status === "authorized";
+  const providerSessionCondition = candidate.providerSessionId
+    ? eq(remoteSupportSessions.providerSessionId, candidate.providerSessionId)
+    : isNull(remoteSupportSessions.providerSessionId);
 
   try {
     const changed = await db.transaction(async (tx) => {
@@ -129,6 +132,7 @@ export async function startRemoteSupportSessionAtomic(
           and(
             eq(remoteSupportSessions.id, sessionId),
             eq(remoteSupportSessions.status, candidate.status),
+            providerSessionCondition,
           ),
         )
         .returning({
@@ -167,7 +171,7 @@ export async function startRemoteSupportSessionAtomic(
     try {
       await revokeMeshCentralDesktopShare(candidate.providerDeviceId, share.id);
     } catch {
-      // The new share will still expire automatically if rollback revocation fails.
+      // Se a revogação de rollback falhar, o próprio share temporário ainda expirará.
     }
     throw cause;
   }
@@ -208,6 +212,9 @@ export async function endRemoteSupportSessionAtomic(
     );
   }
 
+  const providerSessionCondition = candidate.providerSessionId
+    ? eq(remoteSupportSessions.providerSessionId, candidate.providerSessionId)
+    : isNull(remoteSupportSessions.providerSessionId);
   const now = new Date();
   const changed = await db.transaction(async (tx) => {
     const [session] = await tx
@@ -224,10 +231,11 @@ export async function endRemoteSupportSessionAtomic(
         and(
           eq(remoteSupportSessions.id, sessionId),
           inArray(remoteSupportSessions.status, ["active", "authorized"]),
+          providerSessionCondition,
         ),
       )
       .returning({ id: remoteSupportSessions.id, ticketId: remoteSupportSessions.ticketId });
-    if (!session) throw new Error("REMOTE_SESSION_NOT_ACTIVE");
+    if (!session) throw new Error("REMOTE_SESSION_STATE_CHANGED");
     if (session.ticketId) {
       await tx.insert(ticketEvents).values({
         ticketId: session.ticketId,
