@@ -15,6 +15,8 @@ Enviar instalador de Suporte Remoto F10
    ↓
 /suporte-remoto/instalar/:token
    ↓
+F10 entrega F10-Suporte-Remoto.exe
+   ↓
 Agente MeshCentral específico do grupo do cliente
    ↓
 Cliente instala
@@ -67,13 +69,15 @@ F10-CONTATO-aabbccddeeff...
 
 O nome é técnico e não depende do nome comercial do cliente, evitando colisões quando escolas possuem nomes iguais.
 
+O grupo só é criado quando alguém realmente solicita a instalação do suporte remoto. Abrir um chat ou ticket não cria grupos vazios no MeshCentral.
+
 Quando o atendente escolhe **Enviar instalador de Suporte Remoto F10**:
 
 1. o Operations resolve ou cria o grupo daquele cliente no MeshCentral;
 2. registra quais dispositivos já existiam naquele grupo;
 3. cria um enrollment temporário e armazena somente SHA-256 do token público;
 4. envia `/suporte-remoto/instalar/:token` na conversa;
-5. o botão de download redireciona para o agente do grupo correto;
+5. o Operations busca o agente diretamente pela interface local do MeshCentral e o entrega ao navegador como `F10-Suporte-Remoto.exe`;
 6. depois da instalação, o Operations consulta o grupo;
 7. o novo `nodeId` que não existia no baseline é identificado;
 8. `remote_devices` é preenchido automaticamente;
@@ -81,6 +85,8 @@ Quando o atendente escolhe **Enviar instalador de Suporte Remoto F10**:
 10. o ticket recebe `remote.device.enrolled`.
 
 O cadastro manual de Node ID não faz mais parte do fluxo normal.
+
+Quando existe organização, o dispositivo fica associado à organização, e não ao último contato que abriu atendimento. Assim diferentes usuários da mesma escola reutilizam corretamente os computadores daquela organização.
 
 ## Agente persistente e consentimento
 
@@ -123,6 +129,8 @@ O Operations usa o `meshctrl.js` fornecido pelo próprio MeshCentral para:
 - construir o download de agente para aquele grupo.
 
 O processo é executado com `execFile`, sem shell intermediário.
+
+O identificador completo retornado pelo MeshCentral continua armazenado no banco para sincronização/deduplicação. Para `gotonode`, o provider extrai somente o Node ID necessário pela interface web.
 
 ### Credencial
 
@@ -214,7 +222,7 @@ sudo systemctl reload nginx
 O botão se adapta ao estado do cliente:
 
 ```text
-Nenhum computador online
+Nenhum computador conhecido
 → Instalar suporte remoto
 
 1 computador online
@@ -222,9 +230,12 @@ Nenhum computador online
 
 2+ computadores online
 → Escolher computador
+
+Computador conhecido, porém offline
+→ Computador offline
 ```
 
-No primeiro caso, o sistema já coloca o link de instalação dentro da conversa.
+No primeiro caso, o sistema já coloca o link de instalação dentro da conversa. O preview do cliente transforma essa mensagem em um botão real **Baixar Suporte Remoto F10**.
 
 ## Tela do Ticket
 
@@ -254,6 +265,26 @@ Também oferece:
 
 Somente `remote.manage` recebe o catálogo global de dispositivos.
 
+## Permissões
+
+As responsabilidades ficam separadas:
+
+```text
+remote.request
+→ gerar enrollment
+→ enviar instalador
+→ sincronizar computador
+
+remote.use
+→ iniciar/abrir desktop remoto
+→ trabalhar com sessões conforme o próprio scope
+
+remote.manage
+→ visualizar catálogo administrativo global
+```
+
+Ter `remote.request` sem `remote.use` permite ajudar o cliente a instalar o componente, mas não permite abrir o desktop.
+
 ## Auditoria
 
 Novos eventos relevantes:
@@ -276,13 +307,16 @@ O enrollment e as sessões continuam vinculados ao ticket/chat quando aplicável
 - enrollment expira e um novo pedido cancela o anterior aberto daquele grupo;
 - dispositivo só é iniciado se estiver associado ao cliente/organização do ticket;
 - dispositivo precisa estar online;
-- atendimento depende de permissão `remote.request` / `remote.use`;
+- `remote.request` e `remote.use` são validados separadamente no backend;
 - acesso ao desktop pede confirmação local pelo MeshCentral;
 - o cliente não recebe credenciais administrativas;
+- o binário é obtido pela interface local do MeshCentral e entregue pelo Operations com `Cache-Control: no-store`;
 - RDP/3389 não é exposto;
 - MeshCentral permanece atrás do HTTPS existente;
 - credencial de automação fica somente no servidor.
 
-## Limite atual
+## Limites atuais
+
+A sincronização de dispositivos ocorre quando um ticket/chat remoto é aberto ou quando o atendente usa **Verificar agora**. Ainda não existe monitoramento global em background de todos os grupos, portanto o status exibido na tela geral `/app/remote` pode ficar desatualizado até uma sincronização daquele cliente.
 
 O encerramento no Operations registra `remote.ended`, mas ainda não força via API o encerramento físico de uma conexão que continue aberta no MeshCentral. Depois da homologação com a versão real instalada, essa sincronização provider → Operations pode ser adicionada sem mudar o modelo de clientes/dispositivos/enrollment.
