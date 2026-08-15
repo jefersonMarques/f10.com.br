@@ -51,17 +51,59 @@ No servidor, segredos devem preferencialmente ser fornecidos pelo ambiente do pr
 
 ## Validação operacional
 
-`operations:doctor` valida banco, migrations, tabelas críticas, papéis, permissões e a existência de Super Admin ativo.
+`operations:doctor` valida banco, migrations, tabelas críticas, extensão `pg_trgm`, papéis, permissões e a existência de Super Admin ativo.
 
 ```bash
 npm run operations:doctor
 ```
 
-`operations:smoke` valida proteção de `/app`, login, rotas principais e logout usando a conta de homologação configurada nas variáveis `OPERATIONS_SMOKE_*`.
+`operations:smoke` valida proteção de `/app`, login, rotas principais, Base de Conhecimento, Pesquisa de Suporte, Insights e logout usando a conta de homologação configurada nas variáveis `OPERATIONS_SMOKE_*`.
 
 ```bash
 npm run operations:smoke
 ```
+
+## Base de Conhecimento estruturada
+
+A fonte canônica do novo Help Center é formada por:
+
+```text
+help_contents
+  └─ help_content_steps
+       └─ help_step_blocks
+            └─ help_assets
+```
+
+Cada conteúdo possui informações gerais e `ai_general_knowledge`. Cada passo possui `ai_knowledge`. Blocos de imagem e vídeo podem manter transcrição e resumo exclusivo para IA.
+
+A publicação gera um snapshot com duas áreas separadas:
+
+- `public`: somente dados destinados à apresentação para o cliente;
+- `ai`: conhecimento interno, transcrições e contexto para o agente de suporte.
+
+O conteúdo em edição pode voltar para rascunho sem alterar a última versão publicada.
+
+Rotas atuais:
+
+- `/app/help/content`: biblioteca estruturada;
+- `/app/help/content/:contentId`: editor por passos;
+- `/app/help/search`: laboratório de pesquisa;
+- `/app/help/insights`: telemetria e lacunas de conhecimento.
+
+A Central pública atual permanece inalterada até a homologação do novo modelo.
+
+## Pesquisa e telemetria
+
+A migration de busca habilita `pg_trgm` e mantém `help_search_documents` como projeção derivada dos snapshots publicados. O documento é atualizado automaticamente por trigger quando uma publicação de conteúdo é criada ou substituída.
+
+As pesquisas são registradas em:
+
+- `help_search_events`: texto original, texto normalizado, origem, quantidade de resultados e desfecho;
+- `help_search_results`: resultados apresentados, posição, score e clique.
+
+Os campos de desfecho já suportam o futuro agente de IA: `ai_answered`, `escalated` e `ticket_id`.
+
+A busca pública futura deverá usar apenas `public_text`. Ambientes internos e o agente poderão pesquisar também `ai_text`.
 
 ## Autorização
 
@@ -89,3 +131,4 @@ Uma permissão individual com efeito `deny` remove a concessão herdada do papel
 - O login possui bloqueio temporário por combinação de e-mail e origem após tentativas repetidas.
 - Eventos de autenticação são registrados em `audit_logs`.
 - A área `/app` deve permanecer fora do rastreamento de marketing do site público.
+- Rascunhos de conhecimento não substituem a última publicação usada pela pesquisa.
