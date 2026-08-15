@@ -4,6 +4,7 @@
     ArrowLeft,
     Bot,
     CircleAlert,
+    Download,
     ExternalLink,
     MessageCircleMore,
     MonitorCog,
@@ -11,9 +12,10 @@
     TicketCheck,
     UserRound,
   } from "lucide-svelte";
-  import type { PageData } from "./$types";
+  import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
+  export let form: ActionData;
 
   type ChatMessage = PageData["initial"]["messages"][number];
   type ChatDetails = PageData["initial"]["chat"];
@@ -24,6 +26,8 @@
   let sending = false;
   let errorMessage = "";
   let messagesElement: HTMLDivElement;
+
+  $: onlineRemoteDevices = data.remoteDevices.filter((device) => device.online);
 
   const aiLabels: Record<string, string> = {
     active: "IA atendendo",
@@ -99,10 +103,34 @@
 
     <div class="flex flex-wrap gap-2">
       {#if chat.contextUrl}<a href={chat.contextUrl} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#666C7B]">Página de origem<ExternalLink size={13}/></a>{/if}
-      <a href={`/app/tickets/${chat.ticketId}/remote`} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><MonitorCog size={14}/>Acesso remoto</a>
+
+      {#if data.canRemote && data.remoteReady}
+        {#if onlineRemoteDevices.length === 1}
+          <form method="POST" action="?/startRemote">
+            <input type="hidden" name="deviceId" value={onlineRemoteDevices[0].id}/>
+            <button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><MonitorCog size={14}/>Iniciar acesso remoto</button>
+          </form>
+        {:else if onlineRemoteDevices.length > 1}
+          <a href={`/app/tickets/${chat.ticketId}/remote`} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><MonitorCog size={14}/>Escolher computador</a>
+        {:else}
+          <form method="POST" action="?/enrollRemote">
+            <button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><Download size={14}/>Instalar suporte remoto</button>
+          </form>
+        {/if}
+      {:else if data.canRemote}
+        <a href={`/app/tickets/${chat.ticketId}/remote`} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#777D8D]"><MonitorCog size={14}/>Acesso remoto</a>
+      {/if}
+
       <a href={`/app/tickets/${chat.ticketId}`} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white">Abrir ticket<TicketCheck size={14}/></a>
     </div>
   </div>
+
+  {#if form?.message}
+    <div class={`mb-4 flex shrink-0 items-center gap-2 rounded-xl px-4 py-3 text-[10px] font-medium ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>
+      {#if !form.success}<CircleAlert size={14}/>{/if}
+      {form.message}
+    </div>
+  {/if}
 
   <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white shadow-[0_14px_40px_rgba(1,13,40,0.05)]">
     <header class="flex shrink-0 items-center justify-between border-b border-[#EEF0F5] px-5 py-3.5"><div class="flex items-center gap-2"><MessageCircleMore size={16} class="text-[#000A57]"/><span class="text-[11px] font-semibold text-[#444A59]">Conversa em tempo real</span></div><span class="text-[9px] text-[#989DAA]">{chat.assignedUserName ? `Atendendo: ${chat.assignedUserName}` : chat.aiState === "active" ? "Agente IA atendendo" : "Aguardando atendente"}</span></header>
