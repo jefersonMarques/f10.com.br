@@ -32,28 +32,12 @@ function parseUrl(value, protocols) {
 
 const remoteEnabled = process.env.REMOTE_SUPPORT_PROVIDER === "meshcentral";
 const remoteBaseUrl = process.env.MESHCENTRAL_BASE_URL?.trim() ?? "";
-const remoteTemplate = process.env.MESHCENTRAL_DEVICE_URL_TEMPLATE?.trim() ?? "";
 const remoteBase = parseUrl(remoteBaseUrl, ["https:", "http:"]);
 const remoteBaseProtocolOk = Boolean(
   remoteBase &&
   (remoteBase.protocol === "https:" || ["localhost", "127.0.0.1"].includes(remoteBase.hostname)),
 );
-const remoteBasePath = remoteBase?.pathname.endsWith("/")
-  ? remoteBase.pathname
-  : `${remoteBase?.pathname ?? ""}/`;
-let remoteTemplateValid = false;
-try {
-  const templateUrl = new URL(remoteTemplate.replace("{deviceId}", "doctor-device"), remoteBaseUrl || "http://localhost");
-  remoteTemplateValid = Boolean(
-    remoteBase &&
-    remoteTemplate.includes("{deviceId}") &&
-    templateUrl.origin === remoteBase.origin &&
-    `${templateUrl.pathname.endsWith("/") ? templateUrl.pathname : `${templateUrl.pathname}/`}`.startsWith(remoteBasePath),
-  );
-} catch {
-  remoteTemplateValid = false;
-}
-const remoteProviderConfigured = remoteEnabled && remoteBaseProtocolOk && remoteTemplateValid;
+const remoteProviderConfigured = remoteEnabled && remoteBaseProtocolOk;
 
 const meshCtrlPath = process.env.MESHCENTRAL_MESHCTRL_PATH?.trim() ?? "";
 const meshControlUrlValue = process.env.MESHCENTRAL_CONTROL_URL?.trim() ?? "";
@@ -76,10 +60,12 @@ const meshControlConfigured = Boolean(
 const agentType = Number.parseInt(process.env.MESHCENTRAL_WINDOWS_AGENT_TYPE ?? "4", 10);
 const consentFlags = Number.parseInt(process.env.MESHCENTRAL_DEVICE_CONSENT_FLAGS ?? "8", 10);
 const enrollmentHours = Number.parseInt(process.env.REMOTE_ENROLLMENT_HOURS ?? "24", 10);
+const shareMinutes = Number.parseInt(process.env.MESHCENTRAL_SHARE_MINUTES ?? "30", 10);
 const remoteOptionsValid = Boolean(
   Number.isInteger(agentType) && agentType >= 1 && agentType <= 11000 &&
   Number.isInteger(consentFlags) && consentFlags >= 0 &&
-  Number.isInteger(enrollmentHours) && enrollmentHours >= 1 && enrollmentHours <= 168,
+  Number.isInteger(enrollmentHours) && enrollmentHours >= 1 && enrollmentHours <= 168 &&
+  Number.isInteger(shareMinutes) && shareMinutes >= 5 && shareMinutes <= 60,
 );
 const remoteConfigured = remoteProviderConfigured && meshControlConfigured && remoteOptionsValid;
 
@@ -230,22 +216,24 @@ try {
       "remote support provider",
       remoteOk,
       remoteConfigured
-        ? `MeshCentral configured; public=${remoteBaseUrl}; control=${meshControlUrlValue}; agentType=${agentType}; consentFlags=${consentFlags}`
+        ? `MeshCentral configured; public=${remoteBaseUrl}; control=${meshControlUrlValue}; agentType=${agentType}; consentFlags=${consentFlags}; shareMinutes=${shareMinutes}`
         : remoteEnabled || requireRemote
-          ? "MeshCentral requires public URL/template, MeshCtrl path, ws/wss control URL, user/domain, credential and valid enrollment options"
+          ? "MeshCentral requires public URL, MeshCtrl path, ws/wss control URL, user/domain, credential and valid enrollment/share options"
           : "disabled by environment",
     );
     hasFailure ||= !remoteOk;
 
-    const remoteCredentialOk = !remoteEnabled || !requireRemote || Boolean(meshLoginKeyFile && existsSync(meshLoginKeyFile));
+    const remoteCredentialOk = !remoteEnabled || !requireRemote || meshControlCredentialConfigured;
     printResult(
       "remote control credential",
       remoteCredentialOk,
       remoteCredentialOk
         ? meshLoginKeyFile
           ? "login key file configured"
-          : "remote requirement disabled"
-        : "production gate requires MESHCENTRAL_CONTROL_LOGIN_KEY_FILE; password fallback is not accepted when OPERATIONS_DOCTOR_REQUIRE_REMOTE=true",
+          : meshPassword
+            ? "password credential configured"
+            : "remote requirement disabled"
+        : "configure MESHCENTRAL_CONTROL_LOGIN_KEY_FILE or MESHCENTRAL_CONTROL_PASSWORD",
     );
     hasFailure ||= !remoteCredentialOk;
 
