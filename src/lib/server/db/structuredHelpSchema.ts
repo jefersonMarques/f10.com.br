@@ -1,4 +1,5 @@
 import {
+  bigint,
   index,
   integer,
   jsonb,
@@ -17,6 +18,7 @@ export const helpBlockType = pgEnum("help_block_type", [
   "video",
   "notice",
   "link",
+  "file",
 ]);
 
 export const helpAssetType = pgEnum("help_asset_type", [
@@ -99,6 +101,8 @@ export const helpAssets = pgTable(
     storageKey: text("storage_key"),
     originalName: text("original_name"),
     mimeType: text("mime_type"),
+    sizeBytes: bigint("size_bytes", { mode: "number" }),
+    checksumSha256: text("checksum_sha256"),
     altText: text("alt_text").notNull().default(""),
     transcript: text("transcript").notNull().default(""),
     aiSummary: text("ai_summary").notNull().default(""),
@@ -112,6 +116,8 @@ export const helpAssets = pgTable(
   (table) => [
     index("help_assets_content_idx").on(table.contentId),
     index("help_assets_type_idx").on(table.assetType),
+    index("help_assets_checksum_idx").on(table.checksumSha256),
+    index("help_assets_storage_key_idx").on(table.storageKey),
   ],
 );
 
