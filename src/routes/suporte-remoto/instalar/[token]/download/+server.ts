@@ -7,7 +7,7 @@ function validToken(value: string): boolean {
   return /^[A-Za-z0-9_-]{40,120}$/.test(value);
 }
 
-export const GET: RequestHandler = async ({ params, fetch }) => {
+export const GET: RequestHandler = async ({ params }) => {
   const token = params.token ?? "";
   if (!validToken(token)) throw error(404, "Solicitação não encontrada.");
 
