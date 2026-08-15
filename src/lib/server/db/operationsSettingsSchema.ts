@@ -171,6 +171,8 @@ export const remoteSupportSessions = pgTable(
     ),
     deviceId: uuid("device_id").references(() => remoteDevices.id, { onDelete: "set null" }),
     requestedByUserId: uuid("requested_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    startedByUserId: uuid("started_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    endedByUserId: uuid("ended_by_user_id").references(() => users.id, { onDelete: "set null" }),
     status: remoteSupportStatus("status").notNull().default("requested"),
     consentTokenHash: text("consent_token_hash").notNull(),
     consentExpiresAt: timestamp("consent_expires_at", { withTimezone: true }).notNull(),
@@ -191,5 +193,7 @@ export const remoteSupportSessions = pgTable(
     index("remote_support_sessions_status_idx").on(table.status, table.updatedAt),
     index("remote_support_sessions_ticket_idx").on(table.ticketId, table.createdAt),
     index("remote_support_sessions_requester_idx").on(table.requestedByUserId, table.createdAt),
+    index("remote_support_sessions_started_by_idx").on(table.startedByUserId, table.startedAt),
+    index("remote_support_sessions_ended_by_idx").on(table.endedByUserId, table.endedAt),
   ],
 );
