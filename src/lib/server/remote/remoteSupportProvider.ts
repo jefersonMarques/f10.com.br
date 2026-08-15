@@ -13,6 +13,10 @@ export interface RemoteSupportProvider {
   getLaunchUrl(providerDeviceId: string): string;
 }
 
+function normalizeBasePath(pathname: string): string {
+  return pathname.endsWith("/") ? pathname : `${pathname}/`;
+}
+
 function readMeshCentralConfiguration() {
   const provider = env.REMOTE_SUPPORT_PROVIDER?.trim() === "meshcentral" ? "meshcentral" : "disabled";
   const baseUrl = env.MESHCENTRAL_BASE_URL?.trim() ?? "";
@@ -52,6 +56,11 @@ class MeshCentralProvider implements RemoteSupportProvider {
     const raw = this.config.deviceUrlTemplate.replaceAll("{deviceId}", encodeURIComponent(providerDeviceId));
     const url = new URL(raw, this.config.parsedBase);
     if (url.origin !== this.config.parsedBase.origin) throw new Error("REMOTE_PROVIDER_URL_ORIGIN_MISMATCH");
+
+    const basePath = normalizeBasePath(this.config.parsedBase.pathname);
+    const launchPath = normalizeBasePath(url.pathname);
+    if (!launchPath.startsWith(basePath)) throw new Error("REMOTE_PROVIDER_URL_PATH_MISMATCH");
+
     return url.toString();
   }
 }
