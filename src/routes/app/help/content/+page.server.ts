@@ -6,6 +6,7 @@ import {
   createStructuredHelpContent,
   listStructuredHelpContents,
 } from "$lib/server/help/structuredHelpRepository";
+import { listPublishedStructuredHelpLinks } from "$lib/server/help/publicStructuredHelpRepository";
 
 function readFormValue(formData: FormData, name: string): string {
   const value = formData.get(name);
@@ -22,8 +23,19 @@ export const load: PageServerLoad = async ({ parent }) => {
     throw error(403, "Acesso não autorizado.");
   }
 
+  const [contents, publishedLinks] = await Promise.all([
+    listStructuredHelpContents(),
+    listPublishedStructuredHelpLinks(),
+  ]);
+  const publishedById = new Map(
+    publishedLinks.map((publication) => [publication.entityId, publication]),
+  );
+
   return {
-    contents: await listStructuredHelpContents(),
+    contents: contents.map((content) => ({
+      ...content,
+      publishedSlug: publishedById.get(content.id)?.slug ?? null,
+    })),
     canEdit: hasPermission(permissions, "help.edit"),
   };
 };
