@@ -2,13 +2,22 @@ import {
   index,
   integer,
   jsonb,
+  pgEnum,
   pgTable,
   text,
   timestamp,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { supportAiRuns } from "$lib/server/db/supportAiSchema";
 import { tickets } from "$lib/server/db/supportSchema";
+
+export const webChatAiState = pgEnum("web_chat_ai_state", [
+  "active",
+  "escalated",
+  "human",
+  "disabled",
+]);
 
 export const webChatSessions = pgTable(
   "web_chat_sessions",
@@ -28,6 +37,13 @@ export const webChatSessions = pgTable(
       .$type<Record<string, unknown>>()
       .notNull()
       .default({}),
+    aiState: webChatAiState("ai_state").notNull().default("disabled"),
+    aiHandoffReason: text("ai_handoff_reason"),
+    aiHandoffAt: timestamp("ai_handoff_at", { withTimezone: true }),
+    aiProcessingAt: timestamp("ai_processing_at", { withTimezone: true }),
+    aiLastRunId: uuid("ai_last_run_id").references(() => supportAiRuns.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -37,6 +53,8 @@ export const webChatSessions = pgTable(
     uniqueIndex("web_chat_sessions_token_unique").on(table.tokenHash),
     index("web_chat_sessions_expires_idx").on(table.expiresAt),
     index("web_chat_sessions_last_seen_idx").on(table.lastSeenAt),
+    index("web_chat_sessions_ai_state_idx").on(table.aiState, table.lastSeenAt),
+    index("web_chat_sessions_ai_last_run_idx").on(table.aiLastRunId),
   ],
 );
 
