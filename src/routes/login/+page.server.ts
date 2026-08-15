@@ -10,7 +10,13 @@ import {
 
 function sanitizeReturnTo(value: string | null): string {
   if (!value || value.startsWith("//")) return "/app";
-  if (value === "/app" || value.startsWith("/app/") || value.startsWith("/app?")) return value;
+  if (
+    value === "/app" ||
+    value.startsWith("/app/") ||
+    value.startsWith("/app?")
+  ) {
+    return value;
+  }
   return "/app";
 }
 
@@ -25,6 +31,7 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
 
   return {
     returnTo: sanitizeReturnTo(url.searchParams.get("returnTo")),
+    activated: url.searchParams.get("activated") === "1",
   };
 };
 
@@ -33,9 +40,16 @@ export const actions: Actions = {
     const formData = await request.formData();
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
-    const returnTo = sanitizeReturnTo(String(formData.get("returnTo") ?? "/app"));
+    const returnTo = sanitizeReturnTo(
+      String(formData.get("returnTo") ?? "/app"),
+    );
 
-    if (!email || email.length > 254 || password.length < 1 || password.length > 1024) {
+    if (
+      !email ||
+      email.length > 254 ||
+      password.length < 1 ||
+      password.length > 1024
+    ) {
       return fail(400, {
         email,
         returnTo,
@@ -51,7 +65,11 @@ export const actions: Actions = {
       clientAddress = "unknown";
     }
 
-    const authentication = await authenticateUser(email, password, clientAddress);
+    const authentication = await authenticateUser(
+      email,
+      password,
+      clientAddress,
+    );
 
     if (!authentication.ok) {
       return fail(authentication.reason === "throttled" ? 429 : 400, {
@@ -69,7 +87,11 @@ export const actions: Actions = {
       request.headers.get("user-agent"),
     );
 
-    cookies.set(SESSION_COOKIE_NAME, sessionToken, getSessionCookieOptions());
+    cookies.set(
+      SESSION_COOKIE_NAME,
+      sessionToken,
+      getSessionCookieOptions(),
+    );
     throw redirect(303, returnTo);
   },
 };
