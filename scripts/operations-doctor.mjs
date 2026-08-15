@@ -5,6 +5,9 @@ import postgres from "postgres";
 const databaseUrl = process.env.DATABASE_URL?.trim();
 const requireSuperAdmin =
   process.env.OPERATIONS_DOCTOR_REQUIRE_SUPER_ADMIN !== "false";
+const requireOpenAi = process.env.OPERATIONS_DOCTOR_REQUIRE_OPENAI === "true";
+const openAiConfigured = Boolean(process.env.OPENAI_API_KEY?.trim());
+const openAiModel = process.env.OPENAI_MODEL?.trim() || "gpt-5-mini";
 
 if (!databaseUrl) {
   throw new Error("DATABASE_URL is required.");
@@ -60,6 +63,7 @@ const criticalTables = [
   "help_search_documents",
   "help_search_events",
   "help_search_results",
+  "support_ai_runs",
   "user_invites",
   "task_projects",
   "tasks",
@@ -163,6 +167,18 @@ try {
       trigramOk ? "available" : "required by help search intelligence",
     );
     hasFailure ||= !trigramOk;
+
+    const openAiOk = openAiConfigured || !requireOpenAi;
+    printResult(
+      "OpenAI support agent",
+      openAiOk,
+      openAiConfigured
+        ? `configured; model=${openAiModel}`
+        : requireOpenAi
+          ? "OPENAI_API_KEY is required"
+          : "not configured; AI lab will fail closed to human escalation",
+    );
+    hasFailure ||= !openAiOk;
 
     const roleRows = await sql`SELECT code FROM roles`;
     const missingRoles = difference(
