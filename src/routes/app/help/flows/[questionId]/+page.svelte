@@ -35,10 +35,13 @@
     { value: "team", label: "Equipe" },
   ];
 
-  $: failedValues = form && "values" in form ? form.values : null;
+  $: failedValues =
+    form && "values" in form && form.values ? form.values : null;
   $: initialValues = failedValues ?? data.question;
 
-  let options: EditableOption[] = initialValues.options.map((option) => ({ ...option }));
+  let options: EditableOption[] = data.question.options.map((option) => ({
+    ...option,
+  }));
   let previousQuestionId = data.question.id;
   let previousFailedValues = failedValues;
 
