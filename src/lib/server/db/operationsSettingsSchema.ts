@@ -177,6 +177,7 @@ export const remoteSupportSessions = pgTable(
     consentTokenHash: text("consent_token_hash").notNull(),
     consentExpiresAt: timestamp("consent_expires_at", { withTimezone: true }).notNull(),
     providerSessionId: text("provider_session_id"),
+    providerSessionExpiresAt: timestamp("provider_session_expires_at", { withTimezone: true }),
     failureReason: text("failure_reason"),
     requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
     authorizedAt: timestamp("authorized_at", { withTimezone: true }),
@@ -195,5 +196,9 @@ export const remoteSupportSessions = pgTable(
     index("remote_support_sessions_requester_idx").on(table.requestedByUserId, table.createdAt),
     index("remote_support_sessions_started_by_idx").on(table.startedByUserId, table.startedAt),
     index("remote_support_sessions_ended_by_idx").on(table.endedByUserId, table.endedAt),
+    index("remote_support_sessions_provider_session_idx").on(
+      table.providerSessionId,
+      table.providerSessionExpiresAt,
+    ),
   ],
 );
