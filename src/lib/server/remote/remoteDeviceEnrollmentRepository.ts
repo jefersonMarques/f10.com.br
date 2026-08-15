@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { env } from "$env/dynamic/private";
 import { and, eq, inArray, lt, or } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
@@ -26,7 +27,7 @@ function hashToken(value: string): string {
 }
 
 function enrollmentHours(): number {
-  const parsed = Number.parseInt(process.env.REMOTE_ENROLLMENT_HOURS ?? "24", 10);
+  const parsed = Number.parseInt(env.REMOTE_ENROLLMENT_HOURS ?? "24", 10);
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > 168) return 24;
   return parsed;
 }
@@ -71,21 +72,31 @@ async function getTicketSubject(ticketId: string) {
   };
 }
 
-async function getOrCreateCustomerGroup(ticketId: string) {
-  const subject = await getTicketSubject(ticketId);
-  const db = getDatabase();
-  const condition = subject.customerOrganizationId
-    ? eq(remoteCustomerGroups.customerOrganizationId, subject.customerOrganizationId)
-    : and(
-        eq(remoteCustomerGroups.customerContactId, subject.customerContactId),
-        eq(remoteCustomerGroups.provider, "meshcentral"),
-      );
+type TicketSubject = Awaited<ReturnType<typeof getTicketSubject>>;
 
-  const [existing] = await db
+async function findCustomerGroup(subject: TicketSubject) {
+  const db = getDatabase();
+  const subjectCondition = subject.customerOrganizationId
+    ? eq(remoteCustomerGroups.customerOrganizationId, subject.customerOrganizationId)
+    : eq(remoteCustomerGroups.customerContactId, subject.customerContactId);
+
+  const [group] = await db
     .select()
     .from(remoteCustomerGroups)
-    .where(and(eq(remoteCustomerGroups.provider, "meshcentral"), condition))
+    .where(
+      and(
+        eq(remoteCustomerGroups.provider, "meshcentral"),
+        subjectCondition,
+      ),
+    )
     .limit(1);
+
+  return group ?? null;
+}
+
+async function getOrCreateCustomerGroup(ticketId: string) {
+  const subject = await getTicketSubject(ticketId);
+  const existing = await findCustomerGroup(subject);
   if (existing) return { subject, group: existing };
 
   const providerGroup = await ensureMeshCentralDeviceGroup(
@@ -94,6 +105,7 @@ async function getOrCreateCustomerGroup(ticketId: string) {
       contactId: subject.customerContactId,
     }),
   );
+  const db = getDatabase();
 
   const [created] = await db
     .insert(remoteCustomerGroups)
@@ -109,11 +121,7 @@ async function getOrCreateCustomerGroup(ticketId: string) {
 
   if (created) return { subject, group: created };
 
-  const [concurrent] = await db
-    .select()
-    .from(remoteCustomerGroups)
-    .where(and(eq(remoteCustomerGroups.provider, "meshcentral"), condition))
-    .limit(1);
+  const concurrent = await findCustomerGroup(subject);
   if (!concurrent) throw new Error("REMOTE_CUSTOMER_GROUP_NOT_CREATED");
   return { subject, group: concurrent };
 }
@@ -122,7 +130,11 @@ function deviceMetadata(raw: Record<string, unknown>): Record<string, unknown> {
   const metadata: Record<string, unknown> = {};
   for (const key of ["osdesc", "ip", "agent", "icon", "pwr", "conn"]) {
     const value = raw[key];
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
       metadata[key] = value;
     }
   }
@@ -130,7 +142,10 @@ function deviceMetadata(raw: Record<string, unknown>): Record<string, unknown> {
 }
 
 export async function syncRemoteDevicesForTicket(ticketId: string) {
-  const { subject, group } = await getOrCreateCustomerGroup(ticketId);
+  const subject = await getTicketSubject(ticketId);
+  const group = await findCustomerGroup(subject);
+  if (!group) return [];
+
   const providerDevices = await listMeshCentralDevices(group.providerGroupName);
   const db = getDatabase();
   const now = new Date();
@@ -145,7 +160,12 @@ export async function syncRemoteDevicesForTicket(ticketId: string) {
       ),
     );
 
-  const synced: Array<{ id: string; providerDeviceId: string; name: string; online: boolean }> = [];
+  const synced: Array<{
+    id: string;
+    providerDeviceId: string;
+    name: string;
+    online: boolean;
+  }> = [];
 
   for (const providerDevice of providerDevices) {
     const [device] = await db
@@ -213,7 +233,9 @@ export async function syncRemoteDevicesForTicket(ticketId: string) {
     const baseline = isStringArray(enrollment.baselineProviderDeviceIds)
       ? new Set(enrollment.baselineProviderDeviceIds)
       : new Set<string>();
-    const discovered = synced.find((device) => !baseline.has(device.providerDeviceId));
+    const discovered = synced.find(
+      (device) => !baseline.has(device.providerDeviceId),
+    );
 
     if (discovered) {
       await db.transaction(async (tx) => {
@@ -243,7 +265,10 @@ export async function syncRemoteDevicesForTicket(ticketId: string) {
         action: "remote.device.enrolled",
         entityType: "remote_device",
         entityId: discovered.id,
-        metadata: { enrollmentId: enrollment.id, ticketId: enrollment.ticketId },
+        metadata: {
+          enrollmentId: enrollment.id,
+          ticketId: enrollment.ticketId,
+        },
       });
     }
   }
@@ -296,7 +321,10 @@ export async function createRemoteDeviceEnrollment(
     );
 
   const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(now.getTime() + enrollmentHours() * 60 * 60_000);
+  const expiresAt = new Date(
+    now.getTime() + enrollmentHours() * 60 * 60_000,
+  );
+
   const [enrollment] = await db.transaction(async (tx) => {
     const [created] = await tx
       .insert(remoteDeviceEnrollments)
@@ -328,7 +356,10 @@ export async function createRemoteDeviceEnrollment(
       ticketId,
       actorUserId,
       eventType: "remote.enrollment.requested",
-      metadata: { enrollmentId: created.id, expiresAt: expiresAt.toISOString() },
+      metadata: {
+        enrollmentId: created.id,
+        expiresAt: expiresAt.toISOString(),
+      },
     });
     return [created];
   });
@@ -338,10 +369,17 @@ export async function createRemoteDeviceEnrollment(
     action: "remote.enrollment.requested",
     entityType: "remote_device_enrollment",
     entityId: enrollment.id,
-    metadata: { ticketId, customerContactId: subject.customerContactId },
+    metadata: {
+      ticketId,
+      customerContactId: subject.customerContactId,
+    },
   });
 
-  return { id: enrollment.id, installUrl: `${publicBaseUrl.replace(/\/$/, "")}/suporte-remoto/instalar/${token}`, expiresAt };
+  return {
+    id: enrollment.id,
+    installUrl: `${publicBaseUrl.replace(/\/$/, "")}/suporte-remoto/instalar/${token}`,
+    expiresAt,
+  };
 }
 
 export async function getRemoteEnrollmentByToken(token: string) {
@@ -358,10 +396,16 @@ export async function getRemoteEnrollmentByToken(token: string) {
       providerGroupId: remoteCustomerGroups.providerGroupId,
     })
     .from(remoteDeviceEnrollments)
-    .leftJoin(customerContacts, eq(remoteDeviceEnrollments.customerContactId, customerContacts.id))
+    .leftJoin(
+      customerContacts,
+      eq(remoteDeviceEnrollments.customerContactId, customerContacts.id),
+    )
     .innerJoin(
       remoteCustomerGroups,
-      eq(remoteDeviceEnrollments.remoteCustomerGroupId, remoteCustomerGroups.id),
+      eq(
+        remoteDeviceEnrollments.remoteCustomerGroupId,
+        remoteCustomerGroups.id,
+      ),
     )
     .where(eq(remoteDeviceEnrollments.tokenHash, hashToken(token)))
     .limit(1);
@@ -383,12 +427,19 @@ export async function markRemoteEnrollmentDownloaded(token: string) {
     .from(remoteDeviceEnrollments)
     .innerJoin(
       remoteCustomerGroups,
-      eq(remoteDeviceEnrollments.remoteCustomerGroupId, remoteCustomerGroups.id),
+      eq(
+        remoteDeviceEnrollments.remoteCustomerGroupId,
+        remoteCustomerGroups.id,
+      ),
     )
     .where(eq(remoteDeviceEnrollments.tokenHash, hashToken(token)))
     .limit(1);
 
-  if (!row || row.expiresAt <= now || !["pending", "downloaded"].includes(row.status)) {
+  if (
+    !row ||
+    row.expiresAt <= now ||
+    !["pending", "downloaded"].includes(row.status)
+  ) {
     throw new Error("REMOTE_ENROLLMENT_INVALID");
   }
 
@@ -462,7 +513,11 @@ export async function createKnownDeviceRemoteSession(
     action: "remote.requested",
     entityType: "remote_support_session",
     entityId: session.id,
-    metadata: { ticketId, deviceId, consentMode: "meshcentral-local-prompt" },
+    metadata: {
+      ticketId,
+      deviceId,
+      consentMode: "meshcentral-local-prompt",
+    },
   });
 
   return session.id;
