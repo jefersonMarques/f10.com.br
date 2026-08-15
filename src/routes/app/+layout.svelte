@@ -20,7 +20,7 @@
 
   const navigationItems = [
     { label: "Visão geral", icon: LayoutDashboard, enabled: true, href: "/app" },
-    { label: "Central de Ajuda", icon: BookOpen, enabled: false, permission: "help.view" },
+    { label: "Central de Ajuda", icon: BookOpen, enabled: true, href: "/app/help", permission: "help.view" },
     { label: "Tarefas", icon: CheckSquare2, enabled: false, permission: "tasks.view" },
     { label: "Tickets", icon: Headphones, enabled: false, permission: "tickets.view" },
     { label: "Chat", icon: MessageCircleMore, enabled: false, permission: "chat.view" },
