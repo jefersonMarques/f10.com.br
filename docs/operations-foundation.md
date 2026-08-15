@@ -4,6 +4,8 @@ A área interna utiliza o mesmo SvelteKit do site público e adiciona PostgreSQL
 
 ## Variáveis de ambiente
 
+Use `.env.example` como referência e mantenha os valores reais somente no `.env` local ou no ambiente seguro do servidor.
+
 ```bash
 DATABASE_URL=postgres://user:password@127.0.0.1:5432/f10_operations
 DATABASE_POOL_MAX=10
@@ -19,6 +21,16 @@ BOOTSTRAP_SUPER_ADMIN_PASSWORD="uma-senha-forte-com-14-ou-mais-caracteres"
 
 `BOOTSTRAP_SUPER_ADMIN_FORCE_PASSWORD=true` só deve ser usado quando houver intenção explícita de redefinir a senha de uma conta já existente.
 
+Para o smoke test HTTP:
+
+```bash
+OPERATIONS_BASE_URL=https://app.f10.com.br
+OPERATIONS_SMOKE_EMAIL=admin@f10.com.br
+OPERATIONS_SMOKE_PASSWORD="senha-da-conta-de-homologacao"
+```
+
+Os comandos operacionais usam `--env-file-if-exists=.env`. Portanto, carregam automaticamente o `.env` quando ele existe, mas continuam funcionando quando as variáveis são fornecidas diretamente pelo ambiente do processo. Variáveis já definidas no ambiente têm precedência sobre os valores do `.env`.
+
 ## Inicialização
 
 Depois de instalar as dependências do projeto:
@@ -26,38 +38,30 @@ Depois de instalar as dependências do projeto:
 ```bash
 npm run db:migrate
 npm run admin:bootstrap
-```
-
-No servidor, as variáveis podem ser carregadas antes dos comandos ou fornecidas pelo ambiente do processo. Segredos não devem ser versionados no Git.
-
-## Validação do ambiente
-
-Depois das migrations e do bootstrap, valide banco, migrations, tabelas críticas, papéis e permissões:
-
-```bash
-DATABASE_URL="postgres://..." npm run operations:doctor
-```
-
-O comando é somente leitura. Por padrão também exige ao menos um `SUPER_ADMIN` ativo. Para diagnosticar um banco antes do bootstrap:
-
-```bash
-OPERATIONS_DOCTOR_REQUIRE_SUPER_ADMIN=false \
-DATABASE_URL="postgres://..." \
 npm run operations:doctor
 ```
 
-Com a aplicação de homologação em execução, valide autenticação e as rotas principais:
+Com a aplicação em execução, valide as rotas internas:
 
 ```bash
-OPERATIONS_BASE_URL="https://homolog.example.com" \
-OPERATIONS_SMOKE_EMAIL="admin@f10.com.br" \
-OPERATIONS_SMOKE_PASSWORD="..." \
 npm run operations:smoke
 ```
 
-O smoke test cria uma sessão temporária, verifica as rotas protegidas e executa logout ao final.
+No servidor, segredos devem preferencialmente ser fornecidos pelo ambiente do processo ou arquivo protegido fora do repositório. Segredos não devem ser versionados no Git.
 
-O roteiro manual completo está em `docs/operations-test-plan.md`.
+## Validação operacional
+
+`operations:doctor` valida banco, migrations, tabelas críticas, papéis, permissões e a existência de Super Admin ativo.
+
+```bash
+npm run operations:doctor
+```
+
+`operations:smoke` valida proteção de `/app`, login, rotas principais e logout usando a conta de homologação configurada nas variáveis `OPERATIONS_SMOKE_*`.
+
+```bash
+npm run operations:smoke
+```
 
 ## Autorização
 
