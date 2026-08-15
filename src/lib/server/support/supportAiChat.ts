@@ -52,6 +52,24 @@ async function getSessionState(sessionId: string): Promise<ChatAiState> {
   return session?.aiState ?? "disabled";
 }
 
+async function disableAiSession(sessionId: string): Promise<void> {
+  const db = getDatabase();
+  await db
+    .update(webChatSessions)
+    .set({
+      aiState: "disabled",
+      aiHandoffReason: "Atendimento automático desativado por configuração.",
+      aiHandoffAt: new Date(),
+      aiProcessingAt: null,
+    })
+    .where(
+      and(
+        eq(webChatSessions.id, sessionId),
+        eq(webChatSessions.aiState, "active"),
+      ),
+    );
+}
+
 async function claimAiProcessing(sessionId: string) {
   const db = getDatabase();
   const now = new Date();
@@ -292,6 +310,11 @@ export async function processSupportAiChatMessage(
 ): Promise<SupportAiChatProcessResult> {
   const question = questionValue.trim().slice(0, 4_000);
   if (!question) {
+    return { processed: false, state: "disabled", result: null };
+  }
+
+  if (!isSupportAiChatEnabled()) {
+    await disableAiSession(sessionId);
     return { processed: false, state: "disabled", result: null };
   }
 
