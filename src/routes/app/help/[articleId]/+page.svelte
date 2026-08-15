@@ -142,8 +142,9 @@
           required
           maxlength="50000"
           rows="20"
+          value={values.bodyText}
           class="mt-5 w-full resize-y rounded-2xl border border-[#DDE1EA] px-4 py-4 text-[14px] leading-7 text-[#242A39] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"
-        >{values.bodyText}</textarea>
+        ></textarea>
       </section>
 
       {#if data.canEdit}
