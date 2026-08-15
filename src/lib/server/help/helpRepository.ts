@@ -1,9 +1,16 @@
 import { and, asc, count, eq, max } from "drizzle-orm";
-import { helpDestinations as legacyDestinations, helpQuestions as legacyQuestions } from "$lib/help/helpDecisionTree";
+import {
+  helpDestinations as legacyDestinations,
+  helpQuestions as legacyQuestions,
+} from "$lib/help/helpDecisionTree";
 import { destinationAliases } from "$lib/help/helpSearchAliases";
-import { trainingCategories, trainingVideos } from "$lib/onboarding/trainingCatalog";
+import {
+  trainingCategories,
+  trainingVideos,
+} from "$lib/onboarding/trainingCatalog";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
+import { helpPublications } from "$lib/server/db/helpPublications";
 import {
   helpArticles,
   helpContentVersions,
@@ -52,12 +59,13 @@ function buildArticleBlocks(bodyText: string): HelpArticleBlock[] {
 
 export async function getHelpAdminSummary() {
   const db = getDatabase();
-  const [articlesResult, destinationsResult, questionsResult, trainingsResult] = await Promise.all([
-    db.select({ value: count() }).from(helpArticles),
-    db.select({ value: count() }).from(helpDestinations),
-    db.select({ value: count() }).from(helpQuestions),
-    db.select({ value: count() }).from(helpTrainingVideos),
-  ]);
+  const [articlesResult, destinationsResult, questionsResult, trainingsResult] =
+    await Promise.all([
+      db.select({ value: count() }).from(helpArticles),
+      db.select({ value: count() }).from(helpDestinations),
+      db.select({ value: count() }).from(helpQuestions),
+      db.select({ value: count() }).from(helpTrainingVideos),
+    ]);
 
   return {
     articles: articlesResult[0]?.value ?? 0,
@@ -84,15 +92,35 @@ export async function listHelpArticles() {
     .orderBy(asc(helpArticles.title));
 }
 
-async function saveArticleVersion(articleId: string, actorUserId: string): Promise<void> {
+async function getArticle(articleId: string) {
   const db = getDatabase();
-  const article = await db.query.helpArticles.findFirst({ where: eq(helpArticles.id, articleId) });
+  const [article] = await db
+    .select()
+    .from(helpArticles)
+    .where(eq(helpArticles.id, articleId))
+    .limit(1);
+
+  return article ?? null;
+}
+
+async function saveArticleVersion(
+  articleId: string,
+  actorUserId: string,
+): Promise<void> {
+  const db = getDatabase();
+  const article = await getArticle(articleId);
+
   if (!article) return;
 
   const versionResult = await db
     .select({ version: max(helpContentVersions.version) })
     .from(helpContentVersions)
-    .where(and(eq(helpContentVersions.entityType, "article"), eq(helpContentVersions.entityId, articleId)));
+    .where(
+      and(
+        eq(helpContentVersions.entityType, "article"),
+        eq(helpContentVersions.entityId, articleId),
+      ),
+    );
 
   const nextVersion = Number(versionResult[0]?.version ?? 0) + 1;
 
@@ -112,7 +140,10 @@ async function saveArticleVersion(articleId: string, actorUserId: string): Promi
   });
 }
 
-export async function createHelpArticle(actorUserId: string, input: CreateHelpArticleInput) {
+export async function createHelpArticle(
+  actorUserId: string,
+  input: CreateHelpArticleInput,
+) {
   const db = getDatabase();
   const slug = normalizeHelpSlug(input.slug || input.title);
 
@@ -132,6 +163,7 @@ export async function createHelpArticle(actorUserId: string, input: CreateHelpAr
     .returning({ id: helpArticles.id, slug: helpArticles.slug });
 
   if (!article) throw new Error("ARTICLE_NOT_CREATED");
+
   await saveArticleVersion(article.id, actorUserId);
   await recordAuditEvent({
     actorUserId,
@@ -144,28 +176,60 @@ export async function createHelpArticle(actorUserId: string, input: CreateHelpAr
   return article;
 }
 
-export async function publishHelpArticle(actorUserId: string, articleId: string): Promise<void> {
+export async function publishHelpArticle(
+  actorUserId: string,
+  articleId: string,
+): Promise<void> {
   const db = getDatabase();
-  const [updated] = await db
-    .update(helpArticles)
-    .set({
-      status: "published",
-      publishedAt: new Date(),
-      updatedBy: actorUserId,
-      updatedAt: new Date(),
-    })
-    .where(eq(helpArticles.id, articleId))
-    .returning({ id: helpArticles.id, slug: helpArticles.slug });
+  const article = await getArticle(articleId);
 
-  if (!updated) throw new Error("ARTICLE_NOT_FOUND");
+  if (!article) throw new Error("ARTICLE_NOT_FOUND");
 
-  await saveArticleVersion(updated.id, actorUserId);
+  const publishedAt = new Date();
+  const snapshot = {
+    slug: article.slug,
+    title: article.title,
+    summary: article.summary,
+    body: article.body,
+  };
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(helpArticles)
+      .set({
+        status: "published",
+        publishedAt,
+        updatedBy: actorUserId,
+        updatedAt: publishedAt,
+      })
+      .where(eq(helpArticles.id, articleId));
+
+    await tx
+      .insert(helpPublications)
+      .values({
+        entityType: "article",
+        entityId: articleId,
+        snapshot,
+        publishedBy: actorUserId,
+        publishedAt,
+      })
+      .onConflictDoUpdate({
+        target: [helpPublications.entityType, helpPublications.entityId],
+        set: {
+          snapshot,
+          publishedBy: actorUserId,
+          publishedAt,
+        },
+      });
+  });
+
+  await saveArticleVersion(articleId, actorUserId);
   await recordAuditEvent({
     actorUserId,
     action: "help.article.published",
     entityType: "help_article",
-    entityId: updated.id,
-    metadata: { slug: updated.slug },
+    entityId: articleId,
+    metadata: { slug: article.slug },
   });
 }
 
@@ -204,9 +268,32 @@ export async function importLegacyHelpContent(actorUserId: string) {
           updatedBy: actorUserId,
         })
         .onConflictDoNothing();
+
+      await tx
+        .insert(helpPublications)
+        .values({
+          entityType: "training",
+          entityId: training.id,
+          snapshot: {
+            id: training.id,
+            categoryId: training.categoryId,
+            title: training.title,
+            description: training.description,
+            videoId: training.videoId,
+            audience: training.audience ?? null,
+            isEssential: training.isEssential ?? false,
+            isNew: training.isNew ?? false,
+            sortOrder,
+          },
+          publishedBy: actorUserId,
+          publishedAt,
+        })
+        .onConflictDoNothing();
     }
 
     for (const [sortOrder, destination] of legacyDestinations.entries()) {
+      const aliases = destinationAliases[destination.id] ?? [];
+
       await tx
         .insert(helpDestinations)
         .values({
@@ -224,6 +311,21 @@ export async function importLegacyHelpContent(actorUserId: string) {
           publishedAt,
           createdBy: actorUserId,
           updatedBy: actorUserId,
+        })
+        .onConflictDoNothing();
+
+      await tx
+        .insert(helpPublications)
+        .values({
+          entityType: "destination",
+          entityId: destination.id,
+          snapshot: {
+            ...destination,
+            aliases,
+            sortOrder,
+          },
+          publishedBy: actorUserId,
+          publishedAt,
         })
         .onConflictDoNothing();
     }
@@ -247,37 +349,55 @@ export async function importLegacyHelpContent(actorUserId: string) {
         .onConflictDoNothing();
     }
 
-    for (const question of legacyQuestions) {
-      if (question.options.length === 0) continue;
+    for (const [sortOrder, question] of legacyQuestions.entries()) {
+      if (question.options.length > 0) {
+        await tx
+          .insert(helpOptions)
+          .values(
+            question.options.map((option, optionSortOrder) => ({
+              questionId: question.id,
+              optionKey: option.id,
+              label: option.label,
+              description: option.description,
+              icon: option.icon,
+              nextQuestionId: option.nextQuestionId ?? null,
+              destinationId: option.destinationId ?? null,
+              opensSearch: option.opensSearch ?? false,
+              sortOrder: optionSortOrder,
+            })),
+          )
+          .onConflictDoNothing();
+      }
 
       await tx
-        .insert(helpOptions)
-        .values(
-          question.options.map((option, optionSortOrder) => ({
-            questionId: question.id,
-            optionKey: option.id,
-            label: option.label,
-            description: option.description,
-            icon: option.icon,
-            nextQuestionId: option.nextQuestionId ?? null,
-            destinationId: option.destinationId ?? null,
-            opensSearch: option.opensSearch ?? false,
-            sortOrder: optionSortOrder,
-          })),
-        )
+        .insert(helpPublications)
+        .values({
+          entityType: "question",
+          entityId: question.id,
+          snapshot: {
+            ...question,
+            sortOrder,
+          },
+          publishedBy: actorUserId,
+          publishedAt,
+        })
         .onConflictDoNothing();
     }
 
-    const aliasRows = Object.entries(destinationAliases).flatMap(([destinationId, aliases]) =>
-      aliases.map((alias) => ({
-        destinationId,
-        alias,
-        normalizedAlias: normalizeSearchAlias(alias),
-      })),
+    const aliasRows = Object.entries(destinationAliases).flatMap(
+      ([destinationId, aliases]) =>
+        aliases.map((alias) => ({
+          destinationId,
+          alias,
+          normalizedAlias: normalizeSearchAlias(alias),
+        })),
     );
 
     if (aliasRows.length > 0) {
-      await tx.insert(helpSearchAliases).values(aliasRows).onConflictDoNothing();
+      await tx
+        .insert(helpSearchAliases)
+        .values(aliasRows)
+        .onConflictDoNothing();
     }
   });
 
