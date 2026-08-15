@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import {
   helpSearchDocuments,
@@ -18,6 +18,17 @@ export type HelpSearchInput = {
   actorUserId?: string | null;
   customerContactId?: string | null;
   limit?: number;
+};
+
+export type PublishedHelpContext = {
+  contentId: string;
+  slug: string;
+  title: string;
+  summary: string;
+  category: string;
+  publicText: string;
+  aiText: string;
+  publishedAt: Date;
 };
 
 export function normalizeHelpSearchQuery(value: string): string {
@@ -107,6 +118,34 @@ export async function searchPublishedHelp(input: HelpSearchInput) {
       rank: index + 1,
     })),
   };
+}
+
+export async function getPublishedHelpContext(
+  contentIds: string[],
+): Promise<PublishedHelpContext[]> {
+  const orderedIds = Array.from(new Set(contentIds));
+  if (orderedIds.length === 0) return [];
+
+  const db = getDatabase();
+  const rows = await db
+    .select({
+      contentId: helpSearchDocuments.contentId,
+      slug: helpSearchDocuments.slug,
+      title: helpSearchDocuments.title,
+      summary: helpSearchDocuments.summary,
+      category: helpSearchDocuments.category,
+      publicText: helpSearchDocuments.publicText,
+      aiText: helpSearchDocuments.aiText,
+      publishedAt: helpSearchDocuments.publishedAt,
+    })
+    .from(helpSearchDocuments)
+    .where(inArray(helpSearchDocuments.contentId, orderedIds));
+
+  const byId = new Map(rows.map((row) => [row.contentId, row]));
+  return orderedIds.flatMap((contentId) => {
+    const row = byId.get(contentId);
+    return row ? [row] : [];
+  });
 }
 
 export async function recordHelpSearchSelection(
