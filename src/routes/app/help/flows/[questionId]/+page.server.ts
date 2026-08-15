@@ -1,4 +1,5 @@
-import { error, fail, type Actions, type PageServerLoad } from "@sveltejs/kit";
+import { error, fail, type Actions } from "@sveltejs/kit";
+import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import {
@@ -94,7 +95,7 @@ export const actions: Actions = {
     const formData = await request.formData();
     const parsed = parseHelpQuestionFormData(formData);
 
-    if (!parsed.success) {
+    if (parsed.success === false) {
       return fail(400, {
         success: false,
         action: "save",
