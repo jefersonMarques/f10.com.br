@@ -30,6 +30,8 @@ const protectedRoutes = [
   "/app",
   "/app/help",
   "/app/help/content",
+  "/app/help/search",
+  "/app/help/insights",
   "/app/help/flows",
   "/app/team",
   "/app/tasks",
