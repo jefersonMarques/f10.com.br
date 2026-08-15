@@ -227,6 +227,39 @@ async function ensureAcyclicQuestionGraph(
   }
 }
 
+async function ensurePublishedQuestionDependencies(
+  snapshot: NonNullable<Awaited<ReturnType<typeof buildQuestionSnapshot>>>,
+): Promise<void> {
+  const db = getDatabase();
+  const publications = await db
+    .select({
+      entityType: helpPublications.entityType,
+      entityId: helpPublications.entityId,
+    })
+    .from(helpPublications);
+  const publishedEntities = new Set(
+    publications.map(
+      (publication) => `${publication.entityType}:${publication.entityId}`,
+    ),
+  );
+
+  for (const option of snapshot.options) {
+    if (
+      option.nextQuestionId &&
+      !publishedEntities.has(`question:${option.nextQuestionId}`)
+    ) {
+      throw new Error("UNPUBLISHED_QUESTION_TARGET");
+    }
+
+    if (
+      option.destinationId &&
+      !publishedEntities.has(`destination:${option.destinationId}`)
+    ) {
+      throw new Error("UNPUBLISHED_DESTINATION_TARGET");
+    }
+  }
+}
+
 export async function listHelpQuestionsForAdmin() {
   const db = getDatabase();
   const [questions, options] = await Promise.all([
@@ -417,6 +450,8 @@ export async function publishHelpQuestion(
   const snapshot = await buildQuestionSnapshot(questionId);
   if (!snapshot) throw new Error("QUESTION_NOT_FOUND");
   if (snapshot.options.length === 0) throw new Error("QUESTION_WITHOUT_OPTIONS");
+
+  await ensurePublishedQuestionDependencies(snapshot);
 
   const publishedAt = new Date();
 
