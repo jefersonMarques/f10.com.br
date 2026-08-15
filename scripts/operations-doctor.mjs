@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import postgres from "postgres";
@@ -20,17 +21,67 @@ const assetStorageConfigured = assetStorageEnabled && Boolean(
   process.env.S3_SECRET_KEY?.trim(),
 );
 
+function parseUrl(value, protocols) {
+  try {
+    const url = new URL(value);
+    return protocols.includes(url.protocol) ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 const remoteEnabled = process.env.REMOTE_SUPPORT_PROVIDER === "meshcentral";
 const remoteBaseUrl = process.env.MESHCENTRAL_BASE_URL?.trim() ?? "";
 const remoteTemplate = process.env.MESHCENTRAL_DEVICE_URL_TEMPLATE?.trim() ?? "";
-let remoteUrlValid = false;
+const remoteBase = parseUrl(remoteBaseUrl, ["https:", "http:"]);
+const remoteBaseProtocolOk = Boolean(
+  remoteBase &&
+  (remoteBase.protocol === "https:" || ["localhost", "127.0.0.1"].includes(remoteBase.hostname)),
+);
+const remoteBasePath = remoteBase?.pathname.endsWith("/")
+  ? remoteBase.pathname
+  : `${remoteBase?.pathname ?? ""}/`;
+let remoteTemplateValid = false;
 try {
-  const url = new URL(remoteBaseUrl);
-  remoteUrlValid = url.protocol === "https:" || (url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname));
+  const templateUrl = new URL(remoteTemplate.replace("{deviceId}", "doctor-device"), remoteBaseUrl || "http://localhost");
+  remoteTemplateValid = Boolean(
+    remoteBase &&
+    remoteTemplate.includes("{deviceId}") &&
+    templateUrl.origin === remoteBase.origin &&
+    `${templateUrl.pathname.endsWith("/") ? templateUrl.pathname : `${templateUrl.pathname}/`}`.startsWith(remoteBasePath),
+  );
 } catch {
-  remoteUrlValid = false;
+  remoteTemplateValid = false;
 }
-const remoteConfigured = remoteEnabled && remoteUrlValid && remoteTemplate.includes("{deviceId}");
+const remoteProviderConfigured = remoteEnabled && remoteBaseProtocolOk && remoteTemplateValid;
+
+const meshCtrlPath = process.env.MESHCENTRAL_MESHCTRL_PATH?.trim() ?? "";
+const meshControlUrlValue = process.env.MESHCENTRAL_CONTROL_URL?.trim() ?? "";
+const meshControlUrl = parseUrl(meshControlUrlValue, ["ws:", "wss:"]);
+const meshControlUser = process.env.MESHCENTRAL_CONTROL_USER?.trim() ?? "";
+const meshControlDomain = process.env.MESHCENTRAL_CONTROL_DOMAIN?.trim() ?? "";
+const meshLoginKeyFile = process.env.MESHCENTRAL_CONTROL_LOGIN_KEY_FILE?.trim() ?? "";
+const meshPassword = process.env.MESHCENTRAL_CONTROL_PASSWORD ?? "";
+const meshControlCredentialConfigured = Boolean(
+  (meshLoginKeyFile && existsSync(meshLoginKeyFile)) || meshPassword,
+);
+const meshControlConfigured = Boolean(
+  meshCtrlPath &&
+  existsSync(meshCtrlPath) &&
+  meshControlUrl &&
+  meshControlUser &&
+  meshControlDomain &&
+  meshControlCredentialConfigured,
+);
+const agentType = Number.parseInt(process.env.MESHCENTRAL_WINDOWS_AGENT_TYPE ?? "4", 10);
+const consentFlags = Number.parseInt(process.env.MESHCENTRAL_DEVICE_CONSENT_FLAGS ?? "8", 10);
+const enrollmentHours = Number.parseInt(process.env.REMOTE_ENROLLMENT_HOURS ?? "24", 10);
+const remoteOptionsValid = Boolean(
+  Number.isInteger(agentType) && agentType >= 1 && agentType <= 11000 &&
+  Number.isInteger(consentFlags) && consentFlags >= 0 &&
+  Number.isInteger(enrollmentHours) && enrollmentHours >= 1 && enrollmentHours <= 168,
+);
+const remoteConfigured = remoteProviderConfigured && meshControlConfigured && remoteOptionsValid;
 
 if (!databaseUrl) throw new Error("DATABASE_URL is required.");
 
@@ -54,23 +105,33 @@ const criticalTables = [
   "help_search_events", "help_search_results", "support_ai_runs", "user_invites",
   "task_projects", "tasks", "support_queues", "tickets", "ticket_messages",
   "web_chat_sessions", "support_public_limits", "operations_settings",
-  "remote_devices", "remote_support_sessions",
+  "remote_devices", "remote_customer_groups", "remote_device_enrollments",
+  "remote_support_sessions",
 ];
 
 function printResult(label, ok, detail) {
   const marker = ok ? "OK" : "FAIL";
   process.stdout.write(`[${marker}] ${label}${detail ? `: ${detail}` : ""}\n`);
 }
+
 function difference(expectedValues, actualValues) {
   const actual = new Set(actualValues);
   return expectedValues.filter((value) => !actual.has(value));
 }
+
 async function listExpectedMigrations() {
   const migrationDirectory = join(process.cwd(), "migrations");
-  return (await readdir(migrationDirectory)).filter((fileName) => /^\d{4}_.+\.sql$/.test(fileName)).sort();
+  return (await readdir(migrationDirectory))
+    .filter((fileName) => /^\d{4}_.+\.sql$/.test(fileName))
+    .sort();
 }
 
-const sql = postgres(databaseUrl, { max: 1, connect_timeout: 10, idle_timeout: 5, prepare: false });
+const sql = postgres(databaseUrl, {
+  max: 1,
+  connect_timeout: 10,
+  idle_timeout: 5,
+  prepare: false,
+});
 let hasFailure = false;
 
 try {
@@ -87,7 +148,13 @@ try {
     const missingMigrations = difference(expectedMigrations, appliedMigrations);
     const unknownMigrations = difference(appliedMigrations, expectedMigrations);
     const migrationsOk = missingMigrations.length === 0 && unknownMigrations.length === 0;
-    printResult("migrations", migrationsOk, migrationsOk ? `${appliedMigrations.length} applied` : `missing=${missingMigrations.join(",") || "none"}; unknown=${unknownMigrations.join(",") || "none"}`);
+    printResult(
+      "migrations",
+      migrationsOk,
+      migrationsOk
+        ? `${appliedMigrations.length} applied`
+        : `missing=${missingMigrations.join(",") || "none"}; unknown=${unknownMigrations.join(",") || "none"}`,
+    );
     hasFailure ||= !migrationsOk;
 
     const tableRows = await Promise.all(criticalTables.map(async (tableName) => {
@@ -96,44 +163,110 @@ try {
     }));
     const missingTables = tableRows.filter((row) => !row.exists).map((row) => row.tableName);
     const tablesOk = missingTables.length === 0;
-    printResult("critical tables", tablesOk, tablesOk ? `${criticalTables.length} available` : missingTables.join(","));
+    printResult(
+      "critical tables",
+      tablesOk,
+      tablesOk ? `${criticalTables.length} available` : missingTables.join(","),
+    );
     hasFailure ||= !tablesOk;
 
     const [trigramExtension] = await sql`SELECT extname FROM pg_extension WHERE extname = 'pg_trgm' LIMIT 1`;
     const trigramOk = trigramExtension?.extname === "pg_trgm";
-    printResult("pg_trgm extension", trigramOk, trigramOk ? "available" : "required by help search intelligence");
+    printResult(
+      "pg_trgm extension",
+      trigramOk,
+      trigramOk ? "available" : "required by help search intelligence",
+    );
     hasFailure ||= !trigramOk;
 
     const rateLimitSecretOk = supportRateLimitSecret.length >= 32;
-    printResult("native chat rate limit", rateLimitSecretOk, rateLimitSecretOk ? "configured" : "SUPPORT_RATE_LIMIT_SECRET must have at least 32 characters");
+    printResult(
+      "native chat rate limit",
+      rateLimitSecretOk,
+      rateLimitSecretOk
+        ? "configured"
+        : "SUPPORT_RATE_LIMIT_SECRET must have at least 32 characters",
+    );
     hasFailure ||= !rateLimitSecretOk;
 
     const openAiOk = openAiConfigured || !requireOpenAi;
-    printResult("OpenAI support agent", openAiOk, openAiConfigured ? `configured; model=${openAiModel}` : requireOpenAi ? "OPENAI_API_KEY is required" : "not configured; AI lab will fail closed to human escalation");
+    printResult(
+      "OpenAI support agent",
+      openAiOk,
+      openAiConfigured
+        ? `configured; model=${openAiModel}`
+        : requireOpenAi
+          ? "OPENAI_API_KEY is required"
+          : "not configured; AI lab will fail closed to human escalation",
+    );
     hasFailure ||= !openAiOk;
 
     const chatAiOk = !chatAiEnabled || openAiConfigured;
-    printResult("native chat AI", chatAiOk, chatAiEnabled ? chatAiOk ? `enabled; model=${openAiModel}` : "SUPPORT_AI_CHAT_ENABLED requires OPENAI_API_KEY" : "disabled by feature flag");
+    printResult(
+      "native chat AI",
+      chatAiOk,
+      chatAiEnabled
+        ? chatAiOk
+          ? `enabled; model=${openAiModel}`
+          : "SUPPORT_AI_CHAT_ENABLED requires OPENAI_API_KEY"
+        : "disabled by feature flag",
+    );
     hasFailure ||= !chatAiOk;
 
     const storageOk = assetStorageConfigured || (!assetStorageEnabled && !requireAssetStorage);
-    printResult("Help asset storage", storageOk, assetStorageConfigured ? `configured; bucket=${process.env.S3_BUCKET?.trim()}` : assetStorageEnabled || requireAssetStorage ? "S3/MinIO requires endpoint, bucket, access key and secret key" : "disabled; uploads and ZIP assets unavailable");
+    printResult(
+      "Help asset storage",
+      storageOk,
+      assetStorageConfigured
+        ? `configured; bucket=${process.env.S3_BUCKET?.trim()}`
+        : assetStorageEnabled || requireAssetStorage
+          ? "S3/MinIO requires endpoint, bucket, access key and secret key"
+          : "disabled; uploads and ZIP assets unavailable",
+    );
     hasFailure ||= !storageOk;
 
     const remoteOk = remoteConfigured || (!remoteEnabled && !requireRemote);
-    printResult("remote support provider", remoteOk, remoteConfigured ? "MeshCentral configured" : remoteEnabled || requireRemote ? "MeshCentral requires valid base URL and device URL template containing {deviceId}" : "disabled by environment");
+    printResult(
+      "remote support provider",
+      remoteOk,
+      remoteConfigured
+        ? `MeshCentral configured; public=${remoteBaseUrl}; control=${meshControlUrlValue}; agentType=${agentType}; consentFlags=${consentFlags}`
+        : remoteEnabled || requireRemote
+          ? "MeshCentral requires public URL/template, MeshCtrl path, ws/wss control URL, user/domain, credential and valid enrollment options"
+          : "disabled by environment",
+    );
     hasFailure ||= !remoteOk;
+
+    const remoteCredentialOk = !remoteEnabled || !requireRemote || Boolean(meshLoginKeyFile && existsSync(meshLoginKeyFile));
+    printResult(
+      "remote control credential",
+      remoteCredentialOk,
+      remoteCredentialOk
+        ? meshLoginKeyFile
+          ? "login key file configured"
+          : "remote requirement disabled"
+        : "production gate requires MESHCENTRAL_CONTROL_LOGIN_KEY_FILE; password fallback is not accepted when OPERATIONS_DOCTOR_REQUIRE_REMOTE=true",
+    );
+    hasFailure ||= !remoteCredentialOk;
 
     const roleRows = await sql`SELECT code FROM roles`;
     const missingRoles = difference(requiredRoles, roleRows.map((row) => row.code));
     const rolesOk = missingRoles.length === 0;
-    printResult("system roles", rolesOk, rolesOk ? requiredRoles.join(", ") : `missing=${missingRoles.join(",")}`);
+    printResult(
+      "system roles",
+      rolesOk,
+      rolesOk ? requiredRoles.join(", ") : `missing=${missingRoles.join(",")}`,
+    );
     hasFailure ||= !rolesOk;
 
     const permissionRows = await sql`SELECT code FROM permissions`;
     const missingPermissions = difference(requiredPermissions, permissionRows.map((row) => row.code));
     const permissionsOk = missingPermissions.length === 0;
-    printResult("permissions", permissionsOk, permissionsOk ? `${requiredPermissions.length} available` : `missing=${missingPermissions.join(",")}`);
+    printResult(
+      "permissions",
+      permissionsOk,
+      permissionsOk ? `${requiredPermissions.length} available` : `missing=${missingPermissions.join(",")}`,
+    );
     hasFailure ||= !permissionsOk;
 
     const [superAdminRow] = await sql`
@@ -145,7 +278,13 @@ try {
     `;
     const activeSuperAdminCount = Number(superAdminRow?.count ?? 0);
     const superAdminOk = !requireSuperAdmin || activeSuperAdminCount > 0;
-    printResult("active super admin", superAdminOk, requireSuperAdmin ? `${activeSuperAdminCount} found` : `${activeSuperAdminCount} found; requirement disabled`);
+    printResult(
+      "active super admin",
+      superAdminOk,
+      requireSuperAdmin
+        ? `${activeSuperAdminCount} found`
+        : `${activeSuperAdminCount} found; requirement disabled`,
+    );
     hasFailure ||= !superAdminOk;
   }
 } finally {
