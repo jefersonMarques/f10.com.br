@@ -1,9 +1,7 @@
 import { error, fail, redirect, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
-import {
-  decideRemoteConsent,
-  getRemoteConsentByToken,
-} from "$lib/server/remote/remoteSupportRepository";
+import { getRemoteConsentByToken } from "$lib/server/remote/remoteSupportRepository";
+import { decideRemoteConsentAtomic } from "$lib/server/remote/remoteSupportTransitions";
 
 export const prerender = false;
 
@@ -22,7 +20,7 @@ export const actions: Actions = {
   authorize: async ({ params }) => {
     if (!validToken(params.token)) return fail(404, { success: false, message: "Solicitação inválida." });
     try {
-      await decideRemoteConsent(params.token, "authorize");
+      await decideRemoteConsentAtomic(params.token, "authorize");
       throw redirect(303, `/suporte-remoto/${params.token}?done=authorized`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
@@ -32,7 +30,7 @@ export const actions: Actions = {
   deny: async ({ params }) => {
     if (!validToken(params.token)) return fail(404, { success: false, message: "Solicitação inválida." });
     try {
-      await decideRemoteConsent(params.token, "deny");
+      await decideRemoteConsentAtomic(params.token, "deny");
       throw redirect(303, `/suporte-remoto/${params.token}?done=denied`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
