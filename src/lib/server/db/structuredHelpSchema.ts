@@ -53,14 +53,10 @@ export const helpContents = pgTable(
   (table) => [
     uniqueIndex("help_contents_slug_unique").on(table.slug),
     uniqueIndex("help_contents_legacy_article_unique").on(table.legacyArticleId),
-    uniqueIndex("help_contents_import_identity_unique")
-      .on(table.importSource, table.importExternalId)
-      .where(
-        // The migration creates the same partial index in PostgreSQL.
-        // Drizzle keeps the declaration here so schema consumers know the invariant.
-        // eslint is not used in this project, so the SQL predicate remains in migration only.
-        undefined as never,
-      ),
+    uniqueIndex("help_contents_import_identity_unique").on(
+      table.importSource,
+      table.importExternalId,
+    ),
     index("help_contents_status_idx").on(table.status),
     index("help_contents_category_idx").on(table.category),
     index("help_contents_updated_idx").on(table.updatedAt),
