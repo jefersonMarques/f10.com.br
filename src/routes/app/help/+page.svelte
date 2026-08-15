@@ -19,6 +19,11 @@
     published: "Publicado",
     archived: "Arquivado",
   };
+
+  $: createValues =
+    form && form.action === "createArticle" && "values" in form
+      ? form.values
+      : null;
 </script>
 
 <svelte:head>
@@ -119,9 +124,12 @@
             <article class="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
-                  <h3 class="truncate text-[13px] font-semibold text-[#202637]">
+                  <a
+                    href={`/app/help/${article.id}`}
+                    class="truncate text-[13px] font-semibold text-[#202637] transition hover:text-[#000A57] hover:underline"
+                  >
                     {article.title}
-                  </h3>
+                  </a>
                   <span class="rounded-full bg-[#F2F3F7] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.06em] text-[#707687]">
                     {statusLabels[article.status] ?? article.status}
                   </span>
@@ -172,6 +180,7 @@
               name="title"
               required
               maxlength="160"
+              value={createValues?.title ?? ""}
               class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"
             />
           </label>
@@ -181,6 +190,7 @@
             <input
               name="slug"
               maxlength="120"
+              value={createValues?.slug ?? ""}
               placeholder="gerado a partir do título"
               class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"
             />
@@ -193,7 +203,7 @@
               maxlength="320"
               rows="3"
               class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"
-            ></textarea>
+            >{createValues?.summary ?? ""}</textarea>
           </label>
 
           <label class="block">
@@ -205,7 +215,7 @@
               rows="9"
               placeholder="Separe os parágrafos com uma linha em branco."
               class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[13px] leading-6 outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"
-            ></textarea>
+            >{createValues?.bodyText ?? ""}</textarea>
           </label>
 
           <button
