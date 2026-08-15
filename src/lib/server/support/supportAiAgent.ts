@@ -13,6 +13,10 @@ import {
   searchPublishedHelp,
 } from "$lib/server/help/helpSearchRepository";
 
+const MAX_RETRIEVED_SOURCES = 4;
+const MAX_PUBLIC_CONTEXT_CHARS = 12_000;
+const MAX_AI_CONTEXT_CHARS = 6_000;
+
 const SUPPORT_ANSWER_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -85,6 +89,11 @@ function isModelAnswer(value: unknown): value is ModelAnswer {
   );
 }
 
+function limitContext(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, maxChars)}\n[contexto truncado pelo laboratório]`;
+}
+
 function buildSourceContext(
   sources: SupportAiSource[],
   contexts: Awaited<ReturnType<typeof getPublishedHelpContext>>,
@@ -102,9 +111,11 @@ function buildSourceContext(
         `Categoria: ${context.category || "Sem categoria"}`,
         `Resumo: ${context.summary || "Sem resumo"}`,
         "Conteúdo público publicado:",
-        context.publicText,
+        limitContext(context.publicText, MAX_PUBLIC_CONTEXT_CHARS),
         "Conhecimento interno da IA:",
-        context.aiText || "Sem conhecimento interno adicional.",
+        context.aiText
+          ? limitContext(context.aiText, MAX_AI_CONTEXT_CHARS)
+          : "Sem conhecimento interno adicional.",
       ].join("\n");
     })
     .filter(Boolean)
@@ -214,7 +225,7 @@ export async function runSupportAiLab(
     query: question,
     source: "chat_ai",
     actorUserId,
-    limit: 5,
+    limit: MAX_RETRIEVED_SOURCES,
   });
   const sources: SupportAiSource[] = search.results.map((result) => ({
     contentId: result.contentId,
