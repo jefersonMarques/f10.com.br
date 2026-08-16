@@ -8,6 +8,7 @@ import {
   requireTicketAccess,
   type SupportPermissionMap,
 } from "$lib/server/support/supportAccess";
+import { ensureTaskAccess } from "$lib/server/tasks/taskAccess";
 import { createTask, type CreateTaskInput } from "$lib/server/tasks/taskRepository";
 
 export async function linkTicketToTask(
@@ -16,10 +17,14 @@ export async function linkTicketToTask(
   ticketId: string,
   taskId: string,
 ): Promise<void> {
-  const scope = getPermissionScope(permissions, "tickets.reply");
-  if (!scope) throw new Error("TICKET_UPDATE_NOT_ALLOWED");
+  const ticketScope = getPermissionScope(permissions, "tickets.reply");
+  const taskScope = getPermissionScope(permissions, "tasks.view");
+  if (!ticketScope || !taskScope) throw new Error("TICKET_TASK_LINK_NOT_ALLOWED");
 
-  await requireTicketAccess(actorUserId, scope, ticketId);
+  await Promise.all([
+    requireTicketAccess(actorUserId, ticketScope, ticketId),
+    ensureTaskAccess(actorUserId, taskScope, taskId),
+  ]);
 
   const db = getDatabase();
   const now = new Date();
@@ -59,11 +64,21 @@ export async function createTaskFromTicket(
   return task;
 }
 
-export async function listTicketTasks(ticketId: string) {
+export async function listTicketTasks(
+  actorUserId: string,
+  permissions: SupportPermissionMap,
+  ticketId: string,
+) {
+  const ticketScope = getPermissionScope(permissions, "tickets.view");
+  const taskScope = getPermissionScope(permissions, "tasks.view");
+  if (!ticketScope || !taskScope) return [];
+  await requireTicketAccess(actorUserId, ticketScope, ticketId);
+
   const db = getDatabase();
-  return db
+  const rows = await db
     .select({
       id: tasks.id,
+      projectId: tasks.projectId,
       title: tasks.title,
       priority: tasks.priority,
       dueOn: tasks.dueOn,
@@ -79,11 +94,32 @@ export async function listTicketTasks(ticketId: string) {
     .innerJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
     .where(eq(ticketTaskLinks.ticketId, ticketId))
     .orderBy(asc(ticketTaskLinks.createdAt));
+
+  const visible = await Promise.all(
+    rows.map(async (row) => {
+      try {
+        await ensureTaskAccess(actorUserId, taskScope, row.id);
+        return row;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return visible.filter((row): row is NonNullable<typeof row> => Boolean(row));
 }
 
-export async function listTaskTicketOrigins(taskId: string) {
+export async function listTaskTicketOrigins(
+  actorUserId: string,
+  permissions: SupportPermissionMap,
+  taskId: string,
+) {
+  const taskScope = getPermissionScope(permissions, "tasks.view");
+  const ticketScope = getPermissionScope(permissions, "tickets.view");
+  if (!taskScope || !ticketScope) return [];
+  await ensureTaskAccess(actorUserId, taskScope, taskId);
+
   const db = getDatabase();
-  return db
+  const rows = await db
     .select({
       id: tickets.id,
       ticketNumber: tickets.ticketNumber,
@@ -96,4 +132,16 @@ export async function listTaskTicketOrigins(taskId: string) {
     .innerJoin(tickets, eq(ticketTaskLinks.ticketId, tickets.id))
     .where(eq(ticketTaskLinks.taskId, taskId))
     .orderBy(asc(ticketTaskLinks.createdAt));
+
+  const visible = await Promise.all(
+    rows.map(async (row) => {
+      try {
+        await requireTicketAccess(actorUserId, ticketScope, row.id);
+        return row;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return visible.filter((row): row is NonNullable<typeof row> => Boolean(row));
 }
