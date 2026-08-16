@@ -31,8 +31,10 @@ import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTe
 const PROCESSING_STALE_MS = 60_000;
 const MAX_HISTORY_MESSAGES = 6;
 const MAX_HISTORY_BODY_CHARS = 1_000;
+const MAX_CLARIFICATION_ATTEMPTS = 2;
 
 type ChatAiState = "active" | "escalated" | "human" | "disabled";
+type LocalConversationIntent = "greeting" | "thanks" | "goodbye" | "clarification";
 
 type SupportAvailability = Awaited<ReturnType<typeof getSupportAvailabilityStatus>>;
 
@@ -46,23 +48,72 @@ export function isSupportAiChatEnabled(): boolean {
   return env.SUPPORT_AI_CHAT_ENABLED === "true" && isOpenAiConfigured();
 }
 
-function requestsHumanSupport(question: string): boolean {
-  const normalized = question
+function normalizeConversationText(value: string): string {
+  return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function requestsHumanSupport(question: string): boolean {
+  const normalized = normalizeConversationText(question);
   return /(?:quero|preciso|gostaria|posso|pode|chama|chamar|falar|conversar).{0,28}(?:atendente|humano|pessoa)|(?:atendente humano|suporte humano|falar com alguem)/i.test(normalized);
+}
+
+function isGreetingOnly(question: string): boolean {
+  const normalized = normalizeConversationText(question);
+  return /^(?:oi|ola|opa|e ai|bom dia|boa tarde|boa noite|oi tudo bem|ola tudo bem|tudo bem)$/.test(normalized);
+}
+
+function isThanksOnly(question: string): boolean {
+  const normalized = normalizeConversationText(question);
+  return /^(?:obrigado|obrigada|muito obrigado|muito obrigada|valeu|agradeco|agradecido|agradecida|perfeito obrigado|perfeito obrigada)$/.test(normalized);
+}
+
+function isGoodbyeOnly(question: string): boolean {
+  const normalized = normalizeConversationText(question);
+  return /^(?:tchau|ate mais|ate logo|falou|por enquanto e isso|era isso|so isso)$/.test(normalized);
+}
+
+function needsClarification(question: string): boolean {
+  const normalized = normalizeConversationText(question);
+  const words = normalized.split(" ").filter(Boolean);
+  if (words.length === 0 || words.length > 9) return false;
+
+  if (
+    /^(?:estou com|tenho|deu|apareceu|esta dando|ta dando|estou tendo)?\s*(?:um )?(?:problema|erro)$/.test(normalized)
+  ) {
+    return true;
+  }
+
+  return /^(?:preciso de ajuda|pode me ajudar|consegue me ajudar|me ajuda|socorro|nao funciona|nao esta funcionando|nao ta funcionando|nao consigo|nao estou conseguindo|esta com problema|ta com problema)$/.test(normalized);
 }
 
 function handoffMessage(availability: SupportAvailability): string {
   if (availability.isOpen === false) {
     const next = availability.nextOpenLabel
-      ? ` O atendimento humano retorna ${availability.nextOpenLabel.toLowerCase()}.`
-      : " O atendimento humano está fora do horário de funcionamento neste momento.";
-    return `Registrei seu caso para a equipe de suporte.${next} Você pode continuar enviando informações por aqui enquanto isso.`;
+      ? ` O atendimento da equipe retorna ${availability.nextOpenLabel.toLowerCase()}.`
+      : " A equipe está fora do horário de atendimento neste momento.";
+    return `Seu caso ficou registrado para a equipe F10.${next} Você pode continuar enviando informações por aqui enquanto isso.`;
   }
 
-  return "Vou encaminhar esta conversa para a equipe de suporte para continuar o atendimento.";
+  return "Entendi. Vou chamar alguém da equipe F10 para continuar com você por aqui. Se quiser, pode enviar mais detalhes enquanto isso.";
+}
+
+function localResponse(intent: LocalConversationIntent): string {
+  if (intent === "greeting") {
+    return "Olá! Como posso ajudar você hoje?";
+  }
+  if (intent === "thanks") {
+    return "Por nada! Se precisar de mais alguma coisa no F10, pode me chamar por aqui.";
+  }
+  if (intent === "goodbye") {
+    return "Certo. Se precisar novamente, é só chamar por aqui.";
+  }
+  return "Claro. Em qual parte do F10 você está e o que acontece quando tenta continuar?";
 }
 
 async function getSessionState(sessionId: string): Promise<ChatAiState> {
@@ -137,6 +188,21 @@ async function getAiRunCount(ticketId: string): Promise<number> {
   return Number(row?.value ?? 0);
 }
 
+async function getClarificationCount(ticketId: string): Promise<number> {
+  const db = getDatabase();
+  const [row] = await db
+    .select({ value: sql<number>`count(*)::integer` })
+    .from(ticketEvents)
+    .where(
+      and(
+        eq(ticketEvents.ticketId, ticketId),
+        eq(ticketEvents.eventType, "chat.ai.clarification"),
+      ),
+    );
+
+  return Number(row?.value ?? 0);
+}
+
 async function getAiTokensUsedToday(timezone: string): Promise<number> {
   const db = getDatabase();
   const [row] = await db
@@ -186,7 +252,7 @@ async function getConversationContext(
           ? "Cliente"
           : message.authorType === "user"
             ? "Atendente"
-            : "Agente IA";
+            : "Atendimento F10";
       const body = message.body.trim().slice(0, MAX_HISTORY_BODY_CHARS);
       return `${author}: ${body}`;
     })
@@ -201,6 +267,66 @@ async function notifyOrAssignEscalation(
   if (!assignedUserId) {
     await notifySupportTicketNeedsAttention(ticketId, reason).catch(() => undefined);
   }
+}
+
+async function persistLocalResponse(
+  sessionId: string,
+  ticketId: string,
+  intent: LocalConversationIntent,
+): Promise<SupportAiChatProcessResult> {
+  const db = getDatabase();
+  const now = new Date();
+  const accepted = await db.transaction(async (tx) => {
+    const [session] = await tx
+      .update(webChatSessions)
+      .set({ aiProcessingAt: null })
+      .where(
+        and(
+          eq(webChatSessions.id, sessionId),
+          eq(webChatSessions.aiState, "active"),
+        ),
+      )
+      .returning({ id: webChatSessions.id });
+
+    if (!session) return false;
+
+    await tx.insert(ticketMessages).values({
+      ticketId,
+      authorType: "system",
+      visibility: "public",
+      channel: "web_chat",
+      body: localResponse(intent),
+    });
+
+    const [ticket] = await tx
+      .select({ firstResponseAt: tickets.firstResponseAt })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId))
+      .limit(1);
+
+    await tx
+      .update(tickets)
+      .set({
+        firstResponseAt: ticket?.firstResponseAt ?? now,
+        status: "waiting_customer",
+        updatedAt: now,
+      })
+      .where(eq(tickets.id, ticketId));
+
+    await tx.insert(ticketEvents).values({
+      ticketId,
+      eventType: intent === "clarification" ? "chat.ai.clarification" : "chat.automation.message",
+      metadata: { intent, modelUsed: false },
+    });
+
+    return true;
+  });
+
+  return {
+    processed: accepted,
+    state: accepted ? "active" : await getSessionState(sessionId),
+    result: null,
+  };
 }
 
 async function escalateWithoutModel(
@@ -343,7 +469,7 @@ async function persistAiResult(
   if (!answered) {
     await notifyOrAssignEscalation(
       ticketId,
-      result.escalationReason || "A IA encaminhou a conversa para atendimento humano.",
+      result.escalationReason || "O atendimento automático encaminhou a conversa para a equipe.",
     );
   }
 
@@ -423,10 +549,7 @@ export async function processSupportAiChatMessage(
       return { processed: false, state: "human", result: null };
     }
 
-    const [configuration, availability] = await Promise.all([
-      getSupportRoutingConfiguration(),
-      getSupportAvailabilityStatus(),
-    ]);
+    const availability = await getSupportAvailabilityStatus();
     const publicHandoffMessage = handoffMessage(availability);
 
     if (requestsHumanSupport(question)) {
@@ -438,6 +561,32 @@ export async function processSupportAiChatMessage(
       );
     }
 
+    if (isGreetingOnly(question)) {
+      return persistLocalResponse(sessionId, ticket.id, "greeting");
+    }
+
+    if (isThanksOnly(question)) {
+      return persistLocalResponse(sessionId, ticket.id, "thanks");
+    }
+
+    if (isGoodbyeOnly(question)) {
+      return persistLocalResponse(sessionId, ticket.id, "goodbye");
+    }
+
+    if (needsClarification(question)) {
+      const clarificationCount = await getClarificationCount(ticket.id);
+      if (clarificationCount >= MAX_CLARIFICATION_ATTEMPTS) {
+        return escalateWithoutModel(
+          sessionId,
+          ticket.id,
+          "A conversa permaneceu sem contexto suficiente após perguntas de esclarecimento.",
+          publicHandoffMessage,
+        );
+      }
+      return persistLocalResponse(sessionId, ticket.id, "clarification");
+    }
+
+    const configuration = await getSupportRoutingConfiguration();
     const [runCount, usedTokens] = await Promise.all([
       getAiRunCount(ticket.id),
       getAiTokensUsedToday(availability.timezone),
@@ -487,7 +636,7 @@ export async function processSupportAiChatMessage(
       "Falha técnica no atendimento automático.",
       availability
         ? handoffMessage(availability)
-        : "Vou encaminhar esta conversa para a equipe de suporte para continuar o atendimento.",
+        : "Vou chamar alguém da equipe F10 para continuar com você por aqui.",
     );
   } finally {
     await clearAiProcessing(sessionId);
