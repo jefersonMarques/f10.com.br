@@ -9,6 +9,7 @@ import {
   asc,
   eq,
   gt,
+  inArray,
   isNull,
 } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
@@ -17,6 +18,7 @@ import {
   webChatSessions,
 } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
+import { sessions, users } from "$lib/server/db/schema";
 import {
   customerContacts,
   supportQueues,
@@ -30,6 +32,7 @@ const START_WINDOW_MS = 10 * 60 * 1000;
 const START_BLOCK_MS = 30 * 60 * 1000;
 const MESSAGE_WINDOW_MS = 60 * 1000;
 const MESSAGE_BLOCK_MS = 5 * 60 * 1000;
+const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
 export type StartPublicChatInput = {
   name: string;
@@ -293,15 +296,17 @@ export async function listPublicChatMessages(
 ) {
   const session = await authorizePublicChatSession(sessionId, token);
   const db = getDatabase();
-
-  return db
+  const messages = await db
     .select({
       id: ticketMessages.id,
       authorType: ticketMessages.authorType,
+      authorUserId: ticketMessages.authorUserId,
+      authorUserName: users.name,
       body: ticketMessages.body,
       createdAt: ticketMessages.createdAt,
     })
     .from(ticketMessages)
+    .leftJoin(users, eq(ticketMessages.authorUserId, users.id))
     .where(
       and(
         eq(ticketMessages.ticketId, session.ticketId),
@@ -309,6 +314,36 @@ export async function listPublicChatMessages(
       ),
     )
     .orderBy(asc(ticketMessages.createdAt));
+
+  const authorIds = Array.from(
+    new Set(messages.map((message) => message.authorUserId).filter((id): id is string => Boolean(id))),
+  );
+  let onlineUserIds = new Set<string>();
+
+  if (authorIds.length > 0) {
+    const now = new Date();
+    const onlineRows = await db
+      .select({ userId: sessions.userId })
+      .from(sessions)
+      .where(
+        and(
+          inArray(sessions.userId, authorIds),
+          gt(sessions.expiresAt, now),
+          gt(sessions.lastSeenAt, new Date(now.getTime() - ONLINE_WINDOW_MS)),
+          isNull(sessions.revokedAt),
+        ),
+      )
+      .groupBy(sessions.userId);
+    onlineUserIds = new Set(onlineRows.map((row) => row.userId));
+  }
+
+  return messages.map((message) => ({
+    ...message,
+    authorOnline: message.authorUserId ? onlineUserIds.has(message.authorUserId) : false,
+    avatarUrl: message.authorUserId
+      ? `/api/support/agents/${encodeURIComponent(message.authorUserId)}/avatar`
+      : null,
+  }));
 }
 
 export async function addPublicChatMessage(
