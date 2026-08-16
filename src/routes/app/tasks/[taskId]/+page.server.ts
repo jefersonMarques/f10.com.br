@@ -3,6 +3,7 @@ import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import { markEntityNotificationsRead } from "$lib/server/notifications/notificationRepository";
+import { listTaskTicketOrigins } from "$lib/server/support/ticketTaskBridge";
 import {
   addTaskComment,
   assignTask,
@@ -69,11 +70,17 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   }
 
   try {
-    const details = await getTaskDetails(layout.user.id, permissions, params.taskId);
+    const [details, ticketOrigins] = await Promise.all([
+      getTaskDetails(layout.user.id, permissions, params.taskId),
+      hasPermission(permissions, "tickets.view")
+        ? listTaskTicketOrigins(params.taskId)
+        : Promise.resolve([]),
+    ]);
     await markEntityNotificationsRead(layout.user.id, "task", params.taskId);
 
     return {
       details,
+      ticketOrigins,
       canUpdate: hasPermission(permissions, "tasks.update"),
       canAssign: hasPermission(permissions, "tasks.assign"),
     };
@@ -131,96 +138,37 @@ export const actions: Actions = {
         dueOn: dueOn || null,
       });
 
-      return {
-        success: true,
-        action: "update",
-        message: "Tarefa atualizada.",
-      };
+      return { success: true, action: "update", message: "Tarefa atualizada." };
     } catch {
-      return fail(403, {
-        success: false,
-        action: "update",
-        message: "Você não pode alterar esta tarefa.",
-      });
+      return fail(403, { success: false, action: "update", message: "Você não pode alterar esta tarefa." });
     }
   },
 
   assign: async ({ cookies, params, request }) => {
-    if (!isUuid(params.taskId)) {
-      return fail(404, { success: false, message: "Tarefa não encontrada." });
-    }
-
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      "tasks.assign",
-      `/app/tasks/${params.taskId}`,
-    );
-    const formData = await request.formData();
-    const assigneeId = readFormValue(formData, "assigneeId");
-
-    if (!isUuid(assigneeId)) {
-      return fail(400, {
-        success: false,
-        action: "assign",
-        message: "Responsável inválido.",
-      });
-    }
-
+    if (!isUuid(params.taskId)) return fail(404, { success: false, message: "Tarefa não encontrada." });
+    const { session, permissions } = await requireAppPermission(cookies, "tasks.assign", `/app/tasks/${params.taskId}`);
+    const assigneeId = readFormValue(await request.formData(), "assigneeId");
+    if (!isUuid(assigneeId)) return fail(400, { success: false, action: "assign", message: "Responsável inválido." });
     try {
       await assignTask(session.user.id, permissions, params.taskId, assigneeId);
-
-      return {
-        success: true,
-        action: "assign",
-        message: "Responsável atualizado.",
-      };
+      return { success: true, action: "assign", message: "Responsável atualizado." };
     } catch {
-      return fail(403, {
-        success: false,
-        action: "assign",
-        message: "Você não pode atribuir esta tarefa a esse integrante.",
-      });
+      return fail(403, { success: false, action: "assign", message: "Você não pode atribuir esta tarefa a esse integrante." });
     }
   },
 
   comment: async ({ cookies, params, request }) => {
-    if (!isUuid(params.taskId)) {
-      return fail(404, { success: false, message: "Tarefa não encontrada." });
-    }
-
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      "tasks.update",
-      `/app/tasks/${params.taskId}`,
-    );
+    if (!isUuid(params.taskId)) return fail(404, { success: false, message: "Tarefa não encontrada." });
+    const { session, permissions } = await requireAppPermission(cookies, "tasks.update", `/app/tasks/${params.taskId}`);
     const formData = await request.formData();
     const body = readFormValue(formData, "body");
     const mentionedUserIds = readMentionedUserIds(formData);
-
-    if (body.length < 1 || body.length > 5000) {
-      return fail(400, {
-        success: false,
-        action: "comment",
-        message: "O comentário deve ter entre 1 e 5.000 caracteres.",
-      });
-    }
-
+    if (body.length < 1 || body.length > 5000) return fail(400, { success: false, action: "comment", message: "O comentário deve ter entre 1 e 5.000 caracteres." });
     try {
       await addTaskComment(session.user.id, permissions, params.taskId, body, mentionedUserIds);
-
-      return {
-        success: true,
-        action: "comment",
-        message: mentionedUserIds.length > 0
-          ? "Comentário adicionado e menções notificadas."
-          : "Comentário adicionado.",
-      };
+      return { success: true, action: "comment", message: mentionedUserIds.length > 0 ? "Comentário adicionado e menções notificadas." : "Comentário adicionado." };
     } catch {
-      return fail(403, {
-        success: false,
-        action: "comment",
-        message: "Você não pode comentar nesta tarefa.",
-      });
+      return fail(403, { success: false, action: "comment", message: "Você não pode comentar nesta tarefa." });
     }
   },
 };
