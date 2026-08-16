@@ -3,6 +3,7 @@ import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { helpContentVersions } from "$lib/server/db/schema";
 import { helpPublications } from "$lib/server/db/helpPublications";
+import { helpSearchDocuments } from "$lib/server/db/helpSearchSchema";
 import { helpContents } from "$lib/server/db/structuredHelpSchema";
 
 async function getContent(contentId: string) {
@@ -91,6 +92,10 @@ export async function archiveStructuredHelpContent(
           eq(helpPublications.entityId, contentId),
         ),
       );
+
+    await tx
+      .delete(helpSearchDocuments)
+      .where(eq(helpSearchDocuments.contentId, contentId));
 
     await tx
       .update(helpContents)
