@@ -13,6 +13,7 @@ const requiredTables = [
   "help_publications",
   "customer_portal_login_tokens",
   "customer_portal_sessions",
+  "operations_settings",
 ];
 
 let failed = false;
@@ -26,15 +27,6 @@ check(
   "chat rate limit",
   rateLimitSecret.length >= 32,
   rateLimitSecret.length >= 32 ? "configured" : "SUPPORT_RATE_LIMIT_SECRET must have at least 32 characters",
-);
-
-const brevoConfigured = Boolean(
-  process.env.BREVO_API_KEY?.trim() && process.env.BREVO_SENDER_EMAIL?.trim(),
-);
-check(
-  "customer portal email",
-  brevoConfigured,
-  brevoConfigured ? "Brevo sender configured" : "BREVO_API_KEY and BREVO_SENDER_EMAIL are required",
 );
 
 const portalBase = process.env.CUSTOMER_PORTAL_BASE_URL?.trim() ?? "";
@@ -68,6 +60,32 @@ try {
     "support tables",
     missingTables.length === 0,
     missingTables.length === 0 ? `${requiredTables.length} available` : `missing=${missingTables.join(",")}`,
+  );
+
+  let settingsSenderEmail = "";
+  if (!missingTables.includes("operations_settings")) {
+    const [general] = await sql`
+      SELECT value
+      FROM operations_settings
+      WHERE key = 'general'
+      LIMIT 1
+    `;
+    settingsSenderEmail = typeof general?.value?.supportSenderEmail === "string"
+      ? general.value.supportSenderEmail.trim()
+      : "";
+  }
+
+  const apiKeyConfigured = Boolean(process.env.BREVO_API_KEY?.trim());
+  const senderEmail = settingsSenderEmail || process.env.BREVO_SENDER_EMAIL?.trim() || "";
+  const brevoConfigured = apiKeyConfigured && Boolean(senderEmail);
+  check(
+    "customer portal email",
+    brevoConfigured,
+    brevoConfigured
+      ? "Brevo API key and sender configured"
+      : !apiKeyConfigured
+        ? "BREVO_API_KEY is required"
+        : "configure the support sender email in Operations settings",
   );
 
   if (!missingTables.includes("support_queues")) {
