@@ -44,10 +44,11 @@ Quando resolved=true, cite somente os índices das fontes que realmente sustenta
 Não invente telas, menus, botões, prazos, políticas, valores ou funcionalidades.
 Se não houver fonte suficiente, não tente ser útil por aproximação.`;
 
-const MAX_RETRIEVED_SOURCES = 4;
-const MAX_SOURCE_PUBLIC_CHARS = 12_000;
-const MAX_SOURCE_AI_CHARS = 10_000;
-const MAX_CONVERSATION_CHARS = 8_000;
+const MAX_RETRIEVED_SOURCES = 3;
+const MAX_SOURCE_PUBLIC_CHARS = 4_500;
+const MAX_SOURCE_AI_CHARS = 2_500;
+const MAX_KNOWLEDGE_CHARS = 18_000;
+const MAX_CONVERSATION_CHARS = 6_000;
 
 type ModelAnswer = {
   resolved: boolean;
@@ -84,6 +85,7 @@ export type RunSupportAiInput = {
   customerContactId?: string | null;
   ticketId?: string | null;
   conversationContext?: string;
+  maxOutputTokens?: number;
 };
 
 function isModelAnswer(value: unknown): value is ModelAnswer {
@@ -113,7 +115,7 @@ function buildSourceContext(
     contexts.map((context) => [context.contentId, context]),
   );
 
-  return sources
+  const combined = sources
     .map((source, index) => {
       const context = contextById.get(source.contentId);
       if (!context) return "";
@@ -134,6 +136,8 @@ function buildSourceContext(
     })
     .filter(Boolean)
     .join("\n\n---\n\n");
+
+  return trimContext(combined, MAX_KNOWLEDGE_CHARS);
 }
 
 async function saveRun(input: {
@@ -306,7 +310,10 @@ export async function runSupportAi(
       userInput,
       schemaName: "f10_support_answer",
       schema: SUPPORT_ANSWER_SCHEMA,
-      maxOutputTokens: 900,
+      maxOutputTokens: Math.min(
+        Math.max(Math.round(input.maxOutputTokens ?? 500), 200),
+        700,
+      ),
     });
 
     if (!isModelAnswer(response.data)) {
