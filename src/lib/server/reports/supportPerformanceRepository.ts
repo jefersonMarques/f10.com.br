@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, isNotNull, lt } from "drizzle-orm";
+import { and, asc, eq, gte, isNotNull, isNull, lt } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { remoteSupportSessions } from "$lib/server/db/operationsSettingsSchema";
 import { users } from "$lib/server/db/schema";
@@ -141,7 +141,7 @@ export async function getSupportPerformance(periodDays: SupportPerformancePeriod
       .select({ userId: taskAssignees.userId })
       .from(taskAssignees)
       .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
-      .where(and(eq(tasks.completedAt, null), isNotNull(tasks.dueOn), lt(tasks.dueOn, today))),
+      .where(and(isNull(tasks.completedAt), isNotNull(tasks.dueOn), lt(tasks.dueOn, today))),
     db
       .select({
         startedByUserId: remoteSupportSessions.startedByUserId,
