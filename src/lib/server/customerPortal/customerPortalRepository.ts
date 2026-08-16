@@ -5,6 +5,7 @@ import {
   customerPortalLoginTokens,
   customerPortalSessions,
 } from "$lib/server/db/customerPortalSchema";
+import { internalNotifications } from "$lib/server/db/notificationSchema";
 import {
   customerContacts,
   ticketEvents,
@@ -240,7 +241,12 @@ export async function replyCustomerPortalTicket(
 ): Promise<void> {
   const db = getDatabase();
   const [ticket] = await db
-    .select({ status: tickets.status })
+    .select({
+      status: tickets.status,
+      assignedUserId: tickets.assignedUserId,
+      ticketNumber: tickets.ticketNumber,
+      subject: tickets.subject,
+    })
     .from(tickets)
     .where(
       and(
@@ -285,5 +291,17 @@ export async function replyCustomerPortalTicket(
       eventType: "portal.customer.message",
       metadata: {},
     });
+
+    if (ticket.assignedUserId) {
+      await tx.insert(internalNotifications).values({
+        userId: ticket.assignedUserId,
+        kind: "ticket.customer_reply",
+        title: `Cliente respondeu o ticket #${ticket.ticketNumber}`,
+        body: body.trim().slice(0, 500),
+        href: `/app/tickets/${ticketId}`,
+        entityType: "ticket",
+        entityId: ticketId,
+      });
+    }
   });
 }
