@@ -85,7 +85,6 @@
   }
 
   onMount(() => {
-    if (!activeUploaderStepId) activeUploaderStepId = stepId;
     window.addEventListener("paste", handlePaste);
   });
 
@@ -96,6 +95,7 @@
 
 <div
   class={`rounded-xl border border-dashed p-3 transition ${dragActive ? "border-[#000A57] bg-[#EEF0FF]" : "border-[#CDD2DD] bg-[#FAFAFC]"}`}
+  on:pointerenter={activate}
   on:pointerdown={activate}
   on:focusin={activate}
   on:dragenter|preventDefault={() => { activate(); dragActive = true; }}
@@ -109,7 +109,7 @@
     </span>
     <div class="min-w-0 flex-1">
       <strong class="block text-[11px] font-semibold text-[#303645]">Imagem do computador</strong>
-      <span class="mt-1 block text-[10px] leading-5 text-[#858B99]">Clique para selecionar, arraste uma imagem aqui ou clique neste bloco e use <strong>Ctrl+V</strong>.</span>
+      <span class="mt-1 block text-[10px] leading-5 text-[#858B99]">Clique para selecionar, arraste uma imagem aqui ou deixe este bloco ativo e use <strong>Ctrl+V</strong>.</span>
     </div>
   </div>
 
