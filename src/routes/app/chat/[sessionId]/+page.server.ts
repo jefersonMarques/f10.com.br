@@ -1,7 +1,12 @@
 import { error, fail, redirect, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
-import { hasPermission } from "$lib/server/auth/permissions";
+import {
+  getPermissionScope,
+  hasPermission,
+  resolveUserPermissions,
+} from "$lib/server/auth/permissions";
+import { markEntityNotificationsRead } from "$lib/server/notifications/notificationRepository";
 import {
   createKnownDeviceRemoteSession,
   createRemoteDeviceEnrollment,
@@ -10,12 +15,25 @@ import {
 } from "$lib/server/remote/remoteDeviceEnrollmentRepository";
 import { getMeshCentralControlStatus } from "$lib/server/remote/meshCentralControl";
 import { getRemoteProviderStatus } from "$lib/server/remote/remoteSupportProvider";
+import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import {
   assignInternalChat,
   claimInternalChat,
   listChatAssignees,
   listInternalChatMessages,
 } from "$lib/server/support/internalChatRepository";
+import {
+  addTicketMessage,
+  listSupportAgents,
+  updateTicketPriority,
+  updateTicketStatus,
+  type TicketPriority,
+  type TicketStatus,
+} from "$lib/server/support/supportRepository";
+import { createTaskFromTicket, listTicketTasks } from "$lib/server/support/ticketTaskBridge";
+import { listTaskProjects, type TaskPriority } from "$lib/server/tasks/taskRepository";
+
+type MentionUser = { id: string; name: string; email: string };
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -26,6 +44,67 @@ function isUuid(value: string): boolean {
 function readString(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function readMentionedUserIds(formData: FormData): string[] {
+  const raw = readString(formData, "mentionedUserIds");
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return Array.from(
+      new Set(
+        parsed.filter(
+          (value): value is string => typeof value === "string" && isUuid(value),
+        ),
+      ),
+    ).slice(0, 20);
+  } catch {
+    return [];
+  }
+}
+
+async function filterMentionUsersForTicket(
+  users: MentionUser[],
+  ticketId: string,
+): Promise<MentionUser[]> {
+  const resolved = await Promise.all(
+    users.map(async (user) => {
+      const permissions = await resolveUserPermissions(user.id);
+      const scope = getPermissionScope(permissions, "tickets.view");
+      if (!scope) return null;
+      try {
+        await requireTicketAccess(user.id, scope, ticketId);
+        return user;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return resolved.filter((user): user is MentionUser => Boolean(user));
+}
+
+async function validateMentionedUserIds(
+  ticketId: string,
+  requestedIds: string[],
+): Promise<string[]> {
+  if (requestedIds.length === 0) return [];
+  const candidates = await listSupportAgents();
+  const allowed = await filterMentionUsersForTicket(candidates, ticketId);
+  const allowedIds = new Set(allowed.map((user) => user.id));
+  return requestedIds.filter((id) => allowedIds.has(id));
+}
+
+function isTicketStatus(value: string): value is TicketStatus {
+  return ["new", "open", "in_progress", "waiting_customer", "resolved", "closed"].includes(value);
+}
+
+function isTicketPriority(value: string): value is TicketPriority {
+  return ["low", "normal", "high", "urgent"].includes(value);
+}
+
+function isTaskPriority(value: string): value is TaskPriority {
+  return ["low", "normal", "high", "urgent"].includes(value);
 }
 
 export const load: PageServerLoad = async ({ params, parent }) => {
@@ -47,12 +126,29 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       params.sessionId,
     );
     const canRespond = hasPermission(permissions, "chat.respond");
+    const canManageTicket = hasPermission(permissions, "tickets.reply");
     const canAssign = hasPermission(permissions, "tickets.assign");
+    const canViewTasks = hasPermission(permissions, "tasks.view");
+    const canCreateTask = canManageTicket && hasPermission(permissions, "tasks.create");
     const canRequestRemote = hasPermission(permissions, "remote.request");
     const canUseRemote = hasPermission(permissions, "remote.use");
     const provider = getRemoteProviderStatus();
     const control = getMeshCentralControlStatus();
     const remoteVisible = canRequestRemote || canUseRemote;
+
+    const [assignees, supportAgents, linkedTasks, taskProjects] = await Promise.all([
+      canAssign ? listChatAssignees() : Promise.resolve([]),
+      canManageTicket ? listSupportAgents() : Promise.resolve([]),
+      canViewTasks
+        ? listTicketTasks(layout.user.id, permissions, initial.chat.ticketId)
+        : Promise.resolve([]),
+      canCreateTask
+        ? listTaskProjects(layout.user.id, permissions).catch(() => [])
+        : Promise.resolve([]),
+    ]);
+    const mentionUsers = canManageTicket
+      ? await filterMentionUsersForTicket(supportAgents, initial.chat.ticketId)
+      : [];
 
     if (remoteVisible && provider.configured && control.configured) {
       try {
@@ -62,12 +158,22 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       }
     }
 
+    await markEntityNotificationsRead(layout.user.id, "ticket", initial.chat.ticketId).catch(
+      () => undefined,
+    );
+
     return {
       initial,
       currentUserId: layout.user.id,
       canRespond,
+      canManageTicket,
       canAssign,
-      assignees: canAssign ? await listChatAssignees() : [],
+      assignees,
+      mentionUsers,
+      canViewTasks,
+      canCreateTask,
+      linkedTasks,
+      taskProjects,
       canRequestRemote,
       canUseRemote,
       remoteDevices: remoteVisible
@@ -132,6 +238,136 @@ export const actions: Actions = {
         action: "assign",
         message: "Não foi possível atribuir este atendimento ao usuário selecionado.",
       });
+    }
+  },
+
+  note: async ({ params, cookies, request }) => {
+    if (!isUuid(params.sessionId)) {
+      return fail(404, { success: false, action: "note", message: "Conversa não encontrada." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      `/app/chat/${params.sessionId}`,
+    );
+    const formData = await request.formData();
+    const body = readString(formData, "body");
+    const requestedMentionIds = readMentionedUserIds(formData);
+    if (body.length < 1 || body.length > 10_000) {
+      return fail(400, { success: false, action: "note", message: "A nota deve ter entre 1 e 10.000 caracteres." });
+    }
+
+    try {
+      const initial = await listInternalChatMessages(session.user.id, permissions, params.sessionId);
+      const mentionedUserIds = await validateMentionedUserIds(
+        initial.chat.ticketId,
+        requestedMentionIds,
+      );
+      await addTicketMessage(
+        session.user.id,
+        permissions,
+        initial.chat.ticketId,
+        body,
+        "internal",
+        mentionedUserIds,
+      );
+      return {
+        success: true,
+        action: "note",
+        message: mentionedUserIds.length > 0
+          ? "Nota interna adicionada e menções notificadas."
+          : "Nota interna adicionada.",
+      };
+    } catch {
+      return fail(403, { success: false, action: "note", message: "Não foi possível adicionar a nota interna." });
+    }
+  },
+
+  status: async ({ params, cookies, request }) => {
+    if (!isUuid(params.sessionId)) {
+      return fail(404, { success: false, action: "status", message: "Conversa não encontrada." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      `/app/chat/${params.sessionId}`,
+    );
+    const status = readString(await request.formData(), "status");
+    if (!isTicketStatus(status)) {
+      return fail(400, { success: false, action: "status", message: "Status inválido." });
+    }
+    try {
+      const initial = await listInternalChatMessages(session.user.id, permissions, params.sessionId);
+      await updateTicketStatus(session.user.id, permissions, initial.chat.ticketId, status);
+      return { success: true, action: "status", message: "Status atualizado." };
+    } catch {
+      return fail(403, { success: false, action: "status", message: "Não foi possível alterar o status." });
+    }
+  },
+
+  priority: async ({ params, cookies, request }) => {
+    if (!isUuid(params.sessionId)) {
+      return fail(404, { success: false, action: "priority", message: "Conversa não encontrada." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      `/app/chat/${params.sessionId}`,
+    );
+    const priority = readString(await request.formData(), "priority");
+    if (!isTicketPriority(priority)) {
+      return fail(400, { success: false, action: "priority", message: "Prioridade inválida." });
+    }
+    try {
+      const initial = await listInternalChatMessages(session.user.id, permissions, params.sessionId);
+      await updateTicketPriority(session.user.id, permissions, initial.chat.ticketId, priority);
+      return { success: true, action: "priority", message: "Prioridade atualizada." };
+    } catch {
+      return fail(403, { success: false, action: "priority", message: "Não foi possível alterar a prioridade." });
+    }
+  },
+
+  createTask: async ({ params, cookies, request }) => {
+    if (!isUuid(params.sessionId)) {
+      return fail(404, { success: false, action: "createTask", message: "Conversa não encontrada." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tasks.create",
+      `/app/chat/${params.sessionId}`,
+    );
+    const formData = await request.formData();
+    const projectId = readString(formData, "projectId");
+    const title = readString(formData, "title");
+    const description = readString(formData, "description");
+    const priority = readString(formData, "priority");
+    const dueOn = readString(formData, "dueOn") || null;
+
+    if (!isUuid(projectId) || title.length < 2 || title.length > 180 || !isTaskPriority(priority)) {
+      return fail(400, { success: false, action: "createTask", message: "Revise projeto, título e prioridade da tarefa." });
+    }
+    if (description.length > 5_000 || (dueOn && !/^\d{4}-\d{2}-\d{2}$/.test(dueOn))) {
+      return fail(400, { success: false, action: "createTask", message: "Descrição ou prazo da tarefa inválido." });
+    }
+
+    try {
+      const initial = await listInternalChatMessages(session.user.id, permissions, params.sessionId);
+      const task = await createTaskFromTicket(
+        session.user.id,
+        permissions,
+        initial.chat.ticketId,
+        {
+          projectId,
+          title,
+          description,
+          priority,
+          dueOn,
+          assigneeId: null,
+        },
+      );
+      return { success: true, action: "createTask", message: `Tarefa “${task.title}” criada e vinculada ao ticket.` };
+    } catch {
+      return fail(403, { success: false, action: "createTask", message: "Não foi possível criar a tarefa." });
     }
   },
 
