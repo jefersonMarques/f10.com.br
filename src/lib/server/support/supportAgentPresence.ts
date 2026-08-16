@@ -1,4 +1,4 @@
-import { eq, inArray, ne } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -138,8 +138,10 @@ export async function heartbeatSupportAgent(
     .update(supportAgentPresence)
     .set({ lastActivityAt: now, updatedAt: now })
     .where(
-      ne(supportAgentPresence.manualStatus, "offline") &&
-      eq(supportAgentPresence.userId, userId),
+      and(
+        eq(supportAgentPresence.userId, userId),
+        ne(supportAgentPresence.manualStatus, "offline"),
+      ),
     )
     .returning({ manualStatus: supportAgentPresence.manualStatus });
 
