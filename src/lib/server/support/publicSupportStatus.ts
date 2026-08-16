@@ -1,8 +1,8 @@
-import { and, eq, gt, gte, isNotNull } from "drizzle-orm";
+import { and, asc, eq, gt, gte } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { teamMembers } from "$lib/server/db/schema";
 import { supportAgentPresence } from "$lib/server/db/supportRoutingSchema";
-import { supportQueues, tickets } from "$lib/server/db/supportSchema";
+import { supportQueues, ticketMessages, tickets } from "$lib/server/db/supportSchema";
 import { getGeneralOperationsSettings } from "$lib/server/settings/operationsSettingsRepository";
 import {
   getSupportHoursSettings,
@@ -156,30 +156,44 @@ export async function getPublicSupportStatus() {
           and(
             eq(teamMembers.teamId, queue.teamId),
             eq(supportAgentPresence.manualStatus, "online"),
-            gt(
-              supportAgentPresence.lastActivityAt,
-              new Date(now.getTime() - SUPPORT_AWAY_AFTER_MS),
-            ),
+            gt(supportAgentPresence.lastActivityAt, new Date(now.getTime() - SUPPORT_AWAY_AFTER_MS)),
           ),
         )
         .groupBy(supportAgentPresence.userId);
       onlineAgents = onlineRows.length;
     }
 
-    const respondedTickets = await db
-      .select({ createdAt: tickets.createdAt, firstResponseAt: tickets.firstResponseAt })
+    const humanResponses = await db
+      .select({
+        ticketId: tickets.id,
+        ticketCreatedAt: tickets.createdAt,
+        responseAt: ticketMessages.createdAt,
+      })
       .from(tickets)
+      .innerJoin(ticketMessages, eq(ticketMessages.ticketId, tickets.id))
       .where(
         and(
           eq(tickets.queueId, queue.id),
           gte(tickets.createdAt, new Date(now.getTime() - WAIT_SAMPLE_WINDOW_MS)),
-          isNotNull(tickets.firstResponseAt),
+          eq(ticketMessages.authorType, "user"),
+          eq(ticketMessages.visibility, "public"),
         ),
-      );
+      )
+      .orderBy(asc(tickets.id), asc(ticketMessages.createdAt));
 
-    const waits = respondedTickets
-      .filter((ticket): ticket is typeof ticket & { firstResponseAt: Date } => Boolean(ticket.firstResponseAt))
-      .map((ticket) => Math.max(0, ticket.firstResponseAt.getTime() - ticket.createdAt.getTime()));
+    const firstByTicket = new Map<string, { ticketCreatedAt: Date; responseAt: Date }>();
+    for (const row of humanResponses) {
+      if (!firstByTicket.has(row.ticketId)) {
+        firstByTicket.set(row.ticketId, {
+          ticketCreatedAt: row.ticketCreatedAt,
+          responseAt: row.responseAt,
+        });
+      }
+    }
+
+    const waits = Array.from(firstByTicket.values()).map((ticket) =>
+      Math.max(0, ticket.responseAt.getTime() - ticket.ticketCreatedAt.getTime()),
+    );
     waitSampleCount = waits.length;
     if (waits.length >= MIN_WAIT_SAMPLES) {
       averageWaitMinutes = roundWaitMinutes(
