@@ -16,6 +16,7 @@ import {
   supportPublicLimits,
   webChatSessions,
 } from "$lib/server/db/chatSchema";
+import { internalNotifications } from "$lib/server/db/notificationSchema";
 import {
   customerContacts,
   supportQueues,
@@ -336,6 +337,8 @@ export async function addPublicChatMessage(
     .select({
       status: tickets.status,
       customerContactId: tickets.customerContactId,
+      assignedUserId: tickets.assignedUserId,
+      ticketNumber: tickets.ticketNumber,
     })
     .from(tickets)
     .where(eq(tickets.id, session.ticketId))
@@ -372,6 +375,18 @@ export async function addPublicChatMessage(
       eventType: "chat.customer.message",
       metadata: { aiState: session.aiState },
     });
+
+    if (ticket.assignedUserId && session.aiState !== "active") {
+      await tx.insert(internalNotifications).values({
+        userId: ticket.assignedUserId,
+        kind: "ticket.customer_reply",
+        title: `Cliente respondeu o ticket #${ticket.ticketNumber}`,
+        body: body.trim().slice(0, 500),
+        href: `/app/tickets/${session.ticketId}`,
+        entityType: "ticket",
+        entityId: session.ticketId,
+      });
+    }
   });
 
   return { ticketId: session.ticketId, aiState: session.aiState };
