@@ -11,7 +11,9 @@ import {
   createManualTicket,
   listSupportQueues,
   listSupportTickets,
+  updateTicketStatus,
   type TicketPriority,
+  type TicketStatus,
 } from "$lib/server/support/supportRepository";
 
 function readFormValue(formData: FormData, name: string): string {
@@ -19,8 +21,23 @@ function readFormValue(formData: FormData, name: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 function isTicketPriority(value: string): value is TicketPriority {
   return value === "low" || value === "normal" || value === "high" || value === "urgent";
+}
+
+function isTicketStatus(value: string): value is TicketStatus {
+  return (
+    value === "new" ||
+    value === "open" ||
+    value === "in_progress" ||
+    value === "waiting_customer" ||
+    value === "resolved" ||
+    value === "closed"
+  );
 }
 
 function createPermissionMap(
@@ -40,6 +57,7 @@ export const load: PageServerLoad = async ({ parent }) => {
   }
 
   const canCreate = hasPermission(permissionMap, "tickets.create");
+  const canReply = hasPermission(permissionMap, "tickets.reply");
   const [tickets, queues] = await Promise.all([
     listSupportTickets(layout.user.id, permissionMap),
     canCreate ? listSupportQueues() : Promise.resolve([]),
@@ -48,7 +66,9 @@ export const load: PageServerLoad = async ({ parent }) => {
   return {
     tickets,
     queues,
+    currentUserId: layout.user.id,
     canCreate,
+    canReply,
   };
 };
 
@@ -152,6 +172,40 @@ export const actions: Actions = {
         success: false,
         action: "create",
         message: "Não foi possível criar o ticket. Verifique a fila e tente novamente.",
+      });
+    }
+  },
+
+  moveStatus: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      "/app/tickets",
+    );
+    const formData = await request.formData();
+    const ticketId = readFormValue(formData, "ticketId");
+    const status = readFormValue(formData, "status");
+
+    if (!isUuid(ticketId) || !isTicketStatus(status)) {
+      return fail(400, {
+        success: false,
+        action: "moveStatus",
+        message: "Ticket ou status inválido.",
+      });
+    }
+
+    try {
+      await updateTicketStatus(session.user.id, permissions, ticketId, status);
+      return {
+        success: true,
+        action: "moveStatus",
+        message: "Status do ticket atualizado.",
+      };
+    } catch {
+      return fail(403, {
+        success: false,
+        action: "moveStatus",
+        message: "Você não pode alterar este ticket.",
       });
     }
   },
