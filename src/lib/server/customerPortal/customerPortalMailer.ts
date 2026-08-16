@@ -1,5 +1,6 @@
 import { dev } from "$app/environment";
 import { env } from "$env/dynamic/private";
+import { getGeneralOperationsSettings } from "$lib/server/settings/operationsSettingsRepository";
 
 function escapeHtml(value: string): string {
   return value
@@ -36,9 +37,10 @@ export async function sendCustomerPortalMagicLink(input: {
   magicUrl: string;
   expiresAt: Date;
 }): Promise<void> {
+  const general = await getGeneralOperationsSettings();
   const apiKey = env.BREVO_API_KEY?.trim();
-  const senderEmail = env.BREVO_SENDER_EMAIL?.trim();
-  const senderName = env.BREVO_SENDER_NAME?.trim() || "F10 Software";
+  const senderEmail = general.supportSenderEmail || env.BREVO_SENDER_EMAIL?.trim() || "";
+  const senderName = general.supportSenderName || env.BREVO_SENDER_NAME?.trim() || "F10 Software";
 
   if (!apiKey || !senderEmail) {
     throw new Error("CUSTOMER_PORTAL_EMAIL_NOT_CONFIGURED");
