@@ -32,6 +32,7 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
   return {
     returnTo: sanitizeReturnTo(url.searchParams.get("returnTo")),
     activated: url.searchParams.get("activated") === "1",
+    passwordReset: url.searchParams.get("reset") === "1",
   };
 };
 
