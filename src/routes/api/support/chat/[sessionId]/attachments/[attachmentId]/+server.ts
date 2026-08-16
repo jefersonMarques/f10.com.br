@@ -9,21 +9,27 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-function getBearerToken(request: Request): string {
+function validToken(value: string): string {
+  return /^[A-Za-z0-9_-]{40,120}$/.test(value) ? value : "";
+}
+
+function getSessionToken(request: Request, url: URL): string {
   const authorization = request.headers.get("authorization") ?? "";
-  if (!authorization.startsWith("Bearer ")) return "";
-  const token = authorization.slice(7).trim();
-  return /^[A-Za-z0-9_-]{40,120}$/.test(token) ? token : "";
+  if (authorization.startsWith("Bearer ")) {
+    const bearer = validToken(authorization.slice(7).trim());
+    if (bearer) return bearer;
+  }
+  return validToken(url.searchParams.get("token")?.trim() ?? "");
 }
 
 function contentDisposition(name: string): string {
   return `inline; filename*=UTF-8''${encodeURIComponent(name)}`;
 }
 
-export const GET: RequestHandler = async ({ params, request }) => {
+export const GET: RequestHandler = async ({ params, request, url }) => {
   const sessionId = params.sessionId ?? "";
   const attachmentId = params.attachmentId ?? "";
-  const token = getBearerToken(request);
+  const token = getSessionToken(request, url);
   if (!isUuid(sessionId) || !isUuid(attachmentId) || !token) {
     throw error(401, "Anexo não autorizado.");
   }
@@ -41,6 +47,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
         "Content-Length": String(attachment.sizeBytes),
         "Content-Disposition": contentDisposition(attachment.originalName),
         "Cache-Control": "private, no-store",
+        "Referrer-Policy": "no-referrer",
         "X-Content-Type-Options": "nosniff",
       },
     });
