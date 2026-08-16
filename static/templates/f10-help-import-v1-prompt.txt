@@ -2,10 +2,10 @@ Converta os materiais fornecidos para o formato F10 Help Import v1.
 
 Há dois modos de entrega:
 
-A) JSON simples: use quando imagens/documentos continuarão por URL e vídeos usam YouTube.
+A) JSON simples: use quando imagens/documentos continuarão por URL e vídeos usam YouTube. Se uma imagem não possuir URL http/https válida, omita o bloco de imagem; ela será adicionada manualmente depois no editor.
 B) Pacote ZIP: use quando houver imagens ou documentos locais que precisam ser migrados. Nesse caso entregue:
    pacote.zip
-   ├── manifest.json
+   ├── manifest.json (ou um único arquivo .json no pacote)
    └── assets/
        ├── imagem-01.png
        └── documento.pdf
@@ -28,9 +28,9 @@ REGRAS OBRIGATÓRIAS
 11. Para imagens, descreva em "altText" o que o usuário precisa identificar visualmente e, quando útil, use "aiSummary" para explicar o que a imagem demonstra ao agente.
 12. Blocos suportados: text, image, video, notice, link e file.
 13. Para notice, variant só pode ser: info, warning, success ou danger.
-14. Para image no JSON simples, use "url". No pacote ZIP, prefira "file": "assets/nome.png".
+14. Para image no JSON simples, use "url" somente quando houver URL http/https real. Se não houver URL válida, omita o bloco image. No pacote ZIP, use preferencialmente "file": "assets/nome.png". O importador também consegue localizar uma imagem pelo nome único do arquivo, mesmo que esteja em outra pasta do ZIP.
 15. Para file no JSON simples, use "url" e "label". No pacote ZIP, use "file": "assets/nome.ext" e "label".
-16. Nunca informe simultaneamente "url" e "file" no mesmo bloco image/file.
+16. Nunca informe simultaneamente uma URL http/https e "file" no mesmo bloco image/file.
 17. Vídeos permanecem por URL; não coloque vídeo dentro de assets/.
 18. Formatos locais esperados no pacote: png, jpg/jpeg, webp, gif, pdf, docx, xlsx, xls, csv e txt.
 19. Use nomes seguros e simples dentro de assets/. Não use caminhos absolutos, ../ ou arquivos executáveis.
@@ -40,12 +40,13 @@ REGRAS OBRIGATÓRIAS
 23. Não marque nenhum conteúdo como publicado; o sistema F10 sempre importará como rascunho.
 24. Antes de entregar, valide:
     - todos os contents possuem externalId, title e ao menos um step;
-    - todos os steps possuem title e ao menos um block;
+    - todos os steps possuem title;
     - não há externalId duplicado;
     - não há slug duplicado;
-    - URLs usam http ou https;
-    - todo caminho informado em "file" existe dentro do ZIP;
-    - o manifest.json é JSON parseável.
+    - links e vídeos usam http ou https;
+    - no JSON simples, imagens sem URL http/https são omitidas;
+    - no ZIP, todo nome informado em "file" corresponde a um arquivo do pacote;
+    - o JSON principal é parseável.
 
 EXEMPLO DE IMAGEM LOCAL NO ZIP
 
@@ -54,6 +55,14 @@ EXEMPLO DE IMAGEM LOCAL NO ZIP
   "file": "assets/crm-proxima-acao.png",
   "altText": "Área Próxima Ação do CRM F10",
   "aiSummary": "A imagem mostra onde o operador identifica a próxima atividade do lead."
+}
+
+Também é aceito apenas o nome quando ele for único dentro do ZIP:
+
+{
+  "type": "image",
+  "file": "crm-proxima-acao.png",
+  "altText": "Área Próxima Ação do CRM F10"
 }
 
 EXEMPLO DE DOCUMENTO LOCAL NO ZIP
