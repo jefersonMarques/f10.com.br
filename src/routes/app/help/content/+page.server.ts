@@ -3,6 +3,10 @@ import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import {
+  archiveStructuredHelpContent,
+  discardStructuredHelpContent,
+} from "$lib/server/help/helpContentLifecycle";
+import {
   createStructuredHelpContent,
   listStructuredHelpContents,
 } from "$lib/server/help/structuredHelpRepository";
@@ -11,6 +15,10 @@ import { listPublishedStructuredHelpLinks } from "$lib/server/help/publicStructu
 function readFormValue(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 export const load: PageServerLoad = async ({ parent }) => {
@@ -37,6 +45,7 @@ export const load: PageServerLoad = async ({ parent }) => {
       publishedSlug: publishedById.get(content.id)?.slug ?? null,
     })),
     canEdit: hasPermission(permissions, "help.edit"),
+    canArchive: hasPermission(permissions, "help.publish"),
   };
 };
 
@@ -98,5 +107,57 @@ export const actions: Actions = {
         values,
       });
     }
+  },
+
+  discard: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(
+      cookies,
+      "help.edit",
+      "/app/help/content",
+    );
+    const contentId = readFormValue(await request.formData(), "contentId");
+    if (!isUuid(contentId)) {
+      return fail(400, { success: false, message: "Conteúdo inválido." });
+    }
+
+    try {
+      await discardStructuredHelpContent(session.user.id, contentId);
+    } catch (cause) {
+      return fail(409, {
+        success: false,
+        message:
+          cause instanceof Error && cause.message === "CONTENT_ALREADY_PUBLISHED"
+            ? "Conteúdo que já foi publicado não pode ser descartado. Arquive-o para retirá-lo da Central e da IA."
+            : "Não foi possível descartar este conteúdo.",
+      });
+    }
+
+    throw redirect(303, "/app/help/content");
+  },
+
+  archive: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(
+      cookies,
+      "help.publish",
+      "/app/help/content",
+    );
+    const contentId = readFormValue(await request.formData(), "contentId");
+    if (!isUuid(contentId)) {
+      return fail(400, { success: false, message: "Conteúdo inválido." });
+    }
+
+    try {
+      await archiveStructuredHelpContent(session.user.id, contentId);
+    } catch (cause) {
+      return fail(409, {
+        success: false,
+        message:
+          cause instanceof Error && cause.message === "CONTENT_NEVER_PUBLISHED"
+            ? "Este conteúdo nunca foi publicado. Use Descartar se não quiser mantê-lo."
+            : "Não foi possível arquivar este conteúdo.",
+      });
+    }
+
+    throw redirect(303, "/app/help/content");
   },
 };
