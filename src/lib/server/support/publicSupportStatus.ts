@@ -1,6 +1,7 @@
-import { and, eq, gt, gte, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, gt, gte, isNotNull } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
-import { sessions, teamMembers } from "$lib/server/db/schema";
+import { teamMembers } from "$lib/server/db/schema";
+import { supportAgentPresence } from "$lib/server/db/supportRoutingSchema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
 import { getGeneralOperationsSettings } from "$lib/server/settings/operationsSettingsRepository";
 import {
@@ -8,8 +9,8 @@ import {
   type SupportDayKey,
   type SupportHoursSettings,
 } from "$lib/server/settings/supportHoursRepository";
+import { SUPPORT_AWAY_AFTER_MS } from "$lib/server/support/supportAgentPresence";
 
-const ONLINE_WINDOW_MS = 5 * 60_000;
 const WAIT_SAMPLE_WINDOW_MS = 30 * 24 * 60 * 60_000;
 const MIN_WAIT_SAMPLES = 3;
 
@@ -115,14 +116,25 @@ function roundWaitMinutes(milliseconds: number): number {
   return Math.max(1, Math.round(milliseconds / 60_000));
 }
 
-export async function getPublicSupportStatus() {
+export async function getSupportAvailabilityStatus() {
   const [general, hours] = await Promise.all([
     getGeneralOperationsSettings(),
     getSupportHoursSettings(),
   ]);
+  const availability = availabilityFromHours(hours, general.timezone, new Date());
+  return {
+    supportDisplayName: general.supportDisplayName,
+    timezone: general.timezone,
+    hoursConfigured: hours.configured,
+    isOpen: availability.isOpen,
+    nextOpenLabel: availability.nextOpenLabel,
+  };
+}
+
+export async function getPublicSupportStatus() {
+  const availability = await getSupportAvailabilityStatus();
   const db = getDatabase();
   const now = new Date();
-  const availability = availabilityFromHours(hours, general.timezone, now);
 
   const [queue] = await db
     .select({ id: supportQueues.id, teamId: supportQueues.teamId })
@@ -137,18 +149,20 @@ export async function getPublicSupportStatus() {
   if (queue) {
     if (queue.teamId) {
       const onlineRows = await db
-        .select({ userId: sessions.userId })
-        .from(sessions)
-        .innerJoin(teamMembers, eq(teamMembers.userId, sessions.userId))
+        .select({ userId: supportAgentPresence.userId })
+        .from(supportAgentPresence)
+        .innerJoin(teamMembers, eq(teamMembers.userId, supportAgentPresence.userId))
         .where(
           and(
             eq(teamMembers.teamId, queue.teamId),
-            gt(sessions.expiresAt, now),
-            gt(sessions.lastSeenAt, new Date(now.getTime() - ONLINE_WINDOW_MS)),
-            isNull(sessions.revokedAt),
+            eq(supportAgentPresence.manualStatus, "online"),
+            gt(
+              supportAgentPresence.lastActivityAt,
+              new Date(now.getTime() - SUPPORT_AWAY_AFTER_MS),
+            ),
           ),
         )
-        .groupBy(sessions.userId);
+        .groupBy(supportAgentPresence.userId);
       onlineAgents = onlineRows.length;
     }
 
@@ -175,8 +189,8 @@ export async function getPublicSupportStatus() {
   }
 
   return {
-    supportDisplayName: general.supportDisplayName,
-    hoursConfigured: hours.configured,
+    supportDisplayName: availability.supportDisplayName,
+    hoursConfigured: availability.hoursConfigured,
     isOpen: availability.isOpen,
     nextOpenLabel: availability.nextOpenLabel,
     onlineAgents,
