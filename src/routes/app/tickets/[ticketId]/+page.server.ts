@@ -6,6 +6,10 @@ import { markEntityNotificationsRead } from "$lib/server/notifications/notificat
 import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { markTicketChatHumanTakeover } from "$lib/server/support/supportAiHandoff";
 import {
+  createTaskFromTicket,
+  listTicketTasks,
+} from "$lib/server/support/ticketTaskBridge";
+import {
   addTicketMessage,
   assignTicket,
   getSupportTicket,
@@ -15,6 +19,7 @@ import {
   type TicketPriority,
   type TicketStatus,
 } from "$lib/server/support/supportRepository";
+import { listTaskProjects, type TaskPriority } from "$lib/server/tasks/taskRepository";
 
 type MentionUser = { id: string; name: string; email: string };
 
@@ -94,6 +99,10 @@ function isTicketPriority(value: string): value is TicketPriority {
   );
 }
 
+function isTaskPriority(value: string): value is TaskPriority {
+  return value === "low" || value === "normal" || value === "high" || value === "urgent";
+}
+
 export const load: PageServerLoad = async ({ params, parent }) => {
   if (!isUuid(params.ticketId)) {
     throw error(404, "Ticket não encontrado.");
@@ -111,9 +120,15 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   try {
     const canReply = hasPermission(permissions, "tickets.reply");
     const canAssign = hasPermission(permissions, "tickets.assign");
-    const [details, users] = await Promise.all([
+    const canViewTasks = hasPermission(permissions, "tasks.view");
+    const canCreateTask = canReply && hasPermission(permissions, "tasks.create");
+    const [details, users, linkedTasks, taskProjects] = await Promise.all([
       getSupportTicket(layout.user.id, permissions, params.ticketId),
       canReply || canAssign ? listSupportAgents() : Promise.resolve([]),
+      canViewTasks ? listTicketTasks(params.ticketId) : Promise.resolve([]),
+      canCreateTask
+        ? listTaskProjects(layout.user.id, permissions).catch(() => [])
+        : Promise.resolve([]),
     ]);
     const mentionUsers = canReply
       ? await filterMentionUsersForTicket(users, params.ticketId)
@@ -125,8 +140,12 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       details,
       agents: canAssign ? users : [],
       mentionUsers,
+      linkedTasks,
+      taskProjects,
       canReply,
       canAssign,
+      canViewTasks,
+      canCreateTask,
     };
   } catch {
     throw error(
@@ -139,237 +158,106 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 export const actions: Actions = {
   reply: async ({ cookies, params, request }) => {
     if (!isUuid(params.ticketId)) {
-      return fail(404, {
-        success: false,
-        message: "Ticket não encontrado.",
-      });
+      return fail(404, { success: false, message: "Ticket não encontrado." });
     }
-
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      "tickets.reply",
-      `/app/tickets/${params.ticketId}`,
-    );
+    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", `/app/tickets/${params.ticketId}`);
     const formData = await request.formData();
     const body = readFormValue(formData, "body");
-
-    if (body.length < 1 || body.length > 10000) {
-      return fail(400, {
-        success: false,
-        action: "reply",
-        message: "A resposta deve ter entre 1 e 10.000 caracteres.",
-      });
-    }
-
+    if (body.length < 1 || body.length > 10000) return fail(400, { success: false, action: "reply", message: "A resposta deve ter entre 1 e 10.000 caracteres." });
     try {
-      await addTicketMessage(
-        session.user.id,
-        permissions,
-        params.ticketId,
-        body,
-        "public",
-      );
-      await markTicketChatHumanTakeover(
-        params.ticketId,
-        session.user.id,
-        "Atendente respondeu pelo ticket.",
-      );
-      return {
-        success: true,
-        action: "reply",
-        message: "Resposta registrada.",
-      };
+      await addTicketMessage(session.user.id, permissions, params.ticketId, body, "public");
+      await markTicketChatHumanTakeover(params.ticketId, session.user.id, "Atendente respondeu pelo ticket.");
+      return { success: true, action: "reply", message: "Resposta registrada." };
     } catch {
-      return fail(403, {
-        success: false,
-        action: "reply",
-        message: "Não foi possível responder este ticket.",
-      });
+      return fail(403, { success: false, action: "reply", message: "Não foi possível responder este ticket." });
     }
   },
 
   note: async ({ cookies, params, request }) => {
-    if (!isUuid(params.ticketId)) {
-      return fail(404, {
-        success: false,
-        message: "Ticket não encontrado.",
-      });
-    }
-
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      "tickets.reply",
-      `/app/tickets/${params.ticketId}`,
-    );
+    if (!isUuid(params.ticketId)) return fail(404, { success: false, message: "Ticket não encontrado." });
+    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", `/app/tickets/${params.ticketId}`);
     const formData = await request.formData();
     const body = readFormValue(formData, "body");
     const requestedMentionIds = readMentionedUserIds(formData);
-
-    if (body.length < 1 || body.length > 10000) {
-      return fail(400, {
-        success: false,
-        action: "note",
-        message: "A nota deve ter entre 1 e 10.000 caracteres.",
-      });
-    }
-
+    if (body.length < 1 || body.length > 10000) return fail(400, { success: false, action: "note", message: "A nota deve ter entre 1 e 10.000 caracteres." });
     try {
       const mentionedUserIds = await validateMentionedUserIds(params.ticketId, requestedMentionIds);
-      await addTicketMessage(
-        session.user.id,
-        permissions,
-        params.ticketId,
-        body,
-        "internal",
-        mentionedUserIds,
-      );
-      return {
-        success: true,
-        action: "note",
-        message: mentionedUserIds.length > 0
-          ? "Nota interna adicionada e menções notificadas."
-          : "Nota interna adicionada.",
-      };
+      await addTicketMessage(session.user.id, permissions, params.ticketId, body, "internal", mentionedUserIds);
+      return { success: true, action: "note", message: mentionedUserIds.length > 0 ? "Nota interna adicionada e menções notificadas." : "Nota interna adicionada." };
     } catch {
-      return fail(403, {
-        success: false,
-        action: "note",
-        message: "Não foi possível adicionar a nota interna.",
-      });
+      return fail(403, { success: false, action: "note", message: "Não foi possível adicionar a nota interna." });
     }
   },
 
   status: async ({ cookies, params, request }) => {
-    if (!isUuid(params.ticketId)) {
-      return fail(404, {
-        success: false,
-        message: "Ticket não encontrado.",
-      });
-    }
-
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      "tickets.reply",
-      `/app/tickets/${params.ticketId}`,
-    );
-    const formData = await request.formData();
-    const status = readFormValue(formData, "status");
-
-    if (!isTicketStatus(status)) {
-      return fail(400, { success: false, message: "Status inválido." });
-    }
-
+    if (!isUuid(params.ticketId)) return fail(404, { success: false, message: "Ticket não encontrado." });
+    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", `/app/tickets/${params.ticketId}`);
+    const status = readFormValue(await request.formData(), "status");
+    if (!isTicketStatus(status)) return fail(400, { success: false, message: "Status inválido." });
     try {
-      await updateTicketStatus(
-        session.user.id,
-        permissions,
-        params.ticketId,
-        status,
-      );
-      return {
-        success: true,
-        action: "status",
-        message: "Status atualizado.",
-      };
+      await updateTicketStatus(session.user.id, permissions, params.ticketId, status);
+      return { success: true, action: "status", message: "Status atualizado." };
     } catch {
-      return fail(403, {
-        success: false,
-        action: "status",
-        message: "Não foi possível alterar o status deste ticket.",
-      });
+      return fail(403, { success: false, action: "status", message: "Não foi possível alterar o status deste ticket." });
     }
   },
 
   priority: async ({ cookies, params, request }) => {
-    if (!isUuid(params.ticketId)) {
-      return fail(404, {
-        success: false,
-        message: "Ticket não encontrado.",
-      });
-    }
-
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      "tickets.reply",
-      `/app/tickets/${params.ticketId}`,
-    );
-    const formData = await request.formData();
-    const priority = readFormValue(formData, "priority");
-
-    if (!isTicketPriority(priority)) {
-      return fail(400, {
-        success: false,
-        message: "Prioridade inválida.",
-      });
-    }
-
+    if (!isUuid(params.ticketId)) return fail(404, { success: false, message: "Ticket não encontrado." });
+    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", `/app/tickets/${params.ticketId}`);
+    const priority = readFormValue(await request.formData(), "priority");
+    if (!isTicketPriority(priority)) return fail(400, { success: false, message: "Prioridade inválida." });
     try {
-      await updateTicketPriority(
-        session.user.id,
-        permissions,
-        params.ticketId,
-        priority,
-      );
-      return {
-        success: true,
-        action: "priority",
-        message: "Prioridade atualizada.",
-      };
+      await updateTicketPriority(session.user.id, permissions, params.ticketId, priority);
+      return { success: true, action: "priority", message: "Prioridade atualizada." };
     } catch {
-      return fail(403, {
-        success: false,
-        action: "priority",
-        message: "Não foi possível alterar a prioridade deste ticket.",
-      });
+      return fail(403, { success: false, action: "priority", message: "Não foi possível alterar a prioridade deste ticket." });
     }
   },
 
   assign: async ({ cookies, params, request }) => {
-    if (!isUuid(params.ticketId)) {
-      return fail(404, {
-        success: false,
-        message: "Ticket não encontrado.",
-      });
+    if (!isUuid(params.ticketId)) return fail(404, { success: false, message: "Ticket não encontrado." });
+    const { session, permissions } = await requireAppPermission(cookies, "tickets.assign", `/app/tickets/${params.ticketId}`);
+    const assignedUserId = readFormValue(await request.formData(), "assignedUserId");
+    if (!isUuid(assignedUserId)) return fail(400, { success: false, message: "Responsável inválido." });
+    try {
+      await assignTicket(session.user.id, permissions, params.ticketId, assignedUserId);
+      await markTicketChatHumanTakeover(params.ticketId, session.user.id, "Ticket atribuído a um atendente humano.");
+      return { success: true, action: "assign", message: "Responsável atualizado." };
+    } catch {
+      return fail(403, { success: false, action: "assign", message: "Não foi possível atribuir este ticket." });
     }
+  },
 
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      "tickets.assign",
-      `/app/tickets/${params.ticketId}`,
-    );
+  createTask: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) return fail(404, { success: false, action: "createTask", message: "Ticket não encontrado." });
+    const { session, permissions } = await requireAppPermission(cookies, "tasks.create", `/app/tickets/${params.ticketId}`);
     const formData = await request.formData();
-    const assignedUserId = readFormValue(formData, "assignedUserId");
+    const projectId = readFormValue(formData, "projectId");
+    const title = readFormValue(formData, "title");
+    const description = readFormValue(formData, "description");
+    const priorityValue = readFormValue(formData, "priority");
+    const dueOn = readFormValue(formData, "dueOn") || null;
 
-    if (!isUuid(assignedUserId)) {
-      return fail(400, {
-        success: false,
-        message: "Responsável inválido.",
-      });
+    if (!isUuid(projectId) || title.length < 2 || title.length > 240 || !isTaskPriority(priorityValue)) {
+      return fail(400, { success: false, action: "createTask", message: "Revise projeto, título e prioridade da tarefa." });
+    }
+    if (description.length > 10000 || (dueOn && !/^\d{4}-\d{2}-\d{2}$/.test(dueOn))) {
+      return fail(400, { success: false, action: "createTask", message: "Descrição ou prazo da tarefa inválido." });
     }
 
     try {
-      await assignTicket(
-        session.user.id,
-        permissions,
-        params.ticketId,
-        assignedUserId,
-      );
-      await markTicketChatHumanTakeover(
-        params.ticketId,
-        session.user.id,
-        "Ticket atribuído a um atendente humano.",
-      );
-      return {
-        success: true,
-        action: "assign",
-        message: "Responsável atualizado.",
-      };
-    } catch {
-      return fail(403, {
-        success: false,
-        action: "assign",
-        message: "Não foi possível atribuir este ticket.",
+      const task = await createTaskFromTicket(session.user.id, permissions, params.ticketId, {
+        projectId,
+        title,
+        description,
+        priority: priorityValue,
+        dueOn,
+        assigneeId: null,
       });
+      return { success: true, action: "createTask", message: `Tarefa “${task.title}” criada e vinculada ao ticket.` };
+    } catch {
+      return fail(403, { success: false, action: "createTask", message: "Não foi possível criar a tarefa neste projeto." });
     }
   },
 };
