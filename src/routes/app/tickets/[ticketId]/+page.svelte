@@ -10,6 +10,7 @@
     ShieldCheck,
     UserRound,
   } from "lucide-svelte";
+  import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -77,7 +78,19 @@
         {#if data.canReply && data.details.ticket.status !== "closed"}
           <div class="mt-6 grid gap-4 lg:grid-cols-2">
             <form method="POST" action="?/reply" class="rounded-2xl border border-[#D9DDF0] bg-[#F8F9FF] p-4"><label class="block"><span class="mb-2 block text-[11px] font-semibold text-[#000A57]">Resposta ao cliente</span><textarea name="body" required maxlength="10000" rows="5" class="w-full resize-y rounded-xl border border-[#DDE1EA] bg-white px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#000A57]"></textarea></label><button type="submit" class="mt-3 min-h-10 w-full rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white">Registrar resposta</button></form>
-            <form method="POST" action="?/note" class="rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] p-4"><label class="block"><span class="mb-2 block text-[11px] font-semibold text-[#8B4D12]">Nota interna</span><textarea name="body" required maxlength="10000" rows="5" class="w-full resize-y rounded-xl border border-[#E9D6C1] bg-white px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#C46C17]"></textarea></label><button type="submit" class="mt-3 min-h-10 w-full rounded-xl bg-[#9A5513] px-4 text-[11px] font-semibold text-white">Adicionar nota interna</button></form>
+            <form method="POST" action="?/note" class="rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] p-4">
+              <label class="block"><span class="mb-2 block text-[11px] font-semibold text-[#8B4D12]">Nota interna</span></label>
+              <MentionTextarea
+                users={data.mentionUsers}
+                name="body"
+                rows={5}
+                maxlength={10000}
+                placeholder="Ex.: @jeferson pode ver esse caso aqui?"
+                className="w-full resize-y rounded-xl border border-[#E9D6C1] bg-white px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#C46C17]"
+              />
+              <p class="mt-2 text-[9px] leading-4 text-[#9A744F]">Digite <strong>@</strong> e selecione um usuário para gerar uma notificação interna. O cliente nunca vê esta nota.</p>
+              <button type="submit" class="mt-3 min-h-10 w-full rounded-xl bg-[#9A5513] px-4 text-[11px] font-semibold text-white">Adicionar nota interna</button>
+            </form>
           </div>
         {/if}
       </section>
