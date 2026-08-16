@@ -124,10 +124,11 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   const content = await getStructuredHelpContent(params.contentId);
   if (!content) throw error(404, "Conteúdo não encontrado.");
 
+  const archived = content.status === "archived";
   return {
     content,
-    canEdit: hasPermission(permissions, "help.edit"),
-    canPublish: hasPermission(permissions, "help.publish"),
+    canEdit: !archived && hasPermission(permissions, "help.edit"),
+    canPublish: !archived && hasPermission(permissions, "help.publish"),
   };
 };
 
