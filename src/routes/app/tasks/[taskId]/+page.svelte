@@ -9,6 +9,7 @@
     Save,
     UserRound,
   } from "lucide-svelte";
+  import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -163,7 +164,7 @@
           </span>
           <div>
             <h2 class="text-[16px] font-semibold text-[#11182C]">Comentários</h2>
-            <p class="mt-1 text-[11px] text-[#858A98]">Registre contexto, decisões e andamento.</p>
+            <p class="mt-1 text-[11px] text-[#858A98]">Registre contexto, decisões e andamento. Use @ para chamar alguém do projeto.</p>
           </div>
         </div>
 
@@ -187,14 +188,14 @@
 
         {#if data.canUpdate}
           <form method="POST" action="?/comment" class="mt-5">
-            <textarea
+            <MentionTextarea
+              users={data.details.projectMembers}
               name="body"
-              required
-              maxlength="5000"
-              rows="4"
-              placeholder="Adicionar comentário..."
-              class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"
-            ></textarea>
+              rows={4}
+              maxlength={5000}
+              placeholder="Adicionar comentário... use @ para mencionar"
+              className="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"
+            />
             <button
               type="submit"
               class="mt-3 inline-flex min-h-10 items-center justify-center rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white"
