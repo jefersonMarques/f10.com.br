@@ -1,4 +1,4 @@
-import { fail, redirect, type Actions } from "@sveltejs/kit";
+import { fail, redirect, type Actions, type Cookies } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import {
   changeUserEmail,
@@ -12,7 +12,7 @@ import { getAssetStorageStatus } from "$lib/server/storage/assetStorage";
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
-async function requireSession(cookies: Parameters<PageServerLoad>[0]["cookies"], returnTo = "/app/minha-conta") {
+async function requireSession(cookies: Cookies, returnTo = "/app/minha-conta") {
   const token = cookies.get(SESSION_COOKIE_NAME);
   if (!token) throw redirect(303, `/login?returnTo=${encodeURIComponent(returnTo)}`);
   const session = await getSessionUser(token);
