@@ -10,7 +10,12 @@ import {
 } from "$lib/server/remote/remoteDeviceEnrollmentRepository";
 import { getMeshCentralControlStatus } from "$lib/server/remote/meshCentralControl";
 import { getRemoteProviderStatus } from "$lib/server/remote/remoteSupportProvider";
-import { listInternalChatMessages } from "$lib/server/support/internalChatRepository";
+import {
+  assignInternalChat,
+  claimInternalChat,
+  listChatAssignees,
+  listInternalChatMessages,
+} from "$lib/server/support/internalChatRepository";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -41,6 +46,8 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       permissions,
       params.sessionId,
     );
+    const canRespond = hasPermission(permissions, "chat.respond");
+    const canAssign = hasPermission(permissions, "tickets.assign");
     const canRequestRemote = hasPermission(permissions, "remote.request");
     const canUseRemote = hasPermission(permissions, "remote.use");
     const provider = getRemoteProviderStatus();
@@ -57,7 +64,10 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 
     return {
       initial,
-      canRespond: hasPermission(permissions, "chat.respond"),
+      currentUserId: layout.user.id,
+      canRespond,
+      canAssign,
+      assignees: canAssign ? await listChatAssignees() : [],
       canRequestRemote,
       canUseRemote,
       remoteDevices: remoteVisible
@@ -71,6 +81,60 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 };
 
 export const actions: Actions = {
+  claim: async ({ params, cookies }) => {
+    if (!isUuid(params.sessionId)) {
+      return fail(404, { success: false, action: "claim", message: "Conversa não encontrada." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "chat.respond",
+      `/app/chat/${params.sessionId}`,
+    );
+    try {
+      await claimInternalChat(session.user.id, permissions, params.sessionId);
+      return { success: true, action: "claim", message: "Atendimento assumido por você." };
+    } catch (cause) {
+      return fail(409, {
+        success: false,
+        action: "claim",
+        message:
+          cause instanceof Error && cause.message === "CHAT_ALREADY_ASSIGNED"
+            ? "Este atendimento já foi assumido por outra pessoa."
+            : "Não foi possível assumir este atendimento.",
+      });
+    }
+  },
+
+  assign: async ({ params, cookies, request }) => {
+    if (!isUuid(params.sessionId)) {
+      return fail(404, { success: false, action: "assign", message: "Conversa não encontrada." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.assign",
+      `/app/chat/${params.sessionId}`,
+    );
+    const targetUserId = readString(await request.formData(), "assignedUserId");
+    if (!isUuid(targetUserId)) {
+      return fail(400, { success: false, action: "assign", message: "Selecione um atendente válido." });
+    }
+    try {
+      await assignInternalChat(
+        session.user.id,
+        permissions,
+        params.sessionId,
+        targetUserId,
+      );
+      return { success: true, action: "assign", message: "Atendimento atribuído." };
+    } catch {
+      return fail(409, {
+        success: false,
+        action: "assign",
+        message: "Não foi possível atribuir este atendimento ao usuário selecionado.",
+      });
+    }
+  },
+
   enrollRemote: async ({ params, cookies, url }) => {
     if (!isUuid(params.sessionId)) {
       return fail(404, {
