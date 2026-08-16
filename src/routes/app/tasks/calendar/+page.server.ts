@@ -68,7 +68,8 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     sourceTasks = await listMyTasks(layout.user.id, permissions);
   }
 
-  const membersByProject = canAssign
+  type ProjectMember = Awaited<ReturnType<typeof listProjectMembers>>[number];
+  const membersByProject: Record<string, ProjectMember[]> = canAssign
     ? Object.fromEntries(
         await Promise.all(
           projects.map(async (project) => [project.id, await listProjectMembers(project.id)] as const),
