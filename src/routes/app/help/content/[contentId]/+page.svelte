@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    Archive,
     ArrowLeft,
     BrainCircuit,
     CheckCircle2,
@@ -45,13 +46,13 @@
   <div class="mt-5 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
     <div class="min-w-0">
       <div class="flex flex-wrap items-center gap-2">
-        <span class={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em] ${data.content.status === "published" ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#EEF0FF] text-[#000A57]"}`}>
-          {data.content.status === "published" ? "Publicado" : "Rascunho"}
+        <span class={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em] ${data.content.status === "published" ? "bg-[#EEF8F1] text-[#2F7045]" : data.content.status === "archived" ? "bg-[#F1F1F3] text-[#676D7D]" : "bg-[#EEF0FF] text-[#000A57]"}`}>
+          {data.content.status === "published" ? "Publicado" : data.content.status === "archived" ? "Arquivado" : "Rascunho"}
         </span>
         <span class="rounded-full bg-[#F3F4F7] px-3 py-1.5 text-[10px] font-semibold text-[#737989]">
           {data.content.steps.length} {data.content.steps.length === 1 ? "passo" : "passos"}
         </span>
-        {#if data.content.hasPublishedVersion && data.content.status !== "published"}
+        {#if data.content.hasPublishedVersion && data.content.status !== "published" && data.content.status !== "archived"}
           <span class="rounded-full bg-[#FFF4E9] px-3 py-1.5 text-[10px] font-bold text-[#B85408]">Há alterações não publicadas</span>
         {/if}
       </div>
@@ -62,6 +63,17 @@
     <div class="flex flex-wrap gap-2">
       <a href={`/app/help/content/${data.content.id}/preview`} class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57]">Preview<ExternalLink size={13}/></a>
       <a href="/app/help/assets" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57]"><HardDrive size={15}/>Biblioteca</a>
+      {#if data.canEdit && !data.content.publishedAt}
+        <form method="POST" action="/app/help/content?/discard" on:submit={(event) => { if (!confirm("Descartar este conteúdo definitivamente? Esta ação remove o rascunho e não pode ser desfeita.")) event.preventDefault(); }}>
+          <input type="hidden" name="contentId" value={data.content.id}/>
+          <button type="submit" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#F0C8C8] bg-white px-4 text-[11px] font-semibold text-[#9B2C2C] transition hover:bg-[#FFF5F5]"><Trash2 size={15}/>Descartar</button>
+        </form>
+      {:else if data.canPublish && data.content.publishedAt}
+        <form method="POST" action="/app/help/content?/archive" on:submit={(event) => { if (!confirm("Arquivar este conteúdo? Ele deixará de aparecer na Central pública e deixará de ser usado pela IA. O histórico será mantido.")) event.preventDefault(); }}>
+          <input type="hidden" name="contentId" value={data.content.id}/>
+          <button type="submit" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#626979] transition hover:bg-[#F5F6F8]"><Archive size={15}/>Arquivar</button>
+        </form>
+      {/if}
       {#if data.canPublish && data.content.status !== "published"}
         <form method="POST" action="?/publish">
           <button type="submit" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#EA6D0B] px-5 text-[12px] font-semibold text-white shadow-[0_12px_28px_rgba(234,109,11,0.2)] transition hover:brightness-105"><CloudUpload size={17} aria-hidden="true" />Publicar conteúdo</button>
@@ -77,7 +89,12 @@
     </div>
   {/if}
 
-  {#if data.content.hasPublishedVersion && data.content.status !== "published"}
+  {#if data.content.status === "archived"}
+    <section class="mt-6 rounded-2xl border border-[#DDE1EA] bg-[#F7F8FA] px-5 py-4">
+      <p class="text-[12px] font-semibold text-[#505666]">Este conteúdo está arquivado e permanece somente para consulta interna.</p>
+      <p class="mt-1 text-[11px] leading-5 text-[#777D8D]">Ele não aparece na Central pública e não participa da base usada pelo atendimento com IA.</p>
+    </section>
+  {:else if data.content.hasPublishedVersion && data.content.status !== "published"}
     <section class="mt-6 rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] px-5 py-4">
       <p class="text-[12px] font-semibold text-[#7A3B08]">A versão publicada anterior continua sendo a versão segura para pesquisa e IA.</p>
       <p class="mt-1 text-[11px] leading-5 text-[#91603A]">As alterações abaixo só entram na base publicada depois de clicar em “Publicar conteúdo”.</p>
