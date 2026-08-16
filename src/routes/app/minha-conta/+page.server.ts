@@ -28,6 +28,11 @@ function readString(formData: FormData, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function readRawString(formData: FormData, key: string): string {
+  const value = formData.get(key);
+  return typeof value === "string" ? value : "";
+}
+
 function isValidEmail(value: string): boolean {
   return value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
@@ -88,7 +93,7 @@ export const actions: Actions = {
     const session = await requireSession(cookies);
     const formData = await request.formData();
     const email = readString(formData, "email").toLowerCase();
-    const currentPassword = readString(formData, "currentPassword");
+    const currentPassword = readRawString(formData, "currentPassword");
 
     if (!isValidEmail(email) || !currentPassword) {
       return fail(400, { success: false, action: "email", message: "Revise o e-mail e informe sua senha atual." });
@@ -112,9 +117,9 @@ export const actions: Actions = {
   password: async ({ cookies, request }) => {
     const session = await requireSession(cookies);
     const formData = await request.formData();
-    const currentPassword = readString(formData, "currentPassword");
-    const newPassword = readString(formData, "newPassword");
-    const confirmPassword = readString(formData, "confirmPassword");
+    const currentPassword = readRawString(formData, "currentPassword");
+    const newPassword = readRawString(formData, "newPassword");
+    const confirmPassword = readRawString(formData, "confirmPassword");
 
     if (!currentPassword || !isStrongEnoughPassword(newPassword)) {
       return fail(400, {
