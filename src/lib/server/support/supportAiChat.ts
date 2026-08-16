@@ -22,6 +22,7 @@ import {
   runSupportAi,
   type SupportAiResult,
 } from "$lib/server/support/supportAiAgent";
+import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
 
 const PROCESSING_STALE_MS = 60_000;
 const AI_WINDOW_MS = 30 * 60 * 1000;
@@ -220,6 +221,7 @@ async function escalateWithoutModel(
     };
   }
 
+  await notifySupportTicketNeedsAttention(ticketId, reason).catch(() => undefined);
   return { processed: true, state: "escalated", result: null };
 }
 
@@ -295,6 +297,13 @@ async function persistAiResult(
       state: await getSessionState(sessionId),
       result: null,
     };
+  }
+
+  if (!answered) {
+    await notifySupportTicketNeedsAttention(
+      ticketId,
+      result.escalationReason || "A IA encaminhou a conversa para atendimento humano.",
+    ).catch(() => undefined);
   }
 
   return {
