@@ -5,10 +5,7 @@ import { getPermissionScope, hasPermission, resolveUserPermissions } from "$lib/
 import { markEntityNotificationsRead } from "$lib/server/notifications/notificationRepository";
 import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { markTicketChatHumanTakeover } from "$lib/server/support/supportAiHandoff";
-import {
-  createTaskFromTicket,
-  listTicketTasks,
-} from "$lib/server/support/ticketTaskBridge";
+import { createTaskFromTicket, listTicketTasks } from "$lib/server/support/ticketTaskBridge";
 import {
   addTicketMessage,
   assignTicket,
@@ -24,9 +21,7 @@ import { listTaskProjects, type TaskPriority } from "$lib/server/tasks/taskRepos
 type MentionUser = { id: string; name: string; email: string };
 
 function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function readFormValue(formData: FormData, name: string): string {
@@ -37,37 +32,27 @@ function readFormValue(formData: FormData, name: string): string {
 function readMentionedUserIds(formData: FormData): string[] {
   const raw = readFormValue(formData, "mentionedUserIds");
   if (!raw) return [];
-
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return Array.from(
-      new Set(parsed.filter((value): value is string => typeof value === "string" && isUuid(value))),
-    ).slice(0, 20);
+    return Array.from(new Set(parsed.filter((value): value is string => typeof value === "string" && isUuid(value)))).slice(0, 20);
   } catch {
     return [];
   }
 }
 
-async function filterMentionUsersForTicket(
-  users: MentionUser[],
-  ticketId: string,
-): Promise<MentionUser[]> {
-  const resolved = await Promise.all(
-    users.map(async (user) => {
-      const permissions = await resolveUserPermissions(user.id);
-      const scope = getPermissionScope(permissions, "tickets.view");
-      if (!scope) return null;
-
-      try {
-        await requireTicketAccess(user.id, scope, ticketId);
-        return user;
-      } catch {
-        return null;
-      }
-    }),
-  );
-
+async function filterMentionUsersForTicket(users: MentionUser[], ticketId: string): Promise<MentionUser[]> {
+  const resolved = await Promise.all(users.map(async (user) => {
+    const permissions = await resolveUserPermissions(user.id);
+    const scope = getPermissionScope(permissions, "tickets.view");
+    if (!scope) return null;
+    try {
+      await requireTicketAccess(user.id, scope, ticketId);
+      return user;
+    } catch {
+      return null;
+    }
+  }));
   return resolved.filter((user): user is MentionUser => Boolean(user));
 }
 
@@ -80,42 +65,23 @@ async function validateMentionedUserIds(ticketId: string, requestedIds: string[]
 }
 
 function isTicketStatus(value: string): value is TicketStatus {
-  return (
-    value === "new" ||
-    value === "open" ||
-    value === "in_progress" ||
-    value === "waiting_customer" ||
-    value === "resolved" ||
-    value === "closed"
-  );
+  return ["new", "open", "in_progress", "waiting_customer", "resolved", "closed"].includes(value);
 }
 
 function isTicketPriority(value: string): value is TicketPriority {
-  return (
-    value === "low" ||
-    value === "normal" ||
-    value === "high" ||
-    value === "urgent"
-  );
+  return ["low", "normal", "high", "urgent"].includes(value);
 }
 
 function isTaskPriority(value: string): value is TaskPriority {
-  return value === "low" || value === "normal" || value === "high" || value === "urgent";
+  return ["low", "normal", "high", "urgent"].includes(value);
 }
 
 export const load: PageServerLoad = async ({ params, parent }) => {
-  if (!isUuid(params.ticketId)) {
-    throw error(404, "Ticket não encontrado.");
-  }
+  if (!isUuid(params.ticketId)) throw error(404, "Ticket não encontrado.");
 
   const layout = await parent();
-  const permissions = new Map(
-    layout.permissions.map((permission) => [permission.code, permission.scope]),
-  );
-
-  if (!hasPermission(permissions, "tickets.view")) {
-    throw error(403, "Acesso não autorizado.");
-  }
+  const permissions = new Map(layout.permissions.map((permission) => [permission.code, permission.scope]));
+  if (!hasPermission(permissions, "tickets.view")) throw error(403, "Acesso não autorizado.");
 
   try {
     const canReply = hasPermission(permissions, "tickets.reply");
@@ -125,15 +91,14 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     const [details, users, linkedTasks, taskProjects] = await Promise.all([
       getSupportTicket(layout.user.id, permissions, params.ticketId),
       canReply || canAssign ? listSupportAgents() : Promise.resolve([]),
-      canViewTasks ? listTicketTasks(params.ticketId) : Promise.resolve([]),
+      canViewTasks
+        ? listTicketTasks(layout.user.id, permissions, params.ticketId)
+        : Promise.resolve([]),
       canCreateTask
         ? listTaskProjects(layout.user.id, permissions).catch(() => [])
         : Promise.resolve([]),
     ]);
-    const mentionUsers = canReply
-      ? await filterMentionUsersForTicket(users, params.ticketId)
-      : [];
-
+    const mentionUsers = canReply ? await filterMentionUsersForTicket(users, params.ticketId) : [];
     await markEntityNotificationsRead(layout.user.id, "ticket", params.ticketId);
 
     return {
@@ -148,21 +113,15 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       canCreateTask,
     };
   } catch {
-    throw error(
-      404,
-      "Ticket não encontrado ou fora do seu escopo de acesso.",
-    );
+    throw error(404, "Ticket não encontrado ou fora do seu escopo de acesso.");
   }
 };
 
 export const actions: Actions = {
   reply: async ({ cookies, params, request }) => {
-    if (!isUuid(params.ticketId)) {
-      return fail(404, { success: false, message: "Ticket não encontrado." });
-    }
+    if (!isUuid(params.ticketId)) return fail(404, { success: false, message: "Ticket não encontrado." });
     const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", `/app/tickets/${params.ticketId}`);
-    const formData = await request.formData();
-    const body = readFormValue(formData, "body");
+    const body = readFormValue(await request.formData(), "body");
     if (body.length < 1 || body.length > 10000) return fail(400, { success: false, action: "reply", message: "A resposta deve ter entre 1 e 10.000 caracteres." });
     try {
       await addTicketMessage(session.user.id, permissions, params.ticketId, body, "public");
@@ -236,13 +195,13 @@ export const actions: Actions = {
     const projectId = readFormValue(formData, "projectId");
     const title = readFormValue(formData, "title");
     const description = readFormValue(formData, "description");
-    const priorityValue = readFormValue(formData, "priority");
+    const priority = readFormValue(formData, "priority");
     const dueOn = readFormValue(formData, "dueOn") || null;
 
-    if (!isUuid(projectId) || title.length < 2 || title.length > 240 || !isTaskPriority(priorityValue)) {
+    if (!isUuid(projectId) || title.length < 2 || title.length > 180 || !isTaskPriority(priority)) {
       return fail(400, { success: false, action: "createTask", message: "Revise projeto, título e prioridade da tarefa." });
     }
-    if (description.length > 10000 || (dueOn && !/^\d{4}-\d{2}-\d{2}$/.test(dueOn))) {
+    if (description.length > 5000 || (dueOn && !/^\d{4}-\d{2}-\d{2}$/.test(dueOn))) {
       return fail(400, { success: false, action: "createTask", message: "Descrição ou prazo da tarefa inválido." });
     }
 
@@ -251,7 +210,7 @@ export const actions: Actions = {
         projectId,
         title,
         description,
-        priority: priorityValue,
+        priority,
         dueOn,
         assigneeId: null,
       });
