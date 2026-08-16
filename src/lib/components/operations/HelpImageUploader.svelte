@@ -4,7 +4,7 @@
 
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
-  import { onDestroy, onMount } from "svelte";
+  import { onMount } from "svelte";
   import { ClipboardPaste, Image as ImageIcon, UploadCloud } from "lucide-svelte";
 
   export let contentId: string;
@@ -86,10 +86,10 @@
 
   onMount(() => {
     window.addEventListener("paste", handlePaste);
-  });
 
-  onDestroy(() => {
-    window.removeEventListener("paste", handlePaste);
+    return () => {
+      window.removeEventListener("paste", handlePaste);
+    };
   });
 </script>
 
