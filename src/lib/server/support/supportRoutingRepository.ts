@@ -5,6 +5,7 @@ import {
   gt,
   inArray,
   isNull,
+  notInArray,
   sql,
 } from "drizzle-orm";
 import { hasPermission, resolveUserPermissions } from "$lib/server/auth/permissions";
@@ -170,16 +171,27 @@ export async function updateSupportRoutingSettings(
         set: { value: normalized, updatedBy: actorUserId, updatedAt: now },
       });
 
-    await tx.delete(supportChatRoutingMembers);
-    if (userIds.length > 0) {
-      await tx.insert(supportChatRoutingMembers).values(
-        userIds.map((userId) => ({
-          userId,
-          enabled: true,
-          addedBy: actorUserId,
-          updatedAt: now,
-        })),
-      );
+    if (userIds.length === 0) {
+      await tx.delete(supportChatRoutingMembers);
+    } else {
+      await tx
+        .delete(supportChatRoutingMembers)
+        .where(notInArray(supportChatRoutingMembers.userId, userIds));
+
+      for (const userId of userIds) {
+        await tx
+          .insert(supportChatRoutingMembers)
+          .values({
+            userId,
+            enabled: true,
+            addedBy: actorUserId,
+            updatedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: supportChatRoutingMembers.userId,
+            set: { enabled: true, addedBy: actorUserId, updatedAt: now },
+          });
+      }
     }
   });
 
