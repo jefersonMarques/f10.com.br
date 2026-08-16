@@ -11,6 +11,7 @@ import {
 import { hasPermission, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
+import { webChatSessions } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { operationsSettings } from "$lib/server/db/operationsSettingsSchema";
 import { users } from "$lib/server/db/schema";
@@ -307,12 +308,18 @@ export async function autoAssignTicketIfConfigured(
       metadata: { assignedUserId: candidate.userId, strategy: "round_robin" },
     });
 
+    const [chatSession] = await tx
+      .select({ id: webChatSessions.id })
+      .from(webChatSessions)
+      .where(eq(webChatSessions.ticketId, ticketId))
+      .limit(1);
+
     await tx.insert(internalNotifications).values({
       userId: candidate.userId,
       kind: "chat.assigned",
       title: `Novo atendimento atribuído${ticket.ticketNumber ? ` · #${ticket.ticketNumber}` : ""}`,
       body: "Um atendimento do chat foi atribuído automaticamente a você.",
-      href: `/app/tickets/${ticketId}`,
+      href: chatSession?.id ? `/app/chat/${chatSession.id}` : `/app/tickets/${ticketId}`,
       entityType: "ticket",
       entityId: ticketId,
     });
