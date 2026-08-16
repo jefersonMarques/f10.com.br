@@ -6,6 +6,7 @@ import { roles, sessions, userRoles, users } from "$lib/server/db/schema";
 
 export const SESSION_COOKIE_NAME = "f10_operations_session";
 const SESSION_TTL_SECONDS = 12 * 60 * 60;
+const SESSION_TOUCH_INTERVAL_MS = 60_000;
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -59,6 +60,7 @@ export async function getSessionUser(token: string): Promise<{
       userId: users.id,
       name: users.name,
       email: users.email,
+      lastSeenAt: sessions.lastSeenAt,
     })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
@@ -73,6 +75,13 @@ export async function getSessionUser(token: string): Promise<{
     .limit(1);
 
   if (!session) return null;
+
+  if (session.lastSeenAt.getTime() <= now.getTime() - SESSION_TOUCH_INTERVAL_MS) {
+    await db
+      .update(sessions)
+      .set({ lastSeenAt: now })
+      .where(eq(sessions.id, session.sessionId));
+  }
 
   const roleRows = await db
     .select({ code: roles.code })
