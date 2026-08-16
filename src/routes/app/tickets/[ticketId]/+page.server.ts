@@ -1,8 +1,9 @@
 import { error, fail, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
-import { hasPermission } from "$lib/server/auth/permissions";
+import { getPermissionScope, hasPermission, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { markEntityNotificationsRead } from "$lib/server/notifications/notificationRepository";
+import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { markTicketChatHumanTakeover } from "$lib/server/support/supportAiHandoff";
 import {
   addTicketMessage,
@@ -39,6 +40,28 @@ function readMentionedUserIds(formData: FormData): string[] {
   } catch {
     return [];
   }
+}
+
+async function filterMentionUsersForTicket(
+  users: Array<{ id: string; name: string; email: string }>,
+  ticketId: string,
+) {
+  const resolved = await Promise.all(
+    users.map(async (user) => {
+      const permissions = await resolveUserPermissions(user.id);
+      const scope = getPermissionScope(permissions, "tickets.view");
+      if (!scope) return null;
+
+      try {
+        await requireTicketAccess(user.id, scope, ticketId);
+        return user;
+      } catch {
+        return null;
+      }
+    }),
+  );
+
+  return resolved.filter((user): user is { id: string; name: string; email: string } => Boolean(user));
 }
 
 function isTicketStatus(value: string): value is TicketStatus {
@@ -82,13 +105,16 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       getSupportTicket(layout.user.id, permissions, params.ticketId),
       canReply || canAssign ? listSupportAgents() : Promise.resolve([]),
     ]);
+    const mentionUsers = canReply
+      ? await filterMentionUsersForTicket(users, params.ticketId)
+      : [];
 
     await markEntityNotificationsRead(layout.user.id, "ticket", params.ticketId);
 
     return {
       details,
       agents: canAssign ? users : [],
-      mentionUsers: canReply ? users : [],
+      mentionUsers,
       canReply,
       canAssign,
     };
