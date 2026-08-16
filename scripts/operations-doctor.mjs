@@ -92,7 +92,8 @@ const criticalTables = [
   "help_search_events", "help_search_results", "support_ai_runs", "user_invites",
   "task_projects", "tasks", "ticket_task_links", "support_queues", "tickets", "ticket_messages",
   "web_chat_sessions", "support_public_limits", "support_agent_presence",
-  "support_chat_routing_members", "operations_settings",
+  "support_chat_routing_members", "support_chat_entry_options", "ticket_message_attachments",
+  "operations_settings",
   "remote_devices", "remote_customer_groups", "remote_device_enrollments",
   "remote_support_sessions",
 ];
