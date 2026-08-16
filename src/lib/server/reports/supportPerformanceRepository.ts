@@ -15,7 +15,7 @@ type MutableUserMetrics = {
   internalNotes: number;
   handledTickets: Set<string>;
   handledChats: Set<string>;
-  resolvedTickets: number;
+  resolvedTickets: Set<string>;
   firstResponseMinutes: number[];
   firstResponseSlaSamples: number;
   firstResponseSlaMet: number;
@@ -66,7 +66,7 @@ export async function getSupportPerformance(periodDays: SupportPerformancePeriod
         internalNotes: 0,
         handledTickets: new Set<string>(),
         handledChats: new Set<string>(),
-        resolvedTickets: 0,
+        resolvedTickets: new Set<string>(),
         firstResponseMinutes: [],
         firstResponseSlaSamples: 0,
         firstResponseSlaMet: 0,
@@ -117,6 +117,7 @@ export async function getSupportPerformance(periodDays: SupportPerformancePeriod
       .orderBy(asc(tickets.id), asc(ticketMessages.createdAt)),
     db
       .select({
+        ticketId: ticketEvents.ticketId,
         actorUserId: ticketEvents.actorUserId,
         metadata: ticketEvents.metadata,
       })
@@ -183,7 +184,7 @@ export async function getSupportPerformance(periodDays: SupportPerformancePeriod
       : "";
     if (status !== "resolved" && status !== "closed") continue;
     const user = metrics.get(event.actorUserId);
-    if (user) user.resolvedTickets += 1;
+    if (user) user.resolvedTickets.add(event.ticketId);
   }
 
   for (const task of completedTasks) {
@@ -216,7 +217,7 @@ export async function getSupportPerformance(periodDays: SupportPerformancePeriod
     internalNotes: user.internalNotes,
     handledTickets: user.handledTickets.size,
     handledChats: user.handledChats.size,
-    resolvedTickets: user.resolvedTickets,
+    resolvedTickets: user.resolvedTickets.size,
     medianFirstHumanResponseMinutes: roundedMinutes(percentile(user.firstResponseMinutes, 0.5)),
     p90FirstHumanResponseMinutes: roundedMinutes(percentile(user.firstResponseMinutes, 0.9)),
     firstResponseSamples: user.firstResponseMinutes.length,
