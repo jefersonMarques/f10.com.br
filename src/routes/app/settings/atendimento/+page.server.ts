@@ -13,10 +13,20 @@ import {
   getSupportQueueTeamSettings,
   updateSupportQueueTeam,
 } from "$lib/server/settings/supportQueueSettingsRepository";
+import {
+  getSupportRoutingSettings,
+  updateSupportRoutingSettings,
+  type SupportAssignmentMode,
+} from "$lib/server/support/supportRoutingRepository";
 
 function readString(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function readInteger(formData: FormData, key: string, fallback: number): number {
+  const value = Number.parseInt(readString(formData, key), 10);
+  return Number.isFinite(value) ? value : fallback;
 }
 
 function isUuid(value: string): boolean {
@@ -41,11 +51,12 @@ function readSettings(formData: FormData): SupportHoursSettings {
 
 export const load: PageServerLoad = async ({ cookies }) => {
   await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
-  const [settings, queue] = await Promise.all([
+  const [settings, queue, routing] = await Promise.all([
     getSupportHoursSettings(),
     getSupportQueueTeamSettings(),
+    getSupportRoutingSettings(),
   ]);
-  return { settings, queue };
+  return { settings, queue, routing };
 };
 
 export const actions: Actions = {
@@ -101,5 +112,38 @@ export const actions: Actions = {
         message: "Não foi possível vincular esta equipe à fila de suporte.",
       });
     }
+  },
+
+  saveRouting: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(
+      cookies,
+      "system.settings.manage",
+      "/app/settings/atendimento",
+    );
+    const formData = await request.formData();
+    const assignmentMode: SupportAssignmentMode =
+      readString(formData, "assignmentMode") === "round_robin"
+        ? "round_robin"
+        : "manual";
+    const routingUserIds = formData
+      .getAll("routingUserId")
+      .filter((value): value is string => typeof value === "string" && isUuid(value));
+
+    await updateSupportRoutingSettings(
+      session.user.id,
+      {
+        assignmentMode,
+        aiMaxRunsPerConversation: readInteger(formData, "aiMaxRunsPerConversation", 6),
+        aiDailyTokenBudget: readInteger(formData, "aiDailyTokenBudget", 100_000),
+        aiMaxOutputTokens: readInteger(formData, "aiMaxOutputTokens", 500),
+      },
+      routingUserIds,
+    );
+
+    return {
+      success: true,
+      action: "saveRouting",
+      message: "Distribuição do chat e limites da IA atualizados.",
+    };
   },
 };
