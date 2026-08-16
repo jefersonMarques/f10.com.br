@@ -9,10 +9,18 @@ import {
   type SupportDayKey,
   type SupportHoursSettings,
 } from "$lib/server/settings/supportHoursRepository";
+import {
+  getSupportQueueTeamSettings,
+  updateSupportQueueTeam,
+} from "$lib/server/settings/supportQueueSettingsRepository";
 
 function readString(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function readSettings(formData: FormData): SupportHoursSettings {
@@ -33,7 +41,11 @@ function readSettings(formData: FormData): SupportHoursSettings {
 
 export const load: PageServerLoad = async ({ cookies }) => {
   await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
-  return { settings: await getSupportHoursSettings() };
+  const [settings, queue] = await Promise.all([
+    getSupportHoursSettings(),
+    getSupportQueueTeamSettings(),
+  ]);
+  return { settings, queue };
 };
 
 export const actions: Actions = {
@@ -47,6 +59,7 @@ export const actions: Actions = {
     if (!isValidSupportHours(settings)) {
       return fail(400, {
         success: false,
+        action: "save",
         message: "Revise os horários. Cada dia ativo precisa terminar depois do horário de início.",
       });
     }
@@ -54,7 +67,39 @@ export const actions: Actions = {
     await updateSupportHoursSettings(session.user.id, settings);
     return {
       success: true,
+      action: "save",
       message: "Horário de atendimento atualizado.",
     };
+  },
+
+  saveTeam: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(
+      cookies,
+      "system.settings.manage",
+      "/app/settings/atendimento",
+    );
+    const teamId = readString(await request.formData(), "teamId");
+    if (!isUuid(teamId)) {
+      return fail(400, {
+        success: false,
+        action: "saveTeam",
+        message: "Selecione a equipe responsável pelo suporte.",
+      });
+    }
+
+    try {
+      await updateSupportQueueTeam(session.user.id, teamId);
+      return {
+        success: true,
+        action: "saveTeam",
+        message: "Equipe responsável pelo suporte atualizada.",
+      };
+    } catch {
+      return fail(400, {
+        success: false,
+        action: "saveTeam",
+        message: "Não foi possível vincular esta equipe à fila de suporte.",
+      });
+    }
   },
 };
