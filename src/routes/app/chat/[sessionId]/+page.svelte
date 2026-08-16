@@ -26,7 +26,16 @@
   export let data: PageData;
   export let form: ActionData;
 
-  type ChatMessage = PageData["initial"]["messages"][number];
+  type ChatAttachment = {
+    id: string;
+    originalName: string;
+    mimeType: string;
+    sizeBytes: number;
+    url: string;
+  };
+  type ChatMessage = PageData["initial"]["messages"][number] & {
+    attachments?: ChatAttachment[];
+  };
   type ChatDetails = PageData["initial"]["chat"];
   type ComposerMode = "reply" | "note";
 
@@ -127,7 +136,7 @@
 
       const payload = (await response.json()) as { messages?: ChatMessage[]; chat?: ChatDetails };
       const nextMessages = payload.messages ?? [];
-      const changed = nextMessages.length !== previousLength || nextMessages.at(-1)?.id !== previousLastId;
+      const changed = nextMessages.length !== previousLength || nextMessages.at(-1)?.id !== previousLastId || nextMessages.some((message, index) => message.attachments?.length !== messages[index]?.attachments?.length);
       if (payload.chat) chat = payload.chat;
       if (!changed) return;
 
@@ -177,7 +186,7 @@
 
   onMount(() => {
     messageBody = window.sessionStorage.getItem(draftKey) ?? "";
-    void scrollToLatest("auto");
+    void refreshMessages(true);
 
     const intervalId = window.setInterval(() => void refreshMessages(), 3_000);
     const handleVisibilityChange = () => {
@@ -266,7 +275,16 @@
                 <div class={`flex ${message.authorType === "customer" ? "justify-start" : "justify-end"}`}>
                   <article class={`max-w-[82%] rounded-2xl px-4 py-3 shadow-sm ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3EA] bg-white text-[#565C6B]" : message.authorType === "system" ? "rounded-br-md border border-[#D9D4F5] bg-[#F2F0FF] text-[#403878]" : "rounded-br-md bg-[#000A57] text-white"}`}>
                     {#if message.authorType === "system"}<div class="mb-2 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-[0.08em] text-[#6255A8]"><Bot size={12}/>Automação F10</div>{/if}
-                    <p class="whitespace-pre-wrap text-[12px] leading-5">{message.body}</p>
+                    {#if message.attachments && message.attachments.length > 0}
+                      <div class={`mb-2 grid gap-2 ${message.attachments.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                        {#each message.attachments as attachment}
+                          <a href={attachment.url} target="_blank" rel="noopener noreferrer" class="block overflow-hidden rounded-xl border border-black/5 bg-[#F2F3F6]">
+                            <img src={attachment.url} alt={attachment.originalName} class="max-h-[320px] w-full object-contain"/>
+                          </a>
+                        {/each}
+                      </div>
+                    {/if}
+                    {#if message.body}<p class="whitespace-pre-wrap text-[12px] leading-5">{message.body}</p>{/if}
                     <div class={`mt-2 flex items-center gap-2 text-[8px] ${message.authorType === "customer" ? "text-[#9A9FAC]" : message.authorType === "system" ? "text-[#8178B5]" : "text-white/60"}`}><span>{messageAuthor(message)}</span><span>·</span><span>{formatTime(message.createdAt)}</span></div>
                   </article>
                 </div>
