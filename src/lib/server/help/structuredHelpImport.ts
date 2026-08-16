@@ -71,6 +71,8 @@ export type HelpImportValidation = {
   parsed: HelpImportFile | null;
 };
 
+type ParsedHelpImportBlock = HelpImportBlock | null | undefined;
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -102,7 +104,7 @@ function parseBlock(
   value: unknown,
   path: string,
   issues: string[],
-): HelpImportBlock | null {
+): ParsedHelpImportBlock {
   const record = asRecord(value);
   if (!record) {
     issues.push(`${path}: bloco inválido.`);
@@ -166,7 +168,13 @@ function parseBlock(
     const transcript = optionalString(record, "transcript");
 
     if (!isHttpUrl(url)) {
-      issues.push(`${path}: mídia precisa de URL http/https válida.`);
+      if (type === "image") {
+        // JSON simples não transporta arquivo local. Se a imagem ainda não possui
+        // URL pública, ignoramos apenas este bloco para permitir o upload manual
+        // posteriormente no editor do conteúdo.
+        return undefined;
+      }
+      issues.push(`${path}: vídeo precisa de URL http/https válida.`);
       return null;
     }
     if ((altText?.length ?? 0) > 500 || (aiSummary?.length ?? 0) > 20_000) {
@@ -226,13 +234,14 @@ function parseStep(
     return null;
   }
 
-  const blocks = blocksValue
-    .map((block, index) =>
-      parseBlock(block, `${path}.blocks[${index}]`, issues),
-    )
-    .filter((block): block is HelpImportBlock => Boolean(block));
+  const parsedBlocks = blocksValue.map((block, index) =>
+    parseBlock(block, `${path}.blocks[${index}]`, issues),
+  );
+  const blocks = parsedBlocks.filter(
+    (block): block is HelpImportBlock => Boolean(block),
+  );
 
-  if (!title || blocks.length !== blocksValue.length) return null;
+  if (!title || parsedBlocks.some((block) => block === null)) return null;
   return { title, description, aiKnowledge, blocks };
 }
 
