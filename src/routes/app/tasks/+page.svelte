@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { enhance } from "$app/forms";
   import { invalidateAll } from "$app/navigation";
   import { page } from "$app/stores";
   import {
@@ -273,7 +274,7 @@
         </div>
 
         {#if data.canCreate}
-          <form method="POST" action="?/createTask" class={`mt-4 grid gap-2 rounded-2xl border border-dashed border-[#CDD2DD] bg-white p-3 ${data.canAssign ? "md:grid-cols-[minmax(220px,1.6fr)_150px_135px_150px_auto]" : "md:grid-cols-[minmax(220px,1.6fr)_135px_150px_auto]"}`}>
+          <form use:enhance method="POST" action="?/createTask" class={`mt-4 grid gap-2 rounded-2xl border border-dashed border-[#CDD2DD] bg-white p-3 ${data.canAssign ? "md:grid-cols-[minmax(220px,1.6fr)_150px_135px_150px_auto]" : "md:grid-cols-[minmax(220px,1.6fr)_135px_150px_auto]"}`}>
             <input type="hidden" name="projectId" value={data.board.project.id}/>
             <input name="title" required minlength="3" maxlength="180" placeholder="+ Adicionar tarefa" class="h-10 min-w-0 rounded-xl border border-transparent bg-[#F8F9FB] px-3 text-[12px] font-medium outline-none focus:border-[#000A57] focus:bg-white"/>
             {#if data.canAssign}<select name="assigneeId" class="h-10 rounded-xl border border-[#E1E4EA] bg-white px-2 text-[10px]"><option value="">Atribuir a mim</option>{#each data.members as member}<option value={member.id}>{member.name}</option>{/each}</select>{/if}
@@ -360,7 +361,7 @@
           <div class="rounded-2xl border border-[#F0D6BD] bg-[#FFF9F3] p-4"><div class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#A9510D]"><Ticket size={14}/>Origem do suporte</div>{#each data.selectedTask.ticketOrigins as origin}<a href={`/app/tickets/${origin.id}`} class="mt-2 flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2.5 text-[11px] font-semibold text-[#000A57] shadow-sm"><span class="truncate">Ticket #{origin.ticketNumber} · {origin.subject}</span><ChevronRight size={14}/></a>{/each}</div>
         {/if}
 
-        <form method="POST" action="?/updateTask" class="space-y-4">
+        <form use:enhance method="POST" action="?/updateTask" class="space-y-4">
           <input type="hidden" name="taskId" value={data.selectedTask.details.task.id}/>
           <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B69]">Título</span><input name="title" required maxlength="180" value={data.selectedTask.details.task.title} disabled={!data.canUpdate} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px] font-semibold text-[#202637] outline-none focus:border-[#000A57] disabled:bg-[#FAFAFC]"/></label>
           <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B69]">Descrição</span><textarea name="description" maxlength="5000" rows="6" value={data.selectedTask.details.task.description} disabled={!data.canUpdate} placeholder="Adicione contexto, critérios e próximos passos..." class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-3 text-[12px] leading-6 outline-none focus:border-[#000A57] disabled:bg-[#FAFAFC]"></textarea></label>
@@ -371,13 +372,13 @@
         <section class="grid gap-4 rounded-2xl border border-[#E7E9EF] bg-[#FAFAFC] p-4 sm:grid-cols-2">
           <div><span class="text-[9px] font-bold uppercase tracking-[0.08em] text-[#8A909E]">Status</span><p class="mt-1 text-[11px] font-semibold text-[#3B4150]">{data.selectedTask.details.task.statusName}</p></div>
           <div><span class="text-[9px] font-bold uppercase tracking-[0.08em] text-[#8A909E]">Responsável</span><p class="mt-1 text-[11px] font-semibold text-[#3B4150]">{data.selectedTask.details.assignees[0]?.name ?? "Sem responsável"}</p></div>
-          {#if data.canAssign}<form method="POST" action="?/assignTask" class="sm:col-span-2"><input type="hidden" name="taskId" value={data.selectedTask.details.task.id}/><div class="flex gap-2"><select name="assigneeId" required class="h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]">{#each data.selectedTask.details.projectMembers as member}<option value={member.id} selected={member.id === data.selectedTask.details.assignees[0]?.userId}>{member.name}</option>{/each}</select><button type="submit" class="h-10 rounded-xl border border-[#CCD1DD] bg-white px-3 text-[10px] font-semibold text-[#000A57]">Atribuir</button></div></form>{/if}
+          {#if data.canAssign}<form use:enhance method="POST" action="?/assignTask" class="sm:col-span-2"><input type="hidden" name="taskId" value={data.selectedTask.details.task.id}/><div class="flex gap-2"><select name="assigneeId" required class="h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]">{#each data.selectedTask.details.projectMembers as member}<option value={member.id} selected={member.id === data.selectedTask.details.assignees[0]?.userId}>{member.name}</option>{/each}</select><button type="submit" class="h-10 rounded-xl border border-[#CCD1DD] bg-white px-3 text-[10px] font-semibold text-[#000A57]">Atribuir</button></div></form>{/if}
         </section>
 
         <section>
           <div class="flex items-center gap-2"><MessageSquare size={16} class="text-[#000A57]"/><h3 class="text-[13px] font-semibold text-[#2D3342]">Comentários</h3></div>
           {#if data.selectedTask.details.comments.length > 0}<div class="mt-4 space-y-3">{#each data.selectedTask.details.comments as comment}<article class="rounded-2xl border border-[#E7E9EF] bg-[#FAFAFC] p-4"><div class="flex items-center justify-between gap-3"><strong class="text-[10px] font-semibold text-[#3B4150]">{comment.authorName ?? "Usuário removido"}</strong><span class="text-[9px] text-[#999EAA]">{formatDateTime(comment.createdAt)}</span></div><p class="mt-2 whitespace-pre-wrap text-[11px] leading-5 text-[#646A79]">{comment.body}</p></article>{/each}</div>{:else}<p class="mt-3 text-[10px] text-[#969BA7]">Nenhum comentário ainda.</p>{/if}
-          {#if data.canUpdate}<form method="POST" action="?/commentTask" class="mt-4"><input type="hidden" name="taskId" value={data.selectedTask.details.task.id}/><MentionTextarea users={data.selectedTask.details.projectMembers} name="body" rows={3} maxlength={5000} placeholder="Comente ou use @ para mencionar alguém" className="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#000A57]"/><button type="submit" class="mt-2 min-h-10 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white">Comentar</button></form>{/if}
+          {#if data.canUpdate}<form use:enhance method="POST" action="?/commentTask" class="mt-4"><input type="hidden" name="taskId" value={data.selectedTask.details.task.id}/><MentionTextarea users={data.selectedTask.details.projectMembers} name="body" rows={3} maxlength={5000} placeholder="Comente ou use @ para mencionar alguém" className="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#000A57]"/><button type="submit" class="mt-2 min-h-10 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white">Comentar</button></form>{/if}
         </section>
 
         <section>
