@@ -2,6 +2,7 @@ import { and, eq, gt, inArray, isNull } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
+import { internalNotifications } from "$lib/server/db/notificationSchema";
 import {
   remoteDevices,
   remoteSupportSessions,
@@ -43,6 +44,7 @@ export async function decideRemoteConsentAtomic(
       .returning({
         id: remoteSupportSessions.id,
         ticketId: remoteSupportSessions.ticketId,
+        requestedByUserId: remoteSupportSessions.requestedByUserId,
       });
 
     if (!session) throw new Error("REMOTE_CONSENT_INVALID");
@@ -51,6 +53,24 @@ export async function decideRemoteConsentAtomic(
         ticketId: session.ticketId,
         eventType: decision === "authorize" ? "remote.authorized" : "remote.denied",
         metadata: { remoteSessionId: session.id },
+      });
+    }
+
+    if (session.requestedByUserId) {
+      await tx.insert(internalNotifications).values({
+        userId: session.requestedByUserId,
+        kind: decision === "authorize" ? "remote.authorized" : "remote.denied",
+        title: decision === "authorize"
+          ? "Cliente autorizou o acesso remoto"
+          : "Cliente recusou o acesso remoto",
+        body: session.ticketId
+          ? "A solicitação de acesso remoto do ticket foi respondida pelo cliente."
+          : "A solicitação de acesso remoto foi respondida pelo cliente.",
+        href: session.ticketId
+          ? `/app/tickets/${session.ticketId}/remote`
+          : `/app/remote/${session.id}`,
+        entityType: session.ticketId ? "ticket" : "system",
+        entityId: session.ticketId ?? session.id,
       });
     }
     return session;
