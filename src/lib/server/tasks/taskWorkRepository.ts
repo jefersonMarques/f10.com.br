@@ -28,6 +28,37 @@ export type CreateTaskInput = {
   assigneeId: string | null;
 };
 
+export async function listMyTasks(
+  userId: string,
+  permissions: TaskPermissionMap,
+) {
+  requireTaskPermissionScope(permissions, "tasks.view");
+  const db = getDatabase();
+
+  return db
+    .select({
+      id: tasks.id,
+      projectId: tasks.projectId,
+      projectName: taskProjects.name,
+      statusId: tasks.statusId,
+      statusName: taskStatuses.name,
+      statusClosed: taskStatuses.isClosed,
+      title: tasks.title,
+      description: tasks.description,
+      priority: tasks.priority,
+      dueOn: tasks.dueOn,
+      completedAt: tasks.completedAt,
+      createdAt: tasks.createdAt,
+      updatedAt: tasks.updatedAt,
+    })
+    .from(taskAssignees)
+    .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
+    .innerJoin(taskProjects, eq(tasks.projectId, taskProjects.id))
+    .innerJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
+    .where(and(eq(taskAssignees.userId, userId), eq(taskProjects.active, true)))
+    .orderBy(asc(taskStatuses.isClosed), asc(tasks.dueOn), asc(tasks.createdAt));
+}
+
 export async function getTaskBoard(
   userId: string,
   permissions: TaskPermissionMap,
@@ -69,12 +100,14 @@ export async function getTaskBoard(
         description: tasks.description,
         priority: tasks.priority,
         dueOn: tasks.dueOn,
+        completedAt: tasks.completedAt,
         createdBy: tasks.createdBy,
         createdAt: tasks.createdAt,
         updatedAt: tasks.updatedAt,
       })
       .from(tasks)
-      .where(eq(tasks.projectId, projectId)),
+      .where(eq(tasks.projectId, projectId))
+      .orderBy(asc(tasks.dueOn), asc(tasks.createdAt)),
     db
       .select({
         taskId: taskAssignees.taskId,
