@@ -27,6 +27,10 @@
       </div>
       <form method="POST" action="?/saveGeneral" class="mt-5 space-y-4">
         <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6B]">Nome exibido do suporte</span><input name="supportDisplayName" value={data.general.supportDisplayName} maxlength="120" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]" /></label>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6B]">E-mail remetente</span><input name="supportSenderEmail" type="email" value={data.general.supportSenderEmail} maxlength="254" placeholder="suporte@f10.com.br" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]" /><span class="mt-1 block text-[8px] leading-4 text-[#979CA8]">Remetente usado pelos e-mails da Área do Cliente via Brevo.</span></label>
+          <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6B]">Nome do remetente</span><input name="supportSenderName" value={data.general.supportSenderName} maxlength="120" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]" /><span class="mt-1 block text-[8px] leading-4 text-[#979CA8]">A chave da API Brevo continua somente no ambiente seguro do servidor.</span></label>
+        </div>
         <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6B]">Timezone</span><input name="timezone" value={data.general.timezone} maxlength="80" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]" /></label>
         <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6B]">Janela de autorização remota</span><div class="flex items-center gap-2"><input name="remoteConsentMinutes" type="number" min="5" max="120" value={data.general.remoteConsentMinutes} class="h-10 w-28 rounded-xl border border-[#DDE1EA] px-3 text-[11px]" /><span class="text-[10px] text-[#858B99]">minutos</span></div><span class="mt-1 block text-[8px] leading-4 text-[#979CA8]">Usada pelos fluxos de sessão do Operations. O consentimento do desktop também é solicitado localmente pelo MeshCentral.</span></label>
         <button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white"><Save size={14}/>Salvar</button>
@@ -71,5 +75,5 @@
     </section>
   </div>
 
-  <section class="mt-5 flex items-start gap-3 rounded-2xl border border-[#DDE1F0] bg-[#F8F9FF] px-4 py-3 text-[10px] leading-5 text-[#626A7E]"><ShieldCheck size={16} class="mt-0.5 shrink-0 text-[#000A57]"/><span>Chaves OpenAI, Access Key/Secret do MinIO e credenciais do MeshCentral não são gravadas em <code>operations_settings</code> nem devolvidas ao navegador. A tela expõe apenas o estado operacional da configuração.</span></section>
+  <section class="mt-5 flex items-start gap-3 rounded-2xl border border-[#DDE1F0] bg-[#F8F9FF] px-4 py-3 text-[10px] leading-5 text-[#626A7E]"><ShieldCheck size={16} class="mt-0.5 shrink-0 text-[#000A57]"/><span>Chaves OpenAI, Brevo, Access Key/Secret do MinIO e credenciais do MeshCentral não são gravadas em <code>operations_settings</code> nem devolvidas ao navegador. A tela expõe apenas parâmetros não secretos e o estado operacional das integrações.</span></section>
 </div>
