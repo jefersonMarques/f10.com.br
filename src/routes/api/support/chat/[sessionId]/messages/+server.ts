@@ -59,17 +59,25 @@ export const GET: RequestHandler = async ({ params, request }) => {
     return json({ error: "INVALID_SESSION" }, { status: 401 });
   }
 
+  let session: Awaited<ReturnType<typeof authorizePublicChatSession>>;
   try {
-    const [session, messages] = await Promise.all([
-      authorizePublicChatSession(sessionId, token),
-      listPublicChatMessages(sessionId, token),
-    ]);
+    session = await authorizePublicChatSession(sessionId, token);
+  } catch {
+    return json({ error: "INVALID_SESSION" }, { status: 401 });
+  }
+
+  try {
+    const messages = await listPublicChatMessages(sessionId, token);
     return json(
       { messages, aiState: session.aiState },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch {
-    return json({ error: "INVALID_SESSION" }, { status: 401 });
+  } catch (cause) {
+    console.error("[support.chat.messages.get]", {
+      sessionId,
+      causeType: cause instanceof Error ? cause.name : typeof cause,
+    });
+    return json({ error: "CHAT_UNAVAILABLE" }, { status: 503 });
   }
 };
 
