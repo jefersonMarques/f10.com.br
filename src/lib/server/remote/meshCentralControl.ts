@@ -301,17 +301,22 @@ export async function ensureMeshCentralDeviceGroup(
 export async function listMeshCentralDevices(
   groupName: string,
 ): Promise<MeshCentralDevice[]> {
-  const output = await runMeshCtrl("ListDevices", [
-    "--group",
-    groupName,
-    "--json",
-  ]);
-  return parseJsonArray(output)
+  const safeGroupName = groupName.trim();
+  if (!safeGroupName) throw new Error("MESHCENTRAL_GROUP_NAME_REQUIRED");
+
+  const groups = await listMeshCentralDeviceGroups();
+  const group = groups.find((item) => item.name === safeGroupName);
+  if (!group) throw new Error("MESHCENTRAL_GROUP_NOT_FOUND");
+
+  // MeshCtrl's --group filtering has proved unreliable with generated group names.
+  // Read the visible device catalog and filter by MeshCentral's immutable mesh id.
+  const output = await runMeshCtrl("ListDevices", ["--json"]);
+  const devices = parseJsonArray(output)
     .map((device) => {
       const id = typeof device._id === "string" ? device._id : "";
       const name = typeof device.name === "string" ? device.name : "";
       const groupId = typeof device.meshid === "string" ? device.meshid : "";
-      if (!id || !name) return null;
+      if (!id || !name || !groupId) return null;
       const conn =
         typeof device.conn === "number"
           ? device.conn
@@ -325,6 +330,8 @@ export async function listMeshCentralDevices(
       };
     })
     .filter((device): device is MeshCentralDevice => Boolean(device));
+
+  return devices.filter((device) => device.groupId === group.id);
 }
 
 export async function createMeshCentralDesktopShare(
