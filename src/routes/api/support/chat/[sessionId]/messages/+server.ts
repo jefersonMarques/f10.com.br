@@ -1,8 +1,7 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
-import {
-  handoffSupportAiChatForAttachment,
-  processSupportAiChatMessage,
-} from "$lib/server/support/supportAiChat";
+import { handoffSupportChatForAttachment } from "$lib/server/support/supportAiAttachmentHandoff";
+import { processSupportAiChatMessage } from "$lib/server/support/supportAiChat";
+import { handlePureSupportGreeting } from "$lib/server/support/supportChatLocalIntent";
 import {
   addPublicChatMessage,
   authorizePublicChatSession,
@@ -120,12 +119,18 @@ export const POST: RequestHandler = async ({
       body,
       files,
     );
-    const ai =
-      messageResult.aiState === "active"
-        ? files.length > 0
-          ? await handoffSupportAiChatForAttachment(sessionId)
-          : await processSupportAiChatMessage(sessionId, body)
-        : null;
+
+    let ai: { state: "active" | "escalated" | "human" | "disabled"; processed: boolean } | null = null;
+    if (messageResult.aiState === "active") {
+      if (files.length > 0) {
+        ai = await handoffSupportChatForAttachment(sessionId);
+      } else {
+        const handledLocally = await handlePureSupportGreeting(sessionId, body);
+        ai = handledLocally
+          ? { state: "active", processed: true }
+          : await processSupportAiChatMessage(sessionId, body);
+      }
+    }
 
     return json(
       {
