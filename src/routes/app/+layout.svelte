@@ -54,16 +54,21 @@
   );
   $: pathname = $page.url.pathname;
 
-  function isActiveNavigationItem(href?: string): boolean {
+  function isActiveNavigationItem(currentPathname: string, href?: string): boolean {
     if (!href) return false;
-    if (href === "/app") return pathname === href;
-    return pathname === href || pathname.startsWith(`${href}/`);
+    if (href === "/app") return currentPathname === href;
+    return currentPathname === href || currentPathname.startsWith(`${href}/`);
   }
 
-  function navigationBadge(href?: string): number {
-    if (href === "/app/chat") return notifications.chatUnreadCount;
-    if (href === "/app/tickets") return notifications.ticketUnreadCount;
-    if (href === "/app/tasks") return notifications.taskUnreadCount;
+  function navigationBadge(
+    href: string | undefined,
+    chatUnreadCount: number,
+    ticketUnreadCount: number,
+    taskUnreadCount: number,
+  ): number {
+    if (href === "/app/chat") return chatUnreadCount;
+    if (href === "/app/tickets") return ticketUnreadCount;
+    if (href === "/app/tasks") return taskUnreadCount;
     return 0;
   }
 
@@ -186,11 +191,17 @@
         <div class="space-y-1">
           {#each visibleNavigationItems as item}
             {#if item.enabled && item.href}
-              <a href={item.href} class={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-[13px] font-semibold transition ${isActiveNavigationItem(item.href) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#676D7D] hover:bg-[#F7F8FB] hover:text-[#000A57]"}`}>
+              {@const badge = navigationBadge(
+                item.href,
+                notifications.chatUnreadCount,
+                notifications.ticketUnreadCount,
+                notifications.taskUnreadCount,
+              )}
+              <a href={item.href} class={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-[13px] font-semibold transition ${isActiveNavigationItem(pathname, item.href) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#676D7D] hover:bg-[#F7F8FB] hover:text-[#000A57]"}`}>
                 <svelte:component this={item.icon} size={19} aria-hidden="true" />
                 <span class="flex-1">{item.label}</span>
-                {#if navigationBadge(item.href) > 0}
-                  <span class="inline-flex min-w-5 items-center justify-center rounded-full bg-[#D92D20] px-1.5 py-0.5 text-[9px] font-bold text-white">{Math.min(navigationBadge(item.href), 99)}</span>
+                {#if badge > 0}
+                  <span class="inline-flex min-w-5 items-center justify-center rounded-full bg-[#D92D20] px-1.5 py-0.5 text-[9px] font-bold text-white">{Math.min(badge, 99)}</span>
                 {:else}
                   <ChevronRight size={15} aria-hidden="true" />
                 {/if}
