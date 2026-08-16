@@ -1,16 +1,20 @@
 export {
   addTaskProjectMember,
   createTaskProject,
+  getTaskProject,
   listActiveTaskUsers,
   listProjectMembers,
   listTaskProjects,
   removeTaskProjectMember,
+  updateTaskProject,
   type CreateTaskProjectInput,
+  type UpdateTaskProjectInput,
 } from "$lib/server/tasks/taskProjectRepository";
 
 export {
   createTask,
   getTaskBoard,
+  listMyTasks,
   moveTask,
   type CreateTaskInput,
   type TaskPriority,
