@@ -3,6 +3,7 @@
     CheckCircle2,
     Copy,
     ExternalLink,
+    MessageCircleMore,
     Plus,
     ShieldCheck,
     UserRound,
@@ -182,6 +183,19 @@
                 <option value="ADMIN">Admin</option>
               {/if}
             </select>
+          </label>
+
+          <label class="flex items-start gap-3 rounded-2xl border border-[#E2E5ED] bg-[#F8F9FC] px-4 py-3">
+            <input
+              name="includeInChatRouting"
+              type="checkbox"
+              checked={values?.includeInChatRouting ?? false}
+              class="mt-1 h-4 w-4 rounded border-[#C9CEDA]"
+            />
+            <span>
+              <strong class="flex items-center gap-2 text-[11px] text-[#303746]"><MessageCircleMore size={14}/>Participar da distribuição do chat</strong>
+              <span class="mt-1 block text-[9px] leading-4 text-[#858B99]">Quando a conta for ativada e o usuário estiver Online, poderá entrar na rotação automática de novos atendimentos.</span>
+            </span>
           </label>
 
           <button
