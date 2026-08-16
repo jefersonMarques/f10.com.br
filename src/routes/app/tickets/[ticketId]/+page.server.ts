@@ -2,6 +2,7 @@ import { error, fail, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
+import { markEntityNotificationsRead } from "$lib/server/notifications/notificationRepository";
 import { markTicketChatHumanTakeover } from "$lib/server/support/supportAiHandoff";
 import {
   addTicketMessage,
@@ -23,6 +24,21 @@ function isUuid(value: string): boolean {
 function readFormValue(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function readMentionedUserIds(formData: FormData): string[] {
+  const raw = readFormValue(formData, "mentionedUserIds");
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return Array.from(
+      new Set(parsed.filter((value): value is string => typeof value === "string" && isUuid(value))),
+    ).slice(0, 20);
+  } catch {
+    return [];
+  }
 }
 
 function isTicketStatus(value: string): value is TicketStatus {
@@ -60,16 +76,20 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   }
 
   try {
+    const canReply = hasPermission(permissions, "tickets.reply");
     const canAssign = hasPermission(permissions, "tickets.assign");
+    const [details, users] = await Promise.all([
+      getSupportTicket(layout.user.id, permissions, params.ticketId),
+      canReply || canAssign ? listSupportAgents() : Promise.resolve([]),
+    ]);
+
+    await markEntityNotificationsRead(layout.user.id, "ticket", params.ticketId);
 
     return {
-      details: await getSupportTicket(
-        layout.user.id,
-        permissions,
-        params.ticketId,
-      ),
-      agents: canAssign ? await listSupportAgents() : [],
-      canReply: hasPermission(permissions, "tickets.reply"),
+      details,
+      agents: canAssign ? users : [],
+      mentionUsers: canReply ? users : [],
+      canReply,
       canAssign,
     };
   } catch {
@@ -147,6 +167,7 @@ export const actions: Actions = {
     );
     const formData = await request.formData();
     const body = readFormValue(formData, "body");
+    const mentionedUserIds = readMentionedUserIds(formData);
 
     if (body.length < 1 || body.length > 10000) {
       return fail(400, {
@@ -163,11 +184,14 @@ export const actions: Actions = {
         params.ticketId,
         body,
         "internal",
+        mentionedUserIds,
       );
       return {
         success: true,
         action: "note",
-        message: "Nota interna adicionada.",
+        message: mentionedUserIds.length > 0
+          ? "Nota interna adicionada e menções notificadas."
+          : "Nota interna adicionada.",
       };
     } catch {
       return fail(403, {
