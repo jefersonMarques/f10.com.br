@@ -94,6 +94,28 @@ function safeZipPath(value: string): string {
   if (parts.some((part) => !part || part === "." || part === "..")) throw new Error("ZIP_UNSAFE_PATH");
   return parts.join("/");
 }
+function zipBaseName(value: string): string {
+  const normalized = value.replace(/\\/g, "/");
+  return normalized.split("/").pop()?.trim().toLowerCase() ?? "";
+}
+function resolveZipEntryReference(
+  reference: string,
+  entries: Map<string, Uint8Array>,
+): { file: string | null; issue: "invalid" | "missing" | "ambiguous" | null } {
+  let safeReference = "";
+  try { safeReference = safeZipPath(reference); }
+  catch { return { file: null, issue: "invalid" }; }
+
+  if (entries.has(safeReference)) return { file: safeReference, issue: null };
+
+  const baseName = zipBaseName(safeReference);
+  const matches = Array.from(entries.keys()).filter(
+    (entryName) => zipBaseName(entryName) === baseName,
+  );
+  if (matches.length === 1) return { file: matches[0], issue: null };
+  if (matches.length > 1) return { file: null, issue: "ambiguous" };
+  return { file: null, issue: "missing" };
+}
 function findEocd(bytes: Uint8Array): number {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const minimum = Math.max(0, bytes.length - 65_557);
@@ -185,22 +207,59 @@ function parseBlock(
     if (transcript.length > 100_000 || aiSummary.length > 20_000) { issues.push(`${path}: conhecimento do vídeo excede o limite.`); return null; }
     return { type, url, altText: readText(record, "altText").slice(0, 500), transcript, aiSummary };
   }
-  if (type === "image" || type === "file") {
+  if (type === "image") {
+    const url = readText(record, "url");
+    const explicitFile = readText(record, "file");
+    const remoteUrl = isHttpUrl(url) ? url : "";
+    const localReference = explicitFile || (url && !remoteUrl ? url : "");
+
+    if (remoteUrl && explicitFile) {
+      issues.push(`${path}: informe URL ou arquivo local, não os dois.`);
+      return null;
+    }
+    if (!remoteUrl && !localReference) {
+      issues.push(`${path}: informe URL ou nome do arquivo da imagem.`);
+      return null;
+    }
+
+    const aiSummary = readText(record, "aiSummary");
+    if (aiSummary.length > 20_000) { issues.push(`${path}: aiSummary excede o limite.`); return null; }
+    const altText = readText(record, "altText").slice(0, 500);
+    if (remoteUrl) return { type, url: remoteUrl, altText, aiSummary };
+
+    const resolved = resolveZipEntryReference(localReference, entries);
+    if (!resolved.file) {
+      const detail = resolved.issue === "ambiguous"
+        ? `há mais de um arquivo chamado ${zipBaseName(localReference)} no ZIP; informe o caminho completo.`
+        : resolved.issue === "invalid"
+          ? "nome/caminho de imagem inválido."
+          : `imagem ${localReference} não encontrada no ZIP.`;
+      issues.push(`${path}: ${detail}`);
+      return null;
+    }
+
+    const extension = resolved.file.split(".").pop()?.toLowerCase() ?? "";
+    if (!IMAGE_EXTENSIONS.has(extension)) { issues.push(`${path}: use uma imagem válida.`); return null; }
+    return { type, file: resolved.file, altText, aiSummary };
+  }
+  if (type === "file") {
     const url = readText(record, "url");
     let file = readText(record, "file");
     if (Boolean(url) === Boolean(file)) { issues.push(`${path}: informe exatamente um de url ou file.`); return null; }
     if (url && !isHttpUrl(url)) { issues.push(`${path}: URL inválida.`); return null; }
     if (file) {
-      try { file = safeZipPath(file); } catch { issues.push(`${path}: caminho de arquivo inválido.`); return null; }
-      if (!entries.has(file)) { issues.push(`${path}: arquivo ${file} não existe no ZIP.`); return null; }
+      const resolved = resolveZipEntryReference(file, entries);
+      if (!resolved.file) {
+        issues.push(`${path}: arquivo ${file} não existe de forma única no ZIP.`);
+        return null;
+      }
+      file = resolved.file;
       const extension = file.split(".").pop()?.toLowerCase() ?? "";
       if (!MIME_BY_EXTENSION[extension]) { issues.push(`${path}: extensão .${extension} não permitida.`); return null; }
-      if (type === "image" && !IMAGE_EXTENSIONS.has(extension)) { issues.push(`${path}: use uma imagem válida.`); return null; }
-      if (type === "file" && IMAGE_EXTENSIONS.has(extension)) { issues.push(`${path}: use type=image para imagens.`); return null; }
+      if (IMAGE_EXTENSIONS.has(extension)) { issues.push(`${path}: use type=image para imagens.`); return null; }
     }
     const aiSummary = readText(record, "aiSummary");
     if (aiSummary.length > 20_000) { issues.push(`${path}: aiSummary excede o limite.`); return null; }
-    if (type === "image") return { type, url: url || undefined, file: file || undefined, altText: readText(record, "altText").slice(0, 500), aiSummary };
     const label = readText(record, "label");
     if (!label || label.length > 240) { issues.push(`${path}: label do arquivo é obrigatório.`); return null; }
     return { type, url: url || undefined, file: file || undefined, label, aiSummary };
@@ -218,12 +277,32 @@ export function validateHelpImportPackage(zipBytes: Uint8Array): HelpPackageVali
     return { valid: false, source: "", contentCount: 0, stepCount: 0, blockCount: 0, assetCount: 0, issues: [cause instanceof Error ? cause.message : "ZIP_INVALID"], manifest: null, entries };
   }
 
-  const manifestBytes = entries.get("manifest.json");
-  if (!manifestBytes) return { valid: false, source: "", contentCount: 0, stepCount: 0, blockCount: 0, assetCount: 0, issues: ["manifest.json não encontrado na raiz do ZIP."], manifest: null, entries };
+  const jsonEntries = Array.from(entries.keys()).filter((name) => name.toLowerCase().endsWith(".json"));
+  const manifestName = entries.has("manifest.json")
+    ? "manifest.json"
+    : jsonEntries.length === 1
+      ? jsonEntries[0]
+      : null;
+  if (!manifestName) {
+    return {
+      valid: false,
+      source: "",
+      contentCount: 0,
+      stepCount: 0,
+      blockCount: 0,
+      assetCount: 0,
+      issues: [jsonEntries.length > 1
+        ? "Há mais de um JSON no ZIP. Renomeie o arquivo principal para manifest.json."
+        : "Nenhum JSON de importação foi encontrado no ZIP."],
+      manifest: null,
+      entries,
+    };
+  }
+  const manifestBytes = entries.get(manifestName)!;
 
   let root: Record<string, unknown> | null = null;
   try { root = asRecord(JSON.parse(new TextDecoder().decode(manifestBytes))); }
-  catch { issues.push("manifest.json contém JSON inválido."); }
+  catch { issues.push(`${manifestName} contém JSON inválido.`); }
   if (!root) return { valid: false, source: "", contentCount: 0, stepCount: 0, blockCount: 0, assetCount: 0, issues, manifest: null, entries };
 
   const source = readText(root, "source");
