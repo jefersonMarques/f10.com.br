@@ -73,7 +73,7 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
             originalName: attachment.originalName,
             mimeType: attachment.mimeType,
             sizeBytes: attachment.sizeBytes,
-            url: `/api/app/tickets/${encodeURIComponent(result.chat.ticketId)}/attachments/${encodeURIComponent(attachment.id)}`,
+            url: `/api/app/chat/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachment.id)}`,
           })),
         })),
       },
