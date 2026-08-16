@@ -3,6 +3,7 @@ import {
   createHash,
   createHmac,
   randomBytes,
+  randomUUID,
 } from "node:crypto";
 import {
   and,
@@ -19,15 +20,21 @@ import {
 } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { users } from "$lib/server/db/schema";
+import { ticketMessageAttachments } from "$lib/server/db/supportChatEntrySchema";
 import { supportAgentPresence } from "$lib/server/db/supportRoutingSchema";
 import {
   customerContacts,
-  supportQueues,
   ticketEvents,
   ticketMessages,
   tickets,
 } from "$lib/server/db/supportSchema";
 import { SUPPORT_AWAY_AFTER_MS } from "$lib/server/support/supportAgentPresence";
+import { resolveSupportChatEntryOption } from "$lib/server/support/supportChatEntryRepository";
+import {
+  deleteStoredSupportImages,
+  listSupportMessageAttachments,
+  uploadSupportMessageImages,
+} from "$lib/server/support/supportMessageAttachmentRepository";
 
 const CHAT_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const START_WINDOW_MS = 10 * 60 * 1000;
@@ -42,11 +49,27 @@ export type StartPublicChatInput = {
   message: string;
   contextUrl: string;
   contextData: Record<string, unknown>;
+  entryOptionId: string | null;
   enableAi: boolean;
 };
 
 function hashSessionToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
+}
+
+function systemPresentation(body: string): "remote_access" | "routing" | "closed" | null {
+  const normalized = body
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  if (normalized.includes("acesso remoto")) return "remote_access";
+  if (normalized.includes("encaminhad") || normalized.includes("assumiu o atendimento")) {
+    return "routing";
+  }
+  if (normalized.includes("atendimento finalizado") || normalized.includes("atendimento encerrado")) {
+    return "closed";
+  }
+  return null;
 }
 
 export function createPublicLimitKey(
@@ -174,20 +197,10 @@ export async function startPublicChat(
     START_WINDOW_MS,
     START_BLOCK_MS,
   );
-
   if (!allowed) throw new Error("CHAT_RATE_LIMITED");
 
-  const db = getDatabase();
-  const [queue] = await db
-    .select({ id: supportQueues.id })
-    .from(supportQueues)
-    .where(
-      and(eq(supportQueues.code, "support"), eq(supportQueues.active, true)),
-    )
-    .limit(1);
-
-  if (!queue) throw new Error("CHAT_QUEUE_NOT_FOUND");
-
+  const entryOption = await resolveSupportChatEntryOption(input.entryOptionId);
+  const enableAi = input.enableAi && entryOption.initialHandling === "ai";
   const customerContactId = await findOrCreateChatCustomer(
     input.name,
     input.email,
@@ -196,13 +209,14 @@ export async function startPublicChat(
   const token = randomBytes(32).toString("base64url");
   const tokenHash = hashSessionToken(token);
   const expiresAt = new Date(Date.now() + CHAT_SESSION_TTL_MS);
+  const db = getDatabase();
 
   const result = await db.transaction(async (tx) => {
     const [ticket] = await tx
       .insert(tickets)
       .values({
         customerContactId,
-        queueId: queue.id,
+        queueId: entryOption.queueId,
         subject: `Chat: ${input.message.trim().slice(0, 120)}`,
         status: "new",
         priority: "normal",
@@ -221,7 +235,7 @@ export async function startPublicChat(
       body: input.message.trim(),
     });
 
-    const aiState = input.enableAi ? "active" : "disabled";
+    const aiState = enableAi ? "active" : "disabled";
     const [session] = await tx
       .insert(webChatSessions)
       .values({
@@ -229,7 +243,11 @@ export async function startPublicChat(
         tokenHash,
         expiresAt,
         contextUrl: input.contextUrl || null,
-        contextData: input.contextData,
+        contextData: {
+          ...input.contextData,
+          entryOptionId: entryOption.id,
+          entryOptionLabel: entryOption.label,
+        },
         aiState,
       })
       .returning({ id: webChatSessions.id });
@@ -242,6 +260,9 @@ export async function startPublicChat(
       metadata: {
         contextUrl: input.contextUrl || null,
         aiState,
+        entryOptionId: entryOption.id,
+        entryOptionLabel: entryOption.label,
+        queueId: entryOption.queueId,
       },
     });
 
@@ -251,6 +272,7 @@ export async function startPublicChat(
       ticketNumber: ticket.ticketNumber,
       customerContactId,
       aiState,
+      entryOptionLabel: entryOption.label,
     };
   });
 
@@ -316,28 +338,41 @@ export async function listPublicChatMessages(
     )
     .orderBy(asc(ticketMessages.createdAt));
 
-  const authorIds = Array.from(
-    new Set(messages.map((message) => message.authorUserId).filter((id): id is string => Boolean(id))),
-  );
-  let onlineUserIds = new Set<string>();
-
-  if (authorIds.length > 0) {
-    const now = new Date();
-    const onlineRows = await db
-      .select({ userId: supportAgentPresence.userId })
-      .from(supportAgentPresence)
-      .where(
-        and(
-          inArray(supportAgentPresence.userId, authorIds),
-          eq(supportAgentPresence.manualStatus, "online"),
-          gt(
-            supportAgentPresence.lastActivityAt,
-            new Date(now.getTime() - SUPPORT_AWAY_AFTER_MS),
-          ),
+  const [attachmentRows, onlineRows] = await Promise.all([
+    listSupportMessageAttachments(messages.map((message) => message.id)),
+    (async () => {
+      const authorIds = Array.from(
+        new Set(
+          messages
+            .map((message) => message.authorUserId)
+            .filter((id): id is string => Boolean(id)),
         ),
       );
-    onlineUserIds = new Set(onlineRows.map((row) => row.userId));
+      if (authorIds.length === 0) return [];
+      const now = new Date();
+      return db
+        .select({ userId: supportAgentPresence.userId })
+        .from(supportAgentPresence)
+        .where(
+          and(
+            inArray(supportAgentPresence.userId, authorIds),
+            eq(supportAgentPresence.manualStatus, "online"),
+            gt(
+              supportAgentPresence.lastActivityAt,
+              new Date(now.getTime() - SUPPORT_AWAY_AFTER_MS),
+            ),
+          ),
+        );
+    })(),
+  ]);
+
+  const attachmentsByMessage = new Map<string, typeof attachmentRows>();
+  for (const attachment of attachmentRows) {
+    const current = attachmentsByMessage.get(attachment.messageId) ?? [];
+    current.push(attachment);
+    attachmentsByMessage.set(attachment.messageId, current);
   }
+  const onlineUserIds = new Set(onlineRows.map((row) => row.userId));
 
   return messages.map((message) => ({
     ...message,
@@ -345,6 +380,14 @@ export async function listPublicChatMessages(
     avatarUrl: message.authorUserId
       ? `/api/support/agents/${encodeURIComponent(message.authorUserId)}/avatar`
       : null,
+    presentation: message.authorType === "system" ? systemPresentation(message.body) : null,
+    attachments: (attachmentsByMessage.get(message.id) ?? []).map((attachment) => ({
+      id: attachment.id,
+      originalName: attachment.originalName,
+      mimeType: attachment.mimeType,
+      sizeBytes: attachment.sizeBytes,
+      url: `/api/support/chat/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachment.id)}?token=${encodeURIComponent(token)}`,
+    })),
   }));
 }
 
@@ -353,7 +396,12 @@ export async function addPublicChatMessage(
   sessionId: string,
   token: string,
   body: string,
-): Promise<{ ticketId: string; aiState: "active" | "escalated" | "human" | "disabled" }> {
+  files: File[] = [],
+): Promise<{
+  ticketId: string;
+  messageId: string;
+  aiState: "active" | "escalated" | "human" | "disabled";
+}> {
   const session = await authorizePublicChatSession(sessionId, token);
   const limitKey = createPublicLimitKey(
     `chat-message:${sessionId}`,
@@ -365,7 +413,6 @@ export async function addPublicChatMessage(
     MESSAGE_WINDOW_MS,
     MESSAGE_BLOCK_MS,
   );
-
   if (!allowed) throw new Error("CHAT_RATE_LIMITED");
 
   const db = getDatabase();
@@ -385,46 +432,74 @@ export async function addPublicChatMessage(
     throw new Error("CHAT_TICKET_CLOSED");
   }
 
-  await db.transaction(async (tx) => {
-    await tx.insert(ticketMessages).values({
-      ticketId: session.ticketId,
-      authorType: "customer",
-      customerContactId: ticket.customerContactId,
-      visibility: "public",
-      channel: "web_chat",
-      body: body.trim(),
-    });
+  const messageId = randomUUID();
+  const normalizedBody = body.trim();
+  const storedImages = await uploadSupportMessageImages(session.ticketId, messageId, files);
 
-    await tx
-      .update(tickets)
-      .set({
-        status:
-          ticket.status === "resolved" ||
-          ticket.status === "waiting_customer"
-            ? "open"
-            : ticket.status,
-        updatedAt: now,
-      })
-      .where(eq(tickets.id, session.ticketId));
-
-    await tx.insert(ticketEvents).values({
-      ticketId: session.ticketId,
-      eventType: "chat.customer.message",
-      metadata: { aiState: session.aiState },
-    });
-
-    if (ticket.assignedUserId && session.aiState !== "active") {
-      await tx.insert(internalNotifications).values({
-        userId: ticket.assignedUserId,
-        kind: "ticket.customer_reply",
-        title: `Cliente respondeu o ticket #${ticket.ticketNumber}`,
-        body: body.trim().slice(0, 500),
-        href: `/app/tickets/${session.ticketId}`,
-        entityType: "ticket",
-        entityId: session.ticketId,
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(ticketMessages).values({
+        id: messageId,
+        ticketId: session.ticketId,
+        authorType: "customer",
+        customerContactId: ticket.customerContactId,
+        visibility: "public",
+        channel: "web_chat",
+        body: normalizedBody,
       });
-    }
-  });
 
-  return { ticketId: session.ticketId, aiState: session.aiState };
+      if (storedImages.length > 0) {
+        await tx.insert(ticketMessageAttachments).values(
+          storedImages.map((image) => ({
+            messageId,
+            ticketId: session.ticketId,
+            storageKey: image.storageKey,
+            originalName: image.originalName,
+            mimeType: image.mimeType,
+            sizeBytes: image.sizeBytes,
+            checksumSha256: image.checksumSha256,
+          })),
+        );
+      }
+
+      await tx
+        .update(tickets)
+        .set({
+          status:
+            ticket.status === "resolved" ||
+            ticket.status === "waiting_customer"
+              ? "open"
+              : ticket.status,
+          updatedAt: now,
+        })
+        .where(eq(tickets.id, session.ticketId));
+
+      await tx.insert(ticketEvents).values({
+        ticketId: session.ticketId,
+        eventType: "chat.customer.message",
+        metadata: { aiState: session.aiState, attachmentCount: storedImages.length },
+      });
+
+      if (ticket.assignedUserId && session.aiState !== "active") {
+        await tx.insert(internalNotifications).values({
+          userId: ticket.assignedUserId,
+          kind: "ticket.customer_reply",
+          title: `Cliente respondeu o ticket #${ticket.ticketNumber}`,
+          body: normalizedBody.slice(0, 500) || "Cliente enviou uma imagem.",
+          href: `/app/chat/${sessionId}`,
+          entityType: "ticket",
+          entityId: session.ticketId,
+        });
+      }
+    });
+  } catch (cause) {
+    await deleteStoredSupportImages(storedImages);
+    throw cause;
+  }
+
+  return {
+    ticketId: session.ticketId,
+    messageId,
+    aiState: session.aiState,
+  };
 }
