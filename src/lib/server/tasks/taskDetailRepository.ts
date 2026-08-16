@@ -1,5 +1,6 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { users } from "$lib/server/db/schema";
 import {
   taskActivities,
@@ -148,6 +149,13 @@ export async function assignTask(
   }
 
   const db = getDatabase();
+  const [task] = await db
+    .select({ title: tasks.title })
+    .from(tasks)
+    .where(eq(tasks.id, taskId))
+    .limit(1);
+
+  if (!task) throw new Error("TASK_NOT_FOUND");
 
   await db.transaction(async (tx) => {
     await tx.delete(taskAssignees).where(eq(taskAssignees.taskId, taskId));
@@ -162,6 +170,19 @@ export async function assignTask(
       action: "task.assignee.changed",
       metadata: { assigneeId },
     });
+
+    if (assigneeId !== actorUserId) {
+      await tx.insert(internalNotifications).values({
+        userId: assigneeId,
+        actorUserId,
+        kind: "task.assigned",
+        title: "Uma tarefa foi atribuída a você",
+        body: task.title.slice(0, 500),
+        href: `/app/tasks/${taskId}`,
+        entityType: "task",
+        entityId: taskId,
+      });
+    }
   });
 }
 
@@ -170,11 +191,29 @@ export async function addTaskComment(
   permissions: TaskPermissionMap,
   taskId: string,
   body: string,
+  mentionedUserIds: string[] = [],
 ): Promise<void> {
   const updateScope = requireTaskPermissionScope(permissions, "tasks.update");
-  await ensureTaskAccess(actorUserId, updateScope, taskId);
+  const context = await ensureTaskAccess(actorUserId, updateScope, taskId);
 
   const db = getDatabase();
+  const [task, projectMembers] = await Promise.all([
+    db.select({ title: tasks.title }).from(tasks).where(eq(tasks.id, taskId)).limit(1),
+    listProjectMembers(context.task.projectId),
+  ]);
+  if (!task[0]) throw new Error("TASK_NOT_FOUND");
+
+  const allowedMemberIds = new Set(projectMembers.map((member) => member.id));
+  const uniqueMentionIds = Array.from(new Set(mentionedUserIds))
+    .filter((id) => id !== actorUserId && allowedMemberIds.has(id))
+    .slice(0, 20);
+  const mentionUsers = uniqueMentionIds.length > 0
+    ? await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(inArray(users.id, uniqueMentionIds), eq(users.status, "active")))
+    : [];
+
   await db.transaction(async (tx) => {
     await tx.insert(taskComments).values({
       taskId,
@@ -185,7 +224,22 @@ export async function addTaskComment(
       taskId,
       actorUserId,
       action: "task.comment.added",
-      metadata: {},
+      metadata: mentionUsers.length > 0 ? { mentionedUserIds: mentionUsers.map((user) => user.id) } : {},
     });
+
+    if (mentionUsers.length > 0) {
+      await tx.insert(internalNotifications).values(
+        mentionUsers.map((user) => ({
+          userId: user.id,
+          actorUserId,
+          kind: "task.mention",
+          title: "Você foi mencionado em uma tarefa",
+          body: `${task[0].title}: ${body.trim()}`.slice(0, 500),
+          href: `/app/tasks/${taskId}`,
+          entityType: "task",
+          entityId: taskId,
+        })),
+      );
+    }
   });
 }
