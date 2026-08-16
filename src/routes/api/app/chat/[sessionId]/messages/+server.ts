@@ -8,6 +8,7 @@ import {
   listInternalChatMessages,
   respondToInternalChat,
 } from "$lib/server/support/internalChatRepository";
+import { listSupportMessageAttachments } from "$lib/server/support/supportMessageAttachmentRepository";
 
 const MAX_BODY_BYTES = 8 * 1024;
 
@@ -52,8 +53,32 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
       authentication.permissions,
       sessionId,
     );
+    const attachmentRows = await listSupportMessageAttachments(
+      result.messages.map((message) => message.id),
+    );
+    const attachmentsByMessage = new Map<string, typeof attachmentRows>();
+    for (const attachment of attachmentRows) {
+      const current = attachmentsByMessage.get(attachment.messageId) ?? [];
+      current.push(attachment);
+      attachmentsByMessage.set(attachment.messageId, current);
+    }
 
-    return json(result, { headers: { "Cache-Control": "no-store" } });
+    return json(
+      {
+        chat: result.chat,
+        messages: result.messages.map((message) => ({
+          ...message,
+          attachments: (attachmentsByMessage.get(message.id) ?? []).map((attachment) => ({
+            id: attachment.id,
+            originalName: attachment.originalName,
+            mimeType: attachment.mimeType,
+            sizeBytes: attachment.sizeBytes,
+            url: `/api/app/tickets/${encodeURIComponent(result.chat.ticketId)}/attachments/${encodeURIComponent(attachment.id)}`,
+          })),
+        })),
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch {
     return json({ error: "CHAT_NOT_FOUND" }, { status: 404 });
   }
