@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from "$app/stores";
+  import { onDestroy, onMount } from "svelte";
   import {
     BarChart3,
     Bell,
@@ -22,6 +23,8 @@
   export let data: LayoutData;
 
   let notificationOpen = false;
+  let notificationTimer: ReturnType<typeof setInterval> | null = null;
+  let notifications = data.notifications;
   const permissionCodes = new Set(data.permissions.map((permission) => permission.code));
 
   const navigationItems = [
@@ -37,6 +40,7 @@
     { label: "Configurações", icon: Settings, enabled: true, href: "/app/settings", permission: "system.settings.manage" },
   ];
 
+  $: notifications = data.notifications;
   $: visibleNavigationItems = navigationItems.filter(
     (item) => !item.permission || permissionCodes.has(item.permission),
   );
@@ -49,8 +53,8 @@
   }
 
   function navigationBadge(href?: string): number {
-    if (href === "/app/tickets") return data.notifications.ticketUnreadCount;
-    if (href === "/app/tasks") return data.notifications.taskUnreadCount;
+    if (href === "/app/tickets") return notifications.ticketUnreadCount;
+    if (href === "/app/tasks") return notifications.taskUnreadCount;
     return 0;
   }
 
@@ -62,6 +66,23 @@
       minute: "2-digit",
     }).format(new Date(value));
   }
+
+  async function refreshNotifications(): Promise<void> {
+    try {
+      const response = await fetch("/app/notifications/summary", { cache: "no-store" });
+      if (response.ok) notifications = await response.json() as typeof notifications;
+    } catch {
+      // A próxima consulta tenta novamente sem interromper o painel.
+    }
+  }
+
+  onMount(() => {
+    notificationTimer = setInterval(() => void refreshNotifications(), 20_000);
+  });
+
+  onDestroy(() => {
+    if (notificationTimer) clearInterval(notificationTimer);
+  });
 </script>
 
 <svelte:head>
@@ -130,23 +151,23 @@
             on:click={() => (notificationOpen = !notificationOpen)}
           >
             <Bell size={18} aria-hidden="true" />
-            {#if data.notifications.unreadCount > 0}
-              <span class="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full border-2 border-white bg-[#D92D20] px-1 text-[8px] font-bold leading-4 text-white">{Math.min(data.notifications.unreadCount, 99)}</span>
+            {#if notifications.unreadCount > 0}
+              <span class="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full border-2 border-white bg-[#D92D20] px-1 text-[8px] font-bold leading-4 text-white">{Math.min(notifications.unreadCount, 99)}</span>
             {/if}
           </button>
 
           {#if notificationOpen}
             <div class="absolute right-0 top-12 z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[#E1E4EC] bg-white shadow-2xl shadow-slate-900/15">
               <div class="flex items-center justify-between border-b border-[#EEF0F5] px-4 py-3">
-                <div><strong class="block text-[12px] text-[#202637]">Notificações</strong><span class="text-[9px] text-[#8B909E]">{data.notifications.unreadCount} não lida(s)</span></div>
-                {#if data.notifications.unreadCount > 0}
+                <div><strong class="block text-[12px] text-[#202637]">Notificações</strong><span class="text-[9px] text-[#8B909E]">{notifications.unreadCount} não lida(s)</span></div>
+                {#if notifications.unreadCount > 0}
                   <form method="POST" action="/app/notifications/read-all"><button type="submit" class="text-[9px] font-semibold text-[#000A57] hover:underline">Marcar todas como lidas</button></form>
                 {/if}
               </div>
 
-              {#if data.notifications.recent.length > 0}
+              {#if notifications.recent.length > 0}
                 <div class="max-h-[420px] overflow-y-auto p-1.5">
-                  {#each data.notifications.recent as notification}
+                  {#each notifications.recent as notification}
                     <a
                       href={`/app/notifications/open/${notification.id}`}
                       class={`block rounded-xl px-3 py-3 transition hover:bg-[#F6F7FB] ${notification.readAt ? "opacity-65" : "bg-[#F8F9FF]"}`}
