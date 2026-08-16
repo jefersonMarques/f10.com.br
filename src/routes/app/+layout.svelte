@@ -6,6 +6,7 @@
     Bell,
     BookOpen,
     CheckSquare2,
+    ChevronDown,
     ChevronRight,
     Headphones,
     LayoutDashboard,
@@ -23,9 +24,14 @@
   export let data: LayoutData;
 
   let notificationOpen = false;
+  let presenceOpen = false;
   let notificationTimer: ReturnType<typeof setInterval> | null = null;
+  let presenceTimer: ReturnType<typeof setInterval> | null = null;
   let notifications = data.notifications;
+  let presence = data.presence;
+  let lastHeartbeatAt = 0;
   const permissionCodes = new Set(data.permissions.map((permission) => permission.code));
+  const canRespondToChat = permissionCodes.has("chat.respond");
 
   const navigationItems = [
     { label: "Visão geral", icon: LayoutDashboard, enabled: true, href: "/app" },
@@ -36,6 +42,7 @@
     { label: "Tickets", icon: Headphones, enabled: true, href: "/app/tickets", permission: "tickets.view" },
     { label: "Chat", icon: MessageCircleMore, enabled: true, href: "/app/chat", permission: "chat.view" },
     { label: "Acesso remoto", icon: MonitorCog, enabled: true, href: "/app/remote", permission: "remote.use" },
+    { label: "Performance", icon: BarChart3, enabled: true, href: "/app/performance", permission: "reports.view" },
     { label: "Equipe", icon: Users, enabled: true, href: "/app/team", permission: "users.view" },
     { label: "Configurações", icon: Settings, enabled: true, href: "/app/settings", permission: "system.settings.manage" },
   ];
@@ -67,6 +74,20 @@
     }).format(new Date(value));
   }
 
+  function presenceLabel(status?: string): string {
+    if (status === "online") return "Online";
+    if (status === "busy") return "Ocupado";
+    if (status === "away") return "Ausente";
+    return "Offline";
+  }
+
+  function presenceDotClass(status?: string): string {
+    if (status === "online") return "bg-[#2F9E5B]";
+    if (status === "busy") return "bg-[#E59A2F]";
+    if (status === "away") return "bg-[#A6ABB7]";
+    return "bg-[#C7CBD4]";
+  }
+
   async function refreshNotifications(): Promise<void> {
     try {
       const response = await fetch("/app/notifications/summary", { cache: "no-store" });
@@ -76,12 +97,69 @@
     }
   }
 
+  async function refreshPresence(): Promise<void> {
+    if (!canRespondToChat) return;
+    try {
+      const response = await fetch("/api/app/presence", { cache: "no-store" });
+      if (response.ok) presence = await response.json() as typeof presence;
+    } catch {
+      // Presença é auxiliar e não deve interromper o painel.
+    }
+  }
+
+  async function setPresenceStatus(status: "online" | "busy" | "offline"): Promise<void> {
+    try {
+      const response = await fetch("/api/app/presence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "status", status }),
+      });
+      if (response.ok) {
+        presence = await response.json() as typeof presence;
+        presenceOpen = false;
+        lastHeartbeatAt = Date.now();
+      }
+    } catch {
+      // Mantém o último estado conhecido para nova tentativa explícita.
+    }
+  }
+
+  async function heartbeatPresence(): Promise<void> {
+    if (!canRespondToChat || !presence || presence.manualStatus === "offline") return;
+    const now = Date.now();
+    if (now - lastHeartbeatAt < 60_000) return;
+    lastHeartbeatAt = now;
+    try {
+      const response = await fetch("/api/app/presence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "heartbeat" }),
+      });
+      if (response.ok) presence = await response.json() as typeof presence;
+    } catch {
+      // A próxima interação real tenta novamente.
+    }
+  }
+
   onMount(() => {
     notificationTimer = setInterval(() => void refreshNotifications(), 20_000);
+    if (canRespondToChat) {
+      presenceTimer = setInterval(() => void refreshPresence(), 60_000);
+      const handleActivity = () => void heartbeatPresence();
+      window.addEventListener("pointerdown", handleActivity, { passive: true });
+      window.addEventListener("keydown", handleActivity, { passive: true });
+      window.addEventListener("touchstart", handleActivity, { passive: true });
+      return () => {
+        window.removeEventListener("pointerdown", handleActivity);
+        window.removeEventListener("keydown", handleActivity);
+        window.removeEventListener("touchstart", handleActivity);
+      };
+    }
   });
 
   onDestroy(() => {
     if (notificationTimer) clearInterval(notificationTimer);
+    if (presenceTimer) clearInterval(presenceTimer);
   });
 </script>
 
@@ -142,6 +220,24 @@
     <header class="relative flex h-[78px] items-center justify-between border-b border-[#E2E5ED] bg-white px-5 sm:px-8">
       <div><p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">F10 Operations</p><p class="mt-1 text-[14px] font-semibold text-[#33394A]">Ambiente operacional interno</p></div>
       <div class="flex items-center gap-2 sm:gap-3">
+        {#if canRespondToChat && presence}
+          <div class="relative hidden sm:block">
+            <button type="button" on:click={() => (presenceOpen = !presenceOpen)} class="flex h-10 items-center gap-2 rounded-xl bg-[#F5F6FA] px-3 text-[10px] font-semibold text-[#555C6D] transition hover:bg-[#EEF0FF]" aria-expanded={presenceOpen}>
+              <span class={`h-2.5 w-2.5 rounded-full ${presenceDotClass(presence.effectiveStatus)}`}></span>
+              {presenceLabel(presence.effectiveStatus)}
+              <ChevronDown size={13}/>
+            </button>
+            {#if presenceOpen}
+              <div class="absolute right-0 top-12 z-50 w-44 overflow-hidden rounded-xl border border-[#E1E4EC] bg-white p-1.5 shadow-xl">
+                <button type="button" on:click={() => void setPresenceStatus("online")} class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[10px] font-semibold text-[#434A5A] hover:bg-[#F6F7FB]"><span class="h-2.5 w-2.5 rounded-full bg-[#2F9E5B]"></span>Online</button>
+                <button type="button" on:click={() => void setPresenceStatus("busy")} class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[10px] font-semibold text-[#434A5A] hover:bg-[#F6F7FB]"><span class="h-2.5 w-2.5 rounded-full bg-[#E59A2F]"></span>Ocupado</button>
+                <button type="button" on:click={() => void setPresenceStatus("offline")} class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[10px] font-semibold text-[#434A5A] hover:bg-[#F6F7FB]"><span class="h-2.5 w-2.5 rounded-full bg-[#C7CBD4]"></span>Offline</button>
+                {#if presence.effectiveStatus === "away"}<p class="mt-1 border-t border-[#EEF0F5] px-3 pt-2 text-[9px] leading-4 text-[#8A909E]">Ausente por inatividade. Uma nova interação no painel restaura seu estado.</p>{/if}
+              </div>
+            {/if}
+          </div>
+        {/if}
+
         <div class="relative">
           <button
             type="button"
