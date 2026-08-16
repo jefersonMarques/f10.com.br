@@ -63,28 +63,17 @@ export async function resolveSupportChatEntryOption(optionId: string | null) {
   }
 
   const [fallback] = await db
-    .select({
-      id: supportChatEntryOptions.id,
-      label: supportChatEntryOptions.label,
-      queueId: supportQueues.id,
-      initialHandling: supportChatEntryOptions.initialHandling,
-    })
+    .select({ queueId: supportQueues.id })
     .from(supportQueues)
-    .leftJoin(
-      supportChatEntryOptions,
-      and(
-        eq(supportChatEntryOptions.queueId, supportQueues.id),
-        eq(supportChatEntryOptions.active, true),
-      ),
-    )
     .where(and(eq(supportQueues.code, "support"), eq(supportQueues.active, true)))
     .limit(1);
 
   if (!fallback) throw new Error("CHAT_QUEUE_NOT_FOUND");
   return {
-    ...fallback,
-    label: fallback.label ?? "Suporte F10",
-    initialHandling: fallback.initialHandling ?? ("ai" as const),
+    id: null,
+    label: "Suporte F10",
+    queueId: fallback.queueId,
+    initialHandling: "ai" as const,
   };
 }
 
