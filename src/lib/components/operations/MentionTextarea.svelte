@@ -66,9 +66,10 @@
   function selectUser(user: MentionUser): void {
     if (mentionStart < 0) return;
 
+    const start = mentionStart;
     const cursor = textarea.selectionStart ?? value.length;
     const token = `@${handleFor(user)}`;
-    value = `${value.slice(0, mentionStart)}${token} ${value.slice(cursor)}`;
+    value = `${value.slice(0, start)}${token} ${value.slice(cursor)}`;
 
     if (!selectedMentions.some((mention) => mention.id === user.id && mention.token === token)) {
       selectedMentions = [...selectedMentions, { id: user.id, token }];
@@ -79,9 +80,9 @@
     mentionStart = -1;
 
     requestAnimationFrame(() => {
-      const nextCursor = mentionStart + token.length + 1;
+      const nextCursor = start + token.length + 1;
       textarea.focus();
-      textarea.setSelectionRange(Math.max(0, nextCursor), Math.max(0, nextCursor));
+      textarea.setSelectionRange(nextCursor, nextCursor);
     });
   }
 
