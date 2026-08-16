@@ -19,6 +19,7 @@
     UserCircle,
     Users,
   } from "lucide-svelte";
+  import NotificationAlertStack from "$lib/components/operations/NotificationAlertStack.svelte";
   import type { LayoutData } from "./$types";
 
   export let data: LayoutData;
@@ -60,6 +61,7 @@
   }
 
   function navigationBadge(href?: string): number {
+    if (href === "/app/chat") return notifications.chatUnreadCount;
     if (href === "/app/tickets") return notifications.ticketUnreadCount;
     if (href === "/app/tasks") return notifications.taskUnreadCount;
     return 0;
@@ -142,7 +144,7 @@
   }
 
   onMount(() => {
-    notificationTimer = setInterval(() => void refreshNotifications(), 20_000);
+    notificationTimer = setInterval(() => void refreshNotifications(), 8_000);
     if (canRespondToChat) {
       presenceTimer = setInterval(() => void refreshPresence(), 60_000);
       const handleActivity = () => void heartbeatPresence();
@@ -294,5 +296,6 @@
       </div>
     </header>
     <slot />
+    <NotificationAlertStack notifications={notifications.recent} />
   </main>
 </div>
