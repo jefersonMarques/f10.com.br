@@ -1,3 +1,6 @@
-ALTER TABLE users
-  ADD COLUMN IF NOT EXISTS avatar_key text,
-  ADD COLUMN IF NOT EXISTS avatar_content_type text;
+CREATE TABLE IF NOT EXISTS user_profiles (
+  user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  avatar_key text,
+  avatar_content_type text,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
