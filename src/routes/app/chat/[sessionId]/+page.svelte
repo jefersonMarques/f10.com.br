@@ -6,11 +6,13 @@
     CircleAlert,
     Download,
     ExternalLink,
+    Hand,
     MessageCircleMore,
     MonitorCog,
     Send,
     TicketCheck,
     UserRound,
+    UserRoundCog,
   } from "lucide-svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -28,6 +30,8 @@
   let messagesElement: HTMLDivElement;
 
   $: onlineRemoteDevices = data.remoteDevices.filter((device) => device.online);
+  $: assignedToMe = chat.assignedUserId === data.currentUserId;
+  $: canWrite = data.canRespond && (!chat.assignedUserId || assignedToMe);
 
   const aiLabels: Record<string, string> = {
     active: "IA atendendo",
@@ -68,7 +72,7 @@
 
   async function sendMessage(): Promise<void> {
     const body = messageBody.trim();
-    if (!body || sending) return;
+    if (!body || sending || !canWrite) return;
     sending = true; errorMessage = "";
     try {
       const response = await fetch(`/api/app/chat/${chat.sessionId}/messages`, {
@@ -76,7 +80,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body }),
       });
-      if (!response.ok) { errorMessage = "Não foi possível enviar a mensagem."; return; }
+      if (!response.ok) { errorMessage = "Não foi possível enviar a mensagem. Verifique se o atendimento continua atribuído a você."; return; }
       messageBody = ""; await refreshMessages();
     } catch { errorMessage = "Não foi possível enviar a mensagem."; }
     finally { sending = false; }
@@ -101,7 +105,21 @@
       <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><h1 class="truncate text-[16px] font-semibold text-[#222838]">{chat.customerName ?? "Cliente"}</h1><span class="text-[9px] font-bold text-[#EA6D0B]">#{chat.ticketNumber}</span><span class={`rounded-full px-2 py-1 text-[8px] font-bold ${chat.aiState === "active" ? "bg-[#F0EEFF] text-[#5142A6]" : chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#9B3C3C]" : "bg-[#F3F4F7] text-[#777D8D]"}`}>{aiLabels[chat.aiState]}</span></div><p class="mt-1 truncate text-[10px] text-[#898E9B]">{chat.organizationName ?? chat.customerEmail ?? "Chat do site"}</p>{#if chat.aiHandoffReason}<p class="mt-1 line-clamp-1 text-[9px] text-[#9A6464]">{chat.aiHandoffReason}</p>{/if}</div>
     </div>
 
-    <div class="flex flex-wrap gap-2">
+    <div class="flex flex-wrap items-center gap-2">
+      {#if data.canRespond && !chat.assignedUserId && chat.status !== "closed"}
+        <form method="POST" action="?/claim"><button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#176B35] px-3 text-[10px] font-semibold text-white"><Hand size={14}/>Pegar atendimento</button></form>
+      {/if}
+
+      {#if data.canAssign && chat.status !== "closed"}
+        <form method="POST" action="?/assign" class="flex items-center gap-2">
+          <select name="assignedUserId" required class="h-10 max-w-[190px] rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] text-[#555C6D]">
+            <option value="" disabled selected={!chat.assignedUserId}>Atribuir atendente...</option>
+            {#each data.assignees as assignee}<option value={assignee.id} selected={assignee.id === chat.assignedUserId}>{assignee.name}</option>{/each}
+          </select>
+          <button type="submit" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#DDE1EA] bg-white text-[#000A57]" aria-label="Atribuir atendimento"><UserRoundCog size={15}/></button>
+        </form>
+      {/if}
+
       {#if chat.contextUrl}<a href={chat.contextUrl} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#666C7B]">Página de origem<ExternalLink size={13}/></a>{/if}
 
       {#if data.remoteReady}
@@ -139,8 +157,10 @@
 
     <div bind:this={messagesElement} class="min-h-0 flex-1 overflow-y-auto bg-[#F8F9FB] px-4 py-5 sm:px-6"><div class="mx-auto max-w-[840px] space-y-3">{#each messages as message}<div class={`flex ${message.authorType === "customer" ? "justify-start" : "justify-end"}`}><article class={`max-w-[82%] rounded-2xl px-4 py-3 shadow-sm ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3EA] bg-white text-[#565C6B]" : message.authorType === "system" ? "rounded-br-md border border-[#D9D4F5] bg-[#F2F0FF] text-[#403878]" : "rounded-br-md bg-[#000A57] text-white"}`}>{#if message.authorType === "system"}<div class="mb-2 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-[0.08em] text-[#6255A8]"><Bot size={12}/>Agente IA</div>{/if}<p class="whitespace-pre-wrap text-[12px] leading-5">{message.body}</p><div class={`mt-2 flex items-center gap-2 text-[8px] ${message.authorType === "customer" ? "text-[#9A9FAC]" : message.authorType === "system" ? "text-[#8178B5]" : "text-white/60"}`}><span>{messageAuthor(message)}</span><span>·</span><span>{formatTime(message.createdAt)}</span></div></article></div>{/each}</div></div>
 
-    {#if data.canRespond && chat.status !== "closed"}
+    {#if canWrite && chat.status !== "closed"}
       <footer class="shrink-0 border-t border-[#E6E8EE] bg-white p-4 sm:p-5"><div class="mx-auto max-w-[840px]">{#if chat.aiState === "active"}<div class="mb-3 flex items-center gap-2 rounded-xl bg-[#F4F2FF] px-3 py-2 text-[9px] font-medium text-[#6255A8]"><Bot size={14}/>Ao enviar uma resposta, você assume a conversa e o agente de IA é interrompido.</div>{/if}{#if errorMessage}<div class="mb-3 flex items-center gap-2 rounded-xl bg-[#FFF3F3] px-3 py-2 text-[10px] font-medium text-[#A13C3C]"><CircleAlert size={14}/>{errorMessage}</div>{/if}<form on:submit|preventDefault={() => void sendMessage()} class="flex items-end gap-3"><label class="min-w-0 flex-1"><span class="sr-only">Mensagem</span><textarea bind:value={messageBody} maxlength="4000" rows="2" placeholder="Escreva uma mensagem..." class="max-h-32 min-h-[52px] w-full resize-none rounded-2xl border border-[#DDE1EA] px-4 py-3 text-[12px] leading-5 outline-none focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"></textarea></label><button type="submit" disabled={sending || !messageBody.trim()} class="inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl bg-[#000A57] text-white transition hover:bg-[#111B71] disabled:bg-[#D6D9E2]" aria-label="Enviar mensagem"><Send size={18}/></button></form></div></footer>
+    {:else if data.canRespond && chat.assignedUserId && !assignedToMe && chat.status !== "closed"}
+      <footer class="shrink-0 border-t border-[#E6E8EE] bg-[#FAFAFC] px-5 py-4 text-center text-[10px] text-[#777D8D]">Este atendimento está atribuído a <strong>{chat.assignedUserName ?? "outro atendente"}</strong>. Reatribua antes de responder.</footer>
     {/if}
   </section>
 </div>
