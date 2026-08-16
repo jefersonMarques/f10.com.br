@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { teams } from "$lib/server/db/schema";
@@ -34,7 +34,7 @@ export async function updateSupportQueueTeam(
   const [team] = await db
     .select({ id: teams.id })
     .from(teams)
-    .where(eq(teams.id, teamId))
+    .where(and(eq(teams.id, teamId), eq(teams.active, true)))
     .limit(1);
   if (!team) throw new Error("SUPPORT_TEAM_NOT_FOUND");
 
