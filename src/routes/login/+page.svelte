@@ -62,6 +62,13 @@
             </div>
           {/if}
 
+          {#if data.passwordReset}
+            <div class="mt-6 flex items-start gap-3 rounded-xl border border-[#B9E6C9] bg-[#F1FBF4] px-4 py-3 text-[12px] leading-5 text-[#176B35]">
+              <CheckCircle2 size={18} class="mt-0.5 shrink-0" aria-hidden="true" />
+              <span>Senha redefinida com sucesso. Entre novamente com sua nova senha.</span>
+            </div>
+          {/if}
+
           <form method="POST" class="mt-8 space-y-5">
             <input type="hidden" name="returnTo" value={form?.returnTo ?? data.returnTo} />
 
@@ -80,7 +87,10 @@
             </label>
 
             <label class="block">
-              <span class="mb-2 block text-sm font-semibold text-[#242A3A]">Senha</span>
+              <span class="mb-2 flex items-center justify-between gap-3 text-sm font-semibold text-[#242A3A]">
+                <span>Senha</span>
+                <a href="/esqueci-senha" class="text-[13px] font-semibold text-[#000A57] hover:underline">Esqueci minha senha</a>
+              </span>
               <input
                 name="password"
                 type="password"
