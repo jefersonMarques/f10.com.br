@@ -3,7 +3,6 @@ import {
   and,
   asc,
   eq,
-  gt,
   isNull,
   lt,
   or,
@@ -22,15 +21,20 @@ import {
   runSupportAi,
   type SupportAiResult,
 } from "$lib/server/support/supportAiAgent";
+import { getSupportAvailabilityStatus } from "$lib/server/support/publicSupportStatus";
+import {
+  autoAssignTicketIfConfigured,
+  getSupportRoutingConfiguration,
+} from "$lib/server/support/supportRoutingRepository";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
 
 const PROCESSING_STALE_MS = 60_000;
-const AI_WINDOW_MS = 30 * 60 * 1000;
-const AI_MAX_RUNS_PER_WINDOW = 15;
-const MAX_HISTORY_MESSAGES = 10;
-const MAX_HISTORY_BODY_CHARS = 1_500;
+const MAX_HISTORY_MESSAGES = 6;
+const MAX_HISTORY_BODY_CHARS = 1_000;
 
 type ChatAiState = "active" | "escalated" | "human" | "disabled";
+
+type SupportAvailability = Awaited<ReturnType<typeof getSupportAvailabilityStatus>>;
 
 export type SupportAiChatProcessResult = {
   processed: boolean;
@@ -40,6 +44,25 @@ export type SupportAiChatProcessResult = {
 
 export function isSupportAiChatEnabled(): boolean {
   return env.SUPPORT_AI_CHAT_ENABLED === "true" && isOpenAiConfigured();
+}
+
+function requestsHumanSupport(question: string): boolean {
+  const normalized = question
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  return /(?:quero|preciso|gostaria|posso|pode|chama|chamar|falar|conversar).{0,28}(?:atendente|humano|pessoa)|(?:atendente humano|suporte humano|falar com alguem)/i.test(normalized);
+}
+
+function handoffMessage(availability: SupportAvailability): string {
+  if (availability.isOpen === false) {
+    const next = availability.nextOpenLabel
+      ? ` O atendimento humano retorna ${availability.nextOpenLabel.toLowerCase()}.`
+      : " O atendimento humano está fora do horário de funcionamento neste momento.";
+    return `Registrei seu caso para a equipe de suporte.${next} Você pode continuar enviando informações por aqui enquanto isso.`;
+  }
+
+  return "Vou encaminhar esta conversa para a equipe de suporte para continuar o atendimento.";
 }
 
 async function getSessionState(sessionId: string): Promise<ChatAiState> {
@@ -106,15 +129,23 @@ async function clearAiProcessing(sessionId: string): Promise<void> {
 
 async function getAiRunCount(ticketId: string): Promise<number> {
   const db = getDatabase();
-  const since = new Date(Date.now() - AI_WINDOW_MS);
   const [row] = await db
     .select({ value: sql<number>`count(*)::integer` })
     .from(supportAiRuns)
+    .where(eq(supportAiRuns.ticketId, ticketId));
+
+  return Number(row?.value ?? 0);
+}
+
+async function getAiTokensUsedToday(timezone: string): Promise<number> {
+  const db = getDatabase();
+  const [row] = await db
+    .select({
+      value: sql<number>`coalesce(sum(coalesce(${supportAiRuns.inputTokens}, 0) + coalesce(${supportAiRuns.outputTokens}, 0)), 0)::bigint`,
+    })
+    .from(supportAiRuns)
     .where(
-      and(
-        eq(supportAiRuns.ticketId, ticketId),
-        gt(supportAiRuns.createdAt, since),
-      ),
+      sql`${supportAiRuns.createdAt} >= (date_trunc('day', now() at time zone ${timezone}) at time zone ${timezone})`,
     );
 
   return Number(row?.value ?? 0);
@@ -162,15 +193,24 @@ async function getConversationContext(
     .join("\n");
 }
 
+async function notifyOrAssignEscalation(
+  ticketId: string,
+  reason: string,
+): Promise<void> {
+  const assignedUserId = await autoAssignTicketIfConfigured(ticketId).catch(() => null);
+  if (!assignedUserId) {
+    await notifySupportTicketNeedsAttention(ticketId, reason).catch(() => undefined);
+  }
+}
+
 async function escalateWithoutModel(
   sessionId: string,
   ticketId: string,
   reason: string,
+  publicMessage: string,
 ): Promise<SupportAiChatProcessResult> {
   const db = getDatabase();
   const now = new Date();
-  const message =
-    "Vou encaminhar esta conversa para a equipe de suporte para continuar o atendimento.";
 
   const accepted = await db.transaction(async (tx) => {
     const [session] = await tx
@@ -196,7 +236,7 @@ async function escalateWithoutModel(
       authorType: "system",
       visibility: "public",
       channel: "web_chat",
-      body: message,
+      body: publicMessage,
     });
 
     await tx
@@ -221,7 +261,7 @@ async function escalateWithoutModel(
     };
   }
 
-  await notifySupportTicketNeedsAttention(ticketId, reason).catch(() => undefined);
+  await notifyOrAssignEscalation(ticketId, reason);
   return { processed: true, state: "escalated", result: null };
 }
 
@@ -229,6 +269,7 @@ async function persistAiResult(
   sessionId: string,
   ticketId: string,
   result: SupportAiResult,
+  unresolvedPublicMessage: string,
 ): Promise<SupportAiChatProcessResult> {
   const db = getDatabase();
   const now = new Date();
@@ -259,7 +300,7 @@ async function persistAiResult(
       authorType: "system",
       visibility: "public",
       channel: "web_chat",
-      body: result.answer,
+      body: answered ? result.answer : unresolvedPublicMessage,
     });
 
     const [ticket] = await tx
@@ -300,10 +341,10 @@ async function persistAiResult(
   }
 
   if (!answered) {
-    await notifySupportTicketNeedsAttention(
+    await notifyOrAssignEscalation(
       ticketId,
       result.escalationReason || "A IA encaminhou a conversa para atendimento humano.",
-    ).catch(() => undefined);
+    );
   }
 
   return {
@@ -355,10 +396,12 @@ export async function processSupportAiChatMessage(
       .limit(1);
 
     if (!ticket) {
+      const availability = await getSupportAvailabilityStatus();
       return escalateWithoutModel(
         sessionId,
         claimed.ticketId,
         "Ticket da conversa não foi encontrado.",
+        handoffMessage(availability),
       );
     }
 
@@ -380,12 +423,40 @@ export async function processSupportAiChatMessage(
       return { processed: false, state: "human", result: null };
     }
 
-    const runCount = await getAiRunCount(ticket.id);
-    if (runCount >= AI_MAX_RUNS_PER_WINDOW) {
+    const [configuration, availability] = await Promise.all([
+      getSupportRoutingConfiguration(),
+      getSupportAvailabilityStatus(),
+    ]);
+    const publicHandoffMessage = handoffMessage(availability);
+
+    if (requestsHumanSupport(question)) {
+      return escalateWithoutModel(
+        sessionId,
+        ticket.id,
+        "Cliente solicitou atendimento humano explicitamente.",
+        publicHandoffMessage,
+      );
+    }
+
+    const [runCount, usedTokens] = await Promise.all([
+      getAiRunCount(ticket.id),
+      getAiTokensUsedToday(availability.timezone),
+    ]);
+    if (runCount >= configuration.aiMaxRunsPerConversation) {
       return escalateWithoutModel(
         sessionId,
         ticket.id,
         "Limite de interações automáticas atingido nesta conversa.",
+        publicHandoffMessage,
+      );
+    }
+
+    if (usedTokens >= configuration.aiDailyTokenBudget) {
+      return escalateWithoutModel(
+        sessionId,
+        ticket.id,
+        "Orçamento diário do atendimento automático atingido.",
+        publicHandoffMessage,
       );
     }
 
@@ -399,14 +470,24 @@ export async function processSupportAiChatMessage(
       customerContactId: ticket.customerContactId,
       ticketId: ticket.id,
       conversationContext,
+      maxOutputTokens: configuration.aiMaxOutputTokens,
     });
 
-    return persistAiResult(sessionId, ticket.id, result);
+    return persistAiResult(
+      sessionId,
+      ticket.id,
+      result,
+      publicHandoffMessage,
+    );
   } catch {
+    const availability = await getSupportAvailabilityStatus().catch(() => null);
     return escalateWithoutModel(
       sessionId,
       claimed.ticketId,
       "Falha técnica no atendimento automático.",
+      availability
+        ? handoffMessage(availability)
+        : "Vou encaminhar esta conversa para a equipe de suporte para continuar o atendimento.",
     );
   } finally {
     await clearAiProcessing(sessionId);
