@@ -68,6 +68,7 @@
   const channelLabels: Record<string, string> = {
     manual: "Manual",
     web_chat: "Chat",
+    portal: "Área do cliente",
     customer_portal: "Área do cliente",
   };
 
@@ -91,8 +92,11 @@
     }).format(new Date(value));
   }
 
-  function matchesSearch(ticket: PageData["tickets"][number]): boolean {
-    const query = searchTerm.trim().toLocaleLowerCase("pt-BR");
+  function matchesSearch(
+    ticket: PageData["tickets"][number],
+    searchValue: string,
+  ): boolean {
+    const query = searchValue.trim().toLocaleLowerCase("pt-BR");
     if (!query) return true;
     return [
       ticket.ticketNumber,
@@ -109,17 +113,24 @@
       .includes(query);
   }
 
-  function matchesScope(ticket: PageData["tickets"][number]): boolean {
-    if (scope === "mine") return ticket.assignedUserId === data.currentUserId;
-    if (scope === "unassigned") return !ticket.assignedUserId;
+  function matchesScope(
+    ticket: PageData["tickets"][number],
+    selectedScope: TicketScope,
+    currentUserId: string,
+  ): boolean {
+    if (selectedScope === "mine") return ticket.assignedUserId === currentUserId;
+    if (selectedScope === "unassigned") return !ticket.assignedUserId;
     return true;
   }
 
-  function matchesStatus(ticket: PageData["tickets"][number]): boolean {
-    if (statusFilter === "all") return true;
-    if (statusFilter === "active") return ticket.status !== "resolved" && ticket.status !== "closed";
-    if (statusFilter === "completed") return ticket.status === "resolved" || ticket.status === "closed";
-    return ticket.status === statusFilter;
+  function matchesStatus(
+    ticket: PageData["tickets"][number],
+    selectedStatus: string,
+  ): boolean {
+    if (selectedStatus === "all") return true;
+    if (selectedStatus === "active") return ticket.status !== "resolved" && ticket.status !== "closed";
+    if (selectedStatus === "completed") return ticket.status === "resolved" || ticket.status === "closed";
+    return ticket.status === selectedStatus;
   }
 
   $: queueOptions = Array.from(new Set(data.tickets.map((ticket) => ticket.queueName))).sort((a, b) => a.localeCompare(b, "pt-BR"));
@@ -133,7 +144,11 @@
   ).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
   $: filteredTickets = data.tickets.filter((ticket) => {
-    if (!matchesScope(ticket) || !matchesSearch(ticket) || !matchesStatus(ticket)) return false;
+    if (
+      !matchesScope(ticket, scope, data.currentUserId) ||
+      !matchesSearch(ticket, searchTerm) ||
+      !matchesStatus(ticket, statusFilter)
+    ) return false;
     if (priorityFilter !== "all" && ticket.priority !== priorityFilter) return false;
     if (queueFilter !== "all" && ticket.queueName !== queueFilter) return false;
     if (channelFilter !== "all" && ticket.channel !== channelFilter) return false;
@@ -159,8 +174,11 @@
     return status === statusFilter;
   });
 
-  function ticketsForStatus(status: string) {
-    return filteredTickets.filter((ticket) => ticket.status === status);
+  function ticketsForStatus(
+    ticketList: PageData["tickets"],
+    status: string,
+  ) {
+    return ticketList.filter((ticket) => ticket.status === status);
   }
 
   function startDrag(event: DragEvent, ticketId: string): void {
@@ -323,9 +341,9 @@
               on:dragleave={() => { if (dragOverStatus === status) dragOverStatus = null; }}
               on:drop={(event) => void dropTicket(event, status)}
             >
-              <header class="flex items-center justify-between gap-3 px-1 pb-3"><div class="flex items-center gap-2"><span class={`h-2.5 w-2.5 rounded-full ${status === "resolved" || status === "closed" ? "bg-[#4F9B67]" : status === "waiting_customer" ? "bg-[#7A5AA6]" : "bg-[#EA6D0B]"}`}></span><h3 class="text-[12px] font-semibold text-[#3A4050]">{statusLabels[status]}</h3></div><span class="rounded-full bg-white px-2 py-1 text-[9px] font-semibold text-[#858B99] shadow-sm">{ticketsForStatus(status).length}</span></header>
+              <header class="flex items-center justify-between gap-3 px-1 pb-3"><div class="flex items-center gap-2"><span class={`h-2.5 w-2.5 rounded-full ${status === "resolved" || status === "closed" ? "bg-[#4F9B67]" : status === "waiting_customer" ? "bg-[#7A5AA6]" : "bg-[#EA6D0B]"}`}></span><h3 class="text-[12px] font-semibold text-[#3A4050]">{statusLabels[status]}</h3></div><span class="rounded-full bg-white px-2 py-1 text-[9px] font-semibold text-[#858B99] shadow-sm">{ticketsForStatus(filteredTickets, status).length}</span></header>
               <div class="space-y-3">
-                {#each ticketsForStatus(status) as ticket (ticket.id)}
+                {#each ticketsForStatus(filteredTickets, status) as ticket (ticket.id)}
                   <article
                     draggable={data.canReply}
                     on:dragstart={(event) => startDrag(event, ticket.id)}
