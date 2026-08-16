@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { getPermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import { ticketTaskLinks } from "$lib/server/db/supportRoutingSchema";
@@ -144,4 +144,65 @@ export async function listTaskTicketOrigins(
     }),
   );
   return visible.filter((row): row is NonNullable<typeof row> => Boolean(row));
+}
+
+export async function listTaskTicketOriginsForTasks(
+  actorUserId: string,
+  permissions: SupportPermissionMap,
+  taskIds: string[],
+) {
+  const uniqueTaskIds = Array.from(new Set(taskIds));
+  const taskScope = getPermissionScope(permissions, "tasks.view");
+  const ticketScope = getPermissionScope(permissions, "tickets.view");
+  if (!taskScope || !ticketScope || uniqueTaskIds.length === 0) {
+    return new Map<string, Array<{ id: string; ticketNumber: number; subject: string }>>();
+  }
+
+  const accessibleTaskIds = new Set<string>();
+  await Promise.all(
+    uniqueTaskIds.map(async (taskId) => {
+      try {
+        await ensureTaskAccess(actorUserId, taskScope, taskId);
+        accessibleTaskIds.add(taskId);
+      } catch {
+        // Tarefas fora do escopo não entram no mapa.
+      }
+    }),
+  );
+  if (accessibleTaskIds.size === 0) {
+    return new Map<string, Array<{ id: string; ticketNumber: number; subject: string }>>();
+  }
+
+  const db = getDatabase();
+  const rows = await db
+    .select({
+      taskId: ticketTaskLinks.taskId,
+      id: tickets.id,
+      ticketNumber: tickets.ticketNumber,
+      subject: tickets.subject,
+    })
+    .from(ticketTaskLinks)
+    .innerJoin(tickets, eq(ticketTaskLinks.ticketId, tickets.id))
+    .where(inArray(ticketTaskLinks.taskId, Array.from(accessibleTaskIds)))
+    .orderBy(asc(ticketTaskLinks.createdAt));
+
+  const accessibleTickets = new Map<string, boolean>();
+  for (const row of rows) {
+    if (accessibleTickets.has(row.id)) continue;
+    try {
+      await requireTicketAccess(actorUserId, ticketScope, row.id);
+      accessibleTickets.set(row.id, true);
+    } catch {
+      accessibleTickets.set(row.id, false);
+    }
+  }
+
+  const result = new Map<string, Array<{ id: string; ticketNumber: number; subject: string }>>();
+  for (const row of rows) {
+    if (!accessibleTickets.get(row.id)) continue;
+    const current = result.get(row.taskId) ?? [];
+    current.push({ id: row.id, ticketNumber: row.ticketNumber, subject: row.subject });
+    result.set(row.taskId, current);
+  }
+  return result;
 }
