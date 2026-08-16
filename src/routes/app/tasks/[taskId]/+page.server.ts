@@ -2,6 +2,7 @@ import { error, fail, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
+import { markEntityNotificationsRead } from "$lib/server/notifications/notificationRepository";
 import {
   addTaskComment,
   assignTask,
@@ -19,6 +20,21 @@ function isUuid(value: string): boolean {
 function readFormValue(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function readMentionedUserIds(formData: FormData): string[] {
+  const raw = readFormValue(formData, "mentionedUserIds");
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return Array.from(
+      new Set(parsed.filter((value): value is string => typeof value === "string" && isUuid(value))),
+    ).slice(0, 20);
+  } catch {
+    return [];
+  }
 }
 
 function isTaskPriority(value: string): value is TaskPriority {
@@ -53,8 +69,11 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   }
 
   try {
+    const details = await getTaskDetails(layout.user.id, permissions, params.taskId);
+    await markEntityNotificationsRead(layout.user.id, "task", params.taskId);
+
     return {
-      details: await getTaskDetails(layout.user.id, permissions, params.taskId),
+      details,
       canUpdate: hasPermission(permissions, "tasks.update"),
       canAssign: hasPermission(permissions, "tasks.assign"),
     };
@@ -176,6 +195,7 @@ export const actions: Actions = {
     );
     const formData = await request.formData();
     const body = readFormValue(formData, "body");
+    const mentionedUserIds = readMentionedUserIds(formData);
 
     if (body.length < 1 || body.length > 5000) {
       return fail(400, {
@@ -186,12 +206,14 @@ export const actions: Actions = {
     }
 
     try {
-      await addTaskComment(session.user.id, permissions, params.taskId, body);
+      await addTaskComment(session.user.id, permissions, params.taskId, body, mentionedUserIds);
 
       return {
         success: true,
         action: "comment",
-        message: "Comentário adicionado.",
+        message: mentionedUserIds.length > 0
+          ? "Comentário adicionado e menções notificadas."
+          : "Comentário adicionado.",
       };
     } catch {
       return fail(403, {
