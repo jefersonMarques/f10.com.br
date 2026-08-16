@@ -18,7 +18,8 @@ import {
   webChatSessions,
 } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
-import { sessions, users } from "$lib/server/db/schema";
+import { users } from "$lib/server/db/schema";
+import { supportAgentPresence } from "$lib/server/db/supportRoutingSchema";
 import {
   customerContacts,
   supportQueues,
@@ -26,13 +27,13 @@ import {
   ticketMessages,
   tickets,
 } from "$lib/server/db/supportSchema";
+import { SUPPORT_AWAY_AFTER_MS } from "$lib/server/support/supportAgentPresence";
 
 const CHAT_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const START_WINDOW_MS = 10 * 60 * 1000;
 const START_BLOCK_MS = 30 * 60 * 1000;
 const MESSAGE_WINDOW_MS = 60 * 1000;
 const MESSAGE_BLOCK_MS = 5 * 60 * 1000;
-const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
 export type StartPublicChatInput = {
   name: string;
@@ -323,17 +324,18 @@ export async function listPublicChatMessages(
   if (authorIds.length > 0) {
     const now = new Date();
     const onlineRows = await db
-      .select({ userId: sessions.userId })
-      .from(sessions)
+      .select({ userId: supportAgentPresence.userId })
+      .from(supportAgentPresence)
       .where(
         and(
-          inArray(sessions.userId, authorIds),
-          gt(sessions.expiresAt, now),
-          gt(sessions.lastSeenAt, new Date(now.getTime() - ONLINE_WINDOW_MS)),
-          isNull(sessions.revokedAt),
+          inArray(supportAgentPresence.userId, authorIds),
+          eq(supportAgentPresence.manualStatus, "online"),
+          gt(
+            supportAgentPresence.lastActivityAt,
+            new Date(now.getTime() - SUPPORT_AWAY_AFTER_MS),
+          ),
         ),
-      )
-      .groupBy(sessions.userId);
+      );
     onlineUserIds = new Set(onlineRows.map((row) => row.userId));
   }
 
