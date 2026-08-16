@@ -16,6 +16,8 @@ import {
   type TicketStatus,
 } from "$lib/server/support/supportRepository";
 
+type MentionUser = { id: string; name: string; email: string };
+
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
@@ -43,9 +45,9 @@ function readMentionedUserIds(formData: FormData): string[] {
 }
 
 async function filterMentionUsersForTicket(
-  users: Array<{ id: string; name: string; email: string }>,
+  users: MentionUser[],
   ticketId: string,
-) {
+): Promise<MentionUser[]> {
   const resolved = await Promise.all(
     users.map(async (user) => {
       const permissions = await resolveUserPermissions(user.id);
@@ -61,7 +63,15 @@ async function filterMentionUsersForTicket(
     }),
   );
 
-  return resolved.filter((user): user is { id: string; name: string; email: string } => Boolean(user));
+  return resolved.filter((user): user is MentionUser => Boolean(user));
+}
+
+async function validateMentionedUserIds(ticketId: string, requestedIds: string[]): Promise<string[]> {
+  if (requestedIds.length === 0) return [];
+  const candidates = await listSupportAgents();
+  const allowed = await filterMentionUsersForTicket(candidates, ticketId);
+  const allowedIds = new Set(allowed.map((user) => user.id));
+  return requestedIds.filter((id) => allowedIds.has(id));
 }
 
 function isTicketStatus(value: string): value is TicketStatus {
@@ -193,7 +203,7 @@ export const actions: Actions = {
     );
     const formData = await request.formData();
     const body = readFormValue(formData, "body");
-    const mentionedUserIds = readMentionedUserIds(formData);
+    const requestedMentionIds = readMentionedUserIds(formData);
 
     if (body.length < 1 || body.length > 10000) {
       return fail(400, {
@@ -204,6 +214,7 @@ export const actions: Actions = {
     }
 
     try {
+      const mentionedUserIds = await validateMentionedUserIds(params.ticketId, requestedMentionIds);
       await addTicketMessage(
         session.user.id,
         permissions,
