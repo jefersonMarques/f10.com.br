@@ -35,6 +35,18 @@ CREATE INDEX IF NOT EXISTS ticket_task_links_ticket_idx
 CREATE INDEX IF NOT EXISTS ticket_task_links_task_idx
   ON ticket_task_links(task_id, created_at);
 
+CREATE INDEX IF NOT EXISTS ticket_messages_author_user_created_idx
+  ON ticket_messages(author_user_id, created_at)
+  WHERE author_user_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS ticket_events_actor_created_idx
+  ON ticket_events(actor_user_id, created_at)
+  WHERE actor_user_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS tasks_completed_at_idx
+  ON tasks(completed_at)
+  WHERE completed_at IS NOT NULL;
+
 INSERT INTO ticket_task_links (ticket_id, task_id, created_at)
 SELECT id, linked_task_id, updated_at
 FROM tickets
