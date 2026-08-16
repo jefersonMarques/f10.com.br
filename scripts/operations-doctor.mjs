@@ -86,11 +86,13 @@ const requiredPermissions = [
 ];
 const criticalTables = [
   "users", "roles", "permissions", "role_permissions", "sessions", "audit_logs",
+  "auth_password_reset_tokens", "internal_notifications",
   "help_articles", "help_questions", "help_publications", "help_contents",
   "help_content_steps", "help_step_blocks", "help_assets", "help_search_documents",
   "help_search_events", "help_search_results", "support_ai_runs", "user_invites",
-  "task_projects", "tasks", "support_queues", "tickets", "ticket_messages",
-  "web_chat_sessions", "support_public_limits", "operations_settings",
+  "task_projects", "tasks", "ticket_task_links", "support_queues", "tickets", "ticket_messages",
+  "web_chat_sessions", "support_public_limits", "support_agent_presence",
+  "support_chat_routing_members", "operations_settings",
   "remote_devices", "remote_customer_groups", "remote_device_enrollments",
   "remote_support_sessions",
 ];
