@@ -5,6 +5,7 @@ import {
   eq,
   inArray,
   or,
+  sql,
 } from "drizzle-orm";
 import { getPermissionScope, hasPermission, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
@@ -14,6 +15,7 @@ import { webChatSessions } from "$lib/server/db/chatSchema";
 import {
   customerContacts,
   customerOrganizations,
+  supportQueues,
   ticketEvents,
   ticketMessages,
   tickets,
@@ -39,7 +41,6 @@ export async function listInternalChats(
   permissions: SupportPermissionMap,
 ) {
   const scope = requireChatScope(permissions, "chat.view");
-  const db = getDatabase();
   const ownCondition = eq(tickets.assignedUserId, actorUserId);
   let accessCondition = ownCondition;
 
@@ -65,12 +66,31 @@ export async function listInternalChats(
       ticketNumber: tickets.ticketNumber,
       subject: tickets.subject,
       status: tickets.status,
+      priority: tickets.priority,
       aiState: webChatSessions.aiState,
       aiHandoffReason: webChatSessions.aiHandoffReason,
       assignedUserId: tickets.assignedUserId,
       assignedUserName: users.name,
       customerName: customerContacts.name,
+      customerEmail: customerContacts.email,
       organizationName: customerOrganizations.name,
+      firstResponseDueAt: tickets.firstResponseDueAt,
+      resolutionDueAt: tickets.resolutionDueAt,
+      firstResponseAt: tickets.firstResponseAt,
+      lastMessageBody: sql<string | null>`(
+        select tm.body
+        from ticket_messages tm
+        where tm.ticket_id = ${tickets.id} and tm.visibility = 'public'
+        order by tm.created_at desc
+        limit 1
+      )`,
+      lastMessageAuthorType: sql<string | null>`(
+        select tm.author_type::text
+        from ticket_messages tm
+        where tm.ticket_id = ${tickets.id} and tm.visibility = 'public'
+        order by tm.created_at desc
+        limit 1
+      )`,
       lastSeenAt: webChatSessions.lastSeenAt,
       updatedAt: tickets.updatedAt,
       closedAt: webChatSessions.closedAt,
@@ -102,6 +122,8 @@ export async function getInternalChat(
       ticketNumber: tickets.ticketNumber,
       subject: tickets.subject,
       status: tickets.status,
+      priority: tickets.priority,
+      queueName: supportQueues.name,
       aiState: webChatSessions.aiState,
       aiHandoffReason: webChatSessions.aiHandoffReason,
       aiHandoffAt: webChatSessions.aiHandoffAt,
@@ -109,14 +131,21 @@ export async function getInternalChat(
       assignedUserName: users.name,
       customerName: customerContacts.name,
       customerEmail: customerContacts.email,
+      customerPhone: customerContacts.phone,
       organizationName: customerOrganizations.name,
       contextUrl: webChatSessions.contextUrl,
       contextData: webChatSessions.contextData,
+      firstResponseDueAt: tickets.firstResponseDueAt,
+      resolutionDueAt: tickets.resolutionDueAt,
+      firstResponseAt: tickets.firstResponseAt,
+      linkedTaskId: tickets.linkedTaskId,
       lastSeenAt: webChatSessions.lastSeenAt,
       createdAt: webChatSessions.createdAt,
+      updatedAt: tickets.updatedAt,
     })
     .from(webChatSessions)
     .innerJoin(tickets, eq(webChatSessions.ticketId, tickets.id))
+    .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
     .leftJoin(users, eq(tickets.assignedUserId, users.id))
     .leftJoin(customerContacts, eq(tickets.customerContactId, customerContacts.id))
     .leftJoin(
@@ -145,17 +174,14 @@ export async function listInternalChatMessages(
       id: ticketMessages.id,
       authorType: ticketMessages.authorType,
       authorUserName: users.name,
+      visibility: ticketMessages.visibility,
+      channel: ticketMessages.channel,
       body: ticketMessages.body,
       createdAt: ticketMessages.createdAt,
     })
     .from(ticketMessages)
     .leftJoin(users, eq(ticketMessages.authorUserId, users.id))
-    .where(
-      and(
-        eq(ticketMessages.ticketId, chat.ticketId),
-        eq(ticketMessages.visibility, "public"),
-      ),
-    )
+    .where(eq(ticketMessages.ticketId, chat.ticketId))
     .orderBy(asc(ticketMessages.createdAt));
 
   return { chat, messages };
