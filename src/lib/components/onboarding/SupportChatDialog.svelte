@@ -17,8 +17,22 @@
   type ChatMessage = {
     id: string;
     authorType: "customer" | "user" | "system";
+    authorUserId?: string | null;
+    authorUserName?: string | null;
+    authorOnline?: boolean;
+    avatarUrl?: string | null;
     body: string;
     createdAt: string;
+  };
+
+  type SupportStatus = {
+    supportDisplayName: string;
+    hoursConfigured: boolean;
+    isOpen: boolean | null;
+    nextOpenLabel: string | null;
+    onlineAgents: number | null;
+    averageWaitMinutes: number | null;
+    waitSampleCount: number;
   };
 
   const STORAGE_KEY = "f10-support-chat-session-v1";
@@ -29,6 +43,8 @@
   let restored = false;
   let pollingSessionId = "";
   let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let statusTimer: ReturnType<typeof setInterval> | null = null;
+  let statusPollingActive = false;
 
   let name = "";
   let email = "";
@@ -37,6 +53,7 @@
   let reply = "";
   let session: ChatSession | null = null;
   let messages: ChatMessage[] = [];
+  let status: SupportStatus | null = null;
   let starting = false;
   let sending = false;
   let loadingMessages = false;
@@ -45,6 +62,7 @@
   $: if (browser && dialogElement) syncDialogState(isOpen);
   $: if (browser && isOpen && !restored) restoreStoredSession();
   $: if (browser) syncPolling(isOpen, session?.sessionId ?? "");
+  $: if (browser) syncStatusPolling(isOpen);
 
   function syncDialogState(shouldOpen: boolean): void {
     if (shouldOpen && !dialogElement.open) {
@@ -107,6 +125,29 @@
     pollTimer = setInterval(() => void refreshMessages(), 4_000);
   }
 
+  function syncStatusPolling(shouldPoll: boolean): void {
+    if (shouldPoll === statusPollingActive) return;
+    statusPollingActive = shouldPoll;
+
+    if (statusTimer) {
+      clearInterval(statusTimer);
+      statusTimer = null;
+    }
+
+    if (!shouldPoll) return;
+    void refreshStatus();
+    statusTimer = setInterval(() => void refreshStatus(), 60_000);
+  }
+
+  async function refreshStatus(): Promise<void> {
+    try {
+      const response = await fetch("/api/support/chat/status", { cache: "no-store" });
+      if (response.ok) status = await response.json() as SupportStatus;
+    } catch {
+      // O chat continua funcional mesmo se o indicador de disponibilidade falhar.
+    }
+  }
+
   function handleDialogClose(): void {
     if (isOpen) onClose();
     previouslyFocusedElement?.focus();
@@ -120,6 +161,49 @@
 
   function handleBackdropClick(event: MouseEvent): void {
     if (event.target === event.currentTarget) onClose();
+  }
+
+  function hideBrokenImage(event: Event): void {
+    const image = event.currentTarget as HTMLImageElement;
+    image.style.display = "none";
+  }
+
+  function initials(value: string): string {
+    return value
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "F10";
+  }
+
+  function availabilityText(): string {
+    if (!status) return "Atendimento F10";
+    if (status.isOpen === false) {
+      return status.nextOpenLabel ? `Fora do horário · volta ${status.nextOpenLabel.toLowerCase()}` : "Fora do horário de atendimento";
+    }
+    if ((status.onlineAgents ?? 0) > 0) {
+      return `${status.onlineAgents} ${status.onlineAgents === 1 ? "atendente online" : "atendentes online"}`;
+    }
+    if (status.isOpen === true) return "Dentro do horário de atendimento";
+    return "Atendimento F10";
+  }
+
+  function waitText(): string {
+    if (!status?.averageWaitMinutes) return "Tempo de espera ainda sem amostra suficiente";
+    return `Tempo médio de primeira resposta: ~${status.averageWaitMinutes} min`;
+  }
+
+  function sessionStatusText(): string {
+    if (!session) return availabilityText();
+    if (session.aiState === "active") return "Assistente F10 analisando sua mensagem";
+    if (session.aiState === "escalated") {
+      const online = (status?.onlineAgents ?? 0) > 0 ? ` · ${status?.onlineAgents} online` : "";
+      const wait = status?.averageWaitMinutes ? ` · média ~${status.averageWaitMinutes} min` : "";
+      return `Aguardando especialista${online}${wait}`;
+    }
+    if (session.aiState === "human") return "Atendimento com a equipe F10";
+    return availabilityText();
   }
 
   function apiErrorMessage(error: string, diagnosticCode = ""): string {
@@ -270,6 +354,7 @@
 
   onDestroy(() => {
     if (pollTimer) clearInterval(pollTimer);
+    if (statusTimer) clearInterval(statusTimer);
   });
 </script>
 
@@ -289,13 +374,14 @@
             <LifeBuoy size={22} aria-hidden="true" />
           </span>
           <div>
-            <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-[#EA6D0B]">Atendimento F10</p>
+            <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-[#EA6D0B]">{status?.supportDisplayName ?? "Atendimento F10"}</p>
             <h2 id="support-chat-title" class="mt-1 text-[20px] font-semibold leading-tight text-[#010D28] sm:text-[24px]">
               {session ? `Chamado #${session.ticketNumber}` : "Converse com o suporte"}
             </h2>
-            {#if session}
-              <p class="mt-1 text-[9px] text-[#7D8494]">Conversa registrada diretamente no F10 Operations.</p>
-            {/if}
+            <div class="mt-1 flex items-center gap-1.5 text-[9px] text-[#7D8494]">
+              <span class={`h-2 w-2 rounded-full ${(status?.isOpen !== false && (status?.onlineAgents ?? 0) > 0) ? "bg-[#38A169]" : "bg-[#B8BDC8]"}`}></span>
+              <span>{sessionStatusText()}</span>
+            </div>
           </div>
         </div>
         <button
@@ -314,14 +400,40 @@
           {#if messages.length === 0 && loadingMessages}
             <div class="flex h-full items-center justify-center text-[#7D8494]"><LoaderCircle class="animate-spin" size={22} aria-hidden="true" /></div>
           {:else}
-            <div class="space-y-3">
+            <div class="space-y-4">
               {#each messages as message (message.id)}
-                <div class={`flex ${message.authorType === "customer" ? "justify-end" : "justify-start"}`}>
-                  <div class={`max-w-[86%] rounded-2xl px-4 py-3 ${message.authorType === "customer" ? "bg-[#000A57] text-white" : "border border-[#E0E4EC] bg-white text-[#343B4C]"}`}>
-                    <p class="whitespace-pre-wrap text-[12px] leading-5">{message.body}</p>
-                    <span class={`mt-1.5 block text-[8px] ${message.authorType === "customer" ? "text-white/55" : "text-[#969CAA]"}`}>{formatTime(message.createdAt)}</span>
+                {#if message.authorType === "customer"}
+                  <div class="flex justify-end">
+                    <div class="max-w-[86%] rounded-2xl bg-[#000A57] px-4 py-3 text-white">
+                      <p class="whitespace-pre-wrap text-[12px] leading-5">{message.body}</p>
+                      <span class="mt-1.5 block text-[8px] text-white/55">{formatTime(message.createdAt)}</span>
+                    </div>
                   </div>
-                </div>
+                {:else}
+                  <div class="flex items-start gap-2.5">
+                    <span class="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#E0E4EC] bg-white text-[9px] font-bold text-[#000A57]">
+                      {#if message.authorType === "user"}
+                        {initials(message.authorUserName ?? "F10")}
+                        {#if message.avatarUrl}
+                          <img src={message.avatarUrl} alt="" class="absolute inset-0 h-full w-full object-cover" on:error={hideBrokenImage} />
+                        {/if}
+                        {#if message.authorOnline}<span class="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#38A169]"></span>{/if}
+                      {:else}
+                        <LifeBuoy size={16} aria-hidden="true" />
+                      {/if}
+                    </span>
+                    <div class="max-w-[82%]">
+                      <div class="mb-1 flex items-center gap-2 px-1">
+                        <strong class="text-[9px] font-semibold text-[#4C5363]">{message.authorType === "user" ? (message.authorUserName ?? "Equipe F10") : "F10"}</strong>
+                        {#if message.authorType === "user" && message.authorOnline}<span class="text-[8px] text-[#398155]">online</span>{/if}
+                      </div>
+                      <div class="rounded-2xl border border-[#E0E4EC] bg-white px-4 py-3 text-[#343B4C]">
+                        <p class="whitespace-pre-wrap text-[12px] leading-5">{message.body}</p>
+                        <span class="mt-1.5 block text-[8px] text-[#969CAA]">{formatTime(message.createdAt)}</span>
+                      </div>
+                    </div>
+                  </div>
+                {/if}
               {/each}
             </div>
           {/if}
@@ -344,38 +456,54 @@
             </button>
           </div>
           <div class="mt-2 flex items-center justify-between gap-3">
-            <span class="text-[8px] text-[#9298A5]">A sessão permanece ativa neste navegador por até 8 horas.</span>
+            <span class="text-[8px] text-[#9298A5]">A sessão fica ativa neste navegador por até 8 horas. <a href="/cliente" class="font-semibold text-[#000A57] hover:underline">Área do Cliente</a></span>
             <button type="button" class="text-[9px] font-semibold text-[#6D7485] hover:text-[#000A57]" on:click={startAnotherChat}>Novo atendimento</button>
           </div>
         </form>
       {:else}
         <div class="min-h-0 flex-1 overflow-y-auto bg-[#F7F8FB] px-5 py-5 sm:px-7 sm:py-6">
-          <div class="mx-auto max-w-[590px] rounded-[22px] border border-[#E2E5EC] bg-white p-5 sm:p-6">
-            <h3 class="text-[15px] font-semibold text-[#252C3D]">Conte brevemente o que precisa</h3>
-            <p class="mt-1.5 text-[10px] leading-5 text-[#7B8292]">Seu atendimento será criado como um chamado da F10. Informe um e-mail válido para que o chamado também possa ser associado ao seu cadastro.</p>
-
-            <form class="mt-5 space-y-4" on:submit|preventDefault={startChat}>
-              <div class="grid gap-4 sm:grid-cols-2">
-                <label class="block text-[10px] font-semibold text-[#5E6575]">Nome
-                  <input bind:value={name} required minlength="2" maxlength="120" autocomplete="name" class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] px-3 text-[12px] font-normal text-[#252C3D] outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" />
-                </label>
-                <label class="block text-[10px] font-semibold text-[#5E6575]">E-mail
-                  <input bind:value={email} required type="email" maxlength="254" autocomplete="email" class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] px-3 text-[12px] font-normal text-[#252C3D] outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" />
-                </label>
+          <div class="mx-auto max-w-[590px]">
+            <div class="mb-4 grid gap-2 sm:grid-cols-2">
+              <div class="rounded-2xl border border-[#E2E5EC] bg-white px-4 py-3">
+                <span class="block text-[8px] font-bold uppercase tracking-[0.1em] text-[#969CAA]">Disponibilidade</span>
+                <strong class="mt-1 block text-[10px] leading-4 text-[#343B4C]">{availabilityText()}</strong>
               </div>
-              <label class="block text-[10px] font-semibold text-[#5E6575]">Telefone <span class="font-normal text-[#9AA0AD]">(opcional)</span>
-                <input bind:value={phone} maxlength="40" autocomplete="tel" class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] px-3 text-[12px] font-normal text-[#252C3D] outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" />
-              </label>
-              <label class="block text-[10px] font-semibold text-[#5E6575]">Como podemos ajudar?
-                <textarea bind:value={initialMessage} required maxlength="4000" rows="5" class="mt-1.5 w-full resize-y rounded-xl border border-[#DDE1E9] px-3 py-3 text-[12px] font-normal leading-5 text-[#252C3D] outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10"></textarea>
-              </label>
+              <div class="rounded-2xl border border-[#E2E5EC] bg-white px-4 py-3">
+                <span class="block text-[8px] font-bold uppercase tracking-[0.1em] text-[#969CAA]">Espera estimada</span>
+                <strong class="mt-1 block text-[10px] leading-4 text-[#343B4C]">{waitText()}</strong>
+              </div>
+            </div>
 
-              {#if errorMessage}<p class="rounded-xl bg-[#FFF4F1] px-3 py-2.5 text-[10px] leading-4 text-[#9A4E3D]">{errorMessage}</p>{/if}
+            <div class="rounded-[22px] border border-[#E2E5EC] bg-white p-5 sm:p-6">
+              <h3 class="text-[15px] font-semibold text-[#252C3D]">Conte brevemente o que precisa</h3>
+              <p class="mt-1.5 text-[10px] leading-5 text-[#7B8292]">Seu atendimento será criado como um chamado da F10. Informe um e-mail válido para acompanhar depois pela Área do Cliente.</p>
 
-              <button type="submit" disabled={starting} class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white transition hover:bg-[#111B71] disabled:cursor-not-allowed disabled:opacity-60">
-                {#if starting}<LoaderCircle class="animate-spin" size={17} aria-hidden="true" /> Iniciando atendimento...{:else}Iniciar atendimento{/if}
-              </button>
-            </form>
+              <form class="mt-5 space-y-4" on:submit|preventDefault={startChat}>
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <label class="block text-[10px] font-semibold text-[#5E6575]">Nome
+                    <input bind:value={name} required minlength="2" maxlength="120" autocomplete="name" class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] px-3 text-[12px] font-normal text-[#252C3D] outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" />
+                  </label>
+                  <label class="block text-[10px] font-semibold text-[#5E6575]">E-mail
+                    <input bind:value={email} required type="email" maxlength="254" autocomplete="email" class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] px-3 text-[12px] font-normal text-[#252C3D] outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" />
+                  </label>
+                </div>
+                <label class="block text-[10px] font-semibold text-[#5E6575]">Telefone <span class="font-normal text-[#9AA0AD]">(opcional)</span>
+                  <input bind:value={phone} maxlength="40" autocomplete="tel" class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] px-3 text-[12px] font-normal text-[#252C3D] outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" />
+                </label>
+                <label class="block text-[10px] font-semibold text-[#5E6575]">Como podemos ajudar?
+                  <textarea bind:value={initialMessage} required maxlength="4000" rows="5" class="mt-1.5 w-full resize-y rounded-xl border border-[#DDE1E9] px-3 py-3 text-[12px] font-normal leading-5 text-[#252C3D] outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10"></textarea>
+                </label>
+
+                {#if status?.isOpen === false}
+                  <p class="rounded-xl bg-[#FFF8EE] px-3 py-2.5 text-[9px] leading-4 text-[#8B5B24]">Pode enviar agora. Sua mensagem ficará registrada e a equipe continua o atendimento no próximo horário disponível{status.nextOpenLabel ? ` (${status.nextOpenLabel})` : ""}.</p>
+                {/if}
+                {#if errorMessage}<p class="rounded-xl bg-[#FFF4F1] px-3 py-2.5 text-[10px] leading-4 text-[#9A4E3D]">{errorMessage}</p>{/if}
+
+                <button type="submit" disabled={starting} class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white transition hover:bg-[#111B71] disabled:cursor-not-allowed disabled:opacity-60">
+                  {#if starting}<LoaderCircle class="animate-spin" size={17} aria-hidden="true" /> Iniciando atendimento...{:else}Iniciar atendimento{/if}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       {/if}
