@@ -90,7 +90,7 @@
   <meta name="googlebot" content="noindex,nofollow,noarchive" />
 </svelte:head>
 
-<div class="min-h-[100dvh] bg-[#F5F6FA] text-[#010D28] lg:grid lg:grid-cols-[270px_minmax(0,1fr)]">
+<div class="operations-shell min-h-[100dvh] bg-[#F5F6FA] text-[#010D28] lg:grid lg:grid-cols-[270px_minmax(0,1fr)]">
   <aside class="border-b border-[#E2E5ED] bg-white lg:min-h-[100dvh] lg:border-b-0 lg:border-r">
     <div class="flex h-full flex-col">
       <div class="flex h-[78px] items-center justify-between border-b border-[#EEF0F5] px-5 lg:px-6">
