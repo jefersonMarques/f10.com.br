@@ -1,0 +1,67 @@
+import { and, eq, inArray, isNull } from "drizzle-orm";
+import { getDatabase } from "$lib/server/db";
+import { internalNotifications } from "$lib/server/db/notificationSchema";
+import { teamMembers, users } from "$lib/server/db/schema";
+import { supportQueues, tickets } from "$lib/server/db/supportSchema";
+
+export async function notifySupportTicketNeedsAttention(
+  ticketId: string,
+  reason: string,
+): Promise<void> {
+  const db = getDatabase();
+  const [ticket] = await db
+    .select({
+      ticketNumber: tickets.ticketNumber,
+      subject: tickets.subject,
+      assignedUserId: tickets.assignedUserId,
+      teamId: supportQueues.teamId,
+    })
+    .from(tickets)
+    .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
+    .where(eq(tickets.id, ticketId))
+    .limit(1);
+
+  if (!ticket) return;
+
+  let recipientIds: string[] = [];
+  if (ticket.assignedUserId) {
+    recipientIds = [ticket.assignedUserId];
+  } else if (ticket.teamId) {
+    const members = await db
+      .select({ userId: teamMembers.userId })
+      .from(teamMembers)
+      .innerJoin(users, eq(users.id, teamMembers.userId))
+      .where(and(eq(teamMembers.teamId, ticket.teamId), eq(users.status, "active")));
+    recipientIds = Array.from(new Set(members.map((member) => member.userId)));
+  }
+
+  if (recipientIds.length === 0) return;
+
+  const existing = await db
+    .select({ userId: internalNotifications.userId })
+    .from(internalNotifications)
+    .where(
+      and(
+        inArray(internalNotifications.userId, recipientIds),
+        eq(internalNotifications.kind, "ticket.needs_attention"),
+        eq(internalNotifications.entityType, "ticket"),
+        eq(internalNotifications.entityId, ticketId),
+        isNull(internalNotifications.readAt),
+      ),
+    );
+  const alreadyNotified = new Set(existing.map((notification) => notification.userId));
+  const pendingRecipients = recipientIds.filter((userId) => !alreadyNotified.has(userId));
+  if (pendingRecipients.length === 0) return;
+
+  await db.insert(internalNotifications).values(
+    pendingRecipients.map((userId) => ({
+      userId,
+      kind: "ticket.needs_attention",
+      title: `Ticket #${ticket.ticketNumber} precisa de atendimento`,
+      body: `${ticket.subject} — ${reason}`.slice(0, 500),
+      href: `/app/tickets/${ticketId}`,
+      entityType: "ticket",
+      entityId: ticketId,
+    })),
+  );
+}
