@@ -14,6 +14,8 @@ const requiredTables = [
   "customer_portal_login_tokens",
   "customer_portal_sessions",
   "operations_settings",
+  "internal_notifications",
+  "user_profiles",
 ];
 
 let failed = false;
@@ -90,7 +92,7 @@ try {
 
   if (!missingTables.includes("support_queues")) {
     const [queue] = await sql`
-      SELECT code, active
+      SELECT code, active, team_id
       FROM support_queues
       WHERE code = 'support'
       LIMIT 1
@@ -99,6 +101,13 @@ try {
       "support queue",
       Boolean(queue?.active),
       queue?.active ? "support is active" : "active queue with code=support is required",
+    );
+    check(
+      "support queue team",
+      Boolean(queue?.team_id),
+      queue?.team_id
+        ? "configured"
+        : "select the responsible team in Operations > Configurações > Operação do suporte",
     );
   }
 
