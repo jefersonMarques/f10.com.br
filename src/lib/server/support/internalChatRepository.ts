@@ -6,8 +6,9 @@ import {
   inArray,
   or,
 } from "drizzle-orm";
-import { getPermissionScope } from "$lib/server/auth/permissions";
+import { getPermissionScope, hasPermission, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { users } from "$lib/server/db/schema";
 import { webChatSessions } from "$lib/server/db/chatSchema";
 import {
@@ -22,6 +23,7 @@ import {
   requireTicketAccess,
   type SupportPermissionMap,
 } from "$lib/server/support/supportAccess";
+import { listEligibleSupportResponders } from "$lib/server/support/supportRoutingRepository";
 
 function requireChatScope(
   permissions: SupportPermissionMap,
@@ -56,7 +58,7 @@ export async function listInternalChats(
     accessCondition,
   );
 
-  return db
+  return getDatabase()
     .select({
       sessionId: webChatSessions.id,
       ticketId: tickets.id,
@@ -65,6 +67,7 @@ export async function listInternalChats(
       status: tickets.status,
       aiState: webChatSessions.aiState,
       aiHandoffReason: webChatSessions.aiHandoffReason,
+      assignedUserId: tickets.assignedUserId,
       assignedUserName: users.name,
       customerName: customerContacts.name,
       organizationName: customerOrganizations.name,
@@ -158,6 +161,140 @@ export async function listInternalChatMessages(
   return { chat, messages };
 }
 
+export async function listChatAssignees() {
+  return listEligibleSupportResponders();
+}
+
+export async function claimInternalChat(
+  actorUserId: string,
+  permissions: SupportPermissionMap,
+  sessionId: string,
+): Promise<void> {
+  const scope = requireChatScope(permissions, "chat.respond");
+  const db = getDatabase();
+  const [chat] = await db
+    .select({
+      ticketId: tickets.id,
+      assignedUserId: tickets.assignedUserId,
+      status: tickets.status,
+    })
+    .from(webChatSessions)
+    .innerJoin(tickets, eq(webChatSessions.ticketId, tickets.id))
+    .where(eq(webChatSessions.id, sessionId))
+    .limit(1);
+  if (!chat) throw new Error("CHAT_NOT_FOUND");
+  await requireTicketAccess(actorUserId, scope, chat.ticketId);
+  if (chat.status === "closed") throw new Error("CHAT_CLOSED");
+  if (chat.assignedUserId && chat.assignedUserId !== actorUserId) {
+    throw new Error("CHAT_ALREADY_ASSIGNED");
+  }
+  if (chat.assignedUserId === actorUserId) return;
+
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    await tx
+      .update(tickets)
+      .set({
+        assignedUserId: actorUserId,
+        status: chat.status === "new" ? "open" : chat.status,
+        updatedAt: now,
+      })
+      .where(eq(tickets.id, chat.ticketId));
+    await tx
+      .update(webChatSessions)
+      .set({
+        aiState: "human",
+        aiHandoffReason: "Conversa assumida por um atendente humano.",
+        aiHandoffAt: now,
+        aiProcessingAt: null,
+      })
+      .where(eq(webChatSessions.id, sessionId));
+    await tx.insert(ticketEvents).values({
+      ticketId: chat.ticketId,
+      actorUserId,
+      eventType: "chat.claimed",
+      metadata: { assignedUserId: actorUserId },
+    });
+  });
+}
+
+export async function assignInternalChat(
+  actorUserId: string,
+  permissions: SupportPermissionMap,
+  sessionId: string,
+  targetUserId: string,
+): Promise<void> {
+  const assignScope = getPermissionScope(permissions, "tickets.assign");
+  if (!assignScope) throw new Error("CHAT_ASSIGN_NOT_ALLOWED");
+
+  const targetPermissions = await resolveUserPermissions(targetUserId);
+  if (!hasPermission(targetPermissions, "chat.respond")) {
+    throw new Error("CHAT_ASSIGNEE_NOT_ELIGIBLE");
+  }
+
+  const db = getDatabase();
+  const [[target], [chat]] = await Promise.all([
+    db
+      .select({ id: users.id, name: users.name })
+      .from(users)
+      .where(and(eq(users.id, targetUserId), eq(users.status, "active")))
+      .limit(1),
+    db
+      .select({
+        ticketId: tickets.id,
+        ticketNumber: tickets.ticketNumber,
+        status: tickets.status,
+      })
+      .from(webChatSessions)
+      .innerJoin(tickets, eq(webChatSessions.ticketId, tickets.id))
+      .where(eq(webChatSessions.id, sessionId))
+      .limit(1),
+  ]);
+  if (!target) throw new Error("CHAT_ASSIGNEE_NOT_ELIGIBLE");
+  if (!chat) throw new Error("CHAT_NOT_FOUND");
+  await requireTicketAccess(actorUserId, assignScope, chat.ticketId);
+  if (chat.status === "closed") throw new Error("CHAT_CLOSED");
+
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    await tx
+      .update(tickets)
+      .set({
+        assignedUserId: targetUserId,
+        status: chat.status === "new" ? "open" : chat.status,
+        updatedAt: now,
+      })
+      .where(eq(tickets.id, chat.ticketId));
+    await tx
+      .update(webChatSessions)
+      .set({
+        aiState: "human",
+        aiHandoffReason: "Conversa atribuída a um atendente humano.",
+        aiHandoffAt: now,
+        aiProcessingAt: null,
+      })
+      .where(eq(webChatSessions.id, sessionId));
+    await tx.insert(ticketEvents).values({
+      ticketId: chat.ticketId,
+      actorUserId,
+      eventType: "chat.assigned",
+      metadata: { assignedUserId: targetUserId },
+    });
+    if (targetUserId !== actorUserId) {
+      await tx.insert(internalNotifications).values({
+        userId: targetUserId,
+        actorUserId,
+        kind: "chat.assigned",
+        title: `Atendimento atribuído a você · #${chat.ticketNumber}`,
+        body: "Abra a conversa para continuar o atendimento.",
+        href: `/app/chat/${sessionId}`,
+        entityType: "ticket",
+        entityId: chat.ticketId,
+      });
+    }
+  });
+}
+
 export async function respondToInternalChat(
   actorUserId: string,
   permissions: SupportPermissionMap,
@@ -170,6 +307,7 @@ export async function respondToInternalChat(
     .select({
       ticketId: tickets.id,
       status: tickets.status,
+      assignedUserId: tickets.assignedUserId,
       firstResponseAt: tickets.firstResponseAt,
     })
     .from(webChatSessions)
@@ -180,6 +318,9 @@ export async function respondToInternalChat(
   if (!chat) throw new Error("CHAT_NOT_FOUND");
   await requireTicketAccess(actorUserId, respondScope, chat.ticketId);
   if (chat.status === "closed") throw new Error("CHAT_CLOSED");
+  if (chat.assignedUserId && chat.assignedUserId !== actorUserId) {
+    throw new Error("CHAT_ASSIGNED_TO_OTHER_USER");
+  }
 
   const now = new Date();
   await db.transaction(async (tx) => {
@@ -205,7 +346,7 @@ export async function respondToInternalChat(
     await tx
       .update(tickets)
       .set({
-        assignedUserId: actorUserId,
+        assignedUserId: chat.assignedUserId ?? actorUserId,
         firstResponseAt: chat.firstResponseAt ?? now,
         status: chat.status === "new" ? "open" : chat.status,
         updatedAt: now,
