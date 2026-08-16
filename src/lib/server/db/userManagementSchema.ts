@@ -31,3 +31,24 @@ export const userInvites = pgTable(
     index("user_invites_expires_idx").on(table.expiresAt),
   ],
 );
+
+export const passwordResetTokens = pgTable(
+  "auth_password_reset_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("auth_password_reset_tokens_token_unique").on(table.tokenHash),
+    index("auth_password_reset_tokens_user_idx").on(table.userId),
+    index("auth_password_reset_tokens_expires_idx").on(table.expiresAt),
+  ],
+);
