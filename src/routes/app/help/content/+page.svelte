@@ -80,7 +80,7 @@
                       <button type="submit" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#F0C8C8] bg-white px-3 text-[9px] font-semibold text-[#9B2C2C] transition hover:bg-[#FFF5F5]"><Trash2 size={12}/>Descartar</button>
                     </form>
                   {:else if data.canArchive && content.publishedAt && content.status !== "archived"}
-                    <form method="POST" action="?/archive" on:submit={(event) => { if (!confirm("Arquivar este conteúdo? Ele deixará de aparecer na Central pública e não será usado pela IA até uma futura restauração.")) event.preventDefault(); }}>
+                    <form method="POST" action="?/archive" on:submit={(event) => { if (!confirm("Arquivar este conteúdo? Ele deixará de aparecer na Central pública e deixará de ser usado pela IA. O histórico será mantido.")) event.preventDefault(); }}>
                       <input type="hidden" name="contentId" value={content.id}/>
                       <button type="submit" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-3 text-[9px] font-semibold text-[#626979] transition hover:bg-[#F5F6F8]"><Archive size={12}/>Arquivar</button>
                     </form>
