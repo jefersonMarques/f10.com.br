@@ -4,6 +4,7 @@ import {
   isSupportAiChatEnabled,
   processSupportAiChatMessage,
 } from "$lib/server/support/supportAiChat";
+import { handlePureSupportGreeting } from "$lib/server/support/supportChatLocalIntent";
 import { startPublicChat } from "$lib/server/support/publicChatRepository";
 import { autoAssignTicketIfConfigured } from "$lib/server/support/supportRoutingRepository";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
@@ -126,9 +127,14 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
       },
       enableAi: isSupportAiChatEnabled(),
     });
-    const ai = session.aiState === "active"
-      ? await processSupportAiChatMessage(session.sessionId, message)
-      : null;
+
+    let ai: { state: "active" | "escalated" | "human" | "disabled"; processed: boolean } | null = null;
+    if (session.aiState === "active") {
+      const handledLocally = await handlePureSupportGreeting(session.sessionId, message);
+      ai = handledLocally
+        ? { state: "active", processed: true }
+        : await processSupportAiChatMessage(session.sessionId, message);
+    }
 
     if (session.aiState !== "active") {
       const assignedUserId = await autoAssignTicketIfConfigured(session.ticketId).catch(() => null);
