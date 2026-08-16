@@ -5,6 +5,7 @@ import {
   processSupportAiChatMessage,
 } from "$lib/server/support/supportAiChat";
 import { startPublicChat } from "$lib/server/support/publicChatRepository";
+import { autoAssignTicketIfConfigured } from "$lib/server/support/supportRoutingRepository";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
 
 const MAX_BODY_BYTES = 20 * 1024;
@@ -121,10 +122,13 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
       : null;
 
     if (!enableAi) {
-      await notifySupportTicketNeedsAttention(
-        session.ticketId,
-        "Novo atendimento iniciado sem automação de IA.",
-      ).catch(() => undefined);
+      const assignedUserId = await autoAssignTicketIfConfigured(session.ticketId).catch(() => null);
+      if (!assignedUserId) {
+        await notifySupportTicketNeedsAttention(
+          session.ticketId,
+          "Novo atendimento iniciado sem automação de IA.",
+        ).catch(() => undefined);
+      }
     }
 
     return json(
