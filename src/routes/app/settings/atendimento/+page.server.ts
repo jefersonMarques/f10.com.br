@@ -14,6 +14,13 @@ import {
   updateSupportQueueTeam,
 } from "$lib/server/settings/supportQueueSettingsRepository";
 import {
+  createSupportChatEntryOption,
+  createSupportQueue,
+  deleteSupportChatEntryOption,
+  getSupportChatEntrySettings,
+  updateSupportChatEntryOption,
+} from "$lib/server/support/supportChatEntryRepository";
+import {
   getSupportRoutingSettings,
   updateSupportRoutingSettings,
   type SupportAssignmentMode,
@@ -49,14 +56,35 @@ function readSettings(formData: FormData): SupportHoursSettings {
   };
 }
 
+function readEntryOption(formData: FormData) {
+  const label = readString(formData, "label");
+  const description = readString(formData, "description");
+  const queueId = readString(formData, "queueId");
+  const initialHandling = readString(formData, "initialHandling") === "human" ? "human" as const : "ai" as const;
+  const sortOrder = Math.min(Math.max(readInteger(formData, "sortOrder", 10), 0), 10_000);
+
+  if (label.length < 2 || label.length > 80 || description.length > 180 || !isUuid(queueId)) {
+    return null;
+  }
+  return {
+    label,
+    description,
+    queueId,
+    initialHandling,
+    active: formData.has("active"),
+    sortOrder,
+  };
+}
+
 export const load: PageServerLoad = async ({ cookies }) => {
   await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
-  const [settings, queue, routing] = await Promise.all([
+  const [settings, queue, routing, chatEntry] = await Promise.all([
     getSupportHoursSettings(),
     getSupportQueueTeamSettings(),
     getSupportRoutingSettings(),
+    getSupportChatEntrySettings(),
   ]);
-  return { settings, queue, routing };
+  return { settings, queue, routing, chatEntry };
 };
 
 export const actions: Actions = {
@@ -145,5 +173,109 @@ export const actions: Actions = {
       action: "saveRouting",
       message: "Distribuição do chat e limites da IA atualizados.",
     };
+  },
+
+  createQueue: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(
+      cookies,
+      "system.settings.manage",
+      "/app/settings/atendimento",
+    );
+    const formData = await request.formData();
+    const name = readString(formData, "name");
+    const teamId = readString(formData, "teamId");
+    if (name.length < 2 || name.length > 80 || !isUuid(teamId)) {
+      return fail(400, {
+        success: false,
+        action: "createQueue",
+        message: "Informe um nome de fila e uma equipe responsável.",
+      });
+    }
+    try {
+      await createSupportQueue(session.user.id, name, teamId);
+      return { success: true, action: "createQueue", message: "Fila de atendimento criada." };
+    } catch {
+      return fail(400, {
+        success: false,
+        action: "createQueue",
+        message: "Não foi possível criar a fila de atendimento.",
+      });
+    }
+  },
+
+  createEntryOption: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(
+      cookies,
+      "system.settings.manage",
+      "/app/settings/atendimento",
+    );
+    const input = readEntryOption(await request.formData());
+    if (!input) {
+      return fail(400, {
+        success: false,
+        action: "createEntryOption",
+        message: "Revise nome, descrição e fila da opção.",
+      });
+    }
+    try {
+      await createSupportChatEntryOption(session.user.id, input);
+      return { success: true, action: "createEntryOption", message: "Opção de entrada criada." };
+    } catch {
+      return fail(400, {
+        success: false,
+        action: "createEntryOption",
+        message: "Não foi possível criar esta opção de entrada.",
+      });
+    }
+  },
+
+  updateEntryOption: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(
+      cookies,
+      "system.settings.manage",
+      "/app/settings/atendimento",
+    );
+    const formData = await request.formData();
+    const optionId = readString(formData, "optionId");
+    const input = readEntryOption(formData);
+    if (!isUuid(optionId) || !input) {
+      return fail(400, {
+        success: false,
+        action: "updateEntryOption",
+        message: "Revise os dados da opção de entrada.",
+      });
+    }
+    try {
+      await updateSupportChatEntryOption(session.user.id, optionId, input);
+      return { success: true, action: "updateEntryOption", message: "Opção de entrada atualizada." };
+    } catch {
+      return fail(400, {
+        success: false,
+        action: "updateEntryOption",
+        message: "Não foi possível atualizar esta opção.",
+      });
+    }
+  },
+
+  deleteEntryOption: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(
+      cookies,
+      "system.settings.manage",
+      "/app/settings/atendimento",
+    );
+    const optionId = readString(await request.formData(), "optionId");
+    if (!isUuid(optionId)) {
+      return fail(400, { success: false, action: "deleteEntryOption", message: "Opção inválida." });
+    }
+    try {
+      await deleteSupportChatEntryOption(session.user.id, optionId);
+      return { success: true, action: "deleteEntryOption", message: "Opção removida." };
+    } catch {
+      return fail(400, {
+        success: false,
+        action: "deleteEntryOption",
+        message: "Não foi possível remover esta opção.",
+      });
+    }
   },
 };
