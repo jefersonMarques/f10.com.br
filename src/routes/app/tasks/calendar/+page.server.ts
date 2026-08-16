@@ -51,14 +51,22 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const canCreate = hasPermission(permissions, "tasks.create");
   const canAssign = hasPermission(permissions, "tasks.assign");
 
-  const sourceTasks = selectedProject
-    ? (await getTaskBoard(layout.user.id, permissions, selectedProject.id)).tasks.map((task) => ({
+  let sourceTasks;
+  if (selectedProject) {
+    const board = await getTaskBoard(layout.user.id, permissions, selectedProject.id);
+    sourceTasks = board.tasks.map((task) => {
+      const status = board.statuses.find((item) => item.id === task.statusId);
+      return {
         ...task,
+        projectId: selectedProject.id,
         projectName: selectedProject.name,
-        statusName: "",
-        statusClosed: Boolean(task.completedAt),
-      }))
-    : await listMyTasks(layout.user.id, permissions);
+        statusName: status?.name ?? "",
+        statusClosed: status?.isClosed ?? Boolean(task.completedAt),
+      };
+    });
+  } else {
+    sourceTasks = await listMyTasks(layout.user.id, permissions);
+  }
 
   const membersByProject = canAssign
     ? Object.fromEntries(
