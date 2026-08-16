@@ -5,6 +5,7 @@ import {
   processSupportAiChatMessage,
 } from "$lib/server/support/supportAiChat";
 import { startPublicChat } from "$lib/server/support/publicChatRepository";
+import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
 
 const MAX_BODY_BYTES = 20 * 1024;
 
@@ -118,6 +119,13 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
     const ai = enableAi
       ? await processSupportAiChatMessage(session.sessionId, message)
       : null;
+
+    if (!enableAi) {
+      await notifySupportTicketNeedsAttention(
+        session.ticketId,
+        "Novo atendimento iniciado sem automação de IA.",
+      ).catch(() => undefined);
+    }
 
     return json(
       {
