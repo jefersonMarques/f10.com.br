@@ -163,3 +163,8 @@ body::after {
     @apply rounded-2xl border border-slate-200 bg-card shadow-md;
   }
 }
+
+/* Operations intentionally keeps a dense UI, but 10px text was too small at 100% browser zoom. */
+.operations-shell .text-\[10px\] {
+  font-size: 11px;
+}
