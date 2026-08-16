@@ -8,6 +8,7 @@ import {
 } from "drizzle-orm";
 import { getPermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { users } from "$lib/server/db/schema";
 import {
   customerContacts,
@@ -323,6 +324,7 @@ export async function addTicketMessage(
   ticketId: string,
   body: string,
   visibility: "public" | "internal",
+  mentionedUserIds: string[] = [],
 ): Promise<void> {
   const scope = requireSupportScope(permissions, "tickets.reply");
   await requireTicketAccess(actorUserId, scope, ticketId);
@@ -330,13 +332,26 @@ export async function addTicketMessage(
   const db = getDatabase();
   const now = new Date();
   const [ticket] = await db
-    .select({ status: tickets.status, firstResponseAt: tickets.firstResponseAt })
+    .select({
+      status: tickets.status,
+      firstResponseAt: tickets.firstResponseAt,
+      ticketNumber: tickets.ticketNumber,
+      subject: tickets.subject,
+    })
     .from(tickets)
     .where(eq(tickets.id, ticketId))
     .limit(1);
 
   if (!ticket) throw new Error("TICKET_NOT_FOUND");
   if (ticket.status === "closed") throw new Error("TICKET_CLOSED");
+
+  const uniqueMentionIds = Array.from(new Set(mentionedUserIds)).filter((id) => id !== actorUserId).slice(0, 20);
+  const mentionUsers = visibility === "internal" && uniqueMentionIds.length > 0
+    ? await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(inArray(users.id, uniqueMentionIds), eq(users.status, "active")))
+    : [];
 
   await db.transaction(async (tx) => {
     await tx.insert(ticketMessages).values({
@@ -363,8 +378,23 @@ export async function addTicketMessage(
       actorUserId,
       eventType:
         visibility === "public" ? "ticket.replied" : "ticket.note.added",
-      metadata: {},
+      metadata: mentionUsers.length > 0 ? { mentionedUserIds: mentionUsers.map((user) => user.id) } : {},
     });
+
+    if (visibility === "internal" && mentionUsers.length > 0) {
+      await tx.insert(internalNotifications).values(
+        mentionUsers.map((user) => ({
+          userId: user.id,
+          actorUserId,
+          kind: "ticket.mention",
+          title: `Você foi mencionado no ticket #${ticket.ticketNumber}`,
+          body: body.trim().slice(0, 500),
+          href: `/app/tickets/${ticketId}`,
+          entityType: "ticket",
+          entityId: ticketId,
+        })),
+      );
+    }
   });
 }
 
@@ -432,13 +462,21 @@ export async function assignTicket(
   await requireTicketAccess(actorUserId, scope, ticketId);
 
   const db = getDatabase();
-  const [agent] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(and(eq(users.id, assignedUserId), eq(users.status, "active")))
-    .limit(1);
+  const [[agent], [ticket]] = await Promise.all([
+    db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.id, assignedUserId), eq(users.status, "active")))
+      .limit(1),
+    db
+      .select({ ticketNumber: tickets.ticketNumber, subject: tickets.subject })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId))
+      .limit(1),
+  ]);
 
   if (!agent) throw new Error("AGENT_NOT_ACTIVE");
+  if (!ticket) throw new Error("TICKET_NOT_FOUND");
 
   await db.transaction(async (tx) => {
     await tx
@@ -451,5 +489,18 @@ export async function assignTicket(
       eventType: "ticket.assignee.changed",
       metadata: { assignedUserId },
     });
+
+    if (assignedUserId !== actorUserId) {
+      await tx.insert(internalNotifications).values({
+        userId: assignedUserId,
+        actorUserId,
+        kind: "ticket.assigned",
+        title: `Ticket #${ticket.ticketNumber} atribuído a você`,
+        body: ticket.subject.slice(0, 500),
+        href: `/app/tickets/${ticketId}`,
+        entityType: "ticket",
+        entityId: ticketId,
+      });
+    }
   });
 }
