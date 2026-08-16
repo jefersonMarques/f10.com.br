@@ -1,26 +1,24 @@
-import {
-  error,
-  fail,
-  redirect,
-  type Actions,
-} from "@sveltejs/kit";
+import { error, fail, redirect, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
+import { hasPermission } from "$lib/server/auth/permissions";
 import {
-  getPermissionScope,
-  hasPermission,
-} from "$lib/server/auth/permissions";
-import { ensureTaskProjectAccess } from "$lib/server/tasks/taskAccess";
+  listTaskTicketOrigins,
+  listTaskTicketOriginsForTasks,
+} from "$lib/server/support/ticketTaskBridge";
 import {
-  addTaskProjectMember,
+  addTaskComment,
+  assignTask,
   createTask,
   createTaskProject,
   getTaskBoard,
+  getTaskDetails,
   listActiveTaskUsers,
+  listMyTasks,
   listProjectMembers,
   listTaskProjects,
   moveTask,
-  removeTaskProjectMember,
+  updateTaskDetails,
   type TaskPriority,
 } from "$lib/server/tasks/taskRepository";
 
@@ -52,10 +50,8 @@ function isTaskPriority(value: string): value is TaskPriority {
 
 function isValidDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-
   const [year, month, day] = value.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
-
   return (
     date.getUTCFullYear() === year &&
     date.getUTCMonth() === month - 1 &&
@@ -69,6 +65,23 @@ function createPermissionMap(
   return new Map(permissions.map((permission) => [permission.code, permission.scope]));
 }
 
+async function loadSelectedTask(
+  userId: string,
+  permissions: Map<string, "own" | "team" | "all">,
+  taskId: string,
+) {
+  if (!isUuid(taskId)) return null;
+  try {
+    const [details, ticketOrigins] = await Promise.all([
+      getTaskDetails(userId, permissions, taskId),
+      listTaskTicketOrigins(userId, permissions, taskId),
+    ]);
+    return { details, ticketOrigins };
+  } catch {
+    return null;
+  }
+}
+
 export const load: PageServerLoad = async ({ parent, url }) => {
   const layout = await parent();
   const permissionMap = createPermissionMap(layout.permissions);
@@ -79,39 +92,53 @@ export const load: PageServerLoad = async ({ parent, url }) => {
 
   const projects = await listTaskProjects(layout.user.id, permissionMap);
   const requestedProjectId = url.searchParams.get("project") ?? "";
-  const selectedProject =
-    projects.find((project) => project.id === requestedProjectId) ?? projects[0] ?? null;
+  const selectedProject = projects.find((project) => project.id === requestedProjectId) ?? null;
+  const mode = selectedProject ? "project" as const : "mine" as const;
+  const requestedView = url.searchParams.get("view");
+  const view = mode === "project" && requestedView === "board" ? "board" as const : "list" as const;
+  const selectedTaskId = url.searchParams.get("task") ?? "";
+
   const canManage = hasPermission(permissionMap, "tasks.manage");
   const canCreate = hasPermission(permissionMap, "tasks.create");
   const canUpdate = hasPermission(permissionMap, "tasks.update");
   const canAssign = hasPermission(permissionMap, "tasks.assign");
 
-  if (!selectedProject) {
-    return {
-      projects,
-      selectedProjectId: null,
-      board: null,
-      members: [],
-      activeUsers: canManage ? await listActiveTaskUsers() : [],
-      canManage,
-      canCreate,
-      canUpdate,
-      canAssign,
-    };
-  }
-
-  const [board, members, activeUsers] = await Promise.all([
-    getTaskBoard(layout.user.id, permissionMap, selectedProject.id),
-    listProjectMembers(selectedProject.id),
+  const [board, myTasks, members, activeUsers, selectedTask] = await Promise.all([
+    selectedProject
+      ? getTaskBoard(layout.user.id, permissionMap, selectedProject.id)
+      : Promise.resolve(null),
+    mode === "mine"
+      ? listMyTasks(layout.user.id, permissionMap)
+      : Promise.resolve([]),
+    selectedProject
+      ? listProjectMembers(selectedProject.id)
+      : Promise.resolve([]),
     canManage ? listActiveTaskUsers() : Promise.resolve([]),
+    selectedTaskId
+      ? loadSelectedTask(layout.user.id, permissionMap, selectedTaskId)
+      : Promise.resolve(null),
   ]);
+
+  const visibleTasks = board?.tasks ?? myTasks;
+  const ticketOriginsByTask = Object.fromEntries(
+    await listTaskTicketOriginsForTasks(
+      layout.user.id,
+      permissionMap,
+      visibleTasks.map((task) => task.id),
+    ),
+  );
 
   return {
     projects,
-    selectedProjectId: selectedProject.id,
+    mode,
+    view,
+    selectedProjectId: selectedProject?.id ?? null,
     board,
+    myTasks,
     members,
     activeUsers,
+    selectedTask,
+    ticketOriginsByTask,
     canManage,
     canCreate,
     canUpdate,
@@ -121,64 +148,30 @@ export const load: PageServerLoad = async ({ parent, url }) => {
 
 export const actions: Actions = {
   createProject: async ({ cookies, request }) => {
-    const { session } = await requireAppPermission(
-      cookies,
-      "tasks.manage",
-      "/app/tasks",
-    );
+    const { session } = await requireAppPermission(cookies, "tasks.manage", "/app/tasks");
     const formData = await request.formData();
     const name = readFormValue(formData, "name");
     const description = readFormValue(formData, "description");
     const memberIds = readUuidList(formData, "memberIds");
 
     if (name.length < 2 || name.length > 120) {
-      return fail(400, {
-        success: false,
-        action: "createProject",
-        message: "Informe um nome de projeto entre 2 e 120 caracteres.",
-      });
+      return fail(400, { success: false, action: "createProject", message: "Informe um nome de projeto entre 2 e 120 caracteres." });
     }
-
     if (description.length > 1000) {
-      return fail(400, {
-        success: false,
-        action: "createProject",
-        message: "A descrição do projeto deve ter no máximo 1.000 caracteres.",
-      });
+      return fail(400, { success: false, action: "createProject", message: "A descrição do projeto deve ter no máximo 1.000 caracteres." });
     }
 
     try {
-      const project = await createTaskProject(session.user.id, {
-        name,
-        description,
-        memberIds,
-      });
-
+      const project = await createTaskProject(session.user.id, { name, description, memberIds });
       throw redirect(303, `/app/tasks?project=${project.id}`);
     } catch (cause) {
-      if (
-        cause &&
-        typeof cause === "object" &&
-        "status" in cause &&
-        cause.status === 303
-      ) {
-        throw cause;
-      }
-
-      return fail(409, {
-        success: false,
-        action: "createProject",
-        message: "Não foi possível criar o projeto com os membros selecionados.",
-      });
+      if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
+      return fail(409, { success: false, action: "createProject", message: "Não foi possível criar o projeto com os integrantes selecionados." });
     }
   },
 
   createTask: async ({ cookies, request }) => {
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      "tasks.create",
-      "/app/tasks",
-    );
+    const { session, permissions } = await requireAppPermission(cookies, "tasks.create", "/app/tasks");
     const formData = await request.formData();
     const projectId = readFormValue(formData, "projectId");
     const title = readFormValue(formData, "title");
@@ -187,53 +180,12 @@ export const actions: Actions = {
     const requestedDueOn = readFormValue(formData, "dueOn");
     const requestedAssigneeId = readFormValue(formData, "assigneeId");
 
-    if (!isUuid(projectId)) {
-      return fail(400, {
-        success: false,
-        action: "createTask",
-        message: "Projeto inválido.",
-      });
-    }
-
-    if (title.length < 3 || title.length > 180) {
-      return fail(400, {
-        success: false,
-        action: "createTask",
-        message: "Informe um título entre 3 e 180 caracteres.",
-      });
-    }
-
-    if (description.length > 5000) {
-      return fail(400, {
-        success: false,
-        action: "createTask",
-        message: "A descrição deve ter no máximo 5.000 caracteres.",
-      });
-    }
-
-    if (!isTaskPriority(priority)) {
-      return fail(400, {
-        success: false,
-        action: "createTask",
-        message: "Prioridade inválida.",
-      });
-    }
-
-    if (requestedDueOn && !isValidDate(requestedDueOn)) {
-      return fail(400, {
-        success: false,
-        action: "createTask",
-        message: "Data de prazo inválida.",
-      });
-    }
-
-    if (requestedAssigneeId && !isUuid(requestedAssigneeId)) {
-      return fail(400, {
-        success: false,
-        action: "createTask",
-        message: "Responsável inválido.",
-      });
-    }
+    if (!isUuid(projectId)) return fail(400, { success: false, action: "createTask", message: "Projeto inválido." });
+    if (title.length < 3 || title.length > 180) return fail(400, { success: false, action: "createTask", message: "Informe um título entre 3 e 180 caracteres." });
+    if (description.length > 5000) return fail(400, { success: false, action: "createTask", message: "A descrição deve ter no máximo 5.000 caracteres." });
+    if (!isTaskPriority(priority)) return fail(400, { success: false, action: "createTask", message: "Prioridade inválida." });
+    if (requestedDueOn && !isValidDate(requestedDueOn)) return fail(400, { success: false, action: "createTask", message: "Data de prazo inválida." });
+    if (requestedAssigneeId && !isUuid(requestedAssigneeId)) return fail(400, { success: false, action: "createTask", message: "Responsável inválido." });
 
     try {
       await createTask(session.user.id, permissions, {
@@ -244,133 +196,89 @@ export const actions: Actions = {
         dueOn: requestedDueOn || null,
         assigneeId: requestedAssigneeId || null,
       });
-
-      return {
-        success: true,
-        action: "createTask",
-        message: "Tarefa criada.",
-      };
+      return { success: true, action: "createTask", message: "Tarefa criada." };
     } catch {
-      return fail(403, {
-        success: false,
-        action: "createTask",
-        message: "Não foi possível criar esta tarefa no projeto selecionado.",
-      });
+      return fail(403, { success: false, action: "createTask", message: "Não foi possível criar esta tarefa no projeto selecionado." });
     }
   },
 
   moveTask: async ({ cookies, request }) => {
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      "tasks.update",
-      "/app/tasks",
-    );
+    const { session, permissions } = await requireAppPermission(cookies, "tasks.update", "/app/tasks");
     const formData = await request.formData();
     const taskId = readFormValue(formData, "taskId");
     const statusId = readFormValue(formData, "statusId");
 
     if (!isUuid(taskId) || !isUuid(statusId)) {
-      return fail(400, {
-        success: false,
-        action: "moveTask",
-        message: "Tarefa ou status inválido.",
-      });
+      return fail(400, { success: false, action: "moveTask", message: "Tarefa ou status inválido." });
     }
 
     try {
       await moveTask(session.user.id, permissions, taskId, statusId);
-
-      return {
-        success: true,
-        action: "moveTask",
-        message: "Status da tarefa atualizado.",
-      };
+      return { success: true, action: "moveTask", message: "Status da tarefa atualizado." };
     } catch {
-      return fail(403, {
-        success: false,
-        action: "moveTask",
-        message: "Você não pode alterar esta tarefa.",
-      });
+      return fail(403, { success: false, action: "moveTask", message: "Você não pode alterar esta tarefa." });
     }
   },
 
-  addMember: async ({ cookies, request }) => {
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      "tasks.manage",
-      "/app/tasks",
-    );
+  updateTask: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(cookies, "tasks.update", "/app/tasks");
     const formData = await request.formData();
-    const projectId = readFormValue(formData, "projectId");
-    const userId = readFormValue(formData, "userId");
-    const scope = getPermissionScope(permissions, "tasks.manage");
+    const taskId = readFormValue(formData, "taskId");
+    const title = readFormValue(formData, "title");
+    const description = readFormValue(formData, "description");
+    const priority = readFormValue(formData, "priority");
+    const dueOn = readFormValue(formData, "dueOn");
 
-    if (!isUuid(projectId) || !isUuid(userId) || !scope) {
-      return fail(400, {
-        success: false,
-        action: "addMember",
-        message: "Projeto ou usuário inválido.",
-      });
+    if (!isUuid(taskId) || title.length < 3 || title.length > 180 || description.length > 5000 || !isTaskPriority(priority) || (dueOn && !isValidDate(dueOn))) {
+      return fail(400, { success: false, action: "updateTask", message: "Revise os dados da tarefa." });
     }
 
     try {
-      await ensureTaskProjectAccess(session.user.id, scope, projectId);
-      await addTaskProjectMember(session.user.id, projectId, userId);
-
-      return {
-        success: true,
-        action: "addMember",
-        message: "Integrante adicionado ao projeto.",
-      };
-    } catch {
-      return fail(403, {
-        success: false,
-        action: "addMember",
-        message: "Não foi possível adicionar este integrante ao projeto.",
+      await updateTaskDetails(session.user.id, permissions, taskId, {
+        title,
+        description,
+        priority,
+        dueOn: dueOn || null,
       });
+      return { success: true, action: "updateTask", message: "Tarefa atualizada." };
+    } catch {
+      return fail(403, { success: false, action: "updateTask", message: "Você não pode alterar esta tarefa." });
     }
   },
 
-  removeMember: async ({ cookies, request }) => {
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      "tasks.manage",
-      "/app/tasks",
-    );
+  assignTask: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(cookies, "tasks.assign", "/app/tasks");
     const formData = await request.formData();
-    const projectId = readFormValue(formData, "projectId");
-    const userId = readFormValue(formData, "userId");
-    const scope = getPermissionScope(permissions, "tasks.manage");
-
-    if (!isUuid(projectId) || !isUuid(userId) || !scope) {
-      return fail(400, {
-        success: false,
-        action: "removeMember",
-        message: "Projeto ou usuário inválido.",
-      });
+    const taskId = readFormValue(formData, "taskId");
+    const assigneeId = readFormValue(formData, "assigneeId");
+    if (!isUuid(taskId) || !isUuid(assigneeId)) {
+      return fail(400, { success: false, action: "assignTask", message: "Responsável inválido." });
     }
 
     try {
-      await ensureTaskProjectAccess(session.user.id, scope, projectId);
-      await removeTaskProjectMember(session.user.id, projectId, userId);
+      await assignTask(session.user.id, permissions, taskId, assigneeId);
+      return { success: true, action: "assignTask", message: "Responsável atualizado." };
+    } catch {
+      return fail(403, { success: false, action: "assignTask", message: "Você não pode atribuir esta tarefa a esse integrante." });
+    }
+  },
 
-      return {
-        success: true,
-        action: "removeMember",
-        message: "Integrante removido do projeto.",
-      };
-    } catch (cause) {
-      const message =
-        cause instanceof Error &&
-        cause.message === "PROJECT_OWNER_CANNOT_BE_REMOVED"
-          ? "O criador do projeto não pode ser removido."
-          : "Não foi possível remover este integrante do projeto.";
+  commentTask: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(cookies, "tasks.update", "/app/tasks");
+    const formData = await request.formData();
+    const taskId = readFormValue(formData, "taskId");
+    const body = readFormValue(formData, "body");
+    const mentionedUserIds = readUuidList(formData, "mentionedUserIds");
 
-      return fail(409, {
-        success: false,
-        action: "removeMember",
-        message,
-      });
+    if (!isUuid(taskId) || body.length < 1 || body.length > 5000) {
+      return fail(400, { success: false, action: "commentTask", message: "O comentário deve ter entre 1 e 5.000 caracteres." });
+    }
+
+    try {
+      await addTaskComment(session.user.id, permissions, taskId, body, mentionedUserIds);
+      return { success: true, action: "commentTask", message: "Comentário adicionado." };
+    } catch {
+      return fail(403, { success: false, action: "commentTask", message: "Você não pode comentar nesta tarefa." });
     }
   },
 };
