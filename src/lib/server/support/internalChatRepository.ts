@@ -241,6 +241,13 @@ export async function claimInternalChat(
       eventType: "chat.claimed",
       metadata: { assignedUserId: actorUserId },
     });
+    await tx.insert(ticketMessages).values({
+      ticketId: chat.ticketId,
+      authorType: "system",
+      visibility: "public",
+      channel: "web_chat",
+      body: "Um atendente da equipe F10 assumiu o atendimento.",
+    });
   });
 }
 
@@ -305,6 +312,13 @@ export async function assignInternalChat(
       actorUserId,
       eventType: "chat.assigned",
       metadata: { assignedUserId: targetUserId },
+    });
+    await tx.insert(ticketMessages).values({
+      ticketId: chat.ticketId,
+      authorType: "system",
+      visibility: "public",
+      channel: "web_chat",
+      body: "Seu atendimento foi encaminhado para a equipe responsável.",
     });
     if (targetUserId !== actorUserId) {
       await tx.insert(internalNotifications).values({
