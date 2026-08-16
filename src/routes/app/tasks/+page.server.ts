@@ -34,14 +34,29 @@ function readFormValue(formData: FormData, name: string): string {
 }
 
 function readUuidList(formData: FormData, name: string): string[] {
-  return Array.from(
-    new Set(
-      formData
-        .getAll(name)
-        .map((value) => (typeof value === "string" ? value.trim() : ""))
-        .filter(isUuid),
-    ),
-  );
+  const ids: string[] = [];
+
+  for (const value of formData.getAll(name)) {
+    if (typeof value !== "string") continue;
+    const normalized = value.trim();
+    if (isUuid(normalized)) {
+      ids.push(normalized);
+      continue;
+    }
+
+    if (normalized.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(normalized);
+        if (Array.isArray(parsed)) {
+          ids.push(...parsed.filter((item): item is string => typeof item === "string" && isUuid(item)));
+        }
+      } catch {
+        // Campo opcional inválido é ignorado; a validação de acesso ocorre no repositório.
+      }
+    }
+  }
+
+  return Array.from(new Set(ids)).slice(0, 100);
 }
 
 function isTaskPriority(value: string): value is TaskPriority {
