@@ -1,5 +1,6 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { webChatSessions } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { teamMembers, users } from "$lib/server/db/schema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
@@ -13,6 +14,7 @@ export async function notifySupportTicketNeedsAttention(
     .select({
       ticketNumber: tickets.ticketNumber,
       subject: tickets.subject,
+      channel: tickets.channel,
       assignedUserId: tickets.assignedUserId,
       teamId: supportQueues.teamId,
     })
@@ -37,13 +39,29 @@ export async function notifySupportTicketNeedsAttention(
 
   if (recipientIds.length === 0) return;
 
+  const [chatSession] = ticket.channel === "web_chat"
+    ? await db
+        .select({ id: webChatSessions.id })
+        .from(webChatSessions)
+        .where(eq(webChatSessions.ticketId, ticketId))
+        .limit(1)
+    : [];
+  const isChatNotification = Boolean(chatSession?.id);
+  const kind = isChatNotification ? "chat.needs_attention" : "ticket.needs_attention";
+  const href = isChatNotification
+    ? `/app/chat/${chatSession.id}`
+    : `/app/tickets/${ticketId}`;
+  const title = isChatNotification
+    ? `Chat #${ticket.ticketNumber} precisa de atendimento`
+    : `Ticket #${ticket.ticketNumber} precisa de atendimento`;
+
   const existing = await db
     .select({ userId: internalNotifications.userId })
     .from(internalNotifications)
     .where(
       and(
         inArray(internalNotifications.userId, recipientIds),
-        eq(internalNotifications.kind, "ticket.needs_attention"),
+        eq(internalNotifications.kind, kind),
         eq(internalNotifications.entityType, "ticket"),
         eq(internalNotifications.entityId, ticketId),
         isNull(internalNotifications.readAt),
@@ -56,10 +74,10 @@ export async function notifySupportTicketNeedsAttention(
   await db.insert(internalNotifications).values(
     pendingRecipients.map((userId) => ({
       userId,
-      kind: "ticket.needs_attention",
-      title: `Ticket #${ticket.ticketNumber} precisa de atendimento`,
+      kind,
+      title,
       body: `${ticket.subject} — ${reason}`.slice(0, 500),
-      href: `/app/tickets/${ticketId}`,
+      href,
       entityType: "ticket",
       entityId: ticketId,
     })),
