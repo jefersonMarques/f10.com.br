@@ -25,6 +25,10 @@ function readString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 function isValidEmail(value: string): boolean {
   return (
     !value ||
@@ -80,6 +84,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
   const email = readString(body.email).toLowerCase();
   const phone = readString(body.phone);
   const message = readString(body.message);
+  const entryOptionId = readString(body.entryOptionId) || null;
   const contextUrl = sanitizeContextUrl(readString(body.contextUrl));
   const pageTitle = readString(body.pageTitle).slice(0, 200);
   const helpContext = readString(body.helpContext).slice(0, 200);
@@ -96,6 +101,10 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
     return json({ error: "INVALID_MESSAGE" }, { status: 400 });
   }
 
+  if (entryOptionId && !isUuid(entryOptionId)) {
+    return json({ error: "INVALID_ENTRY_OPTION" }, { status: 400 });
+  }
+
   let clientAddress = "unknown";
   try {
     clientAddress = getClientAddress();
@@ -104,29 +113,29 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
   }
 
   try {
-    const enableAi = isSupportAiChatEnabled();
     const session = await startPublicChat(clientAddress, {
       name,
       email,
       phone,
       message,
+      entryOptionId,
       contextUrl,
       contextData: {
         pageTitle: pageTitle || null,
         helpContext: helpContext || null,
       },
-      enableAi,
+      enableAi: isSupportAiChatEnabled(),
     });
-    const ai = enableAi
+    const ai = session.aiState === "active"
       ? await processSupportAiChatMessage(session.sessionId, message)
       : null;
 
-    if (!enableAi) {
+    if (session.aiState !== "active") {
       const assignedUserId = await autoAssignTicketIfConfigured(session.ticketId).catch(() => null);
       if (!assignedUserId) {
         await notifySupportTicketNeedsAttention(
           session.ticketId,
-          "Novo atendimento iniciado sem automação de IA.",
+          "Novo atendimento direcionado para atendimento humano.",
         ).catch(() => undefined);
       }
     }
@@ -136,6 +145,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
         sessionId: session.sessionId,
         token: session.token,
         ticketNumber: session.ticketNumber,
+        entryOptionLabel: session.entryOptionLabel,
         expiresAt: session.expiresAt.toISOString(),
         aiState: ai?.state ?? session.aiState,
         aiProcessed: ai?.processed ?? false,
@@ -148,6 +158,9 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
   } catch (cause) {
     if (cause instanceof Error && cause.message === "CHAT_RATE_LIMITED") {
       return json({ error: "RATE_LIMITED" }, { status: 429 });
+    }
+    if (cause instanceof Error && cause.message === "CHAT_ENTRY_OPTION_NOT_FOUND") {
+      return json({ error: "INVALID_ENTRY_OPTION" }, { status: 400 });
     }
 
     const diagnosticCode = diagnoseChatStartFailure(cause);
