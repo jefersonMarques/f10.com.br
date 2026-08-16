@@ -4,7 +4,7 @@ import { getDatabase } from "$lib/server/db";
 import { helpContentVersions } from "$lib/server/db/schema";
 import { helpPublications } from "$lib/server/db/helpPublications";
 import { helpSearchDocuments } from "$lib/server/db/helpSearchSchema";
-import { helpContents } from "$lib/server/db/structuredHelpSchema";
+import { helpAssets, helpContents } from "$lib/server/db/structuredHelpSchema";
 
 async function getContent(contentId: string) {
   const [content] = await getDatabase()
@@ -50,6 +50,15 @@ export async function discardStructuredHelpContent(
   }
 
   await db.transaction(async (tx) => {
+    // Assets are reusable library items. Older databases still have the original
+    // ON DELETE CASCADE FK from help_assets.content_id, while the current schema
+    // models this relationship as ON DELETE SET NULL. Detach them explicitly
+    // before deleting the draft so discarding content never deletes managed files.
+    await tx
+      .update(helpAssets)
+      .set({ contentId: null })
+      .where(eq(helpAssets.contentId, contentId));
+
     await tx
       .delete(helpContentVersions)
       .where(
@@ -58,6 +67,7 @@ export async function discardStructuredHelpContent(
           eq(helpContentVersions.entityId, contentId),
         ),
       );
+
     await tx.delete(helpContents).where(eq(helpContents.id, contentId));
   });
 
