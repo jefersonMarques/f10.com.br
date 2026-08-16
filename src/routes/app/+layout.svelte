@@ -2,6 +2,7 @@
   import { page } from "$app/stores";
   import {
     BarChart3,
+    Bell,
     BookOpen,
     CheckSquare2,
     ChevronRight,
@@ -13,12 +14,14 @@
     Search,
     Settings,
     ShieldCheck,
+    UserCircle,
     Users,
   } from "lucide-svelte";
   import type { LayoutData } from "./$types";
 
   export let data: LayoutData;
 
+  let notificationOpen = false;
   const permissionCodes = new Set(data.permissions.map((permission) => permission.code));
 
   const navigationItems = [
@@ -44,6 +47,21 @@
     if (href === "/app") return pathname === href;
     return pathname === href || pathname.startsWith(`${href}/`);
   }
+
+  function navigationBadge(href?: string): number {
+    if (href === "/app/tickets") return data.notifications.ticketUnreadCount;
+    if (href === "/app/tasks") return data.notifications.taskUnreadCount;
+    return 0;
+  }
+
+  function formatNotificationDate(value: string | Date): string {
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
+  }
 </script>
 
 <svelte:head>
@@ -67,7 +85,15 @@
         <div class="space-y-1">
           {#each visibleNavigationItems as item}
             {#if item.enabled && item.href}
-              <a href={item.href} class={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-[13px] font-semibold transition ${isActiveNavigationItem(item.href) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#676D7D] hover:bg-[#F7F8FB] hover:text-[#000A57]"}`}><svelte:component this={item.icon} size={19} aria-hidden="true" /><span class="flex-1">{item.label}</span><ChevronRight size={15} aria-hidden="true" /></a>
+              <a href={item.href} class={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-[13px] font-semibold transition ${isActiveNavigationItem(item.href) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#676D7D] hover:bg-[#F7F8FB] hover:text-[#000A57]"}`}>
+                <svelte:component this={item.icon} size={19} aria-hidden="true" />
+                <span class="flex-1">{item.label}</span>
+                {#if navigationBadge(item.href) > 0}
+                  <span class="inline-flex min-w-5 items-center justify-center rounded-full bg-[#D92D20] px-1.5 py-0.5 text-[9px] font-bold text-white">{Math.min(navigationBadge(item.href), 99)}</span>
+                {:else}
+                  <ChevronRight size={15} aria-hidden="true" />
+                {/if}
+              </a>
             {:else}
               <div class="flex min-h-11 items-center gap-3 rounded-xl px-3 text-[13px] font-medium text-[#707687]"><svelte:component this={item.icon} size={19} aria-hidden="true" /><span class="flex-1">{item.label}</span><span class="rounded-full bg-[#F0F1F5] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[#8A8F9D]">Em breve</span></div>
             {/if}
@@ -76,14 +102,80 @@
       </nav>
 
       <div class="hidden border-t border-[#EEF0F5] p-4 lg:block">
-        <div class="rounded-2xl bg-[#F7F8FB] p-3"><p class="truncate text-[13px] font-semibold text-[#202637]">{data.user.name}</p><p class="mt-1 truncate text-[11px] text-[#777D8D]">{data.user.email}</p><div class="mt-3 flex flex-wrap gap-1.5">{#each data.roles as role}<span class="rounded-full bg-white px-2 py-1 text-[9px] font-bold tracking-[0.04em] text-[#000A57] shadow-sm">{role}</span>{/each}</div></div>
+        <a href="/app/minha-conta" class="block rounded-2xl bg-[#F7F8FB] p-3 transition hover:bg-[#EEF0FF]">
+          <div class="flex items-start gap-3">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#000A57] shadow-sm"><UserCircle size={20} /></span>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-[13px] font-semibold text-[#202637]">{data.user.name}</span>
+              <span class="mt-1 block truncate text-[11px] text-[#777D8D]">{data.user.email}</span>
+            </span>
+          </div>
+          <div class="mt-3 flex flex-wrap gap-1.5">{#each data.roles as role}<span class="rounded-full bg-white px-2 py-1 text-[9px] font-bold tracking-[0.04em] text-[#000A57] shadow-sm">{role}</span>{/each}</div>
+        </a>
         <form method="POST" action="/app/logout" class="mt-2"><button type="submit" class="flex h-10 w-full items-center gap-2 rounded-xl px-3 text-left text-[12px] font-semibold text-[#6D7280] transition hover:bg-[#FFF0F0] hover:text-[#A52A2A]"><LogOut size={17} aria-hidden="true" />Sair</button></form>
       </div>
     </div>
   </aside>
 
   <main class="min-w-0">
-    <header class="flex h-[78px] items-center justify-between border-b border-[#E2E5ED] bg-white px-5 sm:px-8"><div><p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">F10 Operations</p><p class="mt-1 text-[14px] font-semibold text-[#33394A]">Ambiente operacional interno</p></div><div class="flex items-center gap-3 lg:hidden"><span class="hidden text-right sm:block"><strong class="block max-w-40 truncate text-[12px]">{data.user.name}</strong><small class="block max-w-40 truncate text-[10px] text-[#858A98]">{data.user.email}</small></span><form method="POST" action="/app/logout"><button type="submit" class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F5F6FA] text-[#6D7280]" aria-label="Sair"><LogOut size={18} aria-hidden="true" /></button></form></div></header>
+    <header class="relative flex h-[78px] items-center justify-between border-b border-[#E2E5ED] bg-white px-5 sm:px-8">
+      <div><p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">F10 Operations</p><p class="mt-1 text-[14px] font-semibold text-[#33394A]">Ambiente operacional interno</p></div>
+      <div class="flex items-center gap-2 sm:gap-3">
+        <div class="relative">
+          <button
+            type="button"
+            class="relative flex h-10 w-10 items-center justify-center rounded-xl bg-[#F5F6FA] text-[#555C6D] transition hover:bg-[#EEF0FF] hover:text-[#000A57]"
+            aria-label="Notificações"
+            aria-expanded={notificationOpen}
+            on:click={() => (notificationOpen = !notificationOpen)}
+          >
+            <Bell size={18} aria-hidden="true" />
+            {#if data.notifications.unreadCount > 0}
+              <span class="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full border-2 border-white bg-[#D92D20] px-1 text-[8px] font-bold leading-4 text-white">{Math.min(data.notifications.unreadCount, 99)}</span>
+            {/if}
+          </button>
+
+          {#if notificationOpen}
+            <div class="absolute right-0 top-12 z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[#E1E4EC] bg-white shadow-2xl shadow-slate-900/15">
+              <div class="flex items-center justify-between border-b border-[#EEF0F5] px-4 py-3">
+                <div><strong class="block text-[12px] text-[#202637]">Notificações</strong><span class="text-[9px] text-[#8B909E]">{data.notifications.unreadCount} não lida(s)</span></div>
+                {#if data.notifications.unreadCount > 0}
+                  <form method="POST" action="/app/notifications/read-all"><button type="submit" class="text-[9px] font-semibold text-[#000A57] hover:underline">Marcar todas como lidas</button></form>
+                {/if}
+              </div>
+
+              {#if data.notifications.recent.length > 0}
+                <div class="max-h-[420px] overflow-y-auto p-1.5">
+                  {#each data.notifications.recent as notification}
+                    <a
+                      href={`/app/notifications/open/${notification.id}`}
+                      class={`block rounded-xl px-3 py-3 transition hover:bg-[#F6F7FB] ${notification.readAt ? "opacity-65" : "bg-[#F8F9FF]"}`}
+                    >
+                      <div class="flex items-start gap-2.5">
+                        <span class={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notification.readAt ? "bg-[#D5D8E0]" : "bg-[#D92D20]"}`}></span>
+                        <span class="min-w-0 flex-1">
+                          <strong class="block text-[10px] font-semibold leading-4 text-[#313747]">{notification.title}</strong>
+                          {#if notification.body}<span class="mt-1 line-clamp-2 block text-[9px] leading-4 text-[#747A89]">{notification.body}</span>{/if}
+                          <span class="mt-1.5 block text-[8px] text-[#9A9EAA]">{formatNotificationDate(notification.createdAt)}</span>
+                        </span>
+                      </div>
+                    </a>
+                  {/each}
+                </div>
+              {:else}
+                <p class="px-5 py-8 text-center text-[10px] text-[#8B909E]">Nenhuma notificação por enquanto.</p>
+              {/if}
+            </div>
+          {/if}
+        </div>
+
+        <a href="/app/minha-conta" class="hidden min-w-0 items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-[#F7F8FB] sm:flex lg:hidden">
+          <UserCircle size={20} class="shrink-0 text-[#000A57]" />
+          <span class="hidden min-w-0 text-right md:block"><strong class="block max-w-40 truncate text-[12px]">{data.user.name}</strong><small class="block max-w-40 truncate text-[10px] text-[#858A98]">{data.user.email}</small></span>
+        </a>
+        <form method="POST" action="/app/logout" class="lg:hidden"><button type="submit" class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F5F6FA] text-[#6D7280]" aria-label="Sair"><LogOut size={18} aria-hidden="true" /></button></form>
+      </div>
+    </header>
     <slot />
   </main>
 </div>
