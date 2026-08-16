@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { dev } from "$app/environment";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, ne } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { roles, sessions, userRoles, users } from "$lib/server/db/schema";
 
@@ -44,6 +44,20 @@ export async function revokeSession(token: string): Promise<void> {
     .update(sessions)
     .set({ revokedAt: new Date() })
     .where(eq(sessions.tokenHash, hashToken(token)));
+}
+
+export async function revokeOtherSessions(userId: string, currentSessionId: string): Promise<void> {
+  const db = getDatabase();
+  await db
+    .update(sessions)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(sessions.userId, userId),
+        ne(sessions.id, currentSessionId),
+        isNull(sessions.revokedAt),
+      ),
+    );
 }
 
 export async function getSessionUser(token: string): Promise<{
