@@ -47,7 +47,12 @@ export const actions: Actions = {
     const requestedRole = readFormValue(formData, "roleCode");
     const roleCode: ManagedRoleCode =
       requestedRole === "ADMIN" ? "ADMIN" : "EMPLOYEE";
-    const values = { name, email, roleCode };
+    const values = {
+      name,
+      email,
+      roleCode,
+      includeInChatRouting: formData.has("includeInChatRouting"),
+    };
 
     if (name.length < 2 || name.length > 120) {
       return fail(400, {
