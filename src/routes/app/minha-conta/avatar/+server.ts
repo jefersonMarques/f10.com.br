@@ -13,5 +13,7 @@ export const GET: RequestHandler = async ({ cookies }) => {
 
   const response = await getUserAvatarResponse(session.user.id).catch(() => null);
   if (!response) throw error(404, "Avatar não encontrado.");
-  return response;
+  const headers = new Headers(response.headers);
+  headers.set("Cache-Control", "no-store");
+  return new Response(response.body, { status: response.status, headers });
 };
