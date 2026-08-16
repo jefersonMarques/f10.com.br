@@ -13,7 +13,7 @@ const ALLOWED_IMAGE_TYPES = new Map([
   ["image/webp", "webp"],
 ]);
 
-type StoredSupportImage = {
+export type StoredSupportImage = {
   storageKey: string;
   originalName: string;
   mimeType: string;
@@ -57,12 +57,12 @@ function detectedImageType(bytes: Uint8Array): "image/png" | "image/jpeg" | "ima
   return null;
 }
 
-export async function storeSupportMessageImages(
+export async function uploadSupportMessageImages(
   ticketId: string,
   messageId: string,
   files: File[],
-): Promise<void> {
-  if (files.length === 0) return;
+): Promise<StoredSupportImage[]> {
+  if (files.length === 0) return [];
   if (files.length > SUPPORT_IMAGE_MAX_FILES) throw new Error("SUPPORT_IMAGE_TOO_MANY");
 
   const stored: StoredSupportImage[] = [];
@@ -91,22 +91,15 @@ export async function storeSupportMessageImages(
         checksumSha256: asset.checksumSha256,
       });
     }
-
-    await getDatabase().insert(ticketMessageAttachments).values(
-      stored.map((item) => ({
-        messageId,
-        ticketId,
-        storageKey: item.storageKey,
-        originalName: item.originalName,
-        mimeType: item.mimeType,
-        sizeBytes: item.sizeBytes,
-        checksumSha256: item.checksumSha256,
-      })),
-    );
+    return stored;
   } catch (cause) {
-    await Promise.all(stored.map((item) => deleteAssetObject(item.storageKey).catch(() => undefined)));
+    await deleteStoredSupportImages(stored);
     throw cause;
   }
+}
+
+export async function deleteStoredSupportImages(images: StoredSupportImage[]): Promise<void> {
+  await Promise.all(images.map((image) => deleteAssetObject(image.storageKey).catch(() => undefined)));
 }
 
 export async function listSupportMessageAttachments(messageIds: string[]) {
