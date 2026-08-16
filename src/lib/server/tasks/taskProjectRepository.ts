@@ -10,6 +10,7 @@ import {
   tasks,
 } from "$lib/server/db/taskSchema";
 import {
+  ensureTaskProjectAccess,
   getAccessibleTaskProjectIds,
   requireTaskPermissionScope,
   type TaskPermissionMap,
@@ -19,6 +20,11 @@ export type CreateTaskProjectInput = {
   name: string;
   description: string;
   memberIds: string[];
+};
+
+export type UpdateTaskProjectInput = {
+  name: string;
+  description: string;
 };
 
 export async function listTaskProjects(
@@ -50,6 +56,32 @@ export async function listTaskProjects(
           ),
     )
     .orderBy(asc(taskProjects.name));
+}
+
+export async function getTaskProject(
+  actorUserId: string,
+  permissions: TaskPermissionMap,
+  projectId: string,
+) {
+  const scope = requireTaskPermissionScope(permissions, "tasks.view");
+  await ensureTaskProjectAccess(actorUserId, scope, projectId);
+  const db = getDatabase();
+  const [project] = await db
+    .select({
+      id: taskProjects.id,
+      name: taskProjects.name,
+      description: taskProjects.description,
+      active: taskProjects.active,
+      createdBy: taskProjects.createdBy,
+      createdAt: taskProjects.createdAt,
+      updatedAt: taskProjects.updatedAt,
+    })
+    .from(taskProjects)
+    .where(eq(taskProjects.id, projectId))
+    .limit(1);
+
+  if (!project) throw new Error("PROJECT_NOT_FOUND");
+  return project;
 }
 
 export async function listActiveTaskUsers() {
@@ -150,6 +182,35 @@ export async function createTaskProject(
   });
 
   return project;
+}
+
+export async function updateTaskProject(
+  actorUserId: string,
+  permissions: TaskPermissionMap,
+  projectId: string,
+  input: UpdateTaskProjectInput,
+): Promise<void> {
+  const scope = requireTaskPermissionScope(permissions, "tasks.manage");
+  await ensureTaskProjectAccess(actorUserId, scope, projectId);
+  const db = getDatabase();
+  const now = new Date();
+
+  await db
+    .update(taskProjects)
+    .set({
+      name: input.name.trim(),
+      description: input.description.trim(),
+      updatedAt: now,
+    })
+    .where(eq(taskProjects.id, projectId));
+
+  await recordAuditEvent({
+    actorUserId,
+    action: "task.project.updated",
+    entityType: "task_project",
+    entityId: projectId,
+    metadata: { name: input.name.trim() },
+  });
 }
 
 export async function addTaskProjectMember(
