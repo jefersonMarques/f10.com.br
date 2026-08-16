@@ -14,6 +14,7 @@ export const load: PageServerLoad = async ({ parent }) => {
   }
 
   return {
+    currentUserId: layout.user.id,
     chats: await listInternalChats(layout.user.id, permissions),
   };
 };
