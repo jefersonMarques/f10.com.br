@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, like, notLike } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 
@@ -52,7 +52,7 @@ export async function createInternalNotifications(inputs: CreateNotificationInpu
 
 export async function getNotificationSummary(userId: string) {
   const db = getDatabase();
-  const [recent, unreadRows, ticketRows, taskRows] = await Promise.all([
+  const [recent, unreadRows, ticketRows, taskRows, chatRows] = await Promise.all([
     db
       .select({
         id: internalNotifications.id,
@@ -80,6 +80,7 @@ export async function getNotificationSummary(userId: string) {
         and(
           eq(internalNotifications.userId, userId),
           eq(internalNotifications.entityType, "ticket"),
+          notLike(internalNotifications.kind, "chat.%"),
           isNull(internalNotifications.readAt),
         ),
       ),
@@ -93,12 +94,23 @@ export async function getNotificationSummary(userId: string) {
           isNull(internalNotifications.readAt),
         ),
       ),
+    db
+      .select({ value: count() })
+      .from(internalNotifications)
+      .where(
+        and(
+          eq(internalNotifications.userId, userId),
+          like(internalNotifications.kind, "chat.%"),
+          isNull(internalNotifications.readAt),
+        ),
+      ),
   ]);
 
   return {
     unreadCount: Number(unreadRows[0]?.value ?? 0),
     ticketUnreadCount: Number(ticketRows[0]?.value ?? 0),
     taskUnreadCount: Number(taskRows[0]?.value ?? 0),
+    chatUnreadCount: Number(chatRows[0]?.value ?? 0),
     recent,
   };
 }
