@@ -18,6 +18,7 @@ import {
   userRoles,
   users,
 } from "$lib/server/db/schema";
+import { supportChatRoutingMembers } from "$lib/server/db/supportRoutingSchema";
 import { userInvites } from "$lib/server/db/userManagementSchema";
 
 export type ManagedRoleCode = "ADMIN" | "EMPLOYEE";
@@ -27,6 +28,7 @@ export type CreateManagedUserInput = {
   name: string;
   email: string;
   roleCode: ManagedRoleCode;
+  includeInChatRouting?: boolean;
 };
 
 function hashInviteToken(token: string): string {
@@ -195,6 +197,14 @@ export async function createManagedUserInvite(
       createdBy: actorUserId,
     });
 
+    if (input.includeInChatRouting) {
+      await tx.insert(supportChatRoutingMembers).values({
+        userId: createdUser.id,
+        enabled: true,
+        addedBy: actorUserId,
+      });
+    }
+
     return createdUser;
   });
 
@@ -203,7 +213,11 @@ export async function createManagedUserInvite(
     action: "user.invited",
     entityType: "user",
     entityId: result.id,
-    metadata: { email: result.email, roleCode: input.roleCode },
+    metadata: {
+      email: result.email,
+      roleCode: input.roleCode,
+      includeInChatRouting: Boolean(input.includeInChatRouting),
+    },
   });
 
   return {
