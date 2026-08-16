@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Bot, HardDrive, MonitorCog, Save, Settings, ShieldCheck } from "lucide-svelte";
+  import { Bot, Clock3, HardDrive, MonitorCog, Save, Settings, ShieldCheck } from "lucide-svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -35,6 +35,11 @@
         <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6B]">Janela de autorização remota</span><div class="flex items-center gap-2"><input name="remoteConsentMinutes" type="number" min="5" max="120" value={data.general.remoteConsentMinutes} class="h-10 w-28 rounded-xl border border-[#DDE1EA] px-3 text-[11px]" /><span class="text-[10px] text-[#858B99]">minutos</span></div><span class="mt-1 block text-[8px] leading-4 text-[#979CA8]">Usada pelos fluxos de sessão do Operations. O consentimento do desktop também é solicitado localmente pelo MeshCentral.</span></label>
         <button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white"><Save size={14}/>Salvar</button>
       </form>
+
+      <a href="/app/settings/atendimento" class="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-[#DDE1EA] bg-[#F8F9FC] px-4 py-3 transition hover:border-[#C9CEE0] hover:bg-[#F4F6FF]">
+        <span class="flex items-center gap-3"><Clock3 size={17} class="text-[#EA6D0B]"/><span><strong class="block text-[10px] text-[#343B4B]">Operação do suporte</strong><small class="mt-1 block text-[8px] text-[#858B99]">Equipe responsável e horário de funcionamento exibido no chat.</small></span></span>
+        <span class="text-[9px] font-semibold text-[#000A57]">Configurar</span>
+      </a>
     </section>
 
     <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
