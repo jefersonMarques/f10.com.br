@@ -5,8 +5,10 @@
     CheckCircle2,
     CircleAlert,
     Headphones,
+    ListTodo,
     MessageSquare,
     MonitorCog,
+    Plus,
     ShieldCheck,
     UserRound,
   } from "lucide-svelte";
@@ -39,6 +41,10 @@
     "ticket.status.changed": "alterou o status",
     "ticket.priority.changed": "alterou a prioridade",
     "ticket.assignee.changed": "alterou o responsável",
+    "ticket.task.linked": "vinculou uma tarefa",
+    "chat.claimed": "assumiu o atendimento",
+    "chat.assigned": "atribuiu o atendimento",
+    "chat.auto_assigned": "recebeu o atendimento pela distribuição automática",
     "remote.enrollment.requested": "enviou o instalador de suporte remoto",
     "remote.device.enrolled": "vinculou um computador ao suporte remoto",
     "remote.requested": "solicitou acesso remoto",
@@ -80,14 +86,7 @@
             <form method="POST" action="?/reply" class="rounded-2xl border border-[#D9DDF0] bg-[#F8F9FF] p-4"><label class="block"><span class="mb-2 block text-[11px] font-semibold text-[#000A57]">Resposta ao cliente</span><textarea name="body" required maxlength="10000" rows="5" class="w-full resize-y rounded-xl border border-[#DDE1EA] bg-white px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#000A57]"></textarea></label><button type="submit" class="mt-3 min-h-10 w-full rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white">Registrar resposta</button></form>
             <form method="POST" action="?/note" class="rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] p-4">
               <label class="block"><span class="mb-2 block text-[11px] font-semibold text-[#8B4D12]">Nota interna</span></label>
-              <MentionTextarea
-                users={data.mentionUsers}
-                name="body"
-                rows={5}
-                maxlength={10000}
-                placeholder="Ex.: @jeferson pode ver esse caso aqui?"
-                className="w-full resize-y rounded-xl border border-[#E9D6C1] bg-white px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#C46C17]"
-              />
+              <MentionTextarea users={data.mentionUsers} name="body" rows={5} maxlength={10000} placeholder="Ex.: @jeferson pode ver esse caso aqui?" className="w-full resize-y rounded-xl border border-[#E9D6C1] bg-white px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#C46C17]" />
               <p class="mt-2 text-[9px] leading-4 text-[#9A744F]">Digite <strong>@</strong> e selecione um usuário para gerar uma notificação interna. O cliente nunca vê esta nota.</p>
               <button type="submit" class="mt-3 min-h-10 w-full rounded-xl bg-[#9A5513] px-4 text-[11px] font-semibold text-white">Adicionar nota interna</button>
             </form>
@@ -105,6 +104,28 @@
         {/if}
         <div class="mt-5 border-t border-[#EEF0F5] pt-4"><span class="text-[10px] font-semibold text-[#555B6A]">Responsável</span><p class="mt-2 text-[11px] font-medium text-[#333948]">{data.details.ticket.assignedUserName ?? "Sem responsável"}</p>{#if data.canAssign}<form method="POST" action="?/assign" class="mt-3 flex gap-2"><select name="assignedUserId" required class="h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2 text-[10px]">{#each data.agents as agent}<option value={agent.id} selected={agent.id === data.details.ticket.assignedUserId}>{agent.name}</option>{/each}</select><button type="submit" class="h-10 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white">Atribuir</button></form>{/if}</div>
       </section>
+
+      {#if data.canViewTasks}
+        <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5">
+          <div class="flex items-center justify-between gap-3"><div class="flex items-center gap-3"><ListTodo size={18} class="text-[#000A57]"/><h2 class="text-[14px] font-semibold text-[#11182C]">Tarefas do ticket</h2></div><span class="rounded-full bg-[#F3F4F7] px-2 py-1 text-[9px] font-bold text-[#676D7D]">{data.linkedTasks.length}</span></div>
+          {#if data.linkedTasks.length > 0}
+            <div class="mt-4 space-y-2">{#each data.linkedTasks as task}<a href={`/app/tasks/${task.id}`} class="block rounded-xl border border-[#E7E9EF] bg-[#FAFAFC] px-3 py-3 transition hover:border-[#C9CFE6] hover:bg-[#F7F8FF]"><div class="flex items-start justify-between gap-3"><strong class="text-[10px] leading-4 text-[#3D4454]">{task.title}</strong><span class={`shrink-0 rounded-full px-2 py-1 text-[8px] font-bold ${task.statusClosed ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#EEF0FF] text-[#000A57]"}`}>{task.statusName}</span></div><p class="mt-1 text-[9px] text-[#8A909E]">{task.projectName}{task.dueOn ? ` · prazo ${task.dueOn}` : ""}</p></a>{/each}</div>
+          {:else}
+            <p class="mt-4 text-[10px] leading-5 text-[#858B99]">Nenhuma tarefa vinculada. Use tarefas quando o atendimento gerar uma ação que precisa continuar fora da conversa.</p>
+          {/if}
+
+          {#if data.canCreateTask && data.taskProjects.length > 0 && data.details.ticket.status !== "closed"}
+            <form method="POST" action="?/createTask" class="mt-4 border-t border-[#EEF0F5] pt-4">
+              <div class="flex items-center gap-2 text-[10px] font-semibold text-[#3F4656]"><Plus size={14}/>Criar tarefa deste ticket</div>
+              <label class="mt-3 block"><span class="mb-1 block text-[9px] font-semibold text-[#777D8D]">Projeto</span><select name="projectId" required class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px]">{#each data.taskProjects as project}<option value={project.id}>{project.name}</option>{/each}</select></label>
+              <label class="mt-3 block"><span class="mb-1 block text-[9px] font-semibold text-[#777D8D]">Título</span><input name="title" required maxlength="240" value={`Ticket #${data.details.ticket.ticketNumber} · ${data.details.ticket.subject}`} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[10px]"/></label>
+              <label class="mt-3 block"><span class="mb-1 block text-[9px] font-semibold text-[#777D8D]">Descrição</span><textarea name="description" rows="3" maxlength="10000" placeholder="O que precisa ser feito?" class="w-full rounded-xl border border-[#DDE1EA] px-3 py-2 text-[10px]"></textarea></label>
+              <div class="mt-3 grid grid-cols-2 gap-2"><label><span class="mb-1 block text-[9px] font-semibold text-[#777D8D]">Prioridade</span><select name="priority" class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-2 text-[10px]"><option value="low" selected={data.details.ticket.priority === "low"}>Baixa</option><option value="normal" selected={data.details.ticket.priority === "normal"}>Normal</option><option value="high" selected={data.details.ticket.priority === "high"}>Alta</option><option value="urgent" selected={data.details.ticket.priority === "urgent"}>Urgente</option></select></label><label><span class="mb-1 block text-[9px] font-semibold text-[#777D8D]">Prazo</span><input name="dueOn" type="date" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-2 text-[10px]"/></label></div>
+              <button type="submit" class="mt-3 min-h-10 w-full rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white">Criar e vincular tarefa</button>
+            </form>
+          {/if}
+        </section>
+      {/if}
 
       <section class="rounded-[24px] border border-[#D8DEF2] bg-[#F8F9FF] p-5"><div class="flex items-center gap-3"><MonitorCog size={18} class="text-[#000A57]"/><h2 class="text-[14px] font-semibold">Suporte remoto</h2></div><p class="mt-3 text-[10px] leading-5 text-[#697187]">Use um computador já reconhecido ou envie o instalador de suporte ao cliente na primeira vez.</p><a href={`/app/tickets/${data.details.ticket.id}/remote`} class="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-[#000A57] text-[10px] font-semibold text-white">Abrir acesso remoto</a></section>
 
