@@ -14,12 +14,12 @@ import { getDatabase } from "$lib/server/db";
 import { webChatSessions } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { operationsSettings } from "$lib/server/db/operationsSettingsSchema";
-import { users } from "$lib/server/db/schema";
+import { teamMembers, users } from "$lib/server/db/schema";
 import {
   supportAgentPresence,
   supportChatRoutingMembers,
 } from "$lib/server/db/supportRoutingSchema";
-import { ticketEvents, tickets } from "$lib/server/db/supportSchema";
+import { supportQueues, ticketEvents, tickets } from "$lib/server/db/supportSchema";
 import {
   listSupportAgentPresence,
   SUPPORT_AWAY_AFTER_MS,
@@ -258,11 +258,27 @@ export async function autoAssignTicketIfConfigured(
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('f10-support-chat-routing'))`);
 
     const [ticket] = await tx
-      .select({ assignedUserId: tickets.assignedUserId, ticketNumber: tickets.ticketNumber })
+      .select({
+        assignedUserId: tickets.assignedUserId,
+        ticketNumber: tickets.ticketNumber,
+        queueTeamId: supportQueues.teamId,
+      })
       .from(tickets)
+      .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
       .where(eq(tickets.id, ticketId))
       .limit(1);
     if (!ticket || ticket.assignedUserId) return ticket?.assignedUserId ?? null;
+
+    let eligibleResponderIds = responderIds;
+    if (ticket.queueTeamId) {
+      const membershipRows = await tx
+        .select({ userId: teamMembers.userId })
+        .from(teamMembers)
+        .where(eq(teamMembers.teamId, ticket.queueTeamId));
+      const teamUserIds = new Set(membershipRows.map((row) => row.userId));
+      eligibleResponderIds = responderIds.filter((userId) => teamUserIds.has(userId));
+      if (eligibleResponderIds.length === 0) return null;
+    }
 
     const [candidate] = await tx
       .select({ userId: supportChatRoutingMembers.userId })
@@ -275,7 +291,7 @@ export async function autoAssignTicketIfConfigured(
       .where(
         and(
           eq(supportChatRoutingMembers.enabled, true),
-          inArray(supportChatRoutingMembers.userId, responderIds),
+          inArray(supportChatRoutingMembers.userId, eligibleResponderIds),
           eq(users.status, "active"),
           eq(supportAgentPresence.manualStatus, "online"),
           gt(supportAgentPresence.lastActivityAt, activeAfter),
@@ -305,7 +321,11 @@ export async function autoAssignTicketIfConfigured(
       ticketId,
       actorUserId: null,
       eventType: "chat.auto_assigned",
-      metadata: { assignedUserId: candidate.userId, strategy: "round_robin" },
+      metadata: {
+        assignedUserId: candidate.userId,
+        strategy: "round_robin",
+        queueTeamId: ticket.queueTeamId,
+      },
     });
 
     const [chatSession] = await tx
