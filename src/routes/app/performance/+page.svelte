@@ -12,8 +12,11 @@
 
   export let data: PageData;
 
-  const performance = data.performance;
-  const traffic = performance.traffic;
+  let performance: PageData["performance"];
+  let traffic: PageData["performance"]["traffic"];
+
+  $: performance = data.performance;
+  $: traffic = performance.traffic;
 
   function minutes(value: number | null): string {
     if (value === null) return "—";
