@@ -1,5 +1,5 @@
 <script lang="ts">
-  export type MentionUser = {
+  type MentionUser = {
     id: string;
     name: string;
     email: string;
