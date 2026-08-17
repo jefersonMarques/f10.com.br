@@ -8,7 +8,6 @@
     Clock3,
     ExternalLink,
     GraduationCap,
-    Image as ImageIcon,
     Mail,
     Plus,
     Save,
@@ -18,6 +17,7 @@
     Video,
   } from "lucide-svelte";
   import TrainingImageUploader from "$lib/components/operations/TrainingImageUploader.svelte";
+  import HelpTrainingVideoUploader from "$lib/components/operations/HelpTrainingVideoUploader.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -98,7 +98,7 @@
       </form>
 
       <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
-        <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h2 class="text-[16px] font-semibold text-[#11182C]">Microações</h2><p class="mt-1 text-[11px] text-[#858A98]">Uma ação observável por vez. Vídeos idealmente entre 20 e 45 segundos; acima de 60 segundos, considere quebrar a ação.</p></div>{#if data.canEdit}<form method="POST" action="?/addStep"><button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white"><Plus size={14}/>Adicionar microação</button></form>{/if}</div>
+        <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h2 class="text-[16px] font-semibold text-[#11182C]">Microações</h2><p class="mt-1 text-[11px] text-[#858A98]">Uma ação observável por vez. O vídeo é bloqueado acima de 60 segundos; mantenha-o idealmente entre 20 e 45 segundos.</p></div>{#if data.canEdit}<form method="POST" action="?/addStep"><button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white"><Plus size={14}/>Adicionar microação</button></form>{/if}</div>
 
         <div class="mt-5 space-y-4">
           {#each data.path.steps as step, stepIndex}
@@ -118,16 +118,19 @@
 
                 <div class="mt-5 border-t border-[#EEF0F5] pt-5">
                   <h3 class="text-[11px] font-semibold text-[#303645]">Demonstração visual</h3>
-                  <p class="mt-1 text-[9px] text-[#8B909D]">Use poucos prints em sequência. Você pode colar screenshots diretamente nesta microação.</p>
+                  <p class="mt-1 text-[9px] text-[#8B909D]">Adicione somente a mídia necessária para esta ação. Prints podem ser colados diretamente; vídeos são enviados como MP4 curto.</p>
                   {#if step.media.length > 0}
                     <div class="mt-3 grid gap-3 sm:grid-cols-2">
                       {#each step.media as media}
                         <div class="rounded-xl border border-[#E2E5ED] bg-[#FAFAFC] p-3">
                           {#if media.mediaType === "image" && media.assetId}
                             <img src={`/api/app/help/assets/${media.assetId}`} alt={media.altText || media.assetName || "Imagem da microação"} class="max-h-48 w-full rounded-lg bg-white object-contain"/>
-                            <p class="mt-2 truncate text-[9px] font-semibold text-[#606777]">{media.assetName || "Imagem da Biblioteca"}</p>
-                          {:else if media.mediaType === "video"}
-                            <div class="flex min-h-28 items-center justify-center rounded-lg bg-[#EEF0FF] text-[#000A57]"><Video size={26}/></div><a href={media.sourceUrl ?? "#"} target="_blank" rel="noopener noreferrer" class="mt-2 inline-flex items-center gap-1 text-[9px] font-semibold text-[#000A57]">Abrir demonstração<ExternalLink size={11}/></a>
+                            <p class="mt-2 truncate text-[9px] font-semibold text-[#606777]">{media.assetName || "Print da microação"}</p>
+                          {:else if media.mediaType === "video" && media.assetId}
+                            <video src={`/api/app/help/assets/${media.assetId}`} controls preload="metadata" class="aspect-video w-full rounded-lg bg-black" aria-label="Demonstração da microação"></video>
+                            <p class="mt-2 truncate text-[9px] font-semibold text-[#606777]">{media.assetName || "Microvídeo"}</p>
+                          {:else if media.mediaType === "video" && media.sourceUrl}
+                            <div class="flex min-h-28 items-center justify-center rounded-lg bg-[#EEF0FF] text-[#000A57]"><Video size={26}/></div><a href={media.sourceUrl} target="_blank" rel="noopener noreferrer" class="mt-2 inline-flex items-center gap-1 text-[9px] font-semibold text-[#000A57]">Vídeo legado<ExternalLink size={11}/></a>
                           {/if}
                           {#if data.canEdit}<form method="POST" action="?/deleteMedia" class="mt-2"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="mediaId" value={media.id}/><button type="submit" class="inline-flex items-center gap-1 text-[9px] font-semibold text-[#9B2C2C]"><Trash2 size={11}/>Remover</button></form>{/if}
                         </div>
@@ -135,10 +138,9 @@
                     </div>
                   {/if}
                   {#if data.canEdit}
-                    <div class="mt-3 grid gap-3 xl:grid-cols-3">
+                    <div class="mt-3 grid gap-3 lg:grid-cols-2">
                       <TrainingImageUploader pathId={data.path.id} stepId={step.id}/>
-                      <form method="POST" action="?/addImage" class="rounded-xl border border-[#DDE1EA] p-3"><input type="hidden" name="stepId" value={step.id}/><span class="flex items-center gap-2 text-[9px] font-semibold text-[#000A57]"><ImageIcon size={13}/>Reutilizar da Biblioteca</span><select name="assetId" required class="mt-2 h-9 w-full rounded-lg border border-[#DDE1EA] bg-white px-2 text-[9px]"><option value="">Selecione uma imagem</option>{#each data.imageAssets as asset}<option value={asset.id}>{asset.originalName || asset.id}</option>{/each}</select><input name="altText" maxlength="500" placeholder="Descrição opcional" class="mt-2 h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[9px]"/><button type="submit" class="mt-2 min-h-8 w-full rounded-lg bg-[#000A57] text-[9px] font-semibold text-white">Adicionar imagem</button></form>
-                      <form method="POST" action="?/addVideo" class="rounded-xl border border-[#DDE1EA] p-3"><input type="hidden" name="stepId" value={step.id}/><span class="flex items-center gap-2 text-[9px] font-semibold text-[#000A57]"><Video size={13}/>Demonstração rápida</span><input name="sourceUrl" required placeholder="URL do YouTube" class="mt-2 h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[9px]"/><p class="mt-1 text-[8px] leading-4 text-[#8B909D]">Ideal 20–45s. Se passar de ~60s, considere dividir a microação.</p><button type="submit" class="mt-2 min-h-8 w-full rounded-lg bg-[#000A57] text-[9px] font-semibold text-white">Salvar vídeo</button></form>
+                      <HelpTrainingVideoUploader pathId={data.path.id} stepId={step.id}/>
                     </div>
                   {/if}
                 </div>
