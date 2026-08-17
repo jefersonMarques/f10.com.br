@@ -7,7 +7,10 @@ import {
   type CreateGoogleCalendarEventInput,
 } from "$lib/server/calendar/googleCalendarRepository";
 import { getDatabase } from "$lib/server/db";
-import { taskGoogleCalendarLinks } from "$lib/server/db/googleCalendarSchema";
+import {
+  taskGoogleCalendarLinks,
+  type TaskGoogleCalendarAttendee,
+} from "$lib/server/db/googleCalendarSchema";
 import { tasks } from "$lib/server/db/taskSchema";
 import {
   ensureTaskAccess,
@@ -22,6 +25,9 @@ export type TaskGoogleCalendarScheduleInput = {
   endTime: string;
   timeZone: string;
   googleMeet?: boolean;
+  location?: string;
+  reminderMinutes?: number | null;
+  attendees?: TaskGoogleCalendarAttendee[];
 };
 
 type TaskSnapshot = {
@@ -43,6 +49,9 @@ type TaskGoogleLink = {
   startTime: string | null;
   endTime: string | null;
   timeZone: string;
+  location: string;
+  reminderMinutes: number | null;
+  attendees: TaskGoogleCalendarAttendee[];
 };
 
 function isValidTime(value: string): boolean {
@@ -60,6 +69,41 @@ function validateTimeZone(value: string): string {
     throw new Error("TASK_GOOGLE_TIME_ZONE_INVALID");
   }
   return normalized;
+}
+
+function normalizeAttendees(attendees: TaskGoogleCalendarAttendee[] | undefined): TaskGoogleCalendarAttendee[] {
+  const normalized = new Map<string, TaskGoogleCalendarAttendee>();
+  for (const attendee of attendees ?? []) {
+    const email = attendee.email.trim().toLowerCase();
+    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error("TASK_GOOGLE_ATTENDEE_INVALID");
+    }
+    normalized.set(email, {
+      email,
+      name: attendee.name.trim().slice(0, 160),
+      userId: attendee.userId?.trim() || null,
+      optional: Boolean(attendee.optional),
+    });
+    if (normalized.size > 100) throw new Error("TASK_GOOGLE_TOO_MANY_ATTENDEES");
+  }
+  return Array.from(normalized.values());
+}
+
+function validateEventDetails(input: TaskGoogleCalendarScheduleInput) {
+  const location = (input.location ?? "").trim();
+  if (location.length > 500) throw new Error("TASK_GOOGLE_LOCATION_INVALID");
+  const reminderMinutes = input.reminderMinutes ?? null;
+  if (
+    reminderMinutes !== null &&
+    (!Number.isInteger(reminderMinutes) || reminderMinutes < 0 || reminderMinutes > 40320)
+  ) {
+    throw new Error("TASK_GOOGLE_REMINDER_INVALID");
+  }
+  return {
+    location,
+    reminderMinutes,
+    attendees: normalizeAttendees(input.attendees),
+  };
 }
 
 function validateSchedule(input: TaskGoogleCalendarScheduleInput) {
@@ -96,7 +140,10 @@ async function getTaskSnapshot(taskId: string): Promise<TaskSnapshot> {
 
 function toGoogleEventInput(
   task: TaskSnapshot,
-  link: Pick<TaskGoogleLink, "allDay" | "startTime" | "endTime" | "timeZone" | "googleMeetEnabled">,
+  link: Pick<
+    TaskGoogleLink,
+    "allDay" | "startTime" | "endTime" | "timeZone" | "googleMeetEnabled" | "location" | "reminderMinutes" | "attendees"
+  >,
   requestGoogleMeet = false,
 ): CreateGoogleCalendarEventInput {
   if (!task.dueOn) throw new Error("TASK_GOOGLE_REQUIRES_DUE_DATE");
@@ -109,6 +156,12 @@ function toGoogleEventInput(
     endTime: link.endTime ?? "",
     timeZone: link.timeZone,
     addGoogleMeet: requestGoogleMeet && link.googleMeetEnabled,
+    location: link.location,
+    reminderMinutes: link.reminderMinutes,
+    attendees: link.attendees.map((attendee) => ({
+      email: attendee.email,
+      optional: attendee.optional,
+    })),
   };
 }
 
@@ -127,6 +180,9 @@ async function getLink(userId: string, taskId: string): Promise<TaskGoogleLink |
       startTime: taskGoogleCalendarLinks.startTime,
       endTime: taskGoogleCalendarLinks.endTime,
       timeZone: taskGoogleCalendarLinks.timeZone,
+      location: taskGoogleCalendarLinks.location,
+      reminderMinutes: taskGoogleCalendarLinks.reminderMinutes,
+      attendees: taskGoogleCalendarLinks.attendees,
     })
     .from(taskGoogleCalendarLinks)
     .where(
@@ -195,6 +251,7 @@ export async function getTaskGoogleCalendarLink(userId: string, taskId: string) 
   const [link] = await db
     .select({
       taskId: taskGoogleCalendarLinks.taskId,
+      googleCalendarId: taskGoogleCalendarLinks.googleCalendarId,
       googleEventId: taskGoogleCalendarLinks.googleEventId,
       googleHtmlLink: taskGoogleCalendarLinks.googleHtmlLink,
       googleMeetEnabled: taskGoogleCalendarLinks.googleMeetEnabled,
@@ -203,6 +260,9 @@ export async function getTaskGoogleCalendarLink(userId: string, taskId: string) 
       startTime: taskGoogleCalendarLinks.startTime,
       endTime: taskGoogleCalendarLinks.endTime,
       timeZone: taskGoogleCalendarLinks.timeZone,
+      location: taskGoogleCalendarLinks.location,
+      reminderMinutes: taskGoogleCalendarLinks.reminderMinutes,
+      attendees: taskGoogleCalendarLinks.attendees,
       lastSyncedAt: taskGoogleCalendarLinks.lastSyncedAt,
       lastSyncError: taskGoogleCalendarLinks.lastSyncError,
     })
@@ -259,6 +319,7 @@ export async function configureTaskGoogleCalendar(
   }
 
   const schedule = validateSchedule(input);
+  const details = validateEventDetails(input);
   const task = await getTaskSnapshot(taskId);
   if (!task.dueOn) throw new Error("TASK_GOOGLE_REQUIRES_DUE_DATE");
 
@@ -273,6 +334,9 @@ export async function configureTaskGoogleCalendar(
         endTime: schedule.allDay ? null : schedule.endTime,
         timeZone: schedule.timeZone,
         googleMeetEnabled: existing.googleMeetEnabled || Boolean(input.googleMeet),
+        location: details.location,
+        reminderMinutes: details.reminderMinutes,
+        attendees: details.attendees,
         updatedAt: new Date(),
       })
       .where(
@@ -317,15 +381,22 @@ export async function configureTaskGoogleCalendar(
   }
 
   const googleMeetEnabled = Boolean(input.googleMeet);
+  const newLink: Pick<
+    TaskGoogleLink,
+    "allDay" | "startTime" | "endTime" | "timeZone" | "googleMeetEnabled" | "location" | "reminderMinutes" | "attendees"
+  > = {
+    allDay: schedule.allDay,
+    startTime: schedule.allDay ? null : schedule.startTime,
+    endTime: schedule.allDay ? null : schedule.endTime,
+    timeZone: schedule.timeZone,
+    googleMeetEnabled,
+    location: details.location,
+    reminderMinutes: details.reminderMinutes,
+    attendees: details.attendees,
+  };
   const event = await createGoogleCalendarEvent(
     actorUserId,
-    toGoogleEventInput(task, {
-      allDay: schedule.allDay,
-      startTime: schedule.allDay ? null : schedule.startTime,
-      endTime: schedule.allDay ? null : schedule.endTime,
-      timeZone: schedule.timeZone,
-      googleMeetEnabled,
-    }, true),
+    toGoogleEventInput(task, newLink, true),
   );
   const now = new Date();
   const db = getDatabase();
@@ -341,6 +412,9 @@ export async function configureTaskGoogleCalendar(
     startTime: schedule.allDay ? null : schedule.startTime,
     endTime: schedule.allDay ? null : schedule.endTime,
     timeZone: schedule.timeZone,
+    location: details.location,
+    reminderMinutes: details.reminderMinutes,
+    attendees: details.attendees,
     lastSyncedAt: now,
     lastSyncError: null,
     updatedAt: now,
@@ -364,6 +438,9 @@ export async function syncAllTaskGoogleCalendarLinks(taskId: string): Promise<vo
         startTime: taskGoogleCalendarLinks.startTime,
         endTime: taskGoogleCalendarLinks.endTime,
         timeZone: taskGoogleCalendarLinks.timeZone,
+        location: taskGoogleCalendarLinks.location,
+        reminderMinutes: taskGoogleCalendarLinks.reminderMinutes,
+        attendees: taskGoogleCalendarLinks.attendees,
       })
       .from(taskGoogleCalendarLinks)
       .where(eq(taskGoogleCalendarLinks.taskId, taskId)),
