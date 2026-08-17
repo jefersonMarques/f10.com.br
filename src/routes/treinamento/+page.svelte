@@ -46,7 +46,12 @@
       {#if data.state}<form method="POST" action="?/logout"><button type="submit" class="rounded-xl px-3 py-2 text-[10px] font-semibold text-[#777D8D] hover:bg-white">Sair</button></form>{/if}
     </header>
 
-    {#if !data.state}
+    {#if data.invitePreview && !data.state}
+      <section class="mt-12 overflow-hidden rounded-[28px] border border-[#E2E5ED] bg-white shadow-[0_18px_60px_rgba(1,13,40,0.06)]">
+        <div class="bg-[#000A57] px-7 py-8 text-white sm:px-10"><p class="text-[10px] font-bold uppercase tracking-[0.12em] text-[#FFB475]">Treinamento F10</p><h1 class="mt-3 text-[28px] font-semibold tracking-[-0.03em] sm:text-[34px]">{data.invitePreview.trainingTitle}</h1>{#if data.invitePreview.audience}<p class="mt-2 text-[11px] text-white/65">{data.invitePreview.audience}</p>{/if}</div>
+        <div class="p-7 sm:p-10"><p class="text-[15px] font-semibold text-[#242B3D]">Olá, {data.invitePreview.participantName}.</p><p class="mt-3 max-w-[650px] text-[12px] leading-6 text-[#6F7585]">{data.invitePreview.welcomeMessage || "Você vai aprender usando o próprio F10. Mostraremos somente uma ação de cada vez."}</p>{#if data.invitePreview.description}<p class="mt-3 max-w-[650px] text-[11px] leading-5 text-[#858A98]">{data.invitePreview.description}</p>{/if}<form method="POST" action="?/acceptInvite" class="mt-7"><button type="submit" class="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#EA6D0B] px-6 text-[12px] font-semibold text-white shadow-[0_12px_28px_rgba(234,109,11,0.2)]">Pronto para começar?<ChevronRight size={16}/></button></form><p class="mt-4 text-[9px] leading-4 text-[#969BA7]">Ao começar, este convite individual é convertido em uma sessão segura neste navegador.</p></div>
+      </section>
+    {:else if !data.state}
       <section class="mt-12 rounded-[28px] border border-[#E2E5ED] bg-white p-7 text-center shadow-[0_18px_60px_rgba(1,13,40,0.06)] sm:p-10">
         <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EEF0FF] text-[#000A57]"><GraduationCap size={26}/></span>
         <h1 class="mt-5 text-[26px] font-semibold tracking-[-0.03em]">Este convite não está disponível</h1>
@@ -62,7 +67,7 @@
     {:else if !data.state.session.startedAt}
       <section class="mt-12 overflow-hidden rounded-[28px] border border-[#E2E5ED] bg-white shadow-[0_18px_60px_rgba(1,13,40,0.06)]">
         <div class="bg-[#000A57] px-7 py-8 text-white sm:px-10"><p class="text-[10px] font-bold uppercase tracking-[0.12em] text-[#FFB475]">Treinamento F10</p><h1 class="mt-3 text-[28px] font-semibold tracking-[-0.03em] sm:text-[34px]">{data.state.snapshot.title}</h1>{#if data.state.snapshot.audience}<p class="mt-2 text-[11px] text-white/65">{data.state.snapshot.audience}</p>{/if}</div>
-        <div class="p-7 sm:p-10"><p class="text-[15px] font-semibold text-[#242B3D]">Olá, {data.state.invite.participantName}.</p><p class="mt-3 max-w-[650px] text-[12px] leading-6 text-[#6F7585]">{data.state.snapshot.welcomeMessage || "Você vai aprender usando o próprio F10. Mostraremos somente uma ação de cada vez."}</p>{#if data.state.snapshot.description}<p class="mt-3 max-w-[650px] text-[11px] leading-5 text-[#858A98]">{data.state.snapshot.description}</p>{/if}<form method="POST" action="?/start" class="mt-7"><button type="submit" class="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#EA6D0B] px-6 text-[12px] font-semibold text-white shadow-[0_12px_28px_rgba(234,109,11,0.2)]">Pronto para começar?<ChevronRight size={16}/></button></form></div>
+        <div class="p-7 sm:p-10"><p class="text-[15px] font-semibold text-[#242B3D]">Olá, {data.state.invite.participantName}.</p><p class="mt-3 max-w-[650px] text-[12px] leading-6 text-[#6F7585]">{data.state.snapshot.welcomeMessage || "Você vai aprender usando o próprio F10. Mostraremos somente uma ação de cada vez."}</p>{#if data.state.snapshot.description}<p class="mt-3 max-w-[650px] text-[11px] leading-5 text-[#858A98]">{data.state.snapshot.description}</p>{/if}<form method="POST" action="?/start" class="mt-7"><button type="submit" class="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#EA6D0B] px-6 text-[12px] font-semibold text-white shadow-[0_12px_28px_rgba(234,109,11,0.2)]">Começar<ChevronRight size={16}/></button></form></div>
       </section>
     {:else if currentStep}
       <section class="mt-8 overflow-hidden rounded-[28px] border border-[#E2E5ED] bg-white shadow-[0_18px_60px_rgba(1,13,40,0.06)]">
