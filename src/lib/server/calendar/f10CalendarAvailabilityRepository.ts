@@ -36,6 +36,7 @@ export type CalendarAvailabilityInput = {
   endTime: string;
   timeZone: string;
   excludeGoogleEventId?: string | null;
+  excludeGoogleIcalUid?: string | null;
 };
 
 function localDateTimeToUtc(date: string, time: string, timeZone: string): Date {
@@ -128,6 +129,7 @@ async function listF10Conflicts(
       dueOn: tasks.dueOn,
       linkUserId: taskGoogleCalendarLinks.userId,
       googleEventId: taskGoogleCalendarLinks.googleEventId,
+      googleIcalUid: taskGoogleCalendarLinks.googleIcalUid,
       allDay: taskGoogleCalendarLinks.allDay,
       startTime: taskGoogleCalendarLinks.startTime,
       endTime: taskGoogleCalendarLinks.endTime,
@@ -143,6 +145,7 @@ async function listF10Conflicts(
   const conflictsByEvent = new Map<string, CalendarAvailabilityConflict>();
   for (const row of rows) {
     if (!row.dueOn || row.googleEventId === input.excludeGoogleEventId) continue;
+    if (input.excludeGoogleIcalUid && row.googleIcalUid === input.excludeGoogleIcalUid) continue;
     const participates =
       row.linkUserId === userId ||
       row.assigneeUserId === userId ||
@@ -190,6 +193,7 @@ async function checkUser(
 
       for (const event of events) {
         if (event.id === input.excludeGoogleEventId) continue;
+        if (input.excludeGoogleIcalUid && event.iCalUID === input.excludeGoogleIcalUid) continue;
         if (event.transparency === "transparent" || selfDeclined(event)) continue;
         const interval = eventInterval(event, input.timeZone);
         if (!interval || !overlaps(requestedStart, requestedEnd, interval.start, interval.end)) continue;
