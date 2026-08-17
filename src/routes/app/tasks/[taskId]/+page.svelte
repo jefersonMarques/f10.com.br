@@ -12,6 +12,7 @@
     MessageSquare,
     Save,
     UserRound,
+    Video,
   } from "lucide-svelte";
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
   import type { ActionData, PageData } from "./$types";
@@ -35,6 +36,7 @@
   let googleStartTime = data.googleLink?.startTime ?? "09:00";
   let googleEndTime = data.googleLink?.endTime ?? "10:00";
   let googleTimeZone = data.googleLink?.timeZone ?? "UTC";
+  let googleMeet = data.googleLink?.googleMeetEnabled ?? false;
 
   onMount(() => {
     if (!data.googleLink) {
@@ -53,7 +55,7 @@
   <a href={`/app/tasks?project=${data.details.task.projectId}`} class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[12px] font-semibold text-[#5F6575] transition hover:bg-white hover:text-[#000A57]"><ArrowLeft size={17}/>Voltar para {data.details.task.projectName}</a>
 
   <div class="mt-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-    <div><div class="flex flex-wrap items-center gap-2"><span class="rounded-full bg-[#EEF0FF] px-3 py-1.5 text-[10px] font-bold text-[#000A57]">{data.details.task.statusName}</span><span class="rounded-full bg-[#F3F4F7] px-3 py-1.5 text-[10px] font-semibold text-[#737989]">{priorityLabels[data.details.task.priority]}</span>{#if data.googleLink}<span class="inline-flex items-center gap-1 rounded-full bg-[#EEF7F1] px-3 py-1.5 text-[10px] font-semibold text-[#2F7045]"><CalendarCheck2 size={12}/>Google Calendar</span>{/if}</div><h1 class={`mt-3 text-[30px] font-semibold tracking-[-0.035em] sm:text-[38px] ${data.details.task.statusClosed ? "text-[#7E8492] line-through" : "text-[#010D28]"}`}>{data.details.task.title}</h1><p class="mt-2 text-[12px] text-[#7C8291]">Projeto: {data.details.task.projectName}</p></div>
+    <div><div class="flex flex-wrap items-center gap-2"><span class="rounded-full bg-[#EEF0FF] px-3 py-1.5 text-[10px] font-bold text-[#000A57]">{data.details.task.statusName}</span><span class="rounded-full bg-[#F3F4F7] px-3 py-1.5 text-[10px] font-semibold text-[#737989]">{priorityLabels[data.details.task.priority]}</span>{#if data.googleLink}<span class="inline-flex items-center gap-1 rounded-full bg-[#EEF7F1] px-3 py-1.5 text-[10px] font-semibold text-[#2F7045]"><CalendarCheck2 size={12}/>Google Calendar</span>{/if}{#if data.googleLink?.googleMeetEnabled}<span class="inline-flex items-center gap-1 rounded-full bg-[#EEF3FF] px-3 py-1.5 text-[10px] font-semibold text-[#214A9A]"><Video size={12}/>Google Meet</span>{/if}</div><h1 class={`mt-3 text-[30px] font-semibold tracking-[-0.035em] sm:text-[38px] ${data.details.task.statusClosed ? "text-[#7E8492] line-through" : "text-[#010D28]"}`}>{data.details.task.title}</h1><p class="mt-2 text-[12px] text-[#7C8291]">Projeto: {data.details.task.projectName}</p></div>
     {#if data.canUpdate}
       <form method="POST" action="?/toggleComplete">
         <input type="hidden" name="completed" value={data.details.task.statusClosed ? "false" : "true"}/>
@@ -91,6 +93,17 @@
                     {:else}
                       <input type="hidden" name="googleStartTime" value=""/><input type="hidden" name="googleEndTime" value=""/>
                     {/if}
+
+                    {#if data.googleLink?.googleMeetEnabled}
+                      <input type="hidden" name="googleMeet" value="true"/>
+                      <div class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#D8E2F6] bg-[#F5F8FF] px-3 py-3">
+                        <span class="inline-flex items-center gap-2 text-[9px] font-semibold text-[#214A9A]"><Video size={14}/>Google Meet ativo</span>
+                        {#if data.googleLink.googleMeetUrl}<a href={data.googleLink.googleMeetUrl} target="_blank" rel="noreferrer" class="inline-flex min-h-8 items-center gap-1 rounded-lg bg-[#214A9A] px-3 text-[9px] font-semibold text-white">Entrar na reunião <ExternalLink size={11}/></a>{:else}<span class="text-[8px] text-[#77839A]">O Google ainda está finalizando o link da reunião.</span>{/if}
+                      </div>
+                    {:else}
+                      <label class="mt-3 flex cursor-pointer items-start gap-2 rounded-xl border border-[#DFE5F1] bg-[#FAFBFE] px-3 py-3"><input type="checkbox" name="googleMeet" value="true" bind:checked={googleMeet} class="mt-0.5"/><span><strong class="block text-[9px] font-semibold text-[#35445F]">Gerar Google Meet</strong><span class="mt-0.5 block text-[8px] leading-4 text-[#7D8797]">Cria um link exclusivo de reunião dentro deste evento.</span></span></label>
+                    {/if}
+
                     <p class="mt-2 text-[8px] text-[#929A94]">Fuso: {googleTimeZone}. Desmarcar a sincronização remove do Google o evento criado pelo F10.</p>
                     {#if data.googleLink?.lastSyncError}<p class="mt-2 rounded-lg bg-[#FFF4E9] px-2 py-2 text-[8px] font-medium text-[#A9510D]">A última sincronização apresentou erro. Salve novamente para tentar atualizar o evento.</p>{/if}
                   </div>
