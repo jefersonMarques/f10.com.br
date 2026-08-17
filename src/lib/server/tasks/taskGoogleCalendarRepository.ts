@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import {
+  addGoogleMeetToGoogleCalendarEvent,
   createGoogleCalendarEvent,
   deleteGoogleCalendarEvent,
   updateGoogleCalendarEvent,
@@ -20,6 +21,7 @@ export type TaskGoogleCalendarScheduleInput = {
   startTime: string;
   endTime: string;
   timeZone: string;
+  googleMeet?: boolean;
 };
 
 type TaskSnapshot = {
@@ -35,6 +37,8 @@ type TaskGoogleLink = {
   googleCalendarId: string;
   googleEventId: string;
   googleHtmlLink: string | null;
+  googleMeetEnabled: boolean;
+  googleMeetUrl: string | null;
   allDay: boolean;
   startTime: string | null;
   endTime: string | null;
@@ -90,7 +94,11 @@ async function getTaskSnapshot(taskId: string): Promise<TaskSnapshot> {
   return task;
 }
 
-function toGoogleEventInput(task: TaskSnapshot, link: Pick<TaskGoogleLink, "allDay" | "startTime" | "endTime" | "timeZone">): CreateGoogleCalendarEventInput {
+function toGoogleEventInput(
+  task: TaskSnapshot,
+  link: Pick<TaskGoogleLink, "allDay" | "startTime" | "endTime" | "timeZone" | "googleMeetEnabled">,
+  requestGoogleMeet = false,
+): CreateGoogleCalendarEventInput {
   if (!task.dueOn) throw new Error("TASK_GOOGLE_REQUIRES_DUE_DATE");
   return {
     title: task.title,
@@ -100,6 +108,7 @@ function toGoogleEventInput(task: TaskSnapshot, link: Pick<TaskGoogleLink, "allD
     startTime: link.startTime ?? "",
     endTime: link.endTime ?? "",
     timeZone: link.timeZone,
+    addGoogleMeet: requestGoogleMeet && link.googleMeetEnabled,
   };
 }
 
@@ -112,6 +121,8 @@ async function getLink(userId: string, taskId: string): Promise<TaskGoogleLink |
       googleCalendarId: taskGoogleCalendarLinks.googleCalendarId,
       googleEventId: taskGoogleCalendarLinks.googleEventId,
       googleHtmlLink: taskGoogleCalendarLinks.googleHtmlLink,
+      googleMeetEnabled: taskGoogleCalendarLinks.googleMeetEnabled,
+      googleMeetUrl: taskGoogleCalendarLinks.googleMeetUrl,
       allDay: taskGoogleCalendarLinks.allDay,
       startTime: taskGoogleCalendarLinks.startTime,
       endTime: taskGoogleCalendarLinks.endTime,
@@ -153,7 +164,11 @@ async function syncExistingLink(task: TaskSnapshot, link: TaskGoogleLink): Promi
   );
 
   if (!event) {
-    event = await createGoogleCalendarEvent(link.userId, input, link.googleCalendarId);
+    event = await createGoogleCalendarEvent(
+      link.userId,
+      toGoogleEventInput(task, link, true),
+      link.googleCalendarId,
+    );
   }
 
   const now = new Date();
@@ -162,6 +177,7 @@ async function syncExistingLink(task: TaskSnapshot, link: TaskGoogleLink): Promi
     .set({
       googleEventId: event.id,
       googleHtmlLink: event.htmlLink,
+      googleMeetUrl: event.meetUrl ?? link.googleMeetUrl,
       lastSyncedAt: now,
       lastSyncError: null,
       updatedAt: now,
@@ -181,6 +197,8 @@ export async function getTaskGoogleCalendarLink(userId: string, taskId: string) 
       taskId: taskGoogleCalendarLinks.taskId,
       googleEventId: taskGoogleCalendarLinks.googleEventId,
       googleHtmlLink: taskGoogleCalendarLinks.googleHtmlLink,
+      googleMeetEnabled: taskGoogleCalendarLinks.googleMeetEnabled,
+      googleMeetUrl: taskGoogleCalendarLinks.googleMeetUrl,
       allDay: taskGoogleCalendarLinks.allDay,
       startTime: taskGoogleCalendarLinks.startTime,
       endTime: taskGoogleCalendarLinks.endTime,
@@ -205,6 +223,7 @@ export async function listUserTaskGoogleCalendarLinks(userId: string) {
     .select({
       taskId: taskGoogleCalendarLinks.taskId,
       googleEventId: taskGoogleCalendarLinks.googleEventId,
+      googleMeetUrl: taskGoogleCalendarLinks.googleMeetUrl,
     })
     .from(taskGoogleCalendarLinks)
     .where(eq(taskGoogleCalendarLinks.userId, userId));
@@ -244,6 +263,7 @@ export async function configureTaskGoogleCalendar(
   if (!task.dueOn) throw new Error("TASK_GOOGLE_REQUIRES_DUE_DATE");
 
   if (existing) {
+    const shouldCreateMeet = Boolean(input.googleMeet) && !existing.googleMeetEnabled;
     const db = getDatabase();
     await db
       .update(taskGoogleCalendarLinks)
@@ -252,6 +272,7 @@ export async function configureTaskGoogleCalendar(
         startTime: schedule.allDay ? null : schedule.startTime,
         endTime: schedule.allDay ? null : schedule.endTime,
         timeZone: schedule.timeZone,
+        googleMeetEnabled: existing.googleMeetEnabled || Boolean(input.googleMeet),
         updatedAt: new Date(),
       })
       .where(
@@ -260,9 +281,33 @@ export async function configureTaskGoogleCalendar(
           eq(taskGoogleCalendarLinks.taskId, taskId),
         ),
       );
-    const updatedLink = await getLink(actorUserId, taskId);
-    if (!updatedLink) throw new Error("TASK_GOOGLE_LINK_NOT_FOUND");
+
     try {
+      if (shouldCreateMeet) {
+        const event = await addGoogleMeetToGoogleCalendarEvent(
+          actorUserId,
+          existing.googleCalendarId,
+          existing.googleEventId,
+        );
+        await db
+          .update(taskGoogleCalendarLinks)
+          .set({
+            googleHtmlLink: event.htmlLink,
+            googleMeetUrl: event.meetUrl,
+            lastSyncedAt: new Date(),
+            lastSyncError: null,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(taskGoogleCalendarLinks.userId, actorUserId),
+              eq(taskGoogleCalendarLinks.taskId, taskId),
+            ),
+          );
+      }
+
+      const updatedLink = await getLink(actorUserId, taskId);
+      if (!updatedLink) throw new Error("TASK_GOOGLE_LINK_NOT_FOUND");
       await syncExistingLink(task, updatedLink);
     } catch (cause) {
       await markSyncError(actorUserId, taskId, cause);
@@ -271,6 +316,7 @@ export async function configureTaskGoogleCalendar(
     return;
   }
 
+  const googleMeetEnabled = Boolean(input.googleMeet);
   const event = await createGoogleCalendarEvent(
     actorUserId,
     toGoogleEventInput(task, {
@@ -278,7 +324,8 @@ export async function configureTaskGoogleCalendar(
       startTime: schedule.allDay ? null : schedule.startTime,
       endTime: schedule.allDay ? null : schedule.endTime,
       timeZone: schedule.timeZone,
-    }),
+      googleMeetEnabled,
+    }, true),
   );
   const now = new Date();
   const db = getDatabase();
@@ -288,6 +335,8 @@ export async function configureTaskGoogleCalendar(
     googleCalendarId: "primary",
     googleEventId: event.id,
     googleHtmlLink: event.htmlLink,
+    googleMeetEnabled,
+    googleMeetUrl: event.meetUrl,
     allDay: schedule.allDay,
     startTime: schedule.allDay ? null : schedule.startTime,
     endTime: schedule.allDay ? null : schedule.endTime,
@@ -309,6 +358,8 @@ export async function syncAllTaskGoogleCalendarLinks(taskId: string): Promise<vo
         googleCalendarId: taskGoogleCalendarLinks.googleCalendarId,
         googleEventId: taskGoogleCalendarLinks.googleEventId,
         googleHtmlLink: taskGoogleCalendarLinks.googleHtmlLink,
+        googleMeetEnabled: taskGoogleCalendarLinks.googleMeetEnabled,
+        googleMeetUrl: taskGoogleCalendarLinks.googleMeetUrl,
         allDay: taskGoogleCalendarLinks.allDay,
         startTime: taskGoogleCalendarLinks.startTime,
         endTime: taskGoogleCalendarLinks.endTime,
