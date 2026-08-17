@@ -16,6 +16,7 @@ import {
   getHelpTrainingSessionCookie,
   setHelpTrainingSessionCookie,
 } from "$lib/server/help/helpTrainingSession";
+import { markHelpTrainingStepViewed } from "$lib/server/help/helpTrainingTelemetry";
 
 function read(formData: FormData, name: string): string {
   const value = formData.get(name);
@@ -37,6 +38,10 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
   const token = getHelpTrainingSessionCookie(cookies);
   const state = token ? await getHelpTrainingSession(token) : null;
   if (token && !state) clearHelpTrainingSessionCookie(cookies);
+
+  if (state?.session.startedAt && state.currentStep) {
+    await markHelpTrainingStepViewed(state.session.id, state.currentStep.id);
+  }
 
   const stagedInviteToken = state ? "" : getHelpTrainingInviteCookie(cookies);
   const invitePreview = stagedInviteToken
