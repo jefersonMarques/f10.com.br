@@ -15,6 +15,7 @@ import {
   requireTaskPermissionScope,
   type TaskPermissionMap,
 } from "$lib/server/tasks/taskAccess";
+import { syncAllTaskGoogleCalendarLinks } from "$lib/server/tasks/taskGoogleCalendarRepository";
 import { listProjectMembers } from "$lib/server/tasks/taskProjectRepository";
 import type { TaskPriority } from "$lib/server/tasks/taskWorkRepository";
 
@@ -132,6 +133,8 @@ export async function updateTaskDetails(
       },
     });
   });
+
+  await syncAllTaskGoogleCalendarLinks(taskId);
 }
 
 export async function assignTask(
