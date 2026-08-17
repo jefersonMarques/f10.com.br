@@ -135,7 +135,7 @@
     on:click={() => fileInput?.click()}
     class="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#EA6D0B] px-3 text-[10px] font-semibold text-white disabled:cursor-wait disabled:opacity-60"
   >
-    <UploadCloud size={14} class:animate-pulse={uploading} aria-hidden="true" />
+    <UploadCloud size={14} class={uploading ? "animate-pulse" : ""} aria-hidden="true" />
     {uploading ? "Validando e enviando..." : "Selecionar ou arrastar MP4"}
   </button>
 
