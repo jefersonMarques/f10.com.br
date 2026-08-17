@@ -11,6 +11,7 @@ import {
 import {
   createTask,
   getTaskBoard,
+  listActiveTaskUsers,
   listMyTasks,
   listProjectMembers,
   listTaskProjects,
@@ -20,6 +21,7 @@ import {
   configureTaskGoogleCalendar,
   listUserTaskGoogleCalendarLinks,
 } from "$lib/server/tasks/taskGoogleCalendarRepository";
+import type { TaskGoogleCalendarAttendee } from "$lib/server/db/googleCalendarSchema";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -71,6 +73,102 @@ function googleRange(anchor: string): { timeMin: Date; timeMax: Date } {
   };
 }
 
+function parseReminderMinutes(formData: FormData): number | null {
+  const raw = readFormValue(formData, "reminderMinutes");
+  if (!raw) return null;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0 || value > 40320) {
+    throw new Error("INVALID_REMINDER");
+  }
+  return value;
+}
+
+function isValidEmail(value: string): boolean {
+  return value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function parseAttendees(
+  formData: FormData,
+  activeUsers: Awaited<ReturnType<typeof listActiveTaskUsers>>,
+  organizerUserId: string,
+  organizerEmail: string,
+): TaskGoogleCalendarAttendee[] {
+  const raw = readFormValue(formData, "attendeesJson");
+  if (!raw) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("INVALID_ATTENDEES");
+  }
+  if (!Array.isArray(parsed)) throw new Error("INVALID_ATTENDEES");
+
+  const organizerEmailNormalized = organizerEmail.trim().toLowerCase();
+  const attendees = new Map<string, TaskGoogleCalendarAttendee>();
+  for (const item of parsed.slice(0, 100)) {
+    if (!item || typeof item !== "object") continue;
+    const value = item as Record<string, unknown>;
+    const requestedUserId = typeof value.userId === "string" ? value.userId.trim() : "";
+    const requestedEmail = typeof value.email === "string" ? value.email.trim().toLowerCase() : "";
+    const optional = Boolean(value.optional);
+
+    const internal = requestedUserId
+      ? activeUsers.find((user) => user.id === requestedUserId)
+      : activeUsers.find((user) => user.email.trim().toLowerCase() === requestedEmail);
+
+    if (internal) {
+      if (internal.id === organizerUserId) continue;
+      const email = internal.email.trim().toLowerCase();
+      if (!email || email === organizerEmailNormalized) continue;
+      attendees.set(email, {
+        email,
+        name: internal.name,
+        userId: internal.id,
+        optional,
+      });
+      continue;
+    }
+
+    if (!isValidEmail(requestedEmail) || requestedEmail === organizerEmailNormalized) {
+      throw new Error("INVALID_ATTENDEES");
+    }
+    attendees.set(requestedEmail, {
+      email: requestedEmail,
+      name: typeof value.name === "string" ? value.name.trim().slice(0, 160) : "",
+      userId: null,
+      optional,
+    });
+  }
+  return Array.from(attendees.values());
+}
+
+async function readGoogleEventDetails(
+  userId: string,
+  formData: FormData,
+): Promise<{
+  location: string;
+  reminderMinutes: number | null;
+  attendees: TaskGoogleCalendarAttendee[];
+}> {
+  const location = readFormValue(formData, "location");
+  if (location.length > 500) throw new Error("INVALID_LOCATION");
+  const [activeUsers, connection] = await Promise.all([
+    listActiveTaskUsers(),
+    getGoogleCalendarConnection(userId),
+  ]);
+  return {
+    location,
+    reminderMinutes: parseReminderMinutes(formData),
+    attendees: parseAttendees(
+      formData,
+      activeUsers,
+      userId,
+      connection.googleEmail,
+    ),
+  };
+}
+
 export const load: PageServerLoad = async ({ parent, url }) => {
   const layout = await parent();
   const permissions = createPermissionMap(layout.permissions);
@@ -105,18 +203,17 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   }
 
   type ProjectMember = Awaited<ReturnType<typeof listProjectMembers>>[number];
-  const membersByProject: Record<string, ProjectMember[]> = canAssign
-    ? Object.fromEntries(
-        await Promise.all(
+  const [membersByProject, googleCalendar, taskGoogleLinks, calendarUsers] = await Promise.all([
+    canAssign
+      ? Promise.all(
           projects.map(async (project) => [project.id, await listProjectMembers(project.id)] as const),
-        ),
-      )
-    : {};
-
-  const [googleCalendar, taskGoogleLinks] = await Promise.all([
+        ).then((entries) => Object.fromEntries(entries) as Record<string, ProjectMember[]>)
+      : Promise.resolve({} as Record<string, ProjectMember[]>),
     getGoogleCalendarConnection(layout.user.id),
     listUserTaskGoogleCalendarLinks(layout.user.id),
+    listActiveTaskUsers(),
   ]);
+
   const linkedEventIds = new Set(taskGoogleLinks.map((link) => link.googleEventId));
   const googleLinkedTaskIds = taskGoogleLinks.map((link) => link.taskId);
   const googleMeetTaskIds = taskGoogleLinks.filter((link) => link.googleMeetUrl).map((link) => link.taskId);
@@ -138,6 +235,8 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     selectedProjectId: selectedProject?.id ?? null,
     tasks: sourceTasks,
     membersByProject,
+    calendarUsers,
+    organizerUserId: layout.user.id,
     canCreate,
     canAssign,
     calendarAnchor,
@@ -185,6 +284,15 @@ export const actions: Actions = {
       return fail(400, { success: false, action: "createTask", message: "Informe um horário válido para sincronizar com o Google Calendar." });
     }
 
+    let eventDetails = { location: "", reminderMinutes: null as number | null, attendees: [] as TaskGoogleCalendarAttendee[] };
+    if (syncGoogle) {
+      try {
+        eventDetails = await readGoogleEventDetails(session.user.id, formData);
+      } catch {
+        return fail(400, { success: false, action: "createTask", message: "Revise local, lembrete e participantes do evento." });
+      }
+    }
+
     let task: Awaited<ReturnType<typeof createTask>>;
     try {
       task = await createTask(session.user.id, permissions, {
@@ -208,6 +316,7 @@ export const actions: Actions = {
           endTime: googleEndTime,
           timeZone: googleTimeZone,
           googleMeet,
+          ...eventDetails,
         });
       } catch {
         return {
@@ -257,6 +366,13 @@ export const actions: Actions = {
       return fail(400, { success: false, action: "createGoogleEvent", message: "Fuso horário inválido." });
     }
 
+    let eventDetails;
+    try {
+      eventDetails = await readGoogleEventDetails(session.user.id, formData);
+    } catch {
+      return fail(400, { success: false, action: "createGoogleEvent", message: "Revise local, lembrete e participantes do evento." });
+    }
+
     if (createAsTask) {
       if (!isUuid(projectId)) {
         return fail(400, { success: false, action: "createGoogleEvent", message: "Selecione um projeto para criar a tarefa." });
@@ -290,6 +406,7 @@ export const actions: Actions = {
           endTime,
           timeZone,
           googleMeet: addGoogleMeet,
+          ...eventDetails,
         });
       } catch {
         return {
@@ -319,6 +436,12 @@ export const actions: Actions = {
         endTime,
         timeZone,
         addGoogleMeet,
+        location: eventDetails.location,
+        reminderMinutes: eventDetails.reminderMinutes,
+        attendees: eventDetails.attendees.map((attendee) => ({
+          email: attendee.email,
+          optional: attendee.optional,
+        })),
       });
       return {
         success: true,
