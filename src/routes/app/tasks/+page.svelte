@@ -174,6 +174,8 @@
   function activityLabel(action: string): string {
     if (action === "task.created") return "criou a tarefa";
     if (action === "task.status.changed") return "alterou o status";
+    if (action === "task.completed") return "concluiu a tarefa";
+    if (action === "task.reopened") return "reabriu a tarefa";
     if (action === "task.details.updated") return "atualizou os detalhes";
     if (action === "task.assignee.changed") return "alterou o responsável";
     if (action === "task.comment.added") return "adicionou um comentário";
@@ -359,6 +361,14 @@
       <div class="space-y-6 p-5 sm:p-6">
         {#if data.selectedTask.ticketOrigins.length > 0}
           <div class="rounded-2xl border border-[#F0D6BD] bg-[#FFF9F3] p-4"><div class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#A9510D]"><Ticket size={14}/>Origem do suporte</div>{#each data.selectedTask.ticketOrigins as origin}<a href={`/app/tickets/${origin.id}`} class="mt-2 flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2.5 text-[11px] font-semibold text-[#000A57] shadow-sm"><span class="truncate">Ticket #{origin.ticketNumber} · {origin.subject}</span><ChevronRight size={14}/></a>{/each}</div>
+        {/if}
+
+        {#if data.canUpdate}
+          <form use:enhance method="POST" action="?/toggleComplete">
+            <input type="hidden" name="taskId" value={data.selectedTask.details.task.id}/>
+            <input type="hidden" name="completed" value={data.selectedTask.details.task.statusClosed ? "false" : "true"}/>
+            <button type="submit" class={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-[11px] font-semibold ${data.selectedTask.details.task.statusClosed ? "border border-[#DDE1EA] bg-white text-[#000A57]" : "bg-[#2F7045] text-white"}`}><CheckCircle2 size={16}/>{data.selectedTask.details.task.statusClosed ? "Reabrir tarefa" : "Concluir tarefa"}</button>
+          </form>
         {/if}
 
         <form use:enhance method="POST" action="?/updateTask" class="space-y-4">
