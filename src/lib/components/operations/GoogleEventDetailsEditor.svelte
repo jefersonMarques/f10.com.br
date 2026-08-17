@@ -23,6 +23,7 @@
   export let initialReminderMinutes: number | null = null;
   export let initialAttendees: AttendeeDraft[] = [];
   export let excludeGoogleEventId: string | null = null;
+  export let excludeGoogleIcalUid: string | null = null;
 
   let location = initialLocation;
   let reminderValue = initialReminderMinutes === null ? "" : String(initialReminderMinutes);
@@ -57,4 +58,5 @@
   {allDay}
   {initialAttendees}
   {excludeGoogleEventId}
+  {excludeGoogleIcalUid}
 />
