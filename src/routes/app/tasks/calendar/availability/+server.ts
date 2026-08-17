@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { checkF10CalendarAvailability } from "$lib/server/calendar/f10CalendarAvailabilityRepository";
+import { getGoogleCalendarEvent } from "$lib/server/calendar/googleCalendarRepository";
 import { getDatabase } from "$lib/server/db";
 import { taskGoogleCalendarLinks } from "$lib/server/db/googleCalendarSchema";
 import { listActiveTaskUsers } from "$lib/server/tasks/taskRepository";
@@ -69,7 +70,10 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
   if (excludeGoogleEventId && !excludeGoogleIcalUid) {
     const db = getDatabase();
     const [link] = await db
-      .select({ googleIcalUid: taskGoogleCalendarLinks.googleIcalUid })
+      .select({
+        googleCalendarId: taskGoogleCalendarLinks.googleCalendarId,
+        googleIcalUid: taskGoogleCalendarLinks.googleIcalUid,
+      })
       .from(taskGoogleCalendarLinks)
       .where(
         and(
@@ -79,6 +83,19 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
       )
       .limit(1);
     excludeGoogleIcalUid = link?.googleIcalUid ?? "";
+
+    if (!excludeGoogleIcalUid && link) {
+      try {
+        const event = await getGoogleCalendarEvent(
+          session.user.id,
+          link.googleCalendarId,
+          excludeGoogleEventId,
+        );
+        excludeGoogleIcalUid = event?.iCalUID ?? "";
+      } catch {
+        // A ausência do UID não impede a checagem; apenas reduz a capacidade de excluir a cópia do próprio convite.
+      }
+    }
   }
 
   const activeUsers = await listActiveTaskUsers();
