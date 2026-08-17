@@ -1,9 +1,12 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import {
     ArrowLeft,
+    CalendarCheck2,
     CalendarDays,
     CheckCircle2,
     CircleAlert,
+    ExternalLink,
     Headphones,
     History,
     MessageSquare,
@@ -27,6 +30,18 @@
     "task.comment.added": "adicionou um comentário",
   };
 
+  let syncGoogle = Boolean(data.googleLink);
+  let googleAllDay = data.googleLink?.allDay ?? false;
+  let googleStartTime = data.googleLink?.startTime ?? "09:00";
+  let googleEndTime = data.googleLink?.endTime ?? "10:00";
+  let googleTimeZone = data.googleLink?.timeZone ?? "UTC";
+
+  onMount(() => {
+    if (!data.googleLink) {
+      googleTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    }
+  });
+
   function formatDateTime(value: string | Date): string {
     return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
   }
@@ -38,7 +53,7 @@
   <a href={`/app/tasks?project=${data.details.task.projectId}`} class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[12px] font-semibold text-[#5F6575] transition hover:bg-white hover:text-[#000A57]"><ArrowLeft size={17}/>Voltar para {data.details.task.projectName}</a>
 
   <div class="mt-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-    <div><div class="flex flex-wrap items-center gap-2"><span class="rounded-full bg-[#EEF0FF] px-3 py-1.5 text-[10px] font-bold text-[#000A57]">{data.details.task.statusName}</span><span class="rounded-full bg-[#F3F4F7] px-3 py-1.5 text-[10px] font-semibold text-[#737989]">{priorityLabels[data.details.task.priority]}</span></div><h1 class={`mt-3 text-[30px] font-semibold tracking-[-0.035em] sm:text-[38px] ${data.details.task.statusClosed ? "text-[#7E8492] line-through" : "text-[#010D28]"}`}>{data.details.task.title}</h1><p class="mt-2 text-[12px] text-[#7C8291]">Projeto: {data.details.task.projectName}</p></div>
+    <div><div class="flex flex-wrap items-center gap-2"><span class="rounded-full bg-[#EEF0FF] px-3 py-1.5 text-[10px] font-bold text-[#000A57]">{data.details.task.statusName}</span><span class="rounded-full bg-[#F3F4F7] px-3 py-1.5 text-[10px] font-semibold text-[#737989]">{priorityLabels[data.details.task.priority]}</span>{#if data.googleLink}<span class="inline-flex items-center gap-1 rounded-full bg-[#EEF7F1] px-3 py-1.5 text-[10px] font-semibold text-[#2F7045]"><CalendarCheck2 size={12}/>Google Calendar</span>{/if}</div><h1 class={`mt-3 text-[30px] font-semibold tracking-[-0.035em] sm:text-[38px] ${data.details.task.statusClosed ? "text-[#7E8492] line-through" : "text-[#010D28]"}`}>{data.details.task.title}</h1><p class="mt-2 text-[12px] text-[#7C8291]">Projeto: {data.details.task.projectName}</p></div>
     {#if data.canUpdate}
       <form method="POST" action="?/toggleComplete">
         <input type="hidden" name="completed" value={data.details.task.statusClosed ? "false" : "true"}/>
@@ -47,18 +62,44 @@
     {/if}
   </div>
 
-  {#if form?.message}<div class={`mt-6 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{#if form.success}<CheckCircle2 size={18} class="mt-0.5 shrink-0"/>{:else}<CircleAlert size={18} class="mt-0.5 shrink-0"/>{/if}<span>{form.message}</span></div>{/if}
+  {#if form?.message}<div class={`mt-6 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.syncWarning ? "border-[#F0D2A9] bg-[#FFF9EF] text-[#8A4B0F]" : form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{#if form.success && !form.syncWarning}<CheckCircle2 size={18} class="mt-0.5 shrink-0"/>{:else}<CircleAlert size={18} class="mt-0.5 shrink-0"/>{/if}<span>{form.message}</span></div>{/if}
 
   <div class="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
     <div class="space-y-6">
       <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-7">
-        <div><h2 class="text-[16px] font-semibold text-[#11182C]">Detalhes</h2><p class="mt-1 text-[11px] text-[#858A98]">Descrição, prioridade e prazo da tarefa.</p></div>
+        <div><h2 class="text-[16px] font-semibold text-[#11182C]">Detalhes</h2><p class="mt-1 text-[11px] text-[#858A98]">Descrição, prioridade, prazo e sincronização da tarefa.</p></div>
         <form method="POST" action="?/update" class="mt-6 grid gap-5 sm:grid-cols-2">
           <fieldset disabled={!data.canUpdate} class="contents disabled:opacity-70">
             <label class="block sm:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Título</span><input name="title" required maxlength="180" value={data.details.task.title} class="h-12 w-full rounded-xl border border-[#DDE1EA] px-4 text-[14px] font-medium text-[#11182C] outline-none focus:border-[#000A57]"/></label>
             <label class="block sm:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Descrição</span><textarea name="description" maxlength="5000" rows="8" value={data.details.task.description} class="w-full resize-y rounded-xl border border-[#DDE1EA] px-4 py-3 text-[13px] leading-6 outline-none focus:border-[#000A57]"></textarea></label>
             <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Prioridade</span><select name="priority" value={data.details.task.priority} class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[12px]"><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></label>
             <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Prazo</span><input name="dueOn" type="date" value={data.details.task.dueOn ?? ""} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]"/></label>
+
+            {#if data.googleCalendar.connected}
+              <div class="sm:col-span-2 rounded-2xl border border-[#DDE7E1] bg-[#F8FBF9] p-4">
+                <input type="hidden" name="googleSyncManaged" value="true"/>
+                <input type="hidden" name="googleTimeZone" value={googleTimeZone}/>
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <label class="flex cursor-pointer items-start gap-3"><input type="checkbox" name="syncGoogle" value="true" bind:checked={syncGoogle} class="mt-1"/><span><strong class="block text-[11px] font-semibold text-[#2E3B33]">Sincronizar com Google Calendar</strong><span class="mt-1 block text-[9px] leading-4 text-[#78827B]">Usa sua conta {data.googleCalendar.googleEmail}. Alterações de título, descrição e data feitas no F10 atualizam o evento.</span></span></label>
+                  {#if data.googleLink?.googleHtmlLink}<a href={data.googleLink.googleHtmlLink} target="_blank" rel="noreferrer" class="inline-flex items-center gap-1 text-[9px] font-semibold text-[#000A57]">Abrir evento <ExternalLink size={12}/></a>{/if}
+                </div>
+                {#if syncGoogle}
+                  <div class="mt-4 rounded-xl border border-[#E1E8E3] bg-white p-3">
+                    <label class="flex items-center gap-2 text-[10px] font-medium text-[#535E57]"><input type="checkbox" name="googleAllDay" value="true" bind:checked={googleAllDay}/>Evento de dia inteiro</label>
+                    {#if !googleAllDay}
+                      <div class="mt-3 grid grid-cols-2 gap-3"><label><span class="mb-1 block text-[9px] font-semibold text-[#6E776F]">Início</span><input type="time" name="googleStartTime" bind:value={googleStartTime} required class="h-10 w-full rounded-lg border border-[#DDE1EA] px-2 text-[11px]"/></label><label><span class="mb-1 block text-[9px] font-semibold text-[#6E776F]">Fim</span><input type="time" name="googleEndTime" bind:value={googleEndTime} required class="h-10 w-full rounded-lg border border-[#DDE1EA] px-2 text-[11px]"/></label></div>
+                    {:else}
+                      <input type="hidden" name="googleStartTime" value=""/><input type="hidden" name="googleEndTime" value=""/>
+                    {/if}
+                    <p class="mt-2 text-[8px] text-[#929A94]">Fuso: {googleTimeZone}. Desmarcar a sincronização remove do Google o evento criado pelo F10.</p>
+                    {#if data.googleLink?.lastSyncError}<p class="mt-2 rounded-lg bg-[#FFF4E9] px-2 py-2 text-[8px] font-medium text-[#A9510D]">A última sincronização apresentou erro. Salve novamente para tentar atualizar o evento.</p>{/if}
+                  </div>
+                {/if}
+              </div>
+            {:else}
+              <div class="sm:col-span-2 rounded-2xl border border-[#E3E6ED] bg-[#FAFAFC] p-4"><div class="flex items-center gap-2"><CalendarCheck2 size={16} class="text-[#000A57]"/><strong class="text-[11px] text-[#3D4453]">Google Calendar</strong></div><p class="mt-1 text-[9px] leading-4 text-[#858B98]">Conecte sua conta para adicionar esta tarefa à sua agenda.</p><a href="/app/tasks/calendar/google/connect" class="mt-3 inline-flex min-h-9 items-center rounded-lg border border-[#D3D8E3] bg-white px-3 text-[9px] font-semibold text-[#000A57]">Conectar Google Calendar</a></div>
+            {/if}
+
             {#if data.canUpdate}<button type="submit" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-5 text-[12px] font-semibold text-white sm:col-span-2"><Save size={17}/>Salvar alterações</button>{/if}
           </fieldset>
         </form>
