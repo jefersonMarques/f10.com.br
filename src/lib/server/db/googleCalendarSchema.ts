@@ -27,6 +27,8 @@ export const taskGoogleCalendarLinks = pgTable(
     googleCalendarId: text("google_calendar_id").notNull().default("primary"),
     googleEventId: text("google_event_id").notNull(),
     googleHtmlLink: text("google_html_link"),
+    googleMeetEnabled: boolean("google_meet_enabled").notNull().default(false),
+    googleMeetUrl: text("google_meet_url"),
     allDay: boolean("all_day").notNull().default(true),
     startTime: text("start_time"),
     endTime: text("end_time"),
