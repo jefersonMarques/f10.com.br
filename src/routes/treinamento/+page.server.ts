@@ -6,7 +6,6 @@ import {
   consumeHelpTrainingInvite,
   getHelpTrainingSession,
   reportHelpTrainingFailure,
-  requestHelpForTrainingStep,
   startHelpTrainingSession,
 } from "$lib/server/help/helpTrainingRepository";
 import {
@@ -16,6 +15,7 @@ import {
   getHelpTrainingSessionCookie,
   setHelpTrainingSessionCookie,
 } from "$lib/server/help/helpTrainingSession";
+import { requestTrainingHumanHelp } from "$lib/server/help/helpTrainingSupport";
 import { markHelpTrainingStepViewed } from "$lib/server/help/helpTrainingTelemetry";
 
 function read(formData: FormData, name: string): string {
@@ -111,7 +111,7 @@ export const actions: Actions = {
     const token = await requireTrainingToken(cookies);
     const formData = await request.formData();
     try {
-      await requestHelpForTrainingStep(token, read(formData, "detail"));
+      await requestTrainingHumanHelp(token, read(formData, "detail"));
       throw redirect(303, "/treinamento?ajuda=1");
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
