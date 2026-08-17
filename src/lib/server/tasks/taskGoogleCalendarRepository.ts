@@ -42,6 +42,7 @@ type TaskGoogleLink = {
   userId: string;
   googleCalendarId: string;
   googleEventId: string;
+  googleIcalUid: string | null;
   googleHtmlLink: string | null;
   googleMeetEnabled: boolean;
   googleMeetUrl: string | null;
@@ -49,6 +50,7 @@ type TaskGoogleLink = {
   startTime: string | null;
   endTime: string | null;
   timeZone: string;
+  eventDetailsManaged: boolean;
   location: string;
   reminderMinutes: number | null;
   attendees: TaskGoogleCalendarAttendee[];
@@ -87,6 +89,10 @@ function normalizeAttendees(attendees: TaskGoogleCalendarAttendee[] | undefined)
     if (normalized.size > 100) throw new Error("TASK_GOOGLE_TOO_MANY_ATTENDEES");
   }
   return Array.from(normalized.values());
+}
+
+function managesEventDetails(input: TaskGoogleCalendarScheduleInput): boolean {
+  return input.location !== undefined || input.reminderMinutes !== undefined || input.attendees !== undefined;
 }
 
 function validateEventDetails(input: TaskGoogleCalendarScheduleInput) {
@@ -142,7 +148,7 @@ function toGoogleEventInput(
   task: TaskSnapshot,
   link: Pick<
     TaskGoogleLink,
-    "allDay" | "startTime" | "endTime" | "timeZone" | "googleMeetEnabled" | "location" | "reminderMinutes" | "attendees"
+    "allDay" | "startTime" | "endTime" | "timeZone" | "googleMeetEnabled" | "eventDetailsManaged" | "location" | "reminderMinutes" | "attendees"
   >,
   requestGoogleMeet = false,
 ): CreateGoogleCalendarEventInput {
@@ -156,12 +162,16 @@ function toGoogleEventInput(
     endTime: link.endTime ?? "",
     timeZone: link.timeZone,
     addGoogleMeet: requestGoogleMeet && link.googleMeetEnabled,
-    location: link.location,
-    reminderMinutes: link.reminderMinutes,
-    attendees: link.attendees.map((attendee) => ({
-      email: attendee.email,
-      optional: attendee.optional,
-    })),
+    ...(link.eventDetailsManaged
+      ? {
+          location: link.location,
+          reminderMinutes: link.reminderMinutes,
+          attendees: link.attendees.map((attendee) => ({
+            email: attendee.email,
+            optional: attendee.optional,
+          })),
+        }
+      : {}),
   };
 }
 
@@ -173,6 +183,7 @@ async function getLink(userId: string, taskId: string): Promise<TaskGoogleLink |
       userId: taskGoogleCalendarLinks.userId,
       googleCalendarId: taskGoogleCalendarLinks.googleCalendarId,
       googleEventId: taskGoogleCalendarLinks.googleEventId,
+      googleIcalUid: taskGoogleCalendarLinks.googleIcalUid,
       googleHtmlLink: taskGoogleCalendarLinks.googleHtmlLink,
       googleMeetEnabled: taskGoogleCalendarLinks.googleMeetEnabled,
       googleMeetUrl: taskGoogleCalendarLinks.googleMeetUrl,
@@ -180,6 +191,7 @@ async function getLink(userId: string, taskId: string): Promise<TaskGoogleLink |
       startTime: taskGoogleCalendarLinks.startTime,
       endTime: taskGoogleCalendarLinks.endTime,
       timeZone: taskGoogleCalendarLinks.timeZone,
+      eventDetailsManaged: taskGoogleCalendarLinks.eventDetailsManaged,
       location: taskGoogleCalendarLinks.location,
       reminderMinutes: taskGoogleCalendarLinks.reminderMinutes,
       attendees: taskGoogleCalendarLinks.attendees,
@@ -232,6 +244,7 @@ async function syncExistingLink(task: TaskSnapshot, link: TaskGoogleLink): Promi
     .update(taskGoogleCalendarLinks)
     .set({
       googleEventId: event.id,
+      googleIcalUid: event.iCalUID,
       googleHtmlLink: event.htmlLink,
       googleMeetUrl: event.meetUrl ?? link.googleMeetUrl,
       lastSyncedAt: now,
@@ -253,6 +266,7 @@ export async function getTaskGoogleCalendarLink(userId: string, taskId: string) 
       taskId: taskGoogleCalendarLinks.taskId,
       googleCalendarId: taskGoogleCalendarLinks.googleCalendarId,
       googleEventId: taskGoogleCalendarLinks.googleEventId,
+      googleIcalUid: taskGoogleCalendarLinks.googleIcalUid,
       googleHtmlLink: taskGoogleCalendarLinks.googleHtmlLink,
       googleMeetEnabled: taskGoogleCalendarLinks.googleMeetEnabled,
       googleMeetUrl: taskGoogleCalendarLinks.googleMeetUrl,
@@ -260,6 +274,7 @@ export async function getTaskGoogleCalendarLink(userId: string, taskId: string) 
       startTime: taskGoogleCalendarLinks.startTime,
       endTime: taskGoogleCalendarLinks.endTime,
       timeZone: taskGoogleCalendarLinks.timeZone,
+      eventDetailsManaged: taskGoogleCalendarLinks.eventDetailsManaged,
       location: taskGoogleCalendarLinks.location,
       reminderMinutes: taskGoogleCalendarLinks.reminderMinutes,
       attendees: taskGoogleCalendarLinks.attendees,
@@ -319,7 +334,10 @@ export async function configureTaskGoogleCalendar(
   }
 
   const schedule = validateSchedule(input);
-  const details = validateEventDetails(input);
+  const shouldManageDetails = managesEventDetails(input);
+  const details = shouldManageDetails
+    ? validateEventDetails(input)
+    : { location: "", reminderMinutes: null, attendees: [] as TaskGoogleCalendarAttendee[] };
   const task = await getTaskSnapshot(taskId);
   if (!task.dueOn) throw new Error("TASK_GOOGLE_REQUIRES_DUE_DATE");
 
@@ -334,9 +352,14 @@ export async function configureTaskGoogleCalendar(
         endTime: schedule.allDay ? null : schedule.endTime,
         timeZone: schedule.timeZone,
         googleMeetEnabled: existing.googleMeetEnabled || Boolean(input.googleMeet),
-        location: details.location,
-        reminderMinutes: details.reminderMinutes,
-        attendees: details.attendees,
+        ...(shouldManageDetails
+          ? {
+              eventDetailsManaged: true,
+              location: details.location,
+              reminderMinutes: details.reminderMinutes,
+              attendees: details.attendees,
+            }
+          : {}),
         updatedAt: new Date(),
       })
       .where(
@@ -356,6 +379,7 @@ export async function configureTaskGoogleCalendar(
         await db
           .update(taskGoogleCalendarLinks)
           .set({
+            googleIcalUid: event.iCalUID,
             googleHtmlLink: event.htmlLink,
             googleMeetUrl: event.meetUrl,
             lastSyncedAt: new Date(),
@@ -383,13 +407,14 @@ export async function configureTaskGoogleCalendar(
   const googleMeetEnabled = Boolean(input.googleMeet);
   const newLink: Pick<
     TaskGoogleLink,
-    "allDay" | "startTime" | "endTime" | "timeZone" | "googleMeetEnabled" | "location" | "reminderMinutes" | "attendees"
+    "allDay" | "startTime" | "endTime" | "timeZone" | "googleMeetEnabled" | "eventDetailsManaged" | "location" | "reminderMinutes" | "attendees"
   > = {
     allDay: schedule.allDay,
     startTime: schedule.allDay ? null : schedule.startTime,
     endTime: schedule.allDay ? null : schedule.endTime,
     timeZone: schedule.timeZone,
     googleMeetEnabled,
+    eventDetailsManaged: shouldManageDetails,
     location: details.location,
     reminderMinutes: details.reminderMinutes,
     attendees: details.attendees,
@@ -405,6 +430,7 @@ export async function configureTaskGoogleCalendar(
     userId: actorUserId,
     googleCalendarId: "primary",
     googleEventId: event.id,
+    googleIcalUid: event.iCalUID,
     googleHtmlLink: event.htmlLink,
     googleMeetEnabled,
     googleMeetUrl: event.meetUrl,
@@ -412,6 +438,7 @@ export async function configureTaskGoogleCalendar(
     startTime: schedule.allDay ? null : schedule.startTime,
     endTime: schedule.allDay ? null : schedule.endTime,
     timeZone: schedule.timeZone,
+    eventDetailsManaged: shouldManageDetails,
     location: details.location,
     reminderMinutes: details.reminderMinutes,
     attendees: details.attendees,
@@ -431,6 +458,7 @@ export async function syncAllTaskGoogleCalendarLinks(taskId: string): Promise<vo
         userId: taskGoogleCalendarLinks.userId,
         googleCalendarId: taskGoogleCalendarLinks.googleCalendarId,
         googleEventId: taskGoogleCalendarLinks.googleEventId,
+        googleIcalUid: taskGoogleCalendarLinks.googleIcalUid,
         googleHtmlLink: taskGoogleCalendarLinks.googleHtmlLink,
         googleMeetEnabled: taskGoogleCalendarLinks.googleMeetEnabled,
         googleMeetUrl: taskGoogleCalendarLinks.googleMeetUrl,
@@ -438,6 +466,7 @@ export async function syncAllTaskGoogleCalendarLinks(taskId: string): Promise<vo
         startTime: taskGoogleCalendarLinks.startTime,
         endTime: taskGoogleCalendarLinks.endTime,
         timeZone: taskGoogleCalendarLinks.timeZone,
+        eventDetailsManaged: taskGoogleCalendarLinks.eventDetailsManaged,
         location: taskGoogleCalendarLinks.location,
         reminderMinutes: taskGoogleCalendarLinks.reminderMinutes,
         attendees: taskGoogleCalendarLinks.attendees,
