@@ -264,3 +264,63 @@ export async function moveTask(
     });
   });
 }
+
+export async function setTaskCompletion(
+  actorUserId: string,
+  permissions: TaskPermissionMap,
+  taskId: string,
+  completed: boolean,
+): Promise<void> {
+  const updateScope = requireTaskPermissionScope(permissions, "tasks.update");
+  const context = await ensureTaskAccess(actorUserId, updateScope, taskId);
+  const db = getDatabase();
+
+  const [currentStatus] = await db
+    .select({ id: taskStatuses.id, isClosed: taskStatuses.isClosed })
+    .from(taskStatuses)
+    .where(eq(taskStatuses.id, context.task.statusId))
+    .limit(1);
+
+  if (!currentStatus) throw new Error("TASK_STATUS_NOT_FOUND");
+  if (currentStatus.isClosed === completed) return;
+
+  const [targetStatus] = await db
+    .select({ id: taskStatuses.id, name: taskStatuses.name })
+    .from(taskStatuses)
+    .where(
+      and(
+        eq(taskStatuses.projectId, context.task.projectId),
+        eq(taskStatuses.isClosed, completed),
+      ),
+    )
+    .orderBy(asc(taskStatuses.sortOrder))
+    .limit(1);
+
+  if (!targetStatus) {
+    throw new Error(completed ? "PROJECT_WITHOUT_CLOSED_STATUS" : "PROJECT_WITHOUT_OPEN_STATUS");
+  }
+
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    await tx
+      .update(tasks)
+      .set({
+        statusId: targetStatus.id,
+        completedAt: completed ? now : null,
+        updatedBy: actorUserId,
+        updatedAt: now,
+      })
+      .where(eq(tasks.id, taskId));
+
+    await tx.insert(taskActivities).values({
+      taskId,
+      actorUserId,
+      action: completed ? "task.completed" : "task.reopened",
+      metadata: {
+        previousStatusId: context.task.statusId,
+        statusId: targetStatus.id,
+        statusName: targetStatus.name,
+      },
+    });
+  });
+}
