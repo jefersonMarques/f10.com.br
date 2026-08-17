@@ -19,6 +19,14 @@ const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
 ];
 
+export type GoogleCalendarAttendee = {
+  email: string;
+  displayName: string;
+  optional: boolean;
+  responseStatus: "needsAction" | "declined" | "tentative" | "accepted" | string;
+  self: boolean;
+};
+
 export type GoogleCalendarEvent = {
   id: string;
   summary: string;
@@ -32,6 +40,13 @@ export type GoogleCalendarEvent = {
   startDateTime: string | null;
   endDate: string | null;
   endDateTime: string | null;
+  transparency: string;
+  attendees: GoogleCalendarAttendee[];
+};
+
+export type GoogleCalendarEventAttendeeInput = {
+  email: string;
+  optional?: boolean;
 };
 
 export type CreateGoogleCalendarEventInput = {
@@ -43,6 +58,9 @@ export type CreateGoogleCalendarEventInput = {
   endTime: string;
   timeZone: string;
   addGoogleMeet?: boolean;
+  location?: string;
+  reminderMinutes?: number | null;
+  attendees?: GoogleCalendarEventAttendeeInput[];
 };
 
 type GoogleTokenResponse = {
@@ -67,8 +85,20 @@ type GoogleEventResource = {
   description?: string;
   location?: string;
   htmlLink?: string;
+  transparency?: string;
   start?: { date?: string; dateTime?: string; timeZone?: string };
   end?: { date?: string; dateTime?: string; timeZone?: string };
+  attendees?: Array<{
+    email?: string;
+    displayName?: string;
+    optional?: boolean;
+    responseStatus?: string;
+    self?: boolean;
+  }>;
+  reminders?: {
+    useDefault?: boolean;
+    overrides?: Array<{ method?: string; minutes?: number }>;
+  };
   conferenceData?: {
     entryPoints?: Array<{
       entryPointType?: string;
@@ -297,6 +327,16 @@ function normalizeGoogleEvent(event: GoogleEventResource): GoogleCalendarEvent |
     startDateTime: event.start.dateTime ?? null,
     endDate: event.end?.date ?? null,
     endDateTime: event.end?.dateTime ?? null,
+    transparency: event.transparency ?? "opaque",
+    attendees: (event.attendees ?? [])
+      .filter((attendee) => attendee.email)
+      .map((attendee) => ({
+        email: attendee.email?.trim().toLowerCase() ?? "",
+        displayName: attendee.displayName?.trim() ?? "",
+        optional: Boolean(attendee.optional),
+        responseStatus: attendee.responseStatus ?? "needsAction",
+        self: Boolean(attendee.self),
+      })),
   };
 }
 
@@ -351,9 +391,25 @@ function googleEventResource(input: CreateGoogleCalendarEventInput) {
         end: { dateTime: `${input.date}T${input.endTime}:00`, timeZone: input.timeZone },
       };
 
+  const reminderMinutes = input.reminderMinutes;
+  const reminders = reminderMinutes === undefined || reminderMinutes === null
+    ? { useDefault: true }
+    : {
+        useDefault: false,
+        overrides: reminderMinutes > 0
+          ? [{ method: "popup", minutes: reminderMinutes }]
+          : [],
+      };
+
   return {
     summary: input.title,
     description: input.description,
+    location: input.location?.trim() ?? "",
+    attendees: (input.attendees ?? []).map((attendee) => ({
+      email: attendee.email.trim().toLowerCase(),
+      optional: Boolean(attendee.optional),
+    })),
+    reminders,
     ...schedule,
     ...(input.addGoogleMeet
       ? {
@@ -386,6 +442,15 @@ async function getGoogleCalendarEventWithToken(
   return normalizeGoogleEvent(resource);
 }
 
+export async function getGoogleCalendarEvent(
+  userId: string,
+  calendarId: string,
+  eventId: string,
+): Promise<GoogleCalendarEvent | null> {
+  const accessToken = await getUserAccessToken(userId);
+  return getGoogleCalendarEventWithToken(accessToken, calendarId, eventId);
+}
+
 async function waitForGoogleMeet(
   accessToken: string,
   calendarId: string,
@@ -416,6 +481,7 @@ export async function createGoogleCalendarEvent(
   const accessToken = await getUserAccessToken(userId);
   const url = new URL(calendarEventsUrl(calendarId));
   if (input.addGoogleMeet) url.searchParams.set("conferenceDataVersion", "1");
+  if (input.attendees !== undefined) url.searchParams.set("sendUpdates", "all");
 
   const response = await fetch(url, {
     method: "POST",
@@ -472,6 +538,7 @@ export async function updateGoogleCalendarEvent(
   const accessToken = await getUserAccessToken(userId);
   const url = new URL(`${calendarEventsUrl(calendarId)}/${encodeURIComponent(eventId)}`);
   url.searchParams.set("conferenceDataVersion", "1");
+  if (input.attendees !== undefined) url.searchParams.set("sendUpdates", "all");
   const resource = googleEventResource({ ...input, addGoogleMeet: false });
 
   const response = await fetch(url, {
