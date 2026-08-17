@@ -127,6 +127,7 @@ export const actions: Actions = {
     const googleStartTime = readFormValue(formData, "googleStartTime");
     const googleEndTime = readFormValue(formData, "googleEndTime");
     const googleTimeZone = readFormValue(formData, "googleTimeZone");
+    const googleMeet = readFormValue(formData, "googleMeet") === "true";
 
     if (title.length < 3 || title.length > 180) return fail(400, { success: false, action: "update", message: "Informe um título entre 3 e 180 caracteres." });
     if (description.length > 5000) return fail(400, { success: false, action: "update", message: "A descrição deve ter no máximo 5.000 caracteres." });
@@ -152,6 +153,7 @@ export const actions: Actions = {
           startTime: googleStartTime,
           endTime: googleEndTime,
           timeZone: googleTimeZone,
+          googleMeet,
         });
       } catch (cause) {
         const code = cause instanceof Error ? cause.message : "";
