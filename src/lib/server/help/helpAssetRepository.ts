@@ -11,13 +11,15 @@ import {
 } from "$lib/server/storage/assetStorage";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
 
-const ALLOWED_MIME_TYPES = new Map<string, { type: "image" | "file"; extension: string; maxBytes: number }>([
+const ALLOWED_MIME_TYPES = new Map<string, { type: "image" | "video" | "file"; extension: string; maxBytes: number }>([
   ["image/png", { type: "image", extension: "png", maxBytes: MAX_IMAGE_BYTES }],
   ["image/jpeg", { type: "image", extension: "jpg", maxBytes: MAX_IMAGE_BYTES }],
   ["image/webp", { type: "image", extension: "webp", maxBytes: MAX_IMAGE_BYTES }],
   ["image/gif", { type: "image", extension: "gif", maxBytes: MAX_IMAGE_BYTES }],
+  ["video/mp4", { type: "video", extension: "mp4", maxBytes: MAX_VIDEO_BYTES }],
   ["application/pdf", { type: "file", extension: "pdf", maxBytes: MAX_DOCUMENT_BYTES }],
   ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", { type: "file", extension: "docx", maxBytes: MAX_DOCUMENT_BYTES }],
   ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", { type: "file", extension: "xlsx", maxBytes: MAX_DOCUMENT_BYTES }],
@@ -35,6 +37,7 @@ function validateMagicBytes(mimeType: string, bytes: Uint8Array): boolean {
   if (mimeType === "image/jpeg") return hasPrefix(bytes, [0xff, 0xd8, 0xff]);
   if (mimeType === "image/gif") return new TextDecoder().decode(bytes.slice(0, 6)) === "GIF87a" || new TextDecoder().decode(bytes.slice(0, 6)) === "GIF89a";
   if (mimeType === "image/webp") return new TextDecoder().decode(bytes.slice(0, 4)) === "RIFF" && new TextDecoder().decode(bytes.slice(8, 12)) === "WEBP";
+  if (mimeType === "video/mp4") return bytes.byteLength >= 12 && new TextDecoder().decode(bytes.slice(4, 8)) === "ftyp";
   if (mimeType === "application/pdf") return new TextDecoder().decode(bytes.slice(0, 5)) === "%PDF-";
   if (mimeType.includes("openxmlformats")) return hasPrefix(bytes, [0x50, 0x4b, 0x03, 0x04]);
   return true;
