@@ -2,6 +2,7 @@ import { error, fail, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
+import { getGoogleCalendarConnection } from "$lib/server/calendar/googleCalendarRepository";
 import { markEntityNotificationsRead } from "$lib/server/notifications/notificationRepository";
 import { listTaskTicketOrigins } from "$lib/server/support/ticketTaskBridge";
 import {
@@ -12,6 +13,10 @@ import {
   updateTaskDetails,
   type TaskPriority,
 } from "$lib/server/tasks/taskRepository";
+import {
+  configureTaskGoogleCalendar,
+  getTaskGoogleCalendarLink,
+} from "$lib/server/tasks/taskGoogleCalendarRepository";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -45,6 +50,12 @@ function isValidDate(value: string): boolean {
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
+function isValidTime(value: string): boolean {
+  if (!/^\d{2}:\d{2}$/.test(value)) return false;
+  const [hour, minute] = value.split(":").map(Number);
+  return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+}
+
 export const load: PageServerLoad = async ({ params, parent }) => {
   if (!isUuid(params.taskId)) throw error(404, "Tarefa não encontrada.");
 
@@ -53,16 +64,20 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   if (!hasPermission(permissions, "tasks.view")) throw error(403, "Acesso não autorizado.");
 
   try {
-    const [details, ticketOrigins] = await Promise.all([
+    const [details, ticketOrigins, googleCalendar, googleLink] = await Promise.all([
       getTaskDetails(layout.user.id, permissions, params.taskId),
       hasPermission(permissions, "tickets.view")
         ? listTaskTicketOrigins(layout.user.id, permissions, params.taskId)
         : Promise.resolve([]),
+      getGoogleCalendarConnection(layout.user.id),
+      getTaskGoogleCalendarLink(layout.user.id, params.taskId),
     ]);
     await markEntityNotificationsRead(layout.user.id, "task", params.taskId);
     return {
       details,
       ticketOrigins,
+      googleCalendar,
+      googleLink,
       canUpdate: hasPermission(permissions, "tasks.update"),
       canAssign: hasPermission(permissions, "tasks.assign"),
     };
@@ -106,15 +121,48 @@ export const actions: Actions = {
     const description = readFormValue(formData, "description");
     const priority = readFormValue(formData, "priority");
     const dueOn = readFormValue(formData, "dueOn");
+    const googleSyncManaged = readFormValue(formData, "googleSyncManaged") === "true";
+    const syncGoogle = readFormValue(formData, "syncGoogle") === "true";
+    const googleAllDay = readFormValue(formData, "googleAllDay") === "true";
+    const googleStartTime = readFormValue(formData, "googleStartTime");
+    const googleEndTime = readFormValue(formData, "googleEndTime");
+    const googleTimeZone = readFormValue(formData, "googleTimeZone");
+
     if (title.length < 3 || title.length > 180) return fail(400, { success: false, action: "update", message: "Informe um título entre 3 e 180 caracteres." });
     if (description.length > 5000) return fail(400, { success: false, action: "update", message: "A descrição deve ter no máximo 5.000 caracteres." });
     if (!isTaskPriority(priority) || (dueOn && !isValidDate(dueOn))) return fail(400, { success: false, action: "update", message: "Prioridade ou prazo inválido." });
+    if (googleSyncManaged && syncGoogle && !dueOn) {
+      return fail(400, { success: false, action: "update", message: "Defina uma data para sincronizar a tarefa com o Google Calendar." });
+    }
+    if (googleSyncManaged && syncGoogle && !googleAllDay && (!isValidTime(googleStartTime) || !isValidTime(googleEndTime) || googleStartTime >= googleEndTime)) {
+      return fail(400, { success: false, action: "update", message: "Informe um horário válido para o evento do Google Calendar." });
+    }
+
     try {
       await updateTaskDetails(session.user.id, permissions, params.taskId, { title, description, priority, dueOn: dueOn || null });
-      return { success: true, action: "update", message: "Tarefa atualizada." };
     } catch {
       return fail(403, { success: false, action: "update", message: "Você não pode alterar esta tarefa." });
     }
+
+    if (googleSyncManaged) {
+      try {
+        await configureTaskGoogleCalendar(session.user.id, permissions, params.taskId, {
+          enabled: syncGoogle,
+          allDay: googleAllDay,
+          startTime: googleStartTime,
+          endTime: googleEndTime,
+          timeZone: googleTimeZone,
+        });
+      } catch (cause) {
+        const code = cause instanceof Error ? cause.message : "";
+        const message = code === "TASK_GOOGLE_REQUIRES_DUE_DATE"
+          ? "Tarefa atualizada, mas a sincronização exige uma data."
+          : "Tarefa atualizada, mas não foi possível sincronizar com o Google Calendar agora.";
+        return { success: true, syncWarning: true, action: "update", message };
+      }
+    }
+
+    return { success: true, action: "update", message: "Tarefa atualizada." };
   },
 
   assign: async ({ cookies, params, request }) => {
