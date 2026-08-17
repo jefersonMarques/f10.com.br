@@ -1,6 +1,9 @@
+import { and, eq } from "drizzle-orm";
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { checkF10CalendarAvailability } from "$lib/server/calendar/f10CalendarAvailabilityRepository";
+import { getDatabase } from "$lib/server/db";
+import { taskGoogleCalendarLinks } from "$lib/server/db/googleCalendarSchema";
 import { listActiveTaskUsers } from "$lib/server/tasks/taskRepository";
 
 function isUuid(value: string): boolean {
@@ -31,7 +34,7 @@ function isValidTimeZone(value: string): boolean {
 }
 
 export const POST: RequestHandler = async ({ cookies, request }) => {
-  await requireAppPermission(cookies, "tasks.view", "/app/tasks/calendar");
+  const { session } = await requireAppPermission(cookies, "tasks.view", "/app/tasks/calendar");
 
   const body = await request.json().catch(() => null) as null | {
     userIds?: unknown;
@@ -53,7 +56,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
   const excludeGoogleEventId = typeof body?.excludeGoogleEventId === "string"
     ? body.excludeGoogleEventId.trim().slice(0, 1024)
     : "";
-  const excludeGoogleIcalUid = typeof body?.excludeGoogleIcalUid === "string"
+  let excludeGoogleIcalUid = typeof body?.excludeGoogleIcalUid === "string"
     ? body.excludeGoogleIcalUid.trim().slice(0, 1024)
     : "";
 
@@ -62,6 +65,21 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
   }
 
   if (userIds.length === 0) return json({ results: [] });
+
+  if (excludeGoogleEventId && !excludeGoogleIcalUid) {
+    const db = getDatabase();
+    const [link] = await db
+      .select({ googleIcalUid: taskGoogleCalendarLinks.googleIcalUid })
+      .from(taskGoogleCalendarLinks)
+      .where(
+        and(
+          eq(taskGoogleCalendarLinks.userId, session.user.id),
+          eq(taskGoogleCalendarLinks.googleEventId, excludeGoogleEventId),
+        ),
+      )
+      .limit(1);
+    excludeGoogleIcalUid = link?.googleIcalUid ?? "";
+  }
 
   const activeUsers = await listActiveTaskUsers();
   const selectedUsers = userIds
