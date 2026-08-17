@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { env } from "$env/dynamic/private";
 import { eq } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
@@ -24,6 +25,8 @@ export type GoogleCalendarEvent = {
   description: string;
   location: string;
   htmlLink: string | null;
+  meetUrl: string | null;
+  conferenceStatus: string | null;
   allDay: boolean;
   startDate: string | null;
   startDateTime: string | null;
@@ -39,6 +42,7 @@ export type CreateGoogleCalendarEventInput = {
   startTime: string;
   endTime: string;
   timeZone: string;
+  addGoogleMeet?: boolean;
 };
 
 type GoogleTokenResponse = {
@@ -65,6 +69,17 @@ type GoogleEventResource = {
   htmlLink?: string;
   start?: { date?: string; dateTime?: string; timeZone?: string };
   end?: { date?: string; dateTime?: string; timeZone?: string };
+  conferenceData?: {
+    entryPoints?: Array<{
+      entryPointType?: string;
+      uri?: string;
+    }>;
+    createRequest?: {
+      status?: {
+        statusCode?: string;
+      };
+    };
+  };
 };
 
 type GoogleEventsResponse = {
@@ -266,12 +281,17 @@ function normalizeGoogleEvent(event: GoogleEventResource): GoogleCalendarEvent |
   if (!event.id || event.status === "cancelled" || (!event.start?.date && !event.start?.dateTime)) {
     return null;
   }
+  const meetEntry = event.conferenceData?.entryPoints?.find(
+    (entryPoint) => entryPoint.entryPointType === "video" && entryPoint.uri,
+  );
   return {
     id: event.id,
     summary: event.summary?.trim() || "Evento sem título",
     description: event.description?.trim() ?? "",
     location: event.location?.trim() ?? "",
     htmlLink: event.htmlLink ?? null,
+    meetUrl: meetEntry?.uri ?? null,
+    conferenceStatus: event.conferenceData?.createRequest?.status?.statusCode ?? null,
     allDay: Boolean(event.start.date),
     startDate: event.start.date ?? null,
     startDateTime: event.start.dateTime ?? null,
@@ -321,23 +341,71 @@ function addOneDay(dateValue: string): string {
 }
 
 function googleEventResource(input: CreateGoogleCalendarEventInput) {
-  return input.allDay
+  const schedule = input.allDay
     ? {
-        summary: input.title,
-        description: input.description,
         start: { date: input.date },
         end: { date: addOneDay(input.date) },
       }
     : {
-        summary: input.title,
-        description: input.description,
         start: { dateTime: `${input.date}T${input.startTime}:00`, timeZone: input.timeZone },
         end: { dateTime: `${input.date}T${input.endTime}:00`, timeZone: input.timeZone },
       };
+
+  return {
+    summary: input.title,
+    description: input.description,
+    ...schedule,
+    ...(input.addGoogleMeet
+      ? {
+          conferenceData: {
+            createRequest: {
+              requestId: randomUUID(),
+              conferenceSolutionKey: { type: "hangoutsMeet" },
+            },
+          },
+        }
+      : {}),
+  };
 }
 
 function calendarEventsUrl(calendarId: string): string {
   return `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events`;
+}
+
+async function getGoogleCalendarEventWithToken(
+  accessToken: string,
+  calendarId: string,
+  eventId: string,
+): Promise<GoogleCalendarEvent | null> {
+  const response = await fetch(
+    `${calendarEventsUrl(calendarId)}/${encodeURIComponent(eventId)}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (response.status === 404 || response.status === 410) return null;
+  const resource = await parseGoogleResponse<GoogleEventResource>(response);
+  return normalizeGoogleEvent(resource);
+}
+
+async function waitForGoogleMeet(
+  accessToken: string,
+  calendarId: string,
+  event: GoogleCalendarEvent,
+): Promise<GoogleCalendarEvent> {
+  if (event.meetUrl || event.conferenceStatus === "failure") return event;
+
+  let current = event;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const refreshed = await getGoogleCalendarEventWithToken(
+      accessToken,
+      calendarId,
+      event.id,
+    );
+    if (!refreshed) return current;
+    current = refreshed;
+    if (current.meetUrl || current.conferenceStatus === "failure") return current;
+  }
+  return current;
 }
 
 export async function createGoogleCalendarEvent(
@@ -346,7 +414,10 @@ export async function createGoogleCalendarEvent(
   calendarId = "primary",
 ): Promise<GoogleCalendarEvent> {
   const accessToken = await getUserAccessToken(userId);
-  const response = await fetch(calendarEventsUrl(calendarId), {
+  const url = new URL(calendarEventsUrl(calendarId));
+  if (input.addGoogleMeet) url.searchParams.set("conferenceDataVersion", "1");
+
+  const response = await fetch(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -357,7 +428,39 @@ export async function createGoogleCalendarEvent(
   const created = await parseGoogleResponse<GoogleEventResource>(response);
   const normalized = normalizeGoogleEvent(created);
   if (!normalized) throw new Error("GOOGLE_EVENT_INVALID_RESPONSE");
-  return normalized;
+  return input.addGoogleMeet
+    ? waitForGoogleMeet(accessToken, calendarId, normalized)
+    : normalized;
+}
+
+export async function addGoogleMeetToGoogleCalendarEvent(
+  userId: string,
+  calendarId: string,
+  eventId: string,
+): Promise<GoogleCalendarEvent> {
+  const accessToken = await getUserAccessToken(userId);
+  const url = new URL(`${calendarEventsUrl(calendarId)}/${encodeURIComponent(eventId)}`);
+  url.searchParams.set("conferenceDataVersion", "1");
+
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      conferenceData: {
+        createRequest: {
+          requestId: randomUUID(),
+          conferenceSolutionKey: { type: "hangoutsMeet" },
+        },
+      },
+    }),
+  });
+  const resource = await parseGoogleResponse<GoogleEventResource>(response);
+  const normalized = normalizeGoogleEvent(resource);
+  if (!normalized) throw new Error("GOOGLE_EVENT_INVALID_RESPONSE");
+  return waitForGoogleMeet(accessToken, calendarId, normalized);
 }
 
 export async function updateGoogleCalendarEvent(
@@ -367,17 +470,18 @@ export async function updateGoogleCalendarEvent(
   input: CreateGoogleCalendarEventInput,
 ): Promise<GoogleCalendarEvent | null> {
   const accessToken = await getUserAccessToken(userId);
-  const response = await fetch(
-    `${calendarEventsUrl(calendarId)}/${encodeURIComponent(eventId)}`,
-    {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(googleEventResource(input)),
+  const url = new URL(`${calendarEventsUrl(calendarId)}/${encodeURIComponent(eventId)}`);
+  url.searchParams.set("conferenceDataVersion", "1");
+  const resource = googleEventResource({ ...input, addGoogleMeet: false });
+
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify(resource),
+  });
 
   if (response.status === 404 || response.status === 410) return null;
   const updated = await parseGoogleResponse<GoogleEventResource>(response);
