@@ -1,6 +1,6 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
-  import { goto, invalidateAll } from "$app/navigation";
+  import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import {
@@ -13,6 +13,7 @@
     Link2,
     Plus,
     Unplug,
+    Video,
     X,
   } from "lucide-svelte";
   import type { ActionData, PageData } from "./$types";
@@ -39,9 +40,14 @@
   let taskGoogleAllDay = false;
   let taskGoogleStartTime = "09:00";
   let taskGoogleEndTime = "10:00";
+  let taskGoogleMeet = false;
+
   let googleEventOpen = false;
   let googleEventDate = data.calendarAnchor;
   let googleEventAllDay = true;
+  let googleEventMeet = false;
+  let googleEventCreateAsTask = false;
+  let googleEventProjectId = data.selectedProjectId ?? data.projects[0]?.id ?? "";
   let googleTimeZone = "UTC";
 
   onMount(() => {
@@ -124,6 +130,10 @@
     return data.googleLinkedTaskIds.includes(taskId);
   }
 
+  function taskHasMeet(taskId: string): boolean {
+    return data.googleMeetTaskIds.includes(taskId);
+  }
+
   function openCreate(date: Date): void {
     if (!data.canCreate || data.projects.length === 0) return;
     createDate = dateKey(date);
@@ -132,6 +142,7 @@
     taskGoogleAllDay = false;
     taskGoogleStartTime = "09:00";
     taskGoogleEndTime = "10:00";
+    taskGoogleMeet = false;
     createOpen = true;
   }
 
@@ -139,7 +150,19 @@
     if (!data.googleCalendar.connected) return;
     googleEventDate = dateKey(date);
     googleEventAllDay = true;
+    googleEventMeet = false;
+    googleEventCreateAsTask = false;
+    googleEventProjectId = data.selectedProjectId ?? data.projects[0]?.id ?? "";
     googleEventOpen = true;
+  }
+
+  async function refreshCalendarData(): Promise<void> {
+    const current = `${$page.url.pathname}${$page.url.search}`;
+    await goto(current, {
+      replaceState: true,
+      noScroll: true,
+      invalidateAll: true,
+    });
   }
 
   function navigateCalendar(next: Date): void {
@@ -190,6 +213,7 @@
   $: weekDays = Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(cursorDate), index));
   $: visibleDays = calendarView === "month" ? monthDays : weekDays;
   $: selectedMembers = data.membersByProject[createProjectId] ?? [];
+  $: googleEventMembers = data.membersByProject[googleEventProjectId] ?? [];
   $: unscheduledCount = data.tasks.filter((task) => !task.dueOn).length;
   $: periodLabel = calendarView === "month"
     ? new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(cursorDate)
@@ -268,10 +292,10 @@
             </button>
             <div class="mt-1 space-y-1">
               {#each dayGoogleEvents.slice(0, 2) as event}
-                {#if event.htmlLink}<a href={event.htmlLink} target="_blank" rel="noopener noreferrer" class="block truncate rounded-md border border-[#CFE0D5] bg-[#F1F8F3] px-2 py-1.5 text-[9px] font-semibold text-[#2F7045]" title={`${googleEventTime(event)} · ${event.summary}`}><span class="mr-1 text-[8px] font-bold">G</span>{googleEventTime(event)} · {event.summary}</a>{:else}<span class="block truncate rounded-md border border-[#CFE0D5] bg-[#F1F8F3] px-2 py-1.5 text-[9px] font-semibold text-[#2F7045]">G · {event.summary}</span>{/if}
+                {#if event.htmlLink}<a href={event.htmlLink} target="_blank" rel="noopener noreferrer" class="block truncate rounded-md border border-[#CFE0D5] bg-[#F1F8F3] px-2 py-1.5 text-[9px] font-semibold text-[#2F7045]" title={`${googleEventTime(event)} · ${event.summary}`}><span class="mr-1 text-[8px] font-bold">G</span>{#if event.meetUrl}<Video size={10} class="mr-1 inline"/>{/if}{googleEventTime(event)} · {event.summary}</a>{:else}<span class="block truncate rounded-md border border-[#CFE0D5] bg-[#F1F8F3] px-2 py-1.5 text-[9px] font-semibold text-[#2F7045]">G · {event.summary}</span>{/if}
               {/each}
               {#each dayTasks.slice(0, Math.max(1, 4 - Math.min(dayGoogleEvents.length, 2))) as task}
-                <a href={taskHref(task.id)} class={`block truncate rounded-md border px-2 py-1.5 text-[9px] font-semibold transition hover:brightness-[0.98] ${priorityClasses[task.priority]}`}>{#if taskLinkedToGoogle(task.id)}<span class="mr-1 font-bold text-[#2F7045]">G</span>{/if}{task.title}</a>
+                <a href={taskHref(task.id)} class={`block truncate rounded-md border px-2 py-1.5 text-[9px] font-semibold transition hover:brightness-[0.98] ${priorityClasses[task.priority]}`}>{#if taskLinkedToGoogle(task.id)}<span class="mr-1 font-bold text-[#2F7045]">G</span>{/if}{#if taskHasMeet(task.id)}<Video size={10} class="mr-1 inline text-[#214A9A]"/>{/if}{task.title}</a>
               {/each}
               {#if dayGoogleEvents.length + dayTasks.length > 4}<span class="block px-1 text-[9px] font-semibold text-[#7C8291]">+ mais itens</span>{/if}
             </div>
@@ -293,10 +317,18 @@
             </button>
             <div class="space-y-2 p-2.5">
               {#each dayGoogleEvents as event}
-                {#if event.htmlLink}<a href={event.htmlLink} target="_blank" rel="noopener noreferrer" class="block rounded-xl border border-[#CFE0D5] bg-[#F1F8F3] p-3 text-[#2F7045] transition hover:shadow-sm"><span class="text-[8px] font-bold uppercase tracking-[0.08em]">Google · {googleEventTime(event)}</span><strong class="mt-1 block text-[10px] font-semibold leading-4">{event.summary}</strong>{#if event.location}<span class="mt-1 block truncate text-[8px] opacity-75">{event.location}</span>{/if}</a>{/if}
+                <article class="rounded-xl border border-[#CFE0D5] bg-[#F1F8F3] p-3 text-[#2F7045] transition hover:shadow-sm">
+                  <span class="text-[8px] font-bold uppercase tracking-[0.08em]">Google · {googleEventTime(event)}</span>
+                  <strong class="mt-1 block text-[10px] font-semibold leading-4">{event.summary}</strong>
+                  {#if event.location}<span class="mt-1 block truncate text-[8px] opacity-75">{event.location}</span>{/if}
+                  <div class="mt-2 flex flex-wrap items-center gap-2">
+                    {#if event.htmlLink}<a href={event.htmlLink} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-[8px] font-semibold text-[#2F7045]">Evento <ExternalLink size={10}/></a>{/if}
+                    {#if event.meetUrl}<a href={event.meetUrl} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 rounded-md bg-[#214A9A] px-2 py-1 text-[8px] font-semibold text-white"><Video size={10}/>Entrar no Meet</a>{/if}
+                  </div>
+                </article>
               {/each}
               {#each dayTasks as task}
-                <a href={taskHref(task.id)} class={`block rounded-xl border p-3 transition hover:shadow-sm ${priorityClasses[task.priority]}`}><span class="text-[8px] font-bold uppercase tracking-[0.06em] opacity-70">Tarefa F10{taskLinkedToGoogle(task.id) ? " · Google" : ""}</span><strong class="mt-1 block text-[10px] font-semibold leading-4">{task.title}</strong><span class="mt-2 block truncate text-[9px] opacity-75">{task.projectName}</span></a>
+                <a href={taskHref(task.id)} class={`block rounded-xl border p-3 transition hover:shadow-sm ${priorityClasses[task.priority]}`}><span class="inline-flex items-center gap-1 text-[8px] font-bold uppercase tracking-[0.06em] opacity-70">Tarefa F10{taskLinkedToGoogle(task.id) ? " · Google" : ""}{#if taskHasMeet(task.id)}<Video size={10}/>{/if}</span><strong class="mt-1 block text-[10px] font-semibold leading-4">{task.title}</strong><span class="mt-2 block truncate text-[9px] opacity-75">{task.projectName}</span></a>
               {/each}
               {#if dayGoogleEvents.length === 0 && dayTasks.length === 0}<button type="button" on:click={() => openCreate(day)} class="flex min-h-20 w-full items-center justify-center rounded-xl border border-dashed border-[#E1E4EA] text-[9px] text-[#A0A5B0] hover:border-[#C8CDD7] hover:bg-[#FAFAFC]">{data.canCreate ? "+ Criar tarefa" : "Sem compromissos"}</button>{/if}
             </div>
@@ -311,12 +343,12 @@
   <div class="fixed inset-0 z-[100] flex items-center justify-center bg-[#010D28]/30 p-4 backdrop-blur-[2px]" role="presentation" on:click={() => (createOpen = false)}>
     <section class="w-full max-w-[460px] rounded-[22px] border border-[#E0E3EA] bg-white shadow-[0_28px_90px_rgba(1,13,40,0.26)]" role="dialog" aria-modal="true" aria-label="Criar tarefa" on:click|stopPropagation>
       <header class="flex items-start justify-between gap-4 border-b border-[#EEF0F4] px-5 py-4"><div><span class="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#EA6D0B]"><CalendarDays size={14}/>Nova tarefa F10</span><h2 class="mt-1 capitalize text-[15px] font-semibold text-[#202637]">{formatModalDate(createDate)}</h2></div><button type="button" on:click={() => (createOpen = false)} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#8B909D] hover:bg-[#F3F4F7]" aria-label="Fechar"><X size={16}/></button></header>
-      <form method="POST" action="?/createTask" use:enhance={() => { return async ({ result, update }) => { await update(); if (result.type === "success") { createOpen = false; await invalidateAll(); } }; }} class="space-y-4 p-5">
+      <form method="POST" action="?/createTask" use:enhance={() => { return async ({ result, update }) => { await update(); if (result.type === "success") { createOpen = false; await refreshCalendarData(); } }; }} class="space-y-4 p-5">
         <input type="hidden" name="dueOn" value={createDate}/>
         <input type="hidden" name="googleTimeZone" value={googleTimeZone}/>
         <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#565D6D]">Tarefa</span><input name="title" required minlength="3" maxlength="180" autofocus placeholder="O que precisa ser feito?" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[13px] outline-none focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"/></label>
         <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#565D6D]">Projeto</span><select name="projectId" bind:value={createProjectId} required class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] outline-none focus:border-[#000A57]">{#each data.projects as project}<option value={project.id}>{project.name}</option>{/each}</select></label>
-        <div class={`grid gap-3 ${data.canAssign ? "grid-cols-2" : "grid-cols-1"}`}><label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#565D6D]">Prioridade</span><select name="priority" class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></label>{#if data.canAssign}<label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#565D6D]">Responsável</span><select name="assigneeId" class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"><option value="">Atribuir a mim</option>{#each selectedMembers as member}<option value={member.id}>{member.name}</option>{/each}</select></label>{/if}</div>
+        <div class={`grid gap-3 ${data.canAssign ? "grid-cols-2" : "grid-cols-1"}`}><label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#565D6D]">Prioridade</span><select name="priority" class="h-11 w-full rounded-xl border border-[#E1E4EA] bg-white px-2 text-[10px]"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></label>{#if data.canAssign}<label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#565D6D]">Responsável</span><select name="assigneeId" class="h-11 w-full rounded-xl border border-[#E1E4EA] bg-white px-2 text-[10px]"><option value="">Atribuir a mim</option>{#each selectedMembers as member}<option value={member.id}>{member.name}</option>{/each}</select></label>{/if}</div>
 
         {#if data.googleCalendar.connected}
           <div class="rounded-xl border border-[#DDE7E1] bg-[#F8FBF9] p-3">
@@ -329,6 +361,7 @@
                 {:else}
                   <input type="hidden" name="googleStartTime" value=""/><input type="hidden" name="googleEndTime" value=""/>
                 {/if}
+                <label class="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-[#DDE3F1] bg-white px-3 py-2"><input type="checkbox" name="googleMeet" value="true" bind:checked={taskGoogleMeet} class="mt-0.5"/><span><strong class="block text-[9px] font-semibold text-[#35445F]">Gerar Google Meet</strong><span class="mt-0.5 block text-[8px] text-[#7D8797]">Gera um link exclusivo para esta reunião.</span></span></label>
               </div>
             {/if}
           </div>
@@ -342,16 +375,31 @@
 
 {#if googleEventOpen}
   <div class="fixed inset-0 z-[110] flex items-center justify-center bg-[#010D28]/30 p-4 backdrop-blur-[2px]" role="presentation" on:click={() => (googleEventOpen = false)}>
-    <section class="w-full max-w-[480px] rounded-[22px] border border-[#E0E3EA] bg-white shadow-[0_28px_90px_rgba(1,13,40,0.26)]" role="dialog" aria-modal="true" aria-label="Novo evento no Google Calendar" on:click|stopPropagation>
-      <header class="flex items-start justify-between gap-4 border-b border-[#EEF0F4] px-5 py-4"><div><span class="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#2F7045]"><Link2 size={14}/>Google Calendar</span><h2 class="mt-1 text-[16px] font-semibold text-[#202637]">Novo evento</h2></div><button type="button" on:click={() => (googleEventOpen = false)} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#8B909D] hover:bg-[#F3F4F7]" aria-label="Fechar"><X size={16}/></button></header>
-      <form method="POST" action="?/createGoogleEvent" use:enhance={() => { return async ({ result, update }) => { await update(); if (result.type === "success") { googleEventOpen = false; await invalidateAll(); } }; }} class="space-y-4 p-5">
+    <section class="max-h-[92vh] w-full max-w-[520px] overflow-y-auto rounded-[22px] border border-[#E0E3EA] bg-white shadow-[0_28px_90px_rgba(1,13,40,0.26)]" role="dialog" aria-modal="true" aria-label="Novo evento no Google Calendar" on:click|stopPropagation>
+      <header class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[#EEF0F4] bg-white px-5 py-4"><div><span class="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#2F7045]"><Link2 size={14}/>Google Calendar</span><h2 class="mt-1 text-[16px] font-semibold text-[#202637]">Novo evento</h2></div><button type="button" on:click={() => (googleEventOpen = false)} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#8B909D] hover:bg-[#F3F4F7]" aria-label="Fechar"><X size={16}/></button></header>
+      <form method="POST" action="?/createGoogleEvent" use:enhance={() => { return async ({ result, update }) => { await update(); if (result.type === "success") { googleEventOpen = false; await refreshCalendarData(); } }; }} class="space-y-4 p-5">
         <input type="hidden" name="timeZone" value={googleTimeZone}/>
-        <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#565D6D]">Título</span><input name="title" required minlength="2" maxlength="180" placeholder="Ex.: Reunião com cliente" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[13px] outline-none focus:border-[#000A57]"/></label>
+        <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#565D6D]">Título</span><input name="title" required minlength={googleEventCreateAsTask ? 3 : 2} maxlength="180" placeholder="Ex.: Reunião com cliente" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[13px] outline-none focus:border-[#000A57]"/></label>
         <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#565D6D]">Data</span><input name="date" type="date" bind:value={googleEventDate} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
         <label class="flex items-center gap-2 rounded-xl border border-[#E7E9EF] bg-[#FAFAFC] px-3 py-3 text-[10px] font-semibold text-[#565D6D]"><input type="checkbox" name="allDay" value="true" bind:checked={googleEventAllDay}/>Evento de dia inteiro</label>
         {#if !googleEventAllDay}<div class="grid grid-cols-2 gap-3"><label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#565D6D]">Início</span><input name="startTime" type="time" value="09:00" required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label><label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#565D6D]">Fim</span><input name="endTime" type="time" value="09:30" required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label></div>{:else}<input type="hidden" name="startTime" value="09:00"/><input type="hidden" name="endTime" value="09:30"/>{/if}
+        <label class="flex cursor-pointer items-start gap-2 rounded-xl border border-[#DDE3F1] bg-[#F8FAFF] px-3 py-3"><input type="checkbox" name="addGoogleMeet" value="true" bind:checked={googleEventMeet} class="mt-0.5"/><span><strong class="inline-flex items-center gap-1.5 text-[10px] font-semibold text-[#214A9A]"><Video size={14}/>Adicionar Google Meet</strong><span class="mt-0.5 block text-[8px] leading-4 text-[#7D8797]">O Google gera um link exclusivo e o anexa a este evento.</span></span></label>
         <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#565D6D]">Descrição <span class="font-normal text-[#9A9FAC]">(opcional)</span></span><textarea name="description" maxlength="5000" rows="4" class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-3 text-[11px] leading-5"></textarea></label>
-        <div class="flex items-center justify-between gap-3"><span class="text-[8px] text-[#969BA7]">Será criado na agenda principal de {data.googleCalendar.googleEmail}.</span><button type="submit" class="inline-flex h-11 items-center gap-2 rounded-xl bg-[#2F7045] px-5 text-[11px] font-semibold text-white"><Plus size={15}/>Criar no Google</button></div>
+
+        {#if data.canCreate && data.projects.length > 0}
+          <div class="rounded-xl border border-[#E2E5ED] bg-[#FAFAFC] p-3">
+            <label class="flex cursor-pointer items-start gap-2"><input type="checkbox" name="createAsTask" value="true" bind:checked={googleEventCreateAsTask} class="mt-0.5"/><span><strong class="block text-[10px] font-semibold text-[#303747]">Criar também como tarefa F10</strong><span class="mt-0.5 block text-[8px] leading-4 text-[#828896]">O evento e a tarefa ficam vinculados. Alterações futuras da tarefa atualizam o evento.</span></span></label>
+            {#if googleEventCreateAsTask}
+              <div class="mt-3 grid gap-3 border-t border-[#E6E8EE] pt-3 sm:grid-cols-2">
+                <label class="block sm:col-span-2"><span class="mb-1 block text-[8px] font-semibold text-[#6E7483]">Projeto</span><select name="projectId" bind:value={googleEventProjectId} required class="h-10 w-full rounded-lg border border-[#DDE1EA] bg-white px-2 text-[10px]">{#each data.projects as project}<option value={project.id}>{project.name}</option>{/each}</select></label>
+                <label class="block"><span class="mb-1 block text-[8px] font-semibold text-[#6E7483]">Prioridade</span><select name="priority" class="h-10 w-full rounded-lg border border-[#DDE1EA] bg-white px-2 text-[10px]"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></label>
+                {#if data.canAssign}<label class="block"><span class="mb-1 block text-[8px] font-semibold text-[#6E7483]">Responsável</span><select name="assigneeId" class="h-10 w-full rounded-lg border border-[#DDE1EA] bg-white px-2 text-[10px]"><option value="">Atribuir a mim</option>{#each googleEventMembers as member}<option value={member.id}>{member.name}</option>{/each}</select></label>{/if}
+              </div>
+            {/if}
+          </div>
+        {/if}
+
+        <div class="flex items-center justify-between gap-3"><span class="text-[8px] text-[#969BA7]">Agenda principal de {data.googleCalendar.googleEmail}.</span><button type="submit" class="inline-flex h-11 items-center gap-2 rounded-xl bg-[#2F7045] px-5 text-[11px] font-semibold text-white"><Plus size={15}/>{googleEventCreateAsTask ? "Criar evento + tarefa" : "Criar no Google"}</button></div>
       </form>
     </section>
   </div>
