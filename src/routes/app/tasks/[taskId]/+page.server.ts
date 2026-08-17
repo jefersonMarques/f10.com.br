@@ -2,13 +2,18 @@ import { error, fail, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
-import { getGoogleCalendarConnection } from "$lib/server/calendar/googleCalendarRepository";
+import {
+  getGoogleCalendarConnection,
+  getGoogleCalendarEvent,
+} from "$lib/server/calendar/googleCalendarRepository";
+import { readGoogleEventDetailsFromForm } from "$lib/server/calendar/googleEventFormInput";
 import { markEntityNotificationsRead } from "$lib/server/notifications/notificationRepository";
 import { listTaskTicketOrigins } from "$lib/server/support/ticketTaskBridge";
 import {
   addTaskComment,
   assignTask,
   getTaskDetails,
+  listActiveTaskUsers,
   setTaskCompletion,
   updateTaskDetails,
   type TaskPriority,
@@ -64,20 +69,38 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   if (!hasPermission(permissions, "tasks.view")) throw error(403, "Acesso não autorizado.");
 
   try {
-    const [details, ticketOrigins, googleCalendar, googleLink] = await Promise.all([
+    const [details, ticketOrigins, googleCalendar, googleLink, calendarUsers] = await Promise.all([
       getTaskDetails(layout.user.id, permissions, params.taskId),
       hasPermission(permissions, "tickets.view")
         ? listTaskTicketOrigins(layout.user.id, permissions, params.taskId)
         : Promise.resolve([]),
       getGoogleCalendarConnection(layout.user.id),
       getTaskGoogleCalendarLink(layout.user.id, params.taskId),
+      listActiveTaskUsers(),
     ]);
+
+    let googleEvent = null;
+    if (googleCalendar.connected && googleLink) {
+      try {
+        googleEvent = await getGoogleCalendarEvent(
+          layout.user.id,
+          googleLink.googleCalendarId,
+          googleLink.googleEventId,
+        );
+      } catch {
+        googleEvent = null;
+      }
+    }
+
     await markEntityNotificationsRead(layout.user.id, "task", params.taskId);
     return {
       details,
       ticketOrigins,
       googleCalendar,
       googleLink,
+      googleEvent,
+      calendarUsers,
+      organizerUserId: layout.user.id,
       canUpdate: hasPermission(permissions, "tasks.update"),
       canAssign: hasPermission(permissions, "tasks.assign"),
     };
@@ -139,6 +162,15 @@ export const actions: Actions = {
       return fail(400, { success: false, action: "update", message: "Informe um horário válido para o evento do Google Calendar." });
     }
 
+    let googleEventDetails = { location: "", reminderMinutes: null as number | null, attendees: [] as Awaited<ReturnType<typeof readGoogleEventDetailsFromForm>>["attendees"] };
+    if (googleSyncManaged && syncGoogle) {
+      try {
+        googleEventDetails = await readGoogleEventDetailsFromForm(session.user.id, formData);
+      } catch {
+        return fail(400, { success: false, action: "update", message: "Revise local, lembrete e participantes do evento." });
+      }
+    }
+
     try {
       await updateTaskDetails(session.user.id, permissions, params.taskId, { title, description, priority, dueOn: dueOn || null });
     } catch {
@@ -154,6 +186,7 @@ export const actions: Actions = {
           endTime: googleEndTime,
           timeZone: googleTimeZone,
           googleMeet,
+          ...googleEventDetails,
         });
       } catch (cause) {
         const code = cause instanceof Error ? cause.message : "";
