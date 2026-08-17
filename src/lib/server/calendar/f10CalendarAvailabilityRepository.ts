@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   getGoogleCalendarConnection,
   listGoogleCalendarEvents,
@@ -6,7 +6,7 @@ import {
 } from "$lib/server/calendar/googleCalendarRepository";
 import { getDatabase } from "$lib/server/db";
 import { taskGoogleCalendarLinks } from "$lib/server/db/googleCalendarSchema";
-import { tasks } from "$lib/server/db/taskSchema";
+import { taskAssignees, tasks } from "$lib/server/db/taskSchema";
 
 export type CalendarAvailabilityUser = {
   id: string;
@@ -124,41 +124,53 @@ async function listF10Conflicts(
   const db = getDatabase();
   const rows = await db
     .select({
+      taskId: tasks.id,
       dueOn: tasks.dueOn,
+      linkUserId: taskGoogleCalendarLinks.userId,
       googleEventId: taskGoogleCalendarLinks.googleEventId,
       allDay: taskGoogleCalendarLinks.allDay,
       startTime: taskGoogleCalendarLinks.startTime,
       endTime: taskGoogleCalendarLinks.endTime,
       timeZone: taskGoogleCalendarLinks.timeZone,
+      attendees: taskGoogleCalendarLinks.attendees,
+      assigneeUserId: taskAssignees.userId,
     })
     .from(taskGoogleCalendarLinks)
     .innerJoin(tasks, eq(taskGoogleCalendarLinks.taskId, tasks.id))
-    .where(
-      and(
-        eq(taskGoogleCalendarLinks.userId, userId),
-        eq(tasks.dueOn, input.date),
-      ),
-    );
+    .leftJoin(taskAssignees, eq(taskAssignees.taskId, tasks.id))
+    .where(eq(tasks.dueOn, input.date));
 
-  const conflicts: CalendarAvailabilityConflict[] = [];
+  const conflictsByEvent = new Map<string, CalendarAvailabilityConflict>();
   for (const row of rows) {
     if (!row.dueOn || row.googleEventId === input.excludeGoogleEventId) continue;
-    const busyStart = row.allDay
-      ? localDateTimeToUtc(row.dueOn, "00:00", row.timeZone || input.timeZone)
-      : localDateTimeToUtc(row.dueOn, row.startTime || "00:00", row.timeZone || input.timeZone);
-    const busyEnd = row.allDay
-      ? localDateTimeToUtc(addDays(row.dueOn, 1), "00:00", row.timeZone || input.timeZone)
-      : localDateTimeToUtc(row.dueOn, row.endTime || "23:59", row.timeZone || input.timeZone);
+    const participates =
+      row.linkUserId === userId ||
+      row.assigneeUserId === userId ||
+      row.attendees.some((attendee) => attendee.userId === userId);
+    if (!participates) continue;
 
+    const zone = row.timeZone || input.timeZone;
+    const busyStart = row.allDay
+      ? localDateTimeToUtc(row.dueOn, "00:00", zone)
+      : row.startTime
+        ? localDateTimeToUtc(row.dueOn, row.startTime, zone)
+        : null;
+    const busyEnd = row.allDay
+      ? localDateTimeToUtc(addDays(row.dueOn, 1), "00:00", zone)
+      : row.endTime
+        ? localDateTimeToUtc(row.dueOn, row.endTime, zone)
+        : null;
+    if (!busyStart || !busyEnd) continue;
     if (!overlaps(requestedStart, requestedEnd, busyStart, busyEnd)) continue;
-    conflicts.push({
+
+    conflictsByEvent.set(row.googleEventId, {
       start: busyStart.toISOString(),
       end: busyEnd.toISOString(),
       allDay: row.allDay,
       source: "f10",
     });
   }
-  return conflicts;
+  return Array.from(conflictsByEvent.values());
 }
 
 async function checkUser(
@@ -197,7 +209,7 @@ async function checkUser(
         conflicts,
       };
     } catch {
-      // Se o Google estiver indisponível, ainda usamos os compromissos temporizados conhecidos pelo F10.
+      // Se o Google estiver indisponível, ainda usamos compromissos temporizados conhecidos pelo F10.
     }
   }
 
