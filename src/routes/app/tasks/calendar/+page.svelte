@@ -35,10 +35,14 @@
   let createOpen = false;
   let createDate = data.calendarAnchor;
   let createProjectId = data.selectedProjectId ?? data.projects[0]?.id ?? "";
+  let taskSyncGoogle = false;
+  let taskGoogleAllDay = false;
+  let taskGoogleStartTime = "09:00";
+  let taskGoogleEndTime = "10:00";
   let googleEventOpen = false;
   let googleEventDate = data.calendarAnchor;
   let googleEventAllDay = true;
-  let googleTimeZone = "America/Sao_Paulo";
+  let googleTimeZone = "UTC";
 
   onMount(() => {
     googleTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || googleTimeZone;
@@ -112,17 +116,22 @@
     }).format(new Date(year, month - 1, day));
   }
 
-  function taskHref(taskId: string, projectId: string): string {
-    const params = new URLSearchParams();
-    params.set("task", taskId);
-    if (data.selectedProjectId || projectId) params.set("project", data.selectedProjectId ?? projectId);
-    return `/app/tasks?${params.toString()}`;
+  function taskHref(taskId: string): string {
+    return `/app/tasks/${taskId}`;
+  }
+
+  function taskLinkedToGoogle(taskId: string): boolean {
+    return data.googleLinkedTaskIds.includes(taskId);
   }
 
   function openCreate(date: Date): void {
     if (!data.canCreate || data.projects.length === 0) return;
     createDate = dateKey(date);
     createProjectId = data.selectedProjectId ?? data.projects[0]?.id ?? "";
+    taskSyncGoogle = false;
+    taskGoogleAllDay = false;
+    taskGoogleStartTime = "09:00";
+    taskGoogleEndTime = "10:00";
     createOpen = true;
   }
 
@@ -225,8 +234,8 @@
   {/if}
   {#if data.googleCalendarError}<div class="mt-5 flex items-center gap-2 rounded-xl border border-[#F0D6BD] bg-[#FFF9F3] px-4 py-3 text-[11px] font-medium text-[#935018]"><CircleAlert size={16}/>{data.googleCalendarError}</div>{/if}
   {#if form?.message}
-    <div class={`mt-5 flex items-center gap-2 rounded-xl border px-4 py-3 text-[11px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
-      {#if !form.success}<CircleAlert size={16}/>{/if}{form.message}
+    <div class={`mt-5 flex items-center gap-2 rounded-xl border px-4 py-3 text-[11px] font-medium ${form.syncWarning ? "border-[#F0D2A9] bg-[#FFF9EF] text-[#8A4B0F]" : form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
+      {#if !form.success || form.syncWarning}<CircleAlert size={16}/>{/if}{form.message}
     </div>
   {/if}
 
@@ -262,7 +271,7 @@
                 {#if event.htmlLink}<a href={event.htmlLink} target="_blank" rel="noopener noreferrer" class="block truncate rounded-md border border-[#CFE0D5] bg-[#F1F8F3] px-2 py-1.5 text-[9px] font-semibold text-[#2F7045]" title={`${googleEventTime(event)} · ${event.summary}`}><span class="mr-1 text-[8px] font-bold">G</span>{googleEventTime(event)} · {event.summary}</a>{:else}<span class="block truncate rounded-md border border-[#CFE0D5] bg-[#F1F8F3] px-2 py-1.5 text-[9px] font-semibold text-[#2F7045]">G · {event.summary}</span>{/if}
               {/each}
               {#each dayTasks.slice(0, Math.max(1, 4 - Math.min(dayGoogleEvents.length, 2))) as task}
-                <a href={taskHref(task.id, task.projectId)} class={`block truncate rounded-md border px-2 py-1.5 text-[9px] font-semibold transition hover:brightness-[0.98] ${priorityClasses[task.priority]}`}>{task.title}</a>
+                <a href={taskHref(task.id)} class={`block truncate rounded-md border px-2 py-1.5 text-[9px] font-semibold transition hover:brightness-[0.98] ${priorityClasses[task.priority]}`}>{#if taskLinkedToGoogle(task.id)}<span class="mr-1 font-bold text-[#2F7045]">G</span>{/if}{task.title}</a>
               {/each}
               {#if dayGoogleEvents.length + dayTasks.length > 4}<span class="block px-1 text-[9px] font-semibold text-[#7C8291]">+ mais itens</span>{/if}
             </div>
@@ -287,7 +296,7 @@
                 {#if event.htmlLink}<a href={event.htmlLink} target="_blank" rel="noopener noreferrer" class="block rounded-xl border border-[#CFE0D5] bg-[#F1F8F3] p-3 text-[#2F7045] transition hover:shadow-sm"><span class="text-[8px] font-bold uppercase tracking-[0.08em]">Google · {googleEventTime(event)}</span><strong class="mt-1 block text-[10px] font-semibold leading-4">{event.summary}</strong>{#if event.location}<span class="mt-1 block truncate text-[8px] opacity-75">{event.location}</span>{/if}</a>{/if}
               {/each}
               {#each dayTasks as task}
-                <a href={taskHref(task.id, task.projectId)} class={`block rounded-xl border p-3 transition hover:shadow-sm ${priorityClasses[task.priority]}`}><span class="text-[8px] font-bold uppercase tracking-[0.06em] opacity-70">Tarefa F10</span><strong class="mt-1 block text-[10px] font-semibold leading-4">{task.title}</strong><span class="mt-2 block truncate text-[9px] opacity-75">{task.projectName}</span></a>
+                <a href={taskHref(task.id)} class={`block rounded-xl border p-3 transition hover:shadow-sm ${priorityClasses[task.priority]}`}><span class="text-[8px] font-bold uppercase tracking-[0.06em] opacity-70">Tarefa F10{taskLinkedToGoogle(task.id) ? " · Google" : ""}</span><strong class="mt-1 block text-[10px] font-semibold leading-4">{task.title}</strong><span class="mt-2 block truncate text-[9px] opacity-75">{task.projectName}</span></a>
               {/each}
               {#if dayGoogleEvents.length === 0 && dayTasks.length === 0}<button type="button" on:click={() => openCreate(day)} class="flex min-h-20 w-full items-center justify-center rounded-xl border border-dashed border-[#E1E4EA] text-[9px] text-[#A0A5B0] hover:border-[#C8CDD7] hover:bg-[#FAFAFC]">{data.canCreate ? "+ Criar tarefa" : "Sem compromissos"}</button>{/if}
             </div>
@@ -300,13 +309,31 @@
 
 {#if createOpen}
   <div class="fixed inset-0 z-[100] flex items-center justify-center bg-[#010D28]/30 p-4 backdrop-blur-[2px]" role="presentation" on:click={() => (createOpen = false)}>
-    <section class="w-full max-w-[430px] rounded-[22px] border border-[#E0E3EA] bg-white shadow-[0_28px_90px_rgba(1,13,40,0.26)]" role="dialog" aria-modal="true" aria-label="Criar tarefa" on:click|stopPropagation>
+    <section class="w-full max-w-[460px] rounded-[22px] border border-[#E0E3EA] bg-white shadow-[0_28px_90px_rgba(1,13,40,0.26)]" role="dialog" aria-modal="true" aria-label="Criar tarefa" on:click|stopPropagation>
       <header class="flex items-start justify-between gap-4 border-b border-[#EEF0F4] px-5 py-4"><div><span class="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#EA6D0B]"><CalendarDays size={14}/>Nova tarefa F10</span><h2 class="mt-1 capitalize text-[15px] font-semibold text-[#202637]">{formatModalDate(createDate)}</h2></div><button type="button" on:click={() => (createOpen = false)} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#8B909D] hover:bg-[#F3F4F7]" aria-label="Fechar"><X size={16}/></button></header>
       <form method="POST" action="?/createTask" use:enhance={() => { return async ({ result, update }) => { await update(); if (result.type === "success") { createOpen = false; await invalidateAll(); } }; }} class="space-y-4 p-5">
         <input type="hidden" name="dueOn" value={createDate}/>
+        <input type="hidden" name="googleTimeZone" value={googleTimeZone}/>
         <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#565D6D]">Tarefa</span><input name="title" required minlength="3" maxlength="180" autofocus placeholder="O que precisa ser feito?" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[13px] outline-none focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"/></label>
         <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#565D6D]">Projeto</span><select name="projectId" bind:value={createProjectId} required class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] outline-none focus:border-[#000A57]">{#each data.projects as project}<option value={project.id}>{project.name}</option>{/each}</select></label>
         <div class={`grid gap-3 ${data.canAssign ? "grid-cols-2" : "grid-cols-1"}`}><label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#565D6D]">Prioridade</span><select name="priority" class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></label>{#if data.canAssign}<label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#565D6D]">Responsável</span><select name="assigneeId" class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"><option value="">Atribuir a mim</option>{#each selectedMembers as member}<option value={member.id}>{member.name}</option>{/each}</select></label>{/if}</div>
+
+        {#if data.googleCalendar.connected}
+          <div class="rounded-xl border border-[#DDE7E1] bg-[#F8FBF9] p-3">
+            <label class="flex cursor-pointer items-start gap-2"><input type="checkbox" name="syncGoogle" value="true" bind:checked={taskSyncGoogle} class="mt-0.5"/><span><strong class="block text-[10px] font-semibold text-[#2F7045]">Adicionar ao Google Calendar</strong><span class="mt-0.5 block text-[8px] leading-4 text-[#7A857D]">Cria um evento vinculado. Alterações futuras da tarefa no F10 atualizam esse evento.</span></span></label>
+            {#if taskSyncGoogle}
+              <div class="mt-3 border-t border-[#E3EAE5] pt-3">
+                <label class="flex items-center gap-2 text-[9px] font-medium text-[#59635C]"><input type="checkbox" name="googleAllDay" value="true" bind:checked={taskGoogleAllDay}/>Dia inteiro</label>
+                {#if !taskGoogleAllDay}
+                  <div class="mt-2 grid grid-cols-2 gap-2"><label><span class="mb-1 block text-[8px] font-semibold text-[#737C75]">Início</span><input type="time" name="googleStartTime" bind:value={taskGoogleStartTime} required class="h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[10px]"/></label><label><span class="mb-1 block text-[8px] font-semibold text-[#737C75]">Fim</span><input type="time" name="googleEndTime" bind:value={taskGoogleEndTime} required class="h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[10px]"/></label></div>
+                {:else}
+                  <input type="hidden" name="googleStartTime" value=""/><input type="hidden" name="googleEndTime" value=""/>
+                {/if}
+              </div>
+            {/if}
+          </div>
+        {/if}
+
         <div class="flex items-center justify-between gap-3 pt-1"><span class="text-[9px] text-[#9297A4]">Prazo: {createDate.split("-").reverse().join("/")}</span><button type="submit" class="inline-flex h-11 items-center gap-2 rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white"><Plus size={15}/>Criar tarefa</button></div>
       </form>
     </section>
