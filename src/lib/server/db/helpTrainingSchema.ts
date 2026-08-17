@@ -10,9 +10,9 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { helpContentStatus, helpAssets } from "$lib/server/db/structuredHelpSchema";
+import { helpAssets } from "$lib/server/db/structuredHelpSchema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
-import { users } from "$lib/server/db/schema";
+import { helpContentStatus, users } from "$lib/server/db/schema";
 
 export const helpTrainingPaths = pgTable(
   "help_training_paths",
