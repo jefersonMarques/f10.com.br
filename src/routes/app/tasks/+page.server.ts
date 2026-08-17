@@ -18,6 +18,7 @@ import {
   listProjectMembers,
   listTaskProjects,
   moveTask,
+  setTaskCompletion,
   updateTaskDetails,
   type TaskPriority,
 } from "$lib/server/tasks/taskRepository";
@@ -232,6 +233,38 @@ export const actions: Actions = {
       return { success: true, action: "moveTask", message: "Status da tarefa atualizado." };
     } catch {
       return fail(403, { success: false, action: "moveTask", message: "Você não pode alterar esta tarefa." });
+    }
+  },
+
+  toggleComplete: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(cookies, "tasks.update", "/app/tasks");
+    const formData = await request.formData();
+    const taskId = readFormValue(formData, "taskId");
+    const completed = readFormValue(formData, "completed") === "true";
+
+    if (!isUuid(taskId)) {
+      return fail(400, { success: false, action: "toggleComplete", message: "Tarefa inválida." });
+    }
+
+    try {
+      await setTaskCompletion(session.user.id, permissions, taskId, completed);
+      return {
+        success: true,
+        action: "toggleComplete",
+        message: completed ? "Tarefa concluída." : "Tarefa reaberta.",
+      };
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : "";
+      const message = code === "PROJECT_WITHOUT_CLOSED_STATUS"
+        ? "Este projeto precisa ter um status marcado como concluído."
+        : code === "PROJECT_WITHOUT_OPEN_STATUS"
+          ? "Este projeto precisa ter um status aberto para reabrir a tarefa."
+          : "Você não pode alterar esta tarefa.";
+      return fail(code.startsWith("PROJECT_WITHOUT_") ? 409 : 403, {
+        success: false,
+        action: "toggleComplete",
+        message,
+      });
     }
   },
 
