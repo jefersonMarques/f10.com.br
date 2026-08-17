@@ -33,6 +33,7 @@ export const taskGoogleCalendarLinks = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     googleCalendarId: text("google_calendar_id").notNull().default("primary"),
     googleEventId: text("google_event_id").notNull(),
+    googleIcalUid: text("google_ical_uid"),
     googleHtmlLink: text("google_html_link"),
     googleMeetEnabled: boolean("google_meet_enabled").notNull().default(false),
     googleMeetUrl: text("google_meet_url"),
@@ -40,6 +41,7 @@ export const taskGoogleCalendarLinks = pgTable(
     startTime: text("start_time"),
     endTime: text("end_time"),
     timeZone: text("time_zone").notNull().default("UTC"),
+    eventDetailsManaged: boolean("event_details_managed").notNull().default(false),
     location: text("location").notNull().default(""),
     reminderMinutes: integer("reminder_minutes"),
     attendees: jsonb("attendees")
