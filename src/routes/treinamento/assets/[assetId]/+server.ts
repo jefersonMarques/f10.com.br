@@ -1,6 +1,6 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { readManagedHelpAsset } from "$lib/server/help/helpAssetRepository";
-import { trainingSessionCanReadAsset } from "$lib/server/help/helpTrainingRepository";
+import { trainingSessionCanReadTrainingAsset } from "$lib/server/help/helpTrainingAssetAccess";
 import { getHelpTrainingSessionCookie } from "$lib/server/help/helpTrainingSession";
 
 function isUuid(value: string): boolean {
@@ -12,15 +12,17 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
   if (!isUuid(assetId)) return json({ error: "NOT_FOUND" }, { status: 404 });
   const token = getHelpTrainingSessionCookie(cookies);
   if (!token) return json({ error: "UNAUTHORIZED" }, { status: 401 });
-  if (!(await trainingSessionCanReadAsset(token, assetId))) {
+  if (!(await trainingSessionCanReadTrainingAsset(token, assetId))) {
     return json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
   try {
     const { asset, response } = await readManagedHelpAsset(assetId);
-    if (asset.assetType !== "image") return json({ error: "NOT_FOUND" }, { status: 404 });
+    if (asset.assetType !== "image" && asset.assetType !== "video") {
+      return json({ error: "NOT_FOUND" }, { status: 404 });
+    }
     const bytes = await response.arrayBuffer();
-    const safeName = (asset.originalName ?? "imagem").replace(/[\r\n"\\]/g, "_");
+    const safeName = (asset.originalName ?? (asset.assetType === "video" ? "demonstracao.mp4" : "imagem")).replace(/[\r\n"\\]/g, "_");
     return new Response(bytes, {
       headers: {
         "Content-Type": asset.mimeType || response.headers.get("content-type") || "application/octet-stream",
