@@ -119,6 +119,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   ]);
   const linkedEventIds = new Set(taskGoogleLinks.map((link) => link.googleEventId));
   const googleLinkedTaskIds = taskGoogleLinks.map((link) => link.taskId);
+  const googleMeetTaskIds = taskGoogleLinks.filter((link) => link.googleMeetUrl).map((link) => link.taskId);
   let googleEvents: Awaited<ReturnType<typeof listGoogleCalendarEvents>> = [];
   let googleCalendarError = "";
 
@@ -143,6 +144,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     googleCalendar,
     googleEvents,
     googleLinkedTaskIds,
+    googleMeetTaskIds,
     googleCalendarError,
     googleStatus: url.searchParams.get("google") ?? "",
   };
@@ -162,6 +164,7 @@ export const actions: Actions = {
     const googleStartTime = readFormValue(formData, "googleStartTime");
     const googleEndTime = readFormValue(formData, "googleEndTime");
     const googleTimeZone = readFormValue(formData, "googleTimeZone");
+    const googleMeet = readFormValue(formData, "googleMeet") === "true";
 
     if (!isUuid(projectId)) {
       return fail(400, { success: false, action: "createTask", message: "Projeto inválido." });
@@ -204,6 +207,7 @@ export const actions: Actions = {
           startTime: googleStartTime,
           endTime: googleEndTime,
           timeZone: googleTimeZone,
+          googleMeet,
         });
       } catch {
         return {
@@ -215,12 +219,22 @@ export const actions: Actions = {
       }
     }
 
-    return { success: true, action: "createTask", message: syncGoogle ? "Tarefa criada e adicionada ao Google Calendar." : "Tarefa criada." };
+    const message = syncGoogle
+      ? googleMeet
+        ? "Tarefa criada com evento e Google Meet."
+        : "Tarefa criada e adicionada ao Google Calendar."
+      : "Tarefa criada.";
+    return { success: true, action: "createTask", message };
   },
 
   createGoogleEvent: async ({ cookies, request }) => {
-    const { session } = await requireAppPermission(cookies, "tasks.view", "/app/tasks/calendar");
     const formData = await request.formData();
+    const createAsTask = readFormValue(formData, "createAsTask") === "true";
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      createAsTask ? "tasks.create" : "tasks.view",
+      "/app/tasks/calendar",
+    );
     const title = readFormValue(formData, "title");
     const description = readFormValue(formData, "description");
     const date = readFormValue(formData, "date");
@@ -228,6 +242,10 @@ export const actions: Actions = {
     const startTime = readFormValue(formData, "startTime");
     const endTime = readFormValue(formData, "endTime");
     const timeZone = readFormValue(formData, "timeZone");
+    const addGoogleMeet = readFormValue(formData, "addGoogleMeet") === "true";
+    const projectId = readFormValue(formData, "projectId");
+    const priority = readFormValue(formData, "priority");
+    const requestedAssigneeId = readFormValue(formData, "assigneeId");
 
     if (title.length < 2 || title.length > 180 || description.length > 5000 || !isValidDate(date)) {
       return fail(400, { success: false, action: "createGoogleEvent", message: "Revise o título, descrição e data do evento." });
@@ -239,6 +257,58 @@ export const actions: Actions = {
       return fail(400, { success: false, action: "createGoogleEvent", message: "Fuso horário inválido." });
     }
 
+    if (createAsTask) {
+      if (!isUuid(projectId)) {
+        return fail(400, { success: false, action: "createGoogleEvent", message: "Selecione um projeto para criar a tarefa." });
+      }
+      if (title.length < 3 || !isTaskPriority(priority)) {
+        return fail(400, { success: false, action: "createGoogleEvent", message: "Revise o título e a prioridade da tarefa." });
+      }
+      if (requestedAssigneeId && !isUuid(requestedAssigneeId)) {
+        return fail(400, { success: false, action: "createGoogleEvent", message: "Responsável inválido." });
+      }
+
+      let task: Awaited<ReturnType<typeof createTask>>;
+      try {
+        task = await createTask(session.user.id, permissions, {
+          projectId,
+          title,
+          description,
+          priority,
+          dueOn: date,
+          assigneeId: requestedAssigneeId || null,
+        });
+      } catch {
+        return fail(403, { success: false, action: "createGoogleEvent", message: "Não foi possível criar a tarefa no projeto selecionado." });
+      }
+
+      try {
+        await configureTaskGoogleCalendar(session.user.id, permissions, task.id, {
+          enabled: true,
+          allDay,
+          startTime,
+          endTime,
+          timeZone,
+          googleMeet: addGoogleMeet,
+        });
+      } catch {
+        return {
+          success: true,
+          syncWarning: true,
+          action: "createGoogleEvent",
+          message: "Tarefa criada, mas não foi possível gerar o evento no Google Calendar agora.",
+        };
+      }
+
+      return {
+        success: true,
+        action: "createGoogleEvent",
+        message: addGoogleMeet
+          ? "Evento com Google Meet criado e vinculado a uma tarefa F10."
+          : "Evento criado e vinculado a uma tarefa F10.",
+      };
+    }
+
     try {
       await createGoogleCalendarEvent(session.user.id, {
         title,
@@ -248,8 +318,13 @@ export const actions: Actions = {
         startTime,
         endTime,
         timeZone,
+        addGoogleMeet,
       });
-      return { success: true, action: "createGoogleEvent", message: "Evento criado no Google Calendar." };
+      return {
+        success: true,
+        action: "createGoogleEvent",
+        message: addGoogleMeet ? "Evento com Google Meet criado." : "Evento criado no Google Calendar.",
+      };
     } catch {
       return fail(409, { success: false, action: "createGoogleEvent", message: "Não foi possível criar o evento no Google Calendar." });
     }
