@@ -16,6 +16,7 @@ export {
   getTaskBoard,
   listMyTasks,
   moveTask,
+  setTaskCompletion,
   type CreateTaskInput,
   type TaskPriority,
 } from "$lib/server/tasks/taskWorkRepository";
