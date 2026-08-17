@@ -40,6 +40,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
     endTime?: unknown;
     timeZone?: unknown;
     excludeGoogleEventId?: unknown;
+    excludeGoogleIcalUid?: unknown;
   };
 
   const userIds = Array.isArray(body?.userIds)
@@ -51,6 +52,9 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
   const timeZone = typeof body?.timeZone === "string" ? body.timeZone.trim() : "";
   const excludeGoogleEventId = typeof body?.excludeGoogleEventId === "string"
     ? body.excludeGoogleEventId.trim().slice(0, 1024)
+    : "";
+  const excludeGoogleIcalUid = typeof body?.excludeGoogleIcalUid === "string"
+    ? body.excludeGoogleIcalUid.trim().slice(0, 1024)
     : "";
 
   if (!isValidDate(date) || !isValidTime(startTime) || !isValidTime(endTime) || startTime >= endTime || !isValidTimeZone(timeZone)) {
@@ -72,6 +76,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
       endTime,
       timeZone,
       excludeGoogleEventId: excludeGoogleEventId || null,
+      excludeGoogleIcalUid: excludeGoogleIcalUid || null,
     });
     return json({ results });
   } catch {
