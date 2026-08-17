@@ -123,6 +123,12 @@
     attendees = attendees.filter((attendee) => attendee.userId !== user.id);
   }
 
+  function setInternalOptional(userId: string, optional: boolean): void {
+    attendees = attendees.map((attendee) =>
+      attendee.userId === userId ? { ...attendee, optional } : attendee,
+    );
+  }
+
   function setOptional(email: string, optional: boolean): void {
     attendees = attendees.map((attendee) =>
       attendee.email === email ? { ...attendee, optional } : attendee,
@@ -276,7 +282,7 @@
                 {#if !allDay}
                   <span class={`text-[8px] font-semibold ${availability?.conflicts.length ? "text-[#A9510D]" : availability ? "text-[#2F7045]" : "text-[#8D93A0]"}`}>{availabilityLoading && !availability ? "Verificando..." : availability ? conflictLabel(availability) : ""}</span>
                 {/if}
-                <label class="flex items-center gap-1 text-[8px] text-[#7D8391]"><input type="checkbox" checked={Boolean(attendee?.optional)} on:change={(event) => setOptional(user.email.trim().toLowerCase(), (event.currentTarget as HTMLInputElement).checked)}/>Opcional</label>
+                <label class="flex items-center gap-1 text-[8px] text-[#7D8391]"><input type="checkbox" checked={Boolean(attendee?.optional)} on:change={(event) => setInternalOptional(user.id, (event.currentTarget as HTMLInputElement).checked)}/>Opcional</label>
               </div>
             {/if}
           </div>
