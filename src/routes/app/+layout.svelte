@@ -8,6 +8,8 @@
     CheckSquare2,
     ChevronDown,
     ChevronRight,
+    FileText,
+    GraduationCap,
     Headphones,
     LayoutDashboard,
     LogOut,
@@ -34,9 +36,33 @@
   const permissionCodes = new Set(data.permissions.map((permission) => permission.code));
   const canRespondToChat = permissionCodes.has("chat.respond");
 
-  const navigationItems = [
+  type NavigationChild = {
+    label: string;
+    icon: typeof LayoutDashboard;
+    href: string;
+  };
+
+  type NavigationItem = {
+    label: string;
+    icon: typeof LayoutDashboard;
+    enabled: boolean;
+    href?: string;
+    permission?: string;
+    children?: NavigationChild[];
+  };
+
+  const navigationItems: NavigationItem[] = [
     { label: "Visão geral", icon: LayoutDashboard, enabled: true, href: "/app" },
-    { label: "Base de Conhecimento", icon: BookOpen, enabled: true, href: "/app/help/content", permission: "help.view" },
+    {
+      label: "Base de Conhecimento",
+      icon: BookOpen,
+      enabled: true,
+      permission: "help.view",
+      children: [
+        { label: "Conteúdos", icon: FileText, href: "/app/help/content" },
+        { label: "Trilhas", icon: GraduationCap, href: "/app/help/trilhas" },
+      ],
+    },
     { label: "Pesquisa de Suporte", icon: Search, enabled: true, href: "/app/help/search", permission: "help.view" },
     { label: "Insights da Central", icon: BarChart3, enabled: true, href: "/app/help/insights", permission: "help.view" },
     { label: "Tarefas", icon: CheckSquare2, enabled: true, href: "/app/tasks", permission: "tasks.view" },
@@ -58,6 +84,10 @@
     if (!href) return false;
     if (href === "/app") return currentPathname === href;
     return currentPathname === href || currentPathname.startsWith(`${href}/`);
+  }
+
+  function isActiveNavigationGroup(currentPathname: string, children: NavigationChild[]): boolean {
+    return children.some((child) => isActiveNavigationItem(currentPathname, child.href));
   }
 
   function navigationBadge(
@@ -190,7 +220,24 @@
         <p class="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A9FAD]">Operação</p>
         <div class="space-y-1">
           {#each visibleNavigationItems as item}
-            {#if item.enabled && item.href}
+            {#if item.children}
+              {@const groupActive = isActiveNavigationGroup(pathname, item.children)}
+              <div class="py-0.5">
+                <div class={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-[13px] font-semibold ${groupActive ? "bg-[#F8F9FF] text-[#000A57]" : "text-[#676D7D]"}`}>
+                  <svelte:component this={item.icon} size={19} aria-hidden="true" />
+                  <span class="flex-1">{item.label}</span>
+                  <ChevronDown size={15} aria-hidden="true" />
+                </div>
+                <div class="ml-[22px] mt-1 space-y-1 border-l border-[#E4E7EE] pl-3">
+                  {#each item.children as child}
+                    <a href={child.href} class={`flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-[11px] font-semibold transition ${isActiveNavigationItem(pathname, child.href) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#747A89] hover:bg-[#F7F8FB] hover:text-[#000A57]"}`}>
+                      <svelte:component this={child.icon} size={15} aria-hidden="true" />
+                      <span>{child.label}</span>
+                    </a>
+                  {/each}
+                </div>
+              </div>
+            {:else if item.enabled && item.href}
               {@const badge = navigationBadge(
                 item.href,
                 notifications.chatUnreadCount,
