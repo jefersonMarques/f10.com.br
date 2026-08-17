@@ -1,6 +1,13 @@
-import { boolean, index, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { users } from "$lib/server/db/schema";
 import { tasks } from "$lib/server/db/taskSchema";
+
+export type TaskGoogleCalendarAttendee = {
+  email: string;
+  name: string;
+  userId: string | null;
+  optional: boolean;
+};
 
 export const googleCalendarConnections = pgTable("google_calendar_connections", {
   userId: uuid("user_id")
@@ -33,6 +40,12 @@ export const taskGoogleCalendarLinks = pgTable(
     startTime: text("start_time"),
     endTime: text("end_time"),
     timeZone: text("time_zone").notNull().default("UTC"),
+    location: text("location").notNull().default(""),
+    reminderMinutes: integer("reminder_minutes"),
+    attendees: jsonb("attendees")
+      .$type<TaskGoogleCalendarAttendee[]>()
+      .notNull()
+      .default([]),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     lastSyncError: text("last_sync_error"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
