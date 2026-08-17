@@ -3,6 +3,7 @@ import { and, count, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
+import { helpTrainingStepMedia, helpTrainingVersions } from "$lib/server/db/helpTrainingSchema";
 import { helpAssets, helpStepBlocks } from "$lib/server/db/structuredHelpSchema";
 import {
   deleteAssetObject,
@@ -66,6 +67,25 @@ function snapshotReferencesAsset(snapshot: Record<string, unknown>, assetId: str
       const assetValue = (blockValue as Record<string, unknown>).asset;
       if (!assetValue || typeof assetValue !== "object" || Array.isArray(assetValue)) continue;
       if ((assetValue as Record<string, unknown>).id === assetId) return true;
+    }
+  }
+  return false;
+}
+
+function trainingSnapshotReferencesAsset(snapshot: unknown, assetId: string): boolean {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return false;
+  const steps = (snapshot as Record<string, unknown>).steps;
+  if (!Array.isArray(steps)) return false;
+  const videoRef = `asset:${assetId}`;
+
+  for (const stepValue of steps) {
+    if (!stepValue || typeof stepValue !== "object" || Array.isArray(stepValue)) continue;
+    const step = stepValue as Record<string, unknown>;
+    if (step.videoUrl === videoRef) return true;
+    if (!Array.isArray(step.images)) continue;
+    for (const imageValue of step.images) {
+      if (!imageValue || typeof imageValue !== "object" || Array.isArray(imageValue)) continue;
+      if ((imageValue as Record<string, unknown>).assetId === assetId) return true;
     }
   }
   return false;
@@ -163,20 +183,30 @@ export async function getHelpAsset(assetId: string) {
 
 export async function getHelpAssetUsageCount(assetId: string): Promise<number> {
   const db = getDatabase();
-  const [row] = await db
-    .select({ value: count() })
-    .from(helpStepBlocks)
-    .where(eq(helpStepBlocks.assetId, assetId));
-  return Number(row?.value ?? 0);
+  const [contentRows, trainingRows] = await Promise.all([
+    db
+      .select({ value: count() })
+      .from(helpStepBlocks)
+      .where(eq(helpStepBlocks.assetId, assetId)),
+    db
+      .select({ value: count() })
+      .from(helpTrainingStepMedia)
+      .where(eq(helpTrainingStepMedia.assetId, assetId)),
+  ]);
+  return Number(contentRows[0]?.value ?? 0) + Number(trainingRows[0]?.value ?? 0);
 }
 
 export async function isHelpAssetPublished(assetId: string): Promise<boolean> {
   const db = getDatabase();
-  const publications = await db
-    .select({ snapshot: helpPublications.snapshot })
-    .from(helpPublications)
-    .where(eq(helpPublications.entityType, "content"));
-  return publications.some((publication) => snapshotReferencesAsset(publication.snapshot, assetId));
+  const [publications, trainingVersions] = await Promise.all([
+    db
+      .select({ snapshot: helpPublications.snapshot })
+      .from(helpPublications)
+      .where(eq(helpPublications.entityType, "content")),
+    db.select({ snapshot: helpTrainingVersions.snapshot }).from(helpTrainingVersions),
+  ]);
+  return publications.some((publication) => snapshotReferencesAsset(publication.snapshot, assetId))
+    || trainingVersions.some((version) => trainingSnapshotReferencesAsset(version.snapshot, assetId));
 }
 
 export async function deleteManagedHelpAsset(actorUserId: string, assetId: string): Promise<void> {
