@@ -1,5 +1,22 @@
-ALTER TABLE help_training_step_media
-  DROP CONSTRAINT IF EXISTS help_training_step_media_check;
+DO $$
+DECLARE
+  constraint_name text;
+BEGIN
+  SELECT conname
+    INTO constraint_name
+  FROM pg_constraint
+  WHERE conrelid = 'help_training_step_media'::regclass
+    AND contype = 'c'
+    AND pg_get_constraintdef(oid) ILIKE '%media_type%'
+    AND pg_get_constraintdef(oid) ILIKE '%asset_id%'
+    AND pg_get_constraintdef(oid) ILIKE '%source_url%'
+  LIMIT 1;
+
+  IF constraint_name IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE help_training_step_media DROP CONSTRAINT %I', constraint_name);
+  END IF;
+END;
+$$;
 
 ALTER TABLE help_training_step_media
   ADD CONSTRAINT help_training_step_media_source_check
