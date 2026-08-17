@@ -1,5 +1,9 @@
 import { getGoogleCalendarConnection } from "$lib/server/calendar/googleCalendarRepository";
-import type { TaskGoogleCalendarAttendee } from "$lib/server/db/googleCalendarSchema";
+import { getDatabase } from "$lib/server/db";
+import {
+  googleCalendarConnections,
+  type TaskGoogleCalendarAttendee,
+} from "$lib/server/db/googleCalendarSchema";
 import { listActiveTaskUsers } from "$lib/server/tasks/taskRepository";
 
 function readFormValue(formData: FormData, name: string): string {
@@ -24,6 +28,7 @@ function isValidEmail(value: string): boolean {
 function parseAttendees(
   formData: FormData,
   activeUsers: Awaited<ReturnType<typeof listActiveTaskUsers>>,
+  connectedEmailsByUserId: Map<string, string>,
   organizerUserId: string,
   organizerEmail: string,
 ): TaskGoogleCalendarAttendee[] {
@@ -53,8 +58,10 @@ function parseAttendees(
 
     if (internal) {
       if (internal.id === organizerUserId) continue;
-      const email = internal.email.trim().toLowerCase();
-      if (!email || email === organizerEmailNormalized) continue;
+      const email = (
+        connectedEmailsByUserId.get(internal.id) || internal.email
+      ).trim().toLowerCase();
+      if (!isValidEmail(email) || email === organizerEmailNormalized) continue;
       attendees.set(email, {
         email,
         name: internal.name,
@@ -88,16 +95,30 @@ export async function readGoogleEventDetailsFromForm(
   const location = readFormValue(formData, "location");
   if (location.length > 500) throw new Error("INVALID_LOCATION");
 
-  const [activeUsers, connection] = await Promise.all([
+  const db = getDatabase();
+  const [activeUsers, connection, connectedAccounts] = await Promise.all([
     listActiveTaskUsers(),
     getGoogleCalendarConnection(userId),
+    db
+      .select({
+        userId: googleCalendarConnections.userId,
+        googleEmail: googleCalendarConnections.googleEmail,
+      })
+      .from(googleCalendarConnections),
   ]);
+  const connectedEmailsByUserId = new Map(
+    connectedAccounts
+      .filter((account) => account.googleEmail.trim())
+      .map((account) => [account.userId, account.googleEmail.trim().toLowerCase()]),
+  );
+
   return {
     location,
     reminderMinutes: parseReminderMinutes(formData),
     attendees: parseAttendees(
       formData,
       activeUsers,
+      connectedEmailsByUserId,
       userId,
       connection.googleEmail,
     ),
