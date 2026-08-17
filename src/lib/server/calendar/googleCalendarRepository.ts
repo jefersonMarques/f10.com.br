@@ -29,6 +29,7 @@ export type GoogleCalendarAttendee = {
 
 export type GoogleCalendarEvent = {
   id: string;
+  iCalUID: string | null;
   summary: string;
   description: string;
   location: string;
@@ -80,6 +81,7 @@ type GoogleUserInfo = {
 
 type GoogleEventResource = {
   id?: string;
+  iCalUID?: string;
   status?: string;
   summary?: string;
   description?: string;
@@ -316,6 +318,7 @@ function normalizeGoogleEvent(event: GoogleEventResource): GoogleCalendarEvent |
   );
   return {
     id: event.id,
+    iCalUID: event.iCalUID?.trim() || null,
     summary: event.summary?.trim() || "Evento sem título",
     description: event.description?.trim() ?? "",
     location: event.location?.trim() ?? "",
@@ -391,25 +394,32 @@ function googleEventResource(input: CreateGoogleCalendarEventInput) {
         end: { dateTime: `${input.date}T${input.endTime}:00`, timeZone: input.timeZone },
       };
 
-  const reminderMinutes = input.reminderMinutes;
-  const reminders = reminderMinutes === undefined || reminderMinutes === null
-    ? { useDefault: true }
-    : {
-        useDefault: false,
-        overrides: reminderMinutes > 0
-          ? [{ method: "popup", minutes: reminderMinutes }]
-          : [],
-      };
+  const details: Record<string, unknown> = {};
+  if (input.location !== undefined) {
+    details.location = input.location.trim();
+  }
+  if (input.attendees !== undefined) {
+    details.attendees = input.attendees.map((attendee) => ({
+      email: attendee.email.trim().toLowerCase(),
+      optional: Boolean(attendee.optional),
+    }));
+  }
+  if (input.reminderMinutes !== undefined) {
+    const reminderMinutes = input.reminderMinutes;
+    details.reminders = reminderMinutes === null
+      ? { useDefault: true }
+      : {
+          useDefault: false,
+          overrides: reminderMinutes > 0
+            ? [{ method: "popup", minutes: reminderMinutes }]
+            : [],
+        };
+  }
 
   return {
     summary: input.title,
     description: input.description,
-    location: input.location?.trim() ?? "",
-    attendees: (input.attendees ?? []).map((attendee) => ({
-      email: attendee.email.trim().toLowerCase(),
-      optional: Boolean(attendee.optional),
-    })),
-    reminders,
+    ...details,
     ...schedule,
     ...(input.addGoogleMeet
       ? {
