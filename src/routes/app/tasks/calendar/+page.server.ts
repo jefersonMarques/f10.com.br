@@ -16,6 +16,10 @@ import {
   listTaskProjects,
   type TaskPriority,
 } from "$lib/server/tasks/taskRepository";
+import {
+  configureTaskGoogleCalendar,
+  listUserTaskGoogleCalendarLinks,
+} from "$lib/server/tasks/taskGoogleCalendarRepository";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -109,14 +113,20 @@ export const load: PageServerLoad = async ({ parent, url }) => {
       )
     : {};
 
-  const googleCalendar = await getGoogleCalendarConnection(layout.user.id);
+  const [googleCalendar, taskGoogleLinks] = await Promise.all([
+    getGoogleCalendarConnection(layout.user.id),
+    listUserTaskGoogleCalendarLinks(layout.user.id),
+  ]);
+  const linkedEventIds = new Set(taskGoogleLinks.map((link) => link.googleEventId));
+  const googleLinkedTaskIds = taskGoogleLinks.map((link) => link.taskId);
   let googleEvents: Awaited<ReturnType<typeof listGoogleCalendarEvents>> = [];
   let googleCalendarError = "";
 
   if (googleCalendar.connected) {
     try {
       const range = googleRange(calendarAnchor);
-      googleEvents = await listGoogleCalendarEvents(layout.user.id, range.timeMin, range.timeMax);
+      const fetchedEvents = await listGoogleCalendarEvents(layout.user.id, range.timeMin, range.timeMax);
+      googleEvents = fetchedEvents.filter((event) => !linkedEventIds.has(event.id));
     } catch {
       googleCalendarError = "Não foi possível atualizar os eventos do Google Calendar agora.";
     }
@@ -132,6 +142,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     calendarAnchor,
     googleCalendar,
     googleEvents,
+    googleLinkedTaskIds,
     googleCalendarError,
     googleStatus: url.searchParams.get("google") ?? "",
   };
@@ -146,6 +157,11 @@ export const actions: Actions = {
     const dueOn = readFormValue(formData, "dueOn");
     const priority = readFormValue(formData, "priority");
     const requestedAssigneeId = readFormValue(formData, "assigneeId");
+    const syncGoogle = readFormValue(formData, "syncGoogle") === "true";
+    const googleAllDay = readFormValue(formData, "googleAllDay") === "true";
+    const googleStartTime = readFormValue(formData, "googleStartTime");
+    const googleEndTime = readFormValue(formData, "googleEndTime");
+    const googleTimeZone = readFormValue(formData, "googleTimeZone");
 
     if (!isUuid(projectId)) {
       return fail(400, { success: false, action: "createTask", message: "Projeto inválido." });
@@ -162,9 +178,13 @@ export const actions: Actions = {
     if (requestedAssigneeId && !isUuid(requestedAssigneeId)) {
       return fail(400, { success: false, action: "createTask", message: "Responsável inválido." });
     }
+    if (syncGoogle && !googleAllDay && (!isValidTime(googleStartTime) || !isValidTime(googleEndTime) || googleStartTime >= googleEndTime)) {
+      return fail(400, { success: false, action: "createTask", message: "Informe um horário válido para sincronizar com o Google Calendar." });
+    }
 
+    let task: Awaited<ReturnType<typeof createTask>>;
     try {
-      await createTask(session.user.id, permissions, {
+      task = await createTask(session.user.id, permissions, {
         projectId,
         title,
         description: "",
@@ -172,10 +192,30 @@ export const actions: Actions = {
         dueOn,
         assigneeId: requestedAssigneeId || null,
       });
-      return { success: true, action: "createTask", message: "Tarefa criada." };
     } catch {
       return fail(403, { success: false, action: "createTask", message: "Não foi possível criar a tarefa neste projeto." });
     }
+
+    if (syncGoogle) {
+      try {
+        await configureTaskGoogleCalendar(session.user.id, permissions, task.id, {
+          enabled: true,
+          allDay: googleAllDay,
+          startTime: googleStartTime,
+          endTime: googleEndTime,
+          timeZone: googleTimeZone,
+        });
+      } catch {
+        return {
+          success: true,
+          syncWarning: true,
+          action: "createTask",
+          message: "Tarefa criada, mas não foi possível adicioná-la ao Google Calendar agora.",
+        };
+      }
+    }
+
+    return { success: true, action: "createTask", message: syncGoogle ? "Tarefa criada e adicionada ao Google Calendar." : "Tarefa criada." };
   },
 
   createGoogleEvent: async ({ cookies, request }) => {
