@@ -320,12 +320,8 @@ function addOneDay(dateValue: string): string {
   return date.toISOString().slice(0, 10);
 }
 
-export async function createGoogleCalendarEvent(
-  userId: string,
-  input: CreateGoogleCalendarEventInput,
-): Promise<GoogleCalendarEvent> {
-  const accessToken = await getUserAccessToken(userId);
-  const resource = input.allDay
+function googleEventResource(input: CreateGoogleCalendarEventInput) {
+  return input.allDay
     ? {
         summary: input.title,
         description: input.description,
@@ -338,19 +334,74 @@ export async function createGoogleCalendarEvent(
         start: { dateTime: `${input.date}T${input.startTime}:00`, timeZone: input.timeZone },
         end: { dateTime: `${input.date}T${input.endTime}:00`, timeZone: input.timeZone },
       };
+}
 
-  const response = await fetch(`${GOOGLE_CALENDAR_API}/calendars/primary/events`, {
+function calendarEventsUrl(calendarId: string): string {
+  return `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events`;
+}
+
+export async function createGoogleCalendarEvent(
+  userId: string,
+  input: CreateGoogleCalendarEventInput,
+  calendarId = "primary",
+): Promise<GoogleCalendarEvent> {
+  const accessToken = await getUserAccessToken(userId);
+  const response = await fetch(calendarEventsUrl(calendarId), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(resource),
+    body: JSON.stringify(googleEventResource(input)),
   });
   const created = await parseGoogleResponse<GoogleEventResource>(response);
   const normalized = normalizeGoogleEvent(created);
   if (!normalized) throw new Error("GOOGLE_EVENT_INVALID_RESPONSE");
   return normalized;
+}
+
+export async function updateGoogleCalendarEvent(
+  userId: string,
+  calendarId: string,
+  eventId: string,
+  input: CreateGoogleCalendarEventInput,
+): Promise<GoogleCalendarEvent | null> {
+  const accessToken = await getUserAccessToken(userId);
+  const response = await fetch(
+    `${calendarEventsUrl(calendarId)}/${encodeURIComponent(eventId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(googleEventResource(input)),
+    },
+  );
+
+  if (response.status === 404 || response.status === 410) return null;
+  const updated = await parseGoogleResponse<GoogleEventResource>(response);
+  const normalized = normalizeGoogleEvent(updated);
+  if (!normalized) throw new Error("GOOGLE_EVENT_INVALID_RESPONSE");
+  return normalized;
+}
+
+export async function deleteGoogleCalendarEvent(
+  userId: string,
+  calendarId: string,
+  eventId: string,
+): Promise<void> {
+  const accessToken = await getUserAccessToken(userId);
+  const response = await fetch(
+    `${calendarEventsUrl(calendarId)}/${encodeURIComponent(eventId)}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  );
+
+  if (response.ok || response.status === 404 || response.status === 410) return;
+  await parseGoogleResponse<Record<string, never>>(response);
 }
 
 export async function disconnectGoogleCalendar(userId: string): Promise<void> {
