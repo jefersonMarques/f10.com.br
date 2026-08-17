@@ -263,7 +263,7 @@ export async function configureTaskGoogleCalendar(
   if (!task.dueOn) throw new Error("TASK_GOOGLE_REQUIRES_DUE_DATE");
 
   if (existing) {
-    const shouldCreateMeet = Boolean(input.googleMeet) && !existing.googleMeetEnabled;
+    const shouldCreateMeet = Boolean(input.googleMeet) && (!existing.googleMeetEnabled || !existing.googleMeetUrl);
     const db = getDatabase();
     await db
       .update(taskGoogleCalendarLinks)
