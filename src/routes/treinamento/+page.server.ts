@@ -1,15 +1,20 @@
-import { fail, redirect, type Actions } from "@sveltejs/kit";
+import { fail, redirect, type Actions, type Cookies } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
+import { previewHelpTrainingInvite } from "$lib/server/help/helpTrainingInvitePreview";
 import {
   completeHelpTrainingStep,
+  consumeHelpTrainingInvite,
   getHelpTrainingSession,
   reportHelpTrainingFailure,
   requestHelpForTrainingStep,
   startHelpTrainingSession,
 } from "$lib/server/help/helpTrainingRepository";
 import {
+  clearHelpTrainingInviteCookie,
   clearHelpTrainingSessionCookie,
+  getHelpTrainingInviteCookie,
   getHelpTrainingSessionCookie,
+  setHelpTrainingSessionCookie,
 } from "$lib/server/help/helpTrainingSession";
 
 function read(formData: FormData, name: string): string {
@@ -17,7 +22,7 @@ function read(formData: FormData, name: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-async function requireTrainingToken(cookies: Parameters<PageServerLoad>[0]["cookies"]): Promise<string> {
+async function requireTrainingToken(cookies: Cookies): Promise<string> {
   const token = getHelpTrainingSessionCookie(cookies);
   if (!token) throw redirect(303, "/treinamento?convite=invalido");
   const state = await getHelpTrainingSession(token);
@@ -33,8 +38,15 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
   const state = token ? await getHelpTrainingSession(token) : null;
   if (token && !state) clearHelpTrainingSessionCookie(cookies);
 
+  const stagedInviteToken = state ? "" : getHelpTrainingInviteCookie(cookies);
+  const invitePreview = stagedInviteToken
+    ? await previewHelpTrainingInvite(stagedInviteToken)
+    : null;
+  if (stagedInviteToken && !invitePreview) clearHelpTrainingInviteCookie(cookies);
+
   return {
     state,
+    invitePreview,
     inviteState: url.searchParams.get("convite"),
     justCompletedStep: url.searchParams.get("feito") === "1",
     helpRequested: url.searchParams.get("ajuda") === "1",
@@ -42,6 +54,22 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
 };
 
 export const actions: Actions = {
+  acceptInvite: async ({ cookies }) => {
+    const inviteToken = getHelpTrainingInviteCookie(cookies);
+    if (!inviteToken) throw redirect(303, "/treinamento?convite=invalido");
+    try {
+      const created = await consumeHelpTrainingInvite(inviteToken);
+      setHelpTrainingSessionCookie(cookies, created.sessionToken, created.expiresAt);
+      clearHelpTrainingInviteCookie(cookies);
+      await startHelpTrainingSession(created.sessionToken);
+      throw redirect(303, "/treinamento");
+    } catch (cause) {
+      if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
+      clearHelpTrainingInviteCookie(cookies);
+      throw redirect(303, "/treinamento?convite=invalido");
+    }
+  },
+
   start: async ({ cookies }) => {
     const token = await requireTrainingToken(cookies);
     await startHelpTrainingSession(token);
@@ -51,8 +79,8 @@ export const actions: Actions = {
   success: async ({ cookies }) => {
     const token = await requireTrainingToken(cookies);
     try {
-      const result = await completeHelpTrainingStep(token);
-      throw redirect(303, result.completed ? "/treinamento?feito=1" : "/treinamento?feito=1");
+      await completeHelpTrainingStep(token);
+      throw redirect(303, "/treinamento?feito=1");
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
       return fail(409, { success: false, message: "Não foi possível registrar essa ação. Tente novamente." });
@@ -87,6 +115,7 @@ export const actions: Actions = {
   },
 
   logout: async ({ cookies }) => {
+    clearHelpTrainingInviteCookie(cookies);
     clearHelpTrainingSessionCookie(cookies);
     throw redirect(303, "/treinamento");
   },
