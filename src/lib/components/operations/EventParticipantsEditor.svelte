@@ -34,6 +34,7 @@
   export let timeZone = "UTC";
   export let allDay = false;
   export let excludeGoogleEventId: string | null = null;
+  export let excludeGoogleIcalUid: string | null = null;
   export let inputName = "attendeesJson";
 
   let initialized = false;
@@ -92,6 +93,7 @@
     timeZone,
     allDay,
     excludeGoogleEventId,
+    excludeGoogleIcalUid,
   });
   $: if (browser) queueAvailabilityCheck(availabilityKey);
 
@@ -201,6 +203,7 @@
           endTime,
           timeZone,
           excludeGoogleEventId,
+          excludeGoogleIcalUid,
         }),
       });
       const payload = await response.json().catch(() => ({})) as {
