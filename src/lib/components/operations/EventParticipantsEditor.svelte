@@ -167,6 +167,13 @@
     return "Aguardando";
   }
 
+  function responseClass(status: string | undefined): string {
+    if (status === "accepted") return "text-[#2F7045]";
+    if (status === "declined") return "text-[#A52A2A]";
+    if (status === "tentative") return "text-[#A9510D]";
+    return "text-[#8C919E]";
+  }
+
   function queueAvailabilityCheck(key: string): void {
     void key;
     if (availabilityTimer) clearTimeout(availabilityTimer);
@@ -261,7 +268,8 @@
           <div class="flex items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-2">
             <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-2"><input type="checkbox" checked={selected} on:change={(event) => toggleInternal(user, (event.currentTarget as HTMLInputElement).checked)}/><span class="min-w-0"><strong class="block truncate text-[9px] font-semibold text-[#424957]">{user.name}</strong><span class="block truncate text-[8px] text-[#9297A4]">{user.email}</span></span></label>
             {#if selected}
-              <div class="flex shrink-0 items-center gap-2">
+              <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                <span class={`text-[8px] font-semibold ${responseClass(attendee?.responseStatus)}`}>{responseLabel(attendee?.responseStatus)}</span>
                 {#if !allDay}
                   <span class={`text-[8px] font-semibold ${availability?.conflicts.length ? "text-[#A9510D]" : availability ? "text-[#2F7045]" : "text-[#8D93A0]"}`}>{availabilityLoading && !availability ? "Verificando..." : availability ? conflictLabel(availability) : ""}</span>
                 {/if}
@@ -282,7 +290,7 @@
       <div class="mt-2 space-y-1.5">
         {#each externalAttendees as attendee}
           <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#E7E9EF] bg-[#FAFAFC] px-2.5 py-2">
-            <div class="min-w-0"><span class="block truncate text-[9px] font-medium text-[#4A5060]">{attendee.email}</span>{#if attendee.responseStatus}<span class="text-[7px] text-[#959AA6]">{responseLabel(attendee.responseStatus)}</span>{/if}</div>
+            <div class="min-w-0"><span class="block truncate text-[9px] font-medium text-[#4A5060]">{attendee.email}</span>{#if attendee.responseStatus}<span class={`text-[7px] ${responseClass(attendee.responseStatus)}`}>{responseLabel(attendee.responseStatus)}</span>{/if}</div>
             <div class="flex items-center gap-2"><label class="flex items-center gap-1 text-[8px] text-[#7D8391]"><input type="checkbox" checked={Boolean(attendee.optional)} on:change={(event) => setOptional(attendee.email, (event.currentTarget as HTMLInputElement).checked)}/>Opcional</label><button type="button" on:click={() => removeAttendee(attendee.email)} class="flex h-7 w-7 items-center justify-center rounded-md text-[#8C919E] hover:bg-white" aria-label="Remover participante"><X size={12}/></button></div>
           </div>
         {/each}
