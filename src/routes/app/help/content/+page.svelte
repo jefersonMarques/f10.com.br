@@ -8,7 +8,6 @@
     ExternalLink,
     Eye,
     FilePlus2,
-    GraduationCap,
     HardDrive,
     Layers3,
     Trash2,
@@ -39,7 +38,6 @@
       <p class="mt-2 max-w-[780px] text-[14px] leading-6 text-[#6F7585]">Crie procedimentos em passos. Texto, imagem, vídeo, arquivos e conhecimento exclusivo para a IA permanecem na mesma fonte.</p>
     </div>
     <div class="flex flex-wrap gap-2">
-      <a href="/app/help/trilhas" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-4 text-[10px] font-semibold text-[#000A57]"><GraduationCap size={15}/>Trilhas F10</a>
       <a href="/app/help/assets" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[10px] font-semibold text-[#000A57]"><HardDrive size={15}/>Biblioteca</a>
       {#if data.canEdit}<a href="/app/help/content/import" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[10px] font-semibold text-[#000A57]"><UploadCloud size={15}/>Importar</a>{/if}
     </div>
