@@ -2,6 +2,7 @@ import { error, fail, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
+import { readGoogleEventDetailsFromForm } from "$lib/server/calendar/googleEventFormInput";
 import {
   createGoogleCalendarEvent,
   disconnectGoogleCalendar,
@@ -21,7 +22,6 @@ import {
   configureTaskGoogleCalendar,
   listUserTaskGoogleCalendarLinks,
 } from "$lib/server/tasks/taskGoogleCalendarRepository";
-import type { TaskGoogleCalendarAttendee } from "$lib/server/db/googleCalendarSchema";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -70,102 +70,6 @@ function googleRange(anchor: string): { timeMin: Date; timeMax: Date } {
   return {
     timeMin: addUtcDays(base, -45),
     timeMax: addUtcDays(base, 80),
-  };
-}
-
-function parseReminderMinutes(formData: FormData): number | null {
-  const raw = readFormValue(formData, "reminderMinutes");
-  if (!raw) return null;
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value < 0 || value > 40320) {
-    throw new Error("INVALID_REMINDER");
-  }
-  return value;
-}
-
-function isValidEmail(value: string): boolean {
-  return value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function parseAttendees(
-  formData: FormData,
-  activeUsers: Awaited<ReturnType<typeof listActiveTaskUsers>>,
-  organizerUserId: string,
-  organizerEmail: string,
-): TaskGoogleCalendarAttendee[] {
-  const raw = readFormValue(formData, "attendeesJson");
-  if (!raw) return [];
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error("INVALID_ATTENDEES");
-  }
-  if (!Array.isArray(parsed)) throw new Error("INVALID_ATTENDEES");
-
-  const organizerEmailNormalized = organizerEmail.trim().toLowerCase();
-  const attendees = new Map<string, TaskGoogleCalendarAttendee>();
-  for (const item of parsed.slice(0, 100)) {
-    if (!item || typeof item !== "object") continue;
-    const value = item as Record<string, unknown>;
-    const requestedUserId = typeof value.userId === "string" ? value.userId.trim() : "";
-    const requestedEmail = typeof value.email === "string" ? value.email.trim().toLowerCase() : "";
-    const optional = Boolean(value.optional);
-
-    const internal = requestedUserId
-      ? activeUsers.find((user) => user.id === requestedUserId)
-      : activeUsers.find((user) => user.email.trim().toLowerCase() === requestedEmail);
-
-    if (internal) {
-      if (internal.id === organizerUserId) continue;
-      const email = internal.email.trim().toLowerCase();
-      if (!email || email === organizerEmailNormalized) continue;
-      attendees.set(email, {
-        email,
-        name: internal.name,
-        userId: internal.id,
-        optional,
-      });
-      continue;
-    }
-
-    if (!isValidEmail(requestedEmail) || requestedEmail === organizerEmailNormalized) {
-      throw new Error("INVALID_ATTENDEES");
-    }
-    attendees.set(requestedEmail, {
-      email: requestedEmail,
-      name: typeof value.name === "string" ? value.name.trim().slice(0, 160) : "",
-      userId: null,
-      optional,
-    });
-  }
-  return Array.from(attendees.values());
-}
-
-async function readGoogleEventDetails(
-  userId: string,
-  formData: FormData,
-): Promise<{
-  location: string;
-  reminderMinutes: number | null;
-  attendees: TaskGoogleCalendarAttendee[];
-}> {
-  const location = readFormValue(formData, "location");
-  if (location.length > 500) throw new Error("INVALID_LOCATION");
-  const [activeUsers, connection] = await Promise.all([
-    listActiveTaskUsers(),
-    getGoogleCalendarConnection(userId),
-  ]);
-  return {
-    location,
-    reminderMinutes: parseReminderMinutes(formData),
-    attendees: parseAttendees(
-      formData,
-      activeUsers,
-      userId,
-      connection.googleEmail,
-    ),
   };
 }
 
@@ -284,10 +188,14 @@ export const actions: Actions = {
       return fail(400, { success: false, action: "createTask", message: "Informe um horário válido para sincronizar com o Google Calendar." });
     }
 
-    let eventDetails = { location: "", reminderMinutes: null as number | null, attendees: [] as TaskGoogleCalendarAttendee[] };
+    let eventDetails: Awaited<ReturnType<typeof readGoogleEventDetailsFromForm>> = {
+      location: "",
+      reminderMinutes: null,
+      attendees: [],
+    };
     if (syncGoogle) {
       try {
-        eventDetails = await readGoogleEventDetails(session.user.id, formData);
+        eventDetails = await readGoogleEventDetailsFromForm(session.user.id, formData);
       } catch {
         return fail(400, { success: false, action: "createTask", message: "Revise local, lembrete e participantes do evento." });
       }
@@ -366,9 +274,9 @@ export const actions: Actions = {
       return fail(400, { success: false, action: "createGoogleEvent", message: "Fuso horário inválido." });
     }
 
-    let eventDetails;
+    let eventDetails: Awaited<ReturnType<typeof readGoogleEventDetailsFromForm>>;
     try {
-      eventDetails = await readGoogleEventDetails(session.user.id, formData);
+      eventDetails = await readGoogleEventDetailsFromForm(session.user.id, formData);
     } catch {
       return fail(400, { success: false, action: "createGoogleEvent", message: "Revise local, lembrete e participantes do evento." });
     }
