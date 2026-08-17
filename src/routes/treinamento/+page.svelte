@@ -15,8 +15,16 @@
     : null;
   $: showRecovery = Boolean(progress && (progress.status === "blocked" || progress.status === "help_requested") && !retryMode);
 
+  function trainingVideoAssetId(value: string | null): string | null {
+    if (!value?.startsWith("asset:")) return null;
+    const assetId = value.slice("asset:".length);
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(assetId)
+      ? assetId
+      : null;
+  }
+
   function youtubeEmbedUrl(value: string | null): string | null {
-    if (!value) return null;
+    if (!value || value.startsWith("asset:")) return null;
     try {
       const url = new URL(value);
       let id = "";
@@ -31,6 +39,7 @@
     }
   }
 
+  $: videoAssetId = trainingVideoAssetId(currentStep?.videoUrl ?? null);
   $: videoEmbed = youtubeEmbedUrl(currentStep?.videoUrl ?? null);
 </script>
 
@@ -87,7 +96,16 @@
             {/if}
 
             {#if currentStep.videoUrl}
-              <details class="mt-6 rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4"><summary class="flex cursor-pointer list-none items-center gap-2 text-[11px] font-semibold text-[#000A57]"><Play size={14}/>Ver demonstração rápida</summary>{#if videoEmbed}<div class="mt-4 overflow-hidden rounded-xl bg-black"><iframe src={videoEmbed} title="Demonstração rápida" class="aspect-video w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>{:else}<a href={currentStep.videoUrl} target="_blank" rel="noopener noreferrer" class="mt-4 inline-flex text-[10px] font-semibold text-[#000A57]">Abrir demonstração</a>{/if}</details>
+              <details class="mt-6 rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4">
+                <summary class="flex cursor-pointer list-none items-center gap-2 text-[11px] font-semibold text-[#000A57]"><Play size={14}/>Ver demonstração rápida</summary>
+                {#if videoAssetId}
+                  <div class="mt-4 overflow-hidden rounded-xl bg-black"><video src={`/treinamento/assets/${videoAssetId}`} controls preload="metadata" playsinline class="aspect-video w-full" aria-label="Demonstração rápida"></video></div>
+                {:else if videoEmbed}
+                  <div class="mt-4 overflow-hidden rounded-xl bg-black"><iframe src={videoEmbed} title="Demonstração rápida" class="aspect-video w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>
+                {:else}
+                  <a href={currentStep.videoUrl} target="_blank" rel="noopener noreferrer" class="mt-4 inline-flex text-[10px] font-semibold text-[#000A57]">Abrir demonstração</a>
+                {/if}
+              </details>
             {/if}
 
             <div class="mt-6 rounded-2xl bg-[#F6F7FA] px-4 py-4"><p class="text-[9px] font-bold uppercase tracking-[0.1em] text-[#8B909D]">Quando terminar</p><p class="mt-2 text-[11px] leading-5 text-[#565D6D]">{currentStep.expectedResult}</p></div>
