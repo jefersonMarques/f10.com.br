@@ -28,6 +28,7 @@
 
   let notificationOpen = false;
   let presenceOpen = false;
+  let openNavigationGroup: string | null = null;
   let notificationTimer: ReturnType<typeof setInterval> | null = null;
   let presenceTimer: ReturnType<typeof setInterval> | null = null;
   let notifications = data.notifications;
@@ -88,6 +89,10 @@
 
   function isActiveNavigationGroup(currentPathname: string, children: NavigationChild[]): boolean {
     return children.some((child) => isActiveNavigationItem(currentPathname, child.href));
+  }
+
+  function toggleNavigationGroup(label: string): void {
+    openNavigationGroup = openNavigationGroup === label ? null : label;
   }
 
   function navigationBadge(
@@ -222,13 +227,19 @@
           {#each visibleNavigationItems as item}
             {#if item.children}
               {@const groupActive = isActiveNavigationGroup(pathname, item.children)}
-              <div class="py-0.5">
-                <div class={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-[13px] font-semibold ${groupActive ? "bg-[#F8F9FF] text-[#000A57]" : "text-[#676D7D]"}`}>
+              {@const groupOpen = openNavigationGroup === item.label}
+              <div class="group py-0.5">
+                <button
+                  type="button"
+                  class={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[13px] font-semibold transition ${groupActive ? "bg-[#F8F9FF] text-[#000A57]" : "text-[#676D7D] hover:bg-[#F7F8FB] hover:text-[#000A57]"}`}
+                  aria-expanded={groupOpen}
+                  on:click={() => toggleNavigationGroup(item.label)}
+                >
                   <svelte:component this={item.icon} size={19} aria-hidden="true" />
                   <span class="flex-1">{item.label}</span>
-                  <ChevronDown size={15} aria-hidden="true" />
-                </div>
-                <div class="ml-[22px] mt-1 space-y-1 border-l border-[#E4E7EE] pl-3">
+                  <ChevronDown size={15} class={`transition-transform duration-150 ${groupOpen ? "rotate-180" : "group-hover:rotate-180"}`} aria-hidden="true" />
+                </button>
+                <div class={`ml-[22px] mt-1 space-y-1 border-l border-[#E4E7EE] pl-3 ${groupOpen ? "block" : "hidden group-hover:block"}`}>
                   {#each item.children as child}
                     <a href={child.href} class={`flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-[11px] font-semibold transition ${isActiveNavigationItem(pathname, child.href) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#747A89] hover:bg-[#F7F8FB] hover:text-[#000A57]"}`}>
                       <svelte:component this={child.icon} size={15} aria-hidden="true" />
