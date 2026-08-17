@@ -17,6 +17,7 @@
     Users,
     Video,
   } from "lucide-svelte";
+  import TrainingImageUploader from "$lib/components/operations/TrainingImageUploader.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -117,6 +118,7 @@
 
                 <div class="mt-5 border-t border-[#EEF0F5] pt-5">
                   <h3 class="text-[11px] font-semibold text-[#303645]">Demonstração visual</h3>
+                  <p class="mt-1 text-[9px] text-[#8B909D]">Use poucos prints em sequência. Você pode colar screenshots diretamente nesta microação.</p>
                   {#if step.media.length > 0}
                     <div class="mt-3 grid gap-3 sm:grid-cols-2">
                       {#each step.media as media}
@@ -133,8 +135,9 @@
                     </div>
                   {/if}
                   {#if data.canEdit}
-                    <div class="mt-3 grid gap-3 lg:grid-cols-2">
-                      <form method="POST" action="?/addImage" class="rounded-xl border border-[#DDE1EA] p-3"><input type="hidden" name="stepId" value={step.id}/><span class="flex items-center gap-2 text-[9px] font-semibold text-[#000A57]"><ImageIcon size={13}/>Adicionar print da Biblioteca</span><select name="assetId" required class="mt-2 h-9 w-full rounded-lg border border-[#DDE1EA] bg-white px-2 text-[9px]"><option value="">Selecione uma imagem</option>{#each data.imageAssets as asset}<option value={asset.id}>{asset.originalName || asset.id}</option>{/each}</select><input name="altText" maxlength="500" placeholder="Descrição opcional" class="mt-2 h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[9px]"/><button type="submit" class="mt-2 min-h-8 w-full rounded-lg bg-[#000A57] text-[9px] font-semibold text-white">Adicionar imagem</button></form>
+                    <div class="mt-3 grid gap-3 xl:grid-cols-3">
+                      <TrainingImageUploader pathId={data.path.id} stepId={step.id}/>
+                      <form method="POST" action="?/addImage" class="rounded-xl border border-[#DDE1EA] p-3"><input type="hidden" name="stepId" value={step.id}/><span class="flex items-center gap-2 text-[9px] font-semibold text-[#000A57]"><ImageIcon size={13}/>Reutilizar da Biblioteca</span><select name="assetId" required class="mt-2 h-9 w-full rounded-lg border border-[#DDE1EA] bg-white px-2 text-[9px]"><option value="">Selecione uma imagem</option>{#each data.imageAssets as asset}<option value={asset.id}>{asset.originalName || asset.id}</option>{/each}</select><input name="altText" maxlength="500" placeholder="Descrição opcional" class="mt-2 h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[9px]"/><button type="submit" class="mt-2 min-h-8 w-full rounded-lg bg-[#000A57] text-[9px] font-semibold text-white">Adicionar imagem</button></form>
                       <form method="POST" action="?/addVideo" class="rounded-xl border border-[#DDE1EA] p-3"><input type="hidden" name="stepId" value={step.id}/><span class="flex items-center gap-2 text-[9px] font-semibold text-[#000A57]"><Video size={13}/>Demonstração rápida</span><input name="sourceUrl" required placeholder="URL do YouTube" class="mt-2 h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[9px]"/><p class="mt-1 text-[8px] leading-4 text-[#8B909D]">Ideal 20–45s. Se passar de ~60s, considere dividir a microação.</p><button type="submit" class="mt-2 min-h-8 w-full rounded-lg bg-[#000A57] text-[9px] font-semibold text-white">Salvar vídeo</button></form>
                     </div>
                   {/if}
