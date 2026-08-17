@@ -14,6 +14,7 @@
     UserRound,
     Video,
   } from "lucide-svelte";
+  import GoogleEventDetailsEditor from "$lib/components/operations/GoogleEventDetailsEditor.svelte";
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -31,12 +32,40 @@
     "task.comment.added": "adicionou um comentário",
   };
 
+  let taskDueOn = data.details.task.dueOn ?? "";
   let syncGoogle = Boolean(data.googleLink);
   let googleAllDay = data.googleLink?.allDay ?? false;
   let googleStartTime = data.googleLink?.startTime ?? "09:00";
   let googleEndTime = data.googleLink?.endTime ?? "10:00";
   let googleTimeZone = data.googleLink?.timeZone ?? "UTC";
   let googleMeet = data.googleLink?.googleMeetEnabled ?? false;
+
+  const initialGoogleAttendees = (() => {
+    const stored = data.googleLink?.attendees ?? [];
+    const live = (data.googleEvent?.attendees ?? []).filter((attendee) => !attendee.self);
+    const storedEmails = new Set(stored.map((attendee) => attendee.email.trim().toLowerCase()));
+
+    return [
+      ...stored.map((attendee) => {
+        const current = live.find(
+          (candidate) => candidate.email.trim().toLowerCase() === attendee.email.trim().toLowerCase(),
+        );
+        return {
+          ...attendee,
+          responseStatus: current?.responseStatus ?? "needsAction",
+        };
+      }),
+      ...live
+        .filter((attendee) => !storedEmails.has(attendee.email.trim().toLowerCase()))
+        .map((attendee) => ({
+          email: attendee.email,
+          name: attendee.displayName,
+          userId: null,
+          optional: attendee.optional,
+          responseStatus: attendee.responseStatus,
+        })),
+    ];
+  })();
 
   onMount(() => {
     if (!data.googleLink) {
@@ -75,37 +104,52 @@
             <label class="block sm:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Título</span><input name="title" required maxlength="180" value={data.details.task.title} class="h-12 w-full rounded-xl border border-[#DDE1EA] px-4 text-[14px] font-medium text-[#11182C] outline-none focus:border-[#000A57]"/></label>
             <label class="block sm:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Descrição</span><textarea name="description" maxlength="5000" rows="8" value={data.details.task.description} class="w-full resize-y rounded-xl border border-[#DDE1EA] px-4 py-3 text-[13px] leading-6 outline-none focus:border-[#000A57]"></textarea></label>
             <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Prioridade</span><select name="priority" value={data.details.task.priority} class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[12px]"><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></label>
-            <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Prazo</span><input name="dueOn" type="date" value={data.details.task.dueOn ?? ""} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]"/></label>
+            <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Prazo</span><input name="dueOn" type="date" bind:value={taskDueOn} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]"/></label>
 
             {#if data.googleCalendar.connected}
               <div class="sm:col-span-2 rounded-2xl border border-[#DDE7E1] bg-[#F8FBF9] p-4">
                 <input type="hidden" name="googleSyncManaged" value="true"/>
                 <input type="hidden" name="googleTimeZone" value={googleTimeZone}/>
                 <div class="flex flex-wrap items-start justify-between gap-3">
-                  <label class="flex cursor-pointer items-start gap-3"><input type="checkbox" name="syncGoogle" value="true" bind:checked={syncGoogle} class="mt-1"/><span><strong class="block text-[11px] font-semibold text-[#2E3B33]">Sincronizar com Google Calendar</strong><span class="mt-1 block text-[9px] leading-4 text-[#78827B]">Usa sua conta {data.googleCalendar.googleEmail}. Alterações de título, descrição e data feitas no F10 atualizam o evento.</span></span></label>
+                  <label class="flex cursor-pointer items-start gap-3"><input type="checkbox" name="syncGoogle" value="true" bind:checked={syncGoogle} class="mt-1"/><span><strong class="block text-[11px] font-semibold text-[#2E3B33]">Sincronizar com Google Calendar</strong><span class="mt-1 block text-[9px] leading-4 text-[#78827B]">Usa sua conta {data.googleCalendar.googleEmail}. Alterações no F10 atualizam o mesmo evento e os convidados.</span></span></label>
                   {#if data.googleLink?.googleHtmlLink}<a href={data.googleLink.googleHtmlLink} target="_blank" rel="noreferrer" class="inline-flex items-center gap-1 text-[9px] font-semibold text-[#000A57]">Abrir evento <ExternalLink size={12}/></a>{/if}
                 </div>
                 {#if syncGoogle}
-                  <div class="mt-4 rounded-xl border border-[#E1E8E3] bg-white p-3">
+                  <div class="mt-4 space-y-3 rounded-xl border border-[#E1E8E3] bg-white p-3">
                     <label class="flex items-center gap-2 text-[10px] font-medium text-[#535E57]"><input type="checkbox" name="googleAllDay" value="true" bind:checked={googleAllDay}/>Evento de dia inteiro</label>
                     {#if !googleAllDay}
-                      <div class="mt-3 grid grid-cols-2 gap-3"><label><span class="mb-1 block text-[9px] font-semibold text-[#6E776F]">Início</span><input type="time" name="googleStartTime" bind:value={googleStartTime} required class="h-10 w-full rounded-lg border border-[#DDE1EA] px-2 text-[11px]"/></label><label><span class="mb-1 block text-[9px] font-semibold text-[#6E776F]">Fim</span><input type="time" name="googleEndTime" bind:value={googleEndTime} required class="h-10 w-full rounded-lg border border-[#DDE1EA] px-2 text-[11px]"/></label></div>
+                      <div class="grid grid-cols-2 gap-3"><label><span class="mb-1 block text-[9px] font-semibold text-[#6E776F]">Início</span><input type="time" name="googleStartTime" bind:value={googleStartTime} required class="h-10 w-full rounded-lg border border-[#DDE1EA] px-2 text-[11px]"/></label><label><span class="mb-1 block text-[9px] font-semibold text-[#6E776F]">Fim</span><input type="time" name="googleEndTime" bind:value={googleEndTime} required class="h-10 w-full rounded-lg border border-[#DDE1EA] px-2 text-[11px]"/></label></div>
                     {:else}
                       <input type="hidden" name="googleStartTime" value=""/><input type="hidden" name="googleEndTime" value=""/>
                     {/if}
 
                     {#if data.googleLink?.googleMeetEnabled}
                       <input type="hidden" name="googleMeet" value="true"/>
-                      <div class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#D8E2F6] bg-[#F5F8FF] px-3 py-3">
+                      <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#D8E2F6] bg-[#F5F8FF] px-3 py-3">
                         <span class="inline-flex items-center gap-2 text-[9px] font-semibold text-[#214A9A]"><Video size={14}/>Google Meet ativo</span>
                         {#if data.googleLink.googleMeetUrl}<a href={data.googleLink.googleMeetUrl} target="_blank" rel="noreferrer" class="inline-flex min-h-8 items-center gap-1 rounded-lg bg-[#214A9A] px-3 text-[9px] font-semibold text-white">Entrar na reunião <ExternalLink size={11}/></a>{:else}<span class="text-[8px] text-[#77839A]">O Google ainda está finalizando o link da reunião.</span>{/if}
                       </div>
                     {:else}
-                      <label class="mt-3 flex cursor-pointer items-start gap-2 rounded-xl border border-[#DFE5F1] bg-[#FAFBFE] px-3 py-3"><input type="checkbox" name="googleMeet" value="true" bind:checked={googleMeet} class="mt-0.5"/><span><strong class="block text-[9px] font-semibold text-[#35445F]">Gerar Google Meet</strong><span class="mt-0.5 block text-[8px] leading-4 text-[#7D8797]">Cria um link exclusivo de reunião dentro deste evento.</span></span></label>
+                      <label class="flex cursor-pointer items-start gap-2 rounded-xl border border-[#DFE5F1] bg-[#FAFBFE] px-3 py-3"><input type="checkbox" name="googleMeet" value="true" bind:checked={googleMeet} class="mt-0.5"/><span><strong class="block text-[9px] font-semibold text-[#35445F]">Gerar Google Meet</strong><span class="mt-0.5 block text-[8px] leading-4 text-[#7D8797]">Cria um link exclusivo de reunião dentro deste evento.</span></span></label>
                     {/if}
 
-                    <p class="mt-2 text-[8px] text-[#929A94]">Fuso: {googleTimeZone}. Desmarcar a sincronização remove do Google o evento criado pelo F10.</p>
-                    {#if data.googleLink?.lastSyncError}<p class="mt-2 rounded-lg bg-[#FFF4E9] px-2 py-2 text-[8px] font-medium text-[#A9510D]">A última sincronização apresentou erro. Salve novamente para tentar atualizar o evento.</p>{/if}
+                    <GoogleEventDetailsEditor
+                      users={data.calendarUsers}
+                      organizerUserId={data.organizerUserId}
+                      organizerEmail={data.googleCalendar.googleEmail}
+                      date={taskDueOn}
+                      startTime={googleStartTime}
+                      endTime={googleEndTime}
+                      timeZone={googleTimeZone}
+                      allDay={googleAllDay}
+                      initialLocation={data.googleLink?.location ?? ""}
+                      initialReminderMinutes={data.googleLink?.reminderMinutes ?? null}
+                      initialAttendees={initialGoogleAttendees}
+                      excludeGoogleEventId={data.googleLink?.googleEventId ?? null}
+                    />
+
+                    <p class="text-[8px] text-[#929A94]">Fuso: {googleTimeZone}. Desmarcar a sincronização remove do Google o evento criado pelo F10.</p>
+                    {#if data.googleLink?.lastSyncError}<p class="rounded-lg bg-[#FFF4E9] px-2 py-2 text-[8px] font-medium text-[#A9510D]">A última sincronização apresentou erro. Salve novamente para tentar atualizar o evento.</p>{/if}
                   </div>
                 {/if}
               </div>
