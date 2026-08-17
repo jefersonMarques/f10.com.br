@@ -3,6 +3,12 @@ import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import {
+  createGoogleCalendarEvent,
+  disconnectGoogleCalendar,
+  getGoogleCalendarConnection,
+  listGoogleCalendarEvents,
+} from "$lib/server/calendar/googleCalendarRepository";
+import {
   createTask,
   getTaskBoard,
   listMyTasks,
@@ -31,10 +37,34 @@ function isValidDate(value: string): boolean {
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
+function isValidTime(value: string): boolean {
+  if (!/^\d{2}:\d{2}$/.test(value)) return false;
+  const [hour, minute] = value.split(":").map(Number);
+  return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+}
+
 function createPermissionMap(
   permissions: Array<{ code: string; scope: "own" | "team" | "all" }>,
 ) {
   return new Map(permissions.map((permission) => [permission.code, permission.scope]));
+}
+
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function addUtcDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function googleRange(anchor: string): { timeMin: Date; timeMax: Date } {
+  const base = new Date(`${anchor}T00:00:00.000Z`);
+  return {
+    timeMin: addUtcDays(base, -45),
+    timeMax: addUtcDays(base, 80),
+  };
 }
 
 export const load: PageServerLoad = async ({ parent, url }) => {
@@ -50,6 +80,8 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const selectedProject = projects.find((project) => project.id === requestedProjectId) ?? null;
   const canCreate = hasPermission(permissions, "tasks.create");
   const canAssign = hasPermission(permissions, "tasks.assign");
+  const requestedDate = url.searchParams.get("date") ?? "";
+  const calendarAnchor = isValidDate(requestedDate) ? requestedDate : todayKey();
 
   let sourceTasks;
   if (selectedProject) {
@@ -77,6 +109,19 @@ export const load: PageServerLoad = async ({ parent, url }) => {
       )
     : {};
 
+  const googleCalendar = await getGoogleCalendarConnection(layout.user.id);
+  let googleEvents: Awaited<ReturnType<typeof listGoogleCalendarEvents>> = [];
+  let googleCalendarError = "";
+
+  if (googleCalendar.connected) {
+    try {
+      const range = googleRange(calendarAnchor);
+      googleEvents = await listGoogleCalendarEvents(layout.user.id, range.timeMin, range.timeMax);
+    } catch {
+      googleCalendarError = "Não foi possível atualizar os eventos do Google Calendar agora.";
+    }
+  }
+
   return {
     projects,
     selectedProjectId: selectedProject?.id ?? null,
@@ -84,6 +129,11 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     membersByProject,
     canCreate,
     canAssign,
+    calendarAnchor,
+    googleCalendar,
+    googleEvents,
+    googleCalendarError,
+    googleStatus: url.searchParams.get("google") ?? "",
   };
 };
 
@@ -125,6 +175,53 @@ export const actions: Actions = {
       return { success: true, action: "createTask", message: "Tarefa criada." };
     } catch {
       return fail(403, { success: false, action: "createTask", message: "Não foi possível criar a tarefa neste projeto." });
+    }
+  },
+
+  createGoogleEvent: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(cookies, "tasks.view", "/app/tasks/calendar");
+    const formData = await request.formData();
+    const title = readFormValue(formData, "title");
+    const description = readFormValue(formData, "description");
+    const date = readFormValue(formData, "date");
+    const allDay = readFormValue(formData, "allDay") === "true";
+    const startTime = readFormValue(formData, "startTime");
+    const endTime = readFormValue(formData, "endTime");
+    const timeZone = readFormValue(formData, "timeZone");
+
+    if (title.length < 2 || title.length > 180 || description.length > 5000 || !isValidDate(date)) {
+      return fail(400, { success: false, action: "createGoogleEvent", message: "Revise o título, descrição e data do evento." });
+    }
+    if (!allDay && (!isValidTime(startTime) || !isValidTime(endTime) || startTime >= endTime)) {
+      return fail(400, { success: false, action: "createGoogleEvent", message: "Informe um horário inicial e final válidos." });
+    }
+    if (timeZone.length < 1 || timeZone.length > 100) {
+      return fail(400, { success: false, action: "createGoogleEvent", message: "Fuso horário inválido." });
+    }
+
+    try {
+      await createGoogleCalendarEvent(session.user.id, {
+        title,
+        description,
+        date,
+        allDay,
+        startTime,
+        endTime,
+        timeZone,
+      });
+      return { success: true, action: "createGoogleEvent", message: "Evento criado no Google Calendar." };
+    } catch {
+      return fail(409, { success: false, action: "createGoogleEvent", message: "Não foi possível criar o evento no Google Calendar." });
+    }
+  },
+
+  disconnectGoogle: async ({ cookies }) => {
+    const { session } = await requireAppPermission(cookies, "tasks.view", "/app/tasks/calendar");
+    try {
+      await disconnectGoogleCalendar(session.user.id);
+      return { success: true, action: "disconnectGoogle", message: "Google Calendar desconectado." };
+    } catch {
+      return fail(409, { success: false, action: "disconnectGoogle", message: "Não foi possível desconectar o Google Calendar agora." });
     }
   },
 };
