@@ -2,12 +2,9 @@ import { error, fail, redirect, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
-import { listManagedHelpAssets } from "$lib/server/help/helpAssetRepository";
 import { getTrainingBaseUrl, sendHelpTrainingInvite } from "$lib/server/help/helpTrainingMailer";
 import {
-  addHelpTrainingImage,
   addHelpTrainingStep,
-  addHelpTrainingVideo,
   archiveHelpTrainingPath,
   createHelpTrainingInvite,
   deleteHelpTrainingMedia,
@@ -47,8 +44,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 
   const path = await getHelpTrainingPath(params.pathId);
   if (!path) throw error(404, "Trilha não encontrada.");
-  const [assets, queues, participants, insights] = await Promise.all([
-    listManagedHelpAssets(300),
+  const [queues, participants, insights] = await Promise.all([
     listTrainingSupportQueues(),
     listHelpTrainingParticipants(params.pathId),
     getHelpTrainingInsights(params.pathId),
@@ -56,7 +52,6 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 
   return {
     path,
-    imageAssets: assets.filter((asset) => asset.assetType === "image"),
     queues,
     participants,
     insights,
@@ -137,36 +132,6 @@ export const actions: Actions = {
           ? "A trilha precisa manter pelo menos uma microação."
           : "Não foi possível remover esta microação.",
       });
-    }
-    redirectToEditor(params.pathId);
-  },
-
-  addImage: async ({ cookies, params, request }) => {
-    if (!isUuid(params.pathId)) return fail(404, { success: false, message: "Trilha não encontrada." });
-    const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
-    const formData = await request.formData();
-    const stepId = read(formData, "stepId");
-    const assetId = read(formData, "assetId");
-    if (!isUuid(stepId) || !isUuid(assetId)) return fail(400, { success: false, message: "Selecione uma imagem válida." });
-    try {
-      await addHelpTrainingImage(session.user.id, params.pathId, stepId, assetId, read(formData, "altText"));
-    } catch {
-      return fail(409, { success: false, message: "Não foi possível adicionar a imagem." });
-    }
-    redirectToEditor(params.pathId);
-  },
-
-  addVideo: async ({ cookies, params, request }) => {
-    if (!isUuid(params.pathId)) return fail(404, { success: false, message: "Trilha não encontrada." });
-    const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
-    const formData = await request.formData();
-    const stepId = read(formData, "stepId");
-    const sourceUrl = read(formData, "sourceUrl");
-    if (!isUuid(stepId) || !sourceUrl) return fail(400, { success: false, message: "Informe o vídeo." });
-    try {
-      await addHelpTrainingVideo(session.user.id, params.pathId, stepId, sourceUrl);
-    } catch {
-      return fail(400, { success: false, message: "Informe uma URL HTTP/HTTPS válida para a demonstração." });
     }
     redirectToEditor(params.pathId);
   },
