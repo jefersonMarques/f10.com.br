@@ -16,8 +16,23 @@
     X,
   } from "lucide-svelte";
 
+  type CustomerSupportContext = {
+    authenticated: boolean;
+    name: string;
+    email: string;
+    groupName: string | null;
+    unitName: string | null;
+  };
+
   export let isOpen = false;
   export let onClose: () => void = () => undefined;
+  export let customerSupport: CustomerSupportContext = {
+    authenticated: false,
+    name: "",
+    email: "",
+    groupName: null,
+    unitName: null,
+  };
 
   type ChatSession = {
     sessionId: string;
@@ -75,6 +90,7 @@
 
   const STORAGE_KEY = "f10-support-chat-session-v1";
   const DRAFT_KEY = "f10-support-chat-draft-v1";
+  const SUPPORT_LOGIN_URL = "/cliente?returnTo=%2Fajuda-f10%3Fchat%3D1";
   const BOTTOM_THRESHOLD = 120;
   const MAX_IMAGES = 4;
   const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -91,8 +107,6 @@
   let statusTimer: ReturnType<typeof setInterval> | null = null;
   let statusPollingActive = false;
 
-  let name = "";
-  let email = "";
   let phone = "";
   let initialMessage = "";
   let reply = "";
@@ -131,6 +145,11 @@
     }
 
     if (!shouldOpen && dialogElement.open) dialogElement.close();
+  }
+
+  function redirectToCustomerLogin(loginUrl = SUPPORT_LOGIN_URL): void {
+    if (!browser) return;
+    window.location.assign(loginUrl.startsWith("/") ? loginUrl : SUPPORT_LOGIN_URL);
   }
 
   function restoreStoredState(): void {
@@ -291,10 +310,10 @@
 
   function apiErrorMessage(error: string, diagnosticCode = ""): string {
     if (error === "RATE_LIMITED") return "Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.";
+    if (error === "CUSTOMER_AUTH_REQUIRED") return "Sua sessão F10 expirou. Entre novamente para continuar o atendimento.";
     if (error === "INVALID_SESSION") return "Este atendimento expirou. Inicie uma nova conversa.";
     if (error === "CHAT_CLOSED") return "Este atendimento foi encerrado. Inicie uma nova conversa se ainda precisar de ajuda.";
-    if (error === "INVALID_NAME") return "Informe seu nome para iniciar o atendimento.";
-    if (error === "INVALID_CONTACT") return "Revise o e-mail ou telefone informado.";
+    if (error === "INVALID_CONTACT") return "Não foi possível validar sua conta F10. Entre novamente e tente outra vez.";
     if (error === "INVALID_MESSAGE") return "Escreva uma mensagem ou adicione uma imagem antes de enviar.";
     if (error === "INVALID_ENTRY_OPTION") return "Esta opção de atendimento não está mais disponível. Escolha outra opção.";
     if (error === "SUPPORT_IMAGE_TOO_MANY" || error === "TOO_MANY_ATTACHMENTS") return "Envie no máximo 4 imagens por mensagem.";
@@ -354,6 +373,11 @@
   }
 
   async function startChat(): Promise<void> {
+    if (!customerSupport.authenticated) {
+      redirectToCustomerLogin();
+      return;
+    }
+
     errorMessage = "";
     starting = true;
 
@@ -362,8 +386,6 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim(),
           phone: phone.trim(),
           message: initialMessage.trim(),
           entryOptionId: selectedEntryOptionId || null,
@@ -375,6 +397,10 @@
       const payload = await response.json() as Record<string, unknown>;
 
       if (!response.ok) {
+        if (response.status === 401 && payload.error === "CUSTOMER_AUTH_REQUIRED") {
+          redirectToCustomerLogin(typeof payload.loginUrl === "string" ? payload.loginUrl : SUPPORT_LOGIN_URL);
+          return;
+        }
         errorMessage = apiErrorMessage(
           typeof payload.error === "string" ? payload.error : "",
           typeof payload.diagnosticCode === "string" ? payload.diagnosticCode : "",
@@ -423,7 +449,12 @@
       const payload = await response.json() as Record<string, unknown>;
 
       if (response.status === 401) {
+        const authRequired = payload.error === "CUSTOMER_AUTH_REQUIRED";
         clearStoredSession();
+        if (authRequired) {
+          redirectToCustomerLogin(typeof payload.loginUrl === "string" ? payload.loginUrl : SUPPORT_LOGIN_URL);
+          return;
+        }
         errorMessage = "Este atendimento expirou. Inicie uma nova conversa.";
         return;
       }
@@ -575,6 +606,9 @@
           revokeImages(images);
           pendingImages = [];
           clearStoredSession();
+          if (error === "CUSTOMER_AUTH_REQUIRED") {
+            redirectToCustomerLogin(typeof payload.loginUrl === "string" ? payload.loginUrl : SUPPORT_LOGIN_URL);
+          }
         }
         return;
       }
@@ -610,8 +644,6 @@
     errorMessage = "";
     attachmentError = "";
     reply = "";
-    name = "";
-    email = "";
     phone = "";
     initialMessage = "";
     intentDraft = "";
@@ -861,14 +893,21 @@
                 </div>
 
                 <form class="mt-5 space-y-4" on:submit|preventDefault={startChat}>
-                  <div class="grid gap-4 sm:grid-cols-2">
-                    <label class="block text-[10px] font-semibold text-[#5E6575]">Nome
-                      <input bind:value={name} required minlength="2" maxlength="120" autocomplete="name" class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] px-3 text-[12px] font-normal text-[#252C3D] outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" />
-                    </label>
-                    <label class="block text-[10px] font-semibold text-[#5E6575]">E-mail
-                      <input bind:value={email} required type="email" maxlength="254" autocomplete="email" class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] px-3 text-[12px] font-normal text-[#252C3D] outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" />
-                    </label>
+                  <div class="rounded-2xl border border-[#DDE3EC] bg-[#F7F9FC] px-4 py-3.5">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div class="min-w-0">
+                        <span class="text-[8px] font-bold uppercase tracking-[0.12em] text-[#5F6B7D]">Conta F10 autenticada</span>
+                        <p class="mt-1 truncate text-[11px] font-semibold text-[#252C3D]">{customerSupport.name || customerSupport.email}</p>
+                        <p class="mt-0.5 break-all text-[9px] text-[#7B8292]">{customerSupport.email}</p>
+                      </div>
+                      <a href="/cliente/unidade?returnTo=%2Fajuda-f10%3Fchat%3D1" class="shrink-0 text-[9px] font-semibold text-[#000A57] hover:underline">Trocar unidade</a>
+                    </div>
+                    <div class="mt-3 grid gap-2 border-t border-[#E5E9F0] pt-3 sm:grid-cols-2">
+                      <div><span class="block text-[8px] font-bold uppercase tracking-[0.1em] text-[#969CAA]">Grupo</span><strong class="mt-1 block text-[10px] text-[#3F4656]">{customerSupport.groupName || "Grupo F10"}</strong></div>
+                      <div><span class="block text-[8px] font-bold uppercase tracking-[0.1em] text-[#969CAA]">Escola / unidade</span><strong class="mt-1 block text-[10px] text-[#3F4656]">{customerSupport.unitName || "Unidade selecionada"}</strong></div>
+                    </div>
                   </div>
+
                   <label class="block text-[10px] font-semibold text-[#5E6575]">Telefone <span class="font-normal text-[#9AA0AD]">(opcional)</span>
                     <input bind:value={phone} maxlength="40" autocomplete="tel" class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] px-3 text-[12px] font-normal text-[#252C3D] outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" />
                   </label>
