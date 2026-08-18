@@ -48,7 +48,7 @@ export async function getOptionalCustomerF10PortalSession(cookies: Cookies) {
   if (!token) return null;
 
   const session = await authorizeF10CustomerPortalSession(token);
-  if (!session) return null;
+  if (!session) clearCustomerPortalSessionCookie(cookies);
   return session;
 }
 
