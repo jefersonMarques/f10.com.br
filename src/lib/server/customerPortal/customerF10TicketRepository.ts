@@ -1,6 +1,7 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
+import { ticketMessages, tickets } from "$lib/server/db/supportSchema";
 import {
   getCustomerPortalTicket,
   listCustomerPortalTickets,
@@ -30,8 +31,8 @@ function contextMatches(
 
 export async function listCustomerF10Tickets(session: CustomerF10PortalSession) {
   if (!hasSelectedContext(session)) return [];
-  const tickets = await listCustomerPortalTickets(session.contactId);
-  if (tickets.length === 0) return [];
+  const customerTickets = await listCustomerPortalTickets(session.contactId);
+  if (customerTickets.length === 0) return [];
 
   const db = getDatabase();
   const contexts = await db
@@ -41,9 +42,9 @@ export async function listCustomerF10Tickets(session: CustomerF10PortalSession) 
       unitId: ticketCustomerContexts.unitId,
     })
     .from(ticketCustomerContexts)
-    .where(inArray(ticketCustomerContexts.ticketId, tickets.map((ticket) => ticket.id)));
+    .where(inArray(ticketCustomerContexts.ticketId, customerTickets.map((ticket) => ticket.id)));
   const byTicket = new Map(contexts.map((context) => [context.ticketId, context]));
-  return tickets.filter((ticket) => contextMatches(session, byTicket.get(ticket.id)));
+  return customerTickets.filter((ticket) => contextMatches(session, byTicket.get(ticket.id)));
 }
 
 export async function getCustomerF10Ticket(
@@ -84,22 +85,30 @@ export async function bindTicketF10Context(
   if (!hasSelectedContext(session)) throw new Error("F10_CUSTOMER_UNIT_REQUIRED");
   const db = getDatabase();
   const now = new Date();
-  await db
-    .insert(ticketCustomerContexts)
-    .values({
-      ticketId,
-      customerContactId: session.contactId,
-      legacyUserId: session.legacyUserId,
-      groupId: session.selectedGroupId as number,
-      groupName: session.selectedGroupName ?? "",
-      unitId: session.selectedUnitId as number,
-      unitName: session.selectedUnitName ?? "",
-      unitSchema: session.selectedUnitSchema ?? "",
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: ticketCustomerContexts.ticketId,
-      set: {
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(tickets)
+      .set({
+        customerContactId: session.contactId,
+        updatedAt: now,
+      })
+      .where(eq(tickets.id, ticketId));
+
+    await tx
+      .update(ticketMessages)
+      .set({ customerContactId: session.contactId })
+      .where(
+        and(
+          eq(ticketMessages.ticketId, ticketId),
+          eq(ticketMessages.authorType, "customer"),
+        ),
+      );
+
+    await tx
+      .insert(ticketCustomerContexts)
+      .values({
+        ticketId,
         customerContactId: session.contactId,
         legacyUserId: session.legacyUserId,
         groupId: session.selectedGroupId as number,
@@ -108,6 +117,19 @@ export async function bindTicketF10Context(
         unitName: session.selectedUnitName ?? "",
         unitSchema: session.selectedUnitSchema ?? "",
         updatedAt: now,
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: ticketCustomerContexts.ticketId,
+        set: {
+          customerContactId: session.contactId,
+          legacyUserId: session.legacyUserId,
+          groupId: session.selectedGroupId as number,
+          groupName: session.selectedGroupName ?? "",
+          unitId: session.selectedUnitId as number,
+          unitName: session.selectedUnitName ?? "",
+          unitSchema: session.selectedUnitSchema ?? "",
+          updatedAt: now,
+        },
+      });
+  });
 }
