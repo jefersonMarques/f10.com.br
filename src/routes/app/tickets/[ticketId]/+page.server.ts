@@ -6,6 +6,7 @@ import { markEntityNotificationsRead } from "$lib/server/notifications/notificat
 import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { markTicketChatHumanTakeover } from "$lib/server/support/supportAiHandoff";
 import { createTaskFromTicket, listTicketTasks } from "$lib/server/support/ticketTaskBridge";
+import { getTicketCustomerContext } from "$lib/server/support/ticketCustomerContextRepository";
 import {
   addTicketMessage,
   assignTicket,
@@ -98,11 +99,15 @@ export const load: PageServerLoad = async ({ params, parent }) => {
         ? listTaskProjects(layout.user.id, permissions).catch(() => [])
         : Promise.resolve([]),
     ]);
-    const mentionUsers = canReply ? await filterMentionUsersForTicket(users, params.ticketId) : [];
+    const [mentionUsers, customerContext] = await Promise.all([
+      canReply ? filterMentionUsersForTicket(users, params.ticketId) : Promise.resolve([]),
+      getTicketCustomerContext(params.ticketId),
+    ]);
     await markEntityNotificationsRead(layout.user.id, "ticket", params.ticketId);
 
     return {
       details,
+      customerContext,
       agents: canAssign ? users : [],
       mentionUsers,
       linkedTasks,
