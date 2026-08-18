@@ -54,6 +54,9 @@
   $: assignedToMe = chat.assignedUserId === data.currentUserId;
   $: canWrite = data.canRespond && (!chat.assignedUserId || assignedToMe);
   $: draftKey = `f10:chat-draft:${chat.sessionId}`;
+  $: f10GroupName = chatContextValue("groupName");
+  $: f10UnitName = chatContextValue("unitName");
+  $: f10LegacyUserId = chatContextValue("legacyUserId");
 
   const statusLabels: Record<string, string> = {
     new: "Novo",
@@ -77,6 +80,15 @@
     human: "Atendimento humano",
     disabled: "Automação desativada",
   };
+
+  function chatContextValue(key: string): string {
+    const value = chat.contextData;
+    if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+    const field = (value as Record<string, unknown>)[key];
+    if (typeof field === "string") return field.trim();
+    if (typeof field === "number") return String(field);
+    return "";
+  }
 
   function formatTime(value: string | Date): string {
     return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
@@ -216,7 +228,11 @@
           <span class="rounded-full bg-[#F3F4F7] px-2 py-1 text-[8px] font-bold text-[#777D8D]">{priorityLabels[chat.priority]}</span>
           <span class={`rounded-full px-2 py-1 text-[8px] font-bold ${chat.aiState === "active" ? "bg-[#F0EEFF] text-[#5142A6]" : chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#9B3C3C]" : "bg-[#F3F4F7] text-[#777D8D]"}`}>{aiLabels[chat.aiState]}</span>
         </div>
-        <p class="mt-1 truncate text-[10px] text-[#898E9B]">{chat.organizationName ?? chat.customerEmail ?? "Chat do site"}</p>
+        {#if f10UnitName}
+          <p class="mt-1 truncate text-[10px] font-medium text-[#666D7C]">{f10UnitName}{f10GroupName ? ` · ${f10GroupName}` : ""}</p>
+        {:else}
+          <p class="mt-1 truncate text-[10px] text-[#898E9B]">{chat.organizationName ?? chat.customerEmail ?? "Chat do site"}</p>
+        {/if}
         {#if chat.aiHandoffReason && chat.aiState === "escalated"}<p class="mt-1 line-clamp-1 text-[9px] text-[#9A6464]">{chat.aiHandoffReason}</p>{/if}
       </div>
     </div>
@@ -336,6 +352,16 @@
         {#if chat.organizationName}<p class="mt-1 text-[10px] text-[#747B8D]">{chat.organizationName}</p>{/if}
         {#if chat.customerEmail}<p class="mt-3 break-all text-[10px] text-[#5E6575]">{chat.customerEmail}</p>{/if}
         {#if chat.customerPhone}<p class="mt-1 text-[10px] text-[#5E6575]">{chat.customerPhone}</p>{/if}
+        {#if f10UnitName}
+          <div class="mt-4 rounded-2xl border border-[#DDE3EC] bg-[#F7F9FC] p-3">
+            <span class="block text-[8px] font-bold uppercase tracking-[0.1em] text-[#808797]">Contexto F10 autenticado</span>
+            <div class="mt-2 grid gap-2">
+              <div><span class="block text-[8px] text-[#969CAA]">Escola / unidade</span><strong class="mt-0.5 block text-[10px] text-[#3F4656]">{f10UnitName}</strong></div>
+              {#if f10GroupName}<div><span class="block text-[8px] text-[#969CAA]">Grupo</span><strong class="mt-0.5 block text-[10px] text-[#3F4656]">{f10GroupName}</strong></div>{/if}
+              {#if f10LegacyUserId}<div><span class="block text-[8px] text-[#969CAA]">Usuário F10</span><strong class="mt-0.5 block font-mono text-[9px] text-[#5C6372]">{f10LegacyUserId}</strong></div>{/if}
+            </div>
+          </div>
+        {/if}
         <p class="mt-3 text-[9px] text-[#9A9FAC]">Conversa iniciada em {formatDateTime(chat.createdAt)}</p>
       </section>
 
