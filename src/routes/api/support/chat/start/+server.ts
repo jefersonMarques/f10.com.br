@@ -1,5 +1,8 @@
 import { dev } from "$app/environment";
 import { json, type RequestHandler } from "@sveltejs/kit";
+import { recordCustomerActivity } from "$lib/server/customerPortal/customerActivityRepository";
+import { bindTicketF10Context } from "$lib/server/customerPortal/customerF10TicketRepository";
+import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import {
   isSupportAiChatEnabled,
   processSupportAiChatMessage,
@@ -15,6 +18,7 @@ type ChatStartDiagnosticCode =
   | "RATE_LIMIT_NOT_CONFIGURED"
   | "SUPPORT_QUEUE_UNAVAILABLE"
   | "DATABASE_UNAVAILABLE"
+  | "CUSTOMER_CONTEXT_BIND_FAILED"
   | "CHAT_START_FAILED";
 
 function isBodyTooLarge(request: Request): boolean {
@@ -28,13 +32,6 @@ function readString(value: unknown): string {
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
-function isValidEmail(value: string): boolean {
-  return (
-    !value ||
-    (value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
-  );
 }
 
 function sanitizeContextUrl(value: string): string {
@@ -58,6 +55,9 @@ function diagnoseChatStartFailure(cause: unknown): ChatStartDiagnosticCode {
   if (cause.message === "CHAT_QUEUE_NOT_FOUND") {
     return "SUPPORT_QUEUE_UNAVAILABLE";
   }
+  if (cause.message === "F10_CUSTOMER_UNIT_REQUIRED") {
+    return "CUSTOMER_CONTEXT_BIND_FAILED";
+  }
   if (
     cause.message.includes("DATABASE_URL") ||
     cause.name === "PostgresError" ||
@@ -68,7 +68,18 @@ function diagnoseChatStartFailure(cause: unknown): ChatStartDiagnosticCode {
   return "CHAT_START_FAILED";
 }
 
-export const POST: RequestHandler = async ({ request, getClientAddress }) => {
+export const POST: RequestHandler = async ({ request, getClientAddress, cookies }) => {
+  const customer = await getOptionalCustomerF10PortalSession(cookies);
+  if (!customer || customer.selectedGroupId === null || customer.selectedUnitId === null) {
+    return json(
+      {
+        error: "CUSTOMER_AUTH_REQUIRED",
+        loginUrl: "/cliente?returnTo=%2Fajuda-f10%3Fchat%3D1",
+      },
+      { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   if (isBodyTooLarge(request)) {
     return json({ error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
   }
@@ -81,8 +92,8 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
     return json({ error: "INVALID_JSON" }, { status: 400 });
   }
 
-  const name = readString(body.name);
-  const email = readString(body.email).toLowerCase();
+  const name = customer.name.trim() || customer.email;
+  const email = customer.email.trim().toLowerCase();
   const phone = readString(body.phone);
   const message = readString(body.message);
   const entryOptionId = readString(body.entryOptionId) || null;
@@ -90,11 +101,11 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
   const pageTitle = readString(body.pageTitle).slice(0, 200);
   const helpContext = readString(body.helpContext).slice(0, 200);
 
-  if (name.length < 2 || name.length > 120) {
-    return json({ error: "INVALID_NAME" }, { status: 400 });
+  if (name.length < 1 || name.length > 120 || email.length > 254) {
+    return json({ error: "INVALID_CONTACT" }, { status: 400 });
   }
 
-  if (!isValidEmail(email) || phone.length > 40) {
+  if (phone.length > 40) {
     return json({ error: "INVALID_CONTACT" }, { status: 400 });
   }
 
@@ -124,9 +135,28 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
       contextData: {
         pageTitle: pageTitle || null,
         helpContext: helpContext || null,
+        authenticatedCustomer: true,
+        legacyUserId: customer.legacyUserId,
+        groupId: customer.selectedGroupId,
+        groupName: customer.selectedGroupName,
+        unitId: customer.selectedUnitId,
+        unitName: customer.selectedUnitName,
       },
       enableAi: isSupportAiChatEnabled(),
     });
+
+    await bindTicketF10Context(session.ticketId, customer);
+    await recordCustomerActivity(customer, {
+      eventType: "support.chat.started",
+      source: "help_center",
+      path: contextUrl || "/ajuda-f10",
+      metadata: {
+        ticketId: session.ticketId,
+        ticketNumber: session.ticketNumber,
+        entryOptionId,
+        entryOptionLabel: session.entryOptionLabel,
+      },
+    }).catch(() => undefined);
 
     let ai: { state: "active" | "escalated" | "human" | "disabled"; processed: boolean } | null = null;
     if (session.aiState === "active") {
