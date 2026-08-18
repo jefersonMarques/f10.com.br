@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
 import {
   getGoogleCalendarConnection,
   listGoogleCalendarEvents,
@@ -34,6 +34,15 @@ export type CalendarAvailabilityInput = {
   date: string;
   startTime: string;
   endTime: string;
+  timeZone: string;
+  excludeGoogleEventId?: string | null;
+  excludeGoogleIcalUid?: string | null;
+};
+
+export type CalendarAvailabilityWindowInput = {
+  user: CalendarAvailabilityUser;
+  startDate: string;
+  endDate: string;
   timeZone: string;
   excludeGoogleEventId?: string | null;
   excludeGoogleIcalUid?: string | null;
@@ -116,11 +125,13 @@ function eventInterval(
   return { start, end, allDay: false };
 }
 
-async function listF10Conflicts(
+async function listF10ConflictsForWindow(
   userId: string,
-  input: CalendarAvailabilityInput,
+  input: Pick<CalendarAvailabilityInput, "timeZone" | "excludeGoogleEventId" | "excludeGoogleIcalUid">,
   requestedStart: Date,
   requestedEnd: Date,
+  startDate: string,
+  endDate: string,
 ): Promise<CalendarAvailabilityConflict[]> {
   const db = getDatabase();
   const rows = await db
@@ -140,7 +151,7 @@ async function listF10Conflicts(
     .from(taskGoogleCalendarLinks)
     .innerJoin(tasks, eq(taskGoogleCalendarLinks.taskId, tasks.id))
     .leftJoin(taskAssignees, eq(taskAssignees.taskId, tasks.id))
-    .where(eq(tasks.dueOn, input.date));
+    .where(and(gte(tasks.dueOn, startDate), lte(tasks.dueOn, endDate)));
 
   const conflictsByEvent = new Map<string, CalendarAvailabilityConflict>();
   for (const row of rows) {
@@ -176,6 +187,45 @@ async function listF10Conflicts(
   return Array.from(conflictsByEvent.values());
 }
 
+async function listF10Conflicts(
+  userId: string,
+  input: CalendarAvailabilityInput,
+  requestedStart: Date,
+  requestedEnd: Date,
+): Promise<CalendarAvailabilityConflict[]> {
+  return listF10ConflictsForWindow(
+    userId,
+    input,
+    requestedStart,
+    requestedEnd,
+    input.date,
+    input.date,
+  );
+}
+
+function googleConflicts(
+  events: GoogleCalendarEvent[],
+  input: Pick<CalendarAvailabilityInput, "timeZone" | "excludeGoogleEventId" | "excludeGoogleIcalUid">,
+  requestedStart: Date,
+  requestedEnd: Date,
+): CalendarAvailabilityConflict[] {
+  const conflicts: CalendarAvailabilityConflict[] = [];
+  for (const event of events) {
+    if (event.id === input.excludeGoogleEventId) continue;
+    if (input.excludeGoogleIcalUid && event.iCalUID === input.excludeGoogleIcalUid) continue;
+    if (event.transparency === "transparent" || selfDeclined(event)) continue;
+    const interval = eventInterval(event, input.timeZone);
+    if (!interval || !overlaps(requestedStart, requestedEnd, interval.start, interval.end)) continue;
+    conflicts.push({
+      start: interval.start.toISOString(),
+      end: interval.end.toISOString(),
+      allDay: interval.allDay,
+      source: "google",
+    });
+  }
+  return conflicts;
+}
+
 async function checkUser(
   user: CalendarAvailabilityUser,
   input: CalendarAvailabilityInput,
@@ -189,28 +239,12 @@ async function checkUser(
       const rangeStart = new Date(requestedStart.getTime() - 24 * 60 * 60 * 1000);
       const rangeEnd = new Date(requestedEnd.getTime() + 24 * 60 * 60 * 1000);
       const events = await listGoogleCalendarEvents(user.id, rangeStart, rangeEnd);
-      const conflicts: CalendarAvailabilityConflict[] = [];
-
-      for (const event of events) {
-        if (event.id === input.excludeGoogleEventId) continue;
-        if (input.excludeGoogleIcalUid && event.iCalUID === input.excludeGoogleIcalUid) continue;
-        if (event.transparency === "transparent" || selfDeclined(event)) continue;
-        const interval = eventInterval(event, input.timeZone);
-        if (!interval || !overlaps(requestedStart, requestedEnd, interval.start, interval.end)) continue;
-        conflicts.push({
-          start: interval.start.toISOString(),
-          end: interval.end.toISOString(),
-          allDay: interval.allDay,
-          source: "google",
-        });
-      }
-
       return {
         userId: user.id,
         name: user.name,
         email: user.email,
         coverage: "google",
-        conflicts,
+        conflicts: googleConflicts(events, input, requestedStart, requestedEnd),
       };
     } catch {
       // Se o Google estiver indisponível, ainda usamos compromissos temporizados conhecidos pelo F10.
@@ -238,4 +272,47 @@ export async function checkF10CalendarAvailability(
   return Promise.all(
     input.users.slice(0, 30).map((user) => checkUser(user, input, requestedStart, requestedEnd)),
   );
+}
+
+export async function listF10CalendarBusyIntervals(
+  input: CalendarAvailabilityWindowInput,
+): Promise<CalendarAvailabilityResult> {
+  const requestedStart = localDateTimeToUtc(input.startDate, "00:00", input.timeZone);
+  const requestedEnd = localDateTimeToUtc(addDays(input.endDate, 1), "00:00", input.timeZone);
+  if (requestedStart.getTime() >= requestedEnd.getTime()) {
+    throw new Error("CALENDAR_AVAILABILITY_INVALID_RANGE");
+  }
+
+  const connection = await getGoogleCalendarConnection(input.user.id);
+  if (connection.connected) {
+    try {
+      const rangeStart = new Date(requestedStart.getTime() - 24 * 60 * 60 * 1000);
+      const rangeEnd = new Date(requestedEnd.getTime() + 24 * 60 * 60 * 1000);
+      const events = await listGoogleCalendarEvents(input.user.id, rangeStart, rangeEnd);
+      return {
+        userId: input.user.id,
+        name: input.user.name,
+        email: input.user.email,
+        coverage: "google",
+        conflicts: googleConflicts(events, input, requestedStart, requestedEnd),
+      };
+    } catch {
+      // O fallback F10 mantém a página utilizável sem expor detalhes privados do Google.
+    }
+  }
+
+  return {
+    userId: input.user.id,
+    name: input.user.name,
+    email: input.user.email,
+    coverage: "f10-only",
+    conflicts: await listF10ConflictsForWindow(
+      input.user.id,
+      input,
+      requestedStart,
+      requestedEnd,
+      input.startDate,
+      input.endDate,
+    ),
+  };
 }
