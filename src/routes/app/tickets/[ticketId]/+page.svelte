@@ -131,7 +131,18 @@
 
       <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5"><div class="flex items-center gap-3"><UserRound size={18} class="text-[#EA6D0B]"/><h2 class="text-[14px] font-semibold text-[#11182C]">Cliente</h2></div><dl class="mt-4 space-y-3 text-[10px]"><div><dt class="text-[#8D929F]">Nome</dt><dd class="mt-1 font-medium text-[#4E5463]">{data.details.ticket.customerName ?? "Não informado"}</dd></div><div><dt class="text-[#8D929F]">E-mail</dt><dd class="mt-1 break-all font-medium text-[#4E5463]">{data.details.ticket.customerEmail ?? "Não informado"}</dd></div><div><dt class="text-[#8D929F]">Telefone</dt><dd class="mt-1 font-medium text-[#4E5463]">{data.details.ticket.customerPhone ?? "Não informado"}</dd></div></dl></section>
 
-      {#if data.details.ticket.organizationName}<section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5"><div class="flex items-center gap-3"><Building2 size={18} class="text-[#000A57]"/><h2 class="text-[14px] font-semibold text-[#11182C]">Organização</h2></div><p class="mt-4 text-[11px] font-medium text-[#4E5463]">{data.details.ticket.organizationName}</p></section>{/if}
+      {#if data.customerContext}
+        <section class="rounded-[24px] border border-[#D8DEF2] bg-[#F8F9FF] p-5">
+          <div class="flex items-center gap-3"><Building2 size={18} class="text-[#000A57]"/><div><h2 class="text-[14px] font-semibold text-[#11182C]">Contexto F10 autenticado</h2><p class="mt-0.5 text-[9px] text-[#808695]">Escola e unidade vinculadas no início do atendimento.</p></div></div>
+          <dl class="mt-4 space-y-3 text-[10px]">
+            <div><dt class="text-[#8D929F]">Escola / unidade</dt><dd class="mt-1 font-semibold text-[#3F4656]">{data.customerContext.unitName}</dd></div>
+            <div><dt class="text-[#8D929F]">Grupo</dt><dd class="mt-1 font-medium text-[#4E5463]">{data.customerContext.groupName}</dd></div>
+            <div><dt class="text-[#8D929F]">Usuário F10</dt><dd class="mt-1 font-mono text-[9px] font-medium text-[#5D6372]">{data.customerContext.legacyUserId}</dd></div>
+          </dl>
+        </section>
+      {:else if data.details.ticket.organizationName}
+        <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5"><div class="flex items-center gap-3"><Building2 size={18} class="text-[#000A57]"/><h2 class="text-[14px] font-semibold text-[#11182C]">Organização</h2></div><p class="mt-4 text-[11px] font-medium text-[#4E5463]">{data.details.ticket.organizationName}</p></section>
+      {/if}
 
       <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5"><div class="flex items-center gap-3"><ShieldCheck size={18} class="text-[#000A57]"/><h2 class="text-[14px] font-semibold text-[#11182C]">Histórico</h2></div><div class="mt-4 space-y-4">{#each data.details.events as event}<div class="border-l-2 border-[#E5E7ED] pl-3"><p class="text-[10px] leading-4 text-[#626877]"><strong class="font-semibold text-[#3E4453]">{event.actorName ?? "Sistema"}</strong> {eventLabels[event.eventType] ?? event.eventType}</p><span class="mt-1 block text-[8px] text-[#9B9FAC]">{formatDateTime(event.createdAt)}</span></div>{/each}</div></section>
     </aside>
