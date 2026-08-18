@@ -165,11 +165,19 @@ export const actions: Actions = {
 
       throw redirect(303, `/app/tickets/${ticket.id}`);
     } catch (cause) {
-      if (cause instanceof Response && cause.status >= 300 && cause.status < 400) throw cause;
-      return fail(403, {
+      if (
+        cause &&
+        typeof cause === "object" &&
+        "status" in cause &&
+        cause.status === 303
+      ) {
+        throw cause;
+      }
+
+      return fail(409, {
         success: false,
         action: "create",
-        message: "Não foi possível criar o ticket com os dados informados.",
+        message: "Não foi possível criar o ticket. Verifique a fila e tente novamente.",
       });
     }
   },
@@ -194,12 +202,16 @@ export const actions: Actions = {
 
     try {
       await updateTicketStatus(session.user.id, permissions, ticketId, status);
-      return { success: true, action: "moveStatus", message: "Status atualizado." };
+      return {
+        success: true,
+        action: "moveStatus",
+        message: "Status do ticket atualizado.",
+      };
     } catch {
       return fail(403, {
         success: false,
         action: "moveStatus",
-        message: "Não foi possível mover este ticket.",
+        message: "Você não pode alterar este ticket.",
       });
     }
   },
