@@ -104,6 +104,9 @@
       ticket.customerName,
       ticket.customerEmail,
       ticket.organizationName,
+      ticket.customerContext?.groupName,
+      ticket.customerContext?.unitName,
+      ticket.customerContext?.legacyUserId,
       ticket.assignedUserName,
       ticket.queueName,
     ]
@@ -281,9 +284,9 @@
       </nav>
 
       <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <label class="relative block sm:w-[310px]">
+        <label class="relative block sm:w-[330px]">
           <Search size={15} class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9499A5]" />
-          <input bind:value={searchTerm} placeholder="Buscar por ticket, cliente ou assunto" class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-9 pr-3 text-[11px] outline-none focus:border-[#000A57] focus:bg-white" />
+          <input bind:value={searchTerm} placeholder="Buscar ticket, cliente, escola, unidade ou assunto" class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-9 pr-3 text-[11px] outline-none focus:border-[#000A57] focus:bg-white" />
         </label>
         <div class="flex rounded-xl bg-[#F3F4F7] p-1">
           <button type="button" on:click={() => (view = "list")} class={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-[11px] font-semibold ${view === "list" ? "bg-white text-[#000A57] shadow-sm" : "text-[#777D8C]"}`}><List size={15} />Lista</button>
@@ -312,7 +315,7 @@
       <div class="overflow-x-auto">
         <div class="min-w-[1040px]">
           <div class="grid grid-cols-[minmax(320px,1.8fr)_minmax(190px,1fr)_150px_140px_130px_170px_34px] gap-3 border-b border-[#E8EAF0] bg-[#F8F9FB] px-5 py-3 text-[9px] font-bold uppercase tracking-[0.08em] text-[#8A909E]">
-            <span>Ticket</span><span>Cliente</span><span>Responsável</span><span>Fila</span><span>Canal</span><span>Atualizado</span><span></span>
+            <span>Ticket</span><span>Cliente / unidade</span><span>Responsável</span><span>Fila</span><span>Canal</span><span>Atualizado</span><span></span>
           </div>
           {#each filteredTickets as ticket}
             <a href={`/app/tickets/${ticket.id}`} class="grid min-h-[72px] grid-cols-[minmax(320px,1.8fr)_minmax(190px,1fr)_150px_140px_130px_170px_34px] items-center gap-3 border-b border-[#EEF0F4] px-5 py-3 transition last:border-b-0 hover:bg-[#F8F9FC]">
@@ -320,7 +323,14 @@
                 <div class="flex flex-wrap items-center gap-2"><span class="text-[10px] font-bold text-[#EA6D0B]">#{ticket.ticketNumber}</span><span class={`rounded-full px-2 py-1 text-[9px] font-bold ${statusClasses[ticket.status]}`}>{statusLabels[ticket.status]}</span><span class={`rounded-full px-2 py-1 text-[9px] font-bold ${priorityClasses[ticket.priority]}`}>{priorityLabels[ticket.priority]}</span></div>
                 <strong class="mt-1.5 block truncate text-[12px] font-semibold text-[#2D3342]">{ticket.subject}</strong>
               </div>
-              <div class="min-w-0"><span class="block truncate text-[11px] font-medium text-[#4E5565]">{ticket.customerName ?? "Cliente não identificado"}</span>{#if ticket.organizationName}<span class="mt-1 block truncate text-[9px] text-[#9297A5]">{ticket.organizationName}</span>{/if}</div>
+              <div class="min-w-0">
+                <span class="block truncate text-[11px] font-medium text-[#4E5565]">{ticket.customerName ?? "Cliente não identificado"}</span>
+                {#if ticket.customerContext}
+                  <span class="mt-1 block truncate text-[9px] font-medium text-[#6D7485]">{ticket.customerContext.unitName} · {ticket.customerContext.groupName}</span>
+                {:else if ticket.organizationName}
+                  <span class="mt-1 block truncate text-[9px] text-[#9297A5]">{ticket.organizationName}</span>
+                {/if}
+              </div>
               <span class={`truncate text-[10px] ${ticket.assignedUserName ? "text-[#5F6575]" : "font-semibold text-[#B42318]"}`}>{ticket.assignedUserName ?? "Sem responsável"}</span>
               <span class="truncate text-[10px] text-[#737989]">{ticket.queueName}</span>
               <span class="text-[10px] text-[#737989]">{channelLabels[ticket.channel] ?? ticket.channel}</span>
@@ -356,6 +366,11 @@
                         <div class="flex items-start justify-between gap-3"><span class="text-[9px] font-bold text-[#EA6D0B]">#{ticket.ticketNumber}</span><span class={`shrink-0 rounded-full px-2 py-1 text-[8px] font-bold ${priorityClasses[ticket.priority]}`}>{priorityLabels[ticket.priority]}</span></div>
                         <strong class="mt-2 block text-[12px] font-semibold leading-5 text-[#252B3B]">{ticket.subject}</strong>
                         <div class="mt-3 flex items-center gap-2 text-[9px] text-[#7D8392]"><UserRound size={12} /><span class="truncate">{ticket.customerName ?? "Cliente não identificado"}</span></div>
+                        {#if ticket.customerContext}
+                          <p class="mt-1.5 truncate pl-5 text-[8px] font-medium text-[#6D7485]">{ticket.customerContext.unitName} · {ticket.customerContext.groupName}</p>
+                        {:else if ticket.organizationName}
+                          <p class="mt-1.5 truncate pl-5 text-[8px] text-[#9297A5]">{ticket.organizationName}</p>
+                        {/if}
                         <div class="mt-2 flex items-center gap-2 text-[9px] text-[#7D8392]"><Users size={12} /><span class={`truncate ${ticket.assignedUserName ? "" : "font-semibold text-[#B42318]"}`}>{ticket.assignedUserName ?? "Sem responsável"}</span></div>
                         {#if ticket.channel === "web_chat"}<div class="mt-2 inline-flex items-center gap-1 rounded-lg bg-[#EEF0FF] px-2 py-1 text-[8px] font-semibold text-[#000A57]"><MessageCircleMore size={10} />Chat</div>{/if}
                       </a>
@@ -394,4 +409,4 @@
       </form>
     </section>
   </div>
-{/if}
+{/if>
