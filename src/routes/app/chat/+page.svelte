@@ -67,6 +67,9 @@
       chat.customerName,
       chat.customerEmail,
       chat.organizationName,
+      chat.customerContext?.groupName,
+      chat.customerContext?.unitName,
+      chat.customerContext?.legacyUserId,
       chat.subject,
       chat.lastMessageBody,
       `#${chat.ticketNumber}`,
@@ -165,7 +168,7 @@
 
         <label class="relative block w-full xl:max-w-[360px]">
           <Search size={15} class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#979CAA]" aria-hidden="true" />
-          <input bind:this={searchElement} bind:value={query} placeholder="Buscar cliente, empresa, e-mail ou #ticket" class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-10 pr-4 text-[11px] text-[#303645] outline-none transition focus:border-[#000A57] focus:bg-white focus:ring-2 focus:ring-[#000A57]/10" />
+          <input bind:this={searchElement} bind:value={query} placeholder="Buscar cliente, escola, unidade, e-mail ou #ticket" class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-10 pr-4 text-[11px] text-[#303645] outline-none transition focus:border-[#000A57] focus:bg-white focus:ring-2 focus:ring-[#000A57]/10" />
           <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-[#E0E3EA] bg-white px-1.5 py-0.5 text-[8px] text-[#999EAA]">/</span>
         </label>
       </div>
@@ -210,7 +213,13 @@
                     {/if}
                   </div>
 
-                  <p class="mt-1 truncate text-[10px] text-[#858B99]">{chat.organizationName ?? chat.customerEmail ?? chat.subject}</p>
+                  {#if chat.customerContext}
+                    <p class="mt-1 truncate text-[10px] font-medium text-[#5F6676]">
+                      {chat.customerContext.unitName} · {chat.customerContext.groupName}
+                    </p>
+                  {:else}
+                    <p class="mt-1 truncate text-[10px] text-[#858B99]">{chat.organizationName ?? chat.customerEmail ?? chat.subject}</p>
+                  {/if}
                   <p class={`mt-2 line-clamp-1 text-[11px] ${chat.lastMessageAuthorType === "customer" ? "font-medium text-[#454B5B]" : "text-[#777D8D]"}`}>
                     {chat.lastMessageAuthorType === "customer" ? "Cliente: " : chat.lastMessageAuthorType === "user" ? "Equipe: " : "Atendimento F10: "}{chat.lastMessageBody ?? chat.subject}
                   </p>
