@@ -15,6 +15,7 @@ import {
   type TicketPriority,
   type TicketStatus,
 } from "$lib/server/support/supportRepository";
+import { listTicketCustomerContexts } from "$lib/server/support/ticketCustomerContextRepository";
 
 function readFormValue(formData: FormData, name: string): string {
   const value = formData.get(name);
@@ -62,9 +63,14 @@ export const load: PageServerLoad = async ({ parent }) => {
     listSupportTickets(layout.user.id, permissionMap),
     canCreate ? listSupportQueues() : Promise.resolve([]),
   ]);
+  const contexts = await listTicketCustomerContexts(tickets.map((ticket) => ticket.id));
+  const contextByTicket = new Map(contexts.map((context) => [context.ticketId, context]));
 
   return {
-    tickets,
+    tickets: tickets.map((ticket) => ({
+      ...ticket,
+      customerContext: contextByTicket.get(ticket.id) ?? null,
+    })),
     queues,
     currentUserId: layout.user.id,
     canCreate,
@@ -159,19 +165,11 @@ export const actions: Actions = {
 
       throw redirect(303, `/app/tickets/${ticket.id}`);
     } catch (cause) {
-      if (
-        cause &&
-        typeof cause === "object" &&
-        "status" in cause &&
-        cause.status === 303
-      ) {
-        throw cause;
-      }
-
-      return fail(409, {
+      if (cause instanceof Response && cause.status >= 300 && cause.status < 400) throw cause;
+      return fail(403, {
         success: false,
         action: "create",
-        message: "Não foi possível criar o ticket. Verifique a fila e tente novamente.",
+        message: "Não foi possível criar o ticket com os dados informados.",
       });
     }
   },
@@ -196,16 +194,12 @@ export const actions: Actions = {
 
     try {
       await updateTicketStatus(session.user.id, permissions, ticketId, status);
-      return {
-        success: true,
-        action: "moveStatus",
-        message: "Status do ticket atualizado.",
-      };
+      return { success: true, action: "moveStatus", message: "Status atualizado." };
     } catch {
       return fail(403, {
         success: false,
         action: "moveStatus",
-        message: "Você não pode alterar este ticket.",
+        message: "Não foi possível mover este ticket.",
       });
     }
   },
