@@ -157,5 +157,9 @@
 </main>
 
 {#if data.customerSupport.authenticated}
-  <SupportChatDialog isOpen={chatOpen} onClose={() => (chatOpen = false)} />
+  <SupportChatDialog
+    isOpen={chatOpen}
+    onClose={() => (chatOpen = false)}
+    customerSupport={data.customerSupport}
+  />
 {/if}
