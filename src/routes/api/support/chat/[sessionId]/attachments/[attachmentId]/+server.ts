@@ -1,5 +1,7 @@
 import { error, type RequestHandler } from "@sveltejs/kit";
+import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { authorizePublicChatSession } from "$lib/server/support/publicChatRepository";
+import { getTicketCustomerContext } from "$lib/server/support/ticketCustomerContextRepository";
 import {
   getSupportMessageAttachment,
   readSupportMessageAttachment,
@@ -26,7 +28,7 @@ function contentDisposition(name: string): string {
   return `inline; filename*=UTF-8''${encodeURIComponent(name)}`;
 }
 
-export const GET: RequestHandler = async ({ params, request, url }) => {
+export const GET: RequestHandler = async ({ params, request, url, cookies }) => {
   const sessionId = params.sessionId ?? "";
   const attachmentId = params.attachmentId ?? "";
   const token = getSessionToken(request, url);
@@ -36,6 +38,20 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
 
   try {
     const session = await authorizePublicChatSession(sessionId, token);
+    const customer = await getOptionalCustomerF10PortalSession(cookies);
+    if (!customer || customer.selectedUnitId === null) {
+      throw error(401, "Anexo não autorizado.");
+    }
+
+    const context = await getTicketCustomerContext(session.ticketId);
+    if (
+      !context ||
+      context.legacyUserId !== customer.legacyUserId ||
+      context.unitId !== customer.selectedUnitId
+    ) {
+      throw error(401, "Anexo não autorizado.");
+    }
+
     const attachment = await getSupportMessageAttachment(attachmentId, session.ticketId);
     if (!attachment) throw error(404, "Anexo não encontrado.");
 
