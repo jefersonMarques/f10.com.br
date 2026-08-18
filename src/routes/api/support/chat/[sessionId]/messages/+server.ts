@@ -1,4 +1,6 @@
-import { json, type RequestHandler } from "@sveltejs/kit";
+import { json, type Cookies, type RequestHandler } from "@sveltejs/kit";
+import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
+import { getTicketCustomerContext } from "$lib/server/support/ticketCustomerContextRepository";
 import { handoffSupportChatForAttachment } from "$lib/server/support/supportAiAttachmentHandoff";
 import { processSupportAiChatMessage } from "$lib/server/support/supportAiChat";
 import { handlePureSupportGreeting } from "$lib/server/support/supportChatLocalIntent";
@@ -51,7 +53,20 @@ async function readMessagePayload(request: Request): Promise<{ body: string; fil
   };
 }
 
-export const GET: RequestHandler = async ({ params, request }) => {
+async function authorizeF10CustomerForTicket(
+  cookies: Cookies,
+  ticketId: string,
+): Promise<boolean> {
+  const customer = await getOptionalCustomerF10PortalSession(cookies);
+  if (!customer || customer.selectedUnitId === null) return false;
+
+  const context = await getTicketCustomerContext(ticketId);
+  if (!context) return false;
+  return context.legacyUserId === customer.legacyUserId &&
+    context.unitId === customer.selectedUnitId;
+}
+
+export const GET: RequestHandler = async ({ params, request, cookies }) => {
   const sessionId = params.sessionId ?? "";
   const token = getBearerToken(request);
 
@@ -64,6 +79,16 @@ export const GET: RequestHandler = async ({ params, request }) => {
     session = await authorizePublicChatSession(sessionId, token);
   } catch {
     return json({ error: "INVALID_SESSION" }, { status: 401 });
+  }
+
+  if (!await authorizeF10CustomerForTicket(cookies, session.ticketId)) {
+    return json(
+      {
+        error: "CUSTOMER_AUTH_REQUIRED",
+        loginUrl: "/cliente?returnTo=%2Fajuda-f10%3Fchat%3D1",
+      },
+      { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   try {
@@ -85,12 +110,30 @@ export const POST: RequestHandler = async ({
   params,
   request,
   getClientAddress,
+  cookies,
 }) => {
   const sessionId = params.sessionId ?? "";
   const token = getBearerToken(request);
 
   if (!isUuid(sessionId) || !token) {
     return json({ error: "INVALID_SESSION" }, { status: 401 });
+  }
+
+  let chatSession: Awaited<ReturnType<typeof authorizePublicChatSession>>;
+  try {
+    chatSession = await authorizePublicChatSession(sessionId, token);
+  } catch {
+    return json({ error: "INVALID_SESSION" }, { status: 401 });
+  }
+
+  if (!await authorizeF10CustomerForTicket(cookies, chatSession.ticketId)) {
+    return json(
+      {
+        error: "CUSTOMER_AUTH_REQUIRED",
+        loginUrl: "/cliente?returnTo=%2Fajuda-f10%3Fchat%3D1",
+      },
+      { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   if (isBodyTooLarge(request)) {
