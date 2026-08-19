@@ -236,56 +236,56 @@
   <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
     <ApplicationBackLink href="/app/chat" label="Chat" />
     <div class="rounded-xl border border-[#E2E5ED] bg-white px-4 py-2.5 sm:text-right">
-      <span class="text-[9px] font-bold uppercase tracking-[0.08em] text-[#959AA8]">Agente no chat</span>
-      <span class={`ml-2 inline-flex rounded-full px-2.5 py-1 text-[8px] font-bold ${data.aiEnabled ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF4E9] text-[#A9510D]"}`}>{data.aiEnabled ? "Habilitado" : "Desabilitado"}</span>
+      <span class="application-text-meta font-bold uppercase tracking-[0.08em] text-[#959AA8]">Agente no chat</span>
+      <span class={`application-text-meta ml-2 inline-flex rounded-full px-2.5 py-1 font-bold ${data.aiEnabled ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF4E9] text-[#A9510D]"}`}>{data.aiEnabled ? "Habilitado" : "Desabilitado"}</span>
     </div>
   </div>
 
   {#if !data.aiEnabled}
-    <div class="mb-3 flex items-start gap-3 rounded-2xl border border-[#F0D3B8] bg-[#FFF9F3] px-4 py-3 text-[10px] leading-5 text-[#81512A]"><CircleAlert size={16} class="mt-0.5 shrink-0" aria-hidden="true" /><span>Para homologar o agente dentro do chat, use <strong>SUPPORT_AI_CHAT_ENABLED=true</strong>. Com o flag desligado, o preview continua testando o chat humano normalmente.</span></div>
+    <div class="application-text-caption mb-3 flex items-start gap-3 rounded-2xl border border-[#F0D3B8] bg-[#FFF9F3] px-4 py-3 leading-5 text-[#81512A]"><CircleAlert size={16} class="mt-0.5 shrink-0" aria-hidden="true" /><span>Para homologar o agente dentro do chat, use <strong>SUPPORT_AI_CHAT_ENABLED=true</strong>. Com o flag desligado, o preview continua testando o chat humano normalmente.</span></div>
   {/if}
 
   {#if errorMessage}
-    <div class="mb-3 flex items-center gap-2 rounded-xl bg-[#FFF3F3] px-4 py-3 text-[10px] font-medium text-[#A13C3C]"><CircleAlert size={15} aria-hidden="true" />{errorMessage}</div>
+    <div class="application-text-caption mb-3 flex items-center gap-2 rounded-xl bg-[#FFF3F3] px-4 py-3 font-medium text-[#A13C3C]"><CircleAlert size={15} aria-hidden="true" />{errorMessage}</div>
   {/if}
 
   {#if !session}
     <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 shadow-[0_10px_32px_rgba(1,13,40,0.04)] sm:p-6">
-      <div class="flex items-start gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><UserRound size={20} aria-hidden="true" /></span><div><h2 class="text-[15px] font-semibold text-[#202637]">Iniciar como cliente</h2><p class="mt-1 text-[10px] text-[#858B99]">Use uma dúvida que exista na Base publicada e depois uma que não exista para testar os dois caminhos.</p></div></div>
+      <div class="flex items-start gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><UserRound size={20} aria-hidden="true" /></span><div><h2 class="text-[15px] font-semibold text-[#202637]">Iniciar como cliente</h2><p class="application-text-caption mt-1 text-[#858B99]">Use uma dúvida que exista na Base publicada e depois uma que não exista para testar os dois caminhos.</p></div></div>
 
       <form on:submit|preventDefault={() => void startChat()} class="mt-6 grid gap-4 sm:grid-cols-2">
-        <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#4A5060]">Nome</span><input bind:value={name} required maxlength="120" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#000A57]" /></label>
-        <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#4A5060]">E-mail</span><input bind:value={email} type="email" maxlength="254" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#000A57]" /></label>
-        <label class="block sm:col-span-2"><span class="mb-1.5 block text-[10px] font-semibold text-[#4A5060]">Telefone opcional</span><input bind:value={phone} maxlength="40" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#000A57]" /></label>
-        <label class="block sm:col-span-2"><span class="mb-1.5 block text-[10px] font-semibold text-[#4A5060]">Primeira dúvida</span><textarea bind:value={firstMessage} required maxlength="4000" rows="4" placeholder="Ex.: Meu aluno está na turma errada. Como faço para trocar?" class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#000A57]"></textarea></label>
+        <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#4A5060]">Nome</span><input bind:value={name} required maxlength="120" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#000A57]" /></label>
+        <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#4A5060]">E-mail</span><input bind:value={email} type="email" maxlength="254" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#000A57]" /></label>
+        <label class="block sm:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#4A5060]">Telefone opcional</span><input bind:value={phone} maxlength="40" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#000A57]" /></label>
+        <label class="block sm:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#4A5060]">Primeira dúvida</span><textarea bind:value={firstMessage} required maxlength="4000" rows="4" placeholder="Ex.: Meu aluno está na turma errada. Como faço para trocar?" class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#000A57]"></textarea></label>
         <button type="submit" disabled={loading} class="sm:col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-5 text-[12px] font-semibold text-white disabled:bg-[#C6CAD6]"><MessageCircleMore size={17} aria-hidden="true" />{loading ? "Iniciando..." : "Iniciar conversa"}</button>
       </form>
     </section>
   {:else}
     <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_36px_rgba(1,13,40,0.05)]">
       <header class="flex flex-col justify-between gap-3 border-b border-[#EEF0F5] px-5 py-4 sm:flex-row sm:items-center sm:px-6">
-        <div><div class="flex flex-wrap items-center gap-2"><h2 class="text-[14px] font-semibold text-[#222839]">Ticket #{session.ticketNumber}</h2><span class={`rounded-full px-2 py-1 text-[8px] font-bold ${session.aiState === "active" ? "bg-[#F0EEFF] text-[#5142A6]" : session.aiState === "escalated" ? "bg-[#FFF0F0] text-[#9B3C3C]" : "bg-[#F3F4F7] text-[#777D8D]"}`}>{aiLabels[session.aiState]}</span></div><p class="mt-1 text-[9px] text-[#989DAA]">Sessão {session.sessionId.slice(0, 8)}</p></div>
-        <div class="flex gap-2"><button type="button" on:click={() => void loadMessages()} class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#DDE1EA] px-3 text-[9px] font-semibold text-[#626979]"><RefreshCw size={13} aria-hidden="true" />Atualizar</button><button type="button" on:click={resetPreview} class="inline-flex min-h-9 items-center rounded-lg bg-[#F3F4F7] px-3 text-[9px] font-semibold text-[#626979]">Nova conversa</button></div>
+        <div><div class="flex flex-wrap items-center gap-2"><h2 class="text-[14px] font-semibold text-[#222839]">Ticket #{session.ticketNumber}</h2><span class={`application-text-meta rounded-full px-2 py-1 font-bold ${session.aiState === "active" ? "bg-[#F0EEFF] text-[#5142A6]" : session.aiState === "escalated" ? "bg-[#FFF0F0] text-[#9B3C3C]" : "bg-[#F3F4F7] text-[#777D8D]"}`}>{aiLabels[session.aiState]}</span></div><p class="application-text-meta mt-1 text-[#989DAA]">Sessão {session.sessionId.slice(0, 8)}</p></div>
+        <div class="flex gap-2"><button type="button" on:click={() => void loadMessages()} class="application-text-meta inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#DDE1EA] px-3 font-semibold text-[#626979]"><RefreshCw size={13} aria-hidden="true" />Atualizar</button><button type="button" on:click={resetPreview} class="application-text-meta inline-flex min-h-9 items-center rounded-lg bg-[#F3F4F7] px-3 font-semibold text-[#626979]">Nova conversa</button></div>
       </header>
 
       <div class="min-h-[360px] bg-[#F8F9FB] px-4 py-5 sm:px-6">
         <div class="mx-auto max-w-[760px] space-y-3">
           {#if messages.length === 0}
-            <div class="py-16 text-center text-[10px] text-[#9297A5]">Aguardando mensagens.</div>
+            <div class="application-text-caption py-16 text-center text-[#9297A5]">Aguardando mensagens.</div>
           {:else}
             {#each messages as message}
               <div class={`flex ${message.authorType === "customer" ? "justify-end" : "justify-start"}`}>
                 <article class={`max-w-[84%] rounded-2xl px-4 py-3 ${message.authorType === "customer" ? "rounded-br-md bg-[#000A57] text-white" : message.authorType === "system" ? "rounded-bl-md border border-[#D9D4F5] bg-[#F2F0FF] text-[#403878]" : "rounded-bl-md border border-[#E0E3EA] bg-white text-[#565C6B]"}`}>
-                  {#if message.authorType === "system"}<div class="mb-2 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-[0.08em] text-[#6255A8]"><Bot size={12} aria-hidden="true" />Agente IA</div>{/if}
-                  {#if message.authorType === "user"}<div class="mb-2 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-[0.08em] text-[#606676]"><ShieldCheck size={12} aria-hidden="true" />Equipe F10</div>{/if}
+                  {#if message.authorType === "system"}<div class="application-text-meta mb-2 flex items-center gap-1.5 font-bold uppercase tracking-[0.08em] text-[#6255A8]"><Bot size={12} aria-hidden="true" />Agente IA</div>{/if}
+                  {#if message.authorType === "user"}<div class="application-text-meta mb-2 flex items-center gap-1.5 font-bold uppercase tracking-[0.08em] text-[#606676]"><ShieldCheck size={12} aria-hidden="true" />Equipe F10</div>{/if}
                   <p class="whitespace-pre-wrap text-[12px] leading-5">{visibleMessageBody(message.body)}</p>
                   {#if remoteInstallPath(message.body)}
-                    <a href={remoteInstallPath(message.body)} target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white">
+                    <a href={remoteInstallPath(message.body)} target="_blank" rel="noopener noreferrer" class="application-text-caption mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 font-semibold text-white">
                       <Download size={15} aria-hidden="true" />
                       Baixar Suporte Remoto F10
                     </a>
                   {/if}
-                  <p class={`mt-2 text-[8px] ${message.authorType === "customer" ? "text-white/60" : "text-[#999EAA]"}`}>{formatTime(message.createdAt)}</p>
+                  <p class={`application-text-meta mt-2 ${message.authorType === "customer" ? "text-white/60" : "text-[#999EAA]"}`}>{formatTime(message.createdAt)}</p>
                 </article>
               </div>
             {/each}
