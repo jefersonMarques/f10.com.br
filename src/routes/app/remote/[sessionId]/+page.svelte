@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { ArrowLeft, Maximize2, MonitorCog, Play, RotateCcw, Square } from "lucide-svelte";
+  import { Maximize2, MonitorCog, Play, RotateCcw, Square } from "lucide-svelte";
+  import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -34,27 +36,27 @@
 
 <svelte:head><title>Sessão remota | F10 Operations</title></svelte:head>
 
-<div class="mx-auto max-w-[1380px] px-5 py-7 sm:px-8 sm:py-9">
-  <a href="/app/remote" class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[11px] font-semibold text-[#5F6575]"><ArrowLeft size={16}/>Voltar</a>
+<ApplicationContent width="wide">
+  <ApplicationBackLink href="/app/remote" label="Acesso remoto" className="mb-3" />
 
-  <header class="mt-5 rounded-[24px] border border-[#E2E5ED] bg-white p-6">
+  <section class="rounded-[22px] border border-[#E2E5ED] bg-white px-5 py-4 sm:px-6">
     <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
       <div class="flex items-center gap-3">
-        <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><MonitorCog size={20}/></span>
+        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><MonitorCog size={19}/></span>
         <div>
-          <p class="text-[9px] font-bold uppercase tracking-[0.1em] text-[#EA6D0B]">Acesso remoto</p>
-          <h1 class="mt-1 text-[20px] font-semibold text-[#222839]">{data.session.deviceName || "Dispositivo"}</h1>
+          <h2 class="text-[18px] font-semibold text-[#222839]">{data.session.deviceName || "Dispositivo"}</h2>
+          <p class="mt-0.5 text-[10px] text-[#858B99]">Sessão de suporte remoto</p>
         </div>
       </div>
       <span class={`rounded-full px-3 py-1.5 text-[9px] font-bold ${data.session.status === "active" ? "bg-[#EEF8F1] text-[#2F7045]" : data.session.status === "authorized" ? "bg-[#EEF0FF] text-[#000A57]" : "bg-[#F3F4F7] text-[#707687]"}`}>{labels[data.session.status] ?? data.session.status}</span>
     </div>
-  </header>
+  </section>
 
   {#if form?.message}
-    <div class={`mt-4 rounded-xl px-4 py-3 text-[10px] ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>{form.message}</div>
+    <div class={`mt-3 rounded-xl px-4 py-3 text-[10px] ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>{form.message}</div>
   {/if}
 
-  <section class="mt-5 rounded-[24px] border border-[#E2E5ED] bg-white p-6">
+  <section class="mt-4 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
     <div class="grid gap-4 text-[10px] sm:grid-cols-2 lg:grid-cols-3">
       <div><span class="text-[#9297A5]">Cliente</span><strong class="mt-1 block">{data.session.customerName || "—"}</strong></div>
       <div><span class="text-[#9297A5]">Solicitado por</span><strong class="mt-1 block">{data.session.requestedByName || "—"}</strong></div>
@@ -82,7 +84,7 @@
   </section>
 
   {#if form?.desktopUrl}
-    <section class="mt-5 overflow-hidden rounded-[24px] border border-[#DDE1EA] bg-[#11131A] shadow-sm">
+    <section class="mt-4 overflow-hidden rounded-[22px] border border-[#DDE1EA] bg-[#11131A] shadow-sm">
       <header class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 text-white">
         <div>
           <strong class="text-[11px]">Desktop remoto</strong>
@@ -101,7 +103,7 @@
       </div>
     </section>
   {:else if data.session.status === "active"}
-    <section class="mt-5 rounded-[24px] border border-[#DDE1EA] bg-[#F8F9FC] px-5 py-8 text-center">
+    <section class="mt-4 rounded-[22px] border border-[#DDE1EA] bg-[#F8F9FC] px-5 py-8 text-center">
       <MonitorCog size={24} class="mx-auto text-[#000A57]"/>
       <h2 class="mt-3 text-[13px] font-semibold text-[#303645]">Sessão ativa</h2>
       <p class="mx-auto mt-2 max-w-[560px] text-[9px] leading-5 text-[#7B8190]">O link de desktop não é persistido no banco. Use <strong>Reconectar desktop</strong> para revogar o compartilhamento anterior e gerar um novo acesso temporário.</p>
@@ -109,4 +111,4 @@
   {/if}
 
   <p class="mt-4 text-[9px] leading-5 text-[#9297A5]">O atendente permanece no F10 Operations. Cada início ou reconexão cria um compartilhamento temporário apenas de Desktop no MeshCentral e o Windows continua exigindo confirmação local do cliente.</p>
-</div>
+</ApplicationContent>

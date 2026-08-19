@@ -1,5 +1,7 @@
 <script lang="ts">
   import { FileText, HardDrive, Image, Link2, Trash2, UploadCloud } from "lucide-svelte";
+  import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -15,17 +17,10 @@
 
 <svelte:head><title>Biblioteca de arquivos | F10 Operations</title></svelte:head>
 
-<div class="mx-auto max-w-[1380px] px-5 py-7 sm:px-8 sm:py-9">
-  <div class="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-    <div>
-      <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Base de Conhecimento</p>
-      <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Biblioteca de arquivos</h1>
-      <p class="mt-2 max-w-[760px] text-[14px] leading-6 text-[#6F7585]">Imagens e documentos ficam no armazenamento S3/MinIO, podem ser reutilizados e vinculados diretamente a qualquer passo.</p>
-    </div>
-    <a href="/app/help/content" class="inline-flex min-h-10 items-center rounded-xl border border-[#DDE1EA] bg-white px-4 text-[10px] font-semibold text-[#626979]">Voltar para conteúdos</a>
-  </div>
+<ApplicationContent width="wide">
+  <ApplicationBackLink href="/app/help/content" label="Conteúdos" className="mb-3" />
 
-  <section class="mt-6 flex items-center gap-3 rounded-2xl border border-[#E2E5ED] bg-white px-4 py-3">
+  <section class="flex items-center gap-3 rounded-2xl border border-[#E2E5ED] bg-white px-4 py-3">
     <HardDrive size={18} class="text-[#000A57]" aria-hidden="true" />
     <div class="min-w-0 flex-1">
       <strong class="block text-[11px] text-[#303645]">{data.storage.provider === "s3" ? "S3 / MinIO" : "Armazenamento desativado"}</strong>
@@ -35,12 +30,12 @@
   </section>
 
   {#if form?.message}
-    <div class={`mt-5 rounded-xl px-4 py-3 text-[10px] font-medium ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>{form.message}</div>
+    <div class={`mt-3 rounded-xl px-4 py-3 text-[10px] font-medium ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>{form.message}</div>
   {/if}
 
-  <div class="mt-6 grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+  <div class="mt-4 grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
     {#if data.canEdit}
-      <section class="h-fit rounded-[24px] border border-[#E2E5ED] bg-white p-5">
+      <section class="h-fit rounded-[22px] border border-[#E2E5ED] bg-white p-5">
         <div class="flex items-center gap-3"><UploadCloud size={19} class="text-[#000A57]"/><div><h2 class="text-[14px] font-semibold">Novo arquivo</h2><p class="mt-1 text-[9px] text-[#9297A5]">Imagens até 10 MB; documentos até 25 MB.</p></div></div>
         <form method="POST" action="?/upload" enctype="multipart/form-data" class="mt-5 space-y-4">
           <label class="block rounded-2xl border border-dashed border-[#C9CEDA] bg-[#FAFAFC] p-5 text-center">
@@ -54,7 +49,7 @@
       </section>
     {/if}
 
-    <section class="overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
+    <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
       <header class="border-b border-[#EEF0F5] px-5 py-4"><h2 class="text-[14px] font-semibold">Arquivos ({data.assets.length})</h2><p class="mt-1 text-[9px] text-[#9297A5]">Vincular um arquivo a um passo transforma o conteúdo em rascunho até nova publicação.</p></header>
       {#if data.assets.length === 0}
         <div class="py-16 text-center text-[10px] text-[#9297A5]">Nenhum arquivo na biblioteca.</div>
@@ -97,4 +92,4 @@
       {/if}
     </section>
   </div>
-</div>
+</ApplicationContent>

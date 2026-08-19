@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { ArrowLeft, CheckCircle2, CircleAlert, Settings, UserPlus, Users, X } from "lucide-svelte";
+  import { CheckCircle2, CircleAlert, UserPlus, Users, X } from "lucide-svelte";
+  import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -11,18 +13,18 @@
 
 <svelte:head><title>Configurações · {data.project.name} | F10 Operations</title></svelte:head>
 
-<div class="mx-auto max-w-[1100px] px-5 py-7 sm:px-8 sm:py-9">
-  <a href={`/app/tasks?project=${data.project.id}`} class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[12px] font-semibold text-[#5F6575] transition hover:bg-white hover:text-[#000A57]"><ArrowLeft size={17}/>Voltar ao projeto</a>
+<ApplicationContent width="narrow">
+  <ApplicationBackLink href={`/app/tasks?project=${data.project.id}`} label="Voltar ao projeto" className="mb-3" />
 
-  <div class="mt-5 flex items-start gap-3">
-    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Settings size={20}/></span>
-    <div><p class="text-[11px] font-bold uppercase tracking-[0.12em] text-[#EA6D0B]">Projeto</p><h1 class="mt-1 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[36px]">Configurações</h1><p class="mt-2 text-[13px] text-[#737989]">Informações e integrantes de {data.project.name}.</p></div>
-  </div>
+  <section class="mb-3 rounded-[22px] border border-[#E2E5ED] bg-white px-5 py-4">
+    <h2 class="truncate text-[18px] font-semibold text-[#202637]">{data.project.name}</h2>
+    <p class="mt-1 text-[11px] text-[#858A98]">Informações e integrantes do projeto.</p>
+  </section>
 
-  {#if form?.message}<div class={`mt-6 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{#if form.success}<CheckCircle2 size={18}/>{:else}<CircleAlert size={18}/>{/if}<span>{form.message}</span></div>{/if}
+  {#if form?.message}<div class={`mb-3 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{#if form.success}<CheckCircle2 size={18}/>{:else}<CircleAlert size={18}/>{/if}<span>{form.message}</span></div>{/if}
 
-  <div class="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-    <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+  <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
+    <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
       <h2 class="text-[16px] font-semibold text-[#11182C]">Informações do projeto</h2>
       <p class="mt-1 text-[11px] text-[#858A98]">Mantenha aqui apenas configurações estruturais. O trabalho diário fica na lista e no quadro.</p>
       <form method="POST" action="?/updateProject" class="mt-6 space-y-4">
@@ -32,7 +34,7 @@
       </form>
     </section>
 
-    <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5">
+    <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
       <div class="flex items-center gap-3"><Users size={18} class="text-[#000A57]"/><div><h2 class="text-[14px] font-semibold text-[#11182C]">Integrantes</h2><p class="mt-1 text-[10px] text-[#8A909E]">Quem pode participar das tarefas deste projeto.</p></div></div>
 
       <div class="mt-5 space-y-2">
@@ -53,4 +55,4 @@
       {/if}
     </section>
   </div>
-</div>
+</ApplicationContent>
