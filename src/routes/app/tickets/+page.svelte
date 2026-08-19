@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
   import {
+    ArrowLeft,
     ArrowRight,
     Boxes,
     CheckCircle2,
@@ -447,7 +448,12 @@
 
     {#if view === "board"}
       <div class="flex flex-col gap-3 border-b border-[#EEF0F5] p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex items-center gap-2">{#if activeWorkflow?.kind === "area"}<Boxes size={15} class="text-[#EA6D0B]"/>{:else}<GitBranch size={15} class="text-[#000A57]"/>{/if}<div><strong class="block text-[10px] text-[#343B4B]">{activeWorkflow?.kind === "area" ? `${activeWorkflow.areaName} · processo interno` : "Kanban global"}</strong><span class="text-[8px] text-[#858B99]">{activeWorkflow?.kind === "area" ? "Conclua uma coluna terminal antes de devolver o ticket ao fluxo global." : "Clique na seta de uma coluna de área para abrir seu processo interno."}</span></div></div>
+        <div class="flex flex-wrap items-center gap-3">
+          {#if activeWorkflow?.kind === "area"}
+            <button type="button" on:click={() => (workflowId = "global")} class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#D9DDE5] bg-white px-3 text-[9px] font-semibold text-[#4E5565] shadow-sm hover:border-[#C7CBD4] hover:bg-[#F8F9FB]"><ArrowLeft size={13}/>Voltar ao nível anterior</button>
+          {/if}
+          <div class="flex items-center gap-2">{#if activeWorkflow?.kind === "area"}<Boxes size={15} class="text-[#EA6D0B]"/>{:else}<GitBranch size={15} class="text-[#000A57]"/>{/if}<div><strong class="block text-[10px] text-[#343B4B]">{activeWorkflow?.kind === "area" ? `${activeWorkflow.areaName} · processo interno` : "Kanban global"}</strong><span class="text-[8px] text-[#858B99]">{activeWorkflow?.kind === "area" ? "Conclua uma coluna terminal antes de devolver o ticket ao fluxo global." : "Clique na seta de uma coluna de área para abrir seu processo interno."}</span></div></div>
+        </div>
         <select bind:value={workflowId} class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[9px] font-semibold"><option value="global">Visão global</option>{#each data.workflowBoard.areaWorkflows as workflow}<option value={workflow.id}>{workflow.areaName}</option>{/each}</select>
       </div>
 
