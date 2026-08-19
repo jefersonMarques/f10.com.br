@@ -108,7 +108,7 @@
             <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F1F3F8] text-[#000A57]">
               <svelte:component this={module.icon} size={19} aria-hidden="true" />
             </span>
-            <span class="rounded-full bg-[#EEF8F1] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.06em] text-[#2F7045]">{module.phase}</span>
+            <span class="application-text-caption rounded-full bg-[#EEF8F1] px-2.5 py-1 font-bold uppercase tracking-[0.06em] text-[#2F7045]">{module.phase}</span>
           </div>
           <h3 class="mt-4 text-[15px] font-semibold text-[#161C2C]">{module.title}</h3>
           <p class="mt-1.5 text-[12px] leading-5 text-[#737989]">{module.description}</p>
