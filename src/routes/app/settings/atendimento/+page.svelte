@@ -1,6 +1,5 @@
 <script lang="ts">
   import {
-    ArrowLeft,
     Bot,
     Clock3,
     MessagesSquare,
@@ -11,6 +10,8 @@
     UserCheck,
     Users,
   } from "lucide-svelte";
+  import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -54,23 +55,14 @@
 
 <svelte:head><title>Atendimento | F10 Operations</title></svelte:head>
 
-<div class="mx-auto max-w-[980px] px-5 py-7 sm:px-8 sm:py-9">
-  <a href="/app/settings" class="inline-flex items-center gap-2 text-[10px] font-semibold text-[#6F7585] hover:text-[#000A57]"><ArrowLeft size={14}/>Configurações</a>
-
-  <div class="mt-5 flex items-start gap-3">
-    <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Clock3 size={20}/></span>
-    <div>
-      <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Atendimento</p>
-      <h1 class="mt-1 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28]">Operação do suporte</h1>
-      <p class="mt-2 max-w-[760px] text-[12px] leading-6 text-[#6F7585]">Define entrada do chat, filas, equipes, presença, distribuição, limites da IA e horário de funcionamento.</p>
-    </div>
-  </div>
+<ApplicationContent width="narrow">
+  <ApplicationBackLink href="/app/settings" label="Configurações" className="mb-3" />
 
   {#if form?.message}
-    <div class={`mt-6 rounded-2xl border px-4 py-3 text-[10px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{form.message}</div>
+    <div class={`mb-3 rounded-2xl border px-4 py-3 text-[10px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{form.message}</div>
   {/if}
 
-  <section class="mt-7 rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+  <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
     <div class="flex items-start gap-3">
       <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F2F0FF] text-[#5C4BA2]"><Users size={18}/></span>
       <div><h2 class="text-[14px] font-semibold text-[#252C3D]">Equipe responsável pelo suporte</h2><p class="mt-1 text-[9px] leading-4 text-[#858B99]">Equipe da fila principal. As demais filas podem usar equipes diferentes, configuradas na entrada do chat.</p></div>
@@ -86,7 +78,7 @@
     {/if}
   </section>
 
-  <section class="mt-5 rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+  <section class="mt-4 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
     <div class="flex items-start gap-3">
       <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFF2E8] text-[#C85C08]"><MessagesSquare size={18}/></span>
       <div>
@@ -152,7 +144,7 @@
     </div>
   </section>
 
-  <form method="POST" action="?/saveRouting" class="mt-5 rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+  <form method="POST" action="?/saveRouting" class="mt-4 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
     <div class="flex items-start gap-3">
       <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF8F1] text-[#2F7045]"><RotateCw size={18}/></span>
       <div><h2 class="text-[14px] font-semibold text-[#252C3D]">Distribuição dos chats</h2><p class="mt-1 text-[9px] leading-4 text-[#858B99]">No automático, o handoff respeita a equipe da fila e vai para o próximo participante realmente Online.</p></div>
@@ -197,7 +189,7 @@
     <button type="submit" class="mt-5 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white"><Save size={14}/>Salvar distribuição e IA</button>
   </form>
 
-  <form method="POST" action="?/save" class="mt-5 rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+  <form method="POST" action="?/save" class="mt-4 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
     <div class="flex items-start gap-3"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Clock3 size={18}/></span><div><h2 class="text-[14px] font-semibold text-[#252C3D]">Horário de funcionamento</h2><p class="mt-1 text-[9px] text-[#858B99]">Controla o estado aberto/fechado exibido no chat e a mensagem de handoff da IA.</p></div></div>
 
     <label class="mt-5 flex items-start gap-3 rounded-2xl border border-[#DDE1EA] bg-[#F8F9FC] px-4 py-3">
@@ -222,4 +214,4 @@
 
     <button type="submit" class="mt-5 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white"><Save size={14}/>Salvar horário</button>
   </form>
-</div>
+</ApplicationContent>
