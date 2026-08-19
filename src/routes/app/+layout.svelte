@@ -225,7 +225,7 @@
       </div>
 
       <nav class="hidden flex-1 px-3 py-4 lg:block" aria-label="Navegação principal">
-        <p class="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A9FAD]">Operação</p>
+        <p class="application-text-caption px-3 pb-2 font-bold uppercase tracking-[0.14em] text-[#9A9FAD]">Operação</p>
         <div class="space-y-1">
           {#each visibleNavigationItems as item}
             {#if item.children}
@@ -262,13 +262,13 @@
                 <svelte:component this={item.icon} size={18} aria-hidden="true" />
                 <span class="flex-1">{item.label}</span>
                 {#if badge > 0}
-                  <span class="inline-flex min-w-5 items-center justify-center rounded-full bg-[#D92D20] px-1.5 py-0.5 text-[9px] font-bold text-white">{Math.min(badge, 99)}</span>
+                  <span class="application-text-meta inline-flex min-w-5 items-center justify-center rounded-full bg-[#D92D20] px-1.5 py-0.5 font-bold text-white">{Math.min(badge, 99)}</span>
                 {:else}
                   <ChevronRight size={15} aria-hidden="true" />
                 {/if}
               </a>
             {:else}
-              <div class="flex min-h-10 items-center gap-3 rounded-xl px-3 text-[13px] font-medium text-[#707687]"><svelte:component this={item.icon} size={18} aria-hidden="true" /><span class="flex-1">{item.label}</span><span class="rounded-full bg-[#F0F1F5] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[#8A8F9D]">Em breve</span></div>
+              <div class="flex min-h-10 items-center gap-3 rounded-xl px-3 text-[13px] font-medium text-[#707687]"><svelte:component this={item.icon} size={18} aria-hidden="true" /><span class="flex-1">{item.label}</span><span class="application-text-meta rounded-full bg-[#F0F1F5] px-2 py-1 font-bold uppercase tracking-[0.08em] text-[#8A8F9D]">Em breve</span></div>
             {/if}
           {/each}
         </div>
@@ -283,7 +283,7 @@
               <span class="mt-1 block truncate text-[11px] text-[#777D8D]">{data.user.email}</span>
             </span>
           </div>
-          <div class="mt-3 flex flex-wrap gap-1.5">{#each data.roles as role}<span class="rounded-full bg-white px-2 py-1 text-[9px] font-bold tracking-[0.04em] text-[#000A57] shadow-sm">{role}</span>{/each}</div>
+          <div class="mt-3 flex flex-wrap gap-1.5">{#each data.roles as role}<span class="application-text-meta rounded-full bg-white px-2 py-1 font-bold tracking-[0.04em] text-[#000A57] shadow-sm">{role}</span>{/each}</div>
         </a>
         <form method="POST" action="/app/logout" class="mt-2"><button type="submit" class="flex h-10 w-full items-center gap-2 rounded-xl px-3 text-left text-[12px] font-semibold text-[#6D7280] transition hover:bg-[#FFF0F0] hover:text-[#A52A2A]"><LogOut size={17} aria-hidden="true" />Sair</button></form>
       </div>
@@ -299,17 +299,17 @@
       <svelte:fragment slot="actions">
         {#if canRespondToChat && presence}
           <div class="relative hidden sm:block">
-            <button type="button" on:click={() => (presenceOpen = !presenceOpen)} class="flex h-10 items-center gap-2 rounded-xl bg-[#F5F6FA] px-3 text-[10px] font-semibold text-[#555C6D] transition hover:bg-[#EEF0FF]" aria-expanded={presenceOpen}>
+            <button type="button" on:click={() => (presenceOpen = !presenceOpen)} class="application-text-caption flex h-10 items-center gap-2 rounded-xl bg-[#F5F6FA] px-3 font-semibold text-[#555C6D] transition hover:bg-[#EEF0FF]" aria-expanded={presenceOpen}>
               <span class={`h-2.5 w-2.5 rounded-full ${presenceDotClass(presence.effectiveStatus)}`}></span>
               {presenceLabel(presence.effectiveStatus)}
               <ChevronDown size={13}/>
             </button>
             {#if presenceOpen}
               <div class="absolute right-0 top-12 z-50 w-44 overflow-hidden rounded-xl border border-[#E1E4EC] bg-white p-1.5 shadow-xl">
-                <button type="button" on:click={() => void setPresenceStatus("online")} class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[10px] font-semibold text-[#434A5A] hover:bg-[#F6F7FB]"><span class="h-2.5 w-2.5 rounded-full bg-[#2F9E5B]"></span>Online</button>
-                <button type="button" on:click={() => void setPresenceStatus("busy")} class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[10px] font-semibold text-[#434A5A] hover:bg-[#F6F7FB]"><span class="h-2.5 w-2.5 rounded-full bg-[#E59A2F]"></span>Ocupado</button>
-                <button type="button" on:click={() => void setPresenceStatus("offline")} class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[10px] font-semibold text-[#434A5A] hover:bg-[#F6F7FB]"><span class="h-2.5 w-2.5 rounded-full bg-[#C7CBD4]"></span>Offline</button>
-                {#if presence.effectiveStatus === "away"}<p class="mt-1 border-t border-[#EEF0F5] px-3 pt-2 text-[9px] leading-4 text-[#8A909E]">Ausente por inatividade. Uma nova interação no painel restaura seu estado.</p>{/if}
+                <button type="button" on:click={() => void setPresenceStatus("online")} class="application-text-caption flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-semibold text-[#434A5A] hover:bg-[#F6F7FB]"><span class="h-2.5 w-2.5 rounded-full bg-[#2F9E5B]"></span>Online</button>
+                <button type="button" on:click={() => void setPresenceStatus("busy")} class="application-text-caption flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-semibold text-[#434A5A] hover:bg-[#F6F7FB]"><span class="h-2.5 w-2.5 rounded-full bg-[#E59A2F]"></span>Ocupado</button>
+                <button type="button" on:click={() => void setPresenceStatus("offline")} class="application-text-caption flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-semibold text-[#434A5A] hover:bg-[#F6F7FB]"><span class="h-2.5 w-2.5 rounded-full bg-[#C7CBD4]"></span>Offline</button>
+                {#if presence.effectiveStatus === "away"}<p class="application-text-meta mt-1 border-t border-[#EEF0F5] px-3 pt-2 leading-4 text-[#8A909E]">Ausente por inatividade. Uma nova interação no painel restaura seu estado.</p>{/if}
               </div>
             {/if}
           </div>
@@ -325,16 +325,16 @@
           >
             <Bell size={18} aria-hidden="true" />
             {#if notifications.unreadCount > 0}
-              <span class="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full border-2 border-white bg-[#D92D20] px-1 text-[8px] font-bold leading-4 text-white">{Math.min(notifications.unreadCount, 99)}</span>
+              <span class="application-text-meta absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full border-2 border-white bg-[#D92D20] px-1 font-bold leading-4 text-white">{Math.min(notifications.unreadCount, 99)}</span>
             {/if}
           </button>
 
           {#if notificationOpen}
             <div class="absolute right-0 top-12 z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[#E1E4EC] bg-white shadow-2xl shadow-slate-900/15">
               <div class="flex items-center justify-between border-b border-[#EEF0F5] px-4 py-3">
-                <div><strong class="block text-[12px] text-[#202637]">Notificações</strong><span class="text-[9px] text-[#8B909E]">{notifications.unreadCount} não lida(s)</span></div>
+                <div><strong class="block text-[12px] text-[#202637]">Notificações</strong><span class="application-text-meta text-[#8B909E]">{notifications.unreadCount} não lida(s)</span></div>
                 {#if notifications.unreadCount > 0}
-                  <form method="POST" action="/app/notifications/read-all"><button type="submit" class="text-[9px] font-semibold text-[#000A57] hover:underline">Marcar todas como lidas</button></form>
+                  <form method="POST" action="/app/notifications/read-all"><button type="submit" class="application-text-meta font-semibold text-[#000A57] hover:underline">Marcar todas como lidas</button></form>
                 {/if}
               </div>
 
@@ -348,16 +348,16 @@
                       <div class="flex items-start gap-2.5">
                         <span class={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notification.readAt ? "bg-[#D5D8E0]" : "bg-[#D92D20]"}`}></span>
                         <span class="min-w-0 flex-1">
-                          <strong class="block text-[10px] font-semibold leading-4 text-[#313747]">{notification.title}</strong>
-                          {#if notification.body}<span class="mt-1 line-clamp-2 block text-[9px] leading-4 text-[#747A89]">{notification.body}</span>{/if}
-                          <span class="mt-1.5 block text-[8px] text-[#9A9EAA]">{formatNotificationDate(notification.createdAt)}</span>
+                          <strong class="application-text-caption block font-semibold leading-4 text-[#313747]">{notification.title}</strong>
+                          {#if notification.body}<span class="application-text-meta mt-1 line-clamp-2 block leading-4 text-[#747A89]">{notification.body}</span>{/if}
+                          <span class="application-text-meta mt-1.5 block text-[#9A9EAA]">{formatNotificationDate(notification.createdAt)}</span>
                         </span>
                       </div>
                     </a>
                   {/each}
                 </div>
               {:else}
-                <p class="px-5 py-8 text-center text-[10px] text-[#8B909E]">Nenhuma notificação por enquanto.</p>
+                <p class="application-text-caption px-5 py-8 text-center text-[#8B909E]">Nenhuma notificação por enquanto.</p>
               {/if}
             </div>
           {/if}
@@ -365,7 +365,7 @@
 
         <a href="/app/minha-conta" class="hidden min-w-0 items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-[#F7F8FB] sm:flex lg:hidden">
           <UserCircle size={20} class="shrink-0 text-[#000A57]" />
-          <span class="hidden min-w-0 text-right md:block"><strong class="block max-w-40 truncate text-[12px]">{data.user.name}</strong><small class="block max-w-40 truncate text-[10px] text-[#858A98]">{data.user.email}</small></span>
+          <span class="hidden min-w-0 text-right md:block"><strong class="block max-w-40 truncate text-[12px]">{data.user.name}</strong><small class="application-text-caption block max-w-40 truncate text-[#858A98]">{data.user.email}</small></span>
         </a>
         <form method="POST" action="/app/logout" class="lg:hidden"><button type="submit" class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F5F6FA] text-[#6D7280]" aria-label="Sair"><LogOut size={18} aria-hidden="true" /></button></form>
       </svelte:fragment>
