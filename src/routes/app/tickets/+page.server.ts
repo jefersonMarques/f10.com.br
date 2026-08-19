@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import {
   error,
   fail,
@@ -6,16 +7,30 @@ import {
 } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
-import { hasPermission } from "$lib/server/auth/permissions";
+import {
+  getPermissionScope,
+  hasPermission,
+  type PermissionScope,
+} from "$lib/server/auth/permissions";
+import { getDatabase } from "$lib/server/db";
+import { ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
+import { tickets as ticketTable } from "$lib/server/db/supportSchema";
+import {
+  getUserSupportQueueIds,
+  type SupportPermissionMap,
+} from "$lib/server/support/supportAccess";
 import {
   createManualTicket,
   listSupportQueues,
   listSupportTickets,
-  updateTicketStatus,
   type TicketPriority,
-  type TicketStatus,
 } from "$lib/server/support/supportRepository";
 import { listTicketCustomerContexts } from "$lib/server/support/ticketCustomerContextRepository";
+import {
+  getTicketWorkflowBoard,
+  moveTicketAreaStage,
+  moveTicketGlobalStage,
+} from "$lib/server/support/ticketWorkflowRepository";
 
 function readFormValue(formData: FormData, name: string): string {
   const value = formData.get(name);
@@ -30,51 +45,133 @@ function isTicketPriority(value: string): value is TicketPriority {
   return value === "low" || value === "normal" || value === "high" || value === "urgent";
 }
 
-function isTicketStatus(value: string): value is TicketStatus {
-  return (
-    value === "new" ||
-    value === "open" ||
-    value === "in_progress" ||
-    value === "waiting_customer" ||
-    value === "resolved" ||
-    value === "closed"
-  );
-}
-
 function createPermissionMap(
-  permissions: Array<{ code: string; scope: "own" | "team" | "all" }>,
-) {
+  permissions: Array<{ code: string; scope: PermissionScope }>,
+): SupportPermissionMap {
   return new Map(
     permissions.map((permission) => [permission.code, permission.scope]),
   );
 }
 
+function workflowMoveMessage(cause: unknown): string {
+  if (!(cause instanceof Error)) return "Não foi possível mover o ticket.";
+  if (cause.message === "TICKET_WORKFLOW_AREA_ACCESS_DENIED") {
+    return "Somente integrantes da área atual ou gestores podem movimentar o processo interno deste ticket.";
+  }
+  if (cause.message === "TICKET_WORKFLOW_AREA_NOT_COMPLETE") {
+    return "A área ainda não concluiu o processo. Mova o ticket para uma etapa terminal antes do handoff.";
+  }
+  if (cause.message === "TICKET_WORKFLOW_AREA_NOT_CONFIGURED") {
+    return "Esta área ainda não possui um workflow configurado.";
+  }
+  if (cause.message === "TICKET_WORKFLOW_AREA_EMPTY") {
+    return "O workflow desta área ainda não possui colunas ativas.";
+  }
+  return "Não foi possível mover o ticket para esta etapa.";
+}
+
+async function requireCurrentAreaOperationAccess(
+  actorUserId: string,
+  permissions: SupportPermissionMap,
+  ticketId: string,
+): Promise<void> {
+  if (hasPermission(permissions, "tickets.manage", "all")) return;
+
+  const db = getDatabase();
+  const [current] = await db
+    .select({
+      queueId: ticketTable.queueId,
+      areaWorkflowId: ticketWorkflowStates.areaWorkflowId,
+    })
+    .from(ticketTable)
+    .leftJoin(
+      ticketWorkflowStates,
+      eq(ticketWorkflowStates.ticketId, ticketTable.id),
+    )
+    .where(eq(ticketTable.id, ticketId))
+    .limit(1);
+
+  if (!current) throw new Error("TICKET_WORKFLOW_STATE_NOT_FOUND");
+  if (!current.areaWorkflowId) return;
+
+  const queueIds = await getUserSupportQueueIds(actorUserId);
+  if (!queueIds.includes(current.queueId)) {
+    throw new Error("TICKET_WORKFLOW_AREA_ACCESS_DENIED");
+  }
+}
+
 export const load: PageServerLoad = async ({ parent }) => {
   const layout = await parent();
   const permissionMap = createPermissionMap(layout.permissions);
+  const viewScope = getPermissionScope(permissionMap, "tickets.view");
 
-  if (!hasPermission(permissionMap, "tickets.view")) {
+  if (!viewScope) {
     throw error(403, "Acesso não autorizado.");
   }
 
   const canCreate = hasPermission(permissionMap, "tickets.create");
   const canReply = hasPermission(permissionMap, "tickets.reply");
+  const canManageWorkflow = hasPermission(permissionMap, "tickets.manage", "all");
   const [tickets, queues] = await Promise.all([
     listSupportTickets(layout.user.id, permissionMap),
     canCreate ? listSupportQueues() : Promise.resolve([]),
   ]);
-  const contexts = await listTicketCustomerContexts(tickets.map((ticket) => ticket.id));
+  const [contexts, workflowBoard, teamQueueIds] = await Promise.all([
+    listTicketCustomerContexts(tickets.map((ticket) => ticket.id)),
+    getTicketWorkflowBoard(
+      layout.user.id,
+      permissionMap,
+      tickets.map((ticket) => ticket.id),
+    ),
+    viewScope === "all"
+      ? Promise.resolve<string[]>([])
+      : getUserSupportQueueIds(layout.user.id),
+  ]);
+
+  const visibleAreaWorkflows = viewScope === "all"
+    ? workflowBoard.areaWorkflows
+    : workflowBoard.areaWorkflows.filter(
+        (workflow) => Boolean(workflow.queueId && teamQueueIds.includes(workflow.queueId)),
+      );
+  const visibleAreaWorkflowIds = new Set(
+    visibleAreaWorkflows.map((workflow) => workflow.id),
+  );
   const contextByTicket = new Map(contexts.map((context) => [context.ticketId, context]));
+  const stateByTicket = new Map(
+    workflowBoard.states.map((state) => {
+      if (
+        state.areaWorkflowId &&
+        !visibleAreaWorkflowIds.has(state.areaWorkflowId)
+      ) {
+        return [
+          state.ticketId,
+          {
+            ...state,
+            areaWorkflowId: null,
+            areaStageId: null,
+            areaEnteredAt: null,
+          },
+        ] as const;
+      }
+      return [state.ticketId, state] as const;
+    }),
+  );
 
   return {
     tickets: tickets.map((ticket) => ({
       ...ticket,
       customerContext: contextByTicket.get(ticket.id) ?? null,
+      workflowState: stateByTicket.get(ticket.id) ?? null,
     })),
     queues,
+    workflowBoard: {
+      globalWorkflow: workflowBoard.globalWorkflow,
+      areaWorkflows: visibleAreaWorkflows,
+    },
     currentUserId: layout.user.id,
     canCreate,
     canReply,
+    canManageWorkflow,
   };
 };
 
@@ -182,7 +279,7 @@ export const actions: Actions = {
     }
   },
 
-  moveStatus: async ({ cookies, request }) => {
+  moveWorkflowStage: async ({ cookies, request }) => {
     const { session, permissions } = await requireAppPermission(
       cookies,
       "tickets.reply",
@@ -190,28 +287,40 @@ export const actions: Actions = {
     );
     const formData = await request.formData();
     const ticketId = readFormValue(formData, "ticketId");
-    const status = readFormValue(formData, "status");
+    const stageId = readFormValue(formData, "stageId");
+    const workflowKind = readFormValue(formData, "workflowKind");
 
-    if (!isUuid(ticketId) || !isTicketStatus(status)) {
+    if (!isUuid(ticketId) || !isUuid(stageId) || !["global", "area"].includes(workflowKind)) {
       return fail(400, {
         success: false,
-        action: "moveStatus",
-        message: "Ticket ou status inválido.",
+        action: "moveWorkflowStage",
+        message: "Ticket, workflow ou etapa inválida.",
       });
     }
 
     try {
-      await updateTicketStatus(session.user.id, permissions, ticketId, status);
+      await requireCurrentAreaOperationAccess(
+        session.user.id,
+        permissions,
+        ticketId,
+      );
+      if (workflowKind === "area") {
+        await moveTicketAreaStage(session.user.id, permissions, ticketId, stageId);
+      } else {
+        await moveTicketGlobalStage(session.user.id, permissions, ticketId, stageId);
+      }
       return {
         success: true,
-        action: "moveStatus",
-        message: "Status do ticket atualizado.",
+        action: "moveWorkflowStage",
+        message: workflowKind === "area"
+          ? "Etapa interna da área atualizada."
+          : "Ticket encaminhado para a nova etapa.",
       };
-    } catch {
-      return fail(403, {
+    } catch (cause) {
+      return fail(409, {
         success: false,
-        action: "moveStatus",
-        message: "Você não pode alterar este ticket.",
+        action: "moveWorkflowStage",
+        message: workflowMoveMessage(cause),
       });
     }
   },
