@@ -150,7 +150,7 @@
           <label class="relative block w-full lg:w-[340px]">
             <Search size={15} class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#979CAA]" aria-hidden="true" />
             <input bind:this={searchElement} bind:value={query} placeholder="Buscar cliente, escola, unidade, e-mail ou #ticket" class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-10 pr-4 text-[11px] text-[#303645] outline-none transition focus:border-[#000A57] focus:bg-white focus:ring-2 focus:ring-[#000A57]/10" />
-            <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-[#E0E3EA] bg-white px-1.5 py-0.5 text-[8px] text-[#999EAA]">/</span>
+            <span class="application-text-meta pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-[#E0E3EA] bg-white px-1.5 py-0.5 text-[#999EAA]">/</span>
           </label>
           <div class="flex gap-2">
             <a href="/app/chat/preview" class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] font-semibold text-[#000A57] transition hover:bg-[#F8F9FF]"><MessageCircleMore size={15} aria-hidden="true" />Preview</a>
@@ -161,9 +161,9 @@
 
       <div class="mt-4 flex gap-2 overflow-x-auto pb-1">
         {#each scopes as item}
-          <button type="button" on:click={() => scope = item.value} class={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-[10px] font-semibold transition ${scope === item.value ? "border-[#000A57] bg-[#000A57] text-white" : "border-[#E1E4EB] bg-white text-[#656C7D] hover:border-[#C6CAD5]"}`}>
+          <button type="button" on:click={() => scope = item.value} class={`application-text-caption inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 font-semibold transition ${scope === item.value ? "border-[#000A57] bg-[#000A57] text-white" : "border-[#E1E4EB] bg-white text-[#656C7D] hover:border-[#C6CAD5]"}`}>
             {item.label}
-            <span class={`rounded-full px-1.5 py-0.5 text-[8px] ${scope === item.value ? "bg-white/15 text-white" : "bg-[#F2F3F6] text-[#858A98]"}`}>{scopeCount(item.value)}</span>
+            <span class={`application-text-meta rounded-full px-1.5 py-0.5 ${scope === item.value ? "bg-white/15 text-white" : "bg-[#F2F3F6] text-[#858A98]"}`}>{scopeCount(item.value)}</span>
           </button>
         {/each}
       </div>
@@ -191,20 +191,20 @@
                 <div class="min-w-0 flex-1">
                   <div class="flex flex-wrap items-center gap-2">
                     <strong class="truncate text-[12px] font-semibold text-[#303645]">{chat.customerName ?? "Cliente"}</strong>
-                    <span class="text-[9px] font-bold text-[#EA6D0B]">#{chat.ticketNumber}</span>
-                    <span class="rounded-full bg-[#EEF0FF] px-2 py-1 text-[8px] font-bold text-[#000A57]">{statusLabels[chat.status]}</span>
-                    <span class={`rounded-full px-2 py-1 text-[8px] font-bold ${priorityClass(chat.priority)}`}>{priorityLabels[chat.priority]}</span>
+                    <span class="application-text-meta font-bold text-[#EA6D0B]">#{chat.ticketNumber}</span>
+                    <span class="application-text-meta rounded-full bg-[#EEF0FF] px-2 py-1 font-bold text-[#000A57]">{statusLabels[chat.status]}</span>
+                    <span class={`application-text-meta rounded-full px-2 py-1 font-bold ${priorityClass(chat.priority)}`}>{priorityLabels[chat.priority]}</span>
                     {#if chat.aiState === "escalated" || chat.aiState === "active"}
-                      <span class={`rounded-full px-2 py-1 text-[8px] font-bold ${chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#9B3C3C]" : "bg-[#F0EEFF] text-[#5142A6]"}`}>{aiLabels[chat.aiState]}</span>
+                      <span class={`application-text-meta rounded-full px-2 py-1 font-bold ${chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#9B3C3C]" : "bg-[#F0EEFF] text-[#5142A6]"}`}>{aiLabels[chat.aiState]}</span>
                     {/if}
                   </div>
 
                   {#if chat.customerContext}
-                    <p class="mt-1 truncate text-[10px] font-medium text-[#5F6676]">
+                    <p class="application-text-caption mt-1 truncate font-medium text-[#5F6676]">
                       {chat.customerContext.unitName} · {chat.customerContext.groupName}
                     </p>
                   {:else}
-                    <p class="mt-1 truncate text-[10px] text-[#858B99]">{chat.organizationName ?? chat.customerEmail ?? chat.subject}</p>
+                    <p class="application-text-caption mt-1 truncate text-[#858B99]">{chat.organizationName ?? chat.customerEmail ?? chat.subject}</p>
                   {/if}
                   <p class={`mt-2 line-clamp-1 text-[11px] ${chat.lastMessageAuthorType === "customer" ? "font-medium text-[#454B5B]" : "text-[#777D8D]"}`}>
                     {chat.lastMessageAuthorType === "customer" ? "Cliente: " : chat.lastMessageAuthorType === "user" ? "Equipe: " : "Atendimento F10: "}{chat.lastMessageBody ?? chat.subject}
@@ -214,12 +214,12 @@
 
               <div class="flex shrink-0 items-center justify-between gap-4 lg:min-w-[250px] lg:justify-end lg:text-right">
                 <div>
-                  <p class={`text-[10px] font-semibold ${chat.assignedUserName ? "text-[#5D6372]" : "text-[#A05C3E]"}`}>{chat.assignedUserName ?? "Não atribuído"}</p>
+                  <p class={`application-text-caption font-semibold ${chat.assignedUserName ? "text-[#5D6372]" : "text-[#A05C3E]"}`}>{chat.assignedUserName ?? "Não atribuído"}</p>
                   {#if slaText(chat)}
-                    <p class={`mt-1 text-[9px] font-medium ${slaText(chat).includes("vencido") ? "text-[#A13C3C]" : "text-[#8C6B35]"}`}>{slaText(chat)}</p>
+                    <p class={`application-text-meta mt-1 font-medium ${slaText(chat).includes("vencido") ? "text-[#A13C3C]" : "text-[#8C6B35]"}`}>{slaText(chat)}</p>
                   {/if}
                 </div>
-                <div class="flex items-center gap-1.5 text-[9px] text-[#A0A4B0]">
+                <div class="application-text-meta flex items-center gap-1.5 text-[#A0A4B0]">
                   <Clock3 size={12} aria-hidden="true" />
                   {formatRelative(chat.updatedAt)}
                 </div>
