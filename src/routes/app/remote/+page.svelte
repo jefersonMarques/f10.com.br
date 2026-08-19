@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Clock3, MonitorCog, ShieldCheck, UserRound } from "lucide-svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;
@@ -38,25 +39,17 @@
 
 <svelte:head><title>Acesso remoto | F10 Operations</title></svelte:head>
 
-<div class="mx-auto max-w-[1380px] px-5 py-7 sm:px-8 sm:py-9">
-  <div class="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-    <div>
-      <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Suporte assistido</p>
-      <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Acesso remoto</h1>
-      <p class="mt-2 max-w-[780px] text-[14px] leading-6 text-[#6F7585]">O cliente instala o componente de suporte apenas na primeira vez. Depois, o computador é reconhecido automaticamente e pode ser chamado novamente pelo ticket ou chat, sempre com confirmação local.</p>
-    </div>
-
-    <div class="flex flex-wrap gap-2">
-      <span class={`rounded-full px-3 py-2 text-[8px] font-bold ${data.provider.configured ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>
-        {data.provider.configured ? "MeshCentral configurado" : "Provider pendente"}
-      </span>
-      <span class={`rounded-full px-3 py-2 text-[8px] font-bold ${data.control.configured ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>
-        {data.control.configured ? "Enrollment automático" : "Controle pendente"}
-      </span>
-    </div>
+<ApplicationContent width="wide">
+  <div class="flex flex-wrap items-center justify-end gap-2">
+    <span class={`rounded-full px-3 py-2 text-[8px] font-bold ${data.provider.configured ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>
+      {data.provider.configured ? "MeshCentral configurado" : "Provider pendente"}
+    </span>
+    <span class={`rounded-full px-3 py-2 text-[8px] font-bold ${data.control.configured ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>
+      {data.control.configured ? "Enrollment automático" : "Controle pendente"}
+    </span>
   </div>
 
-  <section class="mt-7 grid gap-3 md:grid-cols-3">
+  <section class="mt-3 grid gap-3 md:grid-cols-3">
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5">
       <MonitorCog size={19} class="text-[#000A57]"/>
       <strong class="mt-3 block text-[24px]">{data.sessions.filter((item) => item.status === "active").length}</strong>
@@ -75,7 +68,7 @@
   </section>
 
   {#if data.canManage && data.sla}
-    <section class="mt-6 overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
+    <section class="mt-5 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
       <header class="border-b border-[#EEF0F5] px-5 py-4">
         <div class="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
           <div>
@@ -151,8 +144,8 @@
     </section>
   {/if}
 
-  <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
-    <section class="overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
+  <div class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
+    <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
       <header class="border-b border-[#EEF0F5] px-5 py-4">
         <h2 class="text-[14px] font-semibold">Sessões</h2>
         <p class="mt-1 text-[9px] text-[#9297A5]">Histórico de acesso remoto conforme seu escopo.</p>
@@ -183,7 +176,7 @@
     </section>
 
     <div class="space-y-5">
-      <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5">
+      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
         <div class="flex items-start gap-3">
           <ShieldCheck size={18} class="mt-0.5 shrink-0 text-[#000A57]"/>
           <div>
@@ -194,7 +187,7 @@
       </section>
 
       {#if data.canManage}
-        <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5">
+        <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
           <div class="flex items-center justify-between gap-3">
             <div>
               <h2 class="text-[13px] font-semibold">Computadores conhecidos</h2>
@@ -227,4 +220,4 @@
       {/if}
     </div>
   </div>
-</div>
+</ApplicationContent>

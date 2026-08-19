@@ -8,6 +8,7 @@
     MonitorCog,
     TrendingUp,
   } from "lucide-svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;
@@ -64,13 +65,8 @@
 
 <svelte:head><title>Performance | F10 Operations</title></svelte:head>
 
-<div class="mx-auto max-w-[1480px] px-5 py-7 sm:px-8 sm:py-9">
-  <div class="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-    <div>
-      <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Relatórios</p>
-      <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Performance da equipe</h1>
-      <p class="mt-2 max-w-[820px] text-[12px] leading-6 text-[#6F7585]">Métricas objetivas de atendimento humano, tarefas e suporte remoto. O tempo de resposta é calculado pela primeira mensagem humana, sem contar respostas da IA.</p>
-    </div>
+<ApplicationContent width="wide">
+  <div class="flex justify-end">
     <div class="flex rounded-xl border border-[#DDE1EA] bg-white p-1">
       {#each [7, 30, 90] as period}
         <a href={`/app/performance?period=${period}`} class={`rounded-lg px-3 py-2 text-[10px] font-semibold ${performance.periodDays === period ? "bg-[#000A57] text-white" : "text-[#6D7280] hover:bg-[#F6F7FA]"}`}>{period} dias</a>
@@ -78,7 +74,7 @@
     </div>
   </div>
 
-  <div class="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+  <div class="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
     <article class="rounded-2xl border border-[#E2E5ED] bg-white p-4"><Headphones size={18} class="text-[#000A57]"/><span class="mt-4 block text-[9px] font-bold uppercase tracking-[0.08em] text-[#8C919F]">Tickets tratados</span><strong class="mt-1 block text-[24px] font-semibold text-[#11182C]">{performance.summary.handledTickets}</strong></article>
     <article class="rounded-2xl border border-[#E2E5ED] bg-white p-4"><CheckCircle2 size={18} class="text-[#2F7045]"/><span class="mt-4 block text-[9px] font-bold uppercase tracking-[0.08em] text-[#8C919F]">Resolvidos</span><strong class="mt-1 block text-[24px] font-semibold text-[#11182C]">{performance.summary.resolvedTickets}</strong></article>
     <article class="rounded-2xl border border-[#E2E5ED] bg-white p-4"><Clock3 size={18} class="text-[#EA6D0B]"/><span class="mt-4 block text-[9px] font-bold uppercase tracking-[0.08em] text-[#8C919F]">Mediana 1ª resposta</span><strong class="mt-1 block text-[20px] font-semibold text-[#11182C]">{minutes(performance.summary.medianFirstHumanResponseMinutes)}</strong></article>
@@ -87,7 +83,7 @@
     <article class="rounded-2xl border border-[#E2E5ED] bg-white p-4"><MonitorCog size={18} class="text-[#000A57]"/><span class="mt-4 block text-[9px] font-bold uppercase tracking-[0.08em] text-[#8C919F]">Acessos remotos</span><strong class="mt-1 block text-[24px] font-semibold text-[#11182C]">{performance.summary.remoteStarted}</strong></article>
   </div>
 
-  <section class="mt-6 overflow-hidden rounded-[24px] border border-[#DCE7DF] bg-white">
+  <section class="mt-5 overflow-hidden rounded-[22px] border border-[#DCE7DF] bg-white">
     <div class="flex flex-col justify-between gap-4 border-b border-[#E8F0EA] px-5 py-5 sm:px-6 lg:flex-row lg:items-start">
       <div class="flex items-start gap-3">
         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EAF6ED] text-[#287444]"><TrendingUp size={18} /></span>
@@ -171,7 +167,7 @@
     </div>
   </section>
 
-  <section class="mt-6 overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
+  <section class="mt-5 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
     <div class="border-b border-[#EEF0F5] px-5 py-4 sm:px-6">
       <h2 class="text-[15px] font-semibold text-[#202637]">Por usuário</h2>
       <p class="mt-1 text-[10px] leading-5 text-[#858B99]">Sem pontuação artificial: cada coluna representa uma atividade ou indicador mensurável.</p>
@@ -203,4 +199,4 @@
   </section>
 
   <p class="mt-4 text-[9px] leading-5 text-[#9196A3]">“Resolvidos” usa o usuário que registrou a mudança para Resolvido/Fechado. “SLA 1ª resp.” considera apenas tickets que possuem prazo de primeira resposta e atribui o resultado ao autor da primeira resposta pública humana.</p>
-</div>
+</ApplicationContent>

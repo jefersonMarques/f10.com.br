@@ -21,6 +21,7 @@
     Ticket,
     X,
   } from "lucide-svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -189,33 +190,25 @@
 
 <svelte:head><title>Tarefas | F10 Operations</title></svelte:head>
 
-<div class="mx-auto max-w-[1560px] px-5 py-7 sm:px-8 sm:py-9">
-  <div class="flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
-    <div>
-      <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Trabalho interno</p>
-      <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Tarefas</h1>
-      <p class="mt-2 max-w-[760px] text-[14px] leading-6 text-[#6F7585]">Seu trabalho em um só lugar: prioridades pessoais, projetos e atividades que nasceram do suporte.</p>
-    </div>
-    {#if data.canManage}
-      <button type="button" on:click={() => (newProjectOpen = true)} class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[12px] font-semibold text-[#000A57] shadow-sm transition hover:border-[#B9C0CF]"><Plus size={17}/>Novo projeto</button>
-    {/if}
-  </div>
-
+<ApplicationContent width="full">
   {#if form?.message}
-    <div class={`mt-6 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
+    <div class={`mb-3 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
       {#if form.success}<CheckCircle2 size={18} class="mt-0.5 shrink-0"/>{:else}<CircleAlert size={18} class="mt-0.5 shrink-0"/>{/if}<span>{form.message}</span>
     </div>
   {/if}
 
-  <section class="mt-7 overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
-    <div class="flex flex-col gap-4 border-b border-[#EEF0F5] px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
+  <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
+    <div class="flex flex-col gap-3 border-b border-[#EEF0F5] px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
       <nav class="flex min-w-0 gap-1 overflow-x-auto" aria-label="Escopo das tarefas">
         <a href="/app/tasks" class={`shrink-0 rounded-xl px-4 py-2.5 text-[12px] font-semibold transition ${data.mode === "mine" ? "bg-[#000A57] text-white" : "text-[#656B7B] hover:bg-[#F6F7FA] hover:text-[#000A57]"}`}>Minhas tarefas</a>
         {#each data.projects as project}
           <a href={projectHref(project.id)} class={`shrink-0 rounded-xl px-4 py-2.5 text-[12px] font-semibold transition ${project.id === data.selectedProjectId ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#656B7B] hover:bg-[#F6F7FA] hover:text-[#000A57]"}`}>{project.name}</a>
         {/each}
       </nav>
-      <label class="relative block min-w-[220px] lg:w-[300px]"><Search size={15} class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9499A5]"/><input bind:value={searchTerm} placeholder="Buscar tarefas" class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-9 pr-3 text-[12px] outline-none focus:border-[#000A57] focus:bg-white"/></label>
+      <div class="flex flex-wrap items-center gap-2">
+        <label class="relative block min-w-[220px] lg:w-[300px]"><Search size={15} class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9499A5]"/><input bind:value={searchTerm} placeholder="Buscar tarefas" class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-9 pr-3 text-[12px] outline-none focus:border-[#000A57] focus:bg-white"/></label>
+        {#if data.canManage}<button type="button" on:click={() => (newProjectOpen = true)} class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] font-semibold text-[#000A57] transition hover:border-[#B9C0CF]"><Plus size={15}/>Novo projeto</button>{/if}
+      </div>
     </div>
 
     {#if data.mode === "mine"}
@@ -336,7 +329,7 @@
       </div>
     {/if}
   </section>
-</div>
+</ApplicationContent>
 
 {#if newProjectOpen}
   <div class="fixed inset-0 z-[80] flex items-center justify-center bg-[#010D28]/35 p-4" role="presentation" on:click={() => (newProjectOpen = false)}>
