@@ -1,6 +1,8 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, max, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { teams } from "$lib/server/db/schema";
 import {
+  ticketAreas,
   ticketWorkflowStages,
   ticketWorkflowStates,
   ticketWorkflows,
@@ -8,10 +10,15 @@ import {
 import { tickets } from "$lib/server/db/supportSchema";
 import type { SupportPermissionMap } from "$lib/server/support/supportAccess";
 import {
+  addTicketWorkflowStage,
+  archiveTicketWorkflowStage,
   getTicketWorkflowBoard,
   listTicketWorkflowConfiguration,
   moveTicketGlobalStage,
   moveTicketToWorkflowLocation,
+  updateTicketWorkflowStage,
+  type TicketAreaInput,
+  type TicketWorkflowStageInput,
 } from "$lib/server/support/ticketWorkflowRepository";
 
 export const TICKET_WORKFLOW_STAGE_COLORS = [
@@ -28,6 +35,11 @@ export const TICKET_WORKFLOW_STAGE_COLORS = [
 ] as const;
 
 export type TicketWorkflowStageColor = (typeof TICKET_WORKFLOW_STAGE_COLORS)[number];
+
+export type RequiredConclusionResult<T> = {
+  value: T;
+  conclusionCreated: boolean;
+};
 
 type MovementContext = {
   assignedUserId: string | null;
@@ -123,6 +135,177 @@ export async function updateTicketWorkflowStageColor(
     .update(ticketWorkflowStages)
     .set({ color, updatedAt: new Date() })
     .where(eq(ticketWorkflowStages.id, stageId));
+}
+
+export async function ensureAreaWorkflowConclusionStage(
+  workflowId: string,
+): Promise<boolean> {
+  const db = getDatabase();
+
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`ticket-area-conclusion:${workflowId}`}))`,
+    );
+
+    const [workflow] = await tx
+      .select({ id: ticketWorkflows.id, kind: ticketWorkflows.kind })
+      .from(ticketWorkflows)
+      .where(
+        and(
+          eq(ticketWorkflows.id, workflowId),
+          eq(ticketWorkflows.active, true),
+        ),
+      )
+      .limit(1);
+
+    if (!workflow || workflow.kind !== "area") return false;
+
+    const [terminalStage] = await tx
+      .select({ id: ticketWorkflowStages.id })
+      .from(ticketWorkflowStages)
+      .where(
+        and(
+          eq(ticketWorkflowStages.workflowId, workflowId),
+          eq(ticketWorkflowStages.stageType, "terminal"),
+          eq(ticketWorkflowStages.active, true),
+        ),
+      )
+      .limit(1);
+
+    if (terminalStage) return false;
+
+    const [sortResult] = await tx
+      .select({ value: max(ticketWorkflowStages.sortOrder) })
+      .from(ticketWorkflowStages)
+      .where(eq(ticketWorkflowStages.workflowId, workflowId));
+
+    await tx.insert(ticketWorkflowStages).values({
+      workflowId,
+      name: "Concluído",
+      stageType: "terminal",
+      lifecycleStatus: "in_progress",
+      isInitial: false,
+      sortOrder: Number(sortResult?.value ?? 0) + 100,
+      color: "green",
+      active: true,
+    });
+
+    return true;
+  });
+}
+
+export async function createTicketAreaWithRequiredConclusion(
+  actorUserId: string,
+  input: TicketAreaInput,
+): Promise<RequiredConclusionResult<string>> {
+  const cleanName = input.name.trim();
+  if (cleanName.length < 2 || cleanName.length > 80) {
+    throw new Error("TICKET_AREA_NAME_INVALID");
+  }
+
+  const db = getDatabase();
+  return db.transaction(async (tx) => {
+    if (input.teamId) {
+      const [team] = await tx
+        .select({ id: teams.id })
+        .from(teams)
+        .where(and(eq(teams.id, input.teamId), eq(teams.active, true)))
+        .limit(1);
+      if (!team) throw new Error("TICKET_AREA_TEAM_NOT_FOUND");
+    }
+
+    const [area] = await tx
+      .insert(ticketAreas)
+      .values({
+        name: cleanName,
+        teamId: input.teamId,
+        createdBy: actorUserId,
+      })
+      .returning({ id: ticketAreas.id });
+    if (!area) throw new Error("TICKET_AREA_NOT_CREATED");
+
+    const [workflow] = await tx
+      .insert(ticketWorkflows)
+      .values({
+        name: `Processo · ${cleanName}`,
+        kind: "area",
+        areaId: area.id,
+        createdBy: actorUserId,
+      })
+      .returning({ id: ticketWorkflows.id });
+    if (!workflow) throw new Error("TICKET_WORKFLOW_NOT_CREATED");
+
+    await tx.insert(ticketWorkflowStages).values([
+      {
+        workflowId: workflow.id,
+        name: "Recebido",
+        stageType: "normal",
+        lifecycleStatus: "open",
+        isInitial: true,
+        sortOrder: 100,
+        color: "gray",
+      },
+      {
+        workflowId: workflow.id,
+        name: "Concluído",
+        stageType: "terminal",
+        lifecycleStatus: "in_progress",
+        isInitial: false,
+        sortOrder: 200,
+        color: "green",
+      },
+    ]);
+
+    return { value: area.id, conclusionCreated: true };
+  });
+}
+
+export async function addTicketWorkflowStageWithRequiredConclusion(
+  workflowId: string,
+  input: TicketWorkflowStageInput,
+): Promise<RequiredConclusionResult<string>> {
+  const stageId = await addTicketWorkflowStage(workflowId, input);
+  return {
+    value: stageId,
+    conclusionCreated: await ensureAreaWorkflowConclusionStage(workflowId),
+  };
+}
+
+export async function updateTicketWorkflowStageWithRequiredConclusion(
+  stageId: string,
+  input: TicketWorkflowStageInput,
+): Promise<RequiredConclusionResult<void>> {
+  const db = getDatabase();
+  const [stage] = await db
+    .select({ workflowId: ticketWorkflowStages.workflowId })
+    .from(ticketWorkflowStages)
+    .where(eq(ticketWorkflowStages.id, stageId))
+    .limit(1);
+  if (!stage) throw new Error("TICKET_WORKFLOW_STAGE_NOT_FOUND");
+
+  await updateTicketWorkflowStage(stageId, input);
+  return {
+    value: undefined,
+    conclusionCreated: await ensureAreaWorkflowConclusionStage(stage.workflowId),
+  };
+}
+
+export async function archiveTicketWorkflowStageWithRequiredConclusion(
+  stageId: string,
+): Promise<RequiredConclusionResult<void>> {
+  const db = getDatabase();
+  const [stage] = await db
+    .select({ workflowId: ticketWorkflowStages.workflowId })
+    .from(ticketWorkflowStages)
+    .where(eq(ticketWorkflowStages.id, stageId))
+    .limit(1);
+  if (!stage) throw new Error("TICKET_WORKFLOW_STAGE_NOT_FOUND");
+
+  await archiveTicketWorkflowStage(stageId);
+  return {
+    value: undefined,
+    conclusionCreated: await ensureAreaWorkflowConclusionStage(stage.workflowId),
+  };
 }
 
 async function getMovementContext(ticketId: string): Promise<MovementContext> {

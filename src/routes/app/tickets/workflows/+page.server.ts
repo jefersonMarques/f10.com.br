@@ -3,24 +3,24 @@ import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import {
-  addTicketWorkflowStage,
   archiveTicketArea,
-  archiveTicketWorkflowStage,
-  createTicketArea,
   listTicketAreas,
   listTicketWorkflowTeams,
   renameTicketWorkflow,
   reorderTicketWorkflowStage,
   setTicketWorkflowInitialStage,
   updateTicketArea,
-  updateTicketWorkflowStage,
   type TicketLifecycleStatus,
   type TicketWorkflowStageType,
 } from "$lib/server/support/ticketWorkflowRepository";
 import {
+  addTicketWorkflowStageWithRequiredConclusion,
+  archiveTicketWorkflowStageWithRequiredConclusion,
+  createTicketAreaWithRequiredConclusion,
   isTicketWorkflowStageColor,
   listTicketWorkflowConfigurationWithAppearance,
   updateTicketWorkflowStageColor,
+  updateTicketWorkflowStageWithRequiredConclusion,
 } from "$lib/server/support/ticketWorkflowService";
 
 function readFormValue(formData: FormData, name: string): string {
@@ -65,6 +65,12 @@ function workflowErrorMessage(cause: unknown): string {
   return messages[cause.message] ?? "Não foi possível salvar a configuração.";
 }
 
+function conclusionMessage(defaultMessage: string, conclusionCreated: boolean): string {
+  return conclusionCreated
+    ? `${defaultMessage} É obrigatório uma etapa de conclusão; “Concluído” foi criada automaticamente.`
+    : defaultMessage;
+}
+
 async function requireManageAll(cookies: Cookies) {
   const result = await requireAppPermission(cookies, "tickets.manage", "/app/tickets/workflows");
   if (!hasPermission(result.permissions, "tickets.manage", "all")) {
@@ -94,8 +100,12 @@ export const actions: Actions = {
     const teamId = readFormValue(formData, "teamId") || null;
     if (teamId && !isUuid(teamId)) return fail(400, { success: false, action: "createArea", message: "Equipe inválida." });
     try {
-      await createTicketArea(session.user.id, { name, teamId });
-      return { success: true, action: "createArea", message: "Área criada com uma coluna inicial Recebido." };
+      const result = await createTicketAreaWithRequiredConclusion(session.user.id, { name, teamId });
+      return {
+        success: true,
+        action: "createArea",
+        message: conclusionMessage("Área criada com a coluna inicial Recebido.", result.conclusionCreated),
+      };
     } catch (cause) {
       return fail(409, { success: false, action: "createArea", message: workflowErrorMessage(cause) });
     }
@@ -161,11 +171,20 @@ export const actions: Actions = {
       return fail(400, { success: false, action: "addStage", message: "Revise os dados da coluna." });
     }
     try {
-      const stageId = await addTicketWorkflowStage(workflowId, { name, stageType, linkedAreaId, lifecycleStatus });
+      const result = await addTicketWorkflowStageWithRequiredConclusion(workflowId, {
+        name,
+        stageType,
+        linkedAreaId,
+        lifecycleStatus,
+      });
       if (color && isTicketWorkflowStageColor(color)) {
-        await updateTicketWorkflowStageColor(stageId, color);
+        await updateTicketWorkflowStageColor(result.value, color);
       }
-      return { success: true, action: "addStage", message: "Coluna criada." };
+      return {
+        success: true,
+        action: "addStage",
+        message: conclusionMessage("Coluna criada.", result.conclusionCreated),
+      };
     } catch (cause) {
       return fail(409, { success: false, action: "addStage", message: workflowErrorMessage(cause) });
     }
@@ -190,11 +209,20 @@ export const actions: Actions = {
       return fail(400, { success: false, action: "updateStage", message: "Revise os dados da coluna." });
     }
     try {
-      await updateTicketWorkflowStage(stageId, { name, stageType, linkedAreaId, lifecycleStatus });
+      const result = await updateTicketWorkflowStageWithRequiredConclusion(stageId, {
+        name,
+        stageType,
+        linkedAreaId,
+        lifecycleStatus,
+      });
       if (color && isTicketWorkflowStageColor(color)) {
         await updateTicketWorkflowStageColor(stageId, color);
       }
-      return { success: true, action: "updateStage", message: "Coluna atualizada." };
+      return {
+        success: true,
+        action: "updateStage",
+        message: conclusionMessage("Coluna atualizada.", result.conclusionCreated),
+      };
     } catch (cause) {
       return fail(409, { success: false, action: "updateStage", message: workflowErrorMessage(cause) });
     }
@@ -233,8 +261,12 @@ export const actions: Actions = {
     const stageId = readFormValue(await request.formData(), "stageId");
     if (!isUuid(stageId)) return fail(400, { success: false, action: "archiveStage", message: "Coluna inválida." });
     try {
-      await archiveTicketWorkflowStage(stageId);
-      return { success: true, action: "archiveStage", message: "Coluna arquivada." };
+      const result = await archiveTicketWorkflowStageWithRequiredConclusion(stageId);
+      return {
+        success: true,
+        action: "archiveStage",
+        message: conclusionMessage("Coluna arquivada.", result.conclusionCreated),
+      };
     } catch (cause) {
       return fail(409, { success: false, action: "archiveStage", message: workflowErrorMessage(cause) });
     }
