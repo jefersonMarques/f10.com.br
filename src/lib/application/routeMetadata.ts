@@ -17,6 +17,12 @@ const operationsRouteRules: ApplicationRouteRule[] = [
     description: "Workflows, áreas e etapas",
   },
   {
+    prefix: "/app/help/content/import",
+    title: "Importar conteúdos",
+    section: "Base de Conhecimento",
+    description: "Migração estruturada de conteúdo",
+  },
+  {
     prefix: "/app/help/content",
     title: "Conteúdos",
     section: "Base de Conhecimento",
@@ -57,6 +63,24 @@ const operationsRouteRules: ApplicationRouteRule[] = [
     title: "Base de Conhecimento",
     section: "Conhecimento",
     description: "Conteúdos, treinamentos e estrutura de ajuda",
+  },
+  {
+    prefix: "/app/tasks/calendar/scheduling",
+    title: "Links de agendamento",
+    section: "Agenda",
+    description: "Disponibilidade e links para reuniões",
+  },
+  {
+    prefix: "/app/tasks/calendar/availability",
+    title: "Disponibilidade",
+    section: "Agenda",
+    description: "Horários disponíveis para agendamento",
+  },
+  {
+    prefix: "/app/tasks/calendar",
+    title: "Agenda",
+    section: "Trabalho interno",
+    description: "Tarefas, eventos e compromissos",
   },
   {
     prefix: "/app/tasks/projects",
