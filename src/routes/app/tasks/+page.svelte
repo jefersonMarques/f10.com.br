@@ -215,7 +215,7 @@
       <div class="px-4 py-5 sm:px-5">
         <div class="flex items-start justify-between gap-4">
           <div><h2 class="text-[18px] font-semibold text-[#202637]">Minhas tarefas</h2><p class="mt-1 text-[11px] text-[#858A98]">Tudo que está atribuído a você, independente do projeto.</p></div>
-          <span class="rounded-full bg-[#F4F5F8] px-3 py-1.5 text-[10px] font-semibold text-[#727887]">{data.myTasks.length} no total</span>
+          <span class="application-text-caption rounded-full bg-[#F4F5F8] px-3 py-1.5 font-semibold text-[#727887]">{data.myTasks.length} no total</span>
         </div>
 
         {#if filteredMyTasks.length === 0}
@@ -231,15 +231,15 @@
             ] as group}
               {#if group.tasks.length > 0}
                 <section>
-                  <header class="mb-2 flex items-center gap-2 px-2"><span class={`h-2 w-2 rounded-full ${group.key === "overdue" ? "bg-[#D92D20]" : group.key === "completed" ? "bg-[#2F9E5B]" : "bg-[#EA6D0B]"}`}></span><h3 class="text-[11px] font-bold uppercase tracking-[0.08em] text-[#6E7483]">{group.title}</h3><span class="text-[10px] text-[#A0A5B0]">{group.tasks.length}</span></header>
+                  <header class="mb-2 flex items-center gap-2 px-2"><span class={`h-2 w-2 rounded-full ${group.key === "overdue" ? "bg-[#D92D20]" : group.key === "completed" ? "bg-[#2F9E5B]" : "bg-[#EA6D0B]"}`}></span><h3 class="text-[11px] font-bold uppercase tracking-[0.08em] text-[#6E7483]">{group.title}</h3><span class="application-text-caption text-[#A0A5B0]">{group.tasks.length}</span></header>
                   <div class="overflow-hidden rounded-xl border border-[#E7E9EF]">
                     {#each group.tasks as task}
                       <a href={taskHref(task.id)} class="grid min-h-12 grid-cols-[minmax(0,1fr)] items-center gap-2 border-b border-[#F0F1F4] px-3 py-2.5 transition last:border-b-0 hover:bg-[#F8F9FC] md:grid-cols-[minmax(260px,1.8fr)_minmax(130px,0.8fr)_110px_100px_minmax(130px,0.9fr)]">
-                        <div class="flex min-w-0 items-center gap-3"><span class={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${task.statusClosed ? "border-[#A9D7B7] bg-[#EAF7EE] text-[#287645]" : "border-[#D5D9E2] text-transparent"}`}>{#if task.statusClosed}<Check size={13}/>{/if}</span><span class="min-w-0"><strong class={`block truncate text-[12px] font-semibold ${task.statusClosed ? "text-[#8B909C] line-through" : "text-[#2D3342]"}`}>{task.title}</strong>{#if originsFor(task.id).length > 0}<span class="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-[#000A57]"><Ticket size={11}/>Ticket #{originsFor(task.id)[0].ticketNumber}</span>{/if}</span></div>
+                        <div class="flex min-w-0 items-center gap-3"><span class={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${task.statusClosed ? "border-[#A9D7B7] bg-[#EAF7EE] text-[#287645]" : "border-[#D5D9E2] text-transparent"}`}>{#if task.statusClosed}<Check size={13}/>{/if}</span><span class="min-w-0"><strong class={`block truncate text-[12px] font-semibold ${task.statusClosed ? "text-[#8B909C] line-through" : "text-[#2D3342]"}`}>{task.title}</strong>{#if originsFor(task.id).length > 0}<span class="application-text-caption mt-0.5 inline-flex items-center gap-1 font-medium text-[#000A57]"><Ticket size={11}/>Ticket #{originsFor(task.id)[0].ticketNumber}</span>{/if}</span></div>
                         <span class="truncate text-[11px] text-[#747A89]">{task.projectName}</span>
                         <span class={`text-[11px] font-medium ${dueClass(task.dueOn, task.statusClosed)}`}>{formatDueDate(task.dueOn)}</span>
-                        <span class={`w-fit rounded-full px-2 py-1 text-[9px] font-bold ${priorityClasses[task.priority]}`}>{priorityLabels[task.priority]}</span>
-                        <span class="truncate text-[10px] text-[#8B909D]">{task.statusName}</span>
+                        <span class={`application-text-meta w-fit rounded-full px-2 py-1 font-bold ${priorityClasses[task.priority]}`}>{priorityLabels[task.priority]}</span>
+                        <span class="application-text-caption truncate text-[#8B909D]">{task.statusName}</span>
                       </a>
                     {/each}
                   </div>
@@ -260,35 +260,35 @@
         </div>
 
         <div class="mt-5 flex flex-wrap items-center gap-2 rounded-2xl border border-[#E8EAF0] bg-[#FAFAFC] p-3">
-          <span class="inline-flex items-center gap-2 px-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#777D8C]"><SlidersHorizontal size={14}/>Filtros</span>
-          <select bind:value={filterState} class="h-9 rounded-lg border border-[#DDE1EA] bg-white px-2 text-[10px]"><option value="open">Abertas</option><option value="all">Todas</option><option value="closed">Concluídas</option></select>
-          <select bind:value={filterAssignee} class="h-9 rounded-lg border border-[#DDE1EA] bg-white px-2 text-[10px]"><option value="all">Todos responsáveis</option>{#each data.members as member}<option value={member.id}>{member.name}</option>{/each}</select>
-          <select bind:value={filterPriority} class="h-9 rounded-lg border border-[#DDE1EA] bg-white px-2 text-[10px]"><option value="all">Todas prioridades</option><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option><option value="low">Baixa</option></select>
-          <select bind:value={filterOrigin} class="h-9 rounded-lg border border-[#DDE1EA] bg-white px-2 text-[10px]"><option value="all">Todas origens</option><option value="ticket">Vindas de ticket</option><option value="standalone">Sem ticket</option></select>
-          <span class="ml-auto rounded-full bg-white px-3 py-1.5 text-[10px] font-semibold text-[#777D8D] shadow-sm">{filteredProjectTasks.length} tarefa(s)</span>
+          <span class="application-text-caption inline-flex items-center gap-2 px-1 font-bold uppercase tracking-[0.08em] text-[#777D8C]"><SlidersHorizontal size={14}/>Filtros</span>
+          <select bind:value={filterState} class="application-text-caption h-9 rounded-lg border border-[#DDE1EA] bg-white px-2"><option value="open">Abertas</option><option value="all">Todas</option><option value="closed">Concluídas</option></select>
+          <select bind:value={filterAssignee} class="application-text-caption h-9 rounded-lg border border-[#DDE1EA] bg-white px-2"><option value="all">Todos responsáveis</option>{#each data.members as member}<option value={member.id}>{member.name}</option>{/each}</select>
+          <select bind:value={filterPriority} class="application-text-caption h-9 rounded-lg border border-[#DDE1EA] bg-white px-2"><option value="all">Todas prioridades</option><option value="urgent">Urgente</option><option value="high">Alta</option><option value="normal">Normal</option><option value="low">Baixa</option></select>
+          <select bind:value={filterOrigin} class="application-text-caption h-9 rounded-lg border border-[#DDE1EA] bg-white px-2"><option value="all">Todas origens</option><option value="ticket">Vindas de ticket</option><option value="standalone">Sem ticket</option></select>
+          <span class="application-text-caption ml-auto rounded-full bg-white px-3 py-1.5 font-semibold text-[#777D8D] shadow-sm">{filteredProjectTasks.length} tarefa(s)</span>
         </div>
 
         {#if data.canCreate}
           <form use:enhance method="POST" action="?/createTask" class={`mt-4 grid gap-2 rounded-2xl border border-dashed border-[#CDD2DD] bg-white p-3 ${data.canAssign ? "md:grid-cols-[minmax(220px,1.6fr)_150px_135px_150px_auto]" : "md:grid-cols-[minmax(220px,1.6fr)_135px_150px_auto]"}`}>
             <input type="hidden" name="projectId" value={data.board.project.id}/>
             <input name="title" required minlength="3" maxlength="180" placeholder="+ Adicionar tarefa" class="h-10 min-w-0 rounded-xl border border-transparent bg-[#F8F9FB] px-3 text-[12px] font-medium outline-none focus:border-[#000A57] focus:bg-white"/>
-            {#if data.canAssign}<select name="assigneeId" class="h-10 rounded-xl border border-[#E1E4EA] bg-white px-2 text-[10px]"><option value="">Atribuir a mim</option>{#each data.members as member}<option value={member.id}>{member.name}</option>{/each}</select>{/if}
-            <input name="dueOn" type="date" class="h-10 rounded-xl border border-[#E1E4EA] bg-white px-2 text-[10px]"/>
-            <select name="priority" class="h-10 rounded-xl border border-[#E1E4EA] bg-white px-2 text-[10px]"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select>
+            {#if data.canAssign}<select name="assigneeId" class="application-text-caption h-10 rounded-xl border border-[#E1E4EA] bg-white px-2"><option value="">Atribuir a mim</option>{#each data.members as member}<option value={member.id}>{member.name}</option>{/each}</select>{/if}
+            <input name="dueOn" type="date" class="application-text-caption h-10 rounded-xl border border-[#E1E4EA] bg-white px-2"/>
+            <select name="priority" class="application-text-caption h-10 rounded-xl border border-[#E1E4EA] bg-white px-2"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select>
             <button type="submit" class="h-10 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white">Adicionar</button>
           </form>
         {/if}
 
         {#if data.view === "list"}
           <div class="mt-5 overflow-hidden rounded-2xl border border-[#E3E6ED]">
-            <div class="hidden grid-cols-[minmax(300px,1.8fr)_140px_130px_110px_150px_40px] gap-2 border-b border-[#E8EAF0] bg-[#F8F9FB] px-4 py-3 text-[9px] font-bold uppercase tracking-[0.08em] text-[#8A909E] md:grid"><span>Tarefa</span><span>Responsável</span><span>Prazo</span><span>Prioridade</span><span>Status</span><span></span></div>
+            <div class="application-text-meta hidden grid-cols-[minmax(300px,1.8fr)_140px_130px_110px_150px_40px] gap-2 border-b border-[#E8EAF0] bg-[#F8F9FB] px-4 py-3 font-bold uppercase tracking-[0.08em] text-[#8A909E] md:grid"><span>Tarefa</span><span>Responsável</span><span>Prazo</span><span>Prioridade</span><span>Status</span><span></span></div>
             {#each filteredProjectTasks as task}
               <a href={taskHref(task.id)} class="grid min-h-14 grid-cols-[minmax(0,1fr)] items-center gap-2 border-b border-[#EEF0F4] px-4 py-3 transition last:border-b-0 hover:bg-[#F8F9FC] md:grid-cols-[minmax(300px,1.8fr)_140px_130px_110px_150px_40px]">
-                <div class="min-w-0"><strong class="block truncate text-[12px] font-semibold text-[#2D3342]">{task.title}</strong>{#if originsFor(task.id).length > 0}<span class="mt-1 inline-flex items-center gap-1 text-[10px] font-medium text-[#000A57]"><Ticket size={11}/>Ticket #{originsFor(task.id)[0].ticketNumber}</span>{/if}</div>
-                <span class="truncate text-[10px] text-[#686E7E]">{task.assignees[0]?.name ?? "Sem responsável"}</span>
-                <span class={`text-[10px] font-medium ${dueClass(task.dueOn)}`}>{formatDueDate(task.dueOn)}</span>
-                <span class={`w-fit rounded-full px-2 py-1 text-[9px] font-bold ${priorityClasses[task.priority]}`}>{priorityLabels[task.priority]}</span>
-                <span class="truncate text-[10px] text-[#737988]">{data.board.statuses.find((status) => status.id === task.statusId)?.name ?? ""}</span>
+                <div class="min-w-0"><strong class="block truncate text-[12px] font-semibold text-[#2D3342]">{task.title}</strong>{#if originsFor(task.id).length > 0}<span class="application-text-caption mt-1 inline-flex items-center gap-1 font-medium text-[#000A57]"><Ticket size={11}/>Ticket #{originsFor(task.id)[0].ticketNumber}</span>{/if}</div>
+                <span class="application-text-caption truncate text-[#686E7E]">{task.assignees[0]?.name ?? "Sem responsável"}</span>
+                <span class={`application-text-caption font-medium ${dueClass(task.dueOn)}`}>{formatDueDate(task.dueOn)}</span>
+                <span class={`application-text-meta w-fit rounded-full px-2 py-1 font-bold ${priorityClasses[task.priority]}`}>{priorityLabels[task.priority]}</span>
+                <span class="application-text-caption truncate text-[#737988]">{data.board.statuses.find((status) => status.id === task.statusId)?.name ?? ""}</span>
                 <ChevronRight size={15} class="text-[#A0A5B0]"/>
               </a>
             {:else}
@@ -296,17 +296,19 @@
             {/each}
           </div>
         {:else}
-          {#if data.canUpdate}<p class="mt-4 text-[10px] font-medium text-[#7D8392]">Arraste os cards entre as colunas para atualizar o status.</p>{/if}
+          {#if data.canUpdate}<p class="application-text-caption mt-4 font-medium text-[#7D8392]">Arraste os cards entre as colunas para atualizar o status.</p>{/if}
           <div class="mt-4 overflow-x-auto pb-3">
             <div class="grid min-w-[940px] gap-4" style={`grid-template-columns: repeat(${Math.max(data.board.statuses.length, 1)}, minmax(290px, 1fr));`}>
               {#each data.board.statuses as status}
                 <section
                   class={`min-h-[260px] rounded-[20px] border p-3 transition ${dragOverStatusId === status.id ? "border-[#000A57] bg-[#EEF0FF]" : "border-[#E0E3EB] bg-[#F8F9FB]"}`}
+                  role="group"
+                  aria-label={`Coluna ${status.name}`}
                   on:dragover|preventDefault={() => (dragOverStatusId = status.id)}
                   on:dragleave={() => { if (dragOverStatusId === status.id) dragOverStatusId = null; }}
                   on:drop={(event) => void dropTask(event, status.id)}
                 >
-                  <header class="flex items-center justify-between gap-3 px-1 pb-3"><div class="flex items-center gap-2"><span class={`h-2.5 w-2.5 rounded-full ${status.isClosed ? "bg-[#4F9B67]" : "bg-[#EA6D0B]"}`}></span><h3 class="text-[12px] font-semibold text-[#3A4050]">{status.name}</h3></div><span class="rounded-full bg-white px-2 py-1 text-[9px] font-semibold text-[#858B99] shadow-sm">{tasksForStatus(status.id).length}</span></header>
+                  <header class="flex items-center justify-between gap-3 px-1 pb-3"><div class="flex items-center gap-2"><span class={`h-2.5 w-2.5 rounded-full ${status.isClosed ? "bg-[#4F9B67]" : "bg-[#EA6D0B]"}`}></span><h3 class="text-[12px] font-semibold text-[#3A4050]">{status.name}</h3></div><span class="application-text-meta rounded-full bg-white px-2 py-1 font-semibold text-[#858B99] shadow-sm">{tasksForStatus(status.id).length}</span></header>
                   <div class="space-y-3">
                     {#each tasksForStatus(status.id) as task (task.id)}
                       <article
@@ -315,11 +317,11 @@
                         on:dragend={endDrag}
                         class={`group rounded-2xl border bg-white p-4 shadow-[0_5px_18px_rgba(1,13,40,0.04)] transition ${draggingTaskId === task.id ? "border-[#000A57] opacity-60" : "border-[#E2E5EC] hover:border-[#C9CEDA]"}`}
                       >
-                        <div class="flex items-start gap-2">{#if data.canUpdate}<GripVertical size={15} class="mt-0.5 shrink-0 cursor-grab text-[#C0C5CF] group-hover:text-[#7B8190]"/>{/if}<a href={taskHref(task.id)} class="min-w-0 flex-1"><div class="flex items-start justify-between gap-3"><h4 class="text-[12px] font-semibold leading-5 text-[#252B3B]">{task.title}</h4><span class={`shrink-0 rounded-full px-2 py-1 text-[8px] font-bold uppercase tracking-[0.05em] ${priorityClasses[task.priority]}`}>{priorityLabels[task.priority]}</span></div>{#if task.description}<p class="mt-2 line-clamp-2 text-[10px] leading-5 text-[#7B8190]">{task.description}</p>{/if}</a></div>
-                        <div class="mt-4 flex flex-wrap items-center gap-2">{#if task.dueOn}<span class={`inline-flex items-center gap-1.5 rounded-lg bg-[#F5F6F9] px-2 py-1.5 text-[9px] font-medium ${dueClass(task.dueOn, status.isClosed)}`}><CalendarDays size={12}/>{formatDueDate(task.dueOn)}</span>{/if}{#if task.assignees[0]}<span class="rounded-lg bg-[#EEF0FF] px-2 py-1.5 text-[9px] font-medium text-[#000A57]">{task.assignees[0].name}</span>{/if}{#if originsFor(task.id).length > 0}<span class="inline-flex items-center gap-1 rounded-lg bg-[#FFF4E9] px-2 py-1.5 text-[9px] font-medium text-[#A9510D]"><Ticket size={11}/>#{originsFor(task.id)[0].ticketNumber}</span>{/if}</div>
+                        <div class="flex items-start gap-2">{#if data.canUpdate}<GripVertical size={15} class="mt-0.5 shrink-0 cursor-grab text-[#C0C5CF] group-hover:text-[#7B8190]"/>{/if}<a href={taskHref(task.id)} class="min-w-0 flex-1"><div class="flex items-start justify-between gap-3"><h4 class="text-[12px] font-semibold leading-5 text-[#252B3B]">{task.title}</h4><span class={`application-text-meta shrink-0 rounded-full px-2 py-1 font-bold uppercase tracking-[0.05em] ${priorityClasses[task.priority]}`}>{priorityLabels[task.priority]}</span></div>{#if task.description}<p class="application-text-caption mt-2 line-clamp-2 leading-5 text-[#7B8190]">{task.description}</p>{/if}</a></div>
+                        <div class="mt-4 flex flex-wrap items-center gap-2">{#if task.dueOn}<span class={`application-text-meta inline-flex items-center gap-1.5 rounded-lg bg-[#F5F6F9] px-2 py-1.5 font-medium ${dueClass(task.dueOn, status.isClosed)}`}><CalendarDays size={12}/>{formatDueDate(task.dueOn)}</span>{/if}{#if task.assignees[0]}<span class="application-text-meta rounded-lg bg-[#EEF0FF] px-2 py-1.5 font-medium text-[#000A57]">{task.assignees[0].name}</span>{/if}{#if originsFor(task.id).length > 0}<span class="application-text-meta inline-flex items-center gap-1 rounded-lg bg-[#FFF4E9] px-2 py-1.5 font-medium text-[#A9510D]"><Ticket size={11}/>#{originsFor(task.id)[0].ticketNumber}</span>{/if}</div>
                       </article>
                     {/each}
-                    {#if tasksForStatus(status.id).length === 0}<div class="rounded-2xl border border-dashed border-[#D6DAE3] bg-white/50 px-4 py-10 text-center text-[10px] text-[#9A9FAC]">Solte uma tarefa aqui</div>{/if}
+                    {#if tasksForStatus(status.id).length === 0}<div class="application-text-caption rounded-2xl border border-dashed border-[#D6DAE3] bg-white/50 px-4 py-10 text-center text-[#9A9FAC]">Solte uma tarefa aqui</div>{/if}
                   </div>
                 </section>
               {/each}
@@ -332,8 +334,9 @@
 </ApplicationContent>
 
 {#if newProjectOpen}
-  <div class="fixed inset-0 z-[80] flex items-center justify-center bg-[#010D28]/35 p-4" role="presentation" on:click={() => (newProjectOpen = false)}>
-    <section class="w-full max-w-[620px] rounded-[24px] border border-[#E1E4EC] bg-white p-5 shadow-2xl sm:p-6" role="dialog" aria-modal="true" aria-label="Novo projeto" on:click|stopPropagation>
+  <div class="fixed inset-0 z-[80] flex items-center justify-center bg-[#010D28]/35 p-4" role="presentation">
+    <button type="button" class="absolute inset-0 cursor-default" aria-label="Fechar novo projeto" on:click={() => (newProjectOpen = false)}></button>
+    <div class="relative z-10 w-full max-w-[620px] rounded-[24px] border border-[#E1E4EC] bg-white p-5 shadow-2xl sm:p-6" role="dialog" aria-modal="true" aria-label="Novo projeto">
       <div class="flex items-start justify-between gap-4"><div><h2 class="text-[18px] font-semibold text-[#202637]">Novo projeto</h2><p class="mt-1 text-[11px] text-[#858A98]">Crie o espaço de trabalho e escolha os integrantes iniciais.</p></div><button type="button" on:click={() => (newProjectOpen = false)} class="flex h-9 w-9 items-center justify-center rounded-xl text-[#7F8594] hover:bg-[#F4F5F8]" aria-label="Fechar"><X size={17}/></button></div>
       <form method="POST" action="?/createProject" class="mt-5 space-y-4">
         <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Nome</span><input name="name" required maxlength="120" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[13px] outline-none focus:border-[#000A57]"/></label>
@@ -341,7 +344,7 @@
         {#if data.activeUsers.length > 0}<fieldset><legend class="text-[11px] font-semibold text-[#4A5060]">Integrantes</legend><div class="mt-2 grid max-h-48 gap-2 overflow-y-auto rounded-xl border border-[#E7E9EF] p-2 sm:grid-cols-2">{#each data.activeUsers as user}<label class="flex items-center gap-2 rounded-lg px-2 py-2 text-[11px] text-[#555B69] hover:bg-[#F7F8FB]"><input type="checkbox" name="memberIds" value={user.id}/><span class="truncate">{user.name}</span></label>{/each}</div></fieldset>{/if}
         <button type="submit" class="min-h-11 w-full rounded-xl bg-[#000A57] px-5 text-[12px] font-semibold text-white">Criar projeto</button>
       </form>
-    </section>
+    </div>
   </div>
 {/if}
 
@@ -349,11 +352,11 @@
   <div class="fixed inset-0 z-[75] bg-[#010D28]/25" role="presentation">
     <a href={closeTaskHref()} class="absolute inset-0" aria-label="Fechar detalhes da tarefa"></a>
     <aside class="absolute inset-y-0 right-0 z-10 w-full max-w-[620px] overflow-y-auto border-l border-[#DDE1EA] bg-white shadow-[-18px_0_55px_rgba(1,13,40,0.16)]" aria-label="Detalhes da tarefa">
-      <div class="sticky top-0 z-20 flex items-center justify-between border-b border-[#EEF0F5] bg-white/95 px-5 py-4 backdrop-blur"><div class="flex min-w-0 items-center gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><CheckCircle2 size={17}/></span><div class="min-w-0"><span class="block text-[9px] font-bold uppercase tracking-[0.08em] text-[#EA6D0B]">{data.selectedTask.details.task.projectName}</span><strong class="block truncate text-[13px] text-[#2D3342]">Detalhes da tarefa</strong></div></div><a href={closeTaskHref()} class="flex h-9 w-9 items-center justify-center rounded-xl text-[#747A89] hover:bg-[#F4F5F8]" aria-label="Fechar"><X size={18}/></a></div>
+      <div class="sticky top-0 z-20 flex items-center justify-between border-b border-[#EEF0F5] bg-white/95 px-5 py-4 backdrop-blur"><div class="flex min-w-0 items-center gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><CheckCircle2 size={17}/></span><div class="min-w-0"><span class="application-text-meta block font-bold uppercase tracking-[0.08em] text-[#EA6D0B]">{data.selectedTask.details.task.projectName}</span><strong class="block truncate text-[13px] text-[#2D3342]">Detalhes da tarefa</strong></div></div><a href={closeTaskHref()} class="flex h-9 w-9 items-center justify-center rounded-xl text-[#747A89] hover:bg-[#F4F5F8]" aria-label="Fechar"><X size={18}/></a></div>
 
       <div class="space-y-6 p-5 sm:p-6">
         {#if data.selectedTask.ticketOrigins.length > 0}
-          <div class="rounded-2xl border border-[#F0D6BD] bg-[#FFF9F3] p-4"><div class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#A9510D]"><Ticket size={14}/>Origem do suporte</div>{#each data.selectedTask.ticketOrigins as origin}<a href={`/app/tickets/${origin.id}`} class="mt-2 flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2.5 text-[11px] font-semibold text-[#000A57] shadow-sm"><span class="truncate">Ticket #{origin.ticketNumber} · {origin.subject}</span><ChevronRight size={14}/></a>{/each}</div>
+          <div class="rounded-2xl border border-[#F0D6BD] bg-[#FFF9F3] p-4"><div class="application-text-caption flex items-center gap-2 font-bold uppercase tracking-[0.08em] text-[#A9510D]"><Ticket size={14}/>Origem do suporte</div>{#each data.selectedTask.ticketOrigins as origin}<a href={`/app/tickets/${origin.id}`} class="mt-2 flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2.5 text-[11px] font-semibold text-[#000A57] shadow-sm"><span class="truncate">Ticket #{origin.ticketNumber} · {origin.subject}</span><ChevronRight size={14}/></a>{/each}</div>
         {/if}
 
         {#if data.canUpdate}
@@ -366,27 +369,27 @@
 
         <form use:enhance method="POST" action="?/updateTask" class="space-y-4">
           <input type="hidden" name="taskId" value={data.selectedTask.details.task.id}/>
-          <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B69]">Título</span><input name="title" required maxlength="180" value={data.selectedTask.details.task.title} disabled={!data.canUpdate} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px] font-semibold text-[#202637] outline-none focus:border-[#000A57] disabled:bg-[#FAFAFC]"/></label>
-          <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B69]">Descrição</span><textarea name="description" maxlength="5000" rows="6" value={data.selectedTask.details.task.description} disabled={!data.canUpdate} placeholder="Adicione contexto, critérios e próximos passos..." class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-3 text-[12px] leading-6 outline-none focus:border-[#000A57] disabled:bg-[#FAFAFC]"></textarea></label>
-          <div class="grid gap-3 sm:grid-cols-2"><label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B69]">Prazo</span><input name="dueOn" type="date" value={data.selectedTask.details.task.dueOn ?? ""} disabled={!data.canUpdate} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px] disabled:bg-[#FAFAFC]"/></label><label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B69]">Prioridade</span><select name="priority" value={data.selectedTask.details.task.priority} disabled={!data.canUpdate} class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] disabled:bg-[#FAFAFC]"><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></label></div>
+          <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B69]">Título</span><input name="title" required maxlength="180" value={data.selectedTask.details.task.title} disabled={!data.canUpdate} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px] font-semibold text-[#202637] outline-none focus:border-[#000A57] disabled:bg-[#FAFAFC]"/></label>
+          <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B69]">Descrição</span><textarea name="description" maxlength="5000" rows="6" value={data.selectedTask.details.task.description} disabled={!data.canUpdate} placeholder="Adicione contexto, critérios e próximos passos..." class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-3 text-[12px] leading-6 outline-none focus:border-[#000A57] disabled:bg-[#FAFAFC]"></textarea></label>
+          <div class="grid gap-3 sm:grid-cols-2"><label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B69]">Prazo</span><input name="dueOn" type="date" value={data.selectedTask.details.task.dueOn ?? ""} disabled={!data.canUpdate} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px] disabled:bg-[#FAFAFC]"/></label><label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B69]">Prioridade</span><select name="priority" value={data.selectedTask.details.task.priority} disabled={!data.canUpdate} class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] disabled:bg-[#FAFAFC]"><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></label></div>
           {#if data.canUpdate}<button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white">Salvar alterações</button>{/if}
         </form>
 
         <section class="grid gap-4 rounded-2xl border border-[#E7E9EF] bg-[#FAFAFC] p-4 sm:grid-cols-2">
-          <div><span class="text-[9px] font-bold uppercase tracking-[0.08em] text-[#8A909E]">Status</span><p class="mt-1 text-[11px] font-semibold text-[#3B4150]">{data.selectedTask.details.task.statusName}</p></div>
-          <div><span class="text-[9px] font-bold uppercase tracking-[0.08em] text-[#8A909E]">Responsável</span><p class="mt-1 text-[11px] font-semibold text-[#3B4150]">{data.selectedTask.details.assignees[0]?.name ?? "Sem responsável"}</p></div>
-          {#if data.canAssign}<form use:enhance method="POST" action="?/assignTask" class="sm:col-span-2"><input type="hidden" name="taskId" value={data.selectedTask.details.task.id}/><div class="flex gap-2"><select name="assigneeId" required class="h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]">{#each data.selectedTask.details.projectMembers as member}<option value={member.id} selected={member.id === data.selectedTask.details.assignees[0]?.userId}>{member.name}</option>{/each}</select><button type="submit" class="h-10 rounded-xl border border-[#CCD1DD] bg-white px-3 text-[10px] font-semibold text-[#000A57]">Atribuir</button></div></form>{/if}
+          <div><span class="application-text-meta font-bold uppercase tracking-[0.08em] text-[#8A909E]">Status</span><p class="mt-1 text-[11px] font-semibold text-[#3B4150]">{data.selectedTask.details.task.statusName}</p></div>
+          <div><span class="application-text-meta font-bold uppercase tracking-[0.08em] text-[#8A909E]">Responsável</span><p class="mt-1 text-[11px] font-semibold text-[#3B4150]">{data.selectedTask.details.assignees[0]?.name ?? "Sem responsável"}</p></div>
+          {#if data.canAssign}<form use:enhance method="POST" action="?/assignTask" class="sm:col-span-2"><input type="hidden" name="taskId" value={data.selectedTask.details.task.id}/><div class="flex gap-2"><select name="assigneeId" required class="h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]">{#each data.selectedTask.details.projectMembers as member}<option value={member.id} selected={member.id === data.selectedTask.details.assignees[0]?.userId}>{member.name}</option>{/each}</select><button type="submit" class="application-text-caption h-10 rounded-xl border border-[#CCD1DD] bg-white px-3 font-semibold text-[#000A57]">Atribuir</button></div></form>{/if}
         </section>
 
         <section>
           <div class="flex items-center gap-2"><MessageSquare size={16} class="text-[#000A57]"/><h3 class="text-[13px] font-semibold text-[#2D3342]">Comentários</h3></div>
-          {#if data.selectedTask.details.comments.length > 0}<div class="mt-4 space-y-3">{#each data.selectedTask.details.comments as comment}<article class="rounded-2xl border border-[#E7E9EF] bg-[#FAFAFC] p-4"><div class="flex items-center justify-between gap-3"><strong class="text-[10px] font-semibold text-[#3B4150]">{comment.authorName ?? "Usuário removido"}</strong><span class="text-[9px] text-[#999EAA]">{formatDateTime(comment.createdAt)}</span></div><p class="mt-2 whitespace-pre-wrap text-[11px] leading-5 text-[#646A79]">{comment.body}</p></article>{/each}</div>{:else}<p class="mt-3 text-[10px] text-[#969BA7]">Nenhum comentário ainda.</p>{/if}
+          {#if data.selectedTask.details.comments.length > 0}<div class="mt-4 space-y-3">{#each data.selectedTask.details.comments as comment}<article class="rounded-2xl border border-[#E7E9EF] bg-[#FAFAFC] p-4"><div class="flex items-center justify-between gap-3"><strong class="application-text-caption font-semibold text-[#3B4150]">{comment.authorName ?? "Usuário removido"}</strong><span class="application-text-meta text-[#999EAA]">{formatDateTime(comment.createdAt)}</span></div><p class="mt-2 whitespace-pre-wrap text-[11px] leading-5 text-[#646A79]">{comment.body}</p></article>{/each}</div>{:else}<p class="application-text-caption mt-3 text-[#969BA7]">Nenhum comentário ainda.</p>{/if}
           {#if data.canUpdate}<form use:enhance method="POST" action="?/commentTask" class="mt-4"><input type="hidden" name="taskId" value={data.selectedTask.details.task.id}/><MentionTextarea users={data.selectedTask.details.projectMembers} name="body" rows={3} maxlength={5000} placeholder="Comente ou use @ para mencionar alguém" className="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#000A57]"/><button type="submit" class="mt-2 min-h-10 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white">Comentar</button></form>{/if}
         </section>
 
         <section>
           <div class="flex items-center gap-2"><MoreHorizontal size={16} class="text-[#000A57]"/><h3 class="text-[13px] font-semibold text-[#2D3342]">Atividade</h3></div>
-          <div class="mt-4 space-y-4">{#each data.selectedTask.details.activities as activity}<div class="border-l-2 border-[#E5E7ED] pl-3"><p class="text-[10px] leading-4 text-[#626877]"><strong class="font-semibold text-[#3E4453]">{activity.actorName ?? "Sistema"}</strong> {activityLabel(activity.action)}</p><span class="mt-1 block text-[9px] text-[#9B9FAC]">{formatDateTime(activity.createdAt)}</span></div>{/each}</div>
+          <div class="mt-4 space-y-4">{#each data.selectedTask.details.activities as activity}<div class="border-l-2 border-[#E5E7ED] pl-3"><p class="application-text-caption leading-4 text-[#626877]"><strong class="font-semibold text-[#3E4453]">{activity.actorName ?? "Sistema"}</strong> {activityLabel(activity.action)}</p><span class="application-text-meta mt-1 block text-[#9B9FAC]">{formatDateTime(activity.createdAt)}</span></div>{/each}</div>
         </section>
       </div>
     </aside>
