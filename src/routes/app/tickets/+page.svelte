@@ -20,6 +20,7 @@
     UserRound,
     X,
   } from "lucide-svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -418,31 +419,21 @@
 
 <svelte:head><title>Tickets | F10 Operations</title></svelte:head>
 
-<div class="mx-auto max-w-[1560px] px-5 py-7 sm:px-8 sm:py-9">
-  <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
-    <div>
-      <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-[#EA6D0B]">Atendimento</p>
-      <h1 class="mt-2 text-[34px] font-semibold tracking-[-0.035em] text-[#010D28]">Tickets</h1>
-      <p class="mt-2 text-[12px] text-[#6F7585]">Kanban global com áreas como etapas e processos internos por área.</p>
-    </div>
-    <div class="flex flex-wrap gap-2">
-      {#if data.canManageWorkflow}<a href="/app/tickets/workflows" class="inline-flex h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><Settings2 size={14}/>Configurar Kanban</a>{/if}
-      {#if data.canCreate}<button type="button" on:click={() => (createOpen = true)} class="inline-flex h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white"><Plus size={14}/>Novo ticket</button>{/if}
-    </div>
-  </div>
+<ApplicationContent width="full">
+  {#if form?.message}<div class={`mb-3 flex items-center gap-2 rounded-xl border px-4 py-3 text-[11px] ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{#if form.success}<CheckCircle2 size={15}/>{:else}<CircleAlert size={15}/>{/if}{form.message}</div>{/if}
 
-  {#if form?.message}<div class={`mt-5 flex items-center gap-2 rounded-xl border px-4 py-3 text-[11px] ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{#if form.success}<CheckCircle2 size={15}/>{:else}<CircleAlert size={15}/>{/if}{form.message}</div>{/if}
-
-  <section class="mt-6 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
+  <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
     <div class="flex flex-col gap-3 border-b border-[#EEF0F5] p-4 lg:flex-row lg:items-center lg:justify-between">
       <div class="flex rounded-xl bg-[#F3F4F7] p-1">
         <button type="button" on:click={() => (scope = "mine")} class={`h-8 rounded-lg px-3 text-[9px] font-semibold ${scope === "mine" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Minha fila</button>
         <button type="button" on:click={() => (scope = "unassigned")} class={`h-8 rounded-lg px-3 text-[9px] font-semibold ${scope === "unassigned" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Sem responsável</button>
         <button type="button" on:click={() => (scope = "all")} class={`h-8 rounded-lg px-3 text-[9px] font-semibold ${scope === "all" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Todos</button>
       </div>
-      <div class="flex flex-wrap gap-2">
-        <label class="relative min-w-[260px] flex-1"><Search size={14} class="absolute left-3 top-1/2 -translate-y-1/2 text-[#9499A5]"/><input bind:value={search} placeholder="Buscar ticket, cliente ou área" class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-9 pr-3 text-[10px]"/></label>
+      <div class="flex flex-wrap items-center gap-2">
+        <label class="relative min-w-[240px] flex-1 lg:min-w-[280px]"><Search size={14} class="absolute left-3 top-1/2 -translate-y-1/2 text-[#9499A5]"/><input bind:value={search} placeholder="Buscar ticket, cliente ou área" class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-9 pr-3 text-[10px]"/></label>
         <div class="flex rounded-xl bg-[#F3F4F7] p-1"><button type="button" on:click={() => (view = "board")} class={`flex h-8 items-center gap-1 rounded-lg px-2 text-[9px] ${view === "board" ? "bg-white text-[#000A57]" : "text-[#737989]"}`}><Columns3 size={13}/>Quadro</button><button type="button" on:click={() => (view = "list")} class={`flex h-8 items-center gap-1 rounded-lg px-2 text-[9px] ${view === "list" ? "bg-white text-[#000A57]" : "text-[#737989]"}`}><List size={13}/>Lista</button></div>
+        {#if data.canManageWorkflow}<a href="/app/tickets/workflows" class="inline-flex h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><Settings2 size={14}/>Configurar</a>{/if}
+        {#if data.canCreate}<button type="button" on:click={() => (createOpen = true)} class="inline-flex h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white"><Plus size={14}/>Novo ticket</button>{/if}
       </div>
     </div>
 
@@ -500,7 +491,7 @@
       </div>
     {/if}
   </section>
-</div>
+</ApplicationContent>
 
 {#if createOpen}
   <div class="fixed inset-0 z-[100] flex items-center justify-center bg-[#010D28]/35 p-4" on:click={() => (createOpen = false)} role="presentation">

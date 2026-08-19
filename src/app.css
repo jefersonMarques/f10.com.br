@@ -164,7 +164,19 @@ body::after {
   }
 }
 
-/* Operations intentionally keeps a dense UI, but 10px text was too small at 100% browser zoom. */
-.operations-shell .text-\[10px\] {
-  font-size: 11px;
+/* Escala mínima compartilhada somente pelas áreas autenticadas /app e /cliente. */
+.application-ui {
+  --application-header-height: 68px;
+  --application-text-meta: 10px;
+  --application-text-caption: 11px;
+}
+
+.application-ui .text-\[7px\],
+.application-ui .text-\[8px\],
+.application-ui .text-\[9px\] {
+  font-size: var(--application-text-meta);
+}
+
+.application-ui .text-\[10px\] {
+  font-size: var(--application-text-caption);
 }

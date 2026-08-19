@@ -7,6 +7,7 @@
     Sparkles,
     UserRound,
   } from "lucide-svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;
@@ -131,49 +132,34 @@
   <title>Chat | F10 Operations</title>
 </svelte:head>
 
-<div class="mx-auto max-w-[1320px] px-5 py-7 sm:px-8 sm:py-9">
-  <div class="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-    <div>
-      <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Atendimento em tempo real</p>
-      <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Chat</h1>
-      <p class="mt-2 max-w-[760px] text-[14px] leading-6 text-[#6F7585]">
-        Priorize quem está esperando, assuma conversas e continue o atendimento sem sair do Operations.
-      </p>
-    </div>
-
-    <div class="flex flex-wrap gap-2">
-      <a href="/app/chat/preview" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-5 text-[11px] font-semibold text-[#000A57] transition hover:bg-[#F8F9FF]">
-        <MessageCircleMore size={16} aria-hidden="true" />
-        Preview do cliente
-      </a>
-      <a href="/app/chat/lab" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white transition hover:bg-[#111B71]">
-        <Sparkles size={16} aria-hidden="true" />
-        Testar IA
-      </a>
-    </div>
-  </div>
-
-  <section class="mt-7 overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
-    <header class="border-b border-[#EEF0F5] px-5 py-5 sm:px-6">
-      <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+<ApplicationContent width="wide">
+  <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
+    <header class="border-b border-[#EEF0F5] px-4 py-4 sm:px-5">
+      <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div class="flex items-center gap-3">
           <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]">
             <MessageCircleMore size={19} aria-hidden="true" />
           </span>
           <div>
-            <h2 class="text-[16px] font-semibold text-[#11182C]">Caixa de entrada</h2>
-            <p class="mt-1 text-[11px] text-[#858A98]">{filteredChats.length} de {data.chats.length} conversas no seu escopo</p>
+            <h2 class="text-[15px] font-semibold text-[#11182C]">Caixa de entrada</h2>
+            <p class="mt-0.5 text-[11px] text-[#858A98]">{filteredChats.length} de {data.chats.length} conversas no seu escopo</p>
           </div>
         </div>
 
-        <label class="relative block w-full xl:max-w-[360px]">
-          <Search size={15} class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#979CAA]" aria-hidden="true" />
-          <input bind:this={searchElement} bind:value={query} placeholder="Buscar cliente, escola, unidade, e-mail ou #ticket" class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-10 pr-4 text-[11px] text-[#303645] outline-none transition focus:border-[#000A57] focus:bg-white focus:ring-2 focus:ring-[#000A57]/10" />
-          <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-[#E0E3EA] bg-white px-1.5 py-0.5 text-[8px] text-[#999EAA]">/</span>
-        </label>
+        <div class="flex flex-col gap-2 lg:flex-row lg:items-center">
+          <label class="relative block w-full lg:w-[340px]">
+            <Search size={15} class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#979CAA]" aria-hidden="true" />
+            <input bind:this={searchElement} bind:value={query} placeholder="Buscar cliente, escola, unidade, e-mail ou #ticket" class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-10 pr-4 text-[11px] text-[#303645] outline-none transition focus:border-[#000A57] focus:bg-white focus:ring-2 focus:ring-[#000A57]/10" />
+            <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-[#E0E3EA] bg-white px-1.5 py-0.5 text-[8px] text-[#999EAA]">/</span>
+          </label>
+          <div class="flex gap-2">
+            <a href="/app/chat/preview" class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] font-semibold text-[#000A57] transition hover:bg-[#F8F9FF]"><MessageCircleMore size={15} aria-hidden="true" />Preview</a>
+            <a href="/app/chat/lab" class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 text-[11px] font-semibold text-white transition hover:bg-[#111B71]"><Sparkles size={15} aria-hidden="true" />Testar IA</a>
+          </div>
+        </div>
       </div>
 
-      <div class="mt-5 flex gap-2 overflow-x-auto pb-1">
+      <div class="mt-4 flex gap-2 overflow-x-auto pb-1">
         {#each scopes as item}
           <button type="button" on:click={() => scope = item.value} class={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-[10px] font-semibold transition ${scope === item.value ? "border-[#000A57] bg-[#000A57] text-white" : "border-[#E1E4EB] bg-white text-[#656C7D] hover:border-[#C6CAD5]"}`}>
             {item.label}
@@ -244,4 +230,4 @@
       </div>
     {/if}
   </section>
-</div>
+</ApplicationContent>
