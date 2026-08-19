@@ -77,6 +77,7 @@ export const ticketWorkflowStages = pgTable(
       onDelete: "restrict",
     }),
     lifecycleStatus: ticketStatus("lifecycle_status").notNull().default("open"),
+    color: text("color").notNull().default("gray"),
     isInitial: boolean("is_initial").notNull().default(false),
     sortOrder: integer("sort_order").notNull().default(0),
     active: boolean("active").notNull().default(true),

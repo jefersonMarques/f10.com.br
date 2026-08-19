@@ -5,6 +5,8 @@
 
   export let data: LayoutData;
 
+  const AREA_EXIT_MESSAGE = "Entre na área e conclua o fluxo antes de movimentar o ticket.";
+
   let workflowId = data.workflowContext?.areaWorkflowId
     ?? data.workflowBoard.globalWorkflow?.id
     ?? "";
@@ -30,6 +32,11 @@
       (stage) => stage.stageType === "area_gateway" && stage.linkedAreaId === workflow.areaId,
     )),
   );
+  $: currentAreaStage = data.workflowContext?.areaWorkflowId && data.workflowContext?.areaStageId
+    ? data.workflowBoard.areaWorkflows
+        .find((workflow) => workflow.id === data.workflowContext?.areaWorkflowId)
+        ?.stages.find((stage) => stage.id === data.workflowContext?.areaStageId) ?? null
+    : null;
 
   function changeWorkflow(event: Event): void {
     workflowId = (event.currentTarget as HTMLSelectElement).value;
@@ -41,6 +48,16 @@
 
   async function moveTicket(): Promise<void> {
     if (!data.canReply || !workflowId || !stageId || moving) return;
+
+    if (
+      data.workflowContext?.areaWorkflowId
+      && workflowId !== data.workflowContext.areaWorkflowId
+      && currentAreaStage?.stageType !== "terminal"
+    ) {
+      window.alert(AREA_EXIT_MESSAGE);
+      return;
+    }
+
     moving = true;
     try {
       const body = new FormData();
@@ -48,8 +65,13 @@
       body.set("workflowId", workflowId);
       body.set("stageId", stageId);
       const response = await fetch("/app/tickets?/moveTicketLocation", { method: "POST", body });
-      if (!response.ok) window.alert("Não foi possível alterar a área ou coluna deste ticket.");
-      else await invalidateAll();
+      if (!response.ok) {
+        window.alert(response.status === 409 && data.workflowContext?.areaWorkflowId
+          ? AREA_EXIT_MESSAGE
+          : "Não foi possível alterar a área ou coluna deste ticket.");
+      } else {
+        await invalidateAll();
+      }
     } finally {
       moving = false;
     }

@@ -8,7 +8,6 @@ import {
   archiveTicketWorkflowStage,
   createTicketArea,
   listTicketAreas,
-  listTicketWorkflowConfiguration,
   listTicketWorkflowTeams,
   renameTicketWorkflow,
   reorderTicketWorkflowStage,
@@ -18,6 +17,11 @@ import {
   type TicketLifecycleStatus,
   type TicketWorkflowStageType,
 } from "$lib/server/support/ticketWorkflowRepository";
+import {
+  isTicketWorkflowStageColor,
+  listTicketWorkflowConfigurationWithAppearance,
+  updateTicketWorkflowStageColor,
+} from "$lib/server/support/ticketWorkflowService";
 
 function readFormValue(formData: FormData, name: string): string {
   const value = formData.get(name);
@@ -51,6 +55,7 @@ function workflowErrorMessage(cause: unknown): string {
     TICKET_WORKFLOW_TERMINAL_LIFECYCLE_INVALID: "Uma etapa terminal global deve usar Resolvido ou Fechado.",
     TICKET_WORKFLOW_GATEWAY_AREA_REQUIRED: "Selecione a área representada por esta coluna.",
     TICKET_WORKFLOW_STAGE_NAME_INVALID: "Informe um nome de coluna entre 2 e 80 caracteres.",
+    TICKET_WORKFLOW_STAGE_COLOR_AREA_ONLY: "A cor personalizada é exclusiva das colunas internas das áreas.",
     TICKET_WORKFLOW_STAGE_STRUCTURE_IN_USE: "Esta coluna possui tickets. Mova-os antes de alterar o tipo ou a área vinculada.",
     TICKET_WORKFLOW_STAGE_IN_USE: "Esta coluna possui tickets e não pode ser arquivada.",
     TICKET_WORKFLOW_INITIAL_STAGE_ARCHIVE_BLOCKED: "Defina outra coluna inicial antes de arquivar esta.",
@@ -74,7 +79,7 @@ export const load: PageServerLoad = async ({ parent }) => {
   if (!hasPermission(permissions, "tickets.manage", "all")) throw error(403, "Acesso não autorizado.");
 
   const [workflows, areas, teams] = await Promise.all([
-    listTicketWorkflowConfiguration(),
+    listTicketWorkflowConfigurationWithAppearance(),
     listTicketAreas(),
     listTicketWorkflowTeams(),
   ]);
@@ -145,11 +150,21 @@ export const actions: Actions = {
     const stageType = readFormValue(formData, "stageType");
     const lifecycleStatus = readFormValue(formData, "lifecycleStatus");
     const linkedAreaId = stageType === "area_gateway" ? readFormValue(formData, "linkedAreaId") || null : null;
-    if (!isUuid(workflowId) || !isStageType(stageType) || !isLifecycleStatus(lifecycleStatus) || (linkedAreaId && !isUuid(linkedAreaId))) {
+    const color = readFormValue(formData, "color");
+    if (
+      !isUuid(workflowId) ||
+      !isStageType(stageType) ||
+      !isLifecycleStatus(lifecycleStatus) ||
+      (linkedAreaId && !isUuid(linkedAreaId)) ||
+      (color && !isTicketWorkflowStageColor(color))
+    ) {
       return fail(400, { success: false, action: "addStage", message: "Revise os dados da coluna." });
     }
     try {
-      await addTicketWorkflowStage(workflowId, { name, stageType, linkedAreaId, lifecycleStatus });
+      const stageId = await addTicketWorkflowStage(workflowId, { name, stageType, linkedAreaId, lifecycleStatus });
+      if (color && isTicketWorkflowStageColor(color)) {
+        await updateTicketWorkflowStageColor(stageId, color);
+      }
       return { success: true, action: "addStage", message: "Coluna criada." };
     } catch (cause) {
       return fail(409, { success: false, action: "addStage", message: workflowErrorMessage(cause) });
@@ -164,11 +179,21 @@ export const actions: Actions = {
     const stageType = readFormValue(formData, "stageType");
     const lifecycleStatus = readFormValue(formData, "lifecycleStatus");
     const linkedAreaId = stageType === "area_gateway" ? readFormValue(formData, "linkedAreaId") || null : null;
-    if (!isUuid(stageId) || !isStageType(stageType) || !isLifecycleStatus(lifecycleStatus) || (linkedAreaId && !isUuid(linkedAreaId))) {
+    const color = readFormValue(formData, "color");
+    if (
+      !isUuid(stageId) ||
+      !isStageType(stageType) ||
+      !isLifecycleStatus(lifecycleStatus) ||
+      (linkedAreaId && !isUuid(linkedAreaId)) ||
+      (color && !isTicketWorkflowStageColor(color))
+    ) {
       return fail(400, { success: false, action: "updateStage", message: "Revise os dados da coluna." });
     }
     try {
       await updateTicketWorkflowStage(stageId, { name, stageType, linkedAreaId, lifecycleStatus });
+      if (color && isTicketWorkflowStageColor(color)) {
+        await updateTicketWorkflowStageColor(stageId, color);
+      }
       return { success: true, action: "updateStage", message: "Coluna atualizada." };
     } catch (cause) {
       return fail(409, { success: false, action: "updateStage", message: workflowErrorMessage(cause) });

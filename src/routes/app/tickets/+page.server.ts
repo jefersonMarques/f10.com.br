@@ -27,12 +27,12 @@ import {
   type TicketPriority,
 } from "$lib/server/support/supportRepository";
 import { listTicketCustomerContexts } from "$lib/server/support/ticketCustomerContextRepository";
+import { moveTicketAreaStage } from "$lib/server/support/ticketWorkflowRepository";
 import {
-  getTicketWorkflowBoard,
-  moveTicketAreaStage,
-  moveTicketGlobalStage,
-  moveTicketToWorkflowLocation,
-} from "$lib/server/support/ticketWorkflowRepository";
+  getTicketWorkflowBoardWithAppearance,
+  moveTicketGlobalStageWithRules,
+  moveTicketToWorkflowLocationWithRules,
+} from "$lib/server/support/ticketWorkflowService";
 
 function readFormValue(formData: FormData, name: string): string {
   const value = formData.get(name);
@@ -57,6 +57,7 @@ function actionErrorMessage(cause: unknown): string {
   if (!(cause instanceof Error)) return "Não foi possível concluir a operação.";
   const messages: Record<string, string> = {
     TICKET_WORKFLOW_AREA_ACCESS_DENIED: "Você não possui acesso ao processo interno desta área.",
+    TICKET_WORKFLOW_AREA_NOT_COMPLETE: "Entre na área e conclua o fluxo antes de movimentar o ticket.",
     TICKET_WORKFLOW_AREA_NOT_CONFIGURED: "Esta área não possui workflow ativo.",
     TICKET_WORKFLOW_AREA_EMPTY: "Esta área não possui colunas ativas.",
     TICKET_WORKFLOW_AREA_NOT_IN_GLOBAL: "Adicione esta área como uma coluna do fluxo global antes de mover tickets para ela.",
@@ -67,6 +68,9 @@ function actionErrorMessage(cause: unknown): string {
     TICKET_ATTACHMENT_TYPE_NOT_ALLOWED: "Este tipo de arquivo não é permitido.",
     ASSET_STORAGE_NOT_CONFIGURED: "O storage de anexos ainda não está configurado.",
   };
+  if (cause.message.includes("TICKET_WORKFLOW_AREA_NOT_COMPLETE")) {
+    return messages.TICKET_WORKFLOW_AREA_NOT_COMPLETE;
+  }
   return messages[cause.message] ?? "Não foi possível concluir a operação.";
 }
 
@@ -86,7 +90,7 @@ export const load: PageServerLoad = async ({ parent }) => {
   const ticketIds = ticketRows.map((ticket) => ticket.id);
   const [contexts, workflowBoard, labelRows] = await Promise.all([
     listTicketCustomerContexts(ticketIds),
-    getTicketWorkflowBoard(layout.user.id, permissionMap, ticketIds),
+    getTicketWorkflowBoardWithAppearance(layout.user.id, permissionMap, ticketIds),
     listTicketLabelsForTickets(ticketIds),
   ]);
 
@@ -184,7 +188,7 @@ export const actions: Actions = {
 
     try {
       if (workflowKind === "global") {
-        await moveTicketGlobalStage(session.user.id, permissions, ticketId, stageId);
+        await moveTicketGlobalStageWithRules(session.user.id, permissions, ticketId, stageId);
       } else {
         await moveTicketAreaStage(session.user.id, permissions, ticketId, stageId);
       }
@@ -204,7 +208,13 @@ export const actions: Actions = {
       return fail(400, { success: false, action: "moveTicketLocation", message: "Área ou coluna inválida." });
     }
     try {
-      await moveTicketToWorkflowLocation(session.user.id, permissions, ticketId, workflowId, stageId);
+      await moveTicketToWorkflowLocationWithRules(
+        session.user.id,
+        permissions,
+        ticketId,
+        workflowId,
+        stageId,
+      );
       return { success: true, action: "moveTicketLocation", message: "Área e coluna atualizadas." };
     } catch (cause) {
       return fail(409, { success: false, action: "moveTicketLocation", message: actionErrorMessage(cause) });
