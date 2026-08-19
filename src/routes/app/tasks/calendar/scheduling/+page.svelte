@@ -10,6 +10,7 @@
     ShieldCheck,
     Video,
   } from "lucide-svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -135,25 +136,20 @@
 
 <svelte:head><title>Links de agendamento | F10 Operations</title></svelte:head>
 
-<div class="mx-auto max-w-[1560px] px-5 py-7 sm:px-8 sm:py-9">
-  <header class="flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
-    <div>
-      <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Calendário</p>
-      <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Links de agendamento</h1>
-      <p class="mt-2 max-w-[820px] text-[14px] leading-6 text-[#6F7585]">O cliente escolhe um horário dentro da disponibilidade real do responsável. O evento é confirmado na agenda Google do host.</p>
-    </div>
-    <div class="inline-flex items-center gap-2 rounded-xl border border-[#DDE3F1] bg-[#F8FAFF] px-4 py-3 text-[10px] font-medium text-[#526077]">
-      <ShieldCheck size={16} class="text-[#214A9A]"/>
+<ApplicationContent width="wide">
+  <div class="mb-3 flex justify-end">
+    <div class="inline-flex items-center gap-2 rounded-xl border border-[#DDE3F1] bg-[#F8FAFF] px-3 py-2 text-[10px] font-medium text-[#526077]">
+      <ShieldCheck size={15} class="text-[#214A9A]"/>
       Token bruto só aparece no link gerado; a base guarda apenas o hash.
     </div>
-  </header>
+  </div>
 
   {#if form?.message}
-    <div class={`mt-5 rounded-xl border px-4 py-3 text-[11px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{form.message}</div>
+    <div class={`mb-3 rounded-xl border px-4 py-3 text-[11px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{form.message}</div>
   {/if}
 
   {#if bookingPath}
-    <section class="mt-5 rounded-[20px] border border-[#B9E6C9] bg-[#F5FCF7] p-5">
+    <section class="mb-4 rounded-[20px] border border-[#B9E6C9] bg-[#F5FCF7] p-5">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="min-w-0">
           <span class="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#176B35]"><Link2 size={14}/>Link pronto</span>
@@ -167,10 +163,10 @@
     </section>
   {/if}
 
-  <div class="mt-7 grid gap-6 2xl:grid-cols-[1.08fr_0.92fr]">
-    <div class="space-y-6">
+  <div class="grid gap-4 2xl:grid-cols-[1.08fr_0.92fr]">
+    <div class="space-y-4">
       {#if data.canCreate}
-        <section class="rounded-[24px] border border-[#E1E4EB] bg-white p-5 shadow-[0_8px_30px_rgba(1,13,40,0.04)] sm:p-6">
+        <section class="rounded-[22px] border border-[#E1E4EB] bg-white p-5 shadow-[0_8px_30px_rgba(1,13,40,0.04)] sm:p-6">
           <div class="flex items-start justify-between gap-4">
             <div><span class="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#EA6D0B]"><CalendarClock size={15}/>Novo convite</span><h2 class="mt-2 text-[18px] font-semibold text-[#202637]">Criar link de agendamento</h2></div>
           </div>
@@ -192,7 +188,7 @@
       {/if}
 
       {#if data.canConfigure}
-        <section class="rounded-[24px] border border-[#E1E4EB] bg-white p-5 shadow-[0_8px_30px_rgba(1,13,40,0.04)] sm:p-6">
+        <section class="rounded-[22px] border border-[#E1E4EB] bg-white p-5 shadow-[0_8px_30px_rgba(1,13,40,0.04)] sm:p-6">
           <span class="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#214A9A]"><Settings2 size={15}/>Disponibilidade de trabalho</span>
           <h2 class="mt-2 text-[18px] font-semibold text-[#202637]">Quando o cliente pode agendar</h2>
           <p class="mt-1 text-[10px] leading-5 text-[#7A808E]">Horário de trabalho é aplicado antes dos conflitos do Google. Perfil padrão: segunda a sexta, 08:00–18:00, 2h de antecedência e slots de 30 min.</p>
@@ -215,7 +211,7 @@
       {/if}
     </div>
 
-    <section class="h-fit rounded-[24px] border border-[#E1E4EB] bg-white shadow-[0_8px_30px_rgba(1,13,40,0.04)]">
+    <section class="h-fit rounded-[22px] border border-[#E1E4EB] bg-white shadow-[0_8px_30px_rgba(1,13,40,0.04)]">
       <header class="border-b border-[#E8EAF0] px-5 py-4"><span class="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#5C6475]"><Clock3 size={14}/>Convites recentes</span><p class="mt-1 text-[9px] text-[#8A909E]">O token não é recuperável daqui; somente o estado e o agendamento confirmado ficam persistidos.</p></header>
       {#if data.invitations.length === 0}
         <div class="px-5 py-12 text-center text-[10px] text-[#969BA7]">Nenhum convite de agendamento no seu escopo.</div>
@@ -237,4 +233,4 @@
       {/if}
     </section>
   </div>
-</div>
+</ApplicationContent>
