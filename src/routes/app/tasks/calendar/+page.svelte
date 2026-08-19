@@ -16,6 +16,7 @@
     Video,
     X,
   } from "lucide-svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import GoogleEventDetailsEditor from "$lib/components/operations/GoogleEventDetailsEditor.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -228,47 +229,39 @@
 
 <svelte:head><title>Calendário | F10 Operations</title></svelte:head>
 
-<div class="mx-auto max-w-[1560px] px-5 py-7 sm:px-8 sm:py-9">
-  <div class="flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
-    <div>
-      <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Planejamento</p>
-      <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Calendário</h1>
-      <p class="mt-2 max-w-[800px] text-[14px] leading-6 text-[#6F7585]">Prazos das tarefas F10 e eventos da sua agenda Google no mesmo lugar.</p>
-    </div>
+<ApplicationContent width="full">
+  <div class="flex flex-wrap items-center justify-end gap-2">
+    {#if data.googleCalendar.configured && !data.googleCalendar.connected}
+      <a href="/app/tasks/calendar/google/connect" class="inline-flex h-11 items-center gap-2 rounded-xl border border-[#C9D0E0] bg-white px-4 text-[11px] font-semibold text-[#000A57] shadow-sm"><Link2 size={15}/>Conectar Google Calendar</a>
+    {:else if data.googleCalendar.connected}
+      <div class="inline-flex h-11 max-w-[270px] items-center gap-2 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-3 text-[10px] font-semibold text-[#000A57]"><Link2 size={14}/><span class="truncate">{data.googleCalendar.googleEmail || "Google Calendar conectado"}</span></div>
+      <button type="button" on:click={() => openGoogleEvent()} class="inline-flex h-11 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white"><Plus size={15}/>Novo evento</button>
+      <form method="POST" action="?/disconnectGoogle" on:submit={(event) => { if (!confirm("Desconectar o Google Calendar deste usuário?")) event.preventDefault(); }}><button type="submit" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#DDE1EA] bg-white text-[#777D8C]" aria-label="Desconectar Google Calendar"><Unplug size={15}/></button></form>
+    {:else}
+      <span class="inline-flex h-11 items-center rounded-xl border border-[#E4E6EC] bg-[#F7F8FA] px-3 text-[9px] font-semibold text-[#858B99]">Google Calendar não configurado</span>
+    {/if}
 
-    <div class="flex flex-wrap items-center gap-2">
-      {#if data.googleCalendar.configured && !data.googleCalendar.connected}
-        <a href="/app/tasks/calendar/google/connect" class="inline-flex h-11 items-center gap-2 rounded-xl border border-[#C9D0E0] bg-white px-4 text-[11px] font-semibold text-[#000A57] shadow-sm"><Link2 size={15}/>Conectar Google Calendar</a>
-      {:else if data.googleCalendar.connected}
-        <div class="inline-flex h-11 max-w-[270px] items-center gap-2 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-3 text-[10px] font-semibold text-[#000A57]"><Link2 size={14}/><span class="truncate">{data.googleCalendar.googleEmail || "Google Calendar conectado"}</span></div>
-        <button type="button" on:click={() => openGoogleEvent()} class="inline-flex h-11 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white"><Plus size={15}/>Novo evento</button>
-        <form method="POST" action="?/disconnectGoogle" on:submit={(event) => { if (!confirm("Desconectar o Google Calendar deste usuário?")) event.preventDefault(); }}><button type="submit" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#DDE1EA] bg-white text-[#777D8C]" aria-label="Desconectar Google Calendar"><Unplug size={15}/></button></form>
-      {:else}
-        <span class="inline-flex h-11 items-center rounded-xl border border-[#E4E6EC] bg-[#F7F8FA] px-3 text-[9px] font-semibold text-[#858B99]">Google Calendar não configurado</span>
-      {/if}
-
-      <select value={data.selectedProjectId ?? ""} on:change={changeProject} class="h-11 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] font-semibold text-[#5F6575] outline-none focus:border-[#000A57]">
-        <option value="">Minhas tarefas · todos os projetos</option>
-        {#each data.projects as project}<option value={project.id}>{project.name}</option>{/each}
-      </select>
-      <div class="flex rounded-xl bg-[#EDEFF4] p-1">
-        <button type="button" on:click={() => (calendarView = "month")} class={`h-9 rounded-lg px-3 text-[11px] font-semibold ${calendarView === "month" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Mês</button>
-        <button type="button" on:click={() => (calendarView = "week")} class={`h-9 rounded-lg px-3 text-[11px] font-semibold ${calendarView === "week" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Semana</button>
-      </div>
+    <select value={data.selectedProjectId ?? ""} on:change={changeProject} class="h-11 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] font-semibold text-[#5F6575] outline-none focus:border-[#000A57]">
+      <option value="">Minhas tarefas · todos os projetos</option>
+      {#each data.projects as project}<option value={project.id}>{project.name}</option>{/each}
+    </select>
+    <div class="flex rounded-xl bg-[#EDEFF4] p-1">
+      <button type="button" on:click={() => (calendarView = "month")} class={`h-9 rounded-lg px-3 text-[11px] font-semibold ${calendarView === "month" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Mês</button>
+      <button type="button" on:click={() => (calendarView = "week")} class={`h-9 rounded-lg px-3 text-[11px] font-semibold ${calendarView === "week" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Semana</button>
     </div>
   </div>
 
   {#if oauthMessage}
-    <div class={`mt-5 rounded-xl border px-4 py-3 text-[11px] font-medium ${data.googleStatus === "connected" ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0D6BD] bg-[#FFF9F3] text-[#935018]"}`}>{oauthMessage}</div>
+    <div class={`mt-3 rounded-xl border px-4 py-3 text-[11px] font-medium ${data.googleStatus === "connected" ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0D6BD] bg-[#FFF9F3] text-[#935018]"}`}>{oauthMessage}</div>
   {/if}
-  {#if data.googleCalendarError}<div class="mt-5 flex items-center gap-2 rounded-xl border border-[#F0D6BD] bg-[#FFF9F3] px-4 py-3 text-[11px] font-medium text-[#935018]"><CircleAlert size={16}/>{data.googleCalendarError}</div>{/if}
+  {#if data.googleCalendarError}<div class="mt-3 flex items-center gap-2 rounded-xl border border-[#F0D6BD] bg-[#FFF9F3] px-4 py-3 text-[11px] font-medium text-[#935018]"><CircleAlert size={16}/>{data.googleCalendarError}</div>{/if}
   {#if form?.message}
-    <div class={`mt-5 flex items-center gap-2 rounded-xl border px-4 py-3 text-[11px] font-medium ${form.syncWarning ? "border-[#F0D2A9] bg-[#FFF9EF] text-[#8A4B0F]" : form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
+    <div class={`mt-3 flex items-center gap-2 rounded-xl border px-4 py-3 text-[11px] font-medium ${form.syncWarning ? "border-[#F0D2A9] bg-[#FFF9EF] text-[#8A4B0F]" : form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
       {#if !form.success || form.syncWarning}<CircleAlert size={16}/>{/if}{form.message}
     </div>
   {/if}
 
-  <section class="mt-7 overflow-hidden rounded-[24px] border border-[#E1E4EB] bg-white shadow-[0_8px_30px_rgba(1,13,40,0.04)]">
+  <section class="mt-4 overflow-hidden rounded-[22px] border border-[#E1E4EB] bg-white shadow-[0_8px_30px_rgba(1,13,40,0.04)]">
     <header class="flex flex-col gap-3 border-b border-[#E8EAF0] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
       <div class="flex items-center gap-2">
         <button type="button" on:click={goToday} class="h-9 rounded-lg border border-[#DDE1EA] px-3 text-[10px] font-semibold text-[#555C6D] hover:bg-[#F7F8FB]">Hoje</button>
@@ -342,7 +335,7 @@
       </div>
     {/if}
   </section>
-</div>
+</ApplicationContent>
 
 {#if createOpen}
   <div class="fixed inset-0 z-[100] flex items-center justify-center bg-[#010D28]/30 p-4 backdrop-blur-[2px]" role="presentation" on:click={() => (createOpen = false)}>
