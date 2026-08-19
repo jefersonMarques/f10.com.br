@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import {
-    ArrowLeft,
     Bot,
     CircleAlert,
     Download,
@@ -11,6 +10,8 @@
     ShieldCheck,
     UserRound,
   } from "lucide-svelte";
+  import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;
@@ -231,35 +232,25 @@
   <title>Preview do Chat | F10 Operations</title>
 </svelte:head>
 
-<div class="mx-auto max-w-[1180px] px-5 py-7 sm:px-8 sm:py-9">
-  <a href="/app/chat" class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[12px] font-semibold text-[#5F6575] transition hover:bg-white hover:text-[#000A57]">
-    <ArrowLeft size={17} aria-hidden="true" />
-    Voltar para Chat
-  </a>
-
-  <div class="mt-5 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-    <div>
-      <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Homologação ponta a ponta</p>
-      <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Preview do chat do cliente</h1>
-      <p class="mt-2 max-w-[780px] text-[14px] leading-6 text-[#6F7585]">Esta tela usa as mesmas APIs públicas do futuro widget. Permite testar criação do ticket, agente IA, continuidade da conversa, escalonamento, resposta humana e entrega do instalador remoto sem alterar o site público.</p>
-    </div>
-
-    <div class="rounded-2xl border border-[#E2E5ED] bg-white px-4 py-3 text-right">
-      <p class="text-[9px] font-bold uppercase tracking-[0.08em] text-[#959AA8]">Agente no chat</p>
-      <span class={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[8px] font-bold ${data.aiEnabled ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF4E9] text-[#A9510D]"}`}>{data.aiEnabled ? "Habilitado" : "Desabilitado"}</span>
+<ApplicationContent width="narrow">
+  <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <ApplicationBackLink href="/app/chat" label="Chat" />
+    <div class="rounded-xl border border-[#E2E5ED] bg-white px-4 py-2.5 sm:text-right">
+      <span class="text-[9px] font-bold uppercase tracking-[0.08em] text-[#959AA8]">Agente no chat</span>
+      <span class={`ml-2 inline-flex rounded-full px-2.5 py-1 text-[8px] font-bold ${data.aiEnabled ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF4E9] text-[#A9510D]"}`}>{data.aiEnabled ? "Habilitado" : "Desabilitado"}</span>
     </div>
   </div>
 
   {#if !data.aiEnabled}
-    <div class="mt-6 flex items-start gap-3 rounded-2xl border border-[#F0D3B8] bg-[#FFF9F3] px-4 py-3 text-[10px] leading-5 text-[#81512A]"><CircleAlert size={16} class="mt-0.5 shrink-0" aria-hidden="true" /><span>Para homologar o agente dentro do chat, use <strong>SUPPORT_AI_CHAT_ENABLED=true</strong>. Com o flag desligado, o preview continua testando o chat humano normalmente.</span></div>
+    <div class="mb-3 flex items-start gap-3 rounded-2xl border border-[#F0D3B8] bg-[#FFF9F3] px-4 py-3 text-[10px] leading-5 text-[#81512A]"><CircleAlert size={16} class="mt-0.5 shrink-0" aria-hidden="true" /><span>Para homologar o agente dentro do chat, use <strong>SUPPORT_AI_CHAT_ENABLED=true</strong>. Com o flag desligado, o preview continua testando o chat humano normalmente.</span></div>
   {/if}
 
   {#if errorMessage}
-    <div class="mt-5 flex items-center gap-2 rounded-xl bg-[#FFF3F3] px-4 py-3 text-[10px] font-medium text-[#A13C3C]"><CircleAlert size={15} aria-hidden="true" />{errorMessage}</div>
+    <div class="mb-3 flex items-center gap-2 rounded-xl bg-[#FFF3F3] px-4 py-3 text-[10px] font-medium text-[#A13C3C]"><CircleAlert size={15} aria-hidden="true" />{errorMessage}</div>
   {/if}
 
   {#if !session}
-    <section class="mt-7 rounded-[24px] border border-[#E2E5ED] bg-white p-5 shadow-[0_10px_32px_rgba(1,13,40,0.04)] sm:p-7">
+    <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 shadow-[0_10px_32px_rgba(1,13,40,0.04)] sm:p-6">
       <div class="flex items-start gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><UserRound size={20} aria-hidden="true" /></span><div><h2 class="text-[15px] font-semibold text-[#202637]">Iniciar como cliente</h2><p class="mt-1 text-[10px] text-[#858B99]">Use uma dúvida que exista na Base publicada e depois uma que não exista para testar os dois caminhos.</p></div></div>
 
       <form on:submit|preventDefault={() => void startChat()} class="mt-6 grid gap-4 sm:grid-cols-2">
@@ -271,7 +262,7 @@
       </form>
     </section>
   {:else}
-    <section class="mt-7 overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white shadow-[0_12px_36px_rgba(1,13,40,0.05)]">
+    <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_36px_rgba(1,13,40,0.05)]">
       <header class="flex flex-col justify-between gap-3 border-b border-[#EEF0F5] px-5 py-4 sm:flex-row sm:items-center sm:px-6">
         <div><div class="flex flex-wrap items-center gap-2"><h2 class="text-[14px] font-semibold text-[#222839]">Ticket #{session.ticketNumber}</h2><span class={`rounded-full px-2 py-1 text-[8px] font-bold ${session.aiState === "active" ? "bg-[#F0EEFF] text-[#5142A6]" : session.aiState === "escalated" ? "bg-[#FFF0F0] text-[#9B3C3C]" : "bg-[#F3F4F7] text-[#777D8D]"}`}>{aiLabels[session.aiState]}</span></div><p class="mt-1 text-[9px] text-[#989DAA]">Sessão {session.sessionId.slice(0, 8)}</p></div>
         <div class="flex gap-2"><button type="button" on:click={() => void loadMessages()} class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#DDE1EA] px-3 text-[9px] font-semibold text-[#626979]"><RefreshCw size={13} aria-hidden="true" />Atualizar</button><button type="button" on:click={resetPreview} class="inline-flex min-h-9 items-center rounded-lg bg-[#F3F4F7] px-3 text-[9px] font-semibold text-[#626979]">Nova conversa</button></div>
@@ -310,4 +301,4 @@
       </footer>
     </section>
   {/if}
-</div>
+</ApplicationContent>

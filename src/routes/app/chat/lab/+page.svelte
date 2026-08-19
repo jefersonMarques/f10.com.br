@@ -1,8 +1,6 @@
 <script lang="ts">
   import {
-    ArrowLeft,
     Bot,
-    BrainCircuit,
     CheckCircle2,
     CircleAlert,
     Clock3,
@@ -11,6 +9,8 @@
     ShieldAlert,
     Sparkles,
   } from "lucide-svelte";
+  import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -34,34 +34,19 @@
   <title>Laboratório IA | F10 Operations</title>
 </svelte:head>
 
-<div class="mx-auto max-w-[1260px] px-5 py-7 sm:px-8 sm:py-9">
-  <a href="/app/chat" class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[12px] font-semibold text-[#5F6575] transition hover:bg-white hover:text-[#000A57]">
-    <ArrowLeft size={17} aria-hidden="true" />
-    Voltar para Chat
-  </a>
-
-  <div class="mt-5 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-    <div>
-      <div class="inline-flex items-center gap-2 rounded-full bg-[#EEF0FF] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[#000A57]">
-        <BrainCircuit size={14} aria-hidden="true" />
-        Ambiente interno
-      </div>
-      <h1 class="mt-4 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Agente de Suporte IA</h1>
-      <p class="mt-2 max-w-[780px] text-[14px] leading-6 text-[#6F7585]">
-        Simule uma pergunta de cliente. O agente primeiro recupera conteúdos publicados, depois responde exclusivamente a partir dessas fontes. Sem base suficiente, o caso é escalonado.
-      </p>
-    </div>
-
-    <div class="rounded-2xl border border-[#E2E5ED] bg-white px-4 py-3 text-right">
-      <p class="text-[9px] font-bold uppercase tracking-[0.08em] text-[#959AA8]">Modelo configurado</p>
-      <p class="mt-1 text-[12px] font-semibold text-[#202637]">{data.configuration.model}</p>
-      <span class={`mt-2 inline-flex rounded-full px-2 py-1 text-[8px] font-bold ${data.configuration.configured ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF4E9] text-[#A9510D]"}`}>
-        {data.configuration.configured ? "OpenAI configurada" : "Falta OPENAI_API_KEY"}
+<ApplicationContent width="standard">
+  <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <ApplicationBackLink href="/app/chat" label="Chat" />
+    <div class="rounded-xl border border-[#E2E5ED] bg-white px-4 py-2.5 sm:text-right">
+      <span class="text-[9px] font-bold uppercase tracking-[0.08em] text-[#959AA8]">Modelo</span>
+      <span class="ml-2 text-[11px] font-semibold text-[#202637]">{data.configuration.model}</span>
+      <span class={`ml-2 inline-flex rounded-full px-2 py-1 text-[8px] font-bold ${data.configuration.configured ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF4E9] text-[#A9510D]"}`}>
+        {data.configuration.configured ? "OpenAI configurada" : "Configuração pendente"}
       </span>
     </div>
   </div>
 
-  <section class="mt-7 rounded-[24px] border border-[#E2E5ED] bg-white p-5 shadow-[0_10px_32px_rgba(1,13,40,0.04)] sm:p-7">
+  <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 shadow-[0_10px_32px_rgba(1,13,40,0.04)] sm:p-6">
     <div class="flex items-start gap-3">
       <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]">
         <Bot size={19} aria-hidden="true" />
@@ -100,7 +85,7 @@
   </section>
 
   {#if form?.result}
-    <section class={`mt-6 overflow-hidden rounded-[24px] border bg-white ${form.result.resolution === "answered" ? "border-[#B9E6C9]" : "border-[#F0C8C8]"}`}>
+    <section class={`mt-4 overflow-hidden rounded-[22px] border bg-white ${form.result.resolution === "answered" ? "border-[#B9E6C9]" : "border-[#F0C8C8]"}`}>
       <header class={`flex flex-col justify-between gap-4 border-b px-5 py-4 sm:flex-row sm:items-center sm:px-6 ${form.result.resolution === "answered" ? "border-[#DCEFE2] bg-[#F7FCF8]" : "border-[#F4DDDD] bg-[#FFF8F8]"}`}>
         <div class="flex items-center gap-3">
           {#if form.result.resolution === "answered"}
@@ -161,10 +146,10 @@
       </div>
     </section>
   {:else if form?.message}
-    <div class="mt-6 rounded-2xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[11px] font-medium text-[#9B2C2C]">{form.message}</div>
+    <div class="mt-4 rounded-2xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[11px] font-medium text-[#9B2C2C]">{form.message}</div>
   {/if}
 
-  <section class="mt-7 overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
+  <section class="mt-5 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
     <header class="flex items-center gap-3 border-b border-[#EEF0F5] px-5 py-4 sm:px-6">
       <Clock3 size={18} class="text-[#000A57]" aria-hidden="true" />
       <div>
@@ -198,4 +183,4 @@
       </div>
     {/if}
   </section>
-</div>
+</ApplicationContent>
