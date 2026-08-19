@@ -174,18 +174,18 @@
           href={`/app/notifications/open/${alert.id}`}
           class="min-w-0 flex-1 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#000A57]/25"
         >
-          <span class="text-[10px] font-bold uppercase tracking-[0.08em] text-[#EA6D0B]">
+          <span class="application-text-caption font-bold uppercase tracking-[0.08em] text-[#EA6D0B]">
             {notificationLabel(alert.kind)}
           </span>
           <strong class="mt-1 block text-[13px] font-semibold leading-5 text-[#202637]">
             {alert.title}
           </strong>
           {#if alert.body}
-            <span class="mt-1 line-clamp-2 block text-[11px] leading-5 text-[#747A89]">
+            <span class="application-text-caption mt-1 line-clamp-2 block leading-5 text-[#747A89]">
               {alert.body}
             </span>
           {/if}
-          <span class="mt-2 block text-[10px] font-semibold text-[#000A57]">
+          <span class="application-text-caption mt-2 block font-semibold text-[#000A57]">
             Abrir
           </span>
         </a>
