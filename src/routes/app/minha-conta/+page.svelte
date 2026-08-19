@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Camera, CheckCircle2, CircleAlert, KeyRound, Mail, Save, UserRound } from "lucide-svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -15,22 +16,16 @@
 
 <svelte:head><title>Minha conta | F10 Operations</title></svelte:head>
 
-<div class="mx-auto max-w-[1120px] px-5 py-7 sm:px-8 sm:py-9">
-  <div>
-    <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Perfil e segurança</p>
-    <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Minha conta</h1>
-    <p class="mt-2 max-w-[720px] text-[13px] leading-6 text-[#707686]">Atualize seus dados de identificação e as credenciais usadas para entrar no F10 Operations.</p>
-  </div>
-
+<ApplicationContent width="narrow">
   {#if form?.message}
-    <div class={`mt-6 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[11px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
+    <div class={`mb-3 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[11px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
       {#if form.success}<CheckCircle2 size={17} class="mt-0.5 shrink-0" />{:else}<CircleAlert size={17} class="mt-0.5 shrink-0" />{/if}
       <span>{form.message}</span>
     </div>
   {/if}
 
-  <div class="mt-7 grid gap-5 lg:grid-cols-2">
-    <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+  <div class="grid gap-5 lg:grid-cols-2">
+    <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
       <div class="flex items-center gap-3">
         <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><UserRound size={18} /></span>
         <div><h2 class="text-[14px] font-semibold">Perfil</h2><p class="mt-1 text-[9px] text-[#9297A5]">Nome e avatar exibidos dentro do Operations e no atendimento.</p></div>
@@ -58,7 +53,7 @@
       </form>
     </section>
 
-    <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+    <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
       <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF4E9] text-[#A9510D]"><Mail size={18} /></span><div><h2 class="text-[14px] font-semibold">E-mail de acesso</h2><p class="mt-1 text-[9px] text-[#9297A5]">Alterar o e-mail também altera seu login.</p></div></div>
       <form method="POST" action="?/email" class="mt-5 space-y-4">
         <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6B]">E-mail</span><input name="email" type="email" required maxlength="254" value={data.account.email} autocomplete="email" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px] outline-none focus:border-[#000A57]" /></label>
@@ -68,7 +63,7 @@
       </form>
     </section>
 
-    <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6 lg:col-span-2">
+    <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6 lg:col-span-2">
       <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F2F0FF] text-[#5C4BA2]"><KeyRound size={18} /></span><div><h2 class="text-[14px] font-semibold">Senha</h2><p class="mt-1 text-[9px] text-[#9297A5]">Troque sua senha sem expor credenciais em logs ou histórico.</p></div></div>
       <form method="POST" action="?/password" class="mt-5 grid gap-4 md:grid-cols-3">
         <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6B]">Senha atual</span><input name="currentPassword" type="password" required maxlength="200" autocomplete="current-password" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px] outline-none focus:border-[#000A57]" /></label>
@@ -78,4 +73,4 @@
       </form>
     </section>
   </div>
-</div>
+</ApplicationContent>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ArrowRight, Clock3, Inbox } from "lucide-svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;
@@ -32,25 +33,20 @@
 
 <svelte:head><title>Meus chamados | F10 Software</title></svelte:head>
 
-<main class="mx-auto max-w-[1120px] px-5 py-8 sm:px-8 sm:py-10">
-  <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-    <div>
-      <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Suporte F10</p>
-      <h1 class="mt-1 text-[28px] font-semibold tracking-[-0.04em] text-[#010D28] sm:text-[34px]">Meus chamados</h1>
-      <p class="mt-2 text-[11px] leading-5 text-[#777E8D]">Acompanhe conversas iniciadas no chat, respostas da equipe e prazos do atendimento.</p>
-    </div>
-    <a href="/ajuda-f10" class="text-[10px] font-semibold text-[#000A57] hover:underline">Consultar Central de Ajuda</a>
+<ApplicationContent width="narrow">
+  <div class="mb-3 flex justify-end">
+    <a href="/ajuda-f10" class="text-[11px] font-semibold text-[#000A57] hover:underline">Consultar Central de Ajuda</a>
   </div>
 
   {#if data.tickets.length === 0}
-    <section class="mt-7 rounded-[26px] border border-dashed border-[#CBD1DE] bg-white px-6 py-12 text-center">
+    <section class="rounded-[22px] border border-dashed border-[#CBD1DE] bg-white px-6 py-12 text-center">
       <Inbox size={30} class="mx-auto text-[#9BA1AE]" />
       <h2 class="mt-4 text-[17px] font-semibold text-[#303746]">Nenhum chamado encontrado</h2>
       <p class="mx-auto mt-2 max-w-[520px] text-[11px] leading-5 text-[#777E8D]">Quando você iniciar um atendimento com este e-mail, o chamado aparecerá aqui.</p>
       <a href="/ajuda-f10" class="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white">Ir para a Central de Ajuda</a>
     </section>
   {:else}
-    <div class="mt-7 space-y-3">
+    <div class="space-y-3">
       {#each data.tickets as ticket}
         <a href={`/cliente/chamados/${ticket.id}`} class="group block rounded-[22px] border border-[#E1E4EC] bg-white p-5 shadow-[0_8px_28px_rgba(1,13,40,0.035)] transition hover:border-[#C8CEDB] hover:shadow-[0_12px_32px_rgba(1,13,40,0.07)]">
           <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -71,4 +67,4 @@
       {/each}
     </div>
   {/if}
-</main>
+</ApplicationContent>

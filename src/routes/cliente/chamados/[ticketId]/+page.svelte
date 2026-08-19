@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { ArrowLeft, Clock3, Send } from "lucide-svelte";
+  import { Clock3, Send } from "lucide-svelte";
+  import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -32,23 +34,23 @@
 
 <svelte:head><title>Chamado #{data.details.ticket.ticketNumber} | F10 Software</title></svelte:head>
 
-<main class="mx-auto max-w-[940px] px-5 py-7 sm:px-8 sm:py-10">
-  <a href="/cliente/chamados" class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[10px] font-semibold text-[#626A7B] hover:bg-white hover:text-[#000A57]"><ArrowLeft size={15} />Meus chamados</a>
+<ApplicationContent width="narrow">
+  <ApplicationBackLink href="/cliente/chamados" label="Meus chamados" className="mb-3" />
 
-  <header class="mt-4 rounded-[26px] border border-[#E1E4EC] bg-white p-6 shadow-[0_10px_32px_rgba(1,13,40,0.04)] sm:p-7">
+  <section class="rounded-[22px] border border-[#E1E4EC] bg-white p-5 shadow-[0_10px_32px_rgba(1,13,40,0.04)] sm:p-6">
     <div class="flex flex-wrap items-center gap-2">
       <span class="text-[10px] font-bold uppercase tracking-[0.1em] text-[#EA6D0B]">Chamado #{data.details.ticket.ticketNumber}</span>
       <span class="rounded-full bg-[#F1F3F7] px-2.5 py-1 text-[9px] font-semibold text-[#626A7B]">{statusLabels[data.details.ticket.status] ?? data.details.ticket.status}</span>
     </div>
-    <h1 class="mt-3 text-[24px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[30px]">{data.details.ticket.subject}</h1>
+    <h2 class="mt-3 text-[22px] font-semibold tracking-[-0.03em] text-[#010D28] sm:text-[26px]">{data.details.ticket.subject}</h2>
     <div class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[9px] text-[#858C9C]">
       <span>Criado {formatDate(data.details.ticket.createdAt)}</span>
       <span>Atualizado {formatDate(data.details.ticket.updatedAt)}</span>
       <span class={`inline-flex items-center gap-1.5 font-semibold ${dueLabel().startsWith("Prazo excedido") ? "text-[#A44E3B]" : "text-[#5F687B]"}`}><Clock3 size={13} />{dueLabel()}</span>
     </div>
-  </header>
+  </section>
 
-  <section class="mt-5 overflow-hidden rounded-[26px] border border-[#E1E4EC] bg-white">
+  <section class="mt-4 overflow-hidden rounded-[22px] border border-[#E1E4EC] bg-white">
     <header class="border-b border-[#ECEEF3] px-5 py-4 sm:px-6"><h2 class="text-[14px] font-semibold text-[#303746]">Histórico público</h2><p class="mt-1 text-[9px] text-[#8B91A0]">Notas internas da equipe F10 nunca aparecem nesta área.</p></header>
     <div class="space-y-4 bg-[#F8F9FB] px-4 py-5 sm:px-6 sm:py-6">
       {#each data.details.messages as message}
@@ -74,4 +76,4 @@
       </div>
     {/if}
   </section>
-</main>
+</ApplicationContent>

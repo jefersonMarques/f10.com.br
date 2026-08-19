@@ -1,12 +1,13 @@
 <script lang="ts">
   import {
-    ArrowLeft,
     BrainCircuit,
     CircleAlert,
     Search,
     SearchX,
     Sparkles,
   } from "lucide-svelte";
+  import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData } from "./$types";
 
   export let form: ActionData;
@@ -16,21 +17,10 @@
   <title>Pesquisa de Suporte | F10 Operations</title>
 </svelte:head>
 
-<div class="mx-auto max-w-[1120px] px-5 py-7 sm:px-8 sm:py-9">
-  <a href="/app/help/content" class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[12px] font-semibold text-[#5F6575] transition hover:bg-white hover:text-[#000A57]">
-    <ArrowLeft size={17} aria-hidden="true" />
-    Voltar para Base de Conhecimento
-  </a>
+<ApplicationContent width="narrow">
+  <ApplicationBackLink href="/app/help/content" label="Base de Conhecimento" className="mb-3" />
 
-  <div class="mt-5">
-    <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Laboratório de pesquisa</p>
-    <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Pesquisa de Suporte</h1>
-    <p class="mt-2 max-w-[760px] text-[14px] leading-6 text-[#6F7585]">
-      Teste como a base publicada encontra respostas. As consultas ficam registradas para identificar dúvidas sem conteúdo e melhorar a Central continuamente.
-    </p>
-  </div>
-
-  <section class="mt-7 rounded-[24px] border border-[#E2E5ED] bg-white p-5 shadow-[0_10px_32px_rgba(1,13,40,0.04)] sm:p-7">
+  <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 shadow-[0_10px_32px_rgba(1,13,40,0.04)] sm:p-6">
     <form method="POST" action="?/search">
       <label class="block">
         <span class="mb-2 block text-[12px] font-semibold text-[#303645]">O que o usuário está tentando resolver?</span>
@@ -51,14 +41,14 @@
   </section>
 
   {#if form?.message}
-    <div class={`mt-5 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[11px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
+    <div class={`mt-4 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[11px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
       {#if form.success}<Sparkles size={17} class="mt-0.5 shrink-0" aria-hidden="true" />{:else}<CircleAlert size={17} class="mt-0.5 shrink-0" aria-hidden="true" />{/if}
       <span>{form.message}</span>
     </div>
   {/if}
 
   {#if form && "results" in form && form.results.length > 0}
-    <section class="mt-6 overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
+    <section class="mt-4 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
       <header class="border-b border-[#EEF0F5] px-5 py-4 sm:px-6">
         <h2 class="text-[14px] font-semibold text-[#222839]">Resultados publicados</h2>
         <p class="mt-1 text-[10px] text-[#8A909E]">Ordenados por relevância textual, similaridade e conhecimento disponível.</p>
@@ -89,10 +79,10 @@
       </div>
     </section>
   {:else if form?.success && form && "results" in form}
-    <section class="mt-6 rounded-[24px] border border-dashed border-[#CBD0DC] bg-white px-6 py-14 text-center">
+    <section class="mt-4 rounded-[22px] border border-dashed border-[#CBD0DC] bg-white px-6 py-14 text-center">
       <SearchX size={32} class="mx-auto text-[#AEB4C1]" aria-hidden="true" />
       <h2 class="mt-4 text-[14px] font-semibold text-[#303645]">Nenhuma resposta publicada</h2>
       <p class="mx-auto mt-2 max-w-[560px] text-[11px] leading-6 text-[#818795]">Esta dúvida já entrou na telemetria. Depois ela poderá aparecer em “lacunas de conhecimento” para a equipe criar ou melhorar um conteúdo.</p>
     </section>
   {/if}
-</div>
+</ApplicationContent>

@@ -8,6 +8,7 @@
     Library,
     PlaySquare,
   } from "lucide-svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -30,36 +31,24 @@
   <title>Central de Ajuda | F10 Operations</title>
 </svelte:head>
 
-<div class="mx-auto max-w-[1440px] px-5 py-7 sm:px-8 sm:py-9">
-  <div class="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-    <div>
-      <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">
-        Conhecimento
-      </p>
-      <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">
-        Central de Ajuda
-      </h1>
-      <p class="mt-2 max-w-[760px] text-[14px] leading-6 text-[#6F7585]">
-        Gerencie conteúdos, treinamentos e a estrutura interativa que orienta os clientes no site público.
-      </p>
-    </div>
-
-    {#if data.canEdit}
+<ApplicationContent width="standard">
+  {#if data.canEdit}
+    <div class="mb-3 flex justify-end">
       <form method="POST" action="?/importLegacy">
         <button
           type="submit"
-          class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[12px] font-semibold text-[#000A57] shadow-sm transition hover:bg-[#F8F9FC]"
+          class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57] shadow-sm transition hover:bg-[#F8F9FC]"
         >
-          <GitBranch size={17} aria-hidden="true" />
+          <GitBranch size={15} aria-hidden="true" />
           Importar conteúdo atual
         </button>
       </form>
-    {/if}
-  </div>
+    </div>
+  {/if}
 
   {#if form?.message}
     <div
-      class={`mt-6 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${
+      class={`mb-3 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${
         form.success
           ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]"
           : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"
@@ -74,7 +63,7 @@
     </div>
   {/if}
 
-  <section class="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5">
       <Library size={20} class="text-[#000A57]" aria-hidden="true" />
       <strong class="mt-4 block text-[26px] font-semibold">{data.summary.articles}</strong>
@@ -97,26 +86,20 @@
     </div>
   </section>
 
-  <div class="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-    <section class="overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
+  <div class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+    <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
       <header class="flex items-center justify-between gap-4 border-b border-[#EEF0F5] px-5 py-4 sm:px-6">
         <div>
           <h2 class="text-[16px] font-semibold text-[#11182C]">Conteúdos</h2>
-          <p class="mt-1 text-[11px] text-[#858A98]">
-            Rascunhos e conteúdos publicados pela equipe.
-          </p>
+          <p class="mt-1 text-[11px] text-[#858A98]">Rascunhos e conteúdos publicados pela equipe.</p>
         </div>
       </header>
 
       {#if data.articles.length === 0}
         <div class="px-6 py-14 text-center">
           <BookOpen size={30} class="mx-auto text-[#B5BAC7]" aria-hidden="true" />
-          <p class="mt-4 text-[13px] font-semibold text-[#4B5160]">
-            Nenhum conteúdo editorial criado
-          </p>
-          <p class="mt-1 text-[11px] text-[#9297A5]">
-            Os fluxos atuais podem ser importados sem afetar a Central pública.
-          </p>
+          <p class="mt-4 text-[13px] font-semibold text-[#4B5160]">Nenhum conteúdo editorial criado</p>
+          <p class="mt-1 text-[11px] text-[#9297A5]">Os fluxos atuais podem ser importados sem afetar a Central pública.</p>
         </div>
       {:else}
         <div class="divide-y divide-[#EEF0F5]">
@@ -136,9 +119,7 @@
                 </div>
                 <p class="mt-1 truncate text-[11px] text-[#8B909E]">/{article.slug}</p>
                 {#if article.summary}
-                  <p class="mt-2 line-clamp-2 text-[12px] leading-5 text-[#666C7D]">
-                    {article.summary}
-                  </p>
+                  <p class="mt-2 line-clamp-2 text-[12px] leading-5 text-[#666C7D]">{article.summary}</p>
                 {/if}
               </div>
 
@@ -160,70 +141,39 @@
     </section>
 
     {#if data.canEdit}
-      <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
         <div class="flex items-start gap-3">
           <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFF0E4] text-[#EA6D0B]">
             <FilePlus2 size={19} aria-hidden="true" />
           </span>
           <div>
             <h2 class="text-[16px] font-semibold text-[#11182C]">Novo conteúdo</h2>
-            <p class="mt-1 text-[11px] leading-5 text-[#858A98]">
-              Cria um rascunho simples. O editor por blocos será evoluído sobre esta estrutura.
-            </p>
+            <p class="mt-1 text-[11px] leading-5 text-[#858A98]">Cria um rascunho simples para evolução no editor.</p>
           </div>
         </div>
 
         <form method="POST" action="?/createArticle" class="mt-6 space-y-4">
           <label class="block">
             <span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Título</span>
-            <input
-              name="title"
-              required
-              maxlength="160"
-              value={createValues?.title ?? ""}
-              class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"
-            />
+            <input name="title" required maxlength="160" value={createValues?.title ?? ""} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10" />
           </label>
 
           <label class="block">
             <span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Endereço</span>
-            <input
-              name="slug"
-              maxlength="120"
-              value={createValues?.slug ?? ""}
-              placeholder="gerado a partir do título"
-              class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"
-            />
+            <input name="slug" maxlength="120" value={createValues?.slug ?? ""} placeholder="gerado a partir do título" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10" />
           </label>
 
           <label class="block">
             <span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Resumo</span>
-            <textarea
-              name="summary"
-              maxlength="320"
-              rows="3"
-              value={createValues?.summary ?? ""}
-              class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"
-            ></textarea>
+            <textarea name="summary" maxlength="320" rows="3" value={createValues?.summary ?? ""} class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"></textarea>
           </label>
 
           <label class="block">
             <span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Conteúdo</span>
-            <textarea
-              name="bodyText"
-              required
-              maxlength="50000"
-              rows="9"
-              value={createValues?.bodyText ?? ""}
-              placeholder="Separe os parágrafos com uma linha em branco."
-              class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[13px] leading-6 outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"
-            ></textarea>
+            <textarea name="bodyText" required maxlength="50000" rows="9" value={createValues?.bodyText ?? ""} placeholder="Separe os parágrafos com uma linha em branco." class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[13px] leading-6 outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"></textarea>
           </label>
 
-          <button
-            type="submit"
-            class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white transition hover:bg-[#111B71]"
-          >
+          <button type="submit" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white transition hover:bg-[#111B71]">
             <FilePlus2 size={17} aria-hidden="true" />
             Criar rascunho
           </button>
@@ -232,17 +182,13 @@
     {/if}
   </div>
 
-  <section class="mt-7 rounded-[24px] border border-dashed border-[#CFD3DD] bg-[#FAFAFC] px-5 py-5 sm:px-6">
+  <section class="mt-5 rounded-[22px] border border-dashed border-[#CFD3DD] bg-[#FAFAFC] px-5 py-5 sm:px-6">
     <div class="flex items-start gap-3">
       <GitBranch size={20} class="mt-0.5 shrink-0 text-[#EA6D0B]" aria-hidden="true" />
       <div>
-        <h2 class="text-[13px] font-semibold text-[#323848]">
-          Transição sem impacto no site público
-        </h2>
-        <p class="mt-1 max-w-[900px] text-[11px] leading-5 text-[#777D8D]">
-          Nesta fase, os dados são administrados no PostgreSQL, mas a rota pública /ajuda-f10 continua usando a estrutura atual em TypeScript. A troca para leitura dinâmica será feita somente depois de validar a importação e o mecanismo de publicação.
-        </p>
+        <h2 class="text-[13px] font-semibold text-[#323848]">Transição sem impacto no site público</h2>
+        <p class="mt-1 max-w-[900px] text-[11px] leading-5 text-[#777D8D]">Nesta fase, os dados são administrados no PostgreSQL, mas a rota pública /ajuda-f10 continua usando a estrutura atual em TypeScript. A troca para leitura dinâmica será feita somente depois de validar a importação e o mecanismo de publicação.</p>
       </div>
     </div>
   </section>
-</div>
+</ApplicationContent>

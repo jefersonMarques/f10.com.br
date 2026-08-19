@@ -41,6 +41,30 @@ const operationsRouteRules: ApplicationRouteRule[] = [
     description: "Uso, cobertura e oportunidades",
   },
   {
+    prefix: "/app/help/assets",
+    title: "Biblioteca de arquivos",
+    section: "Base de Conhecimento",
+    description: "Mídias e anexos reutilizáveis",
+  },
+  {
+    prefix: "/app/help/flows",
+    title: "Fluxos da Central",
+    section: "Base de Conhecimento",
+    description: "Estrutura interativa de ajuda",
+  },
+  {
+    prefix: "/app/help",
+    title: "Base de Conhecimento",
+    section: "Conhecimento",
+    description: "Conteúdos, treinamentos e estrutura de ajuda",
+  },
+  {
+    prefix: "/app/tasks/projects",
+    title: "Configurar projeto",
+    section: "Tarefas",
+    description: "Equipe, status e regras do projeto",
+  },
+  {
     prefix: "/app/tasks",
     title: "Tarefas",
     section: "Trabalho interno",
@@ -51,6 +75,18 @@ const operationsRouteRules: ApplicationRouteRule[] = [
     title: "Tickets",
     section: "Atendimento",
     description: "Kanban global e fluxos por área",
+  },
+  {
+    prefix: "/app/chat/lab",
+    title: "Laboratório de IA",
+    section: "Chat",
+    description: "Teste controlado do agente de suporte",
+  },
+  {
+    prefix: "/app/chat/preview",
+    title: "Preview do cliente",
+    section: "Chat",
+    description: "Homologação ponta a ponta do atendimento",
   },
   {
     prefix: "/app/chat",
@@ -77,6 +113,12 @@ const operationsRouteRules: ApplicationRouteRule[] = [
     description: "Pessoas, papéis e permissões",
   },
   {
+    prefix: "/app/settings/atendimento",
+    title: "Operação do suporte",
+    section: "Configurações",
+    description: "Filas, equipes, presença, IA e horários",
+  },
+  {
     prefix: "/app/settings",
     title: "Configurações",
     section: "Administração",
@@ -86,7 +128,7 @@ const operationsRouteRules: ApplicationRouteRule[] = [
     prefix: "/app/minha-conta",
     title: "Minha conta",
     section: "Perfil",
-    description: "Dados pessoais e preferências",
+    description: "Dados pessoais e segurança",
   },
   {
     prefix: "/app/notifications",

@@ -13,6 +13,7 @@
     Trash2,
     UploadCloud,
   } from "lucide-svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -30,29 +31,22 @@
 
 <svelte:head><title>Base de Conhecimento | F10 Operations</title></svelte:head>
 
-<div class="mx-auto max-w-[1480px] px-5 py-7 sm:px-8 sm:py-9">
-  <div class="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-    <div>
-      <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Conhecimento estruturado</p>
-      <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Base de Conhecimento</h1>
-      <p class="mt-2 max-w-[780px] text-[14px] leading-6 text-[#6F7585]">Crie procedimentos em passos. Texto, imagem, vídeo, arquivos e conhecimento exclusivo para a IA permanecem na mesma fonte.</p>
-    </div>
-    <div class="flex flex-wrap gap-2">
-      <a href="/app/help/assets" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[10px] font-semibold text-[#000A57]"><HardDrive size={15}/>Biblioteca</a>
-      {#if data.canEdit}<a href="/app/help/content/import" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[10px] font-semibold text-[#000A57]"><UploadCloud size={15}/>Importar</a>{/if}
-    </div>
+<ApplicationContent width="wide">
+  <div class="mb-3 flex flex-wrap justify-end gap-2">
+    <a href="/app/help/assets" class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57]"><HardDrive size={15}/>Biblioteca</a>
+    {#if data.canEdit}<a href="/app/help/content/import" class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57]"><UploadCloud size={15}/>Importar</a>{/if}
   </div>
 
-  {#if form?.message}<div class="mt-6 flex items-start gap-3 rounded-2xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[12px] font-medium text-[#9B2C2C]"><CircleAlert size={18}/><span>{form.message}</span></div>{/if}
+  {#if form?.message}<div class="mb-3 flex items-start gap-3 rounded-2xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[12px] font-medium text-[#9B2C2C]"><CircleAlert size={18}/><span>{form.message}</span></div>{/if}
 
-  <section class="mt-7 grid gap-3 md:grid-cols-3">
+  <section class="grid gap-3 md:grid-cols-3">
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><BookOpenCheck size={20} class="text-[#000A57]"/><strong class="mt-4 block text-[26px] font-semibold">{data.contents.length}</strong><span class="text-[11px] text-[#858A98]">conteúdos estruturados</span></div>
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><Layers3 size={20} class="text-[#000A57]"/><strong class="mt-4 block text-[26px] font-semibold">{data.contents.reduce((total, content) => total + content.stepCount, 0)}</strong><span class="text-[11px] text-[#858A98]">passos cadastrados</span></div>
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><BrainCircuit size={20} class="text-[#EA6D0B]"/><strong class="mt-4 block text-[15px] font-semibold">Fonte única</strong><span class="mt-2 block text-[11px] leading-5 text-[#858A98]">Pesquisa, Central pública e agente de suporte consomem a publicação desta base.</span></div>
   </section>
 
-  <div class="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_410px]">
-    <section class="overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
+  <div class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_410px]">
+    <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
       <header class="border-b border-[#EEF0F5] px-5 py-4 sm:px-6"><h2 class="text-[16px] font-semibold text-[#11182C]">Conteúdos</h2><p class="mt-1 text-[11px] text-[#858A98]">Rascunhos podem ser descartados antes da primeira publicação. Conteúdos já publicados podem ser arquivados para sair da Central e da IA sem perder o histórico.</p></header>
       {#if data.contents.length === 0}
         <div class="px-6 py-16 text-center"><BookOpenCheck size={34} class="mx-auto text-[#B6BBC7]"/><p class="mt-4 text-[13px] font-semibold text-[#4B5160]">Nenhum conteúdo estruturado</p></div>
@@ -94,7 +88,7 @@
     </section>
 
     {#if data.canEdit}
-      <section class="h-fit rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+      <section class="h-fit rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
         <div class="flex items-start gap-3"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFF0E4] text-[#EA6D0B]"><FilePlus2 size={19}/></span><div><h2 class="text-[16px] font-semibold text-[#11182C]">Novo conteúdo</h2><p class="mt-1 text-[11px] leading-5 text-[#858A98]">O Passo 1 é criado automaticamente.</p></div></div>
         <form method="POST" action="?/create" class="mt-6 space-y-4">
           <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Título</span><input name="title" required maxlength="160" value={values?.title ?? ""} placeholder="Ex.: Como cadastrar uma turma" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#000A57]" /></label>
@@ -107,4 +101,4 @@
       </section>
     {/if}
   </div>
-</div>
+</ApplicationContent>

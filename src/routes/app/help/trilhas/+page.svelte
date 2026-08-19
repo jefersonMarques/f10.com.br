@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { ArrowLeft, ArrowRight, BookOpenCheck, CircleAlert, GraduationCap, Plus, Users } from "lucide-svelte";
+  import { ArrowRight, BookOpenCheck, CircleAlert, GraduationCap, Plus, Users } from "lucide-svelte";
+  import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -16,29 +18,21 @@
 
 <svelte:head><title>Trilhas F10 | Base de Conhecimento</title></svelte:head>
 
-<div class="mx-auto max-w-[1480px] px-5 py-7 sm:px-8 sm:py-9">
-  <a href="/app/help/content" class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[12px] font-semibold text-[#5F6575] transition hover:bg-white hover:text-[#000A57]"><ArrowLeft size={17}/>Base de Conhecimento</a>
-
-  <div class="mt-5 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-    <div>
-      <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Aprender fazendo</p>
-      <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Trilhas F10</h1>
-      <p class="mt-2 max-w-[820px] text-[14px] leading-6 text-[#6F7585]">Microações progressivas para ensinar novos usuários sem transformar o treinamento em um curso longo. O participante vê somente a próxima ação.</p>
-    </div>
-  </div>
+<ApplicationContent width="wide">
+  <ApplicationBackLink href="/app/help/content" label="Base de Conhecimento" className="mb-3" />
 
   {#if form?.message}
-    <div class="mt-6 flex items-start gap-3 rounded-2xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[12px] font-medium text-[#9B2C2C]"><CircleAlert size={18}/><span>{form.message}</span></div>
+    <div class="mb-3 flex items-start gap-3 rounded-2xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[12px] font-medium text-[#9B2C2C]"><CircleAlert size={18}/><span>{form.message}</span></div>
   {/if}
 
-  <section class="mt-7 grid gap-3 md:grid-cols-3">
+  <section class="grid gap-3 md:grid-cols-3">
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><GraduationCap size={21} class="text-[#000A57]"/><strong class="mt-4 block text-[26px] font-semibold">{data.paths.length}</strong><span class="text-[11px] text-[#858A98]">trilhas cadastradas</span></div>
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><Users size={21} class="text-[#000A57]"/><strong class="mt-4 block text-[26px] font-semibold">{data.paths.reduce((total, path) => total + path.participantCount, 0)}</strong><span class="text-[11px] text-[#858A98]">convites enviados</span></div>
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><BookOpenCheck size={21} class="text-[#EA6D0B]"/><strong class="mt-4 block text-[26px] font-semibold">{data.paths.reduce((total, path) => total + path.completedCount, 0)}</strong><span class="text-[11px] text-[#858A98]">treinamentos concluídos</span></div>
   </section>
 
-  <div class="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_410px]">
-    <section class="overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
+  <div class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_410px]">
+    <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
       <header class="border-b border-[#EEF0F5] px-5 py-4 sm:px-6"><h2 class="text-[16px] font-semibold text-[#11182C]">Trilhas</h2><p class="mt-1 text-[11px] text-[#858A98]">Quantidade total de microações e progresso completo ficam somente no Operations; o participante não vê esses números.</p></header>
       {#if data.paths.length === 0}
         <div class="px-6 py-16 text-center"><GraduationCap size={36} class="mx-auto text-[#B6BBC7]"/><p class="mt-4 text-[13px] font-semibold text-[#4B5160]">Nenhuma trilha criada</p><p class="mt-1 text-[11px] text-[#9297A5]">Comece por uma função específica, como Comercial, Secretaria ou Financeiro.</p></div>
@@ -65,7 +59,7 @@
     </section>
 
     {#if data.canEdit}
-      <section class="h-fit rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+      <section class="h-fit rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
         <div class="flex items-start gap-3"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFF0E4] text-[#EA6D0B]"><Plus size={19}/></span><div><h2 class="text-[16px] font-semibold text-[#11182C]">Nova trilha</h2><p class="mt-1 text-[11px] leading-5 text-[#858A98]">Crie para uma função ou rotina específica.</p></div></div>
         <form method="POST" action="?/create" class="mt-6 space-y-4">
           <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Nome</span><input name="title" required maxlength="160" value={values?.title ?? ""} placeholder="Ex.: Comercial — primeiros passos" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#000A57]" /></label>
@@ -77,4 +71,4 @@
       </section>
     {/if}
   </div>
-</div>
+</ApplicationContent>
