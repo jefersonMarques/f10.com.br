@@ -1,7 +1,6 @@
 <script lang="ts">
   import {
     ArrowDown,
-    ArrowLeft,
     ArrowUp,
     Boxes,
     CheckCircle2,
@@ -13,6 +12,8 @@
     Trash2,
     Users,
   } from "lucide-svelte";
+  import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -76,22 +77,16 @@
 
 <svelte:head><title>Workflows de tickets | F10 Operations</title></svelte:head>
 
-<div class="mx-auto max-w-[1500px] px-5 py-7 sm:px-8 sm:py-9">
-  <a href="/app/tickets" class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[11px] font-semibold text-[#5F6575] hover:bg-white hover:text-[#000A57]"><ArrowLeft size={16}/>Voltar para tickets</a>
-
-  <div class="mt-5">
-    <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Processos</p>
-    <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">Kanban e áreas</h1>
-    <p class="mt-2 max-w-[900px] text-[13px] leading-6 text-[#6F7585]">O fluxo global pode usar áreas como colunas. Cada área possui seu próprio Kanban interno e suas colunas podem ter cores independentes.</p>
-  </div>
+<ApplicationContent width="full">
+  <ApplicationBackLink href="/app/tickets" label="Tickets" className="mb-3" />
 
   {#if form?.message}
-    <div class={`mt-6 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[11px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
+    <div class={`mb-3 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[11px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
       {#if form.success}<CheckCircle2 size={17}/>{:else}<CircleAlert size={17}/>{/if}<span>{form.message}</span>
     </div>
   {/if}
 
-  <div class="mt-7 grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
+  <div class="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
     <aside class="space-y-5">
       <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-4">
         <div class="flex items-center gap-2"><GitBranch size={17} class="text-[#000A57]"/><h2 class="text-[13px] font-semibold text-[#202637]">Fluxo global</h2></div>
@@ -128,7 +123,7 @@
 
     <main>
       {#if selectedWorkflow}
-        <section class="rounded-[24px] border border-[#E2E5ED] bg-white">
+        <section class="rounded-[22px] border border-[#E2E5ED] bg-white">
           <header class="border-b border-[#EEF0F5] px-5 py-5 sm:px-6">
             <span class={`rounded-full px-2.5 py-1 text-[8px] font-bold uppercase tracking-[0.07em] ${selectedWorkflow.kind === "global" ? "bg-[#EEF0FF] text-[#000A57]" : "bg-[#FFF1E4] text-[#A9510D]"}`}>{selectedWorkflow.kind === "global" ? "Global" : "Área"}</span>
             <h2 class="mt-2 text-[20px] font-semibold text-[#202637]">{selectedWorkflow.kind === "global" ? selectedWorkflow.name : selectedWorkflow.areaName}</h2>
@@ -221,4 +216,4 @@
       {/if}
     </main>
   </div>
-</div>
+</ApplicationContent>
