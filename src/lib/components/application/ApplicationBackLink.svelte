@@ -8,7 +8,7 @@
 
 <a
   {href}
-  class={`inline-flex min-h-9 items-center gap-2 rounded-xl px-2.5 text-[11px] font-semibold text-[#626979] transition hover:bg-white hover:text-[#000A57] ${className}`}
+  class={`application-text-caption inline-flex min-h-9 items-center gap-2 rounded-xl px-2.5 font-semibold text-[#626979] transition hover:bg-white hover:text-[#000A57] ${className}`}
 >
   <ArrowLeft size={15} aria-hidden="true" />
   <span>{label}</span>
