@@ -89,6 +89,8 @@
 
 <div
   class={`rounded-xl border border-dashed p-3 transition ${dragActive ? "border-[#000A57] bg-[#EEF0FF]" : "border-[#CDD2DD] bg-[#FAFAFC]"}`}
+  role="group"
+  aria-label="Upload de imagem da microação"
   on:pointerenter={activate}
   on:focusin={activate}
   on:dragenter|preventDefault={() => { activate(); dragActive = true; }}
