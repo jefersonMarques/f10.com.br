@@ -1,7 +1,6 @@
 <script lang="ts">
   import {
     Archive,
-    ArrowLeft,
     BrainCircuit,
     CheckCircle2,
     CircleAlert,
@@ -17,6 +16,8 @@
     Trash2,
     Video,
   } from "lucide-svelte";
+  import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import HelpImageUploader from "$lib/components/operations/HelpImageUploader.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -37,71 +38,72 @@
   <title>{data.content.title} | Base de Conhecimento | F10 Operations</title>
 </svelte:head>
 
-<div class="mx-auto max-w-[1320px] px-5 py-7 sm:px-8 sm:py-9">
-  <a href="/app/help/content" class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[12px] font-semibold text-[#5F6575] transition hover:bg-white hover:text-[#000A57]">
-    <ArrowLeft size={17} aria-hidden="true" />
-    Voltar para Base de Conhecimento
-  </a>
-
-  <div class="mt-5 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-    <div class="min-w-0">
-      <div class="flex flex-wrap items-center gap-2">
-        <span class={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em] ${data.content.status === "published" ? "bg-[#EEF8F1] text-[#2F7045]" : data.content.status === "archived" ? "bg-[#F1F1F3] text-[#676D7D]" : "bg-[#EEF0FF] text-[#000A57]"}`}>
-          {data.content.status === "published" ? "Publicado" : data.content.status === "archived" ? "Arquivado" : "Rascunho"}
-        </span>
-        <span class="rounded-full bg-[#F3F4F7] px-3 py-1.5 text-[10px] font-semibold text-[#737989]">
-          {data.content.steps.length} {data.content.steps.length === 1 ? "passo" : "passos"}
-        </span>
-        {#if data.content.hasPublishedVersion && data.content.status !== "published" && data.content.status !== "archived"}
-          <span class="rounded-full bg-[#FFF4E9] px-3 py-1.5 text-[10px] font-bold text-[#B85408]">Há alterações não publicadas</span>
-        {/if}
-      </div>
-      <h1 class="mt-3 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">{data.content.title}</h1>
-      <p class="mt-2 text-[12px] text-[#838897]">/{data.content.slug}</p>
-    </div>
-
-    <div class="flex flex-wrap gap-2">
-      <a href={`/app/help/content/${data.content.id}/preview`} class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57]">Preview<ExternalLink size={13}/></a>
-      <a href="/app/help/assets" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57]"><HardDrive size={15}/>Biblioteca</a>
-      {#if data.canEdit && !data.content.publishedAt}
-        <form method="POST" action="/app/help/content?/discard" on:submit={(event) => { if (!confirm("Descartar este conteúdo definitivamente? Esta ação remove o rascunho e não pode ser desfeita.")) event.preventDefault(); }}>
-          <input type="hidden" name="contentId" value={data.content.id}/>
-          <button type="submit" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#F0C8C8] bg-white px-4 text-[11px] font-semibold text-[#9B2C2C] transition hover:bg-[#FFF5F5]"><Trash2 size={15}/>Descartar</button>
-        </form>
-      {:else if data.canPublish && data.content.publishedAt}
-        <form method="POST" action="/app/help/content?/archive" on:submit={(event) => { if (!confirm("Arquivar este conteúdo? Ele deixará de aparecer na Central pública e deixará de ser usado pela IA. O histórico será mantido.")) event.preventDefault(); }}>
-          <input type="hidden" name="contentId" value={data.content.id}/>
-          <button type="submit" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#626979] transition hover:bg-[#F5F6F8]"><Archive size={15}/>Arquivar</button>
-        </form>
-      {/if}
-      {#if data.canPublish && data.content.status !== "published"}
-        <form method="POST" action="?/publish">
-          <button type="submit" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#EA6D0B] px-5 text-[12px] font-semibold text-white shadow-[0_12px_28px_rgba(234,109,11,0.2)] transition hover:brightness-105"><CloudUpload size={17} aria-hidden="true" />Publicar conteúdo</button>
-        </form>
+<ApplicationContent width="wide">
+  <div class="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+    <ApplicationBackLink href="/app/help/content" label="Base de Conhecimento" />
+    <div class="flex flex-wrap items-center gap-2">
+      <span class={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em] ${data.content.status === "published" ? "bg-[#EEF8F1] text-[#2F7045]" : data.content.status === "archived" ? "bg-[#F1F1F3] text-[#676D7D]" : "bg-[#EEF0FF] text-[#000A57]"}`}>
+        {data.content.status === "published" ? "Publicado" : data.content.status === "archived" ? "Arquivado" : "Rascunho"}
+      </span>
+      <span class="rounded-full bg-[#F3F4F7] px-3 py-1.5 text-[10px] font-semibold text-[#737989]">
+        {data.content.steps.length} {data.content.steps.length === 1 ? "passo" : "passos"}
+      </span>
+      {#if data.content.hasPublishedVersion && data.content.status !== "published" && data.content.status !== "archived"}
+        <span class="rounded-full bg-[#FFF4E9] px-3 py-1.5 text-[10px] font-bold text-[#B85408]">Há alterações não publicadas</span>
       {/if}
     </div>
   </div>
 
+  <section class="mb-4 rounded-[22px] border border-[#E2E5ED] bg-white px-5 py-4 sm:px-6">
+    <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+      <div class="min-w-0">
+        <h2 class="truncate text-[18px] font-semibold text-[#11182C]">{data.content.title}</h2>
+        <p class="mt-1 truncate text-[11px] text-[#838897]">/{data.content.slug}</p>
+      </div>
+
+      <div class="flex flex-wrap gap-2">
+        <a href={`/app/help/content/${data.content.id}/preview`} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 text-[10px] font-semibold text-[#000A57]">Preview<ExternalLink size={12}/></a>
+        <a href="/app/help/assets" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 text-[10px] font-semibold text-[#000A57]"><HardDrive size={14}/>Biblioteca</a>
+        {#if data.canEdit && !data.content.publishedAt}
+          <form method="POST" action="/app/help/content?/discard" on:submit={(event) => { if (!confirm("Descartar este conteúdo definitivamente? Esta ação remove o rascunho e não pode ser desfeita.")) event.preventDefault(); }}>
+            <input type="hidden" name="contentId" value={data.content.id}/>
+            <button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#F0C8C8] bg-white px-3.5 text-[10px] font-semibold text-[#9B2C2C] transition hover:bg-[#FFF5F5]"><Trash2 size={14}/>Descartar</button>
+          </form>
+        {:else if data.canPublish && data.content.publishedAt}
+          <form method="POST" action="/app/help/content?/archive" on:submit={(event) => { if (!confirm("Arquivar este conteúdo? Ele deixará de aparecer na Central pública e deixará de ser usado pela IA. O histórico será mantido.")) event.preventDefault(); }}>
+            <input type="hidden" name="contentId" value={data.content.id}/>
+            <button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 text-[10px] font-semibold text-[#626979] transition hover:bg-[#F5F6F8]"><Archive size={14}/>Arquivar</button>
+          </form>
+        {/if}
+        {#if data.canPublish && data.content.status !== "published"}
+          <form method="POST" action="?/publish">
+            <button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[11px] font-semibold text-white shadow-[0_10px_24px_rgba(234,109,11,0.16)] transition hover:brightness-105"><CloudUpload size={15} aria-hidden="true" />Publicar conteúdo</button>
+          </form>
+        {/if}
+      </div>
+    </div>
+  </section>
+
   {#if form?.message}
-    <div class={`mt-6 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
+    <div class={`mb-4 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
       {#if form.success}<CheckCircle2 size={18} class="mt-0.5 shrink-0" aria-hidden="true" />{:else}<CircleAlert size={18} class="mt-0.5 shrink-0" aria-hidden="true" />{/if}
       <span>{form.message}</span>
     </div>
   {/if}
 
   {#if data.content.status === "archived"}
-    <section class="mt-6 rounded-2xl border border-[#DDE1EA] bg-[#F7F8FA] px-5 py-4">
+    <section class="mb-4 rounded-2xl border border-[#DDE1EA] bg-[#F7F8FA] px-5 py-4">
       <p class="text-[12px] font-semibold text-[#505666]">Este conteúdo está arquivado e permanece somente para consulta interna.</p>
       <p class="mt-1 text-[11px] leading-5 text-[#777D8D]">Ele não aparece na Central pública e não participa da base usada pelo atendimento com IA.</p>
     </section>
   {:else if data.content.hasPublishedVersion && data.content.status !== "published"}
-    <section class="mt-6 rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] px-5 py-4">
+    <section class="mb-4 rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] px-5 py-4">
       <p class="text-[12px] font-semibold text-[#7A3B08]">A versão publicada anterior continua sendo a versão segura para pesquisa e IA.</p>
       <p class="mt-1 text-[11px] leading-5 text-[#91603A]">As alterações abaixo só entram na base publicada depois de clicar em “Publicar conteúdo”.</p>
     </section>
   {/if}
 
-  <form method="POST" action="?/updateContent" class="mt-7 rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-7">
+  <form method="POST" action="?/updateContent" class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
     <fieldset disabled={!data.canEdit} class="disabled:opacity-70">
       <div class="flex items-start justify-between gap-4"><div><h2 class="text-[16px] font-semibold text-[#11182C]">Informações gerais</h2><p class="mt-1 text-[11px] text-[#858A98]">Esses dados identificam o procedimento e dão contexto geral ao agente.</p></div><Save size={18} class="text-[#000A57]" aria-hidden="true" /></div>
       <div class="mt-6 grid gap-5 lg:grid-cols-2">
@@ -115,15 +117,15 @@
     </fieldset>
   </form>
 
-  <div class="mt-7 space-y-6">
+  <div class="mt-5 space-y-5">
     {#each data.content.steps as step, stepIndex}
-      <article class="overflow-hidden rounded-[26px] border border-[#DDE1EA] bg-white shadow-[0_8px_30px_rgba(1,13,40,0.04)]">
-        <header class="flex flex-col gap-4 border-b border-[#EEF0F5] bg-[#FAFAFC] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+      <article class="overflow-hidden rounded-[22px] border border-[#DDE1EA] bg-white shadow-[0_8px_30px_rgba(1,13,40,0.04)]">
+        <header class="flex flex-col gap-4 border-b border-[#EEF0F5] bg-[#FAFAFC] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div class="flex items-center gap-4"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#000A57] text-[13px] font-bold text-white">{stepIndex + 1}</span><div><p class="text-[9px] font-bold uppercase tracking-[0.12em] text-[#EA6D0B]">Passo {stepIndex + 1}</p><h2 class="mt-1 text-[16px] font-semibold text-[#222839]">{step.title}</h2></div></div>
           {#if data.canEdit && data.content.steps.length > 1}<form method="POST" action="?/deleteStep"><input type="hidden" name="stepId" value={step.id} /><button type="submit" class="inline-flex min-h-9 items-center gap-2 rounded-xl px-3 text-[10px] font-semibold text-[#9B2C2C] transition hover:bg-[#FFF0F0]"><Trash2 size={14} aria-hidden="true" />Remover passo</button></form>{/if}
         </header>
 
-        <div class="p-5 sm:p-7">
+        <div class="p-5 sm:p-6">
           <form method="POST" action="?/updateStep" class="grid gap-4 lg:grid-cols-2">
             <input type="hidden" name="stepId" value={step.id} />
             <fieldset disabled={!data.canEdit} class="contents disabled:opacity-70">
@@ -194,7 +196,7 @@
     {/each}
   </div>
 
-  {#if data.canEdit}<form method="POST" action="?/addStep" class="mt-6"><button type="submit" class="flex min-h-14 w-full items-center justify-center gap-2 rounded-[20px] border border-dashed border-[#BCC2CF] bg-white text-[12px] font-semibold text-[#000A57] transition hover:border-[#000A57] hover:bg-[#F8F9FF]"><Plus size={18} aria-hidden="true" />Adicionar próximo passo</button></form>{/if}
+  {#if data.canEdit}<form method="POST" action="?/addStep" class="mt-5"><button type="submit" class="flex min-h-14 w-full items-center justify-center gap-2 rounded-[20px] border border-dashed border-[#BCC2CF] bg-white text-[12px] font-semibold text-[#000A57] transition hover:border-[#000A57] hover:bg-[#F8F9FF]"><Plus size={18} aria-hidden="true" />Adicionar próximo passo</button></form>{/if}
 
-  <section class="mt-7 rounded-[24px] border border-[#D8DDF4] bg-[#F8F9FF] p-5 sm:p-6"><div class="flex items-start gap-3"><BrainCircuit size={20} class="mt-0.5 shrink-0 text-[#000A57]" aria-hidden="true" /><div><h2 class="text-[13px] font-semibold text-[#000A57]">Uma única base para cliente, pesquisa e suporte</h2><p class="mt-2 max-w-[900px] text-[11px] leading-6 text-[#646B7D]">Quando publicado, o snapshot guarda separadamente a apresentação pública e o conhecimento privado da IA. Assim o agente pode usar transcrições, exceções e instruções internas sem expor essas informações diretamente na Central pública.</p></div></div></section>
-</div>
+  <section class="mt-5 rounded-[22px] border border-[#D8DDF4] bg-[#F8F9FF] p-5 sm:p-6"><div class="flex items-start gap-3"><BrainCircuit size={20} class="mt-0.5 shrink-0 text-[#000A57]" aria-hidden="true" /><div><h2 class="text-[13px] font-semibold text-[#000A57]">Uma única base para cliente, pesquisa e suporte</h2><p class="mt-2 max-w-[900px] text-[11px] leading-6 text-[#646B7D]">Quando publicado, o snapshot guarda separadamente a apresentação pública e o conhecimento privado da IA. Assim o agente pode usar transcrições, exceções e instruções internas sem expor essas informações diretamente na Central pública.</p></div></div></section>
+</ApplicationContent>

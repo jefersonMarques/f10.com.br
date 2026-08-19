@@ -1,7 +1,6 @@
 <script lang="ts">
   import {
     Archive,
-    ArrowLeft,
     BarChart3,
     CheckCircle2,
     CircleAlert,
@@ -16,6 +15,8 @@
     Users,
     Video,
   } from "lucide-svelte";
+  import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import TrainingImageUploader from "$lib/components/operations/TrainingImageUploader.svelte";
   import HelpTrainingVideoUploader from "$lib/components/operations/HelpTrainingVideoUploader.svelte";
   import type { ActionData, PageData } from "./$types";
@@ -44,45 +45,49 @@
 
 <svelte:head><title>{data.path.title} | Trilhas F10</title></svelte:head>
 
-<div class="mx-auto max-w-[1480px] px-5 py-7 sm:px-8 sm:py-9">
-  <a href="/app/help/trilhas" class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[12px] font-semibold text-[#5F6575] transition hover:bg-white hover:text-[#000A57]"><ArrowLeft size={17}/>Voltar para Trilhas</a>
-
-  <div class="mt-5 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-    <div class="min-w-0">
-      <div class="flex flex-wrap items-center gap-2">
-        <span class={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em] ${data.path.status === "published" ? "bg-[#EEF8F1] text-[#2F7045]" : data.path.status === "archived" ? "bg-[#F1F1F3] text-[#676D7D]" : "bg-[#EEF0FF] text-[#000A57]"}`}>{statusLabel(data.path.status)}</span>
-        {#if data.path.currentVersion > 0}<span class="rounded-full bg-[#F3F4F7] px-3 py-1.5 text-[10px] font-semibold text-[#737989]">versão {data.path.currentVersion}</span>{/if}
-        <span class="rounded-full bg-[#FFF4E9] px-3 py-1.5 text-[10px] font-semibold text-[#B85408]">{data.path.steps.length} microações · somente interno</span>
-      </div>
-      <h1 class="mt-3 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">{data.path.title}</h1>
-      <p class="mt-2 text-[12px] text-[#838897]">/{data.path.slug} · {data.path.audience || "público não informado"}</p>
-    </div>
-    <div class="flex flex-wrap gap-2">
-      {#if data.canPublish && data.path.status !== "published"}
-        <form method="POST" action="?/publish"><button type="submit" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#EA6D0B] px-5 text-[11px] font-semibold text-white"><GraduationCap size={16}/>Publicar nova versão</button></form>
-      {/if}
-      {#if data.canPublish && data.path.currentVersion > 0 && data.path.status !== "archived"}
-        <form method="POST" action="?/archive" on:submit={(event) => { if (!confirm("Arquivar esta trilha? Novos convites serão bloqueados, mas participantes já iniciados continuam na versão recebida.")) event.preventDefault(); }}><button type="submit" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#626979]"><Archive size={15}/>Arquivar</button></form>
-      {/if}
+<ApplicationContent width="wide">
+  <div class="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+    <ApplicationBackLink href="/app/help/trilhas" label="Trilhas" />
+    <div class="flex flex-wrap items-center gap-2">
+      <span class={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em] ${data.path.status === "published" ? "bg-[#EEF8F1] text-[#2F7045]" : data.path.status === "archived" ? "bg-[#F1F1F3] text-[#676D7D]" : "bg-[#EEF0FF] text-[#000A57]"}`}>{statusLabel(data.path.status)}</span>
+      {#if data.path.currentVersion > 0}<span class="rounded-full bg-[#F3F4F7] px-3 py-1.5 text-[10px] font-semibold text-[#737989]">versão {data.path.currentVersion}</span>{/if}
+      <span class="rounded-full bg-[#FFF4E9] px-3 py-1.5 text-[10px] font-semibold text-[#B85408]">{data.path.steps.length} microações · somente interno</span>
     </div>
   </div>
 
+  <section class="mb-4 rounded-[22px] border border-[#E2E5ED] bg-white px-5 py-4 sm:px-6">
+    <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+      <div class="min-w-0">
+        <h2 class="truncate text-[18px] font-semibold text-[#11182C]">{data.path.title}</h2>
+        <p class="mt-1 truncate text-[11px] text-[#838897]">/{data.path.slug} · {data.path.audience || "público não informado"}</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        {#if data.canPublish && data.path.status !== "published"}
+          <form method="POST" action="?/publish"><button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[10px] font-semibold text-white"><GraduationCap size={15}/>Publicar nova versão</button></form>
+        {/if}
+        {#if data.canPublish && data.path.currentVersion > 0 && data.path.status !== "archived"}
+          <form method="POST" action="?/archive" on:submit={(event) => { if (!confirm("Arquivar esta trilha? Novos convites serão bloqueados, mas participantes já iniciados continuam na versão recebida.")) event.preventDefault(); }}><button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 text-[10px] font-semibold text-[#626979]"><Archive size={14}/>Arquivar</button></form>
+        {/if}
+      </div>
+    </div>
+  </section>
+
   {#if form?.message}
-    <div class={`mt-6 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
+    <div class={`mb-4 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
       {#if form.success}<CheckCircle2 size={18}/>{:else}<CircleAlert size={18}/>{/if}<span>{form.message}</span>
     </div>
   {/if}
 
-  <section class="mt-7 grid gap-3 md:grid-cols-4">
+  <section class="grid gap-3 md:grid-cols-4">
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><Mail size={18} class="text-[#000A57]"/><strong class="mt-3 block text-[24px] font-semibold">{data.insights.invited}</strong><span class="text-[10px] text-[#858A98]">convidados</span></div>
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><Users size={18} class="text-[#000A57]"/><strong class="mt-3 block text-[24px] font-semibold">{data.insights.started}</strong><span class="text-[10px] text-[#858A98]">iniciaram</span></div>
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><CheckCircle2 size={18} class="text-[#2F7045]"/><strong class="mt-3 block text-[24px] font-semibold">{data.insights.completed}</strong><span class="text-[10px] text-[#858A98]">concluíram</span></div>
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><CircleAlert size={18} class="text-[#EA6D0B]"/><strong class="mt-3 block text-[24px] font-semibold">{data.insights.humanHelp}</strong><span class="text-[10px] text-[#858A98]">precisaram de ajuda humana</span></div>
   </section>
 
-  <div class="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-    <div class="space-y-6">
-      <form method="POST" action="?/updatePath" class="rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+  <div class="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+    <div class="space-y-5">
+      <form method="POST" action="?/updatePath" class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
         <fieldset disabled={!data.canEdit} class="disabled:opacity-70">
           <div class="flex items-start justify-between gap-3"><div><h2 class="text-[16px] font-semibold text-[#11182C]">Configuração da trilha</h2><p class="mt-1 text-[11px] text-[#858A98]">Essas informações administram a trilha. Não revele quantidade total ou duração ao participante.</p></div><Save size={17} class="text-[#000A57]"/></div>
           <div class="mt-5 grid gap-4 lg:grid-cols-2">
@@ -97,7 +102,7 @@
         </fieldset>
       </form>
 
-      <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
         <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h2 class="text-[16px] font-semibold text-[#11182C]">Microações</h2><p class="mt-1 text-[11px] text-[#858A98]">Uma ação observável por vez. O vídeo é bloqueado acima de 60 segundos; mantenha-o idealmente entre 20 e 45 segundos.</p></div>{#if data.canEdit}<form method="POST" action="?/addStep"><button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white"><Plus size={14}/>Adicionar microação</button></form>{/if}</div>
 
         <div class="mt-5 space-y-4">
@@ -163,24 +168,24 @@
       </section>
     </div>
 
-    <aside class="space-y-6">
-      <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5">
+    <aside class="space-y-5">
+      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
         <div class="flex items-start gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0E4] text-[#EA6D0B]"><Send size={18}/></span><div><h2 class="text-[14px] font-semibold text-[#11182C]">Convidar participante</h2><p class="mt-1 text-[10px] leading-5 text-[#858A98]">O e-mail recebe “Pronto para começar?”. O link é individual e de uso único.</p></div></div>
         {#if data.path.currentVersion < 1}<div class="mt-4 rounded-xl bg-[#FFF7ED] px-3 py-3 text-[9px] leading-4 text-[#9A4B08]">Publique a primeira versão antes de enviar convites.</div>{:else if data.canEdit}
           <form method="POST" action="?/invite" class="mt-4 space-y-3"><input name="name" required maxlength="160" placeholder="Nome do novo usuário" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[10px]"/><input name="email" type="email" required placeholder="email@cliente.com.br" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[10px]"/><input name="organizationName" maxlength="180" placeholder="Empresa / instituição" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[10px]"/><button type="submit" class="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#EA6D0B] px-3 text-[10px] font-semibold text-white"><Mail size={14}/>Enviar convite</button></form>
         {/if}
       </section>
 
-      <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5">
+      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
         <div class="flex items-center gap-2"><BarChart3 size={17} class="text-[#000A57]"/><h2 class="text-[14px] font-semibold text-[#11182C]">Onde estão travando</h2></div>
         {#if data.insights.stepRanking.length === 0}<p class="mt-4 text-[10px] leading-5 text-[#8B909D]">Os dados aparecem conforme participantes usam a trilha.</p>{:else}<div class="mt-4 space-y-3">{#each data.insights.stepRanking.slice(0,5) as step}<div><div class="flex justify-between gap-3 text-[9px]"><span class="font-semibold text-[#4E5565]">{step.title}</span><span class="text-[#8B909D]">{step.failures} falhas · {step.helpRequests} ajuda</span></div><div class="mt-1 h-1.5 rounded-full bg-[#EEF0F5]"><div class="h-1.5 rounded-full bg-[#EA6D0B]" style={`width:${Math.min(100, step.failures * 12 + step.helpRequests * 20)}%`}></div></div></div>{/each}</div>{/if}
         {#if data.insights.reasonRanking.length > 0}<div class="mt-5 border-t border-[#EEF0F5] pt-4"><p class="text-[9px] font-bold uppercase tracking-[0.08em] text-[#8B909D]">Motivos frequentes</p>{#each data.insights.reasonRanking.slice(0,4) as reason}<div class="mt-2 flex justify-between gap-3 text-[9px]"><span class="text-[#5E6575]">{reason.label}</span><strong>{reason.occurrences}</strong></div>{/each}</div>{/if}
       </section>
 
-      <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5">
+      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
         <div class="flex items-center gap-2"><Users size={17} class="text-[#000A57]"/><h2 class="text-[14px] font-semibold text-[#11182C]">Participantes</h2></div>
         {#if data.participants.length === 0}<p class="mt-4 text-[10px] text-[#8B909D]">Nenhum convite enviado.</p>{:else}<div class="mt-4 space-y-3">{#each data.participants.slice(0,12) as participant}<div class="rounded-xl border border-[#EEF0F5] bg-[#FAFAFC] p-3"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><strong class="block truncate text-[10px] text-[#343A49]">{participant.name}</strong><span class="mt-0.5 block truncate text-[8px] text-[#8B909D]">{participant.organizationName || participant.email}</span></div><span class={`shrink-0 rounded-full px-2 py-1 text-[8px] font-semibold ${participant.status === "completed" ? "bg-[#EEF8F1] text-[#2F7045]" : participant.status === "in_progress" ? "bg-[#EEF0FF] text-[#000A57]" : "bg-[#F1F2F5] text-[#6F7585]"}`}>{participantStatus(participant.status)}</span></div>{#if participant.startedAt}<div class="mt-2 flex items-center gap-1 text-[8px] text-[#8B909D]"><Clock3 size={10}/>{formatDate(participant.lastActivityAt)}</div>{/if}{#if participant.status === "in_progress" && participant.currentStepTitle}<p class="mt-2 text-[8px] leading-4 text-[#666D7C]">Atual: {participant.currentStepTitle}</p>{/if}{#if participant.supportTicketId}<p class="mt-2 text-[8px] font-semibold text-[#B85408]">Precisou de ajuda humana</p>{/if}</div>{/each}</div>{/if}
       </section>
     </aside>
   </div>
-</div>
+</ApplicationContent>
