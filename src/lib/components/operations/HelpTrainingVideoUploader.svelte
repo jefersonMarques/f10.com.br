@@ -106,6 +106,8 @@
 
 <div
   class={`rounded-xl border border-dashed p-3 transition ${dragActive ? "border-[#EA6D0B] bg-[#FFF7ED]" : "border-[#CDD2DD] bg-[#FAFAFC]"}`}
+  role="group"
+  aria-label="Upload de microvídeo de treinamento"
   on:dragenter|preventDefault={() => (dragActive = true)}
   on:dragover|preventDefault={() => (dragActive = true)}
   on:dragleave={() => (dragActive = false)}
