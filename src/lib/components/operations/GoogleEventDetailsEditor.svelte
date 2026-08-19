@@ -31,12 +31,12 @@
 
 <div class="grid gap-3 sm:grid-cols-2">
   <label class="block sm:col-span-2">
-    <span class="mb-1.5 inline-flex items-center gap-1 text-[9px] font-semibold text-[#626979]"><MapPin size={12}/>Local <span class="font-normal text-[#9A9FAC]">(opcional)</span></span>
-    <input name="location" maxlength="500" bind:value={location} placeholder="Ex.: Sala de reunião ou endereço" class="h-10 w-full rounded-lg border border-[#DDE1EA] px-2.5 text-[10px] outline-none focus:border-[#000A57]"/>
+    <span class="application-text-meta mb-1.5 inline-flex items-center gap-1 font-semibold text-[#626979]"><MapPin size={12}/>Local <span class="font-normal text-[#9A9FAC]">(opcional)</span></span>
+    <input name="location" maxlength="500" bind:value={location} placeholder="Ex.: Sala de reunião ou endereço" class="application-text-caption h-10 w-full rounded-lg border border-[#DDE1EA] px-2.5 outline-none focus:border-[#000A57]"/>
   </label>
   <label class="block sm:col-span-2">
-    <span class="mb-1.5 inline-flex items-center gap-1 text-[9px] font-semibold text-[#626979]"><Bell size={12}/>Lembrete</span>
-    <select name="reminderMinutes" bind:value={reminderValue} class="h-10 w-full rounded-lg border border-[#DDE1EA] bg-white px-2.5 text-[10px] outline-none focus:border-[#000A57]">
+    <span class="application-text-meta mb-1.5 inline-flex items-center gap-1 font-semibold text-[#626979]"><Bell size={12}/>Lembrete</span>
+    <select name="reminderMinutes" bind:value={reminderValue} class="application-text-caption h-10 w-full rounded-lg border border-[#DDE1EA] bg-white px-2.5 outline-none focus:border-[#000A57]">
       <option value="">Padrão da agenda Google</option>
       <option value="0">Sem lembrete</option>
       <option value="10">10 minutos antes</option>
