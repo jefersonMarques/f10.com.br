@@ -96,7 +96,6 @@
 <div
   class={`rounded-xl border border-dashed p-3 transition ${dragActive ? "border-[#000A57] bg-[#EEF0FF]" : "border-[#CDD2DD] bg-[#FAFAFC]"}`}
   on:pointerenter={activate}
-  on:pointerdown={activate}
   on:focusin={activate}
   on:dragenter|preventDefault={() => { activate(); dragActive = true; }}
   on:dragover|preventDefault={() => { activate(); dragActive = true; }}
@@ -108,14 +107,14 @@
       <ImageIcon size={17} aria-hidden="true" />
     </span>
     <div class="min-w-0 flex-1">
-      <strong class="block text-[11px] font-semibold text-[#303645]">Imagem do computador</strong>
-      <span class="mt-1 block text-[10px] leading-5 text-[#858B99]">Clique para selecionar, arraste uma imagem aqui ou deixe este bloco ativo e use <strong>Ctrl+V</strong>.</span>
+      <strong class="application-text-caption block font-semibold text-[#303645]">Imagem do computador</strong>
+      <span class="application-text-caption mt-1 block leading-5 text-[#858B99]">Clique para selecionar, arraste uma imagem aqui ou deixe este bloco ativo e use <strong>Ctrl+V</strong>.</span>
     </div>
   </div>
 
   <label class="mt-3 block">
-    <span class="mb-1 block text-[9px] font-semibold text-[#707687]">Texto alternativo opcional</span>
-    <input bind:value={altText} maxlength="500" placeholder="Ex.: Tela de cadastro com o botão Salvar destacado" class="h-9 w-full rounded-lg border border-[#DDE1EA] bg-white px-3 text-[10px] outline-none focus:border-[#000A57]" />
+    <span class="application-text-meta mb-1 block font-semibold text-[#707687]">Texto alternativo opcional</span>
+    <input bind:value={altText} maxlength="500" placeholder="Ex.: Tela de cadastro com o botão Salvar destacado" class="application-text-caption h-9 w-full rounded-lg border border-[#DDE1EA] bg-white px-3 outline-none focus:border-[#000A57]" />
   </label>
 
   <input
@@ -130,7 +129,7 @@
     type="button"
     disabled={uploading}
     on:click={() => { activate(); fileInput?.click(); }}
-    class="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#000A57] px-3 text-[10px] font-semibold text-white disabled:cursor-wait disabled:opacity-60"
+    class="application-text-caption mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#000A57] px-3 font-semibold text-white disabled:cursor-wait disabled:opacity-60"
   >
     {#if uploading}
       <UploadCloud size={14} class="animate-pulse" aria-hidden="true" /> Enviando para a biblioteca...
@@ -139,6 +138,6 @@
     {/if}
   </button>
 
-  {#if message}<p class="mt-2 text-[9px] font-medium text-[#257342]">{message}</p>{/if}
-  {#if errorMessage}<p class="mt-2 text-[9px] font-medium text-[#A52A2A]">{errorMessage}</p>{/if}
+  {#if message}<p class="application-text-meta mt-2 font-medium text-[#257342]">{message}</p>{/if}
+  {#if errorMessage}<p class="application-text-meta mt-2 font-medium text-[#A52A2A]">{errorMessage}</p>{/if}
 </div>

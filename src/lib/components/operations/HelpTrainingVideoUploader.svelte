@@ -116,8 +116,8 @@
       <Film size={17} aria-hidden="true" />
     </span>
     <div class="min-w-0 flex-1">
-      <strong class="block text-[11px] font-semibold text-[#303645]">Demonstração em microvídeo</strong>
-      <span class="mt-1 block text-[10px] leading-5 text-[#858B99]">MP4 · máximo 60 segundos · até 25 MB. O ideal é manter entre 20 e 45 segundos e ensinar somente uma ação.</span>
+      <strong class="application-text-caption block font-semibold text-[#303645]">Demonstração em microvídeo</strong>
+      <span class="application-text-caption mt-1 block leading-5 text-[#858B99]">MP4 · máximo 60 segundos · até 25 MB. O ideal é manter entre 20 e 45 segundos e ensinar somente uma ação.</span>
     </div>
   </div>
 
@@ -133,12 +133,12 @@
     type="button"
     disabled={uploading}
     on:click={() => fileInput?.click()}
-    class="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#EA6D0B] px-3 text-[10px] font-semibold text-white disabled:cursor-wait disabled:opacity-60"
+    class="application-text-caption mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#EA6D0B] px-3 font-semibold text-white disabled:cursor-wait disabled:opacity-60"
   >
     <UploadCloud size={14} class={uploading ? "animate-pulse" : ""} aria-hidden="true" />
     {uploading ? "Validando e enviando..." : "Selecionar ou arrastar MP4"}
   </button>
 
-  {#if message}<p class="mt-2 text-[9px] font-medium text-[#257342]">{message}</p>{/if}
-  {#if errorMessage}<p class="mt-2 text-[9px] font-medium text-[#A52A2A]">{errorMessage}</p>{/if}
+  {#if message}<p class="application-text-meta mt-2 font-medium text-[#257342]">{message}</p>{/if}
+  {#if errorMessage}<p class="application-text-meta mt-2 font-medium text-[#A52A2A]">{errorMessage}</p>{/if}
 </div>

@@ -116,12 +116,12 @@
           class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition hover:bg-[#F6F7FB] focus:bg-[#F6F7FB] focus:outline-none"
           on:mousedown|preventDefault={() => selectUser(user)}
         >
-          <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF0FF] text-[10px] font-bold text-[#000A57]">
+          <span class="application-text-caption flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF0FF] font-bold text-[#000A57]">
             {user.name.slice(0, 1).toUpperCase()}
           </span>
           <span class="min-w-0">
-            <strong class="block truncate text-[11px] font-semibold text-[#2F3545]">{user.name}</strong>
-            <small class="block truncate text-[9px] text-[#858B99]">@{handleFor(user)} · {user.email}</small>
+            <strong class="application-text-caption block truncate font-semibold text-[#2F3545]">{user.name}</strong>
+            <small class="application-text-meta block truncate text-[#858B99]">@{handleFor(user)} · {user.email}</small>
           </span>
         </button>
       {/each}
