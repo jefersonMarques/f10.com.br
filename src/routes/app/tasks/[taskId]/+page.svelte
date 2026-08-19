@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import {
-    ArrowLeft,
     CalendarCheck2,
     CalendarDays,
     CheckCircle2,
@@ -14,6 +13,8 @@
     UserRound,
     Video,
   } from "lucide-svelte";
+  import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import GoogleEventDetailsEditor from "$lib/components/operations/GoogleEventDetailsEditor.svelte";
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
   import type { ActionData, PageData } from "./$types";
@@ -80,22 +81,30 @@
 
 <svelte:head><title>{data.details.task.title} | Tarefas | F10 Operations</title></svelte:head>
 
-<div class="mx-auto max-w-[1280px] px-5 py-7 sm:px-8 sm:py-9">
-  <a href={`/app/tasks?project=${data.details.task.projectId}`} class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[12px] font-semibold text-[#5F6575] transition hover:bg-white hover:text-[#000A57]"><ArrowLeft size={17}/>Voltar para {data.details.task.projectName}</a>
-
-  <div class="mt-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-    <div><div class="flex flex-wrap items-center gap-2"><span class="rounded-full bg-[#EEF0FF] px-3 py-1.5 text-[10px] font-bold text-[#000A57]">{data.details.task.statusName}</span><span class="rounded-full bg-[#F3F4F7] px-3 py-1.5 text-[10px] font-semibold text-[#737989]">{priorityLabels[data.details.task.priority]}</span>{#if data.googleLink}<span class="inline-flex items-center gap-1 rounded-full bg-[#EEF7F1] px-3 py-1.5 text-[10px] font-semibold text-[#2F7045]"><CalendarCheck2 size={12}/>Google Calendar</span>{/if}{#if data.googleLink?.googleMeetEnabled}<span class="inline-flex items-center gap-1 rounded-full bg-[#EEF3FF] px-3 py-1.5 text-[10px] font-semibold text-[#214A9A]"><Video size={12}/>Google Meet</span>{/if}</div><h1 class={`mt-3 text-[30px] font-semibold tracking-[-0.035em] sm:text-[38px] ${data.details.task.statusClosed ? "text-[#7E8492] line-through" : "text-[#010D28]"}`}>{data.details.task.title}</h1><p class="mt-2 text-[12px] text-[#7C8291]">Projeto: {data.details.task.projectName}</p></div>
-    {#if data.canUpdate}
-      <form method="POST" action="?/toggleComplete">
-        <input type="hidden" name="completed" value={data.details.task.statusClosed ? "false" : "true"}/>
-        <button type="submit" class={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 text-[12px] font-semibold ${data.details.task.statusClosed ? "border border-[#DDE1EA] bg-white text-[#000A57]" : "bg-[#2F7045] text-white"}`}><CheckCircle2 size={17}/>{data.details.task.statusClosed ? "Reabrir tarefa" : "Concluir tarefa"}</button>
-      </form>
-    {/if}
+<ApplicationContent width="standard">
+  <div class="mb-4">
+    <ApplicationBackLink href={`/app/tasks?project=${data.details.task.projectId}`} label={data.details.task.projectName} />
   </div>
 
-  {#if form?.message}<div class={`mt-6 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.syncWarning ? "border-[#F0D2A9] bg-[#FFF9EF] text-[#8A4B0F]" : form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{#if form.success && !form.syncWarning}<CheckCircle2 size={18} class="mt-0.5 shrink-0"/>{:else}<CircleAlert size={18} class="mt-0.5 shrink-0"/>{/if}<span>{form.message}</span></div>{/if}
+  <section class="mb-4 rounded-[22px] border border-[#E2E5ED] bg-white px-5 py-4 sm:px-6">
+    <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+      <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-2"><span class="rounded-full bg-[#EEF0FF] px-3 py-1.5 text-[10px] font-bold text-[#000A57]">{data.details.task.statusName}</span><span class="rounded-full bg-[#F3F4F7] px-3 py-1.5 text-[10px] font-semibold text-[#737989]">{priorityLabels[data.details.task.priority]}</span>{#if data.googleLink}<span class="inline-flex items-center gap-1 rounded-full bg-[#EEF7F1] px-3 py-1.5 text-[10px] font-semibold text-[#2F7045]"><CalendarCheck2 size={12}/>Google Calendar</span>{/if}{#if data.googleLink?.googleMeetEnabled}<span class="inline-flex items-center gap-1 rounded-full bg-[#EEF3FF] px-3 py-1.5 text-[10px] font-semibold text-[#214A9A]"><Video size={12}/>Google Meet</span>{/if}</div>
+        <h2 class={`mt-3 truncate text-[18px] font-semibold ${data.details.task.statusClosed ? "text-[#7E8492] line-through" : "text-[#11182C]"}`}>{data.details.task.title}</h2>
+        <p class="mt-1 text-[10px] text-[#7C8291]">Projeto: {data.details.task.projectName}</p>
+      </div>
+      {#if data.canUpdate}
+        <form method="POST" action="?/toggleComplete" class="shrink-0">
+          <input type="hidden" name="completed" value={data.details.task.statusClosed ? "false" : "true"}/>
+          <button type="submit" class={`inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 text-[11px] font-semibold ${data.details.task.statusClosed ? "border border-[#DDE1EA] bg-white text-[#000A57]" : "bg-[#2F7045] text-white"}`}><CheckCircle2 size={15}/>{data.details.task.statusClosed ? "Reabrir tarefa" : "Concluir tarefa"}</button>
+        </form>
+      {/if}
+    </div>
+  </section>
 
-  <div class="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+  {#if form?.message}<div class={`mb-4 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.syncWarning ? "border-[#F0D2A9] bg-[#FFF9EF] text-[#8A4B0F]" : form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{#if form.success && !form.syncWarning}<CheckCircle2 size={18} class="mt-0.5 shrink-0"/>{:else}<CircleAlert size={18} class="mt-0.5 shrink-0"/>{/if}<span>{form.message}</span></div>{/if}
+
+  <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
     <div class="space-y-6">
       <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-7">
         <div><h2 class="text-[16px] font-semibold text-[#11182C]">Detalhes</h2><p class="mt-1 text-[11px] text-[#858A98]">Descrição, prioridade, prazo e sincronização da tarefa.</p></div>
@@ -185,4 +194,4 @@
       <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5"><div class="flex items-center gap-3"><History size={18} class="text-[#000A57]"/><h2 class="text-[14px] font-semibold text-[#11182C]">Histórico</h2></div><div class="mt-4 space-y-4">{#each data.details.activities as activity}<div class="border-l-2 border-[#E5E7ED] pl-3"><p class="text-[10px] leading-4 text-[#626877]"><strong class="font-semibold text-[#3E4453]">{activity.actorName ?? "Sistema"}</strong> {activityLabels[activity.action] ?? activity.action}</p><span class="mt-1 block text-[8px] text-[#9B9FAC]">{formatDateTime(activity.createdAt)}</span></div>{/each}</div></section>
     </aside>
   </div>
-</div>
+</ApplicationContent>
