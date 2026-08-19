@@ -10,19 +10,20 @@ import {
 } from "drizzle-orm";
 import {
   getPermissionScope,
-  hasPermission,
   type PermissionScope,
 } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { teams } from "$lib/server/db/schema";
 import {
+  ticketAreas,
   ticketWorkflowHistory,
   ticketWorkflowStages,
   ticketWorkflowStates,
   ticketWorkflows,
 } from "$lib/server/db/ticketWorkflowSchema";
-import { supportQueues, ticketEvents, tickets } from "$lib/server/db/supportSchema";
+import { ticketEvents, tickets } from "$lib/server/db/supportSchema";
 import {
-  getUserSupportQueueIds,
+  getUserSupportTeamIds,
   requireTicketAccess,
   type SupportPermissionMap,
 } from "$lib/server/support/supportAccess";
@@ -40,8 +41,13 @@ export type TicketLifecycleStatus =
 export type TicketWorkflowStageInput = {
   name: string;
   stageType: TicketWorkflowStageType;
-  linkedQueueId: string | null;
+  linkedAreaId: string | null;
   lifecycleStatus: TicketLifecycleStatus;
+};
+
+export type TicketAreaInput = {
+  name: string;
+  teamId: string | null;
 };
 
 function requireTicketScope(
@@ -53,22 +59,33 @@ function requireTicketScope(
   return scope;
 }
 
+function lifecycleDates(status: TicketLifecycleStatus, now: Date) {
+  return {
+    resolvedAt: status === "resolved" || status === "closed" ? now : null,
+    closedAt: status === "closed" ? now : null,
+  };
+}
+
 function validateStageInput(
   workflowKind: TicketWorkflowKind,
   input: TicketWorkflowStageInput,
 ): void {
-  if (input.name.trim().length < 2 || input.name.trim().length > 80) {
+  const cleanName = input.name.trim();
+  if (cleanName.length < 2 || cleanName.length > 80) {
     throw new Error("TICKET_WORKFLOW_STAGE_NAME_INVALID");
   }
+
   if (workflowKind === "area" && input.stageType === "area_gateway") {
     throw new Error("TICKET_WORKFLOW_AREA_GATEWAY_INVALID");
   }
-  if (workflowKind === "area" && input.linkedQueueId) {
-    throw new Error("TICKET_WORKFLOW_AREA_STAGE_QUEUE_INVALID");
+  if (workflowKind === "area" && input.linkedAreaId) {
+    throw new Error("TICKET_WORKFLOW_AREA_LINK_INVALID");
   }
   if (
     workflowKind === "area" &&
-    (input.lifecycleStatus === "new" || input.lifecycleStatus === "resolved" || input.lifecycleStatus === "closed")
+    (input.lifecycleStatus === "new" ||
+      input.lifecycleStatus === "resolved" ||
+      input.lifecycleStatus === "closed")
   ) {
     throw new Error("TICKET_WORKFLOW_AREA_LIFECYCLE_INVALID");
   }
@@ -87,27 +104,97 @@ function validateStageInput(
   ) {
     throw new Error("TICKET_WORKFLOW_TERMINAL_LIFECYCLE_INVALID");
   }
-  if (input.stageType === "area_gateway" && !input.linkedQueueId) {
-    throw new Error("TICKET_WORKFLOW_GATEWAY_QUEUE_REQUIRED");
+  if (input.stageType === "area_gateway" && !input.linkedAreaId) {
+    throw new Error("TICKET_WORKFLOW_GATEWAY_AREA_REQUIRED");
+  }
+  if (input.stageType !== "area_gateway" && input.linkedAreaId) {
+    throw new Error("TICKET_WORKFLOW_AREA_LINK_INVALID");
   }
 }
 
-function lifecycleDates(status: TicketLifecycleStatus, now: Date) {
-  return {
-    resolvedAt: status === "resolved" || status === "closed" ? now : null,
-    closedAt: status === "closed" ? now : null,
-  };
+async function requireActiveArea(areaId: string): Promise<void> {
+  const db = getDatabase();
+  const [area] = await db
+    .select({ id: ticketAreas.id })
+    .from(ticketAreas)
+    .where(and(eq(ticketAreas.id, areaId), eq(ticketAreas.active, true)))
+    .limit(1);
+  if (!area) throw new Error("TICKET_AREA_NOT_FOUND");
+}
+
+async function canAccessAreaInternal(
+  actorUserId: string,
+  scope: PermissionScope,
+  areaId: string,
+): Promise<boolean> {
+  if (scope === "all") return true;
+
+  const db = getDatabase();
+  const [area] = await db
+    .select({ teamId: ticketAreas.teamId })
+    .from(ticketAreas)
+    .where(and(eq(ticketAreas.id, areaId), eq(ticketAreas.active, true)))
+    .limit(1);
+  if (!area) return false;
+  if (!area.teamId) return true;
+
+  const teamIds = await getUserSupportTeamIds(actorUserId);
+  return teamIds.includes(area.teamId);
+}
+
+export async function requireTicketAreaAccess(
+  actorUserId: string,
+  permissions: SupportPermissionMap,
+  areaId: string,
+  permissionCode = "tickets.view",
+): Promise<void> {
+  const scope = requireTicketScope(permissions, permissionCode);
+  if (!(await canAccessAreaInternal(actorUserId, scope, areaId))) {
+    throw new Error("TICKET_WORKFLOW_AREA_ACCESS_DENIED");
+  }
+}
+
+export async function listTicketWorkflowTeams() {
+  const db = getDatabase();
+  return db
+    .select({ id: teams.id, name: teams.name })
+    .from(teams)
+    .where(eq(teams.active, true))
+    .orderBy(asc(teams.name));
+}
+
+export async function listTicketAreas() {
+  const db = getDatabase();
+  const [areas, teamRows] = await Promise.all([
+    db
+      .select({
+        id: ticketAreas.id,
+        name: ticketAreas.name,
+        teamId: ticketAreas.teamId,
+        active: ticketAreas.active,
+        updatedAt: ticketAreas.updatedAt,
+      })
+      .from(ticketAreas)
+      .where(eq(ticketAreas.active, true))
+      .orderBy(asc(ticketAreas.name)),
+    listTicketWorkflowTeams(),
+  ]);
+  const teamNames = new Map(teamRows.map((team) => [team.id, team.name]));
+  return areas.map((area) => ({
+    ...area,
+    teamName: area.teamId ? teamNames.get(area.teamId) ?? "Equipe indisponível" : null,
+  }));
 }
 
 export async function listTicketWorkflowConfiguration() {
   const db = getDatabase();
-  const [workflows, stages, queues] = await Promise.all([
+  const [workflows, stages, areas] = await Promise.all([
     db
       .select({
         id: ticketWorkflows.id,
         name: ticketWorkflows.name,
         kind: ticketWorkflows.kind,
-        queueId: ticketWorkflows.queueId,
+        areaId: ticketWorkflows.areaId,
         active: ticketWorkflows.active,
         updatedAt: ticketWorkflows.updatedAt,
       })
@@ -121,7 +208,7 @@ export async function listTicketWorkflowConfiguration() {
         code: ticketWorkflowStages.code,
         name: ticketWorkflowStages.name,
         stageType: ticketWorkflowStages.stageType,
-        linkedQueueId: ticketWorkflowStages.linkedQueueId,
+        linkedAreaId: ticketWorkflowStages.linkedAreaId,
         lifecycleStatus: ticketWorkflowStages.lifecycleStatus,
         isInitial: ticketWorkflowStages.isInitial,
         sortOrder: ticketWorkflowStages.sortOrder,
@@ -130,23 +217,39 @@ export async function listTicketWorkflowConfiguration() {
       .from(ticketWorkflowStages)
       .where(eq(ticketWorkflowStages.active, true))
       .orderBy(asc(ticketWorkflowStages.sortOrder), asc(ticketWorkflowStages.createdAt)),
-    db
-      .select({ id: supportQueues.id, name: supportQueues.name })
-      .from(supportQueues)
-      .where(eq(supportQueues.active, true))
-      .orderBy(asc(supportQueues.name)),
+    listTicketAreas(),
   ]);
 
-  const queueNames = new Map(queues.map((queue) => [queue.id, queue.name]));
+  const areaById = new Map<
+    string,
+    { id: string; name: string; teamId: string | null; teamName: string | null }
+  >(
+    (
+      areas as Array<{
+        id: string;
+        name: string;
+        teamId: string | null;
+        teamName: string | null;
+      }>
+    ).map((area) => [area.id, area]),
+  );
   return workflows.map((workflow) => ({
     ...workflow,
-    queueName: workflow.queueId ? queueNames.get(workflow.queueId) ?? "Área indisponível" : null,
+    areaName: workflow.areaId
+      ? areaById.get(workflow.areaId)?.name ?? "Área indisponível"
+      : null,
+    areaTeamId: workflow.areaId
+      ? areaById.get(workflow.areaId)?.teamId ?? null
+      : null,
+    areaTeamName: workflow.areaId
+      ? areaById.get(workflow.areaId)?.teamName ?? null
+      : null,
     stages: stages
       .filter((stage) => stage.workflowId === workflow.id)
       .map((stage) => ({
         ...stage,
-        linkedQueueName: stage.linkedQueueId
-          ? queueNames.get(stage.linkedQueueId) ?? "Área indisponível"
+        linkedAreaName: stage.linkedAreaId
+          ? areaById.get(stage.linkedAreaId)?.name ?? "Área indisponível"
           : null,
       })),
   }));
@@ -158,54 +261,71 @@ export async function getTicketWorkflowBoard(
   visibleTicketIds: string[],
 ) {
   const scope = requireTicketScope(permissions, "tickets.view");
-  const configuration = await listTicketWorkflowConfiguration();
-  const globalWorkflow = configuration.find((workflow) => workflow.kind === "global") ?? null;
-  const db = getDatabase();
-  const states = visibleTicketIds.length > 0
-    ? await db
-        .select({
-          ticketId: ticketWorkflowStates.ticketId,
-          globalWorkflowId: ticketWorkflowStates.globalWorkflowId,
-          globalStageId: ticketWorkflowStates.globalStageId,
-          areaWorkflowId: ticketWorkflowStates.areaWorkflowId,
-          areaStageId: ticketWorkflowStates.areaStageId,
-          enteredAt: ticketWorkflowStates.enteredAt,
-          areaEnteredAt: ticketWorkflowStates.areaEnteredAt,
-        })
-        .from(ticketWorkflowStates)
-        .where(inArray(ticketWorkflowStates.ticketId, visibleTicketIds))
-    : [];
-
-  const visibleAreaWorkflowIds = new Set(
-    states
-      .map((state) => state.areaWorkflowId)
-      .filter((workflowId): workflowId is string => Boolean(workflowId)),
+  const [configuration, areas] = await Promise.all([
+    listTicketWorkflowConfiguration(),
+    listTicketAreas(),
+  ]);
+  const globalWorkflow =
+    configuration.find((workflow) => workflow.kind === "global") ?? null;
+  const teamIds = scope === "all" ? [] : await getUserSupportTeamIds(actorUserId);
+  const visibleAreaIds = new Set(
+    areas
+      .filter(
+        (area) => scope === "all" || !area.teamId || teamIds.includes(area.teamId),
+      )
+      .map((area) => area.id),
   );
-  const teamQueueIds = scope === "team"
-    ? new Set(await getUserSupportQueueIds(actorUserId))
-    : new Set<string>();
-  const canViewEveryArea = scope === "all";
   const areaWorkflows = configuration.filter(
     (workflow) =>
       workflow.kind === "area" &&
-      (canViewEveryArea ||
-        visibleAreaWorkflowIds.has(workflow.id) ||
-        (workflow.queueId ? teamQueueIds.has(workflow.queueId) : false)),
+      Boolean(workflow.areaId && visibleAreaIds.has(workflow.areaId)),
   );
 
-  return {
-    globalWorkflow,
-    areaWorkflows,
-    states,
-  };
+  const db = getDatabase();
+  const rawStates =
+    visibleTicketIds.length > 0
+      ? await db
+          .select({
+            ticketId: ticketWorkflowStates.ticketId,
+            globalWorkflowId: ticketWorkflowStates.globalWorkflowId,
+            globalStageId: ticketWorkflowStates.globalStageId,
+            areaId: ticketWorkflowStates.areaId,
+            areaWorkflowId: ticketWorkflowStates.areaWorkflowId,
+            areaStageId: ticketWorkflowStates.areaStageId,
+            enteredAt: ticketWorkflowStates.enteredAt,
+            areaEnteredAt: ticketWorkflowStates.areaEnteredAt,
+          })
+          .from(ticketWorkflowStates)
+          .where(inArray(ticketWorkflowStates.ticketId, visibleTicketIds))
+      : [];
+
+  const states = rawStates.map((state) => {
+    if (state.areaId && !visibleAreaIds.has(state.areaId)) {
+      return {
+        ...state,
+        areaWorkflowId: null,
+        areaStageId: null,
+        areaEnteredAt: null,
+      };
+    }
+    return state;
+  });
+
+  return { globalWorkflow, areaWorkflows, areas, states };
 }
 
-export async function getTicketWorkflowContext(ticketId: string) {
+export async function getTicketWorkflowContext(
+  actorUserId: string,
+  permissions: SupportPermissionMap,
+  ticketId: string,
+) {
+  const scope = requireTicketScope(permissions, "tickets.view");
   const db = getDatabase();
   const [state] = await db
     .select({
       globalWorkflowId: ticketWorkflowStates.globalWorkflowId,
       globalStageId: ticketWorkflowStates.globalStageId,
+      areaId: ticketWorkflowStates.areaId,
       areaWorkflowId: ticketWorkflowStates.areaWorkflowId,
       areaStageId: ticketWorkflowStates.areaStageId,
       enteredAt: ticketWorkflowStates.enteredAt,
@@ -216,25 +336,39 @@ export async function getTicketWorkflowContext(ticketId: string) {
     .limit(1);
   if (!state) return null;
 
-  const configuration = await listTicketWorkflowConfiguration();
-  const globalWorkflow = configuration.find((workflow) => workflow.id === state.globalWorkflowId) ?? null;
-  const globalStage = globalWorkflow?.stages.find((stage) => stage.id === state.globalStageId) ?? null;
-  const areaWorkflow = state.areaWorkflowId
-    ? configuration.find((workflow) => workflow.id === state.areaWorkflowId) ?? null
+  const [configuration, areas] = await Promise.all([
+    listTicketWorkflowConfiguration(),
+    listTicketAreas(),
+  ]);
+  const globalWorkflow =
+    configuration.find((workflow) => workflow.id === state.globalWorkflowId) ?? null;
+  const globalStage =
+    globalWorkflow?.stages.find((stage) => stage.id === state.globalStageId) ?? null;
+  const area = state.areaId
+    ? areas.find((item) => item.id === state.areaId) ?? null
     : null;
-  const areaStage = areaWorkflow && state.areaStageId
-    ? areaWorkflow.stages.find((stage) => stage.id === state.areaStageId) ?? null
-    : null;
+  const canViewArea = state.areaId
+    ? await canAccessAreaInternal(actorUserId, scope, state.areaId)
+    : false;
+  const areaWorkflow =
+    canViewArea && state.areaWorkflowId
+      ? configuration.find((workflow) => workflow.id === state.areaWorkflowId) ?? null
+      : null;
+  const areaStage =
+    areaWorkflow && state.areaStageId
+      ? areaWorkflow.stages.find((stage) => stage.id === state.areaStageId) ?? null
+      : null;
 
   return {
     ...state,
     globalWorkflowName: globalWorkflow?.name ?? "Fluxo global",
     globalStageName: globalStage?.name ?? "Etapa indisponível",
     globalStageType: globalStage?.stageType ?? "normal",
+    areaName: area?.name ?? null,
     areaWorkflowName: areaWorkflow?.name ?? null,
-    areaName: areaWorkflow?.queueName ?? null,
     areaStageName: areaStage?.name ?? null,
     areaStageType: areaStage?.stageType ?? null,
+    canViewAreaDetails: canViewArea,
   };
 }
 
@@ -242,7 +376,7 @@ export async function initializeTicketWorkflowState(ticketId: string): Promise<v
   const db = getDatabase();
   const [[ticket], [existing]] = await Promise.all([
     db
-      .select({ queueId: tickets.queueId, status: tickets.status })
+      .select({ status: tickets.status })
       .from(tickets)
       .where(eq(tickets.id, ticketId))
       .limit(1),
@@ -265,11 +399,8 @@ export async function initializeTicketWorkflowState(ticketId: string): Promise<v
   const globalStages = await db
     .select({
       id: ticketWorkflowStages.id,
-      stageType: ticketWorkflowStages.stageType,
-      linkedQueueId: ticketWorkflowStages.linkedQueueId,
       lifecycleStatus: ticketWorkflowStages.lifecycleStatus,
       isInitial: ticketWorkflowStages.isInitial,
-      sortOrder: ticketWorkflowStages.sortOrder,
     })
     .from(ticketWorkflowStages)
     .where(
@@ -279,50 +410,11 @@ export async function initializeTicketWorkflowState(ticketId: string): Promise<v
       ),
     )
     .orderBy(desc(ticketWorkflowStages.isInitial), asc(ticketWorkflowStages.sortOrder));
-  if (globalStages.length === 0) return;
-
-  const gatewayForQueue = globalStages.find(
-    (stage) => stage.stageType === "area_gateway" && stage.linkedQueueId === ticket.queueId,
-  );
-  const statusStage = globalStages.find((stage) => stage.lifecycleStatus === ticket.status);
-  let selectedGlobalStage = gatewayForQueue ?? statusStage ?? globalStages[0];
-  let areaWorkflowId: string | null = null;
-  let areaStageId: string | null = null;
-
-  if (selectedGlobalStage.stageType === "area_gateway" && selectedGlobalStage.linkedQueueId) {
-    const [areaWorkflow] = await db
-      .select({ id: ticketWorkflows.id })
-      .from(ticketWorkflows)
-      .where(
-        and(
-          eq(ticketWorkflows.kind, "area"),
-          eq(ticketWorkflows.queueId, selectedGlobalStage.linkedQueueId),
-          eq(ticketWorkflows.active, true),
-        ),
-      )
-      .limit(1);
-    if (areaWorkflow) {
-      const [initialAreaStage] = await db
-        .select({ id: ticketWorkflowStages.id })
-        .from(ticketWorkflowStages)
-        .where(
-          and(
-            eq(ticketWorkflowStages.workflowId, areaWorkflow.id),
-            eq(ticketWorkflowStages.active, true),
-          ),
-        )
-        .orderBy(desc(ticketWorkflowStages.isInitial), asc(ticketWorkflowStages.sortOrder))
-        .limit(1);
-      if (initialAreaStage) {
-        areaWorkflowId = areaWorkflow.id;
-        areaStageId = initialAreaStage.id;
-      } else {
-        selectedGlobalStage = globalStages.find((stage) => stage.isInitial) ?? globalStages[0];
-      }
-    } else {
-      selectedGlobalStage = globalStages.find((stage) => stage.isInitial) ?? globalStages[0];
-    }
-  }
+  const selected =
+    globalStages.find((stage) => stage.lifecycleStatus === ticket.status) ??
+    globalStages.find((stage) => stage.isInitial) ??
+    globalStages[0];
+  if (!selected) return;
 
   const now = new Date();
   await db
@@ -330,47 +422,138 @@ export async function initializeTicketWorkflowState(ticketId: string): Promise<v
     .values({
       ticketId,
       globalWorkflowId: globalWorkflow.id,
-      globalStageId: selectedGlobalStage.id,
-      areaWorkflowId,
-      areaStageId,
+      globalStageId: selected.id,
       enteredAt: now,
-      areaEnteredAt: areaStageId ? now : null,
       updatedAt: now,
     })
     .onConflictDoNothing();
 }
 
-export async function createAreaTicketWorkflow(
+export async function createTicketArea(
   actorUserId: string,
-  name: string,
-  queueId: string,
+  input: TicketAreaInput,
 ): Promise<string> {
-  const cleanName = name.trim();
+  const cleanName = input.name.trim();
   if (cleanName.length < 2 || cleanName.length > 80) {
-    throw new Error("TICKET_WORKFLOW_NAME_INVALID");
+    throw new Error("TICKET_AREA_NAME_INVALID");
   }
   const db = getDatabase();
-  const [queue] = await db
-    .select({ id: supportQueues.id })
-    .from(supportQueues)
-    .where(and(eq(supportQueues.id, queueId), eq(supportQueues.active, true)))
-    .limit(1);
-  if (!queue) throw new Error("TICKET_WORKFLOW_QUEUE_NOT_FOUND");
+  if (input.teamId) {
+    const [team] = await db
+      .select({ id: teams.id })
+      .from(teams)
+      .where(and(eq(teams.id, input.teamId), eq(teams.active, true)))
+      .limit(1);
+    if (!team) throw new Error("TICKET_AREA_TEAM_NOT_FOUND");
+  }
 
-  const [workflow] = await db
-    .insert(ticketWorkflows)
-    .values({
-      name: cleanName,
-      kind: "area",
-      queueId,
-      createdBy: actorUserId,
-    })
-    .returning({ id: ticketWorkflows.id });
-  if (!workflow) throw new Error("TICKET_WORKFLOW_NOT_CREATED");
-  return workflow.id;
+  return db.transaction(async (tx) => {
+    const [area] = await tx
+      .insert(ticketAreas)
+      .values({ name: cleanName, teamId: input.teamId, createdBy: actorUserId })
+      .returning({ id: ticketAreas.id });
+    if (!area) throw new Error("TICKET_AREA_NOT_CREATED");
+
+    const [workflow] = await tx
+      .insert(ticketWorkflows)
+      .values({
+        name: `Processo · ${cleanName}`,
+        kind: "area",
+        areaId: area.id,
+        createdBy: actorUserId,
+      })
+      .returning({ id: ticketWorkflows.id });
+    if (!workflow) throw new Error("TICKET_WORKFLOW_NOT_CREATED");
+
+    await tx.insert(ticketWorkflowStages).values({
+      workflowId: workflow.id,
+      name: "Recebido",
+      stageType: "normal",
+      lifecycleStatus: "open",
+      isInitial: true,
+      sortOrder: 100,
+    });
+    return area.id;
+  });
 }
 
-export async function renameTicketWorkflow(workflowId: string, name: string): Promise<void> {
+export async function updateTicketArea(
+  areaId: string,
+  input: TicketAreaInput,
+): Promise<void> {
+  const cleanName = input.name.trim();
+  if (cleanName.length < 2 || cleanName.length > 80) {
+    throw new Error("TICKET_AREA_NAME_INVALID");
+  }
+  const db = getDatabase();
+  if (input.teamId) {
+    const [team] = await db
+      .select({ id: teams.id })
+      .from(teams)
+      .where(and(eq(teams.id, input.teamId), eq(teams.active, true)))
+      .limit(1);
+    if (!team) throw new Error("TICKET_AREA_TEAM_NOT_FOUND");
+  }
+
+  await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(ticketAreas)
+      .set({ name: cleanName, teamId: input.teamId, updatedAt: new Date() })
+      .where(and(eq(ticketAreas.id, areaId), eq(ticketAreas.active, true)))
+      .returning({ id: ticketAreas.id });
+    if (!updated) throw new Error("TICKET_AREA_NOT_FOUND");
+
+    await tx
+      .update(ticketWorkflows)
+      .set({ name: `Processo · ${cleanName}`, updatedAt: new Date() })
+      .where(
+        and(
+          eq(ticketWorkflows.areaId, areaId),
+          eq(ticketWorkflows.kind, "area"),
+          eq(ticketWorkflows.active, true),
+        ),
+      );
+  });
+}
+
+export async function archiveTicketArea(areaId: string): Promise<void> {
+  const db = getDatabase();
+  const [[stateUsage], [stageUsage]] = await Promise.all([
+    db
+      .select({ value: count() })
+      .from(ticketWorkflowStates)
+      .where(eq(ticketWorkflowStates.areaId, areaId)),
+    db
+      .select({ value: count() })
+      .from(ticketWorkflowStages)
+      .where(
+        and(
+          eq(ticketWorkflowStages.linkedAreaId, areaId),
+          eq(ticketWorkflowStages.active, true),
+        ),
+      ),
+  ]);
+  if (Number(stateUsage?.value ?? 0) > 0) throw new Error("TICKET_AREA_IN_USE");
+  if (Number(stageUsage?.value ?? 0) > 0) throw new Error("TICKET_AREA_LINKED");
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(ticketWorkflows)
+      .set({ active: false, updatedAt: new Date() })
+      .where(and(eq(ticketWorkflows.areaId, areaId), eq(ticketWorkflows.kind, "area")));
+    const [updated] = await tx
+      .update(ticketAreas)
+      .set({ active: false, updatedAt: new Date() })
+      .where(and(eq(ticketAreas.id, areaId), eq(ticketAreas.active, true)))
+      .returning({ id: ticketAreas.id });
+    if (!updated) throw new Error("TICKET_AREA_NOT_FOUND");
+  });
+}
+
+export async function renameTicketWorkflow(
+  workflowId: string,
+  name: string,
+): Promise<void> {
   const cleanName = name.trim();
   if (cleanName.length < 2 || cleanName.length > 80) {
     throw new Error("TICKET_WORKFLOW_NAME_INVALID");
@@ -396,15 +579,7 @@ export async function addTicketWorkflowStage(
     .limit(1);
   if (!workflow) throw new Error("TICKET_WORKFLOW_NOT_FOUND");
   validateStageInput(workflow.kind, input);
-
-  if (input.linkedQueueId) {
-    const [queue] = await db
-      .select({ id: supportQueues.id })
-      .from(supportQueues)
-      .where(and(eq(supportQueues.id, input.linkedQueueId), eq(supportQueues.active, true)))
-      .limit(1);
-    if (!queue) throw new Error("TICKET_WORKFLOW_QUEUE_NOT_FOUND");
-  }
+  if (input.linkedAreaId) await requireActiveArea(input.linkedAreaId);
 
   const [[sortResult], [stageCount]] = await Promise.all([
     db
@@ -428,7 +603,7 @@ export async function addTicketWorkflowStage(
       workflowId,
       name: input.name.trim(),
       stageType: input.stageType,
-      linkedQueueId: input.linkedQueueId,
+      linkedAreaId: input.linkedAreaId,
       lifecycleStatus: input.lifecycleStatus,
       isInitial: Number(stageCount?.value ?? 0) === 0,
       sortOrder: Number(sortResult?.value ?? 0) + 100,
@@ -445,10 +620,9 @@ export async function updateTicketWorkflowStage(
   const db = getDatabase();
   const [current] = await db
     .select({
-      id: ticketWorkflowStages.id,
       workflowId: ticketWorkflowStages.workflowId,
       stageType: ticketWorkflowStages.stageType,
-      linkedQueueId: ticketWorkflowStages.linkedQueueId,
+      linkedAreaId: ticketWorkflowStages.linkedAreaId,
       workflowKind: ticketWorkflows.kind,
     })
     .from(ticketWorkflowStages)
@@ -463,18 +637,10 @@ export async function updateTicketWorkflowStage(
     .limit(1);
   if (!current) throw new Error("TICKET_WORKFLOW_STAGE_NOT_FOUND");
   validateStageInput(current.workflowKind, input);
-
-  if (input.linkedQueueId) {
-    const [queue] = await db
-      .select({ id: supportQueues.id })
-      .from(supportQueues)
-      .where(and(eq(supportQueues.id, input.linkedQueueId), eq(supportQueues.active, true)))
-      .limit(1);
-    if (!queue) throw new Error("TICKET_WORKFLOW_QUEUE_NOT_FOUND");
-  }
+  if (input.linkedAreaId) await requireActiveArea(input.linkedAreaId);
 
   const structuralChange =
-    current.stageType !== input.stageType || current.linkedQueueId !== input.linkedQueueId;
+    current.stageType !== input.stageType || current.linkedAreaId !== input.linkedAreaId;
   if (structuralChange) {
     const [usage] = await db
       .select({ value: count() })
@@ -494,7 +660,8 @@ export async function updateTicketWorkflowStage(
     .set({
       name: input.name.trim(),
       stageType: input.stageType,
-      linkedQueueId: input.linkedQueueId,
+      linkedAreaId: input.linkedAreaId,
+      linkedQueueId: null,
       lifecycleStatus: input.lifecycleStatus,
       updatedAt: new Date(),
     })
@@ -597,7 +764,9 @@ export async function archiveTicketWorkflowStage(stageId: string): Promise<void>
       ),
   ]);
   if (Number(usage?.value ?? 0) > 0) throw new Error("TICKET_WORKFLOW_STAGE_IN_USE");
-  if (Number(activeCount?.value ?? 0) <= 1) throw new Error("TICKET_WORKFLOW_LAST_STAGE_ARCHIVE_BLOCKED");
+  if (Number(activeCount?.value ?? 0) <= 1) {
+    throw new Error("TICKET_WORKFLOW_LAST_STAGE_ARCHIVE_BLOCKED");
+  }
 
   await db
     .update(ticketWorkflowStages)
@@ -630,6 +799,7 @@ export async function moveTicketGlobalStage(
         .select({
           globalWorkflowId: ticketWorkflowStates.globalWorkflowId,
           globalStageId: ticketWorkflowStates.globalStageId,
+          areaId: ticketWorkflowStates.areaId,
           areaWorkflowId: ticketWorkflowStates.areaWorkflowId,
           areaStageId: ticketWorkflowStates.areaStageId,
         })
@@ -642,7 +812,7 @@ export async function moveTicketGlobalStage(
           workflowId: ticketWorkflowStages.workflowId,
           name: ticketWorkflowStages.name,
           stageType: ticketWorkflowStages.stageType,
-          linkedQueueId: ticketWorkflowStages.linkedQueueId,
+          linkedAreaId: ticketWorkflowStages.linkedAreaId,
           lifecycleStatus: ticketWorkflowStages.lifecycleStatus,
           workflowKind: ticketWorkflows.kind,
         })
@@ -659,49 +829,30 @@ export async function moveTicketGlobalStage(
     ]);
 
     if (!ticket || !state) throw new Error("TICKET_WORKFLOW_STATE_NOT_FOUND");
-    if (!target || target.workflowKind !== "global") {
+    if (
+      !target ||
+      target.workflowKind !== "global" ||
+      target.workflowId !== state.globalWorkflowId
+    ) {
       throw new Error("TICKET_WORKFLOW_GLOBAL_STAGE_INVALID");
     }
-    if (target.workflowId !== state.globalWorkflowId) {
-      throw new Error("TICKET_WORKFLOW_GLOBAL_WORKFLOW_MISMATCH");
-    }
-    if (target.id === state.globalStageId) return;
+    if (target.id === state.globalStageId && !state.areaId) return;
 
-    let currentAreaStageType: TicketWorkflowStageType | null = null;
-    if (state.areaStageId) {
-      const [currentAreaStage] = await tx
-        .select({ stageType: ticketWorkflowStages.stageType })
-        .from(ticketWorkflowStages)
-        .where(eq(ticketWorkflowStages.id, state.areaStageId))
-        .limit(1);
-      currentAreaStageType = currentAreaStage?.stageType ?? null;
-      if (
-        currentAreaStageType !== "terminal" &&
-        !hasPermission(permissions, "tickets.manage")
-      ) {
-        throw new Error("TICKET_WORKFLOW_AREA_NOT_COMPLETE");
-      }
-    }
-
-    const [fromGlobalStage] = await tx
-      .select({ name: ticketWorkflowStages.name })
-      .from(ticketWorkflowStages)
-      .where(eq(ticketWorkflowStages.id, state.globalStageId))
-      .limit(1);
-
-    let areaWorkflowId: string | null = null;
-    let areaStageId: string | null = null;
-    let targetQueueId = target.linkedQueueId ?? ticket.queueId;
+    let targetAreaId: string | null = null;
+    let targetAreaWorkflowId: string | null = null;
+    let targetAreaStageId: string | null = null;
 
     if (target.stageType === "area_gateway") {
-      if (!target.linkedQueueId) throw new Error("TICKET_WORKFLOW_GATEWAY_QUEUE_REQUIRED");
+      if (!target.linkedAreaId) {
+        throw new Error("TICKET_WORKFLOW_GATEWAY_AREA_REQUIRED");
+      }
       const [areaWorkflow] = await tx
         .select({ id: ticketWorkflows.id })
         .from(ticketWorkflows)
         .where(
           and(
             eq(ticketWorkflows.kind, "area"),
-            eq(ticketWorkflows.queueId, target.linkedQueueId),
+            eq(ticketWorkflows.areaId, target.linkedAreaId),
             eq(ticketWorkflows.active, true),
           ),
         )
@@ -721,30 +872,30 @@ export async function moveTicketGlobalStage(
         .limit(1);
       if (!initialAreaStage) throw new Error("TICKET_WORKFLOW_AREA_EMPTY");
 
-      areaWorkflowId = areaWorkflow.id;
-      areaStageId = initialAreaStage.id;
-      targetQueueId = target.linkedQueueId;
+      targetAreaId = target.linkedAreaId;
+      targetAreaWorkflowId = areaWorkflow.id;
+      targetAreaStageId = initialAreaStage.id;
     }
 
-    const transitionType = state.areaStageId ? "handoff" : "global_move";
+    const areaChanged = state.areaId !== targetAreaId;
+    const transitionType = state.areaId ? "handoff" : "global_move";
     await tx
       .update(ticketWorkflowStates)
       .set({
         globalStageId: target.id,
-        areaWorkflowId,
-        areaStageId,
+        areaId: targetAreaId,
+        areaWorkflowId: targetAreaWorkflowId,
+        areaStageId: targetAreaStageId,
         enteredAt: now,
-        areaEnteredAt: areaStageId ? now : null,
+        areaEnteredAt: targetAreaStageId ? now : null,
         updatedAt: now,
       })
       .where(eq(ticketWorkflowStates.ticketId, ticketId));
 
-    const queueChanged = targetQueueId !== ticket.queueId;
     await tx
       .update(tickets)
       .set({
-        queueId: targetQueueId,
-        ...(queueChanged ? { assignedUserId: null } : {}),
+        ...(areaChanged ? { assignedUserId: null } : {}),
         status: target.lifecycleStatus,
         ...lifecycleDates(target.lifecycleStatus, now),
         updatedAt: now,
@@ -755,32 +906,31 @@ export async function moveTicketGlobalStage(
       ticketId,
       actorUserId,
       transitionType,
-      fromWorkflowId: state.areaStageId ? state.areaWorkflowId : state.globalWorkflowId,
+      fromWorkflowId: state.areaWorkflowId ?? state.globalWorkflowId,
       toWorkflowId: target.workflowId,
       fromStageId: state.areaStageId ?? state.globalStageId,
       toStageId: target.id,
+      fromAreaId: state.areaId,
+      toAreaId: targetAreaId,
       fromQueueId: ticket.queueId,
-      toQueueId: targetQueueId,
+      toQueueId: ticket.queueId,
     });
 
     await tx.insert(ticketEvents).values({
       ticketId,
       actorUserId,
-      eventType: transitionType === "handoff"
-        ? "ticket.workflow.handoff"
-        : "ticket.workflow.global.moved",
+      eventType:
+        transitionType === "handoff"
+          ? "ticket.workflow.handoff"
+          : "ticket.workflow.global.moved",
       metadata: {
         fromStageId: state.globalStageId,
-        fromStageName: fromGlobalStage?.name ?? "",
         toStageId: target.id,
         toStageName: target.name,
-        fromQueueId: ticket.queueId,
-        toQueueId: targetQueueId,
-        enteredArea: target.stageType === "area_gateway",
-        assigneeCleared: queueChanged,
-        bypassedAreaTerminal: Boolean(
-          state.areaStageId && currentAreaStageType !== "terminal",
-        ),
+        fromAreaId: state.areaId,
+        toAreaId: targetAreaId,
+        enteredArea: Boolean(targetAreaId),
+        assigneeCleared: areaChanged,
       },
     });
   });
@@ -797,10 +947,22 @@ export async function moveTicketAreaStage(
   await initializeTicketWorkflowState(ticketId);
 
   const db = getDatabase();
+  const [preState] = await db
+    .select({ areaId: ticketWorkflowStates.areaId })
+    .from(ticketWorkflowStates)
+    .where(eq(ticketWorkflowStates.ticketId, ticketId))
+    .limit(1);
+  if (!preState?.areaId) throw new Error("TICKET_WORKFLOW_AREA_STATE_NOT_FOUND");
+  await requireTicketAreaAccess(
+    actorUserId,
+    permissions,
+    preState.areaId,
+    "tickets.reply",
+  );
+
   const now = new Date();
   await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${ticketId}))`);
-
     const [[ticket], [state], [target]] = await Promise.all([
       tx
         .select({ queueId: tickets.queueId })
@@ -809,6 +971,7 @@ export async function moveTicketAreaStage(
         .limit(1),
       tx
         .select({
+          areaId: ticketWorkflowStates.areaId,
           areaWorkflowId: ticketWorkflowStates.areaWorkflowId,
           areaStageId: ticketWorkflowStates.areaStageId,
         })
@@ -833,25 +996,22 @@ export async function moveTicketAreaStage(
         .limit(1),
     ]);
 
-    if (!ticket || !state?.areaWorkflowId || !state.areaStageId) {
+    if (!ticket || !state?.areaId || !state.areaWorkflowId || !state.areaStageId) {
       throw new Error("TICKET_WORKFLOW_AREA_STATE_NOT_FOUND");
     }
-    if (!target || target.workflowId !== state.areaWorkflowId || target.stageType === "area_gateway") {
+    if (
+      !target ||
+      target.workflowId !== state.areaWorkflowId ||
+      target.stageType === "area_gateway"
+    ) {
       throw new Error("TICKET_WORKFLOW_AREA_STAGE_INVALID");
     }
     if (target.id === state.areaStageId) return;
-
-    const [fromAreaStage] = await tx
-      .select({ name: ticketWorkflowStages.name })
-      .from(ticketWorkflowStages)
-      .where(eq(ticketWorkflowStages.id, state.areaStageId))
-      .limit(1);
 
     await tx
       .update(ticketWorkflowStates)
       .set({ areaStageId: target.id, areaEnteredAt: now, updatedAt: now })
       .where(eq(ticketWorkflowStates.ticketId, ticketId));
-
     await tx
       .update(tickets)
       .set({
@@ -860,7 +1020,6 @@ export async function moveTicketAreaStage(
         updatedAt: now,
       })
       .where(eq(tickets.id, ticketId));
-
     await tx.insert(ticketWorkflowHistory).values({
       ticketId,
       actorUserId,
@@ -869,21 +1028,164 @@ export async function moveTicketAreaStage(
       toWorkflowId: state.areaWorkflowId,
       fromStageId: state.areaStageId,
       toStageId: target.id,
+      fromAreaId: state.areaId,
+      toAreaId: state.areaId,
       fromQueueId: ticket.queueId,
       toQueueId: ticket.queueId,
     });
-
     await tx.insert(ticketEvents).values({
       ticketId,
       actorUserId,
       eventType: "ticket.workflow.area.moved",
       metadata: {
+        areaId: state.areaId,
         fromStageId: state.areaStageId,
-        fromStageName: fromAreaStage?.name ?? "",
         toStageId: target.id,
         toStageName: target.name,
-        queueId: ticket.queueId,
         terminal: target.stageType === "terminal",
+      },
+    });
+  });
+}
+
+export async function moveTicketToWorkflowLocation(
+  actorUserId: string,
+  permissions: SupportPermissionMap,
+  ticketId: string,
+  workflowId: string,
+  stageId: string,
+): Promise<void> {
+  const scope = requireTicketScope(permissions, "tickets.reply");
+  await requireTicketAccess(actorUserId, scope, ticketId);
+  await initializeTicketWorkflowState(ticketId);
+
+  const db = getDatabase();
+  const [workflow] = await db
+    .select({ kind: ticketWorkflows.kind, areaId: ticketWorkflows.areaId })
+    .from(ticketWorkflows)
+    .where(and(eq(ticketWorkflows.id, workflowId), eq(ticketWorkflows.active, true)))
+    .limit(1);
+  if (!workflow) throw new Error("TICKET_WORKFLOW_NOT_FOUND");
+
+  if (workflow.kind === "global") {
+    await moveTicketGlobalStage(actorUserId, permissions, ticketId, stageId);
+    return;
+  }
+  if (!workflow.areaId) throw new Error("TICKET_AREA_NOT_FOUND");
+  const targetAreaId = workflow.areaId;
+  await requireTicketAreaAccess(
+    actorUserId,
+    permissions,
+    targetAreaId,
+    "tickets.reply",
+  );
+
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${ticketId}))`);
+
+    const [[ticket], [state], [target]] = await Promise.all([
+      tx
+        .select({ queueId: tickets.queueId })
+        .from(tickets)
+        .where(eq(tickets.id, ticketId))
+        .limit(1),
+      tx
+        .select({
+          globalWorkflowId: ticketWorkflowStates.globalWorkflowId,
+          globalStageId: ticketWorkflowStates.globalStageId,
+          areaId: ticketWorkflowStates.areaId,
+          areaWorkflowId: ticketWorkflowStates.areaWorkflowId,
+          areaStageId: ticketWorkflowStates.areaStageId,
+        })
+        .from(ticketWorkflowStates)
+        .where(eq(ticketWorkflowStates.ticketId, ticketId))
+        .limit(1),
+      tx
+        .select({
+          id: ticketWorkflowStages.id,
+          name: ticketWorkflowStages.name,
+          stageType: ticketWorkflowStages.stageType,
+          lifecycleStatus: ticketWorkflowStages.lifecycleStatus,
+        })
+        .from(ticketWorkflowStages)
+        .where(
+          and(
+            eq(ticketWorkflowStages.id, stageId),
+            eq(ticketWorkflowStages.workflowId, workflowId),
+            eq(ticketWorkflowStages.active, true),
+          ),
+        )
+        .limit(1),
+    ]);
+
+    if (!ticket || !state || !target) {
+      throw new Error("TICKET_WORKFLOW_STATE_NOT_FOUND");
+    }
+    if (target.stageType === "area_gateway") {
+      throw new Error("TICKET_WORKFLOW_AREA_STAGE_INVALID");
+    }
+
+    const [gateway] = await tx
+      .select({ id: ticketWorkflowStages.id })
+      .from(ticketWorkflowStages)
+      .where(
+        and(
+          eq(ticketWorkflowStages.workflowId, state.globalWorkflowId),
+          eq(ticketWorkflowStages.stageType, "area_gateway"),
+          eq(ticketWorkflowStages.linkedAreaId, targetAreaId),
+          eq(ticketWorkflowStages.active, true),
+        ),
+      )
+      .limit(1);
+    if (!gateway) throw new Error("TICKET_WORKFLOW_AREA_NOT_IN_GLOBAL");
+
+    const areaChanged = state.areaId !== targetAreaId;
+    await tx
+      .update(ticketWorkflowStates)
+      .set({
+        globalStageId: gateway.id,
+        areaId: targetAreaId,
+        areaWorkflowId: workflowId,
+        areaStageId: target.id,
+        ...(areaChanged ? { enteredAt: now } : {}),
+        areaEnteredAt: now,
+        updatedAt: now,
+      })
+      .where(eq(ticketWorkflowStates.ticketId, ticketId));
+    await tx
+      .update(tickets)
+      .set({
+        ...(areaChanged ? { assignedUserId: null } : {}),
+        status: target.lifecycleStatus,
+        ...lifecycleDates(target.lifecycleStatus, now),
+        updatedAt: now,
+      })
+      .where(eq(tickets.id, ticketId));
+    await tx.insert(ticketWorkflowHistory).values({
+      ticketId,
+      actorUserId,
+      transitionType: areaChanged ? "handoff" : "area_move",
+      fromWorkflowId: state.areaWorkflowId ?? state.globalWorkflowId,
+      toWorkflowId: workflowId,
+      fromStageId: state.areaStageId ?? state.globalStageId,
+      toStageId: target.id,
+      fromAreaId: state.areaId,
+      toAreaId: targetAreaId,
+      fromQueueId: ticket.queueId,
+      toQueueId: ticket.queueId,
+    });
+    await tx.insert(ticketEvents).values({
+      ticketId,
+      actorUserId,
+      eventType:
+        areaChanged ? "ticket.workflow.handoff" : "ticket.workflow.area.moved",
+      metadata: {
+        fromAreaId: state.areaId,
+        toAreaId: targetAreaId,
+        toStageId: target.id,
+        toStageName: target.name,
+        assigneeCleared: areaChanged,
       },
     });
   });

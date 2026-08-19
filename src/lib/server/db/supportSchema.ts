@@ -2,6 +2,7 @@ import {
   bigserial,
   boolean,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -184,6 +185,7 @@ export const ticketEvents = pgTable(
 export const supportTags = pgTable("support_tags", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull().unique(),
+  color: text("color").notNull().default("blue"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -200,5 +202,26 @@ export const ticketTags = pgTable(
   (table) => [
     primaryKey({ columns: [table.ticketId, table.tagId] }),
     index("ticket_tags_tag_idx").on(table.tagId),
+  ],
+);
+
+export const ticketAttachments = pgTable(
+  "ticket_attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ticketId: uuid("ticket_id")
+      .notNull()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    storageKey: text("storage_key").notNull(),
+    originalName: text("original_name").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    checksumSha256: text("checksum_sha256").notNull(),
+    uploadedBy: uuid("uploaded_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("ticket_attachments_storage_key_unique").on(table.storageKey),
+    index("ticket_attachments_ticket_idx").on(table.ticketId, table.createdAt),
   ],
 );

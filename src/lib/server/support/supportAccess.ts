@@ -2,6 +2,7 @@ import { eq, inArray } from "drizzle-orm";
 import type { PermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import { teamMembers } from "$lib/server/db/schema";
+import { ticketAreas, ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
 
 export type SupportPermissionMap = Map<string, PermissionScope>;
@@ -48,18 +49,31 @@ export async function canAccessTicket(
     .limit(1);
 
   if (!ticket) return false;
-
-  if (
-    ticket.assignedUserId === userId ||
-    ticket.createdByUserId === userId
-  ) {
-    return true;
-  }
-
+  if (ticket.assignedUserId === userId || ticket.createdByUserId === userId) return true;
   if (scope === "own") return false;
 
-  const queueIds = await getUserSupportQueueIds(userId);
-  return queueIds.includes(ticket.queueId);
+  const teamIds = await getUserSupportTeamIds(userId);
+  if (teamIds.length === 0) return false;
+
+  const queueRows = await db
+    .select({ id: supportQueues.id })
+    .from(supportQueues)
+    .where(inArray(supportQueues.teamId, teamIds));
+  if (queueRows.some((queue) => queue.id === ticket.queueId)) return true;
+
+  const [state] = await db
+    .select({ areaId: ticketWorkflowStates.areaId })
+    .from(ticketWorkflowStates)
+    .where(eq(ticketWorkflowStates.ticketId, ticketId))
+    .limit(1);
+  if (!state?.areaId) return false;
+
+  const [area] = await db
+    .select({ teamId: ticketAreas.teamId })
+    .from(ticketAreas)
+    .where(eq(ticketAreas.id, state.areaId))
+    .limit(1);
+  return Boolean(area?.teamId && teamIds.includes(area.teamId));
 }
 
 export async function requireTicketAccess(

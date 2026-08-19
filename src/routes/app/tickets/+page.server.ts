@@ -1,4 +1,3 @@
-import { eq } from "drizzle-orm";
 import {
   error,
   fail,
@@ -12,13 +11,15 @@ import {
   hasPermission,
   type PermissionScope,
 } from "$lib/server/auth/permissions";
-import { getDatabase } from "$lib/server/db";
-import { ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
-import { tickets as ticketTable } from "$lib/server/db/supportSchema";
+import type { SupportPermissionMap } from "$lib/server/support/supportAccess";
 import {
-  getUserSupportQueueIds,
-  type SupportPermissionMap,
-} from "$lib/server/support/supportAccess";
+  addTicketLabel,
+  createTicketLabel,
+  deleteTicketAttachment,
+  listTicketLabelsForTickets,
+  removeTicketLabel,
+  uploadTicketAttachment,
+} from "$lib/server/support/ticketCardRepository";
 import {
   createManualTicket,
   listSupportQueues,
@@ -30,6 +31,7 @@ import {
   getTicketWorkflowBoard,
   moveTicketAreaStage,
   moveTicketGlobalStage,
+  moveTicketToWorkflowLocation,
 } from "$lib/server/support/ticketWorkflowRepository";
 
 function readFormValue(formData: FormData, name: string): string {
@@ -48,125 +50,66 @@ function isTicketPriority(value: string): value is TicketPriority {
 function createPermissionMap(
   permissions: Array<{ code: string; scope: PermissionScope }>,
 ): SupportPermissionMap {
-  return new Map(
-    permissions.map((permission) => [permission.code, permission.scope]),
-  );
+  return new Map(permissions.map((permission) => [permission.code, permission.scope]));
 }
 
-function workflowMoveMessage(cause: unknown): string {
-  if (!(cause instanceof Error)) return "Não foi possível mover o ticket.";
-  if (cause.message === "TICKET_WORKFLOW_AREA_ACCESS_DENIED") {
-    return "Somente integrantes da área atual ou gestores podem movimentar o processo interno deste ticket.";
-  }
-  if (cause.message === "TICKET_WORKFLOW_AREA_NOT_COMPLETE") {
-    return "A área ainda não concluiu o processo. Mova o ticket para uma etapa terminal antes do handoff.";
-  }
-  if (cause.message === "TICKET_WORKFLOW_AREA_NOT_CONFIGURED") {
-    return "Esta área ainda não possui um workflow configurado.";
-  }
-  if (cause.message === "TICKET_WORKFLOW_AREA_EMPTY") {
-    return "O workflow desta área ainda não possui colunas ativas.";
-  }
-  return "Não foi possível mover o ticket para esta etapa.";
-}
-
-async function requireCurrentAreaOperationAccess(
-  actorUserId: string,
-  permissions: SupportPermissionMap,
-  ticketId: string,
-): Promise<void> {
-  if (hasPermission(permissions, "tickets.manage", "all")) return;
-
-  const db = getDatabase();
-  const [current] = await db
-    .select({
-      queueId: ticketTable.queueId,
-      areaWorkflowId: ticketWorkflowStates.areaWorkflowId,
-    })
-    .from(ticketTable)
-    .leftJoin(
-      ticketWorkflowStates,
-      eq(ticketWorkflowStates.ticketId, ticketTable.id),
-    )
-    .where(eq(ticketTable.id, ticketId))
-    .limit(1);
-
-  if (!current) throw new Error("TICKET_WORKFLOW_STATE_NOT_FOUND");
-  if (!current.areaWorkflowId) return;
-
-  const queueIds = await getUserSupportQueueIds(actorUserId);
-  if (!queueIds.includes(current.queueId)) {
-    throw new Error("TICKET_WORKFLOW_AREA_ACCESS_DENIED");
-  }
+function actionErrorMessage(cause: unknown): string {
+  if (!(cause instanceof Error)) return "Não foi possível concluir a operação.";
+  const messages: Record<string, string> = {
+    TICKET_WORKFLOW_AREA_ACCESS_DENIED: "Você não possui acesso ao processo interno desta área.",
+    TICKET_WORKFLOW_AREA_NOT_CONFIGURED: "Esta área não possui workflow ativo.",
+    TICKET_WORKFLOW_AREA_EMPTY: "Esta área não possui colunas ativas.",
+    TICKET_WORKFLOW_AREA_NOT_IN_GLOBAL: "Adicione esta área como uma coluna do fluxo global antes de mover tickets para ela.",
+    TICKET_LABEL_NAME_INVALID: "Informe uma etiqueta entre 2 e 40 caracteres.",
+    TICKET_LABEL_COLOR_INVALID: "Cor de etiqueta inválida.",
+    TICKET_ATTACHMENT_EMPTY: "Selecione um arquivo válido.",
+    TICKET_ATTACHMENT_TOO_LARGE: "O anexo deve ter no máximo 20 MB.",
+    TICKET_ATTACHMENT_TYPE_NOT_ALLOWED: "Este tipo de arquivo não é permitido.",
+    ASSET_STORAGE_NOT_CONFIGURED: "O storage de anexos ainda não está configurado.",
+  };
+  return messages[cause.message] ?? "Não foi possível concluir a operação.";
 }
 
 export const load: PageServerLoad = async ({ parent }) => {
   const layout = await parent();
   const permissionMap = createPermissionMap(layout.permissions);
   const viewScope = getPermissionScope(permissionMap, "tickets.view");
-
-  if (!viewScope) {
-    throw error(403, "Acesso não autorizado.");
-  }
+  if (!viewScope) throw error(403, "Acesso não autorizado.");
 
   const canCreate = hasPermission(permissionMap, "tickets.create");
   const canReply = hasPermission(permissionMap, "tickets.reply");
   const canManageWorkflow = hasPermission(permissionMap, "tickets.manage", "all");
-  const [tickets, queues] = await Promise.all([
+  const [ticketRows, queues] = await Promise.all([
     listSupportTickets(layout.user.id, permissionMap),
     canCreate ? listSupportQueues() : Promise.resolve([]),
   ]);
-  const [contexts, workflowBoard, teamQueueIds] = await Promise.all([
-    listTicketCustomerContexts(tickets.map((ticket) => ticket.id)),
-    getTicketWorkflowBoard(
-      layout.user.id,
-      permissionMap,
-      tickets.map((ticket) => ticket.id),
-    ),
-    viewScope === "all"
-      ? Promise.resolve<string[]>([])
-      : getUserSupportQueueIds(layout.user.id),
+  const ticketIds = ticketRows.map((ticket) => ticket.id);
+  const [contexts, workflowBoard, labelRows] = await Promise.all([
+    listTicketCustomerContexts(ticketIds),
+    getTicketWorkflowBoard(layout.user.id, permissionMap, ticketIds),
+    listTicketLabelsForTickets(ticketIds),
   ]);
 
-  const visibleAreaWorkflows = viewScope === "all"
-    ? workflowBoard.areaWorkflows
-    : workflowBoard.areaWorkflows.filter(
-        (workflow) => Boolean(workflow.queueId && teamQueueIds.includes(workflow.queueId)),
-      );
-  const visibleAreaWorkflowIds = new Set(
-    visibleAreaWorkflows.map((workflow) => workflow.id),
-  );
   const contextByTicket = new Map(contexts.map((context) => [context.ticketId, context]));
-  const stateByTicket = new Map(
-    workflowBoard.states.map((state) => {
-      if (
-        state.areaWorkflowId &&
-        !visibleAreaWorkflowIds.has(state.areaWorkflowId)
-      ) {
-        return [
-          state.ticketId,
-          {
-            ...state,
-            areaWorkflowId: null,
-            areaStageId: null,
-            areaEnteredAt: null,
-          },
-        ] as const;
-      }
-      return [state.ticketId, state] as const;
-    }),
-  );
+  const stateByTicket = new Map(workflowBoard.states.map((state) => [state.ticketId, state]));
+  const labelsByTicket = new Map<string, typeof labelRows>();
+  for (const label of labelRows) {
+    const current = labelsByTicket.get(label.ticketId) ?? [];
+    current.push(label);
+    labelsByTicket.set(label.ticketId, current);
+  }
 
   return {
-    tickets: tickets.map((ticket) => ({
+    tickets: ticketRows.map((ticket) => ({
       ...ticket,
       customerContext: contextByTicket.get(ticket.id) ?? null,
       workflowState: stateByTicket.get(ticket.id) ?? null,
+      labels: labelsByTicket.get(ticket.id) ?? [],
     })),
     queues,
     workflowBoard: {
       globalWorkflow: workflowBoard.globalWorkflow,
-      areaWorkflows: visibleAreaWorkflows,
+      areaWorkflows: workflowBoard.areaWorkflows,
     },
     currentUserId: layout.user.id,
     canCreate,
@@ -193,59 +136,22 @@ export const actions: Actions = {
     const queueId = readFormValue(formData, "queueId");
 
     if (subject.length < 3 || subject.length > 180) {
-      return fail(400, {
-        success: false,
-        action: "create",
-        message: "Informe um assunto entre 3 e 180 caracteres.",
-      });
+      return fail(400, { success: false, action: "create", message: "Informe um assunto entre 3 e 180 caracteres." });
     }
-
     if (message.length < 1 || message.length > 10000) {
-      return fail(400, {
-        success: false,
-        action: "create",
-        message: "A descrição do atendimento deve ter entre 1 e 10.000 caracteres.",
-      });
+      return fail(400, { success: false, action: "create", message: "A descrição deve ter entre 1 e 10.000 caracteres." });
     }
-
     if (customerName.length < 2 || customerName.length > 120) {
-      return fail(400, {
-        success: false,
-        action: "create",
-        message: "Informe o nome do cliente entre 2 e 120 caracteres.",
-      });
+      return fail(400, { success: false, action: "create", message: "Informe o nome do cliente entre 2 e 120 caracteres." });
     }
-
     if (organizationName.length > 160) {
-      return fail(400, {
-        success: false,
-        action: "create",
-        message: "O nome da escola ou empresa deve ter no máximo 160 caracteres.",
-      });
+      return fail(400, { success: false, action: "create", message: "O nome da escola ou empresa deve ter no máximo 160 caracteres." });
     }
-
     if (customerEmail.length > 254 || customerPhone.length > 40) {
-      return fail(400, {
-        success: false,
-        action: "create",
-        message: "E-mail ou telefone do cliente excede o tamanho permitido.",
-      });
+      return fail(400, { success: false, action: "create", message: "E-mail ou telefone do cliente excede o tamanho permitido." });
     }
-
-    if (!queueId) {
-      return fail(400, {
-        success: false,
-        action: "create",
-        message: "Selecione uma fila de atendimento.",
-      });
-    }
-
-    if (!isTicketPriority(priority)) {
-      return fail(400, {
-        success: false,
-        action: "create",
-        message: "Prioridade inválida.",
-      });
+    if (!queueId || !isTicketPriority(priority)) {
+      return fail(400, { success: false, action: "create", message: "Revise fila e prioridade." });
     }
 
     try {
@@ -259,69 +165,125 @@ export const actions: Actions = {
         organizationName,
         queueId,
       });
-
       throw redirect(303, `/app/tickets/${ticket.id}`);
     } catch (cause) {
-      if (
-        cause &&
-        typeof cause === "object" &&
-        "status" in cause &&
-        cause.status === 303
-      ) {
-        throw cause;
-      }
-
-      return fail(409, {
-        success: false,
-        action: "create",
-        message: "Não foi possível criar o ticket. Verifique a fila e tente novamente.",
-      });
+      if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
+      return fail(409, { success: false, action: "create", message: "Não foi possível criar o ticket." });
     }
   },
 
   moveWorkflowStage: async ({ cookies, request }) => {
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      "tickets.reply",
-      "/app/tickets",
-    );
+    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", "/app/tickets");
     const formData = await request.formData();
     const ticketId = readFormValue(formData, "ticketId");
     const stageId = readFormValue(formData, "stageId");
     const workflowKind = readFormValue(formData, "workflowKind");
-
-    if (!isUuid(ticketId) || !isUuid(stageId) || !["global", "area"].includes(workflowKind)) {
-      return fail(400, {
-        success: false,
-        action: "moveWorkflowStage",
-        message: "Ticket, workflow ou etapa inválida.",
-      });
+    if (!isUuid(ticketId) || !isUuid(stageId) || (workflowKind !== "global" && workflowKind !== "area")) {
+      return fail(400, { success: false, action: "moveWorkflowStage", message: "Movimentação inválida." });
     }
 
     try {
-      await requireCurrentAreaOperationAccess(
-        session.user.id,
-        permissions,
-        ticketId,
-      );
-      if (workflowKind === "area") {
-        await moveTicketAreaStage(session.user.id, permissions, ticketId, stageId);
-      } else {
+      if (workflowKind === "global") {
         await moveTicketGlobalStage(session.user.id, permissions, ticketId, stageId);
+      } else {
+        await moveTicketAreaStage(session.user.id, permissions, ticketId, stageId);
       }
-      return {
-        success: true,
-        action: "moveWorkflowStage",
-        message: workflowKind === "area"
-          ? "Etapa interna da área atualizada."
-          : "Ticket encaminhado para a nova etapa.",
-      };
+      return { success: true, action: "moveWorkflowStage", message: "Ticket movimentado." };
     } catch (cause) {
-      return fail(409, {
-        success: false,
-        action: "moveWorkflowStage",
-        message: workflowMoveMessage(cause),
-      });
+      return fail(409, { success: false, action: "moveWorkflowStage", message: actionErrorMessage(cause) });
+    }
+  },
+
+  moveTicketLocation: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", "/app/tickets");
+    const formData = await request.formData();
+    const ticketId = readFormValue(formData, "ticketId");
+    const workflowId = readFormValue(formData, "workflowId");
+    const stageId = readFormValue(formData, "stageId");
+    if (!isUuid(ticketId) || !isUuid(workflowId) || !isUuid(stageId)) {
+      return fail(400, { success: false, action: "moveTicketLocation", message: "Área ou coluna inválida." });
+    }
+    try {
+      await moveTicketToWorkflowLocation(session.user.id, permissions, ticketId, workflowId, stageId);
+      return { success: true, action: "moveTicketLocation", message: "Área e coluna atualizadas." };
+    } catch (cause) {
+      return fail(409, { success: false, action: "moveTicketLocation", message: actionErrorMessage(cause) });
+    }
+  },
+
+  createLabel: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", "/app/tickets");
+    const formData = await request.formData();
+    const ticketId = readFormValue(formData, "ticketId");
+    const name = readFormValue(formData, "name");
+    const color = readFormValue(formData, "color");
+    if (!isUuid(ticketId)) return fail(400, { success: false, action: "createLabel", message: "Ticket inválido." });
+    try {
+      const tagId = await createTicketLabel(session.user.id, permissions, name, color);
+      await addTicketLabel(session.user.id, permissions, ticketId, tagId);
+      return { success: true, action: "createLabel", message: "Etiqueta criada e adicionada." };
+    } catch (cause) {
+      return fail(409, { success: false, action: "createLabel", message: actionErrorMessage(cause) });
+    }
+  },
+
+  addLabel: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", "/app/tickets");
+    const formData = await request.formData();
+    const ticketId = readFormValue(formData, "ticketId");
+    const tagId = readFormValue(formData, "tagId");
+    if (!isUuid(ticketId) || !isUuid(tagId)) return fail(400, { success: false, action: "addLabel", message: "Etiqueta inválida." });
+    try {
+      await addTicketLabel(session.user.id, permissions, ticketId, tagId);
+      return { success: true, action: "addLabel", message: "Etiqueta adicionada." };
+    } catch (cause) {
+      return fail(409, { success: false, action: "addLabel", message: actionErrorMessage(cause) });
+    }
+  },
+
+  removeLabel: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", "/app/tickets");
+    const formData = await request.formData();
+    const ticketId = readFormValue(formData, "ticketId");
+    const tagId = readFormValue(formData, "tagId");
+    if (!isUuid(ticketId) || !isUuid(tagId)) return fail(400, { success: false, action: "removeLabel", message: "Etiqueta inválida." });
+    try {
+      await removeTicketLabel(session.user.id, permissions, ticketId, tagId);
+      return { success: true, action: "removeLabel", message: "Etiqueta removida." };
+    } catch (cause) {
+      return fail(409, { success: false, action: "removeLabel", message: actionErrorMessage(cause) });
+    }
+  },
+
+  uploadAttachment: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", "/app/tickets");
+    const formData = await request.formData();
+    const ticketId = readFormValue(formData, "ticketId");
+    const file = formData.get("file");
+    if (!isUuid(ticketId) || !(file instanceof File)) {
+      return fail(400, { success: false, action: "uploadAttachment", message: "Selecione um arquivo válido." });
+    }
+    try {
+      await uploadTicketAttachment(session.user.id, permissions, ticketId, file);
+      return { success: true, action: "uploadAttachment", message: "Anexo adicionado." };
+    } catch (cause) {
+      return fail(409, { success: false, action: "uploadAttachment", message: actionErrorMessage(cause) });
+    }
+  },
+
+  deleteAttachment: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", "/app/tickets");
+    const formData = await request.formData();
+    const ticketId = readFormValue(formData, "ticketId");
+    const attachmentId = readFormValue(formData, "attachmentId");
+    if (!isUuid(ticketId) || !isUuid(attachmentId)) {
+      return fail(400, { success: false, action: "deleteAttachment", message: "Anexo inválido." });
+    }
+    try {
+      await deleteTicketAttachment(session.user.id, permissions, ticketId, attachmentId);
+      return { success: true, action: "deleteAttachment", message: "Anexo removido." };
+    } catch (cause) {
+      return fail(409, { success: false, action: "deleteAttachment", message: actionErrorMessage(cause) });
     }
   },
 };
