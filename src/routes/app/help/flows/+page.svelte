@@ -1,11 +1,12 @@
 <script lang="ts">
   import {
-    ArrowLeft,
     ArrowRight,
     CircleAlert,
     GitBranch,
     Plus,
   } from "lucide-svelte";
+  import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -18,38 +19,20 @@
   <title>Fluxos interativos | Central de Ajuda | F10 Operations</title>
 </svelte:head>
 
-<div class="mx-auto max-w-[1280px] px-5 py-7 sm:px-8 sm:py-9">
-  <a
-    href="/app/help"
-    class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[12px] font-semibold text-[#5F6575] transition hover:bg-white hover:text-[#000A57]"
-  >
-    <ArrowLeft size={17} aria-hidden="true" />
-    Voltar para Central de Ajuda
-  </a>
-
-  <div class="mt-5 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-    <div>
-      <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">
-        Navegação guiada
-      </p>
-      <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">
-        Fluxos interativos
-      </h1>
-      <p class="mt-2 max-w-[760px] text-[14px] leading-6 text-[#6F7585]">
-        Edite as perguntas que conduzem o cliente até uma orientação, treinamento, busca ou atendimento.
-      </p>
-    </div>
+<ApplicationContent width="standard">
+  <div class="mb-3">
+    <ApplicationBackLink href="/app/help" label="Central de Ajuda" />
   </div>
 
   {#if form?.message}
-    <div class="mt-6 flex items-start gap-3 rounded-2xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[12px] font-medium text-[#9B2C2C]">
+    <div class="mb-4 flex items-start gap-3 rounded-2xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[12px] font-medium text-[#9B2C2C]">
       <CircleAlert size={18} class="mt-0.5 shrink-0" aria-hidden="true" />
       <span>{form.message}</span>
     </div>
   {/if}
 
-  <div class="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-    <section class="overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
+  <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+    <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
       <header class="border-b border-[#EEF0F5] px-5 py-4 sm:px-6">
         <div class="flex items-center gap-3">
           <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]">
@@ -106,7 +89,7 @@
     </section>
 
     {#if data.canEdit}
-      <section class="h-fit rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+      <section class="h-fit rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
         <div class="flex items-start gap-3">
           <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFF0E4] text-[#EA6D0B]">
             <Plus size={19} aria-hidden="true" />
@@ -157,4 +140,4 @@
       </section>
     {/if}
   </div>
-</div>
+</ApplicationContent>

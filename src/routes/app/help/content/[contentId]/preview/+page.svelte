@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { ArrowLeft, Download, ExternalLink, Eye, Info, PlayCircle, TriangleAlert } from "lucide-svelte";
+  import { Download, ExternalLink, Eye, Info, PlayCircle, TriangleAlert } from "lucide-svelte";
+  import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
+  import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { PageData } from "./$types";
   export let data: PageData;
 
@@ -20,23 +22,23 @@
 
 <svelte:head><title>Preview: {data.content.title} | F10 Operations</title></svelte:head>
 
-<div class="mx-auto max-w-[1080px] px-5 py-7 sm:px-8 sm:py-9">
-  <div class="flex flex-wrap items-center justify-between gap-3">
-    <a href={`/app/help/content/${data.content.id}`} class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[11px] font-semibold text-[#5F6575]"><ArrowLeft size={16}/>Voltar ao editor</a>
+<ApplicationContent width="standard">
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <ApplicationBackLink href={`/app/help/content/${data.content.id}`} label="Editor" />
     <span class="inline-flex items-center gap-2 rounded-full bg-[#FFF0E4] px-3 py-1.5 text-[9px] font-bold text-[#A9510D]"><Eye size={13}/>PREVIEW DO RASCUNHO</span>
   </div>
 
-  <header class="mt-5 rounded-[26px] border border-[#E2E5ED] bg-white p-6 sm:p-8">
+  <header class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
     {#if data.content.category}<p class="text-[9px] font-bold uppercase tracking-[0.13em] text-[#EA6D0B]">{data.content.category}</p>{/if}
-    <h1 class="mt-2 text-[30px] font-semibold tracking-[-0.04em] text-[#010D28] sm:text-[40px]">{data.content.title}</h1>
-    {#if data.content.summary}<p class="mt-3 max-w-[800px] text-[13px] leading-7 text-[#707788]">{data.content.summary}</p>{/if}
+    <h2 class="mt-2 text-[24px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[30px]">{data.content.title}</h2>
+    {#if data.content.summary}<p class="mt-2 max-w-[800px] text-[12px] leading-6 text-[#707788]">{data.content.summary}</p>{/if}
   </header>
 
-  <div class="mt-6 space-y-5">
+  <div class="mt-5 space-y-5">
     {#each data.content.steps as step, index}
-      <section class="overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
-        <header class="flex items-start gap-4 border-b border-[#EEF0F5] px-5 py-5 sm:px-7"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[12px] font-bold text-white">{index + 1}</span><div><h2 class="text-[17px] font-semibold text-[#252B3B]">{step.title}</h2>{#if step.description}<p class="mt-1 text-[11px] leading-5 text-[#7A8190]">{step.description}</p>{/if}</div></header>
-        <div class="space-y-5 px-5 py-6 sm:px-7">
+      <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
+        <header class="flex items-start gap-4 border-b border-[#EEF0F5] px-5 py-5 sm:px-6"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[12px] font-bold text-white">{index + 1}</span><div><h2 class="text-[17px] font-semibold text-[#252B3B]">{step.title}</h2>{#if step.description}<p class="mt-1 text-[11px] leading-5 text-[#7A8190]">{step.description}</p>{/if}</div></header>
+        <div class="space-y-5 px-5 py-6 sm:px-6">
           {#each step.blocks as block}
             {#if block.blockType === "text"}<p class="whitespace-pre-wrap text-[13px] leading-7 text-[#505767]">{block.textContent}</p>
             {:else if block.blockType === "notice"}<div class={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${block.noticeVariant === "warning" || block.noticeVariant === "danger" ? "border-[#F0D0C8] bg-[#FFF8F5]" : "border-[#D8DEF2] bg-[#F8F9FF]"}`}>{#if block.noticeVariant === "warning" || block.noticeVariant === "danger"}<TriangleAlert size={16}/>{:else}<Info size={16}/>{/if}<p class="text-[11px] leading-6">{block.textContent}</p></div>
@@ -49,4 +51,4 @@
       </section>
     {/each}
   </div>
-</div>
+</ApplicationContent>
