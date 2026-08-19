@@ -71,7 +71,7 @@ async function listStageColors(): Promise<Map<string, TicketWorkflowStageColor>>
 function addColorsToWorkflow<T extends { stages: Array<{ id: string }> }>(
   workflow: T | null,
   colors: Map<string, TicketWorkflowStageColor>,
-): (T & { stages: Array<T["stages"][number] & { color: TicketWorkflowStageColor }> }) | null {
+): (T & { stages: Array<T["stages"][number] & { color?: TicketWorkflowStageColor }> }) | null {
   if (!workflow) return null;
   return {
     ...workflow,
