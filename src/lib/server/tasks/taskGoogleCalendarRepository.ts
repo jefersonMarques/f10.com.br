@@ -5,13 +5,15 @@ import {
   deleteGoogleCalendarEvent,
   updateGoogleCalendarEvent,
   type CreateGoogleCalendarEventInput,
+  type GoogleCalendarEvent,
 } from "$lib/server/calendar/googleCalendarRepository";
 import { getDatabase } from "$lib/server/db";
 import {
   taskGoogleCalendarLinks,
+  type GoogleCalendarSyncDirection,
   type TaskGoogleCalendarAttendee,
 } from "$lib/server/db/googleCalendarSchema";
-import { tasks } from "$lib/server/db/taskSchema";
+import { taskActivities, tasks } from "$lib/server/db/taskSchema";
 import {
   ensureTaskAccess,
   requireTaskPermissionScope,
@@ -28,6 +30,9 @@ export type TaskGoogleCalendarScheduleInput = {
   location?: string;
   reminderMinutes?: number | null;
   attendees?: TaskGoogleCalendarAttendee[];
+  calendarId?: string;
+  syncDirection?: GoogleCalendarSyncDirection;
+  autoManaged?: boolean;
 };
 
 type TaskSnapshot = {
@@ -35,6 +40,7 @@ type TaskSnapshot = {
   title: string;
   description: string;
   dueOn: string | null;
+  updatedAt: Date;
 };
 
 type TaskGoogleLink = {
@@ -54,6 +60,13 @@ type TaskGoogleLink = {
   location: string;
   reminderMinutes: number | null;
   attendees: TaskGoogleCalendarAttendee[];
+  syncDirection: GoogleCalendarSyncDirection;
+  autoManaged: boolean;
+  importedFromGoogle: boolean;
+  googleUpdatedAt: Date | null;
+  lastSyncSource: "f10" | "google";
+  lastSyncedAt: Date | null;
+  lastSyncError: string | null;
 };
 
 function isValidTime(value: string): boolean {
@@ -114,18 +127,11 @@ function validateEventDetails(input: TaskGoogleCalendarScheduleInput) {
 
 function validateSchedule(input: TaskGoogleCalendarScheduleInput) {
   const timeZone = validateTimeZone(input.timeZone);
-  if (input.allDay) {
-    return { allDay: true, startTime: "", endTime: "", timeZone };
-  }
+  if (input.allDay) return { allDay: true, startTime: "", endTime: "", timeZone };
   if (!isValidTime(input.startTime) || !isValidTime(input.endTime) || input.startTime >= input.endTime) {
     throw new Error("TASK_GOOGLE_TIME_INVALID");
   }
-  return {
-    allDay: false,
-    startTime: input.startTime,
-    endTime: input.endTime,
-    timeZone,
-  };
+  return { allDay: false, startTime: input.startTime, endTime: input.endTime, timeZone };
 }
 
 async function getTaskSnapshot(taskId: string): Promise<TaskSnapshot> {
@@ -136,6 +142,7 @@ async function getTaskSnapshot(taskId: string): Promise<TaskSnapshot> {
       title: tasks.title,
       description: tasks.description,
       dueOn: tasks.dueOn,
+      updatedAt: tasks.updatedAt,
     })
     .from(tasks)
     .where(eq(tasks.id, taskId))
@@ -175,34 +182,40 @@ function toGoogleEventInput(
   };
 }
 
+function linkSelection() {
+  return {
+    taskId: taskGoogleCalendarLinks.taskId,
+    userId: taskGoogleCalendarLinks.userId,
+    googleCalendarId: taskGoogleCalendarLinks.googleCalendarId,
+    googleEventId: taskGoogleCalendarLinks.googleEventId,
+    googleIcalUid: taskGoogleCalendarLinks.googleIcalUid,
+    googleHtmlLink: taskGoogleCalendarLinks.googleHtmlLink,
+    googleMeetEnabled: taskGoogleCalendarLinks.googleMeetEnabled,
+    googleMeetUrl: taskGoogleCalendarLinks.googleMeetUrl,
+    allDay: taskGoogleCalendarLinks.allDay,
+    startTime: taskGoogleCalendarLinks.startTime,
+    endTime: taskGoogleCalendarLinks.endTime,
+    timeZone: taskGoogleCalendarLinks.timeZone,
+    eventDetailsManaged: taskGoogleCalendarLinks.eventDetailsManaged,
+    location: taskGoogleCalendarLinks.location,
+    reminderMinutes: taskGoogleCalendarLinks.reminderMinutes,
+    attendees: taskGoogleCalendarLinks.attendees,
+    syncDirection: taskGoogleCalendarLinks.syncDirection,
+    autoManaged: taskGoogleCalendarLinks.autoManaged,
+    importedFromGoogle: taskGoogleCalendarLinks.importedFromGoogle,
+    googleUpdatedAt: taskGoogleCalendarLinks.googleUpdatedAt,
+    lastSyncSource: taskGoogleCalendarLinks.lastSyncSource,
+    lastSyncedAt: taskGoogleCalendarLinks.lastSyncedAt,
+    lastSyncError: taskGoogleCalendarLinks.lastSyncError,
+  };
+}
+
 async function getLink(userId: string, taskId: string): Promise<TaskGoogleLink | null> {
   const db = getDatabase();
   const [link] = await db
-    .select({
-      taskId: taskGoogleCalendarLinks.taskId,
-      userId: taskGoogleCalendarLinks.userId,
-      googleCalendarId: taskGoogleCalendarLinks.googleCalendarId,
-      googleEventId: taskGoogleCalendarLinks.googleEventId,
-      googleIcalUid: taskGoogleCalendarLinks.googleIcalUid,
-      googleHtmlLink: taskGoogleCalendarLinks.googleHtmlLink,
-      googleMeetEnabled: taskGoogleCalendarLinks.googleMeetEnabled,
-      googleMeetUrl: taskGoogleCalendarLinks.googleMeetUrl,
-      allDay: taskGoogleCalendarLinks.allDay,
-      startTime: taskGoogleCalendarLinks.startTime,
-      endTime: taskGoogleCalendarLinks.endTime,
-      timeZone: taskGoogleCalendarLinks.timeZone,
-      eventDetailsManaged: taskGoogleCalendarLinks.eventDetailsManaged,
-      location: taskGoogleCalendarLinks.location,
-      reminderMinutes: taskGoogleCalendarLinks.reminderMinutes,
-      attendees: taskGoogleCalendarLinks.attendees,
-    })
+    .select(linkSelection())
     .from(taskGoogleCalendarLinks)
-    .where(
-      and(
-        eq(taskGoogleCalendarLinks.userId, userId),
-        eq(taskGoogleCalendarLinks.taskId, taskId),
-      ),
-    )
+    .where(and(eq(taskGoogleCalendarLinks.userId, userId), eq(taskGoogleCalendarLinks.taskId, taskId)))
     .limit(1);
   return link ?? null;
 }
@@ -213,23 +226,13 @@ async function markSyncError(userId: string, taskId: string, cause: unknown): Pr
   await db
     .update(taskGoogleCalendarLinks)
     .set({ lastSyncError: message, updatedAt: new Date() })
-    .where(
-      and(
-        eq(taskGoogleCalendarLinks.userId, userId),
-        eq(taskGoogleCalendarLinks.taskId, taskId),
-      ),
-    );
+    .where(and(eq(taskGoogleCalendarLinks.userId, userId), eq(taskGoogleCalendarLinks.taskId, taskId)));
 }
 
 async function syncExistingLink(task: TaskSnapshot, link: TaskGoogleLink): Promise<void> {
   const db = getDatabase();
   const input = toGoogleEventInput(task, link);
-  let event = await updateGoogleCalendarEvent(
-    link.userId,
-    link.googleCalendarId,
-    link.googleEventId,
-    input,
-  );
+  let event = await updateGoogleCalendarEvent(link.userId, link.googleCalendarId, link.googleEventId, input);
 
   if (!event) {
     event = await createGoogleCalendarEvent(
@@ -247,45 +250,33 @@ async function syncExistingLink(task: TaskSnapshot, link: TaskGoogleLink): Promi
       googleIcalUid: event.iCalUID,
       googleHtmlLink: event.htmlLink,
       googleMeetUrl: event.meetUrl ?? link.googleMeetUrl,
+      googleUpdatedAt: event.updatedAt ? new Date(event.updatedAt) : null,
+      lastSyncSource: "f10",
       lastSyncedAt: now,
       lastSyncError: null,
       updatedAt: now,
     })
-    .where(
-      and(
-        eq(taskGoogleCalendarLinks.userId, link.userId),
-        eq(taskGoogleCalendarLinks.taskId, link.taskId),
-      ),
-    );
+    .where(and(eq(taskGoogleCalendarLinks.userId, link.userId), eq(taskGoogleCalendarLinks.taskId, link.taskId)));
 }
 
 export async function getTaskGoogleCalendarLink(userId: string, taskId: string) {
+  return getLink(userId, taskId);
+}
+
+export async function findTaskGoogleCalendarLinkByEvent(
+  userId: string,
+  calendarId: string,
+  eventId: string,
+) {
   const db = getDatabase();
   const [link] = await db
-    .select({
-      taskId: taskGoogleCalendarLinks.taskId,
-      googleCalendarId: taskGoogleCalendarLinks.googleCalendarId,
-      googleEventId: taskGoogleCalendarLinks.googleEventId,
-      googleIcalUid: taskGoogleCalendarLinks.googleIcalUid,
-      googleHtmlLink: taskGoogleCalendarLinks.googleHtmlLink,
-      googleMeetEnabled: taskGoogleCalendarLinks.googleMeetEnabled,
-      googleMeetUrl: taskGoogleCalendarLinks.googleMeetUrl,
-      allDay: taskGoogleCalendarLinks.allDay,
-      startTime: taskGoogleCalendarLinks.startTime,
-      endTime: taskGoogleCalendarLinks.endTime,
-      timeZone: taskGoogleCalendarLinks.timeZone,
-      eventDetailsManaged: taskGoogleCalendarLinks.eventDetailsManaged,
-      location: taskGoogleCalendarLinks.location,
-      reminderMinutes: taskGoogleCalendarLinks.reminderMinutes,
-      attendees: taskGoogleCalendarLinks.attendees,
-      lastSyncedAt: taskGoogleCalendarLinks.lastSyncedAt,
-      lastSyncError: taskGoogleCalendarLinks.lastSyncError,
-    })
+    .select(linkSelection())
     .from(taskGoogleCalendarLinks)
     .where(
       and(
         eq(taskGoogleCalendarLinks.userId, userId),
-        eq(taskGoogleCalendarLinks.taskId, taskId),
+        eq(taskGoogleCalendarLinks.googleCalendarId, calendarId),
+        eq(taskGoogleCalendarLinks.googleEventId, eventId),
       ),
     )
     .limit(1);
@@ -295,11 +286,7 @@ export async function getTaskGoogleCalendarLink(userId: string, taskId: string) 
 export async function listUserTaskGoogleCalendarLinks(userId: string) {
   const db = getDatabase();
   return db
-    .select({
-      taskId: taskGoogleCalendarLinks.taskId,
-      googleEventId: taskGoogleCalendarLinks.googleEventId,
-      googleMeetUrl: taskGoogleCalendarLinks.googleMeetUrl,
-    })
+    .select(linkSelection())
     .from(taskGoogleCalendarLinks)
     .where(eq(taskGoogleCalendarLinks.userId, userId));
 }
@@ -316,20 +303,11 @@ export async function configureTaskGoogleCalendar(
   const existing = await getLink(actorUserId, taskId);
   if (!input.enabled) {
     if (!existing) return;
-    await deleteGoogleCalendarEvent(
-      actorUserId,
-      existing.googleCalendarId,
-      existing.googleEventId,
-    );
+    await deleteGoogleCalendarEvent(actorUserId, existing.googleCalendarId, existing.googleEventId);
     const db = getDatabase();
     await db
       .delete(taskGoogleCalendarLinks)
-      .where(
-        and(
-          eq(taskGoogleCalendarLinks.userId, actorUserId),
-          eq(taskGoogleCalendarLinks.taskId, taskId),
-        ),
-      );
+      .where(and(eq(taskGoogleCalendarLinks.userId, actorUserId), eq(taskGoogleCalendarLinks.taskId, taskId)));
     return;
   }
 
@@ -352,6 +330,8 @@ export async function configureTaskGoogleCalendar(
         endTime: schedule.allDay ? null : schedule.endTime,
         timeZone: schedule.timeZone,
         googleMeetEnabled: existing.googleMeetEnabled || Boolean(input.googleMeet),
+        syncDirection: input.syncDirection ?? existing.syncDirection,
+        autoManaged: input.autoManaged ?? existing.autoManaged,
         ...(shouldManageDetails
           ? {
               eventDetailsManaged: true,
@@ -362,12 +342,7 @@ export async function configureTaskGoogleCalendar(
           : {}),
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(taskGoogleCalendarLinks.userId, actorUserId),
-          eq(taskGoogleCalendarLinks.taskId, taskId),
-        ),
-      );
+      .where(and(eq(taskGoogleCalendarLinks.userId, actorUserId), eq(taskGoogleCalendarLinks.taskId, taskId)));
 
     try {
       if (shouldCreateMeet) {
@@ -382,16 +357,13 @@ export async function configureTaskGoogleCalendar(
             googleIcalUid: event.iCalUID,
             googleHtmlLink: event.htmlLink,
             googleMeetUrl: event.meetUrl,
+            googleUpdatedAt: event.updatedAt ? new Date(event.updatedAt) : null,
+            lastSyncSource: "f10",
             lastSyncedAt: new Date(),
             lastSyncError: null,
             updatedAt: new Date(),
           })
-          .where(
-            and(
-              eq(taskGoogleCalendarLinks.userId, actorUserId),
-              eq(taskGoogleCalendarLinks.taskId, taskId),
-            ),
-          );
+          .where(and(eq(taskGoogleCalendarLinks.userId, actorUserId), eq(taskGoogleCalendarLinks.taskId, taskId)));
       }
 
       const updatedLink = await getLink(actorUserId, taskId);
@@ -419,16 +391,18 @@ export async function configureTaskGoogleCalendar(
     reminderMinutes: details.reminderMinutes,
     attendees: details.attendees,
   };
+  const calendarId = input.calendarId?.trim() || "primary";
   const event = await createGoogleCalendarEvent(
     actorUserId,
     toGoogleEventInput(task, newLink, true),
+    calendarId,
   );
   const now = new Date();
   const db = getDatabase();
   await db.insert(taskGoogleCalendarLinks).values({
     taskId,
     userId: actorUserId,
-    googleCalendarId: "primary",
+    googleCalendarId: calendarId,
     googleEventId: event.id,
     googleIcalUid: event.iCalUID,
     googleHtmlLink: event.htmlLink,
@@ -442,37 +416,127 @@ export async function configureTaskGoogleCalendar(
     location: details.location,
     reminderMinutes: details.reminderMinutes,
     attendees: details.attendees,
+    syncDirection: input.syncDirection ?? "f10_to_google",
+    autoManaged: input.autoManaged ?? false,
+    importedFromGoogle: false,
+    googleUpdatedAt: event.updatedAt ? new Date(event.updatedAt) : null,
+    lastSyncSource: "f10",
     lastSyncedAt: now,
     lastSyncError: null,
     updatedAt: now,
   });
 }
 
+export async function linkImportedGoogleEventToTask(
+  userId: string,
+  taskId: string,
+  calendarId: string,
+  event: GoogleCalendarEvent,
+): Promise<void> {
+  const now = new Date();
+  const db = getDatabase();
+  await db
+    .insert(taskGoogleCalendarLinks)
+    .values({
+      taskId,
+      userId,
+      googleCalendarId: calendarId,
+      googleEventId: event.id,
+      googleIcalUid: event.iCalUID,
+      googleHtmlLink: event.htmlLink,
+      googleMeetEnabled: Boolean(event.meetUrl),
+      googleMeetUrl: event.meetUrl,
+      allDay: event.allDay,
+      startTime: event.allDay || !event.startDateTime ? null : event.startDateTime.slice(11, 16),
+      endTime: event.allDay || !event.endDateTime ? null : event.endDateTime.slice(11, 16),
+      timeZone: "UTC",
+      eventDetailsManaged: false,
+      syncDirection: "bidirectional",
+      autoManaged: false,
+      importedFromGoogle: true,
+      googleUpdatedAt: event.updatedAt ? new Date(event.updatedAt) : null,
+      lastSyncSource: "google",
+      lastSyncedAt: now,
+      lastSyncError: null,
+      updatedAt: now,
+    })
+    .onConflictDoNothing();
+}
+
+export async function applyGoogleEventToTask(
+  userId: string,
+  taskId: string,
+  event: GoogleCalendarEvent,
+): Promise<void> {
+  const dueOn = event.startDate ?? event.startDateTime?.slice(0, 10) ?? null;
+  if (!dueOn) return;
+  const db = getDatabase();
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    await tx
+      .update(tasks)
+      .set({
+        title: event.summary.slice(0, 180),
+        description: event.description.slice(0, 5000),
+        dueOn,
+        updatedBy: userId,
+        updatedAt: now,
+      })
+      .where(eq(tasks.id, taskId));
+    await tx.insert(taskActivities).values({
+      taskId,
+      actorUserId: userId,
+      action: "task.google.synced",
+      metadata: { googleEventId: event.id, source: "google" },
+    });
+    await tx
+      .update(taskGoogleCalendarLinks)
+      .set({
+        googleIcalUid: event.iCalUID,
+        googleHtmlLink: event.htmlLink,
+        googleMeetUrl: event.meetUrl,
+        allDay: event.allDay,
+        startTime: event.allDay || !event.startDateTime ? null : event.startDateTime.slice(11, 16),
+        endTime: event.allDay || !event.endDateTime ? null : event.endDateTime.slice(11, 16),
+        googleUpdatedAt: event.updatedAt ? new Date(event.updatedAt) : null,
+        lastSyncSource: "google",
+        lastSyncedAt: now,
+        lastSyncError: null,
+        updatedAt: now,
+      })
+      .where(and(eq(taskGoogleCalendarLinks.userId, userId), eq(taskGoogleCalendarLinks.taskId, taskId)));
+  });
+}
+
+export async function markTaskGoogleSyncConflict(userId: string, taskId: string): Promise<void> {
+  const db = getDatabase();
+  await db
+    .update(taskGoogleCalendarLinks)
+    .set({ lastSyncError: "SYNC_CONFLICT", updatedAt: new Date() })
+    .where(and(eq(taskGoogleCalendarLinks.userId, userId), eq(taskGoogleCalendarLinks.taskId, taskId)));
+}
+
+export async function removeTaskGoogleCalendarLink(
+  userId: string,
+  taskId: string,
+  deleteGoogleEvent = false,
+): Promise<void> {
+  const link = await getLink(userId, taskId);
+  if (!link) return;
+  if (deleteGoogleEvent) {
+    await deleteGoogleCalendarEvent(userId, link.googleCalendarId, link.googleEventId);
+  }
+  const db = getDatabase();
+  await db
+    .delete(taskGoogleCalendarLinks)
+    .where(and(eq(taskGoogleCalendarLinks.userId, userId), eq(taskGoogleCalendarLinks.taskId, taskId)));
+}
+
 export async function syncAllTaskGoogleCalendarLinks(taskId: string): Promise<void> {
   const db = getDatabase();
   const [task, links] = await Promise.all([
     getTaskSnapshot(taskId),
-    db
-      .select({
-        taskId: taskGoogleCalendarLinks.taskId,
-        userId: taskGoogleCalendarLinks.userId,
-        googleCalendarId: taskGoogleCalendarLinks.googleCalendarId,
-        googleEventId: taskGoogleCalendarLinks.googleEventId,
-        googleIcalUid: taskGoogleCalendarLinks.googleIcalUid,
-        googleHtmlLink: taskGoogleCalendarLinks.googleHtmlLink,
-        googleMeetEnabled: taskGoogleCalendarLinks.googleMeetEnabled,
-        googleMeetUrl: taskGoogleCalendarLinks.googleMeetUrl,
-        allDay: taskGoogleCalendarLinks.allDay,
-        startTime: taskGoogleCalendarLinks.startTime,
-        endTime: taskGoogleCalendarLinks.endTime,
-        timeZone: taskGoogleCalendarLinks.timeZone,
-        eventDetailsManaged: taskGoogleCalendarLinks.eventDetailsManaged,
-        location: taskGoogleCalendarLinks.location,
-        reminderMinutes: taskGoogleCalendarLinks.reminderMinutes,
-        attendees: taskGoogleCalendarLinks.attendees,
-      })
-      .from(taskGoogleCalendarLinks)
-      .where(eq(taskGoogleCalendarLinks.taskId, taskId)),
+    db.select(linkSelection()).from(taskGoogleCalendarLinks).where(eq(taskGoogleCalendarLinks.taskId, taskId)),
   ]);
 
   if (links.length === 0) return;
@@ -484,12 +548,7 @@ export async function syncAllTaskGoogleCalendarLinks(taskId: string): Promise<vo
           await deleteGoogleCalendarEvent(link.userId, link.googleCalendarId, link.googleEventId);
           await db
             .delete(taskGoogleCalendarLinks)
-            .where(
-              and(
-                eq(taskGoogleCalendarLinks.userId, link.userId),
-                eq(taskGoogleCalendarLinks.taskId, taskId),
-              ),
-            );
+            .where(and(eq(taskGoogleCalendarLinks.userId, link.userId), eq(taskGoogleCalendarLinks.taskId, taskId)));
         } catch (cause) {
           await markSyncError(link.userId, taskId, cause);
         }

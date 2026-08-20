@@ -13,10 +13,15 @@ const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
+const GOOGLE_CALENDAR_LIST_SCOPE = "https://www.googleapis.com/auth/calendar.calendarlist.readonly";
+const GOOGLE_CALENDAR_ACL_SCOPE = "https://www.googleapis.com/auth/calendar.acl";
+const GOOGLE_CALENDAR_EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const GOOGLE_SCOPES = [
   "openid",
   "email",
-  "https://www.googleapis.com/auth/calendar.events",
+  GOOGLE_CALENDAR_EVENTS_SCOPE,
+  GOOGLE_CALENDAR_LIST_SCOPE,
+  GOOGLE_CALENDAR_ACL_SCOPE,
 ];
 
 export type GoogleCalendarAttendee = {
@@ -42,7 +47,25 @@ export type GoogleCalendarEvent = {
   endDate: string | null;
   endDateTime: string | null;
   transparency: string;
+  updatedAt: string | null;
   attendees: GoogleCalendarAttendee[];
+};
+
+export type GoogleCalendarListEntry = {
+  id: string;
+  summary: string;
+  description: string;
+  primary: boolean;
+  selected: boolean;
+  accessRole: string;
+  timeZone: string;
+};
+
+export type GoogleCalendarAclEntry = {
+  id: string;
+  role: string;
+  scopeType: string;
+  scopeValue: string;
 };
 
 export type GoogleCalendarEventAttendeeInput = {
@@ -88,6 +111,7 @@ type GoogleEventResource = {
   location?: string;
   htmlLink?: string;
   transparency?: string;
+  updated?: string;
   start?: { date?: string; dateTime?: string; timeZone?: string };
   end?: { date?: string; dateTime?: string; timeZone?: string };
   attendees?: Array<{
@@ -119,6 +143,32 @@ type GoogleEventsResponse = {
   nextPageToken?: string;
 };
 
+type GoogleCalendarListResource = {
+  id?: string;
+  summary?: string;
+  description?: string;
+  primary?: boolean;
+  selected?: boolean;
+  accessRole?: string;
+  timeZone?: string;
+};
+
+type GoogleCalendarListResponse = {
+  items?: GoogleCalendarListResource[];
+  nextPageToken?: string;
+};
+
+type GoogleCalendarAclResource = {
+  id?: string;
+  role?: string;
+  scope?: { type?: string; value?: string };
+};
+
+type GoogleCalendarAclResponse = {
+  items?: GoogleCalendarAclResource[];
+  nextPageToken?: string;
+};
+
 function getGoogleConfig() {
   const clientId = env.GOOGLE_CALENDAR_CLIENT_ID?.trim() ?? "";
   const clientSecret = env.GOOGLE_CALENDAR_CLIENT_SECRET?.trim() ?? "";
@@ -130,6 +180,12 @@ function getGoogleConfig() {
     : "");
 
   return { clientId, clientSecret, tokenKey, redirectUri };
+}
+
+function requiredScopesGranted(scope: string): boolean {
+  const granted = new Set(scope.split(/\s+/).filter(Boolean));
+  return [GOOGLE_CALENDAR_EVENTS_SCOPE, GOOGLE_CALENDAR_LIST_SCOPE, GOOGLE_CALENDAR_ACL_SCOPE]
+    .every((required) => granted.has(required));
 }
 
 export function isGoogleCalendarConfigured(): boolean {
@@ -180,13 +236,21 @@ export function buildGoogleCalendarAuthorizationUrl(state: string, loginHint: st
 
 export async function getGoogleCalendarConnection(userId: string) {
   if (!isGoogleCalendarConfigured()) {
-    return { configured: false, connected: false, googleEmail: "" };
+    return {
+      configured: false,
+      connected: false,
+      scopesReady: false,
+      googleEmail: "",
+      connectedAt: null,
+      lastUsedAt: null,
+    };
   }
 
   const db = getDatabase();
   const [connection] = await db
     .select({
       googleEmail: googleCalendarConnections.googleEmail,
+      scope: googleCalendarConnections.scope,
       connectedAt: googleCalendarConnections.connectedAt,
       lastUsedAt: googleCalendarConnections.lastUsedAt,
     })
@@ -197,6 +261,7 @@ export async function getGoogleCalendarConnection(userId: string) {
   return {
     configured: true,
     connected: Boolean(connection),
+    scopesReady: connection ? requiredScopesGranted(connection.scope) : false,
     googleEmail: connection?.googleEmail ?? "",
     connectedAt: connection?.connectedAt ?? null,
     lastUsedAt: connection?.lastUsedAt ?? null,
@@ -331,6 +396,7 @@ function normalizeGoogleEvent(event: GoogleEventResource): GoogleCalendarEvent |
     endDate: event.end?.date ?? null,
     endDateTime: event.end?.dateTime ?? null,
     transparency: event.transparency ?? "opaque",
+    updatedAt: event.updated ?? null,
     attendees: (event.attendees ?? [])
       .filter((attendee) => attendee.email)
       .map((attendee) => ({
@@ -343,17 +409,50 @@ function normalizeGoogleEvent(event: GoogleEventResource): GoogleCalendarEvent |
   };
 }
 
+export async function listGoogleCalendars(userId: string): Promise<GoogleCalendarListEntry[]> {
+  const accessToken = await getUserAccessToken(userId);
+  const calendars: GoogleCalendarListEntry[] = [];
+  let pageToken = "";
+
+  do {
+    const url = new URL(`${GOOGLE_CALENDAR_API}/users/me/calendarList`);
+    url.searchParams.set("maxResults", "250");
+    url.searchParams.set("showHidden", "true");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const page = await parseGoogleResponse<GoogleCalendarListResponse>(response);
+    for (const calendar of page.items ?? []) {
+      if (!calendar.id) continue;
+      calendars.push({
+        id: calendar.id,
+        summary: calendar.summary?.trim() || calendar.id,
+        description: calendar.description?.trim() ?? "",
+        primary: Boolean(calendar.primary),
+        selected: calendar.selected !== false,
+        accessRole: calendar.accessRole ?? "reader",
+        timeZone: calendar.timeZone ?? "UTC",
+      });
+    }
+    pageToken = page.nextPageToken ?? "";
+  } while (pageToken);
+
+  return calendars.sort((left, right) => Number(right.primary) - Number(left.primary) || left.summary.localeCompare(right.summary, "pt-BR"));
+}
+
 export async function listGoogleCalendarEvents(
   userId: string,
   timeMin: Date,
   timeMax: Date,
+  calendarId = "primary",
 ): Promise<GoogleCalendarEvent[]> {
   const accessToken = await getUserAccessToken(userId);
   const events: GoogleCalendarEvent[] = [];
   let pageToken = "";
 
   do {
-    const url = new URL(`${GOOGLE_CALENDAR_API}/calendars/primary/events`);
+    const url = new URL(`${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events`);
     url.searchParams.set("timeMin", timeMin.toISOString());
     url.searchParams.set("timeMax", timeMax.toISOString());
     url.searchParams.set("singleEvents", "true");
@@ -376,6 +475,75 @@ export async function listGoogleCalendarEvents(
   return events;
 }
 
+export async function listGoogleCalendarAcl(
+  userId: string,
+  calendarId: string,
+): Promise<GoogleCalendarAclEntry[]> {
+  const accessToken = await getUserAccessToken(userId);
+  const entries: GoogleCalendarAclEntry[] = [];
+  let pageToken = "";
+
+  do {
+    const url = new URL(`${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/acl`);
+    url.searchParams.set("maxResults", "250");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const page = await parseGoogleResponse<GoogleCalendarAclResponse>(response);
+    for (const item of page.items ?? []) {
+      if (!item.id || !item.scope?.type) continue;
+      entries.push({
+        id: item.id,
+        role: item.role ?? "reader",
+        scopeType: item.scope.type,
+        scopeValue: item.scope.value?.trim().toLowerCase() ?? "",
+      });
+    }
+    pageToken = page.nextPageToken ?? "";
+  } while (pageToken);
+
+  return entries;
+}
+
+export async function shareGoogleCalendar(
+  userId: string,
+  calendarId: string,
+  email: string,
+  role: "reader" | "writer",
+): Promise<void> {
+  const accessToken = await getUserAccessToken(userId);
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) || normalizedEmail.length > 254) {
+    throw new Error("GOOGLE_CALENDAR_SHARE_EMAIL_INVALID");
+  }
+  const url = new URL(`${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/acl`);
+  url.searchParams.set("sendNotifications", "true");
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ role, scope: { type: "user", value: normalizedEmail } }),
+  });
+  await parseGoogleResponse<GoogleCalendarAclResource>(response);
+}
+
+export async function revokeGoogleCalendarShare(
+  userId: string,
+  calendarId: string,
+  aclEntryId: string,
+): Promise<void> {
+  const accessToken = await getUserAccessToken(userId);
+  const response = await fetch(
+    `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/acl/${encodeURIComponent(aclEntryId)}`,
+    { method: "DELETE", headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (response.ok || response.status === 404 || response.status === 410) return;
+  await parseGoogleResponse<Record<string, never>>(response);
+}
+
 function addOneDay(dateValue: string): string {
   const [year, month, day] = dateValue.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
@@ -395,9 +563,7 @@ function googleEventResource(input: CreateGoogleCalendarEventInput) {
       };
 
   const details: Record<string, unknown> = {};
-  if (input.location !== undefined) {
-    details.location = input.location.trim();
-  }
+  if (input.location !== undefined) details.location = input.location.trim();
   if (input.attendees !== undefined) {
     details.attendees = input.attendees.map((attendee) => ({
       email: attendee.email.trim().toLowerCase(),
@@ -471,11 +637,7 @@ async function waitForGoogleMeet(
   let current = event;
   for (let attempt = 0; attempt < 6; attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, 250));
-    const refreshed = await getGoogleCalendarEventWithToken(
-      accessToken,
-      calendarId,
-      event.id,
-    );
+    const refreshed = await getGoogleCalendarEventWithToken(accessToken, calendarId, event.id);
     if (!refreshed) return current;
     current = refreshed;
     if (current.meetUrl || current.conferenceStatus === "failure") return current;
