@@ -30,6 +30,15 @@
     if (role === "freeBusyReader") return "Livre/ocupado";
     return role;
   }
+
+  function formatSyncDate(value: string | Date): string {
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
+  }
 </script>
 
 <svelte:head><title>Google Calendar | F10 Operations</title></svelte:head>
@@ -57,7 +66,12 @@
           <h2 class="text-[14px] font-semibold text-[#202637]">Google Calendar</h2>
           <p class="mt-1 text-[10px] leading-5 text-[#858B99]">Calendários pessoais e compartilhados, sincronização do Operations e importação controlada de eventos.</p>
           {#if data.connection.connected}
-            <span class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#F1FBF4] px-2.5 py-1 text-[9px] font-semibold text-[#176B35]"><span class="h-1.5 w-1.5 rounded-full bg-[#2F9E5B]"></span>{data.connection.googleEmail}</span>
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              <span class="inline-flex items-center gap-1.5 rounded-full bg-[#F1FBF4] px-2.5 py-1 text-[9px] font-semibold text-[#176B35]"><span class="h-1.5 w-1.5 rounded-full bg-[#2F9E5B]"></span>{data.connection.googleEmail}</span>
+              {#if data.syncState.lastSyncCompletedAt}
+                <span class="text-[9px] text-[#8B909D]">Última sincronização global: {formatSyncDate(data.syncState.lastSyncCompletedAt)}</span>
+              {/if}
+            </div>
           {/if}
         </div>
       </div>
@@ -117,13 +131,49 @@
           </label>
           <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-[#D7E4EA] bg-[#F5FAFC] p-4">
             <input type="checkbox" name="syncGoogleChangesToF10" value="true" checked={data.preferences.syncGoogleChangesToF10} class="mt-0.5"/>
-            <span><strong class="application-text-caption block font-semibold text-[#27637B]">Google → F10</strong><span class="application-text-meta mt-1 block leading-4 text-[#728995]">Atualiza Tarefas vinculadas e a data planejada de Tickets. Não fecha ou apaga registros operacionais.</span></span>
+            <span><strong class="application-text-caption block font-semibold text-[#27637B]">Google → F10</strong><span class="application-text-meta mt-1 block leading-4 text-[#728995]">Atualiza Tarefas vinculadas e a data planejada de Tickets. Se os dois lados mudarem, a sincronização para e pede uma escolha.</span></span>
           </label>
         </div>
 
         <button type="submit" disabled={data.writableSources.length === 0} class="inline-flex h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Save size={14}/>Salvar sincronização</button>
       </form>
     </section>
+
+    {#if data.syncIssues.length > 0}
+      <section class="mt-5 rounded-[22px] border border-[#E9CF9C] bg-[#FFF9EE] p-5 sm:p-6">
+        <div class="flex items-start gap-3">
+          <CircleAlert size={18} class="mt-0.5 shrink-0 text-[#A96510]"/>
+          <div>
+            <h2 class="text-[14px] font-semibold text-[#74420B]">Conflitos de sincronização</h2>
+            <p class="mt-1 text-[10px] leading-5 text-[#936326]">O F10 e o Google foram alterados depois da última sincronização. Nenhum lado será sobrescrito até você escolher qual versão deve prevalecer.</p>
+          </div>
+        </div>
+
+        <div class="mt-4 space-y-2">
+          {#each data.syncIssues as issue}
+            <div class="flex flex-col gap-3 rounded-xl border border-[#EAD8B7] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="application-text-meta rounded-full bg-[#FFF2D9] px-2 py-1 font-semibold uppercase text-[#95601B]">{issue.kind === "task" ? "Tarefa" : "Ticket"}</span>
+                  <a href={issue.kind === "task" ? `/app/tasks/${issue.id}` : `/app/tickets/${issue.id}`} class="application-text-caption truncate font-semibold text-[#303747] hover:underline">{issue.title}</a>
+                </div>
+                <span class="application-text-meta mt-1 block truncate text-[#9297A4]">Calendário: {issue.calendarId}</span>
+              </div>
+              <div class="flex shrink-0 flex-wrap gap-2">
+                <form method="POST" action={issue.kind === "task" ? "?/resolveTaskConflictF10" : "?/resolveTicketConflictF10"}>
+                  <input type="hidden" name="entityId" value={issue.id}/>
+                  <button type="submit" class="h-9 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[9px] font-semibold text-[#000A57]">Manter F10</button>
+                </form>
+                <form method="POST" action={issue.kind === "task" ? "?/resolveTaskConflictGoogle" : "?/resolveTicketConflictGoogle"} on:submit={(event) => { if (!confirm("Usar a versão do Google e substituir os campos sincronizados no F10?")) event.preventDefault(); }}>
+                  <input type="hidden" name="entityId" value={issue.id}/>
+                  <button type="submit" class="h-9 rounded-xl bg-[#A96510] px-3 text-[9px] font-semibold text-white">Usar Google</button>
+                </form>
+              </div>
+            </div>
+          {/each}
+        </div>
+      </section>
+    {/if}
 
     <section class="mt-5 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -166,7 +216,7 @@
                 <button type="submit" class="h-10 rounded-xl border border-[#DDE1EA] px-3 text-[10px] font-semibold text-[#000A57]">Salvar</button>
               </div>
             </div>
-            {#if source.importMode === "task"}<p class="application-text-meta mt-2 text-[#8B909D]">Novos eventos deste calendário são criados como Tarefas. O responsável padrão é você; alterações posteriores podem sincronizar nos dois sentidos.</p>{/if}
+            {#if source.importMode === "task"}<p class="application-text-meta mt-2 text-[#8B909D]">Novos eventos deste calendário são criados como Tarefas. Sem sincronização bidirecional, o Google permanece como fonte da Tarefa importada.</p>{/if}
           </form>
         {/each}
       </div>
