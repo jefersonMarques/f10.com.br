@@ -16,6 +16,7 @@ import {
 import { getMeshCentralControlStatus } from "$lib/server/remote/meshCentralControl";
 import { getRemoteProviderStatus } from "$lib/server/remote/remoteSupportProvider";
 import { requireTicketAccess } from "$lib/server/support/supportAccess";
+import { finishInternalChat } from "$lib/server/support/chatLifecycleRepository";
 import {
   assignInternalChat,
   claimInternalChat,
@@ -211,6 +212,42 @@ export const actions: Actions = {
     }
   },
 
+  finish: async ({ params, cookies }) => {
+    if (!isUuid(params.sessionId)) {
+      return fail(404, { success: false, action: "finish", message: "Conversa não encontrada." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "chat.respond",
+      `/app/chat/${params.sessionId}`,
+    );
+    try {
+      await finishInternalChat(session.user.id, permissions, params.sessionId);
+      return { success: true, action: "finish", message: "Atendimento finalizado." };
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "";
+      if (message === "CHAT_ASSIGNED_TO_OTHER_USER") {
+        return fail(409, {
+          success: false,
+          action: "finish",
+          message: "Este atendimento está atribuído a outro usuário.",
+        });
+      }
+      if (message === "CHAT_NOT_FOUND") {
+        return fail(404, {
+          success: false,
+          action: "finish",
+          message: "Conversa não encontrada ou já finalizada.",
+        });
+      }
+      return fail(403, {
+        success: false,
+        action: "finish",
+        message: "Não foi possível finalizar este atendimento.",
+      });
+    }
+  },
+
   assign: async ({ params, cookies, request }) => {
     if (!isUuid(params.sessionId)) {
       return fail(404, { success: false, action: "assign", message: "Conversa não encontrada." });
@@ -293,8 +330,12 @@ export const actions: Actions = {
       `/app/chat/${params.sessionId}`,
     );
     const status = readString(await request.formData(), "status");
-    if (!isTicketStatus(status)) {
-      return fail(400, { success: false, action: "status", message: "Status inválido." });
+    if (!isTicketStatus(status) || status === "closed") {
+      return fail(400, {
+        success: false,
+        action: "status",
+        message: status === "closed" ? "Use Finalizar atendimento para encerrar o chat." : "Status inválido.",
+      });
     }
     try {
       const initial = await listInternalChatMessages(session.user.id, permissions, params.sessionId);
