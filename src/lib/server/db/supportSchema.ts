@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   bigserial,
   boolean,
@@ -127,7 +128,7 @@ export const tickets = pgTable(
     status: ticketStatus("status").notNull().default("new"),
     priority: ticketPriority("priority").notNull().default("normal"),
     channel: supportChannel("channel").notNull().default("manual"),
-    dueOn: date("due_on").notNull(),
+    dueOn: date("due_on").notNull().default(sql`CURRENT_DATE + 3`),
     firstResponseDueAt: timestamp("first_response_due_at", { withTimezone: true }),
     resolutionDueAt: timestamp("resolution_due_at", { withTimezone: true }),
     firstResponseAt: timestamp("first_response_at", { withTimezone: true }),
