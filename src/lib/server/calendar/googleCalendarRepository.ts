@@ -14,7 +14,7 @@ const GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 const GOOGLE_CALENDAR_LIST_SCOPE = "https://www.googleapis.com/auth/calendar.calendarlist.readonly";
-const GOOGLE_CALENDAR_ACL_SCOPE = "https://www.googleapis.com/auth/calendar.acl";
+const GOOGLE_CALENDAR_ACL_SCOPE = "https://www.googleapis.com/auth/calendar.acls";
 const GOOGLE_CALENDAR_EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const GOOGLE_SCOPES = [
   "openid",
