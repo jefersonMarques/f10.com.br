@@ -7,12 +7,14 @@ import {
   isSupportAiChatEnabled,
   processSupportAiChatMessage,
 } from "$lib/server/support/supportAiChat";
+import { persistSupportChatHandoffContext } from "$lib/server/support/supportChatHandoffContext";
 import { handlePureSupportGreeting } from "$lib/server/support/supportChatLocalIntent";
 import { startPublicChat } from "$lib/server/support/publicChatRepository";
 import { autoAssignTicketIfConfigured } from "$lib/server/support/supportRoutingRepository";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
 
-const MAX_BODY_BYTES = 20 * 1024;
+const MAX_BODY_BYTES = 32 * 1024;
+const MAX_HANDOFF_TRANSCRIPT_CHARS = 8_000;
 
 type ChatStartDiagnosticCode =
   | "RATE_LIMIT_NOT_CONFIGURED"
@@ -68,7 +70,10 @@ function diagnoseChatStartFailure(cause: unknown): ChatStartDiagnosticCode {
   return "CHAT_START_FAILED";
 }
 
-export const POST: RequestHandler = async ({ request, getClientAddress, cookies }) => {
+export const POST: RequestHandler = async ({ request, getClientAddress, cookies, url }) => {
+  const origin = request.headers.get("origin");
+  if (origin && origin !== url.origin) return json({ error: "INVALID_ORIGIN" }, { status: 403 });
+
   const customer = await getOptionalCustomerF10PortalSession(cookies);
   if (!customer || customer.selectedGroupId === null || customer.selectedUnitId === null) {
     return json(
@@ -100,6 +105,8 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
   const contextUrl = sanitizeContextUrl(readString(body.contextUrl));
   const pageTitle = readString(body.pageTitle).slice(0, 200);
   const helpContext = readString(body.helpContext).slice(0, 200);
+  const forceHuman = body.forceHuman === true;
+  const handoffTranscript = readString(body.handoffTranscript).slice(0, MAX_HANDOFF_TRANSCRIPT_CHARS);
 
   if (name.length < 1 || name.length > 120 || email.length > 254) {
     return json({ error: "INVALID_CONTACT" }, { status: 400 });
@@ -141,11 +148,22 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
         groupName: customer.selectedGroupName,
         unitId: customer.selectedUnitId,
         unitName: customer.selectedUnitName,
+        assistantHandoff: forceHuman,
+        handoffTranscript: handoffTranscript || null,
       },
-      enableAi: isSupportAiChatEnabled(),
+      enableAi: !forceHuman && isSupportAiChatEnabled(),
     });
 
     await bindTicketF10Context(session.ticketId, customer);
+    if (handoffTranscript) {
+      await persistSupportChatHandoffContext(session.ticketId, handoffTranscript).catch((cause) => {
+        console.error("[support.chat.handoff_context]", {
+          ticketId: session.ticketId,
+          causeType: cause instanceof Error ? cause.name : typeof cause,
+        });
+      });
+    }
+
     await recordCustomerActivity(customer, {
       eventType: "support.chat.started",
       source: "help_center",
@@ -155,6 +173,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
         ticketNumber: session.ticketNumber,
         entryOptionId,
         entryOptionLabel: session.entryOptionLabel,
+        assistantHandoff: forceHuman,
       },
     }).catch(() => undefined);
 
