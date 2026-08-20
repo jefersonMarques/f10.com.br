@@ -11,7 +11,7 @@ export type TaskGoogleCalendarAttendee = {
 };
 
 export type GoogleCalendarImportMode = "hidden" | "view_only" | "task";
-export type GoogleCalendarSyncDirection = "f10_to_google" | "bidirectional";
+export type GoogleCalendarSyncDirection = "f10_to_google" | "google_to_f10" | "bidirectional";
 export type GoogleCalendarSyncSource = "f10" | "google";
 
 export const googleCalendarConnections = pgTable("google_calendar_connections", {
@@ -36,6 +36,9 @@ export const googleCalendarPreferences = pgTable("google_calendar_preferences", 
   syncTicketsToGoogle: boolean("sync_tickets_to_google").notNull().default(false),
   syncSchedulingToGoogle: boolean("sync_scheduling_to_google").notNull().default(true),
   syncGoogleChangesToF10: boolean("sync_google_changes_to_f10").notNull().default(false),
+  lastSyncStartedAt: timestamp("last_sync_started_at", { withTimezone: true }),
+  lastSyncCompletedAt: timestamp("last_sync_completed_at", { withTimezone: true }),
+  lastSyncError: text("last_sync_error"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
