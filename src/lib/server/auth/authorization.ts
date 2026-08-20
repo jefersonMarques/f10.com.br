@@ -9,11 +9,7 @@ import {
   SESSION_COOKIE_NAME,
 } from "$lib/server/auth/session";
 
-export async function requireAppPermission(
-  cookies: Cookies,
-  permissionCode: PermissionCode,
-  returnTo: string,
-) {
+async function requireAppSession(cookies: Cookies, returnTo: string) {
   const token = cookies.get(SESSION_COOKIE_NAME);
   const encodedReturnTo = encodeURIComponent(returnTo);
 
@@ -29,10 +25,33 @@ export async function requireAppPermission(
   }
 
   const permissions = await resolveUserPermissions(session.user.id);
+  return { session, permissions };
+}
 
-  if (!hasPermission(permissions, permissionCode)) {
+export async function requireAppPermission(
+  cookies: Cookies,
+  permissionCode: PermissionCode,
+  returnTo: string,
+) {
+  const context = await requireAppSession(cookies, returnTo);
+
+  if (!hasPermission(context.permissions, permissionCode)) {
     throw error(403, "Acesso não autorizado.");
   }
 
-  return { session, permissions };
+  return context;
+}
+
+export async function requireAppAnyPermission(
+  cookies: Cookies,
+  permissionCodes: PermissionCode[],
+  returnTo: string,
+) {
+  const context = await requireAppSession(cookies, returnTo);
+
+  if (!permissionCodes.some((permissionCode) => hasPermission(context.permissions, permissionCode))) {
+    throw error(403, "Acesso não autorizado.");
+  }
+
+  return context;
 }
