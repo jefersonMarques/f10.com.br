@@ -28,6 +28,11 @@ function normalizeText(value: string): string {
     .trim();
 }
 
+function requestsHumanSupport(message: string): boolean {
+  const normalized = normalizeText(message);
+  return /(?:quero|preciso|gostaria|posso|pode|chama|chamar|falar|conversar).{0,28}(?:atendente|humano|pessoa)|(?:atendente humano|suporte humano|falar com alguem)/i.test(normalized);
+}
+
 function localAssistantReply(message: string): string | null {
   const normalized = normalizeText(message);
   if (/^(?:oi|ola|opa|e ai|bom dia|boa tarde|boa noite|oi tudo bem|ola tudo bem|tudo bem)$/.test(normalized)) {
@@ -69,6 +74,14 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
       blockMs: RATE_BLOCK_MS,
     });
     if (!allowed) return json({ error: "RATE_LIMITED" }, { status: 429 });
+
+    if (requestsHumanSupport(message)) {
+      return json({
+        answer: "Certo. Para falar com alguém da equipe F10, vou pedir a identificação da sua conta aqui no chat.",
+        requiresHuman: true,
+        aiAvailable: isSupportAiChatEnabled(),
+      }, { headers: { "Cache-Control": "no-store" } });
+    }
 
     const localReply = localAssistantReply(message);
     if (localReply) {
