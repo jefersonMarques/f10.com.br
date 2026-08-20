@@ -155,6 +155,12 @@ const operationsRouteRules: ApplicationRouteRule[] = [
     description: "Parâmetros do ambiente interno",
   },
   {
+    prefix: "/app/minha-conta/google",
+    title: "Google Calendar",
+    section: "Minha conta",
+    description: "Calendários, compartilhamento e sincronização",
+  },
+  {
     prefix: "/app/minha-conta",
     title: "Minha conta",
     section: "Perfil",
