@@ -31,6 +31,10 @@
     return role;
   }
 
+  function canReadCalendarEvents(role: string): boolean {
+    return ["reader", "writer", "owner"].includes(role);
+  }
+
   function formatSyncDate(value: string | Date): string {
     return new Intl.DateTimeFormat("pt-BR", {
       day: "2-digit",
@@ -270,19 +274,26 @@
                   <span class="application-text-meta rounded-full bg-[#F4F5F8] px-2 py-1 font-semibold text-[#737987]">{accessLabel(source.accessRole)}</span>
                 </div>
                 <span class="application-text-meta mt-1 block truncate text-[#9A9FAC]">{source.calendarId}</span>
+                {#if !canReadCalendarEvents(source.accessRole)}
+                  <span class="application-text-meta mt-2 block max-w-xl leading-4 text-[#A16A28]">O Google liberou apenas informações de livre/ocupado. Esta agenda não pode exibir eventos nem originar Tarefas no F10.</span>
+                {/if}
               </div>
 
               <div class="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 lg:max-w-[680px] lg:grid-cols-[170px_220px_1fr_auto]">
                 <label class="flex h-10 items-center gap-2 rounded-xl border border-[#E5E7ED] px-3 text-[10px] font-semibold text-[#626978]">
-                  <input type="checkbox" name="visibleInF10" value="true" checked={source.visibleInF10}/>
+                  <input type="checkbox" name="visibleInF10" value="true" checked={source.visibleInF10} disabled={!canReadCalendarEvents(source.accessRole)}/>
                   Mostrar na Agenda
                 </label>
                 <select name="importMode" class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#555C6D]">
                   {#each Object.entries(importModeLabels) as [value, label]}
-                    <option value={value} selected={source.importMode === value} disabled={value === "task" && !data.canManageTaskImport}>{label}</option>
+                    <option
+                      value={value}
+                      selected={source.importMode === value}
+                      disabled={(value !== "hidden" && !canReadCalendarEvents(source.accessRole)) || (value === "task" && !data.canManageTaskImport)}
+                    >{label}</option>
                   {/each}
                 </select>
-                <select name="importProjectId" class="h-10 min-w-0 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] text-[#555C6D]" disabled={!data.canManageTaskImport}>
+                <select name="importProjectId" class="h-10 min-w-0 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] text-[#555C6D]" disabled={!data.canManageTaskImport || !canReadCalendarEvents(source.accessRole)}>
                   <option value="">Projeto para importação</option>
                   {#each data.projects as project}<option value={project.id} selected={source.importProjectId === project.id}>{project.name}</option>{/each}
                 </select>
