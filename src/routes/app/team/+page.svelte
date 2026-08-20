@@ -64,11 +64,11 @@
               <span class="min-w-0">
                 <span class="flex flex-wrap items-center gap-2">
                   <strong class="truncate text-[13px] font-semibold text-[#202637]">{user.name}</strong>
-                  <span class={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.06em] ${user.status === "active" ? "bg-[#EEF8F1] text-[#2F7045]" : user.status === "invited" ? "bg-[#FFF4E9] text-[#A9510D]" : "bg-[#F1F2F5] text-[#777D8C]"}`}>{user.status === "active" ? "Ativo" : user.status === "invited" ? "Convite pendente" : "Inativo"}</span>
+                  <span class={`application-text-meta rounded-full px-2 py-1 font-bold uppercase tracking-[0.06em] ${user.status === "active" ? "bg-[#EEF8F1] text-[#2F7045]" : user.status === "invited" ? "bg-[#FFF4E9] text-[#A9510D]" : "bg-[#F1F2F5] text-[#777D8C]"}`}>{user.status === "active" ? "Ativo" : user.status === "invited" ? "Convite pendente" : "Inativo"}</span>
                 </span>
                 <span class="mt-1 block truncate text-[11px] text-[#8B909E]">{user.email}</span>
               </span>
-              <span class="flex items-center gap-2">{#each user.roles as role}<span class="rounded-full bg-[#F3F4F7] px-2.5 py-1 text-[9px] font-bold text-[#646A79]">{role}</span>{/each}<ExternalLink size={15} class="ml-1 text-[#A0A5B2] transition group-hover:text-[#EA6D0B]" aria-hidden="true" /></span>
+              <span class="flex items-center gap-2">{#each user.roles as role}<span class="application-text-meta rounded-full bg-[#F3F4F7] px-2.5 py-1 font-bold text-[#646A79]">{role}</span>{/each}<ExternalLink size={15} class="ml-1 text-[#A0A5B2] transition group-hover:text-[#EA6D0B]" aria-hidden="true" /></span>
             </a>
           {/each}
         </div>
@@ -88,12 +88,12 @@
           <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Perfil base</span><select name="roleCode" value={values?.roleCode ?? "EMPLOYEE"} class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"><option value="EMPLOYEE">Funcionário</option>{#if data.canCreateAdmin}<option value="ADMIN">Admin</option>{/if}</select></label>
           <label class="flex items-start gap-3 rounded-2xl border border-[#E2E5ED] bg-[#F8F9FC] px-4 py-3">
             <input name="includeInChatRouting" type="checkbox" checked={values?.includeInChatRouting ?? false} class="mt-1 h-4 w-4 rounded border-[#C9CEDA]" />
-            <span><strong class="flex items-center gap-2 text-[11px] text-[#303746]"><MessageCircleMore size={14}/>Participar da distribuição do chat</strong><span class="mt-1 block text-[9px] leading-4 text-[#858B99]">Quando a conta for ativada e o usuário estiver Online, poderá entrar na rotação automática de novos atendimentos.</span></span>
+            <span><strong class="flex items-center gap-2 text-[11px] text-[#303746]"><MessageCircleMore size={14}/>Participar da distribuição do chat</strong><span class="application-text-meta mt-1 block leading-4 text-[#858B99]">Quando a conta for ativada e o usuário estiver Online, poderá entrar na rotação automática de novos atendimentos.</span></span>
           </label>
           <button type="submit" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white transition hover:bg-[#111B71]"><Plus size={17} aria-hidden="true" />Criar convite</button>
         </form>
 
-        <div class="mt-5 flex items-start gap-3 rounded-2xl bg-[#F7F8FB] px-4 py-4"><ShieldCheck size={18} class="mt-0.5 shrink-0 text-[#000A57]" aria-hidden="true" /><p class="text-[10px] leading-5 text-[#747A8A]">Admins podem cadastrar e administrar funcionários. Contas administrativas ficam reservadas ao Super Admin.</p></div>
+        <div class="mt-5 flex items-start gap-3 rounded-2xl bg-[#F7F8FB] px-4 py-4"><ShieldCheck size={18} class="mt-0.5 shrink-0 text-[#000A57]" aria-hidden="true" /><p class="application-text-caption leading-5 text-[#747A8A]">Admins podem cadastrar e administrar funcionários. Contas administrativas ficam reservadas ao Super Admin.</p></div>
       </section>
     {/if}
   </div>
