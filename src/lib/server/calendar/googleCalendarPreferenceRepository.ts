@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, asc, eq, isNull, lt, notInArray, or } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import {
   googleCalendarPreferences,
@@ -203,6 +203,7 @@ export async function refreshGoogleCalendarSources(userId: string): Promise<void
   const calendars = await listGoogleCalendars(userId);
   const db = getDatabase();
   const now = new Date();
+  const calendarIds = calendars.map((calendar) => calendar.id);
 
   await db.transaction(async (tx) => {
     for (const calendar of calendars) {
@@ -230,6 +231,22 @@ export async function refreshGoogleCalendarSources(userId: string): Promise<void
           },
         });
     }
+
+    if (calendarIds.length === 0) {
+      await tx
+        .delete(googleCalendarSources)
+        .where(eq(googleCalendarSources.userId, userId));
+      return;
+    }
+
+    await tx
+      .delete(googleCalendarSources)
+      .where(
+        and(
+          eq(googleCalendarSources.userId, userId),
+          notInArray(googleCalendarSources.calendarId, calendarIds),
+        ),
+      );
   });
 }
 
