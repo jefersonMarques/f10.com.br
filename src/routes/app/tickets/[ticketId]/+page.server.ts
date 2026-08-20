@@ -11,11 +11,13 @@ import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { markTicketChatHumanTakeover } from "$lib/server/support/supportAiHandoff";
 import { createTaskFromTicket, listTicketTasks } from "$lib/server/support/ticketTaskBridge";
 import { getTicketCustomerContext } from "$lib/server/support/ticketCustomerContextRepository";
+import { isTicketDueDate } from "$lib/server/support/ticketDueDate";
 import {
   addTicketMessage,
   assignTicket,
   getSupportTicket,
   listSupportAgents,
+  updateTicketDueOn,
   updateTicketPriority,
   type TicketPriority,
 } from "$lib/server/support/supportRepository";
@@ -256,6 +258,44 @@ export const actions: Actions = {
         success: false,
         action: "priority",
         message: "Não foi possível alterar a prioridade deste ticket.",
+      });
+    }
+  },
+
+  dueOn: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, { success: false, message: "Ticket não encontrado." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      `/app/tickets/${params.ticketId}`,
+    );
+    const dueOn = readFormValue(await request.formData(), "dueOn");
+    if (!isTicketDueDate(dueOn)) {
+      return fail(400, {
+        success: false,
+        action: "dueOn",
+        message: "Informe uma data de conclusão planejada válida.",
+      });
+    }
+    try {
+      await updateTicketDueOn(
+        session.user.id,
+        permissions,
+        params.ticketId,
+        dueOn,
+      );
+      return {
+        success: true,
+        action: "dueOn",
+        message: "Conclusão planejada atualizada.",
+      };
+    } catch {
+      return fail(403, {
+        success: false,
+        action: "dueOn",
+        message: "Não foi possível alterar a conclusão planejada deste ticket.",
       });
     }
   },
