@@ -129,6 +129,7 @@ export async function getInternalChat(
       aiHandoffAt: webChatSessions.aiHandoffAt,
       assignedUserId: tickets.assignedUserId,
       assignedUserName: users.name,
+      customerContactId: tickets.customerContactId,
       customerName: customerContacts.name,
       customerEmail: customerContacts.email,
       customerPhone: customerContacts.phone,

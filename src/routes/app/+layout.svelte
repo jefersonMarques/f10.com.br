@@ -40,6 +40,7 @@
   let lastHeartbeatAt = 0;
   const permissionCodes = new Set(data.permissions.map((permission) => permission.code));
   const canRespondToChat = permissionCodes.has("chat.respond");
+  const canViewCustomers = permissionCodes.has("customers.view");
 
   type NavigationChild = {
     label: string;
@@ -86,6 +87,32 @@
   );
   $: pathname = $page.url.pathname;
   $: routeMetadata = resolveOperationsRouteMetadata(pathname);
+  $: customerProfileId = canViewCustomers ? resolvePageCustomerId($page.data) : null;
+
+  function resolvePageCustomerId(pageData: unknown): string | null {
+    if (!pageData || typeof pageData !== "object") return null;
+    const record = pageData as Record<string, unknown>;
+
+    const details = record.details;
+    if (details && typeof details === "object") {
+      const ticket = (details as Record<string, unknown>).ticket;
+      if (ticket && typeof ticket === "object") {
+        const customerContactId = (ticket as Record<string, unknown>).customerContactId;
+        if (typeof customerContactId === "string" && customerContactId) return customerContactId;
+      }
+    }
+
+    const initial = record.initial;
+    if (initial && typeof initial === "object") {
+      const chat = (initial as Record<string, unknown>).chat;
+      if (chat && typeof chat === "object") {
+        const customerContactId = (chat as Record<string, unknown>).customerContactId;
+        if (typeof customerContactId === "string" && customerContactId) return customerContactId;
+      }
+    }
+
+    return null;
+  }
 
   function isActiveNavigationItem(currentPathname: string, href?: string): boolean {
     if (!href) return false;
@@ -300,6 +327,13 @@
       description={routeMetadata.description}
     >
       <svelte:fragment slot="actions">
+        {#if customerProfileId}
+          <a href={`/app/customers/${customerProfileId}`} class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-2.5 font-semibold text-[#000A57] transition hover:bg-[#F8F9FF] sm:px-3" aria-label="Abrir ficha do cliente">
+            <Building2 size={15} aria-hidden="true" />
+            <span class="hidden md:inline">Cliente</span>
+          </a>
+        {/if}
+
         {#if canRespondToChat && presence}
           <div class="relative hidden sm:block">
             <button type="button" on:click={() => (presenceOpen = !presenceOpen)} class="application-text-caption flex h-10 items-center gap-2 rounded-xl bg-[#F5F6FA] px-3 font-semibold text-[#555C6D] transition hover:bg-[#EEF0FF]" aria-expanded={presenceOpen}>
