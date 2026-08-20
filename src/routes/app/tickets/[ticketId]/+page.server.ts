@@ -19,7 +19,9 @@ import {
   listSupportAgents,
   updateTicketDueOn,
   updateTicketPriority,
+  updateTicketStatus,
   type TicketPriority,
+  type TicketStatus,
 } from "$lib/server/support/supportRepository";
 import { listTaskProjects, type TaskPriority } from "$lib/server/tasks/taskRepository";
 
@@ -81,6 +83,10 @@ async function validateMentionedUserIds(
   const allowed = await filterMentionUsersForTicket(candidates, ticketId);
   const allowedIds = new Set(allowed.map((user) => user.id));
   return requestedIds.filter((id) => allowedIds.has(id));
+}
+
+function isTicketStatus(value: string): value is TicketStatus {
+  return ["new", "open", "in_progress", "waiting_customer", "resolved", "closed"].includes(value);
 }
 
 function isTicketPriority(value: string): value is TicketPriority {
@@ -228,6 +234,40 @@ export const actions: Actions = {
         success: false,
         action: "note",
         message: "Não foi possível adicionar a nota interna.",
+      });
+    }
+  },
+
+  status: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, { success: false, action: "status", message: "Ticket não encontrado." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      `/app/tickets/${params.ticketId}`,
+    );
+    const status = readFormValue(await request.formData(), "status");
+    if (!isTicketStatus(status)) {
+      return fail(400, { success: false, action: "status", message: "Status inválido." });
+    }
+
+    try {
+      const details = await getSupportTicket(session.user.id, permissions, params.ticketId);
+      if (details.ticket.channel === "web_chat" && status === "closed") {
+        return fail(409, {
+          success: false,
+          action: "status",
+          message: "Finalize o atendimento pela tela do Chat para encerrar sessão e automação juntas.",
+        });
+      }
+      await updateTicketStatus(session.user.id, permissions, params.ticketId, status);
+      return { success: true, action: "status", message: "Status atualizado." };
+    } catch {
+      return fail(403, {
+        success: false,
+        action: "status",
+        message: "Não foi possível alterar o status deste ticket.",
       });
     }
   },
