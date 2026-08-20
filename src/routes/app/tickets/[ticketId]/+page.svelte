@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     Building2,
+    CalendarDays,
     CheckCircle2,
     CircleAlert,
     Headphones,
@@ -41,6 +42,7 @@
     "ticket.note.added": "adicionou uma nota interna",
     "ticket.status.changed": "alterou o status",
     "ticket.priority.changed": "alterou a prioridade",
+    "ticket.due_date.changed": "alterou a conclusão planejada",
     "ticket.assignee.changed": "alterou o responsável",
     "ticket.task.linked": "vinculou uma tarefa",
     "chat.claimed": "assumiu o atendimento",
@@ -58,6 +60,11 @@
   function formatDateTime(value: string | Date): string {
     return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
   }
+
+  function formatDate(value: string): string {
+    const [year, month, day] = value.split("-").map(Number);
+    return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(new Date(year, month - 1, day));
+  }
 </script>
 
 <svelte:head><title>Ticket #{data.details.ticket.ticketNumber} | F10 Operations</title></svelte:head>
@@ -67,7 +74,7 @@
 
   <div class="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
     <div class="min-w-0">
-      <div class="flex flex-wrap items-center gap-2"><span class="text-[11px] font-bold text-[#EA6D0B]">#{data.details.ticket.ticketNumber}</span><span class="application-text-caption rounded-full bg-[#EEF0FF] px-3 py-1.5 font-bold text-[#000A57]">{statusLabels[data.details.ticket.status]}</span><span class="application-text-caption rounded-full bg-[#F3F4F7] px-3 py-1.5 font-semibold text-[#737989]">{priorityLabels[data.details.ticket.priority]}</span></div>
+      <div class="flex flex-wrap items-center gap-2"><span class="text-[11px] font-bold text-[#EA6D0B]">#{data.details.ticket.ticketNumber}</span><span class="application-text-caption rounded-full bg-[#EEF0FF] px-3 py-1.5 font-bold text-[#000A57]">{statusLabels[data.details.ticket.status]}</span><span class="application-text-caption rounded-full bg-[#F3F4F7] px-3 py-1.5 font-semibold text-[#737989]">{priorityLabels[data.details.ticket.priority]}</span><span class="application-text-caption inline-flex items-center gap-1.5 rounded-full bg-[#FFF6EC] px-3 py-1.5 font-semibold text-[#9B530F]"><CalendarDays size={12}/>{formatDate(data.details.ticket.dueOn)}</span></div>
       <h2 class="mt-3 text-[30px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[38px]">{data.details.ticket.subject}</h2>
       <p class="mt-2 text-[11px] text-[#808695]">{data.details.ticket.queueName} · aberto em {formatDateTime(data.details.ticket.createdAt)}</p>
     </div>
@@ -86,7 +93,7 @@
           <div class="mt-6 grid gap-4 lg:grid-cols-2">
             <form method="POST" action="?/reply" class="rounded-2xl border border-[#D9DDF0] bg-[#F8F9FF] p-4"><label class="block"><span class="mb-2 block text-[11px] font-semibold text-[#000A57]">Resposta ao cliente</span><textarea name="body" required maxlength="10000" rows="5" class="w-full resize-y rounded-xl border border-[#DDE1EA] bg-white px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#000A57]"></textarea></label><button type="submit" class="mt-3 min-h-10 w-full rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white">Registrar resposta</button></form>
             <form method="POST" action="?/note" class="rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] p-4">
-              <label class="block"><span class="mb-2 block text-[11px] font-semibold text-[#8B4D12]">Nota interna</span></label>
+              <span class="mb-2 block text-[11px] font-semibold text-[#8B4D12]">Nota interna</span>
               <MentionTextarea users={data.mentionUsers} name="body" rows={5} maxlength={10000} placeholder="Ex.: @jeferson pode ver esse caso aqui?" className="w-full resize-y rounded-xl border border-[#E9D6C1] bg-white px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#C46C17]" />
               <p class="application-text-meta mt-2 leading-4 text-[#9A744F]">Digite <strong>@</strong> e selecione um usuário para gerar uma notificação interna. O cliente nunca vê esta nota.</p>
               <button type="submit" class="mt-3 min-h-10 w-full rounded-xl bg-[#9A5513] px-4 text-[11px] font-semibold text-white">Adicionar nota interna</button>
@@ -102,6 +109,9 @@
         {#if data.canReply}
           <form method="POST" action="?/status" class="mt-5"><label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Status</span><div class="flex gap-2"><select name="status" value={data.details.ticket.status} class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="new">Novo</option><option value="open">Aberto</option><option value="in_progress">Em andamento</option><option value="waiting_customer">Aguardando cliente</option><option value="resolved">Resolvido</option><option value="closed">Fechado</option></select><button type="submit" class="application-text-caption h-10 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Salvar</button></div></label></form>
           <form method="POST" action="?/priority" class="mt-4"><label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Prioridade</span><div class="flex gap-2"><select name="priority" value={data.details.ticket.priority} class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select><button type="submit" class="application-text-caption h-10 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Salvar</button></div></label></form>
+          <form method="POST" action="?/dueOn" class="mt-4"><label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Conclusão planejada</span><div class="flex gap-2"><input name="dueOn" type="date" required value={data.details.ticket.dueOn} class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"/><button type="submit" class="application-text-caption h-10 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Salvar</button></div></label><p class="application-text-meta mt-1.5 leading-4 text-[#8A909E]">Data operacional exibida na Agenda. O prazo de SLA permanece separado.</p></form>
+        {:else}
+          <div class="mt-5 rounded-xl border border-[#E7E9EF] bg-[#FAFAFC] px-3 py-3"><span class="application-text-meta block font-semibold uppercase tracking-[0.07em] text-[#9297A4]">Conclusão planejada</span><strong class="application-text-caption mt-1 inline-flex items-center gap-1.5 text-[#3F4656]"><CalendarDays size={13}/>{formatDate(data.details.ticket.dueOn)}</strong></div>
         {/if}
         <div class="mt-5 border-t border-[#EEF0F5] pt-4"><span class="application-text-caption font-semibold text-[#555B6A]">Responsável</span><p class="mt-2 text-[11px] font-medium text-[#333948]">{data.details.ticket.assignedUserName ?? "Sem responsável"}</p>{#if data.canAssign}<form method="POST" action="?/assign" class="mt-3 flex gap-2"><select name="assignedUserId" required class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2">{#each data.agents as agent}<option value={agent.id} selected={agent.id === data.details.ticket.assignedUserId}>{agent.name}</option>{/each}</select><button type="submit" class="application-text-caption h-10 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Atribuir</button></form>{/if}</div>
       </section>
