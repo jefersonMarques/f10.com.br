@@ -5,6 +5,7 @@
     BarChart3,
     Bell,
     BookOpen,
+    Building2,
     CheckSquare2,
     ChevronDown,
     ChevronRight,
@@ -22,6 +23,7 @@
     Users,
   } from "lucide-svelte";
   import ApplicationHeader from "$lib/components/application/ApplicationHeader.svelte";
+  import ActiveChatDock from "$lib/components/operations/ActiveChatDock.svelte";
   import NotificationAlertStack from "$lib/components/operations/NotificationAlertStack.svelte";
   import { resolveOperationsRouteMetadata } from "$lib/application/routeMetadata";
   import type { LayoutData } from "./$types";
@@ -70,6 +72,7 @@
     { label: "Insights da Central", icon: BarChart3, enabled: true, href: "/app/help/insights", permission: "help.view" },
     { label: "Tarefas", icon: CheckSquare2, enabled: true, href: "/app/tasks", permission: "tasks.view" },
     { label: "Tickets", icon: Headphones, enabled: true, href: "/app/tickets", permission: "tickets.view" },
+    { label: "Clientes", icon: Building2, enabled: true, href: "/app/customers", permission: "customers.view" },
     { label: "Chat", icon: MessageCircleMore, enabled: true, href: "/app/chat", permission: "chat.view" },
     { label: "Acesso remoto", icon: MonitorCog, enabled: true, href: "/app/remote", permission: "remote.use" },
     { label: "Performance", icon: BarChart3, enabled: true, href: "/app/performance", permission: "reports.view" },
@@ -372,5 +375,6 @@
     </ApplicationHeader>
     <slot />
     <NotificationAlertStack notifications={notifications.recent} />
+    <ActiveChatDock enabled={canRespondToChat} />
   </main>
 </div>

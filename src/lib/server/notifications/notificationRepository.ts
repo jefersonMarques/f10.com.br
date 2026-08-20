@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull, like, notLike } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, like, ne, notLike, or } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 
@@ -52,6 +52,21 @@ export async function createInternalNotifications(inputs: CreateNotificationInpu
 
 export async function getNotificationSummary(userId: string) {
   const db = getDatabase();
+  const chatNotificationCondition = or(
+    like(internalNotifications.kind, "chat.%"),
+    and(
+      eq(internalNotifications.kind, "ticket.customer_reply"),
+      like(internalNotifications.href, "/app/chat/%"),
+    ),
+  );
+  const nonChatTicketCondition = and(
+    notLike(internalNotifications.kind, "chat.%"),
+    or(
+      ne(internalNotifications.kind, "ticket.customer_reply"),
+      notLike(internalNotifications.href, "/app/chat/%"),
+    ),
+  );
+
   const [recent, unreadRows, ticketRows, taskRows, chatRows] = await Promise.all([
     db
       .select({
@@ -80,7 +95,7 @@ export async function getNotificationSummary(userId: string) {
         and(
           eq(internalNotifications.userId, userId),
           eq(internalNotifications.entityType, "ticket"),
-          notLike(internalNotifications.kind, "chat.%"),
+          nonChatTicketCondition,
           isNull(internalNotifications.readAt),
         ),
       ),
@@ -100,7 +115,7 @@ export async function getNotificationSummary(userId: string) {
       .where(
         and(
           eq(internalNotifications.userId, userId),
-          like(internalNotifications.kind, "chat.%"),
+          chatNotificationCondition,
           isNull(internalNotifications.readAt),
         ),
       ),
