@@ -119,6 +119,12 @@ const operationsRouteRules: ApplicationRouteRule[] = [
     description: "Conversas e atendimento humano",
   },
   {
+    prefix: "/app/customers",
+    title: "Clientes",
+    section: "Atendimento",
+    description: "Contatos, unidades e histórico operacional",
+  },
+  {
     prefix: "/app/remote",
     title: "Acesso remoto",
     section: "Suporte assistido",
