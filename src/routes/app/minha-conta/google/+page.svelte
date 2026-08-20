@@ -14,8 +14,18 @@
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
+  type ProjectMember = {
+    id: string;
+    name: string;
+    email: string;
+  };
+
   export let data: PageData;
   export let form: ActionData;
+
+  let importProjectByCalendar = Object.fromEntries(
+    data.sources.map((source) => [source.calendarId, source.importProjectId ?? ""]),
+  ) as Record<string, string>;
 
   const importModeLabels: Record<string, string> = {
     hidden: "Não usar",
@@ -33,6 +43,19 @@
 
   function canReadCalendarEvents(role: string): boolean {
     return ["reader", "writer", "owner"].includes(role);
+  }
+
+  function projectMembers(projectId: string): ProjectMember[] {
+    return (data.membersByProject as Record<string, ProjectMember[]>)[projectId] ?? [];
+  }
+
+  function changeImportProject(calendarId: string, event: Event): void {
+    const select = event.currentTarget;
+    if (!(select instanceof HTMLSelectElement)) return;
+    importProjectByCalendar = {
+      ...importProjectByCalendar,
+      [calendarId]: select.value,
+    };
   }
 
   function formatSyncDate(value: string | Date): string {
@@ -265,7 +288,6 @@
         {#each data.sources as source}
           <form method="POST" action="?/source" class="rounded-2xl border border-[#E5E8EF] p-4">
             <input type="hidden" name="calendarId" value={source.calendarId}/>
-            <input type="hidden" name="importAssigneeId" value=""/>
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
@@ -279,7 +301,7 @@
                 {/if}
               </div>
 
-              <div class="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 lg:max-w-[680px] lg:grid-cols-[170px_220px_1fr_auto]">
+              <div class="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 lg:max-w-[920px] lg:grid-cols-[160px_200px_1fr_1fr_auto]">
                 <label class="flex h-10 items-center gap-2 rounded-xl border border-[#E5E7ED] px-3 text-[10px] font-semibold text-[#626978]">
                   <input type="checkbox" name="visibleInF10" value="true" checked={source.visibleInF10} disabled={!canReadCalendarEvents(source.accessRole)}/>
                   Mostrar na Agenda
@@ -293,9 +315,24 @@
                     >{label}</option>
                   {/each}
                 </select>
-                <select name="importProjectId" class="h-10 min-w-0 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] text-[#555C6D]" disabled={!data.canManageTaskImport || !canReadCalendarEvents(source.accessRole)}>
+                <select
+                  name="importProjectId"
+                  class="h-10 min-w-0 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] text-[#555C6D]"
+                  disabled={!data.canManageTaskImport || !canReadCalendarEvents(source.accessRole)}
+                  on:change={(event) => changeImportProject(source.calendarId, event)}
+                >
                   <option value="">Projeto para importação</option>
                   {#each data.projects as project}<option value={project.id} selected={source.importProjectId === project.id}>{project.name}</option>{/each}
+                </select>
+                <select
+                  name="importAssigneeId"
+                  class="h-10 min-w-0 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] text-[#555C6D]"
+                  disabled={!data.canAssignTasks || !canReadCalendarEvents(source.accessRole) || !importProjectByCalendar[source.calendarId]}
+                >
+                  <option value="">Sem responsável padrão</option>
+                  {#each projectMembers(importProjectByCalendar[source.calendarId] ?? "") as member}
+                    <option value={member.id} selected={source.importAssigneeId === member.id}>{member.name} · {member.email}</option>
+                  {/each}
                 </select>
                 <button type="submit" class="h-10 rounded-xl border border-[#DDE1EA] px-3 text-[10px] font-semibold text-[#000A57]">Salvar</button>
               </div>
