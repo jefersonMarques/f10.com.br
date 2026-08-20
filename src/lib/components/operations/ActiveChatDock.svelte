@@ -2,10 +2,13 @@
   import { onMount, tick } from "svelte";
   import {
     CheckCircle2,
+    EllipsisVertical,
     ExternalLink,
     MessageCircleMore,
     Minus,
     Send,
+    TicketCheck,
+    UserRound,
   } from "lucide-svelte";
 
   export let enabled = false;
@@ -265,15 +268,24 @@
       <header class="flex items-center gap-2 border-b border-[#E9EBF0] px-4 py-3">
         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><MessageCircleMore size={17}/></span>
         <div class="min-w-0 flex-1">
-          {#if activeChat.customerContactId}
-            <a href={`/app/customers/${activeChat.customerContactId}`} class="block truncate text-[12px] font-semibold text-[#272D3B] hover:text-[#000A57] hover:underline">{customerLabel(activeChat)}</a>
-          {:else}
-            <strong class="block truncate text-[12px] font-semibold text-[#272D3B]">{customerLabel(activeChat)}</strong>
-          {/if}
+          <strong class="block truncate text-[12px] font-semibold text-[#272D3B]">{customerLabel(activeChat)}</strong>
           <span class="application-text-meta mt-0.5 block truncate text-[#858B99]">#{activeChat.ticketNumber} · {statusLabel(activeChat.status)}{activeChat.organizationName && activeChat.organizationName !== activeChat.customerName ? ` · ${activeChat.organizationName}` : ""}</span>
         </div>
-        <button type="button" on:click={() => void finishChat(activeChat.sessionId)} disabled={finishing} class="application-text-meta inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#EEF8F1] px-2.5 font-semibold text-[#2F7045] hover:bg-[#E1F3E7] disabled:opacity-50" aria-label="Finalizar atendimento"><CheckCircle2 size={13}/><span class="hidden sm:inline">Finalizar</span></button>
-        <a href={`/app/chat/${activeChat.sessionId}`} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#737A89] hover:bg-[#F3F4F7] hover:text-[#000A57]" aria-label="Abrir conversa completa"><ExternalLink size={14}/></a>
+        <details class="relative shrink-0">
+          <summary class="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg text-[#737A89] transition hover:bg-[#F3F4F7] hover:text-[#000A57]" aria-label="Ações do atendimento">
+            <EllipsisVertical size={16}/>
+          </summary>
+          <div class="absolute right-0 top-10 z-30 w-56 overflow-hidden rounded-xl border border-[#DDE1EA] bg-white p-1.5 shadow-[0_18px_50px_rgba(1,13,40,0.18)]">
+            <a href={`/app/chat/${activeChat.sessionId}`} class="application-text-caption flex min-h-9 items-center gap-2.5 rounded-lg px-3 font-semibold text-[#4E5565] hover:bg-[#F6F7FB] hover:text-[#000A57]"><ExternalLink size={14}/>Abrir na área de Chat</a>
+            <a href={`/app/tickets/${activeChat.ticketId}`} class="application-text-caption flex min-h-9 items-center gap-2.5 rounded-lg px-3 font-semibold text-[#4E5565] hover:bg-[#F6F7FB] hover:text-[#000A57]"><TicketCheck size={14}/>Abrir ticket</a>
+            {#if activeChat.customerContactId}
+              <a href={`/app/customers/${activeChat.customerContactId}`} class="application-text-caption flex min-h-9 items-center gap-2.5 rounded-lg px-3 font-semibold text-[#4E5565] hover:bg-[#F6F7FB] hover:text-[#000A57]"><UserRound size={14}/>Ver cliente</a>
+            {/if}
+            <div class="mt-1 border-t border-[#EEF0F4] pt-1">
+              <button type="button" on:click={() => void finishChat(activeChat.sessionId)} disabled={finishing} class="application-text-caption flex min-h-9 w-full items-center gap-2.5 rounded-lg px-3 text-left font-semibold text-[#A13B3B] hover:bg-[#FFF1F1] disabled:opacity-50"><CheckCircle2 size={14}/>{finishing ? "Finalizando..." : "Finalizar atendimento"}</button>
+            </div>
+          </div>
+        </details>
         <button type="button" on:click={() => void toggleChat(activeChat.sessionId)} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#737A89] hover:bg-[#F3F4F7]" aria-label="Recolher conversa"><Minus size={15}/></button>
       </header>
 
