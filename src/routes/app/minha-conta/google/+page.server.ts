@@ -294,6 +294,7 @@ export const actions: Actions = {
     const importMode = readString(formData, "importMode");
     const importProjectId = readString(formData, "importProjectId");
     const importAssigneeId = readString(formData, "importAssigneeId");
+    const canAssignTasks = hasPermission(permissions, "tasks.assign");
 
     if (!calendarId || !["hidden", "view_only", "task"].includes(importMode)) {
       return fail(400, { success: false, action: "source", message: "Configuração de calendário inválida." });
@@ -301,8 +302,29 @@ export const actions: Actions = {
     if (importMode === "task" && !hasPermission(permissions, "tasks.create")) {
       return fail(403, { success: false, action: "source", message: "Você não possui permissão para importar eventos como tarefas." });
     }
-    if (importMode === "task" && (!isUuid(importProjectId) || (importAssigneeId && !isUuid(importAssigneeId)))) {
-      return fail(400, { success: false, action: "source", message: "Selecione um projeto e responsável válidos." });
+    if (importMode === "task" && !isUuid(importProjectId)) {
+      return fail(400, { success: false, action: "source", message: "Selecione um projeto válido para importação." });
+    }
+
+    const currentSource = (await listGoogleCalendarSources(session.user.id))
+      .find((source) => source.calendarId === calendarId);
+    if (!currentSource) {
+      return fail(404, { success: false, action: "source", message: "Calendário não encontrado na conexão atual." });
+    }
+
+    let effectiveImportAssigneeId = importAssigneeId;
+    if (importMode === "task" && !canAssignTasks) {
+      const preservedAssigneeId = currentSource.importProjectId === importProjectId
+        ? currentSource.importAssigneeId ?? ""
+        : "";
+      if (importAssigneeId && importAssigneeId !== preservedAssigneeId) {
+        return fail(403, { success: false, action: "source", message: "Você não possui permissão para definir o responsável da Tarefa importada." });
+      }
+      effectiveImportAssigneeId = preservedAssigneeId;
+    }
+
+    if (importMode === "task" && effectiveImportAssigneeId && !isUuid(effectiveImportAssigneeId)) {
+      return fail(400, { success: false, action: "source", message: "Selecione um responsável válido." });
     }
 
     if (importMode === "task") {
@@ -310,10 +332,13 @@ export const actions: Actions = {
       if (!projects.some((project) => project.id === importProjectId)) {
         return fail(403, { success: false, action: "source", message: "Projeto de importação não autorizado." });
       }
-      if (importAssigneeId) {
+      if (effectiveImportAssigneeId) {
         const members = await listProjectMembers(importProjectId);
-        if (!members.some((member) => member.id === importAssigneeId)) {
-          return fail(400, { success: false, action: "source", message: "O responsável precisa participar do projeto selecionado." });
+        if (!members.some((member) => member.id === effectiveImportAssigneeId)) {
+          if (canAssignTasks) {
+            return fail(400, { success: false, action: "source", message: "O responsável precisa participar do projeto selecionado." });
+          }
+          effectiveImportAssigneeId = "";
         }
       }
     }
@@ -324,12 +349,18 @@ export const actions: Actions = {
         visibleInF10: readBoolean(formData, "visibleInF10"),
         importMode: importMode as "hidden" | "view_only" | "task",
         importProjectId: importMode === "task" ? importProjectId : null,
-        importAssigneeId: importMode === "task" && importAssigneeId ? importAssigneeId : null,
+        importAssigneeId: importMode === "task" && effectiveImportAssigneeId
+          ? effectiveImportAssigneeId
+          : null,
       });
       await runSync(session.user.id, permissions);
       return { success: true, action: "source", message: "Regra deste calendário atualizada." };
-    } catch {
-      return fail(400, { success: false, action: "source", message: "Não foi possível atualizar este calendário." });
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : "";
+      const message = code === "GOOGLE_CALENDAR_SOURCE_EVENTS_NOT_READABLE"
+        ? "Este calendário oferece apenas livre/ocupado e não pode fornecer eventos ao F10."
+        : "Não foi possível atualizar este calendário.";
+      return fail(400, { success: false, action: "source", message });
     }
   },
 
