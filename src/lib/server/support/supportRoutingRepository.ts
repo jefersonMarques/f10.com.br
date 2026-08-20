@@ -110,6 +110,57 @@ export async function listEligibleSupportResponders() {
     .map((entry) => entry.user);
 }
 
+export async function countAvailableSupportRespondersForQueue(
+  queueId: string,
+): Promise<number> {
+  const configuration = await getSupportRoutingConfiguration();
+  if (configuration.assignmentMode !== "round_robin") return 0;
+
+  const responders = await listEligibleSupportResponders();
+  if (responders.length === 0) return 0;
+
+  const db = getDatabase();
+  const [queue] = await db
+    .select({ teamId: supportQueues.teamId })
+    .from(supportQueues)
+    .where(and(eq(supportQueues.id, queueId), eq(supportQueues.active, true)))
+    .limit(1);
+  if (!queue) return 0;
+
+  let eligibleResponderIds = responders.map((user) => user.id);
+  if (queue.teamId) {
+    const membershipRows = await db
+      .select({ userId: teamMembers.userId })
+      .from(teamMembers)
+      .where(eq(teamMembers.teamId, queue.teamId));
+    const teamUserIds = new Set(membershipRows.map((row) => row.userId));
+    eligibleResponderIds = eligibleResponderIds.filter((userId) => teamUserIds.has(userId));
+  }
+  if (eligibleResponderIds.length === 0) return 0;
+
+  const now = new Date();
+  const activeAfter = new Date(now.getTime() - SUPPORT_AWAY_AFTER_MS);
+  const rows = await db
+    .select({ userId: supportChatRoutingMembers.userId })
+    .from(supportChatRoutingMembers)
+    .innerJoin(users, eq(users.id, supportChatRoutingMembers.userId))
+    .innerJoin(
+      supportAgentPresence,
+      eq(supportAgentPresence.userId, supportChatRoutingMembers.userId),
+    )
+    .where(
+      and(
+        eq(supportChatRoutingMembers.enabled, true),
+        inArray(supportChatRoutingMembers.userId, eligibleResponderIds),
+        eq(users.status, "active"),
+        eq(supportAgentPresence.manualStatus, "online"),
+        gt(supportAgentPresence.lastActivityAt, activeAfter),
+      ),
+    );
+
+  return rows.length;
+}
+
 export async function getSupportRoutingSettings() {
   const [configuration, eligibleUsers] = await Promise.all([
     getSupportRoutingConfiguration(),
