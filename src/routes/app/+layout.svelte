@@ -2,28 +2,14 @@
   import { page } from "$app/stores";
   import { onDestroy, onMount } from "svelte";
   import {
-    BarChart3,
     Bell,
-    BookOpen,
     Building2,
-    CalendarDays,
-    CheckSquare2,
     ChevronDown,
-    ChevronRight,
-    FileText,
-    GraduationCap,
-    Headphones,
-    LayoutDashboard,
     LogOut,
-    MessageCircleMore,
-    MonitorCog,
-    Search,
-    Settings,
-    ShieldCheck,
     UserCircle,
-    Users,
   } from "lucide-svelte";
   import ApplicationHeader from "$lib/components/application/ApplicationHeader.svelte";
+  import ApplicationSidebar from "$lib/components/application/ApplicationSidebar.svelte";
   import ActiveChatDock from "$lib/components/operations/ActiveChatDock.svelte";
   import NotificationAlertStack from "$lib/components/operations/NotificationAlertStack.svelte";
   import { resolveOperationsRouteMetadata } from "$lib/application/routeMetadata";
@@ -31,9 +17,9 @@
 
   export let data: LayoutData;
 
+  let sidebarCollapsed = false;
   let notificationOpen = false;
   let presenceOpen = false;
-  let openNavigationGroup: string | null = null;
   let notificationTimer: ReturnType<typeof setInterval> | null = null;
   let presenceTimer: ReturnType<typeof setInterval> | null = null;
   let notifications = data.notifications;
@@ -43,53 +29,7 @@
   const canRespondToChat = permissionCodes.has("chat.respond");
   const canViewCustomers = permissionCodes.has("customers.view");
 
-  type NavigationChild = {
-    label: string;
-    icon: typeof LayoutDashboard;
-    href: string;
-  };
-
-  type NavigationItem = {
-    label: string;
-    icon: typeof LayoutDashboard;
-    enabled: boolean;
-    href?: string;
-    permission?: string;
-    permissionsAny?: string[];
-    children?: NavigationChild[];
-  };
-
-  const navigationItems: NavigationItem[] = [
-    { label: "Visão geral", icon: LayoutDashboard, enabled: true, href: "/app" },
-    {
-      label: "Base de Conhecimento",
-      icon: BookOpen,
-      enabled: true,
-      permission: "help.view",
-      children: [
-        { label: "Conteúdos", icon: FileText, href: "/app/help/content" },
-        { label: "Trilhas", icon: GraduationCap, href: "/app/help/trilhas" },
-      ],
-    },
-    { label: "Pesquisa de Suporte", icon: Search, enabled: true, href: "/app/help/search", permission: "help.view" },
-    { label: "Insights da Central", icon: BarChart3, enabled: true, href: "/app/help/insights", permission: "help.view" },
-    { label: "Agenda", icon: CalendarDays, enabled: true, href: "/app/tasks/calendar", permissionsAny: ["tasks.view", "tickets.view"] },
-    { label: "Tarefas", icon: CheckSquare2, enabled: true, href: "/app/tasks", permission: "tasks.view" },
-    { label: "Tickets", icon: Headphones, enabled: true, href: "/app/tickets", permission: "tickets.view" },
-    { label: "Clientes", icon: Building2, enabled: true, href: "/app/customers", permission: "customers.view" },
-    { label: "Chat", icon: MessageCircleMore, enabled: true, href: "/app/chat", permission: "chat.view" },
-    { label: "Acesso remoto", icon: MonitorCog, enabled: true, href: "/app/remote", permission: "remote.use" },
-    { label: "Performance", icon: BarChart3, enabled: true, href: "/app/performance", permission: "reports.view" },
-    { label: "Equipe", icon: Users, enabled: true, href: "/app/team", permission: "users.view" },
-    { label: "Configurações", icon: Settings, enabled: true, href: "/app/settings", permission: "system.settings.manage" },
-  ];
-
   $: notifications = data.notifications;
-  $: visibleNavigationItems = navigationItems.filter(
-    (item) =>
-      (!item.permission || permissionCodes.has(item.permission))
-      && (!item.permissionsAny || item.permissionsAny.some((permission) => permissionCodes.has(permission))),
-  );
   $: pathname = $page.url.pathname;
   $: routeMetadata = resolveOperationsRouteMetadata(pathname);
   $: customerProfileId = canViewCustomers ? resolvePageCustomerId($page.data) : null;
@@ -117,33 +57,6 @@
     }
 
     return null;
-  }
-
-  function isActiveNavigationItem(currentPathname: string, href?: string): boolean {
-    if (!href) return false;
-    if (href === "/app") return currentPathname === href;
-    if (href === "/app/tasks" && currentPathname.startsWith("/app/tasks/calendar")) return false;
-    return currentPathname === href || currentPathname.startsWith(`${href}/`);
-  }
-
-  function isActiveNavigationGroup(currentPathname: string, children: NavigationChild[]): boolean {
-    return children.some((child) => isActiveNavigationItem(currentPathname, child.href));
-  }
-
-  function toggleNavigationGroup(label: string): void {
-    openNavigationGroup = openNavigationGroup === label ? null : label;
-  }
-
-  function navigationBadge(
-    href: string | undefined,
-    chatUnreadCount: number,
-    ticketUnreadCount: number,
-    taskUnreadCount: number,
-  ): number {
-    if (href === "/app/chat") return chatUnreadCount;
-    if (href === "/app/tickets") return ticketUnreadCount;
-    if (href === "/app/tasks") return taskUnreadCount;
-    return 0;
   }
 
   function formatNotificationDate(value: string | Date): string {
@@ -249,82 +162,14 @@
   <meta name="googlebot" content="noindex,nofollow,noarchive" />
 </svelte:head>
 
-<div class="application-ui operations-shell min-h-[100dvh] bg-[#F5F6FA] text-[#010D28] lg:grid lg:grid-cols-[256px_minmax(0,1fr)]">
-  <aside class="border-b border-[#E2E5ED] bg-white lg:min-h-[100dvh] lg:border-b-0 lg:border-r">
-    <div class="flex h-full flex-col">
-      <div class="flex h-[68px] items-center justify-between border-b border-[#EEF0F5] px-4 lg:px-5">
-        <a href="/app" class="flex items-center gap-3">
-          <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#000A57] text-sm font-bold text-white">F10</span>
-          <span><strong class="block text-[14px] font-semibold leading-4">Operations</strong><small class="mt-0.5 block text-[11px] font-medium text-[#8A8F9D]">Área interna</small></span>
-        </a>
-        <ShieldCheck class="text-[#EA6D0B] lg:hidden" size={20} aria-hidden="true" />
-      </div>
-
-      <nav class="hidden flex-1 px-3 py-4 lg:block" aria-label="Navegação principal">
-        <p class="application-text-caption px-3 pb-2 font-bold uppercase tracking-[0.14em] text-[#9A9FAD]">Operação</p>
-        <div class="space-y-1">
-          {#each visibleNavigationItems as item}
-            {#if item.children}
-              {@const groupActive = isActiveNavigationGroup(pathname, item.children)}
-              {@const groupOpen = openNavigationGroup === item.label}
-              <div class="group py-0.5">
-                <button
-                  type="button"
-                  class={`flex min-h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-[13px] font-semibold transition ${groupActive ? "bg-[#F8F9FF] text-[#000A57]" : "text-[#676D7D] hover:bg-[#F7F8FB] hover:text-[#000A57]"}`}
-                  aria-expanded={groupOpen}
-                  on:click={() => toggleNavigationGroup(item.label)}
-                >
-                  <svelte:component this={item.icon} size={18} aria-hidden="true" />
-                  <span class="flex-1">{item.label}</span>
-                  <ChevronDown size={15} class={`transition-transform duration-150 ${groupOpen ? "rotate-180" : "group-hover:rotate-180"}`} aria-hidden="true" />
-                </button>
-                <div class={`ml-[22px] mt-1 space-y-1 border-l border-[#E4E7EE] pl-3 ${groupOpen ? "block" : "hidden group-hover:block"}`}>
-                  {#each item.children as child}
-                    <a href={child.href} class={`flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-[11px] font-semibold transition ${isActiveNavigationItem(pathname, child.href) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#747A89] hover:bg-[#F7F8FB] hover:text-[#000A57]"}`}>
-                      <svelte:component this={child.icon} size={15} aria-hidden="true" />
-                      <span>{child.label}</span>
-                    </a>
-                  {/each}
-                </div>
-              </div>
-            {:else if item.enabled && item.href}
-              {@const badge = navigationBadge(
-                item.href,
-                notifications.chatUnreadCount,
-                notifications.ticketUnreadCount,
-                notifications.taskUnreadCount,
-              )}
-              <a href={item.href} class={`flex min-h-10 items-center gap-3 rounded-xl px-3 text-[13px] font-semibold transition ${isActiveNavigationItem(pathname, item.href) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#676D7D] hover:bg-[#F7F8FB] hover:text-[#000A57]"}`}>
-                <svelte:component this={item.icon} size={18} aria-hidden="true" />
-                <span class="flex-1">{item.label}</span>
-                {#if badge > 0}
-                  <span class="application-text-meta inline-flex min-w-5 items-center justify-center rounded-full bg-[#D92D20] px-1.5 py-0.5 font-bold text-white">{Math.min(badge, 99)}</span>
-                {:else}
-                  <ChevronRight size={15} aria-hidden="true" />
-                {/if}
-              </a>
-            {:else}
-              <div class="flex min-h-10 items-center gap-3 rounded-xl px-3 text-[13px] font-medium text-[#707687]"><svelte:component this={item.icon} size={18} aria-hidden="true" /><span class="flex-1">{item.label}</span><span class="application-text-meta rounded-full bg-[#F0F1F5] px-2 py-1 font-bold uppercase tracking-[0.08em] text-[#8A8F9D]">Em breve</span></div>
-            {/if}
-          {/each}
-        </div>
-      </nav>
-
-      <div class="hidden border-t border-[#EEF0F5] p-3 lg:block">
-        <a href="/app/minha-conta" class="block rounded-2xl bg-[#F7F8FB] p-3 transition hover:bg-[#EEF0FF]">
-          <div class="flex items-start gap-3">
-            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#000A57] shadow-sm"><UserCircle size={20} /></span>
-            <span class="min-w-0 flex-1">
-              <span class="block truncate text-[13px] font-semibold text-[#202637]">{data.user.name}</span>
-              <span class="mt-1 block truncate text-[11px] text-[#777D8D]">{data.user.email}</span>
-            </span>
-          </div>
-          <div class="mt-3 flex flex-wrap gap-1.5">{#each data.roles as role}<span class="application-text-meta rounded-full bg-white px-2 py-1 font-bold tracking-[0.04em] text-[#000A57] shadow-sm">{role}</span>{/each}</div>
-        </a>
-        <form method="POST" action="/app/logout" class="mt-2"><button type="submit" class="flex h-10 w-full items-center gap-2 rounded-xl px-3 text-left text-[12px] font-semibold text-[#6D7280] transition hover:bg-[#FFF0F0] hover:text-[#A52A2A]"><LogOut size={17} aria-hidden="true" />Sair</button></form>
-      </div>
-    </div>
-  </aside>
+<div class={`application-ui operations-shell min-h-[100dvh] bg-[#F5F6FA] text-[#010D28] transition-[grid-template-columns] duration-200 lg:grid ${sidebarCollapsed ? "lg:grid-cols-[76px_minmax(0,1fr)]" : "lg:grid-cols-[256px_minmax(0,1fr)]"}`}>
+  <ApplicationSidebar
+    bind:collapsed={sidebarCollapsed}
+    permissions={data.permissions}
+    {notifications}
+    user={data.user}
+    roles={data.roles}
+  />
 
   <main class="min-w-0">
     <ApplicationHeader
