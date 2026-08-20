@@ -11,6 +11,7 @@
   import ApplicationHeader from "$lib/components/application/ApplicationHeader.svelte";
   import ApplicationSidebar from "$lib/components/application/ApplicationSidebar.svelte";
   import ActiveChatDock from "$lib/components/operations/ActiveChatDock.svelte";
+  import GoogleCalendarSyncPulse from "$lib/components/operations/GoogleCalendarSyncPulse.svelte";
   import NotificationAlertStack from "$lib/components/operations/NotificationAlertStack.svelte";
   import { resolveOperationsRouteMetadata } from "$lib/application/routeMetadata";
   import type { LayoutData } from "./$types";
@@ -28,6 +29,13 @@
   const permissionCodes = new Set(data.permissions.map((permission) => permission.code));
   const canRespondToChat = permissionCodes.has("chat.respond");
   const canViewCustomers = permissionCodes.has("customers.view");
+  const canUseGoogleCalendar = [
+    "tasks.view",
+    "tickets.view",
+    "scheduling.view",
+    "scheduling.create",
+    "integrations.view",
+  ].some((permissionCode) => permissionCodes.has(permissionCode));
 
   $: notifications = data.notifications;
   $: pathname = $page.url.pathname;
@@ -261,5 +269,6 @@
     <slot />
     <NotificationAlertStack notifications={notifications.recent} />
     <ActiveChatDock enabled={canRespondToChat} />
+    <GoogleCalendarSyncPulse enabled={canUseGoogleCalendar} />
   </main>
 </div>
