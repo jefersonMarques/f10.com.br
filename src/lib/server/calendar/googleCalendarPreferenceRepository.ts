@@ -201,9 +201,14 @@ export async function saveGoogleCalendarSyncPreferences(
 
 export async function refreshGoogleCalendarSources(userId: string): Promise<void> {
   const calendars = await listGoogleCalendars(userId);
+  await ensureGoogleCalendarPreferenceRow(userId);
+
   const db = getDatabase();
   const now = new Date();
   const calendarIds = calendars.map((calendar) => calendar.id);
+  const fallbackCalendarId = calendars.find((calendar) => calendar.primary)?.id
+    ?? calendars[0]?.id
+    ?? "primary";
 
   await db.transaction(async (tx) => {
     for (const calendar of calendars) {
@@ -236,6 +241,10 @@ export async function refreshGoogleCalendarSources(userId: string): Promise<void
       await tx
         .delete(googleCalendarSources)
         .where(eq(googleCalendarSources.userId, userId));
+      await tx
+        .update(googleCalendarPreferences)
+        .set({ targetCalendarId: fallbackCalendarId, updatedAt: now })
+        .where(eq(googleCalendarPreferences.userId, userId));
       return;
     }
 
@@ -245,6 +254,16 @@ export async function refreshGoogleCalendarSources(userId: string): Promise<void
         and(
           eq(googleCalendarSources.userId, userId),
           notInArray(googleCalendarSources.calendarId, calendarIds),
+        ),
+      );
+
+    await tx
+      .update(googleCalendarPreferences)
+      .set({ targetCalendarId: fallbackCalendarId, updatedAt: now })
+      .where(
+        and(
+          eq(googleCalendarPreferences.userId, userId),
+          notInArray(googleCalendarPreferences.targetCalendarId, calendarIds),
         ),
       );
   });
