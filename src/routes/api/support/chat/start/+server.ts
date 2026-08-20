@@ -8,6 +8,9 @@ import {
   processSupportAiChatMessage,
 } from "$lib/server/support/supportAiChat";
 import { persistSupportChatHandoffContext } from "$lib/server/support/supportChatHandoffContext";
+import {
+  listPublicSupportChatEntryOptions,
+} from "$lib/server/support/supportChatEntryRepository";
 import { handlePureSupportGreeting } from "$lib/server/support/supportChatLocalIntent";
 import { startPublicChat } from "$lib/server/support/publicChatRepository";
 import { autoAssignTicketIfConfigured } from "$lib/server/support/supportRoutingRepository";
@@ -47,6 +50,17 @@ function sanitizeContextUrl(value: string): string {
   } catch {
     return "";
   }
+}
+
+async function resolveEffectiveEntryOptionId(
+  entryOptionId: string | null,
+  forceHuman: boolean,
+): Promise<string | null> {
+  if (entryOptionId || !forceHuman) return entryOptionId;
+
+  const options = await listPublicSupportChatEntryOptions();
+  const preferred = options.find((option) => option.initialHandling === "human") ?? options[0];
+  return preferred?.id ?? null;
 }
 
 function diagnoseChatStartFailure(cause: unknown): ChatStartDiagnosticCode {
@@ -132,12 +146,13 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
   }
 
   try {
+    const effectiveEntryOptionId = await resolveEffectiveEntryOptionId(entryOptionId, forceHuman);
     const session = await startPublicChat(clientAddress, {
       name,
       email,
       phone,
       message,
-      entryOptionId,
+      entryOptionId: effectiveEntryOptionId,
       contextUrl,
       contextData: {
         pageTitle: pageTitle || null,
@@ -171,7 +186,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
       metadata: {
         ticketId: session.ticketId,
         ticketNumber: session.ticketNumber,
-        entryOptionId,
+        entryOptionId: effectiveEntryOptionId,
         entryOptionLabel: session.entryOptionLabel,
         assistantHandoff: forceHuman,
       },
@@ -221,6 +236,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
     const diagnosticCode = diagnoseChatStartFailure(cause);
     console.error("[support.chat.start]", {
       diagnosticCode,
+      causeCode: cause instanceof Error ? cause.message : null,
       causeType: cause instanceof Error ? cause.name : typeof cause,
     });
 
