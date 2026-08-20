@@ -342,7 +342,7 @@ export async function saveGoogleCalendarSource(
 
   if (!source) throw new Error("GOOGLE_CALENDAR_SOURCE_NOT_FOUND");
   if (
-    (input.visibleInF10 || input.importMode === "task") &&
+    (input.visibleInF10 || input.importMode !== "hidden") &&
     !canReadGoogleCalendarEvents(source.accessRole)
   ) {
     throw new Error("GOOGLE_CALENDAR_SOURCE_EVENTS_NOT_READABLE");
