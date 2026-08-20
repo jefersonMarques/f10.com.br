@@ -19,6 +19,7 @@ import {
   deleteSupportChatEntryOption,
   getSupportChatEntrySettings,
   updateSupportChatEntryOption,
+  updateSupportQueueDueDays,
 } from "$lib/server/support/supportChatEntryRepository";
 import {
   getSupportRoutingSettings,
@@ -38,6 +39,10 @@ function readInteger(formData: FormData, key: string, fallback: number): number 
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function isValidDefaultDueDays(value: number): boolean {
+  return Number.isInteger(value) && value >= 1 && value <= 365;
 }
 
 function readSettings(formData: FormData): SupportHoursSettings {
@@ -184,21 +189,55 @@ export const actions: Actions = {
     const formData = await request.formData();
     const name = readString(formData, "name");
     const teamId = readString(formData, "teamId");
-    if (name.length < 2 || name.length > 80 || !isUuid(teamId)) {
+    const defaultDueDays = readInteger(formData, "defaultDueDays", 3);
+    if (name.length < 2 || name.length > 80 || !isUuid(teamId) || !isValidDefaultDueDays(defaultDueDays)) {
       return fail(400, {
         success: false,
         action: "createQueue",
-        message: "Informe um nome de fila e uma equipe responsável.",
+        message: "Informe nome, equipe e um prazo padrão entre 1 e 365 dias.",
       });
     }
     try {
-      await createSupportQueue(session.user.id, name, teamId);
+      await createSupportQueue(session.user.id, name, teamId, defaultDueDays);
       return { success: true, action: "createQueue", message: "Fila de atendimento criada." };
     } catch {
       return fail(400, {
         success: false,
         action: "createQueue",
         message: "Não foi possível criar a fila de atendimento.",
+      });
+    }
+  },
+
+  saveQueueDueDays: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(
+      cookies,
+      "system.settings.manage",
+      "/app/settings/atendimento",
+    );
+    const formData = await request.formData();
+    const queueId = readString(formData, "queueId");
+    const defaultDueDays = readInteger(formData, "defaultDueDays", 0);
+    if (!isUuid(queueId) || !isValidDefaultDueDays(defaultDueDays)) {
+      return fail(400, {
+        success: false,
+        action: "saveQueueDueDays",
+        message: "Informe um prazo padrão entre 1 e 365 dias.",
+      });
+    }
+
+    try {
+      await updateSupportQueueDueDays(session.user.id, queueId, defaultDueDays);
+      return {
+        success: true,
+        action: "saveQueueDueDays",
+        message: "Prazo padrão da fila atualizado.",
+      };
+    } catch {
+      return fail(400, {
+        success: false,
+        action: "saveQueueDueDays",
+        message: "Não foi possível atualizar o prazo padrão da fila.",
       });
     }
   },
