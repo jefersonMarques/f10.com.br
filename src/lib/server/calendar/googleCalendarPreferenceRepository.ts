@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull, lt, or } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import {
   googleCalendarPreferences,
@@ -13,6 +13,12 @@ export type GoogleCalendarSyncPreferences = {
   syncTicketsToGoogle: boolean;
   syncSchedulingToGoogle: boolean;
   syncGoogleChangesToF10: boolean;
+};
+
+export type GoogleCalendarSyncState = {
+  lastSyncStartedAt: Date | null;
+  lastSyncCompletedAt: Date | null;
+  lastSyncError: string | null;
 };
 
 export type SaveGoogleCalendarSourceInput = {
@@ -31,6 +37,14 @@ export const DEFAULT_GOOGLE_CALENDAR_PREFERENCES: GoogleCalendarSyncPreferences 
   syncGoogleChangesToF10: false,
 };
 
+async function ensureGoogleCalendarPreferenceRow(userId: string): Promise<void> {
+  const db = getDatabase();
+  await db
+    .insert(googleCalendarPreferences)
+    .values({ userId })
+    .onConflictDoNothing();
+}
+
 export async function getGoogleCalendarSyncPreferences(
   userId: string,
 ): Promise<GoogleCalendarSyncPreferences> {
@@ -48,6 +62,93 @@ export async function getGoogleCalendarSyncPreferences(
     .limit(1);
 
   return preferences ?? DEFAULT_GOOGLE_CALENDAR_PREFERENCES;
+}
+
+export async function getGoogleCalendarSyncState(userId: string): Promise<GoogleCalendarSyncState> {
+  const db = getDatabase();
+  const [state] = await db
+    .select({
+      lastSyncStartedAt: googleCalendarPreferences.lastSyncStartedAt,
+      lastSyncCompletedAt: googleCalendarPreferences.lastSyncCompletedAt,
+      lastSyncError: googleCalendarPreferences.lastSyncError,
+    })
+    .from(googleCalendarPreferences)
+    .where(eq(googleCalendarPreferences.userId, userId))
+    .limit(1);
+
+  return state ?? {
+    lastSyncStartedAt: null,
+    lastSyncCompletedAt: null,
+    lastSyncError: null,
+  };
+}
+
+export async function claimGoogleCalendarBackgroundSync(
+  userId: string,
+  minimumIntervalMs = 5 * 60_000,
+  staleLeaseMs = 10 * 60_000,
+): Promise<boolean> {
+  await ensureGoogleCalendarPreferenceRow(userId);
+
+  const db = getDatabase();
+  const now = new Date();
+  const completedBefore = new Date(now.getTime() - minimumIntervalMs);
+  const startedBefore = new Date(now.getTime() - staleLeaseMs);
+  const [claimed] = await db
+    .update(googleCalendarPreferences)
+    .set({
+      lastSyncStartedAt: now,
+      lastSyncError: null,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(googleCalendarPreferences.userId, userId),
+        or(
+          isNull(googleCalendarPreferences.lastSyncStartedAt),
+          lt(googleCalendarPreferences.lastSyncStartedAt, startedBefore),
+        ),
+        or(
+          isNull(googleCalendarPreferences.lastSyncCompletedAt),
+          lt(googleCalendarPreferences.lastSyncCompletedAt, completedBefore),
+        ),
+      ),
+    )
+    .returning({ userId: googleCalendarPreferences.userId });
+
+  return Boolean(claimed);
+}
+
+export async function completeGoogleCalendarBackgroundSync(
+  userId: string,
+  syncError: string | null,
+): Promise<void> {
+  const now = new Date();
+  const db = getDatabase();
+  await db
+    .update(googleCalendarPreferences)
+    .set({
+      lastSyncStartedAt: null,
+      lastSyncCompletedAt: now,
+      lastSyncError: syncError?.slice(0, 1000) ?? null,
+      updatedAt: now,
+    })
+    .where(eq(googleCalendarPreferences.userId, userId));
+}
+
+export async function releaseGoogleCalendarBackgroundSync(
+  userId: string,
+  syncError: string,
+): Promise<void> {
+  const db = getDatabase();
+  await db
+    .update(googleCalendarPreferences)
+    .set({
+      lastSyncStartedAt: null,
+      lastSyncError: syncError.slice(0, 1000),
+      updatedAt: new Date(),
+    })
+    .where(eq(googleCalendarPreferences.userId, userId));
 }
 
 export async function saveGoogleCalendarSyncPreferences(
