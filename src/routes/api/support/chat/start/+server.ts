@@ -12,7 +12,11 @@ import {
   listPublicSupportChatEntryOptions,
 } from "$lib/server/support/supportChatEntryRepository";
 import { handlePureSupportGreeting } from "$lib/server/support/supportChatLocalIntent";
-import { startPublicChat } from "$lib/server/support/publicChatRepository";
+import {
+  addPublicChatSystemMessage,
+  startPublicChat,
+} from "$lib/server/support/publicChatRepository";
+import { getSupportAvailabilityStatus } from "$lib/server/support/publicSupportStatus";
 import { autoAssignTicketIfConfigured } from "$lib/server/support/supportRoutingRepository";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
 
@@ -61,6 +65,13 @@ async function resolveEffectiveEntryOptionId(
   const options = await listPublicSupportChatEntryOptions();
   const preferred = options.find((option) => option.initialHandling === "human") ?? options[0];
   return preferred?.id ?? null;
+}
+
+function buildOutOfHoursMessage(nextOpenLabel: string | null): string {
+  const nextOpen = nextOpenLabel
+    ? ` Nossa equipe retorna ${nextOpenLabel.toLowerCase()}.`
+    : " Nossa equipe responderá no próximo período de atendimento.";
+  return `Recebemos seu atendimento e ele ficou registrado na fila.${nextOpen}`;
 }
 
 function diagnoseChatStartFailure(cause: unknown): ChatStartDiagnosticCode {
@@ -146,7 +157,10 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
   }
 
   try {
-    const effectiveEntryOptionId = await resolveEffectiveEntryOptionId(entryOptionId, forceHuman);
+    const [effectiveEntryOptionId, availability] = await Promise.all([
+      resolveEffectiveEntryOptionId(entryOptionId, forceHuman),
+      getSupportAvailabilityStatus(),
+    ]);
     const session = await startPublicChat(clientAddress, {
       name,
       email,
@@ -189,6 +203,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
         entryOptionId: effectiveEntryOptionId,
         entryOptionLabel: session.entryOptionLabel,
         assistantHandoff: forceHuman,
+        outsideSupportHours: availability.isOpen === false,
       },
     }).catch(() => undefined);
 
@@ -201,12 +216,24 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
     }
 
     if (session.aiState !== "active") {
-      const assignedUserId = await autoAssignTicketIfConfigured(session.ticketId).catch(() => null);
-      if (!assignedUserId) {
-        await notifySupportTicketNeedsAttention(
+      if (availability.isOpen === false) {
+        await addPublicChatSystemMessage(
           session.ticketId,
-          "Novo atendimento direcionado para atendimento humano.",
-        ).catch(() => undefined);
+          buildOutOfHoursMessage(availability.nextOpenLabel),
+        ).catch((cause) => {
+          console.error("[support.chat.out_of_hours_message]", {
+            ticketId: session.ticketId,
+            causeType: cause instanceof Error ? cause.name : typeof cause,
+          });
+        });
+      } else {
+        const assignedUserId = await autoAssignTicketIfConfigured(session.ticketId).catch(() => null);
+        if (!assignedUserId) {
+          await notifySupportTicketNeedsAttention(
+            session.ticketId,
+            "Novo atendimento direcionado para atendimento humano.",
+          ).catch(() => undefined);
+        }
       }
     }
 
@@ -219,6 +246,8 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
         expiresAt: session.expiresAt.toISOString(),
         aiState: ai?.state ?? session.aiState,
         aiProcessed: ai?.processed ?? false,
+        outsideSupportHours: availability.isOpen === false,
+        nextOpenLabel: availability.nextOpenLabel,
       },
       {
         status: 201,
