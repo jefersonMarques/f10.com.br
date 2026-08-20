@@ -12,6 +12,7 @@ import {
   gt,
   inArray,
   isNull,
+  sql,
 } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -187,6 +188,7 @@ export async function startPublicChat(
         status: "new",
         priority: "normal",
         channel: "web_chat",
+        dueOn: sql`CURRENT_DATE + ${entryOption.defaultDueDays}`,
       })
       .returning({ id: tickets.id, ticketNumber: tickets.ticketNumber });
 
