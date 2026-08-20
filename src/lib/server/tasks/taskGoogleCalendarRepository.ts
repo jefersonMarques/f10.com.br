@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import {
   addGoogleMeetToGoogleCalendarEvent,
   createGoogleCalendarEvent,
@@ -230,6 +230,7 @@ async function markSyncError(userId: string, taskId: string, cause: unknown): Pr
 }
 
 async function syncExistingLink(task: TaskSnapshot, link: TaskGoogleLink): Promise<void> {
+  if (link.lastSyncError === "SYNC_CONFLICT") return;
   const db = getDatabase();
   const input = toGoogleEventInput(task, link);
   let event = await updateGoogleCalendarEvent(link.userId, link.googleCalendarId, link.googleEventId, input);
@@ -289,6 +290,38 @@ export async function listUserTaskGoogleCalendarLinks(userId: string) {
     .select(linkSelection())
     .from(taskGoogleCalendarLinks)
     .where(eq(taskGoogleCalendarLinks.userId, userId));
+}
+
+export async function hasTaskGoogleCalendarFieldsChangedSince(
+  taskId: string,
+  since: Date | null,
+): Promise<boolean> {
+  if (!since) return true;
+  const db = getDatabase();
+  const [activity] = await db
+    .select({ id: taskActivities.id })
+    .from(taskActivities)
+    .where(
+      and(
+        eq(taskActivities.taskId, taskId),
+        eq(taskActivities.action, "task.details.updated"),
+        gt(taskActivities.createdAt, since),
+      ),
+    )
+    .limit(1);
+  return Boolean(activity);
+}
+
+export async function setTaskGoogleCalendarSyncDirection(
+  userId: string,
+  taskId: string,
+  syncDirection: GoogleCalendarSyncDirection,
+): Promise<void> {
+  const db = getDatabase();
+  await db
+    .update(taskGoogleCalendarLinks)
+    .set({ syncDirection, updatedAt: new Date() })
+    .where(and(eq(taskGoogleCalendarLinks.userId, userId), eq(taskGoogleCalendarLinks.taskId, taskId)));
 }
 
 export async function configureTaskGoogleCalendar(
@@ -368,7 +401,9 @@ export async function configureTaskGoogleCalendar(
 
       const updatedLink = await getLink(actorUserId, taskId);
       if (!updatedLink) throw new Error("TASK_GOOGLE_LINK_NOT_FOUND");
-      await syncExistingLink(task, updatedLink);
+      if (updatedLink.syncDirection !== "google_to_f10") {
+        await syncExistingLink(task, updatedLink);
+      }
     } catch (cause) {
       await markSyncError(actorUserId, taskId, cause);
       throw cause;
@@ -432,6 +467,7 @@ export async function linkImportedGoogleEventToTask(
   taskId: string,
   calendarId: string,
   event: GoogleCalendarEvent,
+  syncDirection: Extract<GoogleCalendarSyncDirection, "google_to_f10" | "bidirectional"> = "google_to_f10",
 ): Promise<void> {
   const now = new Date();
   const db = getDatabase();
@@ -451,7 +487,7 @@ export async function linkImportedGoogleEventToTask(
       endTime: event.allDay || !event.endDateTime ? null : event.endDateTime.slice(11, 16),
       timeZone: "UTC",
       eventDetailsManaged: false,
-      syncDirection: "bidirectional",
+      syncDirection,
       autoManaged: false,
       importedFromGoogle: true,
       googleUpdatedAt: event.updatedAt ? new Date(event.updatedAt) : null,
@@ -516,6 +552,20 @@ export async function markTaskGoogleSyncConflict(userId: string, taskId: string)
     .where(and(eq(taskGoogleCalendarLinks.userId, userId), eq(taskGoogleCalendarLinks.taskId, taskId)));
 }
 
+export async function resolveTaskGoogleSyncWithF10(userId: string, taskId: string): Promise<void> {
+  const link = await getLink(userId, taskId);
+  if (!link) throw new Error("TASK_GOOGLE_LINK_NOT_FOUND");
+  if (link.syncDirection === "google_to_f10") throw new Error("TASK_GOOGLE_F10_PUSH_NOT_ALLOWED");
+
+  const db = getDatabase();
+  await db
+    .update(taskGoogleCalendarLinks)
+    .set({ lastSyncError: null, updatedAt: new Date() })
+    .where(and(eq(taskGoogleCalendarLinks.userId, userId), eq(taskGoogleCalendarLinks.taskId, taskId)));
+  const task = await getTaskSnapshot(taskId);
+  await syncExistingLink(task, { ...link, lastSyncError: null });
+}
+
 export async function removeTaskGoogleCalendarLink(
   userId: string,
   taskId: string,
@@ -539,26 +589,31 @@ export async function syncAllTaskGoogleCalendarLinks(taskId: string): Promise<vo
     db.select(linkSelection()).from(taskGoogleCalendarLinks).where(eq(taskGoogleCalendarLinks.taskId, taskId)),
   ]);
 
-  if (links.length === 0) return;
+  const writableLinks = links.filter(
+    (link) => link.syncDirection !== "google_to_f10" && link.lastSyncError !== "SYNC_CONFLICT",
+  );
+  if (writableLinks.length === 0) return;
 
   if (!task.dueOn) {
     await Promise.allSettled(
-      links.map(async (link) => {
-        try {
-          await deleteGoogleCalendarEvent(link.userId, link.googleCalendarId, link.googleEventId);
-          await db
-            .delete(taskGoogleCalendarLinks)
-            .where(and(eq(taskGoogleCalendarLinks.userId, link.userId), eq(taskGoogleCalendarLinks.taskId, taskId)));
-        } catch (cause) {
-          await markSyncError(link.userId, taskId, cause);
-        }
-      }),
+      writableLinks
+        .filter((link) => !link.importedFromGoogle)
+        .map(async (link) => {
+          try {
+            await deleteGoogleCalendarEvent(link.userId, link.googleCalendarId, link.googleEventId);
+            await db
+              .delete(taskGoogleCalendarLinks)
+              .where(and(eq(taskGoogleCalendarLinks.userId, link.userId), eq(taskGoogleCalendarLinks.taskId, taskId)));
+          } catch (cause) {
+            await markSyncError(link.userId, taskId, cause);
+          }
+        }),
     );
     return;
   }
 
   await Promise.allSettled(
-    links.map(async (link) => {
+    writableLinks.map(async (link) => {
       try {
         await syncExistingLink(task, link);
       } catch (cause) {
