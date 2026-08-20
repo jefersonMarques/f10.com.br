@@ -215,7 +215,8 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
         : await processSupportAiChatMessage(session.sessionId, message);
     }
 
-    if (session.aiState !== "active") {
+    const effectiveAiState = ai?.state ?? session.aiState;
+    if (effectiveAiState !== "active") {
       if (availability.isOpen === false) {
         await addPublicChatSystemMessage(
           session.ticketId,
@@ -244,7 +245,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
         ticketNumber: session.ticketNumber,
         entryOptionLabel: session.entryOptionLabel,
         expiresAt: session.expiresAt.toISOString(),
-        aiState: ai?.state ?? session.aiState,
+        aiState: effectiveAiState,
         aiProcessed: ai?.processed ?? false,
         outsideSupportHours: availability.isOpen === false,
         nextOpenLabel: availability.nextOpenLabel,
