@@ -6,6 +6,7 @@
     Bell,
     BookOpen,
     Building2,
+    CalendarDays,
     CheckSquare2,
     ChevronDown,
     ChevronRight,
@@ -54,6 +55,7 @@
     enabled: boolean;
     href?: string;
     permission?: string;
+    permissionsAny?: string[];
     children?: NavigationChild[];
   };
 
@@ -71,6 +73,7 @@
     },
     { label: "Pesquisa de Suporte", icon: Search, enabled: true, href: "/app/help/search", permission: "help.view" },
     { label: "Insights da Central", icon: BarChart3, enabled: true, href: "/app/help/insights", permission: "help.view" },
+    { label: "Agenda", icon: CalendarDays, enabled: true, href: "/app/tasks/calendar", permissionsAny: ["tasks.view", "tickets.view"] },
     { label: "Tarefas", icon: CheckSquare2, enabled: true, href: "/app/tasks", permission: "tasks.view" },
     { label: "Tickets", icon: Headphones, enabled: true, href: "/app/tickets", permission: "tickets.view" },
     { label: "Clientes", icon: Building2, enabled: true, href: "/app/customers", permission: "customers.view" },
@@ -83,7 +86,9 @@
 
   $: notifications = data.notifications;
   $: visibleNavigationItems = navigationItems.filter(
-    (item) => !item.permission || permissionCodes.has(item.permission),
+    (item) =>
+      (!item.permission || permissionCodes.has(item.permission))
+      && (!item.permissionsAny || item.permissionsAny.some((permission) => permissionCodes.has(permission))),
   );
   $: pathname = $page.url.pathname;
   $: routeMetadata = resolveOperationsRouteMetadata(pathname);
@@ -117,6 +122,7 @@
   function isActiveNavigationItem(currentPathname: string, href?: string): boolean {
     if (!href) return false;
     if (href === "/app") return currentPathname === href;
+    if (href === "/app/tasks" && currentPathname.startsWith("/app/tasks/calendar")) return false;
     return currentPathname === href || currentPathname.startsWith(`${href}/`);
   }
 
