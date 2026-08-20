@@ -5,6 +5,7 @@
   import { onMount } from "svelte";
   import {
     CalendarDays,
+    ChevronDown,
     ChevronLeft,
     ChevronRight,
     CircleAlert,
@@ -229,109 +230,130 @@
 
 <svelte:head><title>Calendário | F10 Operations</title></svelte:head>
 
-<ApplicationContent width="full">
-  <div class="flex flex-wrap items-center justify-end gap-2">
-    {#if data.googleCalendar.configured && !data.googleCalendar.connected}
-      <a href="/app/tasks/calendar/google/connect" class="inline-flex h-11 items-center gap-2 rounded-xl border border-[#C9D0E0] bg-white px-4 text-[11px] font-semibold text-[#000A57] shadow-sm"><Link2 size={15}/>Conectar Google Calendar</a>
-    {:else if data.googleCalendar.connected}
-      <div class="application-text-caption inline-flex h-11 max-w-[270px] items-center gap-2 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-3 font-semibold text-[#000A57]"><Link2 size={14}/><span class="truncate">{data.googleCalendar.googleEmail || "Google Calendar conectado"}</span></div>
-      <button type="button" on:click={() => openGoogleEvent()} class="inline-flex h-11 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white"><Plus size={15}/>Novo evento</button>
-      <form method="POST" action="?/disconnectGoogle" on:submit={(event) => { if (!confirm("Desconectar o Google Calendar deste usuário?")) event.preventDefault(); }}><button type="submit" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#DDE1EA] bg-white text-[#777D8C]" aria-label="Desconectar Google Calendar"><Unplug size={15}/></button></form>
-    {:else}
-      <span class="application-text-meta inline-flex h-11 items-center rounded-xl border border-[#E4E6EC] bg-[#F7F8FA] px-3 font-semibold text-[#858B99]">Google Calendar não configurado</span>
-    {/if}
-
-    <select value={data.selectedProjectId ?? ""} on:change={changeProject} class="h-11 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] font-semibold text-[#5F6575] outline-none focus:border-[#000A57]">
-      <option value="">Minhas tarefas · todos os projetos</option>
-      {#each data.projects as project}<option value={project.id}>{project.name}</option>{/each}
-    </select>
-    <div class="flex rounded-xl bg-[#EDEFF4] p-1">
-      <button type="button" on:click={() => (calendarView = "month")} class={`h-9 rounded-lg px-3 text-[11px] font-semibold ${calendarView === "month" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Mês</button>
-      <button type="button" on:click={() => (calendarView = "week")} class={`h-9 rounded-lg px-3 text-[11px] font-semibold ${calendarView === "week" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Semana</button>
-    </div>
-  </div>
-
-  {#if oauthMessage}
-    <div class={`mt-3 rounded-xl border px-4 py-3 text-[11px] font-medium ${data.googleStatus === "connected" ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0D6BD] bg-[#FFF9F3] text-[#935018]"}`}>{oauthMessage}</div>
-  {/if}
-  {#if data.googleCalendarError}<div class="mt-3 flex items-center gap-2 rounded-xl border border-[#F0D6BD] bg-[#FFF9F3] px-4 py-3 text-[11px] font-medium text-[#935018]"><CircleAlert size={16}/>{data.googleCalendarError}</div>{/if}
-  {#if form?.message}
-    <div class={`mt-3 flex items-center gap-2 rounded-xl border px-4 py-3 text-[11px] font-medium ${form.syncWarning ? "border-[#F0D2A9] bg-[#FFF9EF] text-[#8A4B0F]" : form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
-      {#if !form.success || form.syncWarning}<CircleAlert size={16}/>{/if}{form.message}
-    </div>
-  {/if}
-
-  <section class="mt-4 overflow-hidden rounded-[22px] border border-[#E1E4EB] bg-white shadow-[0_8px_30px_rgba(1,13,40,0.04)]">
-    <header class="flex flex-col gap-3 border-b border-[#E8EAF0] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-      <div class="flex items-center gap-2">
+<ApplicationContent width="full" padding="none">
+  <section class="min-h-[calc(100dvh-var(--application-header-height))] overflow-hidden border-b border-[#E1E4EB] bg-white">
+    <header class="flex flex-col gap-3 border-b border-[#E8EAF0] px-3 py-3 lg:px-4 xl:flex-row xl:items-center xl:justify-between">
+      <div class="flex min-w-0 flex-wrap items-center gap-2">
         <button type="button" on:click={goToday} class="application-text-caption h-9 rounded-lg border border-[#DDE1EA] px-3 font-semibold text-[#555C6D] hover:bg-[#F7F8FB]">Hoje</button>
-        <button type="button" on:click={previousPeriod} class="flex h-9 w-9 items-center justify-center rounded-lg text-[#686E7E] hover:bg-[#F5F6F9]" aria-label="Período anterior"><ChevronLeft size={17}/></button>
-        <button type="button" on:click={nextPeriod} class="flex h-9 w-9 items-center justify-center rounded-lg text-[#686E7E] hover:bg-[#F5F6F9]" aria-label="Próximo período"><ChevronRight size={17}/></button>
-        <h2 class="ml-1 capitalize text-[16px] font-semibold text-[#202637]">{periodLabel}</h2>
+        <div class="flex items-center rounded-lg border border-[#E2E5EB] bg-[#FAFAFC]">
+          <button type="button" on:click={previousPeriod} class="flex h-9 w-9 items-center justify-center text-[#686E7E] hover:bg-[#F1F2F5]" aria-label="Período anterior"><ChevronLeft size={17}/></button>
+          <button type="button" on:click={nextPeriod} class="flex h-9 w-9 items-center justify-center border-l border-[#E2E5EB] text-[#686E7E] hover:bg-[#F1F2F5]" aria-label="Próximo período"><ChevronRight size={17}/></button>
+        </div>
+        <h2 class="min-w-0 capitalize text-[16px] font-semibold text-[#202637]">{periodLabel}</h2>
       </div>
-      <div class="application-text-caption flex flex-wrap items-center gap-4 text-[#808695]"><span class="inline-flex items-center gap-2"><Clock3 size={14}/>{unscheduledCount} tarefa(s) sem prazo</span>{#if data.googleCalendar.connected}<span class="inline-flex items-center gap-2"><Link2 size={13}/>{data.googleEvents.length} evento(s) Google carregados</span>{/if}</div>
+
+      <div class="flex flex-wrap items-center gap-2 xl:justify-end">
+        <select value={data.selectedProjectId ?? ""} on:change={changeProject} class="application-text-caption h-9 max-w-[260px] rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#5F6575] outline-none focus:border-[#000A57]">
+          <option value="">Todos os projetos</option>
+          {#each data.projects as project}<option value={project.id}>{project.name}</option>{/each}
+        </select>
+
+        <div class="flex rounded-lg bg-[#EDEFF4] p-1">
+          <button type="button" on:click={() => (calendarView = "month")} class={`application-text-caption h-7 rounded-md px-3 font-semibold ${calendarView === "month" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Mês</button>
+          <button type="button" on:click={() => (calendarView = "week")} class={`application-text-caption h-7 rounded-md px-3 font-semibold ${calendarView === "week" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Semana</button>
+        </div>
+
+        {#if data.googleCalendar.configured && !data.googleCalendar.connected}
+          <a href="/app/tasks/calendar/google/connect" class="application-text-caption inline-flex h-9 items-center gap-2 rounded-lg border border-[#C9D0E0] bg-white px-3 font-semibold text-[#000A57]"><Link2 size={14}/>Conectar Google</a>
+        {:else if data.googleCalendar.connected}
+          <button type="button" on:click={() => openGoogleEvent()} class="application-text-caption inline-flex h-9 items-center gap-2 rounded-lg bg-[#000A57] px-3 font-semibold text-white"><Plus size={14}/>Novo evento</button>
+          <details class="relative">
+            <summary class="application-text-caption flex h-9 cursor-pointer list-none items-center gap-2 rounded-lg border border-[#D8DDF4] bg-[#F8F9FF] px-3 font-semibold text-[#000A57]"><Link2 size={13}/><span>Google</span><ChevronDown size={12}/></summary>
+            <div class="absolute right-0 z-30 mt-2 w-[280px] rounded-xl border border-[#DDE1EA] bg-white p-3 shadow-[0_16px_45px_rgba(1,13,40,0.16)]">
+              <span class="application-text-meta block font-semibold uppercase tracking-[0.08em] text-[#9A9FAC]">Conta conectada</span>
+              <strong class="application-text-caption mt-1 block truncate text-[#303746]">{data.googleCalendar.googleEmail || "Google Calendar"}</strong>
+              <form method="POST" action="?/disconnectGoogle" class="mt-3 border-t border-[#EEF0F4] pt-3" on:submit={(event) => { if (!confirm("Desconectar o Google Calendar deste usuário?")) event.preventDefault(); }}><button type="submit" class="application-text-meta inline-flex h-8 w-full items-center justify-center gap-2 rounded-lg border border-[#E7D1D1] bg-[#FFF8F8] font-semibold text-[#9B3C3C]"><Unplug size={12}/>Desconectar Google Calendar</button></form>
+            </div>
+          </details>
+        {:else}
+          <span class="application-text-meta inline-flex h-9 items-center rounded-lg border border-[#E4E6EC] bg-[#F7F8FA] px-3 font-semibold text-[#858B99]">Google não configurado</span>
+        {/if}
+      </div>
     </header>
 
-    {#if calendarView === "month"}
-      <div class="grid grid-cols-7 border-b border-[#E8EAF0] bg-[#FAFAFC]">
-        {#each weekdayLabels as label}<div class="application-text-meta px-2 py-2.5 text-center font-bold uppercase tracking-[0.08em] text-[#858B99]">{label}</div>{/each}
-      </div>
-      <div class="grid min-w-[880px] grid-cols-7">
-        {#each visibleDays as day}
-          {@const key = dateKey(day)}
-          {@const dayTasks = tasksForDay(key)}
-          {@const dayGoogleEvents = googleEventsForDay(key)}
-          {@const outsideMonth = day.getMonth() !== cursorDate.getMonth()}
-          {@const isToday = key === dateKey(new Date())}
-          <div class={`group min-h-[142px] border-b border-r border-[#ECEEF3] p-2 transition ${outsideMonth ? "bg-[#FAFAFC]" : "bg-white hover:bg-[#FCFCFE]"}`}>
-            <button type="button" on:click={() => openCreate(day)} class="flex w-full items-center justify-between rounded-lg px-1 py-0.5 text-left" aria-label={`Criar tarefa em ${formatModalDate(key)}`}>
-              <span class={`application-text-caption flex h-7 min-w-7 items-center justify-center rounded-full px-1 font-semibold ${isToday ? "bg-[#000A57] text-white" : outsideMonth ? "text-[#B1B5BF]" : "text-[#5D6372]"}`}>{formatDayNumber(day)}</span>
-              {#if data.canCreate}<Plus size={14} class="text-[#C0C4CE] opacity-0 transition group-hover:opacity-100"/>{/if}
-            </button>
-            <div class="mt-1 space-y-1">
-              {#each dayGoogleEvents.slice(0, 2) as event}
-                {#if event.htmlLink}<a href={event.htmlLink} target="_blank" rel="noopener noreferrer" class="application-text-meta block truncate rounded-md border border-[#CFE0D5] bg-[#F1F8F3] px-2 py-1.5 font-semibold text-[#2F7045]" title={`${googleEventTime(event)} · ${event.summary}`}><span class="application-text-meta mr-1 font-bold">G</span>{#if event.meetUrl}<Video size={10} class="mr-1 inline"/>{/if}{googleEventTime(event)} · {event.summary}</a>{:else}<span class="application-text-meta block truncate rounded-md border border-[#CFE0D5] bg-[#F1F8F3] px-2 py-1.5 font-semibold text-[#2F7045]">G · {event.summary}</span>{/if}
-              {/each}
-              {#each dayTasks.slice(0, Math.max(1, 4 - Math.min(dayGoogleEvents.length, 2))) as task}
-                <a href={taskHref(task.id)} class={`application-text-meta block truncate rounded-md border px-2 py-1.5 font-semibold transition hover:brightness-[0.98] ${priorityClasses[task.priority]}`}>{#if taskLinkedToGoogle(task.id)}<span class="mr-1 font-bold text-[#2F7045]">G</span>{/if}{#if taskHasMeet(task.id)}<Video size={10} class="mr-1 inline text-[#214A9A]"/>{/if}{task.title}</a>
-              {/each}
-              {#if dayGoogleEvents.length + dayTasks.length > 4}<span class="application-text-meta block px-1 font-semibold text-[#7C8291]">+ mais itens</span>{/if}
-            </div>
+    {#if oauthMessage || data.googleCalendarError || form?.message}
+      <div class="space-y-2 border-b border-[#E8EAF0] bg-[#FAFAFC] px-4 py-3">
+        {#if oauthMessage}
+          <div class={`rounded-xl border px-4 py-3 text-[11px] font-medium ${data.googleStatus === "connected" ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0D6BD] bg-[#FFF9F3] text-[#935018]"}`}>{oauthMessage}</div>
+        {/if}
+        {#if data.googleCalendarError}<div class="flex items-center gap-2 rounded-xl border border-[#F0D6BD] bg-[#FFF9F3] px-4 py-3 text-[11px] font-medium text-[#935018]"><CircleAlert size={16}/>{data.googleCalendarError}</div>{/if}
+        {#if form?.message}
+          <div class={`flex items-center gap-2 rounded-xl border px-4 py-3 text-[11px] font-medium ${form.syncWarning ? "border-[#F0D2A9] bg-[#FFF9EF] text-[#8A4B0F]" : form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
+            {#if !form.success || form.syncWarning}<CircleAlert size={16}/>{/if}{form.message}
           </div>
-        {/each}
+        {/if}
+      </div>
+    {/if}
+
+    <div class="application-text-caption flex flex-wrap items-center justify-between gap-2 border-b border-[#E8EAF0] bg-[#FAFAFC] px-4 py-2 text-[#808695]">
+      <div class="flex flex-wrap items-center gap-4"><span class="inline-flex items-center gap-2"><Clock3 size={14}/>{unscheduledCount} tarefa(s) sem prazo</span>{#if data.googleCalendar.connected}<span class="inline-flex items-center gap-2"><Link2 size={13}/>{data.googleEvents.length} evento(s) Google</span>{/if}</div>
+      <a href="/app/tasks/calendar/scheduling" class="application-text-caption font-semibold text-[#000A57] hover:underline">Links de agendamento</a>
+    </div>
+
+    {#if calendarView === "month"}
+      <div class="overflow-x-auto">
+        <div class="grid min-w-[880px] grid-cols-7 border-b border-[#E8EAF0] bg-[#FAFAFC]">
+          {#each weekdayLabels as label}<div class="application-text-meta px-2 py-2.5 text-center font-bold uppercase tracking-[0.08em] text-[#858B99]">{label}</div>{/each}
+        </div>
+        <div class="grid min-w-[880px] grid-cols-7">
+          {#each visibleDays as day}
+            {@const key = dateKey(day)}
+            {@const dayTasks = tasksForDay(key)}
+            {@const dayGoogleEvents = googleEventsForDay(key)}
+            {@const outsideMonth = day.getMonth() !== cursorDate.getMonth()}
+            {@const isToday = key === dateKey(new Date())}
+            <div class={`group min-h-[142px] border-b border-r border-[#ECEEF3] p-2 transition ${outsideMonth ? "bg-[#FAFAFC]" : "bg-white hover:bg-[#FCFCFE]"}`}>
+              <button type="button" on:click={() => openCreate(day)} class="flex w-full items-center justify-between rounded-lg px-1 py-0.5 text-left" aria-label={`Criar tarefa em ${formatModalDate(key)}`}>
+                <span class={`application-text-caption flex h-7 min-w-7 items-center justify-center rounded-full px-1 font-semibold ${isToday ? "bg-[#000A57] text-white" : outsideMonth ? "text-[#B1B5BF]" : "text-[#5D6372]"}`}>{formatDayNumber(day)}</span>
+                {#if data.canCreate}<Plus size={14} class="text-[#C0C4CE] opacity-0 transition group-hover:opacity-100"/>{/if}
+              </button>
+              <div class="mt-1 space-y-1">
+                {#each dayGoogleEvents.slice(0, 2) as event}
+                  {#if event.htmlLink}<a href={event.htmlLink} target="_blank" rel="noopener noreferrer" class="application-text-meta block truncate rounded-md border border-[#CFE0D5] bg-[#F1F8F3] px-2 py-1.5 font-semibold text-[#2F7045]" title={`${googleEventTime(event)} · ${event.summary}`}><span class="application-text-meta mr-1 font-bold">G</span>{#if event.meetUrl}<Video size={10} class="mr-1 inline"/>{/if}{googleEventTime(event)} · {event.summary}</a>{:else}<span class="application-text-meta block truncate rounded-md border border-[#CFE0D5] bg-[#F1F8F3] px-2 py-1.5 font-semibold text-[#2F7045]">G · {event.summary}</span>{/if}
+                {/each}
+                {#each dayTasks.slice(0, Math.max(1, 4 - Math.min(dayGoogleEvents.length, 2))) as task}
+                  <a href={taskHref(task.id)} class={`application-text-meta block truncate rounded-md border px-2 py-1.5 font-semibold transition hover:brightness-[0.98] ${priorityClasses[task.priority]}`}>{#if taskLinkedToGoogle(task.id)}<span class="mr-1 font-bold text-[#2F7045]">G</span>{/if}{#if taskHasMeet(task.id)}<Video size={10} class="mr-1 inline text-[#214A9A]"/>{/if}{task.title}</a>
+                {/each}
+                {#if dayGoogleEvents.length + dayTasks.length > 4}<span class="application-text-meta block px-1 font-semibold text-[#7C8291]">+ mais itens</span>{/if}
+              </div>
+            </div>
+          {/each}
+        </div>
       </div>
     {:else}
-      <div class="grid min-w-[880px] grid-cols-7">
-        {#each visibleDays as day, index}
-          {@const key = dateKey(day)}
-          {@const dayTasks = tasksForDay(key)}
-          {@const dayGoogleEvents = googleEventsForDay(key)}
-          {@const isToday = key === dateKey(new Date())}
-          <section class={`min-h-[540px] border-r border-[#E8EAF0] ${index === 6 ? "border-r-0" : ""}`}>
-            <button type="button" on:click={() => openCreate(day)} class="group flex w-full flex-col items-center border-b border-[#E8EAF0] px-2 py-3 hover:bg-[#FAFAFC]">
-              <span class="application-text-meta font-bold uppercase tracking-[0.08em] text-[#858B99]">{weekdayLabels[index]}</span>
-              <span class={`mt-1 flex h-9 min-w-9 items-center justify-center rounded-full px-1 text-[13px] font-semibold ${isToday ? "bg-[#000A57] text-white" : "text-[#303646]"}`}>{day.getDate()}</span>
-              {#if data.canCreate}<span class="application-text-meta mt-1 inline-flex items-center gap-1 font-semibold text-[#9A9FAC] opacity-0 transition group-hover:opacity-100"><Plus size={11}/>Adicionar tarefa</span>{/if}
-            </button>
-            <div class="space-y-2 p-2.5">
-              {#each dayGoogleEvents as event}
-                <article class="rounded-xl border border-[#CFE0D5] bg-[#F1F8F3] p-3 text-[#2F7045] transition hover:shadow-sm">
-                  <span class="application-text-meta font-bold uppercase tracking-[0.08em]">Google · {googleEventTime(event)}</span>
-                  <strong class="application-text-caption mt-1 block font-semibold leading-4">{event.summary}</strong>
-                  {#if event.location}<span class="application-text-meta mt-1 block truncate opacity-75">{event.location}</span>{/if}
-                  <div class="mt-2 flex flex-wrap items-center gap-2">
-                    {#if event.htmlLink}<a href={event.htmlLink} target="_blank" rel="noopener noreferrer" class="application-text-meta inline-flex items-center gap-1 font-semibold text-[#2F7045]">Evento <ExternalLink size={10}/></a>{/if}
-                    {#if event.meetUrl}<a href={event.meetUrl} target="_blank" rel="noopener noreferrer" class="application-text-meta inline-flex items-center gap-1 rounded-md bg-[#214A9A] px-2 py-1 font-semibold text-white"><Video size={10}/>Entrar no Meet</a>{/if}
-                  </div>
-                </article>
-              {/each}
-              {#each dayTasks as task}
-                <a href={taskHref(task.id)} class={`block rounded-xl border p-3 transition hover:shadow-sm ${priorityClasses[task.priority]}`}><span class="application-text-meta inline-flex items-center gap-1 font-bold uppercase tracking-[0.06em] opacity-70">Tarefa F10{taskLinkedToGoogle(task.id) ? " · Google" : ""}{#if taskHasMeet(task.id)}<Video size={10}/>{/if}</span><strong class="application-text-caption mt-1 block font-semibold leading-4">{task.title}</strong><span class="application-text-meta mt-2 block truncate opacity-75">{task.projectName}</span></a>
-              {/each}
-              {#if dayGoogleEvents.length === 0 && dayTasks.length === 0}<button type="button" on:click={() => openCreate(day)} class="application-text-meta flex min-h-20 w-full items-center justify-center rounded-xl border border-dashed border-[#E1E4EA] text-[#A0A5B0] hover:border-[#C8CDD7] hover:bg-[#FAFAFC]">{data.canCreate ? "+ Criar tarefa" : "Sem compromissos"}</button>{/if}
-            </div>
-          </section>
-        {/each}
+      <div class="overflow-x-auto">
+        <div class="grid min-w-[880px] grid-cols-7">
+          {#each visibleDays as day, index}
+            {@const key = dateKey(day)}
+            {@const dayTasks = tasksForDay(key)}
+            {@const dayGoogleEvents = googleEventsForDay(key)}
+            {@const isToday = key === dateKey(new Date())}
+            <section class={`min-h-[540px] border-r border-[#E8EAF0] ${index === 6 ? "border-r-0" : ""}`}>
+              <button type="button" on:click={() => openCreate(day)} class="group flex w-full flex-col items-center border-b border-[#E8EAF0] px-2 py-3 hover:bg-[#FAFAFC]">
+                <span class="application-text-meta font-bold uppercase tracking-[0.08em] text-[#858B99]">{weekdayLabels[index]}</span>
+                <span class={`mt-1 flex h-9 min-w-9 items-center justify-center rounded-full px-1 text-[13px] font-semibold ${isToday ? "bg-[#000A57] text-white" : "text-[#303646]"}`}>{day.getDate()}</span>
+                {#if data.canCreate}<span class="application-text-meta mt-1 inline-flex items-center gap-1 font-semibold text-[#9A9FAC] opacity-0 transition group-hover:opacity-100"><Plus size={11}/>Adicionar tarefa</span>{/if}
+              </button>
+              <div class="space-y-2 p-2.5">
+                {#each dayGoogleEvents as event}
+                  <article class="rounded-xl border border-[#CFE0D5] bg-[#F1F8F3] p-3 text-[#2F7045] transition hover:shadow-sm">
+                    <span class="application-text-meta font-bold uppercase tracking-[0.08em]">Google · {googleEventTime(event)}</span>
+                    <strong class="application-text-caption mt-1 block font-semibold leading-4">{event.summary}</strong>
+                    {#if event.location}<span class="application-text-meta mt-1 block truncate opacity-75">{event.location}</span>{/if}
+                    <div class="mt-2 flex flex-wrap items-center gap-2">
+                      {#if event.htmlLink}<a href={event.htmlLink} target="_blank" rel="noopener noreferrer" class="application-text-meta inline-flex items-center gap-1 font-semibold text-[#2F7045]">Evento <ExternalLink size={10}/></a>{/if}
+                      {#if event.meetUrl}<a href={event.meetUrl} target="_blank" rel="noopener noreferrer" class="application-text-meta inline-flex items-center gap-1 rounded-md bg-[#214A9A] px-2 py-1 font-semibold text-white"><Video size={10}/>Entrar no Meet</a>{/if}
+                    </div>
+                  </article>
+                {/each}
+                {#each dayTasks as task}
+                  <a href={taskHref(task.id)} class={`block rounded-xl border p-3 transition hover:shadow-sm ${priorityClasses[task.priority]}`}><span class="application-text-meta inline-flex items-center gap-1 font-bold uppercase tracking-[0.06em] opacity-70">Tarefa F10{taskLinkedToGoogle(task.id) ? " · Google" : ""}{#if taskHasMeet(task.id)}<Video size={10}/>{/if}</span><strong class="application-text-caption mt-1 block font-semibold leading-4">{task.title}</strong><span class="application-text-meta mt-2 block truncate opacity-75">{task.projectName}</span></a>
+                {/each}
+                {#if dayGoogleEvents.length === 0 && dayTasks.length === 0}<button type="button" on:click={() => openCreate(day)} class="application-text-meta flex min-h-20 w-full items-center justify-center rounded-xl border border-dashed border-[#E1E4EA] text-[#A0A5B0] hover:border-[#C8CDD7] hover:bg-[#FAFAFC]">{data.canCreate ? "+ Criar tarefa" : "Sem compromissos"}</button>{/if}
+              </div>
+            </section>
+          {/each}
+        </div>
       </div>
     {/if}
   </section>

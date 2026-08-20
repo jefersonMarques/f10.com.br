@@ -242,3 +242,7 @@ body::after {
     padding-inline: 1.5rem;
   }
 }
+
+.application-content.application-content--flush {
+  padding: 0;
+}
