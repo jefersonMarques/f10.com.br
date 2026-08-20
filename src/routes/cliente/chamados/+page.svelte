@@ -52,14 +52,14 @@
           <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
-                <span class="text-[9px] font-bold uppercase tracking-[0.08em] text-[#EA6D0B]">Chamado #{ticket.ticketNumber}</span>
-                <span class="rounded-full bg-[#F1F3F7] px-2.5 py-1 text-[9px] font-semibold text-[#626A7B]">{statusLabels[ticket.status] ?? ticket.status}</span>
+                <span class="application-text-meta font-bold uppercase tracking-[0.08em] text-[#EA6D0B]">Chamado #{ticket.ticketNumber}</span>
+                <span class="application-text-meta rounded-full bg-[#F1F3F7] px-2.5 py-1 font-semibold text-[#626A7B]">{statusLabels[ticket.status] ?? ticket.status}</span>
               </div>
               <h2 class="mt-2 truncate text-[15px] font-semibold text-[#252C3D] group-hover:text-[#000A57]">{ticket.subject}</h2>
-              <p class="mt-1.5 text-[9px] text-[#9298A5]">Atualizado {formatDate(ticket.updatedAt)}</p>
+              <p class="application-text-meta mt-1.5 text-[#9298A5]">Atualizado {formatDate(ticket.updatedAt)}</p>
             </div>
             <div class="flex shrink-0 items-center justify-between gap-4 sm:justify-end">
-              <span class={`inline-flex items-center gap-1.5 text-[9px] font-semibold ${slaLabel(ticket) === "Prazo excedido" ? "text-[#A44E3B]" : "text-[#687083]"}`}><Clock3 size={13} />{slaLabel(ticket)}</span>
+              <span class={`application-text-meta inline-flex items-center gap-1.5 font-semibold ${slaLabel(ticket) === "Prazo excedido" ? "text-[#A44E3B]" : "text-[#687083]"}`}><Clock3 size={13} />{slaLabel(ticket)}</span>
               <ArrowRight size={17} class="text-[#000A57]" />
             </div>
           </div>
