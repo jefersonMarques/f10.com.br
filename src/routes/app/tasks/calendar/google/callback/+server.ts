@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { redirect, type RequestHandler } from "@sveltejs/kit";
-import { requireAppPermission } from "$lib/server/auth/authorization";
+import { requireAppAnyPermission } from "$lib/server/auth/authorization";
 import { connectGoogleCalendar } from "$lib/server/calendar/googleCalendarRepository";
 
 const GOOGLE_CALENDAR_STATE_COOKIE = "f10_google_calendar_state";
@@ -13,9 +13,9 @@ function stateMatches(expected: string, received: string): boolean {
 }
 
 export const GET: RequestHandler = async ({ cookies, url }) => {
-  const { session } = await requireAppPermission(
+  const { session } = await requireAppAnyPermission(
     cookies,
-    "tasks.view",
+    ["tasks.view", "tickets.view", "scheduling.view", "scheduling.create", "integrations.view"],
     "/app/tasks/calendar",
   );
 
