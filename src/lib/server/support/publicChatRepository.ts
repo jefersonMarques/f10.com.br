@@ -247,6 +247,37 @@ export async function startPublicChat(
   return { ...result, token, expiresAt };
 }
 
+export async function addPublicChatSystemMessage(
+  ticketId: string,
+  body: string,
+): Promise<void> {
+  const normalizedBody = body.trim();
+  if (!normalizedBody) return;
+
+  const db = getDatabase();
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    await tx.insert(ticketMessages).values({
+      ticketId,
+      authorType: "system",
+      visibility: "public",
+      channel: "web_chat",
+      body: normalizedBody,
+    });
+
+    await tx
+      .update(tickets)
+      .set({ updatedAt: now })
+      .where(eq(tickets.id, ticketId));
+
+    await tx.insert(ticketEvents).values({
+      ticketId,
+      eventType: "chat.system.message",
+      metadata: { reason: "support_hours" },
+    });
+  });
+}
+
 export async function authorizePublicChatSession(
   sessionId: string,
   token: string,
