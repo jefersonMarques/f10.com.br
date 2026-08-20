@@ -18,15 +18,15 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
   );
 
   try {
+    const card = await getTicketCard(session.user.id, permissions, params.ticketId);
     const canViewTasks = hasPermission(permissions, "tasks.view");
     const canCreateTask =
       hasPermission(permissions, "tickets.reply") &&
       hasPermission(permissions, "tasks.create");
 
-    const [card, linkedTasks, taskProjects] = await Promise.all([
-      getTicketCard(session.user.id, permissions, params.ticketId),
+    const [linkedTasks, taskProjects] = await Promise.all([
       canViewTasks
-        ? listTicketTasks(session.user.id, permissions, params.ticketId)
+        ? listTicketTasks(session.user.id, permissions, params.ticketId).catch(() => [])
         : Promise.resolve([]),
       canCreateTask
         ? listTaskProjects(session.user.id, permissions).catch(() => [])
