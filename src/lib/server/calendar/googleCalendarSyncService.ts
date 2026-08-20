@@ -21,6 +21,7 @@ import {
   listUserTicketGoogleCalendarLinks,
   markTicketGoogleSyncConflict,
   syncAssignedTicketsToGoogle,
+  syncTicketGoogleCalendarLink,
 } from "$lib/server/calendar/ticketGoogleCalendarRepository";
 import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import {
@@ -35,7 +36,6 @@ import {
   markTaskGoogleSyncConflict,
   removeTaskGoogleCalendarLink,
   setTaskGoogleCalendarSyncDirection,
-  syncAllTaskGoogleCalendarLinks,
 } from "$lib/server/tasks/taskGoogleCalendarRepository";
 import { createTask, listMyTasks } from "$lib/server/tasks/taskRepository";
 
@@ -65,6 +65,11 @@ export type GoogleCalendarSyncResult = {
 type CalendarFetch = {
   source: GoogleCalendarSource;
   events: GoogleCalendarEvent[];
+};
+
+type LinkedEventHydrationResult = {
+  fetched: CalendarFetch[];
+  missingEventKeys: Set<string>;
 };
 
 function eventDueOn(event: GoogleCalendarEvent): string | null {
@@ -135,6 +140,74 @@ async function fetchGoogleSources(
   );
 
   return results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+}
+
+async function hydrateLinkedGoogleEvents(
+  userId: string,
+  sources: GoogleCalendarSource[],
+  fetched: CalendarFetch[],
+  taskLinks: TaskGoogleLink[],
+  ticketLinks: TicketGoogleLink[],
+  primaryCalendarId: string,
+): Promise<LinkedEventHydrationResult> {
+  const fetchedByCalendar = new Map(
+    fetched.map((calendar) => [
+      canonicalCalendarId(calendar.source.calendarId, primaryCalendarId),
+      calendar,
+    ]),
+  );
+  const hydrated = sources.map((source) => ({
+    source,
+    events: [
+      ...(fetchedByCalendar.get(canonicalCalendarId(source.calendarId, primaryCalendarId))?.events ?? []),
+    ],
+  }));
+  const hydratedByCalendar = new Map(
+    hydrated.map((calendar) => [
+      canonicalCalendarId(calendar.source.calendarId, primaryCalendarId),
+      calendar,
+    ]),
+  );
+  const existingKeys = new Set(
+    hydrated.flatMap((calendar) =>
+      calendar.events.map((event) => eventKey(calendar.source.calendarId, event.id, primaryCalendarId)),
+    ),
+  );
+  const linkedEvents = new Map<string, { calendarId: string; eventId: string }>();
+
+  for (const link of [...taskLinks, ...ticketLinks]) {
+    if (link.googleEventId.startsWith("pending:")) continue;
+    const key = eventKey(link.googleCalendarId, link.googleEventId, primaryCalendarId);
+    if (existingKeys.has(key)) continue;
+    const calendarKey = canonicalCalendarId(link.googleCalendarId, primaryCalendarId);
+    if (!hydratedByCalendar.has(calendarKey)) continue;
+    linkedEvents.set(key, {
+      calendarId: link.googleCalendarId,
+      eventId: link.googleEventId,
+    });
+  }
+
+  const results = await Promise.allSettled(
+    Array.from(linkedEvents.entries()).map(async ([key, link]) => ({
+      key,
+      calendarKey: canonicalCalendarId(link.calendarId, primaryCalendarId),
+      event: await getGoogleCalendarEvent(userId, link.calendarId, link.eventId),
+    })),
+  );
+  const missingEventKeys = new Set<string>();
+
+  for (const result of results) {
+    if (result.status !== "fulfilled") continue;
+    const calendar = hydratedByCalendar.get(result.value.calendarKey);
+    if (!calendar) continue;
+    if (!result.value.event) {
+      missingEventKeys.add(result.value.key);
+      continue;
+    }
+    calendar.events.push(result.value.event);
+  }
+
+  return { fetched: hydrated, missingEventKeys };
 }
 
 async function canUpdateTaskFromGoogle(
@@ -308,6 +381,36 @@ async function unlinkDeletedImportedGoogleEvents(
   );
 }
 
+async function syncTaskLinkToGoogle(
+  userId: string,
+  permissions: PermissionMap,
+  link: TaskGoogleLink,
+): Promise<void> {
+  if (link.syncDirection === "google_to_f10" || link.lastSyncError === "SYNC_CONFLICT") return;
+
+  try {
+    await configureTaskGoogleCalendar(userId, permissions, link.taskId, {
+      enabled: true,
+      allDay: link.allDay,
+      startTime: link.startTime ?? "",
+      endTime: link.endTime ?? "",
+      timeZone: link.timeZone,
+      syncDirection: link.syncDirection,
+      autoManaged: link.autoManaged,
+    });
+  } catch (cause) {
+    if (
+      cause instanceof Error &&
+      cause.message === "TASK_GOOGLE_REQUIRES_DUE_DATE" &&
+      !link.importedFromGoogle
+    ) {
+      await removeTaskGoogleCalendarLink(userId, link.taskId, true);
+      return;
+    }
+    throw cause;
+  }
+}
+
 async function publishTasksToGoogle(
   userId: string,
   permissions: PermissionMap,
@@ -315,6 +418,7 @@ async function publishTasksToGoogle(
   primaryCalendarId: string,
   syncTasksToGoogle: boolean,
   syncGoogleChangesToF10: boolean,
+  missingEventKeys: Set<string>,
 ): Promise<void> {
   if (!hasPermission(permissions, "tasks.view")) return;
 
@@ -377,9 +481,13 @@ async function publishTasksToGoogle(
           return;
         }
 
-        const changed = Boolean(existing.lastSyncError) ||
+        const remoteMissing = missingEventKeys.has(
+          eventKey(existing.googleCalendarId, existing.googleEventId, primaryCalendarId),
+        );
+        const changed = remoteMissing ||
+          Boolean(existing.lastSyncError) ||
           await hasTaskGoogleCalendarFieldsChangedSince(task.id, existing.lastSyncedAt);
-        if (changed) await syncAllTaskGoogleCalendarLinks(task.id);
+        if (changed) await syncTaskLinkToGoogle(userId, permissions, existing);
       }),
     );
 
@@ -406,7 +514,7 @@ async function publishTasksToGoogle(
       }
       if (desiredDirection !== "bidirectional") return;
       if (await hasTaskGoogleCalendarFieldsChangedSince(link.taskId, link.lastSyncedAt)) {
-        await syncAllTaskGoogleCalendarLinks(link.taskId);
+        await syncTaskLinkToGoogle(userId, permissions, link);
       }
     }),
   );
@@ -420,8 +528,14 @@ async function publishTasksToGoogle(
         await setTaskGoogleCalendarSyncDirection(userId, link.taskId, desiredDirection);
         link.syncDirection = desiredDirection;
       }
-      if (await hasTaskGoogleCalendarFieldsChangedSince(link.taskId, link.lastSyncedAt)) {
-        await syncAllTaskGoogleCalendarLinks(link.taskId);
+      const remoteMissing = missingEventKeys.has(
+        eventKey(link.googleCalendarId, link.googleEventId, primaryCalendarId),
+      );
+      if (
+        remoteMissing ||
+        await hasTaskGoogleCalendarFieldsChangedSince(link.taskId, link.lastSyncedAt)
+      ) {
+        await syncTaskLinkToGoogle(userId, permissions, link);
       }
     }),
   );
@@ -463,11 +577,19 @@ export async function synchronizeGoogleCalendar(
       input.timeMin,
       input.timeMax,
     );
+    const hydration = await hydrateLinkedGoogleEvents(
+      input.userId,
+      fetchSources,
+      fetched,
+      initialTaskLinks,
+      initialTicketLinks,
+      primaryCalendarId,
+    );
 
     await reconcileGoogleEvents(
       input.userId,
       input.permissions,
-      fetched,
+      hydration.fetched,
       initialTaskLinks,
       initialTicketLinks,
       preferences.syncGoogleChangesToF10,
@@ -476,7 +598,7 @@ export async function synchronizeGoogleCalendar(
     );
 
     const fetchedEventsByCalendar = new Map(
-      fetched.map((calendar) => [
+      hydration.fetched.map((calendar) => [
         canonicalCalendarId(calendar.source.calendarId, primaryCalendarId),
         new Set(calendar.events.map((event) => event.id)),
       ]),
@@ -495,9 +617,23 @@ export async function synchronizeGoogleCalendar(
       primaryCalendarId,
       preferences.syncTasksToGoogle,
       preferences.syncGoogleChangesToF10,
+      hydration.missingEventKeys,
     );
 
     if (preferences.syncTicketsToGoogle && hasPermission(input.permissions, "tickets.view")) {
+      await Promise.allSettled(
+        initialTicketLinks
+          .filter(
+            (link) =>
+              !link.googleEventId.startsWith("pending:") &&
+              canonicalCalendarId(link.googleCalendarId, primaryCalendarId) ===
+                canonicalCalendarId(targetCalendarId, primaryCalendarId) &&
+              hydration.missingEventKeys.has(
+                eventKey(link.googleCalendarId, link.googleEventId, primaryCalendarId),
+              ),
+          )
+          .map((link) => syncTicketGoogleCalendarLink(input.userId, link.ticketId)),
+      );
       await syncAssignedTicketsToGoogle(input.userId, targetCalendarId);
     } else {
       await clearAutoManagedTicketGoogleCalendarLinks(input.userId);
