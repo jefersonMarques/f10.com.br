@@ -39,6 +39,18 @@
       minute: "2-digit",
     }).format(new Date(value));
   }
+
+  function formatDueOn(value: string | null): string {
+    if (!value) return "Sem data";
+    const [year, month, day] = value.split("-");
+    return year && month && day ? `${day}/${month}/${year}` : value;
+  }
+
+  function conflictValueClass(localValue: string | null, googleValue: string | null): string {
+    return localValue === googleValue
+      ? "border-[#E4E7EE] bg-[#FAFAFC]"
+      : "border-[#E9CF9C] bg-[#FFF9EE]";
+  }
 </script>
 
 <svelte:head><title>Google Calendar | F10 Operations</title></svelte:head>
@@ -145,31 +157,92 @@
           <CircleAlert size={18} class="mt-0.5 shrink-0 text-[#A96510]"/>
           <div>
             <h2 class="text-[14px] font-semibold text-[#74420B]">Conflitos de sincronização</h2>
-            <p class="mt-1 text-[10px] leading-5 text-[#936326]">O F10 e o Google foram alterados depois da última sincronização. Nenhum lado será sobrescrito até você escolher qual versão deve prevalecer.</p>
+            <p class="mt-1 text-[10px] leading-5 text-[#936326]">O F10 e o Google foram alterados depois da última sincronização. Compare os campos abaixo antes de escolher qual versão deve prevalecer.</p>
           </div>
         </div>
 
-        <div class="mt-4 space-y-2">
+        <div class="mt-4 space-y-3">
           {#each data.syncIssues as issue}
-            <div class="flex flex-col gap-3 rounded-xl border border-[#EAD8B7] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div class="min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="application-text-meta rounded-full bg-[#FFF2D9] px-2 py-1 font-semibold uppercase text-[#95601B]">{issue.kind === "task" ? "Tarefa" : "Ticket"}</span>
-                  <a href={issue.kind === "task" ? `/app/tasks/${issue.id}` : `/app/tickets/${issue.id}`} class="application-text-caption truncate font-semibold text-[#303747] hover:underline">{issue.title}</a>
+            <article class="rounded-2xl border border-[#EAD8B7] bg-white p-4">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="application-text-meta rounded-full bg-[#FFF2D9] px-2 py-1 font-semibold uppercase text-[#95601B]">{issue.kind === "task" ? "Tarefa" : "Ticket"}</span>
+                    <a href={issue.kind === "task" ? `/app/tasks/${issue.id}` : `/app/tickets/${issue.id}`} class="application-text-caption truncate font-semibold text-[#303747] hover:underline">{issue.title}</a>
+                  </div>
+                  <span class="application-text-meta mt-1 block truncate text-[#9297A4]">Calendário: {issue.calendarId}</span>
                 </div>
-                <span class="application-text-meta mt-1 block truncate text-[#9297A4]">Calendário: {issue.calendarId}</span>
+                <div class="flex shrink-0 flex-wrap gap-2">
+                  <form method="POST" action={issue.kind === "task" ? "?/resolveTaskConflictF10" : "?/resolveTicketConflictF10"}>
+                    <input type="hidden" name="entityId" value={issue.id}/>
+                    <button type="submit" class="h-9 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[9px] font-semibold text-[#000A57]">Manter F10</button>
+                  </form>
+                  <form method="POST" action={issue.kind === "task" ? "?/resolveTaskConflictGoogle" : "?/resolveTicketConflictGoogle"} on:submit={(event) => { if (!confirm("Usar a versão do Google e substituir os campos sincronizados no F10?")) event.preventDefault(); }}>
+                    <input type="hidden" name="entityId" value={issue.id}/>
+                    <button type="submit" disabled={!issue.google} class="h-9 rounded-xl bg-[#A96510] px-3 text-[9px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Usar Google</button>
+                  </form>
+                </div>
               </div>
-              <div class="flex shrink-0 flex-wrap gap-2">
-                <form method="POST" action={issue.kind === "task" ? "?/resolveTaskConflictF10" : "?/resolveTicketConflictF10"}>
-                  <input type="hidden" name="entityId" value={issue.id}/>
-                  <button type="submit" class="h-9 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[9px] font-semibold text-[#000A57]">Manter F10</button>
-                </form>
-                <form method="POST" action={issue.kind === "task" ? "?/resolveTaskConflictGoogle" : "?/resolveTicketConflictGoogle"} on:submit={(event) => { if (!confirm("Usar a versão do Google e substituir os campos sincronizados no F10?")) event.preventDefault(); }}>
-                  <input type="hidden" name="entityId" value={issue.id}/>
-                  <button type="submit" class="h-9 rounded-xl bg-[#A96510] px-3 text-[9px] font-semibold text-white">Usar Google</button>
-                </form>
-              </div>
-            </div>
+
+              {#if issue.google}
+                {#if issue.kind === "task"}
+                  <div class="mt-4 grid gap-3 lg:grid-cols-2">
+                    <div class="rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] p-3">
+                      <strong class="application-text-caption font-semibold text-[#000A57]">F10</strong>
+                      <dl class="mt-3 space-y-2">
+                        <div class={`rounded-lg border p-2.5 ${conflictValueClass(issue.local.title, issue.google.title)}`}>
+                          <dt class="application-text-meta font-semibold uppercase text-[#8A909D]">Título</dt>
+                          <dd class="application-text-caption mt-1 break-words text-[#303747]">{issue.local.title || "Sem título"}</dd>
+                        </div>
+                        <div class={`rounded-lg border p-2.5 ${conflictValueClass(issue.local.dueOn, issue.google.dueOn)}`}>
+                          <dt class="application-text-meta font-semibold uppercase text-[#8A909D]">Data planejada</dt>
+                          <dd class="application-text-caption mt-1 text-[#303747]">{formatDueOn(issue.local.dueOn)}</dd>
+                        </div>
+                        <div class={`rounded-lg border p-2.5 ${conflictValueClass(issue.local.description, issue.google.description)}`}>
+                          <dt class="application-text-meta font-semibold uppercase text-[#8A909D]">Descrição</dt>
+                          <dd class="application-text-caption mt-1 max-h-28 overflow-auto whitespace-pre-wrap break-words text-[#303747]">{issue.local.description || "Sem descrição"}</dd>
+                        </div>
+                      </dl>
+                    </div>
+
+                    <div class="rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] p-3">
+                      <strong class="application-text-caption font-semibold text-[#A96510]">Google</strong>
+                      <dl class="mt-3 space-y-2">
+                        <div class={`rounded-lg border p-2.5 ${conflictValueClass(issue.local.title, issue.google.title)}`}>
+                          <dt class="application-text-meta font-semibold uppercase text-[#8A909D]">Título</dt>
+                          <dd class="application-text-caption mt-1 break-words text-[#303747]">{issue.google.title || "Sem título"}</dd>
+                        </div>
+                        <div class={`rounded-lg border p-2.5 ${conflictValueClass(issue.local.dueOn, issue.google.dueOn)}`}>
+                          <dt class="application-text-meta font-semibold uppercase text-[#8A909D]">Data planejada</dt>
+                          <dd class="application-text-caption mt-1 text-[#303747]">{formatDueOn(issue.google.dueOn)}</dd>
+                        </div>
+                        <div class={`rounded-lg border p-2.5 ${conflictValueClass(issue.local.description, issue.google.description)}`}>
+                          <dt class="application-text-meta font-semibold uppercase text-[#8A909D]">Descrição</dt>
+                          <dd class="application-text-caption mt-1 max-h-28 overflow-auto whitespace-pre-wrap break-words text-[#303747]">{issue.google.description || "Sem descrição"}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </div>
+                {:else}
+                  <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div class={`rounded-xl border p-3 ${conflictValueClass(issue.local.dueOn, issue.google.dueOn)}`}>
+                      <strong class="application-text-caption font-semibold text-[#000A57]">F10</strong>
+                      <span class="application-text-meta mt-2 block uppercase text-[#8A909D]">Conclusão planejada</span>
+                      <span class="application-text-caption mt-1 block text-[#303747]">{formatDueOn(issue.local.dueOn)}</span>
+                    </div>
+                    <div class={`rounded-xl border p-3 ${conflictValueClass(issue.local.dueOn, issue.google.dueOn)}`}>
+                      <strong class="application-text-caption font-semibold text-[#A96510]">Google</strong>
+                      <span class="application-text-meta mt-2 block uppercase text-[#8A909D]">Conclusão planejada</span>
+                      <span class="application-text-caption mt-1 block text-[#303747]">{formatDueOn(issue.google.dueOn)}</span>
+                    </div>
+                  </div>
+                {/if}
+              {:else}
+                <div class="mt-4 rounded-xl border border-[#F0D6BD] bg-[#FFF9F3] px-3 py-2.5 text-[10px] leading-5 text-[#935018]">
+                  O evento vinculado não está mais disponível no Google. A versão remota não pode ser aplicada; mantenha o F10 ou revise o evento no Google Calendar.
+                </div>
+              {/if}
+            </article>
           {/each}
         </div>
       </section>
