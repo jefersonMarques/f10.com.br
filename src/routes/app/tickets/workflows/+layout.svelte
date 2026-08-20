@@ -7,7 +7,7 @@
     <CircleAlert size={17} class="mt-0.5 shrink-0" />
     <div>
       <strong class="block text-[11px] font-semibold">É obrigatório uma etapa de conclusão.</strong>
-      <p class="mt-1 text-[9px] leading-4">
+      <p class="application-text-meta mt-1 leading-4">
         Nos workflows de área, se não existir uma coluna Terminal, o F10 criará automaticamente a etapa “Concluído”.
       </p>
     </div>
