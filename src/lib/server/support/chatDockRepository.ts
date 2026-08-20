@@ -36,6 +36,7 @@ export async function listActiveChatDockItems(
       ticketId: tickets.id,
       ticketNumber: tickets.ticketNumber,
       status: tickets.status,
+      customerContactId: tickets.customerContactId,
       customerName: customerContacts.name,
       organizationName: customerOrganizations.name,
       assignedUserName: users.name,

@@ -9,6 +9,7 @@
     ticketId: string;
     ticketNumber: number;
     status: string;
+    customerContactId: string | null;
     customerName: string | null;
     organizationName: string | null;
     assignedUserName: string | null;
@@ -224,7 +225,11 @@
       <header class="flex items-center gap-3 border-b border-[#E9EBF0] px-4 py-3">
         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><MessageCircleMore size={17}/></span>
         <div class="min-w-0 flex-1">
-          <strong class="block truncate text-[12px] font-semibold text-[#272D3B]">{customerLabel(activeChat)}</strong>
+          {#if activeChat.customerContactId}
+            <a href={`/app/customers/${activeChat.customerContactId}`} class="block truncate text-[12px] font-semibold text-[#272D3B] hover:text-[#000A57] hover:underline">{customerLabel(activeChat)}</a>
+          {:else}
+            <strong class="block truncate text-[12px] font-semibold text-[#272D3B]">{customerLabel(activeChat)}</strong>
+          {/if}
           <span class="application-text-meta mt-0.5 block truncate text-[#858B99]">#{activeChat.ticketNumber} · {statusLabel(activeChat.status)}{activeChat.organizationName && activeChat.organizationName !== activeChat.customerName ? ` · ${activeChat.organizationName}` : ""}</span>
         </div>
         <a href={`/app/chat/${activeChat.sessionId}`} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#737A89] hover:bg-[#F3F4F7] hover:text-[#000A57]" aria-label="Abrir conversa completa"><ExternalLink size={14}/></a>

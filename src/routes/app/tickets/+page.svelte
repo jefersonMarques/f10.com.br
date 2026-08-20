@@ -21,6 +21,7 @@
     X,
   } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
+  import TicketCustomerPicker from "$lib/components/operations/TicketCustomerPicker.svelte";
   import TicketTaskPanel from "$lib/components/operations/TicketTaskPanel.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -53,6 +54,7 @@
         priority: string;
         queueName: string;
         assignedUserName: string | null;
+        customerContactId: string | null;
         customerName: string | null;
         customerEmail: string | null;
         organizationName: string | null;
@@ -511,10 +513,7 @@
       <form method="POST" action="?/create" class="grid gap-3 sm:grid-cols-2">
         <div class="flex items-center justify-between sm:col-span-2"><h2 class="text-[16px] font-semibold">Novo ticket</h2><button type="button" on:click={() => (createOpen = false)}><X size={16}/></button></div>
         <input name="subject" required maxlength="180" placeholder="Assunto" class="application-text-caption h-10 rounded-xl border border-[#DDE1EA] px-3 sm:col-span-2"/>
-        <input name="customerName" required maxlength="120" placeholder="Cliente" class="application-text-caption h-10 rounded-xl border border-[#DDE1EA] px-3"/>
-        <input name="organizationName" maxlength="160" placeholder="Escola / empresa" class="application-text-caption h-10 rounded-xl border border-[#DDE1EA] px-3"/>
-        <input name="customerEmail" type="email" maxlength="254" placeholder="E-mail" class="application-text-caption h-10 rounded-xl border border-[#DDE1EA] px-3"/>
-        <input name="customerPhone" maxlength="40" placeholder="Telefone" class="application-text-caption h-10 rounded-xl border border-[#DDE1EA] px-3"/>
+        <TicketCustomerPicker enabled={data.canSearchCustomers}/>
         <select name="queueId" required class="application-text-meta h-10 rounded-xl border border-[#DDE1EA] px-2">{#each data.queues as queue}<option value={queue.id}>{queue.name}</option>{/each}</select>
         <select name="priority" class="application-text-meta h-10 rounded-xl border border-[#DDE1EA] px-2"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select>
         <textarea name="message" required maxlength="10000" rows="5" placeholder="Descrição do atendimento" class="application-text-caption rounded-xl border border-[#DDE1EA] p-3 sm:col-span-2"></textarea>
@@ -600,7 +599,7 @@
             onCreated={refreshCard}
           />
 
-          <section class="application-text-meta rounded-xl border border-[#DDE1E7] bg-white p-4 leading-5 text-[#6D7482]"><p><strong>Cliente:</strong> {card.details.ticket.customerName ?? "Não identificado"}</p><p><strong>Fila técnica:</strong> {card.details.ticket.queueName}</p><p><strong>Responsável:</strong> {card.details.ticket.assignedUserName ?? "Sem responsável"}</p></section>
+          <section class="application-text-meta rounded-xl border border-[#DDE1E7] bg-white p-4 leading-5 text-[#6D7482]"><p><strong>Cliente:</strong> {#if card.details.ticket.customerContactId}<a href={`/app/customers/${card.details.ticket.customerContactId}`} class="font-semibold text-[#000A57] hover:underline">{card.details.ticket.customerName ?? "Não identificado"}</a>{:else}{card.details.ticket.customerName ?? "Não identificado"}{/if}</p><p><strong>Fila técnica:</strong> {card.details.ticket.queueName}</p><p><strong>Responsável:</strong> {card.details.ticket.assignedUserName ?? "Sem responsável"}</p></section>
           <a href={`/app/tickets/${card.details.ticket.id}`} class="application-text-meta flex h-10 items-center justify-center gap-2 rounded-lg border border-[#CCD1DA] bg-white font-semibold text-[#000A57]"><ExternalLink size={12}/>Abrir página completa</a>
         </div>
       </aside>
