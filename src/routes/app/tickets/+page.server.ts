@@ -12,6 +12,7 @@ import {
   type PermissionScope,
 } from "$lib/server/auth/permissions";
 import type { SupportPermissionMap } from "$lib/server/support/supportAccess";
+import { getCustomerDirectoryDetails } from "$lib/server/support/customerDirectoryRepository";
 import {
   addTicketLabel,
   createTicketLabel,
@@ -83,6 +84,7 @@ export const load: PageServerLoad = async ({ parent }) => {
   const canCreate = hasPermission(permissionMap, "tickets.create");
   const canReply = hasPermission(permissionMap, "tickets.reply");
   const canManageWorkflow = hasPermission(permissionMap, "tickets.manage", "all");
+  const canSearchCustomers = canCreate && hasPermission(permissionMap, "customers.view");
   const [ticketRows, queues] = await Promise.all([
     listSupportTickets(layout.user.id, permissionMap),
     canCreate ? listSupportQueues() : Promise.resolve([]),
@@ -119,6 +121,7 @@ export const load: PageServerLoad = async ({ parent }) => {
     canCreate,
     canReply,
     canManageWorkflow,
+    canSearchCustomers,
   };
 };
 
@@ -133,11 +136,33 @@ export const actions: Actions = {
     const subject = readFormValue(formData, "subject");
     const message = readFormValue(formData, "message");
     const priority = readFormValue(formData, "priority");
-    const customerName = readFormValue(formData, "customerName");
-    const customerEmail = readFormValue(formData, "customerEmail").toLowerCase();
-    const customerPhone = readFormValue(formData, "customerPhone");
-    const organizationName = readFormValue(formData, "organizationName");
+    const customerContactId = readFormValue(formData, "customerContactId");
+    let customerName = readFormValue(formData, "customerName");
+    let customerEmail = readFormValue(formData, "customerEmail").toLowerCase();
+    let customerPhone = readFormValue(formData, "customerPhone");
+    let customerWhatsapp = readFormValue(formData, "customerWhatsapp");
+    let organizationName = readFormValue(formData, "organizationName");
     const queueId = readFormValue(formData, "queueId");
+
+    if (customerContactId) {
+      if (!isUuid(customerContactId) || !hasPermission(permissions, "customers.view")) {
+        return fail(403, { success: false, action: "create", message: "Cliente selecionado não está disponível para este usuário." });
+      }
+      try {
+        const selected = await getCustomerDirectoryDetails(
+          session.user.id,
+          permissions,
+          customerContactId,
+        );
+        customerName = selected.customer.name;
+        customerEmail = selected.customer.email ?? "";
+        customerPhone = selected.customer.phone ?? "";
+        customerWhatsapp = selected.customer.whatsapp ?? "";
+        organizationName = selected.customer.organizationName ?? "";
+      } catch {
+        return fail(403, { success: false, action: "create", message: "Cliente selecionado não está disponível para este usuário." });
+      }
+    }
 
     if (subject.length < 3 || subject.length > 180) {
       return fail(400, { success: false, action: "create", message: "Informe um assunto entre 3 e 180 caracteres." });
@@ -151,8 +176,8 @@ export const actions: Actions = {
     if (organizationName.length > 160) {
       return fail(400, { success: false, action: "create", message: "O nome da escola ou empresa deve ter no máximo 160 caracteres." });
     }
-    if (customerEmail.length > 254 || customerPhone.length > 40) {
-      return fail(400, { success: false, action: "create", message: "E-mail ou telefone do cliente excede o tamanho permitido." });
+    if (customerEmail.length > 254 || customerPhone.length > 40 || customerWhatsapp.length > 40) {
+      return fail(400, { success: false, action: "create", message: "E-mail, telefone ou WhatsApp do cliente excede o tamanho permitido." });
     }
     if (!queueId || !isTicketPriority(priority)) {
       return fail(400, { success: false, action: "create", message: "Revise fila e prioridade." });
@@ -163,9 +188,11 @@ export const actions: Actions = {
         subject,
         message,
         priority,
+        customerContactId: customerContactId || null,
         customerName,
         customerEmail,
         customerPhone,
+        customerWhatsapp,
         organizationName,
         queueId,
       });

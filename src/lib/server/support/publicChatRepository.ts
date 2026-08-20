@@ -23,12 +23,12 @@ import { users } from "$lib/server/db/schema";
 import { ticketMessageAttachments } from "$lib/server/db/supportChatEntrySchema";
 import { supportAgentPresence } from "$lib/server/db/supportRoutingSchema";
 import {
-  customerContacts,
   ticketEvents,
   ticketMessages,
   tickets,
 } from "$lib/server/db/supportSchema";
 import { SUPPORT_AWAY_AFTER_MS } from "$lib/server/support/supportAgentPresence";
+import { resolveCustomerContact } from "$lib/server/support/customerResolutionRepository";
 import { resolveSupportChatEntryOption } from "$lib/server/support/supportChatEntryRepository";
 import {
   deleteStoredSupportImages,
@@ -150,42 +150,6 @@ async function consumePublicLimit(
   return true;
 }
 
-async function findOrCreateChatCustomer(
-  name: string,
-  email: string,
-  phone: string,
-): Promise<string> {
-  const db = getDatabase();
-  const normalizedEmail = email.trim().toLowerCase();
-
-  if (normalizedEmail) {
-    const [existing] = await db
-      .select({ id: customerContacts.id })
-      .from(customerContacts)
-      .where(
-        and(
-          eq(customerContacts.email, normalizedEmail),
-          eq(customerContacts.active, true),
-        ),
-      )
-      .limit(1);
-
-    if (existing) return existing.id;
-  }
-
-  const [contact] = await db
-    .insert(customerContacts)
-    .values({
-      name: name.trim(),
-      email: normalizedEmail || null,
-      phone: phone.trim() || null,
-    })
-    .returning({ id: customerContacts.id });
-
-  if (!contact) throw new Error("CHAT_CUSTOMER_NOT_CREATED");
-  return contact.id;
-}
-
 export async function startPublicChat(
   clientAddress: string,
   input: StartPublicChatInput,
@@ -201,11 +165,13 @@ export async function startPublicChat(
 
   const entryOption = await resolveSupportChatEntryOption(input.entryOptionId);
   const enableAi = input.enableAi && entryOption.initialHandling === "ai";
-  const customerContactId = await findOrCreateChatCustomer(
-    input.name,
-    input.email,
-    input.phone,
-  );
+  const customerContactId = await resolveCustomerContact({
+    name: input.name,
+    email: input.email,
+    phone: input.phone,
+    whatsapp: "",
+    organizationName: "",
+  });
   const token = randomBytes(32).toString("base64url");
   const tokenHash = hashSessionToken(token);
   const expiresAt = new Date(Date.now() + CHAT_SESSION_TTL_MS);
@@ -483,7 +449,7 @@ export async function addPublicChatMessage(
       if (ticket.assignedUserId && session.aiState !== "active") {
         await tx.insert(internalNotifications).values({
           userId: ticket.assignedUserId,
-          kind: "ticket.customer_reply",
+          kind: "chat.customer_reply",
           title: `Cliente respondeu o ticket #${ticket.ticketNumber}`,
           body: normalizedBody.slice(0, 500) || "Cliente enviou uma imagem.",
           href: `/app/chat/${sessionId}`,

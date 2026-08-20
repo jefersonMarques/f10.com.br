@@ -23,6 +23,7 @@ import {
   requireTicketAccess,
   type SupportPermissionMap,
 } from "$lib/server/support/supportAccess";
+import { resolveCustomerContact } from "$lib/server/support/customerResolutionRepository";
 
 export type TicketStatus =
   | "new"
@@ -38,9 +39,11 @@ export type CreateManualTicketInput = {
   subject: string;
   message: string;
   priority: TicketPriority;
+  customerContactId: string | null;
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+  customerWhatsapp: string;
   organizationName: string;
   queueId: string;
 };
@@ -52,57 +55,6 @@ function requireSupportScope(
   const scope = getPermissionScope(permissions, permissionCode);
   if (!scope) throw new Error("SUPPORT_PERMISSION_NOT_ALLOWED");
   return scope;
-}
-
-async function findOrCreateCustomer(
-  input: Pick<
-    CreateManualTicketInput,
-    "customerName" | "customerEmail" | "customerPhone" | "organizationName"
-  >,
-) {
-  const db = getDatabase();
-  const normalizedEmail = input.customerEmail.trim().toLowerCase();
-
-  if (normalizedEmail) {
-    const [existing] = await db
-      .select({ id: customerContacts.id })
-      .from(customerContacts)
-      .where(
-        and(
-          eq(customerContacts.email, normalizedEmail),
-          eq(customerContacts.active, true),
-        ),
-      )
-      .limit(1);
-
-    if (existing) return existing.id;
-  }
-
-  return db.transaction(async (tx) => {
-    let organizationId: string | null = null;
-    const organizationName = input.organizationName.trim();
-
-    if (organizationName) {
-      const [organization] = await tx
-        .insert(customerOrganizations)
-        .values({ name: organizationName })
-        .returning({ id: customerOrganizations.id });
-      organizationId = organization?.id ?? null;
-    }
-
-    const [contact] = await tx
-      .insert(customerContacts)
-      .values({
-        organizationId,
-        name: input.customerName.trim(),
-        email: normalizedEmail || null,
-        phone: input.customerPhone.trim() || null,
-      })
-      .returning({ id: customerContacts.id });
-
-    if (!contact) throw new Error("CUSTOMER_NOT_CREATED");
-    return contact.id;
-  });
 }
 
 export async function listSupportQueues() {
@@ -159,6 +111,7 @@ export async function listSupportTickets(
       assignedUserId: tickets.assignedUserId,
       assignedUserName: users.name,
       queueName: supportQueues.name,
+      customerContactId: tickets.customerContactId,
       customerName: customerContacts.name,
       customerEmail: customerContacts.email,
       organizationName: customerOrganizations.name,
@@ -193,7 +146,14 @@ export async function createManualTicket(
 
   if (!queue) throw new Error("QUEUE_NOT_FOUND");
 
-  const customerContactId = await findOrCreateCustomer(input);
+  const customerContactId = await resolveCustomerContact({
+    contactId: input.customerContactId,
+    name: input.customerName,
+    email: input.customerEmail,
+    phone: input.customerPhone,
+    whatsapp: input.customerWhatsapp,
+    organizationName: input.organizationName,
+  });
 
   return db.transaction(async (tx) => {
     const [ticket] = await tx
@@ -257,6 +217,7 @@ export async function getSupportTicket(
       customerName: customerContacts.name,
       customerEmail: customerContacts.email,
       customerPhone: customerContacts.phone,
+      customerWhatsapp: customerContacts.whatsapp,
       organizationName: customerOrganizations.name,
       linkedTaskId: tickets.linkedTaskId,
       firstResponseDueAt: tickets.firstResponseDueAt,
