@@ -30,6 +30,7 @@ import {
 import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { getSupportTicket } from "$lib/server/support/supportRepository";
 import { ensureTaskAccess } from "$lib/server/tasks/taskAccess";
+import { getTaskDetails } from "$lib/server/tasks/taskDetailRepository";
 import {
   applyGoogleEventToTask,
   getTaskGoogleCalendarLink,
@@ -62,6 +63,11 @@ function readBoolean(formData: FormData, key: string): boolean {
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function googleEventDueOn(event: Awaited<ReturnType<typeof getGoogleCalendarEvent>>): string | null {
+  if (!event) return null;
+  return event.startDate ?? event.startDateTime?.slice(0, 10) ?? null;
 }
 
 function syncRange(): { timeMin: Date; timeMax: Date } {
@@ -160,15 +166,28 @@ export const load: PageServerLoad = async ({ cookies }) => {
   const taskIssues = await Promise.all(
     taskConflictLinks.map(async (link) => {
       try {
-        const scope = getPermissionScope(permissions, "tasks.view");
-        if (!scope) return null;
-        const context = await ensureTaskAccess(session.user.id, scope, link.taskId);
+        const [details, event] = await Promise.all([
+          getTaskDetails(session.user.id, permissions, link.taskId),
+          getGoogleCalendarEvent(session.user.id, link.googleCalendarId, link.googleEventId),
+        ]);
         return {
           kind: "task" as const,
           id: link.taskId,
-          title: context.task.title,
+          title: details.task.title,
           calendarId: link.googleCalendarId,
           googleEventId: link.googleEventId,
+          local: {
+            title: details.task.title,
+            description: details.task.description,
+            dueOn: details.task.dueOn,
+          },
+          google: event
+            ? {
+                title: event.summary,
+                description: event.description,
+                dueOn: googleEventDueOn(event),
+              }
+            : null,
         };
       } catch {
         return null;
@@ -178,13 +197,24 @@ export const load: PageServerLoad = async ({ cookies }) => {
   const ticketIssues = await Promise.all(
     ticketConflictLinks.map(async (link) => {
       try {
-        const details = await getSupportTicket(session.user.id, permissions, link.ticketId);
+        const [details, event] = await Promise.all([
+          getSupportTicket(session.user.id, permissions, link.ticketId),
+          getGoogleCalendarEvent(session.user.id, link.googleCalendarId, link.googleEventId),
+        ]);
         return {
           kind: "ticket" as const,
           id: link.ticketId,
           title: `#${details.ticket.ticketNumber} · ${details.ticket.subject}`,
           calendarId: link.googleCalendarId,
           googleEventId: link.googleEventId,
+          local: {
+            dueOn: details.ticket.dueOn,
+          },
+          google: event
+            ? {
+                dueOn: googleEventDueOn(event),
+              }
+            : null,
         };
       } catch {
         return null;
