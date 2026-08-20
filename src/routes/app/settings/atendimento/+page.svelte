@@ -83,7 +83,7 @@
       <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFF2E8] text-[#C85C08]"><MessagesSquare size={18}/></span>
       <div>
         <h2 class="text-[14px] font-semibold text-[#252C3D]">Entrada do chat</h2>
-        <p class="application-text-meta mt-1 max-w-[760px] leading-4 text-[#858B99]">As opções aparecem antes do formulário do cliente. Cada opção direciona para uma fila; a fila define a equipe e, no modo automático, somente integrantes elegíveis e Online entram no round-robin.</p>
+        <p class="application-text-meta mt-1 max-w-[760px] leading-4 text-[#858B99]">As opções aparecem antes do formulário do cliente. Cada opção direciona para uma fila; a fila define a equipe, o prazo padrão de conclusão e, no modo automático, somente integrantes elegíveis e Online entram no round-robin.</p>
       </div>
     </div>
 
@@ -125,19 +125,28 @@
 
     <div class="mt-6 border-t border-[#EEF0F5] pt-5">
       <div class="flex flex-wrap items-start justify-between gap-3">
-        <div><h3 class="text-[12px] font-semibold text-[#3D4454]">Filas de atendimento</h3><p class="application-text-meta mt-1 leading-4 text-[#8A909E]">A fila agrupa o assunto e aponta para a equipe responsável.</p></div>
+        <div><h3 class="text-[12px] font-semibold text-[#3D4454]">Filas de atendimento</h3><p class="application-text-meta mt-1 leading-4 text-[#8A909E]">O prazo padrão é aplicado a Tickets criados automaticamente por esta fila. Tickets manuais exigem uma data explícita.</p></div>
         <span class="application-text-meta rounded-full bg-[#F3F4F7] px-2.5 py-1 font-bold text-[#707685]">{data.chatEntry.queues.length} filas</span>
       </div>
       <div class="mt-3 grid gap-2 sm:grid-cols-2">
         {#each data.chatEntry.queues as queue}
-          <div class="rounded-xl border border-[#E7E9EF] px-3 py-3"><div class="flex items-center justify-between gap-3"><strong class="application-text-caption text-[#414858]">{queue.name}</strong><span class={`application-text-meta rounded-full px-2 py-1 font-bold ${queue.active ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#F1F2F5] text-[#777D8C]"}`}>{queue.active ? "Ativa" : "Inativa"}</span></div><p class="application-text-meta mt-1 text-[#9297A4]">Equipe: {queue.teamName ?? "sem equipe"}</p></div>
+          <div class="rounded-xl border border-[#E7E9EF] px-3 py-3">
+            <div class="flex items-center justify-between gap-3"><strong class="application-text-caption text-[#414858]">{queue.name}</strong><span class={`application-text-meta rounded-full px-2 py-1 font-bold ${queue.active ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#F1F2F5] text-[#777D8C]"}`}>{queue.active ? "Ativa" : "Inativa"}</span></div>
+            <p class="application-text-meta mt-1 text-[#9297A4]">Equipe: {queue.teamName ?? "sem equipe"}</p>
+            <form method="POST" action="?/saveQueueDueDays" class="mt-3 flex items-end gap-2">
+              <input type="hidden" name="queueId" value={queue.id}/>
+              <label class="min-w-0 flex-1"><span class="application-text-meta mb-1 block font-semibold text-[#5A6170]">Conclusão padrão</span><div class="flex items-center gap-2"><input name="defaultDueDays" type="number" min="1" max="365" required value={queue.defaultDueDays} class="application-text-caption h-9 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"/><span class="application-text-meta shrink-0 text-[#858B99]">dias</span></div></label>
+              <button type="submit" class="application-text-meta inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]"><Save size={12}/>Salvar</button>
+            </form>
+          </div>
         {/each}
       </div>
 
       {#if data.chatEntry.teams.length > 0}
-        <form method="POST" action="?/createQueue" class="mt-4 grid gap-3 rounded-xl bg-[#F8F9FC] p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+        <form method="POST" action="?/createQueue" class="mt-4 grid gap-3 rounded-xl bg-[#F8F9FC] p-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_140px_auto] lg:items-end">
           <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#5A6170]">Nova fila</span><input name="name" required minlength="2" maxlength="80" placeholder="Ex.: Financeiro" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3"/></label>
           <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#5A6170]">Equipe responsável</span><select name="teamId" required class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="" disabled selected>Selecione...</option>{#each data.chatEntry.teams as team}<option value={team.id}>{team.name}</option>{/each}</select></label>
+          <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#5A6170]">Prazo padrão</span><div class="flex items-center gap-2"><input name="defaultDueDays" type="number" min="1" max="365" required value="3" class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"/><span class="application-text-meta text-[#858B99]">dias</span></div></label>
           <button type="submit" class="application-text-meta inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 font-semibold text-[#000A57]"><Plus size={13}/>Criar fila</button>
         </form>
       {/if}
