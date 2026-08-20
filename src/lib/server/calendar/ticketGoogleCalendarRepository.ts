@@ -1,4 +1,4 @@
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, gt, inArray, isNotNull } from "drizzle-orm";
 import {
   createGoogleCalendarEvent,
   deleteGoogleCalendarEvent,
@@ -84,6 +84,26 @@ export async function findTicketGoogleCalendarLinkByEvent(
   return link ?? null;
 }
 
+export async function hasTicketGoogleCalendarFieldsChangedSince(
+  ticketId: string,
+  since: Date | null,
+): Promise<boolean> {
+  if (!since) return true;
+  const db = getDatabase();
+  const [event] = await db
+    .select({ id: ticketEvents.id })
+    .from(ticketEvents)
+    .where(
+      and(
+        eq(ticketEvents.ticketId, ticketId),
+        inArray(ticketEvents.eventType, ["ticket.due_date.changed", "ticket.status.changed"]),
+        gt(ticketEvents.createdAt, since),
+      ),
+    )
+    .limit(1);
+  return Boolean(event);
+}
+
 async function markTicketSyncError(userId: string, ticketId: string, cause: unknown): Promise<void> {
   const message = cause instanceof Error ? cause.message.slice(0, 1000) : "GOOGLE_SYNC_FAILED";
   const db = getDatabase();
@@ -104,29 +124,32 @@ export async function syncTicketGoogleCalendarLink(
       .select({
         googleCalendarId: ticketGoogleCalendarLinks.googleCalendarId,
         googleEventId: ticketGoogleCalendarLinks.googleEventId,
+        lastSyncError: ticketGoogleCalendarLinks.lastSyncError,
       })
       .from(ticketGoogleCalendarLinks)
       .where(and(eq(ticketGoogleCalendarLinks.userId, userId), eq(ticketGoogleCalendarLinks.ticketId, ticketId)))
       .limit(1)
       .then((rows) => rows[0] ?? null),
   ]);
-  if (!ticket || !link || !ticket.dueOn) return;
+  if (!ticket || !link || !ticket.dueOn || link.lastSyncError === "SYNC_CONFLICT") return;
 
   try {
-    let event = await updateGoogleCalendarEvent(
-      userId,
-      link.googleCalendarId,
-      link.googleEventId,
-      {
-        title: ticketEventTitle(ticket),
-        description: `Ticket F10 #${ticket.ticketNumber}`,
-        date: ticket.dueOn,
-        allDay: true,
-        startTime: "",
-        endTime: "",
-        timeZone: "UTC",
-      },
-    );
+    let event = link.googleEventId.startsWith("pending:")
+      ? null
+      : await updateGoogleCalendarEvent(
+          userId,
+          link.googleCalendarId,
+          link.googleEventId,
+          {
+            title: ticketEventTitle(ticket),
+            description: `Ticket F10 #${ticket.ticketNumber}`,
+            date: ticket.dueOn,
+            allDay: true,
+            startTime: "",
+            endTime: "",
+            timeZone: "UTC",
+          },
+        );
     if (!event) {
       event = await createGoogleCalendarEvent(
         userId,
@@ -161,6 +184,30 @@ export async function syncTicketGoogleCalendarLink(
   }
 }
 
+async function removeTicketGoogleCalendarLink(
+  userId: string,
+  ticketId: string,
+  deleteEvent: boolean,
+): Promise<void> {
+  const db = getDatabase();
+  const [link] = await db
+    .select({
+      googleCalendarId: ticketGoogleCalendarLinks.googleCalendarId,
+      googleEventId: ticketGoogleCalendarLinks.googleEventId,
+    })
+    .from(ticketGoogleCalendarLinks)
+    .where(and(eq(ticketGoogleCalendarLinks.userId, userId), eq(ticketGoogleCalendarLinks.ticketId, ticketId)))
+    .limit(1);
+  if (!link) return;
+
+  if (deleteEvent && !link.googleEventId.startsWith("pending:")) {
+    await deleteGoogleCalendarEvent(userId, link.googleCalendarId, link.googleEventId).catch(() => undefined);
+  }
+  await db
+    .delete(ticketGoogleCalendarLinks)
+    .where(and(eq(ticketGoogleCalendarLinks.userId, userId), eq(ticketGoogleCalendarLinks.ticketId, ticketId)));
+}
+
 export async function ensureTicketGoogleCalendarLink(
   userId: string,
   ticketId: string,
@@ -170,13 +217,29 @@ export async function ensureTicketGoogleCalendarLink(
   if (!ticket || !ticket.dueOn || ticket.assignedUserId !== userId) return;
   const db = getDatabase();
   const [existing] = await db
-    .select({ ticketId: ticketGoogleCalendarLinks.ticketId })
+    .select({
+      ticketId: ticketGoogleCalendarLinks.ticketId,
+      googleCalendarId: ticketGoogleCalendarLinks.googleCalendarId,
+      autoManaged: ticketGoogleCalendarLinks.autoManaged,
+      lastSyncedAt: ticketGoogleCalendarLinks.lastSyncedAt,
+      lastSyncError: ticketGoogleCalendarLinks.lastSyncError,
+      googleEventId: ticketGoogleCalendarLinks.googleEventId,
+    })
     .from(ticketGoogleCalendarLinks)
     .where(and(eq(ticketGoogleCalendarLinks.userId, userId), eq(ticketGoogleCalendarLinks.ticketId, ticketId)))
     .limit(1);
+
   if (existing) {
-    await syncTicketGoogleCalendarLink(userId, ticketId);
-    return;
+    if (existing.lastSyncError === "SYNC_CONFLICT") return;
+    if (existing.autoManaged && existing.googleCalendarId !== calendarId) {
+      await removeTicketGoogleCalendarLink(userId, ticketId, true);
+    } else {
+      const changed = existing.googleEventId.startsWith("pending:") ||
+        Boolean(existing.lastSyncError) ||
+        await hasTicketGoogleCalendarFieldsChangedSince(ticketId, existing.lastSyncedAt);
+      if (changed) await syncTicketGoogleCalendarLink(userId, ticketId);
+      return;
+    }
   }
 
   try {
@@ -239,14 +302,7 @@ export async function syncAssignedTicketsToGoogle(
   await Promise.allSettled(
     links
       .filter((link) => link.autoManaged && !assignedIds.has(link.ticketId))
-      .map(async (link) => {
-        if (!link.googleEventId.startsWith("pending:")) {
-          await deleteGoogleCalendarEvent(userId, link.googleCalendarId, link.googleEventId).catch(() => undefined);
-        }
-        await db
-          .delete(ticketGoogleCalendarLinks)
-          .where(and(eq(ticketGoogleCalendarLinks.userId, userId), eq(ticketGoogleCalendarLinks.ticketId, link.ticketId)));
-      }),
+      .map((link) => removeTicketGoogleCalendarLink(userId, link.ticketId, true)),
   );
 }
 
@@ -309,4 +365,20 @@ export async function markTicketGoogleSyncConflict(userId: string, ticketId: str
     .update(ticketGoogleCalendarLinks)
     .set({ lastSyncError: "SYNC_CONFLICT", updatedAt: new Date() })
     .where(and(eq(ticketGoogleCalendarLinks.userId, userId), eq(ticketGoogleCalendarLinks.ticketId, ticketId)));
+}
+
+export async function resolveTicketGoogleSyncWithF10(userId: string, ticketId: string): Promise<void> {
+  const db = getDatabase();
+  const [link] = await db
+    .select({ ticketId: ticketGoogleCalendarLinks.ticketId })
+    .from(ticketGoogleCalendarLinks)
+    .where(and(eq(ticketGoogleCalendarLinks.userId, userId), eq(ticketGoogleCalendarLinks.ticketId, ticketId)))
+    .limit(1);
+  if (!link) throw new Error("TICKET_GOOGLE_LINK_NOT_FOUND");
+
+  await db
+    .update(ticketGoogleCalendarLinks)
+    .set({ lastSyncError: null, updatedAt: new Date() })
+    .where(and(eq(ticketGoogleCalendarLinks.userId, userId), eq(ticketGoogleCalendarLinks.ticketId, ticketId)));
+  await syncTicketGoogleCalendarLink(userId, ticketId);
 }
