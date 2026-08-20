@@ -132,6 +132,20 @@ async function resolvePublicHumanQueueId(): Promise<string | null> {
     .limit(1);
   if (preferred) return preferred.id;
 
+  const [firstActive] = await db
+    .select({ id: supportQueues.id })
+    .from(supportChatEntryOptions)
+    .innerJoin(supportQueues, eq(supportChatEntryOptions.queueId, supportQueues.id))
+    .where(
+      and(
+        eq(supportChatEntryOptions.active, true),
+        eq(supportQueues.active, true),
+      ),
+    )
+    .orderBy(asc(supportChatEntryOptions.sortOrder), asc(supportChatEntryOptions.createdAt))
+    .limit(1);
+  if (firstActive) return firstActive.id;
+
   const [fallback] = await db
     .select({ id: supportQueues.id })
     .from(supportQueues)
