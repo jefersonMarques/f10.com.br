@@ -186,9 +186,11 @@
 
   function formatShortDate(value: string | Date | null): string {
     if (!value) return "—";
-    const date = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
-      ? parseDateKey(value)
-      : new Date(value);
+    const date = value instanceof Date
+      ? value
+      : /^\d{4}-\d{2}-\d{2}$/.test(value)
+        ? parseDateKey(value)
+        : new Date(value);
     return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(date);
   }
 
@@ -450,10 +452,10 @@
     {/if}
 
     <div class="application-text-caption flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[#E8EAF0] bg-[#FAFAFC] px-4 py-2 text-[#808695]">
-      {#if data.canViewTasks}<span class="inline-flex items-center gap-2"><Clock3 size={14}/>{unscheduledCount} tarefa(s) sem prazo</span>{/if}
-      {#if data.canViewTickets}<span class="inline-flex items-center gap-2"><Headphones size={13}/>{data.tickets.length} ticket(s) no período</span>{/if}
-      {#if data.googleCalendar.connected}<span class="inline-flex items-center gap-2"><Link2 size={13}/>{data.googleEvents.length} evento(s) Google</span>{/if}
-      {#if data.canChangeTicketDueOn}<span class="application-text-meta text-[#9A744F]">Arraste um Ticket para outro dia para alterar a conclusão planejada.</span>{/if}
+      {#if data.canViewTasks && showTasks}<span class="inline-flex items-center gap-2"><Clock3 size={14}/>{unscheduledCount} tarefa(s) sem prazo</span>{/if}
+      {#if data.canViewTickets && showTickets}<span class="inline-flex items-center gap-2"><Headphones size={13}/>{data.tickets.length} ticket(s) no período</span>{/if}
+      {#if data.googleCalendar.connected && showGoogle}<span class="inline-flex items-center gap-2"><Link2 size={13}/>{data.googleEvents.length} evento(s) Google</span>{/if}
+      {#if data.canChangeTicketDueOn && showTickets}<span class="application-text-meta text-[#9A744F]">Arraste um Ticket para outro dia para alterar a conclusão planejada.</span>{/if}
     </div>
 
     {#if calendarView === "month"}
@@ -484,7 +486,7 @@
                   {#if event.htmlLink}<a href={event.htmlLink} target="_blank" rel="noopener noreferrer" class="application-text-meta block truncate rounded-md border border-[#CFE0D5] bg-[#F1F8F3] px-2 py-1.5 font-semibold text-[#2F7045]" title={`${googleEventTime(event)} · ${event.summary}`}><span class="application-text-meta mr-1 font-bold">G</span>{#if event.meetUrl}<Video size={10} class="mr-1 inline"/>{/if}{googleEventTime(event)} · {event.summary}</a>{:else}<span class="application-text-meta block truncate rounded-md border border-[#CFE0D5] bg-[#F1F8F3] px-2 py-1.5 font-semibold text-[#2F7045]">G · {event.summary}</span>{/if}
                 {/each}
                 {#each dayTickets.slice(0, 2) as ticket}
-                  <a href={ticketHref(ticket.id)} draggable={data.canChangeTicketDueOn} on:dragstart={(event) => startTicketDrag(event, ticket.id)} on:dragend={() => (draggingTicketId = null)} class={`application-text-meta block truncate rounded-md border px-2 py-1.5 font-semibold transition hover:brightness-[0.98] ${ticketPriorityClasses[ticket.priority]}`} title={`Ticket #${ticket.ticketNumber} · ${ticket.subject} · ${ticketStatusLabels[ticket.status] ?? ticket.status}`}>T#${ticket.ticketNumber} · {ticket.subject}</a>
+                  <a href={ticketHref(ticket.id)} draggable={data.canChangeTicketDueOn} on:dragstart={(event) => startTicketDrag(event, ticket.id)} on:dragend={() => (draggingTicketId = null)} class={`application-text-meta block truncate rounded-md border px-2 py-1.5 font-semibold transition hover:brightness-[0.98] ${ticketPriorityClasses[ticket.priority]}`} title={`Ticket #${ticket.ticketNumber} · ${ticket.subject} · ${ticketStatusLabels[ticket.status] ?? ticket.status}`}>T#{ticket.ticketNumber} · {ticket.subject}</a>
                 {/each}
                 {#each dayTasks.slice(0, 2) as task}
                   <a href={taskHref(task.id)} class={`application-text-meta block truncate rounded-md border px-2 py-1.5 font-semibold transition hover:brightness-[0.98] ${priorityClasses[task.priority]}`}>{#if taskLinkedToGoogle(task.id)}<span class="mr-1 font-bold text-[#2F7045]">G</span>{/if}{#if taskHasMeet(task.id)}<Video size={10} class="mr-1 inline text-[#214A9A]"/>{/if}{task.title}</a>
