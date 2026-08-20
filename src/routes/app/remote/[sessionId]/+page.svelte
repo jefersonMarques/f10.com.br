@@ -45,19 +45,19 @@
         <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><MonitorCog size={19}/></span>
         <div>
           <h2 class="text-[18px] font-semibold text-[#222839]">{data.session.deviceName || "Dispositivo"}</h2>
-          <p class="mt-0.5 text-[10px] text-[#858B99]">Sessão de suporte remoto</p>
+          <p class="application-text-caption mt-0.5 text-[#858B99]">Sessão de suporte remoto</p>
         </div>
       </div>
-      <span class={`rounded-full px-3 py-1.5 text-[9px] font-bold ${data.session.status === "active" ? "bg-[#EEF8F1] text-[#2F7045]" : data.session.status === "authorized" ? "bg-[#EEF0FF] text-[#000A57]" : "bg-[#F3F4F7] text-[#707687]"}`}>{labels[data.session.status] ?? data.session.status}</span>
+      <span class={`application-text-meta rounded-full px-3 py-1.5 font-bold ${data.session.status === "active" ? "bg-[#EEF8F1] text-[#2F7045]" : data.session.status === "authorized" ? "bg-[#EEF0FF] text-[#000A57]" : "bg-[#F3F4F7] text-[#707687]"}`}>{labels[data.session.status] ?? data.session.status}</span>
     </div>
   </section>
 
   {#if form?.message}
-    <div class={`mt-3 rounded-xl px-4 py-3 text-[10px] ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>{form.message}</div>
+    <div class={`application-text-caption mt-3 rounded-xl px-4 py-3 ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>{form.message}</div>
   {/if}
 
   <section class="mt-4 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
-    <div class="grid gap-4 text-[10px] sm:grid-cols-2 lg:grid-cols-3">
+    <div class="application-text-caption grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <div><span class="text-[#9297A5]">Cliente</span><strong class="mt-1 block">{data.session.customerName || "—"}</strong></div>
       <div><span class="text-[#9297A5]">Solicitado por</span><strong class="mt-1 block">{data.session.requestedByName || "—"}</strong></div>
       <div><span class="text-[#9297A5]">Solicitado</span><strong class="mt-1 block">{date(data.session.requestedAt)}</strong></div>
@@ -69,16 +69,16 @@
     <div class="mt-6 flex flex-wrap gap-3 border-t border-[#EEF0F5] pt-5">
       {#if data.session.status === "authorized" || data.session.status === "active"}
         <form method="POST" action="?/start">
-          <button type="submit" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#000A57] px-5 text-[10px] font-semibold text-white">
+          <button type="submit" class="application-text-caption inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#000A57] px-5 font-semibold text-white">
             {#if data.session.status === "active"}<RotateCcw size={15}/>Reconectar desktop{:else}<Play size={15}/>Iniciar acesso remoto{/if}
           </button>
         </form>
         <form method="POST" action="?/end">
-          <button type="submit" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#E0BFC0] px-5 text-[10px] font-semibold text-[#8C3939]"><Square size={13}/>Encerrar sessão</button>
+          <button type="submit" class="application-text-caption inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#E0BFC0] px-5 font-semibold text-[#8C3939]"><Square size={13}/>Encerrar sessão</button>
         </form>
       {/if}
       {#if data.session.ticketId}
-        <a href={`/app/tickets/${data.session.ticketId}`} class="inline-flex min-h-11 items-center rounded-xl border border-[#DDE1EA] px-4 text-[10px] font-semibold text-[#626979]">Abrir ticket</a>
+        <a href={`/app/tickets/${data.session.ticketId}`} class="application-text-caption inline-flex min-h-11 items-center rounded-xl border border-[#DDE1EA] px-4 font-semibold text-[#626979]">Abrir ticket</a>
       {/if}
     </div>
   </section>
@@ -88,9 +88,9 @@
       <header class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 text-white">
         <div>
           <strong class="text-[11px]">Desktop remoto</strong>
-          <span class="ml-2 text-[9px] text-white/60">expira {date(form.desktopExpiresAt ?? null)}</span>
+          <span class="application-text-meta ml-2 text-white/60">expira {date(form.desktopExpiresAt ?? null)}</span>
         </div>
-        <button type="button" on:click={openFullscreen} class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-white/15 px-3 text-[9px] font-semibold"><Maximize2 size={13}/>Tela cheia</button>
+        <button type="button" on:click={openFullscreen} class="application-text-meta inline-flex min-h-9 items-center gap-2 rounded-lg border border-white/15 px-3 font-semibold"><Maximize2 size={13}/>Tela cheia</button>
       </header>
       <div bind:this={desktopContainer} class="h-[72vh] min-h-[520px] bg-black">
         <iframe
@@ -106,9 +106,9 @@
     <section class="mt-4 rounded-[22px] border border-[#DDE1EA] bg-[#F8F9FC] px-5 py-8 text-center">
       <MonitorCog size={24} class="mx-auto text-[#000A57]"/>
       <h2 class="mt-3 text-[13px] font-semibold text-[#303645]">Sessão ativa</h2>
-      <p class="mx-auto mt-2 max-w-[560px] text-[9px] leading-5 text-[#7B8190]">O link de desktop não é persistido no banco. Use <strong>Reconectar desktop</strong> para revogar o compartilhamento anterior e gerar um novo acesso temporário.</p>
+      <p class="application-text-meta mx-auto mt-2 max-w-[560px] leading-5 text-[#7B8190]">O link de desktop não é persistido no banco. Use <strong>Reconectar desktop</strong> para revogar o compartilhamento anterior e gerar um novo acesso temporário.</p>
     </section>
   {/if}
 
-  <p class="mt-4 text-[9px] leading-5 text-[#9297A5]">O atendente permanece no F10 Operations. Cada início ou reconexão cria um compartilhamento temporário apenas de Desktop no MeshCentral e o Windows continua exigindo confirmação local do cliente.</p>
+  <p class="application-text-meta mt-4 leading-5 text-[#9297A5]">O atendente permanece no F10 Operations. Cada início ou reconexão cria um compartilhamento temporário apenas de Desktop no MeshCentral e o Windows continua exigindo confirmação local do cliente.</p>
 </ApplicationContent>
