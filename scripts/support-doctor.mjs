@@ -12,6 +12,7 @@ const requiredTables = [
   "web_chat_sessions",
   "support_public_limits",
   "support_chat_entry_options",
+  "support_ai_runs",
   "help_publications",
   "customer_portal_login_tokens",
   "customer_portal_sessions",
@@ -32,6 +33,43 @@ check(
   rateLimitSecret.length >= 32,
   rateLimitSecret.length >= 32 ? "configured" : "SUPPORT_RATE_LIMIT_SECRET must have at least 32 characters",
 );
+
+const supportAiEnabled = process.env.SUPPORT_AI_CHAT_ENABLED === "true";
+const openAiApiKey = process.env.OPENAI_API_KEY?.trim() ?? "";
+const openAiModel = process.env.OPENAI_MODEL?.trim() || "gpt-5-mini";
+check(
+  "support AI",
+  supportAiEnabled,
+  supportAiEnabled ? "enabled" : "set SUPPORT_AI_CHAT_ENABLED=true",
+);
+check(
+  "OpenAI API key",
+  Boolean(openAiApiKey),
+  openAiApiKey ? "configured" : "OPENAI_API_KEY is required for support AI",
+);
+
+if (supportAiEnabled && openAiApiKey) {
+  try {
+    const response = await fetch(
+      `https://api.openai.com/v1/models/${encodeURIComponent(openAiModel)}`,
+      {
+        headers: { Authorization: `Bearer ${openAiApiKey}` },
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+    check(
+      "OpenAI model access",
+      response.ok,
+      response.ok ? openAiModel : `model=${openAiModel}, HTTP ${response.status}`,
+    );
+  } catch (cause) {
+    check(
+      "OpenAI model access",
+      false,
+      cause instanceof Error ? cause.name : "network error",
+    );
+  }
+}
 
 const portalBase = process.env.CUSTOMER_PORTAL_BASE_URL?.trim() ?? "";
 if (portalBase) {
