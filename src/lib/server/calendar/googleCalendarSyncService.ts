@@ -1,4 +1,8 @@
-import { hasPermission, type PermissionScope } from "$lib/server/auth/permissions";
+import {
+  getPermissionScope,
+  hasPermission,
+  type PermissionScope,
+} from "$lib/server/auth/permissions";
 import {
   getGoogleCalendarConnection,
   getGoogleCalendarEvent,
@@ -18,6 +22,10 @@ import {
   markTicketGoogleSyncConflict,
   syncAssignedTicketsToGoogle,
 } from "$lib/server/calendar/ticketGoogleCalendarRepository";
+import { requireTicketAccess } from "$lib/server/support/supportAccess";
+import {
+  ensureTaskAccess,
+} from "$lib/server/tasks/taskAccess";
 import {
   applyGoogleEventToTask,
   configureTaskGoogleCalendar,
@@ -129,6 +137,36 @@ async function fetchGoogleSources(
   return results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
 }
 
+async function canUpdateTaskFromGoogle(
+  userId: string,
+  permissions: PermissionMap,
+  taskId: string,
+): Promise<boolean> {
+  const scope = getPermissionScope(permissions, "tasks.update");
+  if (!scope) return false;
+  try {
+    await ensureTaskAccess(userId, scope, taskId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function canUpdateTicketFromGoogle(
+  userId: string,
+  permissions: PermissionMap,
+  ticketId: string,
+): Promise<boolean> {
+  const scope = getPermissionScope(permissions, "tickets.reply");
+  if (!scope) return false;
+  try {
+    await requireTicketAccess(userId, scope, ticketId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function reconcileGoogleEvents(
   userId: string,
   permissions: PermissionMap,
@@ -140,8 +178,6 @@ async function reconcileGoogleEvents(
   primaryCalendarId: string,
 ): Promise<void> {
   const canCreateTasks = hasPermission(permissions, "tasks.create");
-  const canUpdateTasks = hasPermission(permissions, "tasks.update");
-  const canUpdateTickets = hasPermission(permissions, "tickets.reply");
   const taskLinksByEvent = new Map(
     taskLinks.map((link) => [eventKey(link.googleCalendarId, link.googleEventId, primaryCalendarId), link]),
   );
@@ -175,8 +211,8 @@ async function reconcileGoogleEvents(
           (syncGoogleChangesToF10 && taskLink.syncDirection === "bidirectional");
         if (
           remoteAllowed &&
-          canUpdateTasks &&
-          googleEventChanged(event, taskLink.googleUpdatedAt, taskLink.lastSyncedAt)
+          googleEventChanged(event, taskLink.googleUpdatedAt, taskLink.lastSyncedAt) &&
+          await canUpdateTaskFromGoogle(userId, permissions, taskLink.taskId)
         ) {
           const localChanged = taskLink.syncDirection === "bidirectional" &&
             await hasTaskGoogleCalendarFieldsChangedSince(taskLink.taskId, taskLink.lastSyncedAt);
@@ -199,8 +235,8 @@ async function reconcileGoogleEvents(
           ticketLink.lastSyncError !== "SYNC_CONFLICT" &&
           syncTicketsToGoogle &&
           syncGoogleChangesToF10 &&
-          canUpdateTickets &&
-          googleEventChanged(event, ticketLink.googleUpdatedAt, ticketLink.lastSyncedAt)
+          googleEventChanged(event, ticketLink.googleUpdatedAt, ticketLink.lastSyncedAt) &&
+          await canUpdateTicketFromGoogle(userId, permissions, ticketLink.ticketId)
         ) {
           const localChanged = await hasTicketGoogleCalendarFieldsChangedSince(
             ticketLink.ticketId,
