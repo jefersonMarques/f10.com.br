@@ -18,7 +18,7 @@
     <section class="mt-5 overflow-hidden rounded-[28px] border border-[#E1E4EC] bg-white shadow-[0_18px_55px_rgba(1,13,40,0.07)]">
       <header class="bg-[#010D28] px-6 py-7 text-white sm:px-8">
         <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-[#FF9A4B]"><ShieldCheck size={21} /></span>
-        <p class="mt-5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#FF9A4B]">Contexto do atendimento</p>
+        <p class="application-text-caption mt-5 font-bold uppercase tracking-[0.14em] text-[#FF9A4B]">Contexto do atendimento</p>
         <h1 class="mt-2 text-[28px] font-semibold tracking-[-0.04em] sm:text-[34px]">Em qual unidade você precisa de ajuda?</h1>
         <p class="mt-3 text-[12px] leading-6 text-white/65">Mostramos somente os grupos e unidades liberados para {data.customer.email}. A unidade escolhida fica vinculada aos novos atendimentos.</p>
       </header>
@@ -32,7 +32,7 @@
           <div class="rounded-2xl border border-dashed border-[#D4D9E3] bg-[#FAFAFC] px-5 py-8 text-center">
             <Building2 size={28} class="mx-auto text-[#8C93A2]" />
             <h2 class="mt-3 text-[15px] font-semibold text-[#303746]">Nenhuma unidade disponível</h2>
-            <p class="mx-auto mt-2 max-w-[500px] text-[10px] leading-5 text-[#818898]">Sua autenticação F10 foi aceita, mas a conta não retornou unidades disponíveis para atendimento.</p>
+            <p class="application-text-caption mx-auto mt-2 max-w-[500px] leading-5 text-[#818898]">Sua autenticação F10 foi aceita, mas a conta não retornou unidades disponíveis para atendimento.</p>
           </div>
         {:else}
           <div class="space-y-5">
@@ -48,7 +48,7 @@
                         <input type="hidden" name="returnTo" value={form && "returnTo" in form ? form.returnTo ?? data.returnTo : data.returnTo}/>
                         <button type="submit" class={`flex min-h-[88px] w-full items-center gap-3 rounded-2xl border p-4 text-left transition hover:border-[#AEB7D4] hover:bg-[#FBFBFE] ${data.customer.selectedUnitId === unit.unidade_id && data.customer.selectedGroupId === group.grupo_id ? "border-[#AEB7D4] bg-[#F7F8FF]" : "border-[#E1E4EC] bg-white"}`}>
                           <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><MapPin size={17}/></span>
-                          <span class="min-w-0"><strong class="block truncate text-[12px] font-semibold text-[#202737]">{unit.unidade}</strong><span class="mt-1 block text-[8px] text-[#969CA9]">Unidade #{unit.unidade_id}</span></span>
+                          <span class="min-w-0"><strong class="block truncate text-[12px] font-semibold text-[#202737]">{unit.unidade}</strong><span class="application-text-meta mt-1 block text-[#969CA9]">Unidade #{unit.unidade_id}</span></span>
                         </button>
                       </form>
                     {/each}
