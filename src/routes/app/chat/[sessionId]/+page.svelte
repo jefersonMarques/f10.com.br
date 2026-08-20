@@ -260,6 +260,12 @@
         <a href={`/app/tickets/${chat.ticketId}/remote`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#777D8D]"><MonitorCog size={14}/>Acesso remoto</a>
       {/if}
 
+      {#if canWrite && chat.status !== "closed"}
+        <form method="POST" action="?/finish" on:submit={(event) => { if (!confirm("Finalizar este atendimento? A conversa e o ticket serão encerrados.")) event.preventDefault(); }}>
+          <button type="submit" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#E7C4C4] bg-[#FFF7F7] px-3 font-semibold text-[#9B3C3C]"><CheckCircle2 size={14}/>Finalizar atendimento</button>
+        </form>
+      {/if}
+
       <a href={`/app/tickets/${chat.ticketId}`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Abrir ticket<TicketCheck size={14}/></a>
     </div>
   </div>
@@ -374,7 +380,7 @@
         </div>
 
         {#if data.canManageTicket && chat.status !== "closed"}
-          <form method="POST" action="?/status" class="mt-4"><label class="block"><span class="application-text-meta mb-1.5 block font-semibold text-[#666C7B]">Status</span><div class="flex gap-2"><select name="status" value={chat.status} class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="new">Novo</option><option value="open">Aberto</option><option value="in_progress">Em andamento</option><option value="waiting_customer">Aguardando cliente</option><option value="resolved">Resolvido</option><option value="closed">Fechado</option></select><button type="submit" class="application-text-meta h-10 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Salvar</button></div></label></form>
+          <form method="POST" action="?/status" class="mt-4"><label class="block"><span class="application-text-meta mb-1.5 block font-semibold text-[#666C7B]">Status</span><div class="flex gap-2"><select name="status" value={chat.status} class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="new">Novo</option><option value="open">Aberto</option><option value="in_progress">Em andamento</option><option value="waiting_customer">Aguardando cliente</option><option value="resolved">Resolvido</option></select><button type="submit" class="application-text-meta h-10 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Salvar</button></div></label></form>
           <form method="POST" action="?/priority" class="mt-3"><label class="block"><span class="application-text-meta mb-1.5 block font-semibold text-[#666C7B]">Prioridade</span><div class="flex gap-2"><select name="priority" value={chat.priority} class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select><button type="submit" class="application-text-meta h-10 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Salvar</button></div></label></form>
         {/if}
 
