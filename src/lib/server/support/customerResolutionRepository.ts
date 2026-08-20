@@ -76,26 +76,11 @@ export async function resolveCustomerContact(
     const organizationName = input.organizationName?.trim() ?? "";
 
     if (organizationName) {
-      const [existingOrganization] = await tx
-        .select({ id: customerOrganizations.id })
-        .from(customerOrganizations)
-        .where(
-          and(
-            eq(customerOrganizations.active, true),
-            sql`lower(${customerOrganizations.name}) = ${organizationName.toLowerCase()}`,
-          ),
-        )
-        .limit(1);
-
-      if (existingOrganization) {
-        organizationId = existingOrganization.id;
-      } else {
-        const [organization] = await tx
-          .insert(customerOrganizations)
-          .values({ name: organizationName })
-          .returning({ id: customerOrganizations.id });
-        organizationId = organization?.id ?? null;
-      }
+      const [organization] = await tx
+        .insert(customerOrganizations)
+        .values({ name: organizationName })
+        .returning({ id: customerOrganizations.id });
+      organizationId = organization?.id ?? null;
     }
 
     const [contact] = await tx
