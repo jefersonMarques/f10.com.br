@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Camera, CheckCircle2, CircleAlert, KeyRound, Mail, Save, UserRound } from "lucide-svelte";
+  import { CalendarDays, Camera, CheckCircle2, CircleAlert, KeyRound, Mail, Save, UserRound } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -61,6 +61,13 @@
         <p class="text-[8px] leading-4 text-[#9499A6]">Por segurança, a troca exige sua senha atual e encerra todas as outras sessões abertas.</p>
         <button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white"><Save size={14} />Atualizar e-mail</button>
       </form>
+    </section>
+
+    <section class="rounded-[22px] border border-[#DDE7E1] bg-[#F8FBF9] p-5 sm:p-6 lg:col-span-2">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-start gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#2F7045] shadow-sm"><CalendarDays size={18}/></span><div><h2 class="text-[14px] font-semibold text-[#284D35]">Google Calendar</h2><p class="mt-1 max-w-2xl text-[9px] leading-4 text-[#738079]">Configure calendários compartilhados, sincronização de Tarefas e Tickets, importação de eventos e permissões de compartilhamento.</p></div></div>
+        <a href="/app/minha-conta/google" class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl bg-[#2F7045] px-4 text-[10px] font-semibold text-white">Configurar Google Calendar</a>
+      </div>
     </section>
 
     <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6 lg:col-span-2">
