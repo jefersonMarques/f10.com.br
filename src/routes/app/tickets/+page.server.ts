@@ -21,6 +21,7 @@ import {
   removeTicketLabel,
   uploadTicketAttachment,
 } from "$lib/server/support/ticketCardRepository";
+import { isTicketDueDate } from "$lib/server/support/ticketDueDate";
 import {
   createManualTicket,
   listSupportQueues,
@@ -136,6 +137,7 @@ export const actions: Actions = {
     const subject = readFormValue(formData, "subject");
     const message = readFormValue(formData, "message");
     const priority = readFormValue(formData, "priority");
+    const dueOn = readFormValue(formData, "dueOn");
     const customerContactId = readFormValue(formData, "customerContactId");
     let customerName = readFormValue(formData, "customerName");
     let customerEmail = readFormValue(formData, "customerEmail").toLowerCase();
@@ -182,12 +184,16 @@ export const actions: Actions = {
     if (!queueId || !isTicketPriority(priority)) {
       return fail(400, { success: false, action: "create", message: "Revise fila e prioridade." });
     }
+    if (!isTicketDueDate(dueOn)) {
+      return fail(400, { success: false, action: "create", message: "Informe uma data planejada de conclusão válida." });
+    }
 
     try {
       const ticket = await createManualTicket(session.user.id, permissions, {
         subject,
         message,
         priority,
+        dueOn,
         customerContactId: customerContactId || null,
         customerName,
         customerEmail,
