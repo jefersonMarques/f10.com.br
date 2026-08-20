@@ -206,8 +206,10 @@ export async function refreshGoogleCalendarSources(userId: string): Promise<void
   const db = getDatabase();
   const now = new Date();
   const calendarIds = calendars.map((calendar) => calendar.id);
-  const fallbackCalendarId = calendars.find((calendar) => calendar.primary)?.id
-    ?? calendars[0]?.id
+  const writableCalendars = calendars.filter((calendar) => ["writer", "owner"].includes(calendar.accessRole));
+  const writableCalendarIds = writableCalendars.map((calendar) => calendar.id);
+  const fallbackCalendarId = writableCalendars.find((calendar) => calendar.primary)?.id
+    ?? writableCalendars[0]?.id
     ?? "primary";
 
   await db.transaction(async (tx) => {
@@ -257,13 +259,21 @@ export async function refreshGoogleCalendarSources(userId: string): Promise<void
         ),
       );
 
+    if (writableCalendarIds.length === 0) {
+      await tx
+        .update(googleCalendarPreferences)
+        .set({ targetCalendarId: fallbackCalendarId, updatedAt: now })
+        .where(eq(googleCalendarPreferences.userId, userId));
+      return;
+    }
+
     await tx
       .update(googleCalendarPreferences)
       .set({ targetCalendarId: fallbackCalendarId, updatedAt: now })
       .where(
         and(
           eq(googleCalendarPreferences.userId, userId),
-          notInArray(googleCalendarPreferences.targetCalendarId, calendarIds),
+          notInArray(googleCalendarPreferences.targetCalendarId, writableCalendarIds),
         ),
       );
   });
