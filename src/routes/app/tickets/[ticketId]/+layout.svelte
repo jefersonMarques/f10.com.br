@@ -81,7 +81,7 @@
 {#if data.workflowContext}
   <div class="mx-auto mt-5 max-w-[1320px] px-5 sm:px-8">
     <div class="rounded-2xl border border-[#DDE2EC] bg-white px-4 py-3 shadow-[0_4px_18px_rgba(1,13,40,0.03)]">
-      <div class="flex flex-wrap items-center gap-2 text-[10px] text-[#626979]">
+      <div class="application-text-caption flex flex-wrap items-center gap-2 text-[#626979]">
         <span class="inline-flex items-center gap-1.5 font-semibold text-[#000A57]"><GitBranch size={13}/>Global · {data.workflowContext.globalStageName}</span>
         {#if data.workflowContext.areaName}
           <span class="text-[#B2B7C1]">/</span>
@@ -91,10 +91,10 @@
 
       {#if data.canReply}
         <div class="mt-3 flex flex-col gap-2 border-t border-[#EEF0F4] pt-3 sm:flex-row sm:items-center">
-          <span class="text-[8px] font-bold uppercase tracking-[0.07em] text-[#8A909E]">Mover ticket</span>
-          <select value={workflowId} on:change={changeWorkflow} class="h-9 min-w-[190px] rounded-lg border border-[#DDE1EA] bg-white px-2 text-[9px]"><option value={data.workflowBoard.globalWorkflow?.id ?? ""}>Fluxo global</option>{#each movableAreaWorkflows as workflow}<option value={workflow.id}>Área · {workflow.areaName}</option>{/each}</select>
-          <select bind:value={stageId} class="h-9 min-w-[190px] rounded-lg border border-[#DDE1EA] bg-white px-2 text-[9px]">{#each stages as stage}<option value={stage.id}>{stage.name}{stage.stageType === "area_gateway" ? ` · ${stage.linkedAreaName}` : ""}</option>{/each}</select>
-          <button type="button" on:click={() => void moveTicket()} disabled={moving || !stageId} class="h-9 rounded-lg bg-[#000A57] px-3 text-[9px] font-semibold text-white disabled:opacity-50">{moving ? "Movendo..." : "Aplicar"}</button>
+          <span class="application-text-meta font-bold uppercase tracking-[0.07em] text-[#8A909E]">Mover ticket</span>
+          <select value={workflowId} on:change={changeWorkflow} class="application-text-meta h-9 min-w-[190px] rounded-lg border border-[#DDE1EA] bg-white px-2"><option value={data.workflowBoard.globalWorkflow?.id ?? ""}>Fluxo global</option>{#each movableAreaWorkflows as workflow}<option value={workflow.id}>Área · {workflow.areaName}</option>{/each}</select>
+          <select bind:value={stageId} class="application-text-meta h-9 min-w-[190px] rounded-lg border border-[#DDE1EA] bg-white px-2">{#each stages as stage}<option value={stage.id}>{stage.name}{stage.stageType === "area_gateway" ? ` · ${stage.linkedAreaName}` : ""}</option>{/each}</select>
+          <button type="button" on:click={() => void moveTicket()} disabled={moving || !stageId} class="application-text-meta h-9 rounded-lg bg-[#000A57] px-3 font-semibold text-white disabled:opacity-50">{moving ? "Movendo..." : "Aplicar"}</button>
         </div>
       {/if}
     </div>
