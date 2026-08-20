@@ -5,6 +5,9 @@ CREATE TABLE IF NOT EXISTS google_calendar_preferences (
   sync_tickets_to_google boolean NOT NULL DEFAULT false,
   sync_scheduling_to_google boolean NOT NULL DEFAULT true,
   sync_google_changes_to_f10 boolean NOT NULL DEFAULT false,
+  last_sync_started_at timestamptz,
+  last_sync_completed_at timestamptz,
+  last_sync_error text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -44,7 +47,7 @@ BEGIN
   ) THEN
     ALTER TABLE task_google_calendar_links
       ADD CONSTRAINT task_google_calendar_links_sync_direction_check
-      CHECK (sync_direction IN ('f10_to_google', 'bidirectional'));
+      CHECK (sync_direction IN ('f10_to_google', 'google_to_f10', 'bidirectional'));
   END IF;
 
   IF NOT EXISTS (
