@@ -39,6 +39,7 @@ export type CreateManualTicketInput = {
   subject: string;
   message: string;
   priority: TicketPriority;
+  dueOn: string;
   customerContactId: string | null;
   customerName: string;
   customerEmail: string;
@@ -61,7 +62,12 @@ export async function listSupportQueues() {
   const db = getDatabase();
 
   return db
-    .select({ id: supportQueues.id, code: supportQueues.code, name: supportQueues.name })
+    .select({
+      id: supportQueues.id,
+      code: supportQueues.code,
+      name: supportQueues.name,
+      defaultDueDays: supportQueues.defaultDueDays,
+    })
     .from(supportQueues)
     .where(eq(supportQueues.active, true))
     .orderBy(asc(supportQueues.name));
@@ -107,6 +113,7 @@ export async function listSupportTickets(
       status: tickets.status,
       priority: tickets.priority,
       channel: tickets.channel,
+      dueOn: tickets.dueOn,
       updatedAt: tickets.updatedAt,
       assignedUserId: tickets.assignedUserId,
       assignedUserName: users.name,
@@ -165,6 +172,7 @@ export async function createManualTicket(
         subject: input.subject.trim(),
         priority: input.priority,
         channel: "manual",
+        dueOn: input.dueOn,
         createdByUserId: actorUserId,
       })
       .returning({ id: tickets.id, ticketNumber: tickets.ticketNumber });
@@ -185,7 +193,7 @@ export async function createManualTicket(
       ticketId: ticket.id,
       actorUserId,
       eventType: "ticket.created",
-      metadata: { channel: "manual" },
+      metadata: { channel: "manual", dueOn: input.dueOn },
     });
 
     return ticket;
@@ -209,6 +217,7 @@ export async function getSupportTicket(
       status: tickets.status,
       priority: tickets.priority,
       channel: tickets.channel,
+      dueOn: tickets.dueOn,
       queueId: tickets.queueId,
       queueName: supportQueues.name,
       assignedUserId: tickets.assignedUserId,
@@ -409,6 +418,39 @@ export async function updateTicketPriority(
       actorUserId,
       eventType: "ticket.priority.changed",
       metadata: { priority },
+    });
+  });
+}
+
+export async function updateTicketDueOn(
+  actorUserId: string,
+  permissions: SupportPermissionMap,
+  ticketId: string,
+  dueOn: string,
+): Promise<void> {
+  const scope = requireSupportScope(permissions, "tickets.reply");
+  await requireTicketAccess(actorUserId, scope, ticketId);
+
+  const db = getDatabase();
+  const [ticket] = await db
+    .select({ dueOn: tickets.dueOn })
+    .from(tickets)
+    .where(eq(tickets.id, ticketId))
+    .limit(1);
+
+  if (!ticket) throw new Error("TICKET_NOT_FOUND");
+  if (ticket.dueOn === dueOn) return;
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(tickets)
+      .set({ dueOn, updatedAt: new Date() })
+      .where(eq(tickets.id, ticketId));
+    await tx.insert(ticketEvents).values({
+      ticketId,
+      actorUserId,
+      eventType: "ticket.due_date.changed",
+      metadata: { previousDueOn: ticket.dueOn, dueOn },
     });
   });
 }
