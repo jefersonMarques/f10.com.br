@@ -1,6 +1,12 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
-  import { ExternalLink, MessageCircleMore, Minus, Send } from "lucide-svelte";
+  import {
+    CheckCircle2,
+    ExternalLink,
+    MessageCircleMore,
+    Minus,
+    Send,
+  } from "lucide-svelte";
 
   export let enabled = false;
 
@@ -38,6 +44,7 @@
   let expandedSessionId: string | null = null;
   let draft = "";
   let sending = false;
+  let finishing = false;
   let refreshing = false;
   let errorMessage = "";
   let messageViewport: HTMLDivElement | null = null;
@@ -164,6 +171,39 @@
     await acknowledgeChat(sessionId);
   }
 
+  async function finishChat(sessionId: string): Promise<void> {
+    if (finishing) return;
+    if (!window.confirm("Finalizar este atendimento? O chat será fechado para novas respostas.")) {
+      return;
+    }
+
+    finishing = true;
+    errorMessage = "";
+    try {
+      const response = await fetch(
+        `/api/app/chat/${encodeURIComponent(sessionId)}/close`,
+        { method: "POST" },
+      );
+      if (!response.ok) {
+        errorMessage = response.status === 409
+          ? "Este atendimento foi atribuído a outro usuário."
+          : "Não foi possível finalizar o atendimento.";
+        return;
+      }
+
+      chats = chats.filter((chat) => chat.sessionId !== sessionId);
+      if (expandedSessionId === sessionId) {
+        expandedSessionId = null;
+        messages = [];
+        draft = "";
+      }
+    } catch {
+      errorMessage = "Não foi possível finalizar o atendimento.";
+    } finally {
+      finishing = false;
+    }
+  }
+
   async function sendMessage(): Promise<void> {
     if (!expandedSessionId || sending) return;
     const body = draft.trim();
@@ -221,8 +261,8 @@
 
 {#if enabled && chats.length > 0}
   {#if activeChat}
-    <section class="fixed bottom-[62px] right-3 z-[95] flex h-[min(500px,calc(100dvh-96px))] w-[min(400px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-[18px] border border-[#D9DDE6] bg-white shadow-[0_24px_80px_rgba(1,13,40,0.24)]" aria-label={`Chat com ${customerLabel(activeChat)}`}>
-      <header class="flex items-center gap-3 border-b border-[#E9EBF0] px-4 py-3">
+    <section class="fixed bottom-8 right-3 z-[95] flex h-[min(500px,calc(100dvh-76px))] w-[min(400px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-t-[18px] border border-b-0 border-[#D9DDE6] bg-white shadow-[0_-16px_50px_rgba(1,13,40,0.18)]" aria-label={`Chat com ${customerLabel(activeChat)}`}>
+      <header class="flex items-center gap-2 border-b border-[#E9EBF0] px-4 py-3">
         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><MessageCircleMore size={17}/></span>
         <div class="min-w-0 flex-1">
           {#if activeChat.customerContactId}
@@ -232,6 +272,7 @@
           {/if}
           <span class="application-text-meta mt-0.5 block truncate text-[#858B99]">#{activeChat.ticketNumber} · {statusLabel(activeChat.status)}{activeChat.organizationName && activeChat.organizationName !== activeChat.customerName ? ` · ${activeChat.organizationName}` : ""}</span>
         </div>
+        <button type="button" on:click={() => void finishChat(activeChat.sessionId)} disabled={finishing} class="application-text-meta inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#EEF8F1] px-2.5 font-semibold text-[#2F7045] hover:bg-[#E1F3E7] disabled:opacity-50" aria-label="Finalizar atendimento"><CheckCircle2 size={13}/><span class="hidden sm:inline">Finalizar</span></button>
         <a href={`/app/chat/${activeChat.sessionId}`} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#737A89] hover:bg-[#F3F4F7] hover:text-[#000A57]" aria-label="Abrir conversa completa"><ExternalLink size={14}/></a>
         <button type="button" on:click={() => void toggleChat(activeChat.sessionId)} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#737A89] hover:bg-[#F3F4F7]" aria-label="Recolher conversa"><Minus size={15}/></button>
       </header>
@@ -269,14 +310,14 @@
     </section>
   {/if}
 
-  <div class="fixed bottom-3 right-3 z-[96] flex max-w-[calc(100vw-1.5rem)] items-end justify-end gap-1.5 overflow-hidden">
+  <div class="fixed -bottom-3 right-3 z-[96] flex max-w-[calc(100vw-1.5rem)] items-start justify-end gap-1.5">
     {#each visibleChats as chat (chat.sessionId)}
-      <button type="button" on:click={() => void toggleChat(chat.sessionId)} class={`relative flex h-11 min-w-0 max-w-[150px] items-center gap-2 rounded-xl border px-3 text-left shadow-lg transition ${expandedSessionId === chat.sessionId ? "border-[#000A57] bg-[#000A57] text-white" : "border-[#D9DDE5] bg-white text-[#303746] hover:border-[#B9C0CE]"}`} aria-expanded={expandedSessionId === chat.sessionId}>
+      <button type="button" on:click={() => void toggleChat(chat.sessionId)} class={`relative flex h-11 min-w-0 max-w-[150px] items-center gap-2 rounded-t-xl border border-b-0 px-3 pb-3 pt-2 text-left shadow-[0_-6px_18px_rgba(1,13,40,0.12)] transition hover:-translate-y-1 ${expandedSessionId === chat.sessionId ? "border-[#000A57] bg-[#000A57] text-white" : "border-[#D9DDE5] bg-white text-[#303746] hover:border-[#B9C0CE]"}`} aria-expanded={expandedSessionId === chat.sessionId}>
         <MessageCircleMore size={14} class="shrink-0"/>
         <span class="application-text-caption min-w-0 flex-1 truncate font-semibold">{customerLabel(chat)}</span>
         {#if chat.unreadCount > 0}<span class="application-text-meta inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-[#D92D20] px-1.5 py-0.5 font-bold text-white">{Math.min(chat.unreadCount, 9)}{chat.unreadCount > 9 ? "+" : ""}</span>{/if}
       </button>
     {/each}
-    {#if hiddenChatCount > 0}<a href="/app/chat" class="application-text-caption flex h-11 shrink-0 items-center justify-center rounded-xl border border-[#D9DDE5] bg-white px-3 font-bold text-[#000A57] shadow-lg">+{hiddenChatCount}</a>{/if}
+    {#if hiddenChatCount > 0}<a href="/app/chat" class="application-text-caption flex h-11 shrink-0 items-center justify-center rounded-t-xl border border-b-0 border-[#D9DDE5] bg-white px-3 pb-3 pt-2 font-bold text-[#000A57] shadow-[0_-6px_18px_rgba(1,13,40,0.12)] transition hover:-translate-y-1">+{hiddenChatCount}</a>{/if}
   </div>
 {/if}
