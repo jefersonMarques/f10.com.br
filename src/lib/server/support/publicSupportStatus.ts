@@ -1,7 +1,6 @@
-import { and, asc, eq, gt, gte } from "drizzle-orm";
+import { and, asc, eq, gte } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
-import { teamMembers } from "$lib/server/db/schema";
-import { supportAgentPresence } from "$lib/server/db/supportRoutingSchema";
+import { supportChatEntryOptions } from "$lib/server/db/supportChatEntrySchema";
 import { supportQueues, ticketMessages, tickets } from "$lib/server/db/supportSchema";
 import { getGeneralOperationsSettings } from "$lib/server/settings/operationsSettingsRepository";
 import {
@@ -9,7 +8,7 @@ import {
   type SupportDayKey,
   type SupportHoursSettings,
 } from "$lib/server/settings/supportHoursRepository";
-import { SUPPORT_AWAY_AFTER_MS } from "$lib/server/support/supportAgentPresence";
+import { countAvailableSupportRespondersForQueue } from "$lib/server/support/supportRoutingRepository";
 
 const WAIT_SAMPLE_WINDOW_MS = 30 * 24 * 60 * 60_000;
 const MIN_WAIT_SAMPLES = 3;
@@ -116,6 +115,31 @@ function roundWaitMinutes(milliseconds: number): number {
   return Math.max(1, Math.round(milliseconds / 60_000));
 }
 
+async function resolvePublicHumanQueueId(): Promise<string | null> {
+  const db = getDatabase();
+  const [preferred] = await db
+    .select({ id: supportQueues.id })
+    .from(supportChatEntryOptions)
+    .innerJoin(supportQueues, eq(supportChatEntryOptions.queueId, supportQueues.id))
+    .where(
+      and(
+        eq(supportChatEntryOptions.active, true),
+        eq(supportChatEntryOptions.initialHandling, "human"),
+        eq(supportQueues.active, true),
+      ),
+    )
+    .orderBy(asc(supportChatEntryOptions.sortOrder), asc(supportChatEntryOptions.createdAt))
+    .limit(1);
+  if (preferred) return preferred.id;
+
+  const [fallback] = await db
+    .select({ id: supportQueues.id })
+    .from(supportQueues)
+    .where(and(eq(supportQueues.code, "support"), eq(supportQueues.active, true)))
+    .limit(1);
+  return fallback?.id ?? null;
+}
+
 export async function getSupportAvailabilityStatus() {
   const [general, hours] = await Promise.all([
     getGeneralOperationsSettings(),
@@ -132,36 +156,21 @@ export async function getSupportAvailabilityStatus() {
 }
 
 export async function getPublicSupportStatus() {
-  const availability = await getSupportAvailabilityStatus();
+  const [availability, queueId] = await Promise.all([
+    getSupportAvailabilityStatus(),
+    resolvePublicHumanQueueId(),
+  ]);
   const db = getDatabase();
   const now = new Date();
-
-  const [queue] = await db
-    .select({ id: supportQueues.id, teamId: supportQueues.teamId })
-    .from(supportQueues)
-    .where(and(eq(supportQueues.code, "support"), eq(supportQueues.active, true)))
-    .limit(1);
 
   let onlineAgents: number | null = null;
   let averageWaitMinutes: number | null = null;
   let waitSampleCount = 0;
 
-  if (queue) {
-    if (queue.teamId) {
-      const onlineRows = await db
-        .select({ userId: supportAgentPresence.userId })
-        .from(supportAgentPresence)
-        .innerJoin(teamMembers, eq(teamMembers.userId, supportAgentPresence.userId))
-        .where(
-          and(
-            eq(teamMembers.teamId, queue.teamId),
-            eq(supportAgentPresence.manualStatus, "online"),
-            gt(supportAgentPresence.lastActivityAt, new Date(now.getTime() - SUPPORT_AWAY_AFTER_MS)),
-          ),
-        )
-        .groupBy(supportAgentPresence.userId);
-      onlineAgents = onlineRows.length;
-    }
+  if (queueId) {
+    onlineAgents = availability.isOpen === false
+      ? 0
+      : await countAvailableSupportRespondersForQueue(queueId);
 
     const humanResponses = await db
       .select({
@@ -173,7 +182,7 @@ export async function getPublicSupportStatus() {
       .innerJoin(ticketMessages, eq(ticketMessages.ticketId, tickets.id))
       .where(
         and(
-          eq(tickets.queueId, queue.id),
+          eq(tickets.queueId, queueId),
           gte(tickets.createdAt, new Date(now.getTime() - WAIT_SAMPLE_WINDOW_MS)),
           eq(ticketMessages.authorType, "user"),
           eq(ticketMessages.visibility, "public"),
