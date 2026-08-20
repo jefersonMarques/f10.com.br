@@ -46,6 +46,7 @@ export async function resolveSupportChatEntryOption(optionId: string | null) {
         id: supportChatEntryOptions.id,
         label: supportChatEntryOptions.label,
         queueId: supportChatEntryOptions.queueId,
+        defaultDueDays: supportQueues.defaultDueDays,
         initialHandling: supportChatEntryOptions.initialHandling,
       })
       .from(supportChatEntryOptions)
@@ -63,7 +64,10 @@ export async function resolveSupportChatEntryOption(optionId: string | null) {
   }
 
   const [fallback] = await db
-    .select({ queueId: supportQueues.id })
+    .select({
+      queueId: supportQueues.id,
+      defaultDueDays: supportQueues.defaultDueDays,
+    })
     .from(supportQueues)
     .where(and(eq(supportQueues.code, "support"), eq(supportQueues.active, true)))
     .limit(1);
@@ -73,6 +77,7 @@ export async function resolveSupportChatEntryOption(optionId: string | null) {
     id: null,
     label: "Suporte F10",
     queueId: fallback.queueId,
+    defaultDueDays: fallback.defaultDueDays,
     initialHandling: "ai" as const,
   };
 }
@@ -101,6 +106,7 @@ export async function getSupportChatEntrySettings() {
         name: supportQueues.name,
         teamId: supportQueues.teamId,
         teamName: teams.name,
+        defaultDueDays: supportQueues.defaultDueDays,
         active: supportQueues.active,
       })
       .from(supportQueues)
@@ -205,6 +211,7 @@ export async function createSupportQueue(
   actorUserId: string,
   name: string,
   teamId: string,
+  defaultDueDays: number,
 ): Promise<void> {
   const db = getDatabase();
   const [team] = await db
@@ -227,6 +234,7 @@ export async function createSupportQueue(
       code: `chat-${codeBase}-${randomUUID().slice(0, 8)}`,
       name,
       teamId,
+      defaultDueDays,
       active: true,
     })
     .returning({ id: supportQueues.id });
@@ -237,6 +245,28 @@ export async function createSupportQueue(
     action: "operations.support_queue.created",
     entityType: "support_queue",
     entityId: queue.id,
-    metadata: { teamId, source: "chat_entry_settings" },
+    metadata: { teamId, defaultDueDays, source: "chat_entry_settings" },
+  });
+}
+
+export async function updateSupportQueueDueDays(
+  actorUserId: string,
+  queueId: string,
+  defaultDueDays: number,
+): Promise<void> {
+  const [updated] = await getDatabase()
+    .update(supportQueues)
+    .set({ defaultDueDays, updatedAt: new Date() })
+    .where(eq(supportQueues.id, queueId))
+    .returning({ id: supportQueues.id });
+
+  if (!updated) throw new Error("SUPPORT_QUEUE_NOT_FOUND");
+
+  await recordAuditEvent({
+    actorUserId,
+    action: "operations.support_queue.default_due_days.updated",
+    entityType: "support_queue",
+    entityId: queueId,
+    metadata: { defaultDueDays },
   });
 }
