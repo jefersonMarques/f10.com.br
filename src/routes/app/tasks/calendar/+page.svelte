@@ -11,6 +11,7 @@
     CircleAlert,
     Clock3,
     ExternalLink,
+    Headphones,
     Link2,
     Plus,
     Unplug,
@@ -33,9 +34,29 @@
     high: "border-[#F3D2B6] bg-[#FFF7EF] text-[#A9510D]",
     urgent: "border-[#F2C5C5] bg-[#FFF3F3] text-[#A52A2A]",
   };
+  const ticketPriorityClasses: Record<string, string> = {
+    low: "border-[#DDE2EA] bg-white text-[#667085]",
+    normal: "border-[#D7DDF0] bg-[#F8F9FF] text-[#35416E]",
+    high: "border-[#F0D2B5] bg-[#FFF8F1] text-[#9B530F]",
+    urgent: "border-[#EFC6C6] bg-[#FFF5F5] text-[#A52A2A]",
+  };
+  const ticketStatusLabels: Record<string, string> = {
+    new: "Novo",
+    open: "Aberto",
+    in_progress: "Em andamento",
+    waiting_customer: "Aguardando cliente",
+    resolved: "Resolvido",
+    closed: "Fechado",
+  };
 
   let calendarView: CalendarView = "month";
   let cursorDate = parseDateKey(data.calendarAnchor);
+  let showTasks = data.canViewTasks;
+  let showTickets = data.canViewTickets;
+  let showGoogle = data.googleCalendar.connected;
+  let draggingTicketId: string | null = null;
+  let movingTicket = false;
+
   let createOpen = false;
   let createDate = data.calendarAnchor;
   let createProjectId = data.selectedProjectId ?? data.projects[0]?.id ?? "";
@@ -93,10 +114,15 @@
   }
 
   function tasksForDay(key: string) {
-    return data.tasks.filter((task) => task.dueOn === key);
+    return showTasks ? data.tasks.filter((task) => task.dueOn === key) : [];
+  }
+
+  function ticketsForDay(key: string) {
+    return showTickets ? data.tickets.filter((ticket) => ticket.dueOn === key) : [];
   }
 
   function googleEventsForDay(key: string) {
+    if (!showGoogle) return [];
     return data.googleEvents.filter((event) => {
       if (event.allDay && event.startDate) {
         return event.startDate <= key && (!event.endDate || key < event.endDate);
@@ -129,6 +155,10 @@
 
   function taskHref(taskId: string): string {
     return `/app/tasks/${taskId}`;
+  }
+
+  function ticketHref(ticketId: string): string {
+    return `/app/tickets/${ticketId}`;
   }
 
   function taskLinkedToGoogle(taskId: string): boolean {
@@ -170,6 +200,43 @@
       noScroll: true,
       invalidateAll: true,
     });
+  }
+
+  function startTicketDrag(event: DragEvent, ticketId: string): void {
+    if (!data.canChangeTicketDueOn || movingTicket) return;
+    draggingTicketId = ticketId;
+    event.dataTransfer?.setData("text/plain", ticketId);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  }
+
+  function allowTicketDrop(event: DragEvent): void {
+    if (!data.canChangeTicketDueOn || !draggingTicketId || movingTicket) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  }
+
+  async function dropTicketDueOn(event: DragEvent, dueOn: string): Promise<void> {
+    event.preventDefault();
+    if (!data.canChangeTicketDueOn || movingTicket) return;
+    const ticketId = draggingTicketId ?? event.dataTransfer?.getData("text/plain") ?? "";
+    const ticket = data.tickets.find((item) => item.id === ticketId);
+    draggingTicketId = null;
+    if (!ticket || ticket.dueOn === dueOn) return;
+
+    movingTicket = true;
+    try {
+      const body = new FormData();
+      body.set("ticketId", ticket.id);
+      body.set("dueOn", dueOn);
+      const response = await fetch("?/updateTicketDueOn", { method: "POST", body });
+      if (!response.ok) {
+        window.alert("Não foi possível alterar a conclusão planejada deste ticket.");
+        return;
+      }
+      await refreshCalendarData();
+    } finally {
+      movingTicket = false;
+    }
   }
 
   function navigateCalendar(next: Date): void {
@@ -228,7 +295,7 @@
   $: oauthMessage = googleStatusMessage(data.googleStatus);
 </script>
 
-<svelte:head><title>Calendário | F10 Operations</title></svelte:head>
+<svelte:head><title>Agenda | F10 Operations</title></svelte:head>
 
 <ApplicationContent width="full" padding="none">
   <section class="min-h-[calc(100dvh-var(--application-header-height))] overflow-hidden border-b border-[#E1E4EB] bg-white">
@@ -243,10 +310,18 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-2 xl:justify-end">
-        <select value={data.selectedProjectId ?? ""} on:change={changeProject} class="application-text-caption h-9 max-w-[260px] rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#5F6575] outline-none focus:border-[#000A57]">
-          <option value="">Todos os projetos</option>
-          {#each data.projects as project}<option value={project.id}>{project.name}</option>{/each}
-        </select>
+        {#if data.canViewTasks && data.projects.length > 0}
+          <select value={data.selectedProjectId ?? ""} on:change={changeProject} class="application-text-caption h-9 max-w-[260px] rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#5F6575] outline-none focus:border-[#000A57]">
+            <option value="">Todos os projetos</option>
+            {#each data.projects as project}<option value={project.id}>{project.name}</option>{/each}
+          </select>
+        {/if}
+
+        <div class="flex rounded-lg bg-[#EDEFF4] p-1">
+          {#if data.canViewTasks}<button type="button" aria-pressed={showTasks} on:click={() => (showTasks = !showTasks)} class={`application-text-meta h-7 rounded-md px-2.5 font-semibold ${showTasks ? "bg-white text-[#000A57] shadow-sm" : "text-[#8A909E]"}`}>Tarefas</button>{/if}
+          {#if data.canViewTickets}<button type="button" aria-pressed={showTickets} on:click={() => (showTickets = !showTickets)} class={`application-text-meta h-7 rounded-md px-2.5 font-semibold ${showTickets ? "bg-white text-[#8B4D12] shadow-sm" : "text-[#8A909E]"}`}>Tickets</button>{/if}
+          {#if data.googleCalendar.connected}<button type="button" aria-pressed={showGoogle} on:click={() => (showGoogle = !showGoogle)} class={`application-text-meta h-7 rounded-md px-2.5 font-semibold ${showGoogle ? "bg-white text-[#2F7045] shadow-sm" : "text-[#8A909E]"}`}>Google</button>{/if}
+        </div>
 
         <div class="flex rounded-lg bg-[#EDEFF4] p-1">
           <button type="button" on:click={() => (calendarView = "month")} class={`application-text-caption h-7 rounded-md px-3 font-semibold ${calendarView === "month" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Mês</button>
@@ -265,8 +340,6 @@
               <form method="POST" action="?/disconnectGoogle" class="mt-3 border-t border-[#EEF0F4] pt-3" on:submit={(event) => { if (!confirm("Desconectar o Google Calendar deste usuário?")) event.preventDefault(); }}><button type="submit" class="application-text-meta inline-flex h-8 w-full items-center justify-center gap-2 rounded-lg border border-[#E7D1D1] bg-[#FFF8F8] font-semibold text-[#9B3C3C]"><Unplug size={12}/>Desconectar Google Calendar</button></form>
             </div>
           </details>
-        {:else}
-          <span class="application-text-meta inline-flex h-9 items-center rounded-lg border border-[#E4E6EC] bg-[#F7F8FA] px-3 font-semibold text-[#858B99]">Google não configurado</span>
         {/if}
       </div>
     </header>
@@ -286,8 +359,13 @@
     {/if}
 
     <div class="application-text-caption flex flex-wrap items-center justify-between gap-2 border-b border-[#E8EAF0] bg-[#FAFAFC] px-4 py-2 text-[#808695]">
-      <div class="flex flex-wrap items-center gap-4"><span class="inline-flex items-center gap-2"><Clock3 size={14}/>{unscheduledCount} tarefa(s) sem prazo</span>{#if data.googleCalendar.connected}<span class="inline-flex items-center gap-2"><Link2 size={13}/>{data.googleEvents.length} evento(s) Google</span>{/if}</div>
-      <a href="/app/tasks/calendar/scheduling" class="application-text-caption font-semibold text-[#000A57] hover:underline">Links de agendamento</a>
+      <div class="flex flex-wrap items-center gap-4">
+        {#if data.canViewTasks}<span class="inline-flex items-center gap-2"><Clock3 size={14}/>{unscheduledCount} tarefa(s) sem prazo</span>{/if}
+        {#if data.canViewTickets}<span class="inline-flex items-center gap-2"><Headphones size={13}/>{data.tickets.length} ticket(s) no período</span>{/if}
+        {#if data.googleCalendar.connected}<span class="inline-flex items-center gap-2"><Link2 size={13}/>{data.googleEvents.length} evento(s) Google</span>{/if}
+        {#if data.canChangeTicketDueOn}<span class="application-text-meta text-[#9A744F]">Arraste um Ticket para outro dia para alterar a conclusão planejada.</span>{/if}
+      </div>
+      {#if data.canViewTasks}<a href="/app/tasks/calendar/scheduling" class="application-text-caption font-semibold text-[#000A57] hover:underline">Links de agendamento</a>{/if}
     </div>
 
     {#if calendarView === "month"}
@@ -299,22 +377,44 @@
           {#each visibleDays as day}
             {@const key = dateKey(day)}
             {@const dayTasks = tasksForDay(key)}
+            {@const dayTickets = ticketsForDay(key)}
             {@const dayGoogleEvents = googleEventsForDay(key)}
+            {@const totalItems = dayTasks.length + dayTickets.length + dayGoogleEvents.length}
             {@const outsideMonth = day.getMonth() !== cursorDate.getMonth()}
             {@const isToday = key === dateKey(new Date())}
-            <div class={`group min-h-[142px] border-b border-r border-[#ECEEF3] p-2 transition ${outsideMonth ? "bg-[#FAFAFC]" : "bg-white hover:bg-[#FCFCFE]"}`}>
-              <button type="button" on:click={() => openCreate(day)} class="flex w-full items-center justify-between rounded-lg px-1 py-0.5 text-left" aria-label={`Criar tarefa em ${formatModalDate(key)}`}>
-                <span class={`application-text-caption flex h-7 min-w-7 items-center justify-center rounded-full px-1 font-semibold ${isToday ? "bg-[#000A57] text-white" : outsideMonth ? "text-[#B1B5BF]" : "text-[#5D6372]"}`}>{formatDayNumber(day)}</span>
-                {#if data.canCreate}<Plus size={14} class="text-[#C0C4CE] opacity-0 transition group-hover:opacity-100"/>{/if}
-              </button>
+            <div
+              role="group"
+              aria-label={`Agenda de ${formatModalDate(key)}`}
+              on:dragover={allowTicketDrop}
+              on:drop={(event) => void dropTicketDueOn(event, key)}
+              class={`group min-h-[150px] border-b border-r border-[#ECEEF3] p-2 transition ${outsideMonth ? "bg-[#FAFAFC]" : "bg-white hover:bg-[#FCFCFE]"} ${draggingTicketId ? "hover:bg-[#FFF8F1]" : ""}`}
+            >
+              {#if data.canCreate}
+                <button type="button" on:click={() => openCreate(day)} class="flex w-full items-center justify-between rounded-lg px-1 py-0.5 text-left" aria-label={`Criar tarefa em ${formatModalDate(key)}`}>
+                  <span class={`application-text-caption flex h-7 min-w-7 items-center justify-center rounded-full px-1 font-semibold ${isToday ? "bg-[#000A57] text-white" : outsideMonth ? "text-[#B1B5BF]" : "text-[#5D6372]"}`}>{formatDayNumber(day)}</span>
+                  <Plus size={14} class="text-[#C0C4CE] opacity-0 transition group-hover:opacity-100"/>
+                </button>
+              {:else}
+                <div class="flex w-full items-center justify-between rounded-lg px-1 py-0.5"><span class={`application-text-caption flex h-7 min-w-7 items-center justify-center rounded-full px-1 font-semibold ${isToday ? "bg-[#000A57] text-white" : outsideMonth ? "text-[#B1B5BF]" : "text-[#5D6372]"}`}>{formatDayNumber(day)}</span></div>
+              {/if}
               <div class="mt-1 space-y-1">
-                {#each dayGoogleEvents.slice(0, 2) as event}
+                {#each dayGoogleEvents.slice(0, 1) as event}
                   {#if event.htmlLink}<a href={event.htmlLink} target="_blank" rel="noopener noreferrer" class="application-text-meta block truncate rounded-md border border-[#CFE0D5] bg-[#F1F8F3] px-2 py-1.5 font-semibold text-[#2F7045]" title={`${googleEventTime(event)} · ${event.summary}`}><span class="application-text-meta mr-1 font-bold">G</span>{#if event.meetUrl}<Video size={10} class="mr-1 inline"/>{/if}{googleEventTime(event)} · {event.summary}</a>{:else}<span class="application-text-meta block truncate rounded-md border border-[#CFE0D5] bg-[#F1F8F3] px-2 py-1.5 font-semibold text-[#2F7045]">G · {event.summary}</span>{/if}
                 {/each}
-                {#each dayTasks.slice(0, Math.max(1, 4 - Math.min(dayGoogleEvents.length, 2))) as task}
+                {#each dayTickets.slice(0, 2) as ticket}
+                  <a
+                    href={ticketHref(ticket.id)}
+                    draggable={data.canChangeTicketDueOn}
+                    on:dragstart={(event) => startTicketDrag(event, ticket.id)}
+                    on:dragend={() => (draggingTicketId = null)}
+                    class={`application-text-meta block truncate rounded-md border px-2 py-1.5 font-semibold transition hover:brightness-[0.98] ${ticketPriorityClasses[ticket.priority]}`}
+                    title={`Ticket #${ticket.ticketNumber} · ${ticket.subject} · ${ticketStatusLabels[ticket.status] ?? ticket.status}`}
+                  >T#{ticket.ticketNumber} · {ticket.subject}</a>
+                {/each}
+                {#each dayTasks.slice(0, 2) as task}
                   <a href={taskHref(task.id)} class={`application-text-meta block truncate rounded-md border px-2 py-1.5 font-semibold transition hover:brightness-[0.98] ${priorityClasses[task.priority]}`}>{#if taskLinkedToGoogle(task.id)}<span class="mr-1 font-bold text-[#2F7045]">G</span>{/if}{#if taskHasMeet(task.id)}<Video size={10} class="mr-1 inline text-[#214A9A]"/>{/if}{task.title}</a>
                 {/each}
-                {#if dayGoogleEvents.length + dayTasks.length > 4}<span class="application-text-meta block px-1 font-semibold text-[#7C8291]">+ mais itens</span>{/if}
+                {#if totalItems > 5}<span class="application-text-meta block px-1 font-semibold text-[#7C8291]">+ {totalItems - 5} item(ns)</span>{/if}
               </div>
             </div>
           {/each}
@@ -326,14 +426,25 @@
           {#each visibleDays as day, index}
             {@const key = dateKey(day)}
             {@const dayTasks = tasksForDay(key)}
+            {@const dayTickets = ticketsForDay(key)}
             {@const dayGoogleEvents = googleEventsForDay(key)}
             {@const isToday = key === dateKey(new Date())}
-            <section class={`min-h-[540px] border-r border-[#E8EAF0] ${index === 6 ? "border-r-0" : ""}`}>
-              <button type="button" on:click={() => openCreate(day)} class="group flex w-full flex-col items-center border-b border-[#E8EAF0] px-2 py-3 hover:bg-[#FAFAFC]">
-                <span class="application-text-meta font-bold uppercase tracking-[0.08em] text-[#858B99]">{weekdayLabels[index]}</span>
-                <span class={`mt-1 flex h-9 min-w-9 items-center justify-center rounded-full px-1 text-[13px] font-semibold ${isToday ? "bg-[#000A57] text-white" : "text-[#303646]"}`}>{day.getDate()}</span>
-                {#if data.canCreate}<span class="application-text-meta mt-1 inline-flex items-center gap-1 font-semibold text-[#9A9FAC] opacity-0 transition group-hover:opacity-100"><Plus size={11}/>Adicionar tarefa</span>{/if}
-              </button>
+            <div
+              role="group"
+              aria-label={`Agenda de ${formatModalDate(key)}`}
+              on:dragover={allowTicketDrop}
+              on:drop={(event) => void dropTicketDueOn(event, key)}
+              class={`min-h-[540px] border-r border-[#E8EAF0] ${index === 6 ? "border-r-0" : ""} ${draggingTicketId ? "hover:bg-[#FFF8F1]" : ""}`}
+            >
+              {#if data.canCreate}
+                <button type="button" on:click={() => openCreate(day)} class="group flex w-full flex-col items-center border-b border-[#E8EAF0] px-2 py-3 hover:bg-[#FAFAFC]">
+                  <span class="application-text-meta font-bold uppercase tracking-[0.08em] text-[#858B99]">{weekdayLabels[index]}</span>
+                  <span class={`mt-1 flex h-9 min-w-9 items-center justify-center rounded-full px-1 text-[13px] font-semibold ${isToday ? "bg-[#000A57] text-white" : "text-[#303646]"}`}>{day.getDate()}</span>
+                  <span class="application-text-meta mt-1 inline-flex items-center gap-1 font-semibold text-[#9A9FAC] opacity-0 transition group-hover:opacity-100"><Plus size={11}/>Adicionar tarefa</span>
+                </button>
+              {:else}
+                <div class="flex w-full flex-col items-center border-b border-[#E8EAF0] px-2 py-3"><span class="application-text-meta font-bold uppercase tracking-[0.08em] text-[#858B99]">{weekdayLabels[index]}</span><span class={`mt-1 flex h-9 min-w-9 items-center justify-center rounded-full px-1 text-[13px] font-semibold ${isToday ? "bg-[#000A57] text-white" : "text-[#303646]"}`}>{day.getDate()}</span></div>
+              {/if}
               <div class="space-y-2 p-2.5">
                 {#each dayGoogleEvents as event}
                   <article class="rounded-xl border border-[#CFE0D5] bg-[#F1F8F3] p-3 text-[#2F7045] transition hover:shadow-sm">
@@ -346,12 +457,23 @@
                     </div>
                   </article>
                 {/each}
+                {#each dayTickets as ticket}
+                  <a
+                    href={ticketHref(ticket.id)}
+                    draggable={data.canChangeTicketDueOn}
+                    on:dragstart={(event) => startTicketDrag(event, ticket.id)}
+                    on:dragend={() => (draggingTicketId = null)}
+                    class={`block rounded-xl border p-3 transition hover:shadow-sm ${ticketPriorityClasses[ticket.priority]}`}
+                  ><span class="application-text-meta inline-flex items-center gap-1 font-bold uppercase tracking-[0.06em] opacity-70"><Headphones size={10}/>Ticket #{ticket.ticketNumber}</span><strong class="application-text-caption mt-1 block font-semibold leading-4">{ticket.subject}</strong><span class="application-text-meta mt-2 block truncate opacity-75">{ticketStatusLabels[ticket.status] ?? ticket.status} · {ticket.queueName}{ticket.assignedUserName ? ` · ${ticket.assignedUserName}` : ""}</span></a>
+                {/each}
                 {#each dayTasks as task}
                   <a href={taskHref(task.id)} class={`block rounded-xl border p-3 transition hover:shadow-sm ${priorityClasses[task.priority]}`}><span class="application-text-meta inline-flex items-center gap-1 font-bold uppercase tracking-[0.06em] opacity-70">Tarefa F10{taskLinkedToGoogle(task.id) ? " · Google" : ""}{#if taskHasMeet(task.id)}<Video size={10}/>{/if}</span><strong class="application-text-caption mt-1 block font-semibold leading-4">{task.title}</strong><span class="application-text-meta mt-2 block truncate opacity-75">{task.projectName}</span></a>
                 {/each}
-                {#if dayGoogleEvents.length === 0 && dayTasks.length === 0}<button type="button" on:click={() => openCreate(day)} class="application-text-meta flex min-h-20 w-full items-center justify-center rounded-xl border border-dashed border-[#E1E4EA] text-[#A0A5B0] hover:border-[#C8CDD7] hover:bg-[#FAFAFC]">{data.canCreate ? "+ Criar tarefa" : "Sem compromissos"}</button>{/if}
+                {#if dayGoogleEvents.length === 0 && dayTickets.length === 0 && dayTasks.length === 0}
+                  {#if data.canCreate}<button type="button" on:click={() => openCreate(day)} class="application-text-meta flex min-h-20 w-full items-center justify-center rounded-xl border border-dashed border-[#E1E4EA] text-[#A0A5B0] hover:border-[#C8CDD7] hover:bg-[#FAFAFC]">+ Criar tarefa</button>{:else}<div class="application-text-meta flex min-h-20 w-full items-center justify-center rounded-xl border border-dashed border-[#E1E4EA] text-[#A0A5B0]">Sem compromissos</div>{/if}
+                {/if}
               </div>
-            </section>
+            </div>
           {/each}
         </div>
       </div>
@@ -360,8 +482,9 @@
 </ApplicationContent>
 
 {#if createOpen}
-  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-[#010D28]/30 p-4 backdrop-blur-[2px]" role="presentation" on:click={() => (createOpen = false)}>
-    <section class="max-h-[92vh] w-full max-w-[520px] overflow-y-auto rounded-[22px] border border-[#E0E3EA] bg-white shadow-[0_28px_90px_rgba(1,13,40,0.26)]" role="dialog" aria-modal="true" aria-label="Criar tarefa" on:click|stopPropagation>
+  <div class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <button type="button" class="absolute inset-0 bg-[#010D28]/30 backdrop-blur-[2px]" aria-label="Fechar criação de tarefa" on:click={() => (createOpen = false)}></button>
+    <div class="relative z-10 max-h-[92vh] w-full max-w-[520px] overflow-y-auto rounded-[22px] border border-[#E0E3EA] bg-white shadow-[0_28px_90px_rgba(1,13,40,0.26)]" role="dialog" aria-modal="true" aria-label="Criar tarefa">
       <header class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[#EEF0F4] bg-white px-5 py-4"><div><span class="application-text-caption inline-flex items-center gap-2 font-bold uppercase tracking-[0.08em] text-[#EA6D0B]"><CalendarDays size={14}/>Nova tarefa F10</span><h2 class="mt-1 capitalize text-[15px] font-semibold text-[#202637]">{formatModalDate(createDate)}</h2></div><button type="button" on:click={() => (createOpen = false)} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#8B909D] hover:bg-[#F3F4F7]" aria-label="Fechar"><X size={16}/></button></header>
       <form method="POST" action="?/createTask" use:enhance={() => { return async ({ result, update }) => { await update(); if (result.type === "success") { createOpen = false; await refreshCalendarData(); } }; }} class="space-y-4 p-5">
         <input type="hidden" name="dueOn" value={createDate}/>
@@ -399,13 +522,14 @@
 
         <div class="flex items-center justify-between gap-3 pt-1"><span class="application-text-meta text-[#9297A4]">Prazo: {createDate.split("-").reverse().join("/")}</span><button type="submit" class="inline-flex h-11 items-center gap-2 rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white"><Plus size={15}/>Criar tarefa</button></div>
       </form>
-    </section>
+    </div>
   </div>
 {/if}
 
 {#if googleEventOpen}
-  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-[#010D28]/30 p-4 backdrop-blur-[2px]" role="presentation" on:click={() => (googleEventOpen = false)}>
-    <section class="max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-[22px] border border-[#E0E3EA] bg-white shadow-[0_28px_90px_rgba(1,13,40,0.26)]" role="dialog" aria-modal="true" aria-label="Novo evento no Google Calendar" on:click|stopPropagation>
+  <div class="fixed inset-0 z-[110] flex items-center justify-center p-4">
+    <button type="button" class="absolute inset-0 bg-[#010D28]/30 backdrop-blur-[2px]" aria-label="Fechar criação de evento" on:click={() => (googleEventOpen = false)}></button>
+    <div class="relative z-10 max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-[22px] border border-[#E0E3EA] bg-white shadow-[0_28px_90px_rgba(1,13,40,0.26)]" role="dialog" aria-modal="true" aria-label="Novo evento no Google Calendar">
       <header class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[#EEF0F4] bg-white px-5 py-4"><div><span class="application-text-caption inline-flex items-center gap-2 font-bold uppercase tracking-[0.08em] text-[#2F7045]"><Link2 size={14}/>Google Calendar</span><h2 class="mt-1 text-[16px] font-semibold text-[#202637]">Novo evento</h2></div><button type="button" on:click={() => (googleEventOpen = false)} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#8B909D] hover:bg-[#F3F4F7]" aria-label="Fechar"><X size={16}/></button></header>
       <form method="POST" action="?/createGoogleEvent" use:enhance={() => { return async ({ result, update }) => { await update(); if (result.type === "success") { googleEventOpen = false; await refreshCalendarData(); } }; }} class="space-y-4 p-5">
         <input type="hidden" name="timeZone" value={googleTimeZone}/>
@@ -443,6 +567,6 @@
 
         <div class="flex items-center justify-between gap-3"><span class="application-text-meta text-[#969BA7]">Agenda principal de {data.googleCalendar.googleEmail}. Convidados recebem atualização pelo Google.</span><button type="submit" class="inline-flex h-11 items-center gap-2 rounded-xl bg-[#2F7045] px-5 text-[11px] font-semibold text-white"><Plus size={15}/>{googleEventCreateAsTask ? "Criar evento + tarefa" : "Criar no Google"}</button></div>
       </form>
-    </section>
+    </div>
   </div>
 {/if}
