@@ -1,6 +1,7 @@
 import {
   bigserial,
   boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -96,6 +97,7 @@ export const supportQueues = pgTable(
     code: text("code").notNull(),
     name: text("name").notNull(),
     teamId: uuid("team_id").references(() => teams.id, { onDelete: "set null" }),
+    defaultDueDays: integer("default_due_days").notNull().default(3),
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -125,6 +127,7 @@ export const tickets = pgTable(
     status: ticketStatus("status").notNull().default("new"),
     priority: ticketPriority("priority").notNull().default("normal"),
     channel: supportChannel("channel").notNull().default("manual"),
+    dueOn: date("due_on").notNull(),
     firstResponseDueAt: timestamp("first_response_due_at", { withTimezone: true }),
     resolutionDueAt: timestamp("resolution_due_at", { withTimezone: true }),
     firstResponseAt: timestamp("first_response_at", { withTimezone: true }),
@@ -141,6 +144,7 @@ export const tickets = pgTable(
     index("tickets_queue_idx").on(table.queueId, table.status),
     index("tickets_assigned_user_idx").on(table.assignedUserId, table.status),
     index("tickets_customer_idx").on(table.customerContactId),
+    index("tickets_due_on_status_idx").on(table.dueOn, table.status),
     index("tickets_updated_idx").on(table.updatedAt),
   ],
 );
