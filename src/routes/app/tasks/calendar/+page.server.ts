@@ -1,6 +1,9 @@
 import { error, fail, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
-import { requireAppPermission } from "$lib/server/auth/authorization";
+import {
+  requireAppAnyPermission,
+  requireAppPermission,
+} from "$lib/server/auth/authorization";
 import { getPermissionScope, hasPermission } from "$lib/server/auth/permissions";
 import { readGoogleEventDetailsFromForm } from "$lib/server/calendar/googleEventFormInput";
 import {
@@ -9,6 +12,12 @@ import {
   getGoogleCalendarConnection,
   listGoogleCalendarEvents,
 } from "$lib/server/calendar/googleCalendarRepository";
+import { getGoogleCalendarSyncPreferences } from "$lib/server/calendar/googleCalendarPreferenceRepository";
+import {
+  synchronizeGoogleCalendar,
+  type GoogleAgendaEvent,
+} from "$lib/server/calendar/googleCalendarSyncService";
+import { syncAllTicketGoogleCalendarLinks } from "$lib/server/calendar/ticketGoogleCalendarLifecycle";
 import {
   DEFAULT_SCHEDULING_AVAILABILITY,
   listSchedulingCustomers,
@@ -36,6 +45,14 @@ import {
   configureTaskGoogleCalendar,
   listUserTaskGoogleCalendarLinks,
 } from "$lib/server/tasks/taskGoogleCalendarRepository";
+
+const GOOGLE_ACCESS_PERMISSIONS = [
+  "tasks.view",
+  "tickets.view",
+  "scheduling.view",
+  "scheduling.create",
+  "integrations.view",
+] as const;
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -111,6 +128,14 @@ function schedulingMessage(errorValue: unknown): string {
   return messages[code] ?? "Não foi possível criar o link de agendamento.";
 }
 
+async function googleWriteConfiguration(userId: string) {
+  const preferences = await getGoogleCalendarSyncPreferences(userId);
+  return {
+    calendarId: preferences.targetCalendarId || "primary",
+    syncDirection: preferences.syncGoogleChangesToF10 ? "bidirectional" as const : "f10_to_google" as const,
+  };
+}
+
 export const load: PageServerLoad = async ({ parent, url }) => {
   const layout = await parent();
   const permissions = createPermissionMap(layout.permissions);
@@ -127,6 +152,41 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const requestedDate = url.searchParams.get("date") ?? "";
   const calendarAnchor = isValidDate(requestedDate) ? requestedDate : todayKey();
   const range = agendaRange(calendarAnchor);
+  const googleCalendar = await getGoogleCalendarConnection(layout.user.id);
+  let googleEvents: GoogleAgendaEvent[] = [];
+  let googleCalendarError = "";
+  let googleSyncedAt: Date | null = null;
+
+  if (googleCalendar.connected) {
+    if (googleCalendar.scopesReady) {
+      const sync = await synchronizeGoogleCalendar({
+        userId: layout.user.id,
+        permissions,
+        timeMin: range.timeMin,
+        timeMax: range.timeMax,
+      });
+      googleEvents = sync.events;
+      googleCalendarError = sync.warning;
+      googleSyncedAt = sync.syncedAt;
+    } else {
+      try {
+        const legacyEvents = await listGoogleCalendarEvents(
+          layout.user.id,
+          range.timeMin,
+          range.timeMax,
+        );
+        googleEvents = legacyEvents.map((event) => ({
+          ...event,
+          calendarId: "primary",
+          calendarName: "Google Calendar",
+        }));
+        googleCalendarError = "Reconecte o Google Calendar para liberar agendas compartilhadas e sincronização completa.";
+      } catch {
+        googleCalendarError = "Não foi possível atualizar os eventos do Google Calendar agora.";
+      }
+    }
+  }
+
   const projects = canViewTasks
     ? await listTaskProjects(layout.user.id, permissions)
     : [];
@@ -170,7 +230,6 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   type ProjectMember = Awaited<ReturnType<typeof listProjectMembers>>[number];
   const [
     membersByProject,
-    googleCalendar,
     taskGoogleLinks,
     calendarUsers,
     ticketRows,
@@ -184,11 +243,8 @@ export const load: PageServerLoad = async ({ parent, url }) => {
           projects.map(async (project) => [project.id, await listProjectMembers(project.id)] as const),
         ).then((entries) => Object.fromEntries(entries) as Record<string, ProjectMember[]>)
       : Promise.resolve({} as Record<string, ProjectMember[]>),
-    canViewTasks
-      ? getGoogleCalendarConnection(layout.user.id)
-      : Promise.resolve({ configured: false, connected: false, googleEmail: "", connectedAt: null, lastUsedAt: null }),
-    canViewTasks
-      ? listUserTaskGoogleCalendarLinks(layout.user.id)
+    canViewTasks && googleCalendar.connected
+      ? listUserTaskGoogleCalendarLinks(layout.user.id).catch(() => [])
       : Promise.resolve([]),
     canViewTasks
       ? listActiveTaskUsers()
@@ -226,20 +282,8 @@ export const load: PageServerLoad = async ({ parent, url }) => {
       maxHorizonDays: host.profileMaxHorizonDays ?? DEFAULT_SCHEDULING_AVAILABILITY.maxHorizonDays,
     }));
 
-  const linkedEventIds = new Set(taskGoogleLinks.map((link) => link.googleEventId));
   const googleLinkedTaskIds = taskGoogleLinks.map((link) => link.taskId);
   const googleMeetTaskIds = taskGoogleLinks.filter((link) => link.googleMeetUrl).map((link) => link.taskId);
-  let googleEvents: Awaited<ReturnType<typeof listGoogleCalendarEvents>> = [];
-  let googleCalendarError = "";
-
-  if (canViewTasks && googleCalendar.connected) {
-    try {
-      const fetchedEvents = await listGoogleCalendarEvents(layout.user.id, range.timeMin, range.timeMax);
-      googleEvents = fetchedEvents.filter((event) => !linkedEventIds.has(event.id));
-    } catch {
-      googleCalendarError = "Não foi possível atualizar os eventos do Google Calendar agora.";
-    }
-  }
 
   return {
     projects,
@@ -269,6 +313,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     googleLinkedTaskIds,
     googleMeetTaskIds,
     googleCalendarError,
+    googleSyncedAt,
     googleStatus: url.searchParams.get("google") ?? "",
   };
 };
@@ -294,6 +339,7 @@ export const actions: Actions = {
 
     try {
       await updateTicketDueOn(session.user.id, permissions, ticketId, dueOn);
+      await syncAllTicketGoogleCalendarLinks(ticketId);
       return {
         success: true,
         action: "updateTicketDueOn",
@@ -411,6 +457,7 @@ export const actions: Actions = {
 
     if (syncGoogle) {
       try {
+        const google = await googleWriteConfiguration(session.user.id);
         await configureTaskGoogleCalendar(session.user.id, permissions, task.id, {
           enabled: true,
           allDay: googleAllDay,
@@ -418,6 +465,8 @@ export const actions: Actions = {
           endTime: googleEndTime,
           timeZone: googleTimeZone,
           googleMeet,
+          calendarId: google.calendarId,
+          syncDirection: google.syncDirection,
           ...eventDetails,
         });
       } catch {
@@ -441,11 +490,10 @@ export const actions: Actions = {
   createGoogleEvent: async ({ cookies, request }) => {
     const formData = await request.formData();
     const createAsTask = readFormValue(formData, "createAsTask") === "true";
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      createAsTask ? "tasks.create" : "tasks.view",
-      "/app/tasks/calendar",
-    );
+    const context = createAsTask
+      ? await requireAppPermission(cookies, "tasks.create", "/app/tasks/calendar")
+      : await requireAppAnyPermission(cookies, [...GOOGLE_ACCESS_PERMISSIONS], "/app/tasks/calendar");
+    const { session, permissions } = context;
     const title = readFormValue(formData, "title");
     const description = readFormValue(formData, "description");
     const date = readFormValue(formData, "date");
@@ -474,6 +522,8 @@ export const actions: Actions = {
     } catch {
       return fail(400, { success: false, action: "createGoogleEvent", message: "Revise local, lembrete e participantes do evento." });
     }
+
+    const google = await googleWriteConfiguration(session.user.id);
 
     if (createAsTask) {
       if (!isUuid(projectId)) {
@@ -508,6 +558,8 @@ export const actions: Actions = {
           endTime,
           timeZone,
           googleMeet: addGoogleMeet,
+          calendarId: google.calendarId,
+          syncDirection: google.syncDirection,
           ...eventDetails,
         });
       } catch {
@@ -529,22 +581,26 @@ export const actions: Actions = {
     }
 
     try {
-      await createGoogleCalendarEvent(session.user.id, {
-        title,
-        description,
-        date,
-        allDay,
-        startTime,
-        endTime,
-        timeZone,
-        addGoogleMeet,
-        location: eventDetails.location,
-        reminderMinutes: eventDetails.reminderMinutes,
-        attendees: eventDetails.attendees.map((attendee) => ({
-          email: attendee.email,
-          optional: attendee.optional,
-        })),
-      });
+      await createGoogleCalendarEvent(
+        session.user.id,
+        {
+          title,
+          description,
+          date,
+          allDay,
+          startTime,
+          endTime,
+          timeZone,
+          addGoogleMeet,
+          location: eventDetails.location,
+          reminderMinutes: eventDetails.reminderMinutes,
+          attendees: eventDetails.attendees.map((attendee) => ({
+            email: attendee.email,
+            optional: attendee.optional,
+          })),
+        },
+        google.calendarId,
+      );
       return {
         success: true,
         action: "createGoogleEvent",
@@ -556,7 +612,11 @@ export const actions: Actions = {
   },
 
   disconnectGoogle: async ({ cookies }) => {
-    const { session } = await requireAppPermission(cookies, "tasks.view", "/app/tasks/calendar");
+    const { session } = await requireAppAnyPermission(
+      cookies,
+      [...GOOGLE_ACCESS_PERMISSIONS],
+      "/app/tasks/calendar",
+    );
     try {
       await disconnectGoogleCalendar(session.user.id);
       return { success: true, action: "disconnectGoogle", message: "Google Calendar desconectado." };
