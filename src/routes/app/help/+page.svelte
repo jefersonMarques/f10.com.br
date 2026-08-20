@@ -113,7 +113,7 @@
                   >
                     {article.title}
                   </a>
-                  <span class="rounded-full bg-[#F2F3F7] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.06em] text-[#707687]">
+                  <span class="application-text-meta rounded-full bg-[#F2F3F7] px-2 py-1 font-bold uppercase tracking-[0.06em] text-[#707687]">
                     {statusLabels[article.status] ?? article.status}
                   </span>
                 </div>
