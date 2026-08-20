@@ -242,14 +242,3 @@ body::after {
     padding-inline: 1.5rem;
   }
 }
-
-/* Compatibilidade temporária para telas legadas enquanto a escala é normalizada na origem. */
-.application-ui .text-\[7px\],
-.application-ui .text-\[8px\],
-.application-ui .text-\[9px\] {
-  font-size: var(--application-text-meta);
-}
-
-.application-ui .text-\[10px\] {
-  font-size: var(--application-text-caption);
-}
