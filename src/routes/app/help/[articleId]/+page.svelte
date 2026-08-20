@@ -28,11 +28,11 @@
   <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
     <ApplicationBackLink href="/app/help" label="Central de Ajuda" />
     <div class="flex flex-wrap items-center gap-2">
-      <span class="rounded-full bg-[#EEF0FF] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[#000A57]">
+      <span class="application-text-caption rounded-full bg-[#EEF0FF] px-3 py-1.5 font-bold uppercase tracking-[0.08em] text-[#000A57]">
         {data.article.status === "published" ? "Publicado" : "Rascunho"}
       </span>
       {#if data.article.hasPublishedVersion && data.article.status !== "published"}
-        <span class="rounded-full bg-[#FFF4E9] px-3 py-1.5 text-[10px] font-bold text-[#B85408]">
+        <span class="application-text-caption rounded-full bg-[#FFF4E9] px-3 py-1.5 font-bold text-[#B85408]">
           Alterações ainda não publicadas
         </span>
       {/if}
@@ -132,7 +132,7 @@
               Nesta primeira versão, cada parágrafo é armazenado como um bloco independente.
             </p>
           </div>
-          <span class="text-[10px] font-medium text-[#9A9FAD]">máximo 50.000 caracteres</span>
+          <span class="application-text-caption font-medium text-[#9A9FAD]">máximo 50.000 caracteres</span>
         </div>
 
         <textarea
