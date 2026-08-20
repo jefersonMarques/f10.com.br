@@ -75,6 +75,7 @@ export const customerContacts = pgTable(
     name: text("name").notNull(),
     email: text("email"),
     phone: text("phone"),
+    whatsapp: text("whatsapp"),
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -82,6 +83,9 @@ export const customerContacts = pgTable(
   (table) => [
     index("customer_contacts_organization_idx").on(table.organizationId),
     index("customer_contacts_email_idx").on(table.email),
+    index("customer_contacts_phone_idx").on(table.phone),
+    index("customer_contacts_whatsapp_idx").on(table.whatsapp),
+    index("customer_contacts_updated_idx").on(table.updatedAt),
   ],
 );
 
