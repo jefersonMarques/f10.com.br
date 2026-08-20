@@ -137,6 +137,12 @@
   }
 
   function toggleNavigationGroup(label: string): void {
+    if (collapsed) {
+      collapsed = false;
+      openNavigationGroup = label;
+      window.localStorage.setItem(SIDEBAR_STORAGE_KEY, "0");
+      return;
+    }
     openNavigationGroup = openNavigationGroup === label ? null : label;
   }
 
@@ -202,17 +208,7 @@
                     {/if}
                   </button>
 
-                  {#if collapsed && groupOpen}
-                    <div class="absolute left-[calc(100%+8px)] top-0 z-50 w-52 rounded-xl border border-[#E1E4EC] bg-white p-2 shadow-xl">
-                      <p class="application-text-meta px-2 pb-2 font-bold uppercase tracking-[0.08em] text-[#999EAA]">{item.label}</p>
-                      {#each item.children as child}
-                        <a href={child.href} class={`flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-[11px] font-semibold transition ${isActiveNavigationItem(pathname, child.href) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#747A89] hover:bg-[#F7F8FB] hover:text-[#000A57]"}`}>
-                          <svelte:component this={child.icon} size={15} aria-hidden="true" />
-                          <span>{child.label}</span>
-                        </a>
-                      {/each}
-                    </div>
-                  {:else if !collapsed && (groupOpen || groupActive)}
+                  {#if !collapsed && (groupOpen || groupActive)}
                     <div class="ml-[22px] mt-1 space-y-1 border-l border-[#E4E7EE] pl-3">
                       {#each item.children as child}
                         <a href={child.href} class={`flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-[11px] font-semibold transition ${isActiveNavigationItem(pathname, child.href) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#747A89] hover:bg-[#F7F8FB] hover:text-[#000A57]"}`}>
