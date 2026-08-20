@@ -188,7 +188,7 @@ export async function startPublicChat(
         status: "new",
         priority: "normal",
         channel: "web_chat",
-        dueOn: sql`CURRENT_DATE + ${entryOption.defaultDueDays}`,
+        dueOn: sql`CURRENT_DATE + ${entryOption.defaultDueDays}::integer`,
       })
       .returning({ id: tickets.id, ticketNumber: tickets.ticketNumber });
 
