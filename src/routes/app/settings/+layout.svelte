@@ -7,11 +7,11 @@
   <div class="mx-auto flex max-w-[1260px] flex-wrap gap-2">
     <a
       href="/app/settings"
-      class={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-[9px] font-semibold transition ${$page.url.pathname === "/app/settings" ? "bg-[#000A57] text-white" : "border border-[#DDE1EA] text-[#555B6B] hover:text-[#000A57]"}`}
+      class={`application-text-meta inline-flex min-h-9 items-center gap-2 rounded-lg px-3 font-semibold transition ${$page.url.pathname === "/app/settings" ? "bg-[#000A57] text-white" : "border border-[#DDE1EA] text-[#555B6B] hover:text-[#000A57]"}`}
     ><Settings size={13}/>Geral e integrações</a>
     <a
       href="/app/settings/atendimento"
-      class={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-[9px] font-semibold transition ${$page.url.pathname.startsWith("/app/settings/atendimento") ? "bg-[#000A57] text-white" : "border border-[#DDE1EA] text-[#555B6B] hover:text-[#000A57]"}`}
+      class={`application-text-meta inline-flex min-h-9 items-center gap-2 rounded-lg px-3 font-semibold transition ${$page.url.pathname.startsWith("/app/settings/atendimento") ? "bg-[#000A57] text-white" : "border border-[#DDE1EA] text-[#555B6B] hover:text-[#000A57]"}`}
     ><Clock3 size={13}/>Horário de atendimento</a>
   </div>
 </nav>
