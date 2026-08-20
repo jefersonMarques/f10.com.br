@@ -1,10 +1,11 @@
 import { fail, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppAnyPermission } from "$lib/server/auth/authorization";
-import { hasPermission } from "$lib/server/auth/permissions";
+import { getPermissionScope, hasPermission } from "$lib/server/auth/permissions";
 import {
   disconnectGoogleCalendar,
   getGoogleCalendarConnection,
+  getGoogleCalendarEvent,
   listGoogleCalendarAcl,
   revokeGoogleCalendarShare,
   shareGoogleCalendar,
@@ -12,6 +13,7 @@ import {
 import {
   DEFAULT_GOOGLE_CALENDAR_PREFERENCES,
   getGoogleCalendarSyncPreferences,
+  getGoogleCalendarSyncState,
   listGoogleCalendarSources,
   refreshAndListGoogleCalendarSources,
   saveGoogleCalendarSource,
@@ -21,8 +23,19 @@ import {
 import { synchronizeGoogleCalendar } from "$lib/server/calendar/googleCalendarSyncService";
 import { clearAutoManagedTicketGoogleCalendarLinks } from "$lib/server/calendar/ticketGoogleCalendarLifecycle";
 import {
+  applyGoogleEventToTicketDueDate,
+  listUserTicketGoogleCalendarLinks,
+  resolveTicketGoogleSyncWithF10,
+} from "$lib/server/calendar/ticketGoogleCalendarRepository";
+import { requireTicketAccess } from "$lib/server/support/supportAccess";
+import { getSupportTicket } from "$lib/server/support/supportRepository";
+import { ensureTaskAccess } from "$lib/server/tasks/taskAccess";
+import {
+  applyGoogleEventToTask,
+  getTaskGoogleCalendarLink,
   listUserTaskGoogleCalendarLinks,
   removeTaskGoogleCalendarLink,
+  resolveTaskGoogleSyncWithF10,
 } from "$lib/server/tasks/taskGoogleCalendarRepository";
 import {
   listProjectMembers,
@@ -71,6 +84,26 @@ async function runSync(
   await synchronizeGoogleCalendar({ userId, permissions, ...range });
 }
 
+async function requireTaskUpdateAccess(
+  userId: string,
+  permissions: Awaited<ReturnType<typeof requireGoogleContext>>["permissions"],
+  taskId: string,
+): Promise<void> {
+  const scope = getPermissionScope(permissions, "tasks.update");
+  if (!scope) throw new Error("TASK_UPDATE_NOT_ALLOWED");
+  await ensureTaskAccess(userId, scope, taskId);
+}
+
+async function requireTicketReplyAccess(
+  userId: string,
+  permissions: Awaited<ReturnType<typeof requireGoogleContext>>["permissions"],
+  ticketId: string,
+): Promise<void> {
+  const scope = getPermissionScope(permissions, "tickets.reply");
+  if (!scope) throw new Error("TICKET_REPLY_NOT_ALLOWED");
+  await requireTicketAccess(userId, scope, ticketId);
+}
+
 export const load: PageServerLoad = async ({ cookies }) => {
   const { session, permissions } = await requireGoogleContext(cookies);
   const connection = await getGoogleCalendarConnection(session.user.id);
@@ -110,9 +143,54 @@ export const load: PageServerLoad = async ({ cookies }) => {
     : {};
 
   const writableSources = sources.filter((source) => ["writer", "owner"].includes(source.accessRole));
-  const taskLinks = connection.connected
-    ? await listUserTaskGoogleCalendarLinks(session.user.id).catch(() => [])
-    : [];
+  const [taskLinks, ticketLinks, syncState] = connection.connected
+    ? await Promise.all([
+        listUserTaskGoogleCalendarLinks(session.user.id).catch(() => []),
+        listUserTicketGoogleCalendarLinks(session.user.id).catch(() => []),
+        getGoogleCalendarSyncState(session.user.id).catch(() => ({
+          lastSyncStartedAt: null,
+          lastSyncCompletedAt: null,
+          lastSyncError: null,
+        })),
+      ])
+    : [[], [], { lastSyncStartedAt: null, lastSyncCompletedAt: null, lastSyncError: null }];
+
+  const taskConflictLinks = taskLinks.filter((link) => link.lastSyncError === "SYNC_CONFLICT");
+  const ticketConflictLinks = ticketLinks.filter((link) => link.lastSyncError === "SYNC_CONFLICT");
+  const taskIssues = await Promise.all(
+    taskConflictLinks.map(async (link) => {
+      try {
+        const scope = getPermissionScope(permissions, "tasks.view");
+        if (!scope) return null;
+        const context = await ensureTaskAccess(session.user.id, scope, link.taskId);
+        return {
+          kind: "task" as const,
+          id: link.taskId,
+          title: context.task.title,
+          calendarId: link.googleCalendarId,
+          googleEventId: link.googleEventId,
+        };
+      } catch {
+        return null;
+      }
+    }),
+  );
+  const ticketIssues = await Promise.all(
+    ticketConflictLinks.map(async (link) => {
+      try {
+        const details = await getSupportTicket(session.user.id, permissions, link.ticketId);
+        return {
+          kind: "ticket" as const,
+          id: link.ticketId,
+          title: `#${details.ticket.ticketNumber} · ${details.ticket.subject}`,
+          calendarId: link.googleCalendarId,
+          googleEventId: link.googleEventId,
+        };
+      } catch {
+        return null;
+      }
+    }),
+  );
 
   return {
     connection,
@@ -125,7 +203,9 @@ export const load: PageServerLoad = async ({ cookies }) => {
     canManageTaskImport,
     canAssignTasks,
     sourceError,
-    syncErrors: taskLinks.filter((link) => Boolean(link.lastSyncError)).length,
+    syncState,
+    syncErrors: [...taskLinks, ...ticketLinks].filter((link) => Boolean(link.lastSyncError)).length,
+    syncIssues: [...taskIssues, ...ticketIssues].filter((issue) => issue !== null),
   };
 };
 
@@ -220,6 +300,71 @@ export const actions: Actions = {
       return { success: true, action: "source", message: "Regra deste calendário atualizada." };
     } catch {
       return fail(400, { success: false, action: "source", message: "Não foi possível atualizar este calendário." });
+    }
+  },
+
+  resolveTaskConflictF10: async ({ cookies, request }) => {
+    const { session, permissions } = await requireGoogleContext(cookies);
+    const taskId = readString(await request.formData(), "entityId");
+    if (!isUuid(taskId)) return fail(400, { success: false, action: "resolveTaskConflictF10", message: "Tarefa inválida." });
+
+    try {
+      await requireTaskUpdateAccess(session.user.id, permissions, taskId);
+      await resolveTaskGoogleSyncWithF10(session.user.id, taskId);
+      return { success: true, action: "resolveTaskConflictF10", message: "Conflito resolvido mantendo a versão do F10." };
+    } catch {
+      return fail(403, { success: false, action: "resolveTaskConflictF10", message: "Não foi possível resolver este conflito." });
+    }
+  },
+
+  resolveTaskConflictGoogle: async ({ cookies, request }) => {
+    const { session, permissions } = await requireGoogleContext(cookies);
+    const taskId = readString(await request.formData(), "entityId");
+    if (!isUuid(taskId)) return fail(400, { success: false, action: "resolveTaskConflictGoogle", message: "Tarefa inválida." });
+
+    try {
+      await requireTaskUpdateAccess(session.user.id, permissions, taskId);
+      const link = await getTaskGoogleCalendarLink(session.user.id, taskId);
+      if (!link) throw new Error("TASK_GOOGLE_LINK_NOT_FOUND");
+      const event = await getGoogleCalendarEvent(session.user.id, link.googleCalendarId, link.googleEventId);
+      if (!event) throw new Error("GOOGLE_EVENT_NOT_FOUND");
+      await applyGoogleEventToTask(session.user.id, taskId, event);
+      return { success: true, action: "resolveTaskConflictGoogle", message: "Conflito resolvido usando a versão do Google." };
+    } catch {
+      return fail(403, { success: false, action: "resolveTaskConflictGoogle", message: "Não foi possível resolver este conflito." });
+    }
+  },
+
+  resolveTicketConflictF10: async ({ cookies, request }) => {
+    const { session, permissions } = await requireGoogleContext(cookies);
+    const ticketId = readString(await request.formData(), "entityId");
+    if (!isUuid(ticketId)) return fail(400, { success: false, action: "resolveTicketConflictF10", message: "Ticket inválido." });
+
+    try {
+      await requireTicketReplyAccess(session.user.id, permissions, ticketId);
+      await resolveTicketGoogleSyncWithF10(session.user.id, ticketId);
+      return { success: true, action: "resolveTicketConflictF10", message: "Conflito resolvido mantendo a versão do F10." };
+    } catch {
+      return fail(403, { success: false, action: "resolveTicketConflictF10", message: "Não foi possível resolver este conflito." });
+    }
+  },
+
+  resolveTicketConflictGoogle: async ({ cookies, request }) => {
+    const { session, permissions } = await requireGoogleContext(cookies);
+    const ticketId = readString(await request.formData(), "entityId");
+    if (!isUuid(ticketId)) return fail(400, { success: false, action: "resolveTicketConflictGoogle", message: "Ticket inválido." });
+
+    try {
+      await requireTicketReplyAccess(session.user.id, permissions, ticketId);
+      const links = await listUserTicketGoogleCalendarLinks(session.user.id);
+      const link = links.find((item) => item.ticketId === ticketId);
+      if (!link) throw new Error("TICKET_GOOGLE_LINK_NOT_FOUND");
+      const event = await getGoogleCalendarEvent(session.user.id, link.googleCalendarId, link.googleEventId);
+      if (!event) throw new Error("GOOGLE_EVENT_NOT_FOUND");
+      await applyGoogleEventToTicketDueDate(session.user.id, ticketId, event);
+      return { success: true, action: "resolveTicketConflictGoogle", message: "Conflito resolvido usando a data do Google." };
+    } catch {
+      return fail(403, { success: false, action: "resolveTicketConflictGoogle", message: "Não foi possível resolver este conflito." });
     }
   },
 
