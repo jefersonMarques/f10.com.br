@@ -5,8 +5,7 @@
 
   export let data: PageData;
 
-  let chatOpen = data.openChat && data.customerSupport.authenticated;
-  const supportLoginUrl = "/cliente?returnTo=%2Fajuda-f10%3Fchat%3D1";
+  let chatOpen = data.openChat;
 </script>
 
 <svelte:head>
@@ -129,37 +128,24 @@
         <span class="inline-flex h-11 min-w-11 items-center justify-center rounded-2xl bg-white/10 text-[#FF9A4B]"><LifeBuoy size={21} aria-hidden="true" /></span>
         <div>
           <h2 class="text-[18px] font-semibold">Não encontrou o que precisava?</h2>
-          {#if data.customerSupport.authenticated}
-            <p class="mt-1.5 max-w-[620px] text-[11px] leading-5 text-white/65">Inicie um atendimento identificado como {data.customerSupport.unitName || "sua unidade"}. A conversa vira um chamado e fica vinculada ao seu contexto F10.</p>
-          {:else}
-            <p class="mt-1.5 max-w-[620px] text-[11px] leading-5 text-white/65">Para proteger seus chamados e identificar corretamente sua unidade, entre com a mesma conta usada no sistema F10 antes de iniciar o atendimento.</p>
-          {/if}
+          <p class="mt-1.5 max-w-[620px] text-[11px] leading-5 text-white/65">
+            Converse primeiro com o Assistente F10 sem precisar entrar. Se você quiser falar com alguém da equipe, a identificação da conta e da unidade acontece dentro do próprio chat.
+          </p>
         </div>
       </div>
-      {#if data.customerSupport.authenticated}
-        <button
-          type="button"
-          class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-[#EA6D0B] px-5 text-[11px] font-semibold text-white transition hover:bg-[#D96208] focus:outline-none focus:ring-4 focus:ring-white/15"
-          on:click={() => (chatOpen = true)}
-        >
-          Falar com o suporte
-        </button>
-      {:else}
-        <a
-          href={supportLoginUrl}
-          class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-[#EA6D0B] px-5 text-[11px] font-semibold text-white transition hover:bg-[#D96208] focus:outline-none focus:ring-4 focus:ring-white/15"
-        >
-          Entrar para falar com suporte
-        </a>
-      {/if}
+      <button
+        type="button"
+        class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-[#EA6D0B] px-5 text-[11px] font-semibold text-white transition hover:bg-[#D96208] focus:outline-none focus:ring-4 focus:ring-white/15"
+        on:click={() => (chatOpen = true)}
+      >
+        Abrir atendimento
+      </button>
     </section>
   </div>
 </main>
 
-{#if data.customerSupport.authenticated}
-  <SupportChatDialog
-    isOpen={chatOpen}
-    onClose={() => (chatOpen = false)}
-    customerSupport={data.customerSupport}
-  />
-{/if}
+<SupportChatDialog
+  isOpen={chatOpen}
+  onClose={() => (chatOpen = false)}
+  customerSupport={data.customerSupport}
+/>
