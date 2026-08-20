@@ -9,6 +9,9 @@ import {
   getGoogleCalendarConnection,
   listGoogleCalendarEvents,
 } from "$lib/server/calendar/googleCalendarRepository";
+import { listTicketAgendaItems } from "$lib/server/support/ticketAgendaRepository";
+import { isTicketDueDate } from "$lib/server/support/ticketDueDate";
+import { updateTicketDueOn } from "$lib/server/support/supportRepository";
 import {
   createTask,
   getTaskBoard,
@@ -65,32 +68,44 @@ function addUtcDays(date: Date, days: number): Date {
   return next;
 }
 
-function googleRange(anchor: string): { timeMin: Date; timeMax: Date } {
+function agendaRange(anchor: string): { timeMin: Date; timeMax: Date; startOn: string; endOn: string } {
   const base = new Date(`${anchor}T00:00:00.000Z`);
+  const timeMin = addUtcDays(base, -45);
+  const timeMax = addUtcDays(base, 80);
   return {
-    timeMin: addUtcDays(base, -45),
-    timeMax: addUtcDays(base, 80),
+    timeMin,
+    timeMax,
+    startOn: timeMin.toISOString().slice(0, 10),
+    endOn: timeMax.toISOString().slice(0, 10),
   };
 }
 
 export const load: PageServerLoad = async ({ parent, url }) => {
   const layout = await parent();
   const permissions = createPermissionMap(layout.permissions);
+  const canViewTasks = hasPermission(permissions, "tasks.view");
+  const canViewTickets = hasPermission(permissions, "tickets.view");
 
-  if (!hasPermission(permissions, "tasks.view")) {
+  if (!canViewTasks && !canViewTickets) {
     throw error(403, "Acesso não autorizado.");
   }
 
-  const projects = await listTaskProjects(layout.user.id, permissions);
-  const requestedProjectId = url.searchParams.get("project") ?? "";
-  const selectedProject = projects.find((project) => project.id === requestedProjectId) ?? null;
-  const canCreate = hasPermission(permissions, "tasks.create");
-  const canAssign = hasPermission(permissions, "tasks.assign");
   const requestedDate = url.searchParams.get("date") ?? "";
   const calendarAnchor = isValidDate(requestedDate) ? requestedDate : todayKey();
+  const range = agendaRange(calendarAnchor);
+  const projects = canViewTasks
+    ? await listTaskProjects(layout.user.id, permissions)
+    : [];
+  const requestedProjectId = url.searchParams.get("project") ?? "";
+  const selectedProject = canViewTasks
+    ? projects.find((project) => project.id === requestedProjectId) ?? null
+    : null;
+  const canCreate = canViewTasks && hasPermission(permissions, "tasks.create");
+  const canAssign = canViewTasks && hasPermission(permissions, "tasks.assign");
+  const canChangeTicketDueOn = canViewTickets && hasPermission(permissions, "tickets.reply");
 
-  let sourceTasks;
-  if (selectedProject) {
+  let sourceTasks: Awaited<ReturnType<typeof listMyTasks>> = [];
+  if (canViewTasks && selectedProject) {
     const board = await getTaskBoard(layout.user.id, permissions, selectedProject.id);
     sourceTasks = board.tasks.map((task) => {
       const status = board.statuses.find((item) => item.id === task.statusId);
@@ -102,20 +117,29 @@ export const load: PageServerLoad = async ({ parent, url }) => {
         statusClosed: status?.isClosed ?? Boolean(task.completedAt),
       };
     });
-  } else {
+  } else if (canViewTasks) {
     sourceTasks = await listMyTasks(layout.user.id, permissions);
   }
 
   type ProjectMember = Awaited<ReturnType<typeof listProjectMembers>>[number];
-  const [membersByProject, googleCalendar, taskGoogleLinks, calendarUsers] = await Promise.all([
+  const [membersByProject, googleCalendar, taskGoogleLinks, calendarUsers, ticketRows] = await Promise.all([
     canAssign
       ? Promise.all(
           projects.map(async (project) => [project.id, await listProjectMembers(project.id)] as const),
         ).then((entries) => Object.fromEntries(entries) as Record<string, ProjectMember[]>)
       : Promise.resolve({} as Record<string, ProjectMember[]>),
-    getGoogleCalendarConnection(layout.user.id),
-    listUserTaskGoogleCalendarLinks(layout.user.id),
-    listActiveTaskUsers(),
+    canViewTasks
+      ? getGoogleCalendarConnection(layout.user.id)
+      : Promise.resolve({ configured: false, connected: false, googleEmail: "", connectedAt: null, lastUsedAt: null }),
+    canViewTasks
+      ? listUserTaskGoogleCalendarLinks(layout.user.id)
+      : Promise.resolve([]),
+    canViewTasks
+      ? listActiveTaskUsers()
+      : Promise.resolve([]),
+    canViewTickets
+      ? listTicketAgendaItems(layout.user.id, permissions, range.startOn, range.endOn)
+      : Promise.resolve([]),
   ]);
 
   const linkedEventIds = new Set(taskGoogleLinks.map((link) => link.googleEventId));
@@ -124,9 +148,8 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   let googleEvents: Awaited<ReturnType<typeof listGoogleCalendarEvents>> = [];
   let googleCalendarError = "";
 
-  if (googleCalendar.connected) {
+  if (canViewTasks && googleCalendar.connected) {
     try {
-      const range = googleRange(calendarAnchor);
       const fetchedEvents = await listGoogleCalendarEvents(layout.user.id, range.timeMin, range.timeMax);
       googleEvents = fetchedEvents.filter((event) => !linkedEventIds.has(event.id));
     } catch {
@@ -138,11 +161,15 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     projects,
     selectedProjectId: selectedProject?.id ?? null,
     tasks: sourceTasks,
+    tickets: ticketRows,
     membersByProject,
     calendarUsers,
     organizerUserId: layout.user.id,
+    canViewTasks,
+    canViewTickets,
     canCreate,
     canAssign,
+    canChangeTicketDueOn,
     calendarAnchor,
     googleCalendar,
     googleEvents,
@@ -154,6 +181,40 @@ export const load: PageServerLoad = async ({ parent, url }) => {
 };
 
 export const actions: Actions = {
+  updateTicketDueOn: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      "/app/tasks/calendar",
+    );
+    const formData = await request.formData();
+    const ticketId = readFormValue(formData, "ticketId");
+    const dueOn = readFormValue(formData, "dueOn");
+
+    if (!isUuid(ticketId) || !isTicketDueDate(dueOn)) {
+      return fail(400, {
+        success: false,
+        action: "updateTicketDueOn",
+        message: "Ticket ou data de conclusão inválida.",
+      });
+    }
+
+    try {
+      await updateTicketDueOn(session.user.id, permissions, ticketId, dueOn);
+      return {
+        success: true,
+        action: "updateTicketDueOn",
+        message: "Conclusão planejada atualizada.",
+      };
+    } catch {
+      return fail(403, {
+        success: false,
+        action: "updateTicketDueOn",
+        message: "Não foi possível alterar a conclusão planejada deste ticket.",
+      });
+    }
+  },
+
   createTask: async ({ cookies, request }) => {
     const { session, permissions } = await requireAppPermission(cookies, "tasks.create", "/app/tasks/calendar");
     const formData = await request.formData();
