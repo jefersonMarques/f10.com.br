@@ -34,3 +34,29 @@ export async function completeSchedulingGoogleReservation(
 
   if (!updated) throw new Error("SCHEDULING_BOOKING_STATE_CHANGED");
 }
+
+export async function completeSchedulingWithoutGoogleReservation(
+  invitationId: string,
+): Promise<void> {
+  const db = getDatabase();
+  const now = new Date();
+  const [updated] = await db
+    .update(schedulingInvitations)
+    .set({
+      status: "booked",
+      bookedAt: now,
+      googleEventId: null,
+      googleIcalUid: null,
+      googleMeetUrl: null,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(schedulingInvitations.id, invitationId),
+        eq(schedulingInvitations.status, "booking"),
+      ),
+    )
+    .returning({ id: schedulingInvitations.id });
+
+  if (!updated) throw new Error("SCHEDULING_BOOKING_STATE_CHANGED");
+}
