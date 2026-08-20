@@ -37,6 +37,14 @@ export const DEFAULT_GOOGLE_CALENDAR_PREFERENCES: GoogleCalendarSyncPreferences 
   syncGoogleChangesToF10: false,
 };
 
+function canReadGoogleCalendarEvents(accessRole: string): boolean {
+  return ["reader", "writer", "owner"].includes(accessRole);
+}
+
+function canWriteGoogleCalendarEvents(accessRole: string): boolean {
+  return ["writer", "owner"].includes(accessRole);
+}
+
 async function ensureGoogleCalendarPreferenceRow(userId: string): Promise<void> {
   const db = getDatabase();
   await db
@@ -170,7 +178,7 @@ export async function saveGoogleCalendarSyncPreferences(
     )
     .limit(1);
 
-  if (!target || !["writer", "owner"].includes(target.accessRole)) {
+  if (!target || !canWriteGoogleCalendarEvents(target.accessRole)) {
     throw new Error("GOOGLE_CALENDAR_TARGET_NOT_WRITABLE");
   }
 
@@ -206,7 +214,7 @@ export async function refreshGoogleCalendarSources(userId: string): Promise<void
   const db = getDatabase();
   const now = new Date();
   const calendarIds = calendars.map((calendar) => calendar.id);
-  const writableCalendars = calendars.filter((calendar) => ["writer", "owner"].includes(calendar.accessRole));
+  const writableCalendars = calendars.filter((calendar) => canWriteGoogleCalendarEvents(calendar.accessRole));
   const writableCalendarIds = writableCalendars.map((calendar) => calendar.id);
   const fallbackCalendarId = writableCalendars.find((calendar) => calendar.primary)?.id
     ?? writableCalendars[0]?.id
@@ -214,6 +222,7 @@ export async function refreshGoogleCalendarSources(userId: string): Promise<void
 
   await db.transaction(async (tx) => {
     for (const calendar of calendars) {
+      const canReadEvents = canReadGoogleCalendarEvents(calendar.accessRole);
       await tx
         .insert(googleCalendarSources)
         .values({
@@ -222,8 +231,8 @@ export async function refreshGoogleCalendarSources(userId: string): Promise<void
           calendarName: calendar.summary,
           accessRole: calendar.accessRole,
           isPrimary: calendar.primary,
-          visibleInF10: calendar.primary,
-          importMode: "view_only",
+          visibleInF10: canReadEvents && calendar.primary,
+          importMode: canReadEvents ? "view_only" : "hidden",
           lastSeenAt: now,
           updatedAt: now,
         })
@@ -235,6 +244,14 @@ export async function refreshGoogleCalendarSources(userId: string): Promise<void
             isPrimary: calendar.primary,
             lastSeenAt: now,
             updatedAt: now,
+            ...(!canReadEvents
+              ? {
+                  visibleInF10: false,
+                  importMode: "hidden" as const,
+                  importProjectId: null,
+                  importAssigneeId: null,
+                }
+              : {}),
           },
         });
     }
@@ -312,7 +329,26 @@ export async function saveGoogleCalendarSource(
   }
 
   const db = getDatabase();
-  const [updated] = await db
+  const [source] = await db
+    .select({ accessRole: googleCalendarSources.accessRole })
+    .from(googleCalendarSources)
+    .where(
+      and(
+        eq(googleCalendarSources.userId, userId),
+        eq(googleCalendarSources.calendarId, input.calendarId),
+      ),
+    )
+    .limit(1);
+
+  if (!source) throw new Error("GOOGLE_CALENDAR_SOURCE_NOT_FOUND");
+  if (
+    (input.visibleInF10 || input.importMode === "task") &&
+    !canReadGoogleCalendarEvents(source.accessRole)
+  ) {
+    throw new Error("GOOGLE_CALENDAR_SOURCE_EVENTS_NOT_READABLE");
+  }
+
+  await db
     .update(googleCalendarSources)
     .set({
       visibleInF10: input.visibleInF10,
@@ -326,10 +362,7 @@ export async function saveGoogleCalendarSource(
         eq(googleCalendarSources.userId, userId),
         eq(googleCalendarSources.calendarId, input.calendarId),
       ),
-    )
-    .returning({ calendarId: googleCalendarSources.calendarId });
-
-  if (!updated) throw new Error("GOOGLE_CALENDAR_SOURCE_NOT_FOUND");
+    );
 }
 
 export async function listVisibleGoogleCalendarSources(userId: string) {
