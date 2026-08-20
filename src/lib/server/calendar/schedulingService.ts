@@ -11,7 +11,10 @@ import {
   getGoogleCalendarConnection,
 } from "$lib/server/calendar/googleCalendarRepository";
 import { getGoogleCalendarSyncPreferences } from "$lib/server/calendar/googleCalendarPreferenceRepository";
-import { completeSchedulingGoogleReservation } from "$lib/server/calendar/schedulingGoogleCalendarRepository";
+import {
+  completeSchedulingGoogleReservation,
+  completeSchedulingWithoutGoogleReservation,
+} from "$lib/server/calendar/schedulingGoogleCalendarRepository";
 import {
   claimSchedulingReservation,
   createSchedulingInvitation,
@@ -508,6 +511,39 @@ export async function bookSchedulingSlot(
     throw error;
   }
 
+  const preferences = await getGoogleCalendarSyncPreferences(invitation.hostUserId);
+  const shouldSyncGoogle = preferences.syncSchedulingToGoogle || invitation.addGoogleMeet;
+
+  if (!shouldSyncGoogle) {
+    try {
+      await completeSchedulingWithoutGoogleReservation(invitation.id);
+    } catch (error) {
+      await releaseSchedulingReservation(invitation.id);
+      throw error;
+    }
+
+    await recordAuditEvent({
+      action: "scheduling.invitation.booked",
+      entityType: "scheduling_invitation",
+      entityId: invitation.id,
+      metadata: {
+        hostUserId: invitation.hostUserId,
+        customerContactId: invitation.customerContactId,
+        startAt: startAt.toISOString(),
+        endAt: endAt.toISOString(),
+        googleSynchronized: false,
+      },
+    });
+
+    return {
+      ...resolved.invitation,
+      status: "booked",
+      selectedStartAt: startAt.toISOString(),
+      selectedEndAt: endAt.toISOString(),
+      googleMeetUrl: null,
+    };
+  }
+
   const localStart = instantToZonedParts(startAt, invitation.timeZone);
   const localEnd = instantToZonedParts(endAt, invitation.timeZone);
   let googleEvent: Awaited<ReturnType<typeof createGoogleCalendarEvent>> | null = null;
@@ -517,7 +553,6 @@ export async function bookSchedulingSlot(
     const created = await createSchedulingGoogleEvent(invitation, localStart, localEnd);
     googleEvent = created.event;
     googleCalendarId = created.calendarId;
-
     await completeSchedulingGoogleReservation(invitation.id, googleCalendarId, {
       eventId: googleEvent.id,
       iCalUid: googleEvent.iCalUID,
@@ -543,6 +578,7 @@ export async function bookSchedulingSlot(
       customerContactId: invitation.customerContactId,
       startAt: startAt.toISOString(),
       endAt: endAt.toISOString(),
+      googleSynchronized: true,
       googleCalendarId,
       googleEventId: googleEvent.id,
     },
