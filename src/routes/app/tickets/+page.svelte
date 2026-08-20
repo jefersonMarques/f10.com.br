@@ -21,6 +21,7 @@
     X,
   } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
+  import TicketTaskPanel from "$lib/components/operations/TicketTaskPanel.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -87,6 +88,16 @@
     selectedLabels: CardLabel[];
     attachments: CardAttachment[];
     attachmentsEnabled: boolean;
+    linkedTasks: Array<{
+      id: string;
+      title: string;
+      projectName: string;
+      statusName: string;
+      statusClosed: boolean;
+      dueOn: string | null;
+    }>;
+    taskProjects: Array<{ id: string; name: string }>;
+    canCreateTask: boolean;
   };
 
   const AREA_EXIT_MESSAGE = "Entre na área e conclua o fluxo antes de movimentar o ticket.";
@@ -578,6 +589,16 @@
             <h3 class="application-text-caption flex items-center gap-2 font-semibold text-[#3D4452]"><Paperclip size={13}/>Adicionar anexo</h3>
             {#if data.canReply && card.attachmentsEnabled}<form on:submit={uploadAttachment} class="mt-3"><input name="file" type="file" required accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,.docx,.xlsx,.zip" class="application-text-meta block w-full text-[#6C7381]"/><button class="application-text-meta mt-3 h-9 w-full rounded-lg border border-[#D9DDE4] bg-white font-semibold text-[#4E5565]">Enviar arquivo</button></form>{:else if !card.attachmentsEnabled}<p class="application-text-meta mt-2 leading-4 text-[#8A5A2A]">Configure o storage S3 para habilitar anexos.</p>{/if}
           </section>
+
+          <TicketTaskPanel
+            ticketId={card.details.ticket.id}
+            ticketNumber={card.details.ticket.ticketNumber}
+            ticketSubject={card.details.ticket.subject}
+            tasks={card.linkedTasks}
+            projects={card.taskProjects}
+            canCreate={card.canCreateTask}
+            onCreated={refreshCard}
+          />
 
           <section class="application-text-meta rounded-xl border border-[#DDE1E7] bg-white p-4 leading-5 text-[#6D7482]"><p><strong>Cliente:</strong> {card.details.ticket.customerName ?? "Não identificado"}</p><p><strong>Fila técnica:</strong> {card.details.ticket.queueName}</p><p><strong>Responsável:</strong> {card.details.ticket.assignedUserName ?? "Sem responsável"}</p></section>
           <a href={`/app/tickets/${card.details.ticket.id}`} class="application-text-meta flex h-10 items-center justify-center gap-2 rounded-lg border border-[#CCD1DA] bg-white font-semibold text-[#000A57]"><ExternalLink size={12}/>Abrir página completa</a>
