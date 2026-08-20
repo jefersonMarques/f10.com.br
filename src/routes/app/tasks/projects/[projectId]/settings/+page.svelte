@@ -35,13 +35,13 @@
     </section>
 
     <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
-      <div class="flex items-center gap-3"><Users size={18} class="text-[#000A57]"/><div><h2 class="text-[14px] font-semibold text-[#11182C]">Integrantes</h2><p class="mt-1 text-[10px] text-[#8A909E]">Quem pode participar das tarefas deste projeto.</p></div></div>
+      <div class="flex items-center gap-3"><Users size={18} class="text-[#000A57]"/><div><h2 class="text-[14px] font-semibold text-[#11182C]">Integrantes</h2><p class="application-text-caption mt-1 text-[#8A909E]">Quem pode participar das tarefas deste projeto.</p></div></div>
 
       <div class="mt-5 space-y-2">
         {#each data.members as member}
           <div class="flex items-center gap-3 rounded-xl border border-[#E7E9EF] px-3 py-3">
             <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF0FF] text-[11px] font-bold text-[#000A57]">{member.name.slice(0,1).toUpperCase()}</span>
-            <div class="min-w-0 flex-1"><strong class="block truncate text-[11px] font-semibold text-[#303646]">{member.name}</strong><span class="mt-0.5 block truncate text-[10px] text-[#8B909E]">{member.email}</span></div>
+            <div class="min-w-0 flex-1"><strong class="block truncate text-[11px] font-semibold text-[#303646]">{member.name}</strong><span class="application-text-caption mt-0.5 block truncate text-[#8B909E]">{member.email}</span></div>
             <form method="POST" action="?/removeMember"><input type="hidden" name="userId" value={member.id}/><button type="submit" class="flex h-8 w-8 items-center justify-center rounded-lg text-[#9B6B6B] hover:bg-[#FFF0F0]" aria-label={`Remover ${member.name}`}><X size={15}/></button></form>
           </div>
         {/each}
