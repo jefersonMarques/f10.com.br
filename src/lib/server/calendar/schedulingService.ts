@@ -10,9 +10,10 @@ import {
   deleteGoogleCalendarEvent,
   getGoogleCalendarConnection,
 } from "$lib/server/calendar/googleCalendarRepository";
+import { getGoogleCalendarSyncPreferences } from "$lib/server/calendar/googleCalendarPreferenceRepository";
+import { completeSchedulingGoogleReservation } from "$lib/server/calendar/schedulingGoogleCalendarRepository";
 import {
   claimSchedulingReservation,
-  completeSchedulingReservation,
   createSchedulingInvitation,
   getSchedulingAvailabilityProfile,
   getSchedulingCustomer,
@@ -445,6 +446,39 @@ async function slotStillAvailable(
   );
 }
 
+async function createSchedulingGoogleEvent(
+  invitation: SchedulingInvitationRow,
+  localStart: { date: string; time: string },
+  localEnd: { date: string; time: string },
+): Promise<{ event: Awaited<ReturnType<typeof createGoogleCalendarEvent>>; calendarId: string }> {
+  const preferences = await getGoogleCalendarSyncPreferences(invitation.hostUserId);
+  const preferredCalendarId = preferences.targetCalendarId || "primary";
+  const input = {
+    title: invitation.title,
+    description: "Agendamento confirmado pelo F10.",
+    date: localStart.date,
+    allDay: false,
+    startTime: localStart.time,
+    endTime: localEnd.time,
+    timeZone: invitation.timeZone,
+    addGoogleMeet: invitation.addGoogleMeet,
+    attendees: [{ email: invitation.customerEmail }],
+  };
+
+  try {
+    return {
+      event: await createGoogleCalendarEvent(invitation.hostUserId, input, preferredCalendarId),
+      calendarId: preferredCalendarId,
+    };
+  } catch (cause) {
+    if (preferredCalendarId === "primary") throw cause;
+    return {
+      event: await createGoogleCalendarEvent(invitation.hostUserId, input, "primary"),
+      calendarId: "primary",
+    };
+  }
+}
+
 export async function bookSchedulingSlot(
   token: string,
   selectedStartAt: string,
@@ -477,28 +511,21 @@ export async function bookSchedulingSlot(
   const localStart = instantToZonedParts(startAt, invitation.timeZone);
   const localEnd = instantToZonedParts(endAt, invitation.timeZone);
   let googleEvent: Awaited<ReturnType<typeof createGoogleCalendarEvent>> | null = null;
+  let googleCalendarId = "primary";
 
   try {
-    googleEvent = await createGoogleCalendarEvent(invitation.hostUserId, {
-      title: invitation.title,
-      description: "Agendamento confirmado pelo F10.",
-      date: localStart.date,
-      allDay: false,
-      startTime: localStart.time,
-      endTime: localEnd.time,
-      timeZone: invitation.timeZone,
-      addGoogleMeet: invitation.addGoogleMeet,
-      attendees: [{ email: invitation.customerEmail }],
-    });
+    const created = await createSchedulingGoogleEvent(invitation, localStart, localEnd);
+    googleEvent = created.event;
+    googleCalendarId = created.calendarId;
 
-    await completeSchedulingReservation(invitation.id, {
+    await completeSchedulingGoogleReservation(invitation.id, googleCalendarId, {
       eventId: googleEvent.id,
       iCalUid: googleEvent.iCalUID,
       meetUrl: googleEvent.meetUrl,
     });
   } catch (error) {
     if (googleEvent) {
-      await deleteGoogleCalendarEvent(invitation.hostUserId, "primary", googleEvent.id).catch(() => undefined);
+      await deleteGoogleCalendarEvent(invitation.hostUserId, googleCalendarId, googleEvent.id).catch(() => undefined);
     }
     await releaseSchedulingReservation(invitation.id);
     if (error instanceof Error && error.message === "SCHEDULING_SLOT_UNAVAILABLE") throw error;
@@ -516,6 +543,7 @@ export async function bookSchedulingSlot(
       customerContactId: invitation.customerContactId,
       startAt: startAt.toISOString(),
       endAt: endAt.toISOString(),
+      googleCalendarId,
       googleEventId: googleEvent.id,
     },
   });
