@@ -53,9 +53,11 @@ export const helpTrainingSteps = pgTable(
       .notNull()
       .references(() => helpTrainingPaths.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
+    question: text("question").notNull().default(""),
     instruction: text("instruction").notNull().default(""),
     expectedResult: text("expected_result").notNull().default(""),
     successMessage: text("success_message").notNull().default(""),
+    primaryActionLabel: text("primary_action_label").notNull().default(""),
     interactionMode: text("interaction_mode")
       .$type<HelpTrainingInteractionMode>()
       .notNull()
@@ -124,9 +126,11 @@ export type HelpTrainingSnapshot = {
   steps: Array<{
     id: string;
     title: string;
+    question?: string;
     instruction: string;
     expectedResult: string;
     successMessage: string;
+    primaryActionLabel?: string;
     interactionMode?: HelpTrainingInteractionMode;
     estimatedSeconds: number;
     images: Array<{ assetId: string; altText: string }>;
