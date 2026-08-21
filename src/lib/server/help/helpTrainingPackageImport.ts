@@ -227,6 +227,18 @@ function mimeTypeForFile(path: string, expected: PackageAssetType): string {
   return mimeType;
 }
 
+function registerReferencedFile(
+  referencedFiles: Map<string, PackageAssetType>,
+  path: string,
+  assetType: PackageAssetType,
+): void {
+  const existingType = referencedFiles.get(path);
+  if (existingType && existingType !== assetType) {
+    throw new Error(`TRAINING_PACKAGE_FILE_TYPE_CONFLICT:${path}`);
+  }
+  referencedFiles.set(path, assetType);
+}
+
 export async function importHelpTrainingPackage(
   actorUserId: string,
   archiveBytes: Uint8Array,
@@ -238,9 +250,9 @@ export async function importHelpTrainingPackage(
 
   const referencedFiles = new Map<string, PackageAssetType>();
   for (const step of manifest.steps) {
-    for (const image of step.images) referencedFiles.set(image.file, "image");
-    if (step.video?.file) referencedFiles.set(step.video.file, "video");
-    if (step.video?.captions) referencedFiles.set(step.video.captions, "caption");
+    for (const image of step.images) registerReferencedFile(referencedFiles, image.file, "image");
+    if (step.video?.file) registerReferencedFile(referencedFiles, step.video.file, "video");
+    if (step.video?.captions) registerReferencedFile(referencedFiles, step.video.captions, "caption");
   }
   for (const [path, expectedType] of referencedFiles) {
     const entry = archive.get(path);
