@@ -11,11 +11,6 @@ export type HelpTrainingClientStep = {
   images: Array<{ assetId: string; altText: string }>;
   videoUrl: string | null;
   captionAssetId: string | null;
-  failureReasons: Array<{
-    key: string;
-    label: string;
-    recoveryMessage: string;
-  }>;
 };
 
 export function normalizeTrainingClientStep(
@@ -33,7 +28,6 @@ export function normalizeTrainingClientStep(
     images: step.images,
     videoUrl: step.videoUrl,
     captionAssetId: step.captionAssetId ?? null,
-    failureReasons: interactionMode === "presentation" ? [] : step.failureReasons,
   };
 }
 
