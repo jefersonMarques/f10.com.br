@@ -218,10 +218,29 @@
     return "Não foi possível concluir a identificação agora. Tente novamente.";
   }
 
+  function parseAuthGroups(value: unknown): CustomerGroup[] {
+    if (!Array.isArray(value)) return [];
+    return value.flatMap((rawGroup) => {
+      if (!rawGroup || typeof rawGroup !== "object") return [];
+      const group = rawGroup as Record<string, unknown>;
+      const id = typeof group.id === "number" ? group.id : 0;
+      const name = typeof group.name === "string" ? group.name : "";
+      if (!id || !name) return [];
+      const units = Array.isArray(group.units)
+        ? group.units.flatMap((rawUnit) => {
+            if (!rawUnit || typeof rawUnit !== "object") return [];
+            const unit = rawUnit as Record<string, unknown>;
+            const unitId = typeof unit.id === "number" ? unit.id : 0;
+            const unitName = typeof unit.name === "string" ? unit.name : "";
+            return unitId && unitName ? [{ id: unitId, name: unitName }] : [];
+          })
+        : [];
+      return [{ id, name, units }];
+    });
+  }
+
   function applyAuthPayload(payload: Record<string, unknown>): void {
-    const groups = Array.isArray(payload.groups)
-      ? payload.groups.filter((group): group is CustomerGroup => Boolean(group && typeof group === "object"))
-      : [];
+    const groups = parseAuthGroups(payload.groups);
     authState = {
       authenticated: payload.authenticated === true,
       name: typeof payload.name === "string" ? payload.name : "",
@@ -430,8 +449,8 @@
 </div>
 
 {#if difficultyOpen}
-  <div class="fixed inset-0 z-[140] flex items-end justify-center bg-[#07132D]/60 p-3 backdrop-blur-[3px] sm:items-center" role="presentation" on:click={(event) => { if (event.currentTarget === event.target && !isSubmitting && !isAuthenticating && !isOpeningTicket) difficultyOpen = false; }}>
-    <section class="w-full max-w-[590px] rounded-[26px] bg-white p-5 shadow-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="difficulty-title">
+  <div class="fixed inset-0 z-[140] flex items-end justify-center bg-[#07132D]/60 p-3 backdrop-blur-[3px] sm:items-center">
+    <div class="w-full max-w-[590px] rounded-[26px] bg-white p-5 shadow-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="difficulty-title">
       <div class="flex items-start justify-between gap-4">
         <div>
           <p class="text-[9px] font-bold uppercase tracking-[0.14em] text-[#F36B00]">Não consegui</p>
@@ -477,12 +496,12 @@
           </div>
         </form>
       {/if}
-    </section>
+    </div>
   </div>
 {/if}
 
 {#if videoOpen && step.videoUrl}
-  <div class="fixed inset-0 z-[150] flex items-center justify-center bg-[#07132D]/92 p-3 sm:p-6" role="presentation" on:click={(event) => { if (event.currentTarget === event.target) videoOpen = false; }}>
+  <div class="fixed inset-0 z-[150] flex items-center justify-center bg-[#07132D]/92 p-3 sm:p-6">
     <div class="relative w-full max-w-[1120px] overflow-hidden rounded-[24px] bg-[#07132D] shadow-2xl" role="dialog" aria-modal="true" aria-label="Demonstração rápida">
       <div class="flex items-center justify-between gap-3 px-4 py-3 text-white sm:px-5"><div><p class="text-[8px] font-bold uppercase tracking-[0.12em] text-[#FF9A4B]">Demonstração rápida</p><strong class="mt-1 block text-[11px]">{step.title}</strong></div><button type="button" on:click={() => (videoOpen = false)} class="training-subtle flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white" aria-label="Fechar demonstração"><X size={16}/></button></div>
       {#if videoAssetId}
