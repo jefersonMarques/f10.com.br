@@ -14,6 +14,13 @@ import {
   getHelpTrainingPublicSessionCookie,
   setHelpTrainingPublicSessionCookie,
 } from "$lib/server/help/helpTrainingSession";
+import { consumeSupportPublicRateLimit } from "$lib/server/support/supportPublicRateLimit";
+
+const PUBLIC_TRAINING_START_RATE_LIMIT = {
+  maxRequests: 20,
+  windowMs: 15 * 60 * 1000,
+  blockMs: 15 * 60 * 1000,
+} as const;
 
 function read(formData: FormData, name: string): string {
   const value = formData.get(name);
@@ -57,13 +64,24 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
 };
 
 export const actions: Actions = {
-  start: async ({ params, cookies }) => {
+  start: async ({ params, cookies, getClientAddress }) => {
     const slug = params.slug?.trim() ?? "";
     try {
+      const allowed = await consumeSupportPublicRateLimit(
+        "help-training-public-start",
+        getClientAddress(),
+        PUBLIC_TRAINING_START_RATE_LIMIT,
+      );
+      if (!allowed) {
+        return fail(429, { success: false, message: "Muitas tentativas foram feitas. Aguarde alguns minutos e tente novamente." });
+      }
       const session = await startPublicHelpTrainingSession(slug);
       setHelpTrainingPublicSessionCookie(cookies, session.sessionToken, session.expiresAt);
-    } catch {
-      return fail(404, { success: false, message: "Esta trilha não está disponível agora." });
+    } catch (cause) {
+      console.error("[help.training.public.start]", {
+        code: cause instanceof Error ? cause.message : "PUBLIC_TRAINING_START_FAILED",
+      });
+      return fail(503, { success: false, message: "Esta trilha não pode ser iniciada agora. Tente novamente em instantes." });
     }
     throw redirect(303, publicPath(slug));
   },
