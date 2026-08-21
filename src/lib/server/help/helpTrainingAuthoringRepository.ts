@@ -255,7 +255,12 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
       .map((media) => ({ assetId: media.assetId as string, altText: media.altText }));
     const video = step.media.find((media) => media.mediaType === "video" && media.sourceUrl);
     const caption = step.media.find((media) => media.mediaType === "caption" && media.assetId);
-    if (video?.sourceUrl) assertVideoReference(video.sourceUrl, video.assetId);
+    if (video?.sourceUrl) {
+      assertVideoReference(video.sourceUrl, video.assetId);
+      if (video.sourceUrl.startsWith("asset:") && !caption?.assetId) {
+        throw new Error("TRAINING_VIDEO_INVALID");
+      }
+    }
 
     return {
       id: step.id,

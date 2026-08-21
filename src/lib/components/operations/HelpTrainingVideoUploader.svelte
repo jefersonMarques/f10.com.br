@@ -71,17 +71,17 @@
     return true;
   }
 
-  async function uploadVideo(): Promise<void> {
-    if (uploading || !selectedFile) return;
+  async function uploadSelection(): Promise<void> {
+    if (uploading || (!selectedFile && !selectedCaptions)) return;
     message = "";
     errorMessage = "";
-    if (!(await validateVideo(selectedFile))) return;
+    if (selectedFile && !(await validateVideo(selectedFile))) return;
     if (selectedCaptions && !validateCaptions(selectedCaptions)) return;
 
     uploading = true;
     try {
       const body = new FormData();
-      body.set("file", selectedFile, selectedFile.name || "demonstracao.mp4");
+      if (selectedFile) body.set("file", selectedFile, selectedFile.name || "demonstracao.mp4");
       if (selectedCaptions) body.set("captions", selectedCaptions, selectedCaptions.name || "legendas.vtt");
       const response = await fetch(`/api/app/help/trilhas/${pathId}/steps/${stepId}/video`, {
         method: "POST",
@@ -90,24 +90,24 @@
       const result = await response.json() as {
         success?: boolean;
         message?: string;
-        durationSeconds?: number;
+        durationSeconds?: number | null;
       };
       if (!response.ok || !result.success) {
-        errorMessage = result.message ?? "Não foi possível enviar o vídeo.";
+        errorMessage = result.message ?? "Não foi possível enviar o vídeo ou a legenda.";
         return;
       }
 
       const durationLabel = typeof result.durationSeconds === "number"
         ? ` (${result.durationSeconds.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}s)`
         : "";
-      message = `${result.message ?? "Vídeo adicionado."}${durationLabel}`;
+      message = `${result.message ?? "Arquivo adicionado."}${durationLabel}`;
       selectedFile = null;
       selectedCaptions = null;
       if (fileInput) fileInput.value = "";
       if (captionInput) captionInput.value = "";
       await invalidateAll();
     } catch {
-      errorMessage = "Não foi possível enviar o vídeo.";
+      errorMessage = "Não foi possível enviar o vídeo ou a legenda.";
     } finally {
       uploading = false;
     }
@@ -145,6 +145,14 @@
       errorMessage = "Arraste um vídeo MP4.";
     }
   }
+
+  $: submitLabel = uploading
+    ? "Validando e enviando..."
+    : selectedFile
+      ? "Enviar vídeo"
+      : selectedCaptions
+        ? "Enviar legenda para o vídeo existente"
+        : "Selecione um arquivo";
 </script>
 
 <div
@@ -158,16 +166,16 @@
 >
   <div class="flex items-start gap-3">
     <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#EA6D0B] shadow-sm"><Film size={17} aria-hidden="true" /></span>
-    <div class="min-w-0 flex-1"><strong class="application-text-caption block font-semibold text-[#303645]">Demonstração em microvídeo</strong><span class="application-text-caption mt-1 block leading-5 text-[#858B99]">MP4 · máximo 60 segundos · até 25 MB. Se houver fala ou informação sonora relevante, envie também a legenda WebVTT.</span></div>
+    <div class="min-w-0 flex-1"><strong class="application-text-caption block font-semibold text-[#303645]">Demonstração em microvídeo</strong><span class="application-text-caption mt-1 block leading-5 text-[#858B99]">MP4 · máximo 60 segundos · até 25 MB. Para publicar um MP4 local, anexe uma legenda WebVTT. Se o vídeo já estiver enviado, você pode selecionar somente o .vtt.</span></div>
   </div>
 
   <input bind:this={fileInput} type="file" accept="video/mp4,.mp4" class="sr-only" on:change={handleFileInput}/>
   <button type="button" disabled={uploading} on:click={() => fileInput?.click()} class="application-text-caption mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57] disabled:cursor-wait disabled:opacity-60"><Film size={14}/>{selectedFile ? selectedFile.name : "Selecionar ou arrastar MP4"}</button>
 
   <input bind:this={captionInput} type="file" accept="text/vtt,.vtt" class="sr-only" on:change={handleCaptionInput}/>
-  <button type="button" disabled={uploading} on:click={() => captionInput?.click()} class="application-text-caption mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#5B6272] disabled:cursor-wait disabled:opacity-60"><Captions size={14}/>{selectedCaptions ? selectedCaptions.name : "Adicionar legenda .vtt (recomendado)"}</button>
+  <button type="button" disabled={uploading} on:click={() => captionInput?.click()} class="application-text-caption mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#5B6272] disabled:cursor-wait disabled:opacity-60"><Captions size={14}/>{selectedCaptions ? selectedCaptions.name : "Selecionar legenda .vtt"}</button>
 
-  <button type="button" disabled={uploading || !selectedFile} on:click={() => void uploadVideo()} class="application-text-caption mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#EA6D0B] px-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><UploadCloud size={14} class={uploading ? "animate-pulse" : ""} aria-hidden="true" />{uploading ? "Validando e enviando..." : "Enviar vídeo"}</button>
+  <button type="button" disabled={uploading || (!selectedFile && !selectedCaptions)} on:click={() => void uploadSelection()} class="application-text-caption mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#EA6D0B] px-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><UploadCloud size={14} class={uploading ? "animate-pulse" : ""} aria-hidden="true" />{submitLabel}</button>
 
   {#if message}<p class="application-text-meta mt-2 font-medium text-[#257342]">{message}</p>{/if}
   {#if errorMessage}<p class="application-text-meta mt-2 font-medium text-[#A52A2A]">{errorMessage}</p>{/if}

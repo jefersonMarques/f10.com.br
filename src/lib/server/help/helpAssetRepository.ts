@@ -81,7 +81,7 @@ function trainingSnapshotReferencesAsset(snapshot: unknown, assetId: string): bo
   for (const stepValue of steps) {
     if (!stepValue || typeof stepValue !== "object" || Array.isArray(stepValue)) continue;
     const step = stepValue as Record<string, unknown>;
-    if (step.videoUrl === videoRef) return true;
+    if (step.videoUrl === videoRef || step.captionAssetId === assetId) return true;
     if (!Array.isArray(step.images)) continue;
     for (const imageValue of step.images) {
       if (!imageValue || typeof imageValue !== "object" || Array.isArray(imageValue)) continue;

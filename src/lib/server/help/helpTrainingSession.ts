@@ -46,7 +46,7 @@ export function setHelpTrainingPublicSessionCookie(
     httpOnly: true,
     sameSite: "lax",
     secure: !dev,
-    path: "/treinamento/trilha",
+    path: "/treinamento",
     maxAge: sessionMaxAge(expiresAt, PUBLIC_SESSION_MAX_AGE_SECONDS),
   });
 }
@@ -56,7 +56,7 @@ export function getHelpTrainingPublicSessionCookie(cookies: Cookies): string {
 }
 
 export function clearHelpTrainingPublicSessionCookie(cookies: Cookies): void {
-  cookies.delete(HELP_TRAINING_PUBLIC_SESSION_COOKIE, { path: "/treinamento/trilha" });
+  cookies.delete(HELP_TRAINING_PUBLIC_SESSION_COOKIE, { path: "/treinamento" });
 }
 
 export function setHelpTrainingInviteCookie(cookies: Cookies, token: string): void {

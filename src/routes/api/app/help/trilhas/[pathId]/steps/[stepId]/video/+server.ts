@@ -9,7 +9,10 @@ import {
   createTrainingCaptionAsset,
   validateTrainingCaptions,
 } from "$lib/server/help/helpTrainingCaption";
-import { attachHelpTrainingVideo } from "$lib/server/help/helpTrainingVideoAttachment";
+import {
+  attachHelpTrainingCaption,
+  attachHelpTrainingVideo,
+} from "$lib/server/help/helpTrainingVideoAttachment";
 import { validateTrainingVideo } from "$lib/server/help/helpTrainingVideo";
 
 const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
@@ -27,9 +30,10 @@ function errorMessage(cause: unknown): string {
   if (code === "ASSET_SIZE_NOT_ALLOWED") return "O vídeo deve ter no máximo 25 MB.";
   if (code === "TRAINING_CAPTION_SIZE_INVALID") return "A legenda deve ter no máximo 1 MB.";
   if (code === "TRAINING_CAPTION_INVALID") return "Use uma legenda WebVTT válida (.vtt), iniciando com WEBVTT.";
+  if (code === "TRAINING_LOCAL_VIDEO_REQUIRED") return "Envie primeiro um vídeo MP4 local antes de anexar somente a legenda.";
   if (code === "ASSET_STORAGE_NOT_CONFIGURED") return "O armazenamento de arquivos não está configurado.";
   if (code === "TRAINING_STEP_NOT_FOUND") return "A microação selecionada não está mais disponível.";
-  return "Não foi possível enviar o vídeo.";
+  return "Não foi possível enviar o vídeo ou a legenda.";
 }
 
 export const POST: RequestHandler = async ({ cookies, params, request }) => {
@@ -46,21 +50,22 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
   );
 
   const formData = await request.formData();
-  const file = formData.get("file");
-  const captions = formData.get("captions");
-  if (!(file instanceof File) || file.size < 1) {
-    return json({ success: false, message: "Selecione um vídeo MP4." }, { status: 400 });
+  const fileValue = formData.get("file");
+  const captionsValue = formData.get("captions");
+  const file = fileValue instanceof File && fileValue.size > 0 ? fileValue : null;
+  const captions = captionsValue instanceof File && captionsValue.size > 0 ? captionsValue : null;
+
+  if (!file && !captions) {
+    return json({ success: false, message: "Selecione um vídeo MP4 ou uma legenda .vtt." }, { status: 400 });
   }
-  if (file.type.toLowerCase() !== "video/mp4") {
+  if (file && file.type.toLowerCase() !== "video/mp4") {
     return json({ success: false, message: "Use um vídeo MP4." }, { status: 400 });
   }
-  if (file.size > MAX_VIDEO_BYTES) {
+  if (file && file.size > MAX_VIDEO_BYTES) {
     return json({ success: false, message: "O vídeo deve ter no máximo 25 MB." }, { status: 400 });
   }
-  if (captions instanceof File && captions.size > 0) {
-    if (!captions.name.toLowerCase().endsWith(".vtt") || captions.size > MAX_CAPTION_BYTES) {
-      return json({ success: false, message: "Use uma legenda WebVTT (.vtt) de até 1 MB." }, { status: 400 });
-    }
+  if (captions && (!captions.name.toLowerCase().endsWith(".vtt") || captions.size > MAX_CAPTION_BYTES)) {
+    return json({ success: false, message: "Use uma legenda WebVTT (.vtt) de até 1 MB." }, { status: 400 });
   }
 
   let videoAssetId: string | null = null;
@@ -69,18 +74,21 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
   let captionReused = false;
 
   try {
-    const videoBytes = new Uint8Array(await file.arrayBuffer());
-    const durationSeconds = validateTrainingVideo(videoBytes, file.type);
-    const videoResult = await createManagedHelpAsset(session.user.id, {
-      fileName: file.name || "demonstracao.mp4",
-      mimeType: file.type,
-      bytes: videoBytes,
-      contentId: null,
-    });
-    videoAssetId = videoResult.asset.id;
-    videoReused = videoResult.reused;
+    let durationSeconds: number | null = null;
+    if (file) {
+      const videoBytes = new Uint8Array(await file.arrayBuffer());
+      durationSeconds = validateTrainingVideo(videoBytes, file.type);
+      const videoResult = await createManagedHelpAsset(session.user.id, {
+        fileName: file.name || "demonstracao.mp4",
+        mimeType: file.type,
+        bytes: videoBytes,
+        contentId: null,
+      });
+      videoAssetId = videoResult.asset.id;
+      videoReused = videoResult.reused;
+    }
 
-    if (captions instanceof File && captions.size > 0) {
+    if (captions) {
       const captionBytes = new Uint8Array(await captions.arrayBuffer());
       validateTrainingCaptions(captionBytes);
       const captionResult = await createTrainingCaptionAsset(
@@ -92,25 +100,29 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
       captionReused = captionResult.reused;
     }
 
-    await attachHelpTrainingVideo(
-      session.user.id,
-      pathId,
-      stepId,
-      videoAssetId,
-      captionAssetId,
-    );
+    if (videoAssetId) {
+      await attachHelpTrainingVideo(
+        session.user.id,
+        pathId,
+        stepId,
+        videoAssetId,
+        captionAssetId,
+      );
+    } else if (captionAssetId) {
+      await attachHelpTrainingCaption(session.user.id, pathId, stepId, captionAssetId);
+    }
 
     return json({
       success: true,
       assetId: videoAssetId,
       captionAssetId,
-      durationSeconds: Math.round(durationSeconds * 10) / 10,
+      durationSeconds: durationSeconds === null ? null : Math.round(durationSeconds * 10) / 10,
       reused: videoReused,
-      message: captionAssetId
+      message: videoAssetId && captionAssetId
         ? "Vídeo e legenda adicionados à microação."
-        : videoReused
-          ? "Vídeo existente reutilizado nesta microação."
-          : "Vídeo adicionado à microação. Adicione uma legenda .vtt quando houver fala ou informação sonora relevante.",
+        : videoAssetId
+          ? "Vídeo adicionado. Anexe a legenda .vtt antes de publicar."
+          : "Legenda adicionada ao vídeo existente.",
     });
   } catch (cause) {
     if (captionAssetId && !captionReused) {
