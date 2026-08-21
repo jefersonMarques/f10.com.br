@@ -331,31 +331,31 @@ body::after {
   }
 }
 
-/* Progressão é neutra: laranja fica reservado para orientação e atenção. */
+/* Progressão usa azul F10; laranja fica reservado para orientação e atenção. */
 .training-primary.training-float {
   animation: none !important;
   transform: none !important;
-  background-color: #FFFFFF !important;
-  color: #000A57 !important;
-  border: 1px solid #C9D2E1 !important;
+  background-color: #000A57 !important;
+  color: #FFFFFF !important;
+  border: 1px solid #000A57 !important;
   opacity: 1 !important;
-  box-shadow: 0 6px 18px rgba(12, 23, 52, 0.07) !important;
+  box-shadow: 0 8px 20px rgba(0, 10, 87, 0.16) !important;
 }
 
 .training-primary.training-float svg {
-  color: #000A57;
+  color: #FFFFFF;
 }
 
 .training-primary.training-float:not(:disabled):hover {
   transform: none !important;
-  background-color: #F7F9FC !important;
-  color: #000A57 !important;
-  border-color: #B9C5D7 !important;
+  background-color: #06134A !important;
+  color: #FFFFFF !important;
+  border-color: #06134A !important;
   opacity: 1 !important;
-  box-shadow: 0 8px 20px rgba(12, 23, 52, 0.09) !important;
+  box-shadow: 0 9px 22px rgba(0, 10, 87, 0.18) !important;
 }
 
-/* Na confirmação, nenhuma resposta recebe aparência de CTA principal. */
+/* Na confirmação, as duas respostas têm o mesmo peso visual. */
 .training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) {
   border-color: #DDE3EE !important;
   background: #F8FAFD !important;
@@ -397,9 +397,9 @@ body::after {
   min-height: 4rem !important;
   flex-direction: row !important;
   gap: 0.55rem !important;
-  border: 1px solid #D9DEE8 !important;
-  background: #FFFFFF !important;
-  color: #26334D !important;
+  border: 1px solid #C9D3EA !important;
+  background: #EEF2FF !important;
+  color: #13245B !important;
   box-shadow: 0 6px 18px rgba(12, 23, 52, 0.05) !important;
   animation: none !important;
   transform: none !important;
@@ -419,9 +419,27 @@ body::after {
 
 .training-step-enter:has(> .training-verification-question) > div.grid > button:hover,
 .training-step-enter:has(> .training-verification-question) > div.grid > form > button:hover {
-  background: #FFFFFF !important;
-  color: #26334D !important;
-  border-color: #C8D0DD !important;
+  background: #E4EAFF !important;
+  color: #13245B !important;
+  border-color: #B8C4E2 !important;
   box-shadow: 0 8px 20px rgba(12, 23, 52, 0.07) !important;
   transform: none !important;
+}
+
+/* Recuperação usa âmbar para sinalizar correção, sem voltar ao laranja de progressão. */
+.training-step-enter > div.mt-7.w-full > button.training-primary.training-float {
+  background-color: #FFF1DF !important;
+  color: #93440D !important;
+  border-color: #E8B783 !important;
+  box-shadow: 0 7px 18px rgba(147, 68, 13, 0.08) !important;
+}
+
+.training-step-enter > div.mt-7.w-full > button.training-primary.training-float svg {
+  color: #93440D;
+}
+
+.training-step-enter > div.mt-7.w-full > button.training-primary.training-float:not(:disabled):hover {
+  background-color: #FFE7CA !important;
+  color: #7D3809 !important;
+  border-color: #DDA46D !important;
 }
