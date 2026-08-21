@@ -122,9 +122,6 @@ export async function reportInviteTrainingDifficulty(
 ): Promise<void> {
   const state = await getHelpTrainingSession(rawSessionToken);
   if (!state || !state.currentStep) throw new Error("TRAINING_SESSION_INVALID");
-  if ((state.currentStep.interactionMode ?? "action") !== "action") {
-    throw new Error("TRAINING_DIFFICULTY_NOT_ALLOWED");
-  }
 
   const detail = normalizeDifficultyDetail(detailInput);
   const reporter = normalizeReporter(reporterInput);
@@ -208,9 +205,6 @@ export async function reportPublicTrainingDifficulty(
 ): Promise<void> {
   const state = await getPublicHelpTrainingSession(rawSessionToken);
   if (!state || !state.currentStep) throw new Error("PUBLIC_TRAINING_SESSION_INVALID");
-  if ((state.currentStep.interactionMode ?? "action") !== "action") {
-    throw new Error("TRAINING_DIFFICULTY_NOT_ALLOWED");
-  }
 
   const detail = normalizeDifficultyDetail(detailInput);
   const reporter = normalizeReporter(reporterInput);
