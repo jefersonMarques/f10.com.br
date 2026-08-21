@@ -21,24 +21,25 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       title: path.title,
       audience: path.audience,
       welcomeMessage: path.welcomeMessage,
-      steps: path.steps.map((step) => ({
-        id: step.id,
-        title: step.title,
-        instruction: step.instruction,
-        expectedResult: step.expectedResult,
-        successMessage: step.successMessage,
-        interactionMode: step.interactionMode ?? "action",
-        images: step.media
-          .filter((media) => media.mediaType === "image" && media.assetId)
-          .map((media) => ({ assetId: media.assetId as string, altText: media.altText })),
-        videoUrl: step.media.find((media) => media.mediaType === "video")?.sourceUrl ?? null,
-        captionAssetId: step.media.find((media) => media.mediaType === "caption" && media.assetId)?.assetId ?? null,
-        failureReasons: step.failureReasons.map((reason) => ({
-          key: reason.reasonKey,
-          label: reason.label,
-          recoveryMessage: reason.recoveryMessage,
-        })),
-      })),
+      steps: path.steps.map((step) => {
+        const interactionMode = step.interactionMode ?? "action";
+        return {
+          id: step.id,
+          title: step.title,
+          question: step.question?.trim() || step.title,
+          instruction: step.instruction,
+          expectedResult: step.expectedResult,
+          successMessage: step.successMessage,
+          primaryActionLabel: step.primaryActionLabel?.trim()
+            || (interactionMode === "presentation" ? "Entendi, continuar" : "Sim, consegui"),
+          interactionMode,
+          images: step.media
+            .filter((media) => media.mediaType === "image" && media.assetId)
+            .map((media) => ({ assetId: media.assetId as string, altText: media.altText })),
+          videoUrl: step.media.find((media) => media.mediaType === "video")?.sourceUrl ?? null,
+          captionAssetId: step.media.find((media) => media.mediaType === "caption" && media.assetId)?.assetId ?? null,
+        };
+      }),
     },
   };
 };
