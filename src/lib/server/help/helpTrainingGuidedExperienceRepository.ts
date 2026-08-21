@@ -8,8 +8,14 @@ import {
   helpTrainingSessions,
   helpTrainingStepProgress,
 } from "$lib/server/db/helpTrainingSchema";
-import { getHelpTrainingSession } from "$lib/server/help/helpTrainingRepository";
-import { getPublicHelpTrainingSession } from "$lib/server/help/helpTrainingPublicRepository";
+import {
+  completeHelpTrainingStep,
+  getHelpTrainingSession,
+} from "$lib/server/help/helpTrainingRepository";
+import {
+  completePublicHelpTrainingStep,
+  getPublicHelpTrainingSession,
+} from "$lib/server/help/helpTrainingPublicRepository";
 
 const MAX_DIFFICULTY_DETAIL_LENGTH = 4000;
 const MAX_REPORTER_NAME_LENGTH = 160;
@@ -33,6 +39,71 @@ function normalizeReporterEmail(value: string): string {
     throw new Error("TRAINING_REPORTER_EMAIL_INVALID");
   }
   return email;
+}
+
+function isCompletedProgress(progress: { status: string; completedAt: Date | null } | null): boolean {
+  if (!progress?.completedAt) return false;
+  return progress.status === "succeeded" || progress.status === "continued";
+}
+
+export async function completeInviteTrainingStepGuided(rawSessionToken: string) {
+  const state = await getHelpTrainingSession(rawSessionToken);
+  if (!state || !state.currentStep) throw new Error("TRAINING_SESSION_INVALID");
+  if (!isCompletedProgress(state.progress)) return completeHelpTrainingStep(rawSessionToken);
+
+  const now = new Date();
+  const nextIndex = state.session.currentStepIndex + 1;
+  const completed = nextIndex >= state.snapshot.steps.length;
+  const db = getDatabase();
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(helpTrainingSessions)
+      .set({
+        currentStepIndex: nextIndex,
+        completedAt: completed ? state.session.completedAt ?? now : null,
+        lastActivityAt: now,
+      })
+      .where(sql`${helpTrainingSessions.id} = ${state.session.id}`);
+    await tx.insert(helpTrainingEvents).values({
+      sessionId: state.session.id,
+      stepKey: state.currentStep!.id,
+      eventType: "step_revisited",
+      metadata: { nextStepIndex: nextIndex },
+    });
+  });
+
+  return { completed, successMessage: state.currentStep.successMessage };
+}
+
+export async function completePublicTrainingStepGuided(rawSessionToken: string) {
+  const state = await getPublicHelpTrainingSession(rawSessionToken);
+  if (!state || !state.currentStep) throw new Error("PUBLIC_TRAINING_SESSION_INVALID");
+  if (!isCompletedProgress(state.progress)) return completePublicHelpTrainingStep(rawSessionToken);
+
+  const now = new Date();
+  const nextIndex = state.session.currentStepIndex + 1;
+  const completed = nextIndex >= state.snapshot.steps.length;
+  const db = getDatabase();
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(helpTrainingPublicSessions)
+      .set({
+        currentStepIndex: nextIndex,
+        completedAt: completed ? state.session.completedAt ?? now : null,
+        lastActivityAt: now,
+      })
+      .where(sql`${helpTrainingPublicSessions.id} = ${state.session.id}`);
+    await tx.insert(helpTrainingPublicEvents).values({
+      sessionId: state.session.id,
+      stepKey: state.currentStep!.id,
+      eventType: "step_revisited",
+      metadata: { nextStepIndex: nextIndex },
+    });
+  });
+
+  return { completed, successMessage: state.currentStep.successMessage };
 }
 
 export async function reportInviteTrainingDifficulty(
