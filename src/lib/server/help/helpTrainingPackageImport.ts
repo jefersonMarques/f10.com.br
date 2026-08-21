@@ -63,6 +63,27 @@ type TrainingMediaRow = {
   altText: string;
   sortOrder: number;
 };
+type ImportOptions = {
+  replacePathId?: string | null;
+};
+
+export type HelpTrainingPackageReplaceCandidate = {
+  id: string;
+  slug: string;
+  title: string;
+  status: string;
+  currentVersion: number;
+};
+
+export class HelpTrainingPackageConflictError extends Error {
+  readonly existingPath: HelpTrainingPackageReplaceCandidate;
+
+  constructor(existingPath: HelpTrainingPackageReplaceCandidate) {
+    super("TRAINING_PACKAGE_SLUG_EXISTS");
+    this.name = "HelpTrainingPackageConflictError";
+    this.existingPath = existingPath;
+  }
+}
 
 function text(value: unknown, maxLength: number): string {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -248,9 +269,25 @@ function registerReferencedFile(
   referencedFiles.set(path, assetType);
 }
 
+async function findExistingPath(slug: string): Promise<HelpTrainingPackageReplaceCandidate | null> {
+  const [path] = await getDatabase()
+    .select({
+      id: helpTrainingPaths.id,
+      slug: helpTrainingPaths.slug,
+      title: helpTrainingPaths.title,
+      status: helpTrainingPaths.status,
+      currentVersion: helpTrainingPaths.currentVersion,
+    })
+    .from(helpTrainingPaths)
+    .where(eq(helpTrainingPaths.slug, slug))
+    .limit(1);
+  return path ?? null;
+}
+
 export async function importHelpTrainingPackage(
   actorUserId: string,
   archiveBytes: Uint8Array,
+  options: ImportOptions = {},
 ) {
   const archive = readZipArchive(archiveBytes);
   const manifestEntry = MANIFEST_NAMES.map((name) => archive.get(name)).find(Boolean);
@@ -271,12 +308,14 @@ export async function importHelpTrainingPackage(
     if (expectedType === "caption") validateTrainingCaptions(entry.bytes);
   }
 
-  const [existingPath] = await getDatabase()
-    .select({ id: helpTrainingPaths.id })
-    .from(helpTrainingPaths)
-    .where(eq(helpTrainingPaths.slug, manifest.slug))
-    .limit(1);
-  if (existingPath) throw new Error("TRAINING_PACKAGE_SLUG_EXISTS");
+  const existingPath = await findExistingPath(manifest.slug);
+  const replacePathId = options.replacePathId?.trim() || null;
+  if (existingPath && replacePathId !== existingPath.id) {
+    throw new HelpTrainingPackageConflictError(existingPath);
+  }
+  if (!existingPath && replacePathId) {
+    throw new Error("TRAINING_PACKAGE_REPLACE_TARGET_INVALID");
+  }
 
   const preparedAssets = new Map<string, PreparedAsset>();
   const newAssetIds: string[] = [];
@@ -305,21 +344,43 @@ export async function importHelpTrainingPackage(
 
     const db = getDatabase();
     const result = await db.transaction(async (tx) => {
-      const [path] = await tx
-        .insert(helpTrainingPaths)
-        .values({
-          slug: manifest.slug,
-          title: manifest.title,
-          audience: manifest.audience,
-          description: manifest.description,
-          welcomeMessage: manifest.welcomeMessage,
-          accessMode: manifest.accessMode,
-          status: "draft",
-          createdBy: actorUserId,
-          updatedBy: actorUserId,
-        })
-        .returning({ id: helpTrainingPaths.id, slug: helpTrainingPaths.slug });
-      if (!path) throw new Error("TRAINING_PACKAGE_PATH_NOT_CREATED");
+      let path: { id: string; slug: string } | undefined;
+
+      if (existingPath) {
+        await tx.delete(helpTrainingSteps).where(eq(helpTrainingSteps.pathId, existingPath.id));
+        [path] = await tx
+          .update(helpTrainingPaths)
+          .set({
+            slug: manifest.slug,
+            title: manifest.title,
+            audience: manifest.audience,
+            description: manifest.description,
+            welcomeMessage: manifest.welcomeMessage,
+            accessMode: manifest.accessMode,
+            status: "draft",
+            updatedBy: actorUserId,
+            updatedAt: new Date(),
+          })
+          .where(eq(helpTrainingPaths.id, existingPath.id))
+          .returning({ id: helpTrainingPaths.id, slug: helpTrainingPaths.slug });
+      } else {
+        [path] = await tx
+          .insert(helpTrainingPaths)
+          .values({
+            slug: manifest.slug,
+            title: manifest.title,
+            audience: manifest.audience,
+            description: manifest.description,
+            welcomeMessage: manifest.welcomeMessage,
+            accessMode: manifest.accessMode,
+            status: "draft",
+            createdBy: actorUserId,
+            updatedBy: actorUserId,
+          })
+          .returning({ id: helpTrainingPaths.id, slug: helpTrainingPaths.slug });
+      }
+
+      if (!path) throw new Error(existingPath ? "TRAINING_PACKAGE_PATH_NOT_UPDATED" : "TRAINING_PACKAGE_PATH_NOT_CREATED");
 
       for (let stepIndex = 0; stepIndex < manifest.steps.length; stepIndex += 1) {
         const source = manifest.steps[stepIndex]!;
@@ -397,10 +458,16 @@ export async function importHelpTrainingPackage(
 
     await recordAuditEvent({
       actorUserId,
-      action: "help.training.package_imported",
+      action: existingPath ? "help.training.package_updated" : "help.training.package_imported",
       entityType: "help_training_path",
       entityId: result.id,
-      metadata: { slug: result.slug, stepCount: manifest.steps.length, assetCount: referencedFiles.size },
+      metadata: {
+        slug: result.slug,
+        stepCount: manifest.steps.length,
+        assetCount: referencedFiles.size,
+        previousStatus: existingPath?.status ?? null,
+        preservedVersion: existingPath?.currentVersion ?? 0,
+      },
     });
     return result;
   } catch (cause) {
