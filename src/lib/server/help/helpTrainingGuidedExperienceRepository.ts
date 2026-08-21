@@ -154,7 +154,7 @@ export async function reportInviteTrainingDifficulty(
       sessionId: state.session.id,
       stepKey: state.currentStep!.id,
       eventType: "step_blocked",
-      metadata: { inputMode: "free_text", detailLength: detail.length },
+      metadata: { inputMode: "free_text", detailLength: detail.length, detail },
     });
   });
 }
