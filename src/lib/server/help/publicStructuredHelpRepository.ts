@@ -35,6 +35,7 @@ export type PublishedStructuredHelp = {
   title: string;
   summary: string;
   category: string;
+  featuredVideo: PublishedHelpAsset | null;
   steps: PublishedHelpStep[];
   publishedAt: Date;
 };
@@ -121,6 +122,29 @@ function parseStep(value: unknown): PublishedHelpStep | null {
   };
 }
 
+function normalizeFeaturedVideo(
+  publicSnapshot: Record<string, unknown>,
+  steps: PublishedHelpStep[],
+): { featuredVideo: PublishedHelpAsset | null; steps: PublishedHelpStep[] } {
+  const explicitFeaturedVideo = parseAsset(publicSnapshot.featuredVideo);
+  const legacyFeaturedVideo = steps
+    .flatMap((step) => step.blocks)
+    .find((block) => block.blockType === "video" && block.asset?.assetType === "video")
+    ?.asset ?? null;
+
+  return {
+    featuredVideo: explicitFeaturedVideo?.assetType === "video"
+      ? explicitFeaturedVideo
+      : legacyFeaturedVideo,
+    steps: steps.map((step) => ({
+      ...step,
+      // Publicações v1 podiam conter vários vídeos em passos. A experiência pública
+      // passa a exibir somente um vídeo principal no topo sem destruir o snapshot.
+      blocks: step.blocks.filter((block) => block.blockType !== "video"),
+    })),
+  };
+}
+
 function parsePublication(
   entityId: string,
   publishedAt: Date,
@@ -131,16 +155,19 @@ function parsePublication(
   const slug = readString(publicSnapshot, "slug");
   const title = readString(publicSnapshot, "title");
   if (!slug || !title) return null;
-  const steps = Array.isArray(publicSnapshot.steps)
+  const parsedSteps = Array.isArray(publicSnapshot.steps)
     ? publicSnapshot.steps.map(parseStep).filter((step): step is PublishedHelpStep => Boolean(step))
     : [];
+  const normalized = normalizeFeaturedVideo(publicSnapshot, parsedSteps);
+
   return {
     contentId: entityId,
     slug,
     title,
     summary: readString(publicSnapshot, "summary"),
     category: readString(publicSnapshot, "category"),
-    steps,
+    featuredVideo: normalized.featuredVideo,
+    steps: normalized.steps,
     publishedAt,
   };
 }
@@ -238,6 +265,9 @@ export async function getPublishedStructuredHelpBySlug(slug: string) {
 export async function isAssetPublishedForSlug(slug: string, assetId: string): Promise<boolean> {
   const content = await getPublishedStructuredHelpBySlug(slug);
   if (!content) return false;
+  if (content.featuredVideo?.id === assetId && Boolean(content.featuredVideo.storageKey)) {
+    return true;
+  }
   return content.steps.some((step) =>
     step.blocks.some((block) => block.asset?.id === assetId && Boolean(block.asset.storageKey)),
   );
