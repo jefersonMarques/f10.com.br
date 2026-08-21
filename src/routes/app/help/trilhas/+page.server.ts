@@ -3,6 +3,10 @@ import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import {
+  listHelpCategories,
+  listHelpTrainingCategoryAssignments,
+} from "$lib/server/help/helpCategoryRepository";
+import {
   HelpTrainingPackageConflictError,
   importHelpTrainingPackage,
 } from "$lib/server/help/helpTrainingPackageImport";
@@ -115,8 +119,18 @@ export const load: PageServerLoad = async ({ parent }) => {
   const permissions = new Map(layout.permissions.map((permission) => [permission.code, permission.scope]));
   if (!hasPermission(permissions, "help.view")) throw error(403, "Acesso não autorizado.");
 
+  const [paths, categories] = await Promise.all([
+    listHelpTrainingPaths(),
+    listHelpCategories(true),
+  ]);
+  const assignments = await listHelpTrainingCategoryAssignments(paths.map((path) => path.id));
+
   return {
-    paths: await listHelpTrainingPaths(),
+    paths: paths.map((path) => ({
+      ...path,
+      categories: assignments.get(path.id) ?? [],
+    })),
+    categories,
     canEdit: hasPermission(permissions, "help.edit"),
     canPublish: hasPermission(permissions, "help.publish"),
   };
