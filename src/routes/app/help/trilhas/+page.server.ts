@@ -71,6 +71,11 @@ function packageErrorMessage(cause: unknown): string {
   const diagnostic = databaseDiagnostic(cause);
   if (code.startsWith("TRAINING_PACKAGE_FILE_MISSING:")) return `O pacote referencia um arquivo que não existe: ${code.split(":").slice(1).join(":")}`;
   if (code.startsWith("TRAINING_PACKAGE_FILE_TYPE_CONFLICT:")) return `O mesmo arquivo foi usado com tipos diferentes no JSON: ${code.split(":").slice(1).join(":")}`;
+  if (code.startsWith("TRAINING_PACKAGE_CATEGORY_NOT_FOUND:")) {
+    const slug = code.split(":").slice(1).join(":");
+    return `A categoria "${slug}" não existe ou está desativada. Crie/ative essa categoria em Base de Conhecimento > Categorias ou remova o slug do training.json.`;
+  }
+  if (code === "TRAINING_PACKAGE_CATEGORIES_INVALID") return "O campo categories deve ser uma lista com até 12 slugs de categorias existentes no F10.";
   if (code === "TRAINING_PACKAGE_MANIFEST_MISSING") return "Inclua training.json ou manifest.json na raiz do arquivo .zip.";
   if (code === "TRAINING_PACKAGE_MANIFEST_JSON") return "O JSON do pacote não é válido.";
   if (code === "TRAINING_PACKAGE_MANIFEST_SIZE") return "O training.json deve ter no máximo 1 MB.";
