@@ -87,6 +87,7 @@ export async function createHelpCategory(
   const name = input.name.trim().slice(0, 160);
   const slug = normalizeHelpCategorySlug(input.slug || name);
   if (name.length < 2 || !slug) throw new Error("HELP_CATEGORY_INVALID");
+  const sortOrder = Number.isFinite(input.sortOrder) ? input.sortOrder : 10;
   const [category] = await getDatabase()
     .insert(helpCategories)
     .values({
@@ -94,7 +95,7 @@ export async function createHelpCategory(
       slug,
       description: input.description.trim().slice(0, 600),
       icon: input.icon.trim().slice(0, 32),
-      sortOrder: Math.min(Math.max(Math.round(input.sortOrder || 10), 0), 10000),
+      sortOrder: Math.min(Math.max(Math.round(sortOrder), 0), 10000),
       createdBy: actorUserId,
       updatedBy: actorUserId,
     })
@@ -118,6 +119,7 @@ export async function updateHelpCategory(
   const name = input.name.trim().slice(0, 160);
   const slug = normalizeHelpCategorySlug(input.slug || name);
   if (name.length < 2 || !slug) throw new Error("HELP_CATEGORY_INVALID");
+  const sortOrder = Number.isFinite(input.sortOrder) ? input.sortOrder : 10;
   const [updated] = await getDatabase()
     .update(helpCategories)
     .set({
@@ -125,7 +127,7 @@ export async function updateHelpCategory(
       slug,
       description: input.description.trim().slice(0, 600),
       icon: input.icon.trim().slice(0, 32),
-      sortOrder: Math.min(Math.max(Math.round(input.sortOrder || 10), 0), 10000),
+      sortOrder: Math.min(Math.max(Math.round(sortOrder), 0), 10000),
       active: input.active,
       updatedBy: actorUserId,
       updatedAt: new Date(),
@@ -156,7 +158,7 @@ export async function listHelpTrainingPathCategories(pathId: string): Promise<He
     .from(helpTrainingPathCategories)
     .innerJoin(helpCategories, eq(helpTrainingPathCategories.categoryId, helpCategories.id))
     .where(eq(helpTrainingPathCategories.pathId, pathId))
-    .orderBy(asc(helpTrainingPathCategories.sortOrder), asc(helpCategories.name));
+    .orderBy(asc(helpCategories.sortOrder), asc(helpCategories.name));
 }
 
 export async function listHelpTrainingCategoryAssignments(pathIds: string[]): Promise<Map<string, HelpCategorySummary[]>> {
@@ -172,11 +174,12 @@ export async function listHelpTrainingCategoryAssignments(pathIds: string[]): Pr
       icon: helpCategories.icon,
       sortOrder: helpTrainingPathCategories.sortOrder,
       active: helpCategories.active,
+      categorySortOrder: helpCategories.sortOrder,
     })
     .from(helpTrainingPathCategories)
     .innerJoin(helpCategories, eq(helpTrainingPathCategories.categoryId, helpCategories.id))
     .where(inArray(helpTrainingPathCategories.pathId, pathIds))
-    .orderBy(asc(helpTrainingPathCategories.sortOrder), asc(helpCategories.name));
+    .orderBy(asc(helpCategories.sortOrder), asc(helpCategories.name));
   for (const row of rows) {
     const current = result.get(row.pathId) ?? [];
     current.push({
@@ -185,7 +188,7 @@ export async function listHelpTrainingCategoryAssignments(pathIds: string[]): Pr
       name: row.name,
       description: row.description,
       icon: row.icon,
-      sortOrder: row.sortOrder,
+      sortOrder: row.categorySortOrder,
       active: row.active,
     });
     result.set(row.pathId, current);
@@ -244,10 +247,10 @@ export async function updateHelpTrainingPathWithCategories(
     await tx.delete(helpTrainingPathCategories).where(eq(helpTrainingPathCategories.pathId, pathId));
     if (categoryIds.length > 0) {
       await tx.insert(helpTrainingPathCategories).values(
-        categoryIds.map((categoryId, index) => ({
+        categoryIds.map((categoryId) => ({
           pathId,
           categoryId,
-          sortOrder: (index + 1) * 10,
+          sortOrder: 10,
         })),
       );
     }
