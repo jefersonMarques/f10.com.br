@@ -123,8 +123,9 @@ export async function updateHelpTrainingStepDraft(
   }
 
   const title = input.title.trim();
-  const question = input.question.trim().slice(0, 300) || title;
+  const question = input.question.trim().slice(0, 300) || step.question.trim() || title;
   const primaryActionLabel = input.primaryActionLabel.trim().slice(0, 80)
+    || step.primaryActionLabel.trim()
     || defaultPrimaryActionLabel(input.interactionMode);
   const estimatedSeconds = Math.min(Math.max(Math.round(input.estimatedSeconds || 45), 5), 900);
   await getDatabase()
