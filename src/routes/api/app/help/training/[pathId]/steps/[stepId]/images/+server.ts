@@ -5,10 +5,8 @@ import {
   createManagedHelpAsset,
   deleteManagedHelpAsset,
 } from "$lib/server/help/helpAssetRepository";
-import {
-  addHelpTrainingImage,
-  getHelpTrainingPath,
-} from "$lib/server/help/helpTrainingRepository";
+import { replaceHelpTrainingStepImage } from "$lib/server/help/helpTrainingImageAttachment";
+import { getHelpTrainingPath } from "$lib/server/help/helpTrainingRepository";
 
 const ALLOWED_IMAGE_MIME_TYPES = new Set([
   "image/png",
@@ -76,7 +74,7 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
     });
     createdAssetId = result.asset.id;
     reused = result.reused;
-    await addHelpTrainingImage(
+    await replaceHelpTrainingStepImage(
       session.user.id,
       pathId,
       stepId,
@@ -89,8 +87,8 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
       assetId: result.asset.id,
       reused,
       message: reused
-        ? "Imagem da Biblioteca reutilizada nesta microação."
-        : "Imagem enviada e adicionada à microação.",
+        ? "Imagem da Biblioteca definida como referência principal deste passo."
+        : "Imagem principal deste passo atualizada.",
     });
   } catch (cause) {
     if (createdAssetId && !reused) {
