@@ -2,12 +2,12 @@ import { fail, redirect, type Actions, type Cookies } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { previewHelpTrainingInvite } from "$lib/server/help/helpTrainingInvitePreview";
 import {
-  completeHelpTrainingStep,
   consumeHelpTrainingInvite,
   getHelpTrainingSession,
   startHelpTrainingSession,
 } from "$lib/server/help/helpTrainingRepository";
 import {
+  completeInviteTrainingStepGuided,
   goBackInviteTrainingStep,
   reportInviteTrainingDifficulty,
 } from "$lib/server/help/helpTrainingGuidedExperienceRepository";
@@ -90,7 +90,7 @@ export const actions: Actions = {
   success: async ({ cookies }) => {
     const token = await requireTrainingToken(cookies);
     try {
-      const result = await completeHelpTrainingStep(token);
+      const result = await completeInviteTrainingStepGuided(token);
       const message = encodeURIComponent(result.successMessage || "Certo. Vamos continuar.");
       throw redirect(303, `/treinamento?feito=${message}`);
     } catch (cause) {
