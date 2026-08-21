@@ -17,7 +17,7 @@
     X,
   } from "lucide-svelte";
 
-  export type TrainingPlayerStep = {
+  type TrainingPlayerStep = {
     id: string;
     title: string;
     question: string;
@@ -34,7 +34,7 @@
   type CustomerUnit = { id: number; name: string };
   type CustomerGroup = { id: number; name: string; units: CustomerUnit[] };
 
-  export type TrainingDifficultyAuth = {
+  type TrainingDifficultyAuth = {
     authenticated: boolean;
     name: string;
     email: string;
