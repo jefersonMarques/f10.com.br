@@ -37,6 +37,9 @@
 
   $: videoAssetId = trainingVideoAssetId(currentStep?.videoUrl ?? null);
   $: videoEmbed = youtubeEmbedUrl(currentStep?.videoUrl ?? null);
+  $: captionUrl = currentStep?.captionAssetId
+    ? `/api/app/help/assets/${currentStep.captionAssetId}`
+    : "/help-training-empty.vtt";
 
   function advance(): void {
     if (!currentStep) return;
@@ -83,7 +86,7 @@
           {#if currentStep.images.length > 0}<div class="mt-6 space-y-4">{#each currentStep.images as image, imageIndex}<figure class="overflow-hidden rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-2"><img src={`/api/app/help/assets/${image.assetId}`} alt={image.altText || `Demonstração ${imageIndex + 1}`} class="mx-auto max-h-[520px] w-auto rounded-xl object-contain"/></figure>{/each}</div>{/if}
           {#if currentStep.videoUrl}
             <details class="mt-6 rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4"><summary class="flex cursor-pointer list-none items-center gap-2 text-[11px] font-semibold text-[#000A57]"><Play size={14}/>Ver demonstração rápida</summary>
-              {#if videoAssetId}<video src={`/api/app/help/assets/${videoAssetId}`} controls preload="metadata" playsinline class="mt-4 aspect-video w-full rounded-xl bg-black">{#if currentStep.captionAssetId}<track kind="captions" srclang="pt-BR" label="Português" src={`/api/app/help/assets/${currentStep.captionAssetId}`} default />{/if}</video>{:else if videoEmbed}<iframe src={videoEmbed} title="Demonstração rápida" class="mt-4 aspect-video w-full rounded-xl bg-black" allowfullscreen></iframe>{:else}<a href={currentStep.videoUrl} target="_blank" rel="noopener noreferrer" class="mt-4 inline-flex text-[10px] font-semibold text-[#000A57]">Abrir demonstração</a>{/if}
+              {#if videoAssetId}<video src={`/api/app/help/assets/${videoAssetId}`} controls preload="metadata" playsinline class="mt-4 aspect-video w-full rounded-xl bg-black"><track kind="captions" srclang="pt-BR" label="Português" src={captionUrl} default /></video>{:else if videoEmbed}<iframe src={videoEmbed} title="Demonstração rápida" class="mt-4 aspect-video w-full rounded-xl bg-black" allowfullscreen></iframe>{:else}<a href={currentStep.videoUrl} target="_blank" rel="noopener noreferrer" class="mt-4 inline-flex text-[10px] font-semibold text-[#000A57]">Abrir demonstração</a>{/if}
             </details>
           {/if}
           {#if currentStep.interactionMode === "action" && currentStep.expectedResult}<div class="mt-6 rounded-2xl bg-[#F6F7FA] px-4 py-4"><p class="text-[9px] font-bold uppercase tracking-[0.1em] text-[#8B909D]">Quando terminar</p><p class="mt-2 text-[11px] leading-5 text-[#565D6D]">{currentStep.expectedResult}</p></div>{/if}

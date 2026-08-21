@@ -28,10 +28,13 @@
   import HelpTrainingVideoUploader from "$lib/components/operations/HelpTrainingVideoUploader.svelte";
   import type { ActionData, PageData } from "./$types";
 
+  type InteractionMode = "presentation" | "action";
+
   export let data: PageData;
   export let form: ActionData;
 
   let openStepId = data.path.steps[0]?.id ?? "";
+  let interactionModeByStep: Record<string, InteractionMode> = {};
 
   $: if (form && "openStepId" in form && typeof form.openStepId === "string") {
     openStepId = form.openStepId;
@@ -71,8 +74,25 @@
     else if (openStepId === stepId) openStepId = "";
   }
 
+  function interactionModeFor(step: PageData["path"]["steps"][number]): InteractionMode {
+    return interactionModeByStep[step.id] ?? step.interactionMode ?? "action";
+  }
+
+  function handleInteractionModeChange(event: Event, stepId: string): void {
+    const value = (event.currentTarget as HTMLSelectElement).value;
+    interactionModeByStep = {
+      ...interactionModeByStep,
+      [stepId]: value === "presentation" ? "presentation" : "action",
+    };
+  }
+
   function captionAssetId(step: PageData["path"]["steps"][number]): string | null {
     return step.media.find((media) => media.mediaType === "caption" && media.assetId)?.assetId ?? null;
+  }
+
+  function captionUrl(step: PageData["path"]["steps"][number]): string {
+    const assetId = captionAssetId(step);
+    return assetId ? `/api/app/help/assets/${assetId}` : "/help-training-empty.vtt";
   }
 </script>
 
@@ -122,7 +142,7 @@
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><CheckCircle2 size={18} class="text-[#2F7045]"/><strong class="mt-3 block text-[24px] font-semibold">{data.insights.completed}</strong><span class="application-text-caption text-[#858A98]">concluíram</span></div>
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><CircleAlert size={18} class="text-[#EA6D0B]"/><strong class="mt-3 block text-[24px] font-semibold">{data.insights.humanHelp}</strong><span class="application-text-caption text-[#858A98]">precisaram de ajuda humana</span></div>
   </section>
-  {#if "publicStarted" in data.insights && data.insights.publicStarted > 0}<p class="application-text-meta mt-2 text-right text-[#8B909D]">Dos acessos acima, {data.insights.publicStarted} começaram pelo link público e {data.insights.publicCompleted} concluíram.</p>{/if}
+  {#if data.insights.publicStarted > 0}<p class="application-text-meta mt-2 text-right text-[#8B909D]">Dos acessos acima, {data.insights.publicStarted} começaram pelo link público e {data.insights.publicCompleted} concluíram.</p>{/if}
 
   <div class="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
     <div class="space-y-5">
@@ -149,17 +169,17 @@
           {#each data.path.steps as step, stepIndex (step.id)}
             <details class="overflow-hidden rounded-2xl border border-[#E3E6ED] bg-[#FAFAFC]" open={openStepId === step.id} on:toggle={(event) => handleStepToggle(event, step.id)}>
               <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 sm:px-5">
-                <div class="flex min-w-0 items-center gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[11px] font-bold text-white">{stepIndex + 1}</span><div class="min-w-0"><strong class="block truncate text-[12px] font-semibold text-[#2B3141]">{step.title}</strong><span class="application-text-meta mt-1 block text-[#8B909D]">{(step.interactionMode ?? "action") === "presentation" ? "Apresentação" : "Ação com confirmação"} · estimativa interna {step.estimatedSeconds}s</span></div></div>
+                <div class="flex min-w-0 items-center gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[11px] font-bold text-white">{stepIndex + 1}</span><div class="min-w-0"><strong class="block truncate text-[12px] font-semibold text-[#2B3141]">{step.title}</strong><span class="application-text-meta mt-1 block text-[#8B909D]">{interactionModeFor(step) === "presentation" ? "Apresentação" : "Ação com confirmação"} · estimativa interna {step.estimatedSeconds}s</span></div></div>
                 {#if data.canEdit}<div class="flex shrink-0 gap-1"><form method="POST" action="?/moveStep" use:enhance={enhanceEditor}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="up"/><button type="submit" on:click|stopPropagation disabled={stepIndex === 0} aria-label="Mover microação para cima" class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#E1E4EB] bg-white text-[#6B7280] disabled:opacity-30"><ArrowUp size={13}/></button></form><form method="POST" action="?/moveStep" use:enhance={enhanceEditor}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="down"/><button type="submit" on:click|stopPropagation disabled={stepIndex === data.path.steps.length - 1} aria-label="Mover microação para baixo" class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#E1E4EB] bg-white text-[#6B7280] disabled:opacity-30"><ArrowDown size={13}/></button></form></div>{/if}
               </summary>
               <div class="border-t border-[#E7E9EF] bg-white p-4 sm:p-5">
                 <form method="POST" action="?/updateStep" use:enhance={enhanceEditor} class="space-y-4">
                   <input type="hidden" name="stepId" value={step.id}/>
                   <fieldset disabled={!data.canEdit} class="space-y-4 disabled:opacity-70">
-                    <div class="grid gap-3 lg:grid-cols-[220px_1fr]"><label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">Tipo</span><select name="interactionMode" value={step.interactionMode ?? "action"} class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"><option value="presentation">Apresentação — só continuar</option><option value="action">Ação — conseguiu / não conseguiu</option></select></label><label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">Título curto</span><input name="title" required maxlength="180" value={step.title} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label></div>
+                    <div class="grid gap-3 lg:grid-cols-[220px_1fr]"><label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">Tipo</span><select name="interactionMode" value={interactionModeFor(step)} on:change={(event) => handleInteractionModeChange(event, step.id)} class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"><option value="presentation">Apresentação — só continuar</option><option value="action">Ação — conseguiu / não conseguiu</option></select></label><label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">Título curto</span><input name="title" required maxlength="180" value={step.title} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label></div>
                     <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">Conteúdo mostrado agora</span><textarea name="instruction" required rows="4" maxlength="6000" class="w-full rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[11px] leading-5">{step.instruction}</textarea></label>
-                    {#if (step.interactionMode ?? "action") === "action"}<label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">O que deve aparecer quando terminar</span><textarea name="expectedResult" required rows="2" maxlength="3000" class="w-full rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[11px]">{step.expectedResult}</textarea></label>{:else}<input type="hidden" name="expectedResult" value=""/><div class="rounded-xl bg-[#F7F8FB] px-3 py-3 text-[10px] leading-5 text-[#6F7585]">Neste tipo de passo o participante verá somente <strong>Continuar</strong>. Não haverá “Não consegui” nem cobrança de resultado.</div>{/if}
-                    <div class="grid gap-3 lg:grid-cols-[1fr_160px]"><label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">Mensagem após concluir</span><input name="successMessage" maxlength="500" value={step.successMessage} placeholder={(step.interactionMode ?? "action") === "presentation" ? "Certo. Vamos continuar." : "Perfeito. Você concluiu esta ação."} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label><label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">Segundos estimados</span><input name="estimatedSeconds" type="number" min="5" max="900" value={step.estimatedSeconds} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label></div>
+                    {#if interactionModeFor(step) === "action"}<label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">O que deve aparecer quando terminar</span><textarea name="expectedResult" required rows="2" maxlength="3000" class="w-full rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[11px]">{step.expectedResult}</textarea></label>{:else}<input type="hidden" name="expectedResult" value=""/><div class="rounded-xl bg-[#F7F8FB] px-3 py-3 text-[10px] leading-5 text-[#6F7585]">Neste tipo de passo o participante verá somente <strong>Continuar</strong>. Não haverá “Não consegui” nem cobrança de resultado.</div>{/if}
+                    <div class="grid gap-3 lg:grid-cols-[1fr_160px]"><label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">Mensagem após concluir</span><input name="successMessage" maxlength="500" value={step.successMessage} placeholder={interactionModeFor(step) === "presentation" ? "Certo. Vamos continuar." : "Perfeito. Você concluiu esta ação."} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label><label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">Segundos estimados</span><input name="estimatedSeconds" type="number" min="5" max="900" value={step.estimatedSeconds} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label></div>
                     {#if data.canEdit}<div class="flex justify-end"><button type="submit" class="application-text-caption inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]"><Save size={13}/>Salvar microação</button></div>{/if}
                   </fieldset>
                 </form>
@@ -175,9 +195,9 @@
                             <img src={`/api/app/help/assets/${media.assetId}`} alt={media.altText || media.assetName || "Imagem da microação"} class="max-h-48 w-full rounded-lg bg-white object-contain"/>
                             <p class="application-text-meta mt-2 truncate font-semibold text-[#606777]">{media.assetName || "Print da microação"}</p>
                           {:else if media.mediaType === "video" && media.assetId}
-                            <video src={`/api/app/help/assets/${media.assetId}`} controls preload="metadata" class="aspect-video w-full rounded-lg bg-black">{#if captionAssetId(step)}<track kind="captions" srclang="pt-BR" label="Português" src={`/api/app/help/assets/${captionAssetId(step)}`} default />{/if}</video>
+                            <video src={`/api/app/help/assets/${media.assetId}`} controls preload="metadata" class="aspect-video w-full rounded-lg bg-black"><track kind="captions" srclang="pt-BR" label="Português" src={captionUrl(step)} default /></video>
                             <p class="application-text-meta mt-2 truncate font-semibold text-[#606777]">{media.assetName || "Microvídeo"}</p>
-                            {#if !captionAssetId(step)}<p class="application-text-meta mt-1 text-[#A15A18]">Sem legenda .vtt. Adicione legenda quando houver fala ou informação sonora relevante.</p>{/if}
+                            {#if !captionAssetId(step)}<p class="application-text-meta mt-1 text-[#A15A18]">Sem legenda .vtt. Ela é obrigatória para publicar um MP4 local.</p>{/if}
                           {:else if media.mediaType === "video" && media.sourceUrl}
                             <div class="flex min-h-28 items-center justify-center rounded-lg bg-[#EEF0FF] text-[#000A57]"><Video size={26}/></div><a href={media.sourceUrl} target="_blank" rel="noopener noreferrer" class="application-text-meta mt-2 inline-flex items-center gap-1 font-semibold text-[#000A57]">Vídeo externo<ExternalLink size={11}/></a>
                           {:else if media.mediaType === "caption" && media.assetId}
@@ -191,7 +211,7 @@
                   {#if data.canEdit}<div class="mt-3 grid gap-3 lg:grid-cols-2"><TrainingImageUploader pathId={data.path.id} stepId={step.id}/><HelpTrainingVideoUploader pathId={data.path.id} stepId={step.id}/></div>{/if}
                 </div>
 
-                {#if (step.interactionMode ?? "action") === "action"}
+                {#if interactionModeFor(step) === "action"}
                   <div class="mt-5 border-t border-[#EEF0F5] pt-5">
                     <div class="flex flex-col justify-between gap-2 sm:flex-row sm:items-center"><div><h3 class="text-[11px] font-semibold text-[#303645]">Quando a pessoa disser “Não consegui”</h3><p class="application-text-meta mt-1 text-[#8B909D]">O motivo coletado ajuda a recuperar a pessoa e mostra onde a trilha precisa melhorar.</p></div>{#if data.canEdit}<form method="POST" action="?/addReason" use:enhance={enhanceEditor}><input type="hidden" name="stepId" value={step.id}/><button type="submit" class="application-text-meta inline-flex min-h-8 items-center gap-1 rounded-lg border border-[#DDE1EA] bg-white px-2.5 font-semibold text-[#000A57]"><Plus size={11}/>Adicionar motivo</button></form>{/if}</div>
                     {#if step.failureReasons.length === 0}<div class="application-text-meta mt-3 rounded-xl bg-[#FFF7ED] px-3 py-3 text-[#9A4B08]">Adicione pelo menos um motivo antes de publicar.</div>{/if}

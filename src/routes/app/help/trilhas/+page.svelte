@@ -84,7 +84,8 @@ images/
   boas-vindas.png
   clientes.png
 videos/
-  clientes.mp4</pre></details>
+  clientes.mp4
+  clientes.vtt</pre></details>
         </section>
       </aside>
     {/if}

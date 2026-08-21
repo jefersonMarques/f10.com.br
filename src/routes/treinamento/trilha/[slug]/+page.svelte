@@ -39,6 +39,9 @@
 
   $: videoAssetId = trainingVideoAssetId(currentStep?.videoUrl ?? null);
   $: videoEmbed = youtubeEmbedUrl(currentStep?.videoUrl ?? null);
+  $: captionUrl = currentStep?.captionAssetId
+    ? `/treinamento/assets/${currentStep.captionAssetId}`
+    : "/help-training-empty.vtt";
 </script>
 
 <svelte:head>
@@ -104,7 +107,7 @@
               <details class="mt-6 rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4">
                 <summary class="flex cursor-pointer list-none items-center gap-2 text-[11px] font-semibold text-[#000A57]"><Play size={14}/>Ver demonstração rápida</summary>
                 {#if videoAssetId}
-                  <div class="mt-4 overflow-hidden rounded-xl bg-black"><video src={`/treinamento/assets/${videoAssetId}`} controls preload="metadata" playsinline class="aspect-video w-full">{#if currentStep.captionAssetId}<track kind="captions" srclang="pt-BR" label="Português" src={`/treinamento/assets/${currentStep.captionAssetId}`} default />{/if}</video></div>
+                  <div class="mt-4 overflow-hidden rounded-xl bg-black"><video src={`/treinamento/assets/${videoAssetId}`} controls preload="metadata" playsinline class="aspect-video w-full"><track kind="captions" srclang="pt-BR" label="Português" src={captionUrl} default /></video></div>
                 {:else if videoEmbed}
                   <div class="mt-4 overflow-hidden rounded-xl bg-black"><iframe src={videoEmbed} title="Demonstração rápida" class="aspect-video w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>
                 {:else}
