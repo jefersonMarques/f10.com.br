@@ -125,6 +125,24 @@ export const helpAssets = pgTable(
   ],
 );
 
+export const helpContentFeaturedVideos = pgTable(
+  "help_content_featured_videos",
+  {
+    contentId: uuid("content_id")
+      .primaryKey()
+      .references(() => helpContents.id, { onDelete: "cascade" }),
+    assetId: uuid("asset_id")
+      .notNull()
+      .references(() => helpAssets.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("help_content_featured_videos_asset_unique").on(table.assetId),
+    index("help_content_featured_videos_updated_idx").on(table.updatedAt),
+  ],
+);
+
 export const helpStepBlocks = pgTable(
   "help_step_blocks",
   {
