@@ -119,7 +119,9 @@
   $: selectedUnits = authState.groups.find((group) => group.id === selectedGroupId)?.units ?? [];
   $: videoAssetId = trainingVideoAssetId(step.videoUrl);
   $: videoEmbedUrl = youtubeEmbedUrl(step.videoUrl);
-  $: captionUrl = step.captionAssetId ? `${assetBasePath}/${step.captionAssetId}` : null;
+  $: captionUrl = step.captionAssetId
+    ? `${assetBasePath}/${step.captionAssetId}`
+    : "/help-training-empty.vtt";
   $: verificationQuestion = verificationQuestionForStep(step);
 
   $: if (pipWindow && !pipWindow.closed) {
@@ -378,7 +380,7 @@
       :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#061333;background:#f7f8fb}
       *{box-sizing:border-box}body{margin:0;height:100vh;overflow:hidden;background:#f7f8fb}.guide{height:100vh;display:grid;grid-template-rows:auto minmax(0,1fr) auto}
       .top{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #e5e8ef;background:#fff;padding:12px 14px}.brand{display:flex;min-width:0;align-items:center;gap:9px}.logo{font-size:22px;font-weight:900;letter-spacing:-.07em;color:#f36b00}.training{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:700;color:#697187}.help-top{border:1px solid #dfe3ea;background:#f7f8fb;color:#697187;border-radius:999px;min-height:34px;padding:0 10px;font-size:10px;font-weight:700;cursor:pointer}
-      .content{overflow-y:auto;padding:22px 18px 28px}.step{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#f36b00;margin:0 0 8px}.step.warning{color:#b54b00}.title{font-size:27px;line-height:1.08;letter-spacing:-.04em;margin:0;color:#061333}.rich{font-size:15px;line-height:1.6;color:#4f5a70;margin-top:16px}.rich p{margin:0 0 11px}.rich strong{font-weight:850;color:#061333}.rich code{display:inline-block;border-radius:6px;background:#edf0f5;padding:1px 6px;color:#000a57;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;font-weight:800}.rich ul,.rich ol{margin:8px 0 12px;padding-left:22px}.rich li{margin:6px 0}.verify{margin-top:18px;font-size:20px;line-height:1.3;font-weight:800;color:#061333}.hint{margin-top:16px;padding:13px 14px;border:1px solid #f0cfb4;border-radius:13px;background:#fff5ec;color:#76502d;font-size:12px;line-height:1.55}.hint strong{color:#9f4b0a}.hint .rich{margin:6px 0 0;font-size:12px;color:#76502d}.recovery{margin-top:15px;border-radius:13px;background:#fff0e6;padding:14px;color:#824212;font-size:13px;line-height:1.55}.video-button{width:100%;margin-top:14px;border:1px solid #ffd0ad;background:#fff7f0;color:#b94e00;border-radius:12px;min-height:44px;font-weight:800;cursor:pointer}.footer{display:grid;grid-template-columns:1fr 1.45fr;gap:9px;border-top:1px solid #e5e8ef;background:#fff;padding:12px 14px}.secondary,.danger,.primary{border:0;border-radius:14px;min-height:50px;font-size:12px;font-weight:800;cursor:pointer}.secondary{background:#eef0f5;color:#4e576a}.secondary:disabled{cursor:not-allowed;opacity:.4}.danger{background:#fff0e6;color:#aa4a09}.primary{background:#f36b00;color:#fff;box-shadow:0 12px 28px rgba(243,107,0,.23);animation:float 3.2s ease-in-out infinite}.primary:disabled{cursor:wait;opacity:.6}
+      .content{overflow-y:auto;padding:22px 18px 28px}.step{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#f36b00;margin:0 0 8px}.step.warning{color:#b54b00}.title{font-size:27px;line-height:1.08;letter-spacing:-.04em;margin:0;color:#061333}.rich{font-size:15px;line-height:1.6;color:#4f5a70;margin-top:16px}.rich p{margin:0 0 11px}.rich strong{font-weight:850;color:#061333}.rich code{display:inline-block;border-radius:6px;background:#edf0f5;padding:1px 6px;color:#000a57;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;font-weight:800}.rich ul,.rich ol{margin:8px 0 12px;padding-left:22px}.rich li{margin:6px 0}.verify{margin-top:18px;font-size:20px;line-height:1.3;font-weight:800;color:#061333}.verify p{margin:0}.verify strong{font-weight:900}.verify code{display:inline-block;border-radius:6px;background:#edf0f5;padding:1px 6px;color:#000a57;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;font-weight:800}.hint{margin-top:16px;padding:13px 14px;border:1px solid #f0cfb4;border-radius:13px;background:#fff5ec;color:#76502d;font-size:12px;line-height:1.55}.hint strong{color:#9f4b0a}.hint .rich{margin:6px 0 0;font-size:12px;color:#76502d}.recovery{margin-top:15px;border-radius:13px;background:#fff0e6;padding:14px;color:#824212;font-size:13px;line-height:1.55}.video-button{width:100%;margin-top:14px;border:1px solid #ffd0ad;background:#fff7f0;color:#b94e00;border-radius:12px;min-height:44px;font-weight:800;cursor:pointer}.footer{display:grid;grid-template-columns:1fr 1.45fr;gap:9px;border-top:1px solid #e5e8ef;background:#fff;padding:12px 14px}.secondary,.danger,.primary{border:0;border-radius:14px;min-height:50px;font-size:12px;font-weight:800;cursor:pointer}.secondary{background:#eef0f5;color:#4e576a}.secondary:disabled{cursor:not-allowed;opacity:.4}.danger{background:#fff0e6;color:#aa4a09}.primary{background:#f36b00;color:#fff;box-shadow:0 12px 28px rgba(243,107,0,.23);animation:float 3.2s ease-in-out infinite}.primary:disabled{cursor:wait;opacity:.6}
       @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}@media(prefers-reduced-motion:reduce){.primary{animation:none}}
     `;
     documentRef.head.append(style);
@@ -692,7 +694,7 @@
             <div class="training-rich mt-3 max-w-[760px] text-[13px] leading-6 text-[#5E687E] sm:text-[14px]">{@html trainingMarkupToHtml(step.instruction)}</div>
           {:else if interactionStage === "verify"}
             <p class="text-[9px] font-bold uppercase tracking-[0.18em] text-[#F36B00]">Confirme antes de continuar</p>
-            <div class="training-rich mt-3 max-w-[760px] text-balance text-[25px] font-semibold leading-[1.2] tracking-[-0.035em] text-[#061333] sm:text-[32px]">{@html trainingMarkupToHtml(verificationQuestion)}</div>
+            <div class="training-verification-question mt-3 max-w-[760px] text-balance text-[25px] font-semibold leading-[1.2] tracking-[-0.035em] text-[#061333] sm:text-[32px]">{@html trainingMarkupToHtml(verificationQuestion)}</div>
           {:else}
             <p class="text-[9px] font-bold uppercase tracking-[0.18em] text-[#B94E00]">Não avance ainda</p>
             <h1 class="mt-3 max-w-[900px] text-balance text-[30px] font-semibold tracking-[-0.045em] text-[#061333] sm:text-[38px]">Vamos corrigir esta etapa</h1>
@@ -821,7 +823,7 @@
     <div class="relative w-full max-w-[1120px] overflow-hidden rounded-[24px] bg-[#07132D] shadow-2xl" role="dialog" aria-modal="true" aria-label="Demonstração">
       <div class="flex items-center justify-between gap-3 px-4 py-3 text-white sm:px-5"><div><p class="text-[8px] font-bold uppercase tracking-[0.12em] text-[#FF9A4B]">Demonstração</p><strong class="mt-1 block text-[11px]">{step.title}</strong></div><button type="button" on:click={() => (videoOpen = false)} class="training-subtle flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white" aria-label="Fechar demonstração"><X size={16}/></button></div>
       {#if videoAssetId}
-        <video src={`${assetBasePath}/${videoAssetId}`} controls autoplay preload="metadata" playsinline class="max-h-[80dvh] w-full bg-black">{#if captionUrl}<track kind="captions" srclang="pt-BR" label="Português" src={captionUrl} default />{/if}</video>
+        <video src={`${assetBasePath}/${videoAssetId}`} controls autoplay preload="metadata" playsinline class="max-h-[80dvh] w-full bg-black"><track kind="captions" srclang="pt-BR" label="Português" src={captionUrl} default /></video>
       {:else if videoEmbedUrl}
         <iframe src={videoEmbedUrl} title="Demonstração" class="aspect-video max-h-[80dvh] w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
       {:else}
@@ -861,12 +863,14 @@
     margin: 0.28rem 0;
   }
 
-  :global(.training-rich strong) {
+  :global(.training-rich strong),
+  :global(.training-verification-question strong) {
     font-weight: 800;
     color: #061333;
   }
 
-  :global(.training-rich code) {
+  :global(.training-rich code),
+  :global(.training-verification-question code) {
     display: inline-block;
     border-radius: 0.38rem;
     background: #edf0f5;
@@ -875,6 +879,10 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.92em;
     font-weight: 800;
+  }
+
+  :global(.training-verification-question p) {
+    margin: 0;
   }
 
   :global(.training-rich ul),
