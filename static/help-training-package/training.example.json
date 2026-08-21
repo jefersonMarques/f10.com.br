@@ -7,7 +7,6 @@
   "description": "Observação interna para quem administra a trilha. Não será mostrada ao participante.",
   "welcomeMessage": "Vamos fazer juntos. Siga uma orientação por vez e avance quando terminar.",
   "accessMode": "invite_only",
-  "categories": ["comercial"],
   "steps": [
     {
       "title": "Veja onde fica o menu principal",
