@@ -82,6 +82,7 @@ export async function getCombinedHelpTrainingInsights(pathId: string) {
         .select({
           sessionId: helpTrainingEvents.sessionId,
           stepKey: helpTrainingEvents.stepKey,
+          metadata: helpTrainingEvents.metadata,
           createdAt: helpTrainingEvents.createdAt,
         })
         .from(helpTrainingEvents)
@@ -163,18 +164,35 @@ export async function getCombinedHelpTrainingInsights(pathId: string) {
   const participantBySession = new Map(
     participants.flatMap((participant) => participant.sessionId ? [[participant.sessionId, participant] as const] : []),
   );
-  const inviteReportedAt = new Map<string, Date>();
+  const difficultyReports: TrainingDifficultyReport[] = [];
+  const inviteDetailedEventKeys = new Set<string>();
+
   for (const event of inviteBlockedEvents) {
     if (!event.stepKey) continue;
-    const key = `${event.sessionId}:${event.stepKey}`;
-    const current = inviteReportedAt.get(key);
-    if (!current || event.createdAt > current) inviteReportedAt.set(key, event.createdAt);
+    const metadata = event.metadata ?? {};
+    const detail = metadataText(metadata, "detail", 4000);
+    if (!detail) continue;
+    const participant = participantBySession.get(event.sessionId);
+    if (!participant) continue;
+    inviteDetailedEventKeys.add(`${event.sessionId}:${event.stepKey}`);
+    difficultyReports.push({
+      source: "invite",
+      name: participant.name,
+      email: participant.email,
+      organizationName: participant.organizationName,
+      version: participant.version,
+      stepId: event.stepKey,
+      stepTitle: stepTitles.get(event.stepKey) ?? "Orientação da trilha",
+      detail,
+      reportedAt: event.createdAt,
+    });
   }
 
-  const difficultyReports: TrainingDifficultyReport[] = [];
   for (const progress of inviteProgress) {
     const detail = progress.failureDetail.trim();
     if (!detail) continue;
+    const key = `${progress.sessionId}:${progress.stepKey}`;
+    if (inviteDetailedEventKeys.has(key)) continue;
     const participant = participantBySession.get(progress.sessionId);
     if (!participant) continue;
     difficultyReports.push({
@@ -186,7 +204,7 @@ export async function getCombinedHelpTrainingInsights(pathId: string) {
       stepId: progress.stepKey,
       stepTitle: stepTitles.get(progress.stepKey) ?? "Orientação da trilha",
       detail,
-      reportedAt: inviteReportedAt.get(`${progress.sessionId}:${progress.stepKey}`) ?? progress.updatedAt,
+      reportedAt: progress.updatedAt,
     });
   }
 
