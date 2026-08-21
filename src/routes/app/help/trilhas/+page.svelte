@@ -1,17 +1,42 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
   import type { SubmitFunction } from "@sveltejs/kit";
-  import { ArrowRight, BookOpenCheck, CircleAlert, Download, FileArchive, GraduationCap, LoaderCircle, Plus, Upload, Users } from "lucide-svelte";
+  import {
+    ArrowRight,
+    BookOpenCheck,
+    CircleAlert,
+    Download,
+    FileArchive,
+    GraduationCap,
+    LoaderCircle,
+    Plus,
+    RefreshCw,
+    RotateCcw,
+    Upload,
+    Users,
+  } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
+
+  type ReplaceCandidate = {
+    id: string;
+    slug: string;
+    title: string;
+    status: string;
+    currentVersion: number;
+  };
 
   export let data: PageData;
   export let form: ActionData;
 
   let isImporting = false;
+  let replaceCandidate: ReplaceCandidate | null = null;
 
   $: values = form && "values" in form ? form.values : null;
+  $: replaceCandidate = form && "replaceCandidate" in form && form.replaceCandidate
+    ? form.replaceCandidate as ReplaceCandidate
+    : null;
 
   const enhancePackageImport: SubmitFunction = () => {
     isImporting = true;
@@ -38,7 +63,7 @@
 <ApplicationContent width="wide">
   <ApplicationBackLink href="/app/help/content" label="Base de Conhecimento" className="mb-3" />
 
-  {#if form?.message}
+  {#if form?.message && !replaceCandidate}
     <div class="mb-3 flex items-start gap-3 rounded-2xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[12px] font-medium text-[#9B2C2C]"><CircleAlert size={18}/><span>{form.message}</span></div>
   {/if}
 
@@ -56,20 +81,29 @@
       {:else}
         <div class="divide-y divide-[#EEF0F5]">
           {#each data.paths as path}
-            <a href={`/app/help/trilhas/${path.id}`} class={`block px-5 py-4 transition sm:px-6 ${path.status === "archived" ? "bg-[#FAFAFC] opacity-75" : "hover:bg-[#FAFAFC]"}`}>
+            <div class={`px-5 py-4 transition sm:px-6 ${path.status === "archived" ? "bg-[#FAFAFC]" : "hover:bg-[#FAFAFC]"}`}>
               <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                <div class="min-w-0 flex-1">
+                <a href={`/app/help/trilhas/${path.id}`} class={`min-w-0 flex-1 ${path.status === "archived" ? "opacity-75" : ""}`}>
                   <div class="flex flex-wrap items-center gap-2"><strong class="text-[13px] font-semibold text-[#252B3B]">{path.title}</strong><span class={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.05em] ${path.status === "published" ? "bg-[#EEF8F1] text-[#2F7045]" : path.status === "archived" ? "bg-[#F1F1F3] text-[#676D7D]" : "bg-[#EEF0FF] text-[#000A57]"}`}>{statusLabel(path.status, path.currentVersion)}</span>{#if path.currentVersion > 0}<span class="rounded-full bg-[#F4F5F8] px-2 py-1 text-[9px] font-semibold text-[#747A8A]">v{path.currentVersion}</span>{/if}{#if path.accessMode === "public"}<span class="rounded-full bg-[#EEF8F1] px-2 py-1 text-[9px] font-semibold text-[#2F7045]">link público</span>{/if}</div>
                   <p class="mt-1 text-[10px] text-[#858B99]">{path.audience || "Público não informado"} · {path.stepCount} microações</p>
                   {#if path.description}<p class="mt-2 line-clamp-2 max-w-[780px] text-[11px] leading-5 text-[#737989]">{path.description}</p>{/if}
-                </div>
-                <div class="flex shrink-0 items-center gap-5 text-right">
+                </a>
+                <div class="flex shrink-0 flex-wrap items-center justify-end gap-3 text-right">
                   <div><strong class="block text-[15px] font-semibold text-[#11182C]">{path.startedCount}/{path.participantCount}</strong><span class="text-[9px] text-[#8B909D]">iniciaram</span></div>
                   <div><strong class="block text-[15px] font-semibold text-[#2F7045]">{path.completedCount}</strong><span class="text-[9px] text-[#8B909D]">concluíram</span></div>
-                  <ArrowRight size={17} class="text-[#8A909E]"/>
+                  {#if path.currentVersion > 0}
+                    <a href="#training-package-import" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-2.5 text-[9px] font-semibold text-[#000A57]" title="Importar um novo pacote mantendo o histórico desta trilha"><RefreshCw size={12}/>Importar atualização</a>
+                  {/if}
+                  {#if path.status === "archived" && data.canPublish}
+                    <form method="POST" action="?/restore" on:submit={(event) => { if (!confirm("Restaurar esta trilha como rascunho? A última versão publicada continuará preservada até uma nova publicação.")) event.preventDefault(); }}>
+                      <input type="hidden" name="pathId" value={path.id}/>
+                      <button type="submit" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#B9E6C9] bg-[#F1FBF4] px-2.5 text-[9px] font-semibold text-[#2F7045]"><RotateCcw size={12}/>Restaurar</button>
+                    </form>
+                  {/if}
+                  <a href={`/app/help/trilhas/${path.id}`} class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#8A909E] hover:bg-white" aria-label={`Abrir ${path.title}`}><ArrowRight size={17}/></a>
                 </div>
               </div>
-            </a>
+            </div>
           {/each}
         </div>
       {/if}
@@ -88,18 +122,37 @@
           </form>
         </section>
 
-        <section class="h-fit rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
-          <div class="flex items-start gap-3"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><FileArchive size={19}/></span><div><h2 class="text-[16px] font-semibold text-[#11182C]">Importar pacote .zip</h2><p class="mt-1 text-[11px] leading-5 text-[#858A98]">Cria uma nova trilha em rascunho usando textos, imagens e vídeos do pacote.</p></div></div>
+        <section id="training-package-import" class="h-fit scroll-mt-6 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+          <div class="flex items-start gap-3"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><FileArchive size={19}/></span><div><h2 class="text-[16px] font-semibold text-[#11182C]">Importar pacote .zip</h2><p class="mt-1 text-[11px] leading-5 text-[#858A98]">Cria uma trilha nova ou identifica pelo slug quando o pacote é uma atualização.</p></div></div>
           <form method="POST" action="?/importPackage" enctype="multipart/form-data" class="mt-5 space-y-3" use:enhance={enhancePackageImport} aria-busy={isImporting ? "true" : "false"}>
-            <label class="block rounded-xl border border-dashed border-[#CDD2DD] bg-[#FAFAFC] p-4"><span class="text-[10px] font-semibold text-[#4A5060]">Arquivo .zip</span><input name="package" type="file" accept="application/zip,.zip" required disabled={isImporting} class="mt-2 block w-full text-[10px] text-[#6E7483] file:mr-3 file:rounded-lg file:border-0 file:bg-[#000A57] file:px-3 file:py-2 file:text-[10px] file:font-semibold file:text-white disabled:opacity-60"/><span class="mt-2 block text-[9px] leading-4 text-[#8B909D]">Até 120 MB. O JSON deve estar na raiz como <strong>training.json</strong> ou <strong>manifest.json</strong>.</span></label>
-            <button type="submit" disabled={isImporting} class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[12px] font-semibold text-white disabled:cursor-wait disabled:opacity-70">
-              {#if isImporting}<LoaderCircle size={16} class="animate-spin"/>Importando pacote...{:else}<Upload size={15}/>Importar trilha{/if}
-            </button>
+            <label class="block rounded-xl border border-dashed border-[#CDD2DD] bg-[#FAFAFC] p-4"><span class="text-[10px] font-semibold text-[#4A5060]">Arquivo .zip</span><input name="package" type="file" accept="application/zip,.zip" required disabled={isImporting} on:change={() => replaceCandidate = null} class="mt-2 block w-full text-[10px] text-[#6E7483] file:mr-3 file:rounded-lg file:border-0 file:bg-[#000A57] file:px-3 file:py-2 file:text-[10px] file:font-semibold file:text-white disabled:opacity-60"/><span class="mt-2 block text-[9px] leading-4 text-[#8B909D]">Até 120 MB. O JSON deve estar na raiz como <strong>training.json</strong> ou <strong>manifest.json</strong>.</span></label>
+
+            {#if replaceCandidate}
+              <div class="rounded-xl border border-[#F2D1AE] bg-[#FFF8F0] p-4">
+                <div class="flex items-start gap-3"><CircleAlert size={17} class="mt-0.5 shrink-0 text-[#B85408]"/><div><strong class="block text-[11px] font-semibold text-[#8B460E]">{replaceCandidate.status === "archived" ? "Esta trilha está arquivada" : "Esta trilha já existe"}</strong><span class="mt-1 block text-[10px] leading-5 text-[#75583F]">{replaceCandidate.title} · /{replaceCandidate.slug}{#if replaceCandidate.currentVersion > 0} · versão {replaceCandidate.currentVersion}{/if}</span></div></div>
+                <p class="mt-3 text-[10px] leading-5 text-[#75583F]">O conteúdo editável atual será substituído pelo pacote. <strong>Versões publicadas, participantes, sessões, relatos e métricas serão preservados.</strong> Depois da importação a trilha ficará como rascunho para revisão e nova publicação.</p>
+                <button
+                  type="submit"
+                  name="replacePathId"
+                  value={replaceCandidate.id}
+                  disabled={isImporting}
+                  on:click={(event) => { if (!confirm(replaceCandidate?.status === "archived" ? "Restaurar esta trilha e substituir o conteúdo editável pelo pacote? O histórico publicado será preservado." : "Substituir o conteúdo editável desta trilha pelo pacote? O histórico publicado será preservado.")) event.preventDefault(); }}
+                  class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[12px] font-semibold text-white disabled:cursor-wait disabled:opacity-70"
+                >
+                  {#if isImporting}<LoaderCircle size={16} class="animate-spin"/>Atualizando...{:else}<RefreshCw size={15}/>{replaceCandidate.status === "archived" ? "Restaurar e atualizar" : "Atualizar trilha existente"}{/if}
+                </button>
+              </div>
+            {:else}
+              <button type="submit" disabled={isImporting} class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[12px] font-semibold text-white disabled:cursor-wait disabled:opacity-70">
+                {#if isImporting}<LoaderCircle size={16} class="animate-spin"/>Importando pacote...{:else}<Upload size={15}/>Importar pacote{/if}
+              </button>
+            {/if}
+
             {#if isImporting}
               <div class="rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-4 py-3" role="status" aria-live="polite">
                 <div class="flex items-start gap-3">
                   <LoaderCircle size={17} class="mt-0.5 shrink-0 animate-spin text-[#000A57]"/>
-                  <div class="min-w-0"><strong class="block text-[11px] font-semibold text-[#000A57]">Importando o pacote</strong><span class="mt-1 block text-[9px] leading-4 text-[#697084]">Enviando o ZIP, validando o JSON e os arquivos e criando a trilha. Aguarde a conclusão antes de sair desta página.</span></div>
+                  <div class="min-w-0"><strong class="block text-[11px] font-semibold text-[#000A57]">Processando o pacote</strong><span class="mt-1 block text-[9px] leading-4 text-[#697084]">Enviando o ZIP, validando JSON, vídeos, legendas e imagens e gravando tudo em uma única operação. Aguarde a conclusão antes de sair desta página.</span></div>
                 </div>
                 <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-[#E1E4F1]"><div class="h-full w-1/2 animate-pulse rounded-full bg-[#000A57]"></div></div>
               </div>
