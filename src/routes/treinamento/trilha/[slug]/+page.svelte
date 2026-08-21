@@ -14,8 +14,8 @@
     data.state?.progress?.status === "help_requested",
   );
   $: helpHref = currentStep
-    ? `/ajuda-f10?origem=trilha&trilha=${encodeURIComponent(data.landing.slug)}&passo=${encodeURIComponent(currentStep.id)}`
-    : "/ajuda-f10";
+    ? `/ajuda-f10?chat=1&origem=trilha&trilha=${encodeURIComponent(data.landing.slug)}&passo=${encodeURIComponent(currentStep.id)}`
+    : "/ajuda-f10?chat=1";
 </script>
 
 <svelte:head>
