@@ -33,7 +33,9 @@ export function normalizeHelpCategorySlug(value: string): string {
 }
 
 function uniqueCategoryIds(categoryIds: string[]): string[] {
-  return Array.from(new Set(categoryIds)).slice(0, MAX_CATEGORIES_PER_TRAINING);
+  const normalized = Array.from(new Set(categoryIds));
+  if (normalized.length > MAX_CATEGORIES_PER_TRAINING) throw new Error("HELP_CATEGORY_LIMIT");
+  return normalized;
 }
 
 async function assertActiveCategoryIds(categoryIds: string[]): Promise<string[]> {
@@ -49,7 +51,22 @@ async function assertActiveCategoryIds(categoryIds: string[]): Promise<string[]>
 
 export async function listHelpCategories(activeOnly = false): Promise<HelpCategorySummary[]> {
   const db = getDatabase();
-  const query = db
+  if (activeOnly) {
+    return db
+      .select({
+        id: helpCategories.id,
+        slug: helpCategories.slug,
+        name: helpCategories.name,
+        description: helpCategories.description,
+        icon: helpCategories.icon,
+        sortOrder: helpCategories.sortOrder,
+        active: helpCategories.active,
+      })
+      .from(helpCategories)
+      .where(eq(helpCategories.active, true))
+      .orderBy(asc(helpCategories.sortOrder), asc(helpCategories.name));
+  }
+  return db
     .select({
       id: helpCategories.id,
       slug: helpCategories.slug,
@@ -59,11 +76,8 @@ export async function listHelpCategories(activeOnly = false): Promise<HelpCatego
       sortOrder: helpCategories.sortOrder,
       active: helpCategories.active,
     })
-    .from(helpCategories);
-  const rows = activeOnly
-    ? await query.where(eq(helpCategories.active, true)).orderBy(asc(helpCategories.sortOrder), asc(helpCategories.name))
-    : await query.orderBy(asc(helpCategories.sortOrder), asc(helpCategories.name));
-  return rows;
+    .from(helpCategories)
+    .orderBy(asc(helpCategories.sortOrder), asc(helpCategories.name));
 }
 
 export async function createHelpCategory(
