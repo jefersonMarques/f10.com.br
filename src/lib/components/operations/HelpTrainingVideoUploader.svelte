@@ -7,6 +7,7 @@
 
   const MAX_BYTES = 25 * 1024 * 1024;
   const MAX_CAPTION_BYTES = 1024 * 1024;
+  const MIN_SECONDS = 30;
   const MAX_SECONDS = 60;
 
   let fileInput: HTMLInputElement;
@@ -48,8 +49,12 @@
     }
     try {
       const duration = await getBrowserDuration(file);
+      if (duration < MIN_SECONDS - 0.05) {
+        errorMessage = `Este vídeo tem cerca de ${Math.max(1, Math.floor(duration))}s. Cada demonstração deve ter pelo menos 30s para não ficar cortada demais.`;
+        return false;
+      }
       if (duration > MAX_SECONDS + 0.05) {
-        errorMessage = `Este vídeo tem cerca de ${Math.ceil(duration)}s. O limite é 60s; divida a demonstração em microações menores.`;
+        errorMessage = `Este vídeo tem cerca de ${Math.ceil(duration)}s. O limite é 60s; divida a demonstração em outra microação quando necessário.`;
         return false;
       }
     } catch {
@@ -166,7 +171,7 @@
 >
   <div class="flex items-start gap-3">
     <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#EA6D0B] shadow-sm"><Film size={17} aria-hidden="true" /></span>
-    <div class="min-w-0 flex-1"><strong class="application-text-caption block font-semibold text-[#303645]">Demonstração em microvídeo</strong><span class="application-text-caption mt-1 block leading-5 text-[#858B99]">MP4 · máximo 60 segundos · até 25 MB. Para publicar um MP4 local, anexe uma legenda WebVTT. Se o vídeo já estiver enviado, você pode selecionar somente o .vtt.</span></div>
+    <div class="min-w-0 flex-1"><strong class="application-text-caption block font-semibold text-[#303645]">Demonstração em microvídeo</strong><span class="application-text-caption mt-1 block leading-5 text-[#858B99]">MP4 · entre 30 e 60 segundos · até 25 MB. Para publicar um MP4 local, anexe uma legenda WebVTT. Se o vídeo já estiver enviado, você pode selecionar somente o .vtt.</span></div>
   </div>
 
   <input bind:this={fileInput} type="file" accept="video/mp4,.mp4" class="sr-only" on:change={handleFileInput}/>
