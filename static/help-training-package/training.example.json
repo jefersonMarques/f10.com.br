@@ -1,19 +1,20 @@
 {
-  "_aiPrompt": "Use este arquivo apenas como referência de formato. Transforme o material que eu enviar em um training.json completo e importável no F10. Crie um guia operacional passo a passo para uma pessoa leiga: não faça perguntas, diga exatamente o que ela deve fazer agora e use primaryActionLabel \"Próximo passo\" por padrão. O guia flutuante não mostra imagens, então title e instruction precisam ser suficientes para a pessoa executar a ação. Em instruction e expectedResult você pode usar somente **negrito**, `nomes exatos de botões/campos`, listas com - e quebras de linha. Use interactionMode \"presentation\" quando a pessoa só precisa ler ou observar e \"action\" quando ela precisa executar algo. expectedResult é opcional e deve ser apenas uma dica curta para reconhecer a tela correta. Não crie failureReasons: a opção global é \"Preciso de ajuda\", com login, relato livre e opção de registrar ou abrir ticket. Use no máximo uma imagem por passo; se forem necessárias duas imagens para duas ações diferentes, crie dois passos. Não invente arquivos nem telas: referencie somente imagens e vídeos realmente fornecidos. Todo MP4 local deve durar entre 30 e 60 segundos e não precisa de legenda .vtt. Se uma demonstração tiver menos de 30 segundos, junte instruções relacionadas; se passar de 60 segundos, divida somente quando houver outra ação independente. O campo categories é opcional: use somente slugs de categorias que eu informar como existentes no F10 e omita categories se você não souber a taxonomia real. Use accessMode \"invite_only\" salvo se eu pedir explicitamente um link público. Não informe ao participante quantidade total de passos nem duração total. Na resposta, entregue primeiro o training.json final sem este campo _aiPrompt e depois a estrutura de arquivos esperada no .zip. Se faltar informação indispensável, liste as pendências depois do JSON em vez de inventar dados.",
+  "_aiPrompt": "Use este arquivo apenas como referência de formato. Transforme o material que eu enviar em um training.json completo e importável no F10. Crie um guia operacional para uma pessoa leiga. Em cada passo, diga exatamente o que ela deve fazer e gere uma question que confirme algo observável na tela do F10 depois da ação. Nunca use perguntas de conhecimento ou entendimento como 'Você entendeu?' ou 'Quer continuar?'. Use primaryActionLabel \"Já fiz esta etapa\". expectedResult deve descrever o estado obrigatório que a pessoa precisa encontrar e será usado quando ela responder Não. O guia flutuante não mostra imagens, então title, instruction, question e expectedResult precisam funcionar sem a imagem. Em instruction, question e expectedResult você pode usar somente **negrito**, `nomes exatos de botões/campos`, listas com - e quebras de linha. Não crie failureReasons: a opção global é \"Preciso de ajuda\", com login, relato livre e opção de registrar ou abrir ticket. Use no máximo uma imagem por passo. Todo MP4 local deve durar entre 30 e 60 segundos, ter até 25 MB e não precisa de legenda .vtt. O campo categories é opcional: use somente slugs de categorias que eu informar como existentes no F10. Use accessMode \"invite_only\" salvo se eu pedir explicitamente um link público. Não informe quantidade total de passos nem duração total. Na resposta, entregue primeiro o training.json final sem este campo _aiPrompt e depois a estrutura de arquivos esperada no .zip. Se faltar informação indispensável para confirmar o resultado de uma ação, liste em Pendências em vez de inventar.",
   "formatVersion": 1,
   "title": "Comercial — primeiros passos",
   "slug": "comercial-primeiros-passos",
   "audience": "Novos usuários do Comercial",
   "description": "Observação interna para quem administra a trilha. Não será mostrada ao participante.",
-  "welcomeMessage": "Vamos fazer juntos. Siga uma orientação por vez e avance quando terminar.",
+  "welcomeMessage": "Vamos fazer juntos. Deixe o F10 aberto, execute uma orientação por vez e confirme o resultado antes de avançar.",
   "accessMode": "invite_only",
   "steps": [
     {
-      "title": "Veja onde fica o menu principal",
+      "title": "Localize o menu principal",
       "interactionMode": "presentation",
-      "instruction": "Observe o **menu no lado esquerdo** da tela. É nele que você vai encontrar as opções usadas nos próximos passos.",
-      "primaryActionLabel": "Próximo passo",
-      "successMessage": "Certo. Vamos para o próximo passo.",
+      "instruction": "Observe o **menu no lado esquerdo** da tela.",
+      "question": "Você está vendo o **menu principal** no lado esquerdo do F10?",
+      "expectedResult": "O menu principal deve estar visível no lado esquerdo da tela.",
+      "primaryActionLabel": "Já fiz esta etapa",
       "images": [
         { "file": "images/menu-principal.png", "altText": "Menu principal do F10 no lado esquerdo da tela" }
       ]
@@ -22,9 +23,9 @@
       "title": "Abra o cadastro de clientes",
       "interactionMode": "action",
       "instruction": "No menu lateral, clique em **Cadastros**.\n\nDepois clique em `Clientes`.",
-      "expectedResult": "A lista de **clientes** deve ficar aberta.",
-      "primaryActionLabel": "Próximo passo",
-      "successMessage": "Certo. Vamos para o próximo passo.",
+      "question": "A lista de **clientes** está aberta?",
+      "expectedResult": "A lista de clientes deve estar visível na tela.",
+      "primaryActionLabel": "Já fiz esta etapa",
       "estimatedSeconds": 45,
       "images": [
         { "file": "images/clientes.png", "altText": "Opção Clientes destacada no menu lateral do F10" }
