@@ -47,7 +47,7 @@
         return;
       }
 
-      message = result.message ?? "Imagem adicionada à microação.";
+      message = result.message ?? "Imagem principal atualizada.";
       altText = "";
       if (fileInput) fileInput.value = "";
       await invalidateAll();
@@ -90,7 +90,7 @@
 <div
   class={`rounded-xl border border-dashed p-3 transition ${dragActive ? "border-[#000A57] bg-[#EEF0FF]" : "border-[#CDD2DD] bg-[#FAFAFC]"}`}
   role="group"
-  aria-label="Upload de imagem da microação"
+  aria-label="Upload da imagem principal do passo"
   on:pointerenter={activate}
   on:focusin={activate}
   on:dragenter|preventDefault={() => { activate(); dragActive = true; }}
@@ -100,7 +100,7 @@
 >
   <div class="flex items-start gap-3">
     <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#000A57] shadow-sm"><ImageIcon size={17}/></span>
-    <div class="min-w-0 flex-1"><strong class="application-text-caption block font-semibold text-[#303645]">Adicionar print agora</strong><span class="application-text-meta mt-1 block leading-4 text-[#858B99]">Selecione, arraste ou ative este bloco e use <strong>Ctrl+V</strong>. A imagem também fica disponível na Biblioteca.</span></div>
+    <div class="min-w-0 flex-1"><strong class="application-text-caption block font-semibold text-[#303645]">Imagem principal do passo</strong><span class="application-text-meta mt-1 block leading-4 text-[#858B99]">Use um único print que mostre exatamente onde a pessoa deve olhar ou clicar. Um novo upload substitui a imagem anterior deste passo.</span></div>
   </div>
   <input bind:value={altText} maxlength="500" placeholder="Descrição opcional da imagem" class="application-text-meta mt-3 h-9 w-full rounded-lg border border-[#DDE1EA] bg-white px-3 outline-none focus:border-[#000A57]" />
   <input bind:this={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="sr-only" on:change={handleFileInput}/>
