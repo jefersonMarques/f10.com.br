@@ -340,3 +340,118 @@ body::after {
   opacity: 1 !important;
   box-shadow: 0 18px 40px rgba(243, 107, 0, 0.24) !important;
 }
+
+/* Na confirmação, nenhuma resposta recebe aparência de CTA principal. */
+.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) {
+  border-color: #DDE3EE !important;
+  background: #F8FAFD !important;
+  padding: 1rem 1.1rem !important;
+  color: #4F5A70 !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > strong {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.82rem !important;
+  line-height: 1.4;
+  font-weight: 800 !important;
+  color: #061333 !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > strong::before {
+  content: "◉";
+  display: inline-flex;
+  width: 1.65rem;
+  height: 1.65rem;
+  flex: 0 0 1.65rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: #EEF0FF;
+  color: #000A57;
+  font-size: 0.78rem;
+}
+
+.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > .training-rich {
+  margin-top: 0.55rem !important;
+  font-size: 0.78rem !important;
+  line-height: 1.65 !important;
+  color: #4F5A70 !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div.grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 0.75rem !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div.grid > button,
+.training-step-enter:has(> .training-verification-question) > div.grid > form > button {
+  min-height: 5rem !important;
+  flex-direction: column !important;
+  gap: 0.22rem !important;
+  border: 1px solid #D9DEE8 !important;
+  background: #FFFFFF !important;
+  color: #26334D !important;
+  box-shadow: 0 6px 18px rgba(12, 23, 52, 0.05) !important;
+  animation: none !important;
+  transform: none !important;
+  font-size: 0.8rem !important;
+  font-weight: 800 !important;
+  opacity: 1 !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div.grid > button svg,
+.training-step-enter:has(> .training-verification-question) > div.grid > form > button svg {
+  display: none !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div.grid > button::before,
+.training-step-enter:has(> .training-verification-question) > div.grid > form > button::before {
+  display: inline-flex;
+  width: 1.8rem;
+  height: 1.8rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.training-step-enter:has(> .training-verification-question) > div.grid > button:first-child::before {
+  content: "×";
+  background: #FFF3E8;
+  color: #B85408;
+}
+
+.training-step-enter:has(> .training-verification-question) > div.grid > button:first-child::after {
+  content: "Ainda não aconteceu";
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #7A8292;
+}
+
+.training-step-enter:has(> .training-verification-question) > div.grid > button:nth-child(2)::before,
+.training-step-enter:has(> .training-verification-question) > div.grid > form:nth-child(2) > button::before {
+  content: "✓";
+  background: #EDF8F1;
+  color: #2F7045;
+}
+
+.training-step-enter:has(> .training-verification-question) > div.grid > button:nth-child(2)::after,
+.training-step-enter:has(> .training-verification-question) > div.grid > form:nth-child(2) > button::after {
+  content: "Aconteceu no F10";
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #7A8292;
+}
+
+.training-step-enter:has(> .training-verification-question) > div.grid > button:hover,
+.training-step-enter:has(> .training-verification-question) > div.grid > form > button:hover {
+  background: #FFFFFF !important;
+  color: #26334D !important;
+  border-color: #C8D0DD !important;
+  box-shadow: 0 8px 20px rgba(12, 23, 52, 0.07) !important;
+  transform: none !important;
+}
