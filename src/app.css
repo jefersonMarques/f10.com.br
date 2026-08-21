@@ -470,18 +470,18 @@ main > section .training-primary.training-float:not(:disabled):hover {
 }
 
 /* Recuperação/atenção = laranja sólido somente no botão. */
-.training-step-enter > div.mt-7.w-full > button.training-primary.training-float {
+.training-step-enter > div.mt-7.w-full:not(.grid) > button.training-primary.training-float {
   background-color: #F36B00 !important;
   color: #FFFFFF !important;
   border-color: #F36B00 !important;
   box-shadow: 0 8px 20px rgba(243, 107, 0, 0.22) !important;
 }
 
-.training-step-enter > div.mt-7.w-full > button.training-primary.training-float svg {
+.training-step-enter > div.mt-7.w-full:not(.grid) > button.training-primary.training-float svg {
   color: #FFFFFF !important;
 }
 
-.training-step-enter > div.mt-7.w-full > button.training-primary.training-float:not(:disabled):hover {
+.training-step-enter > div.mt-7.w-full:not(.grid) > button.training-primary.training-float:not(:disabled):hover {
   background-color: #D85F00 !important;
   color: #FFFFFF !important;
   border-color: #D85F00 !important;
