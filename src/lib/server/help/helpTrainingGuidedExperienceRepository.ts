@@ -20,6 +20,14 @@ import {
 const MAX_DIFFICULTY_DETAIL_LENGTH = 4000;
 const MAX_REPORTER_NAME_LENGTH = 160;
 const MAX_REPORTER_EMAIL_LENGTH = 320;
+const MAX_CONTEXT_LABEL_LENGTH = 180;
+
+export type TrainingDifficultyReporter = {
+  name: string;
+  email: string;
+  groupName?: string | null;
+  unitName?: string | null;
+};
 
 function normalizeDifficultyDetail(value: string): string {
   const detail = value.trim().slice(0, MAX_DIFFICULTY_DETAIL_LENGTH);
@@ -27,18 +35,19 @@ function normalizeDifficultyDetail(value: string): string {
   return detail;
 }
 
-function normalizeReporterName(value: string): string {
-  const name = value.trim().slice(0, MAX_REPORTER_NAME_LENGTH);
+function normalizeReporter(input: TrainingDifficultyReporter) {
+  const name = input.name.trim().slice(0, MAX_REPORTER_NAME_LENGTH);
+  const email = input.email.trim().toLowerCase().slice(0, MAX_REPORTER_EMAIL_LENGTH);
   if (name.length < 2) throw new Error("TRAINING_REPORTER_NAME_REQUIRED");
-  return name;
-}
-
-function normalizeReporterEmail(value: string): string {
-  const email = value.trim().toLowerCase().slice(0, MAX_REPORTER_EMAIL_LENGTH);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error("TRAINING_REPORTER_EMAIL_INVALID");
   }
-  return email;
+  return {
+    name,
+    email,
+    groupName: input.groupName?.trim().slice(0, MAX_CONTEXT_LABEL_LENGTH) || null,
+    unitName: input.unitName?.trim().slice(0, MAX_CONTEXT_LABEL_LENGTH) || null,
+  };
 }
 
 function isCompletedProgress(progress: { status: string; completedAt: Date | null } | null): boolean {
@@ -109,6 +118,7 @@ export async function completePublicTrainingStepGuided(rawSessionToken: string) 
 export async function reportInviteTrainingDifficulty(
   rawSessionToken: string,
   detailInput: string,
+  reporterInput: TrainingDifficultyReporter,
 ): Promise<void> {
   const state = await getHelpTrainingSession(rawSessionToken);
   if (!state || !state.currentStep) throw new Error("TRAINING_SESSION_INVALID");
@@ -117,6 +127,7 @@ export async function reportInviteTrainingDifficulty(
   }
 
   const detail = normalizeDifficultyDetail(detailInput);
+  const reporter = normalizeReporter(reporterInput);
   const db = getDatabase();
   const now = new Date();
 
@@ -154,7 +165,15 @@ export async function reportInviteTrainingDifficulty(
       sessionId: state.session.id,
       stepKey: state.currentStep!.id,
       eventType: "step_blocked",
-      metadata: { inputMode: "free_text", detailLength: detail.length, detail },
+      metadata: {
+        inputMode: "free_text",
+        detailLength: detail.length,
+        detail,
+        reporterName: reporter.name,
+        reporterEmail: reporter.email,
+        groupName: reporter.groupName,
+        unitName: reporter.unitName,
+      },
     });
   });
 }
@@ -184,7 +203,8 @@ export async function goBackInviteTrainingStep(rawSessionToken: string): Promise
 
 export async function reportPublicTrainingDifficulty(
   rawSessionToken: string,
-  input: { detail: string; reporterName: string; reporterEmail: string },
+  detailInput: string,
+  reporterInput: TrainingDifficultyReporter,
 ): Promise<void> {
   const state = await getPublicHelpTrainingSession(rawSessionToken);
   if (!state || !state.currentStep) throw new Error("PUBLIC_TRAINING_SESSION_INVALID");
@@ -192,9 +212,8 @@ export async function reportPublicTrainingDifficulty(
     throw new Error("TRAINING_DIFFICULTY_NOT_ALLOWED");
   }
 
-  const detail = normalizeDifficultyDetail(input.detail);
-  const reporterName = normalizeReporterName(input.reporterName);
-  const reporterEmail = normalizeReporterEmail(input.reporterEmail);
+  const detail = normalizeDifficultyDetail(detailInput);
+  const reporter = normalizeReporter(reporterInput);
   const db = getDatabase();
   const now = new Date();
 
@@ -234,8 +253,10 @@ export async function reportPublicTrainingDifficulty(
       eventType: "step_blocked",
       metadata: {
         inputMode: "free_text",
-        reporterName,
-        reporterEmail,
+        reporterName: reporter.name,
+        reporterEmail: reporter.email,
+        groupName: reporter.groupName,
+        unitName: reporter.unitName,
         detail,
       },
     });
