@@ -23,7 +23,7 @@
       <p class="mt-8 text-[9px] font-bold uppercase tracking-[0.16em] text-[#F36B00]">Orientação F10</p>
       <h1 class="mx-auto mt-3 max-w-[760px] text-[30px] font-semibold tracking-[-0.04em] text-[#061333] sm:text-[44px]">{data.landing.title}</h1>
       {#if data.landing.audience}<p class="mt-3 text-[11px] text-[#858A98]">{data.landing.audience}</p>{/if}
-      <p class="mx-auto mt-7 max-w-[620px] text-[13px] leading-7 text-[#656C7C]">{data.landing.welcomeMessage || "Vamos fazer uma coisa de cada vez. Leia a orientação, faça a ação e continue quando estiver pronto."}</p>
+      <p class="mx-auto mt-7 max-w-[620px] text-[13px] leading-7 text-[#656C7C]">Mantenha o F10 aberto. Você executará uma orientação por vez e precisará confirmar o resultado no sistema antes de avançar.</p>
       {#if formMessage}<p class="mx-auto mt-5 max-w-[560px] rounded-xl bg-[#FFF5F5] px-4 py-3 text-[10px] leading-5 text-[#9B2C2C]">{formMessage}</p>{/if}
       <form method="POST" action="?/start" class="mt-8"><button type="submit" class="training-start inline-flex min-h-14 items-center gap-2 rounded-full bg-[#F36B00] px-8 text-[12px] font-bold text-white shadow-[0_18px_36px_rgba(243,107,0,0.22)]">Começar<ChevronRight size={17}/></button></form>
     </section>
