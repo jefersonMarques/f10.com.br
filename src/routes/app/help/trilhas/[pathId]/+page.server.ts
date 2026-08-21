@@ -9,9 +9,13 @@ import {
   moveHelpTrainingFailureReason,
   moveHelpTrainingStep,
   publishHelpTrainingPathDraft,
-  updateHelpTrainingPathDraft,
   updateHelpTrainingStepDraft,
 } from "$lib/server/help/helpTrainingAuthoringRepository";
+import {
+  listHelpCategories,
+  listHelpTrainingPathCategories,
+  updateHelpTrainingPathWithCategories,
+} from "$lib/server/help/helpCategoryRepository";
 import { getCombinedHelpTrainingInsights } from "$lib/server/help/helpTrainingInsightsRepository";
 import { getTrainingBaseUrl, sendHelpTrainingInvite } from "$lib/server/help/helpTrainingMailer";
 import {
@@ -46,8 +50,7 @@ function direction(value: string): "up" | "down" | null {
 function publishErrorMessage(cause: unknown): string {
   const code = cause instanceof Error ? cause.message : "TRAINING_PUBLISH_FAILED";
   if (code === "TRAINING_STEP_INCOMPLETE") return "Toda microação precisa ter título e conteúdo.";
-  if (code === "TRAINING_STEP_RESULT_REQUIRED") return "Toda microação do tipo ação precisa informar o resultado esperado.";
-  if (code === "TRAINING_VIDEO_INVALID" || code === "INVALID_MEDIA_URL") return "Há um vídeo inválido ou sem legenda em uma das microações.";
+  if (code === "TRAINING_VIDEO_INVALID" || code === "INVALID_MEDIA_URL") return "Há um vídeo inválido em uma das microações.";
   return "Não foi possível publicar. Revise as microações e tente novamente.";
 }
 
@@ -59,10 +62,12 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 
   const path = await getHelpTrainingPath(params.pathId);
   if (!path) throw error(404, "Trilha não encontrada.");
-  const [queues, participants, insights] = await Promise.all([
+  const [queues, participants, insights, categories, assignedCategories] = await Promise.all([
     listTrainingSupportQueues(),
     listHelpTrainingParticipants(params.pathId),
     getCombinedHelpTrainingInsights(params.pathId),
+    listHelpCategories(true),
+    listHelpTrainingPathCategories(params.pathId),
   ]);
   const canEditPermission = hasPermission(permissions, "help.edit");
   const canPublishPermission = hasPermission(permissions, "help.publish");
@@ -72,6 +77,8 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     queues,
     participants,
     insights,
+    categories,
+    assignedCategoryIds: assignedCategories.map((category) => category.id),
     canEdit: canEditPermission && path.status !== "archived",
     canPublish: canPublishPermission && path.status !== "archived",
     canDelete: canEditPermission && path.currentVersion === 0,
@@ -95,11 +102,16 @@ export const actions: Actions = {
     const welcomeMessage = read(formData, "welcomeMessage");
     const supportQueueId = read(formData, "supportQueueId");
     const accessMode = read(formData, "accessMode") === "public" ? "public" : "invite_only";
+    const categoryValues = formData.getAll("categoryIds");
+    if (categoryValues.some((value) => typeof value !== "string" || !isUuid(value))) {
+      return fail(400, { success: false, message: "Uma das categorias selecionadas é inválida." });
+    }
+    const categoryIds = categoryValues as string[];
     if (title.length < 4 || title.length > 160 || audience.length > 160 || description.length > 1200 || welcomeMessage.length > 1200) {
       return fail(400, { success: false, message: "Revise os dados da trilha." });
     }
     try {
-      await updateHelpTrainingPathDraft(session.user.id, params.pathId, {
+      await updateHelpTrainingPathWithCategories(session.user.id, params.pathId, {
         title,
         slug,
         audience,
@@ -107,10 +119,16 @@ export const actions: Actions = {
         welcomeMessage,
         supportQueueId: isUuid(supportQueueId) ? supportQueueId : null,
         accessMode,
+        categoryIds,
       });
-      return { success: true, message: "Configuração salva." };
-    } catch {
-      return fail(409, { success: false, message: "Não foi possível salvar a trilha. Verifique se o endereço já está em uso." });
+      return { success: true, message: "Configuração e categorias salvas." };
+    } catch (cause) {
+      return fail(409, {
+        success: false,
+        message: cause instanceof Error && cause.message === "HELP_CATEGORY_INVALID"
+          ? "Uma das categorias foi desativada ou não existe mais. Atualize a página e selecione novamente."
+          : "Não foi possível salvar a trilha. Verifique se o endereço já está em uso.",
+      });
     }
   },
 
