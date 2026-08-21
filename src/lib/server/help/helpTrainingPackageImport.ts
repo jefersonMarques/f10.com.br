@@ -4,6 +4,7 @@ import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import {
   helpTrainingFailureReasons,
+  helpTrainingPathCategories,
   helpTrainingPaths,
   helpTrainingStepMedia,
   helpTrainingSteps,
@@ -12,6 +13,11 @@ import {
 } from "$lib/server/db/helpTrainingSchema";
 import { createManagedHelpAsset, deleteManagedHelpAsset } from "$lib/server/help/helpAssetRepository";
 import { createTrainingCaptionAsset, validateTrainingCaptions } from "$lib/server/help/helpTrainingCaption";
+import {
+  getHelpCategoriesBySlugs,
+  normalizeHelpCategorySlug,
+  type HelpCategorySummary,
+} from "$lib/server/help/helpCategoryRepository";
 import { normalizeTrainingSlug } from "$lib/server/help/helpTrainingRepository";
 import { validateTrainingVideo } from "$lib/server/help/helpTrainingVideo";
 import { readZipArchive } from "$lib/server/help/zipArchive";
@@ -20,6 +26,7 @@ const MANIFEST_NAMES = ["training.json", "manifest.json"];
 const MAX_MANIFEST_BYTES = 1024 * 1024;
 const MAX_STEPS = 100;
 const MAX_IMAGES_PER_STEP = 1;
+const MAX_CATEGORIES_PER_TRAINING = 12;
 
 type ManifestImage = { file: string; altText: string };
 type ManifestVideo = { file: string | null; url: string | null; captions: string | null };
@@ -44,6 +51,7 @@ type TrainingManifest = {
   description: string;
   welcomeMessage: string;
   accessMode: HelpTrainingAccessMode;
+  categorySlugs: string[] | null;
   steps: ManifestStep[];
 };
 type PreparedAsset = { id: string; reused: boolean };
@@ -125,6 +133,20 @@ function assertHttpUrl(value: string): void {
   }
 }
 
+function parseCategorySlugs(source: Record<string, unknown>): string[] | null {
+  if (!("categories" in source)) return null;
+  if (!Array.isArray(source.categories) || source.categories.length > MAX_CATEGORIES_PER_TRAINING) {
+    throw new Error("TRAINING_PACKAGE_CATEGORIES_INVALID");
+  }
+  const slugs = source.categories.map((value) => {
+    if (typeof value !== "string") throw new Error("TRAINING_PACKAGE_CATEGORIES_INVALID");
+    const slug = normalizeHelpCategorySlug(value);
+    if (!slug) throw new Error("TRAINING_PACKAGE_CATEGORIES_INVALID");
+    return slug;
+  });
+  return Array.from(new Set(slugs));
+}
+
 function parseManifest(bytes: Uint8Array): TrainingManifest {
   if (bytes.byteLength < 2 || bytes.byteLength > MAX_MANIFEST_BYTES) throw new Error("TRAINING_PACKAGE_MANIFEST_SIZE");
   let raw: unknown;
@@ -142,6 +164,7 @@ function parseManifest(bytes: Uint8Array): TrainingManifest {
   const slug = normalizeTrainingSlug(text(source.slug, 100) || title);
   if (!slug) throw new Error("TRAINING_PACKAGE_SLUG_INVALID");
   const accessMode: HelpTrainingAccessMode = source.accessMode === "public" ? "public" : "invite_only";
+  const categorySlugs = parseCategorySlugs(source);
   if (!Array.isArray(source.steps) || source.steps.length < 1 || source.steps.length > MAX_STEPS) {
     throw new Error("TRAINING_PACKAGE_STEPS_INVALID");
   }
@@ -218,6 +241,7 @@ function parseManifest(bytes: Uint8Array): TrainingManifest {
     description: text(source.description, 1200),
     welcomeMessage: text(source.welcomeMessage, 1200) || "Vamos fazer juntos. Siga uma orientação por vez e avance quando terminar.",
     accessMode,
+    categorySlugs,
     steps,
   };
 }
@@ -273,6 +297,16 @@ async function findExistingPath(slug: string): Promise<HelpTrainingPackageReplac
   return path ?? null;
 }
 
+async function resolveManifestCategories(categorySlugs: string[] | null): Promise<HelpCategorySummary[] | null> {
+  if (categorySlugs === null) return null;
+  if (categorySlugs.length === 0) return [];
+  const found = await getHelpCategoriesBySlugs(categorySlugs);
+  const bySlug = new Map(found.map((category) => [category.slug, category]));
+  const missing = categorySlugs.find((slug) => !bySlug.has(slug));
+  if (missing) throw new Error(`TRAINING_PACKAGE_CATEGORY_NOT_FOUND:${missing}`);
+  return categorySlugs.map((slug) => bySlug.get(slug)!);
+}
+
 export async function importHelpTrainingPackage(
   actorUserId: string,
   archiveBytes: Uint8Array,
@@ -297,6 +331,7 @@ export async function importHelpTrainingPackage(
     if (expectedType === "caption") validateTrainingCaptions(entry.bytes);
   }
 
+  const resolvedCategories = await resolveManifestCategories(manifest.categorySlugs);
   const existingPath = await findExistingPath(manifest.slug);
   const replacePathId = options.replacePathId?.trim() || null;
   if (existingPath && replacePathId !== existingPath.id) {
@@ -370,6 +405,19 @@ export async function importHelpTrainingPackage(
       }
 
       if (!path) throw new Error(existingPath ? "TRAINING_PACKAGE_PATH_NOT_UPDATED" : "TRAINING_PACKAGE_PATH_NOT_CREATED");
+
+      if (resolvedCategories !== null) {
+        await tx.delete(helpTrainingPathCategories).where(eq(helpTrainingPathCategories.pathId, path.id));
+        if (resolvedCategories.length > 0) {
+          await tx.insert(helpTrainingPathCategories).values(
+            resolvedCategories.map((category, index) => ({
+              pathId: path!.id,
+              categoryId: category.id,
+              sortOrder: (index + 1) * 10,
+            })),
+          );
+        }
+      }
 
       for (let stepIndex = 0; stepIndex < manifest.steps.length; stepIndex += 1) {
         const source = manifest.steps[stepIndex]!;
@@ -454,6 +502,7 @@ export async function importHelpTrainingPackage(
         slug: result.slug,
         stepCount: manifest.steps.length,
         assetCount: referencedFiles.size,
+        categories: manifest.categorySlugs,
         previousStatus: existingPath?.status ?? null,
         preservedVersion: existingPath?.currentVersion ?? 0,
       },
