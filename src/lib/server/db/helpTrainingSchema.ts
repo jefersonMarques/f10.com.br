@@ -14,6 +14,9 @@ import { helpAssets } from "$lib/server/db/structuredHelpSchema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
 import { helpContentStatus, users } from "$lib/server/db/schema";
 
+export type HelpTrainingAccessMode = "invite_only" | "public";
+export type HelpTrainingInteractionMode = "presentation" | "action";
+
 export const helpTrainingPaths = pgTable(
   "help_training_paths",
   {
@@ -24,6 +27,7 @@ export const helpTrainingPaths = pgTable(
     description: text("description").notNull().default(""),
     welcomeMessage: text("welcome_message").notNull().default(""),
     status: helpContentStatus("status").notNull().default("draft"),
+    accessMode: text("access_mode").$type<HelpTrainingAccessMode>().notNull().default("invite_only"),
     currentVersion: integer("current_version").notNull().default(0),
     supportQueueId: uuid("support_queue_id").references(() => supportQueues.id, {
       onDelete: "set null",
@@ -37,6 +41,7 @@ export const helpTrainingPaths = pgTable(
   (table) => [
     uniqueIndex("help_training_paths_slug_unique").on(table.slug),
     index("help_training_paths_status_idx").on(table.status, table.updatedAt),
+    index("help_training_paths_public_idx").on(table.accessMode, table.status, table.slug),
   ],
 );
 
@@ -51,6 +56,10 @@ export const helpTrainingSteps = pgTable(
     instruction: text("instruction").notNull().default(""),
     expectedResult: text("expected_result").notNull().default(""),
     successMessage: text("success_message").notNull().default(""),
+    interactionMode: text("interaction_mode")
+      .$type<HelpTrainingInteractionMode>()
+      .notNull()
+      .default("action"),
     estimatedSeconds: integer("estimated_seconds").notNull().default(45),
     sortOrder: integer("sort_order").notNull().default(10),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -118,6 +127,7 @@ export type HelpTrainingSnapshot = {
     instruction: string;
     expectedResult: string;
     successMessage: string;
+    interactionMode?: HelpTrainingInteractionMode;
     estimatedSeconds: number;
     images: Array<{ assetId: string; altText: string }>;
     videoUrl: string | null;
@@ -234,5 +244,65 @@ export const helpTrainingEvents = pgTable(
   (table) => [
     index("help_training_events_session_idx").on(table.sessionId, table.createdAt),
     index("help_training_events_type_idx").on(table.eventType, table.createdAt),
+  ],
+);
+
+export const helpTrainingPublicSessions = pgTable(
+  "help_training_public_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    versionId: uuid("version_id")
+      .notNull()
+      .references(() => helpTrainingVersions.id, { onDelete: "restrict" }),
+    sessionTokenHash: text("session_token_hash").notNull(),
+    currentStepIndex: integer("current_step_index").notNull().default(0),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("help_training_public_sessions_token_unique").on(table.sessionTokenHash),
+    index("help_training_public_sessions_version_idx").on(table.versionId, table.lastActivityAt),
+  ],
+);
+
+export const helpTrainingPublicStepProgress = pgTable(
+  "help_training_public_step_progress",
+  {
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => helpTrainingPublicSessions.id, { onDelete: "cascade" }),
+    stepKey: text("step_key").notNull(),
+    status: text("status").notNull().default("pending"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    failureReasonKey: text("failure_reason_key"),
+    failureDetail: text("failure_detail").notNull().default(""),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.sessionId, table.stepKey] }),
+    index("help_training_public_step_progress_status_idx").on(table.status, table.updatedAt),
+  ],
+);
+
+export const helpTrainingPublicEvents = pgTable(
+  "help_training_public_events",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => helpTrainingPublicSessions.id, { onDelete: "cascade" }),
+    stepKey: text("step_key"),
+    eventType: text("event_type").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("help_training_public_events_session_idx").on(table.sessionId, table.createdAt),
+    index("help_training_public_events_type_idx").on(table.eventType, table.createdAt),
   ],
 );

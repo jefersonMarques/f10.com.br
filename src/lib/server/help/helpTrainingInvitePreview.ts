@@ -31,7 +31,6 @@ export async function previewHelpTrainingInvite(rawToken: string) {
     organizationName: invite.organizationName,
     trainingTitle: version.snapshot.title,
     audience: version.snapshot.audience,
-    description: version.snapshot.description,
     welcomeMessage: version.snapshot.welcomeMessage,
   };
 }

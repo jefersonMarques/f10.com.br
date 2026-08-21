@@ -8,6 +8,7 @@ import {
   reportHelpTrainingFailure,
   startHelpTrainingSession,
 } from "$lib/server/help/helpTrainingRepository";
+import { toHelpTrainingClientState } from "$lib/server/help/helpTrainingExperience";
 import {
   clearHelpTrainingInviteCookie,
   clearHelpTrainingSessionCookie,
@@ -50,10 +51,10 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
   if (stagedInviteToken && !invitePreview) clearHelpTrainingInviteCookie(cookies);
 
   return {
-    state,
+    state: state ? toHelpTrainingClientState(state) : null,
     invitePreview,
     inviteState: url.searchParams.get("convite"),
-    justCompletedStep: url.searchParams.get("feito") === "1",
+    successMessage: (url.searchParams.get("feito") ?? "").slice(0, 500),
     helpRequested: url.searchParams.get("ajuda") === "1",
   };
 };
@@ -84,8 +85,9 @@ export const actions: Actions = {
   success: async ({ cookies }) => {
     const token = await requireTrainingToken(cookies);
     try {
-      await completeHelpTrainingStep(token);
-      throw redirect(303, "/treinamento?feito=1");
+      const result = await completeHelpTrainingStep(token);
+      const message = encodeURIComponent(result.successMessage || "Feito. Vamos continuar.");
+      throw redirect(303, `/treinamento?feito=${message}`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
       return fail(409, { success: false, message: "Não foi possível registrar essa ação. Tente novamente." });

@@ -58,7 +58,7 @@
     {#if data.invitePreview && !data.state}
       <section class="mt-12 overflow-hidden rounded-[28px] border border-[#E2E5ED] bg-white shadow-[0_18px_60px_rgba(1,13,40,0.06)]">
         <div class="bg-[#000A57] px-7 py-8 text-white sm:px-10"><p class="text-[10px] font-bold uppercase tracking-[0.12em] text-[#FFB475]">Treinamento F10</p><h1 class="mt-3 text-[28px] font-semibold tracking-[-0.03em] sm:text-[34px]">{data.invitePreview.trainingTitle}</h1>{#if data.invitePreview.audience}<p class="mt-2 text-[11px] text-white/65">{data.invitePreview.audience}</p>{/if}</div>
-        <div class="p-7 sm:p-10"><p class="text-[15px] font-semibold text-[#242B3D]">Olá, {data.invitePreview.participantName}.</p><p class="mt-3 max-w-[650px] text-[12px] leading-6 text-[#6F7585]">{data.invitePreview.welcomeMessage || "Você vai aprender usando o próprio F10. Mostraremos somente uma ação de cada vez."}</p>{#if data.invitePreview.description}<p class="mt-3 max-w-[650px] text-[11px] leading-5 text-[#858A98]">{data.invitePreview.description}</p>{/if}<form method="POST" action="?/acceptInvite" class="mt-7"><button type="submit" class="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#EA6D0B] px-6 text-[12px] font-semibold text-white shadow-[0_12px_28px_rgba(234,109,11,0.2)]">Pronto para começar?<ChevronRight size={16}/></button></form><p class="mt-4 text-[9px] leading-4 text-[#969BA7]">Ao começar, este convite individual é convertido em uma sessão segura neste navegador.</p></div>
+        <div class="p-7 sm:p-10"><p class="text-[15px] font-semibold text-[#242B3D]">Olá, {data.invitePreview.participantName}.</p><p class="mt-3 max-w-[650px] text-[12px] leading-6 text-[#6F7585]">{data.invitePreview.welcomeMessage || "Você vai aprender usando o próprio F10. Mostraremos somente uma orientação de cada vez."}</p><form method="POST" action="?/acceptInvite" class="mt-7"><button type="submit" class="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#EA6D0B] px-6 text-[12px] font-semibold text-white shadow-[0_12px_28px_rgba(234,109,11,0.2)]">Pronto para começar?<ChevronRight size={16}/></button></form><p class="mt-4 text-[9px] leading-4 text-[#969BA7]">Ao começar, este convite individual é convertido em uma sessão segura neste navegador.</p></div>
       </section>
     {:else if !data.state}
       <section class="mt-12 rounded-[28px] border border-[#E2E5ED] bg-white p-7 text-center shadow-[0_18px_60px_rgba(1,13,40,0.06)] sm:p-10">
@@ -75,14 +75,14 @@
       </section>
     {:else if !data.state.session.startedAt}
       <section class="mt-12 overflow-hidden rounded-[28px] border border-[#E2E5ED] bg-white shadow-[0_18px_60px_rgba(1,13,40,0.06)]">
-        <div class="bg-[#000A57] px-7 py-8 text-white sm:px-10"><p class="text-[10px] font-bold uppercase tracking-[0.12em] text-[#FFB475]">Treinamento F10</p><h1 class="mt-3 text-[28px] font-semibold tracking-[-0.03em] sm:text-[34px]">{data.state.snapshot.title}</h1>{#if data.state.snapshot.audience}<p class="mt-2 text-[11px] text-white/65">{data.state.snapshot.audience}</p>{/if}</div>
-        <div class="p-7 sm:p-10"><p class="text-[15px] font-semibold text-[#242B3D]">Olá, {data.state.invite.participantName}.</p><p class="mt-3 max-w-[650px] text-[12px] leading-6 text-[#6F7585]">{data.state.snapshot.welcomeMessage || "Você vai aprender usando o próprio F10. Mostraremos somente uma ação de cada vez."}</p>{#if data.state.snapshot.description}<p class="mt-3 max-w-[650px] text-[11px] leading-5 text-[#858A98]">{data.state.snapshot.description}</p>{/if}<form method="POST" action="?/start" class="mt-7"><button type="submit" class="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#EA6D0B] px-6 text-[12px] font-semibold text-white shadow-[0_12px_28px_rgba(234,109,11,0.2)]">Começar<ChevronRight size={16}/></button></form></div>
+        <div class="bg-[#000A57] px-7 py-8 text-white sm:px-10"><p class="text-[10px] font-bold uppercase tracking-[0.12em] text-[#FFB475]">Treinamento F10</p><h1 class="mt-3 text-[28px] font-semibold tracking-[-0.03em] sm:text-[34px]">{data.state.training.title}</h1>{#if data.state.training.audience}<p class="mt-2 text-[11px] text-white/65">{data.state.training.audience}</p>{/if}</div>
+        <div class="p-7 sm:p-10"><p class="text-[15px] font-semibold text-[#242B3D]">Olá, {data.state.invite.participantName}.</p><p class="mt-3 max-w-[650px] text-[12px] leading-6 text-[#6F7585]">{data.state.training.welcomeMessage || "Você vai aprender usando o próprio F10. Mostraremos somente uma orientação de cada vez."}</p><form method="POST" action="?/start" class="mt-7"><button type="submit" class="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#EA6D0B] px-6 text-[12px] font-semibold text-white shadow-[0_12px_28px_rgba(234,109,11,0.2)]">Começar<ChevronRight size={16}/></button></form></div>
       </section>
     {:else if currentStep}
       <section class="mt-8 overflow-hidden rounded-[28px] border border-[#E2E5ED] bg-white shadow-[0_18px_60px_rgba(1,13,40,0.06)]">
-        <div class="border-b border-[#EEF0F5] px-6 py-6 sm:px-8"><p class="text-[9px] font-bold uppercase tracking-[0.12em] text-[#EA6D0B]">Sua próxima ação</p><h1 class="mt-2 text-[24px] font-semibold tracking-[-0.03em] text-[#11182C] sm:text-[30px]">{currentStep.title}</h1></div>
+        <div class="border-b border-[#EEF0F5] px-6 py-6 sm:px-8"><p class="text-[9px] font-bold uppercase tracking-[0.12em] text-[#EA6D0B]">Agora</p><h1 class="mt-2 text-[24px] font-semibold tracking-[-0.03em] text-[#11182C] sm:text-[30px]">{currentStep.title}</h1></div>
         <div class="p-6 sm:p-8">
-          {#if data.justCompletedStep}<div class="mb-5 flex items-start gap-3 rounded-2xl border border-[#B9E6C9] bg-[#F1FBF4] px-4 py-3"><Check size={17} class="mt-0.5 shrink-0 text-[#2F7045]"/><div><strong class="block text-[11px] text-[#176B35]">Feito.</strong><span class="mt-1 block text-[10px] leading-5 text-[#397B4F]">Continue com esta próxima ação.</span></div></div>{/if}
+          {#if data.successMessage}<div class="mb-5 flex items-start gap-3 rounded-2xl border border-[#B9E6C9] bg-[#F1FBF4] px-4 py-3"><Check size={17} class="mt-0.5 shrink-0 text-[#2F7045]"/><span class="block text-[10px] leading-5 text-[#397B4F]">{data.successMessage}</span></div>{/if}
           {#if data.helpRequested}<div class="mb-5 flex items-start gap-3 rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] px-4 py-3"><Send size={17} class="mt-0.5 shrink-0 text-[#000A57]"/><div><strong class="block text-[11px] text-[#000A57]">Pedido enviado.</strong><span class="mt-1 block text-[10px] leading-5 text-[#646B7D]">A equipe F10 recebeu o contexto desta ação e do que aconteceu. Você não precisa explicar tudo de novo.</span></div></div>{/if}
           {#if form?.message}<div class="mb-5 flex items-start gap-3 rounded-2xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[10px] text-[#9B2C2C]"><CircleAlert size={16}/>{form.message}</div>{/if}
 
@@ -99,7 +99,7 @@
               <details class="mt-6 rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4">
                 <summary class="flex cursor-pointer list-none items-center gap-2 text-[11px] font-semibold text-[#000A57]"><Play size={14}/>Ver demonstração rápida</summary>
                 {#if videoAssetId}
-                  <div class="mt-4 overflow-hidden rounded-xl bg-black"><video src={`/treinamento/assets/${videoAssetId}`} controls preload="metadata" playsinline class="aspect-video w-full" aria-label="Demonstração rápida"></video></div>
+                  <div class="mt-4 overflow-hidden rounded-xl bg-black"><video src={`/treinamento/assets/${videoAssetId}`} controls preload="metadata" playsinline class="aspect-video w-full">{#if currentStep.captionAssetId}<track kind="captions" srclang="pt-BR" label="Português" src={`/treinamento/assets/${currentStep.captionAssetId}`} default />{/if}</video></div>
                 {:else if videoEmbed}
                   <div class="mt-4 overflow-hidden rounded-xl bg-black"><iframe src={videoEmbed} title="Demonstração rápida" class="aspect-video w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>
                 {:else}
@@ -108,9 +108,13 @@
               </details>
             {/if}
 
-            <div class="mt-6 rounded-2xl bg-[#F6F7FA] px-4 py-4"><p class="text-[9px] font-bold uppercase tracking-[0.1em] text-[#8B909D]">Quando terminar</p><p class="mt-2 text-[11px] leading-5 text-[#565D6D]">{currentStep.expectedResult}</p></div>
+            {#if currentStep.interactionMode === "action" && currentStep.expectedResult}<div class="mt-6 rounded-2xl bg-[#F6F7FA] px-4 py-4"><p class="text-[9px] font-bold uppercase tracking-[0.1em] text-[#8B909D]">Quando terminar</p><p class="mt-2 text-[11px] leading-5 text-[#565D6D]">{currentStep.expectedResult}</p></div>{/if}
 
-            <div class="mt-7 grid gap-3 sm:grid-cols-2"><form method="POST" action="?/success"><button type="submit" class="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#2F7045] px-5 text-[11px] font-semibold text-white"><Check size={16}/>Consegui fazer</button></form><button type="button" on:click={() => (failureOpen = true)} class="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-5 text-[11px] font-semibold text-[#5D6474]"><HelpCircle size={16}/>Não consegui</button></div>
+            {#if currentStep.interactionMode === "presentation"}
+              <form method="POST" action="?/success" class="mt-7"><button type="submit" class="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white">Continuar<ChevronRight size={16}/></button></form>
+            {:else}
+              <div class="mt-7 grid gap-3 sm:grid-cols-2"><form method="POST" action="?/success"><button type="submit" class="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#2F7045] px-5 text-[11px] font-semibold text-white"><Check size={16}/>Consegui fazer</button></form><button type="button" on:click={() => (failureOpen = true)} class="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-5 text-[11px] font-semibold text-[#5D6474]"><HelpCircle size={16}/>Não consegui</button></div>
+            {/if}
           {/if}
         </div>
       </section>
@@ -118,7 +122,7 @@
   </div>
 </div>
 
-{#if failureOpen && currentStep}
+{#if failureOpen && currentStep && currentStep.interactionMode === "action"}
   <div class="fixed inset-0 z-[100] flex items-end justify-center bg-[#010D28]/45 p-3 sm:items-center" role="presentation" on:click={(event) => { if (event.currentTarget === event.target) failureOpen = false; }}>
     <div class="w-full max-w-[560px] rounded-[24px] bg-white p-5 shadow-2xl sm:p-6" role="dialog" aria-modal="true" aria-labelledby="failure-title">
       <div class="flex items-start justify-between gap-3"><div><p class="text-[9px] font-bold uppercase tracking-[0.1em] text-[#EA6D0B]">Tudo bem</p><h2 id="failure-title" class="mt-1 text-[20px] font-semibold text-[#11182C]">O que impediu você?</h2><p class="mt-2 text-[10px] leading-5 text-[#7A808F]">Vamos tentar resolver aqui antes de chamar alguém.</p></div><button type="button" on:click={() => (failureOpen = false)} class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F5F6F8] text-[#747A8A]" aria-label="Fechar"><X size={15}/></button></div>

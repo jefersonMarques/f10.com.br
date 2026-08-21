@@ -1,0 +1,44 @@
+{
+  "formatVersion": 1,
+  "title": "Comercial — primeiros passos",
+  "slug": "comercial-primeiros-passos",
+  "audience": "Novos usuários do Comercial",
+  "description": "Observação interna para quem administra a trilha. Não será mostrada ao participante.",
+  "welcomeMessage": "Vamos fazer juntos. Você verá somente a orientação necessária agora.",
+  "accessMode": "invite_only",
+  "steps": [
+    {
+      "title": "Antes de começar",
+      "interactionMode": "presentation",
+      "instruction": "Nesta trilha você vai executar uma ação de cada vez. Quando estiver pronto, continue.",
+      "successMessage": "Certo. Vamos começar.",
+      "images": [
+        { "file": "images/boas-vindas.png", "altText": "Tela inicial do F10" }
+      ]
+    },
+    {
+      "title": "Abra o cadastro de clientes",
+      "interactionMode": "action",
+      "instruction": "No menu principal, abra Clientes.",
+      "expectedResult": "A lista de clientes deve aparecer na tela.",
+      "successMessage": "Perfeito. Você chegou à lista de clientes.",
+      "estimatedSeconds": 30,
+      "images": [
+        { "file": "images/clientes.png", "altText": "Menu Clientes destacado" }
+      ],
+      "video": { "file": "videos/clientes.mp4" },
+      "failureReasons": [
+        {
+          "key": "option_not_found",
+          "label": "Não encontrei a opção",
+          "recoveryMessage": "Confira o menu lateral e compare com a imagem acima."
+        },
+        {
+          "key": "permission_missing",
+          "label": "Não tenho permissão",
+          "recoveryMessage": "Peça ajuda para verificarmos o perfil liberado para seu usuário."
+        }
+      ]
+    }
+  ]
+}

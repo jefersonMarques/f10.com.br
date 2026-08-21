@@ -1,7 +1,13 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { readManagedHelpAsset } from "$lib/server/help/helpAssetRepository";
-import { trainingSessionCanReadTrainingAsset } from "$lib/server/help/helpTrainingAssetAccess";
-import { getHelpTrainingSessionCookie } from "$lib/server/help/helpTrainingSession";
+import {
+  publicSessionCanReadTrainingAsset,
+  trainingSessionCanReadTrainingAsset,
+} from "$lib/server/help/helpTrainingAssetAccess";
+import {
+  getHelpTrainingPublicSessionCookie,
+  getHelpTrainingSessionCookie,
+} from "$lib/server/help/helpTrainingSession";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -10,11 +16,12 @@ function isUuid(value: string): boolean {
 export const GET: RequestHandler = async ({ params, cookies }) => {
   const assetId = params.assetId ?? "";
   if (!isUuid(assetId)) return json({ error: "NOT_FOUND" }, { status: 404 });
-  const token = getHelpTrainingSessionCookie(cookies);
-  if (!token) return json({ error: "UNAUTHORIZED" }, { status: 401 });
-  if (!(await trainingSessionCanReadTrainingAsset(token, assetId))) {
-    return json({ error: "FORBIDDEN" }, { status: 403 });
-  }
+
+  const inviteToken = getHelpTrainingSessionCookie(cookies);
+  const publicToken = getHelpTrainingPublicSessionCookie(cookies);
+  const allowed = (inviteToken && await trainingSessionCanReadTrainingAsset(inviteToken, assetId))
+    || (publicToken && await publicSessionCanReadTrainingAsset(publicToken, assetId));
+  if (!allowed) return json({ error: inviteToken || publicToken ? "FORBIDDEN" : "UNAUTHORIZED" }, { status: inviteToken || publicToken ? 403 : 401 });
 
   try {
     const { asset, response } = await readManagedHelpAsset(assetId);
