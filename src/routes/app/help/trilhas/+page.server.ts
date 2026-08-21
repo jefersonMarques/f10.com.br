@@ -54,14 +54,14 @@ function packageErrorMessage(cause: unknown): string {
   if (code === "TRAINING_PACKAGE_VERSION_UNSUPPORTED") return "A versão do formato do pacote não é suportada. Use formatVersion 1.";
   if (code === "TRAINING_PACKAGE_STEPS_INVALID") return "O pacote deve conter entre 1 e 100 microações.";
   if (code === "TRAINING_PACKAGE_RESULT_REQUIRED") return "Todo passo do tipo ação precisa informar expectedResult.";
-  if (code === "TRAINING_PACKAGE_REASON_REQUIRED") return "Todo passo do tipo ação precisa ter ao menos um motivo de dificuldade.";
   if (code === "TRAINING_PACKAGE_IMAGE_FORMAT") return "Use imagens PNG, JPG/JPEG, WEBP ou GIF no pacote.";
   if (code === "TRAINING_PACKAGE_VIDEO_FORMAT") return "Use vídeos MP4 no pacote.";
   if (code === "TRAINING_PACKAGE_CAPTION_FORMAT") return "Use legendas WebVTT com extensão .vtt.";
   if (code === "TRAINING_PACKAGE_CAPTION_WITHOUT_VIDEO") return "Uma legenda .vtt só pode ser associada a um vídeo MP4 local.";
   if (code === "TRAINING_PACKAGE_VIDEO_URL_INVALID") return "A URL de vídeo externo deve usar http ou https.";
   if (code === "TRAINING_CAPTION_INVALID" || code === "TRAINING_CAPTION_SIZE_INVALID") return "Uma das legendas .vtt é inválida. O arquivo deve iniciar com WEBVTT e ter até 1 MB.";
-  if (code === "TRAINING_VIDEO_TOO_LONG") return "Os vídeos do pacote devem ter no máximo 60 segundos.";
+  if (code === "TRAINING_VIDEO_TOO_SHORT") return "Os vídeos do pacote devem ter pelo menos 30 segundos. Junte instruções relacionadas para formar uma demonstração mais completa.";
+  if (code === "TRAINING_VIDEO_TOO_LONG") return "Os vídeos do pacote devem ter no máximo 60 segundos. Divida somente quando houver outra ação independente.";
   if (code === "TRAINING_VIDEO_INVALID") return "Um dos arquivos MP4 não pôde ser validado.";
   if (code.startsWith("TRAINING_ZIP_")) return "O arquivo .zip é inválido, excede os limites permitidos ou contém uma estrutura não segura.";
   if (code === "ASSET_STORAGE_NOT_CONFIGURED") return "O armazenamento de arquivos não está configurado.";
