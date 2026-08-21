@@ -19,14 +19,7 @@ import { readZipArchive } from "$lib/server/help/zipArchive";
 const MANIFEST_NAMES = ["training.json", "manifest.json"];
 const MAX_MANIFEST_BYTES = 1024 * 1024;
 const MAX_STEPS = 100;
-const MAX_IMAGES_PER_STEP = 10;
-
-const DEFAULT_FAILURE_REASONS = [
-  { key: "option_not_found", label: "Não encontrei a opção", recoveryMessage: "Confira novamente a orientação e a demonstração desta etapa." },
-  { key: "system_error", label: "Deu erro no sistema", recoveryMessage: "Anote a mensagem exibida e, se possível, faça uma captura da tela antes de tentar novamente." },
-  { key: "permission_missing", label: "Não tenho permissão", recoveryMessage: "Essa ação pode depender do perfil liberado pela sua empresa. Peça ajuda para verificarmos a permissão correta." },
-  { key: "instruction_unclear", label: "Não entendi o que preciso fazer", recoveryMessage: "Releia somente esta orientação e use a demonstração, se houver. Depois tente novamente." },
-];
+const MAX_IMAGES_PER_STEP = 1;
 
 type ManifestImage = { file: string; altText: string };
 type ManifestVideo = { file: string | null; url: string | null; captions: string | null };
@@ -119,8 +112,8 @@ function normalizeReasonKey(value: unknown, stepIndex: number, reasonIndex: numb
   return normalized || `reason_${stepIndex + 1}_${reasonIndex + 1}`;
 }
 
-function defaultPrimaryActionLabel(interactionMode: HelpTrainingInteractionMode): string {
-  return interactionMode === "presentation" ? "Entendi, continuar" : "Sim, consegui";
+function defaultPrimaryActionLabel(_interactionMode: HelpTrainingInteractionMode): string {
+  return "Próximo passo";
 }
 
 function assertHttpUrl(value: string): void {
@@ -189,29 +182,25 @@ function parseManifest(bytes: Uint8Array): TrainingManifest {
       if (video?.url) assertHttpUrl(video.url);
     }
 
-    const reasonsSource = Array.isArray(step.failureReasons) ? step.failureReasons : DEFAULT_FAILURE_REASONS;
-    const failureReasons = interactionMode === "presentation"
-      ? []
-      : reasonsSource.map((rawReason, reasonIndex): ManifestReason => {
-          if (!rawReason || typeof rawReason !== "object" || Array.isArray(rawReason)) throw new Error("TRAINING_PACKAGE_REASON_INVALID");
-          const reason = rawReason as Record<string, unknown>;
-          return {
-            key: normalizeReasonKey(reason.key, stepIndex, reasonIndex),
-            label: requiredText(reason.label, 180, "TRAINING_PACKAGE_REASON_INVALID"),
-            recoveryMessage: text(reason.recoveryMessage, 4000),
-          };
-        });
+    const reasonsSource = Array.isArray(step.failureReasons) ? step.failureReasons : [];
+    const failureReasons = reasonsSource.map((rawReason, reasonIndex): ManifestReason => {
+      if (!rawReason || typeof rawReason !== "object" || Array.isArray(rawReason)) throw new Error("TRAINING_PACKAGE_REASON_INVALID");
+      const reason = rawReason as Record<string, unknown>;
+      return {
+        key: normalizeReasonKey(reason.key, stepIndex, reasonIndex),
+        label: requiredText(reason.label, 180, "TRAINING_PACKAGE_REASON_INVALID"),
+        recoveryMessage: text(reason.recoveryMessage, 4000),
+      };
+    });
     if (new Set(failureReasons.map((reason) => reason.key)).size !== failureReasons.length) {
       throw new Error("TRAINING_PACKAGE_REASON_DUPLICATE");
     }
 
-    const expectedResult = text(step.expectedResult, 3000);
-    if (interactionMode === "action" && !expectedResult) throw new Error("TRAINING_PACKAGE_RESULT_REQUIRED");
     return {
       title,
       question: text(step.question, 300) || title,
       instruction: requiredText(step.instruction, 6000, "TRAINING_PACKAGE_STEP_INSTRUCTION_REQUIRED"),
-      expectedResult: interactionMode === "presentation" ? "" : expectedResult,
+      expectedResult: text(step.expectedResult, 3000),
       successMessage: text(step.successMessage, 500),
       primaryActionLabel: text(step.primaryActionLabel, 80) || defaultPrimaryActionLabel(interactionMode),
       estimatedSeconds: integer(step.estimatedSeconds, 45, 5, 900),
@@ -227,7 +216,7 @@ function parseManifest(bytes: Uint8Array): TrainingManifest {
     slug,
     audience: text(source.audience, 160),
     description: text(source.description, 1200),
-    welcomeMessage: text(source.welcomeMessage, 1200) || "Vamos aprender fazendo. Você verá uma orientação curta por vez.",
+    welcomeMessage: text(source.welcomeMessage, 1200) || "Vamos fazer juntos. Siga uma orientação por vez e avance quando terminar.",
     accessMode,
     steps,
   };
