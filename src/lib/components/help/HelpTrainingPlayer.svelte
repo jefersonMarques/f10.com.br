@@ -2,29 +2,49 @@
   import { enhance } from "$app/forms";
   import type { SubmitFunction } from "@sveltejs/kit";
   import {
+    ArrowLeft,
     Check,
     ChevronLeft,
     ChevronRight,
     CircleAlert,
     HelpCircle,
     LoaderCircle,
+    LockKeyhole,
     Play,
-    RotateCcw,
     Send,
+    Sparkles,
+    UserRound,
     X,
   } from "lucide-svelte";
 
   export type TrainingPlayerStep = {
     id: string;
     title: string;
+    question: string;
     instruction: string;
     expectedResult: string;
     successMessage: string;
+    primaryActionLabel: string;
     interactionMode: "presentation" | "action";
     images: Array<{ assetId: string; altText: string }>;
     videoUrl: string | null;
     captionAssetId?: string | null;
   };
+
+  type CustomerUnit = { id: number; name: string };
+  type CustomerGroup = { id: number; name: string; units: CustomerUnit[] };
+
+  export type TrainingDifficultyAuth = {
+    authenticated: boolean;
+    name: string;
+    email: string;
+    groupName: string | null;
+    unitName: string | null;
+    requiresUnitSelection: boolean;
+    groups: CustomerGroup[];
+  };
+
+  type DifficultyStage = "login" | "unit" | "detail";
 
   export let mode: "preview" | "invite" | "public";
   export let trainingTitle: string;
@@ -34,14 +54,19 @@
   export let successMessage = "";
   export let failureReported = false;
   export let failureDetail = "";
-  export let helpRequested = false;
   export let formMessage = "";
   export let successAction = "";
   export let backAction = "";
   export let failureAction = "";
-  export let helpAction = "";
-  export let helpHref = "";
-  export let identityRequired = false;
+  export let difficultyAuth: TrainingDifficultyAuth = {
+    authenticated: false,
+    name: "",
+    email: "",
+    groupName: null,
+    unitName: null,
+    requiresUnitSelection: false,
+    groups: [],
+  };
   export let onAdvance: (() => void) | null = null;
   export let onBack: (() => void) | null = null;
   export let onFailure: ((detail: string) => void) | null = null;
@@ -49,12 +74,23 @@
   let imageIndex = 0;
   let videoOpen = false;
   let videoSeen = false;
-  let failureOpen = false;
-  let failureDismissed = false;
-  let difficultyDetail = "";
-  let reporterName = "";
-  let reporterEmail = "";
+  let difficultyOpen = false;
+  let difficultyStage: DifficultyStage = mode === "preview" || difficultyAuth.authenticated
+    ? "detail"
+    : difficultyAuth.requiresUnitSelection
+      ? "unit"
+      : "login";
+  let difficultyDetail = failureDetail;
+  let difficultyMessage = "";
+  let ticketNumber: number | null = null;
   let isSubmitting = false;
+  let isAuthenticating = false;
+  let isOpeningTicket = false;
+  let loginEmail = difficultyAuth.email;
+  let loginPassword = "";
+  let authState: TrainingDifficultyAuth = { ...difficultyAuth };
+  let selectedGroupId = authState.groups[0]?.id ?? 0;
+  let selectedUnitId = authState.groups[0]?.units[0]?.id ?? 0;
   let trackedStepId = step.id;
 
   $: if (step.id !== trackedStepId) {
@@ -62,13 +98,14 @@
     imageIndex = 0;
     videoOpen = false;
     videoSeen = false;
-    failureOpen = false;
-    failureDismissed = false;
+    difficultyOpen = false;
     difficultyDetail = "";
+    difficultyMessage = "";
+    ticketNumber = null;
   }
 
   $: currentImage = step.images[imageIndex] ?? null;
-  $: showDifficultyConfirmation = failureReported && !failureDismissed;
+  $: selectedUnits = authState.groups.find((group) => group.id === selectedGroupId)?.units ?? [];
   $: videoAssetId = trainingVideoAssetId(step.videoUrl);
   $: videoEmbedUrl = youtubeEmbedUrl(step.videoUrl);
   $: captionUrl = step.captionAssetId
@@ -87,13 +124,44 @@
     };
   };
 
-  const enhanceFailure: SubmitFunction = () => {
+  const enhanceFailure: SubmitFunction = ({ formData }) => {
     if (isSubmitting) return () => undefined;
     isSubmitting = true;
-    return async ({ update }) => {
+    difficultyMessage = "";
+    const intent = formData.get("intent") === "ticket" ? "ticket" : "save";
+    const detail = typeof formData.get("detail") === "string"
+      ? String(formData.get("detail")).trim()
+      : "";
+
+    return async ({ result, update }) => {
       try {
+        const data = result.type === "success" || result.type === "failure"
+          ? result.data as Record<string, unknown> | undefined
+          : undefined;
+        if (result.type === "failure" && data?.authRequired === true) {
+          authState = { ...authState, authenticated: false, requiresUnitSelection: false };
+          difficultyStage = "login";
+          difficultyMessage = typeof data.message === "string" ? data.message : "Entre com sua conta F10 para continuar.";
+          return;
+        }
+        if (result.type !== "success" || data?.difficultySaved !== true) {
+          difficultyMessage = typeof data?.message === "string"
+            ? data.message
+            : "Não foi possível registrar a dificuldade. Tente novamente.";
+          return;
+        }
+
+        failureReported = true;
+        failureDetail = detail;
+        difficultyDetail = detail;
+        if (intent === "ticket") {
+          await openSupportTicket(detail);
+          if (ticketNumber) difficultyOpen = false;
+        } else {
+          difficultyMessage = "Dificuldade salva. Obrigado por explicar o que aconteceu.";
+          difficultyOpen = false;
+        }
         await update({ reset: false, invalidateAll: true });
-        failureOpen = false;
       } finally {
         isSubmitting = false;
       }
@@ -134,221 +202,365 @@
     imageIndex = imageIndex + 1 >= step.images.length ? 0 : imageIndex + 1;
   }
 
-  function openVideo(): void {
-    videoSeen = true;
-    videoOpen = true;
+  function openDifficulty(): void {
+    difficultyMessage = "";
+    if (mode === "preview") difficultyStage = "detail";
+    else if (authState.authenticated) difficultyStage = "detail";
+    else if (authState.requiresUnitSelection) difficultyStage = "unit";
+    else difficultyStage = "login";
+    difficultyOpen = true;
   }
 
-  function submitPreviewFailure(): void {
+  function apiErrorMessage(code: string): string {
+    if (code === "INVALID_CREDENTIALS") return "E-mail ou senha inválidos. Use os mesmos dados que você usa para entrar no F10.";
+    if (code === "RATE_LIMITED") return "Foram feitas muitas tentativas. Aguarde alguns minutos e tente novamente.";
+    if (code === "UNIT_NOT_AUTHORIZED") return "Essa unidade não está disponível para sua conta.";
+    return "Não foi possível concluir a identificação agora. Tente novamente.";
+  }
+
+  function applyAuthPayload(payload: Record<string, unknown>): void {
+    const groups = Array.isArray(payload.groups)
+      ? payload.groups.filter((group): group is CustomerGroup => Boolean(group && typeof group === "object"))
+      : [];
+    authState = {
+      authenticated: payload.authenticated === true,
+      name: typeof payload.name === "string" ? payload.name : "",
+      email: typeof payload.email === "string" ? payload.email : "",
+      groupName: typeof payload.groupName === "string" ? payload.groupName : null,
+      unitName: typeof payload.unitName === "string" ? payload.unitName : null,
+      requiresUnitSelection: payload.requiresUnitSelection === true,
+      groups,
+    };
+    const firstGroup = groups[0];
+    selectedGroupId = firstGroup?.id ?? 0;
+    selectedUnitId = firstGroup?.units[0]?.id ?? 0;
+    difficultyStage = authState.authenticated ? "detail" : "unit";
+  }
+
+  async function submitLogin(): Promise<void> {
+    if (isAuthenticating || !loginEmail.trim() || !loginPassword) return;
+    isAuthenticating = true;
+    difficultyMessage = "";
+    try {
+      const response = await fetch("/api/support/chat/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: loginEmail.trim(), password: loginPassword }),
+      });
+      const payload = await response.json() as Record<string, unknown>;
+      loginPassword = "";
+      if (!response.ok) {
+        difficultyMessage = apiErrorMessage(typeof payload.error === "string" ? payload.error : "");
+        return;
+      }
+      applyAuthPayload(payload);
+    } catch {
+      difficultyMessage = "Não foi possível entrar agora. Verifique sua conexão e tente novamente.";
+    } finally {
+      isAuthenticating = false;
+    }
+  }
+
+  function changeGroup(event: Event): void {
+    selectedGroupId = Number((event.currentTarget as HTMLSelectElement).value);
+    const group = authState.groups.find((item) => item.id === selectedGroupId);
+    selectedUnitId = group?.units[0]?.id ?? 0;
+  }
+
+  async function submitUnit(): Promise<void> {
+    if (isAuthenticating || !selectedGroupId || !selectedUnitId) return;
+    isAuthenticating = true;
+    difficultyMessage = "";
+    try {
+      const response = await fetch("/api/support/chat/auth/unit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId: selectedGroupId, unitId: selectedUnitId }),
+      });
+      const payload = await response.json() as Record<string, unknown>;
+      if (!response.ok) {
+        difficultyMessage = apiErrorMessage(typeof payload.error === "string" ? payload.error : "");
+        return;
+      }
+      applyAuthPayload(payload);
+    } catch {
+      difficultyMessage = "Não foi possível selecionar a unidade agora. Tente novamente.";
+    } finally {
+      isAuthenticating = false;
+    }
+  }
+
+  function submitPreviewDifficulty(): void {
     const detail = difficultyDetail.trim();
     if (detail.length < 3) return;
     onFailure?.(detail);
-    failureOpen = false;
+    failureReported = true;
+    failureDetail = detail;
+    difficultyOpen = false;
+    difficultyMessage = "Dificuldade simulada na prévia.";
+  }
+
+  async function openSupportTicket(detail: string): Promise<void> {
+    if (isOpeningTicket || ticketNumber) return;
+    isOpeningTicket = true;
+    difficultyMessage = "";
+    const message = [
+      `Preciso de ajuda na trilha: ${trainingTitle}.`,
+      `Orientação: ${step.question || step.title}.`,
+      `O que aconteceu: ${detail}`,
+    ].join("\n");
+
+    try {
+      const response = await fetch("/api/support/chat/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: "",
+          message,
+          contextUrl: window.location.href,
+          pageTitle: trainingTitle,
+          helpContext: `Trilha F10 · ${step.question || step.title}`,
+          forceHuman: true,
+          handoffTranscript: message,
+        }),
+      });
+      const payload = await response.json() as Record<string, unknown>;
+      if (!response.ok) {
+        difficultyMessage = response.status === 401
+          ? "Sua identificação expirou. Entre novamente antes de abrir o ticket."
+          : "A dificuldade foi salva, mas não foi possível abrir o ticket agora. Você pode tentar novamente.";
+        if (response.status === 401) {
+          authState = { ...authState, authenticated: false, requiresUnitSelection: false };
+          difficultyStage = "login";
+        }
+        return;
+      }
+
+      const createdTicketNumber = typeof payload.ticketNumber === "number" ? payload.ticketNumber : null;
+      ticketNumber = createdTicketNumber;
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.setItem("f10-support-chat-session-v1", JSON.stringify({
+          sessionId: payload.sessionId,
+          token: payload.token,
+          ticketNumber: payload.ticketNumber,
+          expiresAt: payload.expiresAt,
+          aiState: payload.aiState,
+          entryOptionLabel: payload.entryOptionLabel,
+        }));
+      }
+      difficultyMessage = createdTicketNumber
+        ? `Ticket #${createdTicketNumber} aberto. A equipe recebeu o contexto desta orientação.`
+        : "Ticket aberto. A equipe recebeu o contexto desta orientação.";
+    } catch {
+      difficultyMessage = "A dificuldade foi salva, mas não foi possível abrir o ticket agora. Tente novamente.";
+    } finally {
+      isOpeningTicket = false;
+    }
   }
 </script>
 
-<div class="fixed inset-0 z-[80] grid h-[100dvh] grid-rows-[58px_minmax(0,1fr)_76px] overflow-hidden bg-white text-[#010D28] sm:grid-rows-[64px_minmax(0,1fr)_82px]">
-  <header class="flex items-center justify-between border-b border-[#EEF0F5] px-4 sm:px-7">
+<div class="fixed inset-0 z-[80] h-[100dvh] overflow-hidden bg-[#F5F6FA] text-[#061333]">
+  <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_12%,rgba(234,109,11,0.12),transparent_28%),radial-gradient(circle_at_88%_78%,rgba(0,10,87,0.08),transparent_28%)]"></div>
+
+  <header class="relative z-20 flex h-16 items-center justify-between border-b border-[#E4E7EE] bg-white/92 px-4 backdrop-blur sm:px-8 lg:px-[max(2rem,calc((100vw-1120px)/2))]">
     <div class="flex min-w-0 items-center gap-3">
-      <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#000A57] text-[10px] font-bold text-white sm:h-9 sm:w-9">F10</span>
-      <div class="min-w-0">
-        <strong class="block truncate text-[11px] font-semibold text-[#242B3D] sm:text-[12px]">{trainingTitle}</strong>
-        <span class="block text-[9px] text-[#969BA7]">uma orientação por vez</span>
-      </div>
+      <span class="text-[28px] font-black tracking-[-0.08em] text-[#F36B00]">F10</span>
+      <span class="h-7 w-px bg-[#D9DDE7]"></span>
+      <strong class="truncate text-[11px] font-semibold text-[#1E2942] sm:text-[12px]">{trainingTitle}</strong>
     </div>
-    {#if mode === "preview"}<span class="rounded-full bg-[#FFF4E9] px-2.5 py-1 text-[8px] font-bold uppercase tracking-[0.08em] text-[#B85408]">Prévia</span>{/if}
-  </header>
-
-  <main class="relative min-h-0 overflow-hidden">
-    {#key step.id}
-      <div class="training-step-enter mx-auto grid h-full w-full max-w-[1500px] grid-rows-[minmax(0,1fr)_auto] px-3 sm:px-6 lg:px-10">
-        <section class="relative flex min-h-0 items-center justify-center overflow-hidden py-3 sm:py-4">
-          {#if currentImage}
-            <figure class="relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-[#F7F8FB] sm:rounded-[24px]">
-              <img
-                src={`${assetBasePath}/${currentImage.assetId}`}
-                alt={currentImage.altText || "Demonstração da ação"}
-                class="h-full max-h-full w-full object-contain"
-              />
-              {#if step.images.length > 1}
-                <button type="button" on:click={showPreviousImage} class="training-icon-action absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-[#000A57] shadow-lg" aria-label="Imagem anterior"><ChevronLeft size={18}/></button>
-                <button type="button" on:click={showNextImage} class="training-icon-action absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-[#000A57] shadow-lg" aria-label="Próxima imagem"><ChevronRight size={18}/></button>
-                <span class="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-[#010D28]/70 px-2.5 py-1 text-[8px] font-semibold text-white">{imageIndex + 1} / {step.images.length}</span>
-              {/if}
-            </figure>
-          {:else}
-            <div class="flex h-full w-full items-center justify-center rounded-2xl bg-[radial-gradient(circle_at_center,#F7F8FB_0%,#FFFFFF_68%)] sm:rounded-[24px]">
-              <div class="max-w-[720px] px-6 text-center"><span class="text-[10px] font-bold uppercase tracking-[0.12em] text-[#EA6D0B]">Agora</span><h1 class="mt-3 text-[26px] font-semibold tracking-[-0.03em] text-[#11182C] sm:text-[34px]">{step.title}</h1></div>
-            </div>
-          {/if}
-
-          {#if step.videoUrl}
-            <button type="button" on:click={openVideo} class:radar-unseen={!videoSeen} class="radar-button absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full bg-[#000A57] text-white shadow-[0_12px_30px_rgba(0,10,87,0.24)] sm:right-7 sm:top-7" aria-label="Ver demonstração rápida" title="Ver demonstração rápida"><Play size={17} fill="currentColor"/></button>
-          {/if}
-        </section>
-
-        <section class="mx-auto max-h-[30dvh] w-full max-w-[1040px] overflow-y-auto px-1 pb-3 pt-2 sm:max-h-[27dvh] sm:px-4 sm:pb-4">
-          {#if currentImage}<h1 class="text-[20px] font-semibold tracking-[-0.025em] text-[#11182C] sm:text-[24px]">{step.title}</h1>{/if}
-          <p class="mt-2 whitespace-pre-line text-[12px] leading-6 text-[#4B5262] sm:text-[13px]">{step.instruction}</p>
-          {#if step.interactionMode === "action" && step.expectedResult}
-            <p class="mt-2 text-[10px] leading-5 text-[#7A8090]"><strong class="font-semibold text-[#545B6B]">Ao terminar:</strong> {step.expectedResult}</p>
-          {/if}
-          {#if successMessage}
-            <div class="mt-3 flex items-start gap-2 rounded-xl bg-[#F1FBF4] px-3 py-2 text-[10px] leading-5 text-[#397B4F]" role="status"><Check size={14} class="mt-0.5 shrink-0"/>{successMessage}</div>
-          {/if}
-          {#if formMessage}
-            <div class="mt-3 flex items-start gap-2 rounded-xl bg-[#FFF5F5] px-3 py-2 text-[10px] leading-5 text-[#9B2C2C]" role="alert"><CircleAlert size={14} class="mt-0.5 shrink-0"/>{formMessage}</div>
-          {/if}
-          {#if helpRequested}
-            <div class="mt-3 flex items-start gap-2 rounded-xl bg-[#F8F9FF] px-3 py-2 text-[10px] leading-5 text-[#000A57]" role="status"><Send size={14} class="mt-0.5 shrink-0"/>A equipe recebeu o contexto desta ação. Você não precisa explicar tudo novamente.</div>
-          {/if}
-        </section>
-      </div>
-    {/key}
-
-    {#if showDifficultyConfirmation}
-      <div class="absolute inset-x-3 bottom-3 z-20 mx-auto max-w-[660px] rounded-2xl border border-[#F1D7BD] bg-white p-4 shadow-[0_18px_55px_rgba(1,13,40,0.16)] sm:bottom-5 sm:p-5" role="status" aria-live="polite">
-        <div class="flex items-start gap-3"><HelpCircle size={18} class="mt-0.5 shrink-0 text-[#EA6D0B]"/><div class="min-w-0"><strong class="block text-[12px] text-[#5B3A1E]">Recebemos o que aconteceu.</strong><p class="mt-1 text-[10px] leading-5 text-[#7A6757]">Você pode tentar novamente nesta mesma orientação ou pedir ajuda com este contexto já registrado.</p></div></div>
-        <div class="mt-3 flex flex-wrap gap-2">
-          <button type="button" on:click={() => (failureDismissed = true)} class="training-action inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#E2E5ED] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><RotateCcw size={13}/>Tentar novamente</button>
-          {#if helpAction}
-            <form method="POST" action={helpAction} use:enhance={enhanceNavigation}><input type="hidden" name="detail" value={failureDetail}/><button type="submit" disabled={isSubmitting} class="training-action inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white"><Send size={13}/>Falar com a equipe</button></form>
-          {:else if helpHref}
-            <a href={helpHref} class="training-action inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white"><Send size={13}/>Falar com a equipe</a>
-          {/if}
-        </div>
-      </div>
-    {/if}
-  </main>
-
-  <footer class="grid grid-cols-[auto_1fr_auto] items-center gap-2 border-t border-[#E8EAF0] bg-white px-3 sm:gap-4 sm:px-7">
     {#if canGoBack}
       {#if mode === "preview"}
-        <button type="button" on:click={() => onBack?.()} class="training-action inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-[10px] font-semibold text-[#5D6474] hover:bg-[#F6F7FA]"><ChevronLeft size={16}/><span class="hidden sm:inline">Voltar</span></button>
+        <button type="button" on:click={() => onBack?.()} class="training-subtle inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-[10px] font-semibold text-[#687084]"><ArrowLeft size={15}/>Voltar</button>
       {:else}
-        <form method="POST" action={backAction} use:enhance={enhanceNavigation}><button type="submit" disabled={isSubmitting} class="training-action inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-[10px] font-semibold text-[#5D6474] hover:bg-[#F6F7FA]"><ChevronLeft size={16}/><span class="hidden sm:inline">Voltar</span></button></form>
+        <form method="POST" action={backAction} use:enhance={enhanceNavigation}><button type="submit" disabled={isSubmitting} class="training-subtle inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-[10px] font-semibold text-[#687084]"><ArrowLeft size={15}/>Voltar</button></form>
       {/if}
-    {:else}<span class="w-10"></span>{/if}
-
-    <div class="flex justify-center">
-      {#if step.interactionMode === "action"}
-        <button type="button" on:click={() => (failureOpen = true)} disabled={isSubmitting} class="training-action inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-[10px] font-semibold text-[#747A8A] hover:bg-[#FFF7F0] hover:text-[#A64D08]"><HelpCircle size={15}/>Não consegui</button>
-      {/if}
-    </div>
-
-    {#if mode === "preview"}
-      <button type="button" on:click={() => onAdvance?.()} class="training-primary training-action inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white sm:px-5 sm:text-[11px]">{step.interactionMode === "presentation" ? "Continuar" : "Entendi, próximo"}<ChevronRight size={16}/></button>
-    {:else}
-      <form method="POST" action={successAction} use:enhance={enhanceNavigation}><button type="submit" disabled={isSubmitting} class="training-primary training-action inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:cursor-wait disabled:opacity-70 sm:px-5 sm:text-[11px]">{#if isSubmitting}<LoaderCircle size={15} class="animate-spin"/>{/if}{step.interactionMode === "presentation" ? "Continuar" : "Entendi, próximo"}<ChevronRight size={16}/></button></form>
     {/if}
-  </footer>
+  </header>
+
+  <main class="relative z-10 h-[calc(100dvh-4rem)] overflow-y-auto px-4 py-5 sm:px-7 sm:py-7">
+    {#key step.id}
+      <div class="training-step-enter mx-auto flex min-h-full w-full max-w-[1180px] flex-col items-center justify-center pb-6 text-center">
+        {#if currentImage}
+          <div class="relative mb-5 flex max-h-[43dvh] min-h-[180px] w-full max-w-[900px] items-center justify-center overflow-hidden rounded-[24px] bg-white shadow-[0_22px_60px_rgba(12,23,52,0.09)] ring-1 ring-[#E5E8EF] sm:min-h-[260px]">
+            <img src={`${assetBasePath}/${currentImage.assetId}`} alt={currentImage.altText || step.title} class="max-h-[43dvh] w-full object-contain" />
+            {#if step.images.length > 1}
+              <button type="button" on:click={showPreviousImage} class="training-subtle absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-[#000A57] shadow-lg" aria-label="Imagem anterior"><ChevronLeft size={18}/></button>
+              <button type="button" on:click={showNextImage} class="training-subtle absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-[#000A57] shadow-lg" aria-label="Próxima imagem"><ChevronRight size={18}/></button>
+            {/if}
+            {#if step.videoUrl}
+              <button type="button" on:click={() => { videoSeen = true; videoOpen = true; }} class:radar-unseen={!videoSeen} class="radar-button absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-[#F36B00] text-white shadow-[0_12px_28px_rgba(243,107,0,0.28)]" aria-label="Ver demonstração rápida" title="Ver demonstração rápida"><Play size={17} fill="currentColor"/></button>
+            {/if}
+          </div>
+        {:else if step.videoUrl}
+          <button type="button" on:click={() => { videoSeen = true; videoOpen = true; }} class:radar-unseen={!videoSeen} class="radar-button mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#FFF0E4] text-[#F36B00] ring-8 ring-white shadow-[0_16px_40px_rgba(243,107,0,0.13)]" aria-label="Ver demonstração rápida"><Play size={23}/></button>
+        {:else}
+          <span class="mb-5 flex h-16 w-16 items-center justify-center rounded-[20px] bg-[#FFF0E4] text-[#F36B00] ring-8 ring-white shadow-[0_16px_40px_rgba(243,107,0,0.10)]"><Sparkles size={23}/></span>
+        {/if}
+
+        <p class="text-[9px] font-bold uppercase tracking-[0.18em] text-[#F36B00]">{step.title}</p>
+        <h1 class="mt-3 max-w-[940px] text-balance text-[28px] font-semibold tracking-[-0.045em] text-[#061333] sm:text-[38px] lg:text-[44px]">{step.question || step.title}</h1>
+        <p class="mt-3 max-w-[760px] whitespace-pre-line text-[12px] leading-6 text-[#667087] sm:text-[13px]">{step.instruction}</p>
+        {#if step.expectedResult}
+          <div class="mt-4 max-w-[720px] rounded-2xl border border-[#DDE2EC] bg-white/85 px-5 py-3 text-[10px] leading-5 text-[#4F596F] shadow-sm"><strong class="font-semibold text-[#061333]">O que você deve ver:</strong> {step.expectedResult}</div>
+        {/if}
+
+        {#if successMessage}
+          <div class="mt-4 inline-flex items-center gap-2 rounded-full bg-[#EAF8F1] px-4 py-2 text-[10px] font-semibold text-[#23714A]" role="status"><Check size={14}/>{successMessage}</div>
+        {/if}
+        {#if formMessage}
+          <div class="mt-4 inline-flex max-w-[680px] items-start gap-2 rounded-xl bg-[#FFF2F2] px-4 py-3 text-left text-[10px] leading-5 text-[#9B2C2C]" role="alert"><CircleAlert size={14} class="mt-0.5 shrink-0"/>{formMessage}</div>
+        {/if}
+        {#if ticketNumber}
+          <div class="mt-4 inline-flex items-center gap-2 rounded-full bg-[#EEF0FF] px-4 py-2 text-[10px] font-semibold text-[#000A57]" role="status"><Send size={14}/>Ticket #{ticketNumber} aberto. A equipe recebeu o contexto.</div>
+        {:else if difficultyMessage && !difficultyOpen}
+          <div class="mt-4 inline-flex items-center gap-2 rounded-full bg-[#EEF0FF] px-4 py-2 text-[10px] font-semibold text-[#000A57]" role="status"><Check size={14}/>{difficultyMessage}</div>
+        {/if}
+
+        <div class="mt-7 flex w-full max-w-[640px] flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          {#if mode === "preview"}
+            <button type="button" on:click={() => onAdvance?.()} class="training-primary training-float inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-[#F36B00] px-7 text-[12px] font-bold text-white shadow-[0_18px_40px_rgba(243,107,0,0.24)] sm:w-auto sm:min-w-[280px]">{step.primaryActionLabel || "Entendi, continuar"}<ChevronRight size={17}/></button>
+          {:else}
+            <form method="POST" action={successAction} use:enhance={enhanceNavigation} class="w-full sm:w-auto"><button type="submit" disabled={isSubmitting} class="training-primary training-float inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-[#F36B00] px-7 text-[12px] font-bold text-white shadow-[0_18px_40px_rgba(243,107,0,0.24)] disabled:cursor-wait disabled:opacity-70 sm:min-w-[280px]">{#if isSubmitting}<LoaderCircle size={16} class="animate-spin"/>{/if}{step.primaryActionLabel || "Entendi, continuar"}<ChevronRight size={17}/></button></form>
+          {/if}
+          <button type="button" on:click={openDifficulty} class="training-subtle inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-2 border-[#F36B00] bg-white/80 px-6 text-[11px] font-semibold text-[#C75200] sm:w-auto sm:min-w-[210px]"><HelpCircle size={16}/>Não consegui</button>
+        </div>
+      </div>
+    {/key}
+  </main>
 </div>
 
-{#if failureOpen && step.interactionMode === "action"}
-  <div class="fixed inset-0 z-[120] flex items-end justify-center bg-[#010D28]/55 p-3 backdrop-blur-[2px] sm:items-center" role="presentation" on:click={(event) => { if (event.currentTarget === event.target && !isSubmitting) failureOpen = false; }}>
-    <div class="w-full max-w-[560px] rounded-[24px] bg-white p-5 shadow-2xl sm:p-6" role="dialog" aria-modal="true" aria-labelledby="training-difficulty-title">
-      <div class="flex items-start justify-between gap-3"><div><p class="text-[9px] font-bold uppercase tracking-[0.1em] text-[#EA6D0B]">Não consegui</p><h2 id="training-difficulty-title" class="mt-1 text-[20px] font-semibold text-[#11182C]">Conte o que aconteceu</h2><p class="mt-2 text-[10px] leading-5 text-[#7B8190]">Escreva com suas palavras. Isso fica ligado a esta orientação para podermos ajudar e melhorar o processo.</p></div><button type="button" on:click={() => (failureOpen = false)} disabled={isSubmitting} class="training-icon-action flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F5F6F8] text-[#747A8A]" aria-label="Fechar"><X size={15}/></button></div>
+{#if difficultyOpen}
+  <div class="fixed inset-0 z-[140] flex items-end justify-center bg-[#07132D]/60 p-3 backdrop-blur-[3px] sm:items-center" role="presentation" on:click={(event) => { if (event.currentTarget === event.target && !isSubmitting && !isAuthenticating && !isOpeningTicket) difficultyOpen = false; }}>
+    <section class="w-full max-w-[590px] rounded-[26px] bg-white p-5 shadow-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="difficulty-title">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p class="text-[9px] font-bold uppercase tracking-[0.14em] text-[#F36B00]">Não consegui</p>
+          <h2 id="difficulty-title" class="mt-1 text-[22px] font-semibold tracking-[-0.03em] text-[#061333]">
+            {difficultyStage === "login" ? "Primeiro, entre na sua conta F10" : difficultyStage === "unit" ? "Qual unidade você está usando?" : "Explique onde você travou"}
+          </h2>
+          <p class="mt-2 text-[10px] leading-5 text-[#747C8D]">
+            {difficultyStage === "login" ? "Assim conseguimos registrar quem encontrou a dificuldade e ajudar a pessoa certa." : difficultyStage === "unit" ? "Escolha a empresa e a unidade desta operação." : "Descreva com suas palavras o que apareceu na tela. Você pode somente salvar ou abrir um ticket para a equipe."}
+          </p>
+        </div>
+        <button type="button" on:click={() => (difficultyOpen = false)} disabled={isSubmitting || isAuthenticating || isOpeningTicket} class="training-subtle flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F4F5F8] text-[#6D7588]" aria-label="Fechar"><X size={16}/></button>
+      </div>
 
-      {#if mode === "preview"}
+      {#if difficultyMessage}
+        <div class="mt-4 rounded-xl bg-[#FFF3EA] px-4 py-3 text-[10px] leading-5 text-[#9B4C11]" role="status">{difficultyMessage}</div>
+      {/if}
+
+      {#if difficultyStage === "login" && mode !== "preview"}
+        <form class="mt-5 space-y-3" on:submit|preventDefault={() => void submitLogin()}>
+          <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#4E576C]">E-mail usado no F10</span><input bind:value={loginEmail} type="email" required autocomplete="username" class="h-12 w-full rounded-xl border border-[#DCE1EA] px-3 text-[12px] outline-none focus:border-[#000A57]" placeholder="voce@empresa.com.br"/></label>
+          <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#4E576C]">Senha do F10</span><input bind:value={loginPassword} type="password" required autocomplete="current-password" class="h-12 w-full rounded-xl border border-[#DCE1EA] px-3 text-[12px] outline-none focus:border-[#000A57]" placeholder="Sua senha"/></label>
+          <div class="flex items-start gap-2 rounded-xl bg-[#F7F8FB] px-3 py-3 text-[9px] leading-4 text-[#727A8B]"><LockKeyhole size={13} class="mt-0.5 shrink-0"/>A senha é usada somente para validar seu acesso no F10 e não é armazenada neste treinamento.</div>
+          <button type="submit" disabled={isAuthenticating} class="training-primary inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:opacity-60">{#if isAuthenticating}<LoaderCircle size={15} class="animate-spin"/>Entrando...{:else}<UserRound size={15}/>Entrar e continuar{/if}</button>
+        </form>
+      {:else if difficultyStage === "unit" && mode !== "preview"}
+        <div class="mt-5 space-y-3">
+          <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#4E576C]">Empresa</span><select value={selectedGroupId} on:change={changeGroup} class="h-12 w-full rounded-xl border border-[#DCE1EA] bg-white px-3 text-[11px]"><option value={0}>Selecione</option>{#each authState.groups as group}<option value={group.id}>{group.name}</option>{/each}</select></label>
+          <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#4E576C]">Unidade</span><select bind:value={selectedUnitId} class="h-12 w-full rounded-xl border border-[#DCE1EA] bg-white px-3 text-[11px]"><option value={0}>Selecione</option>{#each selectedUnits as unit}<option value={unit.id}>{unit.name}</option>{/each}</select></label>
+          <button type="button" on:click={() => void submitUnit()} disabled={isAuthenticating || !selectedGroupId || !selectedUnitId} class="training-primary inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:opacity-60">{#if isAuthenticating}<LoaderCircle size={15} class="animate-spin"/>Confirmando...{:else}Continuar{/if}</button>
+        </div>
+      {:else if mode === "preview"}
         <div class="mt-5 space-y-4">
-          <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6A]">O que impediu você?</span><textarea bind:value={difficultyDetail} rows="4" minlength="3" maxlength="4000" placeholder="Ex.: não encontrei o botão mostrado na imagem" class="w-full rounded-xl border border-[#DDE1EA] px-3 py-3 text-[11px] leading-5 outline-none focus:border-[#000A57]"></textarea></label>
-          <button type="button" on:click={submitPreviewFailure} disabled={difficultyDetail.trim().length < 3} class="training-primary training-action inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:opacity-50">Registrar na prévia<ChevronRight size={14}/></button>
+          <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#4E576C]">O que aconteceu?</span><textarea bind:value={difficultyDetail} rows="5" minlength="3" maxlength="4000" placeholder="Ex.: cliquei no botão indicado, mas apareceu uma mensagem de erro." class="w-full rounded-xl border border-[#DCE1EA] px-3 py-3 text-[11px] leading-5 outline-none focus:border-[#000A57]"></textarea><span class="mt-1.5 block text-[9px] text-[#8A91A0]">Na prévia nada é salvo. Este campo apenas simula a experiência.</span></label>
+          <button type="button" on:click={submitPreviewDifficulty} disabled={difficultyDetail.trim().length < 3} class="training-primary inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:opacity-50">Simular registro<ChevronRight size={15}/></button>
         </div>
       {:else}
         <form method="POST" action={failureAction} use:enhance={enhanceFailure} class="mt-5 space-y-4">
-          <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6A]">O que impediu você?</span><textarea name="detail" bind:value={difficultyDetail} required rows="4" minlength="3" maxlength="4000" placeholder="Ex.: não encontrei o botão mostrado na imagem" class="w-full rounded-xl border border-[#DDE1EA] px-3 py-3 text-[11px] leading-5 outline-none focus:border-[#000A57]"></textarea></label>
-          {#if identityRequired}
-            <div class="grid gap-3 sm:grid-cols-2">
-              <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6A]">Seu nome</span><input name="reporterName" bind:value={reporterName} required minlength="2" maxlength="160" autocomplete="name" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px] outline-none focus:border-[#000A57]"/></label>
-              <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#555B6A]">E-mail para contato</span><input name="reporterEmail" bind:value={reporterEmail} required type="email" maxlength="320" autocomplete="email" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px] outline-none focus:border-[#000A57]"/></label>
-            </div>
-          {/if}
-          <button type="submit" disabled={isSubmitting} class="training-primary training-action inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:cursor-wait disabled:opacity-60">{#if isSubmitting}<LoaderCircle size={15} class="animate-spin"/>Enviando...{:else}Registrar dificuldade<ChevronRight size={14}/>{/if}</button>
+          <div class="flex items-center gap-3 rounded-xl bg-[#F7F8FB] px-3 py-3"><span class="flex h-8 w-8 items-center justify-center rounded-full bg-[#EEF0FF] text-[#000A57]"><UserRound size={14}/></span><div class="min-w-0"><strong class="block truncate text-[10px] text-[#30394E]">{authState.name || authState.email}</strong><span class="block truncate text-[9px] text-[#858C9B]">{authState.unitName || authState.groupName || authState.email}</span></div></div>
+          <label class="block"><span class="mb-1.5 block text-[10px] font-semibold text-[#4E576C]">O que aconteceu?</span><textarea name="detail" bind:value={difficultyDetail} required rows="5" minlength="3" maxlength="4000" placeholder="Ex.: cliquei em Entrar, mas apareceu a mensagem 'usuário sem permissão'." class="w-full rounded-xl border border-[#DCE1EA] px-3 py-3 text-[11px] leading-5 outline-none focus:border-[#000A57]"></textarea><span class="mt-1.5 block text-[9px] leading-4 text-[#8A91A0]">Tente dizer o que você clicou e o que apareceu na tela. Isso ajuda muito mais do que apenas dizer “deu erro”.</span></label>
+          <div class="grid gap-2 sm:grid-cols-2">
+            <button type="submit" name="intent" value="save" disabled={isSubmitting || isOpeningTicket || difficultyDetail.trim().length < 3} class="training-subtle inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#D9DEE8] bg-white px-4 text-[11px] font-semibold text-[#000A57] disabled:opacity-50"><Check size={15}/>Apenas salvar</button>
+            <button type="submit" name="intent" value="ticket" disabled={isSubmitting || isOpeningTicket || difficultyDetail.trim().length < 3} class="training-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#F36B00] px-4 text-[11px] font-semibold text-white shadow-[0_12px_28px_rgba(243,107,0,0.20)] disabled:opacity-50">{#if isSubmitting || isOpeningTicket}<LoaderCircle size={15} class="animate-spin"/>{:else}<Send size={15}/>{/if}Abrir ticket</button>
+          </div>
         </form>
       {/if}
-    </div>
+    </section>
   </div>
 {/if}
 
 {#if videoOpen && step.videoUrl}
-  <div class="fixed inset-0 z-[130] flex items-center justify-center bg-[#010D28]/90 p-3 sm:p-6" role="presentation" on:click={(event) => { if (event.currentTarget === event.target) videoOpen = false; }}>
-    <div class="relative w-full max-w-[1100px] overflow-hidden rounded-[22px] bg-black shadow-2xl" role="dialog" aria-modal="true" aria-label="Demonstração rápida">
-      <button type="button" on:click={() => (videoOpen = false)} class="training-icon-action absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/65 text-white backdrop-blur" aria-label="Fechar demonstração"><X size={16}/></button>
+  <div class="fixed inset-0 z-[150] flex items-center justify-center bg-[#07132D]/92 p-3 sm:p-6" role="presentation" on:click={(event) => { if (event.currentTarget === event.target) videoOpen = false; }}>
+    <div class="relative w-full max-w-[1120px] overflow-hidden rounded-[24px] bg-[#07132D] shadow-2xl" role="dialog" aria-modal="true" aria-label="Demonstração rápida">
+      <div class="flex items-center justify-between gap-3 px-4 py-3 text-white sm:px-5"><div><p class="text-[8px] font-bold uppercase tracking-[0.12em] text-[#FF9A4B]">Demonstração rápida</p><strong class="mt-1 block text-[11px]">{step.title}</strong></div><button type="button" on:click={() => (videoOpen = false)} class="training-subtle flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white" aria-label="Fechar demonstração"><X size={16}/></button></div>
       {#if videoAssetId}
-        <video src={`${assetBasePath}/${videoAssetId}`} controls autoplay preload="metadata" playsinline class="max-h-[86dvh] w-full bg-black"><track kind="captions" srclang="pt-BR" label="Português" src={captionUrl} default /></video>
+        <video src={`${assetBasePath}/${videoAssetId}`} controls autoplay preload="metadata" playsinline class="max-h-[80dvh] w-full bg-black"><track kind="captions" srclang="pt-BR" label="Português" src={captionUrl} default /></video>
       {:else if videoEmbedUrl}
-        <iframe src={videoEmbedUrl} title="Demonstração rápida" class="aspect-video max-h-[86dvh] w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        <iframe src={videoEmbedUrl} title="Demonstração rápida" class="aspect-video max-h-[80dvh] w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
       {:else}
-        <div class="flex min-h-[240px] items-center justify-center p-8"><a href={step.videoUrl} target="_blank" rel="noopener noreferrer" class="training-action inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-5 text-[11px] font-semibold text-[#000A57]"><Play size={15}/>Abrir demonstração</a></div>
+        <div class="flex min-h-[260px] items-center justify-center p-8"><a href={step.videoUrl} target="_blank" rel="noopener noreferrer" class="training-primary inline-flex min-h-12 items-center gap-2 rounded-full bg-white px-6 text-[11px] font-semibold text-[#000A57]"><Play size={16}/>Abrir demonstração</a></div>
       {/if}
     </div>
   </div>
 {/if}
 
 <style>
-  .training-action {
+  .training-primary,
+  .training-subtle,
+  .radar-button {
     transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease, color 180ms ease, opacity 180ms ease;
   }
 
-  .training-action:not(:disabled):hover,
-  .training-icon-action:not(:disabled):hover {
-    transform: translateY(-1px);
+  .training-primary:not(:disabled):hover,
+  .training-subtle:not(:disabled):hover,
+  .radar-button:not(:disabled):hover {
+    transform: translateY(-2px);
   }
 
-  .training-action:not(:disabled):active,
-  .training-icon-action:not(:disabled):active {
-    transform: translateY(1px) scale(0.975);
+  .training-primary:not(:disabled):active,
+  .training-subtle:not(:disabled):active,
+  .radar-button:not(:disabled):active {
+    transform: translateY(1px) scale(0.98);
   }
 
-  .training-primary:not(:disabled):hover {
-    box-shadow: 0 10px 24px rgba(0, 10, 87, 0.18);
+  .training-float {
+    animation: training-float 3.2s ease-in-out infinite;
   }
 
   .training-step-enter {
-    animation: training-step-enter 220ms ease both;
-  }
-
-  .radar-button {
-    transition: transform 180ms ease, box-shadow 180ms ease;
+    animation: training-step-enter 260ms ease both;
   }
 
   .radar-unseen::before,
   .radar-unseen::after {
     content: "";
     position: absolute;
-    inset: -1px;
-    border: 2px solid rgba(0, 10, 87, 0.28);
+    inset: -2px;
+    border: 2px solid rgba(243, 107, 0, 0.34);
     border-radius: 9999px;
     animation: training-radar 2s ease-out infinite;
     pointer-events: none;
   }
 
-  .radar-unseen::after {
-    animation-delay: 1s;
+  .radar-unseen::after { animation-delay: 1s; }
+
+  @keyframes training-float {
+    0%, 100% { transform: translateY(0); box-shadow: 0 18px 40px rgba(243, 107, 0, 0.22); }
+    50% { transform: translateY(-5px); box-shadow: 0 24px 46px rgba(243, 107, 0, 0.30); }
   }
 
   @keyframes training-radar {
-    0% { opacity: 0.65; transform: scale(0.9); }
+    0% { opacity: 0.7; transform: scale(0.9); }
     75%, 100% { opacity: 0; transform: scale(1.75); }
   }
 
   @keyframes training-step-enter {
-    from { opacity: 0; transform: translateX(14px); }
-    to { opacity: 1; transform: translateX(0); }
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .training-action,
-    .training-icon-action,
+    .training-primary,
+    .training-subtle,
     .radar-button,
-    .training-step-enter {
-      animation: none !important;
-      transition: none !important;
-    }
+    .training-float,
+    .training-step-enter,
     .radar-unseen::before,
     .radar-unseen::after {
       animation: none !important;
-      display: none;
+      transition: none !important;
     }
   }
 </style>
