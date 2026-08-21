@@ -45,6 +45,13 @@ function registerStepTitles(target: Map<string, string>, snapshot: HelpTrainingS
   for (const step of snapshot?.steps ?? []) target.set(step.id, step.title);
 }
 
+function reporterOrganization(metadata: Record<string, unknown>, fallback: string): string {
+  const groupName = metadataText(metadata, "groupName", 180);
+  const unitName = metadataText(metadata, "unitName", 180);
+  if (groupName && unitName) return `${groupName} · ${unitName}`;
+  return unitName || groupName || fallback;
+}
+
 export async function getCombinedHelpTrainingInsights(pathId: string) {
   const db = getDatabase();
   const participants = await listHelpTrainingParticipants(pathId);
@@ -177,9 +184,9 @@ export async function getCombinedHelpTrainingInsights(pathId: string) {
     inviteDetailedEventKeys.add(`${event.sessionId}:${event.stepKey}`);
     difficultyReports.push({
       source: "invite",
-      name: participant.name,
-      email: participant.email,
-      organizationName: participant.organizationName,
+      name: metadataText(metadata, "reporterName", 160) || participant.name,
+      email: metadataText(metadata, "reporterEmail", 320) || participant.email,
+      organizationName: reporterOrganization(metadata, participant.organizationName),
       version: participant.version,
       stepId: event.stepKey,
       stepTitle: stepTitles.get(event.stepKey) ?? "Orientação da trilha",
@@ -220,7 +227,7 @@ export async function getCombinedHelpTrainingInsights(pathId: string) {
       source: "public",
       name: metadataText(metadata, "reporterName", 160) || "Acesso público",
       email: metadataText(metadata, "reporterEmail", 320),
-      organizationName: "",
+      organizationName: reporterOrganization(metadata, ""),
       version: session.version,
       stepId: event.stepKey,
       stepTitle: stepTitles.get(event.stepKey) ?? "Orientação da trilha",
