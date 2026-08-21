@@ -246,3 +246,97 @@ body::after {
 .application-content.application-content--flush {
   padding: 0;
 }
+
+/* Trilhas: a referência visual domina a tela no desktop; a orientação fica estável à direita. */
+@media (min-width: 1100px) {
+  .training-step-enter:has(> div > img) {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
+    column-gap: clamp(1.75rem, 3vw, 3.75rem);
+    align-items: center !important;
+    align-content: center;
+    width: 100%;
+    max-width: none !important;
+    min-height: calc(100dvh - 7.5rem) !important;
+    padding-bottom: 0 !important;
+    text-align: left !important;
+  }
+
+  .training-step-enter:has(> div > img) > * {
+    grid-column: 2;
+    width: 100%;
+    max-width: none !important;
+    justify-self: stretch;
+  }
+
+  .training-step-enter:has(> div > img) > p:first-child {
+    margin-top: 0;
+    text-align: left;
+  }
+
+  .training-step-enter:has(> div > img) > h1 {
+    margin-top: 0.65rem;
+    font-size: clamp(1.85rem, 2.2vw, 2.4rem) !important;
+    line-height: 1.08;
+    text-align: left;
+  }
+
+  .training-step-enter:has(> div > img) > .training-rich {
+    margin-top: 1rem;
+    font-size: 0.94rem !important;
+    line-height: 1.7;
+    text-align: left;
+  }
+
+  .training-step-enter:has(> div > img) > div:has(> img) {
+    grid-column: 1;
+    grid-row: 1 / span 12;
+    align-self: center;
+    width: 100% !important;
+    height: calc(100dvh - 8.5rem);
+    min-height: 0 !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 8.5rem) !important;
+    margin-top: 0 !important;
+    border-radius: 1.1rem !important;
+  }
+
+  .training-step-enter:has(> div > img) > div:has(> img) > img {
+    width: 100% !important;
+    height: 100%;
+    max-height: 100% !important;
+    object-fit: contain;
+  }
+
+  .training-step-enter:has(> div > img) > div:has(> .training-rich) {
+    margin-top: 1.25rem !important;
+    text-align: left;
+  }
+
+  .training-step-enter:has(> div > img) > [role="status"],
+  .training-step-enter:has(> div > img) > [role="alert"] {
+    margin-top: 1rem !important;
+    justify-self: start;
+  }
+
+  .training-step-enter:has(> div > img) > div.grid {
+    grid-template-columns: minmax(0, 128px) minmax(0, 1fr) !important;
+    gap: 0.65rem !important;
+    margin-top: 1.5rem !important;
+  }
+
+  .training-step-enter:has(> div > img) > p:last-child {
+    margin-top: 1rem !important;
+    text-align: left;
+  }
+}
+
+/* O CTA principal não muda de contraste, cor ou posição ao receber hover. */
+.training-primary.training-float:not(:disabled):hover {
+  animation-play-state: paused !important;
+  transform: none !important;
+  background-color: #F36B00 !important;
+  color: #fff !important;
+  opacity: 1 !important;
+  box-shadow: 0 18px 40px rgba(243, 107, 0, 0.24) !important;
+}
