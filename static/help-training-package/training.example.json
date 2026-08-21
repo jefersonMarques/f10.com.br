@@ -1,5 +1,5 @@
 {
-  "_aiPrompt": "Use este arquivo apenas como referência de formato. Transforme o material que eu enviar em um training.json completo e importável no F10. Divida o conteúdo em microações curtas, com uma ação ou orientação por passo. Use interactionMode \"presentation\" quando a pessoa só precisa ler ou observar e \"action\" quando ela precisa executar algo. Em passos do tipo action, preencha expectedResult. O participante registra com texto livre quando não consegue realizar uma ação, portanto não crie categorias ou listas de motivos de falha. Não invente arquivos nem telas: referencie somente imagens, vídeos e documentos realmente fornecidos. Todo MP4 local deve ter uma legenda WebVTT em video.captions. Use accessMode \"invite_only\" salvo se eu pedir explicitamente um link público. Não informe ao participante quantidade total de passos nem duração total. Na resposta, entregue primeiro o training.json final sem este campo _aiPrompt, depois a estrutura de arquivos esperada no .zip e, quando você tiver informação suficiente para gerar legendas, entregue também o conteúdo dos arquivos .vtt. Se faltar informação indispensável, liste as pendências depois do JSON em vez de inventar dados.",
+  "_aiPrompt": "Use este arquivo apenas como referência de formato. Transforme o material que eu enviar em um training.json completo e importável no F10. Divida o conteúdo em microações claras, mas não corte demais as demonstrações. Cada etapa deve ter uma pergunta principal simples no campo question e um botão principal explícito no campo primaryActionLabel. Use interactionMode \"presentation\" quando a pessoa só precisa ler ou observar e \"action\" quando ela precisa executar algo. Em passos do tipo action, preencha expectedResult. O participante registra com texto livre quando não consegue e só então faz login para salvar ou abrir ticket, portanto não crie categorias ou listas de motivos de falha. Não invente arquivos nem telas: referencie somente imagens e vídeos realmente fornecidos. Todo MP4 local deve durar entre 30 e 60 segundos e deve ter legenda WebVTT em video.captions. Se uma demonstração tiver menos de 30 segundos, junte instruções relacionadas; se passar de 60 segundos, divida somente quando houver outra ação independente. Use accessMode \"invite_only\" salvo se eu pedir explicitamente um link público. Não informe ao participante quantidade total de passos nem duração total. Na resposta, entregue primeiro o training.json final sem este campo _aiPrompt, depois a estrutura de arquivos esperada no .zip e, quando você tiver informação suficiente para gerar legendas, entregue também o conteúdo dos arquivos .vtt. Se faltar informação indispensável, liste as pendências depois do JSON em vez de inventar dados.",
   "formatVersion": 1,
   "title": "Comercial — primeiros passos",
   "slug": "comercial-primeiros-passos",
@@ -10,20 +10,24 @@
   "steps": [
     {
       "title": "Antes de começar",
+      "question": "Pronto para começar?",
       "interactionMode": "presentation",
-      "instruction": "Nesta trilha você vai executar uma ação de cada vez. Quando estiver pronto, continue.",
+      "instruction": "Você verá uma orientação de cada vez. Faça somente o que está sendo pedido agora.",
+      "primaryActionLabel": "Sim, começar",
       "successMessage": "Certo. Vamos começar.",
       "images": [
         { "file": "images/boas-vindas.png", "altText": "Tela inicial do F10" }
       ]
     },
     {
-      "title": "Abra o cadastro de clientes",
+      "title": "Cadastro de clientes",
+      "question": "A lista de clientes apareceu?",
       "interactionMode": "action",
-      "instruction": "No menu principal, abra Clientes.",
+      "instruction": "No menu principal, clique em Clientes.",
       "expectedResult": "A lista de clientes deve aparecer na tela.",
+      "primaryActionLabel": "Sim, apareceu",
       "successMessage": "Certo. Próxima orientação.",
-      "estimatedSeconds": 30,
+      "estimatedSeconds": 45,
       "images": [
         { "file": "images/clientes.png", "altText": "Menu Clientes destacado" }
       ],
