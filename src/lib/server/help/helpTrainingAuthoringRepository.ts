@@ -32,8 +32,8 @@ function assertVideoReference(value: string, assetId: string | null): void {
   }
 }
 
-function defaultPrimaryActionLabel(interactionMode: HelpTrainingInteractionMode): string {
-  return interactionMode === "presentation" ? "Entendi, continuar" : "Sim, consegui";
+function defaultPrimaryActionLabel(_interactionMode: HelpTrainingInteractionMode): string {
+  return "Próximo passo";
 }
 
 async function getTrainingPathRow(pathId: string) {
@@ -134,7 +134,7 @@ export async function updateHelpTrainingStepDraft(
       title,
       question,
       instruction: input.instruction.trim(),
-      expectedResult: input.interactionMode === "presentation" ? "" : input.expectedResult.trim(),
+      expectedResult: input.expectedResult.trim(),
       successMessage: input.successMessage.trim(),
       primaryActionLabel,
       estimatedSeconds,
@@ -256,28 +256,21 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
   const steps = path.steps.map((step) => {
     const interactionMode = step.interactionMode ?? "action";
     if (!step.title.trim() || !step.instruction.trim()) throw new Error("TRAINING_STEP_INCOMPLETE");
-    if (interactionMode === "action" && !step.expectedResult.trim()) {
-      throw new Error("TRAINING_STEP_RESULT_REQUIRED");
-    }
 
     const images = step.media
       .filter((media) => media.mediaType === "image" && media.assetId)
+      .slice(0, 1)
       .map((media) => ({ assetId: media.assetId as string, altText: media.altText }));
     const video = step.media.find((media) => media.mediaType === "video" && media.sourceUrl);
     const caption = step.media.find((media) => media.mediaType === "caption" && media.assetId);
-    if (video?.sourceUrl) {
-      assertVideoReference(video.sourceUrl, video.assetId);
-      if (video.sourceUrl.startsWith("asset:") && !caption?.assetId) {
-        throw new Error("TRAINING_VIDEO_INVALID");
-      }
-    }
+    if (video?.sourceUrl) assertVideoReference(video.sourceUrl, video.assetId);
 
     return {
       id: step.id,
       title: step.title,
       question: step.question.trim() || step.title.trim(),
       instruction: step.instruction,
-      expectedResult: interactionMode === "presentation" ? "" : step.expectedResult,
+      expectedResult: step.expectedResult,
       successMessage: step.successMessage,
       primaryActionLabel: step.primaryActionLabel.trim() || defaultPrimaryActionLabel(interactionMode),
       interactionMode,
