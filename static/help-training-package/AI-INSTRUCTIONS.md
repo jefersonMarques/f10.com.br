@@ -1,66 +1,41 @@
-# Prompt para criar uma Trilha F10 com IA
+# Criar uma Trilha F10 com IA
 
-Copie todo o conteúdo deste arquivo e envie para a IA junto com o material de origem: manual, procedimento, descrição da rotina, prints, vídeos, transcrições ou arquivos que devem virar treinamento.
+Envie este arquivo para a IA junto com o material de origem: procedimentos, manuais, prints, vídeos ou transcrições.
 
----
+## Tarefa
 
-Você é responsável por transformar o material que eu fornecer em um pacote importável de **Trilha F10**.
+Transforme o material fornecido em um pacote importável de Trilha F10. Gere um `training.json` válido e organize o conteúdo em microações curtas. Cada passo deve mostrar somente a orientação necessária naquele momento.
 
-## Objetivo
-
-Produza um `training.json` válido no formato F10 e organize o conteúdo em microações curtas, mostrando ao participante somente o que ele precisa fazer agora.
-
-Não invente telas, menus, permissões, mensagens, arquivos, imagens ou vídeos que não estejam no material fornecido. Quando faltar uma informação indispensável, não crie um dado fictício: liste a pendência depois do JSON.
-
-## Regras obrigatórias do `training.json`
+## Regras
 
 - Use `"formatVersion": 1`.
-- Use `"accessMode": "invite_only"` por padrão. Use `"public"` somente se eu pedir explicitamente um link público.
-- Crie títulos e instruções em português do Brasil, curtos e objetivos.
-- Divida o conteúdo em microações. Cada passo deve ensinar ou solicitar somente uma coisa por vez.
-- Não informe ao participante a quantidade total de passos nem a duração total da trilha.
-- `estimatedSeconds` é apenas uma estimativa interna e pode ser informado por passo quando fizer sentido.
-- Use `interactionMode: "presentation"` quando a pessoa só precisa ler, entender ou observar algo.
-- Use `interactionMode: "action"` quando a pessoa precisa executar uma ação no sistema.
-- Todo passo `action` deve possuir `expectedResult` e pelo menos um item em `failureReasons`.
-- `successMessage` deve ser uma microvitória curta, confirmando que a pessoa avançou.
-- Use `images` apenas para imagens realmente fornecidas. Não invente nomes de arquivos.
-- Para vídeo externo, use uma URL HTTP/HTTPS.
-- Para MP4 local, use obrigatoriamente:
+- Use `"accessMode": "invite_only"` por padrão; use `"public"` somente quando solicitado.
+- Escreva em português do Brasil, com instruções curtas e objetivas.
+- Não informe ao participante quantidade total de passos ou duração total.
+- Use `interactionMode: "presentation"` quando a pessoa só precisa ler ou observar.
+- Use `interactionMode: "action"` quando a pessoa precisa executar algo.
+- Todo passo `action` deve possuir `expectedResult`.
+- Não crie `failureReasons`. O F10 coleta o motivo de dificuldade com texto livre diretamente do participante e registra esse relato junto da pessoa e da microação.
+- `successMessage` deve ser curta e não afirmar algo que não foi verificado. Exemplo: `Certo. Próxima orientação.`
+- `estimatedSeconds` é somente informação interna e pode ser usado por passo.
+- Referencie somente imagens e vídeos realmente fornecidos. Não invente nomes de arquivos, telas ou funcionalidades.
+- Imagens aceitas: PNG, JPG/JPEG, WEBP e GIF.
+- Vídeo local deve ser MP4, ter no máximo 60 segundos e possuir legenda WebVTT `.vtt`.
+- Para vídeo externo, use URL HTTP/HTTPS.
+- Não use o mesmo caminho de arquivo como tipos diferentes.
 
-```json
-"video": {
-  "file": "videos/exemplo.mp4",
-  "captions": "videos/exemplo.vtt"
-}
-```
-
-- Todo MP4 local precisa de legenda WebVTT `.vtt` para poder ser publicado.
-- Não referencie o mesmo caminho de arquivo como tipos diferentes.
-- Não inclua campos extras no `training.json` final, incluindo `_aiPrompt`.
-
-## Modos de interação
-
-### Apresentação
-
-Use quando não existe uma ação que precise ser confirmada.
-
-Exemplo:
+## Exemplo de apresentação
 
 ```json
 {
   "title": "Antes de começar",
   "interactionMode": "presentation",
-  "instruction": "Confira as informações desta tela antes de continuar.",
+  "instruction": "Confira esta tela antes de continuar.",
   "successMessage": "Certo. Vamos continuar."
 }
 ```
 
-### Ação
-
-Use quando a pessoa precisa fazer alguma coisa e confirmar que conseguiu.
-
-Exemplo:
+## Exemplo de ação
 
 ```json
 {
@@ -68,70 +43,41 @@ Exemplo:
   "interactionMode": "action",
   "instruction": "No menu principal, abra Clientes.",
   "expectedResult": "A lista de clientes deve aparecer na tela.",
-  "successMessage": "Perfeito. Você chegou à lista de clientes.",
+  "successMessage": "Certo. Próxima orientação.",
   "estimatedSeconds": 30,
-  "failureReasons": [
+  "images": [
     {
-      "key": "option_not_found",
-      "label": "Não encontrei a opção",
-      "recoveryMessage": "Confira novamente o menu indicado e compare com a demonstração."
-    },
-    {
-      "key": "permission_missing",
-      "label": "Não tenho permissão",
-      "recoveryMessage": "Peça ajuda para verificar o perfil liberado para seu usuário."
+      "file": "images/clientes.png",
+      "altText": "Menu Clientes destacado"
     }
-  ]
+  ],
+  "video": {
+    "file": "videos/clientes.mp4",
+    "captions": "videos/clientes.vtt"
+  }
 }
 ```
 
-## Arquivos de mídia
-
-Imagens aceitas no pacote:
-
-- PNG
-- JPG/JPEG
-- WEBP
-- GIF
-
-Vídeo local:
-
-- MP4
-- máximo de 60 segundos por microvídeo
-- até 25 MB
-- legenda `.vtt` obrigatória
-
-Não transforme um vídeo longo em uma única etapa. Divida em microvídeos quando houver mais de uma ação independente.
-
-Se eu enviar um vídeo com fala e você conseguir compreender o conteúdo, gere também o texto WebVTT correspondente. Se não houver informação suficiente para produzir uma legenda fiel, informe que o `.vtt` precisa ser criado e não invente falas.
-
-## Estrutura esperada do ZIP
-
-A raiz deve conter `training.json` ou `manifest.json`.
-
-Exemplo:
+## Estrutura do ZIP
 
 ```text
 training.json
 images/
-  boas-vindas.png
   clientes.png
 videos/
   clientes.mp4
   clientes.vtt
 ```
 
-## Como responder
+A raiz deve conter `training.json` ou `manifest.json`.
 
-Entregue sua resposta nesta ordem:
+## Formato da resposta
 
-1. O conteúdo completo do `training.json` final, em um único bloco JSON válido.
-2. A árvore de arquivos que devem existir dentro do `.zip`.
-3. O conteúdo completo de cada arquivo `.vtt` que você conseguir gerar com segurança.
-4. Uma seção `Pendências`, somente se faltar algum arquivo ou informação indispensável.
+Entregue nesta ordem:
 
-O JSON final deve poder ser salvo diretamente como `training.json`, sem textos, comentários ou marcações dentro do objeto.
+1. conteúdo completo do `training.json` em um único bloco JSON válido;
+2. árvore de arquivos esperada no ZIP;
+3. conteúdo dos arquivos `.vtt` que puder gerar com fidelidade;
+4. seção `Pendências` somente quando faltar informação indispensável.
 
-## Material de origem
-
-A partir deste ponto, use somente o material que eu fornecer para definir telas, nomes, instruções, resultados e arquivos. Preserve a terminologia real do sistema e não substitua informações do material por suposições genéricas.
+Não invente dados quando o material de origem não for suficiente. Preserve a terminologia real encontrada nos arquivos fornecidos.
