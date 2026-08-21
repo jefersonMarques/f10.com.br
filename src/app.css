@@ -331,36 +331,54 @@ body::after {
   }
 }
 
-/* Progressão usa azul F10; laranja fica reservado para orientação e atenção. */
+/* Neutro = branco. */
 .training-primary.training-float {
   animation: none !important;
   transform: none !important;
-  background-color: #000A57 !important;
-  color: #FFFFFF !important;
-  border: 1px solid #000A57 !important;
+  background-color: #FFFFFF !important;
+  color: #000A57 !important;
+  border: 1px solid #C9D2E1 !important;
   opacity: 1 !important;
-  box-shadow: 0 8px 20px rgba(0, 10, 87, 0.16) !important;
+  box-shadow: 0 6px 18px rgba(12, 23, 52, 0.07) !important;
 }
 
 .training-primary.training-float svg {
-  color: #FFFFFF;
+  color: #000A57;
 }
 
 .training-primary.training-float:not(:disabled):hover {
   transform: none !important;
-  background-color: #06134A !important;
-  color: #FFFFFF !important;
-  border-color: #06134A !important;
+  background-color: #F7F9FC !important;
+  color: #000A57 !important;
+  border-color: #B9C5D7 !important;
   opacity: 1 !important;
-  box-shadow: 0 9px 22px rgba(0, 10, 87, 0.18) !important;
+  box-shadow: 0 8px 20px rgba(12, 23, 52, 0.09) !important;
 }
 
-/* Na confirmação, as duas respostas têm o mesmo peso visual. */
+/* Preparação positiva = verde. */
+main > section .training-primary.training-float {
+  background-color: #E7F7EC !important;
+  color: #176B3A !important;
+  border-color: #79BF92 !important;
+  box-shadow: 0 7px 18px rgba(23, 107, 58, 0.10) !important;
+}
+
+main > section .training-primary.training-float svg {
+  color: #176B3A !important;
+}
+
+main > section .training-primary.training-float:not(:disabled):hover {
+  background-color: #DDF3E5 !important;
+  color: #145F34 !important;
+  border-color: #69B384 !important;
+}
+
+/* Confirmação exige leitura: negativo vermelho, positivo verde. */
 .training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) {
-  border-color: #DDE3EE !important;
-  background: #F8FAFD !important;
+  border-color: #F0B36C !important;
+  background: #FFF3E4 !important;
   padding: 1rem 1.1rem !important;
-  color: #4F5A70 !important;
+  color: #6F4A24 !important;
 }
 
 .training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > strong {
@@ -370,21 +388,21 @@ body::after {
   font-size: 0.86rem !important;
   line-height: 1.4;
   font-weight: 800 !important;
-  color: #061333 !important;
+  color: #9A480A !important;
 }
 
 .training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > strong svg {
   width: 1.1rem;
   height: 1.1rem;
   flex: 0 0 auto;
-  color: #000A57;
+  color: #D8650B;
 }
 
 .training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > .training-rich {
   margin-top: 0.65rem !important;
   font-size: 0.88rem !important;
   line-height: 1.7 !important;
-  color: #4F5A70 !important;
+  color: #6F4A24 !important;
 }
 
 .training-step-enter:has(> .training-verification-question) > div.grid {
@@ -397,10 +415,6 @@ body::after {
   min-height: 4rem !important;
   flex-direction: row !important;
   gap: 0.55rem !important;
-  border: 1px solid #C9D3EA !important;
-  background: #EEF2FF !important;
-  color: #13245B !important;
-  box-shadow: 0 6px 18px rgba(12, 23, 52, 0.05) !important;
   animation: none !important;
   transform: none !important;
   font-size: 0.82rem !important;
@@ -408,38 +422,59 @@ body::after {
   opacity: 1 !important;
 }
 
+.training-step-enter:has(> .training-verification-question) > div.grid > button:first-child {
+  background: #FDEBEC !important;
+  color: #A1262D !important;
+  border: 1px solid #E49AA0 !important;
+  box-shadow: 0 6px 18px rgba(161, 38, 45, 0.08) !important;
+}
+
 .training-step-enter:has(> .training-verification-question) > div.grid > button:first-child svg {
-  color: #B85408;
+  color: #B4232D !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div.grid > button:first-child:hover {
+  background: #F9DEE0 !important;
+  color: #901E26 !important;
+  border-color: #D98289 !important;
+  box-shadow: 0 8px 20px rgba(161, 38, 45, 0.10) !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div.grid > button:nth-child(2),
+.training-step-enter:has(> .training-verification-question) > div.grid > form:nth-child(2) > button {
+  background: #E7F7EC !important;
+  color: #176B3A !important;
+  border: 1px solid #79BF92 !important;
+  box-shadow: 0 6px 18px rgba(23, 107, 58, 0.08) !important;
 }
 
 .training-step-enter:has(> .training-verification-question) > div.grid > button:nth-child(2) svg,
 .training-step-enter:has(> .training-verification-question) > div.grid > form:nth-child(2) > button svg {
-  color: #2F7045;
+  color: #1F7A45 !important;
 }
 
-.training-step-enter:has(> .training-verification-question) > div.grid > button:hover,
-.training-step-enter:has(> .training-verification-question) > div.grid > form > button:hover {
-  background: #E4EAFF !important;
-  color: #13245B !important;
-  border-color: #B8C4E2 !important;
-  box-shadow: 0 8px 20px rgba(12, 23, 52, 0.07) !important;
-  transform: none !important;
+.training-step-enter:has(> .training-verification-question) > div.grid > button:nth-child(2):hover,
+.training-step-enter:has(> .training-verification-question) > div.grid > form:nth-child(2) > button:hover {
+  background: #DDF3E5 !important;
+  color: #145F34 !important;
+  border-color: #69B384 !important;
+  box-shadow: 0 8px 20px rgba(23, 107, 58, 0.10) !important;
 }
 
-/* Recuperação usa âmbar para sinalizar correção, sem voltar ao laranja de progressão. */
+/* Atenção/recuperação = laranja. */
 .training-step-enter > div.mt-7.w-full > button.training-primary.training-float {
-  background-color: #FFF1DF !important;
-  color: #93440D !important;
-  border-color: #E8B783 !important;
-  box-shadow: 0 7px 18px rgba(147, 68, 13, 0.08) !important;
+  background-color: #FFF0DF !important;
+  color: #A34B09 !important;
+  border-color: #EEAC65 !important;
+  box-shadow: 0 7px 18px rgba(163, 75, 9, 0.10) !important;
 }
 
 .training-step-enter > div.mt-7.w-full > button.training-primary.training-float svg {
-  color: #93440D;
+  color: #C35B0B !important;
 }
 
 .training-step-enter > div.mt-7.w-full > button.training-primary.training-float:not(:disabled):hover {
-  background-color: #FFE7CA !important;
-  color: #7D3809 !important;
-  border-color: #DDA46D !important;
+  background-color: #FFE4C5 !important;
+  color: #8C3F06 !important;
+  border-color: #E29A4D !important;
 }
