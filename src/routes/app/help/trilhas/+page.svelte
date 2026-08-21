@@ -152,7 +152,7 @@
               <div class="rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-4 py-3" role="status" aria-live="polite">
                 <div class="flex items-start gap-3">
                   <LoaderCircle size={17} class="mt-0.5 shrink-0 animate-spin text-[#000A57]"/>
-                  <div class="min-w-0"><strong class="block text-[11px] font-semibold text-[#000A57]">Processando o pacote</strong><span class="mt-1 block text-[9px] leading-4 text-[#697084]">Enviando o ZIP, validando JSON, vídeos, legendas e imagens e gravando tudo em uma única operação. Aguarde a conclusão antes de sair desta página.</span></div>
+                  <div class="min-w-0"><strong class="block text-[11px] font-semibold text-[#000A57]">Processando o pacote</strong><span class="mt-1 block text-[9px] leading-4 text-[#697084]">Enviando o ZIP, validando JSON, vídeos e imagens e gravando tudo em uma única operação. Aguarde a conclusão antes de sair desta página.</span></div>
                 </div>
                 <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-[#E1E4F1]"><div class="h-full w-1/2 animate-pulse rounded-full bg-[#000A57]"></div></div>
               </div>
@@ -162,14 +162,13 @@
             <a href="/help-training-package/training.example.json" download class="inline-flex items-center gap-2 text-[10px] font-semibold text-[#000A57]"><Download size={13}/>Baixar modelo de training.json</a>
             <a href="/help-training-package/AI-INSTRUCTIONS.md" download class="inline-flex items-center gap-2 text-[10px] font-semibold text-[#000A57]"><Download size={13}/>Baixar prompt para IA (.md)</a>
           </div>
-          <p class="mt-3 rounded-xl bg-[#F7F8FB] px-3 py-3 text-[9px] leading-4 text-[#707686]">Para criar uma trilha com IA, envie o arquivo <strong>AI-INSTRUCTIONS.md</strong> junto com seu manual, procedimento, prints ou vídeos. A IA recebe as regras do formato e devolve o <strong>training.json</strong>, a estrutura do ZIP e as legendas quando possível.</p>
+          <p class="mt-3 rounded-xl bg-[#F7F8FB] px-3 py-3 text-[9px] leading-4 text-[#707686]">Para criar uma trilha com IA, envie o arquivo <strong>AI-INSTRUCTIONS.md</strong> junto com seu manual, procedimento, prints ou vídeos. A IA recebe as regras do formato e devolve o <strong>training.json</strong> e a estrutura esperada do ZIP.</p>
           <details class="mt-4 rounded-xl bg-[#F7F8FB] p-3"><summary class="cursor-pointer text-[10px] font-semibold text-[#4D5464]">Estrutura esperada do .zip</summary><pre class="mt-3 overflow-x-auto whitespace-pre text-[9px] leading-4 text-[#707686]">training.json
 images/
   boas-vindas.png
   clientes.png
 videos/
-  clientes.mp4
-  clientes.vtt</pre></details>
+  clientes.mp4</pre></details>
         </section>
       </aside>
     {/if}
