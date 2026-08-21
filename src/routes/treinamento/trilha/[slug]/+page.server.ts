@@ -25,6 +25,12 @@ const PUBLIC_TRAINING_START_RATE_LIMIT = {
   blockMs: 15 * 60 * 1000,
 } as const;
 
+const PUBLIC_TRAINING_FAILURE_RATE_LIMIT = {
+  maxRequests: 12,
+  windowMs: 15 * 60 * 1000,
+  blockMs: 30 * 60 * 1000,
+} as const;
+
 function read(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === "string" ? value.trim() : "";
@@ -115,7 +121,7 @@ export const actions: Actions = {
     }
   },
 
-  failure: async ({ params, cookies, request }) => {
+  failure: async ({ params, cookies, request, getClientAddress }) => {
     const slug = params.slug?.trim() ?? "";
     const { token } = await requirePublicSession(cookies, slug);
     const formData = await request.formData();
@@ -130,6 +136,14 @@ export const actions: Actions = {
     }
 
     try {
+      const allowed = await consumeSupportPublicRateLimit(
+        "help-training-public-failure",
+        getClientAddress(),
+        PUBLIC_TRAINING_FAILURE_RATE_LIMIT,
+      );
+      if (!allowed) {
+        return fail(429, { success: false, message: "Muitos relatos foram enviados. Aguarde alguns minutos antes de tentar novamente." });
+      }
       await reportPublicTrainingDifficulty(token, { detail, reporterName, reporterEmail });
       throw redirect(303, `${publicPath(slug)}?nao-consegui=1`);
     } catch (cause) {
