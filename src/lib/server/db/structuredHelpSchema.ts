@@ -1,5 +1,6 @@
 import {
   bigint,
+  boolean,
   index,
   integer,
   jsonb,
@@ -26,6 +27,27 @@ export const helpAssetType = pgEnum("help_asset_type", [
   "video",
   "file",
 ]);
+
+export const helpCategories = pgTable(
+  "help_categories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    icon: text("icon").notNull().default(""),
+    sortOrder: integer("sort_order").notNull().default(10),
+    active: boolean("active").notNull().default(true),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("help_categories_slug_unique").on(table.slug),
+    index("help_categories_active_order_idx").on(table.active, table.sortOrder),
+  ],
+);
 
 export const helpContents = pgTable(
   "help_contents",
