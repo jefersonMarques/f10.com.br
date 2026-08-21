@@ -1,19 +1,16 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
-  import { Captions, Film, UploadCloud } from "lucide-svelte";
+  import { Film, UploadCloud } from "lucide-svelte";
 
   export let pathId: string;
   export let stepId: string;
 
   const MAX_BYTES = 25 * 1024 * 1024;
-  const MAX_CAPTION_BYTES = 1024 * 1024;
   const MIN_SECONDS = 30;
   const MAX_SECONDS = 60;
 
   let fileInput: HTMLInputElement;
-  let captionInput: HTMLInputElement;
   let selectedFile: File | null = null;
-  let selectedCaptions: File | null = null;
   let uploading = false;
   let dragActive = false;
   let message = "";
@@ -54,7 +51,7 @@
         return false;
       }
       if (duration > MAX_SECONDS + 0.05) {
-        errorMessage = `Este vídeo tem cerca de ${Math.ceil(duration)}s. O limite é 60s; divida a demonstração em outra microação quando necessário.`;
+        errorMessage = `Este vídeo tem cerca de ${Math.ceil(duration)}s. O limite é 60s; divida a demonstração em outro passo quando necessário.`;
         return false;
       }
     } catch {
@@ -64,30 +61,16 @@
     return true;
   }
 
-  function validateCaptions(file: File): boolean {
-    if (!file.name.toLowerCase().endsWith(".vtt")) {
-      errorMessage = "Use uma legenda WebVTT com extensão .vtt.";
-      return false;
-    }
-    if (file.size > MAX_CAPTION_BYTES) {
-      errorMessage = "A legenda deve ter no máximo 1 MB.";
-      return false;
-    }
-    return true;
-  }
-
   async function uploadSelection(): Promise<void> {
-    if (uploading || (!selectedFile && !selectedCaptions)) return;
+    if (uploading || !selectedFile) return;
     message = "";
     errorMessage = "";
-    if (selectedFile && !(await validateVideo(selectedFile))) return;
-    if (selectedCaptions && !validateCaptions(selectedCaptions)) return;
+    if (!(await validateVideo(selectedFile))) return;
 
     uploading = true;
     try {
       const body = new FormData();
-      if (selectedFile) body.set("file", selectedFile, selectedFile.name || "demonstracao.mp4");
-      if (selectedCaptions) body.set("captions", selectedCaptions, selectedCaptions.name || "legendas.vtt");
+      body.set("file", selectedFile, selectedFile.name || "demonstracao.mp4");
       const response = await fetch(`/api/app/help/trilhas/${pathId}/steps/${stepId}/video`, {
         method: "POST",
         body,
@@ -98,21 +81,19 @@
         durationSeconds?: number | null;
       };
       if (!response.ok || !result.success) {
-        errorMessage = result.message ?? "Não foi possível enviar o vídeo ou a legenda.";
+        errorMessage = result.message ?? "Não foi possível enviar o vídeo.";
         return;
       }
 
       const durationLabel = typeof result.durationSeconds === "number"
         ? ` (${result.durationSeconds.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}s)`
         : "";
-      message = `${result.message ?? "Arquivo adicionado."}${durationLabel}`;
+      message = `${result.message ?? "Vídeo adicionado."}${durationLabel}`;
       selectedFile = null;
-      selectedCaptions = null;
       if (fileInput) fileInput.value = "";
-      if (captionInput) captionInput.value = "";
       await invalidateAll();
     } catch {
-      errorMessage = "Não foi possível enviar o vídeo ou a legenda.";
+      errorMessage = "Não foi possível enviar o vídeo.";
     } finally {
       uploading = false;
     }
@@ -126,19 +107,6 @@
     selectedFile = file;
   }
 
-  function handleCaptionInput(event: Event): void {
-    const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0] ?? null;
-    if (!file) return;
-    errorMessage = "";
-    if (!validateCaptions(file)) {
-      input.value = "";
-      selectedCaptions = null;
-      return;
-    }
-    selectedCaptions = file;
-  }
-
   function handleDrop(event: DragEvent): void {
     event.preventDefault();
     dragActive = false;
@@ -150,20 +118,12 @@
       errorMessage = "Arraste um vídeo MP4.";
     }
   }
-
-  $: submitLabel = uploading
-    ? "Validando e enviando..."
-    : selectedFile
-      ? "Enviar vídeo"
-      : selectedCaptions
-        ? "Enviar legenda para o vídeo existente"
-        : "Selecione um arquivo";
 </script>
 
 <div
   class={`rounded-xl border border-dashed p-3 transition ${dragActive ? "border-[#EA6D0B] bg-[#FFF7ED]" : "border-[#CDD2DD] bg-[#FAFAFC]"}`}
   role="group"
-  aria-label="Upload de microvídeo de treinamento"
+  aria-label="Upload de demonstração em vídeo"
   on:dragenter|preventDefault={() => (dragActive = true)}
   on:dragover|preventDefault={() => (dragActive = true)}
   on:dragleave={() => (dragActive = false)}
@@ -171,16 +131,13 @@
 >
   <div class="flex items-start gap-3">
     <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#EA6D0B] shadow-sm"><Film size={17} aria-hidden="true" /></span>
-    <div class="min-w-0 flex-1"><strong class="application-text-caption block font-semibold text-[#303645]">Demonstração em microvídeo</strong><span class="application-text-caption mt-1 block leading-5 text-[#858B99]">MP4 · entre 30 e 60 segundos · até 25 MB. Para publicar um MP4 local, anexe uma legenda WebVTT. Se o vídeo já estiver enviado, você pode selecionar somente o .vtt.</span></div>
+    <div class="min-w-0 flex-1"><strong class="application-text-caption block font-semibold text-[#303645]">Demonstração em vídeo</strong><span class="application-text-caption mt-1 block leading-5 text-[#858B99]">MP4 · entre 30 e 60 segundos · até 25 MB. A legenda .vtt não é obrigatória.</span></div>
   </div>
 
   <input bind:this={fileInput} type="file" accept="video/mp4,.mp4" class="sr-only" on:change={handleFileInput}/>
   <button type="button" disabled={uploading} on:click={() => fileInput?.click()} class="application-text-caption mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57] disabled:cursor-wait disabled:opacity-60"><Film size={14}/>{selectedFile ? selectedFile.name : "Selecionar ou arrastar MP4"}</button>
 
-  <input bind:this={captionInput} type="file" accept="text/vtt,.vtt" class="sr-only" on:change={handleCaptionInput}/>
-  <button type="button" disabled={uploading} on:click={() => captionInput?.click()} class="application-text-caption mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#5B6272] disabled:cursor-wait disabled:opacity-60"><Captions size={14}/>{selectedCaptions ? selectedCaptions.name : "Selecionar legenda .vtt"}</button>
-
-  <button type="button" disabled={uploading || (!selectedFile && !selectedCaptions)} on:click={() => void uploadSelection()} class="application-text-caption mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#EA6D0B] px-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><UploadCloud size={14} class={uploading ? "animate-pulse" : ""} aria-hidden="true" />{submitLabel}</button>
+  <button type="button" disabled={uploading || !selectedFile} on:click={() => void uploadSelection()} class="application-text-caption mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#EA6D0B] px-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><UploadCloud size={14} class={uploading ? "animate-pulse" : ""} aria-hidden="true" />{uploading ? "Validando e enviando..." : "Enviar vídeo"}</button>
 
   {#if message}<p class="application-text-meta mt-2 font-medium text-[#257342]">{message}</p>{/if}
   {#if errorMessage}<p class="application-text-meta mt-2 font-medium text-[#A52A2A]">{errorMessage}</p>{/if}
