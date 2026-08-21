@@ -78,7 +78,11 @@
             <label class="block rounded-xl border border-dashed border-[#CDD2DD] bg-[#FAFAFC] p-4"><span class="text-[10px] font-semibold text-[#4A5060]">Arquivo .zip</span><input name="package" type="file" accept="application/zip,.zip" required class="mt-2 block w-full text-[10px] text-[#6E7483] file:mr-3 file:rounded-lg file:border-0 file:bg-[#000A57] file:px-3 file:py-2 file:text-[10px] file:font-semibold file:text-white"/><span class="mt-2 block text-[9px] leading-4 text-[#8B909D]">Até 120 MB. O JSON deve estar na raiz como <strong>training.json</strong> ou <strong>manifest.json</strong>.</span></label>
             <button type="submit" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[12px] font-semibold text-white"><Upload size={15}/>Importar trilha</button>
           </form>
-          <a href="/help-training-package/training.example.json" download class="mt-3 inline-flex items-center gap-2 text-[10px] font-semibold text-[#000A57]"><Download size={13}/>Baixar modelo de training.json</a>
+          <div class="mt-3 flex flex-col items-start gap-2">
+            <a href="/help-training-package/training.example.json" download class="inline-flex items-center gap-2 text-[10px] font-semibold text-[#000A57]"><Download size={13}/>Baixar modelo de training.json</a>
+            <a href="/help-training-package/AI-INSTRUCTIONS.md" download class="inline-flex items-center gap-2 text-[10px] font-semibold text-[#000A57]"><Download size={13}/>Baixar prompt para IA (.md)</a>
+          </div>
+          <p class="mt-3 rounded-xl bg-[#F7F8FB] px-3 py-3 text-[9px] leading-4 text-[#707686]">Para criar uma trilha com IA, envie o arquivo <strong>AI-INSTRUCTIONS.md</strong> junto com seu manual, procedimento, prints ou vídeos. A IA recebe as regras do formato e devolve o <strong>training.json</strong>, a estrutura do ZIP e as legendas quando possível.</p>
           <details class="mt-4 rounded-xl bg-[#F7F8FB] p-3"><summary class="cursor-pointer text-[10px] font-semibold text-[#4D5464]">Estrutura esperada do .zip</summary><pre class="mt-3 overflow-x-auto whitespace-pre text-[9px] leading-4 text-[#707686]">training.json
 images/
   boas-vindas.png
