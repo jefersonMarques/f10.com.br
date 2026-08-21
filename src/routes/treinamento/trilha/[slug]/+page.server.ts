@@ -1,7 +1,6 @@
 import { error, fail, redirect, type Actions, type Cookies } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import {
-  completePublicHelpTrainingStep,
   getPublicHelpTrainingLanding,
   getPublicHelpTrainingSession,
   markPublicHelpTrainingStepViewed,
@@ -9,6 +8,7 @@ import {
   toPublicHelpTrainingClientState,
 } from "$lib/server/help/helpTrainingPublicRepository";
 import {
+  completePublicTrainingStepGuided,
   goBackPublicTrainingStep,
   reportPublicTrainingDifficulty,
 } from "$lib/server/help/helpTrainingGuidedExperienceRepository";
@@ -100,7 +100,7 @@ export const actions: Actions = {
     const slug = params.slug?.trim() ?? "";
     const { token } = await requirePublicSession(cookies, slug);
     try {
-      const result = await completePublicHelpTrainingStep(token);
+      const result = await completePublicTrainingStepGuided(token);
       const message = encodeURIComponent(result.successMessage || "Certo. Vamos continuar.");
       throw redirect(303, `${publicPath(slug)}?feito=${message}`);
     } catch (cause) {
