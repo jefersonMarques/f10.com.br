@@ -331,14 +331,28 @@ body::after {
   }
 }
 
-/* O CTA principal não muda de contraste, cor ou posição ao receber hover. */
-.training-primary.training-float:not(:disabled):hover {
-  animation-play-state: paused !important;
+/* Progressão é neutra: laranja fica reservado para orientação e atenção. */
+.training-primary.training-float {
+  animation: none !important;
   transform: none !important;
-  background-color: #F36B00 !important;
-  color: #fff !important;
+  background-color: #FFFFFF !important;
+  color: #000A57 !important;
+  border: 1px solid #C9D2E1 !important;
   opacity: 1 !important;
-  box-shadow: 0 18px 40px rgba(243, 107, 0, 0.24) !important;
+  box-shadow: 0 6px 18px rgba(12, 23, 52, 0.07) !important;
+}
+
+.training-primary.training-float svg {
+  color: #000A57;
+}
+
+.training-primary.training-float:not(:disabled):hover {
+  transform: none !important;
+  background-color: #F7F9FC !important;
+  color: #000A57 !important;
+  border-color: #B9C5D7 !important;
+  opacity: 1 !important;
+  box-shadow: 0 8px 20px rgba(12, 23, 52, 0.09) !important;
 }
 
 /* Na confirmação, nenhuma resposta recebe aparência de CTA principal. */
