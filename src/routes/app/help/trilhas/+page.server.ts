@@ -13,6 +13,7 @@ const MAX_PACKAGE_BYTES = 120 * 1024 * 1024;
 type DatabaseDiagnostic = {
   code: string;
   constraint: string;
+  table: string;
   type: string;
 };
 
@@ -26,11 +27,21 @@ function databaseDiagnostic(cause: unknown): DatabaseDiagnostic {
   for (let depth = 0; depth < 5 && current && typeof current === "object"; depth += 1) {
     const record = current as Record<string, unknown>;
     const code = typeof record.code === "string" ? record.code : "";
-    const constraint = typeof record.constraint === "string" ? record.constraint : "";
-    if (code || constraint) {
+    const constraint = typeof record.constraint === "string"
+      ? record.constraint
+      : typeof record.constraint_name === "string"
+        ? record.constraint_name
+        : "";
+    const table = typeof record.table === "string"
+      ? record.table
+      : typeof record.table_name === "string"
+        ? record.table_name
+        : "";
+    if (code || constraint || table) {
       return {
         code,
         constraint,
+        table,
         type: current instanceof Error ? current.name : "Error",
       };
     }
@@ -39,6 +50,7 @@ function databaseDiagnostic(cause: unknown): DatabaseDiagnostic {
   return {
     code: "",
     constraint: "",
+    table: "",
     type: cause instanceof Error ? cause.name : typeof cause,
   };
 }
@@ -65,7 +77,17 @@ function packageErrorMessage(cause: unknown): string {
   if (code === "TRAINING_VIDEO_INVALID") return "Um dos arquivos MP4 não pôde ser validado.";
   if (code.startsWith("TRAINING_ZIP_")) return "O arquivo .zip é inválido, excede os limites permitidos ou contém uma estrutura não segura.";
   if (code === "ASSET_STORAGE_NOT_CONFIGURED") return "O armazenamento de arquivos não está configurado.";
-  if (diagnostic.code === "23505" && diagnostic.constraint.includes("help_training_paths") && diagnostic.constraint.includes("slug")) {
+  if (code === "TRAINING_PACKAGE_SLUG_EXISTS") {
+    return "Já existe uma trilha com este endereço. Altere o campo slug no training.json ou renomeie/exclua o rascunho existente antes de importar novamente.";
+  }
+  if (
+    diagnostic.code === "23505" &&
+    (
+      diagnostic.constraint.includes("help_training_paths") ||
+      diagnostic.table === "help_training_paths"
+    ) &&
+    (diagnostic.constraint.includes("slug") || !diagnostic.constraint)
+  ) {
     return "Já existe uma trilha com este endereço. Altere o campo slug no training.json e importe novamente.";
   }
   if (diagnostic.code === "23514" && diagnostic.constraint.includes("help_training_step_media")) {
@@ -136,6 +158,7 @@ export const actions: Actions = {
           : "TRAINING_PACKAGE_IMPORT_FAILED",
         databaseCode: diagnostic.code || undefined,
         constraint: diagnostic.constraint || undefined,
+        table: diagnostic.table || undefined,
         causeType: diagnostic.type,
       });
       return fail(400, { success: false, message: packageErrorMessage(cause) });
