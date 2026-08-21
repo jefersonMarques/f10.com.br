@@ -5,10 +5,13 @@ import {
   getPublicHelpTrainingLanding,
   getPublicHelpTrainingSession,
   markPublicHelpTrainingStepViewed,
-  reportPublicHelpTrainingFailure,
   startPublicHelpTrainingSession,
   toPublicHelpTrainingClientState,
 } from "$lib/server/help/helpTrainingPublicRepository";
+import {
+  goBackPublicTrainingStep,
+  reportPublicTrainingDifficulty,
+} from "$lib/server/help/helpTrainingGuidedExperienceRepository";
 import {
   clearHelpTrainingPublicSessionCookie,
   getHelpTrainingPublicSessionCookie,
@@ -58,6 +61,7 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
   return {
     landing,
     state: state ? toPublicHelpTrainingClientState(state) : null,
+    canGoBack: Boolean(state && state.session.currentStepIndex > 0),
     successMessage: (url.searchParams.get("feito") ?? "").slice(0, 500),
     failureReported: url.searchParams.get("nao-consegui") === "1",
   };
@@ -91,11 +95,23 @@ export const actions: Actions = {
     const { token } = await requirePublicSession(cookies, slug);
     try {
       const result = await completePublicHelpTrainingStep(token);
-      const message = encodeURIComponent(result.successMessage || "Feito. Vamos continuar.");
+      const message = encodeURIComponent(result.successMessage || "Certo. Vamos continuar.");
       throw redirect(303, `${publicPath(slug)}?feito=${message}`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
-      return fail(409, { success: false, message: "Não foi possível registrar esta ação. Tente novamente." });
+      return fail(409, { success: false, message: "Não foi possível avançar. Tente novamente." });
+    }
+  },
+
+  back: async ({ params, cookies }) => {
+    const slug = params.slug?.trim() ?? "";
+    const { token } = await requirePublicSession(cookies, slug);
+    try {
+      await goBackPublicTrainingStep(token);
+      throw redirect(303, publicPath(slug));
+    } catch (cause) {
+      if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
+      return fail(409, { success: false, message: "Não foi possível voltar para a orientação anterior." });
     }
   },
 
@@ -103,11 +119,18 @@ export const actions: Actions = {
     const slug = params.slug?.trim() ?? "";
     const { token } = await requirePublicSession(cookies, slug);
     const formData = await request.formData();
-    const reasonKey = read(formData, "reasonKey");
     const detail = read(formData, "detail");
-    if (!reasonKey) return fail(400, { success: false, message: "Escolha o que impediu você de concluir." });
+    const reporterName = read(formData, "reporterName");
+    const reporterEmail = read(formData, "reporterEmail");
+
+    if (detail.length < 3) return fail(400, { success: false, message: "Conte brevemente o que impediu você de continuar." });
+    if (reporterName.length < 2) return fail(400, { success: false, message: "Informe seu nome para podermos identificar este relato." });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(reporterEmail)) {
+      return fail(400, { success: false, message: "Informe um e-mail válido para podermos ajudar se necessário." });
+    }
+
     try {
-      await reportPublicHelpTrainingFailure(token, { reasonKey, detail });
+      await reportPublicTrainingDifficulty(token, { detail, reporterName, reporterEmail });
       throw redirect(303, `${publicPath(slug)}?nao-consegui=1`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
