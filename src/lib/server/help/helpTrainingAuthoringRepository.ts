@@ -32,6 +32,10 @@ function assertVideoReference(value: string, assetId: string | null): void {
   }
 }
 
+function defaultPrimaryActionLabel(interactionMode: HelpTrainingInteractionMode): string {
+  return interactionMode === "presentation" ? "Entendi, continuar" : "Sim, consegui";
+}
+
 async function getTrainingPathRow(pathId: string) {
   const [path] = await getDatabase()
     .select()
@@ -103,9 +107,11 @@ export async function updateHelpTrainingStepDraft(
   stepId: string,
   input: {
     title: string;
+    question: string;
     instruction: string;
     expectedResult: string;
     successMessage: string;
+    primaryActionLabel: string;
     estimatedSeconds: number;
     interactionMode: HelpTrainingInteractionMode;
   },
@@ -116,14 +122,20 @@ export async function updateHelpTrainingStepDraft(
     throw new Error("TRAINING_INTERACTION_MODE_INVALID");
   }
 
+  const title = input.title.trim();
+  const question = input.question.trim().slice(0, 300) || title;
+  const primaryActionLabel = input.primaryActionLabel.trim().slice(0, 80)
+    || defaultPrimaryActionLabel(input.interactionMode);
   const estimatedSeconds = Math.min(Math.max(Math.round(input.estimatedSeconds || 45), 5), 900);
   await getDatabase()
     .update(helpTrainingSteps)
     .set({
-      title: input.title.trim(),
+      title,
+      question,
       instruction: input.instruction.trim(),
       expectedResult: input.interactionMode === "presentation" ? "" : input.expectedResult.trim(),
       successMessage: input.successMessage.trim(),
+      primaryActionLabel,
       estimatedSeconds,
       interactionMode: input.interactionMode,
       updatedAt: new Date(),
@@ -262,9 +274,11 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
     return {
       id: step.id,
       title: step.title,
+      question: step.question.trim() || step.title.trim(),
       instruction: step.instruction,
       expectedResult: interactionMode === "presentation" ? "" : step.expectedResult,
       successMessage: step.successMessage,
+      primaryActionLabel: step.primaryActionLabel.trim() || defaultPrimaryActionLabel(interactionMode),
       interactionMode,
       estimatedSeconds: step.estimatedSeconds,
       images,
