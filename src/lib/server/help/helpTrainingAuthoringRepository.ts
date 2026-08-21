@@ -246,9 +246,6 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
     if (interactionMode === "action" && !step.expectedResult.trim()) {
       throw new Error("TRAINING_STEP_RESULT_REQUIRED");
     }
-    if (interactionMode === "action" && step.failureReasons.length === 0) {
-      throw new Error("TRAINING_FAILURE_REASON_REQUIRED");
-    }
 
     const images = step.media
       .filter((media) => media.mediaType === "image" && media.assetId)
