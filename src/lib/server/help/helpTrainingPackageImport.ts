@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -269,6 +270,13 @@ export async function importHelpTrainingPackage(
     if (expectedType === "video") validateTrainingVideo(entry.bytes, mimeType);
     if (expectedType === "caption") validateTrainingCaptions(entry.bytes);
   }
+
+  const [existingPath] = await getDatabase()
+    .select({ id: helpTrainingPaths.id })
+    .from(helpTrainingPaths)
+    .where(eq(helpTrainingPaths.slug, manifest.slug))
+    .limit(1);
+  if (existingPath) throw new Error("TRAINING_PACKAGE_SLUG_EXISTS");
 
   const preparedAssets = new Map<string, PreparedAsset>();
   const newAssetIds: string[] = [];
