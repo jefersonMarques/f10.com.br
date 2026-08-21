@@ -5,9 +5,12 @@ import {
   completeHelpTrainingStep,
   consumeHelpTrainingInvite,
   getHelpTrainingSession,
-  reportHelpTrainingFailure,
   startHelpTrainingSession,
 } from "$lib/server/help/helpTrainingRepository";
+import {
+  goBackInviteTrainingStep,
+  reportInviteTrainingDifficulty,
+} from "$lib/server/help/helpTrainingGuidedExperienceRepository";
 import { toHelpTrainingClientState } from "$lib/server/help/helpTrainingExperience";
 import {
   clearHelpTrainingInviteCookie,
@@ -52,9 +55,11 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
 
   return {
     state: state ? toHelpTrainingClientState(state) : null,
+    canGoBack: Boolean(state && state.session.currentStepIndex > 0),
     invitePreview,
     inviteState: url.searchParams.get("convite"),
     successMessage: (url.searchParams.get("feito") ?? "").slice(0, 500),
+    failureReported: url.searchParams.get("nao-consegui") === "1",
     helpRequested: url.searchParams.get("ajuda") === "1",
   };
 };
@@ -86,22 +91,34 @@ export const actions: Actions = {
     const token = await requireTrainingToken(cookies);
     try {
       const result = await completeHelpTrainingStep(token);
-      const message = encodeURIComponent(result.successMessage || "Feito. Vamos continuar.");
+      const message = encodeURIComponent(result.successMessage || "Certo. Vamos continuar.");
       throw redirect(303, `/treinamento?feito=${message}`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
-      return fail(409, { success: false, message: "Não foi possível registrar essa ação. Tente novamente." });
+      return fail(409, { success: false, message: "Não foi possível avançar. Tente novamente." });
+    }
+  },
+
+  back: async ({ cookies }) => {
+    const token = await requireTrainingToken(cookies);
+    try {
+      await goBackInviteTrainingStep(token);
+      throw redirect(303, "/treinamento");
+    } catch (cause) {
+      if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
+      return fail(409, { success: false, message: "Não foi possível voltar para a orientação anterior." });
     }
   },
 
   failure: async ({ cookies, request }) => {
     const token = await requireTrainingToken(cookies);
     const formData = await request.formData();
-    const reasonKey = read(formData, "reasonKey");
     const detail = read(formData, "detail");
-    if (!reasonKey) return fail(400, { success: false, message: "Escolha o que impediu você de concluir." });
+    if (detail.length < 3) {
+      return fail(400, { success: false, message: "Conte brevemente o que impediu você de continuar." });
+    }
     try {
-      await reportHelpTrainingFailure(token, { reasonKey, detail });
+      await reportInviteTrainingDifficulty(token, detail);
       throw redirect(303, "/treinamento?nao-consegui=1");
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
