@@ -3,9 +3,8 @@ import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { helpTrainingPaths } from "$lib/server/db/helpTrainingSchema";
 
-export async function restoreHelpTrainingPath(actorUserId: string, pathId: string): Promise<void> {
-  const db = getDatabase();
-  const [path] = await db
+export async function getHelpTrainingLifecycleState(pathId: string) {
+  const [path] = await getDatabase()
     .select({
       id: helpTrainingPaths.id,
       slug: helpTrainingPaths.slug,
@@ -15,6 +14,12 @@ export async function restoreHelpTrainingPath(actorUserId: string, pathId: strin
     .from(helpTrainingPaths)
     .where(eq(helpTrainingPaths.id, pathId))
     .limit(1);
+  return path ?? null;
+}
+
+export async function restoreHelpTrainingPath(actorUserId: string, pathId: string): Promise<void> {
+  const db = getDatabase();
+  const path = await getHelpTrainingLifecycleState(pathId);
 
   if (!path) throw new Error("TRAINING_PATH_NOT_FOUND");
   if (path.status !== "archived") return;
