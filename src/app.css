@@ -373,12 +373,12 @@ main > section .training-primary.training-float:not(:disabled):hover {
   border-color: #166534 !important;
 }
 
-/* Atenção = laranja sólido. */
+/* Atenção informa contexto; somente botões recebem preenchimento sólido. */
 .training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) {
   border-color: #F36B00 !important;
-  background: #F36B00 !important;
+  background: #FFFFFF !important;
   padding: 1rem 1.1rem !important;
-  color: #FFFFFF !important;
+  color: #4F5A70 !important;
 }
 
 .training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > strong {
@@ -388,27 +388,30 @@ main > section .training-primary.training-float:not(:disabled):hover {
   font-size: 0.86rem !important;
   line-height: 1.4;
   font-weight: 800 !important;
-  color: #FFFFFF !important;
+  color: #C95A00 !important;
 }
 
 .training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > strong svg {
   width: 1.1rem;
   height: 1.1rem;
   flex: 0 0 auto;
-  color: #FFFFFF !important;
+  color: #F36B00 !important;
 }
 
-.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > .training-rich,
-.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > .training-rich strong,
-.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > .training-rich code {
+.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > .training-rich {
   margin-top: 0.65rem !important;
   font-size: 0.88rem !important;
   line-height: 1.7 !important;
-  color: #FFFFFF !important;
+  color: #4F5A70 !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > .training-rich strong,
+.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > .training-rich code {
+  color: #061333 !important;
 }
 
 .training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > .training-rich code {
-  background: rgba(255, 255, 255, 0.18) !important;
+  background: #EDF0F5 !important;
 }
 
 .training-step-enter:has(> .training-verification-question) > div.grid {
@@ -429,47 +432,44 @@ main > section .training-primary.training-float:not(:disabled):hover {
 }
 
 /* Negativo = vermelho sólido. */
-.training-step-enter:has(> .training-verification-question) > div.grid > button:first-child {
+.training-step-enter:has(> .training-verification-question) > div.grid .training-subtle {
   background: #C62828 !important;
   color: #FFFFFF !important;
   border: 1px solid #C62828 !important;
   box-shadow: 0 7px 18px rgba(198, 40, 40, 0.20) !important;
 }
 
-.training-step-enter:has(> .training-verification-question) > div.grid > button:first-child svg {
+.training-step-enter:has(> .training-verification-question) > div.grid .training-subtle svg {
   color: #FFFFFF !important;
 }
 
-.training-step-enter:has(> .training-verification-question) > div.grid > button:first-child:hover {
+.training-step-enter:has(> .training-verification-question) > div.grid .training-subtle:hover {
   background: #A61B1B !important;
   color: #FFFFFF !important;
   border-color: #A61B1B !important;
   box-shadow: 0 9px 22px rgba(166, 27, 27, 0.24) !important;
 }
 
-/* Positivo = verde sólido. */
-.training-step-enter:has(> .training-verification-question) > div.grid > button:nth-child(2),
-.training-step-enter:has(> .training-verification-question) > div.grid > form:nth-child(2) > button {
+/* Positivo = verde sólido, independentemente do wrapper do formulário. */
+.training-step-enter:has(> .training-verification-question) .training-primary.training-float {
   background: #15803D !important;
   color: #FFFFFF !important;
   border: 1px solid #15803D !important;
   box-shadow: 0 7px 18px rgba(21, 128, 61, 0.20) !important;
 }
 
-.training-step-enter:has(> .training-verification-question) > div.grid > button:nth-child(2) svg,
-.training-step-enter:has(> .training-verification-question) > div.grid > form:nth-child(2) > button svg {
+.training-step-enter:has(> .training-verification-question) .training-primary.training-float svg {
   color: #FFFFFF !important;
 }
 
-.training-step-enter:has(> .training-verification-question) > div.grid > button:nth-child(2):hover,
-.training-step-enter:has(> .training-verification-question) > div.grid > form:nth-child(2) > button:hover {
+.training-step-enter:has(> .training-verification-question) .training-primary.training-float:not(:disabled):hover {
   background: #166534 !important;
   color: #FFFFFF !important;
   border-color: #166534 !important;
   box-shadow: 0 9px 22px rgba(22, 101, 52, 0.24) !important;
 }
 
-/* Recuperação/atenção = laranja sólido. */
+/* Recuperação/atenção = laranja sólido somente no botão. */
 .training-step-enter > div.mt-7.w-full > button.training-primary.training-float {
   background-color: #F36B00 !important;
   color: #FFFFFF !important;
