@@ -10,7 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { helpAssets } from "$lib/server/db/structuredHelpSchema";
+import { helpAssets, helpCategories } from "$lib/server/db/structuredHelpSchema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
 import { helpContentStatus, users } from "$lib/server/db/schema";
 
@@ -42,6 +42,25 @@ export const helpTrainingPaths = pgTable(
     uniqueIndex("help_training_paths_slug_unique").on(table.slug),
     index("help_training_paths_status_idx").on(table.status, table.updatedAt),
     index("help_training_paths_public_idx").on(table.accessMode, table.status, table.slug),
+  ],
+);
+
+export const helpTrainingPathCategories = pgTable(
+  "help_training_path_categories",
+  {
+    pathId: uuid("path_id")
+      .notNull()
+      .references(() => helpTrainingPaths.id, { onDelete: "cascade" }),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => helpCategories.id, { onDelete: "restrict" }),
+    sortOrder: integer("sort_order").notNull().default(10),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.pathId, table.categoryId] }),
+    index("help_training_path_categories_category_idx").on(table.categoryId, table.sortOrder),
+    index("help_training_path_categories_path_idx").on(table.pathId),
   ],
 );
 
