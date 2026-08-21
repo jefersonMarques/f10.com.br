@@ -16,6 +16,7 @@
     UserRound,
     X,
   } from "lucide-svelte";
+  import { trainingMarkupToHtml } from "$lib/help/trainingMarkup";
 
   type TrainingPlayerStep = {
     id: string;
@@ -122,6 +123,7 @@
     formMessage;
     failureReported;
     difficultyMessage;
+    canGoBack;
     renderPipGuide();
   }
 
@@ -235,7 +237,13 @@
     pipOpening = true;
     try {
       closePipWindow();
-      pipWindow = await controller.requestWindow({ width: 420, height: 680 });
+      const availableHeight = typeof window !== "undefined" && Number.isFinite(window.screen?.availHeight)
+        ? window.screen.availHeight
+        : 760;
+      pipWindow = await controller.requestWindow({
+        width: 440,
+        height: Math.max(640, availableHeight - 32),
+      });
       pipWindow.addEventListener("pagehide", () => {
         pipWindow = null;
       }, { once: true });
@@ -266,13 +274,23 @@
     label: string,
     className: string,
     handler: () => void,
+    disabled = false,
   ): HTMLButtonElement {
     const button = documentRef.createElement("button");
     button.type = "button";
     button.className = className;
     button.textContent = label;
-    button.addEventListener("click", handler);
+    button.disabled = disabled;
+    if (!disabled) button.addEventListener("click", handler);
     return button;
+  }
+
+  function appendPipMarkup(documentRef: Document, parent: HTMLElement, className: string, value: string): HTMLElement {
+    const element = documentRef.createElement("div");
+    element.className = className;
+    element.innerHTML = trainingMarkupToHtml(value);
+    parent.append(element);
+    return element;
   }
 
   function triggerAdvance(): void {
@@ -317,81 +335,55 @@
     const style = documentRef.createElement("style");
     style.textContent = `
       :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#061333;background:#f7f8fb}
-      *{box-sizing:border-box}body{margin:0;min-height:100vh;background:#f7f8fb}.guide{min-height:100vh;display:flex;flex-direction:column;padding:18px}
-      .brand{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.logo{font-size:23px;font-weight:900;letter-spacing:-.07em;color:#f36b00}.training{font-size:11px;font-weight:700;color:#697187;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .step{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#f36b00;margin:0 0 7px}.title{font-size:25px;line-height:1.08;letter-spacing:-.04em;margin:0;color:#061333}.instruction{font-size:14px;line-height:1.55;color:#4f5a70;margin:12px 0 0;white-space:pre-line}
-      .visual{margin-top:16px;border:1px solid #e1e5ed;border-radius:18px;background:#fff;overflow:hidden;box-shadow:0 14px 36px rgba(8,20,50,.09)}.visual img{display:block;width:100%;max-height:290px;object-fit:contain;background:#fff}.visual video{display:block;width:100%;max-height:300px;background:#000}
-      .hint{margin-top:13px;padding:11px 13px;border-radius:13px;background:#fff5ec;color:#76502d;font-size:11px;line-height:1.5}.hint strong{color:#9f4b0a}.video-button{margin-top:12px;border:1px solid #ffd0ad;background:#fff7f0;color:#b94e00;border-radius:12px;min-height:42px;font-weight:800;cursor:pointer}
-      .spacer{flex:1;min-height:14px}.actions{display:grid;grid-template-columns:1fr 1.55fr;gap:9px;margin-top:16px}.secondary,.primary,.help{border:0;border-radius:14px;min-height:48px;font-size:12px;font-weight:800;cursor:pointer}.secondary{background:#eef0f5;color:#4e576a}.primary{background:#f36b00;color:#fff;box-shadow:0 12px 28px rgba(243,107,0,.23);animation:float 3.2s ease-in-out infinite}.help{grid-column:1/-1;background:transparent;color:#8a4a1a;border:1px solid #efc8a8;min-height:42px}.status{margin-top:12px;border-radius:11px;padding:9px 11px;background:#eaf8f1;color:#257049;font-size:10px;font-weight:700}
+      *{box-sizing:border-box}body{margin:0;height:100vh;overflow:hidden;background:#f7f8fb}.guide{height:100vh;display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+      .top{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #e5e8ef;background:#fff;padding:12px 14px}.brand{display:flex;min-width:0;align-items:center;gap:9px}.logo{font-size:22px;font-weight:900;letter-spacing:-.07em;color:#f36b00}.training{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:700;color:#697187}.help-top{border:1px solid #dfe3ea;background:#f7f8fb;color:#697187;border-radius:999px;min-height:34px;padding:0 10px;font-size:10px;font-weight:700;cursor:pointer}
+      .content{overflow-y:auto;padding:20px 18px 24px}.step{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#f36b00;margin:0 0 8px}.title{font-size:27px;line-height:1.08;letter-spacing:-.04em;margin:0;color:#061333}.rich{font-size:15px;line-height:1.6;color:#4f5a70;margin-top:16px}.rich p{margin:0 0 11px}.rich strong{font-weight:850;color:#061333}.rich code{display:inline-block;border-radius:6px;background:#edf0f5;padding:1px 6px;color:#000a57;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;font-weight:800}.rich ul,.rich ol{margin:8px 0 12px;padding-left:22px}.rich li{margin:6px 0}.hint{margin-top:16px;padding:12px 13px;border-radius:13px;background:#fff5ec;color:#76502d;font-size:12px;line-height:1.55}.hint strong{color:#9f4b0a}.hint .rich{margin:6px 0 0;font-size:12px;color:#76502d}.video-button{width:100%;margin-top:14px;border:1px solid #ffd0ad;background:#fff7f0;color:#b94e00;border-radius:12px;min-height:44px;font-weight:800;cursor:pointer}.status{margin-top:13px;border-radius:11px;padding:9px 11px;background:#eaf8f1;color:#257049;font-size:10px;font-weight:700}
+      .footer{display:grid;grid-template-columns:1fr 1.5fr;gap:9px;border-top:1px solid #e5e8ef;background:#fff;padding:12px 14px}.secondary,.primary{border:0;border-radius:14px;min-height:50px;font-size:12px;font-weight:800;cursor:pointer}.secondary{background:#eef0f5;color:#4e576a}.secondary:disabled{cursor:not-allowed;opacity:.4}.primary{background:#f36b00;color:#fff;box-shadow:0 12px 28px rgba(243,107,0,.23);animation:float 3.2s ease-in-out infinite}
       @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}@media(prefers-reduced-motion:reduce){.primary{animation:none}}
     `;
     documentRef.head.append(style);
 
     const root = documentRef.createElement("main");
     root.className = "guide";
+
+    const top = documentRef.createElement("header");
+    top.className = "top";
     const brand = documentRef.createElement("div");
     brand.className = "brand";
     appendPipText(documentRef, brand, "strong", "logo", "F10");
     appendPipText(documentRef, brand, "span", "training", trainingTitle);
-    root.append(brand);
+    top.append(brand);
+    top.append(createPipButton(documentRef, "Preciso de ajuda", "help-top", openDifficultyFromPip));
+    root.append(top);
 
-    appendPipText(documentRef, root, "p", "step", "Faça isso agora");
-    appendPipText(documentRef, root, "h1", "title", step.title);
-    appendPipText(documentRef, root, "p", "instruction", step.instruction);
-
-    if (currentImage) {
-      const visual = documentRef.createElement("div");
-      visual.className = "visual";
-      const image = documentRef.createElement("img");
-      image.src = `${assetBasePath}/${currentImage.assetId}`;
-      image.alt = currentImage.altText || step.title;
-      visual.append(image);
-      root.append(visual);
-    }
+    const content = documentRef.createElement("section");
+    content.className = "content";
+    appendPipText(documentRef, content, "p", "step", "Faça isso agora");
+    appendPipText(documentRef, content, "h1", "title", step.title);
+    appendPipMarkup(documentRef, content, "rich", step.instruction);
 
     if (step.expectedResult.trim()) {
       const hint = documentRef.createElement("div");
       hint.className = "hint";
       const label = documentRef.createElement("strong");
-      label.textContent = "Se precisar, confira: ";
-      hint.append(label, documentRef.createTextNode(step.expectedResult));
-      root.append(hint);
+      label.textContent = "Se precisar, confira:";
+      hint.append(label);
+      appendPipMarkup(documentRef, hint, "rich", step.expectedResult);
+      content.append(hint);
     }
 
-    if (step.videoUrl && videoAssetId && !currentImage) {
-      const visual = documentRef.createElement("div");
-      visual.className = "visual";
-      const video = documentRef.createElement("video");
-      video.controls = true;
-      video.preload = "metadata";
-      video.src = `${assetBasePath}/${videoAssetId}`;
-      const track = documentRef.createElement("track");
-      track.kind = "captions";
-      track.srclang = "pt-BR";
-      track.label = "Português";
-      track.src = captionUrl;
-      video.append(track);
-      visual.append(video);
-      root.append(visual);
-    } else if (step.videoUrl) {
-      root.append(createPipButton(documentRef, "▶ Ver demonstração", "video-button", openVideoFromPip));
+    if (step.videoUrl) {
+      content.append(createPipButton(documentRef, "▶ Ver demonstração", "video-button", openVideoFromPip));
     }
 
-    if (successMessage) appendPipText(documentRef, root, "p", "status", successMessage);
-    const spacer = documentRef.createElement("div");
-    spacer.className = "spacer";
-    root.append(spacer);
+    if (successMessage) appendPipText(documentRef, content, "p", "status", successMessage);
+    root.append(content);
 
-    const actions = documentRef.createElement("div");
-    actions.className = "actions";
-    if (canGoBack) actions.append(createPipButton(documentRef, "← Voltar", "secondary", triggerBack));
-    else {
-      const placeholder = documentRef.createElement("span");
-      actions.append(placeholder);
-    }
-    actions.append(createPipButton(documentRef, "Próximo passo →", "primary", triggerAdvance));
-    actions.append(createPipButton(documentRef, "Preciso de ajuda", "help", openDifficultyFromPip));
-    root.append(actions);
+    const footer = documentRef.createElement("footer");
+    footer.className = "footer";
+    footer.append(createPipButton(documentRef, "← Voltar", "secondary", triggerBack, !canGoBack || isSubmitting));
+    footer.append(createPipButton(documentRef, "Próximo passo →", "primary", triggerAdvance, isSubmitting));
+    root.append(footer);
     documentRef.body.append(root);
   }
 
@@ -582,15 +574,9 @@
     </div>
     <div class="flex shrink-0 items-center gap-2">
       {#if pipSupported}
-        <button type="button" on:click={() => void openPipGuide()} disabled={pipOpening} class="training-subtle inline-flex min-h-10 items-center gap-2 rounded-full border border-[#FFD1B0] bg-[#FFF7F0] px-3 text-[10px] font-bold text-[#B94E00] disabled:opacity-60">{#if pipOpening}<LoaderCircle size={14} class="animate-spin"/>{:else}<Sparkles size={14}/>{/if}Abrir guia flutuante</button>
+        <button type="button" on:click={() => void openPipGuide()} disabled={pipOpening} class="training-subtle inline-flex min-h-9 items-center gap-2 rounded-full border border-[#FFD1B0] bg-[#FFF7F0] px-3 text-[9px] font-bold text-[#B94E00] disabled:opacity-60">{#if pipOpening}<LoaderCircle size={13} class="animate-spin"/>{:else}<Sparkles size={13}/>{/if}Abrir guia flutuante</button>
       {/if}
-      {#if canGoBack}
-        {#if mode === "preview"}
-          <button type="button" on:click={triggerBack} class="training-subtle inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-[10px] font-semibold text-[#687084]"><ArrowLeft size={15}/>Voltar</button>
-        {:else}
-          <form bind:this={backForm} method="POST" action={backAction} use:enhance={enhanceNavigation}><button type="submit" disabled={isSubmitting} class="training-subtle inline-flex min-h-10 items-center gap-2 rounded-full px-3 text-[10px] font-semibold text-[#687084]"><ArrowLeft size={15}/>Voltar</button></form>
-        {/if}
-      {/if}
+      <button type="button" on:click={openDifficulty} class="training-subtle inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[#E0E3EA] bg-white px-3 text-[9px] font-semibold text-[#6D7586]"><HelpCircle size={13}/>Preciso de ajuda</button>
     </div>
   </header>
 
@@ -599,7 +585,7 @@
       <div class="training-step-enter mx-auto flex min-h-full w-full max-w-[1060px] flex-col items-center justify-center pb-6 text-center">
         <p class="text-[9px] font-bold uppercase tracking-[0.18em] text-[#F36B00]">Faça isso agora</p>
         <h1 class="mt-3 max-w-[900px] text-balance text-[30px] font-semibold tracking-[-0.045em] text-[#061333] sm:text-[40px] lg:text-[46px]">{step.title}</h1>
-        <p class="mt-3 max-w-[760px] whitespace-pre-line text-[13px] leading-6 text-[#5E687E] sm:text-[14px]">{step.instruction}</p>
+        <div class="training-rich mt-3 max-w-[760px] text-[13px] leading-6 text-[#5E687E] sm:text-[14px]">{@html trainingMarkupToHtml(step.instruction)}</div>
 
         {#if currentImage}
           <div class="relative mt-5 flex max-h-[48dvh] min-h-[180px] w-full max-w-[900px] items-center justify-center overflow-hidden rounded-[24px] bg-white shadow-[0_22px_60px_rgba(12,23,52,0.09)] ring-1 ring-[#E5E8EF] sm:min-h-[260px]">
@@ -613,7 +599,7 @@
         {/if}
 
         {#if step.expectedResult.trim()}
-          <div class="mt-4 max-w-[720px] rounded-2xl border border-[#F2D4BC] bg-[#FFF8F2] px-5 py-3 text-[10px] leading-5 text-[#71583F]"><strong class="font-semibold text-[#9D4B0E]">Se precisar, confira:</strong> {step.expectedResult}</div>
+          <div class="mt-4 max-w-[720px] rounded-2xl border border-[#F2D4BC] bg-[#FFF8F2] px-5 py-3 text-left text-[10px] leading-5 text-[#71583F]"><strong class="font-semibold text-[#9D4B0E]">Se precisar, confira:</strong><div class="training-rich mt-1">{@html trainingMarkupToHtml(step.expectedResult)}</div></div>
         {/if}
 
         {#if successMessage}
@@ -628,17 +614,26 @@
           <div class="mt-4 inline-flex items-center gap-2 rounded-full bg-[#EEF0FF] px-4 py-2 text-[10px] font-semibold text-[#000A57]" role="status"><Check size={14}/>{difficultyMessage}</div>
         {/if}
 
-        <div class="mt-7 flex w-full max-w-[620px] flex-col items-center gap-3 sm:flex-row sm:justify-center">
-          {#if mode === "preview"}
-            <button type="button" on:click={triggerAdvance} class="training-primary training-float inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-[#F36B00] px-8 text-[12px] font-bold text-white shadow-[0_18px_40px_rgba(243,107,0,0.24)] sm:w-auto sm:min-w-[300px]">Próximo passo<ChevronRight size={17}/></button>
+        <div class="mt-7 grid w-full max-w-[560px] grid-cols-[minmax(0,180px)_minmax(0,1fr)] gap-3">
+          {#if canGoBack}
+            {#if mode === "preview"}
+              <button type="button" on:click={triggerBack} class="training-subtle inline-flex min-h-14 items-center justify-center gap-2 rounded-full border border-[#DDE1EA] bg-white px-5 text-[11px] font-semibold text-[#687084]"><ArrowLeft size={15}/>Voltar</button>
+            {:else}
+              <form bind:this={backForm} method="POST" action={backAction} use:enhance={enhanceNavigation}><button type="submit" disabled={isSubmitting} class="training-subtle inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full border border-[#DDE1EA] bg-white px-5 text-[11px] font-semibold text-[#687084] disabled:opacity-50"><ArrowLeft size={15}/>Voltar</button></form>
+            {/if}
           {:else}
-            <form bind:this={successForm} method="POST" action={successAction} use:enhance={enhanceNavigation} class="w-full sm:w-auto"><button type="submit" disabled={isSubmitting} class="training-primary training-float inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-[#F36B00] px-8 text-[12px] font-bold text-white shadow-[0_18px_40px_rgba(243,107,0,0.24)] disabled:cursor-wait disabled:opacity-70 sm:min-w-[300px]">{#if isSubmitting}<LoaderCircle size={16} class="animate-spin"/>{/if}Próximo passo<ChevronRight size={17}/></button></form>
+            <button type="button" disabled class="inline-flex min-h-14 items-center justify-center gap-2 rounded-full border border-[#E7E9EF] bg-[#F3F4F7] px-5 text-[11px] font-semibold text-[#A6ACB8]"><ArrowLeft size={15}/>Voltar</button>
           {/if}
-          <button type="button" on:click={openDifficulty} class="training-subtle inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-[#E4C4AA] bg-white/80 px-6 text-[11px] font-semibold text-[#8B4C1D] sm:w-auto sm:min-w-[190px]"><HelpCircle size={16}/>Preciso de ajuda</button>
+
+          {#if mode === "preview"}
+            <button type="button" on:click={triggerAdvance} class="training-primary training-float inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#F36B00] px-8 text-[12px] font-bold text-white shadow-[0_18px_40px_rgba(243,107,0,0.24)]">Próximo passo<ChevronRight size={17}/></button>
+          {:else}
+            <form bind:this={successForm} method="POST" action={successAction} use:enhance={enhanceNavigation}><button type="submit" disabled={isSubmitting} class="training-primary training-float inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-[#F36B00] px-8 text-[12px] font-bold text-white shadow-[0_18px_40px_rgba(243,107,0,0.24)] disabled:cursor-wait disabled:opacity-70">{#if isSubmitting}<LoaderCircle size={16} class="animate-spin"/>{/if}Próximo passo<ChevronRight size={17}/></button></form>
+          {/if}
         </div>
 
         {#if pipSupported}
-          <p class="mt-5 max-w-[540px] text-[9px] leading-4 text-[#8A91A0]">Dica: use <strong>Abrir guia flutuante</strong> para manter este passo visível por cima do F10 enquanto você trabalha.</p>
+          <p class="mt-5 max-w-[540px] text-[9px] leading-4 text-[#8A91A0]">Dica: use <strong>Abrir guia flutuante</strong> para manter a instrução por cima do F10 enquanto você trabalha.</p>
         {/if}
       </div>
     {/key}
@@ -737,6 +732,39 @@
 
   .training-step-enter {
     animation: training-step-enter 260ms ease both;
+  }
+
+  :global(.training-rich p) {
+    margin: 0.28rem 0;
+  }
+
+  :global(.training-rich strong) {
+    font-weight: 800;
+    color: #061333;
+  }
+
+  :global(.training-rich code) {
+    display: inline-block;
+    border-radius: 0.38rem;
+    background: #edf0f5;
+    padding: 0.02rem 0.38rem;
+    color: #000a57;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.92em;
+    font-weight: 800;
+  }
+
+  :global(.training-rich ul),
+  :global(.training-rich ol) {
+    margin: 0.45rem auto;
+    width: fit-content;
+    max-width: 100%;
+    padding-left: 1.4rem;
+    text-align: left;
+  }
+
+  :global(.training-rich li) {
+    margin: 0.2rem 0;
   }
 
   .radar-unseen::before,
