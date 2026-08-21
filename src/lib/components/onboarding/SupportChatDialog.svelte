@@ -873,7 +873,7 @@
 </script>
 
 {#if isOpen}
-  <section
+  <div
     class="fixed bottom-4 right-4 z-[10020] flex h-[min(680px,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-w-[420px] flex-col overflow-hidden rounded-[24px] border border-[#DDE1E9] bg-white shadow-[0_24px_80px_rgba(1,13,40,0.24)] sm:bottom-6 sm:right-6"
     role="dialog"
     aria-modal="false"
@@ -1076,5 +1076,5 @@
         </div>
       </form>
     {/if}
-  </section>
+  </div>
 {/if}
