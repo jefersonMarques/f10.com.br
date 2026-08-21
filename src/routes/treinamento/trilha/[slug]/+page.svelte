@@ -14,7 +14,7 @@
     data.state?.progress?.status === "help_requested",
   );
   $: helpHref = currentStep
-    ? `/ajuda-f10?chat=1&origem=trilha&trilha=${encodeURIComponent(data.landing.slug)}&passo=${encodeURIComponent(currentStep.id)}`
+    ? `/ajuda-f10?chat=1&origem=trilha&trilha=${encodeURIComponent(data.landing.slug)}&passo=${encodeURIComponent(currentStep.title)}&passoId=${encodeURIComponent(currentStep.id)}`
     : "/ajuda-f10?chat=1";
 </script>
 
