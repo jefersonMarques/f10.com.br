@@ -713,7 +713,7 @@
           {/if}
 
           {#if interactionStage !== "action" && step.expectedResult.trim()}
-            <div class="mt-4 max-w-[720px] rounded-2xl border border-[#F2D4BC] bg-[#FFF8F2] px-5 py-3 text-left text-[10px] leading-5 text-[#71583F]"><strong class="font-semibold text-[#9D4B0E]">{interactionStage === "verify" ? "Confira no F10:" : "O que precisa acontecer:"}</strong><div class="training-rich mt-1">{@html trainingMarkupToHtml(step.expectedResult)}</div></div>
+            <div class="mt-4 max-w-[720px] rounded-2xl border border-[#F2D4BC] bg-[#FFF8F2] px-5 py-3 text-left text-[10px] leading-5 text-[#71583F]"><strong class="inline-flex items-center gap-2 font-semibold text-[#9D4B0E]"><CircleAlert size={17}/>{interactionStage === "verify" ? "Confira no F10:" : "O que precisa acontecer:"}</strong><div class="training-rich mt-1">{@html trainingMarkupToHtml(step.expectedResult)}</div></div>
           {/if}
 
           {#if interactionStage === "recovery" && step.videoUrl}
@@ -744,7 +744,7 @@
             </div>
           {:else if interactionStage === "verify"}
             <div class="mt-7 grid w-full max-w-[560px] grid-cols-2 gap-3">
-              <button type="button" on:click={rejectVerification} disabled={isSubmitting} class="training-subtle inline-flex min-h-14 items-center justify-center rounded-full border border-[#F0CDB3] bg-[#FFF7F0] px-5 text-[11px] font-bold text-[#B94E00] disabled:opacity-50">Não</button>
+              <button type="button" on:click={rejectVerification} disabled={isSubmitting} class="training-subtle inline-flex min-h-14 items-center justify-center gap-2 rounded-full border border-[#F0CDB3] bg-[#FFF7F0] px-5 text-[11px] font-bold text-[#B94E00] disabled:opacity-50"><X size={17}/>Não</button>
               {#if mode === "preview"}
                 <button type="button" on:click={triggerAdvance} disabled={isSubmitting} class="training-primary training-float inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#F36B00] px-8 text-[12px] font-bold text-white shadow-[0_18px_40px_rgba(243,107,0,0.24)] disabled:opacity-60"><Check size={17}/>Sim</button>
               {:else}
