@@ -1,4 +1,6 @@
+const MIN_TRAINING_VIDEO_SECONDS = 30;
 const MAX_TRAINING_VIDEO_SECONDS = 60;
+const DURATION_TOLERANCE_SECONDS = 0.05;
 
 function readUint32(bytes: Uint8Array, offset: number): number {
   if (offset < 0 || offset + 4 > bytes.byteLength) throw new Error("TRAINING_VIDEO_INVALID");
@@ -112,10 +114,14 @@ export function getMp4DurationSeconds(bytes: Uint8Array): number {
 export function validateTrainingVideo(bytes: Uint8Array, mimeType: string): number {
   if (mimeType.trim().toLowerCase() !== "video/mp4") throw new Error("TRAINING_VIDEO_FORMAT");
   const durationSeconds = getMp4DurationSeconds(bytes);
-  if (durationSeconds > MAX_TRAINING_VIDEO_SECONDS + 0.05) {
+  if (durationSeconds < MIN_TRAINING_VIDEO_SECONDS - DURATION_TOLERANCE_SECONDS) {
+    throw new Error("TRAINING_VIDEO_TOO_SHORT");
+  }
+  if (durationSeconds > MAX_TRAINING_VIDEO_SECONDS + DURATION_TOLERANCE_SECONDS) {
     throw new Error("TRAINING_VIDEO_TOO_LONG");
   }
   return durationSeconds;
 }
 
+export const TRAINING_VIDEO_MIN_SECONDS = MIN_TRAINING_VIDEO_SECONDS;
 export const TRAINING_VIDEO_MAX_SECONDS = MAX_TRAINING_VIDEO_SECONDS;
