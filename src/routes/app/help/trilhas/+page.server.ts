@@ -6,7 +6,10 @@ import {
   HelpTrainingPackageConflictError,
   importHelpTrainingPackage,
 } from "$lib/server/help/helpTrainingPackageImport";
-import { restoreHelpTrainingPath } from "$lib/server/help/helpTrainingLifecycleRepository";
+import {
+  getHelpTrainingLifecycleState,
+  restoreHelpTrainingPath,
+} from "$lib/server/help/helpTrainingLifecycleRepository";
 import {
   createHelpTrainingPath,
   listHelpTrainingPaths,
@@ -165,6 +168,18 @@ export const actions: Actions = {
     }
     if (!file.name.toLowerCase().endsWith(".zip") || file.size > MAX_PACKAGE_BYTES) {
       return fail(400, { success: false, message: "Use um arquivo .zip de até 120 MB." });
+    }
+    if (replacePathId) {
+      if (!isUuid(replacePathId)) {
+        return fail(400, { success: false, message: "A confirmação da trilha é inválida. Selecione o pacote novamente." });
+      }
+      const target = await getHelpTrainingLifecycleState(replacePathId);
+      if (!target) {
+        return fail(404, { success: false, message: "A trilha que seria atualizada não existe mais." });
+      }
+      if (target.status === "archived") {
+        await requireAppPermission(cookies, "help.publish", "/app/help/trilhas");
+      }
     }
 
     try {
