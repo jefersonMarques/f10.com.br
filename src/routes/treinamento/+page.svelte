@@ -24,7 +24,7 @@
       <h1 class="mx-auto mt-3 max-w-[760px] text-[30px] font-semibold tracking-[-0.04em] text-[#061333] sm:text-[44px]">{data.invitePreview.trainingTitle}</h1>
       {#if data.invitePreview.audience}<p class="mt-3 text-[11px] text-[#858A98]">{data.invitePreview.audience}</p>{/if}
       <p class="mt-7 text-[14px] font-semibold text-[#2B3141]">Olá, {data.invitePreview.participantName}.</p>
-      <p class="mx-auto mt-3 max-w-[620px] text-[13px] leading-7 text-[#656C7C]">{data.invitePreview.welcomeMessage || "Vamos fazer uma coisa de cada vez. Leia a orientação, faça a ação e continue quando estiver pronto."}</p>
+      <p class="mx-auto mt-3 max-w-[620px] text-[13px] leading-7 text-[#656C7C]">Mantenha o F10 aberto. Você executará uma orientação por vez e precisará confirmar o resultado no sistema antes de avançar.</p>
       <form method="POST" action="?/acceptInvite" class="mt-8"><button type="submit" class="training-start inline-flex min-h-14 items-center gap-2 rounded-full bg-[#F36B00] px-8 text-[12px] font-bold text-white shadow-[0_18px_36px_rgba(243,107,0,0.22)]">Começar<ChevronRight size={17}/></button></form>
     </section>
   </main>
@@ -51,7 +51,7 @@
       <span class="mx-auto text-[40px] font-black tracking-[-0.08em] text-[#F36B00]">F10</span>
       <h1 class="mt-8 text-[30px] font-semibold tracking-[-0.035em] text-[#11182C] sm:text-[40px]">{data.state.training.title}</h1>
       <p class="mt-5 text-[14px] font-semibold text-[#2B3141]">Olá, {data.state.invite.participantName}.</p>
-      <p class="mx-auto mt-3 max-w-[620px] text-[13px] leading-7 text-[#656C7C]">{data.state.training.welcomeMessage || "Vamos fazer uma coisa de cada vez."}</p>
+      <p class="mx-auto mt-3 max-w-[620px] text-[13px] leading-7 text-[#656C7C]">Mantenha o F10 aberto. Você fará cada ação no sistema e confirmará o resultado antes de continuar.</p>
       <form method="POST" action="?/start" class="mt-8"><button type="submit" class="training-start inline-flex min-h-14 items-center gap-2 rounded-full bg-[#F36B00] px-8 text-[12px] font-bold text-white">Começar<ChevronRight size={17}/></button></form>
     </section>
   </main>
