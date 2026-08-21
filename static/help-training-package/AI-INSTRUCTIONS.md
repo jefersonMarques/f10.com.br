@@ -8,6 +8,8 @@ Transforme o material fornecido em um pacote importável de **Trilha F10**. Gere
 
 A experiência não deve parecer prova, formulário ou treinamento teórico. O participante deve olhar para a orientação, executar uma ação simples no F10 e clicar em **Próximo passo**.
 
+Quando o navegador suportar o guia flutuante, o participante poderá manter uma pequena janela por cima do F10. **Essa janela não mostra a imagem do passo**, portanto o `title` e o `instruction` precisam ser compreensíveis sozinhos.
+
 ## Regras de experiência
 
 - Use `"formatVersion": 1`.
@@ -27,6 +29,43 @@ A experiência não deve parecer prova, formulário ou treinamento teórico. O p
 - Não informe ao participante quantidade total de passos nem duração total da trilha.
 - Referencie somente imagens e vídeos realmente fornecidos. Não invente nomes de arquivos, telas, botões, permissões ou funcionalidades.
 
+## Categorias
+
+A trilha pode pertencer a mais de uma categoria da Central de Ajuda, por exemplo `comercial`, `financeiro` e `pedagogico`.
+
+Quando a lista de **slugs de categorias existentes no F10** for fornecida explicitamente, use o campo opcional:
+
+```json
+"categories": ["comercial", "pedagogico"]
+```
+
+Regras:
+
+- use somente slugs de categorias que tenham sido fornecidos ou confirmados como existentes;
+- nunca invente uma categoria ou um slug;
+- use no máximo 12 categorias;
+- se não houver informação confiável sobre as categorias existentes, **omita o campo `categories`**;
+- não use nomes livres como `Setor financeiro`, `Finanças` ou `Área Comercial` tentando adivinhar a taxonomia.
+
+## Marcação de texto
+
+`instruction` e `expectedResult` aceitam uma marcação simples e segura. Use apenas quando melhorar a leitura:
+
+- `**texto**` para **negrito**;
+- `` `texto` `` para destacar exatamente um botão, símbolo, campo ou opção da interface;
+- linhas começando com `- ` para listas;
+- quebras de linha para separar instruções curtas.
+
+Exemplo:
+
+```text
+No menu lateral, clique em **Cadastros**.
+
+Depois clique no botão `+`.
+```
+
+Use negrito para a ação ou seção importante e código para o texto exato de botões/símbolos. Não use HTML, links em Markdown, títulos Markdown ou outras sintaxes.
+
 ## Imagens
 
 Formatos aceitos:
@@ -38,11 +77,13 @@ Formatos aceitos:
 
 Use **no máximo uma imagem por passo**.
 
-A imagem deve mostrar exatamente onde a pessoa precisa olhar ou clicar. Evite sequências de prints, galerias e carrosséis. Se duas imagens forem realmente necessárias para explicar duas ações diferentes, crie dois passos.
+A imagem deve mostrar exatamente onde a pessoa precisa olhar ou clicar na página normal. Evite sequências de prints, galerias e carrosséis. Se duas imagens forem realmente necessárias para explicar duas ações diferentes, crie dois passos.
 
 Prefira recortes ou prints em que o elemento importante esteja visualmente evidente. Quando possível, destaque no próprio material a região relevante com seta, contorno, círculo ou zoom. Não invente marcações que não correspondam ao print real fornecido.
 
 Use `altText` com uma descrição simples do que está sendo mostrado.
+
+Lembre-se: a imagem **não aparece no guia flutuante**. O texto do passo não pode depender dela para fazer sentido.
 
 ## Vídeos
 
@@ -72,7 +113,7 @@ Não use o mesmo caminho de arquivo como tipos diferentes.
 {
   "title": "Veja onde fica o menu principal",
   "interactionMode": "presentation",
-  "instruction": "Observe o menu no lado esquerdo da tela. É nele que você vai encontrar as opções usadas nos próximos passos.",
+  "instruction": "Observe o **menu no lado esquerdo** da tela. É nele que você vai encontrar as opções usadas nos próximos passos.",
   "primaryActionLabel": "Próximo passo",
   "successMessage": "Certo. Vamos para o próximo passo.",
   "images": [
@@ -90,8 +131,8 @@ Não use o mesmo caminho de arquivo como tipos diferentes.
 {
   "title": "Abra o cadastro de usuários",
   "interactionMode": "action",
-  "instruction": "No menu lateral, clique em Usuários.",
-  "expectedResult": "A tela com a lista de usuários deve ficar aberta.",
+  "instruction": "No menu lateral, clique em **Cadastros**.\n\nDepois clique em `Usuários`.",
+  "expectedResult": "A lista de **usuários** deve ficar aberta.",
   "primaryActionLabel": "Próximo passo",
   "successMessage": "Certo. Vamos para o próximo passo.",
   "estimatedSeconds": 45,
