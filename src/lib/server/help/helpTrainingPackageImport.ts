@@ -32,9 +32,11 @@ type ManifestVideo = { file: string | null; url: string | null; captions: string
 type ManifestReason = { key: string; label: string; recoveryMessage: string };
 type ManifestStep = {
   title: string;
+  question: string;
   instruction: string;
   expectedResult: string;
   successMessage: string;
+  primaryActionLabel: string;
   estimatedSeconds: number;
   interactionMode: HelpTrainingInteractionMode;
   images: ManifestImage[];
@@ -95,6 +97,10 @@ function normalizeReasonKey(value: unknown, stepIndex: number, reasonIndex: numb
   return normalized || `reason_${stepIndex + 1}_${reasonIndex + 1}`;
 }
 
+function defaultPrimaryActionLabel(interactionMode: HelpTrainingInteractionMode): string {
+  return interactionMode === "presentation" ? "Entendi, continuar" : "Sim, consegui";
+}
+
 function assertHttpUrl(value: string): void {
   try {
     const url = new URL(value);
@@ -129,6 +135,7 @@ function parseManifest(bytes: Uint8Array): TrainingManifest {
     if (!rawStep || typeof rawStep !== "object" || Array.isArray(rawStep)) throw new Error("TRAINING_PACKAGE_STEP_INVALID");
     const step = rawStep as Record<string, unknown>;
     const interactionMode: HelpTrainingInteractionMode = step.interactionMode === "presentation" ? "presentation" : "action";
+    const title = requiredText(step.title, 180, "TRAINING_PACKAGE_STEP_TITLE_REQUIRED");
     const imagesSource = Array.isArray(step.images) ? step.images : [];
     if (imagesSource.length > MAX_IMAGES_PER_STEP) throw new Error("TRAINING_PACKAGE_IMAGES_LIMIT");
     const images = imagesSource.map((rawImage): ManifestImage => {
@@ -172,7 +179,6 @@ function parseManifest(bytes: Uint8Array): TrainingManifest {
             recoveryMessage: text(reason.recoveryMessage, 4000),
           };
         });
-    if (interactionMode === "action" && failureReasons.length === 0) throw new Error("TRAINING_PACKAGE_REASON_REQUIRED");
     if (new Set(failureReasons.map((reason) => reason.key)).size !== failureReasons.length) {
       throw new Error("TRAINING_PACKAGE_REASON_DUPLICATE");
     }
@@ -180,10 +186,12 @@ function parseManifest(bytes: Uint8Array): TrainingManifest {
     const expectedResult = text(step.expectedResult, 3000);
     if (interactionMode === "action" && !expectedResult) throw new Error("TRAINING_PACKAGE_RESULT_REQUIRED");
     return {
-      title: requiredText(step.title, 180, "TRAINING_PACKAGE_STEP_TITLE_REQUIRED"),
+      title,
+      question: text(step.question, 300) || title,
       instruction: requiredText(step.instruction, 6000, "TRAINING_PACKAGE_STEP_INSTRUCTION_REQUIRED"),
       expectedResult: interactionMode === "presentation" ? "" : expectedResult,
       successMessage: text(step.successMessage, 500),
+      primaryActionLabel: text(step.primaryActionLabel, 80) || defaultPrimaryActionLabel(interactionMode),
       estimatedSeconds: integer(step.estimatedSeconds, 45, 5, 900),
       interactionMode,
       images,
@@ -312,9 +320,11 @@ export async function importHelpTrainingPackage(
           .values({
             pathId: path.id,
             title: source.title,
+            question: source.question,
             instruction: source.instruction,
             expectedResult: source.expectedResult,
             successMessage: source.successMessage,
+            primaryActionLabel: source.primaryActionLabel,
             estimatedSeconds: source.estimatedSeconds,
             interactionMode: source.interactionMode,
             sortOrder: (stepIndex + 1) * 10,
