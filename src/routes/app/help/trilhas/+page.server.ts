@@ -2,7 +2,11 @@ import { error, fail, redirect, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
-import { importHelpTrainingPackage } from "$lib/server/help/helpTrainingPackageImport";
+import {
+  HelpTrainingPackageConflictError,
+  importHelpTrainingPackage,
+} from "$lib/server/help/helpTrainingPackageImport";
+import { restoreHelpTrainingPath } from "$lib/server/help/helpTrainingLifecycleRepository";
 import {
   createHelpTrainingPath,
   listHelpTrainingPaths,
@@ -16,6 +20,10 @@ type DatabaseDiagnostic = {
   table: string;
   type: string;
 };
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
 
 function read(formData: FormData, name: string): string {
   const value = formData.get(name);
@@ -75,11 +83,9 @@ function packageErrorMessage(cause: unknown): string {
   if (code === "TRAINING_VIDEO_TOO_SHORT") return "Os vídeos do pacote devem ter pelo menos 30 segundos. Junte instruções relacionadas para formar uma demonstração mais completa.";
   if (code === "TRAINING_VIDEO_TOO_LONG") return "Os vídeos do pacote devem ter no máximo 60 segundos. Divida somente quando houver outra ação independente.";
   if (code === "TRAINING_VIDEO_INVALID") return "Um dos arquivos MP4 não pôde ser validado.";
+  if (code === "TRAINING_PACKAGE_REPLACE_TARGET_INVALID") return "A trilha mudou desde a confirmação. Selecione o pacote novamente para revisar a atualização.";
   if (code.startsWith("TRAINING_ZIP_")) return "O arquivo .zip é inválido, excede os limites permitidos ou contém uma estrutura não segura.";
   if (code === "ASSET_STORAGE_NOT_CONFIGURED") return "O armazenamento de arquivos não está configurado.";
-  if (code === "TRAINING_PACKAGE_SLUG_EXISTS") {
-    return "Já existe uma trilha com este endereço. Altere o campo slug no training.json ou renomeie/exclua o rascunho existente antes de importar novamente.";
-  }
   if (
     diagnostic.code === "23505" &&
     (
@@ -88,7 +94,7 @@ function packageErrorMessage(cause: unknown): string {
     ) &&
     (diagnostic.constraint.includes("slug") || !diagnostic.constraint)
   ) {
-    return "Já existe uma trilha com este endereço. Altere o campo slug no training.json e importe novamente.";
+    return "O endereço da trilha foi alterado durante a importação. Tente novamente.";
   }
   if (diagnostic.code === "23514" && diagnostic.constraint.includes("help_training_step_media")) {
     return "O banco de dados ainda precisa da migration de suporte a legendas das Trilhas. Atualize o projeto e execute as migrations pendentes no ambiente local.";
@@ -135,10 +141,25 @@ export const actions: Actions = {
     }
   },
 
+  restore: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(cookies, "help.publish", "/app/help/trilhas");
+    const formData = await request.formData();
+    const pathId = read(formData, "pathId");
+    if (!isUuid(pathId)) return fail(400, { success: false, message: "Trilha inválida." });
+
+    try {
+      await restoreHelpTrainingPath(session.user.id, pathId);
+    } catch {
+      return fail(409, { success: false, message: "Não foi possível restaurar esta trilha." });
+    }
+    throw redirect(303, `/app/help/trilhas/${pathId}`);
+  },
+
   importPackage: async ({ cookies, request }) => {
     const { session } = await requireAppPermission(cookies, "help.edit", "/app/help/trilhas");
     const formData = await request.formData();
     const file = formData.get("package");
+    const replacePathId = read(formData, "replacePathId");
     if (!(file instanceof File) || file.size < 1) {
       return fail(400, { success: false, message: "Selecione um arquivo .zip para importar." });
     }
@@ -147,10 +168,21 @@ export const actions: Actions = {
     }
 
     try {
-      const path = await importHelpTrainingPackage(session.user.id, new Uint8Array(await file.arrayBuffer()));
+      const path = await importHelpTrainingPackage(
+        session.user.id,
+        new Uint8Array(await file.arrayBuffer()),
+        { replacePathId: replacePathId || null },
+      );
       throw redirect(303, `/app/help/trilhas/${path.id}`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
+      if (cause instanceof HelpTrainingPackageConflictError) {
+        return fail(409, {
+          success: false,
+          message: "Este pacote corresponde a uma trilha já cadastrada. Confirme abaixo se deseja substituir o conteúdo editável atual.",
+          replaceCandidate: cause.existingPath,
+        });
+      }
       const diagnostic = databaseDiagnostic(cause);
       console.error("[help.training.import]", {
         diagnosticCode: cause instanceof Error && cause.message.startsWith("TRAINING_")
