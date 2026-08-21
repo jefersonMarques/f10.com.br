@@ -11,6 +11,7 @@
     LoaderCircle,
     LockKeyhole,
     Play,
+    RotateCcw,
     Send,
     Sparkles,
     UserRound,
@@ -46,6 +47,7 @@
   };
 
   type DifficultyStage = "login" | "unit" | "detail";
+  type InteractionStage = "action" | "verify" | "recovery";
   type DocumentPictureInPictureController = {
     requestWindow: (options?: { width?: number; height?: number }) => Promise<Window>;
   };
@@ -75,6 +77,9 @@
   export let onBack: (() => void) | null = null;
   export let onFailure: ((detail: string) => void) | null = null;
 
+  let preparationConfirmed = false;
+  let preparationBlocked = false;
+  let interactionStage: InteractionStage = "action";
   let videoOpen = false;
   let difficultyOpen = false;
   let difficultyStage: DifficultyStage = mode === "preview" || difficultyAuth.authenticated
@@ -102,6 +107,7 @@
 
   $: if (step.id !== trackedStepId) {
     trackedStepId = step.id;
+    interactionStage = "action";
     videoOpen = false;
     difficultyOpen = false;
     difficultyDetail = "";
@@ -113,17 +119,18 @@
   $: selectedUnits = authState.groups.find((group) => group.id === selectedGroupId)?.units ?? [];
   $: videoAssetId = trainingVideoAssetId(step.videoUrl);
   $: videoEmbedUrl = youtubeEmbedUrl(step.videoUrl);
-  $: captionUrl = step.captionAssetId
-    ? `${assetBasePath}/${step.captionAssetId}`
-    : "/help-training-empty.vtt";
+  $: captionUrl = step.captionAssetId ? `${assetBasePath}/${step.captionAssetId}` : null;
+  $: verificationQuestion = verificationQuestionForStep(step);
 
   $: if (pipWindow && !pipWindow.closed) {
     step.id;
-    successMessage;
+    preparationConfirmed;
+    preparationBlocked;
+    interactionStage;
     formMessage;
-    failureReported;
     difficultyMessage;
     canGoBack;
+    isSubmitting;
     renderPipGuide();
   }
 
@@ -187,6 +194,35 @@
       }
     };
   };
+
+  function verificationQuestionForStep(currentStep: TrainingPlayerStep): string {
+    const title = currentStep.title.trim().toLocaleLowerCase("pt-BR");
+    const question = currentStep.question?.trim() ?? "";
+    if (question && question.toLocaleLowerCase("pt-BR") !== title) return question;
+    if (currentStep.expectedResult.trim()) return "O resultado esperado abaixo aconteceu no F10?";
+    return "Você concluiu esta etapa no F10?";
+  }
+
+  function confirmPreparation(): void {
+    preparationConfirmed = true;
+    preparationBlocked = false;
+    interactionStage = "action";
+  }
+
+  function startVerification(): void {
+    if (!preparationConfirmed || isSubmitting) return;
+    interactionStage = "verify";
+  }
+
+  function rejectVerification(): void {
+    if (isSubmitting) return;
+    interactionStage = "recovery";
+  }
+
+  function retryAction(): void {
+    if (isSubmitting) return;
+    interactionStage = "action";
+  }
 
   function trainingVideoAssetId(value: string | null): string | null {
     if (!value?.startsWith("asset:")) return null;
@@ -269,6 +305,14 @@
     return element;
   }
 
+  function appendPipMarkup(documentRef: Document, parent: HTMLElement, className: string, value: string): HTMLElement {
+    const element = documentRef.createElement("div");
+    element.className = className;
+    element.innerHTML = trainingMarkupToHtml(value);
+    parent.append(element);
+    return element;
+  }
+
   function createPipButton(
     documentRef: Document,
     label: string,
@@ -285,22 +329,19 @@
     return button;
   }
 
-  function appendPipMarkup(documentRef: Document, parent: HTMLElement, className: string, value: string): HTMLElement {
-    const element = documentRef.createElement("div");
-    element.className = className;
-    element.innerHTML = trainingMarkupToHtml(value);
-    parent.append(element);
-    return element;
-  }
-
   function triggerAdvance(): void {
-    if (isSubmitting) return;
+    if (!preparationConfirmed || interactionStage !== "verify" || isSubmitting) return;
     if (mode === "preview") onAdvance?.();
     else successForm?.requestSubmit();
   }
 
   function triggerBack(): void {
-    if (!canGoBack || isSubmitting) return;
+    if (isSubmitting) return;
+    if (interactionStage !== "action") {
+      interactionStage = "action";
+      return;
+    }
+    if (!canGoBack) return;
     if (mode === "preview") onBack?.();
     else backForm?.requestSubmit();
   }
@@ -337,8 +378,7 @@
       :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#061333;background:#f7f8fb}
       *{box-sizing:border-box}body{margin:0;height:100vh;overflow:hidden;background:#f7f8fb}.guide{height:100vh;display:grid;grid-template-rows:auto minmax(0,1fr) auto}
       .top{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #e5e8ef;background:#fff;padding:12px 14px}.brand{display:flex;min-width:0;align-items:center;gap:9px}.logo{font-size:22px;font-weight:900;letter-spacing:-.07em;color:#f36b00}.training{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:700;color:#697187}.help-top{border:1px solid #dfe3ea;background:#f7f8fb;color:#697187;border-radius:999px;min-height:34px;padding:0 10px;font-size:10px;font-weight:700;cursor:pointer}
-      .content{overflow-y:auto;padding:20px 18px 24px}.step{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#f36b00;margin:0 0 8px}.title{font-size:27px;line-height:1.08;letter-spacing:-.04em;margin:0;color:#061333}.rich{font-size:15px;line-height:1.6;color:#4f5a70;margin-top:16px}.rich p{margin:0 0 11px}.rich strong{font-weight:850;color:#061333}.rich code{display:inline-block;border-radius:6px;background:#edf0f5;padding:1px 6px;color:#000a57;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;font-weight:800}.rich ul,.rich ol{margin:8px 0 12px;padding-left:22px}.rich li{margin:6px 0}.hint{margin-top:16px;padding:12px 13px;border-radius:13px;background:#fff5ec;color:#76502d;font-size:12px;line-height:1.55}.hint strong{color:#9f4b0a}.hint .rich{margin:6px 0 0;font-size:12px;color:#76502d}.video-button{width:100%;margin-top:14px;border:1px solid #ffd0ad;background:#fff7f0;color:#b94e00;border-radius:12px;min-height:44px;font-weight:800;cursor:pointer}.status{margin-top:13px;border-radius:11px;padding:9px 11px;background:#eaf8f1;color:#257049;font-size:10px;font-weight:700}
-      .footer{display:grid;grid-template-columns:1fr 1.5fr;gap:9px;border-top:1px solid #e5e8ef;background:#fff;padding:12px 14px}.secondary,.primary{border:0;border-radius:14px;min-height:50px;font-size:12px;font-weight:800;cursor:pointer}.secondary{background:#eef0f5;color:#4e576a}.secondary:disabled{cursor:not-allowed;opacity:.4}.primary{background:#f36b00;color:#fff;box-shadow:0 12px 28px rgba(243,107,0,.23);animation:float 3.2s ease-in-out infinite}
+      .content{overflow-y:auto;padding:22px 18px 28px}.step{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#f36b00;margin:0 0 8px}.step.warning{color:#b54b00}.title{font-size:27px;line-height:1.08;letter-spacing:-.04em;margin:0;color:#061333}.rich{font-size:15px;line-height:1.6;color:#4f5a70;margin-top:16px}.rich p{margin:0 0 11px}.rich strong{font-weight:850;color:#061333}.rich code{display:inline-block;border-radius:6px;background:#edf0f5;padding:1px 6px;color:#000a57;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;font-weight:800}.rich ul,.rich ol{margin:8px 0 12px;padding-left:22px}.rich li{margin:6px 0}.verify{margin-top:18px;font-size:20px;line-height:1.3;font-weight:800;color:#061333}.hint{margin-top:16px;padding:13px 14px;border:1px solid #f0cfb4;border-radius:13px;background:#fff5ec;color:#76502d;font-size:12px;line-height:1.55}.hint strong{color:#9f4b0a}.hint .rich{margin:6px 0 0;font-size:12px;color:#76502d}.recovery{margin-top:15px;border-radius:13px;background:#fff0e6;padding:14px;color:#824212;font-size:13px;line-height:1.55}.video-button{width:100%;margin-top:14px;border:1px solid #ffd0ad;background:#fff7f0;color:#b94e00;border-radius:12px;min-height:44px;font-weight:800;cursor:pointer}.footer{display:grid;grid-template-columns:1fr 1.45fr;gap:9px;border-top:1px solid #e5e8ef;background:#fff;padding:12px 14px}.secondary,.danger,.primary{border:0;border-radius:14px;min-height:50px;font-size:12px;font-weight:800;cursor:pointer}.secondary{background:#eef0f5;color:#4e576a}.secondary:disabled{cursor:not-allowed;opacity:.4}.danger{background:#fff0e6;color:#aa4a09}.primary{background:#f36b00;color:#fff;box-shadow:0 12px 28px rgba(243,107,0,.23);animation:float 3.2s ease-in-out infinite}.primary:disabled{cursor:wait;opacity:.6}
       @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}@media(prefers-reduced-motion:reduce){.primary{animation:none}}
     `;
     documentRef.head.append(style);
@@ -353,36 +393,75 @@
     appendPipText(documentRef, brand, "strong", "logo", "F10");
     appendPipText(documentRef, brand, "span", "training", trainingTitle);
     top.append(brand);
-    top.append(createPipButton(documentRef, "Preciso de ajuda", "help-top", openDifficultyFromPip));
+    if (preparationConfirmed) {
+      top.append(createPipButton(documentRef, "Preciso de ajuda", "help-top", openDifficultyFromPip));
+    }
     root.append(top);
 
     const content = documentRef.createElement("section");
     content.className = "content";
-    appendPipText(documentRef, content, "p", "step", "Faça isso agora");
-    appendPipText(documentRef, content, "h1", "title", step.title);
-    appendPipMarkup(documentRef, content, "rich", step.instruction);
-
-    if (step.expectedResult.trim()) {
-      const hint = documentRef.createElement("div");
-      hint.className = "hint";
-      const label = documentRef.createElement("strong");
-      label.textContent = "Se precisar, confira:";
-      hint.append(label);
-      appendPipMarkup(documentRef, hint, "rich", step.expectedResult);
-      content.append(hint);
-    }
-
-    if (step.videoUrl) {
-      content.append(createPipButton(documentRef, "▶ Ver demonstração", "video-button", openVideoFromPip));
-    }
-
-    if (successMessage) appendPipText(documentRef, content, "p", "status", successMessage);
-    root.append(content);
-
     const footer = documentRef.createElement("footer");
     footer.className = "footer";
-    footer.append(createPipButton(documentRef, "← Voltar", "secondary", triggerBack, !canGoBack || isSubmitting));
-    footer.append(createPipButton(documentRef, "Próximo passo →", "primary", triggerAdvance, isSubmitting));
+
+    if (!preparationConfirmed) {
+      appendPipText(documentRef, content, "p", "step", "Antes de começar");
+      appendPipText(documentRef, content, "h1", "title", "Você está com o F10 aberto?");
+      appendPipText(
+        documentRef,
+        content,
+        "p",
+        "rich",
+        preparationBlocked
+          ? "Abra o F10, faça seu login e deixe a tela principal pronta. Esta trilha só funciona se você executar cada ação junto no sistema."
+          : "Você vai executar cada orientação no F10 e confirmar o resultado antes de avançar.",
+      );
+      if (preparationBlocked) {
+        footer.style.gridTemplateColumns = "1fr";
+        footer.append(createPipButton(documentRef, "Agora estou com o F10 aberto", "primary", confirmPreparation));
+      } else {
+        footer.append(createPipButton(documentRef, "Ainda não", "secondary", () => (preparationBlocked = true)));
+        footer.append(createPipButton(documentRef, "Sim, está aberto", "primary", confirmPreparation));
+      }
+    } else if (interactionStage === "action") {
+      appendPipText(documentRef, content, "p", "step", "Faça isso agora");
+      appendPipText(documentRef, content, "h1", "title", step.title);
+      appendPipMarkup(documentRef, content, "rich", step.instruction);
+      if (step.videoUrl) content.append(createPipButton(documentRef, "▶ Ver demonstração", "video-button", openVideoFromPip));
+      footer.append(createPipButton(documentRef, "← Voltar", "secondary", triggerBack, !canGoBack || isSubmitting));
+      footer.append(createPipButton(documentRef, "Já fiz esta etapa", "primary", startVerification, isSubmitting));
+    } else if (interactionStage === "verify") {
+      appendPipText(documentRef, content, "p", "step", "Confirme antes de continuar");
+      appendPipMarkup(documentRef, content, "verify", verificationQuestion);
+      if (step.expectedResult.trim()) {
+        const hint = documentRef.createElement("div");
+        hint.className = "hint";
+        const label = documentRef.createElement("strong");
+        label.textContent = "Confira no F10:";
+        hint.append(label);
+        appendPipMarkup(documentRef, hint, "rich", step.expectedResult);
+        content.append(hint);
+      }
+      footer.append(createPipButton(documentRef, "Não", "danger", rejectVerification, isSubmitting));
+      footer.append(createPipButton(documentRef, "Sim", "primary", triggerAdvance, isSubmitting));
+    } else {
+      appendPipText(documentRef, content, "p", "step warning", "Não avance ainda");
+      appendPipText(documentRef, content, "h1", "title", "Vamos corrigir esta etapa");
+      appendPipText(documentRef, content, "p", "recovery", "Esta etapa precisa estar concluída no F10 antes de continuar. Volte à orientação e tente novamente.");
+      if (step.expectedResult.trim()) {
+        const hint = documentRef.createElement("div");
+        hint.className = "hint";
+        const label = documentRef.createElement("strong");
+        label.textContent = "O que precisa acontecer:";
+        hint.append(label);
+        appendPipMarkup(documentRef, hint, "rich", step.expectedResult);
+        content.append(hint);
+      }
+      if (step.videoUrl) content.append(createPipButton(documentRef, "▶ Ver como fazer", "video-button", openVideoFromPip));
+      footer.style.gridTemplateColumns = "1fr";
+      footer.append(createPipButton(documentRef, "Tentar novamente", "primary", retryAction, isSubmitting));
+    }
+
+    root.append(content);
     root.append(footer);
     documentRef.body.append(root);
   }
@@ -572,71 +651,116 @@
       <span class="h-7 w-px bg-[#D9DDE7]"></span>
       <strong class="truncate text-[11px] font-semibold text-[#1E2942] sm:text-[12px]">{trainingTitle}</strong>
     </div>
-    <div class="flex shrink-0 items-center gap-2">
-      {#if pipSupported}
-        <button type="button" on:click={() => void openPipGuide()} disabled={pipOpening} class="training-subtle inline-flex min-h-9 items-center gap-2 rounded-full border border-[#FFD1B0] bg-[#FFF7F0] px-3 text-[9px] font-bold text-[#B94E00] disabled:opacity-60">{#if pipOpening}<LoaderCircle size={13} class="animate-spin"/>{:else}<Sparkles size={13}/>{/if}Abrir guia flutuante</button>
-      {/if}
-      <button type="button" on:click={openDifficulty} class="training-subtle inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[#E0E3EA] bg-white px-3 text-[9px] font-semibold text-[#6D7586]"><HelpCircle size={13}/>Preciso de ajuda</button>
-    </div>
+    {#if preparationConfirmed}
+      <div class="flex shrink-0 items-center gap-2">
+        {#if pipSupported}
+          <button type="button" on:click={() => void openPipGuide()} disabled={pipOpening} class="training-subtle inline-flex min-h-9 items-center gap-2 rounded-full border border-[#FFD1B0] bg-[#FFF7F0] px-3 text-[9px] font-bold text-[#B94E00] disabled:opacity-60">{#if pipOpening}<LoaderCircle size={13} class="animate-spin"/>{:else}<Sparkles size={13}/>{/if}Abrir guia flutuante</button>
+        {/if}
+        <button type="button" on:click={openDifficulty} class="training-subtle inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[#E0E3EA] bg-white px-3 text-[9px] font-semibold text-[#6D7586]"><HelpCircle size={13}/>Preciso de ajuda</button>
+      </div>
+    {/if}
   </header>
 
   <main class="relative z-10 h-[calc(100dvh-4rem)] overflow-y-auto px-4 py-5 sm:px-7 sm:py-7">
-    {#key step.id}
-      <div class="training-step-enter mx-auto flex min-h-full w-full max-w-[1060px] flex-col items-center justify-center pb-6 text-center">
-        <p class="text-[9px] font-bold uppercase tracking-[0.18em] text-[#F36B00]">Faça isso agora</p>
-        <h1 class="mt-3 max-w-[900px] text-balance text-[30px] font-semibold tracking-[-0.045em] text-[#061333] sm:text-[40px] lg:text-[46px]">{step.title}</h1>
-        <div class="training-rich mt-3 max-w-[760px] text-[13px] leading-6 text-[#5E687E] sm:text-[14px]">{@html trainingMarkupToHtml(step.instruction)}</div>
-
-        {#if currentImage}
-          <div class="relative mt-5 flex max-h-[48dvh] min-h-[180px] w-full max-w-[900px] items-center justify-center overflow-hidden rounded-[24px] bg-white shadow-[0_22px_60px_rgba(12,23,52,0.09)] ring-1 ring-[#E5E8EF] sm:min-h-[260px]">
-            <img src={`${assetBasePath}/${currentImage.assetId}`} alt={currentImage.altText || step.title} class="max-h-[48dvh] w-full object-contain" />
-            {#if step.videoUrl}
-              <button type="button" on:click={() => (videoOpen = true)} class="radar-button radar-unseen absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-[#F36B00] text-white shadow-[0_12px_28px_rgba(243,107,0,0.28)]" aria-label="Ver demonstração" title="Ver demonstração"><Play size={17} fill="currentColor"/></button>
-            {/if}
-          </div>
-        {:else if step.videoUrl}
-          <button type="button" on:click={() => (videoOpen = true)} class="radar-button radar-unseen mt-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#FFF0E4] text-[#F36B00] ring-8 ring-white shadow-[0_16px_40px_rgba(243,107,0,0.13)]" aria-label="Ver demonstração"><Play size={23}/></button>
-        {/if}
-
-        {#if step.expectedResult.trim()}
-          <div class="mt-4 max-w-[720px] rounded-2xl border border-[#F2D4BC] bg-[#FFF8F2] px-5 py-3 text-left text-[10px] leading-5 text-[#71583F]"><strong class="font-semibold text-[#9D4B0E]">Se precisar, confira:</strong><div class="training-rich mt-1">{@html trainingMarkupToHtml(step.expectedResult)}</div></div>
-        {/if}
-
-        {#if successMessage}
-          <div class="mt-4 inline-flex items-center gap-2 rounded-full bg-[#EAF8F1] px-4 py-2 text-[10px] font-semibold text-[#23714A]" role="status"><Check size={14}/>{successMessage}</div>
-        {/if}
-        {#if formMessage}
-          <div class="mt-4 inline-flex max-w-[680px] items-start gap-2 rounded-xl bg-[#FFF2F2] px-4 py-3 text-left text-[10px] leading-5 text-[#9B2C2C]" role="alert"><CircleAlert size={14} class="mt-0.5 shrink-0"/>{formMessage}</div>
-        {/if}
-        {#if ticketNumber}
-          <div class="mt-4 inline-flex items-center gap-2 rounded-full bg-[#EEF0FF] px-4 py-2 text-[10px] font-semibold text-[#000A57]" role="status"><Send size={14}/>Ticket #{ticketNumber} aberto. A equipe recebeu o contexto.</div>
-        {:else if difficultyMessage && !difficultyOpen}
-          <div class="mt-4 inline-flex items-center gap-2 rounded-full bg-[#EEF0FF] px-4 py-2 text-[10px] font-semibold text-[#000A57]" role="status"><Check size={14}/>{difficultyMessage}</div>
-        {/if}
-
-        <div class="mt-7 grid w-full max-w-[560px] grid-cols-[minmax(0,180px)_minmax(0,1fr)] gap-3">
-          {#if canGoBack}
-            {#if mode === "preview"}
-              <button type="button" on:click={triggerBack} class="training-subtle inline-flex min-h-14 items-center justify-center gap-2 rounded-full border border-[#DDE1EA] bg-white px-5 text-[11px] font-semibold text-[#687084]"><ArrowLeft size={15}/>Voltar</button>
-            {:else}
-              <form bind:this={backForm} method="POST" action={backAction} use:enhance={enhanceNavigation}><button type="submit" disabled={isSubmitting} class="training-subtle inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full border border-[#DDE1EA] bg-white px-5 text-[11px] font-semibold text-[#687084] disabled:opacity-50"><ArrowLeft size={15}/>Voltar</button></form>
-            {/if}
+    {#if !preparationConfirmed}
+      <section class="mx-auto flex min-h-full w-full max-w-[720px] items-center justify-center py-8 text-center">
+        <div class="w-full">
+          <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#000A57] text-[12px] font-black text-white">F10</span>
+          <p class="mt-7 text-[9px] font-bold uppercase tracking-[0.18em] text-[#F36B00]">Antes de começar</p>
+          <h1 class="mx-auto mt-3 max-w-[660px] text-balance text-[34px] font-semibold tracking-[-0.045em] text-[#061333] sm:text-[44px]">Você está com o F10 aberto?</h1>
+          {#if preparationBlocked}
+            <div class="mx-auto mt-5 max-w-[560px] rounded-2xl border border-[#F2D4BC] bg-[#FFF8F2] px-5 py-4 text-left">
+              <strong class="text-[12px] text-[#9D4B0E]">Abra o F10 antes de continuar.</strong>
+              <p class="mt-2 text-[12px] leading-6 text-[#71583F]">Faça seu login e deixe a tela principal pronta. Você precisará executar cada ação no sistema e confirmar o resultado antes de avançar.</p>
+            </div>
+            <button type="button" on:click={confirmPreparation} class="training-primary training-float mt-7 inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#F36B00] px-8 text-[12px] font-bold text-white shadow-[0_18px_40px_rgba(243,107,0,0.24)]"><Check size={17}/>Agora estou com o F10 aberto</button>
           {:else}
-            <button type="button" disabled class="inline-flex min-h-14 items-center justify-center gap-2 rounded-full border border-[#E7E9EF] bg-[#F3F4F7] px-5 text-[11px] font-semibold text-[#A6ACB8]"><ArrowLeft size={15}/>Voltar</button>
-          {/if}
-
-          {#if mode === "preview"}
-            <button type="button" on:click={triggerAdvance} class="training-primary training-float inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#F36B00] px-8 text-[12px] font-bold text-white shadow-[0_18px_40px_rgba(243,107,0,0.24)]">Próximo passo<ChevronRight size={17}/></button>
-          {:else}
-            <form bind:this={successForm} method="POST" action={successAction} use:enhance={enhanceNavigation}><button type="submit" disabled={isSubmitting} class="training-primary training-float inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-[#F36B00] px-8 text-[12px] font-bold text-white shadow-[0_18px_40px_rgba(243,107,0,0.24)] disabled:cursor-wait disabled:opacity-70">{#if isSubmitting}<LoaderCircle size={16} class="animate-spin"/>{/if}Próximo passo<ChevronRight size={17}/></button></form>
+            <p class="mx-auto mt-4 max-w-[570px] text-[13px] leading-7 text-[#667086]">Esta trilha não é para assistir. Você fará cada ação no F10 e só poderá avançar depois de confirmar o que aconteceu na tela.</p>
+            <div class="mx-auto mt-7 grid w-full max-w-[560px] gap-3 sm:grid-cols-[minmax(0,180px)_minmax(0,1fr)]">
+              <button type="button" on:click={() => (preparationBlocked = true)} class="training-subtle inline-flex min-h-14 items-center justify-center rounded-full border border-[#DDE1EA] bg-white px-5 text-[11px] font-semibold text-[#687084]">Ainda não</button>
+              <button type="button" on:click={confirmPreparation} class="training-primary training-float inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#F36B00] px-8 text-[12px] font-bold text-white shadow-[0_18px_40px_rgba(243,107,0,0.24)]"><Check size={17}/>Sim, estou com o F10 aberto</button>
+            </div>
           {/if}
         </div>
+      </section>
+    {:else}
+      {#key step.id}
+        <div class="training-step-enter mx-auto flex min-h-full w-full max-w-[1060px] flex-col items-center justify-center pb-6 text-center">
+          {#if interactionStage === "action"}
+            <p class="text-[9px] font-bold uppercase tracking-[0.18em] text-[#F36B00]">Faça isso agora</p>
+            <h1 class="mt-3 max-w-[900px] text-balance text-[30px] font-semibold tracking-[-0.045em] text-[#061333] sm:text-[40px] lg:text-[46px]">{step.title}</h1>
+            <div class="training-rich mt-3 max-w-[760px] text-[13px] leading-6 text-[#5E687E] sm:text-[14px]">{@html trainingMarkupToHtml(step.instruction)}</div>
+          {:else if interactionStage === "verify"}
+            <p class="text-[9px] font-bold uppercase tracking-[0.18em] text-[#F36B00]">Confirme antes de continuar</p>
+            <div class="training-rich mt-3 max-w-[760px] text-balance text-[25px] font-semibold leading-[1.2] tracking-[-0.035em] text-[#061333] sm:text-[32px]">{@html trainingMarkupToHtml(verificationQuestion)}</div>
+          {:else}
+            <p class="text-[9px] font-bold uppercase tracking-[0.18em] text-[#B94E00]">Não avance ainda</p>
+            <h1 class="mt-3 max-w-[900px] text-balance text-[30px] font-semibold tracking-[-0.045em] text-[#061333] sm:text-[38px]">Vamos corrigir esta etapa</h1>
+            <p class="mt-3 max-w-[720px] text-[13px] leading-6 text-[#5E687E]">Esta ação precisa estar concluída no F10 antes de continuar. Confira o resultado abaixo e tente novamente.</p>
+          {/if}
 
-        {#if pipSupported}
-          <p class="mt-5 max-w-[540px] text-[9px] leading-4 text-[#8A91A0]">Dica: use <strong>Abrir guia flutuante</strong> para manter a instrução por cima do F10 enquanto você trabalha.</p>
-        {/if}
-      </div>
-    {/key}
+          {#if currentImage}
+            <div class="relative mt-5 flex max-h-[48dvh] min-h-[180px] w-full max-w-[900px] items-center justify-center overflow-hidden rounded-[24px] bg-white shadow-[0_22px_60px_rgba(12,23,52,0.09)] ring-1 ring-[#E5E8EF] sm:min-h-[260px]">
+              <img src={`${assetBasePath}/${currentImage.assetId}`} alt={currentImage.altText || step.title} class="max-h-[48dvh] w-full object-contain" />
+              {#if step.videoUrl && interactionStage === "action"}
+                <button type="button" on:click={() => (videoOpen = true)} class="radar-button radar-unseen absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-[#F36B00] text-white shadow-[0_12px_28px_rgba(243,107,0,0.28)]" aria-label="Ver demonstração" title="Ver demonstração"><Play size={17} fill="currentColor"/></button>
+              {/if}
+            </div>
+          {:else if step.videoUrl && interactionStage === "action"}
+            <button type="button" on:click={() => (videoOpen = true)} class="radar-button radar-unseen mt-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#FFF0E4] text-[#F36B00] ring-8 ring-white shadow-[0_16px_40px_rgba(243,107,0,0.13)]" aria-label="Ver demonstração"><Play size={23}/></button>
+          {/if}
+
+          {#if interactionStage !== "action" && step.expectedResult.trim()}
+            <div class="mt-4 max-w-[720px] rounded-2xl border border-[#F2D4BC] bg-[#FFF8F2] px-5 py-3 text-left text-[10px] leading-5 text-[#71583F]"><strong class="font-semibold text-[#9D4B0E]">{interactionStage === "verify" ? "Confira no F10:" : "O que precisa acontecer:"}</strong><div class="training-rich mt-1">{@html trainingMarkupToHtml(step.expectedResult)}</div></div>
+          {/if}
+
+          {#if interactionStage === "recovery" && step.videoUrl}
+            <button type="button" on:click={() => (videoOpen = true)} class="training-subtle mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[#FFD1B0] bg-[#FFF7F0] px-5 text-[10px] font-bold text-[#B94E00]"><Play size={14}/>Ver como fazer</button>
+          {/if}
+
+          {#if formMessage}
+            <div class="mt-4 inline-flex max-w-[680px] items-start gap-2 rounded-xl bg-[#FFF2F2] px-4 py-3 text-left text-[10px] leading-5 text-[#9B2C2C]" role="alert"><CircleAlert size={14} class="mt-0.5 shrink-0"/>{formMessage}</div>
+          {/if}
+          {#if ticketNumber}
+            <div class="mt-4 inline-flex items-center gap-2 rounded-full bg-[#EEF0FF] px-4 py-2 text-[10px] font-semibold text-[#000A57]" role="status"><Send size={14}/>Ticket #{ticketNumber} aberto. A equipe recebeu o contexto.</div>
+          {:else if difficultyMessage && !difficultyOpen}
+            <div class="mt-4 inline-flex items-center gap-2 rounded-full bg-[#EEF0FF] px-4 py-2 text-[10px] font-semibold text-[#000A57]" role="status"><Check size={14}/>{difficultyMessage}</div>
+          {/if}
+
+          {#if interactionStage === "action"}
+            <div class="mt-7 grid w-full max-w-[560px] grid-cols-[minmax(0,180px)_minmax(0,1fr)] gap-3">
+              {#if canGoBack}
+                {#if mode === "preview"}
+                  <button type="button" on:click={triggerBack} class="training-subtle inline-flex min-h-14 items-center justify-center gap-2 rounded-full border border-[#DDE1EA] bg-white px-5 text-[11px] font-semibold text-[#687084]"><ArrowLeft size={15}/>Voltar</button>
+                {:else}
+                  <form bind:this={backForm} method="POST" action={backAction} use:enhance={enhanceNavigation}><button type="submit" disabled={isSubmitting} class="training-subtle inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full border border-[#DDE1EA] bg-white px-5 text-[11px] font-semibold text-[#687084] disabled:opacity-50"><ArrowLeft size={15}/>Voltar</button></form>
+                {/if}
+              {:else}
+                <button type="button" disabled class="inline-flex min-h-14 items-center justify-center gap-2 rounded-full border border-[#E7E9EF] bg-[#F3F4F7] px-5 text-[11px] font-semibold text-[#A6ACB8]"><ArrowLeft size={15}/>Voltar</button>
+              {/if}
+              <button type="button" on:click={startVerification} disabled={isSubmitting} class="training-primary training-float inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#F36B00] px-8 text-[12px] font-bold text-white shadow-[0_18px_40px_rgba(243,107,0,0.24)] disabled:opacity-60"><Check size={17}/>Já fiz esta etapa</button>
+            </div>
+          {:else if interactionStage === "verify"}
+            <div class="mt-7 grid w-full max-w-[560px] grid-cols-2 gap-3">
+              <button type="button" on:click={rejectVerification} disabled={isSubmitting} class="training-subtle inline-flex min-h-14 items-center justify-center rounded-full border border-[#F0CDB3] bg-[#FFF7F0] px-5 text-[11px] font-bold text-[#B94E00] disabled:opacity-50">Não</button>
+              {#if mode === "preview"}
+                <button type="button" on:click={triggerAdvance} disabled={isSubmitting} class="training-primary training-float inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#F36B00] px-8 text-[12px] font-bold text-white shadow-[0_18px_40px_rgba(243,107,0,0.24)] disabled:opacity-60"><Check size={17}/>Sim</button>
+              {:else}
+                <form bind:this={successForm} method="POST" action={successAction} use:enhance={enhanceNavigation}><button type="submit" disabled={isSubmitting} class="training-primary training-float inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-[#F36B00] px-8 text-[12px] font-bold text-white shadow-[0_18px_40px_rgba(243,107,0,0.24)] disabled:cursor-wait disabled:opacity-70">{#if isSubmitting}<LoaderCircle size={16} class="animate-spin"/>{:else}<Check size={17}/>{/if}Sim</button></form>
+              {/if}
+            </div>
+          {:else}
+            <div class="mt-7 w-full max-w-[560px]">
+              <button type="button" on:click={retryAction} disabled={isSubmitting} class="training-primary training-float inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-[#F36B00] px-8 text-[12px] font-bold text-white shadow-[0_18px_40px_rgba(243,107,0,0.24)] disabled:opacity-60"><RotateCcw size={16}/>Tentar novamente</button>
+            </div>
+          {/if}
+
+          {#if pipSupported}
+            <p class="mt-5 max-w-[540px] text-[9px] leading-4 text-[#8A91A0]">Dica: use <strong>Abrir guia flutuante</strong> para manter a orientação por cima do F10 enquanto você trabalha.</p>
+          {/if}
+        </div>
+      {/key}
+    {/if}
   </main>
 </div>
 
@@ -697,7 +821,7 @@
     <div class="relative w-full max-w-[1120px] overflow-hidden rounded-[24px] bg-[#07132D] shadow-2xl" role="dialog" aria-modal="true" aria-label="Demonstração">
       <div class="flex items-center justify-between gap-3 px-4 py-3 text-white sm:px-5"><div><p class="text-[8px] font-bold uppercase tracking-[0.12em] text-[#FF9A4B]">Demonstração</p><strong class="mt-1 block text-[11px]">{step.title}</strong></div><button type="button" on:click={() => (videoOpen = false)} class="training-subtle flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white" aria-label="Fechar demonstração"><X size={16}/></button></div>
       {#if videoAssetId}
-        <video src={`${assetBasePath}/${videoAssetId}`} controls autoplay preload="metadata" playsinline class="max-h-[80dvh] w-full bg-black"><track kind="captions" srclang="pt-BR" label="Português" src={captionUrl} default /></video>
+        <video src={`${assetBasePath}/${videoAssetId}`} controls autoplay preload="metadata" playsinline class="max-h-[80dvh] w-full bg-black">{#if captionUrl}<track kind="captions" srclang="pt-BR" label="Português" src={captionUrl} default />{/if}</video>
       {:else if videoEmbedUrl}
         <iframe src={videoEmbedUrl} title="Demonstração" class="aspect-video max-h-[80dvh] w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
       {:else}
@@ -714,7 +838,6 @@
     transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease, color 180ms ease, opacity 180ms ease;
   }
 
-  .training-primary:not(:disabled):hover,
   .training-subtle:not(:disabled):hover,
   .radar-button:not(:disabled):hover {
     transform: translateY(-2px);
