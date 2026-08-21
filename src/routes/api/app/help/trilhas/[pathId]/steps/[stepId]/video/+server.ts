@@ -24,7 +24,8 @@ function isUuid(value: string): boolean {
 
 function errorMessage(cause: unknown): string {
   const code = cause instanceof Error ? cause.message : "TRAINING_VIDEO_UPLOAD_FAILED";
-  if (code === "TRAINING_VIDEO_TOO_LONG") return "O vídeo deve ter no máximo 60 segundos. Quebre a demonstração em microações menores.";
+  if (code === "TRAINING_VIDEO_TOO_SHORT") return "O vídeo deve ter pelo menos 30 segundos. Junte instruções relacionadas para evitar uma demonstração cortada demais.";
+  if (code === "TRAINING_VIDEO_TOO_LONG") return "O vídeo deve ter no máximo 60 segundos. Divida somente quando houver outra ação independente.";
   if (code === "TRAINING_VIDEO_FORMAT" || code === "ASSET_MIME_NOT_ALLOWED") return "Use um vídeo MP4.";
   if (code === "TRAINING_VIDEO_INVALID" || code === "ASSET_CONTENT_MISMATCH") return "Não foi possível validar este MP4. Exporte o vídeo novamente e tente outra vez.";
   if (code === "ASSET_SIZE_NOT_ALLOWED") return "O vídeo deve ter no máximo 25 MB.";
