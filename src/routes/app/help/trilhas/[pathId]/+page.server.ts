@@ -47,8 +47,7 @@ function publishErrorMessage(cause: unknown): string {
   const code = cause instanceof Error ? cause.message : "TRAINING_PUBLISH_FAILED";
   if (code === "TRAINING_STEP_INCOMPLETE") return "Toda microação precisa ter título e conteúdo.";
   if (code === "TRAINING_STEP_RESULT_REQUIRED") return "Toda microação do tipo ação precisa informar o resultado esperado.";
-  if (code === "TRAINING_FAILURE_REASON_REQUIRED") return "Toda microação do tipo ação precisa ter ao menos um motivo para “Não consegui”.";
-  if (code === "TRAINING_VIDEO_INVALID" || code === "INVALID_MEDIA_URL") return "Há um vídeo inválido em uma das microações.";
+  if (code === "TRAINING_VIDEO_INVALID" || code === "INVALID_MEDIA_URL") return "Há um vídeo inválido ou sem legenda em uma das microações.";
   return "Não foi possível publicar. Revise as microações e tente novamente.";
 }
 
@@ -137,9 +136,11 @@ export const actions: Actions = {
     try {
       await updateHelpTrainingStepDraft(session.user.id, params.pathId, stepId, {
         title: read(formData, "title"),
+        question: read(formData, "question"),
         instruction: read(formData, "instruction"),
         expectedResult: read(formData, "expectedResult"),
         successMessage: read(formData, "successMessage"),
+        primaryActionLabel: read(formData, "primaryActionLabel"),
         estimatedSeconds,
         interactionMode,
       });
