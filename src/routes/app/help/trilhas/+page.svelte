@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { ArrowRight, BookOpenCheck, CircleAlert, Download, FileArchive, GraduationCap, Plus, Upload, Users } from "lucide-svelte";
+  import { enhance } from "$app/forms";
+  import type { SubmitFunction } from "@sveltejs/kit";
+  import { ArrowRight, BookOpenCheck, CircleAlert, Download, FileArchive, GraduationCap, LoaderCircle, Plus, Upload, Users } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
@@ -7,7 +9,21 @@
   export let data: PageData;
   export let form: ActionData;
 
+  let isImporting = false;
+
   $: values = form && "values" in form ? form.values : null;
+
+  const enhancePackageImport: SubmitFunction = () => {
+    isImporting = true;
+
+    return async ({ update }) => {
+      try {
+        await update({ reset: false });
+      } finally {
+        isImporting = false;
+      }
+    };
+  };
 
   function statusLabel(status: string, currentVersion: number): string {
     if (status === "published") return "Publicada";
@@ -74,9 +90,20 @@
 
         <section class="h-fit rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
           <div class="flex items-start gap-3"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><FileArchive size={19}/></span><div><h2 class="text-[16px] font-semibold text-[#11182C]">Importar pacote .zip</h2><p class="mt-1 text-[11px] leading-5 text-[#858A98]">Cria uma nova trilha em rascunho usando textos, imagens e vídeos do pacote.</p></div></div>
-          <form method="POST" action="?/importPackage" enctype="multipart/form-data" class="mt-5 space-y-3">
-            <label class="block rounded-xl border border-dashed border-[#CDD2DD] bg-[#FAFAFC] p-4"><span class="text-[10px] font-semibold text-[#4A5060]">Arquivo .zip</span><input name="package" type="file" accept="application/zip,.zip" required class="mt-2 block w-full text-[10px] text-[#6E7483] file:mr-3 file:rounded-lg file:border-0 file:bg-[#000A57] file:px-3 file:py-2 file:text-[10px] file:font-semibold file:text-white"/><span class="mt-2 block text-[9px] leading-4 text-[#8B909D]">Até 120 MB. O JSON deve estar na raiz como <strong>training.json</strong> ou <strong>manifest.json</strong>.</span></label>
-            <button type="submit" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[12px] font-semibold text-white"><Upload size={15}/>Importar trilha</button>
+          <form method="POST" action="?/importPackage" enctype="multipart/form-data" class="mt-5 space-y-3" use:enhance={enhancePackageImport} aria-busy={isImporting ? "true" : "false"}>
+            <label class="block rounded-xl border border-dashed border-[#CDD2DD] bg-[#FAFAFC] p-4"><span class="text-[10px] font-semibold text-[#4A5060]">Arquivo .zip</span><input name="package" type="file" accept="application/zip,.zip" required disabled={isImporting} class="mt-2 block w-full text-[10px] text-[#6E7483] file:mr-3 file:rounded-lg file:border-0 file:bg-[#000A57] file:px-3 file:py-2 file:text-[10px] file:font-semibold file:text-white disabled:opacity-60"/><span class="mt-2 block text-[9px] leading-4 text-[#8B909D]">Até 120 MB. O JSON deve estar na raiz como <strong>training.json</strong> ou <strong>manifest.json</strong>.</span></label>
+            <button type="submit" disabled={isImporting} class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[12px] font-semibold text-white disabled:cursor-wait disabled:opacity-70">
+              {#if isImporting}<LoaderCircle size={16} class="animate-spin"/>Importando pacote...{:else}<Upload size={15}/>Importar trilha{/if}
+            </button>
+            {#if isImporting}
+              <div class="rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-4 py-3" role="status" aria-live="polite">
+                <div class="flex items-start gap-3">
+                  <LoaderCircle size={17} class="mt-0.5 shrink-0 animate-spin text-[#000A57]"/>
+                  <div class="min-w-0"><strong class="block text-[11px] font-semibold text-[#000A57]">Importando o pacote</strong><span class="mt-1 block text-[9px] leading-4 text-[#697084]">Enviando o ZIP, validando o JSON e os arquivos e criando a trilha. Aguarde a conclusão antes de sair desta página.</span></div>
+                </div>
+                <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-[#E1E4F1]"><div class="h-full w-1/2 animate-pulse rounded-full bg-[#000A57]"></div></div>
+              </div>
+            {/if}
           </form>
           <div class="mt-3 flex flex-col items-start gap-2">
             <a href="/help-training-package/training.example.json" download class="inline-flex items-center gap-2 text-[10px] font-semibold text-[#000A57]"><Download size={13}/>Baixar modelo de training.json</a>
