@@ -6,9 +6,19 @@ Envie este arquivo para a IA junto com o material de origem: procedimentos, manu
 
 Transforme o material fornecido em um pacote importável de **Trilha F10**. Gere um `training.json` válido e organize o conteúdo como um **guia operacional passo a passo** para uma pessoa com pouca familiaridade com sistemas e pouca disposição para estudar antes de executar.
 
-A experiência não deve parecer prova, formulário ou treinamento teórico. O participante deve olhar para a orientação, executar uma ação simples no F10 e clicar em **Próximo passo**.
+A experiência não é um curso para assistir. O participante precisa estar com o F10 aberto, executar uma ação curta e depois confirmar um resultado observável na tela antes que o próximo passo seja liberado.
 
-Quando o navegador suportar o guia flutuante, o participante poderá manter uma pequena janela por cima do F10. **Essa janela não mostra a imagem do passo**, portanto o `title` e o `instruction` precisam ser compreensíveis sozinhos.
+O fluxo de cada passo é:
+
+```text
+FAZER A AÇÃO
+→ Já fiz esta etapa
+→ CONFIRMAR O RESULTADO
+   → Sim: avança
+   → Não: bloqueia o avanço e mostra recuperação
+```
+
+Quando o navegador suportar o guia flutuante, o participante poderá manter uma pequena janela por cima do F10. **Essa janela não mostra a imagem do passo**, portanto `title`, `instruction`, `question` e `expectedResult` precisam ser compreensíveis sozinhos.
 
 ## Regras de experiência
 
@@ -16,18 +26,46 @@ Quando o navegador suportar o guia flutuante, o participante poderá manter uma 
 - Use `"accessMode": "invite_only"` por padrão; use `"public"` somente quando solicitado.
 - Escreva em português do Brasil, com frases curtas, palavras simples e sem jargões desnecessários.
 - Não suponha que o participante conheça menus, processos, atalhos ou termos técnicos.
-- Não faça perguntas ao participante. Não gere campos `question` no JSON novo.
 - Cada passo deve começar com um `title` no imperativo ou com uma ação extremamente clara. Exemplos: `Abra o menu Cadastros`, `Clique em Novo usuário`, `Preencha o e-mail`.
 - `instruction` deve dizer exatamente o que fazer agora, sem explicar ações futuras.
-- `primaryActionLabel` deve ser `Próximo passo`, salvo quando houver uma razão operacional muito clara para outro texto.
-- Use `interactionMode: "presentation"` quando a pessoa só precisa ler ou observar.
+- Todo passo deve ter `question`: uma **pergunta de confirmação sobre algo que a pessoa consegue observar no F10 depois de executar a ação**.
+- A pergunta nunca deve testar conhecimento, memória ou entendimento. Não use perguntas como `Você entendeu?`, `Quer continuar?`, `Você sabe onde fica?` ou `Conseguiu acompanhar?`.
+- Prefira perguntas concretas como `A janela Funcionários - Dados da Pessoa está aberta?`, `O campo E-mail está preenchido?`, `Usuário Ativo está marcado?` ou `O funcionário apareceu na lista?`.
+- `expectedResult` deve descrever, de forma curta, o estado obrigatório que a pessoa precisa encontrar. Ele será usado principalmente quando a pessoa responder **Não**.
+- Use `primaryActionLabel: "Já fiz esta etapa"`.
+- Use `interactionMode: "presentation"` quando a pessoa só precisa observar algo, mas ainda assim gere uma confirmação observável.
 - Use `interactionMode: "action"` quando a pessoa precisa executar algo.
-- `expectedResult` é opcional. Quando usado, escreva apenas uma dica curta que ajude a pessoa a reconhecer a tela ou entender se está no lugar certo. Não transforme o campo em outra pergunta.
 - Não crie `failureReasons`. A opção **Preciso de ajuda** é global. O F10 solicita login, coleta o relato em texto livre e permite somente registrar a dificuldade ou registrar e abrir um ticket.
-- `successMessage` deve ser curta e não afirmar algo que o sistema não verificou. Exemplo: `Certo. Vamos para o próximo passo.`
+- `successMessage` é opcional e não deve ser usada para afirmar algo que o sistema não verificou.
 - `estimatedSeconds` é somente informação interna e não deve ser mencionada nos textos mostrados ao participante.
 - Não informe ao participante quantidade total de passos nem duração total da trilha.
 - Referencie somente imagens e vídeos realmente fornecidos. Não invente nomes de arquivos, telas, botões, permissões ou funcionalidades.
+
+## Como escrever uma boa confirmação
+
+A pergunta deve ser respondível olhando para o F10 naquele momento.
+
+Exemplo correto:
+
+```json
+{
+  "title": "Abra um novo cadastro de funcionário",
+  "instruction": "Abra **Cadastros**, entre em `Funcionários` e clique em `+`.",
+  "question": "A janela **Funcionários - Dados da Pessoa** está aberta?",
+  "expectedResult": "A janela de cadastro deve estar aberta e pronta para preenchimento."
+}
+```
+
+Exemplos incorretos:
+
+```text
+Você entendeu como cadastrar um funcionário?
+Quer continuar?
+Você sabe o que fazer agora?
+Conseguiu acompanhar?
+```
+
+Se o material de origem não permitir identificar qual resultado visual deve confirmar a ação, não invente. Liste isso em `Pendências`.
 
 ## Categorias
 
@@ -49,7 +87,7 @@ Regras:
 
 ## Marcação de texto
 
-`instruction` e `expectedResult` aceitam uma marcação simples e segura. Use apenas quando melhorar a leitura:
+`instruction`, `question` e `expectedResult` podem usar a marcação simples abaixo quando melhorar a leitura:
 
 - `**texto**` para **negrito**;
 - `` `texto` `` para destacar exatamente um botão, símbolo, campo ou opção da interface;
@@ -83,7 +121,7 @@ Prefira recortes ou prints em que o elemento importante esteja visualmente evide
 
 Use `altText` com uma descrição simples do que está sendo mostrado.
 
-Lembre-se: a imagem **não aparece no guia flutuante**. O texto do passo não pode depender dela para fazer sentido.
+Lembre-se: a imagem **não aparece no guia flutuante**. O texto do passo e a confirmação não podem depender dela para fazer sentido.
 
 ## Vídeos
 
@@ -95,7 +133,7 @@ Vídeo local deve:
 
 Legenda `.vtt` não é obrigatória e não deve ser criada apenas para satisfazer o formato.
 
-O vídeo é uma demonstração auxiliar para quem não conseguiu entender pela instrução e pela imagem. Não use vídeo como única forma de explicar um passo quando houver um print claro disponível.
+O vídeo é uma demonstração auxiliar, principalmente para o estado de recuperação quando a pessoa respondeu **Não** na confirmação. Não use vídeo como única forma de explicar um passo quando houver um print claro disponível.
 
 Essa faixa de duração é obrigatória. Não corte uma demonstração em vídeos de poucos segundos apenas para transformar cada clique em uma etapa.
 
@@ -111,11 +149,12 @@ Não use o mesmo caminho de arquivo como tipos diferentes.
 
 ```json
 {
-  "title": "Veja onde fica o menu principal",
+  "title": "Localize o menu principal",
   "interactionMode": "presentation",
-  "instruction": "Observe o **menu no lado esquerdo** da tela. É nele que você vai encontrar as opções usadas nos próximos passos.",
-  "primaryActionLabel": "Próximo passo",
-  "successMessage": "Certo. Vamos para o próximo passo.",
+  "instruction": "Observe o **menu no lado esquerdo** da tela.",
+  "question": "Você está vendo o **menu principal** no lado esquerdo do F10?",
+  "expectedResult": "O menu principal deve estar visível no lado esquerdo da tela.",
+  "primaryActionLabel": "Já fiz esta etapa",
   "images": [
     {
       "file": "images/menu-principal.png",
@@ -132,9 +171,9 @@ Não use o mesmo caminho de arquivo como tipos diferentes.
   "title": "Abra o cadastro de usuários",
   "interactionMode": "action",
   "instruction": "No menu lateral, clique em **Cadastros**.\n\nDepois clique em `Usuários`.",
-  "expectedResult": "A lista de **usuários** deve ficar aberta.",
-  "primaryActionLabel": "Próximo passo",
-  "successMessage": "Certo. Vamos para o próximo passo.",
+  "question": "A lista de **usuários** está aberta?",
+  "expectedResult": "A lista de usuários deve estar visível na tela.",
+  "primaryActionLabel": "Já fiz esta etapa",
   "estimatedSeconds": 45,
   "images": [
     {
@@ -171,4 +210,4 @@ Entregue nesta ordem:
 
 O `training.json` final não deve conter comentários, explicações ou o campo `_aiPrompt`.
 
-Não invente dados quando o material de origem não for suficiente. Preserve a terminologia real encontrada nos arquivos fornecidos, mas reescreva as instruções para que uma pessoa sem conhecimento técnico consiga apenas olhar, executar e avançar.
+Não invente dados quando o material de origem não for suficiente. Preserve a terminologia real encontrada nos arquivos fornecidos, mas reescreva as instruções para que uma pessoa sem conhecimento técnico consiga olhar, executar, confirmar o resultado e somente então avançar.
