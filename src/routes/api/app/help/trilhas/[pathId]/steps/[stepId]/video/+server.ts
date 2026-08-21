@@ -5,10 +5,15 @@ import {
   createManagedHelpAsset,
   deleteManagedHelpAsset,
 } from "$lib/server/help/helpAssetRepository";
+import {
+  createTrainingCaptionAsset,
+  validateTrainingCaptions,
+} from "$lib/server/help/helpTrainingCaption";
 import { attachHelpTrainingVideo } from "$lib/server/help/helpTrainingVideoAttachment";
 import { validateTrainingVideo } from "$lib/server/help/helpTrainingVideo";
 
 const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
+const MAX_CAPTION_BYTES = 1024 * 1024;
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -20,6 +25,8 @@ function errorMessage(cause: unknown): string {
   if (code === "TRAINING_VIDEO_FORMAT" || code === "ASSET_MIME_NOT_ALLOWED") return "Use um vídeo MP4.";
   if (code === "TRAINING_VIDEO_INVALID" || code === "ASSET_CONTENT_MISMATCH") return "Não foi possível validar este MP4. Exporte o vídeo novamente e tente outra vez.";
   if (code === "ASSET_SIZE_NOT_ALLOWED") return "O vídeo deve ter no máximo 25 MB.";
+  if (code === "TRAINING_CAPTION_SIZE_INVALID") return "A legenda deve ter no máximo 1 MB.";
+  if (code === "TRAINING_CAPTION_INVALID") return "Use uma legenda WebVTT válida (.vtt), iniciando com WEBVTT.";
   if (code === "ASSET_STORAGE_NOT_CONFIGURED") return "O armazenamento de arquivos não está configurado.";
   if (code === "TRAINING_STEP_NOT_FOUND") return "A microação selecionada não está mais disponível.";
   return "Não foi possível enviar o vídeo.";
@@ -40,6 +47,7 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
 
   const formData = await request.formData();
   const file = formData.get("file");
+  const captions = formData.get("captions");
   if (!(file instanceof File) || file.size < 1) {
     return json({ success: false, message: "Selecione um vídeo MP4." }, { status: 400 });
   }
@@ -49,34 +57,67 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
   if (file.size > MAX_VIDEO_BYTES) {
     return json({ success: false, message: "O vídeo deve ter no máximo 25 MB." }, { status: 400 });
   }
+  if (captions instanceof File && captions.size > 0) {
+    if (!captions.name.toLowerCase().endsWith(".vtt") || captions.size > MAX_CAPTION_BYTES) {
+      return json({ success: false, message: "Use uma legenda WebVTT (.vtt) de até 1 MB." }, { status: 400 });
+    }
+  }
 
-  let createdAssetId: string | null = null;
-  let reused = false;
+  let videoAssetId: string | null = null;
+  let videoReused = false;
+  let captionAssetId: string | null = null;
+  let captionReused = false;
 
   try {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const durationSeconds = validateTrainingVideo(bytes, file.type);
-    const result = await createManagedHelpAsset(session.user.id, {
+    const videoBytes = new Uint8Array(await file.arrayBuffer());
+    const durationSeconds = validateTrainingVideo(videoBytes, file.type);
+    const videoResult = await createManagedHelpAsset(session.user.id, {
       fileName: file.name || "demonstracao.mp4",
       mimeType: file.type,
-      bytes,
+      bytes: videoBytes,
       contentId: null,
     });
-    createdAssetId = result.asset.id;
-    reused = result.reused;
+    videoAssetId = videoResult.asset.id;
+    videoReused = videoResult.reused;
 
-    await attachHelpTrainingVideo(session.user.id, pathId, stepId, result.asset.id);
+    if (captions instanceof File && captions.size > 0) {
+      const captionBytes = new Uint8Array(await captions.arrayBuffer());
+      validateTrainingCaptions(captionBytes);
+      const captionResult = await createTrainingCaptionAsset(
+        session.user.id,
+        captions.name || "legendas.vtt",
+        captionBytes,
+      );
+      captionAssetId = captionResult.assetId;
+      captionReused = captionResult.reused;
+    }
+
+    await attachHelpTrainingVideo(
+      session.user.id,
+      pathId,
+      stepId,
+      videoAssetId,
+      captionAssetId,
+    );
 
     return json({
       success: true,
-      assetId: result.asset.id,
+      assetId: videoAssetId,
+      captionAssetId,
       durationSeconds: Math.round(durationSeconds * 10) / 10,
-      reused,
-      message: reused ? "Vídeo existente reutilizado nesta microação." : "Vídeo adicionado à microação.",
+      reused: videoReused,
+      message: captionAssetId
+        ? "Vídeo e legenda adicionados à microação."
+        : videoReused
+          ? "Vídeo existente reutilizado nesta microação."
+          : "Vídeo adicionado à microação. Adicione uma legenda .vtt quando houver fala ou informação sonora relevante.",
     });
   } catch (cause) {
-    if (createdAssetId && !reused) {
-      await deleteManagedHelpAsset(session.user.id, createdAssetId).catch(() => undefined);
+    if (captionAssetId && !captionReused) {
+      await deleteManagedHelpAsset(session.user.id, captionAssetId).catch(() => undefined);
+    }
+    if (videoAssetId && !videoReused) {
+      await deleteManagedHelpAsset(session.user.id, videoAssetId).catch(() => undefined);
     }
     return json({ success: false, message: errorMessage(cause) }, { status: 400 });
   }

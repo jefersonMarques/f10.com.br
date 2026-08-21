@@ -131,6 +131,7 @@ export type HelpTrainingSnapshot = {
     estimatedSeconds: number;
     images: Array<{ assetId: string; altText: string }>;
     videoUrl: string | null;
+    captionAssetId?: string | null;
     failureReasons: Array<{
       key: string;
       label: string;

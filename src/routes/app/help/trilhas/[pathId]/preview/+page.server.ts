@@ -32,6 +32,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
           .filter((media) => media.mediaType === "image" && media.assetId)
           .map((media) => ({ assetId: media.assetId as string, altText: media.altText })),
         videoUrl: step.media.find((media) => media.mediaType === "video")?.sourceUrl ?? null,
+        captionAssetId: step.media.find((media) => media.mediaType === "caption" && media.assetId)?.assetId ?? null,
         failureReasons: step.failureReasons.map((reason) => ({
           key: reason.reasonKey,
           label: reason.label,

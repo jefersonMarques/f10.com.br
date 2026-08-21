@@ -25,11 +25,12 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 
   try {
     const { asset, response } = await readManagedHelpAsset(assetId);
-    if (asset.assetType !== "image" && asset.assetType !== "video") {
+    const isCaption = asset.assetType === "file" && asset.mimeType === "text/vtt";
+    if (asset.assetType !== "image" && asset.assetType !== "video" && !isCaption) {
       return json({ error: "NOT_FOUND" }, { status: 404 });
     }
     const bytes = await response.arrayBuffer();
-    const safeName = (asset.originalName ?? (asset.assetType === "video" ? "demonstracao.mp4" : "imagem")).replace(/[\r\n"\\]/g, "_");
+    const safeName = (asset.originalName ?? (asset.assetType === "video" ? "demonstracao.mp4" : isCaption ? "legendas.vtt" : "imagem")).replace(/[\r\n"\\]/g, "_");
     return new Response(bytes, {
       headers: {
         "Content-Type": asset.mimeType || response.headers.get("content-type") || "application/octet-stream",

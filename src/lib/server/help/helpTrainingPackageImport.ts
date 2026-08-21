@@ -10,6 +10,7 @@ import {
   type HelpTrainingInteractionMode,
 } from "$lib/server/db/helpTrainingSchema";
 import { createManagedHelpAsset, deleteManagedHelpAsset } from "$lib/server/help/helpAssetRepository";
+import { createTrainingCaptionAsset, validateTrainingCaptions } from "$lib/server/help/helpTrainingCaption";
 import { normalizeTrainingSlug } from "$lib/server/help/helpTrainingRepository";
 import { validateTrainingVideo } from "$lib/server/help/helpTrainingVideo";
 import { readZipArchive } from "$lib/server/help/zipArchive";
@@ -27,7 +28,7 @@ const DEFAULT_FAILURE_REASONS = [
 ];
 
 type ManifestImage = { file: string; altText: string };
-type ManifestVideo = { file: string | null; url: string | null };
+type ManifestVideo = { file: string | null; url: string | null; captions: string | null };
 type ManifestReason = { key: string; label: string; recoveryMessage: string };
 type ManifestStep = {
   title: string;
@@ -49,8 +50,16 @@ type TrainingManifest = {
   accessMode: HelpTrainingAccessMode;
   steps: ManifestStep[];
 };
-
 type PreparedAsset = { id: string; reused: boolean };
+type PackageAssetType = "image" | "video" | "caption";
+type TrainingMediaRow = {
+  stepId: string;
+  mediaType: string;
+  assetId: string | null;
+  sourceUrl: string | null;
+  altText: string;
+  sortOrder: number;
+};
 
 function text(value: unknown, maxLength: number): string {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -86,11 +95,21 @@ function normalizeReasonKey(value: unknown, stepIndex: number, reasonIndex: numb
   return normalized || `reason_${stepIndex + 1}_${reasonIndex + 1}`;
 }
 
+function assertHttpUrl(value: string): void {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error();
+  } catch {
+    throw new Error("TRAINING_PACKAGE_VIDEO_URL_INVALID");
+  }
+}
+
 function parseManifest(bytes: Uint8Array): TrainingManifest {
   if (bytes.byteLength < 2 || bytes.byteLength > MAX_MANIFEST_BYTES) throw new Error("TRAINING_PACKAGE_MANIFEST_SIZE");
   let raw: unknown;
   try {
-    raw = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    const sourceText = new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\uFEFF/, "");
+    raw = JSON.parse(sourceText);
   } catch {
     throw new Error("TRAINING_PACKAGE_MANIFEST_JSON");
   }
@@ -101,7 +120,7 @@ function parseManifest(bytes: Uint8Array): TrainingManifest {
   if (title.length < 4) throw new Error("TRAINING_PACKAGE_TITLE_REQUIRED");
   const slug = normalizeTrainingSlug(text(source.slug, 100) || title);
   if (!slug) throw new Error("TRAINING_PACKAGE_SLUG_INVALID");
-  const accessMode = source.accessMode === "public" ? "public" : "invite_only";
+  const accessMode: HelpTrainingAccessMode = source.accessMode === "public" ? "public" : "invite_only";
   if (!Array.isArray(source.steps) || source.steps.length < 1 || source.steps.length > MAX_STEPS) {
     throw new Error("TRAINING_PACKAGE_STEPS_INVALID");
   }
@@ -123,20 +142,22 @@ function parseManifest(bytes: Uint8Array): TrainingManifest {
     if (step.video) {
       if (typeof step.video === "string") {
         const value = text(step.video, 1000);
-        video = /^https?:\/\//i.test(value) ? { file: null, url: value } : { file: normalizeFilePath(value), url: null };
+        if (!value) throw new Error("TRAINING_PACKAGE_VIDEO_REFERENCE_INVALID");
+        video = /^https?:\/\//i.test(value)
+          ? { file: null, url: value, captions: null }
+          : { file: normalizeFilePath(value), url: null, captions: null };
       } else if (typeof step.video === "object" && !Array.isArray(step.video)) {
         const rawVideo = step.video as Record<string, unknown>;
         const file = rawVideo.file ? normalizeFilePath(rawVideo.file) : null;
         const url = text(rawVideo.url, 1000) || null;
+        const captions = rawVideo.captions ? normalizeFilePath(rawVideo.captions) : null;
         if (file && url) throw new Error("TRAINING_PACKAGE_VIDEO_REFERENCE_INVALID");
-        video = file || url ? { file, url } : null;
+        if (captions && !file) throw new Error("TRAINING_PACKAGE_CAPTION_WITHOUT_VIDEO");
+        video = file || url ? { file, url, captions } : null;
       } else {
         throw new Error("TRAINING_PACKAGE_VIDEO_REFERENCE_INVALID");
       }
-      if (video?.url) {
-        const parsed = new URL(video.url);
-        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("TRAINING_PACKAGE_VIDEO_URL_INVALID");
-      }
+      if (video?.url) assertHttpUrl(video.url);
     }
 
     const reasonsSource = Array.isArray(step.failureReasons) ? step.failureReasons : DEFAULT_FAILURE_REASONS;
@@ -182,16 +203,26 @@ function parseManifest(bytes: Uint8Array): TrainingManifest {
   };
 }
 
-function mimeTypeForFile(path: string, expected: "image" | "video"): string {
+function mimeTypeForFile(path: string, expected: PackageAssetType): string {
   const extension = path.split(".").pop()?.toLowerCase() ?? "";
   const mimeType = extension === "png" ? "image/png"
     : extension === "jpg" || extension === "jpeg" ? "image/jpeg"
       : extension === "webp" ? "image/webp"
         : extension === "gif" ? "image/gif"
           : extension === "mp4" ? "video/mp4"
-            : "";
-  if (!mimeType || (expected === "image" && !mimeType.startsWith("image/")) || (expected === "video" && mimeType !== "video/mp4")) {
-    throw new Error(expected === "image" ? "TRAINING_PACKAGE_IMAGE_FORMAT" : "TRAINING_PACKAGE_VIDEO_FORMAT");
+            : extension === "vtt" ? "text/vtt"
+              : "";
+  const valid = expected === "image"
+    ? mimeType.startsWith("image/")
+    : expected === "video"
+      ? mimeType === "video/mp4"
+      : mimeType === "text/vtt";
+  if (!valid) {
+    throw new Error(expected === "image"
+      ? "TRAINING_PACKAGE_IMAGE_FORMAT"
+      : expected === "video"
+        ? "TRAINING_PACKAGE_VIDEO_FORMAT"
+        : "TRAINING_PACKAGE_CAPTION_FORMAT");
   }
   return mimeType;
 }
@@ -205,16 +236,18 @@ export async function importHelpTrainingPackage(
   if (!manifestEntry) throw new Error("TRAINING_PACKAGE_MANIFEST_MISSING");
   const manifest = parseManifest(manifestEntry.bytes);
 
-  const referencedFiles = new Map<string, "image" | "video">();
+  const referencedFiles = new Map<string, PackageAssetType>();
   for (const step of manifest.steps) {
     for (const image of step.images) referencedFiles.set(image.file, "image");
     if (step.video?.file) referencedFiles.set(step.video.file, "video");
+    if (step.video?.captions) referencedFiles.set(step.video.captions, "caption");
   }
   for (const [path, expectedType] of referencedFiles) {
     const entry = archive.get(path);
     if (!entry) throw new Error(`TRAINING_PACKAGE_FILE_MISSING:${path}`);
     const mimeType = mimeTypeForFile(path, expectedType);
     if (expectedType === "video") validateTrainingVideo(entry.bytes, mimeType);
+    if (expectedType === "caption") validateTrainingCaptions(entry.bytes);
   }
 
   const preparedAssets = new Map<string, PreparedAsset>();
@@ -222,6 +255,16 @@ export async function importHelpTrainingPackage(
   try {
     for (const [path, expectedType] of referencedFiles) {
       const entry = archive.get(path)!;
+      if (expectedType === "caption") {
+        const result = await createTrainingCaptionAsset(
+          actorUserId,
+          path.split("/").pop() || "legendas.vtt",
+          entry.bytes,
+        );
+        preparedAssets.set(path, { id: result.assetId, reused: result.reused });
+        if (!result.reused) newAssetIds.push(result.assetId);
+        continue;
+      }
       const result = await createManagedHelpAsset(actorUserId, {
         fileName: path.split("/").pop() || path,
         mimeType: mimeTypeForFile(path, expectedType),
@@ -279,7 +322,7 @@ export async function importHelpTrainingPackage(
           );
         }
 
-        const mediaRows = source.images.map((image, imageIndex) => ({
+        const mediaRows: TrainingMediaRow[] = source.images.map((image, imageIndex) => ({
           stepId: step.id,
           mediaType: "image",
           assetId: preparedAssets.get(image.file)!.id,
@@ -297,11 +340,21 @@ export async function importHelpTrainingPackage(
             altText: "",
             sortOrder: (mediaRows.length + 1) * 10,
           });
+          if (source.video.captions) {
+            mediaRows.push({
+              stepId: step.id,
+              mediaType: "caption",
+              assetId: preparedAssets.get(source.video.captions)!.id,
+              sourceUrl: null,
+              altText: "Legendas em português",
+              sortOrder: (mediaRows.length + 1) * 10,
+            });
+          }
         } else if (source.video?.url) {
           mediaRows.push({
             stepId: step.id,
             mediaType: "video",
-            assetId: null as unknown as string,
+            assetId: null,
             sourceUrl: source.video.url,
             altText: "",
             sortOrder: (mediaRows.length + 1) * 10,

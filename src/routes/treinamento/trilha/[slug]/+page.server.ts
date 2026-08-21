@@ -1,4 +1,4 @@
-import { error, fail, redirect, type Actions } from "@sveltejs/kit";
+import { error, fail, redirect, type Actions, type Cookies } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import {
   completePublicHelpTrainingStep,
@@ -24,7 +24,7 @@ function publicPath(slug: string): string {
   return `/treinamento/trilha/${encodeURIComponent(slug)}`;
 }
 
-async function requirePublicSession(cookies: Parameters<NonNullable<Actions[string]>>[0]["cookies"], slug: string) {
+async function requirePublicSession(cookies: Cookies, slug: string) {
   const token = getHelpTrainingPublicSessionCookie(cookies);
   if (!token) throw redirect(303, publicPath(slug));
   const state = await getPublicHelpTrainingSession(token);

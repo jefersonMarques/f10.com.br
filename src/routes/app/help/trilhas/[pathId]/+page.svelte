@@ -6,6 +6,7 @@
     ArrowDown,
     ArrowUp,
     BarChart3,
+    Captions,
     CheckCircle2,
     CircleAlert,
     Clock3,
@@ -69,6 +70,10 @@
     if (details.open) openStepId = stepId;
     else if (openStepId === stepId) openStepId = "";
   }
+
+  function captionAssetId(step: PageData["path"]["steps"][number]): string | null {
+    return step.media.find((media) => media.mediaType === "caption" && media.assetId)?.assetId ?? null;
+  }
 </script>
 
 <svelte:head><title>{data.path.title} | Trilhas F10</title></svelte:head>
@@ -117,6 +122,7 @@
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><CheckCircle2 size={18} class="text-[#2F7045]"/><strong class="mt-3 block text-[24px] font-semibold">{data.insights.completed}</strong><span class="application-text-caption text-[#858A98]">concluíram</span></div>
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><CircleAlert size={18} class="text-[#EA6D0B]"/><strong class="mt-3 block text-[24px] font-semibold">{data.insights.humanHelp}</strong><span class="application-text-caption text-[#858A98]">precisaram de ajuda humana</span></div>
   </section>
+  {#if "publicStarted" in data.insights && data.insights.publicStarted > 0}<p class="application-text-meta mt-2 text-right text-[#8B909D]">Dos acessos acima, {data.insights.publicStarted} começaram pelo link público e {data.insights.publicCompleted} concluíram.</p>{/if}
 
   <div class="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
     <div class="space-y-5">
@@ -144,7 +150,7 @@
             <details class="overflow-hidden rounded-2xl border border-[#E3E6ED] bg-[#FAFAFC]" open={openStepId === step.id} on:toggle={(event) => handleStepToggle(event, step.id)}>
               <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 sm:px-5">
                 <div class="flex min-w-0 items-center gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[11px] font-bold text-white">{stepIndex + 1}</span><div class="min-w-0"><strong class="block truncate text-[12px] font-semibold text-[#2B3141]">{step.title}</strong><span class="application-text-meta mt-1 block text-[#8B909D]">{(step.interactionMode ?? "action") === "presentation" ? "Apresentação" : "Ação com confirmação"} · estimativa interna {step.estimatedSeconds}s</span></div></div>
-                {#if data.canEdit}<div class="flex shrink-0 gap-1" on:click|stopPropagation><form method="POST" action="?/moveStep" use:enhance={enhanceEditor}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="up"/><button type="submit" disabled={stepIndex === 0} aria-label="Mover microação para cima" class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#E1E4EB] bg-white text-[#6B7280] disabled:opacity-30"><ArrowUp size={13}/></button></form><form method="POST" action="?/moveStep" use:enhance={enhanceEditor}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="down"/><button type="submit" disabled={stepIndex === data.path.steps.length - 1} aria-label="Mover microação para baixo" class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#E1E4EB] bg-white text-[#6B7280] disabled:opacity-30"><ArrowDown size={13}/></button></form></div>{/if}
+                {#if data.canEdit}<div class="flex shrink-0 gap-1"><form method="POST" action="?/moveStep" use:enhance={enhanceEditor}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="up"/><button type="submit" on:click|stopPropagation disabled={stepIndex === 0} aria-label="Mover microação para cima" class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#E1E4EB] bg-white text-[#6B7280] disabled:opacity-30"><ArrowUp size={13}/></button></form><form method="POST" action="?/moveStep" use:enhance={enhanceEditor}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="down"/><button type="submit" on:click|stopPropagation disabled={stepIndex === data.path.steps.length - 1} aria-label="Mover microação para baixo" class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#E1E4EB] bg-white text-[#6B7280] disabled:opacity-30"><ArrowDown size={13}/></button></form></div>{/if}
               </summary>
               <div class="border-t border-[#E7E9EF] bg-white p-4 sm:p-5">
                 <form method="POST" action="?/updateStep" use:enhance={enhanceEditor} class="space-y-4">
@@ -169,10 +175,13 @@
                             <img src={`/api/app/help/assets/${media.assetId}`} alt={media.altText || media.assetName || "Imagem da microação"} class="max-h-48 w-full rounded-lg bg-white object-contain"/>
                             <p class="application-text-meta mt-2 truncate font-semibold text-[#606777]">{media.assetName || "Print da microação"}</p>
                           {:else if media.mediaType === "video" && media.assetId}
-                            <video src={`/api/app/help/assets/${media.assetId}`} controls preload="metadata" class="aspect-video w-full rounded-lg bg-black" aria-label="Demonstração da microação"></video>
+                            <video src={`/api/app/help/assets/${media.assetId}`} controls preload="metadata" class="aspect-video w-full rounded-lg bg-black">{#if captionAssetId(step)}<track kind="captions" srclang="pt-BR" label="Português" src={`/api/app/help/assets/${captionAssetId(step)}`} default />{/if}</video>
                             <p class="application-text-meta mt-2 truncate font-semibold text-[#606777]">{media.assetName || "Microvídeo"}</p>
+                            {#if !captionAssetId(step)}<p class="application-text-meta mt-1 text-[#A15A18]">Sem legenda .vtt. Adicione legenda quando houver fala ou informação sonora relevante.</p>{/if}
                           {:else if media.mediaType === "video" && media.sourceUrl}
                             <div class="flex min-h-28 items-center justify-center rounded-lg bg-[#EEF0FF] text-[#000A57]"><Video size={26}/></div><a href={media.sourceUrl} target="_blank" rel="noopener noreferrer" class="application-text-meta mt-2 inline-flex items-center gap-1 font-semibold text-[#000A57]">Vídeo externo<ExternalLink size={11}/></a>
+                          {:else if media.mediaType === "caption" && media.assetId}
+                            <div class="flex min-h-28 items-center justify-center rounded-lg bg-[#F4F5F8] text-[#000A57]"><Captions size={26}/></div><p class="application-text-meta mt-2 truncate font-semibold text-[#606777]">{media.assetName || "Legendas WebVTT"}</p>
                           {/if}
                           {#if data.canEdit}<form method="POST" action="?/deleteMedia" use:enhance={enhanceEditor} class="mt-2"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="mediaId" value={media.id}/><button type="submit" class="application-text-meta inline-flex items-center gap-1 font-semibold text-[#9B2C2C]"><Trash2 size={11}/>Remover</button></form>{/if}
                         </div>

@@ -26,7 +26,10 @@
       "images": [
         { "file": "images/clientes.png", "altText": "Menu Clientes destacado" }
       ],
-      "video": { "file": "videos/clientes.mp4" },
+      "video": {
+        "file": "videos/clientes.mp4",
+        "captions": "videos/clientes.vtt"
+      },
       "failureReasons": [
         {
           "key": "option_not_found",

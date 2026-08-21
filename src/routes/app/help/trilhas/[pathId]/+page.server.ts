@@ -12,6 +12,7 @@ import {
   updateHelpTrainingPathDraft,
   updateHelpTrainingStepDraft,
 } from "$lib/server/help/helpTrainingAuthoringRepository";
+import { getCombinedHelpTrainingInsights } from "$lib/server/help/helpTrainingInsightsRepository";
 import { getTrainingBaseUrl, sendHelpTrainingInvite } from "$lib/server/help/helpTrainingMailer";
 import {
   addHelpTrainingStep,
@@ -19,7 +20,6 @@ import {
   createHelpTrainingInvite,
   deleteHelpTrainingMedia,
   deleteHelpTrainingStep,
-  getHelpTrainingInsights,
   getHelpTrainingPath,
   listHelpTrainingParticipants,
   listTrainingSupportQueues,
@@ -63,7 +63,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   const [queues, participants, insights] = await Promise.all([
     listTrainingSupportQueues(),
     listHelpTrainingParticipants(params.pathId),
-    getHelpTrainingInsights(params.pathId),
+    getCombinedHelpTrainingInsights(params.pathId),
   ]);
   const canEditPermission = hasPermission(permissions, "help.edit");
   const canPublishPermission = hasPermission(permissions, "help.publish");

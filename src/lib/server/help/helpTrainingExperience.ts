@@ -10,6 +10,7 @@ export type HelpTrainingClientStep = {
   interactionMode: HelpTrainingInteractionMode;
   images: Array<{ assetId: string; altText: string }>;
   videoUrl: string | null;
+  captionAssetId: string | null;
   failureReasons: Array<{
     key: string;
     label: string;
@@ -21,16 +22,18 @@ export function normalizeTrainingClientStep(
   step: NonNullable<Awaited<ReturnType<typeof getHelpTrainingSession>>>["currentStep"],
 ): HelpTrainingClientStep | null {
   if (!step) return null;
+  const interactionMode = step.interactionMode ?? "action";
   return {
     id: step.id,
     title: step.title,
     instruction: step.instruction,
-    expectedResult: step.expectedResult,
+    expectedResult: interactionMode === "presentation" ? "" : step.expectedResult,
     successMessage: step.successMessage,
-    interactionMode: step.interactionMode ?? "action",
+    interactionMode,
     images: step.images,
     videoUrl: step.videoUrl,
-    failureReasons: step.interactionMode === "presentation" ? [] : step.failureReasons,
+    captionAssetId: step.captionAssetId ?? null,
+    failureReasons: interactionMode === "presentation" ? [] : step.failureReasons,
   };
 }
 
