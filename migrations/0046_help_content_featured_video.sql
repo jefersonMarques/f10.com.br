@@ -11,6 +11,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS help_content_featured_videos_asset_unique
 CREATE INDEX IF NOT EXISTS help_content_featured_videos_updated_idx
   ON help_content_featured_videos(updated_at);
 
+-- Durante a transição, o bloco legado permanece como espelho porque versões
+-- publicadas antigas ainda serializam vídeos dentro dos passos.
 WITH single_video AS (
   SELECT
     steps.content_id,
@@ -26,10 +28,3 @@ INSERT INTO help_content_featured_videos (content_id, asset_id)
 SELECT content_id, asset_id
 FROM single_video
 ON CONFLICT (content_id) DO NOTHING;
-
-DELETE FROM help_step_blocks AS blocks
-USING help_content_steps AS steps, help_content_featured_videos AS featured
-WHERE blocks.step_id = steps.id
-  AND steps.content_id = featured.content_id
-  AND blocks.block_type = 'video'
-  AND blocks.asset_id = featured.asset_id;
