@@ -29,12 +29,12 @@ function errorMessage(cause: unknown): string {
   if (code === "TRAINING_VIDEO_FORMAT" || code === "ASSET_MIME_NOT_ALLOWED") return "Use um vídeo MP4.";
   if (code === "TRAINING_VIDEO_INVALID" || code === "ASSET_CONTENT_MISMATCH") return "Não foi possível validar este MP4. Exporte o vídeo novamente e tente outra vez.";
   if (code === "ASSET_SIZE_NOT_ALLOWED") return "O vídeo deve ter no máximo 25 MB.";
-  if (code === "TRAINING_CAPTION_SIZE_INVALID") return "A legenda deve ter no máximo 1 MB.";
+  if (code === "TRAINING_CAPTION_SIZE_INVALID") return "A legenda opcional deve ter no máximo 1 MB.";
   if (code === "TRAINING_CAPTION_INVALID") return "Use uma legenda WebVTT válida (.vtt), iniciando com WEBVTT.";
   if (code === "TRAINING_LOCAL_VIDEO_REQUIRED") return "Envie primeiro um vídeo MP4 local antes de anexar somente a legenda.";
   if (code === "ASSET_STORAGE_NOT_CONFIGURED") return "O armazenamento de arquivos não está configurado.";
   if (code === "TRAINING_STEP_NOT_FOUND") return "A microação selecionada não está mais disponível.";
-  return "Não foi possível enviar o vídeo ou a legenda.";
+  return "Não foi possível enviar o vídeo.";
 }
 
 export const POST: RequestHandler = async ({ cookies, params, request }) => {
@@ -57,7 +57,7 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
   const captions = captionsValue instanceof File && captionsValue.size > 0 ? captionsValue : null;
 
   if (!file && !captions) {
-    return json({ success: false, message: "Selecione um vídeo MP4 ou uma legenda .vtt." }, { status: 400 });
+    return json({ success: false, message: "Selecione um vídeo MP4." }, { status: 400 });
   }
   if (file && file.type.toLowerCase() !== "video/mp4") {
     return json({ success: false, message: "Use um vídeo MP4." }, { status: 400 });
@@ -120,10 +120,10 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
       durationSeconds: durationSeconds === null ? null : Math.round(durationSeconds * 10) / 10,
       reused: videoReused,
       message: videoAssetId && captionAssetId
-        ? "Vídeo e legenda adicionados à microação."
+        ? "Vídeo e legenda opcional adicionados à microação."
         : videoAssetId
-          ? "Vídeo adicionado. Anexe a legenda .vtt antes de publicar."
-          : "Legenda adicionada ao vídeo existente.",
+          ? "Vídeo adicionado à microação."
+          : "Legenda opcional adicionada ao vídeo existente.",
     });
   } catch (cause) {
     if (captionAssetId && !captionReused) {
