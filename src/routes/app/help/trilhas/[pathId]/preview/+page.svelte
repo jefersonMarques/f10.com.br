@@ -17,7 +17,7 @@
 
   function advance(): void {
     if (!currentStep) return;
-    successMessage = currentStep.successMessage || (currentStep.interactionMode === "presentation" ? "Certo. Vamos continuar." : "Certo. Próxima orientação.");
+    successMessage = currentStep.successMessage || "Etapa confirmada.";
     failureReported = false;
     failureDetail = "";
     if (stepIndex + 1 >= data.preview.steps.length) {
@@ -59,7 +59,7 @@
       <p class="mt-8 text-[9px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Pré-visualização</p>
       <h1 class="mx-auto mt-3 max-w-[760px] text-[30px] font-semibold tracking-[-0.035em] text-[#11182C] sm:text-[42px]">{data.preview.title}</h1>
       {#if data.preview.audience}<p class="mt-3 text-[11px] text-[#858A98]">{data.preview.audience}</p>{/if}
-      <p class="mx-auto mt-7 max-w-[620px] text-[13px] leading-7 text-[#656C7C]">{data.preview.welcomeMessage || "Você verá uma orientação por vez."}</p>
+      <p class="mx-auto mt-7 max-w-[620px] text-[13px] leading-7 text-[#656C7C]">Mantenha o F10 aberto. Você executará uma orientação por vez e precisará confirmar o resultado no sistema antes de avançar.</p>
       <p class="mt-3 text-[9px] text-[#9A9EAA]">Nenhum progresso ou dificuldade será registrado nesta prévia.</p>
       <button type="button" on:click={() => (started = true)} class="training-start mt-8 inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#000A57] px-6 text-[11px] font-semibold text-white shadow-[0_12px_28px_rgba(0,10,87,0.16)]">Começar<ChevronRight size={16}/></button>
     </section>
