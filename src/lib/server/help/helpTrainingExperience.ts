@@ -4,14 +4,20 @@ import { getHelpTrainingSession } from "$lib/server/help/helpTrainingRepository"
 export type HelpTrainingClientStep = {
   id: string;
   title: string;
+  question: string;
   instruction: string;
   expectedResult: string;
   successMessage: string;
+  primaryActionLabel: string;
   interactionMode: HelpTrainingInteractionMode;
   images: Array<{ assetId: string; altText: string }>;
   videoUrl: string | null;
   captionAssetId: string | null;
 };
+
+function defaultActionLabel(interactionMode: HelpTrainingInteractionMode): string {
+  return interactionMode === "presentation" ? "Entendi, continuar" : "Sim, consegui";
+}
 
 export function normalizeTrainingClientStep(
   step: NonNullable<Awaited<ReturnType<typeof getHelpTrainingSession>>>["currentStep"],
@@ -21,9 +27,11 @@ export function normalizeTrainingClientStep(
   return {
     id: step.id,
     title: step.title,
+    question: step.question?.trim() || step.title,
     instruction: step.instruction,
     expectedResult: interactionMode === "presentation" ? "" : step.expectedResult,
     successMessage: step.successMessage,
+    primaryActionLabel: step.primaryActionLabel?.trim() || defaultActionLabel(interactionMode),
     interactionMode,
     images: step.images,
     videoUrl: step.videoUrl,
