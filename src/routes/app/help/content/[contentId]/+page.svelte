@@ -27,7 +27,7 @@
   const blockLabels: Record<string, string> = {
     text: "Texto",
     image: "Imagem",
-    video: "Vídeo",
+    video: "Vídeo legado",
     notice: "Aviso",
     link: "Link",
     file: "Arquivo",
@@ -117,6 +117,64 @@
     </fieldset>
   </form>
 
+  <section class="mt-5 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div class="flex items-start gap-3">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Video size={20} aria-hidden="true" /></span>
+        <div>
+          <h2 class="text-[16px] font-semibold text-[#11182C]">Vídeo principal</h2>
+          <p class="mt-1 max-w-[720px] text-[11px] leading-5 text-[#858A98]">Opcional. Existe no máximo um vídeo por conteúdo e ele sempre aparece no topo da página pública, antes de todos os passos.</p>
+        </div>
+      </div>
+      {#if data.content.featuredVideo}
+        <span class="application-text-caption rounded-full bg-[#EEF8F1] px-3 py-1.5 font-bold text-[#2F7045]">Configurado</span>
+      {/if}
+    </div>
+
+    {#if data.content.legacyVideoCount > 0}
+      <div class="mt-5 flex items-start gap-3 rounded-2xl border border-[#F0C8C8] bg-[#FFF8F7] px-4 py-3 text-[#8D3333]">
+        <CircleAlert size={18} class="mt-0.5 shrink-0" aria-hidden="true" />
+        <div>
+          <strong class="block text-[11px]">Há {data.content.legacyVideoCount} {data.content.legacyVideoCount === 1 ? "vídeo antigo" : "vídeos antigos"} dentro dos passos.</strong>
+          <p class="application-text-caption mt-1 leading-5">Remova os vídeos extras abaixo. Se restar apenas um vídeo legado, você pode reutilizar a mesma URL ao salvar o Vídeo principal. A publicação fica bloqueada enquanto houver vídeo dentro dos passos.</p>
+        </div>
+      </div>
+    {/if}
+
+    <form method="POST" action="?/updateFeaturedVideo" class="mt-5">
+      <fieldset disabled={!data.canEdit} class="grid gap-4 disabled:opacity-70 lg:grid-cols-2">
+        <label class="block lg:col-span-2">
+          <span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">URL do vídeo principal</span>
+          <input name="sourceUrl" required value={data.content.featuredVideo?.sourceUrl ?? ""} placeholder="https://www.youtube.com/watch?v=..." class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#000A57]" />
+          <span class="application-text-meta mt-1.5 block text-[#9297A5]">YouTube é incorporado na página. Outras URLs HTTP/HTTPS ficam disponíveis como link externo.</span>
+        </label>
+        <label class="block lg:col-span-2">
+          <span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Descrição do vídeo</span>
+          <input name="altText" maxlength="500" value={data.content.featuredVideo?.altText ?? ""} placeholder="Explique o que o vídeo demonstra." class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#000A57]" />
+        </label>
+        <label class="block rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4">
+          <span class="application-text-caption font-semibold text-[#000A57]">Transcrição para a IA</span>
+          <textarea name="transcript" maxlength="100000" rows="6" class="mt-3 w-full resize-y rounded-xl border border-[#D8DDF4] bg-white px-3 py-2.5 text-[11px] leading-5 outline-none focus:border-[#000A57]">{data.content.featuredVideo?.transcript ?? ""}</textarea>
+        </label>
+        <label class="block rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4">
+          <span class="application-text-caption font-semibold text-[#000A57]">Resumo operacional para a IA</span>
+          <textarea name="aiSummary" maxlength="20000" rows="6" class="mt-3 w-full resize-y rounded-xl border border-[#D8DDF4] bg-white px-3 py-2.5 text-[11px] leading-5 outline-none focus:border-[#000A57]">{data.content.featuredVideo?.aiSummary ?? ""}</textarea>
+        </label>
+        {#if data.canEdit}
+          <div class="flex justify-end lg:col-span-2">
+            <button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white"><Save size={15} aria-hidden="true" />{data.content.featuredVideo ? "Salvar vídeo principal" : "Adicionar vídeo principal"}</button>
+          </div>
+        {/if}
+      </fieldset>
+    </form>
+
+    {#if data.canEdit && data.content.featuredVideo}
+      <form method="POST" action="?/deleteFeaturedVideo" class="mt-3 flex justify-end" on:submit={(event) => { if (!confirm("Remover o vídeo principal deste conteúdo?")) event.preventDefault(); }}>
+        <button type="submit" class="application-text-caption inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#F0C8C8] bg-white px-3 font-semibold text-[#9B2C2C] transition hover:bg-[#FFF5F5]"><Trash2 size={14} aria-hidden="true" />Remover vídeo principal</button>
+      </form>
+    {/if}
+  </section>
+
   <div class="mt-5 space-y-5">
     {#each data.content.steps as step, stepIndex}
       <article class="overflow-hidden rounded-[22px] border border-[#DDE1EA] bg-white shadow-[0_8px_30px_rgba(1,13,40,0.04)]">
@@ -138,16 +196,16 @@
 
           <section class="mt-7 border-t border-[#EEF0F5] pt-6">
             <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-              <div><h3 class="text-[13px] font-semibold text-[#303645]">Conteúdo visível deste passo</h3><p class="application-text-caption mt-1 text-[#9297A5]">Texto, imagem, vídeo e arquivos ficam separados para melhorar leitura, busca e suporte.</p></div>
+              <div><h3 class="text-[13px] font-semibold text-[#303645]">Conteúdo visível deste passo</h3><p class="application-text-caption mt-1 text-[#9297A5]">Texto, imagens, avisos e arquivos ficam separados para melhorar leitura, busca e navegação contextual. O vídeo principal é configurado acima.</p></div>
               <div class="flex items-center gap-2"><span class="application-text-meta rounded-full bg-[#F4F5F8] px-2.5 py-1 font-semibold text-[#747A8A]">{step.blocks.length} blocos</span>{#if data.canEdit}<a href="/app/help/assets" class="application-text-meta inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-2.5 font-semibold text-[#000A57]"><HardDrive size={12}/>Usar biblioteca</a>{/if}</div>
             </div>
 
             {#if step.blocks.length === 0}
-              <div class="mt-4 rounded-2xl border border-dashed border-[#D6DAE3] bg-[#FAFAFC] px-5 py-8 text-center"><p class="text-[11px] font-semibold text-[#5F6574]">Este passo ainda está vazio.</p><p class="application-text-caption mt-1 text-[#9499A6]">Adicione texto, imagem, vídeo ou arquivo antes de publicar.</p></div>
+              <div class="mt-4 rounded-2xl border border-dashed border-[#D6DAE3] bg-[#FAFAFC] px-5 py-8 text-center"><p class="text-[11px] font-semibold text-[#5F6574]">Este passo ainda está vazio.</p><p class="application-text-caption mt-1 text-[#9499A6]">Adicione texto, imagem, aviso, link ou arquivo antes de publicar.</p></div>
             {:else}
               <div class="mt-4 space-y-4">
                 {#each step.blocks as block, blockIndex}
-                  <div class="rounded-2xl border border-[#E3E6ED] bg-[#FAFAFC] p-4 sm:p-5">
+                  <div class={`rounded-2xl border p-4 sm:p-5 ${block.blockType === "video" ? "border-[#F0C8C8] bg-[#FFF8F7]" : "border-[#E3E6ED] bg-[#FAFAFC]"}`}>
                     <div class="flex items-center justify-between gap-3">
                       <span class="application-text-meta inline-flex items-center gap-2 font-bold uppercase tracking-[0.08em] text-[#737989]">
                         {#if block.blockType === "text" || block.blockType === "file"}<FileText size={14} aria-hidden="true" />{:else if block.blockType === "image"}<ImageIcon size={14} aria-hidden="true" />{:else if block.blockType === "video"}<Video size={14} aria-hidden="true" />{:else if block.blockType === "link"}<Link2 size={14} aria-hidden="true" />{:else}<Info size={14} aria-hidden="true" />{/if}
@@ -155,6 +213,10 @@
                       </span>
                       {#if data.canEdit}<form method="POST" action="?/deleteBlock"><input type="hidden" name="blockId" value={block.id} /><button type="submit" class="flex h-8 w-8 items-center justify-center rounded-lg text-[#969BA7] transition hover:bg-[#FFF0F0] hover:text-[#A52A2A]" aria-label="Remover bloco"><Trash2 size={14} aria-hidden="true" /></button></form>{/if}
                     </div>
+
+                    {#if block.blockType === "video"}
+                      <p class="application-text-caption mt-3 rounded-xl bg-white px-3 py-2 leading-5 text-[#8D3333]">Este vídeo usa o formato legado dentro de um passo. Remova os extras e use a seção <strong>Vídeo principal</strong> acima.</p>
+                    {/if}
 
                     <form method="POST" action="?/updateBlock" class="mt-4 space-y-3">
                       <input type="hidden" name="blockId" value={block.id} /><input type="hidden" name="blockType" value={block.blockType} />
@@ -184,10 +246,9 @@
             {/if}
 
             {#if data.canEdit}
-              <div class="mt-5 grid gap-3 lg:grid-cols-3">
+              <div class="mt-5 grid gap-3 lg:grid-cols-2">
                 <details class="rounded-2xl border border-[#DDE1EA] bg-white p-4"><summary class="application-text-caption flex cursor-pointer list-none items-center gap-2 font-semibold text-[#000A57]"><FileText size={15} aria-hidden="true" />Adicionar texto</summary><form method="POST" action="?/addBlock" class="mt-4 space-y-3"><input type="hidden" name="stepId" value={step.id} /><input type="hidden" name="blockType" value="text" /><textarea name="textContent" required maxlength="50000" rows="5" placeholder="Explique o que o usuário deve fazer neste ponto." class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2 text-[11px] leading-5"></textarea><button type="submit" class="application-text-caption min-h-9 w-full rounded-xl bg-[#000A57] px-3 font-semibold text-white">Adicionar texto</button></form></details>
                 <HelpImageUploader contentId={data.content.id} stepId={step.id} />
-                <details class="rounded-2xl border border-[#DDE1EA] bg-white p-4"><summary class="application-text-caption flex cursor-pointer list-none items-center gap-2 font-semibold text-[#000A57]"><Video size={15} aria-hidden="true" />Adicionar vídeo do YouTube</summary><form method="POST" action="?/addBlock" class="mt-4 space-y-3"><input type="hidden" name="stepId" value={step.id} /><input type="hidden" name="blockType" value="video" /><input name="sourceUrl" required placeholder="https://www.youtube.com/watch?v=..." class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] px-3" /><input name="altText" maxlength="500" placeholder="Descrição do vídeo" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] px-3" /><textarea name="transcript" maxlength="100000" rows="4" placeholder="Transcrição ou conteúdo do vídeo para a IA" class="application-text-caption w-full rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-3 py-2"></textarea><textarea name="aiSummary" maxlength="20000" rows="3" placeholder="Resumo adicional para IA" class="application-text-caption w-full rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-3 py-2"></textarea><button type="submit" class="application-text-caption min-h-9 w-full rounded-xl bg-[#000A57] px-3 font-semibold text-white">Adicionar vídeo</button></form></details>
               </div>
             {/if}
           </section>
@@ -198,5 +259,5 @@
 
   {#if data.canEdit}<form method="POST" action="?/addStep" class="mt-5"><button type="submit" class="flex min-h-14 w-full items-center justify-center gap-2 rounded-[20px] border border-dashed border-[#BCC2CF] bg-white text-[12px] font-semibold text-[#000A57] transition hover:border-[#000A57] hover:bg-[#F8F9FF]"><Plus size={18} aria-hidden="true" />Adicionar próximo passo</button></form>{/if}
 
-  <section class="mt-5 rounded-[22px] border border-[#D8DDF4] bg-[#F8F9FF] p-5 sm:p-6"><div class="flex items-start gap-3"><BrainCircuit size={20} class="mt-0.5 shrink-0 text-[#000A57]" aria-hidden="true" /><div><h2 class="text-[13px] font-semibold text-[#000A57]">Uma única base para cliente, pesquisa e suporte</h2><p class="mt-2 max-w-[900px] text-[11px] leading-6 text-[#646B7D]">Quando publicado, o snapshot guarda separadamente a apresentação pública e o conhecimento privado da IA. Assim o agente pode usar transcrições, exceções e instruções internas sem expor essas informações diretamente na Central pública.</p></div></div></section>
+  <section class="mt-5 rounded-[22px] border border-[#D8DDF4] bg-[#F8F9FF] p-5 sm:p-6"><div class="flex items-start gap-3"><BrainCircuit size={20} class="mt-0.5 shrink-0 text-[#000A57]" aria-hidden="true" /><div><h2 class="text-[13px] font-semibold text-[#000A57]">Uma única base para cliente, pesquisa e suporte</h2><p class="mt-2 max-w-[900px] text-[11px] leading-6 text-[#646B7D]">Quando publicado, o snapshot guarda separadamente a apresentação pública e o conhecimento privado da IA. Os títulos e blocos dos passos também formam os alvos estáveis usados pela navegação contextual.</p></div></div></section>
 </ApplicationContent>
