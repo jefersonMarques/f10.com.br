@@ -55,9 +55,7 @@
   function targetElement(helpTarget: HelpTarget): HTMLElement | null {
     if (typeof document === "undefined") return null;
     if (helpTarget.anchor) return document.getElementById(helpTarget.anchor);
-    return document.querySelector<HTMLElement>(
-      `[data-help-content-slug="${CSS.escape(helpTarget.slug)}"]`,
-    );
+    return document.querySelector<HTMLElement>("[data-help-content-slug]");
   }
 
   async function revealTarget(helpTarget: HelpTarget): Promise<void> {
@@ -105,12 +103,7 @@
     }
 
     storeNavigationState();
-    const params = new URLSearchParams();
-    if (helpTarget.anchor) params.set("aiTarget", helpTarget.anchor);
-    const queryString = params.toString();
-    await goto(
-      `/ajuda-f10/${encodeURIComponent(helpTarget.slug)}${queryString ? `?${queryString}` : ""}`,
-    );
+    await goto(`/ajuda-f10/${encodeURIComponent(helpTarget.slug)}`);
   }
 
   function errorFor(code: string): string {
@@ -177,19 +170,6 @@
       target = restored.target;
       minimized = false;
       void revealTarget(restored.target);
-      return;
-    }
-
-    const params = new URLSearchParams(window.location.search);
-    const anchor = params.get("aiTarget");
-    if (anchor) {
-      window.setTimeout(() => {
-        const element = document.getElementById(anchor);
-        if (!element) return;
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
-        element.classList.add("help-ai-target-highlight");
-        window.setTimeout(() => element.classList.remove("help-ai-target-highlight"), 4_500);
-      }, 160);
     }
   });
 </script>
