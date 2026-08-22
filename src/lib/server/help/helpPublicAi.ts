@@ -131,6 +131,21 @@ function mediaKnowledgeByBlock(aiStep: Record<string, unknown> | null): Map<stri
   return result;
 }
 
+function findLegacyFeaturedVideo(rawPublicSteps: unknown[]): Record<string, unknown> | null {
+  for (const rawStep of rawPublicSteps) {
+    const step = asRecord(rawStep);
+    if (!step || !Array.isArray(step.blocks)) continue;
+
+    for (const rawBlock of step.blocks) {
+      const block = asRecord(rawBlock);
+      if (readString(block, "blockType") !== "video") continue;
+      const asset = asRecord(block?.asset);
+      if (asset && readString(asset, "assetType") === "video") return asset;
+    }
+  }
+  return null;
+}
+
 function buildFragments(
   question: string,
   contentId: string,
@@ -181,18 +196,25 @@ function buildFragments(
     readString(aiData, "generalKnowledge"),
   );
 
-  const featuredVideo = asRecord(publicData.featuredVideo);
-  const featuredKnowledge = asRecord(aiData?.featuredVideoKnowledge);
+  const rawPublicSteps = Array.isArray(publicData.steps) ? publicData.steps : [];
+  const explicitFeaturedVideo = asRecord(publicData.featuredVideo);
+  const featuredVideo = explicitFeaturedVideo ?? findLegacyFeaturedVideo(rawPublicSteps);
+  const featuredKnowledge = explicitFeaturedVideo
+    ? asRecord(aiData?.featuredVideoKnowledge)
+    : null;
+
   if (featuredVideo) {
     addFragment(
       "featured_video",
       null,
       null,
       [title, readString(featuredVideo, "altText"), "Vídeo principal do conteúdo."].filter(Boolean).join("\n"),
-      [
-        readString(featuredKnowledge, "transcript"),
-        readString(featuredKnowledge, "summary"),
-      ].filter(Boolean).join("\n"),
+      featuredKnowledge
+        ? [
+            readString(featuredKnowledge, "transcript"),
+            readString(featuredKnowledge, "summary"),
+          ].filter(Boolean).join("\n")
+        : "",
     );
   }
 
@@ -204,7 +226,6 @@ function buildFragments(
     if (record && id) aiSteps.set(id, record);
   }
 
-  const rawPublicSteps = Array.isArray(publicData.steps) ? publicData.steps : [];
   for (const rawStep of rawPublicSteps) {
     const step = asRecord(rawStep);
     const stepId = readString(step, "id");
@@ -228,6 +249,8 @@ function buildFragments(
       if (!block || !blockId) continue;
 
       const blockType = readString(block, "blockType");
+      if (blockType === "video") continue;
+
       const asset = asRecord(block.asset);
       const publicText = [
         stepTitle,
