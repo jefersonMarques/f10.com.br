@@ -12,7 +12,9 @@ import {
 } from "$lib/server/remote/remoteSupportProvider";
 import {
   getGeneralOperationsSettings,
+  getHelpPublicAiSettings,
   updateGeneralOperationsSettings,
+  updateHelpPublicAiSettings,
 } from "$lib/server/settings/operationsSettingsRepository";
 import {
   getAssetStorageStatus,
@@ -25,14 +27,24 @@ function readString(formData: FormData, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function readBoolean(formData: FormData, key: string): boolean {
+  return formData.get(key) === "on";
+}
+
 function isValidOptionalEmail(value: string): boolean {
   return !value || (value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
 }
 
 export const load: PageServerLoad = async ({ cookies }) => {
   await requireAppPermission(cookies, "system.settings.manage", "/app/settings");
+  const [general, helpPublicAi] = await Promise.all([
+    getGeneralOperationsSettings(),
+    getHelpPublicAiSettings(),
+  ]);
+
   return {
-    general: await getGeneralOperationsSettings(),
+    general,
+    helpPublicAi,
     storage: getAssetStorageStatus(),
     ai: {
       configured: isOpenAiConfigured(),
@@ -86,6 +98,58 @@ export const actions: Actions = {
       success: true,
       action: "saveGeneral",
       message: "Configurações gerais atualizadas.",
+    };
+  },
+
+  saveHelpPublicAi: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(
+      cookies,
+      "system.settings.manage",
+      "/app/settings",
+    );
+    const formData = await request.formData();
+    const enabled = readBoolean(formData, "enabled");
+    const anonymousAccessEnabled = readBoolean(formData, "anonymousAccessEnabled");
+    const rateLimitWindowMinutes = Number(readString(formData, "rateLimitWindowMinutes"));
+    const sessionRequestLimit = Number(readString(formData, "sessionRequestLimit"));
+    const ipRequestLimit = Number(readString(formData, "ipRequestLimit"));
+    const globalRequestLimitPerHour = Number(readString(formData, "globalRequestLimitPerHour"));
+
+    if (
+      !Number.isInteger(rateLimitWindowMinutes) ||
+      rateLimitWindowMinutes < 1 ||
+      rateLimitWindowMinutes > 60 ||
+      !Number.isInteger(sessionRequestLimit) ||
+      sessionRequestLimit < 1 ||
+      sessionRequestLimit > 100 ||
+      !Number.isInteger(ipRequestLimit) ||
+      ipRequestLimit < 1 ||
+      ipRequestLimit > 500 ||
+      ipRequestLimit < sessionRequestLimit ||
+      !Number.isInteger(globalRequestLimitPerHour) ||
+      globalRequestLimitPerHour < 10 ||
+      globalRequestLimitPerHour > 50_000
+    ) {
+      return fail(400, {
+        success: false,
+        action: "saveHelpPublicAi",
+        message: "Revise os limites da IA da Central de Ajuda. O limite por IP deve ser igual ou maior que o limite por sessão.",
+      });
+    }
+
+    await updateHelpPublicAiSettings(session.user.id, {
+      enabled,
+      anonymousAccessEnabled,
+      rateLimitWindowMinutes,
+      sessionRequestLimit,
+      ipRequestLimit,
+      globalRequestLimitPerHour,
+    });
+
+    return {
+      success: true,
+      action: "saveHelpPublicAi",
+      message: "Proteções da IA da Central de Ajuda atualizadas.",
     };
   },
 
