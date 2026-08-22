@@ -345,6 +345,7 @@ export async function answerPublicHelpQuestion(questionInput: string): Promise<H
     query: question,
     source: "public",
     limit: MAX_RETRIEVED_CONTENTS,
+    includeAiKnowledge: true,
   });
 
   if (search.results.length === 0) {
