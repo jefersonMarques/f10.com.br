@@ -73,6 +73,49 @@
         </div>
       </div>
     </section>
+
+    <section class="rounded-[22px] border border-[#D8DDF4] bg-white p-5 sm:p-6 lg:col-span-2">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><ShieldCheck size={18}/></span>
+          <div><h2 class="text-[14px] font-semibold">IA da Central de Ajuda</h2><p class="application-text-meta mt-1 text-[#9297A5]">Disponibilidade pública e limites de proteção contra abuso e custo excessivo.</p></div>
+        </div>
+        <span class={`application-text-meta w-fit rounded-full px-2.5 py-1 font-bold ${data.helpPublicAi.enabled && data.ai.configured ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF4E9] text-[#A9510D]"}`}>{data.helpPublicAi.enabled && data.ai.configured ? "Pronta para ativação" : data.helpPublicAi.enabled ? "OpenAI pendente" : "Desativada"}</span>
+      </div>
+
+      <form method="POST" action="?/saveHelpPublicAi" class="mt-6 space-y-5">
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#E2E5ED] bg-[#FAFBFD] p-4">
+            <input name="enabled" type="checkbox" checked={data.helpPublicAi.enabled} class="mt-0.5 h-4 w-4 rounded border-[#C9CEDA]" />
+            <span><strong class="application-text-caption block text-[#343B4B]">Habilitar IA na Central de Ajuda</strong><small class="application-text-meta mt-1 block leading-5 text-[#858B99]">É o interruptor geral que o endpoint público deverá respeitar.</small></span>
+          </label>
+          <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#E2E5ED] bg-[#FAFBFD] p-4">
+            <input name="anonymousAccessEnabled" type="checkbox" checked={data.helpPublicAi.anonymousAccessEnabled} class="mt-0.5 h-4 w-4 rounded border-[#C9CEDA]" />
+            <span><strong class="application-text-caption block text-[#343B4B]">Permitir visitantes sem login</strong><small class="application-text-meta mt-1 block leading-5 text-[#858B99]">Quando desmarcado, a futura API exigirá uma sessão autenticada.</small></span>
+          </label>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6B]">Janela de rate limit</span><div class="flex items-center gap-2"><input name="rateLimitWindowMinutes" type="number" min="1" max="60" value={data.helpPublicAi.rateLimitWindowMinutes} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]" /><span class="application-text-meta text-[#858B99]">min</span></div><span class="application-text-meta mt-1 block leading-4 text-[#979CA8]">Padrão recomendado: 10.</span></label>
+          <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6B]">Perguntas por sessão</span><input name="sessionRequestLimit" type="number" min="1" max="100" value={data.helpPublicAi.sessionRequestLimit} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]" /><span class="application-text-meta mt-1 block leading-4 text-[#979CA8]">Padrão recomendado: 10 por janela.</span></label>
+          <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6B]">Perguntas por IP</span><input name="ipRequestLimit" type="number" min="1" max="500" value={data.helpPublicAi.ipRequestLimit} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]" /><span class="application-text-meta mt-1 block leading-4 text-[#979CA8]">Deve ser igual ou maior que o limite por sessão.</span></label>
+          <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6B]">Teto global por hora</span><input name="globalRequestLimitPerHour" type="number" min="10" max="50000" value={data.helpPublicAi.globalRequestLimitPerHour} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]" /><span class="application-text-meta mt-1 block leading-4 text-[#979CA8]">Circuit breaker de custo para toda a instalação.</span></label>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="rounded-xl border border-[#E3E6EE] bg-[#F8F9FF] px-3 py-3"><strong class="application-text-meta block text-[#000A57]">Concorrência fixa</strong><span class="application-text-meta mt-1 block leading-4 text-[#7E8493]">1 execução simultânea por visitante.</span></div>
+          <div class="rounded-xl border border-[#E3E6EE] bg-[#F8F9FF] px-3 py-3"><strong class="application-text-meta block text-[#000A57]">Fonte publicada</strong><span class="application-text-meta mt-1 block leading-4 text-[#7E8493]">Somente conteúdo efetivamente publicado.</span></div>
+          <div class="rounded-xl border border-[#E3E6EE] bg-[#F8F9FF] px-3 py-3"><strong class="application-text-meta block text-[#000A57]">Destino validado</strong><span class="application-text-meta mt-1 block leading-4 text-[#7E8493]">Slug, passo e bloco precisam pertencer à publicação.</span></div>
+          <div class="rounded-xl border border-[#E3E6EE] bg-[#F8F9FF] px-3 py-3"><strong class="application-text-meta block text-[#000A57]">Dados internos protegidos</strong><span class="application-text-meta mt-1 block leading-4 text-[#7E8493]">Conhecimento privado orienta a IA, mas não é devolvido ao visitante.</span></div>
+        </div>
+
+        {#if !data.ai.configured}
+          <p class="application-text-caption rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 leading-5 text-[#7A3B08]">A configuração pode ser salva agora, mas a IA pública não poderá responder enquanto a OpenAI não estiver configurada no ambiente seguro do servidor.</p>
+        {/if}
+
+        <button type="submit" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 font-semibold text-white"><Save size={14}/>Salvar proteção da Central</button>
+      </form>
+    </section>
   </div>
 
   <section class="application-text-caption mt-5 flex items-start gap-3 rounded-2xl border border-[#DDE1F0] bg-[#F8F9FF] px-4 py-3 leading-5 text-[#626A7E]"><ShieldCheck size={16} class="mt-0.5 shrink-0 text-[#000A57]"/><span>Chaves OpenAI, Brevo, Access Key/Secret do MinIO e credenciais do MeshCentral não são gravadas em <code>operations_settings</code> nem devolvidas ao navegador. A tela expõe apenas parâmetros não secretos e o estado operacional das integrações.</span></section>
