@@ -5,6 +5,7 @@ import { hasPermission } from "$lib/server/auth/permissions";
 import {
   importStructuredHelpFile,
   validateHelpImportJson,
+  type HelpImportFile,
 } from "$lib/server/help/structuredHelpImport";
 import {
   importStructuredHelpPackage,
@@ -22,16 +23,44 @@ function permissionMap(
 }
 
 function conflictMessage(message: string): string {
-  if (message.startsWith("IMPORT_SLUG_CONFLICT:")) return `Já existem conteúdos com estes endereços: ${message.slice("IMPORT_SLUG_CONFLICT:".length)}.`;
-  if (message.startsWith("IMPORT_EXTERNAL_ID_CONFLICT:")) return `Este arquivo contém itens já importados desta mesma origem: ${message.slice("IMPORT_EXTERNAL_ID_CONFLICT:".length)}.`;
-  if (message === "ASSET_STORAGE_NOT_CONFIGURED") return "O pacote possui arquivos locais, mas o S3/MinIO ainda não está configurado.";
+  if (message.startsWith("IMPORT_SLUG_CONFLICT:")) {
+    return `Já existem conteúdos com estes endereços: ${message.slice("IMPORT_SLUG_CONFLICT:".length)}.`;
+  }
+  if (message.startsWith("IMPORT_EXTERNAL_ID_CONFLICT:")) {
+    return `Este arquivo contém itens já importados desta mesma origem: ${message.slice("IMPORT_EXTERNAL_ID_CONFLICT:".length)}.`;
+  }
+  if (message === "ASSET_STORAGE_NOT_CONFIGURED") {
+    return "O pacote possui arquivos locais, mas o S3/MinIO ainda não está configurado.";
+  }
   return "Não foi possível importar o arquivo. Nenhum conteúdo foi alterado.";
+}
+
+function countJsonAssets(file: HelpImportFile): number {
+  return file.contents.reduce(
+    (contentTotal, content) =>
+      contentTotal +
+      (content.featuredVideo ? 1 : 0) +
+      content.steps.reduce(
+        (stepTotal, step) =>
+          stepTotal +
+          step.blocks.filter(
+            (block) =>
+              block.type === "image" ||
+              block.type === "video" ||
+              block.type === "file",
+          ).length,
+        0,
+      ),
+    0,
+  );
 }
 
 export const load: PageServerLoad = async ({ parent }) => {
   const layout = await parent();
   const permissions = permissionMap(layout.permissions);
-  if (!hasPermission(permissions, "help.view")) throw error(403, "Acesso não autorizado.");
+  if (!hasPermission(permissions, "help.view")) {
+    throw error(403, "Acesso não autorizado.");
+  }
   return {
     canImport: hasPermission(permissions, "help.edit"),
     maxImportBytes: MAX_ZIP_BYTES,
@@ -41,28 +70,56 @@ export const load: PageServerLoad = async ({ parent }) => {
 
 export const actions: Actions = {
   import: async ({ cookies, request }) => {
-    const { session } = await requireAppPermission(cookies, "help.edit", "/app/help/content/import");
+    const { session } = await requireAppPermission(
+      cookies,
+      "help.edit",
+      "/app/help/content/import",
+    );
     const formData = await request.formData();
     const fileValue = formData.get("file");
     if (!(fileValue instanceof File) || fileValue.size === 0) {
-      return fail(400, { success: false, message: "Selecione um arquivo JSON ou ZIP para importar.", issues: [] });
+      return fail(400, {
+        success: false,
+        message: "Selecione um arquivo JSON ou ZIP para importar.",
+        issues: [],
+      });
     }
 
     const lowerName = fileValue.name.toLowerCase();
     const isZip = lowerName.endsWith(".zip");
     const isJson = lowerName.endsWith(".json");
-    if (!isZip && !isJson) return fail(400, { success: false, message: "Use um arquivo .json ou .zip.", issues: [] });
+    if (!isZip && !isJson) {
+      return fail(400, {
+        success: false,
+        message: "Use um arquivo .json ou .zip.",
+        issues: [],
+      });
+    }
     const maxBytes = isZip ? MAX_ZIP_BYTES : MAX_JSON_BYTES;
-    if (fileValue.size > maxBytes) return fail(413, { success: false, message: `O arquivo excede o limite de ${Math.round(maxBytes / 1024 / 1024)} MB.`, issues: [] });
+    if (fileValue.size > maxBytes) {
+      return fail(413, {
+        success: false,
+        message: `O arquivo excede o limite de ${Math.round(maxBytes / 1024 / 1024)} MB.`,
+        issues: [],
+      });
+    }
 
     if (isZip) {
-      const validation = validateHelpImportPackage(new Uint8Array(await fileValue.arrayBuffer()));
+      const validation = validateHelpImportPackage(
+        new Uint8Array(await fileValue.arrayBuffer()),
+      );
       if (!validation.valid || !validation.manifest) {
         return fail(400, {
           success: false,
           message: "O pacote ZIP não segue o formato de importação do F10.",
           issues: validation.issues,
-          summary: { source: validation.source, contentCount: validation.contentCount, stepCount: validation.stepCount, blockCount: validation.blockCount, assetCount: validation.assetCount },
+          summary: {
+            source: validation.source,
+            contentCount: validation.contentCount,
+            stepCount: validation.stepCount,
+            blockCount: validation.blockCount,
+            assetCount: validation.assetCount,
+          },
         });
       }
       try {
@@ -71,11 +128,21 @@ export const actions: Actions = {
           success: true,
           message: `${result.contentCount} conteúdo(s) e ${result.assetCount} referência(s) de mídia/arquivo importados como rascunho.`,
           issues: [],
-          summary: { source: result.source, contentCount: result.contentCount, stepCount: result.stepCount, blockCount: result.blockCount, assetCount: result.assetCount },
+          summary: {
+            source: result.source,
+            contentCount: result.contentCount,
+            stepCount: result.stepCount,
+            blockCount: result.blockCount,
+            assetCount: result.assetCount,
+          },
           imported: result.imported,
         };
       } catch (cause) {
-        return fail(409, { success: false, message: conflictMessage(cause instanceof Error ? cause.message : ""), issues: [] });
+        return fail(409, {
+          success: false,
+          message: conflictMessage(cause instanceof Error ? cause.message : ""),
+          issues: [],
+        });
       }
     }
 
@@ -86,17 +153,30 @@ export const actions: Actions = {
         success: false,
         message: "O arquivo não segue o formato de importação do F10.",
         issues: validation.issues,
-        summary: { source: validation.source, contentCount: validation.contentCount, stepCount: validation.stepCount, blockCount: validation.blockCount, assetCount: 0 },
+        summary: {
+          source: validation.source,
+          contentCount: validation.contentCount,
+          stepCount: validation.stepCount,
+          blockCount: validation.blockCount,
+          assetCount: 0,
+        },
       });
     }
 
+    const assetCount = countJsonAssets(validation.parsed);
     try {
       const result = await importStructuredHelpFile(session.user.id, validation.parsed);
       return {
         success: true,
         message: `${result.contentCount} conteúdo(s) importado(s) como rascunho.`,
         issues: [],
-        summary: { source: result.source, contentCount: result.contentCount, stepCount: result.stepCount, blockCount: result.blockCount, assetCount: 0 },
+        summary: {
+          source: result.source,
+          contentCount: result.contentCount,
+          stepCount: result.stepCount,
+          blockCount: result.blockCount,
+          assetCount,
+        },
         imported: result.imported,
       };
     } catch (cause) {
@@ -104,7 +184,13 @@ export const actions: Actions = {
         success: false,
         message: conflictMessage(cause instanceof Error ? cause.message : ""),
         issues: [],
-        summary: { source: validation.source, contentCount: validation.contentCount, stepCount: validation.stepCount, blockCount: validation.blockCount, assetCount: 0 },
+        summary: {
+          source: validation.source,
+          contentCount: validation.contentCount,
+          stepCount: validation.stepCount,
+          blockCount: validation.blockCount,
+          assetCount,
+        },
       });
     }
   },
