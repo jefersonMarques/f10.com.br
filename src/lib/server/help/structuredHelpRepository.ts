@@ -1,9 +1,10 @@
-import { and, asc, eq, max } from "drizzle-orm";
+import { and, asc, eq, inArray, max } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
 import {
   helpAssets,
+  helpContentFeaturedVideos,
   helpContentSteps,
   helpContents,
   helpStepBlocks,
@@ -44,9 +45,15 @@ export type StructuredHelpBlockInput = {
   noticeVariant: string;
 };
 
+export type StructuredHelpFeaturedVideoInput = {
+  sourceUrl: string;
+  altText: string;
+  transcript: string;
+  aiSummary: string;
+};
+
 async function getContentRow(contentId: string) {
-  const db = getDatabase();
-  const [content] = await db
+  const [content] = await getDatabase()
     .select()
     .from(helpContents)
     .where(eq(helpContents.id, contentId))
@@ -56,8 +63,7 @@ async function getContentRow(contentId: string) {
 }
 
 async function getStepRow(stepId: string) {
-  const db = getDatabase();
-  const [step] = await db
+  const [step] = await getDatabase()
     .select()
     .from(helpContentSteps)
     .where(eq(helpContentSteps.id, stepId))
@@ -67,14 +73,30 @@ async function getStepRow(stepId: string) {
 }
 
 async function getBlockRow(blockId: string) {
-  const db = getDatabase();
-  const [block] = await db
+  const [block] = await getDatabase()
     .select()
     .from(helpStepBlocks)
     .where(eq(helpStepBlocks.id, blockId))
     .limit(1);
 
   return block ?? null;
+}
+
+async function getContentVideoBlocks(contentId: string) {
+  const db = getDatabase();
+  const steps = await db
+    .select({ id: helpContentSteps.id })
+    .from(helpContentSteps)
+    .where(eq(helpContentSteps.contentId, contentId));
+
+  const stepIds = steps.map((step) => step.id);
+  if (stepIds.length === 0) return [];
+
+  return db
+    .select()
+    .from(helpStepBlocks)
+    .where(inArray(helpStepBlocks.stepId, stepIds))
+    .then((blocks) => blocks.filter((block) => block.blockType === "video"));
 }
 
 export async function listStructuredHelpContents() {
@@ -113,7 +135,7 @@ export async function getStructuredHelpContent(contentId: string) {
   const content = await getContentRow(contentId);
   if (!content) return null;
 
-  const [steps, publication] = await Promise.all([
+  const [steps, publication, featuredRows] = await Promise.all([
     db
       .select()
       .from(helpContentSteps)
@@ -129,62 +151,93 @@ export async function getStructuredHelpContent(contentId: string) {
         ),
       )
       .limit(1),
+    db
+      .select({ assetId: helpContentFeaturedVideos.assetId })
+      .from(helpContentFeaturedVideos)
+      .where(eq(helpContentFeaturedVideos.contentId, contentId))
+      .limit(1),
   ]);
 
   const stepIds = steps.map((step) => step.id);
-  const blocks = stepIds.length
-    ? await db
-        .select()
-        .from(helpStepBlocks)
-        .where(
-          // Drizzle has no need for relational query here; keeping the schema explicit.
-          // Each step is loaded below to preserve stable order.
-          eq(helpStepBlocks.stepId, stepIds[0]),
-        )
-    : [];
+  const blocksByStep = new Map<string, Array<typeof helpStepBlocks.$inferSelect>>();
 
-  const blocksByStep = new Map<string, typeof blocks>();
   if (stepIds.length > 0) {
-    for (const step of steps) {
-      const stepBlocks = await db
-        .select()
-        .from(helpStepBlocks)
-        .where(eq(helpStepBlocks.stepId, step.id))
-        .orderBy(asc(helpStepBlocks.sortOrder));
-      blocksByStep.set(step.id, stepBlocks);
+    const blocks = await db
+      .select()
+      .from(helpStepBlocks)
+      .where(inArray(helpStepBlocks.stepId, stepIds))
+      .orderBy(asc(helpStepBlocks.sortOrder));
+
+    for (const block of blocks) {
+      const current = blocksByStep.get(block.stepId) ?? [];
+      current.push(block);
+      blocksByStep.set(block.stepId, current);
     }
   }
 
+  const featuredAssetId = featuredRows[0]?.assetId ?? null;
+  const allBlocks = Array.from(blocksByStep.values()).flat();
   const assetIds = Array.from(
     new Set(
-      Array.from(blocksByStep.values())
-        .flat()
-        .map((block) => block.assetId)
-        .filter((assetId): assetId is string => Boolean(assetId)),
+      [
+        ...allBlocks.map((block) => block.assetId),
+        featuredAssetId,
+      ].filter((assetId): assetId is string => Boolean(assetId)),
     ),
   );
   const assetsById = new Map<string, typeof helpAssets.$inferSelect>();
 
-  for (const assetId of assetIds) {
-    const [asset] = await db
+  if (assetIds.length > 0) {
+    const assets = await db
       .select()
       .from(helpAssets)
-      .where(eq(helpAssets.id, assetId))
-      .limit(1);
-    if (asset) assetsById.set(asset.id, asset);
+      .where(inArray(helpAssets.id, assetIds));
+    for (const asset of assets) assetsById.set(asset.id, asset);
   }
+
+  const legacyVideoCount = allBlocks.filter(
+    (block) =>
+      block.blockType === "video" &&
+      (!featuredAssetId || block.assetId !== featuredAssetId),
+  ).length;
 
   return {
     ...content,
+    featuredVideo: featuredAssetId
+      ? (assetsById.get(featuredAssetId) ?? null)
+      : null,
+    legacyVideoCount,
     hasPublishedVersion: publication.length > 0,
     publishedVersionAt: publication[0]?.publishedAt ?? null,
     steps: steps.map((step) => ({
       ...step,
-      blocks: (blocksByStep.get(step.id) ?? []).map((block) => ({
-        ...block,
-        asset: block.assetId ? (assetsById.get(block.assetId) ?? null) : null,
-      })),
+      blocks: (blocksByStep.get(step.id) ?? [])
+        .filter(
+          (block) =>
+            !(
+              block.blockType === "video" &&
+              featuredAssetId &&
+              block.assetId === featuredAssetId
+            ),
+        )
+        .map((block) => ({
+          ...block,
+          asset: block.assetId ? (assetsById.get(block.assetId) ?? null) : null,
+        })),
     })),
+  };
+}
+
+function serializeAsset(asset: typeof helpAssets.$inferSelect | null) {
+  if (!asset) return null;
+  return {
+    id: asset.id,
+    assetType: asset.assetType,
+    sourceUrl: asset.sourceUrl,
+    storageKey: asset.storageKey,
+    altText: asset.altText,
+    transcript: asset.transcript,
+    aiSummary: asset.aiSummary,
   };
 }
 
@@ -198,6 +251,7 @@ async function buildVersionSnapshot(contentId: string) {
     summary: content.summary,
     category: content.category,
     aiGeneralKnowledge: content.aiGeneralKnowledge,
+    featuredVideo: serializeAsset(content.featuredVideo),
     status: content.status,
     publishedAt: content.publishedAt?.toISOString() ?? null,
     steps: content.steps.map((step) => ({
@@ -214,17 +268,7 @@ async function buildVersionSnapshot(contentId: string) {
         linkLabel: block.linkLabel,
         noticeVariant: block.noticeVariant,
         sortOrder: block.sortOrder,
-        asset: block.asset
-          ? {
-              id: block.asset.id,
-              assetType: block.asset.assetType,
-              sourceUrl: block.asset.sourceUrl,
-              storageKey: block.asset.storageKey,
-              altText: block.asset.altText,
-              transcript: block.asset.transcript,
-              aiSummary: block.asset.aiSummary,
-            }
-          : null,
+        asset: serializeAsset(block.asset),
       })),
     })),
   };
@@ -240,8 +284,7 @@ async function saveStructuredContentVersion(
 }
 
 async function markContentDraft(contentId: string, actorUserId: string) {
-  const db = getDatabase();
-  await db
+  await getDatabase()
     .update(helpContents)
     .set({
       status: "draft",
@@ -304,7 +347,6 @@ export async function updateStructuredHelpContent(
   contentId: string,
   input: StructuredHelpContentInput,
 ): Promise<void> {
-  const db = getDatabase();
   const content = await getContentRow(contentId);
   if (!content) throw new Error("CONTENT_NOT_FOUND");
   if (content.status === "archived") throw new Error("CONTENT_ARCHIVED");
@@ -312,7 +354,7 @@ export async function updateStructuredHelpContent(
   const slug = normalizeHelpSlug(input.slug || input.title);
   if (!slug) throw new Error("INVALID_SLUG");
 
-  await db
+  await getDatabase()
     .update(helpContents)
     .set({
       slug,
@@ -333,6 +375,137 @@ export async function updateStructuredHelpContent(
     entityType: "help_content",
     entityId: contentId,
     metadata: { slug, previousStatus: content.status },
+  });
+}
+
+export async function upsertStructuredHelpFeaturedVideo(
+  actorUserId: string,
+  contentId: string,
+  input: StructuredHelpFeaturedVideoInput,
+): Promise<void> {
+  const db = getDatabase();
+  const content = await getContentRow(contentId);
+  if (!content) throw new Error("CONTENT_NOT_FOUND");
+  if (content.status === "archived") throw new Error("CONTENT_ARCHIVED");
+  if (!input.sourceUrl.trim()) throw new Error("FEATURED_VIDEO_URL_REQUIRED");
+
+  const [currentFeatured] = await db
+    .select({ assetId: helpContentFeaturedVideos.assetId })
+    .from(helpContentFeaturedVideos)
+    .where(eq(helpContentFeaturedVideos.contentId, contentId))
+    .limit(1);
+
+  let assetId = currentFeatured?.assetId ?? null;
+  if (!assetId) {
+    const legacyVideos = await getContentVideoBlocks(contentId);
+    if (legacyVideos.length > 1) throw new Error("MULTIPLE_LEGACY_VIDEOS");
+    assetId = legacyVideos[0]?.assetId ?? null;
+  }
+
+  await db.transaction(async (tx) => {
+    if (assetId) {
+      await tx
+        .update(helpAssets)
+        .set({
+          assetType: "video",
+          sourceUrl: input.sourceUrl.trim(),
+          altText: input.altText.trim(),
+          transcript: input.transcript.trim(),
+          aiSummary: input.aiSummary.trim(),
+          updatedAt: new Date(),
+        })
+        .where(eq(helpAssets.id, assetId));
+    } else {
+      const [createdAsset] = await tx
+        .insert(helpAssets)
+        .values({
+          contentId,
+          assetType: "video",
+          sourceUrl: input.sourceUrl.trim(),
+          altText: input.altText.trim(),
+          transcript: input.transcript.trim(),
+          aiSummary: input.aiSummary.trim(),
+          createdBy: actorUserId,
+        })
+        .returning({ id: helpAssets.id });
+      assetId = createdAsset?.id ?? null;
+    }
+
+    if (!assetId) throw new Error("FEATURED_VIDEO_NOT_CREATED");
+
+    await tx
+      .insert(helpContentFeaturedVideos)
+      .values({ contentId, assetId })
+      .onConflictDoUpdate({
+        target: helpContentFeaturedVideos.contentId,
+        set: { assetId, updatedAt: new Date() },
+      });
+  });
+
+  await markContentDraft(contentId, actorUserId);
+  await saveStructuredContentVersion(contentId, actorUserId);
+  await recordAuditEvent({
+    actorUserId,
+    action: "help.content.featured_video.updated",
+    entityType: "help_content",
+    entityId: contentId,
+    metadata: { assetId },
+  });
+}
+
+export async function deleteStructuredHelpFeaturedVideo(
+  actorUserId: string,
+  contentId: string,
+): Promise<void> {
+  const db = getDatabase();
+  const content = await getContentRow(contentId);
+  if (!content) throw new Error("CONTENT_NOT_FOUND");
+  if (content.status === "archived") throw new Error("CONTENT_ARCHIVED");
+
+  const [featured] = await db
+    .select({ assetId: helpContentFeaturedVideos.assetId })
+    .from(helpContentFeaturedVideos)
+    .where(eq(helpContentFeaturedVideos.contentId, contentId))
+    .limit(1);
+  if (!featured) return;
+
+  const stepRows = await db
+    .select({ id: helpContentSteps.id })
+    .from(helpContentSteps)
+    .where(eq(helpContentSteps.contentId, contentId));
+  const stepIds = stepRows.map((step) => step.id);
+
+  await db.transaction(async (tx) => {
+    if (stepIds.length > 0) {
+      const mirrors = await tx
+        .select({ id: helpStepBlocks.id, assetId: helpStepBlocks.assetId })
+        .from(helpStepBlocks)
+        .where(inArray(helpStepBlocks.stepId, stepIds));
+      const mirrorIds = mirrors
+        .filter(
+          (block) =>
+            block.assetId === featured.assetId,
+        )
+        .map((block) => block.id);
+      if (mirrorIds.length > 0) {
+        await tx.delete(helpStepBlocks).where(inArray(helpStepBlocks.id, mirrorIds));
+      }
+    }
+
+    await tx
+      .delete(helpContentFeaturedVideos)
+      .where(eq(helpContentFeaturedVideos.contentId, contentId));
+    await tx.delete(helpAssets).where(eq(helpAssets.id, featured.assetId));
+  });
+
+  await markContentDraft(contentId, actorUserId);
+  await saveStructuredContentVersion(contentId, actorUserId);
+  await recordAuditEvent({
+    actorUserId,
+    action: "help.content.featured_video.deleted",
+    entityType: "help_content",
+    entityId: contentId,
+    metadata: { assetId: featured.assetId },
   });
 }
 
@@ -375,11 +548,10 @@ export async function updateStructuredHelpStep(
   stepId: string,
   input: StructuredHelpStepInput,
 ): Promise<void> {
-  const db = getDatabase();
   const step = await getStepRow(stepId);
   if (!step || step.contentId !== contentId) throw new Error("STEP_NOT_FOUND");
 
-  await db
+  await getDatabase()
     .update(helpContentSteps)
     .set({
       title: input.title.trim(),
@@ -435,8 +607,7 @@ async function createAssetForBlock(
 ): Promise<string | null> {
   if (input.blockType !== "image" && input.blockType !== "video") return null;
 
-  const db = getDatabase();
-  const [asset] = await db
+  const [asset] = await getDatabase()
     .insert(helpAssets)
     .values({
       contentId,
@@ -459,7 +630,9 @@ export async function addStructuredHelpBlock(
   stepId: string,
   input: StructuredHelpBlockInput,
 ): Promise<void> {
+  if (input.blockType === "video") throw new Error("VIDEO_BLOCK_NOT_ALLOWED");
   validateBlockInput(input);
+
   const db = getDatabase();
   const step = await getStepRow(stepId);
   if (!step || step.contentId !== contentId) throw new Error("STEP_NOT_FOUND");
@@ -493,12 +666,16 @@ export async function updateStructuredHelpBlock(
   blockId: string,
   input: StructuredHelpBlockInput,
 ): Promise<void> {
-  validateBlockInput(input);
   const db = getDatabase();
   const block = await getBlockRow(blockId);
   if (!block) throw new Error("BLOCK_NOT_FOUND");
   const step = await getStepRow(block.stepId);
   if (!step || step.contentId !== contentId) throw new Error("BLOCK_NOT_FOUND");
+  if (input.blockType === "video" && block.blockType !== "video") {
+    throw new Error("VIDEO_BLOCK_NOT_ALLOWED");
+  }
+
+  validateBlockInput(input);
 
   let assetId = block.assetId;
   if (input.blockType === "image" || input.blockType === "video") {
@@ -570,6 +747,15 @@ function buildPublicationSnapshot(
       title: content.title,
       summary: content.summary,
       category: content.category,
+      featuredVideo: content.featuredVideo
+        ? {
+            id: content.featuredVideo.id,
+            assetType: content.featuredVideo.assetType,
+            sourceUrl: content.featuredVideo.sourceUrl,
+            storageKey: content.featuredVideo.storageKey,
+            altText: content.featuredVideo.altText,
+          }
+        : null,
       steps: content.steps.map((step) => ({
         id: step.id,
         title: step.title,
@@ -597,6 +783,13 @@ function buildPublicationSnapshot(
     },
     ai: {
       generalKnowledge: content.aiGeneralKnowledge,
+      featuredVideoKnowledge: content.featuredVideo
+        ? {
+            assetId: content.featuredVideo.id,
+            transcript: content.featuredVideo.transcript,
+            summary: content.featuredVideo.aiSummary,
+          }
+        : null,
       steps: content.steps.map((step) => ({
         id: step.id,
         title: step.title,
@@ -616,6 +809,7 @@ function buildPublicationSnapshot(
 function validateForPublication(
   content: NonNullable<Awaited<ReturnType<typeof getStructuredHelpContent>>>,
 ): void {
+  if (content.legacyVideoCount > 0) throw new Error("LEGACY_VIDEO_REVIEW_REQUIRED");
   if (content.steps.length === 0) throw new Error("CONTENT_STEP_REQUIRED");
 
   for (const step of content.steps) {
@@ -635,7 +829,7 @@ function validateForPublication(
     if (meaningfulBlocks.length === 0) throw new Error("STEP_BLOCK_REQUIRED");
 
     const hasOnlyMedia = step.blocks.every(
-      (block) => block.blockType === "image" || block.blockType === "video",
+      (block) => block.blockType === "image",
     );
     if (hasOnlyMedia) {
       const mediaHasKnowledge = step.blocks.some(
@@ -699,6 +893,9 @@ export async function publishStructuredHelpContent(
     action: "help.content.published",
     entityType: "help_content",
     entityId: contentId,
-    metadata: { stepCount: content.steps.length },
+    metadata: {
+      stepCount: content.steps.length,
+      hasFeaturedVideo: Boolean(content.featuredVideo),
+    },
   });
 }
