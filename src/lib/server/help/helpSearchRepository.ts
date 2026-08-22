@@ -18,6 +18,7 @@ export type HelpSearchInput = {
   actorUserId?: string | null;
   customerContactId?: string | null;
   limit?: number;
+  includeAiKnowledge?: boolean;
 };
 
 export type PublishedHelpContext = {
@@ -46,7 +47,7 @@ export async function searchPublishedHelp(input: HelpSearchInput) {
   const query = input.query.trim().slice(0, 500);
   const normalizedQuery = normalizeHelpSearchQuery(query);
   const limit = Math.min(Math.max(input.limit ?? 8, 1), 20);
-  const includeAiKnowledge = input.source !== "public";
+  const includeAiKnowledge = input.includeAiKnowledge ?? input.source !== "public";
 
   if (!normalizedQuery) {
     return { searchEventId: null, results: [] };
