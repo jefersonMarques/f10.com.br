@@ -101,49 +101,49 @@ export async function claimHelpPublicAiRequest(
         ),
       );
 
-    const [activeSession, sessionUsage, ipUsage, globalUsage] = await Promise.all([
-      tx
-        .select({ value: count() })
-        .from(helpPublicAiRequests)
-        .where(
-          and(
-            eq(helpPublicAiRequests.sessionKey, sessionKey),
-            isNull(helpPublicAiRequests.finishedAt),
-          ),
+    const activeSession = await tx
+      .select({ value: count() })
+      .from(helpPublicAiRequests)
+      .where(
+        and(
+          eq(helpPublicAiRequests.sessionKey, sessionKey),
+          isNull(helpPublicAiRequests.finishedAt),
         ),
-      tx
-        .select({ value: count() })
-        .from(helpPublicAiRequests)
-        .where(
-          and(
-            eq(helpPublicAiRequests.sessionKey, sessionKey),
-            gte(helpPublicAiRequests.startedAt, windowStartedAt),
-          ),
-        ),
-      tx
-        .select({ value: count() })
-        .from(helpPublicAiRequests)
-        .where(
-          and(
-            eq(helpPublicAiRequests.ipKey, ipKey),
-            gte(helpPublicAiRequests.startedAt, windowStartedAt),
-          ),
-        ),
-      tx
-        .select({ value: count() })
-        .from(helpPublicAiRequests)
-        .where(gte(helpPublicAiRequests.startedAt, hourStartedAt)),
-    ]);
-
+      );
     if (Number(activeSession[0]?.value ?? 0) > 0) {
       throw new Error("HELP_PUBLIC_AI_BUSY");
     }
+
+    const sessionUsage = await tx
+      .select({ value: count() })
+      .from(helpPublicAiRequests)
+      .where(
+        and(
+          eq(helpPublicAiRequests.sessionKey, sessionKey),
+          gte(helpPublicAiRequests.startedAt, windowStartedAt),
+        ),
+      );
     if (Number(sessionUsage[0]?.value ?? 0) >= settings.sessionRequestLimit) {
       throw new Error("HELP_PUBLIC_AI_SESSION_RATE_LIMITED");
     }
+
+    const ipUsage = await tx
+      .select({ value: count() })
+      .from(helpPublicAiRequests)
+      .where(
+        and(
+          eq(helpPublicAiRequests.ipKey, ipKey),
+          gte(helpPublicAiRequests.startedAt, windowStartedAt),
+        ),
+      );
     if (Number(ipUsage[0]?.value ?? 0) >= settings.ipRequestLimit) {
       throw new Error("HELP_PUBLIC_AI_IP_RATE_LIMITED");
     }
+
+    const globalUsage = await tx
+      .select({ value: count() })
+      .from(helpPublicAiRequests)
+      .where(gte(helpPublicAiRequests.startedAt, hourStartedAt));
     if (Number(globalUsage[0]?.value ?? 0) >= settings.globalRequestLimitPerHour) {
       throw new Error("HELP_PUBLIC_AI_GLOBAL_RATE_LIMITED");
     }
