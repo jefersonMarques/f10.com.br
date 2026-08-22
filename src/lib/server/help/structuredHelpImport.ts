@@ -4,6 +4,7 @@ import { getDatabase } from "$lib/server/db";
 import { helpContentVersions } from "$lib/server/db/schema";
 import {
   helpAssets,
+  helpContentFeaturedVideos,
   helpContents,
   helpContentSteps,
   helpStepBlocks,
@@ -11,18 +12,28 @@ import {
 import { normalizeHelpSlug } from "$lib/server/help/helpArticleRepository";
 
 const IMPORT_FORMAT = "f10-help-import";
-const IMPORT_VERSION = 1;
+const SUPPORTED_IMPORT_VERSIONS = new Set([1, 2]);
+const CURRENT_IMPORT_VERSION = 2 as const;
 const MAX_CONTENTS = 250;
 const MAX_STEPS_PER_CONTENT = 80;
 const MAX_BLOCKS_PER_STEP = 80;
 const MAX_TOTAL_BLOCKS = 8_000;
 
 type NoticeVariant = "info" | "warning" | "success" | "danger";
+type HelpImportVersion = 1 | 2;
+
+export type HelpImportFeaturedVideo = {
+  url: string;
+  altText?: string;
+  transcript?: string;
+  aiSummary?: string;
+};
 
 export type HelpImportBlock =
   | { type: "text"; text: string }
   | { type: "notice"; text: string; variant?: NoticeVariant }
   | { type: "link"; url: string; label: string }
+  | { type: "file"; url: string; label: string; aiSummary?: string }
   | {
       type: "image";
       url: string;
@@ -51,12 +62,13 @@ export type HelpImportContent = {
   summary?: string;
   category?: string;
   aiGeneralKnowledge?: string;
+  featuredVideo?: HelpImportFeaturedVideo;
   steps: HelpImportStep[];
 };
 
 export type HelpImportFile = {
   format: typeof IMPORT_FORMAT;
-  version: typeof IMPORT_VERSION;
+  version: HelpImportVersion;
   source: string;
   contents: HelpImportContent[];
 };
@@ -100,9 +112,35 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
+function parseFeaturedVideo(
+  value: unknown,
+  path: string,
+  issues: string[],
+): HelpImportFeaturedVideo | undefined {
+  if (value === undefined || value === null) return undefined;
+  const record = asRecord(value);
+  if (!record) {
+    issues.push(`${path}: featuredVideo inválido.`);
+    return undefined;
+  }
+
+  const url = readString(record, "url");
+  const altText = optionalString(record, "altText");
+  const transcript = optionalString(record, "transcript");
+  const aiSummary = optionalString(record, "aiSummary");
+
+  if (!isHttpUrl(url)) issues.push(`${path}: featuredVideo precisa de URL http/https válida.`);
+  if ((altText?.length ?? 0) > 500) issues.push(`${path}: altText do vídeo excede 500 caracteres.`);
+  if ((transcript?.length ?? 0) > 100_000) issues.push(`${path}: transcrição do vídeo excede 100.000 caracteres.`);
+  if ((aiSummary?.length ?? 0) > 20_000) issues.push(`${path}: aiSummary do vídeo excede 20.000 caracteres.`);
+
+  return isHttpUrl(url) ? { url, altText, transcript, aiSummary } : undefined;
+}
+
 function parseBlock(
   value: unknown,
   path: string,
+  version: HelpImportVersion,
   issues: string[],
 ): ParsedHelpImportBlock {
   const record = asRecord(value);
@@ -116,9 +154,7 @@ function parseBlock(
   if (type === "text") {
     const text = readString(record, "text");
     if (!text || text.length > 30_000) {
-      issues.push(
-        `${path}: bloco de texto deve ter entre 1 e 30.000 caracteres.`,
-      );
+      issues.push(`${path}: bloco de texto deve ter entre 1 e 30.000 caracteres.`);
       return null;
     }
     return { type, text };
@@ -127,53 +163,69 @@ function parseBlock(
   if (type === "notice") {
     const text = readString(record, "text");
     const variantValue = optionalString(record, "variant");
-    const allowedVariants: NoticeVariant[] = [
-      "info",
-      "warning",
-      "success",
-      "danger",
-    ];
-
+    const allowedVariants: NoticeVariant[] = ["info", "warning", "success", "danger"];
     if (!text || text.length > 15_000) {
       issues.push(`${path}: aviso deve ter entre 1 e 15.000 caracteres.`);
       return null;
     }
-
-    if (
-      variantValue &&
-      !allowedVariants.includes(variantValue as NoticeVariant)
-    ) {
+    if (variantValue && !allowedVariants.includes(variantValue as NoticeVariant)) {
       issues.push(`${path}: variant inválido.`);
       return null;
     }
-
-    const variant = variantValue as NoticeVariant | undefined;
-    return { type, text, variant };
+    return { type, text, variant: variantValue as NoticeVariant | undefined };
   }
 
   if (type === "link") {
     const url = readString(record, "url");
     const label = readString(record, "label");
-    if (!isHttpUrl(url) || !label || label.length > 200) {
+    if (!isHttpUrl(url) || !label || label.length > 240) {
       issues.push(`${path}: link precisa de URL http/https e label válido.`);
       return null;
     }
     return { type, url, label };
   }
 
-  if (type === "image" || type === "video") {
+  if (type === "file") {
+    const url = readString(record, "url");
+    const label = readString(record, "label");
+    const aiSummary = optionalString(record, "aiSummary");
+    if (!isHttpUrl(url) || !label || label.length > 240) {
+      issues.push(`${path}: file precisa de URL http/https e label válido.`);
+      return null;
+    }
+    if ((aiSummary?.length ?? 0) > 20_000) {
+      issues.push(`${path}: aiSummary do arquivo excede 20.000 caracteres.`);
+      return null;
+    }
+    return { type, url, label, aiSummary };
+  }
+
+  if (type === "image") {
     const url = readString(record, "url");
     const altText = optionalString(record, "altText");
     const aiSummary = optionalString(record, "aiSummary");
-    const transcript = optionalString(record, "transcript");
-
     if (!isHttpUrl(url)) {
-      if (type === "image") {
-        // JSON simples não transporta arquivo local. Se a imagem ainda não possui
-        // URL pública, ignoramos apenas este bloco para permitir o upload manual
-        // posteriormente no editor do conteúdo.
-        return undefined;
-      }
+      // JSON simples não transporta arquivo local. Imagens locais são adicionadas
+      // por pacote ZIP ou manualmente no editor.
+      return undefined;
+    }
+    if ((altText?.length ?? 0) > 500 || (aiSummary?.length ?? 0) > 20_000) {
+      issues.push(`${path}: altText ou aiSummary excede o limite.`);
+      return null;
+    }
+    return { type, url, altText, aiSummary };
+  }
+
+  if (type === "video") {
+    if (version === CURRENT_IMPORT_VERSION) {
+      issues.push(`${path}: no v2 use featuredVideo no conteúdo; vídeo não pode ficar dentro de blocks.`);
+      return null;
+    }
+    const url = readString(record, "url");
+    const altText = optionalString(record, "altText");
+    const transcript = optionalString(record, "transcript");
+    const aiSummary = optionalString(record, "aiSummary");
+    if (!isHttpUrl(url)) {
       issues.push(`${path}: vídeo precisa de URL http/https válida.`);
       return null;
     }
@@ -181,24 +233,21 @@ function parseBlock(
       issues.push(`${path}: altText ou aiSummary excede o limite.`);
       return null;
     }
-    if ((transcript?.length ?? 0) > 80_000) {
-      issues.push(`${path}: transcrição excede 80.000 caracteres.`);
+    if ((transcript?.length ?? 0) > 100_000) {
+      issues.push(`${path}: transcrição excede 100.000 caracteres.`);
       return null;
     }
-
-    if (type === "image") return { type, url, altText, aiSummary };
     return { type, url, altText, transcript, aiSummary };
   }
 
-  issues.push(
-    `${path}: tipo de bloco não suportado: ${type || "vazio"}.`,
-  );
+  issues.push(`${path}: tipo de bloco não suportado: ${type || "vazio"}.`);
   return null;
 }
 
 function parseStep(
   value: unknown,
   path: string,
+  version: HelpImportVersion,
   issues: string[],
 ): HelpImportStep | null {
   const record = asRecord(value);
@@ -212,42 +261,35 @@ function parseStep(
   const aiKnowledge = optionalString(record, "aiKnowledge");
   const blocksValue = record.blocks;
 
-  if (!title || title.length > 180) {
-    issues.push(
-      `${path}: título do passo é obrigatório e deve ter até 180 caracteres.`,
-    );
-  }
-  if ((description?.length ?? 0) > 10_000) {
-    issues.push(`${path}: descrição excede 10.000 caracteres.`);
-  }
-  if ((aiKnowledge?.length ?? 0) > 30_000) {
-    issues.push(`${path}: conhecimento da IA excede 30.000 caracteres.`);
-  }
+  if (!title || title.length > 180) issues.push(`${path}: título do passo é obrigatório e deve ter até 180 caracteres.`);
+  if ((description?.length ?? 0) > 10_000) issues.push(`${path}: descrição excede 10.000 caracteres.`);
+  if ((aiKnowledge?.length ?? 0) > 30_000) issues.push(`${path}: conhecimento da IA excede 30.000 caracteres.`);
   if (!Array.isArray(blocksValue) || blocksValue.length === 0) {
     issues.push(`${path}: cada passo deve ter ao menos um bloco.`);
     return null;
   }
   if (blocksValue.length > MAX_BLOCKS_PER_STEP) {
-    issues.push(
-      `${path}: máximo de ${MAX_BLOCKS_PER_STEP} blocos por passo.`,
-    );
+    issues.push(`${path}: máximo de ${MAX_BLOCKS_PER_STEP} blocos por passo.`);
     return null;
   }
 
   const parsedBlocks = blocksValue.map((block, index) =>
-    parseBlock(block, `${path}.blocks[${index}]`, issues),
+    parseBlock(block, `${path}.blocks[${index}]`, version, issues),
   );
-  const blocks = parsedBlocks.filter(
-    (block): block is HelpImportBlock => Boolean(block),
-  );
+  const blocks = parsedBlocks.filter((block): block is HelpImportBlock => Boolean(block));
 
   if (!title || parsedBlocks.some((block) => block === null)) return null;
+  if (blocks.length === 0) {
+    issues.push(`${path}: após validar mídias, o passo ficou sem conteúdo público.`);
+    return null;
+  }
   return { title, description, aiKnowledge, blocks };
 }
 
 function parseContent(
   value: unknown,
   index: number,
+  version: HelpImportVersion,
   issues: string[],
 ): HelpImportContent | null {
   const path = `contents[${index}]`;
@@ -263,51 +305,41 @@ function parseContent(
   const summary = optionalString(record, "summary");
   const category = optionalString(record, "category");
   const aiGeneralKnowledge = optionalString(record, "aiGeneralKnowledge");
+  const featuredVideo = version === CURRENT_IMPORT_VERSION
+    ? parseFeaturedVideo(record.featuredVideo, `${path}.featuredVideo`, issues)
+    : undefined;
   const stepsValue = record.steps;
 
-  if (!externalId || externalId.length > 240) {
-    issues.push(
-      `${path}: externalId é obrigatório e deve ter até 240 caracteres.`,
-    );
-  }
-  if (!title || title.length < 4 || title.length > 160) {
-    issues.push(`${path}: título deve ter entre 4 e 160 caracteres.`);
-  }
-  if ((slug?.length ?? 0) > 160) {
-    issues.push(`${path}: slug excede 160 caracteres.`);
-  }
-  if ((summary?.length ?? 0) > 320) {
-    issues.push(`${path}: resumo excede 320 caracteres.`);
-  }
-  if ((category?.length ?? 0) > 120) {
-    issues.push(`${path}: categoria excede 120 caracteres.`);
-  }
-  if ((aiGeneralKnowledge?.length ?? 0) > 40_000) {
-    issues.push(
-      `${path}: conhecimento geral da IA excede 40.000 caracteres.`,
-    );
-  }
+  if (!externalId || externalId.length > 240) issues.push(`${path}: externalId é obrigatório e deve ter até 240 caracteres.`);
+  if (!title || title.length < 4 || title.length > 160) issues.push(`${path}: título deve ter entre 4 e 160 caracteres.`);
+  if ((slug?.length ?? 0) > 160) issues.push(`${path}: slug excede 160 caracteres.`);
+  if ((summary?.length ?? 0) > 320) issues.push(`${path}: resumo excede 320 caracteres.`);
+  if ((category?.length ?? 0) > 120) issues.push(`${path}: categoria excede 120 caracteres.`);
+  if ((aiGeneralKnowledge?.length ?? 0) > 40_000) issues.push(`${path}: conhecimento geral da IA excede 40.000 caracteres.`);
   if (!Array.isArray(stepsValue) || stepsValue.length === 0) {
     issues.push(`${path}: conteúdo deve possuir ao menos um passo.`);
     return null;
   }
   if (stepsValue.length > MAX_STEPS_PER_CONTENT) {
-    issues.push(
-      `${path}: máximo de ${MAX_STEPS_PER_CONTENT} passos por conteúdo.`,
-    );
+    issues.push(`${path}: máximo de ${MAX_STEPS_PER_CONTENT} passos por conteúdo.`);
     return null;
   }
 
   const steps = stepsValue
-    .map((step, stepIndex) =>
-      parseStep(step, `${path}.steps[${stepIndex}]`, issues),
-    )
+    .map((step, stepIndex) => parseStep(step, `${path}.steps[${stepIndex}]`, version, issues))
     .filter((step): step is HelpImportStep => Boolean(step));
 
-  if (!externalId || !title || steps.length !== stepsValue.length) {
-    return null;
+  if (version === 1) {
+    const legacyVideoCount = steps.reduce(
+      (total, step) => total + step.blocks.filter((block) => block.type === "video").length,
+      0,
+    );
+    if (legacyVideoCount > 1) {
+      issues.push(`${path}: o conteúdo possui ${legacyVideoCount} vídeos. Mantenha apenas um vídeo por conteúdo.`);
+    }
   }
 
+  if (!externalId || !title || steps.length !== stepsValue.length) return null;
   return {
     externalId,
     title,
@@ -315,6 +347,7 @@ function parseContent(
     summary,
     category,
     aiGeneralKnowledge,
+    featuredVideo,
     steps,
   };
 }
@@ -351,28 +384,23 @@ export function validateHelpImportJson(rawJson: string): HelpImportValidation {
   }
 
   const format = readString(root, "format");
-  const version = root.version;
+  const rawVersion = root.version;
+  const version = rawVersion === 1 || rawVersion === 2 ? rawVersion : null;
   const source = readString(root, "source");
   const contentsValue = root.contents;
 
-  if (format !== IMPORT_FORMAT) {
-    issues.push(`format deve ser "${IMPORT_FORMAT}".`);
-  }
-  if (version !== IMPORT_VERSION) {
-    issues.push(`version deve ser ${IMPORT_VERSION}.`);
-  }
-  if (!source || source.length > 80) {
-    issues.push("source é obrigatório e deve ter até 80 caracteres.");
-  }
+  if (format !== IMPORT_FORMAT) issues.push(`format deve ser "${IMPORT_FORMAT}".`);
+  if (!version || !SUPPORTED_IMPORT_VERSIONS.has(version)) issues.push("version deve ser 1 ou 2.");
+  if (!source || source.length > 80) issues.push("source é obrigatório e deve ter até 80 caracteres.");
   if (!Array.isArray(contentsValue) || contentsValue.length === 0) {
     issues.push("contents deve possuir ao menos um conteúdo.");
   } else if (contentsValue.length > MAX_CONTENTS) {
     issues.push(`Máximo de ${MAX_CONTENTS} conteúdos por arquivo.`);
   }
 
-  const contents = Array.isArray(contentsValue)
+  const contents = Array.isArray(contentsValue) && version
     ? contentsValue
-        .map((content, index) => parseContent(content, index, issues))
+        .map((content, index) => parseContent(content, index, version, issues))
         .filter((content): content is HelpImportContent => Boolean(content))
     : [];
 
@@ -383,45 +411,25 @@ export function validateHelpImportJson(rawJson: string): HelpImportValidation {
 
   for (const [index, content] of contents.entries()) {
     const slug = normalizeHelpSlug(content.slug || content.title);
-    if (!slug) {
-      issues.push(`contents[${index}]: não foi possível gerar slug válido.`);
-    }
-    if (externalIds.has(content.externalId)) {
-      issues.push(`contents[${index}]: externalId duplicado no arquivo.`);
-    }
-    if (slug && slugs.has(slug)) {
-      issues.push(
-        `contents[${index}]: slug duplicado no arquivo: ${slug}.`,
-      );
-    }
+    if (!slug) issues.push(`contents[${index}]: não foi possível gerar slug válido.`);
+    if (externalIds.has(content.externalId)) issues.push(`contents[${index}]: externalId duplicado no arquivo.`);
+    if (slug && slugs.has(slug)) issues.push(`contents[${index}]: slug duplicado no arquivo: ${slug}.`);
     externalIds.add(content.externalId);
     if (slug) slugs.add(slug);
     stepCount += content.steps.length;
-    blockCount += content.steps.reduce(
-      (total, step) => total + step.blocks.length,
-      0,
-    );
+    blockCount += content.steps.reduce((total, step) => total + step.blocks.length, 0);
   }
 
-  if (blockCount > MAX_TOTAL_BLOCKS) {
-    issues.push(`Máximo de ${MAX_TOTAL_BLOCKS} blocos por arquivo.`);
-  }
+  if (blockCount > MAX_TOTAL_BLOCKS) issues.push(`Máximo de ${MAX_TOTAL_BLOCKS} blocos por arquivo.`);
 
-  const contentArrayLength = Array.isArray(contentsValue)
-    ? contentsValue.length
-    : 0;
+  const contentArrayLength = Array.isArray(contentsValue) ? contentsValue.length : 0;
   const parsed: HelpImportFile | null =
     issues.length === 0 &&
     format === IMPORT_FORMAT &&
-    version === IMPORT_VERSION &&
+    version !== null &&
     Boolean(source) &&
     contents.length === contentArrayLength
-      ? {
-          format: IMPORT_FORMAT,
-          version: IMPORT_VERSION,
-          source,
-          contents,
-        }
+      ? { format: IMPORT_FORMAT, version, source, contents }
       : null;
 
   return {
@@ -435,21 +443,42 @@ export function validateHelpImportJson(rawJson: string): HelpImportValidation {
   };
 }
 
+async function createRemoteAsset(
+  tx: Parameters<Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]>[0],
+  actorUserId: string,
+  contentId: string,
+  source: string,
+  block: Extract<HelpImportBlock, { type: "image" | "video" | "file" }> | HelpImportFeaturedVideo,
+  assetType: "image" | "video" | "file",
+): Promise<string> {
+  const [asset] = await tx
+    .insert(helpAssets)
+    .values({
+      contentId,
+      assetType,
+      sourceUrl: block.url,
+      altText: "altText" in block ? block.altText ?? "" : "",
+      transcript: assetType === "video" && "transcript" in block ? block.transcript ?? "" : "",
+      aiSummary: "aiSummary" in block ? block.aiSummary ?? "" : "",
+      metadata: { importedFrom: source },
+      createdBy: actorUserId,
+    })
+    .returning({ id: helpAssets.id });
+
+  if (!asset) throw new Error("IMPORT_ASSET_NOT_CREATED");
+  return asset.id;
+}
+
 export async function importStructuredHelpFile(
   actorUserId: string,
   file: HelpImportFile,
 ) {
   const db = getDatabase();
-  const normalizedSlugs = file.contents.map((content) =>
-    normalizeHelpSlug(content.slug || content.title),
-  );
+  const normalizedSlugs = file.contents.map((content) => normalizeHelpSlug(content.slug || content.title));
   const externalIds = file.contents.map((content) => content.externalId);
 
   const [existingSlugs, existingExternalIds] = await Promise.all([
-    db
-      .select({ slug: helpContents.slug })
-      .from(helpContents)
-      .where(inArray(helpContents.slug, normalizedSlugs)),
+    db.select({ slug: helpContents.slug }).from(helpContents).where(inArray(helpContents.slug, normalizedSlugs)),
     db
       .select({ externalId: helpContents.importExternalId })
       .from(helpContents)
@@ -462,9 +491,7 @@ export async function importStructuredHelpFile(
   ]);
 
   if (existingSlugs.length > 0) {
-    throw new Error(
-      `IMPORT_SLUG_CONFLICT:${existingSlugs.map((row) => row.slug).join(",")}`,
-    );
+    throw new Error(`IMPORT_SLUG_CONFLICT:${existingSlugs.map((row) => row.slug).join(",")}`);
   }
   if (existingExternalIds.length > 0) {
     throw new Error(
@@ -476,11 +503,7 @@ export async function importStructuredHelpFile(
   }
 
   const imported = await db.transaction(async (tx) => {
-    const result: Array<{
-      id: string;
-      title: string;
-      externalId: string;
-    }> = [];
+    const result: Array<{ id: string; title: string; externalId: string }> = [];
 
     for (const content of file.contents) {
       const slug = normalizeHelpSlug(content.slug || content.title);
@@ -502,6 +525,22 @@ export async function importStructuredHelpFile(
 
       if (!createdContent) throw new Error("IMPORT_CONTENT_NOT_CREATED");
 
+      let featuredVideoAssetId: string | null = null;
+      if (content.featuredVideo) {
+        featuredVideoAssetId = await createRemoteAsset(
+          tx,
+          actorUserId,
+          createdContent.id,
+          file.source,
+          content.featuredVideo,
+          "video",
+        );
+        await tx.insert(helpContentFeaturedVideos).values({
+          contentId: createdContent.id,
+          assetId: featuredVideoAssetId,
+        });
+      }
+
       for (const [stepIndex, step] of content.steps.entries()) {
         const [createdStep] = await tx
           .insert(helpContentSteps)
@@ -516,42 +555,51 @@ export async function importStructuredHelpFile(
 
         if (!createdStep) throw new Error("IMPORT_STEP_NOT_CREATED");
 
+        if (stepIndex === 0 && featuredVideoAssetId) {
+          await tx.insert(helpStepBlocks).values({
+            stepId: createdStep.id,
+            blockType: "video",
+            assetId: featuredVideoAssetId,
+            metadata: { importedFrom: file.source, featuredVideoMirror: true },
+            sortOrder: 5,
+          });
+        }
+
         for (const [blockIndex, block] of step.blocks.entries()) {
           let assetId: string | null = null;
 
-          if (block.type === "image" || block.type === "video") {
-            const [asset] = await tx
-              .insert(helpAssets)
-              .values({
-                contentId: createdContent.id,
-                assetType: block.type,
-                sourceUrl: block.url,
-                altText: block.altText ?? "",
-                transcript:
-                  block.type === "video" ? block.transcript ?? "" : "",
-                aiSummary: block.aiSummary ?? "",
-                metadata: { importedFrom: file.source },
-                createdBy: actorUserId,
-              })
-              .returning({ id: helpAssets.id });
+          if (block.type === "image" || block.type === "video" || block.type === "file") {
+            assetId = await createRemoteAsset(
+              tx,
+              actorUserId,
+              createdContent.id,
+              file.source,
+              block,
+              block.type,
+            );
 
-            assetId = asset?.id ?? null;
-            if (!assetId) throw new Error("IMPORT_ASSET_NOT_CREATED");
+            if (block.type === "video" && !featuredVideoAssetId) {
+              featuredVideoAssetId = assetId;
+              await tx.insert(helpContentFeaturedVideos).values({
+                contentId: createdContent.id,
+                assetId,
+              });
+            }
           }
 
           await tx.insert(helpStepBlocks).values({
             stepId: createdStep.id,
             blockType: block.type,
-            textContent:
-              block.type === "text" || block.type === "notice"
-                ? block.text
-                : "",
+            textContent: block.type === "text" || block.type === "notice" ? block.text : "",
             assetId,
             linkUrl: block.type === "link" ? block.url : null,
-            linkLabel: block.type === "link" ? block.label : null,
-            noticeVariant:
-              block.type === "notice" ? block.variant ?? "info" : null,
-            metadata: { importedFrom: file.source },
+            linkLabel:
+              block.type === "link" || block.type === "file" ? block.label : null,
+            noticeVariant: block.type === "notice" ? block.variant ?? "info" : null,
+            metadata: {
+              importedFrom: file.source,
+              ...(block.type === "video" ? { featuredVideoMirror: true } : {}),
+            },
             sortOrder: (blockIndex + 1) * 10,
           });
         }
@@ -565,12 +613,14 @@ export async function importStructuredHelpFile(
           import: {
             source: file.source,
             externalId: content.externalId,
+            formatVersion: file.version,
           },
           title: content.title,
           slug,
           summary: content.summary ?? "",
           category: content.category ?? "",
           aiGeneralKnowledge: content.aiGeneralKnowledge ?? "",
+          featuredVideo: content.featuredVideo ?? null,
           status: "draft",
           steps: content.steps.map((step, stepIndex) => ({
             title: step.title,
@@ -593,17 +643,9 @@ export async function importStructuredHelpFile(
     return result;
   });
 
-  const stepCount = file.contents.reduce(
-    (total, content) => total + content.steps.length,
-    0,
-  );
+  const stepCount = file.contents.reduce((total, content) => total + content.steps.length, 0);
   const blockCount = file.contents.reduce(
-    (total, content) =>
-      total +
-      content.steps.reduce(
-        (stepTotal, step) => stepTotal + step.blocks.length,
-        0,
-      ),
+    (total, content) => total + content.steps.reduce((stepTotal, step) => stepTotal + step.blocks.length, 0),
     0,
   );
 
@@ -613,6 +655,7 @@ export async function importStructuredHelpFile(
     entityType: "help_content_import",
     metadata: {
       source: file.source,
+      formatVersion: file.version,
       contentCount: file.contents.length,
       stepCount,
       blockCount,
