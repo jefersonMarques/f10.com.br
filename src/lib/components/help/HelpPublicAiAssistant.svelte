@@ -55,7 +55,7 @@
   function targetElement(helpTarget: HelpTarget): HTMLElement | null {
     if (typeof document === "undefined") return null;
     if (helpTarget.anchor) return document.getElementById(helpTarget.anchor);
-    return document.querySelector<HTMLElement>("[data-help-content-slug]");
+    return document.querySelector<HTMLElement>("[data-help-content-slug] header");
   }
 
   async function revealTarget(helpTarget: HelpTarget): Promise<void> {
@@ -66,6 +66,7 @@
       element.scrollIntoView({ behavior: "smooth", block: "center" });
       element.classList.add("help-ai-target-highlight");
       window.setTimeout(() => element.classList.remove("help-ai-target-highlight"), 4_500);
+      sessionStorage.removeItem(STORAGE_KEY);
     }, 120);
   }
 
@@ -104,6 +105,7 @@
 
     storeNavigationState();
     await goto(`/ajuda-f10/${encodeURIComponent(helpTarget.slug)}`);
+    await revealTarget(helpTarget);
   }
 
   function errorFor(code: string): string {
