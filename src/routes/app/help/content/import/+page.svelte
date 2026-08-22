@@ -27,16 +27,16 @@
   <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
     <ApplicationBackLink href="/app/help/content" label="Base de Conhecimento" />
     <div class="flex flex-wrap gap-2">
-      <a href="/templates/f10-help-import-v1-prompt.txt" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]"><Download size={14}/>Prompt para IA</a>
-      <a href="/templates/f10-help-import-v1.example.json" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]"><Download size={14}/>Modelo JSON</a>
+      <a href="/templates/f10-help-import-v2-prompt.md" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]"><Download size={14}/>Prompt v2 para IA</a>
+      <a href="/templates/f10-help-import-v2.example.json" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]"><Download size={14}/>Modelo JSON v2</a>
     </div>
   </div>
 
   <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-    <div class="rounded-2xl border border-[#E2E5ED] bg-white p-4"><FileJson2 size={20} class="text-[#000A57]"/><strong class="mt-3 block text-[13px]">JSON v1</strong><p class="application-text-caption mt-2 leading-5 text-[#858B99]">Ideal para texto, YouTube e mídias que continuarão por URL.</p></div>
+    <div class="rounded-2xl border border-[#E2E5ED] bg-white p-4"><FileJson2 size={20} class="text-[#000A57]"/><strong class="mt-3 block text-[13px]">JSON v2</strong><p class="application-text-caption mt-2 leading-5 text-[#858B99]">Contrato atual para texto, vídeo principal e mídias por URL.</p></div>
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-4"><FileArchive size={20} class="text-[#000A57]"/><strong class="mt-3 block text-[13px]">ZIP + assets</strong><p class="application-text-caption mt-2 leading-5 text-[#858B99]">Use <code>manifest.json</code> e referências como <code>assets/tela.png</code>.</p></div>
-    <div class="rounded-2xl border border-[#E2E5ED] bg-white p-4"><Bot size={20} class="text-[#EA6D0B]"/><strong class="mt-3 block text-[13px]">Pronto para IA</strong><p class="application-text-caption mt-2 leading-5 text-[#858B99]">Transcrições, resumos e conhecimento privado entram estruturados.</p></div>
-    <div class="rounded-2xl border border-[#E2E5ED] bg-white p-4"><CheckCircle2 size={20} class="text-[#2F7045]"/><strong class="mt-3 block text-[13px]">Sempre rascunho</strong><p class="application-text-caption mt-2 leading-5 text-[#858B99]">Nenhuma importação ganha publicação automática.</p></div>
+    <div class="rounded-2xl border border-[#E2E5ED] bg-white p-4"><Bot size={20} class="text-[#EA6D0B]"/><strong class="mt-3 block text-[13px]">Preparado para IA</strong><p class="application-text-caption mt-2 leading-5 text-[#858B99]">Passos específicos, transcrição, resumos e conhecimento interno entram estruturados.</p></div>
+    <div class="rounded-2xl border border-[#E2E5ED] bg-white p-4"><CheckCircle2 size={20} class="text-[#2F7045]"/><strong class="mt-3 block text-[13px]">Sempre rascunho</strong><p class="application-text-caption mt-2 leading-5 text-[#858B99]">Nenhuma importação ganha publicação automática. Arquivos v1 continuam aceitos como legado.</p></div>
   </section>
 
   <section class="mt-4 flex items-center gap-3 rounded-2xl border border-[#E2E5ED] bg-white px-4 py-3">
@@ -69,8 +69,8 @@
     <section class="mt-5 rounded-[22px] border border-[#E2E5ED] bg-white p-5 shadow-[0_10px_32px_rgba(1,13,40,0.04)] sm:p-6">
       <div class="flex items-start gap-3"><span class="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><UploadCloud size={20}/></span><div><h2 class="text-[15px] font-semibold">Enviar JSON ou ZIP</h2><p class="application-text-caption mt-1 text-[#858B99]">ZIP até {formatMegabytes(data.maxImportBytes)}. A importação é atômica: conflito ou erro cancela o lote.</p></div></div>
       <form method="POST" action="?/import" enctype="multipart/form-data" class="mt-6">
-        <label class="block rounded-2xl border border-dashed border-[#CBD0DC] bg-[#FAFBFD] p-6 text-center"><FileArchive size={30} class="mx-auto text-[#A7ADBA]"/><span class="mt-3 block text-[12px] font-semibold">Selecione o arquivo preparado pela IA</span><span class="application-text-caption mt-1 block text-[#9297A5]">.json ou .zip no formato F10 Help Import v1</span><input type="file" name="file" accept="application/json,.json,application/zip,.zip" required class="application-text-caption mx-auto mt-4 block max-w-full" /></label>
-        <div class="application-text-caption mt-4 rounded-xl bg-[#F8F9FF] px-4 py-3 leading-5 text-[#5F6575]">No ZIP, use <code>manifest.json</code> na raiz e arquivos em <code>assets/</code>. Vídeos continuam por URL do YouTube. Imagens e documentos referenciados por <code>file</code> são copiados para o MinIO.</div>
+        <label class="block rounded-2xl border border-dashed border-[#CBD0DC] bg-[#FAFBFD] p-6 text-center"><FileArchive size={30} class="mx-auto text-[#A7ADBA]"/><span class="mt-3 block text-[12px] font-semibold">Selecione o arquivo preparado pela IA</span><span class="application-text-caption mt-1 block text-[#9297A5]">.json ou .zip no formato F10 Help Import v2; v1 permanece compatível</span><input type="file" name="file" accept="application/json,.json,application/zip,.zip" required class="application-text-caption mx-auto mt-4 block max-w-full" /></label>
+        <div class="application-text-caption mt-4 rounded-xl bg-[#F8F9FF] px-4 py-3 leading-5 text-[#5F6575]">No v2 existe no máximo um <code>featuredVideo</code> por conteúdo e ele fica no topo da página. Não use vídeo dentro dos passos. No ZIP, imagens e documentos em <code>assets/</code> são copiados para o MinIO.</div>
         <button type="submit" class="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-5 text-[12px] font-semibold text-white"><UploadCloud size={17}/>Validar e importar como rascunho</button>
       </form>
     </section>
