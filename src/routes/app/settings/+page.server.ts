@@ -2,6 +2,7 @@ import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { getOpenAiModel, isOpenAiConfigured } from "$lib/server/ai/openAiResponses";
+import { isHelpPublicAiSecretConfigured } from "$lib/server/help/helpPublicAiProtection";
 import {
   getMeshCentralControlStatus,
   listMeshCentralDeviceGroups,
@@ -50,6 +51,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
       configured: isOpenAiConfigured(),
       model: getOpenAiModel(),
       chatEnabled: isSupportAiChatEnabled(),
+      publicHelpSecretConfigured: isHelpPublicAiSecretConfigured(),
     },
     remote: getRemoteProviderStatus(),
     remoteControl: getMeshCentralControlStatus(),
