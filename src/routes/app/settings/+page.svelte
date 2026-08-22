@@ -5,6 +5,8 @@
 
   export let data: PageData;
   export let form: ActionData;
+
+  $: helpAiRuntimeReady = data.ai.configured && data.ai.publicHelpSecretConfigured;
 </script>
 
 <svelte:head><title>Configurações | F10 Operations</title></svelte:head>
@@ -80,18 +82,23 @@
           <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><ShieldCheck size={18}/></span>
           <div><h2 class="text-[14px] font-semibold">IA da Central de Ajuda</h2><p class="application-text-meta mt-1 text-[#9297A5]">Disponibilidade pública e limites de proteção contra abuso e custo excessivo.</p></div>
         </div>
-        <span class={`application-text-meta w-fit rounded-full px-2.5 py-1 font-bold ${data.helpPublicAi.enabled && data.ai.configured ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF4E9] text-[#A9510D]"}`}>{data.helpPublicAi.enabled && data.ai.configured ? "Pronta para ativação" : data.helpPublicAi.enabled ? "OpenAI pendente" : "Desativada"}</span>
+        <span class={`application-text-meta w-fit rounded-full px-2.5 py-1 font-bold ${data.helpPublicAi.enabled && helpAiRuntimeReady ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF4E9] text-[#A9510D]"}`}>{data.helpPublicAi.enabled && helpAiRuntimeReady ? "Ativa" : data.helpPublicAi.enabled ? "Configuração do servidor pendente" : "Desativada"}</span>
+      </div>
+
+      <div class="application-text-caption mt-5 grid gap-3 sm:grid-cols-2">
+        <div class="flex items-center justify-between gap-3 rounded-xl border border-[#E3E6EE] bg-[#FAFBFD] px-3 py-3"><span class="text-[#777E8D]">OpenAI</span><strong>{data.ai.configured ? "Configurada" : "Pendente"}</strong></div>
+        <div class="flex items-center justify-between gap-3 rounded-xl border border-[#E3E6EE] bg-[#FAFBFD] px-3 py-3"><span class="text-[#777E8D]">Proteção HMAC</span><strong>{data.ai.publicHelpSecretConfigured ? "Configurada" : "Pendente"}</strong></div>
       </div>
 
       <form method="POST" action="?/saveHelpPublicAi" class="mt-6 space-y-5">
         <div class="grid gap-3 sm:grid-cols-2">
           <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#E2E5ED] bg-[#FAFBFD] p-4">
             <input name="enabled" type="checkbox" checked={data.helpPublicAi.enabled} class="mt-0.5 h-4 w-4 rounded border-[#C9CEDA]" />
-            <span><strong class="application-text-caption block text-[#343B4B]">Habilitar IA na Central de Ajuda</strong><small class="application-text-meta mt-1 block leading-5 text-[#858B99]">É o interruptor geral que o endpoint público deverá respeitar.</small></span>
+            <span><strong class="application-text-caption block text-[#343B4B]">Habilitar IA na Central de Ajuda</strong><small class="application-text-meta mt-1 block leading-5 text-[#858B99]">Interruptor geral da API e do campo flutuante da Central pública.</small></span>
           </label>
           <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#E2E5ED] bg-[#FAFBFD] p-4">
             <input name="anonymousAccessEnabled" type="checkbox" checked={data.helpPublicAi.anonymousAccessEnabled} class="mt-0.5 h-4 w-4 rounded border-[#C9CEDA]" />
-            <span><strong class="application-text-caption block text-[#343B4B]">Permitir visitantes sem login</strong><small class="application-text-meta mt-1 block leading-5 text-[#858B99]">Quando desmarcado, a futura API exigirá uma sessão autenticada.</small></span>
+            <span><strong class="application-text-caption block text-[#343B4B]">Permitir visitantes sem login</strong><small class="application-text-meta mt-1 block leading-5 text-[#858B99]">Quando desmarcado, a API exige login F10 e unidade selecionada.</small></span>
           </label>
         </div>
 
@@ -110,7 +117,10 @@
         </div>
 
         {#if !data.ai.configured}
-          <p class="application-text-caption rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 leading-5 text-[#7A3B08]">A configuração pode ser salva agora, mas a IA pública não poderá responder enquanto a OpenAI não estiver configurada no ambiente seguro do servidor.</p>
+          <p class="application-text-caption rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 leading-5 text-[#7A3B08]">A configuração pode ser salva agora, mas a IA pública não responderá enquanto a OpenAI não estiver configurada no ambiente seguro do servidor.</p>
+        {/if}
+        {#if !data.ai.publicHelpSecretConfigured}
+          <p class="application-text-caption rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 leading-5 text-[#7A3B08]">Defina <code>HELP_PUBLIC_AI_SECRET</code> com pelo menos 32 caracteres aleatórios no ambiente do servidor. Esse segredo assina sessões anônimas e gera hashes dos identificadores de tráfego; ele nunca é persistido nas configurações administrativas.</p>
         {/if}
 
         <button type="submit" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 font-semibold text-white"><Save size={14}/>Salvar proteção da Central</button>
@@ -118,5 +128,5 @@
     </section>
   </div>
 
-  <section class="application-text-caption mt-5 flex items-start gap-3 rounded-2xl border border-[#DDE1F0] bg-[#F8F9FF] px-4 py-3 leading-5 text-[#626A7E]"><ShieldCheck size={16} class="mt-0.5 shrink-0 text-[#000A57]"/><span>Chaves OpenAI, Brevo, Access Key/Secret do MinIO e credenciais do MeshCentral não são gravadas em <code>operations_settings</code> nem devolvidas ao navegador. A tela expõe apenas parâmetros não secretos e o estado operacional das integrações.</span></section>
+  <section class="application-text-caption mt-5 flex items-start gap-3 rounded-2xl border border-[#DDE1F0] bg-[#F8F9FF] px-4 py-3 leading-5 text-[#626A7E]"><ShieldCheck size={16} class="mt-0.5 shrink-0 text-[#000A57]"/><span>Chaves OpenAI, Brevo, Access Key/Secret do MinIO, <code>HELP_PUBLIC_AI_SECRET</code> e credenciais do MeshCentral não são gravadas em <code>operations_settings</code> nem devolvidas ao navegador. A tela expõe apenas parâmetros não secretos e o estado operacional das integrações.</span></section>
 </ApplicationContent>
