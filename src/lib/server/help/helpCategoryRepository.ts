@@ -17,6 +17,7 @@ export type HelpCategorySummary = {
   name: string;
   description: string;
   icon: string;
+  destinationUrl: string;
   sortOrder: number;
   active: boolean;
 };
@@ -34,13 +35,16 @@ export function normalizeHelpCategorySlug(value: string): string {
 
 function uniqueCategoryIds(categoryIds: string[]): string[] {
   const normalized = Array.from(new Set(categoryIds));
-  if (normalized.length > MAX_CATEGORIES_PER_TRAINING) throw new Error("HELP_CATEGORY_LIMIT");
+  if (normalized.length > MAX_CATEGORIES_PER_TRAINING) {
+    throw new Error("HELP_CATEGORY_LIMIT");
+  }
   return normalized;
 }
 
 async function assertActiveCategoryIds(categoryIds: string[]): Promise<string[]> {
   const normalized = uniqueCategoryIds(categoryIds);
   if (normalized.length === 0) return [];
+
   const rows = await getDatabase()
     .select({ id: helpCategories.id })
     .from(helpCategories)
@@ -49,45 +53,48 @@ async function assertActiveCategoryIds(categoryIds: string[]): Promise<string[]>
   return normalized;
 }
 
+const categorySelection = {
+  id: helpCategories.id,
+  slug: helpCategories.slug,
+  name: helpCategories.name,
+  description: helpCategories.description,
+  icon: helpCategories.icon,
+  destinationUrl: helpCategories.destinationUrl,
+  sortOrder: helpCategories.sortOrder,
+  active: helpCategories.active,
+};
+
 export async function listHelpCategories(activeOnly = false): Promise<HelpCategorySummary[]> {
-  const db = getDatabase();
-  if (activeOnly) {
-    return db
-      .select({
-        id: helpCategories.id,
-        slug: helpCategories.slug,
-        name: helpCategories.name,
-        description: helpCategories.description,
-        icon: helpCategories.icon,
-        sortOrder: helpCategories.sortOrder,
-        active: helpCategories.active,
-      })
-      .from(helpCategories)
-      .where(eq(helpCategories.active, true))
-      .orderBy(asc(helpCategories.sortOrder), asc(helpCategories.name));
-  }
-  return db
-    .select({
-      id: helpCategories.id,
-      slug: helpCategories.slug,
-      name: helpCategories.name,
-      description: helpCategories.description,
-      icon: helpCategories.icon,
-      sortOrder: helpCategories.sortOrder,
-      active: helpCategories.active,
-    })
+  const query = getDatabase()
+    .select(categorySelection)
     .from(helpCategories)
+    .orderBy(asc(helpCategories.sortOrder), asc(helpCategories.name));
+
+  if (!activeOnly) return query;
+
+  return getDatabase()
+    .select(categorySelection)
+    .from(helpCategories)
+    .where(eq(helpCategories.active, true))
     .orderBy(asc(helpCategories.sortOrder), asc(helpCategories.name));
 }
 
 export async function createHelpCategory(
   actorUserId: string,
-  input: { name: string; slug: string; description: string; icon: string; sortOrder: number },
+  input: {
+    name: string;
+    slug: string;
+    description: string;
+    icon: string;
+    destinationUrl: string;
+    sortOrder: number;
+  },
 ): Promise<string> {
   const name = input.name.trim().slice(0, 160);
   const slug = normalizeHelpCategorySlug(input.slug || name);
   if (name.length < 2 || !slug) throw new Error("HELP_CATEGORY_INVALID");
   const sortOrder = Number.isFinite(input.sortOrder) ? input.sortOrder : 10;
+
   const [category] = await getDatabase()
     .insert(helpCategories)
     .values({
@@ -95,11 +102,13 @@ export async function createHelpCategory(
       slug,
       description: input.description.trim().slice(0, 600),
       icon: input.icon.trim().slice(0, 32),
+      destinationUrl: input.destinationUrl.trim().slice(0, 1000),
       sortOrder: Math.min(Math.max(Math.round(sortOrder), 0), 10000),
       createdBy: actorUserId,
       updatedBy: actorUserId,
     })
     .returning({ id: helpCategories.id });
+
   if (!category) throw new Error("HELP_CATEGORY_NOT_CREATED");
   await recordAuditEvent({
     actorUserId,
@@ -114,12 +123,21 @@ export async function createHelpCategory(
 export async function updateHelpCategory(
   actorUserId: string,
   categoryId: string,
-  input: { name: string; slug: string; description: string; icon: string; sortOrder: number; active: boolean },
+  input: {
+    name: string;
+    slug: string;
+    description: string;
+    icon: string;
+    destinationUrl: string;
+    sortOrder: number;
+    active: boolean;
+  },
 ): Promise<void> {
   const name = input.name.trim().slice(0, 160);
   const slug = normalizeHelpCategorySlug(input.slug || name);
   if (name.length < 2 || !slug) throw new Error("HELP_CATEGORY_INVALID");
   const sortOrder = Number.isFinite(input.sortOrder) ? input.sortOrder : 10;
+
   const [updated] = await getDatabase()
     .update(helpCategories)
     .set({
@@ -127,6 +145,7 @@ export async function updateHelpCategory(
       slug,
       description: input.description.trim().slice(0, 600),
       icon: input.icon.trim().slice(0, 32),
+      destinationUrl: input.destinationUrl.trim().slice(0, 1000),
       sortOrder: Math.min(Math.max(Math.round(sortOrder), 0), 10000),
       active: input.active,
       updatedBy: actorUserId,
@@ -134,6 +153,7 @@ export async function updateHelpCategory(
     })
     .where(eq(helpCategories.id, categoryId))
     .returning({ id: helpCategories.id });
+
   if (!updated) throw new Error("HELP_CATEGORY_NOT_FOUND");
   await recordAuditEvent({
     actorUserId,
@@ -147,13 +167,8 @@ export async function updateHelpCategory(
 export async function listHelpTrainingPathCategories(pathId: string): Promise<HelpCategorySummary[]> {
   return getDatabase()
     .select({
-      id: helpCategories.id,
-      slug: helpCategories.slug,
-      name: helpCategories.name,
-      description: helpCategories.description,
-      icon: helpCategories.icon,
+      ...categorySelection,
       sortOrder: helpTrainingPathCategories.sortOrder,
-      active: helpCategories.active,
     })
     .from(helpTrainingPathCategories)
     .innerJoin(helpCategories, eq(helpTrainingPathCategories.categoryId, helpCategories.id))
@@ -161,9 +176,12 @@ export async function listHelpTrainingPathCategories(pathId: string): Promise<He
     .orderBy(asc(helpCategories.sortOrder), asc(helpCategories.name));
 }
 
-export async function listHelpTrainingCategoryAssignments(pathIds: string[]): Promise<Map<string, HelpCategorySummary[]>> {
+export async function listHelpTrainingCategoryAssignments(
+  pathIds: string[],
+): Promise<Map<string, HelpCategorySummary[]>> {
   const result = new Map<string, HelpCategorySummary[]>();
   if (pathIds.length === 0) return result;
+
   const rows = await getDatabase()
     .select({
       pathId: helpTrainingPathCategories.pathId,
@@ -172,6 +190,7 @@ export async function listHelpTrainingCategoryAssignments(pathIds: string[]): Pr
       name: helpCategories.name,
       description: helpCategories.description,
       icon: helpCategories.icon,
+      destinationUrl: helpCategories.destinationUrl,
       sortOrder: helpTrainingPathCategories.sortOrder,
       active: helpCategories.active,
       categorySortOrder: helpCategories.sortOrder,
@@ -180,6 +199,7 @@ export async function listHelpTrainingCategoryAssignments(pathIds: string[]): Pr
     .innerJoin(helpCategories, eq(helpTrainingPathCategories.categoryId, helpCategories.id))
     .where(inArray(helpTrainingPathCategories.pathId, pathIds))
     .orderBy(asc(helpCategories.sortOrder), asc(helpCategories.name));
+
   for (const row of rows) {
     const current = result.get(row.pathId) ?? [];
     current.push({
@@ -188,6 +208,7 @@ export async function listHelpTrainingCategoryAssignments(pathIds: string[]): Pr
       name: row.name,
       description: row.description,
       icon: row.icon,
+      destinationUrl: row.destinationUrl,
       sortOrder: row.categorySortOrder,
       active: row.active,
     });
@@ -258,18 +279,13 @@ export async function updateHelpTrainingPathWithCategories(
 }
 
 export async function getHelpCategoriesBySlugs(slugs: string[]): Promise<HelpCategorySummary[]> {
-  const normalized = Array.from(new Set(slugs.map(normalizeHelpCategorySlug).filter(Boolean)));
+  const normalized = Array.from(
+    new Set(slugs.map(normalizeHelpCategorySlug).filter(Boolean)),
+  );
   if (normalized.length === 0) return [];
+
   return getDatabase()
-    .select({
-      id: helpCategories.id,
-      slug: helpCategories.slug,
-      name: helpCategories.name,
-      description: helpCategories.description,
-      icon: helpCategories.icon,
-      sortOrder: helpCategories.sortOrder,
-      active: helpCategories.active,
-    })
+    .select(categorySelection)
     .from(helpCategories)
     .where(and(inArray(helpCategories.slug, normalized), eq(helpCategories.active, true)))
     .orderBy(asc(helpCategories.sortOrder), asc(helpCategories.name));
@@ -283,24 +299,28 @@ export async function listPublicHelpCategories() {
       name: helpCategories.name,
       description: helpCategories.description,
       icon: helpCategories.icon,
+      destinationUrl: helpCategories.destinationUrl,
       sortOrder: helpCategories.sortOrder,
       trainingCount: count(helpTrainingPaths.id),
     })
     .from(helpCategories)
     .innerJoin(helpTrainingPathCategories, eq(helpTrainingPathCategories.categoryId, helpCategories.id))
     .innerJoin(helpTrainingPaths, eq(helpTrainingPathCategories.pathId, helpTrainingPaths.id))
-    .where(and(
-      eq(helpCategories.active, true),
-      eq(helpTrainingPaths.status, "published"),
-      eq(helpTrainingPaths.accessMode, "public"),
-      gt(helpTrainingPaths.currentVersion, 0),
-    ))
+    .where(
+      and(
+        eq(helpCategories.active, true),
+        eq(helpTrainingPaths.status, "published"),
+        eq(helpTrainingPaths.accessMode, "public"),
+        gt(helpTrainingPaths.currentVersion, 0),
+      ),
+    )
     .groupBy(
       helpCategories.id,
       helpCategories.slug,
       helpCategories.name,
       helpCategories.description,
       helpCategories.icon,
+      helpCategories.destinationUrl,
       helpCategories.sortOrder,
     )
     .orderBy(asc(helpCategories.sortOrder), asc(helpCategories.name));
@@ -317,6 +337,7 @@ export async function getPublicHelpCategory(slug: string) {
       name: helpCategories.name,
       description: helpCategories.description,
       icon: helpCategories.icon,
+      destinationUrl: helpCategories.destinationUrl,
     })
     .from(helpCategories)
     .where(and(eq(helpCategories.slug, normalizedSlug), eq(helpCategories.active, true)))
@@ -332,12 +353,14 @@ export async function getPublicHelpCategory(slug: string) {
     })
     .from(helpTrainingPathCategories)
     .innerJoin(helpTrainingPaths, eq(helpTrainingPathCategories.pathId, helpTrainingPaths.id))
-    .where(and(
-      eq(helpTrainingPathCategories.categoryId, category.id),
-      eq(helpTrainingPaths.status, "published"),
-      eq(helpTrainingPaths.accessMode, "public"),
-      gt(helpTrainingPaths.currentVersion, 0),
-    ))
+    .where(
+      and(
+        eq(helpTrainingPathCategories.categoryId, category.id),
+        eq(helpTrainingPaths.status, "published"),
+        eq(helpTrainingPaths.accessMode, "public"),
+        gt(helpTrainingPaths.currentVersion, 0),
+      ),
+    )
     .orderBy(asc(helpTrainingPathCategories.sortOrder), asc(helpTrainingPaths.title));
 
   return { ...category, trainings };
