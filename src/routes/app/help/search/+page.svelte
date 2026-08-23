@@ -13,9 +13,7 @@
   export let form: ActionData;
 </script>
 
-<svelte:head>
-  <title>Pesquisa de Suporte | F10 Operations</title>
-</svelte:head>
+<svelte:head><title>Pesquisa de Suporte | F10 Operations</title></svelte:head>
 
 <ApplicationContent width="narrow">
   <ApplicationBackLink href="/app/help/content" label="Base de Conhecimento" className="mb-3" />
@@ -36,7 +34,7 @@
 
     <div class="mt-4 flex items-start gap-2 rounded-xl bg-[#F8F9FF] px-4 py-3 text-[10px] leading-5 text-[#687087]">
       <BrainCircuit size={15} class="mt-0.5 shrink-0 text-[#000A57]" aria-hidden="true" />
-      <span>Neste laboratório interno a pesquisa também considera o conhecimento exclusivo da IA. A futura busca pública usará apenas o conteúdo público publicado.</span>
+      <span>A pesquisa considera conteúdo público, categorias, termos relacionados e conhecimento adicional seguro para o cliente. Notas internas nunca participam deste índice.</span>
     </div>
   </section>
 
@@ -49,10 +47,7 @@
 
   {#if form && "results" in form && form.results.length > 0}
     <section class="mt-4 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
-      <header class="border-b border-[#EEF0F5] px-5 py-4 sm:px-6">
-        <h2 class="text-[14px] font-semibold text-[#222839]">Resultados publicados</h2>
-        <p class="mt-1 text-[10px] text-[#8A909E]">Ordenados por relevância textual, similaridade e conhecimento disponível.</p>
-      </header>
+      <header class="border-b border-[#EEF0F5] px-5 py-4 sm:px-6"><h2 class="text-[14px] font-semibold text-[#222839]">Resultados publicados</h2><p class="mt-1 text-[10px] text-[#8A909E]">Ordenados por relevância textual, categorias, aliases e similaridade.</p></header>
 
       <div class="divide-y divide-[#EEF0F5]">
         {#each form.results as result}
@@ -62,8 +57,8 @@
                 <div class="flex flex-wrap items-center gap-2">
                   <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-[#EEF0FF] text-[10px] font-bold text-[#000A57]">{result.rank}</span>
                   <strong class="text-[13px] font-semibold text-[#202637]">{result.title}</strong>
-                  {#if result.category}<span class="rounded-full bg-[#F3F4F7] px-2 py-1 text-[8px] font-semibold text-[#777D8D]">{result.category}</span>{/if}
                 </div>
+                {#if result.categoryText}<p class="mt-1 line-clamp-1 text-[9px] font-semibold text-[#8A909E]">{result.categoryText}</p>{/if}
                 {#if result.summary}<p class="mt-2 max-w-[760px] text-[11px] leading-5 text-[#747A8A]">{result.summary}</p>{/if}
                 <p class="mt-2 text-[9px] text-[#A0A5B0]">/{result.slug}</p>
               </div>
@@ -81,8 +76,8 @@
   {:else if form?.success && form && "results" in form}
     <section class="mt-4 rounded-[22px] border border-dashed border-[#CBD0DC] bg-white px-6 py-14 text-center">
       <SearchX size={32} class="mx-auto text-[#AEB4C1]" aria-hidden="true" />
-      <h2 class="mt-4 text-[14px] font-semibold text-[#303645]">Nenhuma resposta publicada</h2>
-      <p class="mx-auto mt-2 max-w-[560px] text-[11px] leading-6 text-[#818795]">Esta dúvida já entrou na telemetria. Depois ela poderá aparecer em “lacunas de conhecimento” para a equipe criar ou melhorar um conteúdo.</p>
+      <h2 class="mt-4 text-[14px] font-semibold text-[#303645]">Nenhum conteúdo publicado</h2>
+      <p class="mx-auto mt-2 max-w-[560px] text-[11px] leading-6 text-[#818795]">Esta dúvida já entrou na telemetria e pode orientar a criação ou melhoria de artigos.</p>
     </section>
   {/if}
 </ApplicationContent>
