@@ -18,7 +18,9 @@ export type HelpSearchInput = {
   actorUserId?: string | null;
   customerContactId?: string | null;
   limit?: number;
-  includeAiKnowledge?: boolean;
+  includeAssistantKnowledge?: boolean;
+  contentId?: string | null;
+  categoryId?: string | null;
 };
 
 export type PublishedHelpContext = {
@@ -26,9 +28,9 @@ export type PublishedHelpContext = {
   slug: string;
   title: string;
   summary: string;
-  category: string;
+  categoryText: string;
   publicText: string;
-  aiText: string;
+  assistantText: string;
   publishedAt: Date;
 };
 
@@ -47,24 +49,45 @@ export async function searchPublishedHelp(input: HelpSearchInput) {
   const query = input.query.trim().slice(0, 500);
   const normalizedQuery = normalizeHelpSearchQuery(query);
   const limit = Math.min(Math.max(input.limit ?? 8, 1), 20);
-  const includeAiKnowledge = input.includeAiKnowledge ?? input.source !== "public";
+  const includeAssistantKnowledge = input.includeAssistantKnowledge ?? true;
 
   if (!normalizedQuery) {
     return { searchEventId: null, results: [] };
   }
 
-  const searchableText = includeAiKnowledge
-    ? sql`concat_ws(' ', ${helpSearchDocuments.title}, ${helpSearchDocuments.summary}, ${helpSearchDocuments.publicText}, ${helpSearchDocuments.aiText})`
-    : sql`concat_ws(' ', ${helpSearchDocuments.title}, ${helpSearchDocuments.summary}, ${helpSearchDocuments.publicText})`;
+  const searchableText = includeAssistantKnowledge
+    ? sql`concat_ws(' ', ${helpSearchDocuments.title}, ${helpSearchDocuments.summary}, ${helpSearchDocuments.categoryText}, ${helpSearchDocuments.publicText}, ${helpSearchDocuments.searchAliases}, ${helpSearchDocuments.assistantText})`
+    : sql`concat_ws(' ', ${helpSearchDocuments.title}, ${helpSearchDocuments.summary}, ${helpSearchDocuments.categoryText}, ${helpSearchDocuments.publicText}, ${helpSearchDocuments.searchAliases})`;
   const searchVector = sql`to_tsvector('portuguese', ${searchableText})`;
   const searchQuery = sql`websearch_to_tsquery('portuguese', ${query})`;
   const score = sql<number>`(
     ts_rank_cd(${searchVector}, ${searchQuery}) * 2
     + greatest(
         similarity(${helpSearchDocuments.title}, ${query}),
-        similarity(${helpSearchDocuments.summary}, ${query})
+        similarity(${helpSearchDocuments.summary}, ${query}),
+        similarity(${helpSearchDocuments.categoryText}, ${query}),
+        similarity(${helpSearchDocuments.searchAliases}, ${query})
       )
   )`;
+
+  const searchPredicate = sql`(
+    ${searchVector} @@ ${searchQuery}
+    OR ${helpSearchDocuments.title} % ${query}
+    OR ${helpSearchDocuments.summary} % ${query}
+    OR ${helpSearchDocuments.categoryText} % ${query}
+    OR ${helpSearchDocuments.searchAliases} % ${query}
+  )`;
+  const contentPredicate = input.contentId
+    ? eq(helpSearchDocuments.contentId, input.contentId)
+    : undefined;
+  const categoryPredicate = input.categoryId
+    ? sql`EXISTS (
+        SELECT 1
+        FROM help_content_categories hcc
+        WHERE hcc.content_id = ${helpSearchDocuments.contentId}
+          AND hcc.category_id = ${input.categoryId}
+      )`
+    : undefined;
 
   const rows = await db
     .select({
@@ -72,16 +95,12 @@ export async function searchPublishedHelp(input: HelpSearchInput) {
       slug: helpSearchDocuments.slug,
       title: helpSearchDocuments.title,
       summary: helpSearchDocuments.summary,
-      category: helpSearchDocuments.category,
+      categoryText: helpSearchDocuments.categoryText,
       publishedAt: helpSearchDocuments.publishedAt,
       score,
     })
     .from(helpSearchDocuments)
-    .where(
-      sql`${searchVector} @@ ${searchQuery}
-        OR ${helpSearchDocuments.title} % ${query}
-        OR ${helpSearchDocuments.summary} % ${query}`,
-    )
+    .where(and(searchPredicate, contentPredicate, categoryPredicate))
     .orderBy(desc(score))
     .limit(limit);
 
@@ -127,16 +146,15 @@ export async function getPublishedHelpContext(
   const orderedIds = Array.from(new Set(contentIds));
   if (orderedIds.length === 0) return [];
 
-  const db = getDatabase();
-  const rows = await db
+  const rows = await getDatabase()
     .select({
       contentId: helpSearchDocuments.contentId,
       slug: helpSearchDocuments.slug,
       title: helpSearchDocuments.title,
       summary: helpSearchDocuments.summary,
-      category: helpSearchDocuments.category,
+      categoryText: helpSearchDocuments.categoryText,
       publicText: helpSearchDocuments.publicText,
-      aiText: helpSearchDocuments.aiText,
+      assistantText: helpSearchDocuments.assistantText,
       publishedAt: helpSearchDocuments.publishedAt,
     })
     .from(helpSearchDocuments)
@@ -182,17 +200,11 @@ export async function markHelpSearchOutcome(
     ticketId?: string | null;
   },
 ): Promise<void> {
-  const db = getDatabase();
-
-  await db
+  await getDatabase()
     .update(helpSearchEvents)
     .set({
-      ...(outcome.aiAnswered === undefined
-        ? {}
-        : { aiAnswered: outcome.aiAnswered }),
-      ...(outcome.escalated === undefined
-        ? {}
-        : { escalated: outcome.escalated }),
+      ...(outcome.aiAnswered === undefined ? {} : { aiAnswered: outcome.aiAnswered }),
+      ...(outcome.escalated === undefined ? {} : { escalated: outcome.escalated }),
       ...(outcome.ticketId === undefined ? {} : { ticketId: outcome.ticketId }),
       updatedAt: new Date(),
     })
