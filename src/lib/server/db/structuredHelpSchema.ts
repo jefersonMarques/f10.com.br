@@ -6,6 +6,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -36,6 +37,7 @@ export const helpCategories = pgTable(
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
     icon: text("icon").notNull().default(""),
+    destinationUrl: text("destination_url").notNull().default(""),
     sortOrder: integer("sort_order").notNull().default(10),
     active: boolean("active").notNull().default(true),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
@@ -56,8 +58,9 @@ export const helpContents = pgTable(
     slug: text("slug").notNull(),
     title: text("title").notNull(),
     summary: text("summary").notNull().default(""),
-    category: text("category").notNull().default(""),
-    aiGeneralKnowledge: text("ai_general_knowledge").notNull().default(""),
+    searchAliases: jsonb("search_aliases").$type<string[]>().notNull().default([]),
+    assistantKnowledge: text("assistant_knowledge").notNull().default(""),
+    internalSupportNotes: text("internal_support_notes").notNull().default(""),
     status: helpContentStatus("status").notNull().default("draft"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     legacyArticleId: uuid("legacy_article_id").references(() => helpArticles.id, { onDelete: "set null" }),
@@ -73,9 +76,28 @@ export const helpContents = pgTable(
     uniqueIndex("help_contents_legacy_article_unique").on(table.legacyArticleId),
     uniqueIndex("help_contents_import_identity_unique").on(table.importSource, table.importExternalId),
     index("help_contents_status_idx").on(table.status),
-    index("help_contents_category_idx").on(table.category),
     index("help_contents_updated_idx").on(table.updatedAt),
     index("help_contents_import_source_idx").on(table.importSource),
+  ],
+);
+
+export const helpContentCategories = pgTable(
+  "help_content_categories",
+  {
+    contentId: uuid("content_id")
+      .notNull()
+      .references(() => helpContents.id, { onDelete: "cascade" }),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => helpCategories.id, { onDelete: "restrict" }),
+    destinationUrl: text("destination_url").notNull().default(""),
+    sortOrder: integer("sort_order").notNull().default(10),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.contentId, table.categoryId] }),
+    index("help_content_categories_category_idx").on(table.categoryId, table.sortOrder),
+    index("help_content_categories_content_idx").on(table.contentId, table.sortOrder),
   ],
 );
 
@@ -86,7 +108,7 @@ export const helpContentSteps = pgTable(
     contentId: uuid("content_id").notNull().references(() => helpContents.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     description: text("description").notNull().default(""),
-    aiKnowledge: text("ai_knowledge").notNull().default(""),
+    assistantKnowledge: text("assistant_knowledge").notNull().default(""),
     sortOrder: integer("sort_order").notNull().default(10),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -110,8 +132,10 @@ export const helpAssets = pgTable(
     sizeBytes: bigint("size_bytes", { mode: "number" }),
     checksumSha256: text("checksum_sha256"),
     altText: text("alt_text").notNull().default(""),
-    transcript: text("transcript").notNull().default(""),
-    aiSummary: text("ai_summary").notNull().default(""),
+    assistantDescription: text("assistant_description").notNull().default(""),
+    subtitles: text("subtitles").notNull().default(""),
+    assistantSummary: text("assistant_summary").notNull().default(""),
+    extractedText: text("extracted_text").notNull().default(""),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
