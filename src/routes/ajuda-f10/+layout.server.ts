@@ -7,7 +7,8 @@ export const load: LayoutServerLoad = async () => {
   const settings = await getHelpPublicAiSettings();
   return {
     helpPublicAi: {
-      enabled:
+      enabled: settings.enabled,
+      available:
         settings.enabled &&
         isOpenAiConfigured() &&
         isHelpPublicAiSecretConfigured(),
