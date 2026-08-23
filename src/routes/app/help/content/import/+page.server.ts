@@ -2,19 +2,14 @@ import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
+import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import {
   importStructuredHelpFile,
   validateHelpImportJson,
   type HelpImportFile,
 } from "$lib/server/help/structuredHelpImport";
-import {
-  importStructuredHelpPackage,
-  validateHelpImportPackage,
-} from "$lib/server/help/helpImportPackage";
-import { getAssetStorageStatus } from "$lib/server/storage/assetStorage";
 
 const MAX_JSON_BYTES = 5 * 1024 * 1024;
-const MAX_ZIP_BYTES = 40 * 1024 * 1024;
 
 function permissionMap(
   permissions: Array<{ code: string; scope: "own" | "team" | "all" }>,
@@ -29,8 +24,8 @@ function conflictMessage(message: string): string {
   if (message.startsWith("IMPORT_EXTERNAL_ID_CONFLICT:")) {
     return `Este arquivo contém itens já importados desta mesma origem: ${message.slice("IMPORT_EXTERNAL_ID_CONFLICT:".length)}.`;
   }
-  if (message === "ASSET_STORAGE_NOT_CONFIGURED") {
-    return "O pacote possui arquivos locais, mas o S3/MinIO ainda não está configurado.";
+  if (message.startsWith("IMPORT_CATEGORY_INVALID:")) {
+    return `Estas categorias não existem ou estão inativas: ${message.slice("IMPORT_CATEGORY_INVALID:".length)}. Atualize o prompt e gere o JSON novamente.`;
   }
   return "Não foi possível importar o arquivo. Nenhum conteúdo foi alterado.";
 }
@@ -42,13 +37,7 @@ function countJsonAssets(file: HelpImportFile): number {
       (content.featuredVideo ? 1 : 0) +
       content.steps.reduce(
         (stepTotal, step) =>
-          stepTotal +
-          step.blocks.filter(
-            (block) =>
-              block.type === "image" ||
-              block.type === "video" ||
-              block.type === "file",
-          ).length,
+          stepTotal + step.blocks.filter((block) => block.type === "image" || block.type === "file").length,
         0,
       ),
     0,
@@ -58,13 +47,11 @@ function countJsonAssets(file: HelpImportFile): number {
 export const load: PageServerLoad = async ({ parent }) => {
   const layout = await parent();
   const permissions = permissionMap(layout.permissions);
-  if (!hasPermission(permissions, "help.view")) {
-    throw error(403, "Acesso não autorizado.");
-  }
+  if (!hasPermission(permissions, "help.view")) throw error(403, "Acesso não autorizado.");
   return {
     canImport: hasPermission(permissions, "help.edit"),
-    maxImportBytes: MAX_ZIP_BYTES,
-    storage: getAssetStorageStatus(),
+    maxImportBytes: MAX_JSON_BYTES,
+    categories: await listHelpCategories(true),
   };
 };
 
@@ -75,83 +62,34 @@ export const actions: Actions = {
       "help.edit",
       "/app/help/content/import",
     );
-    const formData = await request.formData();
-    const fileValue = formData.get("file");
+    const fileValue = (await request.formData()).get("file");
     if (!(fileValue instanceof File) || fileValue.size === 0) {
       return fail(400, {
         success: false,
-        message: "Selecione um arquivo JSON ou ZIP para importar.",
+        message: "Selecione o JSON gerado pela IA.",
         issues: [],
       });
     }
-
-    const lowerName = fileValue.name.toLowerCase();
-    const isZip = lowerName.endsWith(".zip");
-    const isJson = lowerName.endsWith(".json");
-    if (!isZip && !isJson) {
+    if (!fileValue.name.toLowerCase().endsWith(".json")) {
       return fail(400, {
         success: false,
-        message: "Use um arquivo .json ou .zip.",
+        message: "Use um arquivo .json no formato F10 Help Import.",
         issues: [],
       });
     }
-    const maxBytes = isZip ? MAX_ZIP_BYTES : MAX_JSON_BYTES;
-    if (fileValue.size > maxBytes) {
+    if (fileValue.size > MAX_JSON_BYTES) {
       return fail(413, {
         success: false,
-        message: `O arquivo excede o limite de ${Math.round(maxBytes / 1024 / 1024)} MB.`,
+        message: `O arquivo excede o limite de ${Math.round(MAX_JSON_BYTES / 1024 / 1024)} MB.`,
         issues: [],
       });
     }
 
-    if (isZip) {
-      const validation = validateHelpImportPackage(
-        new Uint8Array(await fileValue.arrayBuffer()),
-      );
-      if (!validation.valid || !validation.manifest) {
-        return fail(400, {
-          success: false,
-          message: "O pacote ZIP não segue o formato de importação do F10.",
-          issues: validation.issues,
-          summary: {
-            source: validation.source,
-            contentCount: validation.contentCount,
-            stepCount: validation.stepCount,
-            blockCount: validation.blockCount,
-            assetCount: validation.assetCount,
-          },
-        });
-      }
-      try {
-        const result = await importStructuredHelpPackage(session.user.id, validation);
-        return {
-          success: true,
-          message: `${result.contentCount} conteúdo(s) e ${result.assetCount} referência(s) de mídia/arquivo importados como rascunho.`,
-          issues: [],
-          summary: {
-            source: result.source,
-            contentCount: result.contentCount,
-            stepCount: result.stepCount,
-            blockCount: result.blockCount,
-            assetCount: result.assetCount,
-          },
-          imported: result.imported,
-        };
-      } catch (cause) {
-        return fail(409, {
-          success: false,
-          message: conflictMessage(cause instanceof Error ? cause.message : ""),
-          issues: [],
-        });
-      }
-    }
-
-    const rawJson = await fileValue.text();
-    const validation = validateHelpImportJson(rawJson);
+    const validation = validateHelpImportJson(await fileValue.text());
     if (!validation.valid || !validation.parsed) {
       return fail(400, {
         success: false,
-        message: "O arquivo não segue o formato de importação do F10.",
+        message: "O arquivo não segue o contrato atual de importação do F10.",
         issues: validation.issues,
         summary: {
           source: validation.source,
@@ -168,7 +106,7 @@ export const actions: Actions = {
       const result = await importStructuredHelpFile(session.user.id, validation.parsed);
       return {
         success: true,
-        message: `${result.contentCount} conteúdo(s) importado(s) como rascunho.`,
+        message: `${result.contentCount} conteúdo(s) importado(s) como rascunho. Revise antes de publicar.`,
         issues: [],
         summary: {
           source: result.source,
