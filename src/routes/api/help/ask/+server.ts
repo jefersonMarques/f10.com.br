@@ -1,7 +1,10 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { isOpenAiConfigured, OpenAiResponseError } from "$lib/server/ai/openAiResponses";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
-import { answerPublicHelpQuestion } from "$lib/server/help/helpPublicAi";
+import {
+  answerHelpQuestion,
+  type HelpKnowledgeScope,
+} from "$lib/server/help/helpKnowledgeEngine";
 import {
   claimHelpPublicAiRequest,
   createHelpPublicAiIpKey,
@@ -31,6 +34,14 @@ function errorResponse(error: string, status: number, retryAfter?: number) {
   );
 }
 
+function parseScope(payload: Record<string, unknown>): HelpKnowledgeScope | null {
+  const scope = payload.scope === "article" ? "article" : "global";
+  if (scope === "global") return { type: "global" };
+  const articleSlug = typeof payload.articleSlug === "string" ? payload.articleSlug.trim() : "";
+  if (!articleSlug || articleSlug.length > 160) return null;
+  return { type: "article", slug: articleSlug };
+}
+
 export const POST: RequestHandler = async ({ request, cookies, getClientAddress, url }) => {
   const origin = request.headers.get("origin");
   if (origin && origin !== url.origin) return errorResponse("INVALID_ORIGIN", 403);
@@ -56,7 +67,8 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
   }
 
   const question = typeof payload.question === "string" ? payload.question.trim() : "";
-  if (question.length < 3 || question.length > 600) {
+  const scope = parseScope(payload);
+  if (question.length < 3 || question.length > 600 || !scope) {
     return errorResponse("INVALID_QUESTION", 400);
   }
 
@@ -73,9 +85,16 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
     const ipKey = createHelpPublicAiIpKey(clientAddress);
     requestId = await claimHelpPublicAiRequest(sessionKey, ipKey, settings);
 
-    const result = await answerPublicHelpQuestion(question);
+    const result = await answerHelpQuestion({
+      question,
+      scope,
+      source: "public",
+    });
     await finishHelpPublicAiRequest(requestId, {
-      status: result.resolved ? "answered" : "not_found",
+      status:
+        result.resolution === "answered" || result.resolution === "navigate"
+          ? "answered"
+          : "not_found",
       model: result.model ?? "",
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
@@ -83,6 +102,7 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
 
     return json(
       {
+        resolution: result.resolution,
         resolved: result.resolved,
         answer: result.answer,
         target: result.target,
@@ -110,8 +130,11 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
     ) {
       return errorResponse("RATE_LIMITED", 429, settings.rateLimitWindowMinutes * 60);
     }
-    if (code === "HELP_PUBLIC_AI_QUESTION_INVALID") {
+    if (code === "HELP_KNOWLEDGE_QUESTION_INVALID") {
       return errorResponse("INVALID_QUESTION", 400);
+    }
+    if (code === "HELP_ARTICLE_NOT_FOUND") {
+      return errorResponse("ARTICLE_NOT_FOUND", 404);
     }
     if (code === "HELP_PUBLIC_AI_SECRET_NOT_CONFIGURED") {
       return errorResponse("AI_UNAVAILABLE", 503);
