@@ -41,7 +41,13 @@
 
   <main data-help-content-id={data.content.id} data-help-content-slug={data.content.slug}>
     <header class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
-      {#if data.content.category}<p class="application-text-meta font-bold uppercase tracking-[0.13em] text-[#EA6D0B]">{data.content.category}</p>{/if}
+      {#if data.content.categories.length > 0}
+        <div class="flex flex-wrap gap-2">
+          {#each data.content.categories as category}
+            <span class="application-text-meta rounded-full bg-[#FFF3E9] px-3 py-1.5 font-bold uppercase tracking-[0.08em] text-[#B85408]">{category.icon ? `${category.icon} ` : ""}{category.name}</span>
+          {/each}
+        </div>
+      {/if}
       <h2 class="mt-2 text-[24px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[30px]">{data.content.title}</h2>
       {#if data.content.summary}<p class="mt-2 max-w-[800px] text-[12px] leading-6 text-[#707788]">{data.content.summary}</p>{/if}
     </header>
@@ -50,9 +56,7 @@
       {@const featuredEmbed = youtubeEmbedUrl(data.content.featuredVideo.sourceUrl)}
       <section id="help-featured-video" data-help-featured-video-id={data.content.featuredVideo.id} class="mt-5 scroll-mt-24 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
         {#if featuredEmbed}
-          <div class="aspect-video overflow-hidden bg-black">
-            <iframe src={featuredEmbed} title={data.content.featuredVideo.altText || `Vídeo: ${data.content.title}`} class="h-full w-full" allowfullscreen></iframe>
-          </div>
+          <div class="aspect-video overflow-hidden bg-black"><iframe src={featuredEmbed} title={data.content.featuredVideo.altText || `Vídeo: ${data.content.title}`} class="h-full w-full" allowfullscreen></iframe></div>
         {:else if data.content.featuredVideo.sourceUrl}
           <a href={data.content.featuredVideo.sourceUrl} target="_blank" rel="noopener noreferrer" class="flex min-h-20 items-center justify-between gap-3 px-5 py-4 text-[11px] font-semibold text-[#000A57]"><span class="inline-flex items-center gap-2"><PlayCircle size={18}/>Assistir ao vídeo principal</span><ExternalLink size={13}/></a>
         {/if}
@@ -60,10 +64,7 @@
     {/if}
 
     {#if data.content.legacyVideoCount > 0}
-      <div class="mt-5 flex items-start gap-3 rounded-2xl border border-[#F0C8C8] bg-[#FFF8F7] px-4 py-3 text-[#8D3333]">
-        <TriangleAlert size={17} class="mt-0.5 shrink-0" />
-        <p class="text-[11px] leading-5">Este rascunho ainda possui {data.content.legacyVideoCount} {data.content.legacyVideoCount === 1 ? "vídeo legado" : "vídeos legados"} dentro dos passos. A publicação fica bloqueada até a revisão.</p>
-      </div>
+      <div class="mt-5 flex items-start gap-3 rounded-2xl border border-[#F0C8C8] bg-[#FFF8F7] px-4 py-3 text-[#8D3333]"><TriangleAlert size={17} class="mt-0.5 shrink-0"/><p class="text-[11px] leading-5">Este rascunho ainda possui {data.content.legacyVideoCount} {data.content.legacyVideoCount === 1 ? "vídeo legado" : "vídeos legados"} dentro dos passos. A publicação fica bloqueada até a revisão.</p></div>
     {/if}
 
     <div class="mt-5 space-y-5">
