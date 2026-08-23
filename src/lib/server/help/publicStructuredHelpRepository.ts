@@ -10,6 +10,15 @@ export type PublishedHelpAsset = {
   altText: string;
 };
 
+export type PublishedHelpCategory = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  icon: string;
+  destinationUrl: string;
+};
+
 export type PublishedHelpBlock = {
   id: string;
   blockType: "text" | "image" | "video" | "notice" | "link" | "file";
@@ -34,7 +43,7 @@ export type PublishedStructuredHelp = {
   slug: string;
   title: string;
   summary: string;
-  category: string;
+  categories: PublishedHelpCategory[];
   featuredVideo: PublishedHelpAsset | null;
   steps: PublishedHelpStep[];
   publishedAt: Date;
@@ -45,19 +54,19 @@ export type PublishedStructuredHelpSummary = {
   slug: string;
   title: string;
   summary: string;
-  category: string;
+  categories: PublishedHelpCategory[];
   stepCount: number;
   publishedAt: Date;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : null;
 }
 
 function readString(record: Record<string, unknown>, key: string): string {
-  return typeof record[key] === "string" ? record[key] as string : "";
+  return typeof record[key] === "string" ? (record[key] as string) : "";
 }
 
 function normalizeSearchText(value: string): string {
@@ -82,6 +91,23 @@ function parseAsset(value: unknown): PublishedHelpAsset | null {
     sourceUrl: readString(record, "sourceUrl") || null,
     storageKey: readString(record, "storageKey") || null,
     altText: readString(record, "altText"),
+  };
+}
+
+function parseCategory(value: unknown): PublishedHelpCategory | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  const id = readString(record, "id");
+  const slug = readString(record, "slug");
+  const name = readString(record, "name");
+  if (!id || !slug || !name) return null;
+  return {
+    id,
+    slug,
+    name,
+    description: readString(record, "description"),
+    icon: readString(record, "icon"),
+    destinationUrl: readString(record, "destinationUrl"),
   };
 }
 
@@ -118,30 +144,7 @@ function parseStep(value: unknown): PublishedHelpStep | null {
     title,
     description: readString(record, "description"),
     sortOrder: typeof record.sortOrder === "number" ? record.sortOrder : 0,
-    blocks,
-  };
-}
-
-function normalizeFeaturedVideo(
-  publicSnapshot: Record<string, unknown>,
-  steps: PublishedHelpStep[],
-): { featuredVideo: PublishedHelpAsset | null; steps: PublishedHelpStep[] } {
-  const explicitFeaturedVideo = parseAsset(publicSnapshot.featuredVideo);
-  const legacyFeaturedVideo = steps
-    .flatMap((step) => step.blocks)
-    .find((block) => block.blockType === "video" && block.asset?.assetType === "video")
-    ?.asset ?? null;
-
-  return {
-    featuredVideo: explicitFeaturedVideo?.assetType === "video"
-      ? explicitFeaturedVideo
-      : legacyFeaturedVideo,
-    steps: steps.map((step) => ({
-      ...step,
-      // Publicações v1 podiam conter vários vídeos em passos. A experiência pública
-      // passa a exibir somente um vídeo principal no topo sem destruir o snapshot.
-      blocks: step.blocks.filter((block) => block.blockType !== "video"),
-    })),
+    blocks: blocks.filter((block) => block.blockType !== "video"),
   };
 }
 
@@ -155,41 +158,58 @@ function parsePublication(
   const slug = readString(publicSnapshot, "slug");
   const title = readString(publicSnapshot, "title");
   if (!slug || !title) return null;
-  const parsedSteps = Array.isArray(publicSnapshot.steps)
-    ? publicSnapshot.steps.map(parseStep).filter((step): step is PublishedHelpStep => Boolean(step))
+
+  const categories = Array.isArray(publicSnapshot.categories)
+    ? publicSnapshot.categories
+        .map(parseCategory)
+        .filter((category): category is PublishedHelpCategory => Boolean(category))
     : [];
-  const normalized = normalizeFeaturedVideo(publicSnapshot, parsedSteps);
+  const steps = Array.isArray(publicSnapshot.steps)
+    ? publicSnapshot.steps
+        .map(parseStep)
+        .filter((step): step is PublishedHelpStep => Boolean(step))
+    : [];
+  const featuredVideo = parseAsset(publicSnapshot.featuredVideo);
 
   return {
     contentId: entityId,
     slug,
     title,
     summary: readString(publicSnapshot, "summary"),
-    category: readString(publicSnapshot, "category"),
-    featuredVideo: normalized.featuredVideo,
-    steps: normalized.steps,
+    categories,
+    featuredVideo: featuredVideo?.assetType === "video" ? featuredVideo : null,
+    steps,
     publishedAt,
   };
 }
 
 function publicationSearchText(content: PublishedStructuredHelp): string {
-  return normalizeSearchText([
-    content.title,
-    content.summary,
-    content.category,
-    ...content.steps.flatMap((step) => [
-      step.title,
-      step.description,
-      ...step.blocks.map((block) => block.textContent),
-    ]),
-  ].join(" "));
+  return normalizeSearchText(
+    [
+      content.title,
+      content.summary,
+      ...content.categories.flatMap((category) => [
+        category.slug,
+        category.name,
+        category.description,
+      ]),
+      ...content.steps.flatMap((step) => [
+        step.title,
+        step.description,
+        ...step.blocks.flatMap((block) => [
+          block.textContent,
+          block.linkLabel ?? "",
+          block.asset?.altText ?? "",
+        ]),
+      ]),
+    ].join(" "),
+  );
 }
 
 export async function listPublishedStructuredHelpCatalog(
   query = "",
 ): Promise<PublishedStructuredHelpSummary[]> {
-  const db = getDatabase();
-  const rows = await db
+  const rows = await getDatabase()
     .select({
       entityId: helpPublications.entityId,
       snapshot: helpPublications.snapshot,
@@ -198,8 +218,7 @@ export async function listPublishedStructuredHelpCatalog(
     .from(helpPublications)
     .where(eq(helpPublications.entityType, "content"));
 
-  const normalizedQuery = normalizeSearchText(query);
-  const terms = normalizedQuery.split(" ").filter(Boolean);
+  const terms = normalizeSearchText(query).split(" ").filter(Boolean);
 
   return rows
     .map((row) => parsePublication(row.entityId, row.publishedAt, row.snapshot))
@@ -214,20 +233,20 @@ export async function listPublishedStructuredHelpCatalog(
       slug: content.slug,
       title: content.title,
       summary: content.summary,
-      category: content.category,
+      categories: content.categories,
       stepCount: content.steps.length,
       publishedAt: content.publishedAt,
     }))
     .sort((left, right) => {
-      const categoryComparison = left.category.localeCompare(right.category, "pt-BR");
-      if (categoryComparison !== 0) return categoryComparison;
-      return left.title.localeCompare(right.title, "pt-BR");
+      const leftCategory = left.categories[0]?.name ?? "";
+      const rightCategory = right.categories[0]?.name ?? "";
+      const categoryComparison = leftCategory.localeCompare(rightCategory, "pt-BR");
+      return categoryComparison || left.title.localeCompare(right.title, "pt-BR");
     });
 }
 
 export async function listPublishedStructuredHelpLinks() {
-  const db = getDatabase();
-  const rows = await db
+  const rows = await getDatabase()
     .select({
       entityId: helpPublications.entityId,
       snapshot: helpPublications.snapshot,
@@ -244,8 +263,7 @@ export async function listPublishedStructuredHelpLinks() {
 }
 
 export async function getPublishedStructuredHelpBySlug(slug: string) {
-  const db = getDatabase();
-  const [row] = await db
+  const [row] = await getDatabase()
     .select({
       entityId: helpPublications.entityId,
       snapshot: helpPublications.snapshot,
@@ -265,9 +283,7 @@ export async function getPublishedStructuredHelpBySlug(slug: string) {
 export async function isAssetPublishedForSlug(slug: string, assetId: string): Promise<boolean> {
   const content = await getPublishedStructuredHelpBySlug(slug);
   if (!content) return false;
-  if (content.featuredVideo?.id === assetId && Boolean(content.featuredVideo.storageKey)) {
-    return true;
-  }
+  if (content.featuredVideo?.id === assetId && Boolean(content.featuredVideo.storageKey)) return true;
   return content.steps.some((step) =>
     step.blocks.some((block) => block.asset?.id === assetId && Boolean(block.asset.storageKey)),
   );
