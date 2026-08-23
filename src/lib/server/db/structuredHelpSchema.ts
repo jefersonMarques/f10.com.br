@@ -12,12 +12,11 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { helpArticles, helpContentStatus, users } from "$lib/server/db/schema";
+import { helpContentStatus, users } from "$lib/server/db/schema";
 
 export const helpBlockType = pgEnum("help_block_type", [
   "text",
   "image",
-  "video",
   "notice",
   "link",
   "file",
@@ -63,7 +62,6 @@ export const helpContents = pgTable(
     internalSupportNotes: text("internal_support_notes").notNull().default(""),
     status: helpContentStatus("status").notNull().default("draft"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
-    legacyArticleId: uuid("legacy_article_id").references(() => helpArticles.id, { onDelete: "set null" }),
     importSource: text("import_source"),
     importExternalId: text("import_external_id"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
@@ -73,7 +71,6 @@ export const helpContents = pgTable(
   },
   (table) => [
     uniqueIndex("help_contents_slug_unique").on(table.slug),
-    uniqueIndex("help_contents_legacy_article_unique").on(table.legacyArticleId),
     uniqueIndex("help_contents_import_identity_unique").on(table.importSource, table.importExternalId),
     index("help_contents_status_idx").on(table.status),
     index("help_contents_updated_idx").on(table.updatedAt),
