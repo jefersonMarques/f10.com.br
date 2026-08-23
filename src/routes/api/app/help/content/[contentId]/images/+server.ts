@@ -48,14 +48,17 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
   const formData = await request.formData();
   const stepId = readString(formData, "stepId");
   const altText = readString(formData, "altText");
+  const assistantDescription = readString(formData, "assistantDescription");
   const file = formData.get("file");
 
   if (!isUuid(stepId) || !(file instanceof File) || file.size === 0) {
     return json({ success: false, message: "Selecione uma imagem válida." }, { status: 400 });
   }
-
   if (!ALLOWED_IMAGE_MIME_TYPES.has(file.type.toLowerCase())) {
     return json({ success: false, message: "Use uma imagem PNG, JPG, WEBP ou GIF." }, { status: 400 });
+  }
+  if (altText.length > 500 || assistantDescription.length > 20_000) {
+    return json({ success: false, message: "Revise a descrição da imagem." }, { status: 400 });
   }
 
   const content = await getStructuredHelpContent(params.contentId);
@@ -72,6 +75,7 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
       mimeType: file.type,
       bytes: new Uint8Array(await file.arrayBuffer()),
       altText: altText.slice(0, 500),
+      assistantDescription: assistantDescription.slice(0, 20_000),
       contentId: params.contentId,
     });
 
@@ -91,10 +95,6 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
     if (createdAssetId && !reused) {
       await deleteManagedHelpAsset(session.user.id, createdAssetId).catch(() => undefined);
     }
-
-    return json(
-      { success: false, message: uploadErrorMessage(cause) },
-      { status: 400 },
-    );
+    return json({ success: false, message: uploadErrorMessage(cause) }, { status: 400 });
   }
 };
