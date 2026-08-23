@@ -30,15 +30,14 @@ export const helpSearchDocuments = pgTable(
     slug: text("slug").notNull(),
     title: text("title").notNull(),
     summary: text("summary").notNull().default(""),
-    category: text("category").notNull().default(""),
+    categoryText: text("category_text").notNull().default(""),
     publicText: text("public_text").notNull().default(""),
-    aiText: text("ai_text").notNull().default(""),
+    searchAliases: text("search_aliases").notNull().default(""),
+    assistantText: text("assistant_text").notNull().default(""),
     publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [
-    index("help_search_documents_updated_idx").on(table.updatedAt),
-  ],
+  (table) => [index("help_search_documents_updated_idx").on(table.updatedAt)],
 );
 
 export const helpSearchEvents = pgTable(
