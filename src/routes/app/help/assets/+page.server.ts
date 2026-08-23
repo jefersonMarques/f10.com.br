@@ -17,6 +17,7 @@ function readString(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === "string" ? value.trim() : "";
 }
+
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
@@ -50,12 +51,16 @@ export const actions: Actions = {
         mimeType: file.type || "application/octet-stream",
         bytes: new Uint8Array(await file.arrayBuffer()),
         altText: readString(formData, "altText"),
-        aiSummary: readString(formData, "aiSummary"),
+        assistantDescription: readString(formData, "assistantDescription"),
+        assistantSummary: readString(formData, "assistantSummary"),
+        extractedText: readString(formData, "extractedText"),
       });
       return {
         success: true,
         action: "upload",
-        message: result.reused ? "O arquivo já existia e foi reutilizado." : "Arquivo enviado para a biblioteca.",
+        message: result.reused
+          ? "O arquivo já existia e foi reutilizado."
+          : "Arquivo enviado para a biblioteca.",
       };
     } catch (cause) {
       const code = cause instanceof Error ? cause.message : "ASSET_UPLOAD_FAILED";
@@ -83,7 +88,11 @@ export const actions: Actions = {
     }
     try {
       await attachHelpAssetToStep(session.user.id, assetId, stepId, label);
-      return { success: true, action: "attach", message: "Arquivo adicionado ao passo. O conteúdo voltou para rascunho até nova publicação." };
+      return {
+        success: true,
+        action: "attach",
+        message: "Arquivo adicionado ao passo. O conteúdo voltou para rascunho até nova publicação.",
+      };
     } catch {
       return fail(409, { success: false, action: "attach", message: "Não foi possível vincular o arquivo ao passo." });
     }
@@ -91,8 +100,7 @@ export const actions: Actions = {
 
   delete: async ({ cookies, request }) => {
     const { session } = await requireAppPermission(cookies, "help.edit", "/app/help/assets");
-    const formData = await request.formData();
-    const assetId = readString(formData, "assetId");
+    const assetId = readString(await request.formData(), "assetId");
     try {
       await deleteManagedHelpAsset(session.user.id, assetId);
       return { success: true, action: "delete", message: "Arquivo removido da biblioteca." };
@@ -100,9 +108,10 @@ export const actions: Actions = {
       return fail(409, {
         success: false,
         action: "delete",
-        message: cause instanceof Error && cause.message === "ASSET_IN_USE"
-          ? "Este arquivo está sendo usado em um rascunho ou publicação e não pode ser removido."
-          : "Não foi possível remover o arquivo.",
+        message:
+          cause instanceof Error && cause.message === "ASSET_IN_USE"
+            ? "Este arquivo está sendo usado em um rascunho ou publicação e não pode ser removido."
+            : "Não foi possível remover o arquivo.",
       });
     }
   },
