@@ -1,0 +1,74 @@
+{
+  "format": "f10-help-import",
+  "version": 1,
+  "source": "video-subtitles",
+  "contents": [
+    {
+      "externalId": "video-001",
+      "title": "Como realizar este procedimento no F10",
+      "slug": "como-realizar-este-procedimento-no-f10",
+      "summary": "Resumo curto e público do procedimento.",
+      "categories": [
+        {
+          "slug": "substitua-por-uma-categoria-valida",
+          "destinationUrl": ""
+        }
+      ],
+      "searchAliases": [
+        "termo pesquisado pelo usuário",
+        "sinônimo da tarefa"
+      ],
+      "assistantKnowledge": "",
+      "internalSupportNotes": "",
+      "featuredVideo": {
+        "url": "https://www.youtube.com/watch?v=VIDEO_ID",
+        "description": "Demonstração do procedimento no F10.",
+        "subtitles": "COLE AQUI OS SUBTITLES DO VÍDEO",
+        "assistantSummary": "Resumo operacional curto e fiel ao vídeo."
+      },
+      "steps": [
+        {
+          "title": "Primeira ação do procedimento",
+          "description": "Descrição pública opcional.",
+          "assistantKnowledge": "",
+          "blocks": [
+            {
+              "type": "text",
+              "text": "Explique objetivamente o que o usuário deve fazer."
+            }
+          ]
+        },
+        {
+          "title": "Segunda ação do procedimento",
+          "description": "",
+          "assistantKnowledge": "",
+          "blocks": [
+            {
+              "type": "notice",
+              "variant": "warning",
+              "text": "Use avisos apenas quando o material realmente sustentar a orientação."
+            },
+            {
+              "type": "image",
+              "url": "https://exemplo.com/imagem-real.png",
+              "altText": "Descrição curta da imagem.",
+              "assistantDescription": "Informação visual relevante que não esteja explicada no texto."
+            },
+            {
+              "type": "link",
+              "url": "https://exemplo.com/referencia-real",
+              "label": "Abrir referência"
+            },
+            {
+              "type": "file",
+              "url": "https://exemplo.com/arquivo-real.pdf",
+              "label": "Baixar arquivo",
+              "extractedText": "",
+              "assistantSummary": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
