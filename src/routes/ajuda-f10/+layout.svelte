@@ -9,5 +9,6 @@
 
 <HelpPublicAiAssistant
   enabled={data.helpPublicAi.enabled}
+  available={data.helpPublicAi.available}
   requiresAuthentication={data.helpPublicAi.requiresAuthentication}
 />
