@@ -22,7 +22,11 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
         contentId: content.contentId,
         slug: content.slug,
         title: content.title,
-        category: content.category,
+        categories: content.categories.map((category) => ({
+          id: category.id,
+          slug: category.slug,
+          name: category.name,
+        })),
       },
     }).catch(() => undefined);
   }
