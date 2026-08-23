@@ -42,16 +42,26 @@ export const actions: Actions = {
       slug: read(formData, "slug"),
       description: read(formData, "description"),
       icon: read(formData, "icon"),
+      destinationUrl: read(formData, "destinationUrl"),
       sortOrder: readSortOrder(formData),
     };
-    if (name.length < 2 || name.length > 160 || values.description.length > 600) {
+    if (
+      name.length < 2 ||
+      name.length > 160 ||
+      values.description.length > 600 ||
+      values.destinationUrl.length > 1000
+    ) {
       return fail(400, { success: false, message: "Revise os dados da categoria.", values });
     }
     try {
       await createHelpCategory(session.user.id, values);
       return { success: true, message: "Categoria criada." };
     } catch {
-      return fail(409, { success: false, message: "Não foi possível criar a categoria. Verifique se o endereço já está em uso.", values });
+      return fail(409, {
+        success: false,
+        message: "Não foi possível criar a categoria. Verifique se o endereço já está em uso.",
+        values,
+      });
     }
   },
 
@@ -59,19 +69,25 @@ export const actions: Actions = {
     const { session } = await requireAppPermission(cookies, "help.edit", "/app/help/categories");
     const formData = await request.formData();
     const categoryId = read(formData, "categoryId");
-    if (!isUuid(categoryId)) return fail(400, { success: false, message: "Categoria inválida." });
+    if (!isUuid(categoryId)) {
+      return fail(400, { success: false, message: "Categoria inválida." });
+    }
     try {
       await updateHelpCategory(session.user.id, categoryId, {
         name: read(formData, "name"),
         slug: read(formData, "slug"),
         description: read(formData, "description"),
         icon: read(formData, "icon"),
+        destinationUrl: read(formData, "destinationUrl"),
         sortOrder: readSortOrder(formData),
         active: formData.get("active") === "on",
       });
       return { success: true, message: "Categoria atualizada." };
     } catch {
-      return fail(409, { success: false, message: "Não foi possível atualizar a categoria. Verifique se o endereço já está em uso." });
+      return fail(409, {
+        success: false,
+        message: "Não foi possível atualizar a categoria. Verifique se o endereço já está em uso.",
+      });
     }
   },
 };
