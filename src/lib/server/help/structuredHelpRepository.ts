@@ -4,6 +4,8 @@ import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
 import {
   helpAssets,
+  helpCategories,
+  helpContentCategories,
   helpContentFeaturedVideos,
   helpContentSteps,
   helpContents,
@@ -17,20 +19,29 @@ export type StructuredHelpBlockType =
   | "image"
   | "video"
   | "notice"
-  | "link";
+  | "link"
+  | "file";
+
+export type StructuredHelpContentCategoryInput = {
+  categoryId: string;
+  destinationUrl: string;
+  sortOrder?: number;
+};
 
 export type StructuredHelpContentInput = {
   title: string;
   slug: string;
   summary: string;
-  category: string;
-  aiGeneralKnowledge: string;
+  searchAliases: string[];
+  assistantKnowledge: string;
+  internalSupportNotes: string;
+  categories: StructuredHelpContentCategoryInput[];
 };
 
 export type StructuredHelpStepInput = {
   title: string;
   description: string;
-  aiKnowledge: string;
+  assistantKnowledge: string;
 };
 
 export type StructuredHelpBlockInput = {
@@ -38,8 +49,10 @@ export type StructuredHelpBlockInput = {
   textContent: string;
   sourceUrl: string;
   altText: string;
-  transcript: string;
-  aiSummary: string;
+  assistantDescription: string;
+  subtitles: string;
+  assistantSummary: string;
+  extractedText: string;
   linkUrl: string;
   linkLabel: string;
   noticeVariant: string;
@@ -48,9 +61,67 @@ export type StructuredHelpBlockInput = {
 export type StructuredHelpFeaturedVideoInput = {
   sourceUrl: string;
   altText: string;
-  transcript: string;
-  aiSummary: string;
+  subtitles: string;
+  assistantSummary: string;
 };
+
+function normalizeAliases(values: string[]): string[] {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => value.trim().toLowerCase())
+        .filter((value) => value.length >= 2)
+        .slice(0, 80),
+    ),
+  );
+}
+
+function uniqueCategoryInputs(
+  categories: StructuredHelpContentCategoryInput[],
+): StructuredHelpContentCategoryInput[] {
+  const result = new Map<string, StructuredHelpContentCategoryInput>();
+  for (const category of categories) {
+    if (!category.categoryId) continue;
+    result.set(category.categoryId, {
+      categoryId: category.categoryId,
+      destinationUrl: category.destinationUrl.trim().slice(0, 1000),
+      sortOrder: Number.isFinite(category.sortOrder) ? Math.max(0, Math.round(category.sortOrder ?? 10)) : 10,
+    });
+  }
+  return Array.from(result.values());
+}
+
+async function assertActiveCategories(
+  categories: StructuredHelpContentCategoryInput[],
+): Promise<StructuredHelpContentCategoryInput[]> {
+  const normalized = uniqueCategoryInputs(categories);
+  if (normalized.length === 0) throw new Error("CONTENT_CATEGORY_REQUIRED");
+
+  const ids = normalized.map((category) => category.categoryId);
+  const rows = await getDatabase()
+    .select({ id: helpCategories.id })
+    .from(helpCategories)
+    .where(and(inArray(helpCategories.id, ids), eq(helpCategories.active, true)));
+  if (rows.length !== ids.length) throw new Error("CONTENT_CATEGORY_INVALID");
+  return normalized;
+}
+
+async function replaceContentCategories(
+  tx: Parameters<Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]>[0],
+  contentId: string,
+  categories: StructuredHelpContentCategoryInput[],
+): Promise<void> {
+  await tx.delete(helpContentCategories).where(eq(helpContentCategories.contentId, contentId));
+  if (categories.length === 0) return;
+  await tx.insert(helpContentCategories).values(
+    categories.map((category) => ({
+      contentId,
+      categoryId: category.categoryId,
+      destinationUrl: category.destinationUrl,
+      sortOrder: category.sortOrder ?? 10,
+    })),
+  );
+}
 
 async function getContentRow(contentId: string) {
   const [content] = await getDatabase()
@@ -58,7 +129,6 @@ async function getContentRow(contentId: string) {
     .from(helpContents)
     .where(eq(helpContents.id, contentId))
     .limit(1);
-
   return content ?? null;
 }
 
@@ -68,7 +138,6 @@ async function getStepRow(stepId: string) {
     .from(helpContentSteps)
     .where(eq(helpContentSteps.id, stepId))
     .limit(1);
-
   return step ?? null;
 }
 
@@ -78,7 +147,6 @@ async function getBlockRow(blockId: string) {
     .from(helpStepBlocks)
     .where(eq(helpStepBlocks.id, blockId))
     .limit(1);
-
   return block ?? null;
 }
 
@@ -88,10 +156,8 @@ async function getContentVideoBlocks(contentId: string) {
     .select({ id: helpContentSteps.id })
     .from(helpContentSteps)
     .where(eq(helpContentSteps.contentId, contentId));
-
   const stepIds = steps.map((step) => step.id);
   if (stepIds.length === 0) return [];
-
   return db
     .select()
     .from(helpStepBlocks)
@@ -107,7 +173,6 @@ export async function listStructuredHelpContents() {
       slug: helpContents.slug,
       title: helpContents.title,
       summary: helpContents.summary,
-      category: helpContents.category,
       status: helpContents.status,
       publishedAt: helpContents.publishedAt,
       updatedAt: helpContents.updatedAt,
@@ -115,18 +180,36 @@ export async function listStructuredHelpContents() {
     .from(helpContents)
     .orderBy(asc(helpContents.title));
 
-  const stepRows = await db
-    .select({ contentId: helpContentSteps.contentId })
-    .from(helpContentSteps);
-  const stepCount = new Map<string, number>();
+  const [stepRows, categoryRows] = await Promise.all([
+    db.select({ contentId: helpContentSteps.contentId }).from(helpContentSteps),
+    db
+      .select({
+        contentId: helpContentCategories.contentId,
+        id: helpCategories.id,
+        name: helpCategories.name,
+        slug: helpCategories.slug,
+      })
+      .from(helpContentCategories)
+      .innerJoin(helpCategories, eq(helpContentCategories.categoryId, helpCategories.id))
+      .orderBy(asc(helpCategories.sortOrder), asc(helpCategories.name)),
+  ]);
 
+  const stepCount = new Map<string, number>();
   for (const step of stepRows) {
     stepCount.set(step.contentId, (stepCount.get(step.contentId) ?? 0) + 1);
+  }
+
+  const categoriesByContent = new Map<string, Array<{ id: string; name: string; slug: string }>>();
+  for (const category of categoryRows) {
+    const current = categoriesByContent.get(category.contentId) ?? [];
+    current.push({ id: category.id, name: category.name, slug: category.slug });
+    categoriesByContent.set(category.contentId, current);
   }
 
   return rows.map((row) => ({
     ...row,
     stepCount: stepCount.get(row.id) ?? 0,
+    categories: categoriesByContent.get(row.id) ?? [],
   }));
 }
 
@@ -135,7 +218,7 @@ export async function getStructuredHelpContent(contentId: string) {
   const content = await getContentRow(contentId);
   if (!content) return null;
 
-  const [steps, publication, featuredRows] = await Promise.all([
+  const [steps, publication, featuredRows, categories] = await Promise.all([
     db
       .select()
       .from(helpContentSteps)
@@ -156,6 +239,22 @@ export async function getStructuredHelpContent(contentId: string) {
       .from(helpContentFeaturedVideos)
       .where(eq(helpContentFeaturedVideos.contentId, contentId))
       .limit(1),
+    db
+      .select({
+        id: helpCategories.id,
+        slug: helpCategories.slug,
+        name: helpCategories.name,
+        description: helpCategories.description,
+        icon: helpCategories.icon,
+        active: helpCategories.active,
+        defaultDestinationUrl: helpCategories.destinationUrl,
+        destinationUrl: helpContentCategories.destinationUrl,
+        sortOrder: helpContentCategories.sortOrder,
+      })
+      .from(helpContentCategories)
+      .innerJoin(helpCategories, eq(helpContentCategories.categoryId, helpCategories.id))
+      .where(eq(helpContentCategories.contentId, contentId))
+      .orderBy(asc(helpContentCategories.sortOrder), asc(helpCategories.name)),
   ]);
 
   const stepIds = steps.map((step) => step.id);
@@ -167,7 +266,6 @@ export async function getStructuredHelpContent(contentId: string) {
       .from(helpStepBlocks)
       .where(inArray(helpStepBlocks.stepId, stepIds))
       .orderBy(asc(helpStepBlocks.sortOrder));
-
     for (const block of blocks) {
       const current = blocksByStep.get(block.stepId) ?? [];
       current.push(block);
@@ -179,19 +277,15 @@ export async function getStructuredHelpContent(contentId: string) {
   const allBlocks = Array.from(blocksByStep.values()).flat();
   const assetIds = Array.from(
     new Set(
-      [
-        ...allBlocks.map((block) => block.assetId),
-        featuredAssetId,
-      ].filter((assetId): assetId is string => Boolean(assetId)),
+      [...allBlocks.map((block) => block.assetId), featuredAssetId].filter(
+        (assetId): assetId is string => Boolean(assetId),
+      ),
     ),
   );
   const assetsById = new Map<string, typeof helpAssets.$inferSelect>();
 
   if (assetIds.length > 0) {
-    const assets = await db
-      .select()
-      .from(helpAssets)
-      .where(inArray(helpAssets.id, assetIds));
+    const assets = await db.select().from(helpAssets).where(inArray(helpAssets.id, assetIds));
     for (const asset of assets) assetsById.set(asset.id, asset);
   }
 
@@ -203,9 +297,11 @@ export async function getStructuredHelpContent(contentId: string) {
 
   return {
     ...content,
-    featuredVideo: featuredAssetId
-      ? (assetsById.get(featuredAssetId) ?? null)
-      : null,
+    categories: categories.map((category) => ({
+      ...category,
+      effectiveDestinationUrl: category.destinationUrl || category.defaultDestinationUrl,
+    })),
+    featuredVideo: featuredAssetId ? (assetsById.get(featuredAssetId) ?? null) : null,
     legacyVideoCount,
     hasPublishedVersion: publication.length > 0,
     publishedVersionAt: publication[0]?.publishedAt ?? null,
@@ -236,8 +332,10 @@ function serializeAsset(asset: typeof helpAssets.$inferSelect | null) {
     sourceUrl: asset.sourceUrl,
     storageKey: asset.storageKey,
     altText: asset.altText,
-    transcript: asset.transcript,
-    aiSummary: asset.aiSummary,
+    assistantDescription: asset.assistantDescription,
+    subtitles: asset.subtitles,
+    assistantSummary: asset.assistantSummary,
+    extractedText: asset.extractedText,
   };
 }
 
@@ -249,8 +347,10 @@ async function buildVersionSnapshot(contentId: string) {
     slug: content.slug,
     title: content.title,
     summary: content.summary,
-    category: content.category,
-    aiGeneralKnowledge: content.aiGeneralKnowledge,
+    searchAliases: content.searchAliases,
+    assistantKnowledge: content.assistantKnowledge,
+    internalSupportNotes: content.internalSupportNotes,
+    categories: content.categories,
     featuredVideo: serializeAsset(content.featuredVideo),
     status: content.status,
     publishedAt: content.publishedAt?.toISOString() ?? null,
@@ -258,7 +358,7 @@ async function buildVersionSnapshot(contentId: string) {
       id: step.id,
       title: step.title,
       description: step.description,
-      aiKnowledge: step.aiKnowledge,
+      assistantKnowledge: step.assistantKnowledge,
       sortOrder: step.sortOrder,
       blocks: step.blocks.map((block) => ({
         id: block.id,
@@ -301,6 +401,7 @@ export async function createStructuredHelpContent(
   const db = getDatabase();
   const slug = normalizeHelpSlug(input.slug || input.title);
   if (!slug) throw new Error("INVALID_SLUG");
+  const categories = await assertActiveCategories(input.categories);
 
   const content = await db.transaction(async (tx) => {
     const [created] = await tx
@@ -309,24 +410,24 @@ export async function createStructuredHelpContent(
         slug,
         title: input.title.trim(),
         summary: input.summary.trim(),
-        category: input.category.trim(),
-        aiGeneralKnowledge: input.aiGeneralKnowledge.trim(),
+        searchAliases: normalizeAliases(input.searchAliases),
+        assistantKnowledge: input.assistantKnowledge.trim(),
+        internalSupportNotes: input.internalSupportNotes.trim(),
         status: "draft",
         createdBy: actorUserId,
         updatedBy: actorUserId,
       })
       .returning({ id: helpContents.id, slug: helpContents.slug });
-
     if (!created) throw new Error("CONTENT_NOT_CREATED");
 
+    await replaceContentCategories(tx, created.id, categories);
     await tx.insert(helpContentSteps).values({
       contentId: created.id,
       title: "Passo 1",
       description: "",
-      aiKnowledge: "",
+      assistantKnowledge: "",
       sortOrder: 10,
     });
-
     return created;
   });
 
@@ -336,9 +437,8 @@ export async function createStructuredHelpContent(
     action: "help.content.created",
     entityType: "help_content",
     entityId: content.id,
-    metadata: { slug: content.slug },
+    metadata: { slug: content.slug, categoryCount: categories.length },
   });
-
   return content;
 }
 
@@ -353,20 +453,26 @@ export async function updateStructuredHelpContent(
 
   const slug = normalizeHelpSlug(input.slug || input.title);
   if (!slug) throw new Error("INVALID_SLUG");
+  const categories = await assertActiveCategories(input.categories);
+  const db = getDatabase();
 
-  await getDatabase()
-    .update(helpContents)
-    .set({
-      slug,
-      title: input.title.trim(),
-      summary: input.summary.trim(),
-      category: input.category.trim(),
-      aiGeneralKnowledge: input.aiGeneralKnowledge.trim(),
-      status: "draft",
-      updatedBy: actorUserId,
-      updatedAt: new Date(),
-    })
-    .where(eq(helpContents.id, contentId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(helpContents)
+      .set({
+        slug,
+        title: input.title.trim(),
+        summary: input.summary.trim(),
+        searchAliases: normalizeAliases(input.searchAliases),
+        assistantKnowledge: input.assistantKnowledge.trim(),
+        internalSupportNotes: input.internalSupportNotes.trim(),
+        status: "draft",
+        updatedBy: actorUserId,
+        updatedAt: new Date(),
+      })
+      .where(eq(helpContents.id, contentId));
+    await replaceContentCategories(tx, contentId, categories);
+  });
 
   await saveStructuredContentVersion(contentId, actorUserId);
   await recordAuditEvent({
@@ -374,7 +480,7 @@ export async function updateStructuredHelpContent(
     action: "help.content.updated",
     entityType: "help_content",
     entityId: contentId,
-    metadata: { slug, previousStatus: content.status },
+    metadata: { slug, previousStatus: content.status, categoryCount: categories.length },
   });
 }
 
@@ -403,28 +509,25 @@ export async function upsertStructuredHelpFeaturedVideo(
   }
 
   await db.transaction(async (tx) => {
+    const values = {
+      assetType: "video" as const,
+      sourceUrl: input.sourceUrl.trim(),
+      altText: input.altText.trim(),
+      subtitles: input.subtitles.trim(),
+      assistantSummary: input.assistantSummary.trim(),
+      assistantDescription: "",
+      extractedText: "",
+      updatedAt: new Date(),
+    };
+
     if (assetId) {
-      await tx
-        .update(helpAssets)
-        .set({
-          assetType: "video",
-          sourceUrl: input.sourceUrl.trim(),
-          altText: input.altText.trim(),
-          transcript: input.transcript.trim(),
-          aiSummary: input.aiSummary.trim(),
-          updatedAt: new Date(),
-        })
-        .where(eq(helpAssets.id, assetId));
+      await tx.update(helpAssets).set(values).where(eq(helpAssets.id, assetId));
     } else {
       const [createdAsset] = await tx
         .insert(helpAssets)
         .values({
           contentId,
-          assetType: "video",
-          sourceUrl: input.sourceUrl.trim(),
-          altText: input.altText.trim(),
-          transcript: input.transcript.trim(),
-          aiSummary: input.aiSummary.trim(),
+          ...values,
           createdBy: actorUserId,
         })
         .returning({ id: helpAssets.id });
@@ -432,7 +535,6 @@ export async function upsertStructuredHelpFeaturedVideo(
     }
 
     if (!assetId) throw new Error("FEATURED_VIDEO_NOT_CREATED");
-
     await tx
       .insert(helpContentFeaturedVideos)
       .values({ contentId, assetId })
@@ -482,16 +584,12 @@ export async function deleteStructuredHelpFeaturedVideo(
         .from(helpStepBlocks)
         .where(inArray(helpStepBlocks.stepId, stepIds));
       const mirrorIds = mirrors
-        .filter(
-          (block) =>
-            block.assetId === featured.assetId,
-        )
+        .filter((block) => block.assetId === featured.assetId)
         .map((block) => block.id);
       if (mirrorIds.length > 0) {
         await tx.delete(helpStepBlocks).where(inArray(helpStepBlocks.id, mirrorIds));
       }
     }
-
     await tx
       .delete(helpContentFeaturedVideos)
       .where(eq(helpContentFeaturedVideos.contentId, contentId));
@@ -531,12 +629,12 @@ export async function addStructuredHelpStep(
       contentId,
       title: `Passo ${stepNumber}`,
       description: "",
-      aiKnowledge: "",
+      assistantKnowledge: "",
       sortOrder,
     })
     .returning({ id: helpContentSteps.id });
-
   if (!step) throw new Error("STEP_NOT_CREATED");
+
   await markContentDraft(contentId, actorUserId);
   await saveStructuredContentVersion(contentId, actorUserId);
   return step.id;
@@ -556,7 +654,7 @@ export async function updateStructuredHelpStep(
     .set({
       title: input.title.trim(),
       description: input.description.trim(),
-      aiKnowledge: input.aiKnowledge.trim(),
+      assistantKnowledge: input.assistantKnowledge.trim(),
       updatedAt: new Date(),
     })
     .where(eq(helpContentSteps.id, stepId));
@@ -575,7 +673,6 @@ export async function deleteStructuredHelpStep(
     .select({ id: helpContentSteps.id })
     .from(helpContentSteps)
     .where(eq(helpContentSteps.contentId, contentId));
-
   if (steps.length <= 1) throw new Error("LAST_STEP_REQUIRED");
   if (!steps.some((step) => step.id === stepId)) throw new Error("STEP_NOT_FOUND");
 
@@ -589,14 +686,14 @@ function validateBlockInput(input: StructuredHelpBlockInput): void {
     if (!input.textContent.trim()) throw new Error("BLOCK_TEXT_REQUIRED");
     return;
   }
-
   if (input.blockType === "link") {
-    if (!input.linkUrl.trim() || !input.linkLabel.trim()) {
-      throw new Error("BLOCK_LINK_REQUIRED");
-    }
+    if (!input.linkUrl.trim() || !input.linkLabel.trim()) throw new Error("BLOCK_LINK_REQUIRED");
     return;
   }
-
+  if (input.blockType === "file") {
+    if (!input.sourceUrl.trim() && !input.extractedText.trim()) throw new Error("BLOCK_FILE_REQUIRED");
+    return;
+  }
   if (!input.sourceUrl.trim()) throw new Error("BLOCK_MEDIA_URL_REQUIRED");
 }
 
@@ -605,21 +702,24 @@ async function createAssetForBlock(
   contentId: string,
   input: StructuredHelpBlockInput,
 ): Promise<string | null> {
-  if (input.blockType !== "image" && input.blockType !== "video") return null;
+  if (input.blockType !== "image" && input.blockType !== "video" && input.blockType !== "file") {
+    return null;
+  }
 
   const [asset] = await getDatabase()
     .insert(helpAssets)
     .values({
       contentId,
       assetType: input.blockType,
-      sourceUrl: input.sourceUrl.trim(),
+      sourceUrl: input.sourceUrl.trim() || null,
       altText: input.altText.trim(),
-      transcript: input.transcript.trim(),
-      aiSummary: input.aiSummary.trim(),
+      assistantDescription: input.assistantDescription.trim(),
+      subtitles: input.subtitles.trim(),
+      assistantSummary: input.assistantSummary.trim(),
+      extractedText: input.extractedText.trim(),
       createdBy: actorUserId,
     })
     .returning({ id: helpAssets.id });
-
   if (!asset) throw new Error("ASSET_NOT_CREATED");
   return asset.id;
 }
@@ -650,7 +750,10 @@ export async function addStructuredHelpBlock(
     textContent: input.textContent.trim(),
     assetId,
     linkUrl: input.blockType === "link" ? input.linkUrl.trim() : null,
-    linkLabel: input.blockType === "link" ? input.linkLabel.trim() : null,
+    linkLabel:
+      input.blockType === "link" || input.blockType === "file"
+        ? input.linkLabel.trim() || null
+        : null,
     noticeVariant:
       input.blockType === "notice" ? input.noticeVariant.trim() || "info" : null,
     sortOrder,
@@ -674,23 +777,22 @@ export async function updateStructuredHelpBlock(
   if (input.blockType === "video" && block.blockType !== "video") {
     throw new Error("VIDEO_BLOCK_NOT_ALLOWED");
   }
-
   validateBlockInput(input);
 
   let assetId = block.assetId;
-  if (input.blockType === "image" || input.blockType === "video") {
+  if (input.blockType === "image" || input.blockType === "video" || input.blockType === "file") {
+    const values = {
+      assetType: input.blockType,
+      sourceUrl: input.sourceUrl.trim() || null,
+      altText: input.altText.trim(),
+      assistantDescription: input.assistantDescription.trim(),
+      subtitles: input.subtitles.trim(),
+      assistantSummary: input.assistantSummary.trim(),
+      extractedText: input.extractedText.trim(),
+      updatedAt: new Date(),
+    };
     if (assetId) {
-      await db
-        .update(helpAssets)
-        .set({
-          assetType: input.blockType,
-          sourceUrl: input.sourceUrl.trim(),
-          altText: input.altText.trim(),
-          transcript: input.transcript.trim(),
-          aiSummary: input.aiSummary.trim(),
-          updatedAt: new Date(),
-        })
-        .where(eq(helpAssets.id, assetId));
+      await db.update(helpAssets).set(values).where(eq(helpAssets.id, assetId));
     } else {
       assetId = await createAssetForBlock(actorUserId, contentId, input);
     }
@@ -705,7 +807,10 @@ export async function updateStructuredHelpBlock(
       textContent: input.textContent.trim(),
       assetId,
       linkUrl: input.blockType === "link" ? input.linkUrl.trim() : null,
-      linkLabel: input.blockType === "link" ? input.linkLabel.trim() : null,
+      linkLabel:
+        input.blockType === "link" || input.blockType === "file"
+          ? input.linkLabel.trim() || null
+          : null,
       noticeVariant:
         input.blockType === "notice" ? input.noticeVariant.trim() || "info" : null,
       updatedAt: new Date(),
@@ -729,9 +834,7 @@ export async function deleteStructuredHelpBlock(
 
   await db.transaction(async (tx) => {
     await tx.delete(helpStepBlocks).where(eq(helpStepBlocks.id, blockId));
-    if (block.assetId) {
-      await tx.delete(helpAssets).where(eq(helpAssets.id, block.assetId));
-    }
+    if (block.assetId) await tx.delete(helpAssets).where(eq(helpAssets.id, block.assetId));
   });
 
   await markContentDraft(contentId, actorUserId);
@@ -746,7 +849,14 @@ function buildPublicationSnapshot(
       slug: content.slug,
       title: content.title,
       summary: content.summary,
-      category: content.category,
+      categories: content.categories.map((category) => ({
+        id: category.id,
+        slug: category.slug,
+        name: category.name,
+        description: category.description,
+        icon: category.icon,
+        destinationUrl: category.effectiveDestinationUrl,
+      })),
       featuredVideo: content.featuredVideo
         ? {
             id: content.featuredVideo.id,
@@ -781,25 +891,27 @@ function buildPublicationSnapshot(
         })),
       })),
     },
-    ai: {
-      generalKnowledge: content.aiGeneralKnowledge,
-      featuredVideoKnowledge: content.featuredVideo
+    assistant: {
+      searchAliases: content.searchAliases,
+      knowledge: content.assistantKnowledge,
+      featuredVideo: content.featuredVideo
         ? {
             assetId: content.featuredVideo.id,
-            transcript: content.featuredVideo.transcript,
-            summary: content.featuredVideo.aiSummary,
+            subtitles: content.featuredVideo.subtitles,
+            summary: content.featuredVideo.assistantSummary,
           }
         : null,
       steps: content.steps.map((step) => ({
         id: step.id,
         title: step.title,
-        knowledge: step.aiKnowledge,
-        mediaKnowledge: step.blocks
+        knowledge: step.assistantKnowledge,
+        media: step.blocks
           .filter((block) => block.asset)
           .map((block) => ({
             blockId: block.id,
-            transcript: block.asset?.transcript ?? "",
-            summary: block.asset?.aiSummary ?? "",
+            assistantDescription: block.asset?.assistantDescription ?? "",
+            assistantSummary: block.asset?.assistantSummary ?? "",
+            extractedText: block.asset?.extractedText ?? "",
           })),
       })),
     },
@@ -809,7 +921,13 @@ function buildPublicationSnapshot(
 function validateForPublication(
   content: NonNullable<Awaited<ReturnType<typeof getStructuredHelpContent>>>,
 ): void {
+  if (content.categories.length === 0 || content.categories.some((category) => !category.active)) {
+    throw new Error("CONTENT_CATEGORY_REQUIRED");
+  }
   if (content.legacyVideoCount > 0) throw new Error("LEGACY_VIDEO_REVIEW_REQUIRED");
+  if (content.featuredVideo && !content.featuredVideo.subtitles.trim()) {
+    throw new Error("FEATURED_VIDEO_SUBTITLES_REQUIRED");
+  }
   if (content.steps.length === 0) throw new Error("CONTENT_STEP_REQUIRED");
 
   for (const step of content.steps) {
@@ -820,26 +938,21 @@ function validateForPublication(
       if (block.blockType === "text" || block.blockType === "notice") {
         return Boolean(block.textContent.trim());
       }
-      if (block.blockType === "link") {
-        return Boolean(block.linkUrl && block.linkLabel);
-      }
-      return Boolean(block.asset?.sourceUrl || block.asset?.storageKey);
+      if (block.blockType === "link") return Boolean(block.linkUrl && block.linkLabel);
+      return Boolean(block.asset?.sourceUrl || block.asset?.storageKey || block.asset?.extractedText);
     });
-
     if (meaningfulBlocks.length === 0) throw new Error("STEP_BLOCK_REQUIRED");
 
-    const hasOnlyMedia = step.blocks.every(
-      (block) => block.blockType === "image",
-    );
-    if (hasOnlyMedia) {
-      const mediaHasKnowledge = step.blocks.some(
+    const images = step.blocks.filter((block) => block.blockType === "image");
+    const hasOnlyImages = images.length > 0 && images.length === step.blocks.length;
+    if (
+      hasOnlyImages &&
+      images.some(
         (block) =>
-          Boolean(block.asset?.transcript.trim()) ||
-          Boolean(block.asset?.aiSummary.trim()),
-      );
-      if (!step.aiKnowledge.trim() && !mediaHasKnowledge) {
-        throw new Error("MEDIA_AI_KNOWLEDGE_REQUIRED");
-      }
+          !block.asset?.altText.trim() && !block.asset?.assistantDescription.trim(),
+      )
+    ) {
+      throw new Error("IMAGE_DESCRIPTION_REQUIRED");
     }
   }
 }
@@ -879,11 +992,7 @@ export async function publishStructuredHelpContent(
       })
       .onConflictDoUpdate({
         target: [helpPublications.entityType, helpPublications.entityId],
-        set: {
-          snapshot,
-          publishedBy: actorUserId,
-          publishedAt,
-        },
+        set: { snapshot, publishedBy: actorUserId, publishedAt },
       });
   });
 
@@ -895,6 +1004,7 @@ export async function publishStructuredHelpContent(
     entityId: contentId,
     metadata: {
       stepCount: content.steps.length,
+      categoryCount: content.categories.length,
       hasFeaturedVideo: Boolean(content.featuredVideo),
     },
   });
