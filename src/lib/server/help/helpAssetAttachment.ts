@@ -10,8 +10,7 @@ import {
 import { updateStructuredHelpStep } from "$lib/server/help/structuredHelpRepository";
 
 export async function listHelpAssetAttachmentTargets() {
-  const db = getDatabase();
-  return db
+  return getDatabase()
     .select({
       contentId: helpContents.id,
       contentTitle: helpContents.title,
@@ -58,11 +57,10 @@ export async function attachHelpAssetToStep(
     sortOrder: Number(currentMax ?? 0) + 10,
   });
 
-  // Reaproveita o pipeline existente para voltar o conteúdo a rascunho e versionar.
   await updateStructuredHelpStep(actorUserId, step.contentId, step.id, {
     title: step.title,
     description: step.description,
-    aiKnowledge: step.aiKnowledge,
+    assistantKnowledge: step.assistantKnowledge,
   });
 
   await recordAuditEvent({
