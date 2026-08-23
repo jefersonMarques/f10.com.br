@@ -1,57 +1,63 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
-import { helpContentVersions } from "$lib/server/db/schema";
 import {
   helpAssets,
+  helpCategories,
+  helpContentCategories,
   helpContentFeaturedVideos,
   helpContents,
   helpContentSteps,
   helpStepBlocks,
 } from "$lib/server/db/structuredHelpSchema";
 import { normalizeHelpSlug } from "$lib/server/help/helpArticleRepository";
+import { normalizeHelpCategorySlug } from "$lib/server/help/helpCategoryRepository";
 
 const IMPORT_FORMAT = "f10-help-import";
-const SUPPORTED_IMPORT_VERSIONS = new Set([1, 2]);
-const CURRENT_IMPORT_VERSION = 2 as const;
+const IMPORT_VERSION = 1 as const;
 const MAX_CONTENTS = 250;
 const MAX_STEPS_PER_CONTENT = 80;
 const MAX_BLOCKS_PER_STEP = 80;
 const MAX_TOTAL_BLOCKS = 8_000;
+const MAX_CATEGORIES_PER_CONTENT = 12;
+const MAX_SEARCH_ALIASES = 80;
 
 type NoticeVariant = "info" | "warning" | "success" | "danger";
-type HelpImportVersion = 1 | 2;
+
+export type HelpImportCategory = {
+  slug: string;
+  destinationUrl?: string;
+};
 
 export type HelpImportFeaturedVideo = {
   url: string;
-  altText?: string;
-  transcript?: string;
-  aiSummary?: string;
+  description?: string;
+  subtitles: string;
+  assistantSummary?: string;
 };
 
 export type HelpImportBlock =
   | { type: "text"; text: string }
   | { type: "notice"; text: string; variant?: NoticeVariant }
   | { type: "link"; url: string; label: string }
-  | { type: "file"; url: string; label: string; aiSummary?: string }
   | {
       type: "image";
       url: string;
       altText?: string;
-      aiSummary?: string;
+      assistantDescription?: string;
     }
   | {
-      type: "video";
+      type: "file";
       url: string;
-      altText?: string;
-      transcript?: string;
-      aiSummary?: string;
+      label: string;
+      extractedText?: string;
+      assistantSummary?: string;
     };
 
 export type HelpImportStep = {
   title: string;
   description?: string;
-  aiKnowledge?: string;
+  assistantKnowledge?: string;
   blocks: HelpImportBlock[];
 };
 
@@ -60,15 +66,17 @@ export type HelpImportContent = {
   title: string;
   slug?: string;
   summary?: string;
-  category?: string;
-  aiGeneralKnowledge?: string;
+  categories: HelpImportCategory[];
+  searchAliases: string[];
+  assistantKnowledge?: string;
+  internalSupportNotes?: string;
   featuredVideo?: HelpImportFeaturedVideo;
   steps: HelpImportStep[];
 };
 
 export type HelpImportFile = {
   format: typeof IMPORT_FORMAT;
-  version: HelpImportVersion;
+  version: typeof IMPORT_VERSION;
   source: string;
   contents: HelpImportContent[];
 };
@@ -83,8 +91,6 @@ export type HelpImportValidation = {
   parsed: HelpImportFile | null;
 };
 
-type ParsedHelpImportBlock = HelpImportBlock | null | undefined;
-
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -95,10 +101,7 @@ function readString(record: Record<string, unknown>, key: string): string {
   return typeof record[key] === "string" ? record[key].trim() : "";
 }
 
-function optionalString(
-  record: Record<string, unknown>,
-  key: string,
-): string | undefined {
+function optionalString(record: Record<string, unknown>, key: string): string | undefined {
   const value = readString(record, key);
   return value || undefined;
 }
@@ -110,6 +113,74 @@ function isHttpUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function isDestinationUrl(value: string): boolean {
+  if (!value) return true;
+  if (value.startsWith("/") && !value.startsWith("//")) return true;
+  return isHttpUrl(value);
+}
+
+function parseStringArray(
+  value: unknown,
+  path: string,
+  issues: string[],
+  maxItems: number,
+): string[] {
+  if (!Array.isArray(value)) {
+    issues.push(`${path}: deve ser uma lista.`);
+    return [];
+  }
+  if (value.length > maxItems) issues.push(`${path}: máximo de ${maxItems} itens.`);
+  const result: string[] = [];
+  for (const [index, item] of value.entries()) {
+    if (typeof item !== "string" || !item.trim()) {
+      issues.push(`${path}[${index}]: informe um texto válido.`);
+      continue;
+    }
+    const normalized = item.trim();
+    if (normalized.length > 160) {
+      issues.push(`${path}[${index}]: máximo de 160 caracteres.`);
+      continue;
+    }
+    result.push(normalized);
+  }
+  return Array.from(new Set(result));
+}
+
+function parseCategories(
+  value: unknown,
+  path: string,
+  issues: string[],
+): HelpImportCategory[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    issues.push(`${path}: todo conteúdo precisa de pelo menos uma categoria.`);
+    return [];
+  }
+  if (value.length > MAX_CATEGORIES_PER_CONTENT) {
+    issues.push(`${path}: máximo de ${MAX_CATEGORIES_PER_CONTENT} categorias por conteúdo.`);
+  }
+
+  const result = new Map<string, HelpImportCategory>();
+  for (const [index, item] of value.entries()) {
+    const record = asRecord(item);
+    if (!record) {
+      issues.push(`${path}[${index}]: categoria inválida.`);
+      continue;
+    }
+    const slug = normalizeHelpCategorySlug(readString(record, "slug"));
+    const destinationUrl = optionalString(record, "destinationUrl");
+    if (!slug) {
+      issues.push(`${path}[${index}].slug: obrigatório.`);
+      continue;
+    }
+    if (destinationUrl && (!isDestinationUrl(destinationUrl) || destinationUrl.length > 1000)) {
+      issues.push(`${path}[${index}].destinationUrl: use caminho interno iniciado por / ou URL http/https.`);
+      continue;
+    }
+    result.set(slug, { slug, destinationUrl });
+  }
+  return Array.from(result.values());
 }
 
 function parseFeaturedVideo(
@@ -125,36 +196,38 @@ function parseFeaturedVideo(
   }
 
   const url = readString(record, "url");
-  const altText = optionalString(record, "altText");
-  const transcript = optionalString(record, "transcript");
-  const aiSummary = optionalString(record, "aiSummary");
+  const description = optionalString(record, "description");
+  const subtitles = readString(record, "subtitles");
+  const assistantSummary = optionalString(record, "assistantSummary");
 
-  if (!isHttpUrl(url)) issues.push(`${path}: featuredVideo precisa de URL http/https válida.`);
-  if ((altText?.length ?? 0) > 500) issues.push(`${path}: altText do vídeo excede 500 caracteres.`);
-  if ((transcript?.length ?? 0) > 100_000) issues.push(`${path}: transcrição do vídeo excede 100.000 caracteres.`);
-  if ((aiSummary?.length ?? 0) > 20_000) issues.push(`${path}: aiSummary do vídeo excede 20.000 caracteres.`);
+  if (!isHttpUrl(url)) issues.push(`${path}.url: use URL http/https válida.`);
+  if ((description?.length ?? 0) > 500) issues.push(`${path}.description: máximo de 500 caracteres.`);
+  if (!subtitles) issues.push(`${path}.subtitles: obrigatório quando existe vídeo.`);
+  if (subtitles.length > 200_000) issues.push(`${path}.subtitles: máximo de 200.000 caracteres.`);
+  if ((assistantSummary?.length ?? 0) > 20_000) {
+    issues.push(`${path}.assistantSummary: máximo de 20.000 caracteres.`);
+  }
 
-  return isHttpUrl(url) ? { url, altText, transcript, aiSummary } : undefined;
+  if (!isHttpUrl(url) || !subtitles) return undefined;
+  return { url, description, subtitles, assistantSummary };
 }
 
 function parseBlock(
   value: unknown,
   path: string,
-  version: HelpImportVersion,
   issues: string[],
-): ParsedHelpImportBlock {
+): HelpImportBlock | null {
   const record = asRecord(value);
   if (!record) {
     issues.push(`${path}: bloco inválido.`);
     return null;
   }
-
   const type = readString(record, "type");
 
   if (type === "text") {
     const text = readString(record, "text");
-    if (!text || text.length > 30_000) {
-      issues.push(`${path}: bloco de texto deve ter entre 1 e 30.000 caracteres.`);
+    if (!text || text.length > 50_000) {
+      issues.push(`${path}.text: obrigatório e máximo de 50.000 caracteres.`);
       return null;
     }
     return { type, text };
@@ -162,17 +235,17 @@ function parseBlock(
 
   if (type === "notice") {
     const text = readString(record, "text");
-    const variantValue = optionalString(record, "variant");
-    const allowedVariants: NoticeVariant[] = ["info", "warning", "success", "danger"];
-    if (!text || text.length > 15_000) {
-      issues.push(`${path}: aviso deve ter entre 1 e 15.000 caracteres.`);
+    const variant = optionalString(record, "variant") as NoticeVariant | undefined;
+    const allowed: NoticeVariant[] = ["info", "warning", "success", "danger"];
+    if (!text || text.length > 50_000) {
+      issues.push(`${path}.text: obrigatório e máximo de 50.000 caracteres.`);
       return null;
     }
-    if (variantValue && !allowedVariants.includes(variantValue as NoticeVariant)) {
-      issues.push(`${path}: variant inválido.`);
+    if (variant && !allowed.includes(variant)) {
+      issues.push(`${path}.variant: use info, warning, success ou danger.`);
       return null;
     }
-    return { type, text, variant: variantValue as NoticeVariant | undefined };
+    return { type, text, variant };
   }
 
   if (type === "link") {
@@ -185,59 +258,42 @@ function parseBlock(
     return { type, url, label };
   }
 
+  if (type === "image") {
+    const url = readString(record, "url");
+    const altText = optionalString(record, "altText");
+    const assistantDescription = optionalString(record, "assistantDescription");
+    if (!isHttpUrl(url)) {
+      issues.push(`${path}.url: imagem precisa de URL http/https válida.`);
+      return null;
+    }
+    if ((altText?.length ?? 0) > 500) issues.push(`${path}.altText: máximo de 500 caracteres.`);
+    if ((assistantDescription?.length ?? 0) > 20_000) {
+      issues.push(`${path}.assistantDescription: máximo de 20.000 caracteres.`);
+    }
+    return { type, url, altText, assistantDescription };
+  }
+
   if (type === "file") {
     const url = readString(record, "url");
     const label = readString(record, "label");
-    const aiSummary = optionalString(record, "aiSummary");
+    const extractedText = optionalString(record, "extractedText");
+    const assistantSummary = optionalString(record, "assistantSummary");
     if (!isHttpUrl(url) || !label || label.length > 240) {
       issues.push(`${path}: file precisa de URL http/https e label válido.`);
       return null;
     }
-    if ((aiSummary?.length ?? 0) > 20_000) {
-      issues.push(`${path}: aiSummary do arquivo excede 20.000 caracteres.`);
-      return null;
+    if ((extractedText?.length ?? 0) > 200_000) {
+      issues.push(`${path}.extractedText: máximo de 200.000 caracteres.`);
     }
-    return { type, url, label, aiSummary };
-  }
-
-  if (type === "image") {
-    const url = readString(record, "url");
-    const altText = optionalString(record, "altText");
-    const aiSummary = optionalString(record, "aiSummary");
-    if (!isHttpUrl(url)) {
-      // JSON simples não transporta arquivo local. Imagens locais são adicionadas
-      // por pacote ZIP ou manualmente no editor.
-      return undefined;
+    if ((assistantSummary?.length ?? 0) > 20_000) {
+      issues.push(`${path}.assistantSummary: máximo de 20.000 caracteres.`);
     }
-    if ((altText?.length ?? 0) > 500 || (aiSummary?.length ?? 0) > 20_000) {
-      issues.push(`${path}: altText ou aiSummary excede o limite.`);
-      return null;
-    }
-    return { type, url, altText, aiSummary };
+    return { type, url, label, extractedText, assistantSummary };
   }
 
   if (type === "video") {
-    if (version === CURRENT_IMPORT_VERSION) {
-      issues.push(`${path}: no v2 use featuredVideo no conteúdo; vídeo não pode ficar dentro de blocks.`);
-      return null;
-    }
-    const url = readString(record, "url");
-    const altText = optionalString(record, "altText");
-    const transcript = optionalString(record, "transcript");
-    const aiSummary = optionalString(record, "aiSummary");
-    if (!isHttpUrl(url)) {
-      issues.push(`${path}: vídeo precisa de URL http/https válida.`);
-      return null;
-    }
-    if ((altText?.length ?? 0) > 500 || (aiSummary?.length ?? 0) > 20_000) {
-      issues.push(`${path}: altText ou aiSummary excede o limite.`);
-      return null;
-    }
-    if ((transcript?.length ?? 0) > 100_000) {
-      issues.push(`${path}: transcrição excede 100.000 caracteres.`);
-      return null;
-    }
-    return { type, url, altText, transcript, aiSummary };
+    issues.push(`${path}: vídeo não pode existir dentro dos passos. Use featuredVideo.`);
+    return null;
   }
 
   issues.push(`${path}: tipo de bloco não suportado: ${type || "vazio"}.`);
@@ -247,7 +303,6 @@ function parseBlock(
 function parseStep(
   value: unknown,
   path: string,
-  version: HelpImportVersion,
   issues: string[],
 ): HelpImportStep | null {
   const record = asRecord(value);
@@ -258,38 +313,34 @@ function parseStep(
 
   const title = readString(record, "title");
   const description = optionalString(record, "description");
-  const aiKnowledge = optionalString(record, "aiKnowledge");
+  const assistantKnowledge = optionalString(record, "assistantKnowledge");
   const blocksValue = record.blocks;
 
-  if (!title || title.length > 180) issues.push(`${path}: título do passo é obrigatório e deve ter até 180 caracteres.`);
-  if ((description?.length ?? 0) > 10_000) issues.push(`${path}: descrição excede 10.000 caracteres.`);
-  if ((aiKnowledge?.length ?? 0) > 30_000) issues.push(`${path}: conhecimento da IA excede 30.000 caracteres.`);
+  if (!title || title.length > 180) issues.push(`${path}.title: obrigatório e máximo de 180 caracteres.`);
+  if ((description?.length ?? 0) > 2_000) issues.push(`${path}.description: máximo de 2.000 caracteres.`);
+  if ((assistantKnowledge?.length ?? 0) > 20_000) {
+    issues.push(`${path}.assistantKnowledge: máximo de 20.000 caracteres.`);
+  }
   if (!Array.isArray(blocksValue) || blocksValue.length === 0) {
-    issues.push(`${path}: cada passo deve ter ao menos um bloco.`);
+    issues.push(`${path}.blocks: informe ao menos um bloco público.`);
     return null;
   }
   if (blocksValue.length > MAX_BLOCKS_PER_STEP) {
-    issues.push(`${path}: máximo de ${MAX_BLOCKS_PER_STEP} blocos por passo.`);
+    issues.push(`${path}.blocks: máximo de ${MAX_BLOCKS_PER_STEP} blocos.`);
     return null;
   }
 
-  const parsedBlocks = blocksValue.map((block, index) =>
-    parseBlock(block, `${path}.blocks[${index}]`, version, issues),
-  );
-  const blocks = parsedBlocks.filter((block): block is HelpImportBlock => Boolean(block));
+  const blocks = blocksValue
+    .map((block, index) => parseBlock(block, `${path}.blocks[${index}]`, issues))
+    .filter((block): block is HelpImportBlock => Boolean(block));
 
-  if (!title || parsedBlocks.some((block) => block === null)) return null;
-  if (blocks.length === 0) {
-    issues.push(`${path}: após validar mídias, o passo ficou sem conteúdo público.`);
-    return null;
-  }
-  return { title, description, aiKnowledge, blocks };
+  if (!title || blocks.length !== blocksValue.length) return null;
+  return { title, description, assistantKnowledge, blocks };
 }
 
 function parseContent(
   value: unknown,
   index: number,
-  version: HelpImportVersion,
   issues: string[],
 ): HelpImportContent | null {
   const path = `contents[${index}]`;
@@ -303,50 +354,55 @@ function parseContent(
   const title = readString(record, "title");
   const slug = optionalString(record, "slug");
   const summary = optionalString(record, "summary");
-  const category = optionalString(record, "category");
-  const aiGeneralKnowledge = optionalString(record, "aiGeneralKnowledge");
-  const featuredVideo = version === CURRENT_IMPORT_VERSION
-    ? parseFeaturedVideo(record.featuredVideo, `${path}.featuredVideo`, issues)
-    : undefined;
+  const categories = parseCategories(record.categories, `${path}.categories`, issues);
+  const searchAliases = parseStringArray(
+    record.searchAliases ?? [],
+    `${path}.searchAliases`,
+    issues,
+    MAX_SEARCH_ALIASES,
+  );
+  const assistantKnowledge = optionalString(record, "assistantKnowledge");
+  const internalSupportNotes = optionalString(record, "internalSupportNotes");
+  const featuredVideo = parseFeaturedVideo(record.featuredVideo, `${path}.featuredVideo`, issues);
   const stepsValue = record.steps;
 
-  if (!externalId || externalId.length > 240) issues.push(`${path}: externalId é obrigatório e deve ter até 240 caracteres.`);
-  if (!title || title.length < 4 || title.length > 160) issues.push(`${path}: título deve ter entre 4 e 160 caracteres.`);
-  if ((slug?.length ?? 0) > 160) issues.push(`${path}: slug excede 160 caracteres.`);
-  if ((summary?.length ?? 0) > 320) issues.push(`${path}: resumo excede 320 caracteres.`);
-  if ((category?.length ?? 0) > 120) issues.push(`${path}: categoria excede 120 caracteres.`);
-  if ((aiGeneralKnowledge?.length ?? 0) > 40_000) issues.push(`${path}: conhecimento geral da IA excede 40.000 caracteres.`);
+  if (!externalId || externalId.length > 240) {
+    issues.push(`${path}.externalId: obrigatório e máximo de 240 caracteres.`);
+  }
+  if (!title || title.length < 4 || title.length > 160) {
+    issues.push(`${path}.title: deve ter entre 4 e 160 caracteres.`);
+  }
+  if ((slug?.length ?? 0) > 160) issues.push(`${path}.slug: máximo de 160 caracteres.`);
+  if ((summary?.length ?? 0) > 320) issues.push(`${path}.summary: máximo de 320 caracteres.`);
+  if ((assistantKnowledge?.length ?? 0) > 40_000) {
+    issues.push(`${path}.assistantKnowledge: máximo de 40.000 caracteres.`);
+  }
+  if ((internalSupportNotes?.length ?? 0) > 40_000) {
+    issues.push(`${path}.internalSupportNotes: máximo de 40.000 caracteres.`);
+  }
   if (!Array.isArray(stepsValue) || stepsValue.length === 0) {
-    issues.push(`${path}: conteúdo deve possuir ao menos um passo.`);
+    issues.push(`${path}.steps: informe ao menos um passo.`);
     return null;
   }
   if (stepsValue.length > MAX_STEPS_PER_CONTENT) {
-    issues.push(`${path}: máximo de ${MAX_STEPS_PER_CONTENT} passos por conteúdo.`);
+    issues.push(`${path}.steps: máximo de ${MAX_STEPS_PER_CONTENT} passos.`);
     return null;
   }
 
   const steps = stepsValue
-    .map((step, stepIndex) => parseStep(step, `${path}.steps[${stepIndex}]`, version, issues))
+    .map((step, stepIndex) => parseStep(step, `${path}.steps[${stepIndex}]`, issues))
     .filter((step): step is HelpImportStep => Boolean(step));
 
-  if (version === 1) {
-    const legacyVideoCount = steps.reduce(
-      (total, step) => total + step.blocks.filter((block) => block.type === "video").length,
-      0,
-    );
-    if (legacyVideoCount > 1) {
-      issues.push(`${path}: o conteúdo possui ${legacyVideoCount} vídeos. Mantenha apenas um vídeo por conteúdo.`);
-    }
-  }
-
-  if (!externalId || !title || steps.length !== stepsValue.length) return null;
+  if (!externalId || !title || categories.length === 0 || steps.length !== stepsValue.length) return null;
   return {
     externalId,
     title,
     slug,
     summary,
-    category,
-    aiGeneralKnowledge,
+    categories,
+    searchAliases,
+    assistantKnowledge,
+    internalSupportNotes,
     featuredVideo,
     steps,
   };
@@ -355,7 +411,6 @@ function parseContent(
 export function validateHelpImportJson(rawJson: string): HelpImportValidation {
   const issues: string[] = [];
   let value: unknown;
-
   try {
     value = JSON.parse(rawJson);
   } catch {
@@ -384,13 +439,12 @@ export function validateHelpImportJson(rawJson: string): HelpImportValidation {
   }
 
   const format = readString(root, "format");
-  const rawVersion = root.version;
-  const version = rawVersion === 1 || rawVersion === 2 ? rawVersion : null;
+  const version = root.version;
   const source = readString(root, "source");
   const contentsValue = root.contents;
 
   if (format !== IMPORT_FORMAT) issues.push(`format deve ser "${IMPORT_FORMAT}".`);
-  if (!version || !SUPPORTED_IMPORT_VERSIONS.has(version)) issues.push("version deve ser 1 ou 2.");
+  if (version !== IMPORT_VERSION) issues.push(`version deve ser ${IMPORT_VERSION}.`);
   if (!source || source.length > 80) issues.push("source é obrigatório e deve ter até 80 caracteres.");
   if (!Array.isArray(contentsValue) || contentsValue.length === 0) {
     issues.push("contents deve possuir ao menos um conteúdo.");
@@ -398,38 +452,46 @@ export function validateHelpImportJson(rawJson: string): HelpImportValidation {
     issues.push(`Máximo de ${MAX_CONTENTS} conteúdos por arquivo.`);
   }
 
-  const contents = Array.isArray(contentsValue) && version
+  const contents = Array.isArray(contentsValue)
     ? contentsValue
-        .map((content, index) => parseContent(content, index, version, issues))
+        .map((content, index) => parseContent(content, index, issues))
         .filter((content): content is HelpImportContent => Boolean(content))
     : [];
 
   const externalIds = new Set<string>();
   const slugs = new Set<string>();
-  let stepCount = 0;
-  let blockCount = 0;
-
   for (const [index, content] of contents.entries()) {
-    const slug = normalizeHelpSlug(content.slug || content.title);
-    if (!slug) issues.push(`contents[${index}]: não foi possível gerar slug válido.`);
-    if (externalIds.has(content.externalId)) issues.push(`contents[${index}]: externalId duplicado no arquivo.`);
-    if (slug && slugs.has(slug)) issues.push(`contents[${index}]: slug duplicado no arquivo: ${slug}.`);
+    if (externalIds.has(content.externalId)) {
+      issues.push(`contents[${index}].externalId: duplicado no arquivo.`);
+    }
     externalIds.add(content.externalId);
-    if (slug) slugs.add(slug);
-    stepCount += content.steps.length;
-    blockCount += content.steps.reduce((total, step) => total + step.blocks.length, 0);
+    const normalizedSlug = normalizeHelpSlug(content.slug || content.title);
+    if (!normalizedSlug) {
+      issues.push(`contents[${index}].slug: não foi possível gerar um endereço válido.`);
+    } else if (slugs.has(normalizedSlug)) {
+      issues.push(`contents[${index}].slug: duplicado no arquivo.`);
+    }
+    slugs.add(normalizedSlug);
   }
 
-  if (blockCount > MAX_TOTAL_BLOCKS) issues.push(`Máximo de ${MAX_TOTAL_BLOCKS} blocos por arquivo.`);
+  const stepCount = contents.reduce((total, content) => total + content.steps.length, 0);
+  const blockCount = contents.reduce(
+    (contentTotal, content) =>
+      contentTotal + content.steps.reduce((stepTotal, step) => stepTotal + step.blocks.length, 0),
+    0,
+  );
+  if (blockCount > MAX_TOTAL_BLOCKS) {
+    issues.push(`Máximo de ${MAX_TOTAL_BLOCKS} blocos por arquivo.`);
+  }
 
-  const contentArrayLength = Array.isArray(contentsValue) ? contentsValue.length : 0;
   const parsed: HelpImportFile | null =
-    issues.length === 0 &&
     format === IMPORT_FORMAT &&
-    version !== null &&
-    Boolean(source) &&
-    contents.length === contentArrayLength
-      ? { format: IMPORT_FORMAT, version, source, contents }
+    version === IMPORT_VERSION &&
+    source &&
+    Array.isArray(contentsValue) &&
+    contents.length === contentsValue.length &&
+    issues.length === 0
+      ? { format: IMPORT_FORMAT, version: IMPORT_VERSION, source, contents }
       : null;
 
   return {
@@ -438,35 +500,9 @@ export function validateHelpImportJson(rawJson: string): HelpImportValidation {
     contentCount: contents.length,
     stepCount,
     blockCount,
-    issues: issues.slice(0, 100),
+    issues,
     parsed,
   };
-}
-
-async function createRemoteAsset(
-  tx: Parameters<Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]>[0],
-  actorUserId: string,
-  contentId: string,
-  source: string,
-  block: Extract<HelpImportBlock, { type: "image" | "video" | "file" }> | HelpImportFeaturedVideo,
-  assetType: "image" | "video" | "file",
-): Promise<string> {
-  const [asset] = await tx
-    .insert(helpAssets)
-    .values({
-      contentId,
-      assetType,
-      sourceUrl: block.url,
-      altText: "altText" in block ? block.altText ?? "" : "",
-      transcript: assetType === "video" && "transcript" in block ? block.transcript ?? "" : "",
-      aiSummary: "aiSummary" in block ? block.aiSummary ?? "" : "",
-      metadata: { importedFrom: source },
-      createdBy: actorUserId,
-    })
-    .returning({ id: helpAssets.id });
-
-  if (!asset) throw new Error("IMPORT_ASSET_NOT_CREATED");
-  return asset.id;
 }
 
 export async function importStructuredHelpFile(
@@ -474,11 +510,38 @@ export async function importStructuredHelpFile(
   file: HelpImportFile,
 ) {
   const db = getDatabase();
-  const normalizedSlugs = file.contents.map((content) => normalizeHelpSlug(content.slug || content.title));
-  const externalIds = file.contents.map((content) => content.externalId);
+  const requestedCategorySlugs = Array.from(
+    new Set(file.contents.flatMap((content) => content.categories.map((category) => category.slug))),
+  );
+  const categoryRows = requestedCategorySlugs.length
+    ? await db
+        .select({ id: helpCategories.id, slug: helpCategories.slug })
+        .from(helpCategories)
+        .where(
+          and(
+            inArray(helpCategories.slug, requestedCategorySlugs),
+            eq(helpCategories.active, true),
+          ),
+        )
+    : [];
+  const categoryBySlug = new Map(categoryRows.map((category) => [category.slug, category.id]));
+  const invalidCategories = requestedCategorySlugs.filter((slug) => !categoryBySlug.has(slug));
+  if (invalidCategories.length > 0) {
+    throw new Error(`IMPORT_CATEGORY_INVALID:${invalidCategories.join(",")}`);
+  }
 
-  const [existingSlugs, existingExternalIds] = await Promise.all([
-    db.select({ slug: helpContents.slug }).from(helpContents).where(inArray(helpContents.slug, normalizedSlugs)),
+  const normalizedContents = file.contents.map((content) => ({
+    ...content,
+    normalizedSlug: normalizeHelpSlug(content.slug || content.title),
+  }));
+  if (normalizedContents.some((content) => !content.normalizedSlug)) {
+    throw new Error("IMPORT_INVALID_SLUG");
+  }
+
+  const slugs = normalizedContents.map((content) => content.normalizedSlug);
+  const externalIds = normalizedContents.map((content) => content.externalId);
+  const [slugConflicts, externalConflicts] = await Promise.all([
+    db.select({ slug: helpContents.slug }).from(helpContents).where(inArray(helpContents.slug, slugs)),
     db
       .select({ externalId: helpContents.importExternalId })
       .from(helpContents)
@@ -489,32 +552,31 @@ export async function importStructuredHelpFile(
         ),
       ),
   ]);
-
-  if (existingSlugs.length > 0) {
-    throw new Error(`IMPORT_SLUG_CONFLICT:${existingSlugs.map((row) => row.slug).join(",")}`);
+  if (slugConflicts.length > 0) {
+    throw new Error(`IMPORT_SLUG_CONFLICT:${slugConflicts.map((item) => item.slug).join(",")}`);
   }
-  if (existingExternalIds.length > 0) {
+  if (externalConflicts.length > 0) {
     throw new Error(
-      `IMPORT_EXTERNAL_ID_CONFLICT:${existingExternalIds
-        .map((row) => row.externalId)
+      `IMPORT_EXTERNAL_ID_CONFLICT:${externalConflicts
+        .map((item) => item.externalId)
         .filter(Boolean)
         .join(",")}`,
     );
   }
 
-  const imported = await db.transaction(async (tx) => {
-    const result: Array<{ id: string; title: string; externalId: string }> = [];
+  const imported: Array<{ id: string; externalId: string; title: string }> = [];
 
-    for (const content of file.contents) {
-      const slug = normalizeHelpSlug(content.slug || content.title);
-      const [createdContent] = await tx
+  await db.transaction(async (tx) => {
+    for (const content of normalizedContents) {
+      const [created] = await tx
         .insert(helpContents)
         .values({
-          slug,
-          title: content.title,
-          summary: content.summary ?? "",
-          category: content.category ?? "",
-          aiGeneralKnowledge: content.aiGeneralKnowledge ?? "",
+          slug: content.normalizedSlug,
+          title: content.title.trim(),
+          summary: content.summary?.trim() ?? "",
+          searchAliases: Array.from(new Set(content.searchAliases.map((item) => item.trim().toLowerCase()))),
+          assistantKnowledge: content.assistantKnowledge?.trim() ?? "",
+          internalSupportNotes: content.internalSupportNotes?.trim() ?? "",
           status: "draft",
           importSource: file.source,
           importExternalId: content.externalId,
@@ -522,22 +584,34 @@ export async function importStructuredHelpFile(
           updatedBy: actorUserId,
         })
         .returning({ id: helpContents.id });
+      if (!created) throw new Error("IMPORT_CONTENT_NOT_CREATED");
 
-      if (!createdContent) throw new Error("IMPORT_CONTENT_NOT_CREATED");
+      await tx.insert(helpContentCategories).values(
+        content.categories.map((category, categoryIndex) => ({
+          contentId: created.id,
+          categoryId: categoryBySlug.get(category.slug)!,
+          destinationUrl: category.destinationUrl?.trim() ?? "",
+          sortOrder: (categoryIndex + 1) * 10,
+        })),
+      );
 
-      let featuredVideoAssetId: string | null = null;
       if (content.featuredVideo) {
-        featuredVideoAssetId = await createRemoteAsset(
-          tx,
-          actorUserId,
-          createdContent.id,
-          file.source,
-          content.featuredVideo,
-          "video",
-        );
+        const [videoAsset] = await tx
+          .insert(helpAssets)
+          .values({
+            contentId: created.id,
+            assetType: "video",
+            sourceUrl: content.featuredVideo.url,
+            altText: content.featuredVideo.description ?? "",
+            subtitles: content.featuredVideo.subtitles,
+            assistantSummary: content.featuredVideo.assistantSummary ?? "",
+            createdBy: actorUserId,
+          })
+          .returning({ id: helpAssets.id });
+        if (!videoAsset) throw new Error("IMPORT_VIDEO_NOT_CREATED");
         await tx.insert(helpContentFeaturedVideos).values({
-          contentId: createdContent.id,
-          assetId: featuredVideoAssetId,
+          contentId: created.id,
+          assetId: videoAsset.id,
         });
       }
 
@@ -545,46 +619,43 @@ export async function importStructuredHelpFile(
         const [createdStep] = await tx
           .insert(helpContentSteps)
           .values({
-            contentId: createdContent.id,
+            contentId: created.id,
             title: step.title,
             description: step.description ?? "",
-            aiKnowledge: step.aiKnowledge ?? "",
+            assistantKnowledge: step.assistantKnowledge ?? "",
             sortOrder: (stepIndex + 1) * 10,
           })
           .returning({ id: helpContentSteps.id });
-
         if (!createdStep) throw new Error("IMPORT_STEP_NOT_CREATED");
-
-        if (stepIndex === 0 && featuredVideoAssetId) {
-          await tx.insert(helpStepBlocks).values({
-            stepId: createdStep.id,
-            blockType: "video",
-            assetId: featuredVideoAssetId,
-            metadata: { importedFrom: file.source, featuredVideoMirror: true },
-            sortOrder: 5,
-          });
-        }
 
         for (const [blockIndex, block] of step.blocks.entries()) {
           let assetId: string | null = null;
-
-          if (block.type === "image" || block.type === "video" || block.type === "file") {
-            assetId = await createRemoteAsset(
-              tx,
-              actorUserId,
-              createdContent.id,
-              file.source,
-              block,
-              block.type,
-            );
-
-            if (block.type === "video" && !featuredVideoAssetId) {
-              featuredVideoAssetId = assetId;
-              await tx.insert(helpContentFeaturedVideos).values({
-                contentId: createdContent.id,
-                assetId,
-              });
-            }
+          if (block.type === "image") {
+            const [asset] = await tx
+              .insert(helpAssets)
+              .values({
+                contentId: created.id,
+                assetType: "image",
+                sourceUrl: block.url,
+                altText: block.altText ?? "",
+                assistantDescription: block.assistantDescription ?? "",
+                createdBy: actorUserId,
+              })
+              .returning({ id: helpAssets.id });
+            assetId = asset?.id ?? null;
+          } else if (block.type === "file") {
+            const [asset] = await tx
+              .insert(helpAssets)
+              .values({
+                contentId: created.id,
+                assetType: "file",
+                sourceUrl: block.url,
+                extractedText: block.extractedText ?? "",
+                assistantSummary: block.assistantSummary ?? "",
+                createdBy: actorUserId,
+              })
+              .returning({ id: helpAssets.id });
+            assetId = asset?.id ?? null;
           }
 
           await tx.insert(helpStepBlocks).values({
@@ -593,81 +664,37 @@ export async function importStructuredHelpFile(
             textContent: block.type === "text" || block.type === "notice" ? block.text : "",
             assetId,
             linkUrl: block.type === "link" ? block.url : null,
-            linkLabel:
-              block.type === "link" || block.type === "file" ? block.label : null,
+            linkLabel: block.type === "link" || block.type === "file" ? block.label : null,
             noticeVariant: block.type === "notice" ? block.variant ?? "info" : null,
-            metadata: {
-              importedFrom: file.source,
-              ...(block.type === "video" ? { featuredVideoMirror: true } : {}),
-            },
             sortOrder: (blockIndex + 1) * 10,
           });
         }
       }
 
-      await tx.insert(helpContentVersions).values({
-        entityType: "content",
-        entityId: createdContent.id,
-        version: 1,
-        snapshot: {
-          import: {
-            source: file.source,
-            externalId: content.externalId,
-            formatVersion: file.version,
-          },
-          title: content.title,
-          slug,
-          summary: content.summary ?? "",
-          category: content.category ?? "",
-          aiGeneralKnowledge: content.aiGeneralKnowledge ?? "",
-          featuredVideo: content.featuredVideo ?? null,
-          status: "draft",
-          steps: content.steps.map((step, stepIndex) => ({
-            title: step.title,
-            description: step.description ?? "",
-            aiKnowledge: step.aiKnowledge ?? "",
-            sortOrder: (stepIndex + 1) * 10,
-            blocks: step.blocks,
-          })),
-        },
-        createdBy: actorUserId,
-      });
-
-      result.push({
-        id: createdContent.id,
-        title: content.title,
-        externalId: content.externalId,
-      });
+      imported.push({ id: created.id, externalId: content.externalId, title: content.title });
     }
-
-    return result;
   });
-
-  const stepCount = file.contents.reduce((total, content) => total + content.steps.length, 0);
-  const blockCount = file.contents.reduce(
-    (total, content) => total + content.steps.reduce((stepTotal, step) => stepTotal + step.blocks.length, 0),
-    0,
-  );
 
   await recordAuditEvent({
     actorUserId,
     action: "help.content.imported",
-    entityType: "help_content_import",
+    entityType: "help_import",
     metadata: {
       source: file.source,
-      formatVersion: file.version,
-      contentCount: file.contents.length,
-      stepCount,
-      blockCount,
-      externalIds: imported.map((item) => item.externalId),
+      contentCount: imported.length,
+      version: file.version,
     },
   });
 
   return {
-    imported,
     source: file.source,
-    contentCount: file.contents.length,
-    stepCount,
-    blockCount,
+    contentCount: imported.length,
+    stepCount: file.contents.reduce((total, content) => total + content.steps.length, 0),
+    blockCount: file.contents.reduce(
+      (contentTotal, content) =>
+        contentTotal + content.steps.reduce((stepTotal, step) => stepTotal + step.blocks.length, 0),
+      0,
+    ),
+    imported,
   };
 }
