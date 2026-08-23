@@ -94,8 +94,8 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 
     if (!isSupportAiChatEnabled()) {
       return json({
-        answer: "Não consegui consultar o assistente agora. Posso encaminhar você para alguém da equipe F10.",
-        requiresHuman: true,
+        answer: "Não consegui consultar a Base de Conhecimento agora. Você pode tentar novamente ou escolher falar com a equipe F10.",
+        requiresHuman: false,
         aiAvailable: false,
       }, { headers: { "Cache-Control": "no-store" } });
     }
@@ -106,27 +106,21 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
       maxOutputTokens: 500,
     });
 
-    if (result.resolution === "answered") {
-      return json({
-        answer: result.answer,
-        requiresHuman: false,
-        aiAvailable: true,
-      }, { headers: { "Cache-Control": "no-store" } });
-    }
-
     return json({
-      answer: "Não encontrei informação suficiente para responder isso com segurança. Posso chamar alguém da equipe F10 para continuar com você por aqui.",
-      requiresHuman: true,
-      aiAvailable: true,
+      answer: result.answer,
+      requiresHuman: false,
+      aiAvailable: result.resolution !== "failed",
+      canEscalate: result.resolution !== "answered",
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (cause) {
     console.error("[support.chat.assistant]", {
       causeType: cause instanceof Error ? cause.name : typeof cause,
     });
     return json({
-      answer: "Não consegui consultar o assistente agora. Posso encaminhar você para alguém da equipe F10.",
-      requiresHuman: true,
+      answer: "Não consegui consultar a Base de Conhecimento agora. Você pode tentar novamente ou escolher falar com a equipe F10.",
+      requiresHuman: false,
       aiAvailable: false,
+      canEscalate: true,
     }, { status: 200, headers: { "Cache-Control": "no-store" } });
   }
 };
