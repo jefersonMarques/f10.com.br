@@ -6,6 +6,7 @@ import {
   archiveStructuredHelpContent,
   discardStructuredHelpContent,
 } from "$lib/server/help/helpContentLifecycle";
+import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import {
   createStructuredHelpContent,
   listStructuredHelpContents,
@@ -31,9 +32,10 @@ export const load: PageServerLoad = async ({ parent }) => {
     throw error(403, "Acesso não autorizado.");
   }
 
-  const [contents, publishedLinks] = await Promise.all([
+  const [contents, publishedLinks, categories] = await Promise.all([
     listStructuredHelpContents(),
     listPublishedStructuredHelpLinks(),
+    listHelpCategories(true),
   ]);
   const publishedById = new Map(
     publishedLinks.map((publication) => [publication.entityId, publication]),
@@ -44,6 +46,7 @@ export const load: PageServerLoad = async ({ parent }) => {
       ...content,
       publishedSlug: publishedById.get(content.id)?.slug ?? null,
     })),
+    categories,
     canEdit: hasPermission(permissions, "help.edit"),
     canArchive: hasPermission(permissions, "help.publish"),
   };
@@ -60,9 +63,8 @@ export const actions: Actions = {
     const title = readFormValue(formData, "title");
     const slug = readFormValue(formData, "slug");
     const summary = readFormValue(formData, "summary");
-    const category = readFormValue(formData, "category");
-    const aiGeneralKnowledge = readFormValue(formData, "aiGeneralKnowledge");
-    const values = { title, slug, summary, category, aiGeneralKnowledge };
+    const categoryId = readFormValue(formData, "categoryId");
+    const values = { title, slug, summary, categoryId };
 
     if (title.length < 4 || title.length > 160) {
       return fail(400, {
@@ -71,50 +73,49 @@ export const actions: Actions = {
         values,
       });
     }
-
-    if (summary.length > 320 || category.length > 120) {
+    if (summary.length > 320) {
       return fail(400, {
         success: false,
-        message: "Resumo ou categoria excede o tamanho permitido.",
+        message: "O resumo deve ter no máximo 320 caracteres.",
         values,
       });
     }
-
-    if (aiGeneralKnowledge.length > 20_000) {
+    if (!isUuid(categoryId)) {
       return fail(400, {
         success: false,
-        message: "O conhecimento geral da IA deve ter no máximo 20.000 caracteres.",
+        message: "Selecione uma categoria para o conteúdo.",
         values,
       });
     }
 
     try {
-      const content = await createStructuredHelpContent(session.user.id, values);
+      const content = await createStructuredHelpContent(session.user.id, {
+        title,
+        slug,
+        summary,
+        searchAliases: [],
+        assistantKnowledge: "",
+        internalSupportNotes: "",
+        categories: [{ categoryId, destinationUrl: "", sortOrder: 10 }],
+      });
       throw redirect(303, `/app/help/content/${content.id}`);
     } catch (cause) {
-      if (
-        cause &&
-        typeof cause === "object" &&
-        "status" in cause &&
-        cause.status === 303
-      ) {
+      if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) {
         throw cause;
       }
-
       return fail(409, {
         success: false,
-        message: "Não foi possível criar o conteúdo. Verifique se o endereço já está em uso.",
+        message:
+          cause instanceof Error && cause.message.startsWith("CONTENT_CATEGORY")
+            ? "Selecione uma categoria ativa para o conteúdo."
+            : "Não foi possível criar o conteúdo. Verifique se o endereço já está em uso.",
         values,
       });
     }
   },
 
   discard: async ({ cookies, request }) => {
-    const { session } = await requireAppPermission(
-      cookies,
-      "help.edit",
-      "/app/help/content",
-    );
+    const { session } = await requireAppPermission(cookies, "help.edit", "/app/help/content");
     const contentId = readFormValue(await request.formData(), "contentId");
     if (!isUuid(contentId)) {
       return fail(400, { success: false, message: "Conteúdo inválido." });
@@ -131,16 +132,11 @@ export const actions: Actions = {
             : "Não foi possível descartar este conteúdo.",
       });
     }
-
     throw redirect(303, "/app/help/content");
   },
 
   archive: async ({ cookies, request }) => {
-    const { session } = await requireAppPermission(
-      cookies,
-      "help.publish",
-      "/app/help/content",
-    );
+    const { session } = await requireAppPermission(cookies, "help.publish", "/app/help/content");
     const contentId = readFormValue(await request.formData(), "contentId");
     if (!isUuid(contentId)) {
       return fail(400, { success: false, message: "Conteúdo inválido." });
@@ -157,7 +153,6 @@ export const actions: Actions = {
             : "Não foi possível arquivar este conteúdo.",
       });
     }
-
     throw redirect(303, "/app/help/content");
   },
 };
