@@ -16,6 +16,7 @@
   let message = "";
   let errorMessage = "";
   let altText = "";
+  let assistantDescription = "";
 
   function activate(): void {
     activeUploaderStepId = stepId;
@@ -36,13 +37,14 @@
       const body = new FormData();
       body.set("stepId", stepId);
       body.set("altText", altText.trim());
+      body.set("assistantDescription", assistantDescription.trim());
       body.set("file", file, file.name || `imagem-colada-${Date.now()}.png`);
 
       const response = await fetch(`/api/app/help/content/${contentId}/images`, {
         method: "POST",
         body,
       });
-      const result = await response.json() as { success?: boolean; message?: string };
+      const result = (await response.json()) as { success?: boolean; message?: string };
 
       if (!response.ok || !result.success) {
         errorMessage = result.message ?? "Não foi possível enviar a imagem.";
@@ -51,6 +53,7 @@
 
       message = result.message ?? "Imagem adicionada ao passo.";
       altText = "";
+      assistantDescription = "";
       if (fileInput) fileInput.value = "";
       await invalidateAll();
     } catch {
@@ -71,25 +74,25 @@
     event.preventDefault();
     activate();
     dragActive = false;
-    const file = Array.from(event.dataTransfer?.files ?? []).find((item) => item.type.startsWith("image/"));
+    const file = Array.from(event.dataTransfer?.files ?? []).find((item) =>
+      item.type.startsWith("image/"),
+    );
     if (file) void uploadImage(file);
   }
 
   function handlePaste(event: ClipboardEvent): void {
     if (activeUploaderStepId !== stepId || uploading) return;
-    const file = Array.from(event.clipboardData?.files ?? []).find((item) => item.type.startsWith("image/"));
+    const file = Array.from(event.clipboardData?.files ?? []).find((item) =>
+      item.type.startsWith("image/"),
+    );
     if (!file) return;
-
     event.preventDefault();
     void uploadImage(file);
   }
 
   onMount(() => {
     window.addEventListener("paste", handlePaste);
-
-    return () => {
-      window.removeEventListener("paste", handlePaste);
-    };
+    return () => window.removeEventListener("paste", handlePaste);
   });
 </script>
 
@@ -105,39 +108,27 @@
   on:drop={handleDrop}
 >
   <div class="flex items-start gap-3">
-    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#000A57] shadow-sm">
-      <ImageIcon size={17} aria-hidden="true" />
-    </span>
+    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#000A57] shadow-sm"><ImageIcon size={17} aria-hidden="true" /></span>
     <div class="min-w-0 flex-1">
       <strong class="application-text-caption block font-semibold text-[#303645]">Imagem do computador</strong>
-      <span class="application-text-caption mt-1 block leading-5 text-[#858B99]">Clique para selecionar, arraste uma imagem aqui ou deixe este bloco ativo e use <strong>Ctrl+V</strong>.</span>
+      <span class="application-text-caption mt-1 block leading-5 text-[#858B99]">Selecione, arraste ou use <strong>Ctrl+V</strong>. Descreva apenas o que a imagem ensina e não está explicado no texto.</span>
     </div>
   </div>
 
   <label class="mt-3 block">
-    <span class="application-text-meta mb-1 block font-semibold text-[#707687]">Texto alternativo opcional</span>
-    <input bind:value={altText} maxlength="500" placeholder="Ex.: Tela de cadastro com o botão Salvar destacado" class="application-text-caption h-9 w-full rounded-lg border border-[#DDE1EA] bg-white px-3 outline-none focus:border-[#000A57]" />
+    <span class="application-text-meta mb-1 block font-semibold text-[#707687]">Texto alternativo</span>
+    <input bind:value={altText} maxlength="500" placeholder="Ex.: Tela de cadastro de funcionários" class="application-text-caption h-9 w-full rounded-lg border border-[#DDE1EA] bg-white px-3 outline-none focus:border-[#000A57]" />
   </label>
 
-  <input
-    bind:this={fileInput}
-    type="file"
-    accept="image/png,image/jpeg,image/webp,image/gif"
-    class="sr-only"
-    on:change={handleFileInput}
-  />
+  <label class="mt-3 block">
+    <span class="application-text-meta mb-1 block font-semibold text-[#707687]">Descrição adicional para o assistente</span>
+    <textarea bind:value={assistantDescription} maxlength="20000" rows="3" placeholder="Ex.: O botão Novo fica no canto superior direito, acima da grade." class="application-text-caption w-full resize-y rounded-lg border border-[#DDE1EA] bg-white px-3 py-2 leading-5 outline-none focus:border-[#000A57]"></textarea>
+  </label>
 
-  <button
-    type="button"
-    disabled={uploading}
-    on:click={() => { activate(); fileInput?.click(); }}
-    class="application-text-caption mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#000A57] px-3 font-semibold text-white disabled:cursor-wait disabled:opacity-60"
-  >
-    {#if uploading}
-      <UploadCloud size={14} class="animate-pulse" aria-hidden="true" /> Enviando para a biblioteca...
-    {:else}
-      <ClipboardPaste size={14} aria-hidden="true" /> Selecionar ou colar imagem
-    {/if}
+  <input bind:this={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="sr-only" on:change={handleFileInput} />
+
+  <button type="button" disabled={uploading} on:click={() => { activate(); fileInput?.click(); }} class="application-text-caption mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#000A57] px-3 font-semibold text-white disabled:cursor-wait disabled:opacity-60">
+    {#if uploading}<UploadCloud size={14} class="animate-pulse" aria-hidden="true" /> Enviando...{:else}<ClipboardPaste size={14} aria-hidden="true" /> Selecionar ou colar imagem{/if}
   </button>
 
   {#if message}<p class="application-text-meta mt-2 font-medium text-[#257342]">{message}</p>{/if}
