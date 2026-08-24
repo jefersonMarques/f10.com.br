@@ -137,6 +137,8 @@ function validateFeaturedVideoInput(input: StructuredHelpFeaturedVideoInput): st
 function getPublishErrorMessage(cause: unknown): string {
   if (!(cause instanceof Error)) return "Não foi possível publicar este conteúdo.";
   switch (cause.message) {
+    case "CONTENT_REAL_CATEGORY_REQUIRED":
+      return "Substitua a categoria “Sem categoria” por uma ou mais categorias reais antes de publicar.";
     case "CONTENT_CATEGORY_REQUIRED":
     case "CONTENT_CATEGORY_INVALID":
       return "Associe o conteúdo a pelo menos uma categoria ativa antes de publicar.";
