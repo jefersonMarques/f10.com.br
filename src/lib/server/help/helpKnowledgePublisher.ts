@@ -1,11 +1,16 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
-import { compileHelpKnowledgeDocument } from "$lib/server/help/helpKnowledgeCompiler";
+import { helpContents } from "$lib/server/db/structuredHelpSchema";
 import {
-  getStructuredHelpContent,
-  publishStructuredHelpContent,
-} from "$lib/server/help/structuredHelpRepository";
+  compileHelpKnowledgeDocument,
+  compileHelpPublicSnapshot,
+  compileHelpVersionSnapshot,
+  validateHelpKnowledgePublication,
+} from "$lib/server/help/helpKnowledgeCompiler";
+import { getStructuredHelpContent } from "$lib/server/help/structuredHelpRepository";
+import { saveHelpContentVersion } from "$lib/server/help/helpVersionRepository";
 
 export async function publishHelpKnowledgeContent(
   actorUserId: string,
@@ -13,39 +18,65 @@ export async function publishHelpKnowledgeContent(
 ): Promise<void> {
   const content = await getStructuredHelpContent(contentId);
   if (!content) throw new Error("CONTENT_NOT_FOUND");
+  if (content.status === "archived") throw new Error("CONTENT_ARCHIVED");
 
-  const knowledge = compileHelpKnowledgeDocument(content);
-  await publishStructuredHelpContent(actorUserId, contentId);
+  validateHelpKnowledgePublication(content);
 
+  const publishedAt = new Date();
+  const snapshot = {
+    public: compileHelpPublicSnapshot(content),
+    knowledge: compileHelpKnowledgeDocument(content),
+  };
   const db = getDatabase();
-  const [publication] = await db
-    .select({ snapshot: helpPublications.snapshot })
-    .from(helpPublications)
-    .where(
-      and(
-        eq(helpPublications.entityType, "content"),
-        eq(helpPublications.entityId, contentId),
-      ),
-    )
-    .limit(1);
 
-  if (!publication) throw new Error("HELP_PUBLICATION_NOT_FOUND");
+  await db.transaction(async (tx) => {
+    await tx
+      .update(helpContents)
+      .set({
+        status: "published",
+        publishedAt,
+        updatedBy: actorUserId,
+        updatedAt: publishedAt,
+      })
+      .where(eq(helpContents.id, contentId));
 
-  const snapshot = { ...publication.snapshot };
-  delete snapshot.assistant;
+    await tx
+      .insert(helpPublications)
+      .values({
+        entityType: "content",
+        entityId: contentId,
+        snapshot,
+        publishedBy: actorUserId,
+        publishedAt,
+      })
+      .onConflictDoUpdate({
+        target: [helpPublications.entityType, helpPublications.entityId],
+        set: {
+          snapshot,
+          publishedBy: actorUserId,
+          publishedAt,
+        },
+      });
+  });
 
-  await db
-    .update(helpPublications)
-    .set({
-      snapshot: {
-        ...snapshot,
-        knowledge,
-      },
-    })
-    .where(
-      and(
-        eq(helpPublications.entityType, "content"),
-        eq(helpPublications.entityId, contentId),
-      ),
-    );
+  await saveHelpContentVersion(
+    "content",
+    contentId,
+    compileHelpVersionSnapshot(content, publishedAt),
+    actorUserId,
+  );
+
+  await recordAuditEvent({
+    actorUserId,
+    action: "help.content.published",
+    entityType: "help_content",
+    entityId: contentId,
+    metadata: {
+      stepCount: content.steps.length,
+      categoryCount: content.categories.length,
+      hasFeaturedVideo: Boolean(content.featuredVideo),
+      knowledgeVersion: snapshot.knowledge.version,
+      knowledgeFragmentCount: snapshot.knowledge.fragments.length,
+    },
+  });
 }
