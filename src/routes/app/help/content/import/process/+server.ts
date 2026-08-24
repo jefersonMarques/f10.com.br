@@ -33,9 +33,16 @@ function automationErrorMessage(code: string): string {
   }
   if (code === "HELP_VIDEO_UPLOAD_FORMAT_INVALID") return "Use um arquivo .mp4 válido.";
   if (code === "HELP_VIDEO_TRANSCRIPTION_EMPTY") return "A transcrição retornou vazia. Revise o áudio do vídeo.";
+  if (code === "HELP_VIDEO_TRANSCRIPTION_TIMEOUT") return "A transcrição demorou mais que o limite permitido. Tente novamente.";
   if (code === "HELP_VIDEO_FRAMES_NOT_FOUND") return "O F10 não encontrou telas válidas para analisar no vídeo.";
   if (code === "HELP_VIDEO_ARTICLE_GENERATION_EMPTY") {
     return "A OpenAI não retornou o artigo estruturado. Tente processar o vídeo novamente.";
+  }
+  if (code === "HELP_VIDEO_ARTICLE_GENERATION_INVALID_JSON") {
+    return "A OpenAI retornou um artigo estruturado inválido. Tente processar o vídeo novamente.";
+  }
+  if (code === "HELP_VIDEO_ARTICLE_GENERATION_TIMEOUT") {
+    return "A análise do vídeo pela OpenAI demorou mais que o limite permitido. Tente novamente.";
   }
   if (code === "HELP_VIDEO_NO_SCREENSHOTS_SELECTED") return "A análise não selecionou screenshots suficientes. Tente novamente ou use o fluxo por ZIP.";
   if (code === "IMPORT_CONTENT_NOT_CREATED") return "O conteúdo foi analisado, mas o F10 não conseguiu criar o rascunho.";
@@ -52,6 +59,17 @@ function automationErrorMessage(code: string): string {
   if (code === "IMPORT_INVALID_SLUG") return "O F10 não conseguiu gerar um endereço válido para o conteúdo.";
   if (code === "HELP_VIDEO_COMMAND_TIMEOUT") return "O processamento local do vídeo excedeu o tempo permitido.";
   return "Não foi possível gerar o conteúdo automaticamente a partir do vídeo.";
+}
+
+function classifyAutomationError(cause: unknown, stage: string): string {
+  if (cause instanceof SyntaxError && stage === "analyze") {
+    return "HELP_VIDEO_ARTICLE_GENERATION_INVALID_JSON";
+  }
+  if (cause instanceof Error && cause.name === "AbortError") {
+    if (stage === "transcribe") return "HELP_VIDEO_TRANSCRIPTION_TIMEOUT";
+    if (stage === "analyze") return "HELP_VIDEO_ARTICLE_GENERATION_TIMEOUT";
+  }
+  return cause instanceof Error ? cause.message : "HELP_VIDEO_AUTOMATION_FAILED";
 }
 
 function technicalErrorCode(code: string): string {
@@ -279,7 +297,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
           imported: result.imported,
         });
       } catch (cause) {
-        const code = cause instanceof Error ? cause.message : "HELP_VIDEO_AUTOMATION_FAILED";
+        const code = classifyAutomationError(cause, lastProgressStage);
         const technicalCode = technicalErrorCode(code);
         console.error("[help-video-import] processing failed", {
           stage: lastProgressStage,
