@@ -440,9 +440,12 @@
     } catch {
       guestMessages = [
         ...guestMessages,
-        createGuestMessage("assistant", "Não consegui consultar o assistente agora. Posso encaminhar você para alguém da equipe F10."),
+        createGuestMessage(
+          "assistant",
+          "Não consegui consultar o assistente agora. Tente novamente ou, se preferir, use “Falar com uma pessoa”.",
+        ),
       ];
-      await requestHumanSupport();
+      await scrollToLatest();
     } finally {
       assistantSending = false;
     }
