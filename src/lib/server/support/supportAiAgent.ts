@@ -148,6 +148,7 @@ export async function runSupportAi(
       customerContactId: input.customerContactId,
       searchEventId: knowledge.searchEventId,
       question,
+      retrievalQuery: knowledge.retrievalQuery,
       resolution: knowledge.resolution,
       target: knowledge.target
         ? {
