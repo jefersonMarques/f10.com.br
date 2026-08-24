@@ -123,6 +123,15 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
         }
       };
 
+      const heartbeat = setInterval(() => {
+        if (streamClosed) return;
+        try {
+          controller.enqueue(encoder.encode("\n"));
+        } catch {
+          streamClosed = true;
+        }
+      }, 15_000);
+
       const progress = (item: HelpVideoAutomationProgress) => {
         write({ type: "progress", ...item });
       };
@@ -200,6 +209,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
         const code = cause instanceof Error ? cause.message : "HELP_VIDEO_AUTOMATION_FAILED";
         write({ type: "error", message: automationErrorMessage(code), issues: [] });
       } finally {
+        clearInterval(heartbeat);
         if (!streamClosed) {
           streamClosed = true;
           controller.close();
