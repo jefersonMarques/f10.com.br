@@ -22,6 +22,9 @@ export type HelpKnowledgeDocument = {
 
 type CompilerAsset = {
   id: string;
+  assetType: "image" | "video" | "file";
+  sourceUrl: string | null;
+  storageKey: string | null;
   altText: string;
   assistantDescription: string;
   subtitles: string;
@@ -33,7 +36,10 @@ type CompilerBlock = {
   id: string;
   blockType: "text" | "image" | "notice" | "link" | "file";
   textContent: string;
+  linkUrl: string | null;
   linkLabel: string | null;
+  noticeVariant: string | null;
+  sortOrder: number;
   asset: CompilerAsset | null;
 };
 
@@ -42,13 +48,18 @@ type CompilerStep = {
   title: string;
   description: string;
   assistantKnowledge: string;
+  sortOrder: number;
   blocks: CompilerBlock[];
 };
 
 type CompilerCategory = {
+  id: string;
   slug: string;
   name: string;
   description: string;
+  icon: string;
+  effectiveDestinationUrl: string;
+  active: boolean;
 };
 
 export type HelpKnowledgeCompilerInput = {
@@ -58,6 +69,9 @@ export type HelpKnowledgeCompilerInput = {
   summary: string;
   searchAliases: string[];
   assistantKnowledge: string;
+  internalSupportNotes: string;
+  status: string;
+  publishedAt: Date | null;
   categories: CompilerCategory[];
   featuredVideo: CompilerAsset | null;
   steps: CompilerStep[];
@@ -150,6 +164,140 @@ function addFragment(
       MAX_SEARCH_TEXT_CHARS,
     ),
   });
+}
+
+export function validateHelpKnowledgePublication(content: HelpKnowledgeCompilerInput): void {
+  if (content.categories.length === 0 || content.categories.some((category) => !category.active)) {
+    throw new Error("CONTENT_CATEGORY_REQUIRED");
+  }
+  if (content.featuredVideo && !content.featuredVideo.subtitles.trim()) {
+    throw new Error("FEATURED_VIDEO_SUBTITLES_REQUIRED");
+  }
+  if (content.steps.length === 0) throw new Error("CONTENT_STEP_REQUIRED");
+
+  for (const step of content.steps) {
+    if (!step.title.trim()) throw new Error("STEP_TITLE_REQUIRED");
+    if (step.blocks.length === 0) throw new Error("STEP_BLOCK_REQUIRED");
+
+    const meaningfulBlocks = step.blocks.filter((block) => {
+      if (block.blockType === "text" || block.blockType === "notice") {
+        return Boolean(block.textContent.trim());
+      }
+      if (block.blockType === "link") return Boolean(block.linkUrl && block.linkLabel);
+      return Boolean(block.asset?.sourceUrl || block.asset?.storageKey || block.asset?.extractedText);
+    });
+    if (meaningfulBlocks.length === 0) throw new Error("STEP_BLOCK_REQUIRED");
+
+    const images = step.blocks.filter((block) => block.blockType === "image");
+    const hasOnlyImages = images.length > 0 && images.length === step.blocks.length;
+    if (
+      hasOnlyImages &&
+      images.some(
+        (block) => !block.asset?.altText.trim() && !block.asset?.assistantDescription.trim(),
+      )
+    ) {
+      throw new Error("IMAGE_DESCRIPTION_REQUIRED");
+    }
+  }
+}
+
+export function compileHelpPublicSnapshot(content: HelpKnowledgeCompilerInput) {
+  return {
+    slug: content.slug,
+    title: content.title,
+    summary: content.summary,
+    categories: content.categories.map((category) => ({
+      id: category.id,
+      slug: category.slug,
+      name: category.name,
+      description: category.description,
+      icon: category.icon,
+      destinationUrl: category.effectiveDestinationUrl,
+    })),
+    featuredVideo: content.featuredVideo
+      ? {
+          id: content.featuredVideo.id,
+          assetType: content.featuredVideo.assetType,
+          sourceUrl: content.featuredVideo.sourceUrl,
+          storageKey: content.featuredVideo.storageKey,
+          altText: content.featuredVideo.altText,
+        }
+      : null,
+    steps: content.steps.map((step) => ({
+      id: step.id,
+      title: step.title,
+      description: step.description,
+      sortOrder: step.sortOrder,
+      blocks: step.blocks.map((block) => ({
+        id: block.id,
+        blockType: block.blockType,
+        textContent: block.textContent,
+        linkUrl: block.linkUrl,
+        linkLabel: block.linkLabel,
+        noticeVariant: block.noticeVariant,
+        sortOrder: block.sortOrder,
+        asset: block.asset
+          ? {
+              id: block.asset.id,
+              assetType: block.asset.assetType,
+              sourceUrl: block.asset.sourceUrl,
+              storageKey: block.asset.storageKey,
+              altText: block.asset.altText,
+            }
+          : null,
+      })),
+    })),
+  };
+}
+
+export function compileHelpVersionSnapshot(
+  content: HelpKnowledgeCompilerInput,
+  publishedAt: Date,
+) {
+  const serializeAsset = (asset: CompilerAsset | null) =>
+    asset
+      ? {
+          id: asset.id,
+          assetType: asset.assetType,
+          sourceUrl: asset.sourceUrl,
+          storageKey: asset.storageKey,
+          altText: asset.altText,
+          assistantDescription: asset.assistantDescription,
+          subtitles: asset.subtitles,
+          assistantSummary: asset.assistantSummary,
+          extractedText: asset.extractedText,
+        }
+      : null;
+
+  return {
+    slug: content.slug,
+    title: content.title,
+    summary: content.summary,
+    searchAliases: content.searchAliases,
+    assistantKnowledge: content.assistantKnowledge,
+    internalSupportNotes: content.internalSupportNotes,
+    categories: content.categories,
+    featuredVideo: serializeAsset(content.featuredVideo),
+    status: "published",
+    publishedAt: publishedAt.toISOString(),
+    steps: content.steps.map((step) => ({
+      id: step.id,
+      title: step.title,
+      description: step.description,
+      assistantKnowledge: step.assistantKnowledge,
+      sortOrder: step.sortOrder,
+      blocks: step.blocks.map((block) => ({
+        id: block.id,
+        blockType: block.blockType,
+        textContent: block.textContent,
+        linkUrl: block.linkUrl,
+        linkLabel: block.linkLabel,
+        noticeVariant: block.noticeVariant,
+        sortOrder: block.sortOrder,
+        asset: serializeAsset(block.asset),
+      })),
+    })),
+  };
 }
 
 export function compileHelpKnowledgeDocument(
