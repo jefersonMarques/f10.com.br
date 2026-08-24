@@ -97,6 +97,7 @@ export type HelpKnowledgeResult = {
   answer: string;
   target: HelpKnowledgeTarget | null;
   searchEventId: string | null;
+  retrievalQuery: string;
   sources: Array<{
     contentId: string;
     slug: string;
@@ -371,8 +372,9 @@ async function answerArticleScope(
 ): Promise<HelpKnowledgeResult> {
   const row = await getPublicationBySlug(input.scope.slug);
   if (!row) throw new Error("HELP_ARTICLE_NOT_FOUND");
+  const retrievalQuery = retrievalQueryFor(input);
 
-  const fragments = selectFragments(buildFragments(input.question, row, 1));
+  const fragments = selectFragments(buildFragments(retrievalQuery, row, 1));
   if (fragments.length === 0) throw new Error("HELP_KNOWLEDGE_DOCUMENT_MISSING");
 
   const response = await runModel(input, fragments);
@@ -390,6 +392,7 @@ async function answerArticleScope(
       answer,
       target,
       searchEventId: null,
+      retrievalQuery,
       sources: [
         {
           contentId: row.entityId,
@@ -407,7 +410,7 @@ async function answerArticleScope(
   }
 
   const search = await searchPublishedHelp({
-    query: retrievalQueryFor(input),
+    query: retrievalQuery,
     source: input.source,
     actorUserId: input.actorUserId ?? null,
     customerContactId: input.customerContactId ?? null,
@@ -431,6 +434,7 @@ async function answerArticleScope(
         answer: `Esse assunto não faz parte deste conteúdo. Encontrei uma orientação específica em “${target.title}”.`,
         target,
         searchEventId: search.searchEventId,
+        retrievalQuery,
         sources,
         model: response.model,
         providerResponseId: response.responseId,
@@ -449,6 +453,7 @@ async function answerArticleScope(
     answer: NOT_FOUND_ANSWER,
     target: null,
     searchEventId: search.searchEventId,
+    retrievalQuery,
     sources,
     model: response.model,
     providerResponseId: response.responseId,
@@ -460,8 +465,9 @@ async function answerArticleScope(
 async function answerGlobalScope(
   input: AnswerHelpQuestionInput & { scope: Extract<HelpKnowledgeScope, { type: "global" }> },
 ): Promise<HelpKnowledgeResult> {
+  const retrievalQuery = retrievalQueryFor(input);
   const search = await searchPublishedHelp({
-    query: retrievalQueryFor(input),
+    query: retrievalQuery,
     source: input.source,
     actorUserId: input.actorUserId ?? null,
     customerContactId: input.customerContactId ?? null,
@@ -481,6 +487,7 @@ async function answerGlobalScope(
       answer: NOT_FOUND_ANSWER,
       target: null,
       searchEventId: search.searchEventId,
+      retrievalQuery,
       sources,
       model: null,
       providerResponseId: null,
@@ -503,6 +510,7 @@ async function answerGlobalScope(
         answer: `Encontrei a orientação “${target.title}”.`,
         target,
         searchEventId: search.searchEventId,
+        retrievalQuery,
         sources,
         model: null,
         providerResponseId: null,
@@ -517,7 +525,7 @@ async function answerGlobalScope(
   const fragments = selectFragments(
     search.results.flatMap((result) => {
       const row = rowById.get(result.contentId);
-      return row ? buildFragments(input.question, row, result.rank) : [];
+      return row ? buildFragments(retrievalQuery, row, result.rank) : [];
     }),
   );
 
@@ -540,6 +548,7 @@ async function answerGlobalScope(
       answer: NOT_FOUND_ANSWER,
       target: null,
       searchEventId: search.searchEventId,
+      retrievalQuery,
       sources,
       model: response.model,
       providerResponseId: response.responseId,
@@ -559,6 +568,7 @@ async function answerGlobalScope(
     answer,
     target,
     searchEventId: search.searchEventId,
+    retrievalQuery,
     sources,
     model: response.model,
     providerResponseId: response.responseId,
