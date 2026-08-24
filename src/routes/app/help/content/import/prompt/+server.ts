@@ -36,6 +36,7 @@ Além do JSON, extraia do próprio vídeo os screenshots das telas relevantes e 
 - Ícones visuais podem ter mudado entre a gravação e a versão atual do F10. Ao interpretar o vídeo, priorize sempre títulos, labels e textos visíveis; não transforme a aparência de um ícone em requisito do procedimento.
 - Não transforme inferência em fato.
 - O texto público do artigo é a principal fonte do assistente. Não duplique informação em campos adicionais.
+- Cada passo do artigo pode possuir **no máximo um screenshot**. Se uma segunda tela for realmente necessária para explicar a sequência, crie outro passo específico.
 
 ## Identidade e reimportação
 
@@ -64,10 +65,12 @@ Regras:
 - o JSON deve se chamar exatamente \`f10-help-import.json\` e ficar na raiz;
 - screenshots ficam em \`screenshots/<article-slug>/\`;
 - prefira PNG; JPG/JPEG e WebP também são aceitos;
-- use nomes determinísticos como \`step-NN-NN.ext\`;
+- use um screenshot por passo, com nome determinístico como \`step-NN-01.ext\`;
+- não gere \`step-NN-02\`, \`step-NN-03\` etc.; quando uma segunda tela for necessária, crie um novo passo;
 - não inclua o vídeo original, arquivos temporários ou screenshots não utilizados;
 - todo \`assetPath\` precisa existir exatamente no ZIP;
-- cada screenshot deve ser usado por um único bloco de imagem.
+- cada screenshot deve ser usado por um único bloco de imagem;
+- cada \`steps[]\` pode conter **no máximo um bloco \`image\`**.
 
 ## Contrato JSON
 
@@ -101,7 +104,7 @@ Use o vídeo para:
 - confirmar a sequência do procedimento;
 - identificar nomes claramente visíveis de telas, menus, campos e botões;
 - identificar mudanças de tela relevantes;
-- selecionar os melhores frames para screenshots.
+- selecionar o melhor frame de cada passo para screenshot.
 
 Quando houver diferença entre o ícone mostrado no vídeo e a interface atual sugerida por outros materiais, descreva a ação pelo título/label textual, nunca pelo formato do ícone.
 
@@ -115,6 +118,8 @@ Capture preferencialmente:
 - a tela em que o botão, menu, campo ou opção aparece;
 - a tela após uma ação quando confirma o resultado;
 - avisos ou estados importantes.
+
+**Escolha somente um desses frames por passo.** Se duas telas distintas forem indispensáveis, divida a explicação em dois passos, cada um com seu próprio screenshot.
 
 ### Enquadramento obrigatório: tela inteira
 
@@ -142,7 +147,7 @@ Portanto, nunca recorte a imagem para simular um destaque. Entregue a tela compl
 
 Não gere prints redundantes, borrados, em transição ou artificialmente anotados.
 
-Cada screenshot usado deve virar um bloco \`image\` com \`assetPath\`:
+Cada screenshot usado deve virar o único bloco \`image\` daquele passo, com \`assetPath\`:
 
 \`\`\`json
 {
@@ -227,6 +232,10 @@ Nunca crie bloco \`video\` em \`steps[].blocks\`.
 
 Divida o procedimento em ações compreensíveis isoladamente. Cada passo precisa de título específico e pelo menos um bloco público.
 
+Cada passo pode conter textos, avisos, links e arquivos conforme necessário, mas **no máximo um bloco \`image\`**.
+
+Quando a mudança de tela justificar outro screenshot, encerre o passo atual e crie o próximo passo. Isso mantém uma relação clara entre instrução e imagem.
+
 ### Numeração obrigatória das ações dentro de cada etapa
 
 Sempre que uma etapa contiver uma ou mais ações que o usuário precisa executar, escreva essas ações como uma **lista numerada explícita**.
@@ -286,6 +295,7 @@ Para screenshots extraídos do vídeo, use \`assetPath\`, nunca URL externa.
 - Toda ação executável deve ser apresentada de forma numerada quando houver procedimento sequencial.
 - Não concentre várias ações em um único parágrafo quando elas puderem ser separadas em passos numerados.
 - Screenshots complementam o texto e não o substituem.
+- Use no máximo um screenshot por passo; uma segunda tela relevante exige outro passo.
 - Todo screenshot deve preservar a tela completa do F10 e contexto suficiente para orientação; nunca recorte apenas o elemento da ação.
 - O screenshot original deve permanecer limpo; destaques visuais serão adicionados manualmente no editor do F10.
 - Use Markdown para destacar, não para decorar excessivamente.
