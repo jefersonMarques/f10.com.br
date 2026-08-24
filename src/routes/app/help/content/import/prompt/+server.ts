@@ -1,4 +1,5 @@
 import type { RequestHandler } from "./$types";
+import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 
@@ -6,6 +7,7 @@ function categoryCatalog(
   categories: Awaited<ReturnType<typeof listHelpCategories>>,
 ): string {
   return categories
+    .filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG)
     .map((category) => {
       const destination = category.destinationUrl
         ? ` | link padrão: ${category.destinationUrl}`
@@ -18,25 +20,58 @@ function categoryCatalog(
 function buildPrompt(
   categories: Awaited<ReturnType<typeof listHelpCategories>>,
 ): string {
-  return `# F10 Help Import — criação de artigo a partir de subtitles
+  const realCategories = categoryCatalog(categories);
+  return `# F10 Help Import — criação de artigo a partir de vídeo e subtitles
 
-Você receberá três materiais:
+Você receberá quatro materiais:
 
 1. este prompt;
 2. o arquivo \`f10-help-import-template.json\`;
-3. os subtitles de um vídeo do F10 (SRT, VTT ou texto equivalente).
+3. o vídeo do F10;
+4. os subtitles do vídeo do F10 (SRT, VTT ou texto equivalente).
 
-Seu trabalho é transformar o conteúdo sustentado pelos subtitles em documentação operacional clara e estruturada para a Base de Conhecimento F10.
+Seu trabalho é transformar o conteúdo sustentado pelo vídeo e pelos subtitles em documentação operacional clara e estruturada para a Base de Conhecimento F10.
+
+Além do JSON, extraia do próprio vídeo os screenshots das telas relevantes para o procedimento e organize toda a entrega em um único arquivo ZIP.
 
 ## Regra central
 
 Não invente telas, menus, botões, permissões, regras, resultados, links ou comportamentos que não estejam sustentados pelos materiais fornecidos.
 
-O texto público do artigo já será a principal fonte de conhecimento do assistente. Não repita o mesmo conteúdo em campos adicionais.
+Os subtitles são a principal fonte textual. A interface visível no vídeo também pode confirmar nomes de telas, menus, campos, botões, estados e sequências quando isso estiver claramente legível.
 
-## Contrato obrigatório
+Não transforme inferência em fato.
 
-Preencha exatamente o formato do arquivo JSON fornecido:
+O texto público do artigo será a principal fonte de conhecimento do assistente. Não repita a mesma informação em campos adicionais.
+
+## Entrega obrigatória em ZIP
+
+A saída final deve ser um único arquivo ZIP com esta estrutura:
+
+\`\`\`text
+f10-help-import.zip
+├── f10-help-import.json
+└── screenshots/
+    └── <article-slug>/
+        ├── step-01-01.png
+        ├── step-02-01.png
+        └── ...
+\`\`\`
+
+Regras:
+
+- o JSON final deve se chamar exatamente \`f10-help-import.json\` e ficar na raiz;
+- todos os screenshots devem ficar dentro de \`screenshots/<article-slug>/\`;
+- prefira PNG; JPG/JPEG e WebP também são aceitos;
+- use nomes determinísticos em minúsculas seguindo \`step-NN-NN.ext\`;
+- não inclua o vídeo original no ZIP;
+- não inclua arquivos temporários ou screenshots não utilizados;
+- todo \`assetPath\` do JSON deve existir exatamente dentro do ZIP;
+- cada screenshot deve ser referenciado por um único bloco de imagem.
+
+## Contrato JSON
+
+Preencha exatamente o formato do template:
 
 - \`format\`: \`f10-help-import\`;
 - \`version\`: \`1\`;
@@ -45,95 +80,113 @@ Preencha exatamente o formato do arquivo JSON fornecido:
 
 Não acrescente campos fora do contrato.
 
-O template contém valores marcados como \`REPLACE_*\` apenas para mostrar campos obrigatórios. Nenhum valor \`REPLACE_*\` pode permanecer na saída final. Se uma estrutura opcional não tiver informação real nos materiais, remova o objeto opcional inteiro em vez de inventar ou manter placeholders.
+Nenhum valor \`REPLACE_*\` pode permanecer na saída final. Se uma estrutura opcional não tiver informação real, remova-a em vez de inventar dados.
 
 ## Categorias
 
-Todo conteúdo precisa pertencer a pelo menos uma das categorias ativas abaixo. Use somente os slugs listados. Não crie categorias novas.
+Use categorias reais quando o assunto do artigo corresponder com segurança a uma ou mais categorias abaixo:
 
-${categoryCatalog(categories) || "Nenhuma categoria ativa disponível. Não gere o JSON até que o F10 tenha ao menos uma categoria ativa."}
+${realCategories || "Nenhuma categoria editorial real está cadastrada neste momento."}
 
-Em \`categories[].destinationUrl\`, deixe vazio por padrão. Só informe um link específico quando o material fornecido sustentar claramente que aquele artigo deve abrir outra área diferente do link padrão da categoria.
+Se não for possível escolher uma categoria real com segurança, use somente:
 
-## Como transformar os subtitles
+- \`${UNCATEGORIZED_HELP_CATEGORY_SLUG}\` — categoria técnica temporária para criação do rascunho.
 
-Os subtitles são a fonte factual principal do vídeo. Reescreva fala espontânea em documentação objetiva, preservando significado e ordem operacional.
+A categoria \`${UNCATEGORIZED_HELP_CATEGORY_SLUG}\` nunca é uma classificação final. O F10 permite importar o rascunho com ela, mas bloqueia a publicação até que um operador associe categorias reais e remova a categoria temporária.
 
-Exemplo:
+Não crie novos slugs de categoria.
 
-Fala: "agora entra ali em funcionários, clica no mais e coloca o nome"
+Em \`categories[].destinationUrl\`, deixe vazio por padrão. Só informe um link específico quando o material sustentar claramente que aquele artigo deve abrir uma área diferente do link padrão da categoria.
 
-Pode virar, se os próprios subtitles sustentarem esses nomes:
+## Como transformar o vídeo e os subtitles
 
-- Passo: "Abra o cadastro de funcionários";
-- Texto: "Acesse Funcionários.";
-- Passo seguinte: "Inicie um novo cadastro";
-- Texto: "Clique no botão de inclusão e informe o nome.".
+Reescreva fala espontânea em documentação objetiva, preservando significado e ordem operacional.
 
-Não transforme inferência em fato. Quando um detalhe não estiver claro, omita-o.
+Use o vídeo para:
+
+- confirmar a sequência visual do procedimento;
+- identificar nomes claramente visíveis de telas, menus, campos e botões;
+- identificar mudanças de tela relevantes;
+- selecionar os melhores frames para screenshots de cada passo.
+
+Quando um detalhe não estiver claro no vídeo nem nos subtitles, omita-o.
+
+## Screenshots obrigatórios do vídeo
+
+Ao receber o vídeo, percorra o procedimento e gere screenshots das telas que realmente ajudam o usuário a executar cada ação.
+
+Capture preferencialmente:
+
+- a tela inicial de uma etapa quando ela orienta onde o usuário está;
+- a tela em que o botão, menu, campo ou opção relevante aparece;
+- a tela após uma ação quando ela confirma que o usuário chegou ao local correto;
+- estados, avisos ou resultados importantes para o procedimento.
+
+Não:
+
+- gere um print para cada fala ou intervalo de tempo;
+- repita praticamente a mesma tela;
+- use frames borrados ou em transição quando houver frame melhor;
+- corte a interface de forma que o contexto necessário seja perdido;
+- desenhe setas, círculos, textos ou elementos que não existam no vídeo;
+- recrie artificialmente uma tela ausente do vídeo.
+
+Use a menor quantidade de screenshots que deixe o procedimento visualmente claro.
+
+Cada screenshot utilizado deve estar associado ao passo correto por um bloco \`image\` com \`assetPath\`:
+
+\`\`\`json
+{
+  "type": "image",
+  "assetPath": "screenshots/cadastrar-funcionario/step-02-01.png",
+  "altText": "Tela de cadastro de funcionário",
+  "assistantDescription": "O botão de inclusão aparece no canto superior direito da tela."
+}
+\`\`\`
+
+\`altText\` identifica objetivamente a tela. \`assistantDescription\` deve conter apenas informação visual relevante que não esteja suficientemente clara no texto público.
 
 ## Estrutura do conteúdo
 
 ### title
-Título claro, orientado à tarefa do usuário.
+Título claro e orientado à tarefa.
 
 ### slug
 Slug estável e legível. Não use IDs aleatórios.
 
 ### summary
-Resumo público curto do que o usuário conseguirá fazer.
+Resumo público curto do resultado do procedimento.
 
 ### categories
-Uma ou mais categorias válidas do catálogo acima.
+Uma ou mais categorias válidas. Use \`${UNCATEGORIZED_HELP_CATEGORY_SLUG}\` apenas quando não houver classificação real segura.
 
 ### searchAliases
-Termos e sinônimos que um usuário provavelmente pesquisaria para encontrar este conteúdo. Servem somente para retrieval.
-
-Exemplos seguros de variação linguística: "funcionário", "colaborador", "novo funcionário" quando todos representam a mesma tarefa documentada.
-
-Não use aliases para adicionar funcionalidades não mencionadas.
+Termos e sinônimos que usuários provavelmente pesquisariam. Servem somente para retrieval e não podem introduzir funcionalidades não documentadas.
 
 ### assistantKnowledge
-Use somente para informação segura para o cliente que ajuda a responder dúvidas, mas que deixaria o artigo visualmente carregado.
-
-Exemplos: pré-requisito, permissão, exceção ou nomenclatura antiga explicitamente mencionados no material.
-
-Se a informação já está no texto público, deixe este campo vazio.
+Use somente para informação segura para o cliente que ajuda a responder dúvidas, mas que deixaria o artigo visualmente carregado. Se já estiver no texto público, deixe vazio.
 
 ### internalSupportNotes
-Por padrão, deixe vazio. Só preencha quando o material fornecido identificar explicitamente uma informação como interna e inadequada para resposta ao cliente.
-
-Nunca coloque senhas, tokens, dados pessoais ou segredos.
+Por padrão, deixe vazio. Só preencha quando o material identificar explicitamente uma informação como interna e inadequada para resposta ao cliente. Nunca coloque segredos, senhas, tokens ou dados pessoais.
 
 ## Vídeo principal
 
 Quando o artigo estiver baseado no vídeo fornecido, preencha \`featuredVideo\`:
 
-- \`url\`: URL real do vídeo fornecida junto com os materiais;
+- \`url\`: URL real do vídeo;
 - \`description\`: descrição pública curta;
-- \`subtitles\`: preserve os subtitles fornecidos integralmente ou em forma textual equivalente sem perder conteúdo factual;
-- \`assistantSummary\`: resumo operacional curto do vídeo, sem inventar informação.
+- \`subtitles\`: subtitles integrais ou forma textual equivalente sem perda factual;
+- \`assistantSummary\`: resumo operacional curto e opcional.
 
-Se houver \`featuredVideo\`, \`url\` e \`subtitles\` são obrigatórios. Se a URL real do vídeo não foi fornecida, não invente uma URL: informe ao operador que falta esse dado em vez de gerar um JSON importável com endereço fictício.
+Se a URL real do vídeo não foi fornecida, não invente uma URL: informe ao operador que falta esse dado e não gere um pacote importável fictício.
 
 Nunca crie bloco \`video\` dentro de \`steps[].blocks\`.
 
-## Passos
+## Passos e blocos
 
-Divida o procedimento em ações compreensíveis isoladamente.
+Divida o procedimento em ações compreensíveis isoladamente. Cada passo precisa de título específico e pelo menos um bloco público.
 
-Cada passo precisa de:
-
-- \`title\` específico;
-- \`description\` pública opcional;
-- \`assistantKnowledge\` somente quando houver conhecimento adicional não repetido;
-- ao menos um bloco público.
-
-Evite títulos como "Continuar", "Próximo" ou "Passo seguinte".
-
-## Blocos
-
-Use somente:
+Use somente os blocos:
 
 - \`text\`;
 - \`notice\`;
@@ -141,45 +194,34 @@ Use somente:
 - \`image\`;
 - \`file\`.
 
-### text
-Use para instrução pública.
+Para screenshots extraídos do vídeo, use \`assetPath\`, nunca uma URL externa.
 
-### notice
-Use somente para informação, atenção, sucesso ou perigo realmente sustentados pelo material.
-
-### link
-Inclua o bloco somente quando uma URL real tiver sido fornecida nos materiais. Nunca mantenha URL de exemplo ou placeholder.
-
-### image
-Inclua o bloco somente quando houver URL HTTP/HTTPS real fornecida. \`altText\` identifica a imagem; \`assistantDescription\` explica informação visual relevante que não esteja no texto.
-
-### file
-Inclua o bloco somente quando houver URL HTTP/HTTPS real fornecida. \`extractedText\` deve conter apenas texto efetivamente extraído/fornecido. \`assistantSummary\` é opcional.
+Links e arquivos externos só podem ser incluídos quando uma URL HTTP/HTTPS real tiver sido fornecida nos materiais.
 
 ## Qualidade editorial
 
-- O artigo deve ser útil mesmo sem o vídeo.
-- O texto público é a fonte principal do assistente.
-- Não duplique conteúdo em \`assistantKnowledge\`.
-- Não escreva para "a IA"; escreva conhecimento factual.
+- O artigo deve continuar útil sem assistir ao vídeo.
+- Os screenshots complementam o texto e não o substituem.
 - Preserve nomenclaturas do F10 quando estiverem claras.
-- Mantenha passos na ordem do procedimento.
-- Não crie etapas que não existam nos subtitles.
+- Mantenha passos e screenshots na ordem do procedimento.
+- Não crie etapas que não existam no vídeo/subtitles.
 - Não marque conteúdo como publicado.
-- Não mantenha valores de exemplo, placeholders, domínios fictícios ou URLs não fornecidas.
+- Não mantenha placeholders, domínios fictícios ou URLs inventadas.
+- Antes de gerar o ZIP, confirme que todos os \`assetPath\` existem e que não há screenshots sobrando.
 
 ## Saída
 
-Entregue somente um arquivo JSON válido conforme \`f10-help-import-template.json\`, sem explicações fora do JSON.
+Entregue somente o arquivo ZIP final contendo:
+
+1. \`f10-help-import.json\`;
+2. a pasta \`screenshots/\` com todos e somente os prints utilizados pelo JSON.
+
+Não entregue explicações fora do ZIP.
 `;
 }
 
 export const GET: RequestHandler = async ({ cookies }) => {
-  await requireAppPermission(
-    cookies,
-    "help.view",
-    "/app/help/content/import",
-  );
+  await requireAppPermission(cookies, "help.view", "/app/help/content/import");
   const categories = await listHelpCategories(true);
   const prompt = buildPrompt(categories);
 
