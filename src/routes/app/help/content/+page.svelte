@@ -9,8 +9,10 @@
     FilePlus2,
     HardDrive,
     Layers3,
+    RotateCcw,
     Trash2,
     UploadCloud,
+    X,
   } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
@@ -25,10 +27,30 @@
     archived: "Arquivado",
   };
 
+  let deleteTarget: { id: string; title: string; hasPublicVersion: boolean } | null = null;
+  let deleteConfirmation = "";
+
   $: values = form && "values" in form ? form.values : null;
+  $: deleteConfirmationReady = deleteConfirmation.trim().toLocaleLowerCase("pt-BR").replace(/\s+/g, " ") === "quero excluir";
+
+  function openDeleteModal(content: { id: string; title: string; publishedSlug: string | null }): void {
+    deleteTarget = {
+      id: content.id,
+      title: content.title,
+      hasPublicVersion: Boolean(content.publishedSlug),
+    };
+    deleteConfirmation = "";
+  }
+
+  function closeDeleteModal(): void {
+    deleteTarget = null;
+    deleteConfirmation = "";
+  }
 </script>
 
 <svelte:head><title>Base de Conhecimento | F10 Operations</title></svelte:head>
+
+<svelte:window on:keydown={(event) => event.key === "Escape" && deleteTarget && closeDeleteModal()} />
 
 <ApplicationContent width="wide">
   <div class="mb-3 flex flex-wrap justify-end gap-2">
@@ -64,12 +86,14 @@
                 </a>
                 <div class="flex shrink-0 flex-wrap items-center gap-2">
                   <a href={`/app/help/content/${content.id}/preview`} class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#626979]"><Eye size={13}/>Preview</a>
-                  {#if content.publishedSlug}<a href={`/ajuda-f10/${content.publishedSlug}`} target="_blank" rel="noopener noreferrer" class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 font-semibold text-white">Ver artigo<ExternalLink size={12}/></a>{:else}<a href={`/app/help/content/${content.id}`} class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#777D8D]" aria-label="Editar"><ArrowRight size={14}/></a>{/if}
+                  {#if content.publishedSlug}<a href={`/ajuda-f10/${content.publishedSlug}`} target="_blank" rel="noopener noreferrer" class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 font-semibold text-white">Ver artigo<ExternalLink size={12}/></a>{:else if content.status !== "archived"}<a href={`/app/help/content/${content.id}`} class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#777D8D]" aria-label="Editar"><ArrowRight size={14}/></a>{/if}
 
-                  {#if data.canEdit && !content.publishedAt && content.status !== "archived"}
-                    <form method="POST" action="?/discard" on:submit={(event) => { if (!confirm("Descartar este conteúdo definitivamente?")) event.preventDefault(); }}><input type="hidden" name="contentId" value={content.id}/><button type="submit" class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#F0C8C8] bg-white px-3 font-semibold text-[#9B2C2C]"><Trash2 size={12}/>Descartar</button></form>
-                  {:else if data.canArchive && content.publishedAt && content.status !== "archived"}
-                    <form method="POST" action="?/archive" on:submit={(event) => { if (!confirm("Arquivar este conteúdo?")) event.preventDefault(); }}><input type="hidden" name="contentId" value={content.id}/><button type="submit" class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#626979]"><Archive size={12}/>Arquivar</button></form>
+                  {#if data.canEdit && content.status === "draft"}
+                    <button type="button" on:click={() => openDeleteModal(content)} class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#F0C8C8] bg-white px-3 font-semibold text-[#9B2C2C]"><Trash2 size={12}/>Excluir</button>
+                  {:else if data.canEdit && content.status === "archived"}
+                    <form method="POST" action="?/restore"><input type="hidden" name="contentId" value={content.id}/><button type="submit" class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#D8DDF4] bg-white px-3 font-semibold text-[#000A57]"><RotateCcw size={12}/>Restaurar</button></form>
+                  {:else if data.canArchive && content.status === "published"}
+                    <form method="POST" action="?/archive" on:submit={(event) => { if (!confirm("Arquivar este conteúdo? Ele sairá da Central e da IA pública.")) event.preventDefault(); }}><input type="hidden" name="contentId" value={content.id}/><button type="submit" class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#626979]"><Archive size={12}/>Arquivar</button></form>
                   {/if}
                 </div>
               </div>
@@ -94,3 +118,28 @@
     {/if}
   </div>
 </ApplicationContent>
+
+{#if deleteTarget}
+  <div class="fixed inset-0 z-[120] flex items-center justify-center bg-[#050A1A]/55 px-4" role="presentation" on:click={(event) => event.currentTarget === event.target && closeDeleteModal()}>
+    <section role="dialog" aria-modal="true" aria-labelledby="delete-help-content-title" class="w-full max-w-[520px] rounded-[24px] border border-[#F0C8C8] bg-white p-5 shadow-2xl sm:p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div><h2 id="delete-help-content-title" class="text-[17px] font-semibold text-[#7F2525]">Excluir rascunho definitivamente</h2><p class="mt-1 text-[11px] leading-5 text-[#777D8D]">{deleteTarget.title}</p></div>
+        <button type="button" on:click={closeDeleteModal} class="flex h-9 w-9 items-center justify-center rounded-lg text-[#777D8D] hover:bg-[#F3F4F7]" aria-label="Fechar"><X size={16}/></button>
+      </div>
+
+      <div class="mt-4 rounded-2xl border border-[#F2DADA] bg-[#FFF7F7] px-4 py-3 text-[10px] leading-5 text-[#7D4A4A]">
+        Esta ação remove o conteúdo, versões editoriais, publicação e índice de pesquisa relacionados. Não pode ser desfeita.
+        {#if deleteTarget.hasPublicVersion}<strong class="mt-2 block text-[#8C2F2F]">Este rascunho ainda possui uma versão pública anterior. Ela também será retirada imediatamente.</strong>{/if}
+      </div>
+
+      <form method="POST" action="?/discard" class="mt-5 space-y-4">
+        <input type="hidden" name="contentId" value={deleteTarget.id}/>
+        <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Digite <strong>quero excluir</strong> para confirmar</span><input name="confirmation" bind:value={deleteConfirmation} autocomplete="off" autofocus class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#9B2C2C]" /></label>
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" on:click={closeDeleteModal} class="min-h-10 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#626979]">Cancelar</button>
+          <button type="submit" disabled={!deleteConfirmationReady} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#9B2C2C] px-4 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Trash2 size={14}/>Excluir definitivamente</button>
+        </div>
+      </form>
+    </section>
+  </div>
+{/if}
