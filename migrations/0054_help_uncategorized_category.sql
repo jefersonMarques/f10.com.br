@@ -30,7 +30,10 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
   IF OLD.slug <> 'uncategorized' THEN
-    RETURN COALESCE(NEW, OLD);
+    IF TG_OP = 'DELETE' THEN
+      RETURN OLD;
+    END IF;
+    RETURN NEW;
   END IF;
 
   IF TG_OP = 'DELETE' THEN
