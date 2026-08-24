@@ -83,10 +83,13 @@ export const actions: Actions = {
         active: formData.get("active") === "on",
       });
       return { success: true, message: "Categoria atualizada." };
-    } catch {
+    } catch (cause) {
+      const causeMessage = cause instanceof Error ? cause.message : "";
       return fail(409, {
         success: false,
-        message: "Não foi possível atualizar a categoria. Verifique se o endereço já está em uso.",
+        message: causeMessage.includes("HELP_CATEGORY_PUBLISHED_CONTENT")
+          ? "Esta categoria está sendo usada por conteúdo publicado. Ajuste ou arquive esses artigos antes de desativá-la."
+          : "Não foi possível atualizar a categoria. Verifique se o endereço já está em uso.",
       });
     }
   },
