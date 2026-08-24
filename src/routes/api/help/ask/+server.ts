@@ -119,6 +119,7 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
       scope: scope.type,
       searchEventId: result.searchEventId,
       question,
+      retrievalQuery: result.retrievalQuery,
       contextSlug: scope.type === "article" ? scope.slug : "",
       resolution: result.resolution,
       target: result.target
