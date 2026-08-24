@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
+import { readHelpImageAnnotationsFromMetadata } from "$lib/help/helpImageAnnotations";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
@@ -27,10 +28,26 @@ export async function publishHelpKnowledgeContent(
 
   validateHelpKnowledgePublication(content);
 
+  const annotationsByBlockId = new Map(
+    content.steps.flatMap((step) =>
+      step.blocks.map((block) => [
+        block.id,
+        readHelpImageAnnotationsFromMetadata(block.metadata),
+      ] as const),
+    ),
+  );
   const publishedAt = new Date();
+  const compiledPublicSnapshot = compileHelpPublicSnapshot(content);
   const publicSnapshot = {
-    ...compileHelpPublicSnapshot(content),
+    ...compiledPublicSnapshot,
     quickGuide: content.quickGuide,
+    steps: compiledPublicSnapshot.steps.map((step) => ({
+      ...step,
+      blocks: step.blocks.map((block) => ({
+        ...block,
+        annotations: annotationsByBlockId.get(block.id) ?? [],
+      })),
+    })),
   };
   const knowledge = compileHelpKnowledgeDocument(content);
   if (content.quickGuide.trim()) {
@@ -79,12 +96,20 @@ export async function publishHelpKnowledgeContent(
       });
   });
 
+  const compiledVersionSnapshot = compileHelpVersionSnapshot(content, publishedAt);
   await saveHelpContentVersion(
     "content",
     contentId,
     {
-      ...compileHelpVersionSnapshot(content, publishedAt),
+      ...compiledVersionSnapshot,
       quickGuide: content.quickGuide,
+      steps: compiledVersionSnapshot.steps.map((step) => ({
+        ...step,
+        blocks: step.blocks.map((block) => ({
+          ...block,
+          annotations: annotationsByBlockId.get(block.id) ?? [],
+        })),
+      })),
     },
     actorUserId,
   );
@@ -99,6 +124,10 @@ export async function publishHelpKnowledgeContent(
       categoryCount: content.categories.length,
       hasFeaturedVideo: Boolean(content.featuredVideo),
       hasQuickGuide: Boolean(content.quickGuide.trim()),
+      imageAnnotationCount: Array.from(annotationsByBlockId.values()).reduce(
+        (total, annotations) => total + annotations.length,
+        0,
+      ),
       knowledgeVersion: snapshot.knowledge.version,
       knowledgeFragmentCount: snapshot.knowledge.fragments.length,
     },
