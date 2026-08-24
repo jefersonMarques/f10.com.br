@@ -7,7 +7,12 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-export const GET: RequestHandler = async ({ params, cookies }) => {
+function supportsInlinePreview(assetType: string, mimeType: string | null): boolean {
+  if (assetType === "image" || assetType === "video") return true;
+  return ["application/pdf", "text/plain", "text/csv", "text/vtt"].includes(mimeType ?? "");
+}
+
+export const GET: RequestHandler = async ({ params, cookies, url }) => {
   const assetId = params.assetId ?? "";
   if (!isUuid(assetId)) return json({ error: "NOT_FOUND" }, { status: 404 });
 
@@ -20,7 +25,12 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
   try {
     const { asset, response } = await readManagedHelpAsset(assetId);
     const bytes = await response.arrayBuffer();
-    const disposition = asset.assetType === "image" || asset.assetType === "video" || asset.mimeType === "text/vtt" ? "inline" : "attachment";
+    const previewRequested = url.searchParams.get("preview") === "1";
+    const disposition = previewRequested && supportsInlinePreview(asset.assetType, asset.mimeType)
+      ? "inline"
+      : asset.assetType === "image" || asset.assetType === "video" || asset.mimeType === "text/vtt"
+        ? "inline"
+        : "attachment";
     const safeName = (asset.originalName ?? "arquivo").replace(/[\r\n"\\]/g, "_");
     return new Response(bytes, {
       headers: {
