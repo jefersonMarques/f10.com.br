@@ -3,6 +3,7 @@ import type { Actions, PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
+import { stabilizeHelpImportIdentity } from "$lib/server/help/helpImportIdentity";
 import {
   MAX_HELP_IMPORT_PACKAGE_BYTES,
   parseHelpImportPackage,
@@ -203,7 +204,8 @@ export const actions: Actions = {
 
     const assetCount = countJsonAssets(validation.parsed);
     try {
-      const result = await importStructuredHelpFile(session.user.id, validation.parsed, packageFile.assets);
+      const stabilizedFile = await stabilizeHelpImportIdentity(validation.parsed);
+      const result = await importStructuredHelpFile(session.user.id, stabilizedFile, packageFile.assets);
       const overwriteMessage = result.overwrittenCount > 0
         ? ` ${result.overwrittenCount} conteúdo(s) anterior(es) foram substituídos mantendo o mesmo ID.`
         : "";
