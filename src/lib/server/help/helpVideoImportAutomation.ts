@@ -42,6 +42,25 @@ export type HelpVideoAutomationRuntimeStatus = {
   ytDlpPath: string;
 };
 
+export type HelpVideoAutomationProgressStage =
+  | "runtime"
+  | "source"
+  | "extract"
+  | "transcribe"
+  | "analyze"
+  | "package";
+
+export type HelpVideoAutomationProgress = {
+  stage: HelpVideoAutomationProgressStage;
+  status: "active" | "done";
+  label: string;
+  detail?: string;
+};
+
+export type HelpVideoAutomationProgressHandler = (
+  progress: HelpVideoAutomationProgress,
+) => void | Promise<void>;
+
 type GeneratedScreenshot = {
   frameIndex: number;
   altText: string;
@@ -74,6 +93,13 @@ export type HelpVideoAutomationResult = {
   selectedScreenshotCount: number;
   sourceType: HelpVideoAutomationSource["type"];
 };
+
+async function reportProgress(
+  handler: HelpVideoAutomationProgressHandler | undefined,
+  progress: HelpVideoAutomationProgress,
+): Promise<void> {
+  if (handler) await handler(progress);
+}
 
 function ffmpegPath(): string {
   return env.HELP_VIDEO_FFMPEG_PATH?.trim() || "ffmpeg";
@@ -417,12 +443,17 @@ async function generateArticle(
         "Crie um único artigo operacional da Base de Conhecimento F10 a partir da transcrição e dos frames cronológicos.",
         "Não invente telas, ações, regras ou URLs.",
         "Use Markdown seguro nos textos: **negrito**, *itálico*, `código`, listas e emojis.",
-        "quickGuide deve ser curto, sequencial e útil sem abrir o passo a passo completo.",
+        "Em cada step.instruction, toda ação executável deve ficar em sua própria linha numerada usando **1.**, **2.**, **3.** e assim por diante.",
+        "Não junte duas ou mais ações executáveis em um parágrafo corrido. Mantenha uma ação principal por número.",
+        "Informações complementares, contexto e observações devem ficar depois da lista numerada, em parágrafo separado e sem número.",
+        "Use negrito para caminhos, menus, botões e campos relevantes dentro das ações numeradas.",
+        "quickGuide também deve ser curto, sequencial, numerado e útil sem abrir o passo a passo completo.",
         "Escolha somente frames que realmente ajudam a executar ou confirmar uma ação.",
         "Os frames representam a tela inteira do F10; nunca peça ou proponha recortes. frameIndex começa em 1.",
         `Categorias permitidas: ${categories.map((category) => `${category.slug} (${category.name})`).join(", ") || UNCATEGORIZED_HELP_CATEGORY_SLUG}.`,
         `Se nenhuma categoria real for segura, use somente ${UNCATEGORIZED_HELP_CATEGORY_SLUG}.`,
         "A descrição adicional de screenshot deve conter apenas informação visual útil que não esteja clara no texto.",
+        "Exemplo de instruction correta: **1.** Abra **Cadastros > Funcionários**.\n**2.** Clique no botão de inclusão para criar um novo cadastro.\n\nNessa mesma área também ficam as ações de edição, exclusão e filtro.",
         "TRANSCRIÇÃO:",
         transcript,
       ].join("\n\n"),
@@ -593,19 +624,36 @@ export async function generateHelpImportFromVideo(input: {
   source: HelpVideoAutomationSource;
   categories: HelpVideoAutomationCategory[];
   externalIdHint?: string;
+  onProgress?: HelpVideoAutomationProgressHandler;
 }): Promise<HelpVideoAutomationResult> {
+  await reportProgress(input.onProgress, {
+    stage: "runtime",
+    status: "active",
+    label: "Validando OpenAI e ferramentas do servidor",
+  });
   const runtime = await getHelpVideoAutomationRuntimeStatus();
   if (!runtime.openAi) throw new Error("OPENAI_NOT_CONFIGURED");
   if (!runtime.ffmpeg) throw new Error("HELP_VIDEO_FFMPEG_NOT_AVAILABLE");
   if (input.source.type === "youtube" && !runtime.youtube) {
     throw new Error("HELP_VIDEO_YTDLP_NOT_AVAILABLE");
   }
+  await reportProgress(input.onProgress, {
+    stage: "runtime",
+    status: "done",
+    label: "Ambiente de processamento validado",
+  });
 
   const directory = await mkdtemp(join(tmpdir(), "f10-help-video-"));
   try {
     let videoPath: string;
     let derivedExternalId: string;
     let featuredVideoUrl: string | undefined;
+
+    await reportProgress(input.onProgress, {
+      stage: "source",
+      status: "active",
+      label: input.source.type === "youtube" ? "Baixando vídeo do YouTube" : "Preparando arquivo MP4 enviado",
+    });
 
     if (input.source.type === "youtube") {
       const id = youtubeVideoId(input.source.url);
@@ -631,14 +679,62 @@ export async function generateHelpImportFromVideo(input: {
         : undefined;
     }
 
+    await reportProgress(input.onProgress, {
+      stage: "source",
+      status: "done",
+      label: input.source.type === "youtube" ? "Vídeo do YouTube baixado" : "Arquivo MP4 recebido e preparado",
+    });
+
     const externalId = normalizeExternalId(input.externalIdHint ?? "") || derivedExternalId;
+
+    await reportProgress(input.onProgress, {
+      stage: "extract",
+      status: "active",
+      label: "Extraindo áudio e telas do vídeo",
+    });
     const [audioPath, framePaths] = await Promise.all([
       extractAudio(videoPath, directory),
       extractFrames(videoPath, directory),
     ]);
+    await reportProgress(input.onProgress, {
+      stage: "extract",
+      status: "done",
+      label: "Áudio e telas extraídos",
+      detail: `${framePaths.length} frames selecionados para análise`,
+    });
+
+    await reportProgress(input.onProgress, {
+      stage: "transcribe",
+      status: "active",
+      label: "Transcrevendo o áudio com OpenAI",
+    });
     const transcript = await transcribeAudio(audioPath);
+    await reportProgress(input.onProgress, {
+      stage: "transcribe",
+      status: "done",
+      label: "Transcrição concluída",
+      detail: `${transcript.length} caracteres`,
+    });
+
+    await reportProgress(input.onProgress, {
+      stage: "analyze",
+      status: "active",
+      label: "Analisando telas e estruturando o procedimento",
+    });
     const article = await generateArticle(transcript, framePaths, input.categories);
-    return await buildImportResult({
+    await reportProgress(input.onProgress, {
+      stage: "analyze",
+      status: "done",
+      label: "Artigo estruturado pela IA",
+      detail: `${article.steps.length} etapa(s) identificada(s)`,
+    });
+
+    await reportProgress(input.onProgress, {
+      stage: "package",
+      status: "active",
+      label: "Organizando screenshots e conteúdo do rascunho",
+    });
+    const result = await buildImportResult({
       article,
       transcript,
       framePaths,
@@ -647,6 +743,13 @@ export async function generateHelpImportFromVideo(input: {
       featuredVideoUrl,
       sourceType: input.source.type,
     });
+    await reportProgress(input.onProgress, {
+      stage: "package",
+      status: "done",
+      label: "Conteúdo e screenshots organizados",
+      detail: `${result.selectedScreenshotCount} screenshot(s) selecionado(s)`,
+    });
+    return result;
   } finally {
     await rm(directory, { recursive: true, force: true }).catch(() => undefined);
   }
