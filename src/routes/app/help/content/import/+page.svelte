@@ -11,6 +11,7 @@
   import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
+  import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -37,13 +38,13 @@
   </div>
 
   <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
-    <div class="flex items-start gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Video size={20}/></span><div><h1 class="text-[18px] font-semibold text-[#11182C]">Criar conteúdo a partir do vídeo</h1><p class="mt-1 max-w-[760px] text-[11px] leading-5 text-[#858A98]">Envie à IA o prompt, o template, o vídeo, os subtitles e a URL real do vídeo. A IA estrutura o artigo, captura as telas relevantes e devolve um único ZIP pronto para importação.</p></div></div>
+    <div class="flex items-start gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Video size={20}/></span><div><h1 class="text-[18px] font-semibold text-[#11182C]">Criar conteúdo a partir do vídeo</h1><p class="mt-1 max-w-[760px] text-[11px] leading-5 text-[#858A98]">Envie à IA o prompt, o template, o vídeo, os subtitles e a URL real. A IA cria o resumo rápido, estrutura os passos com destaque em Markdown, captura as telas relevantes e devolve um ZIP pronto para importação.</p></div></div>
 
     <ol class="mt-5 grid gap-3 md:grid-cols-4">
       <li class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4"><strong class="text-[11px] text-[#000A57]">1. Baixe</strong><p class="mt-2 text-[10px] leading-5 text-[#777D8D]">Prompt dinâmico e template JSON.</p></li>
       <li class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4"><strong class="text-[11px] text-[#000A57]">2. Envie à IA</strong><p class="mt-2 text-[10px] leading-5 text-[#777D8D]">Prompt + template + vídeo + subtitles + URL real.</p></li>
-      <li class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4"><strong class="text-[11px] text-[#000A57]">3. Receba</strong><p class="mt-2 text-[10px] leading-5 text-[#777D8D]">Um ZIP com f10-help-import.json e screenshots organizados por artigo.</p></li>
-      <li class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4"><strong class="text-[11px] text-[#000A57]">4. Importe</strong><p class="mt-2 text-[10px] leading-5 text-[#777D8D]">O F10 valida o pacote, salva os prints e cria rascunhos para revisão.</p></li>
+      <li class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4"><strong class="text-[11px] text-[#000A57]">3. Receba</strong><p class="mt-2 text-[10px] leading-5 text-[#777D8D]">ZIP com JSON, resumo rápido e screenshots organizados.</p></li>
+      <li class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4"><strong class="text-[11px] text-[#000A57]">4. Importe</strong><p class="mt-2 text-[10px] leading-5 text-[#777D8D]">Conteúdo novo é criado; a mesma origem + ID externo substitui o rascunho anterior.</p></li>
     </ol>
   </section>
 
@@ -52,9 +53,14 @@
     {#if realCategories.length === 0}
       <p class="mt-4 rounded-xl border border-[#F1D7BD] bg-white px-3 py-2 text-[10px] text-[#7A3B08]">Ainda não há categoria editorial real. Os rascunhos podem ser importados como <strong>uncategorized</strong>, mas não poderão ser publicados até receberem uma categoria real.</p>
     {:else}
-      <div class="mt-4 flex flex-wrap gap-2">{#each realCategories as category}<span class="rounded-full border border-[#D8DDF4] bg-white px-3 py-1.5 text-[10px] font-semibold text-[#454C60]">{category.icon ? `${category.icon} ` : ""}{category.name} · {category.slug}</span>{/each}</div>
+      <div class="mt-4 flex flex-wrap gap-2">{#each realCategories as category}<span class="inline-flex items-center gap-1.5 rounded-full border border-[#D8DDF4] bg-white px-3 py-1.5 text-[10px] font-semibold text-[#454C60]"><HelpCategoryIcon name={category.icon} size={12}/>{category.name} · {category.slug}</span>{/each}</div>
     {/if}
     <div class="mt-3 rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-3 py-2 text-[10px] leading-5 text-[#7A3B08]"><strong>uncategorized · Sem categoria</strong> é técnica e temporária. A publicação exige remover essa associação e escolher uma ou mais categorias reais.</div>
+  </section>
+
+  <section class="mt-4 rounded-[20px] border border-[#DCE0EA] bg-white p-5">
+    <h2 class="text-[13px] font-semibold text-[#303645]">Reimportação segura</h2>
+    <p class="mt-2 text-[10px] leading-5 text-[#777D8D]">O par <strong>source + externalId</strong> identifica o mesmo conteúdo. Uma nova versão com essa mesma identidade substitui o rascunho anterior mantendo o mesmo ID. Se já existir uma publicação, ela continua atendendo clientes até você revisar e publicar novamente.</p>
   </section>
 
   {#if form?.message}<div class={`mt-4 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[11px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{#if form.success}<CheckCircle2 size={18}/>{:else}<CircleAlert size={18}/>{/if}<span>{form.message}</span></div>{/if}
@@ -74,7 +80,7 @@
   {/if}
 
   {#if form && "imported" in form && form.imported && form.imported.length > 0}
-    <section class="mt-4 overflow-hidden rounded-[20px] border border-[#DCEDE2] bg-white"><header class="border-b px-5 py-4"><h2 class="text-[13px] font-semibold text-[#225C37]">Conteúdos importados</h2></header><div class="divide-y">{#each form.imported as item}<a href={`/app/help/content/${item.id}`} class="flex items-center justify-between px-5 py-3 text-[11px] hover:bg-[#FAFAFC]"><div class="min-w-0"><strong class="block truncate">{item.title}</strong><span class="application-text-meta text-[#999EAA]">ID externo: {item.externalId}</span></div><span class="font-semibold text-[#000A57]">Revisar</span></a>{/each}</div></section>
+    <section class="mt-4 overflow-hidden rounded-[20px] border border-[#DCEDE2] bg-white"><header class="border-b px-5 py-4"><h2 class="text-[13px] font-semibold text-[#225C37]">Conteúdos importados</h2></header><div class="divide-y">{#each form.imported as item}<a href={`/app/help/content/${item.id}`} class="flex items-center justify-between px-5 py-3 text-[11px] hover:bg-[#FAFAFC]"><div class="min-w-0"><div class="flex items-center gap-2"><strong class="block truncate">{item.title}</strong>{#if item.overwritten}<span class="rounded-full bg-[#FFF0E4] px-2 py-0.5 text-[8px] font-bold text-[#A9510D]">ATUALIZADO</span>{/if}</div><span class="application-text-meta text-[#999EAA]">ID externo: {item.externalId}</span></div><span class="font-semibold text-[#000A57]">Revisar</span></a>{/each}</div></section>
   {/if}
 
   {#if data.canImport}
