@@ -33,6 +33,13 @@ export async function publishHelpKnowledgeContent(
   if (content.categories.some((category) => category.slug === UNCATEGORIZED_HELP_CATEGORY_SLUG)) {
     throw new Error("CONTENT_REAL_CATEGORY_REQUIRED");
   }
+  if (
+    content.steps.some(
+      (step) => step.blocks.filter((block) => block.blockType === "image").length > 1,
+    )
+  ) {
+    throw new Error("STEP_IMAGE_LIMIT_EXCEEDED");
+  }
 
   validateHelpKnowledgePublication(content);
 
