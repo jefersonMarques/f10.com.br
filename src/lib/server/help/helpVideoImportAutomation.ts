@@ -1,0 +1,581 @@
+import { createHash } from "node:crypto";
+import { spawn } from "node:child_process";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { env } from "$env/dynamic/private";
+import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
+import { getOpenAiModel, isOpenAiConfigured } from "$lib/server/ai/openAiResponses";
+import type { HelpImportPackageAsset } from "$lib/server/help/helpImportPackage";
+import type { HelpImportFile } from "$lib/server/help/structuredHelpImport";
+
+const OPENAI_TRANSCRIPTIONS_URL = "https://api.openai.com/v1/audio/transcriptions";
+const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
+const TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe";
+const MAX_UPLOAD_VIDEO_BYTES = 100 * 1024 * 1024;
+const MAX_FRAMES = 48;
+const COMMAND_TIMEOUT_MS = 8 * 60 * 1_000;
+const OPENAI_AUTOMATION_TIMEOUT_MS = 3 * 60 * 1_000;
+
+export type HelpVideoAutomationSource =
+  | { type: "youtube"; url: string }
+  | { type: "upload"; fileName: string; mimeType: string; bytes: Uint8Array; publishedVideoUrl?: string };
+
+export type HelpVideoAutomationCategory = {
+  slug: string;
+  name: string;
+  description: string;
+};
+
+export type HelpVideoAutomationRuntimeStatus = {
+  openAi: boolean;
+  ffmpeg: boolean;
+  youtube: boolean;
+  ffmpegPath: string;
+  ytDlpPath: string;
+};
+
+type GeneratedScreenshot = {
+  frameIndex: number;
+  altText: string;
+  assistantDescription: string;
+};
+
+type GeneratedStep = {
+  title: string;
+  description: string;
+  instruction: string;
+  screenshots: GeneratedScreenshot[];
+};
+
+type GeneratedArticle = {
+  title: string;
+  slug: string;
+  summary: string;
+  quickGuide: string;
+  categories: string[];
+  searchAliases: string[];
+  assistantKnowledge: string;
+  steps: GeneratedStep[];
+};
+
+export type HelpVideoAutomationResult = {
+  file: HelpImportFile;
+  assets: Map<string, HelpImportPackageAsset>;
+  transcriptChars: number;
+  analyzedFrameCount: number;
+  selectedScreenshotCount: number;
+  sourceType: HelpVideoAutomationSource["type"];
+};
+
+function ffmpegPath(): string {
+  return env.HELP_VIDEO_FFMPEG_PATH?.trim() || "ffmpeg";
+}
+
+function ytDlpPath(): string {
+  return env.HELP_VIDEO_YTDLP_PATH?.trim() || "yt-dlp";
+}
+
+function normalizeSlug(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120);
+}
+
+function normalizeExternalId(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._:-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 200);
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function youtubeVideoId(value: string): string | null {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    if (hostname === "youtu.be") {
+      const id = url.pathname.split("/").filter(Boolean)[0] ?? "";
+      return /^[A-Za-z0-9_-]{6,20}$/.test(id) ? id : null;
+    }
+    if (!["youtube.com", "www.youtube.com", "m.youtube.com"].includes(hostname)) return null;
+    let id = url.searchParams.get("v") ?? "";
+    if (!id && (url.pathname.startsWith("/shorts/") || url.pathname.startsWith("/embed/"))) {
+      id = url.pathname.split("/")[2] ?? "";
+    }
+    return /^[A-Za-z0-9_-]{6,20}$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+function commandAvailable(command: string, args: string[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, { stdio: "ignore", windowsHide: true });
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      resolve(false);
+    }, 4_000);
+    child.once("error", () => {
+      clearTimeout(timer);
+      resolve(false);
+    });
+    child.once("exit", (code) => {
+      clearTimeout(timer);
+      resolve(code === 0);
+    });
+  });
+}
+
+export async function getHelpVideoAutomationRuntimeStatus(): Promise<HelpVideoAutomationRuntimeStatus> {
+  const ffmpeg = await commandAvailable(ffmpegPath(), ["-version"]);
+  const youtube = await commandAvailable(ytDlpPath(), ["--version"]);
+  return {
+    openAi: isOpenAiConfigured(),
+    ffmpeg,
+    youtube,
+    ffmpegPath: ffmpegPath(),
+    ytDlpPath: ytDlpPath(),
+  };
+}
+
+async function runCommand(command: string, args: string[], timeoutMs = COMMAND_TIMEOUT_MS): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args, {
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error("HELP_VIDEO_COMMAND_TIMEOUT"));
+    }, timeoutMs);
+    child.stderr.on("data", (chunk) => {
+      if (stderr.length < 32_000) stderr += String(chunk);
+    });
+    child.once("error", (cause) => {
+      clearTimeout(timer);
+      reject(cause);
+    });
+    child.once("exit", (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve();
+      else reject(new Error(`HELP_VIDEO_COMMAND_FAILED:${command}:${code ?? "unknown"}:${stderr.slice(-2_000)}`));
+    });
+  });
+}
+
+async function downloadYoutubeVideo(url: string, directory: string): Promise<string> {
+  if (!youtubeVideoId(url)) throw new Error("HELP_VIDEO_YOUTUBE_URL_INVALID");
+  await runCommand(ytDlpPath(), [
+    "--no-playlist",
+    "--no-progress",
+    "--restrict-filenames",
+    "--merge-output-format",
+    "mp4",
+    "-f",
+    "bv*+ba/b",
+    "-o",
+    join(directory, "source.%(ext)s"),
+    url,
+  ]);
+  const files = await readdir(directory);
+  const downloaded = files.find((file) => /^source\.(mp4|webm|mkv|mov)$/i.test(file));
+  if (!downloaded) throw new Error("HELP_VIDEO_YOUTUBE_DOWNLOAD_NOT_FOUND");
+  return join(directory, downloaded);
+}
+
+async function extractAudio(videoPath: string, directory: string): Promise<string> {
+  const audioPath = join(directory, "audio.mp3");
+  await runCommand(ffmpegPath(), [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-y",
+    "-i",
+    videoPath,
+    "-vn",
+    "-ac",
+    "1",
+    "-ar",
+    "16000",
+    "-b:a",
+    "64k",
+    audioPath,
+  ]);
+  return audioPath;
+}
+
+async function extractFrames(videoPath: string, directory: string): Promise<string[]> {
+  const outputPattern = join(directory, "frame-%04d.jpg");
+  await runCommand(ffmpegPath(), [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-y",
+    "-i",
+    videoPath,
+    "-vf",
+    "fps=1/4,scale='min(1280,iw)':-2,mpdecimate",
+    "-frames:v",
+    String(MAX_FRAMES),
+    "-q:v",
+    "3",
+    outputPattern,
+  ]);
+  const files = (await readdir(directory))
+    .filter((file) => /^frame-\d{4}\.jpg$/i.test(file))
+    .sort()
+    .slice(0, MAX_FRAMES)
+    .map((file) => join(directory, file));
+  if (files.length === 0) throw new Error("HELP_VIDEO_FRAMES_NOT_FOUND");
+  return files;
+}
+
+async function transcribeAudio(audioPath: string): Promise<string> {
+  const apiKey = env.OPENAI_API_KEY?.trim();
+  if (!apiKey) throw new Error("OPENAI_NOT_CONFIGURED");
+  const bytes = await readFile(audioPath);
+  const form = new FormData();
+  form.set("model", TRANSCRIPTION_MODEL);
+  form.set("language", "pt");
+  form.set("response_format", "json");
+  form.set("file", new Blob([bytes], { type: "audio/mpeg" }), "audio.mp3");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OPENAI_AUTOMATION_TIMEOUT_MS);
+  try {
+    const response = await fetch(OPENAI_TRANSCRIPTIONS_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+      signal: controller.signal,
+    });
+    const payload = await response.json().catch(() => ({})) as { text?: string; error?: { message?: string } };
+    if (!response.ok) throw new Error(`HELP_VIDEO_TRANSCRIPTION_FAILED:${payload.error?.message ?? response.status}`);
+    const text = payload.text?.trim() ?? "";
+    if (!text) throw new Error("HELP_VIDEO_TRANSCRIPTION_EMPTY");
+    return text.slice(0, 180_000);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function articleSchema(): Record<string, unknown> {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["title", "slug", "summary", "quickGuide", "categories", "searchAliases", "assistantKnowledge", "steps"],
+    properties: {
+      title: { type: "string", minLength: 4, maxLength: 160 },
+      slug: { type: "string", minLength: 1, maxLength: 120 },
+      summary: { type: "string", maxLength: 320 },
+      quickGuide: { type: "string", minLength: 1, maxLength: 12000 },
+      categories: { type: "array", maxItems: 12, items: { type: "string", maxLength: 120 } },
+      searchAliases: { type: "array", maxItems: 40, items: { type: "string", maxLength: 160 } },
+      assistantKnowledge: { type: "string", maxLength: 20000 },
+      steps: {
+        type: "array",
+        minItems: 1,
+        maxItems: 40,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["title", "description", "instruction", "screenshots"],
+          properties: {
+            title: { type: "string", minLength: 1, maxLength: 180 },
+            description: { type: "string", maxLength: 2000 },
+            instruction: { type: "string", minLength: 1, maxLength: 50000 },
+            screenshots: {
+              type: "array",
+              maxItems: 3,
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["frameIndex", "altText", "assistantDescription"],
+                properties: {
+                  frameIndex: { type: "integer", minimum: 1, maximum: MAX_FRAMES },
+                  altText: { type: "string", maxLength: 500 },
+                  assistantDescription: { type: "string", maxLength: 20000 },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+function extractOpenAiOutputText(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const output = (payload as { output?: unknown }).output;
+  if (!Array.isArray(output)) return "";
+  const parts: string[] = [];
+  for (const item of output) {
+    if (!item || typeof item !== "object" || (item as { type?: unknown }).type !== "message") continue;
+    const content = (item as { content?: unknown }).content;
+    if (!Array.isArray(content)) continue;
+    for (const part of content) {
+      if (
+        part &&
+        typeof part === "object" &&
+        (part as { type?: unknown }).type === "output_text" &&
+        typeof (part as { text?: unknown }).text === "string"
+      ) {
+        parts.push(String((part as { text?: unknown }).text));
+      }
+    }
+  }
+  return parts.join("\n").trim();
+}
+
+async function generateArticle(
+  transcript: string,
+  framePaths: string[],
+  categories: HelpVideoAutomationCategory[],
+): Promise<GeneratedArticle> {
+  const apiKey = env.OPENAI_API_KEY?.trim();
+  if (!apiKey) throw new Error("OPENAI_NOT_CONFIGURED");
+
+  const content: Array<Record<string, unknown>> = [
+    {
+      type: "input_text",
+      text: [
+        "Crie um único artigo operacional da Base de Conhecimento F10 a partir da transcrição e dos frames cronológicos.",
+        "Não invente telas, ações, regras ou URLs.",
+        "Use Markdown seguro nos textos: **negrito**, *itálico*, `código`, listas e emojis.",
+        "quickGuide deve ser curto, sequencial e útil sem abrir o passo a passo completo.",
+        "Escolha somente frames que realmente ajudam a executar ou confirmar uma ação.",
+        "Os frames são screenshots da tela inteira do F10; nunca peça recortes. frameIndex começa em 1.",
+        `Categorias permitidas: ${categories.map((category) => `${category.slug} (${category.name})`).join(", ") || UNCATEGORIZED_HELP_CATEGORY_SLUG}.`,
+        `Se nenhuma categoria real for segura, use somente ${UNCATEGORIZED_HELP_CATEGORY_SLUG}.`,
+        "A descrição adicional de screenshot deve conter apenas informação visual útil que não esteja clara no texto.",
+        "TRANSCRIÇÃO:",
+        transcript,
+      ].join("\n\n"),
+    },
+  ];
+
+  for (const [index, framePath] of framePaths.entries()) {
+    const bytes = await readFile(framePath);
+    content.push({ type: "input_text", text: `FRAME ${index + 1} — ordem cronológica.` });
+    content.push({
+      type: "input_image",
+      detail: "high",
+      image_url: `data:image/jpeg;base64,${bytes.toString("base64")}`,
+    });
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OPENAI_AUTOMATION_TIMEOUT_MS);
+  try {
+    const response = await fetch(OPENAI_RESPONSES_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: getOpenAiModel(),
+        store: false,
+        input: [{ role: "user", content }],
+        max_output_tokens: 8_000,
+        text: {
+          format: {
+            type: "json_schema",
+            name: "f10_help_video_article",
+            strict: true,
+            schema: articleSchema(),
+          },
+        },
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = payload && typeof payload === "object"
+        ? String((payload as { error?: { message?: unknown } }).error?.message ?? response.status)
+        : String(response.status);
+      throw new Error(`HELP_VIDEO_ARTICLE_GENERATION_FAILED:${message}`);
+    }
+    const output = extractOpenAiOutputText(payload);
+    if (!output) throw new Error("HELP_VIDEO_ARTICLE_GENERATION_EMPTY");
+    return JSON.parse(output) as GeneratedArticle;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function categorySlugs(
+  generated: string[],
+  available: HelpVideoAutomationCategory[],
+): string[] {
+  const allowed = new Set(available.map((category) => category.slug));
+  const result = Array.from(new Set(generated.map((value) => normalizeSlug(value)).filter((value) => allowed.has(value))));
+  return result.length > 0 ? result : [UNCATEGORIZED_HELP_CATEGORY_SLUG];
+}
+
+async function buildImportResult(input: {
+  article: GeneratedArticle;
+  transcript: string;
+  framePaths: string[];
+  categories: HelpVideoAutomationCategory[];
+  externalId: string;
+  featuredVideoUrl?: string;
+  sourceType: HelpVideoAutomationSource["type"];
+}): Promise<HelpVideoAutomationResult> {
+  const slug = normalizeSlug(input.article.slug || input.article.title) || `conteudo-${Date.now()}`;
+  const assets = new Map<string, HelpImportPackageAsset>();
+  const usedFrames = new Set<number>();
+  let selectedScreenshotCount = 0;
+
+  const steps = [] as HelpImportFile["contents"][number]["steps"];
+  for (const [stepIndex, step] of input.article.steps.entries()) {
+    const blocks: HelpImportFile["contents"][number]["steps"][number]["blocks"] = [
+      { type: "text", text: step.instruction.trim() },
+    ];
+    let screenshotIndex = 0;
+    for (const screenshot of step.screenshots ?? []) {
+      const frameIndex = Math.round(Number(screenshot.frameIndex));
+      if (frameIndex < 1 || frameIndex > input.framePaths.length || usedFrames.has(frameIndex)) continue;
+      usedFrames.add(frameIndex);
+      const frameBytes = await readFile(input.framePaths[frameIndex - 1]);
+      screenshotIndex += 1;
+      selectedScreenshotCount += 1;
+      const path = `screenshots/${slug}/step-${String(stepIndex + 1).padStart(2, "0")}-${String(screenshotIndex).padStart(2, "0")}.jpg`;
+      assets.set(path, {
+        path,
+        fileName: path.split("/").at(-1) ?? "screenshot.jpg",
+        mimeType: "image/jpeg",
+        bytes: new Uint8Array(frameBytes),
+      });
+      blocks.push({
+        type: "image",
+        url: `package:${path}`,
+        altText: screenshot.altText.trim().slice(0, 500),
+        assistantDescription: screenshot.assistantDescription.trim().slice(0, 20_000),
+      });
+    }
+    steps.push({
+      title: step.title.trim().slice(0, 180),
+      description: step.description.trim().slice(0, 2_000),
+      assistantKnowledge: "",
+      blocks,
+    });
+  }
+
+  if (selectedScreenshotCount === 0) throw new Error("HELP_VIDEO_NO_SCREENSHOTS_SELECTED");
+
+  const featuredVideo = input.featuredVideoUrl && isHttpUrl(input.featuredVideoUrl)
+    ? {
+        url: input.featuredVideoUrl,
+        description: input.article.summary.trim().slice(0, 500),
+        subtitles: input.transcript,
+        assistantSummary: input.article.quickGuide.trim().slice(0, 20_000),
+      }
+    : undefined;
+
+  const file: HelpImportFile = {
+    format: "f10-help-import",
+    version: 1,
+    source: "f10-auto-video",
+    contents: [{
+      externalId: input.externalId,
+      title: input.article.title.trim().slice(0, 160),
+      slug,
+      summary: input.article.summary.trim().slice(0, 320),
+      quickGuide: input.article.quickGuide.trim().slice(0, 12_000),
+      categories: categorySlugs(input.article.categories, input.categories).map((categorySlug) => ({ slug: categorySlug })),
+      searchAliases: Array.from(new Set(input.article.searchAliases.map((value) => value.trim()).filter(Boolean))).slice(0, 80),
+      assistantKnowledge: input.article.assistantKnowledge.trim().slice(0, 40_000),
+      internalSupportNotes: "",
+      featuredVideo,
+      steps,
+    }],
+  };
+
+  return {
+    file,
+    assets,
+    transcriptChars: input.transcript.length,
+    analyzedFrameCount: input.framePaths.length,
+    selectedScreenshotCount,
+    sourceType: input.sourceType,
+  };
+}
+
+export async function generateHelpImportFromVideo(input: {
+  source: HelpVideoAutomationSource;
+  categories: HelpVideoAutomationCategory[];
+  externalIdHint?: string;
+}): Promise<HelpVideoAutomationResult> {
+  const runtime = await getHelpVideoAutomationRuntimeStatus();
+  if (!runtime.openAi) throw new Error("OPENAI_NOT_CONFIGURED");
+  if (!runtime.ffmpeg) throw new Error("HELP_VIDEO_FFMPEG_NOT_AVAILABLE");
+  if (input.source.type === "youtube" && !runtime.youtube) {
+    throw new Error("HELP_VIDEO_YTDLP_NOT_AVAILABLE");
+  }
+
+  const directory = await mkdtemp(join(tmpdir(), "f10-help-video-"));
+  try {
+    let videoPath: string;
+    let derivedExternalId: string;
+    let featuredVideoUrl: string | undefined;
+
+    if (input.source.type === "youtube") {
+      const id = youtubeVideoId(input.source.url);
+      if (!id) throw new Error("HELP_VIDEO_YOUTUBE_URL_INVALID");
+      videoPath = await downloadYoutubeVideo(input.source.url, directory);
+      derivedExternalId = `youtube:${id.toLowerCase()}`;
+      featuredVideoUrl = input.source.url;
+    } else {
+      if (input.source.bytes.byteLength < 1 || input.source.bytes.byteLength > MAX_UPLOAD_VIDEO_BYTES) {
+        throw new Error("HELP_VIDEO_UPLOAD_SIZE_INVALID");
+      }
+      if (input.source.mimeType.toLowerCase() !== "video/mp4" && !input.source.fileName.toLowerCase().endsWith(".mp4")) {
+        throw new Error("HELP_VIDEO_UPLOAD_FORMAT_INVALID");
+      }
+      videoPath = join(directory, "source.mp4");
+      await writeFile(videoPath, input.source.bytes);
+      derivedExternalId = `sha256:${createHash("sha256").update(input.source.bytes).digest("hex")}`;
+      featuredVideoUrl = input.source.publishedVideoUrl && isHttpUrl(input.source.publishedVideoUrl)
+        ? input.source.publishedVideoUrl
+        : undefined;
+    }
+
+    const externalId = normalizeExternalId(input.externalIdHint ?? "") || derivedExternalId;
+    const [audioPath, framePaths] = await Promise.all([
+      extractAudio(videoPath, directory),
+      extractFrames(videoPath, directory),
+    ]);
+    const transcript = await transcribeAudio(audioPath);
+    const article = await generateArticle(transcript, framePaths, input.categories);
+    return await buildImportResult({
+      article,
+      transcript,
+      framePaths,
+      categories: input.categories,
+      externalId,
+      featuredVideoUrl,
+      sourceType: input.source.type,
+    });
+  } finally {
+    await rm(directory, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+export const HELP_VIDEO_AUTOMATION_MAX_UPLOAD_BYTES = MAX_UPLOAD_VIDEO_BYTES;
