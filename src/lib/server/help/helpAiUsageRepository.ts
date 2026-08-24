@@ -1,4 +1,4 @@
-import { desc, sql } from "drizzle-orm";
+import { desc, isNotNull, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { helpAiUsageRuns } from "$lib/server/db/helpAiUsageSchema";
 import { helpKnowledgeRuns } from "$lib/server/db/helpKnowledgeSchema";
@@ -132,10 +132,12 @@ export async function getHelpAiUsageInsights() {
       .select({
         model: helpKnowledgeRuns.model,
         runs: sql<number>`count(*)::integer`,
+        failed: sql<number>`count(*) filter (where ${helpKnowledgeRuns.failureCode} is not null)::integer`,
         inputTokens: sql<number>`coalesce(sum(${helpKnowledgeRuns.inputTokens}), 0)::integer`,
         outputTokens: sql<number>`coalesce(sum(${helpKnowledgeRuns.outputTokens}), 0)::integer`,
       })
       .from(helpKnowledgeRuns)
+      .where(isNotNull(helpKnowledgeRuns.model))
       .groupBy(helpKnowledgeRuns.model),
   ]);
 
@@ -149,6 +151,7 @@ export async function getHelpAiUsageInsights() {
   };
 
   let assistantRuns = 0;
+  let assistantFailedRuns = 0;
   let assistantInputTokens = 0;
   let assistantOutputTokens = 0;
   let assistantCostUsdMicros = 0;
@@ -158,6 +161,7 @@ export async function getHelpAiUsageInsights() {
     const inputTokens = Number(row.inputTokens ?? 0);
     const outputTokens = Number(row.outputTokens ?? 0);
     assistantRuns += runs;
+    assistantFailedRuns += Number(row.failed ?? 0);
     assistantInputTokens += inputTokens;
     assistantOutputTokens += outputTokens;
     const cost = row.model
@@ -177,7 +181,7 @@ export async function getHelpAiUsageInsights() {
       runs: assistantRuns + automationRuns,
       assistantRuns,
       automationRuns,
-      failed: Number(usageSummary.failed ?? 0),
+      failed: assistantFailedRuns + Number(usageSummary.failed ?? 0),
       inputTokens: assistantInputTokens + automationInputTokens,
       outputTokens: assistantOutputTokens + automationOutputTokens,
       audioSeconds: Number(usageSummary.audioSeconds ?? 0),
