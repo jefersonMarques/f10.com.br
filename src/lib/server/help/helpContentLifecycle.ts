@@ -44,16 +44,24 @@ export async function discardStructuredHelpContent(
   const db = getDatabase();
   const content = await getContent(contentId);
   if (!content) throw new Error("CONTENT_NOT_FOUND");
-
-  if (content.publishedAt || (await hasPublication(contentId))) {
-    throw new Error("CONTENT_ALREADY_PUBLISHED");
-  }
+  if (content.status !== "draft") throw new Error("CONTENT_NOT_DRAFT");
 
   await db.transaction(async (tx) => {
-    // Assets are reusable library items. Older databases still have the original
-    // ON DELETE CASCADE FK from help_assets.content_id, while the current schema
-    // models this relationship as ON DELETE SET NULL. Detach them explicitly
-    // before deleting the draft so discarding content never deletes managed files.
+    await tx
+      .delete(helpPublications)
+      .where(
+        and(
+          eq(helpPublications.entityType, "content"),
+          eq(helpPublications.entityId, contentId),
+        ),
+      );
+
+    await tx
+      .delete(helpSearchDocuments)
+      .where(eq(helpSearchDocuments.contentId, contentId));
+
+    // Assets da biblioteca podem sobreviver ao conteúdo. O vínculo com blocos é
+    // removido pelo cascade de help_contents; o arquivo físico continua gerenciado.
     await tx
       .update(helpAssets)
       .set({ contentId: null })
@@ -76,7 +84,11 @@ export async function discardStructuredHelpContent(
     action: "help.content.discarded",
     entityType: "help_content",
     entityId: contentId,
-    metadata: { slug: content.slug, title: content.title },
+    metadata: {
+      slug: content.slug,
+      title: content.title,
+      hadPublication: Boolean(content.publishedAt),
+    },
   });
 }
 
@@ -128,5 +140,33 @@ export async function archiveStructuredHelpContent(
       previousStatus: content.status,
       publishedAt: content.publishedAt?.toISOString() ?? null,
     },
+  });
+}
+
+export async function restoreArchivedStructuredHelpContent(
+  actorUserId: string,
+  contentId: string,
+): Promise<void> {
+  const content = await getContent(contentId);
+  if (!content) throw new Error("CONTENT_NOT_FOUND");
+  if (content.status !== "archived") throw new Error("CONTENT_NOT_ARCHIVED");
+
+  const restoredAt = new Date();
+  await getDatabase()
+    .update(helpContents)
+    .set({
+      status: "draft",
+      publishedAt: null,
+      updatedBy: actorUserId,
+      updatedAt: restoredAt,
+    })
+    .where(eq(helpContents.id, contentId));
+
+  await recordAuditEvent({
+    actorUserId,
+    action: "help.content.restored",
+    entityType: "help_content",
+    entityId: contentId,
+    metadata: { slug: content.slug, title: content.title },
   });
 }
