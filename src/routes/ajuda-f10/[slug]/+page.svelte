@@ -108,6 +108,8 @@
       <section id="help-featured-video" data-help-featured-video-id={data.content.featuredVideo.id} class="mt-7 scroll-mt-24 overflow-hidden rounded-[26px] border border-[#E3E6EE] bg-white shadow-[0_14px_44px_rgba(1,13,40,0.05)]">
         {#if videoEmbed}
           <div class="aspect-video overflow-hidden bg-black"><iframe src={videoEmbed} title={data.content.featuredVideo.altText || `Vídeo: ${data.content.title}`} class="h-full w-full" loading="eager" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>
+        {:else if data.content.featuredVideo.storageKey}
+          <video controls preload="metadata" class="aspect-video h-auto w-full bg-black" src={managedAssetUrl(data.content.featuredVideo.id)}><track kind="captions" /></video>
         {:else if data.content.featuredVideo.sourceUrl}
           <a href={data.content.featuredVideo.sourceUrl} target="_blank" rel="noopener noreferrer" class="flex min-h-24 items-center justify-between gap-4 px-6 py-5 text-[#000A57] transition hover:bg-[#FAFAFC]"><span class="flex items-center gap-3"><PlayCircle size={24}/><span><strong class="block text-[13px]">Assistir ao vídeo deste conteúdo</strong><small class="mt-1 block text-[10px] text-[#7E8493]">O vídeo abre em uma nova guia.</small></span></span><ExternalLink size={16}/></a>
         {/if}
