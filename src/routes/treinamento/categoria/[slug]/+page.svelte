@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ArrowLeft, ArrowRight, GraduationCap } from "lucide-svelte";
+  import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;
@@ -12,7 +13,7 @@
     <a href="/treinamento/categorias" class="inline-flex min-h-10 items-center gap-2 rounded-full px-2 text-[11px] font-semibold text-[#667086]"><ArrowLeft size={15}/>Todas as áreas</a>
 
     <header class="mt-6 rounded-[28px] border border-[#E1E4EB] bg-white p-7 shadow-[0_18px_48px_rgba(12,23,52,0.05)] sm:p-9">
-      <span class="text-[34px]">{data.category.icon || "•"}</span>
+      <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F7F8FB] text-[#000A57]"><HelpCategoryIcon name={data.category.icon} size={28}/></span>
       <h1 class="mt-4 text-[30px] font-semibold tracking-[-0.04em] sm:text-[40px]">{data.category.name}</h1>
       {#if data.category.description}<p class="mt-3 max-w-[680px] text-[13px] leading-6 text-[#6C7589]">{data.category.description}</p>{/if}
     </header>
