@@ -13,8 +13,8 @@ const OPENAI_TRANSCRIPTIONS_URL = "https://api.openai.com/v1/audio/transcription
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe";
 const MAX_UPLOAD_VIDEO_BYTES = 90 * 1024 * 1024;
-const MAX_FRAMES = 48;
-const MAX_EXTRACTED_FRAMES = 450;
+const MAX_FRAMES = 72;
+const MAX_EXTRACTED_FRAMES = 900;
 const COMMAND_TIMEOUT_MS = 8 * 60 * 1_000;
 const OPENAI_AUTOMATION_TIMEOUT_MS = 3 * 60 * 1_000;
 
@@ -294,7 +294,7 @@ async function extractFrames(videoPath: string, directory: string): Promise<stri
     "-i",
     videoPath,
     "-vf",
-    "fps=1/4,scale=min(1280\\,iw):-2,mpdecimate",
+    "fps=1/2,scale=min(1280\\,iw):-2,mpdecimate",
     "-frames:v",
     String(MAX_EXTRACTED_FRAMES),
     "-q:v",
@@ -386,7 +386,7 @@ function articleSchema(): Record<string, unknown> {
             instruction: { type: "string", minLength: 1, maxLength: 50000 },
             screenshots: {
               type: "array",
-              maxItems: 3,
+              maxItems: 1,
               items: {
                 type: "object",
                 additionalProperties: false,
@@ -428,6 +428,34 @@ function extractOpenAiOutputText(payload: unknown): string {
   return parts.join("\n").trim();
 }
 
+function articlePrompt(categories: HelpVideoAutomationCategory[], transcript: string): string {
+  return [
+    "Crie um único artigo operacional da Base de Conhecimento F10 a partir da transcrição e dos frames cronológicos.",
+    "Não invente telas, ações, regras ou URLs.",
+    "Use Markdown seguro nos textos: **negrito**, *itálico*, `código`, listas e emojis.",
+    "Para nomes literais da interface, caminhos, menus, botões, campos, status, códigos e valores, prefira inline code: `Cadastros > Funcionários`, `Salvar`, `E-mail`, `Ativo`, `F10-123`.",
+    "Reserve negrito para ênfase semântica e para a numeração; não use negrito como padrão para nomes de controles da interface.",
+    "Em cada step.instruction, toda ação executável deve ficar em sua própria linha numerada usando **1.**, **2.**, **3.** e assim por diante.",
+    "Não junte duas ou mais ações executáveis em um parágrafo corrido. Mantenha uma ação principal por número.",
+    "Informações complementares, contexto e observações devem ficar depois da lista numerada, em parágrafo separado e sem número.",
+    "quickGuide também deve ser curto, sequencial, numerado e útil sem abrir o passo a passo completo.",
+    "Cada step pode possuir no máximo um screenshot. Se uma segunda tela for indispensável, crie outro step específico.",
+    "O screenshot precisa representar exatamente o estado visual descrito naquele step; não escolha um frame apenas por proximidade cronológica com a fala.",
+    "Antes de escolher frameIndex, confirme que tela, modal, menu, campo, botão ou estado citado na instrução realmente está visível naquele frame.",
+    "Prefira um frame estável após a ação terminar. Não escolha carregamento, animação, transição, tela parcialmente atualizada ou tela pertencente ao passo anterior/seguinte.",
+    "Quando a instrução ensina a localizar algo antes do clique, escolha um frame em que esse elemento esteja claramente visível.",
+    "Se nenhum frame representar corretamente o step, retorne screenshots: [] para esse step. É melhor não ter imagem do que usar um screenshot incorreto.",
+    "Não reutilize o mesmo frame em steps diferentes.",
+    "Os frames representam a tela inteira do F10; nunca peça ou proponha recortes. frameIndex começa em 1.",
+    `Categorias permitidas: ${categories.map((category) => `${category.slug} (${category.name})`).join(", ") || UNCATEGORIZED_HELP_CATEGORY_SLUG}.`,
+    `Se nenhuma categoria real for segura, use somente ${UNCATEGORIZED_HELP_CATEGORY_SLUG}.`,
+    "altText e assistantDescription devem descrever somente o que está realmente visível no screenshot escolhido e servir como verificação adicional de coerência.",
+    "Exemplo de instruction correta: **1.** Abra `Cadastros > Funcionários`.\n**2.** Clique no botão de inclusão para criar um novo cadastro.\n\nNessa mesma área também ficam as ações de edição, exclusão e filtro.",
+    "TRANSCRIÇÃO:",
+    transcript,
+  ].join("\n\n");
+}
+
 async function generateArticle(
   transcript: string,
   framePaths: string[],
@@ -437,27 +465,7 @@ async function generateArticle(
   if (!apiKey) throw new Error("OPENAI_NOT_CONFIGURED");
 
   const content: Array<Record<string, unknown>> = [
-    {
-      type: "input_text",
-      text: [
-        "Crie um único artigo operacional da Base de Conhecimento F10 a partir da transcrição e dos frames cronológicos.",
-        "Não invente telas, ações, regras ou URLs.",
-        "Use Markdown seguro nos textos: **negrito**, *itálico*, `código`, listas e emojis.",
-        "Em cada step.instruction, toda ação executável deve ficar em sua própria linha numerada usando **1.**, **2.**, **3.** e assim por diante.",
-        "Não junte duas ou mais ações executáveis em um parágrafo corrido. Mantenha uma ação principal por número.",
-        "Informações complementares, contexto e observações devem ficar depois da lista numerada, em parágrafo separado e sem número.",
-        "Use negrito para caminhos, menus, botões e campos relevantes dentro das ações numeradas.",
-        "quickGuide também deve ser curto, sequencial, numerado e útil sem abrir o passo a passo completo.",
-        "Escolha somente frames que realmente ajudam a executar ou confirmar uma ação.",
-        "Os frames representam a tela inteira do F10; nunca peça ou proponha recortes. frameIndex começa em 1.",
-        `Categorias permitidas: ${categories.map((category) => `${category.slug} (${category.name})`).join(", ") || UNCATEGORIZED_HELP_CATEGORY_SLUG}.`,
-        `Se nenhuma categoria real for segura, use somente ${UNCATEGORIZED_HELP_CATEGORY_SLUG}.`,
-        "A descrição adicional de screenshot deve conter apenas informação visual útil que não esteja clara no texto.",
-        "Exemplo de instruction correta: **1.** Abra **Cadastros > Funcionários**.\n**2.** Clique no botão de inclusão para criar um novo cadastro.\n\nNessa mesma área também ficam as ações de edição, exclusão e filtro.",
-        "TRANSCRIÇÃO:",
-        transcript,
-      ].join("\n\n"),
-    },
+    { type: "input_text", text: articlePrompt(categories, transcript) },
   ];
 
   for (const [index, framePath] of framePaths.entries()) {
@@ -544,30 +552,32 @@ async function buildImportResult(input: {
     const blocks: HelpImportFile["contents"][number]["steps"][number]["blocks"] = [
       { type: "text", text: step.instruction.trim() },
     ];
-    let screenshotIndex = 0;
-    for (const screenshot of step.screenshots ?? []) {
+    const screenshot = step.screenshots?.[0];
+    if (screenshot) {
       const frameIndex = Math.round(Number(screenshot.frameIndex));
-      if (frameIndex < 1 || frameIndex > input.framePaths.length || usedFrames.has(frameIndex)) continue;
-      const framePath = input.framePaths[frameIndex - 1];
-      if (!framePath) continue;
-      usedFrames.add(frameIndex);
-      const frameBytes = await readFile(framePath);
-      screenshotIndex += 1;
-      selectedScreenshotCount += 1;
-      const path = `screenshots/${slug}/step-${String(stepIndex + 1).padStart(2, "0")}-${String(screenshotIndex).padStart(2, "0")}.jpg`;
-      assets.set(path, {
-        path,
-        fileName: path.split("/").at(-1) ?? "screenshot.jpg",
-        mimeType: "image/jpeg",
-        bytes: new Uint8Array(frameBytes),
-      });
-      blocks.push({
-        type: "image",
-        url: `package:${path}`,
-        altText: screenshot.altText.trim().slice(0, 500),
-        assistantDescription: screenshot.assistantDescription.trim().slice(0, 20_000),
-      });
+      if (frameIndex >= 1 && frameIndex <= input.framePaths.length && !usedFrames.has(frameIndex)) {
+        const framePath = input.framePaths[frameIndex - 1];
+        if (framePath) {
+          usedFrames.add(frameIndex);
+          const frameBytes = await readFile(framePath);
+          selectedScreenshotCount += 1;
+          const path = `screenshots/${slug}/step-${String(stepIndex + 1).padStart(2, "0")}-01.jpg`;
+          assets.set(path, {
+            path,
+            fileName: path.split("/").at(-1) ?? "screenshot.jpg",
+            mimeType: "image/jpeg",
+            bytes: new Uint8Array(frameBytes),
+          });
+          blocks.push({
+            type: "image",
+            url: `package:${path}`,
+            altText: screenshot.altText.trim().slice(0, 500),
+            assistantDescription: screenshot.assistantDescription.trim().slice(0, 20_000),
+          });
+        }
+      }
     }
+
     steps.push({
       title: step.title.trim().slice(0, 180),
       description: step.description.trim().slice(0, 2_000),
