@@ -27,10 +27,25 @@ export async function publishHelpKnowledgeContent(
   validateHelpKnowledgePublication(content);
 
   const publishedAt = new Date();
-  const snapshot = {
-    public: compileHelpPublicSnapshot(content),
-    knowledge: compileHelpKnowledgeDocument(content),
+  const publicSnapshot = {
+    ...compileHelpPublicSnapshot(content),
+    quickGuide: content.quickGuide,
   };
+  const knowledge = compileHelpKnowledgeDocument(content);
+  if (content.quickGuide.trim()) {
+    const quickGuide = content.quickGuide.trim();
+    knowledge.fragments.splice(1, 0, {
+      id: `quick-guide:${content.id}`,
+      targetType: "article",
+      stepId: null,
+      blockId: null,
+      anchor: "help-quick-guide",
+      publicText: quickGuide,
+      assistantKnowledge: "",
+      searchText: quickGuide,
+    });
+  }
+  const snapshot = { public: publicSnapshot, knowledge };
   const db = getDatabase();
 
   await db.transaction(async (tx) => {
@@ -66,7 +81,10 @@ export async function publishHelpKnowledgeContent(
   await saveHelpContentVersion(
     "content",
     contentId,
-    compileHelpVersionSnapshot(content, publishedAt),
+    {
+      ...compileHelpVersionSnapshot(content, publishedAt),
+      quickGuide: content.quickGuide,
+    },
     actorUserId,
   );
 
@@ -79,6 +97,7 @@ export async function publishHelpKnowledgeContent(
       stepCount: content.steps.length,
       categoryCount: content.categories.length,
       hasFeaturedVideo: Boolean(content.featuredVideo),
+      hasQuickGuide: Boolean(content.quickGuide.trim()),
       knowledgeVersion: snapshot.knowledge.version,
       knowledgeFragmentCount: snapshot.knowledge.fragments.length,
     },
