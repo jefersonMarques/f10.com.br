@@ -8,6 +8,7 @@
       "title": "REPLACE_WITH_ARTICLE_TITLE",
       "slug": "REPLACE_WITH_ARTICLE_SLUG",
       "summary": "REPLACE_WITH_PUBLIC_SUMMARY",
+      "quickGuide": "🚀 **Passo 1:** REPLACE_WITH_QUICK_ACTION\n📍 **Passo 2:** REPLACE_WITH_QUICK_ACTION",
       "categories": [
         {
           "slug": "uncategorized",
