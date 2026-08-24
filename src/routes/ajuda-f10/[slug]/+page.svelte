@@ -7,8 +7,11 @@
     ExternalLink,
     Info,
     PlayCircle,
+    Sparkles,
     TriangleAlert,
   } from "lucide-svelte";
+  import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
+  import HelpRichText from "$lib/components/help/HelpRichText.svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;
@@ -83,17 +86,16 @@
                 rel={externalUrl(category.destinationUrl) ? "noopener noreferrer" : undefined}
                 class="inline-flex items-center gap-1.5 rounded-full bg-[#FFF3E9] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-[#B85408] transition hover:bg-[#FFE8D6]"
               >
-                {category.icon ? `${category.icon} ` : ""}{category.name}
-                <ExternalLink size={10}/>
+                <HelpCategoryIcon name={category.icon} size={12}/>{category.name}<ExternalLink size={10}/>
               </a>
             {:else}
-              <span class="rounded-full bg-[#FFF3E9] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-[#B85408]">{category.icon ? `${category.icon} ` : ""}{category.name}</span>
+              <span class="inline-flex items-center gap-1.5 rounded-full bg-[#FFF3E9] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-[#B85408]"><HelpCategoryIcon name={category.icon} size={12}/>{category.name}</span>
             {/if}
           {/each}
         </div>
       {/if}
       <h1 class="mt-3 max-w-[860px] text-[30px] font-semibold tracking-[-0.04em] text-[#010D28] sm:text-[44px]">{data.content.title}</h1>
-      {#if data.content.summary}<p class="mt-4 max-w-[820px] text-[14px] leading-7 text-[#6C7383] sm:text-[15px]">{data.content.summary}</p>{/if}
+      {#if data.content.summary}<HelpRichText text={data.content.summary} className="mt-4 max-w-[820px] space-y-1 text-[14px] leading-7 text-[#6C7383] sm:text-[15px]"/>{/if}
       <div class="mt-6 flex flex-wrap gap-2 text-[9px] font-semibold text-[#777E8E]">
         <span class="rounded-full bg-[#F4F5F8] px-3 py-1.5">{data.content.steps.length} {data.content.steps.length === 1 ? "passo" : "passos"}</span>
         <span class="rounded-full bg-[#F4F5F8] px-3 py-1.5">Atualizado {new Intl.DateTimeFormat("pt-BR").format(new Date(data.content.publishedAt))}</span>
@@ -109,20 +111,32 @@
           <a href={data.content.featuredVideo.sourceUrl} target="_blank" rel="noopener noreferrer" class="flex min-h-24 items-center justify-between gap-4 px-6 py-5 text-[#000A57] transition hover:bg-[#FAFAFC]"><span class="flex items-center gap-3"><PlayCircle size={24}/><span><strong class="block text-[13px]">Assistir ao vídeo deste conteúdo</strong><small class="mt-1 block text-[10px] text-[#7E8493]">O vídeo abre em uma nova guia.</small></span></span><ExternalLink size={16}/></a>
         {/if}
       </section>
+
+      <section class="mt-3 flex items-start gap-3 rounded-[20px] border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3.5 text-[#7A3B08] sm:px-5">
+        <Info size={17} class="mt-0.5 shrink-0"/>
+        <p class="text-[11px] font-medium leading-5">Os ícones do sistema podem ser diferentes do atual, sempre leia os títulos de cada item.</p>
+      </section>
+    {/if}
+
+    {#if data.content.quickGuide}
+      <section id="help-quick-guide" class="mt-4 scroll-mt-24 rounded-[24px] border border-[#D8DDF4] bg-[#F8F9FF] px-5 py-5 sm:px-7 sm:py-6">
+        <div class="flex items-center gap-2"><Sparkles size={17} class="text-[#EA6D0B]"/><h2 class="text-[15px] font-semibold text-[#000A57]">Resumo rápido</h2></div>
+        <HelpRichText text={data.content.quickGuide} className="mt-4 space-y-1.5 text-[13px] leading-6 text-[#454D62]"/>
+      </section>
     {/if}
 
     <div class="mt-7 space-y-5">
       {#each data.content.steps as step, index}
         <section id={`help-step-${step.id}`} data-help-step-id={step.id} class="scroll-mt-24 overflow-hidden rounded-[26px] border border-[#E3E6EE] bg-white transition-[box-shadow,border-color,background-color] duration-300">
-          <header class="flex items-start gap-4 border-b border-[#EEF0F5] px-5 py-5 sm:px-7"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[12px] font-bold text-white">{index + 1}</span><div><h2 class="text-[18px] font-semibold tracking-[-0.02em] text-[#1F2638]">{step.title}</h2>{#if step.description}<p class="mt-1.5 text-[12px] leading-6 text-[#757C8D]">{step.description}</p>{/if}</div></header>
+          <header class="flex items-start gap-4 border-b border-[#EEF0F5] px-5 py-5 sm:px-7"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[12px] font-bold text-white">{index + 1}</span><div><h2 class="text-[18px] font-semibold tracking-[-0.02em] text-[#1F2638]">{step.title}</h2>{#if step.description}<HelpRichText text={step.description} className="mt-1.5 space-y-1 text-[12px] leading-6 text-[#757C8D]"/>{/if}</div></header>
 
           <div class="space-y-5 px-5 py-6 sm:px-7">
             {#each step.blocks as block}
               <div id={`help-block-${block.id}`} data-help-block-id={block.id} data-help-block-type={block.blockType} class="scroll-mt-24 transition-[box-shadow,background-color] duration-300">
                 {#if block.blockType === "text"}
-                  <div class="whitespace-pre-wrap text-[14px] leading-7 text-[#4E5565]">{block.textContent}</div>
+                  <HelpRichText text={block.textContent} className="space-y-1.5 text-[14px] leading-7 text-[#4E5565]"/>
                 {:else if block.blockType === "notice"}
-                  <div class={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${block.noticeVariant === "warning" || block.noticeVariant === "danger" ? "border-[#F0D0C8] bg-[#FFF8F5] text-[#7D493D]" : "border-[#D8DEF2] bg-[#F8F9FF] text-[#4D587A]"}`}>{#if block.noticeVariant === "warning" || block.noticeVariant === "danger"}<TriangleAlert size={17} class="mt-0.5 shrink-0"/>{:else}<Info size={17} class="mt-0.5 shrink-0"/>{/if}<p class="text-[12px] leading-6">{block.textContent}</p></div>
+                  <div class={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${block.noticeVariant === "warning" || block.noticeVariant === "danger" ? "border-[#F0D0C8] bg-[#FFF8F5] text-[#7D493D]" : "border-[#D8DEF2] bg-[#F8F9FF] text-[#4D587A]"}`}>{#if block.noticeVariant === "warning" || block.noticeVariant === "danger"}<TriangleAlert size={17} class="mt-0.5 shrink-0"/>{:else}<Info size={17} class="mt-0.5 shrink-0"/>{/if}<HelpRichText text={block.textContent} className="min-w-0 space-y-1 text-[12px] leading-6"/></div>
                 {:else if block.blockType === "image" && block.asset}
                   {@const imageUrl = block.asset.storageKey ? managedAssetUrl(block.asset.id) : block.asset.sourceUrl}
                   {#if imageUrl}<figure class="overflow-hidden rounded-2xl border border-[#E6E8EE] bg-[#FAFAFC]"><img src={imageUrl} alt={block.asset.altText || "Imagem do passo"} loading="lazy" class="h-auto w-full object-contain" />{#if block.asset.altText}<figcaption class="border-t border-[#ECEEF3] px-4 py-2.5 text-[9px] text-[#848A99]">{block.asset.altText}</figcaption>{/if}</figure>{/if}
