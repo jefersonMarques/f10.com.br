@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ArrowRight, BookOpenCheck } from "lucide-svelte";
+  import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;
@@ -22,7 +23,7 @@
       <section class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {#each data.categories as category}
           <a href={`/treinamento/categoria/${encodeURIComponent(category.slug)}`} class="group flex min-h-[190px] flex-col rounded-[24px] border border-[#E1E4EB] bg-white p-6 shadow-[0_16px_42px_rgba(12,23,52,0.05)] transition hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(12,23,52,0.09)]">
-            <span class="text-[30px]">{category.icon || "•"}</span>
+            <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#F7F8FB] text-[#000A57]"><HelpCategoryIcon name={category.icon} size={25}/></span>
             <h2 class="mt-5 text-[18px] font-semibold tracking-[-0.025em]">{category.name}</h2>
             {#if category.description}<p class="mt-2 line-clamp-2 text-[11px] leading-5 text-[#737C8F]">{category.description}</p>{/if}
             <div class="mt-auto flex items-center justify-between pt-5 text-[10px] font-semibold text-[#000A57]"><span>{Number(category.trainingCount)} {Number(category.trainingCount) === 1 ? "trilha" : "trilhas"}</span><ArrowRight size={15} class="transition group-hover:translate-x-1"/></div>
