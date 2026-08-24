@@ -1,4 +1,4 @@
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import {
   helpKnowledgeRuns,
@@ -67,7 +67,6 @@ export async function recordHelpKnowledgeRun(
 
 export async function getHelpKnowledgeInsights() {
   const db = getDatabase();
-  const gapResolutions: HelpKnowledgeTelemetryResolution[] = ["not_found"];
 
   const [summaryRows, gapRows, elsewhereRows, recentRuns] = await Promise.all([
     db
@@ -92,7 +91,7 @@ export async function getHelpKnowledgeInsights() {
         lastAskedAt: sql<Date>`max(${helpKnowledgeRuns.createdAt})`,
       })
       .from(helpKnowledgeRuns)
-      .where(inArray(helpKnowledgeRuns.resolution, gapResolutions))
+      .where(eq(helpKnowledgeRuns.resolution, "not_found"))
       .groupBy(helpKnowledgeRuns.normalizedQuery)
       .orderBy(desc(sql`count(*)`), desc(sql`max(${helpKnowledgeRuns.createdAt})`))
       .limit(30),
