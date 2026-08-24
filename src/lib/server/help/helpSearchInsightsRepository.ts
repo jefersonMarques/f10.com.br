@@ -4,6 +4,7 @@ import {
   helpSearchEvents,
   helpSearchResults,
 } from "$lib/server/db/helpSearchSchema";
+import { getHelpAiUsageInsights } from "$lib/server/help/helpAiUsageRepository";
 import { getHelpKnowledgeInsights } from "$lib/server/help/helpKnowledgeTelemetryRepository";
 
 export async function getHelpSearchInsights() {
@@ -16,6 +17,7 @@ export async function getHelpSearchInsights() {
     clickedContents,
     escalatedQueries,
     knowledge,
+    aiUsage,
   ] = await Promise.all([
     db
       .select({
@@ -77,6 +79,7 @@ export async function getHelpSearchInsights() {
       .orderBy(desc(helpSearchEvents.createdAt))
       .limit(30),
     getHelpKnowledgeInsights(),
+    getHelpAiUsageInsights(),
   ]);
 
   const summary = summaryRows[0] ?? {
@@ -111,5 +114,6 @@ export async function getHelpSearchInsights() {
     })),
     escalatedQueries,
     knowledge,
+    aiUsage,
   };
 }
