@@ -12,14 +12,21 @@ import type { HelpImportFile } from "$lib/server/help/structuredHelpImport";
 const OPENAI_TRANSCRIPTIONS_URL = "https://api.openai.com/v1/audio/transcriptions";
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe";
-const MAX_UPLOAD_VIDEO_BYTES = 100 * 1024 * 1024;
+const MAX_UPLOAD_VIDEO_BYTES = 90 * 1024 * 1024;
 const MAX_FRAMES = 48;
+const MAX_EXTRACTED_FRAMES = 450;
 const COMMAND_TIMEOUT_MS = 8 * 60 * 1_000;
 const OPENAI_AUTOMATION_TIMEOUT_MS = 3 * 60 * 1_000;
 
 export type HelpVideoAutomationSource =
   | { type: "youtube"; url: string }
-  | { type: "upload"; fileName: string; mimeType: string; bytes: Uint8Array; publishedVideoUrl?: string };
+  | {
+      type: "upload";
+      fileName: string;
+      mimeType: string;
+      bytes: Uint8Array;
+      publishedVideoUrl?: string;
+    };
 
 export type HelpVideoAutomationCategory = {
   slug: string;
@@ -125,25 +132,33 @@ function youtubeVideoId(value: string): string | null {
 
 function commandAvailable(command: string, args: string[]): Promise<boolean> {
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
     const child = spawn(command, args, { stdio: "ignore", windowsHide: true });
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
-      resolve(false);
+      finish(false);
     }, 4_000);
     child.once("error", () => {
       clearTimeout(timer);
-      resolve(false);
+      finish(false);
     });
     child.once("exit", (code) => {
       clearTimeout(timer);
-      resolve(code === 0);
+      finish(code === 0);
     });
   });
 }
 
 export async function getHelpVideoAutomationRuntimeStatus(): Promise<HelpVideoAutomationRuntimeStatus> {
-  const ffmpeg = await commandAvailable(ffmpegPath(), ["-version"]);
-  const youtube = await commandAvailable(ytDlpPath(), ["--version"]);
+  const [ffmpeg, youtube] = await Promise.all([
+    commandAvailable(ffmpegPath(), ["-version"]),
+    commandAvailable(ytDlpPath(), ["--version"]),
+  ]);
   return {
     openAi: isOpenAiConfigured(),
     ffmpeg,
@@ -155,6 +170,13 @@ export async function getHelpVideoAutomationRuntimeStatus(): Promise<HelpVideoAu
 
 async function runCommand(command: string, args: string[], timeoutMs = COMMAND_TIMEOUT_MS): Promise<void> {
   await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (cause?: Error) => {
+      if (settled) return;
+      settled = true;
+      if (cause) reject(cause);
+      else resolve();
+    };
     const child = spawn(command, args, {
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
@@ -162,19 +184,19 @@ async function runCommand(command: string, args: string[], timeoutMs = COMMAND_T
     let stderr = "";
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
-      reject(new Error("HELP_VIDEO_COMMAND_TIMEOUT"));
+      finish(new Error("HELP_VIDEO_COMMAND_TIMEOUT"));
     }, timeoutMs);
     child.stderr.on("data", (chunk) => {
       if (stderr.length < 32_000) stderr += String(chunk);
     });
     child.once("error", (cause) => {
       clearTimeout(timer);
-      reject(cause);
+      finish(cause instanceof Error ? cause : new Error("HELP_VIDEO_COMMAND_FAILED"));
     });
     child.once("exit", (code) => {
       clearTimeout(timer);
-      if (code === 0) resolve();
-      else reject(new Error(`HELP_VIDEO_COMMAND_FAILED:${command}:${code ?? "unknown"}:${stderr.slice(-2_000)}`));
+      if (code === 0) finish();
+      else finish(new Error(`HELP_VIDEO_COMMAND_FAILED:${command}:${code ?? "unknown"}:${stderr.slice(-2_000)}`));
     });
   });
 }
@@ -185,6 +207,10 @@ async function downloadYoutubeVideo(url: string, directory: string): Promise<str
     "--no-playlist",
     "--no-progress",
     "--restrict-filenames",
+    "--match-filter",
+    "duration <= 1800",
+    "--max-filesize",
+    "500M",
     "--merge-output-format",
     "mp4",
     "-f",
@@ -220,6 +246,18 @@ async function extractAudio(videoPath: string, directory: string): Promise<strin
   return audioPath;
 }
 
+function selectEvenly<T>(values: T[], limit: number): T[] {
+  if (values.length <= limit) return values;
+  if (limit <= 1) return values.slice(0, 1);
+  const result: T[] = [];
+  for (let index = 0; index < limit; index += 1) {
+    const sourceIndex = Math.round((index * (values.length - 1)) / (limit - 1));
+    const value = values[sourceIndex];
+    if (value !== undefined) result.push(value);
+  }
+  return result;
+}
+
 async function extractFrames(videoPath: string, directory: string): Promise<string[]> {
   const outputPattern = join(directory, "frame-%04d.jpg");
   await runCommand(ffmpegPath(), [
@@ -230,9 +268,9 @@ async function extractFrames(videoPath: string, directory: string): Promise<stri
     "-i",
     videoPath,
     "-vf",
-    "fps=1/4,scale='min(1280,iw)':-2,mpdecimate",
+    "fps=1/4,scale=min(1280\\,iw):-2,mpdecimate",
     "-frames:v",
-    String(MAX_FRAMES),
+    String(MAX_EXTRACTED_FRAMES),
     "-q:v",
     "3",
     outputPattern,
@@ -240,10 +278,9 @@ async function extractFrames(videoPath: string, directory: string): Promise<stri
   const files = (await readdir(directory))
     .filter((file) => /^frame-\d{4}\.jpg$/i.test(file))
     .sort()
-    .slice(0, MAX_FRAMES)
     .map((file) => join(directory, file));
   if (files.length === 0) throw new Error("HELP_VIDEO_FRAMES_NOT_FOUND");
-  return files;
+  return selectEvenly(files, MAX_FRAMES);
 }
 
 async function transcribeAudio(audioPath: string): Promise<string> {
@@ -254,7 +291,7 @@ async function transcribeAudio(audioPath: string): Promise<string> {
   form.set("model", TRANSCRIPTION_MODEL);
   form.set("language", "pt");
   form.set("response_format", "json");
-  form.set("file", new Blob([bytes], { type: "audio/mpeg" }), "audio.mp3");
+  form.set("file", new Blob([new Uint8Array(bytes)], { type: "audio/mpeg" }), "audio.mp3");
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OPENAI_AUTOMATION_TIMEOUT_MS);
   try {
@@ -264,8 +301,13 @@ async function transcribeAudio(audioPath: string): Promise<string> {
       body: form,
       signal: controller.signal,
     });
-    const payload = await response.json().catch(() => ({})) as { text?: string; error?: { message?: string } };
-    if (!response.ok) throw new Error(`HELP_VIDEO_TRANSCRIPTION_FAILED:${payload.error?.message ?? response.status}`);
+    const payload = await response.json().catch(() => ({})) as {
+      text?: string;
+      error?: { message?: string };
+    };
+    if (!response.ok) {
+      throw new Error(`HELP_VIDEO_TRANSCRIPTION_FAILED:${payload.error?.message ?? response.status}`);
+    }
     const text = payload.text?.trim() ?? "";
     if (!text) throw new Error("HELP_VIDEO_TRANSCRIPTION_EMPTY");
     return text.slice(0, 180_000);
@@ -278,14 +320,31 @@ function articleSchema(): Record<string, unknown> {
   return {
     type: "object",
     additionalProperties: false,
-    required: ["title", "slug", "summary", "quickGuide", "categories", "searchAliases", "assistantKnowledge", "steps"],
+    required: [
+      "title",
+      "slug",
+      "summary",
+      "quickGuide",
+      "categories",
+      "searchAliases",
+      "assistantKnowledge",
+      "steps",
+    ],
     properties: {
       title: { type: "string", minLength: 4, maxLength: 160 },
       slug: { type: "string", minLength: 1, maxLength: 120 },
       summary: { type: "string", maxLength: 320 },
       quickGuide: { type: "string", minLength: 1, maxLength: 12000 },
-      categories: { type: "array", maxItems: 12, items: { type: "string", maxLength: 120 } },
-      searchAliases: { type: "array", maxItems: 40, items: { type: "string", maxLength: 160 } },
+      categories: {
+        type: "array",
+        maxItems: 12,
+        items: { type: "string", maxLength: 120 },
+      },
+      searchAliases: {
+        type: "array",
+        maxItems: 40,
+        items: { type: "string", maxLength: 160 },
+      },
       assistantKnowledge: { type: "string", maxLength: 20000 },
       steps: {
         type: "array",
@@ -360,7 +419,7 @@ async function generateArticle(
         "Use Markdown seguro nos textos: **negrito**, *itálico*, `código`, listas e emojis.",
         "quickGuide deve ser curto, sequencial e útil sem abrir o passo a passo completo.",
         "Escolha somente frames que realmente ajudam a executar ou confirmar uma ação.",
-        "Os frames são screenshots da tela inteira do F10; nunca peça recortes. frameIndex começa em 1.",
+        "Os frames representam a tela inteira do F10; nunca peça ou proponha recortes. frameIndex começa em 1.",
         `Categorias permitidas: ${categories.map((category) => `${category.slug} (${category.name})`).join(", ") || UNCATEGORIZED_HELP_CATEGORY_SLUG}.`,
         `Se nenhuma categoria real for segura, use somente ${UNCATEGORIZED_HELP_CATEGORY_SLUG}.`,
         "A descrição adicional de screenshot deve conter apenas informação visual útil que não esteja clara no texto.",
@@ -425,7 +484,13 @@ function categorySlugs(
   available: HelpVideoAutomationCategory[],
 ): string[] {
   const allowed = new Set(available.map((category) => category.slug));
-  const result = Array.from(new Set(generated.map((value) => normalizeSlug(value)).filter((value) => allowed.has(value))));
+  const result = Array.from(
+    new Set(
+      generated
+        .map((value) => normalizeSlug(value))
+        .filter((value) => allowed.has(value)),
+    ),
+  );
   return result.length > 0 ? result : [UNCATEGORIZED_HELP_CATEGORY_SLUG];
 }
 
@@ -443,7 +508,7 @@ async function buildImportResult(input: {
   const usedFrames = new Set<number>();
   let selectedScreenshotCount = 0;
 
-  const steps = [] as HelpImportFile["contents"][number]["steps"];
+  const steps: HelpImportFile["contents"][number]["steps"] = [];
   for (const [stepIndex, step] of input.article.steps.entries()) {
     const blocks: HelpImportFile["contents"][number]["steps"][number]["blocks"] = [
       { type: "text", text: step.instruction.trim() },
@@ -452,8 +517,10 @@ async function buildImportResult(input: {
     for (const screenshot of step.screenshots ?? []) {
       const frameIndex = Math.round(Number(screenshot.frameIndex));
       if (frameIndex < 1 || frameIndex > input.framePaths.length || usedFrames.has(frameIndex)) continue;
+      const framePath = input.framePaths[frameIndex - 1];
+      if (!framePath) continue;
       usedFrames.add(frameIndex);
-      const frameBytes = await readFile(input.framePaths[frameIndex - 1]);
+      const frameBytes = await readFile(framePath);
       screenshotIndex += 1;
       selectedScreenshotCount += 1;
       const path = `screenshots/${slug}/step-${String(stepIndex + 1).padStart(2, "0")}-${String(screenshotIndex).padStart(2, "0")}.jpg`;
@@ -499,8 +566,12 @@ async function buildImportResult(input: {
       slug,
       summary: input.article.summary.trim().slice(0, 320),
       quickGuide: input.article.quickGuide.trim().slice(0, 12_000),
-      categories: categorySlugs(input.article.categories, input.categories).map((categorySlug) => ({ slug: categorySlug })),
-      searchAliases: Array.from(new Set(input.article.searchAliases.map((value) => value.trim()).filter(Boolean))).slice(0, 80),
+      categories: categorySlugs(input.article.categories, input.categories).map((categorySlug) => ({
+        slug: categorySlug,
+      })),
+      searchAliases: Array.from(
+        new Set(input.article.searchAliases.map((value) => value.trim()).filter(Boolean)),
+      ).slice(0, 80),
       assistantKnowledge: input.article.assistantKnowledge.trim().slice(0, 40_000),
       internalSupportNotes: "",
       featuredVideo,
@@ -546,7 +617,10 @@ export async function generateHelpImportFromVideo(input: {
       if (input.source.bytes.byteLength < 1 || input.source.bytes.byteLength > MAX_UPLOAD_VIDEO_BYTES) {
         throw new Error("HELP_VIDEO_UPLOAD_SIZE_INVALID");
       }
-      if (input.source.mimeType.toLowerCase() !== "video/mp4" && !input.source.fileName.toLowerCase().endsWith(".mp4")) {
+      if (
+        input.source.mimeType.toLowerCase() !== "video/mp4" &&
+        !input.source.fileName.toLowerCase().endsWith(".mp4")
+      ) {
         throw new Error("HELP_VIDEO_UPLOAD_FORMAT_INVALID");
       }
       videoPath = join(directory, "source.mp4");
