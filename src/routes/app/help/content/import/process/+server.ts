@@ -33,6 +33,7 @@ function automationErrorMessage(code: string): string {
   }
   if (code === "HELP_VIDEO_UPLOAD_FORMAT_INVALID") return "Use um arquivo .mp4 válido.";
   if (code === "HELP_VIDEO_TRANSCRIPTION_EMPTY") return "A transcrição retornou vazia. Revise o áudio do vídeo.";
+  if (code === "HELP_VIDEO_TRANSCRIPTION_TIMESTAMPS_EMPTY") return "A transcrição não retornou os tempos necessários para gerar os screenshots.";
   if (code === "HELP_VIDEO_TRANSCRIPTION_TIMEOUT") return "A transcrição demorou mais que o limite permitido. Tente novamente.";
   if (code === "HELP_VIDEO_FRAMES_NOT_FOUND") return "O F10 não encontrou telas válidas para analisar no vídeo.";
   if (code === "HELP_VIDEO_ARTICLE_GENERATION_EMPTY") {
@@ -42,9 +43,14 @@ function automationErrorMessage(code: string): string {
     return "A OpenAI retornou um artigo estruturado inválido. Tente processar o vídeo novamente.";
   }
   if (code === "HELP_VIDEO_ARTICLE_GENERATION_TIMEOUT") {
-    return "A análise do vídeo pela OpenAI demorou mais que o limite permitido. Tente novamente.";
+    return "A análise textual do vídeo pela OpenAI demorou mais que o limite permitido. Tente novamente.";
   }
-  if (code === "HELP_VIDEO_NO_SCREENSHOTS_SELECTED") return "A análise não selecionou screenshots suficientes. Tente novamente ou use o fluxo por ZIP.";
+  if (code === "HELP_VIDEO_SCREENSHOTS_NOT_PLANNED") {
+    return "A IA estruturou o artigo, mas não definiu cortes para os passos visuais. O F10 não criou um artigo somente com texto.";
+  }
+  if (code === "HELP_VIDEO_NO_SCREENSHOTS_SELECTED") {
+    return "Os cortes foram planejados, mas o F10 não conseguiu extrair nenhum screenshot válido nas janelas indicadas.";
+  }
   if (code === "IMPORT_CONTENT_NOT_CREATED") return "O conteúdo foi analisado, mas o F10 não conseguiu criar o rascunho.";
   if (code === "IMPORT_VIDEO_NOT_CREATED") return "O conteúdo foi criado, mas o F10 não conseguiu salvar o vídeo principal.";
   if (code === "IMPORT_STEP_NOT_CREATED") return "O F10 não conseguiu salvar uma das etapas do conteúdo gerado.";
