@@ -29,7 +29,6 @@
   const blockLabels: Record<string, string> = {
     text: "Texto",
     image: "Imagem",
-    video: "Vídeo legado",
     notice: "Aviso",
     link: "Link",
     file: "Arquivo",
@@ -150,8 +149,8 @@
             {:else}
               <div class="mt-4 space-y-4">
                 {#each step.blocks as block, blockIndex}
-                  <div class={`rounded-2xl border p-4 sm:p-5 ${block.blockType === "video" ? "border-[#F0C8C8] bg-[#FFF8F7]" : "border-[#E3E6ED] bg-[#FAFAFC]"}`}>
-                    <div class="flex items-center justify-between gap-3"><span class="application-text-meta inline-flex items-center gap-2 font-bold uppercase tracking-[0.08em] text-[#737989]">{#if block.blockType === "text" || block.blockType === "file"}<FileText size={14}/>{:else if block.blockType === "image"}<ImageIcon size={14}/>{:else if block.blockType === "video"}<Video size={14}/>{:else if block.blockType === "link"}<Link2 size={14}/>{:else}<Info size={14}/>{/if}{blockLabels[block.blockType] ?? block.blockType} {blockIndex + 1}</span>{#if data.canEdit}<form method="POST" action="?/deleteBlock"><input type="hidden" name="blockId" value={block.id}/><button type="submit" class="flex h-8 w-8 items-center justify-center rounded-lg text-[#969BA7] hover:text-[#A52A2A]" aria-label="Remover bloco"><Trash2 size={14}/></button></form>{/if}</div>
+                  <div class="rounded-2xl border border-[#E3E6ED] bg-[#FAFAFC] p-4 sm:p-5">
+                    <div class="flex items-center justify-between gap-3"><span class="application-text-meta inline-flex items-center gap-2 font-bold uppercase tracking-[0.08em] text-[#737989]">{#if block.blockType === "text" || block.blockType === "file"}<FileText size={14}/>{:else if block.blockType === "image"}<ImageIcon size={14}/>{:else if block.blockType === "link"}<Link2 size={14}/>{:else}<Info size={14}/>{/if}{blockLabels[block.blockType] ?? block.blockType} {blockIndex + 1}</span>{#if data.canEdit}<form method="POST" action="?/deleteBlock"><input type="hidden" name="blockId" value={block.id}/><button type="submit" class="flex h-8 w-8 items-center justify-center rounded-lg text-[#969BA7] hover:text-[#A52A2A]" aria-label="Remover bloco"><Trash2 size={14}/></button></form>{/if}</div>
 
                     {#if block.blockType === "text" || block.blockType === "notice"}
                       <form method="POST" action="?/updateBlock" class="mt-4 space-y-3"><input type="hidden" name="blockId" value={block.id}/><input type="hidden" name="blockType" value={block.blockType}/><textarea name="textContent" required maxlength="50000" rows="5" class="w-full resize-y rounded-xl border border-[#DDE1EA] bg-white px-3 py-2.5 text-[12px] leading-6">{block.textContent}</textarea>{#if block.blockType === "notice"}<select name="noticeVariant" value={block.noticeVariant ?? "info"} class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"><option value="info">Informação</option><option value="warning">Atenção</option><option value="success">Sucesso</option><option value="danger">Perigo</option></select>{/if}{#if data.canEdit}<div class="flex justify-end"><button type="submit" class="application-text-caption min-h-9 rounded-xl bg-white px-3 font-semibold text-[#000A57] ring-1 ring-[#DDE1EA]">Salvar bloco</button></div>{/if}</form>
@@ -162,8 +161,6 @@
                       <form method="POST" action="?/updateBlock" class="mt-4 grid gap-3 lg:grid-cols-2"><input type="hidden" name="blockId" value={block.id}/><input type="hidden" name="blockType" value="link"/><input name="linkLabel" required maxlength="240" value={block.linkLabel ?? ""} class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"/><input name="linkUrl" required value={block.linkUrl ?? ""} class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"/>{#if data.canEdit}<div class="flex justify-end lg:col-span-2"><button type="submit" class="application-text-caption min-h-9 rounded-xl bg-white px-3 font-semibold text-[#000A57] ring-1 ring-[#DDE1EA]">Salvar link</button></div>{/if}</form>
                     {:else if block.blockType === "file" && block.asset}
                       <div class="mt-4 rounded-xl border border-[#DDE1EA] bg-white p-3"><strong class="text-[11px] text-[#303645]">{block.linkLabel || block.asset.originalName || "Arquivo"}</strong>{#if block.asset.extractedText}<p class="mt-2 line-clamp-4 whitespace-pre-wrap text-[10px] leading-5 text-[#777D8D]">{block.asset.extractedText}</p>{/if}</div>
-                    {:else if block.blockType === "video"}
-                      <p class="mt-3 rounded-xl bg-white px-3 py-2 text-[10px] leading-5 text-[#8D3333]">Vídeo legado. Remova este bloco e use o Vídeo principal.</p>
                     {/if}
                   </div>
                 {/each}
