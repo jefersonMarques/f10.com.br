@@ -2,8 +2,10 @@
   import { Download, ExternalLink, Eye, Info, PlayCircle, Sparkles, TriangleAlert } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
+  import HelpAnnotatedImage from "$lib/components/help/HelpAnnotatedImage.svelte";
   import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
   import HelpRichText from "$lib/components/help/HelpRichText.svelte";
+  import { readHelpImageAnnotationsFromMetadata } from "$lib/help/helpImageAnnotations";
   import type { PageData } from "./$types";
 
   export let data: PageData;
@@ -82,7 +84,7 @@
               <div id={`help-block-${block.id}`} data-help-block-id={block.id} data-help-block-type={block.blockType} class="scroll-mt-24">
                 {#if block.blockType === "text"}<HelpRichText text={block.textContent} className="space-y-1.5 text-[13px] leading-7 text-[#505767]"/>
                 {:else if block.blockType === "notice"}<div class={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${block.noticeVariant === "warning" || block.noticeVariant === "danger" ? "border-[#F0D0C8] bg-[#FFF8F5]" : "border-[#D8DEF2] bg-[#F8F9FF]"}`}>{#if block.noticeVariant === "warning" || block.noticeVariant === "danger"}<TriangleAlert size={16}/>{:else}<Info size={16}/>{/if}<HelpRichText text={block.textContent} className="min-w-0 space-y-1 text-[11px] leading-6"/></div>
-                {:else if block.blockType === "image" && block.asset}{@const imageUrl = block.asset.storageKey ? assetUrl(block.asset.id) : block.asset.sourceUrl}{#if imageUrl}<img src={imageUrl} alt={block.asset.altText || "Imagem do passo"} class="w-full rounded-2xl border border-[#E6E8EE] object-contain" />{/if}
+                {:else if block.blockType === "image" && block.asset}{@const imageUrl = block.asset.storageKey ? assetUrl(block.asset.id) : block.asset.sourceUrl}{#if imageUrl}<HelpAnnotatedImage src={imageUrl} alt={block.asset.altText || "Imagem do passo"} annotations={readHelpImageAnnotationsFromMetadata(block.metadata)} className="rounded-2xl border border-[#E6E8EE] bg-white" />{/if}
                 {:else if block.blockType === "file" && block.asset}{@const fileUrl = block.asset.storageKey ? assetUrl(block.asset.id) : block.asset.sourceUrl}{#if fileUrl}<a href={fileUrl} target="_blank" rel="noopener noreferrer" class="flex items-center justify-between rounded-2xl border border-[#E1E4EC] bg-[#FAFAFC] px-4 py-4"><span class="text-[11px] font-semibold text-[#303645]">{block.linkLabel || "Baixar arquivo"}</span><Download size={17} class="text-[#000A57]"/></a>{/if}
                 {:else if block.blockType === "link" && block.linkUrl}<a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption inline-flex items-center gap-2 rounded-xl bg-[#EEF0FF] px-4 py-2.5 font-semibold text-[#000A57]">{block.linkLabel || "Abrir link"}<ExternalLink size={12}/></a>{/if}
               </div>
