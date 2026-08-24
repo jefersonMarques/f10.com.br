@@ -19,7 +19,10 @@
   } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
+  import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
+  import HelpQuickGuideEditor from "$lib/components/help/HelpQuickGuideEditor.svelte";
   import HelpImageUploader from "$lib/components/operations/HelpImageUploader.svelte";
+  import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -54,10 +57,14 @@
       (block) => Boolean(block.asset?.altText.trim() || block.asset?.assistantDescription.trim()),
     );
   });
+  $: realCategoriesReady =
+    data.content.categories.length > 0 &&
+    data.content.categories.every(
+      (category) => category.active && category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG,
+    );
   $: videoReady = !data.content.featuredVideo || Boolean(data.content.featuredVideo.subtitles.trim());
   $: publicationReady =
-    data.content.categories.length > 0 &&
-    data.content.categories.every((category) => category.active) &&
+    realCategoriesReady &&
     data.content.steps.length > 0 &&
     stepsWithContent === data.content.steps.length &&
     imageOnlyStepsReady &&
@@ -125,11 +132,11 @@
         <label class="block lg:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Resumo público</span><textarea name="summary" maxlength="320" rows="3" class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[12px] leading-5">{data.content.summary}</textarea></label>
 
         <section class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4 lg:col-span-2">
-          <div><h3 class="text-[12px] font-semibold text-[#303645]">Categorias *</h3><p class="mt-1 text-[10px] leading-5 text-[#858A98]">Selecione uma ou mais. O link específico substitui o link operacional padrão da categoria somente para este artigo.</p></div>
+          <div><h3 class="text-[12px] font-semibold text-[#303645]">Categorias *</h3><p class="mt-1 text-[10px] leading-5 text-[#858A98]">Selecione uma ou mais categorias reais. “Sem categoria” pode existir em rascunhos automáticos, mas bloqueia publicação.</p></div>
           <div class="mt-4 grid gap-3 lg:grid-cols-2">
             {#each data.categories as category}
               <div class={`rounded-xl border p-3 ${assignedCategory(category.id) ? "border-[#BFC7F4] bg-white" : "border-[#E2E5ED] bg-white"}`}>
-                <label class="flex items-center gap-2 text-[11px] font-semibold text-[#333A4A]"><input type="checkbox" name="categoryId" value={category.id} checked={Boolean(assignedCategory(category.id))} disabled={!category.active && !assignedCategory(category.id)} class="h-4 w-4" />{category.icon ? `${category.icon} ` : ""}{category.name}{#if !category.active}<span class="text-[9px] text-[#9B2C2C]">inativa</span>{/if}</label>
+                <label class="flex items-center gap-2 text-[11px] font-semibold text-[#333A4A]"><input type="checkbox" name="categoryId" value={category.id} checked={Boolean(assignedCategory(category.id))} disabled={!category.active && !assignedCategory(category.id)} class="h-4 w-4" /><HelpCategoryIcon name={category.icon} size={15}/>{category.name}{#if category.slug === UNCATEGORIZED_HELP_CATEGORY_SLUG}<span class="text-[9px] text-[#A9510D]">rascunho</span>{:else if !category.active}<span class="text-[9px] text-[#9B2C2C]">inativa</span>{/if}</label>
                 <input name={`categoryDestination:${category.id}`} maxlength="1000" value={assignedCategory(category.id)?.destinationUrl ?? ""} placeholder={category.destinationUrl || "Link específico opcional"} class="mt-2 h-9 w-full rounded-lg border border-[#DDE1EA] px-3 text-[10px]" />
                 {#if category.destinationUrl}<p class="mt-1 text-[9px] text-[#9297A5]">Padrão: {category.destinationUrl}</p>{/if}
               </div>
@@ -162,6 +169,8 @@
     {#if data.canEdit && data.content.featuredVideo}<form method="POST" action="?/deleteFeaturedVideo" class="mt-3 flex justify-end" on:submit={(event) => { if (!confirm("Remover o vídeo principal?")) event.preventDefault(); }}><button type="submit" class="application-text-caption inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#F0C8C8] bg-white px-3 font-semibold text-[#9B2C2C]"><Trash2 size={14}/>Remover vídeo</button></form>{/if}
   </section>
 
+  <HelpQuickGuideEditor contentId={data.content.id} value={data.content.quickGuide} canEdit={data.canEdit}/>
+
   <div class="mt-5 space-y-5">
     {#each data.content.steps as step, stepIndex}
       <article class="overflow-hidden rounded-[22px] border border-[#DDE1EA] bg-white">
@@ -172,14 +181,14 @@
             <input type="hidden" name="stepId" value={step.id}/>
             <fieldset disabled={!data.canEdit} class="contents disabled:opacity-70">
               <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Título do passo</span><input name="title" required maxlength="180" value={step.title} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]" /></label>
-              <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Descrição pública</span><input name="description" maxlength="2000" value={step.description} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]" /></label>
+              <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Descrição pública</span><input name="description" maxlength="2000" value={step.description} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]" /><span class="mt-1 block text-[9px] text-[#9297A5]">Aceita **negrito**, *itálico*, `código` e emojis.</span></label>
               <label class="block rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4 lg:col-span-2"><span class="application-text-caption flex items-center gap-2 font-semibold text-[#000A57]"><BrainCircuit size={14}/>Conhecimento adicional do assistente</span><span class="mt-1 block text-[10px] text-[#777D8D]">Deixe vazio se o conteúdo público do passo já for suficiente.</span><textarea name="assistantKnowledge" maxlength="20000" rows="4" class="mt-3 w-full resize-y rounded-xl border border-[#D8DDF4] bg-white px-3 py-2.5 text-[11px] leading-5">{step.assistantKnowledge}</textarea></label>
               {#if data.canEdit}<div class="flex justify-end lg:col-span-2"><button type="submit" class="application-text-caption inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 font-semibold text-[#000A57]"><Save size={14}/>Salvar passo</button></div>{/if}
             </fieldset>
           </form>
 
           <section class="mt-7 border-t border-[#EEF0F5] pt-6">
-            <div><h3 class="text-[13px] font-semibold text-[#303645]">Conteúdo visível deste passo</h3><p class="application-text-caption mt-1 text-[#9297A5]">Texto público já é conhecimento do assistente; não repita a mesma informação em campos adicionais.</p></div>
+            <div><h3 class="text-[13px] font-semibold text-[#303645]">Conteúdo visível deste passo</h3><p class="application-text-caption mt-1 text-[#9297A5]">Textos e avisos aceitam **negrito**, *itálico*, `código`, listas e emojis. O texto público já é conhecimento do assistente.</p></div>
 
             {#if step.blocks.length === 0}
               <div class="mt-4 rounded-2xl border border-dashed border-[#D6DAE3] bg-[#FAFAFC] px-5 py-8 text-center"><p class="text-[11px] font-semibold text-[#5F6574]">Este passo ainda está vazio.</p></div>
@@ -206,7 +215,7 @@
 
             {#if data.canEdit}
               <div class="mt-5 grid gap-3 lg:grid-cols-2">
-                <details class="rounded-2xl border border-[#DDE1EA] bg-white p-4"><summary class="application-text-caption flex cursor-pointer list-none items-center gap-2 font-semibold text-[#000A57]"><FileText size={15}/>Adicionar texto</summary><form method="POST" action="?/addBlock" class="mt-4 space-y-3"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockType" value="text"/><textarea name="textContent" required maxlength="50000" rows="5" placeholder="Explique o que o usuário deve fazer." class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2 text-[11px] leading-5"></textarea><button type="submit" class="application-text-caption min-h-9 w-full rounded-xl bg-[#000A57] px-3 font-semibold text-white">Adicionar texto</button></form></details>
+                <details class="rounded-2xl border border-[#DDE1EA] bg-white p-4"><summary class="application-text-caption flex cursor-pointer list-none items-center gap-2 font-semibold text-[#000A57]"><FileText size={15}/>Adicionar texto</summary><form method="POST" action="?/addBlock" class="mt-4 space-y-3"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockType" value="text"/><p class="text-[9px] leading-4 text-[#9297A5]">Use **negrito**, *itálico*, `código`, listas e emojis quando ajudarem a destacar a ação.</p><textarea name="textContent" required maxlength="50000" rows="5" placeholder="Explique o que o usuário deve fazer." class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2 text-[11px] leading-5"></textarea><button type="submit" class="application-text-caption min-h-9 w-full rounded-xl bg-[#000A57] px-3 font-semibold text-white">Adicionar texto</button></form></details>
                 <HelpImageUploader contentId={data.content.id} stepId={step.id}/>
                 <details class="rounded-2xl border border-[#DDE1EA] bg-white p-4"><summary class="application-text-caption cursor-pointer font-semibold text-[#000A57]">Adicionar aviso</summary><form method="POST" action="?/addBlock" class="mt-4 space-y-3"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockType" value="notice"/><textarea name="textContent" required rows="3" maxlength="50000" class="w-full rounded-xl border border-[#DDE1EA] px-3 py-2 text-[11px]"></textarea><select name="noticeVariant" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"><option value="info">Informação</option><option value="warning">Atenção</option><option value="success">Sucesso</option><option value="danger">Perigo</option></select><button type="submit" class="application-text-caption min-h-9 w-full rounded-xl bg-[#000A57] px-3 font-semibold text-white">Adicionar aviso</button></form></details>
                 <details class="rounded-2xl border border-[#DDE1EA] bg-white p-4"><summary class="application-text-caption cursor-pointer font-semibold text-[#000A57]">Adicionar link</summary><form method="POST" action="?/addBlock" class="mt-4 space-y-3"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockType" value="link"/><input name="linkLabel" required maxlength="240" placeholder="Texto do link" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/><input name="linkUrl" required placeholder="https://..." class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/><button type="submit" class="application-text-caption min-h-9 w-full rounded-xl bg-[#000A57] px-3 font-semibold text-white">Adicionar link</button></form></details>
@@ -230,7 +239,7 @@
         </div>
 
         <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if data.content.categories.length > 0 && data.content.categories.every((category) => category.active)}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Categorias</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{data.content.categories.length} associada{data.content.categories.length === 1 ? "" : "s"}. Pelo menos uma categoria ativa é obrigatória.</p></div>
+          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if realCategoriesReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Categorias reais</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">“Sem categoria” serve somente para criação automática e precisa ser substituída antes de publicar.</p></div>
           <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if stepsWithContent === data.content.steps.length && data.content.steps.length > 0}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Passos públicos</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{stepsWithContent}/{data.content.steps.length} com conteúdo público estruturado.</p></div>
           <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if imageOnlyStepsReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Imagens compreensíveis</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{describedImageCount}/{imageBlocks.length} imagens possuem texto alternativo ou descrição adicional.</p></div>
           <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if videoReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Vídeo e subtitles</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{data.content.featuredVideo ? (videoReady ? "Vídeo com fonte textual disponível." : "Vídeo sem subtitles.") : "Sem vídeo principal."}</p></div>
