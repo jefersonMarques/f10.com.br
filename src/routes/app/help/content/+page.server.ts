@@ -23,6 +23,17 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function isManualCategoryAllowed(
+  category: { id: string; slug: string; active: boolean },
+  categoryId: string,
+): boolean {
+  return (
+    category.id === categoryId &&
+    category.active &&
+    category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG
+  );
+}
+
 export const load: PageServerLoad = async ({ parent }) => {
   const layout = await parent();
   const permissions = new Map(
@@ -87,6 +98,15 @@ export const actions: Actions = {
       return fail(400, {
         success: false,
         message: "Selecione uma categoria para o conteúdo.",
+        values,
+      });
+    }
+
+    const categories = await listHelpCategories(true);
+    if (!categories.some((category) => isManualCategoryAllowed(category, categoryId))) {
+      return fail(400, {
+        success: false,
+        message: "Selecione uma categoria editorial ativa. “Sem categoria” é reservada às importações automáticas.",
         values,
       });
     }
