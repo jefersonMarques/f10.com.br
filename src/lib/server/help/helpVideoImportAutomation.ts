@@ -88,6 +88,7 @@ type GeneratedArticle = {
 export type HelpVideoAutomationResult = {
   file: HelpImportFile;
   assets: Map<string, HelpImportPackageAsset>;
+  transcript: string;
   transcriptChars: number;
   analyzedFrameCount: number;
   selectedScreenshotCount: number;
@@ -432,6 +433,10 @@ function articlePrompt(categories: HelpVideoAutomationCategory[], transcript: st
   return [
     "Crie um único artigo operacional da Base de Conhecimento F10 a partir da transcrição e dos frames cronológicos.",
     "Não invente telas, ações, regras ou URLs.",
+    "Preserve como fatos prioritários todas as obrigatoriedades, condições, exceções e dependências explicitamente ditas na transcrição, especialmente expressões como 'é obrigatório', 'precisa', 'deve', 'somente', 'se', 'caso', 'exceto' e 'não pode'.",
+    "Nunca generalize uma regra condicional. Exemplo: se a fonte disser que `E-mail` é obrigatório quando o funcionário também é `Usuário`, não transforme isso em obrigação para todo funcionário.",
+    "Quando uma condição ou obrigatoriedade ajuda o cliente a executar corretamente o procedimento, declare-a no texto público do step correspondente.",
+    "Use assistantKnowledge para preservar regras seguras para o cliente, condições e exceções importantes que estejam explícitas na transcrição mas não precisem aparecer integralmente no artigo. Não descarte esses fatos.",
     "Use Markdown seguro nos textos: **negrito**, *itálico*, `código`, listas e emojis.",
     "Para nomes literais da interface, caminhos, menus, botões, campos, status, códigos e valores, prefira inline code: `Cadastros > Funcionários`, `Salvar`, `E-mail`, `Ativo`, `F10-123`.",
     "Reserve negrito para ênfase semântica e para a numeração; não use negrito como padrão para nomes de controles da interface.",
@@ -450,6 +455,7 @@ function articlePrompt(categories: HelpVideoAutomationCategory[], transcript: st
     `Categorias permitidas: ${categories.map((category) => `${category.slug} (${category.name})`).join(", ") || UNCATEGORIZED_HELP_CATEGORY_SLUG}.`,
     `Se nenhuma categoria real for segura, use somente ${UNCATEGORIZED_HELP_CATEGORY_SLUG}.`,
     "altText e assistantDescription devem descrever somente o que está realmente visível no screenshot escolhido e servir como verificação adicional de coerência.",
+    "Exemplo de regra condicional correta: Se o funcionário também for `Usuário` e fizer login no F10, o campo `E-mail` é obrigatório e deve ser válido para receber o link de definição de senha.",
     "Exemplo de instruction correta: **1.** Abra `Cadastros > Funcionários`.\n**2.** Clique no botão de inclusão para criar um novo cadastro.\n\nNessa mesma área também ficam as ações de edição, exclusão e filtro.",
     "TRANSCRIÇÃO:",
     transcript,
@@ -623,6 +629,7 @@ async function buildImportResult(input: {
   return {
     file,
     assets,
+    transcript: input.transcript,
     transcriptChars: input.transcript.length,
     analyzedFrameCount: input.framePaths.length,
     selectedScreenshotCount,
