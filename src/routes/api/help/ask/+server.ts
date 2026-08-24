@@ -95,38 +95,37 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
     });
     const latencyMs = Date.now() - knowledgeStartedAt;
 
-    await Promise.all([
-      finishHelpPublicAiRequest(requestId, {
-        status:
-          result.resolution === "answered" || result.resolution === "navigate"
-            ? "answered"
-            : "not_found",
-        model: result.model ?? "",
-        inputTokens: result.inputTokens,
-        outputTokens: result.outputTokens,
-      }),
-      recordHelpKnowledgeRun({
-        source: "public",
-        scope: scope.type,
-        searchEventId: result.searchEventId,
-        question,
-        contextSlug: scope.type === "article" ? scope.slug : "",
-        resolution: result.resolution,
-        target: result.target
-          ? {
-              contentId: result.target.contentId,
-              slug: result.target.slug,
-              targetType: result.target.targetType,
-            }
-          : null,
-        sources: result.sources,
-        model: result.model,
-        providerResponseId: result.providerResponseId,
-        inputTokens: result.inputTokens,
-        outputTokens: result.outputTokens,
-        latencyMs,
-      }),
-    ]);
+    await finishHelpPublicAiRequest(requestId, {
+      status:
+        result.resolution === "answered" || result.resolution === "navigate"
+          ? "answered"
+          : "not_found",
+      model: result.model ?? "",
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+    });
+
+    await recordHelpKnowledgeRun({
+      source: "public",
+      scope: scope.type,
+      searchEventId: result.searchEventId,
+      question,
+      contextSlug: scope.type === "article" ? scope.slug : "",
+      resolution: result.resolution,
+      target: result.target
+        ? {
+            contentId: result.target.contentId,
+            slug: result.target.slug,
+            targetType: result.target.targetType,
+          }
+        : null,
+      sources: result.sources,
+      model: result.model,
+      providerResponseId: result.providerResponseId,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      latencyMs,
+    }).catch(() => undefined);
 
     return json(
       {
