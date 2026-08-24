@@ -2,6 +2,7 @@
   import {
     Archive,
     ArrowRight,
+    BarChart3,
     BookOpenCheck,
     CircleAlert,
     ExternalLink,
@@ -54,6 +55,7 @@
 
 <ApplicationContent width="wide">
   <div class="mb-3 flex flex-wrap justify-end gap-2">
+    <a href="/app/help/insights" class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57]"><BarChart3 size={15}/>Insights</a>
     <a href="/app/help/categories" class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57]">Categorias</a>
     <a href="/app/help/assets" class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57]"><HardDrive size={15}/>Biblioteca</a>
     {#if data.canEdit}<a href="/app/help/content/import" class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57]"><UploadCloud size={15}/>Importar</a>{/if}
@@ -120,26 +122,12 @@
 </ApplicationContent>
 
 {#if deleteTarget}
-  <div class="fixed inset-0 z-[120] flex items-center justify-center bg-[#050A1A]/55 px-4" role="presentation" on:click={(event) => event.currentTarget === event.target && closeDeleteModal()}>
-    <section role="dialog" aria-modal="true" aria-labelledby="delete-help-content-title" class="w-full max-w-[520px] rounded-[24px] border border-[#F0C8C8] bg-white p-5 shadow-2xl sm:p-6">
-      <div class="flex items-start justify-between gap-4">
-        <div><h2 id="delete-help-content-title" class="text-[17px] font-semibold text-[#7F2525]">Excluir rascunho definitivamente</h2><p class="mt-1 text-[11px] leading-5 text-[#777D8D]">{deleteTarget.title}</p></div>
-        <button type="button" on:click={closeDeleteModal} class="flex h-9 w-9 items-center justify-center rounded-lg text-[#777D8D] hover:bg-[#F3F4F7]" aria-label="Fechar"><X size={16}/></button>
-      </div>
-
-      <div class="mt-4 rounded-2xl border border-[#F2DADA] bg-[#FFF7F7] px-4 py-3 text-[10px] leading-5 text-[#7D4A4A]">
-        Esta ação remove o conteúdo, versões editoriais, publicação e índice de pesquisa relacionados. Não pode ser desfeita.
-        {#if deleteTarget.hasPublicVersion}<strong class="mt-2 block text-[#8C2F2F]">Este rascunho ainda possui uma versão pública anterior. Ela também será retirada imediatamente.</strong>{/if}
-      </div>
-
-      <form method="POST" action="?/discard" class="mt-5 space-y-4">
-        <input type="hidden" name="contentId" value={deleteTarget.id}/>
-        <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Digite <strong>quero excluir</strong> para confirmar</span><input name="confirmation" bind:value={deleteConfirmation} autocomplete="off" autofocus class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#9B2C2C]" /></label>
-        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button type="button" on:click={closeDeleteModal} class="min-h-10 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#626979]">Cancelar</button>
-          <button type="submit" disabled={!deleteConfirmationReady} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#9B2C2C] px-4 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Trash2 size={14}/>Excluir definitivamente</button>
-        </div>
-      </form>
+  <div class="fixed inset-0 z-[130] flex items-center justify-center bg-[#0B1020]/60 p-4 backdrop-blur-sm" role="presentation" on:click={(event) => event.currentTarget === event.target && closeDeleteModal()}>
+    <section class="w-full max-w-[520px] rounded-[24px] border border-white/20 bg-white p-5 shadow-2xl sm:p-6" role="dialog" aria-modal="true" aria-labelledby="help-delete-title">
+      <div class="flex items-start justify-between gap-4"><div><h2 id="help-delete-title" class="text-[16px] font-semibold text-[#11182C]">Excluir rascunho</h2><p class="mt-1 text-[10px] leading-5 text-[#7C8291]">Esta exclusão é permanente para o conteúdo estruturado atual.</p></div><button type="button" on:click={closeDeleteModal} class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F3F4F7] text-[#6E7482]" aria-label="Fechar"><X size={16}/></button></div>
+      <div class="mt-5 rounded-2xl border border-[#F0C8C8] bg-[#FFF7F7] px-4 py-3 text-[10px] leading-5 text-[#7C3A3A]"><strong class="block text-[11px]">{deleteTarget.title}</strong>{#if deleteTarget.hasPublicVersion}<span class="mt-1 block">Existe uma publicação vinculada; o histórico público também será removido.</span>{:else}<span class="mt-1 block">Passos, blocos e vínculos públicos deste rascunho serão removidos.</span>{/if}</div>
+      <label class="mt-5 block"><span class="text-[10px] font-semibold text-[#4D5361]">Digite <strong>quero excluir</strong> para confirmar</span><input bind:value={deleteConfirmation} autocomplete="off" class="mt-2 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]" placeholder="quero excluir"/></label>
+      <div class="mt-5 flex justify-end gap-2"><button type="button" on:click={closeDeleteModal} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[10px] font-semibold text-[#626979]">Cancelar</button><form method="POST" action="?/delete"><input type="hidden" name="contentId" value={deleteTarget.id}/><input type="hidden" name="confirmation" value={deleteConfirmation}/><button type="submit" disabled={!deleteConfirmationReady} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#9B2C2C] px-4 text-[10px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Trash2 size={13}/>Excluir permanentemente</button></form></div>
     </section>
   </div>
 {/if}
