@@ -31,7 +31,8 @@ export async function publishHelpKnowledgeContent(
 
   if (!publication) throw new Error("HELP_PUBLICATION_NOT_FOUND");
 
-  const { assistant: _assistant, ...snapshot } = publication.snapshot;
+  const snapshot = { ...publication.snapshot };
+  delete snapshot.assistant;
 
   await db
     .update(helpPublications)
