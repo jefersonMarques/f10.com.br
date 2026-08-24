@@ -10,6 +10,7 @@
     Sparkles,
     TriangleAlert,
   } from "lucide-svelte";
+  import HelpAnnotatedImage from "$lib/components/help/HelpAnnotatedImage.svelte";
   import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
   import HelpRichText from "$lib/components/help/HelpRichText.svelte";
   import type { PageData } from "./$types";
@@ -139,7 +140,7 @@
                   <div class={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${block.noticeVariant === "warning" || block.noticeVariant === "danger" ? "border-[#F0D0C8] bg-[#FFF8F5] text-[#7D493D]" : "border-[#D8DEF2] bg-[#F8F9FF] text-[#4D587A]"}`}>{#if block.noticeVariant === "warning" || block.noticeVariant === "danger"}<TriangleAlert size={17} class="mt-0.5 shrink-0"/>{:else}<Info size={17} class="mt-0.5 shrink-0"/>{/if}<HelpRichText text={block.textContent} className="min-w-0 space-y-1 text-[12px] leading-6"/></div>
                 {:else if block.blockType === "image" && block.asset}
                   {@const imageUrl = block.asset.storageKey ? managedAssetUrl(block.asset.id) : block.asset.sourceUrl}
-                  {#if imageUrl}<figure class="overflow-hidden rounded-2xl border border-[#E6E8EE] bg-[#FAFAFC]"><img src={imageUrl} alt={block.asset.altText || "Imagem do passo"} loading="lazy" class="h-auto w-full object-contain" />{#if block.asset.altText}<figcaption class="border-t border-[#ECEEF3] px-4 py-2.5 text-[9px] text-[#848A99]">{block.asset.altText}</figcaption>{/if}</figure>{/if}
+                  {#if imageUrl}<figure class="rounded-2xl border border-[#E6E8EE] bg-[#FAFAFC]"><HelpAnnotatedImage src={imageUrl} alt={block.asset.altText || "Imagem do passo"} annotations={block.annotations}/>{#if block.asset.altText}<figcaption class="border-t border-[#ECEEF3] px-4 py-2.5 text-[9px] text-[#848A99]">{block.asset.altText}</figcaption>{/if}</figure>{/if}
                 {:else if block.blockType === "file" && block.asset}
                   {@const fileUrl = block.asset.storageKey ? managedAssetUrl(block.asset.id) : block.asset.sourceUrl}
                   {#if fileUrl}<a href={fileUrl} target="_blank" rel="noopener noreferrer" class="flex items-center justify-between gap-3 rounded-2xl border border-[#E1E4EC] bg-[#FAFAFC] px-4 py-4 transition hover:border-[#C8CEE0]"><span><strong class="block text-[11px] text-[#303645]">{block.linkLabel || "Baixar arquivo"}</strong><small class="mt-1 block text-[9px] text-[#8A909E]">Material complementar</small></span><Download size={18} class="text-[#000A57]"/></a>{/if}
