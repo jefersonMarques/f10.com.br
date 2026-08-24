@@ -230,7 +230,7 @@
           on:click={() => selectMode("mp4")}
           class={`rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${importMode === "mp4" ? "border-[#000A57] bg-[#F6F7FF] ring-1 ring-[#000A57]" : "border-[#E2E5ED] bg-[#FAFBFD] hover:border-[#C7CCDA]"}`}
         >
-          <span class="flex items-start gap-3"><FileVideo2 size={19} class="mt-0.5 shrink-0 text-[#000A57]"/><span><strong class="block text-[12px] text-[#2F3544]">Arquivo MP4</strong><small class="mt-1 block text-[9px] leading-4 text-[#858B99]">O F10 transcreve, analisa as telas e cria o rascunho automaticamente.</small><span class={`mt-3 inline-flex rounded-full px-2 py-1 text-[8px] font-bold ${mp4Available ? "bg-[#EAF7EE] text-[#2D7143]" : "bg-[#FFF0E9] text-[#A9510D]"}`}>{mp4Available ? "AUTOMAÇÃO DISPONÍVEL" : data.videoAutomation.enabled ? "OPENAI / FFMPEG PENDENTE" : "DESABILITADO PELO ADMIN"}</span></span></span>
+          <span class="flex items-start gap-3"><FileVideo2 size={19} class="mt-0.5 shrink-0 text-[#000A57]"/><span><strong class="block text-[12px] text-[#2F3544]">Arquivo MP4</strong><small class="mt-1 block text-[9px] leading-4 text-[#858B99]">O F10 transcreve com tempos, planeja os cortes e valida apenas screenshots relevantes.</small><span class={`mt-3 inline-flex rounded-full px-2 py-1 text-[8px] font-bold ${mp4Available ? "bg-[#EAF7EE] text-[#2D7143]" : "bg-[#FFF0E9] text-[#A9510D]"}`}>{mp4Available ? "AUTOMAÇÃO DISPONÍVEL" : data.videoAutomation.enabled ? "OPENAI / FFMPEG PENDENTE" : "DESABILITADO PELO ADMIN"}</span></span></span>
         </button>
 
         <button
@@ -277,7 +277,7 @@
   {:else if importMode === "mp4" || importMode === "youtube"}
     <section class="mt-4 rounded-[22px] border border-[#D8DDF4] bg-white p-5 sm:p-6">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div class="flex items-start gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Sparkles size={20}/></span><div><h2 class="text-[15px] font-semibold text-[#11182C]">2. Gerar automaticamente por {importMode === "youtube" ? "YouTube" : "MP4"}</h2><p class="application-text-caption mt-1 max-w-[650px] leading-5 text-[#858B99]">O F10 extrai áudio e telas, transcreve, estrutura as ações numeradas, escolhe screenshots da tela inteira e cria o rascunho.</p></div></div>
+        <div class="flex items-start gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Sparkles size={20}/></span><div><h2 class="text-[15px] font-semibold text-[#11182C]">2. Gerar automaticamente por {importMode === "youtube" ? "YouTube" : "MP4"}</h2><p class="application-text-caption mt-1 max-w-[650px] leading-5 text-[#858B99]">O F10 transcreve o áudio com timestamps, estrutura o artigo em texto, planeja janelas de captura e valida somente poucos frames candidatos por etapa.</p></div></div>
         <a href="/app/settings/help-video" class="application-text-meta w-fit rounded-lg border border-[#DDE1EA] px-3 py-2 font-semibold text-[#000A57]">Configuração</a>
       </div>
 
@@ -295,7 +295,7 @@
         <div class="mt-4 rounded-2xl border border-[#B9E6C9] bg-[#F1FBF4] px-4 py-3 text-[11px] font-medium text-[#176B35]"><div class="flex items-start gap-3"><CheckCircle2 size={18}/><span>{automaticResult.message}</span></div></div>
         <div class="mt-3 grid gap-3 sm:grid-cols-4">
           <div class="rounded-xl border border-[#E3E6EE] bg-[#FAFBFD] p-3"><span class="text-[8px] font-bold uppercase text-[#959AA8]">Transcrição</span><strong class="mt-1 block text-[14px]">{automaticResult.automation.transcriptChars}</strong><small class="text-[8px] text-[#9297A5]">caracteres</small></div>
-          <div class="rounded-xl border border-[#E3E6EE] bg-[#FAFBFD] p-3"><span class="text-[8px] font-bold uppercase text-[#959AA8]">Frames</span><strong class="mt-1 block text-[18px]">{automaticResult.automation.analyzedFrameCount}</strong></div>
+          <div class="rounded-xl border border-[#E3E6EE] bg-[#FAFBFD] p-3"><span class="text-[8px] font-bold uppercase text-[#959AA8]">Entradas visuais</span><strong class="mt-1 block text-[18px]">{automaticResult.automation.analyzedFrameCount}</strong></div>
           <div class="rounded-xl border border-[#E3E6EE] bg-[#FAFBFD] p-3"><span class="text-[8px] font-bold uppercase text-[#959AA8]">Screenshots</span><strong class="mt-1 block text-[18px]">{automaticResult.automation.selectedScreenshotCount}</strong></div>
           <div class="rounded-xl border border-[#E3E6EE] bg-[#FAFBFD] p-3"><span class="text-[8px] font-bold uppercase text-[#959AA8]">Etapas</span><strong class="mt-1 block text-[18px]">{automaticResult.summary.stepCount}</strong></div>
         </div>
@@ -306,13 +306,12 @@
         {#if importMode === "youtube"}
           <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6B]">URL do YouTube</span><input name="youtubeUrl" type="url" required placeholder="https://www.youtube.com/watch?v=..." class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/><span class="application-text-meta mt-1 block leading-4 text-[#9297A5]">A mesma URL será usada como vídeo principal do artigo.</span></label>
         {:else}
-          <label class="block rounded-2xl border border-dashed border-[#CBD0DC] bg-[#FAFBFD] p-5 text-center"><FileVideo2 size={27} class="mx-auto text-[#A7ADBA]"/><span class="mt-2 block text-[11px] font-semibold">Arquivo MP4 para análise</span><span class="application-text-meta mt-1 block text-[#9297A5]">Até {formatMegabytes(data.maxVideoBytes)}</span><input type="file" name="videoFile" accept="video/mp4,.mp4" required class="application-text-caption mx-auto mt-3 block max-w-full"/></label>
-          <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6B]">URL pública do vídeo no artigo <span class="font-normal text-[#9297A5]">(opcional)</span></span><input name="publishedVideoUrl" type="url" placeholder="https://..." class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/><span class="application-text-meta mt-1 block leading-4 text-[#9297A5]">Sem URL pública, o rascunho é criado sem vídeo principal.</span></label>
+          <label class="block rounded-2xl border border-dashed border-[#CBD0DC] bg-[#FAFBFD] p-5 text-center"><FileVideo2 size={27} class="mx-auto text-[#A7ADBA]"/><span class="mt-2 block text-[11px] font-semibold">Arquivo MP4 para análise e publicação</span><span class="application-text-meta mt-1 block text-[#9297A5]">Até {formatMegabytes(data.maxVideoBytes)} · o arquivo será armazenado e usado como vídeo principal</span><input type="file" name="videoFile" accept="video/mp4,.mp4" required class="application-text-caption mx-auto mt-3 block max-w-full"/></label>
         {/if}
 
         <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6B]">ID externo estável <span class="font-normal text-[#9297A5]">(opcional)</span></span><input name="externalId" maxlength="200" placeholder="Ex.: cadastro-funcionario-video-01" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/><span class="application-text-meta mt-1 block leading-4 text-[#9297A5]">Repita este valor para sobrescrever o mesmo conteúdo em uma nova geração. YouTube usa o ID do vídeo automaticamente quando este campo fica vazio.</span></label>
 
-        <div class="rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[10px] leading-5 text-[#7A3B08]"><strong>O processamento pode levar alguns minutos.</strong> Depois de iniciar, mantenha esta aba aberta. O F10 mostrará cada etapa concluída até o rascunho ser salvo.</div>
+        <div class="rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[10px] leading-5 text-[#7A3B08]"><strong>O processamento pode levar alguns minutos.</strong> Depois de iniciar, mantenha esta aba aberta. O F10 mostrará a transcrição temporal, o planejamento das capturas e a validação dos screenshots até o rascunho ser salvo.</div>
         <button type="submit" disabled={isProcessing} class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-5 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#B8BCC8]"><Sparkles size={17}/>Processar e criar rascunho</button>
       </form>
     </section>
