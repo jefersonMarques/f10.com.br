@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
-import { HELP_IMAGE_ANNOTATIONS_METADATA_KEY } from "$lib/help/helpImageAnnotations";
+import {
+  HELP_IMAGE_ANNOTATIONS_METADATA_KEY,
+  type HelpImageAnnotation,
+} from "$lib/help/helpImageAnnotations";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -85,7 +88,26 @@ async function cleanupExpiredCandidates(contentId: string): Promise<void> {
   });
   if (expired.length === 0) return;
 
-  await db.delete(helpAssets).where(inArray(helpAssets.id, expired.map((row) => row.id)));
+  const expiredStepIds = new Set(
+    expired.flatMap((asset) => {
+      const stepId = reviewMetadata(asset.metadata)?.stepId;
+      return stepId ? [stepId] : [];
+    }),
+  );
+  const recommended = rows.filter((row) => {
+    const review = reviewMetadata(row.metadata);
+    return review?.role === "recommended" && expiredStepIds.has(review.stepId ?? "");
+  });
+
+  await db.transaction(async (tx) => {
+    await tx.delete(helpAssets).where(inArray(helpAssets.id, expired.map((row) => row.id)));
+    for (const asset of recommended) {
+      await tx
+        .update(helpAssets)
+        .set({ metadata: clearReviewMetadata(asset.metadata), updatedAt: new Date() })
+        .where(eq(helpAssets.id, asset.id));
+    }
+  });
   await deleteStoredAssets(expired);
 }
 
@@ -290,6 +312,7 @@ export async function confirmHelpScreenshotReviewSelection(input: {
   contentId: string;
   blockId: string;
   assetId: string;
+  annotations: HelpImageAnnotation[];
 }): Promise<void> {
   const db = getDatabase();
   const [row] = await db
@@ -342,15 +365,16 @@ export async function confirmHelpScreenshotReviewSelection(input: {
   }
 
   const updatedAt = new Date();
+  const blockMetadata = {
+    ...(row.blockMetadata ?? {}),
+    [HELP_IMAGE_ANNOTATIONS_METADATA_KEY]: input.annotations,
+  };
+
   await db.transaction(async (tx) => {
-    if (selected.id !== row.currentAssetId) {
-      const blockMetadata = { ...(row.blockMetadata ?? {}) };
-      delete blockMetadata[HELP_IMAGE_ANNOTATIONS_METADATA_KEY];
-      await tx
-        .update(helpStepBlocks)
-        .set({ assetId: selected.id, metadata: blockMetadata, updatedAt })
-        .where(eq(helpStepBlocks.id, row.blockId));
-    }
+    await tx
+      .update(helpStepBlocks)
+      .set({ assetId: selected.id, metadata: blockMetadata, updatedAt })
+      .where(eq(helpStepBlocks.id, row.blockId));
 
     await tx
       .update(helpAssets)
@@ -377,6 +401,7 @@ export async function confirmHelpScreenshotReviewSelection(input: {
       contentId: input.contentId,
       selectedAssetId: selected.id,
       changed: selected.id !== row.currentAssetId,
+      annotationCount: input.annotations.length,
       discardedCandidates: removable.length,
     },
   });
