@@ -133,6 +133,26 @@ export const actions: Actions = {
       });
     }
 
+    const contentsWithoutQuickGuide = validation.parsed.contents
+      .filter((content) => !content.quickGuide?.trim())
+      .map((content) => content.title);
+    if (contentsWithoutQuickGuide.length > 0) {
+      return fail(400, {
+        success: false,
+        message: "Todo conteúdo importado a partir de vídeo precisa ter um resumo rápido.",
+        issues: contentsWithoutQuickGuide.map(
+          (title) => `${title}: preencha quickGuide com os passos essenciais em texto, Markdown e emojis.`,
+        ),
+        summary: {
+          source: validation.source,
+          contentCount: validation.contentCount,
+          stepCount: validation.stepCount,
+          blockCount: validation.blockCount,
+          assetCount: prepared.referencedAssetCount,
+        },
+      });
+    }
+
     const assetCount = countJsonAssets(validation.parsed);
     try {
       const result = await importStructuredHelpFile(session.user.id, validation.parsed, packageFile.assets);
