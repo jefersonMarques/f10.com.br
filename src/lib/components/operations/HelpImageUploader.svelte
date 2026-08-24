@@ -5,7 +5,7 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
   import { onMount } from "svelte";
-  import { ClipboardPaste, Image as ImageIcon, UploadCloud } from "lucide-svelte";
+  import { ClipboardPaste, Image as ImageIcon, PenTool, UploadCloud } from "lucide-svelte";
 
   export let contentId: string;
   export let stepId: string;
@@ -17,6 +17,7 @@
   let errorMessage = "";
   let altText = "";
   let assistantDescription = "";
+  let annotationBlockId = "";
 
   function activate(): void {
     activeUploaderStepId = stepId;
@@ -32,6 +33,7 @@
     uploading = true;
     message = "";
     errorMessage = "";
+    annotationBlockId = "";
 
     try {
       const body = new FormData();
@@ -44,7 +46,11 @@
         method: "POST",
         body,
       });
-      const result = (await response.json()) as { success?: boolean; message?: string };
+      const result = (await response.json()) as {
+        success?: boolean;
+        message?: string;
+        blockId?: string;
+      };
 
       if (!response.ok || !result.success) {
         errorMessage = result.message ?? "Não foi possível enviar a imagem.";
@@ -52,6 +58,7 @@
       }
 
       message = result.message ?? "Imagem adicionada ao passo.";
+      annotationBlockId = result.blockId ?? "";
       altText = "";
       assistantDescription = "";
       if (fileInput) fileInput.value = "";
@@ -111,7 +118,7 @@
     <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#000A57] shadow-sm"><ImageIcon size={17} aria-hidden="true" /></span>
     <div class="min-w-0 flex-1">
       <strong class="application-text-caption block font-semibold text-[#303645]">Imagem do computador</strong>
-      <span class="application-text-caption mt-1 block leading-5 text-[#858B99]">Selecione, arraste ou use <strong>Ctrl+V</strong>. Descreva apenas o que a imagem ensina e não está explicado no texto.</span>
+      <span class="application-text-caption mt-1 block leading-5 text-[#858B99]">Selecione, arraste ou use <strong>Ctrl+V</strong>. Prefira a captura da tela inteira; números, destaques, setas e textos podem ser adicionados depois sem recortar a imagem.</span>
     </div>
   </div>
 
@@ -132,5 +139,8 @@
   </button>
 
   {#if message}<p class="application-text-meta mt-2 font-medium text-[#257342]">{message}</p>{/if}
+  {#if annotationBlockId}
+    <a href={`/app/help/content/${contentId}/blocks/${annotationBlockId}/annotate`} class="application-text-caption mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border border-[#C9CEE1] bg-white px-3 font-semibold text-[#000A57]"><PenTool size={14}/>Marcar imagem</a>
+  {/if}
   {#if errorMessage}<p class="application-text-meta mt-2 font-medium text-[#A52A2A]">{errorMessage}</p>{/if}
 </div>
