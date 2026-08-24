@@ -31,11 +31,13 @@ export async function publishHelpKnowledgeContent(
 
   if (!publication) throw new Error("HELP_PUBLICATION_NOT_FOUND");
 
+  const { assistant: _assistant, ...snapshot } = publication.snapshot;
+
   await db
     .update(helpPublications)
     .set({
       snapshot: {
-        ...publication.snapshot,
+        ...snapshot,
         knowledge,
       },
     })
