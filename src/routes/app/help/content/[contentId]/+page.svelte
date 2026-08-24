@@ -11,6 +11,7 @@
     Info,
     Link2,
     LockKeyhole,
+    PenTool,
     Plus,
     Save,
     Search,
@@ -101,6 +102,7 @@
       <div class="min-w-0"><h2 class="truncate text-[18px] font-semibold text-[#11182C]">{data.content.title}</h2><p class="mt-1 truncate text-[11px] text-[#838897]">/{data.content.slug}</p></div>
       <div class="flex flex-wrap gap-2">
         <a href={`/app/help/content/${data.content.id}/preview`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]">Preview<ExternalLink size={12}/></a>
+        <a href={`/app/help/content/${data.content.id}/images`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><PenTool size={13}/>Marcar imagens</a>
         <a href="/app/help/categories" class="application-text-caption inline-flex min-h-10 items-center justify-center rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]">Categorias</a>
         <a href="/app/help/assets" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><HardDrive size={14}/>Biblioteca</a>
         {#if data.canPublish && data.content.status !== "published"}
