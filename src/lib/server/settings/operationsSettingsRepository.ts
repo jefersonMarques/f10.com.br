@@ -20,6 +20,10 @@ export type HelpPublicAiSettings = {
   globalRequestLimitPerHour: number;
 };
 
+export type HelpVideoAutomationSettings = {
+  enabled: boolean;
+};
+
 const DEFAULT_SETTINGS: GeneralOperationsSettings = {
   supportDisplayName: "Equipe F10",
   supportSenderEmail: "",
@@ -35,6 +39,10 @@ export const DEFAULT_HELP_PUBLIC_AI_SETTINGS: HelpPublicAiSettings = {
   sessionRequestLimit: 10,
   ipRequestLimit: 30,
   globalRequestLimitPerHour: 1_000,
+};
+
+export const DEFAULT_HELP_VIDEO_AUTOMATION_SETTINGS: HelpVideoAutomationSettings = {
+  enabled: false,
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -124,6 +132,20 @@ export async function getHelpPublicAiSettings(): Promise<HelpPublicAiSettings> {
   };
 }
 
+export async function getHelpVideoAutomationSettings(): Promise<HelpVideoAutomationSettings> {
+  const [row] = await getDatabase()
+    .select({ value: operationsSettings.value })
+    .from(operationsSettings)
+    .where(eq(operationsSettings.key, "help_video_automation"))
+    .limit(1);
+  const value = asRecord(row?.value);
+  return {
+    enabled: typeof value.enabled === "boolean"
+      ? value.enabled
+      : DEFAULT_HELP_VIDEO_AUTOMATION_SETTINGS.enabled,
+  };
+}
+
 export async function updateGeneralOperationsSettings(
   actorUserId: string,
   value: GeneralOperationsSettings,
@@ -185,6 +207,35 @@ export async function updateHelpPublicAiSettings(
     action: "operations.help_public_ai.settings.updated",
     entityType: "operations_settings",
     entityId: "help_public_ai",
+    metadata: normalized,
+  });
+}
+
+export async function updateHelpVideoAutomationSettings(
+  actorUserId: string,
+  value: HelpVideoAutomationSettings,
+): Promise<void> {
+  const normalized: HelpVideoAutomationSettings = { enabled: Boolean(value.enabled) };
+  const now = new Date();
+
+  await getDatabase()
+    .insert(operationsSettings)
+    .values({
+      key: "help_video_automation",
+      value: normalized,
+      updatedBy: actorUserId,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: operationsSettings.key,
+      set: { value: normalized, updatedBy: actorUserId, updatedAt: now },
+    });
+
+  await recordAuditEvent({
+    actorUserId,
+    action: "operations.help_video_automation.settings.updated",
+    entityType: "operations_settings",
+    entityId: "help_video_automation",
     metadata: normalized,
   });
 }
