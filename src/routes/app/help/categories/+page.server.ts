@@ -1,5 +1,6 @@
 import { error, fail, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
+import { normalizeHelpCategoryIcon } from "$lib/help/helpCategoryConstants";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import {
@@ -41,7 +42,7 @@ export const actions: Actions = {
       name,
       slug: read(formData, "slug"),
       description: read(formData, "description"),
-      icon: read(formData, "icon"),
+      icon: normalizeHelpCategoryIcon(read(formData, "icon")),
       destinationUrl: read(formData, "destinationUrl"),
       sortOrder: readSortOrder(formData),
     };
@@ -69,15 +70,13 @@ export const actions: Actions = {
     const { session } = await requireAppPermission(cookies, "help.edit", "/app/help/categories");
     const formData = await request.formData();
     const categoryId = read(formData, "categoryId");
-    if (!isUuid(categoryId)) {
-      return fail(400, { success: false, message: "Categoria inválida." });
-    }
+    if (!isUuid(categoryId)) return fail(400, { success: false, message: "Categoria inválida." });
     try {
       await updateHelpCategory(session.user.id, categoryId, {
         name: read(formData, "name"),
         slug: read(formData, "slug"),
         description: read(formData, "description"),
-        icon: read(formData, "icon"),
+        icon: normalizeHelpCategoryIcon(read(formData, "icon")),
         destinationUrl: read(formData, "destinationUrl"),
         sortOrder: readSortOrder(formData),
         active: formData.get("active") === "on",
