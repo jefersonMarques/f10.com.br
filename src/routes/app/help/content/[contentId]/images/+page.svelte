@@ -5,6 +5,7 @@
   import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
   import HelpInlineImageAnnotationEditor from "$lib/components/help/HelpInlineImageAnnotationEditor.svelte";
   import HelpRichText from "$lib/components/help/HelpRichText.svelte";
+  import HelpScreenshotReviewCarousel from "$lib/components/help/HelpScreenshotReviewCarousel.svelte";
   import { readHelpImageAnnotationsFromMetadata } from "$lib/help/helpImageAnnotations";
   import type { PageData } from "./$types";
 
@@ -35,19 +36,19 @@
   }
 </script>
 
-<svelte:head><title>Marcar imagens | {data.content.title} | F10 Operations</title></svelte:head>
+<svelte:head><title>Revisar e marcar imagens | {data.content.title} | F10 Operations</title></svelte:head>
 
 <ApplicationContent width="standard">
   <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
     <ApplicationBackLink href={`/app/help/content/${data.content.id}`} label="Editor" />
     <div class="flex flex-wrap items-center gap-2">
-      <span class="application-text-meta inline-flex items-center gap-2 rounded-full bg-[#EEF0FF] px-3 py-1.5 font-bold text-[#000A57]"><PenTool size={13}/>MARCAÇÃO INLINE</span>
+      <span class="application-text-meta inline-flex items-center gap-2 rounded-full bg-[#EEF0FF] px-3 py-1.5 font-bold text-[#000A57]"><PenTool size={13}/>REVISÃO + MARCAÇÃO</span>
       <a href={`/app/help/content/${data.content.id}/preview`} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><Eye size={14}/>Preview</a>
     </div>
   </div>
 
   <section class="mb-4 rounded-[18px] border border-[#D8DDF4] bg-[#F8F9FF] px-4 py-3">
-    <p class="text-[10px] leading-5 text-[#5F6678]">Percorra o artigo na mesma ordem do Preview e marque cada screenshot no próprio contexto. Cada passo aceita apenas uma imagem.</p>
+    <p class="text-[10px] leading-5 text-[#5F6678]">Percorra o artigo na ordem do Preview. Quando houver opções, confirme primeiro o screenshot mais correto; em seguida a ferramenta de marcação aparece no mesmo local. Cada passo mantém apenas uma imagem.</p>
   </section>
 
   <main data-help-content-id={data.content.id}>
@@ -102,16 +103,26 @@
                   <HelpRichText text={block.textContent} className="min-w-0 space-y-1 text-[11px] leading-6"/>
                 </div>
               {:else if block.blockType === "image" && block.asset}
-                {@const imageUrl = block.asset.storageKey ? assetUrl(block.asset.id) : block.asset.sourceUrl}
-                {#if imageUrl}
-                  <HelpInlineImageAnnotationEditor
+                {@const review = data.screenshotReview.find((item) => item.blockId === block.id)}
+                {#if review}
+                  <HelpScreenshotReviewCarousel
                     contentId={data.content.id}
                     blockId={block.id}
-                    {imageUrl}
-                    altText={block.asset.altText || "Screenshot do passo"}
-                    initialAnnotations={readHelpImageAnnotationsFromMetadata(block.metadata)}
+                    candidates={review.candidates}
                     disabled={!data.canEdit}
                   />
+                {:else}
+                  {@const imageUrl = block.asset.storageKey ? assetUrl(block.asset.id) : block.asset.sourceUrl}
+                  {#if imageUrl}
+                    <HelpInlineImageAnnotationEditor
+                      contentId={data.content.id}
+                      blockId={block.id}
+                      {imageUrl}
+                      altText={block.asset.altText || "Screenshot do passo"}
+                      initialAnnotations={readHelpImageAnnotationsFromMetadata(block.metadata)}
+                      disabled={!data.canEdit}
+                    />
+                  {/if}
                 {/if}
               {:else if block.blockType === "file" && block.asset}
                 {@const fileUrl = block.asset.storageKey ? assetUrl(block.asset.id) : block.asset.sourceUrl}
