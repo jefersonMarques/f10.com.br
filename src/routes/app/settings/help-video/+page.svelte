@@ -25,26 +25,26 @@
         <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Video size={20}/></span>
         <div>
           <h1 class="text-[17px] font-semibold text-[#11182C]">Geração automática de conteúdo por vídeo</h1>
-          <p class="mt-1 max-w-[760px] text-[11px] leading-5 text-[#858B99]">Alternativa ao fluxo manual de prompt + ZIP. O servidor extrai áudio e frames, transcreve o procedimento, analisa as telas e cria o rascunho no mesmo contrato da Base de Conhecimento.</p>
+          <p class="mt-1 max-w-[760px] text-[11px] leading-5 text-[#858B99]">Alternativa ao fluxo manual de prompt + ZIP. O servidor extrai o áudio, cria uma transcrição temporal, estrutura o artigo e só então captura e valida poucos screenshots nas janelas relevantes.</p>
         </div>
       </div>
       <span class={`application-text-meta w-fit rounded-full px-3 py-1.5 font-bold ${data.settings.enabled ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#F3F4F7] text-[#777D8D]"}`}>{data.settings.enabled ? "Habilitada" : "Desabilitada"}</span>
     </div>
 
     <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <div class="rounded-2xl border border-[#E2E5ED] bg-[#FAFBFD] p-4"><span class="application-text-meta uppercase tracking-[0.06em] text-[#969BA8]">OpenAI</span><strong class={`mt-2 block text-[11px] ${data.runtime.openAi ? "text-[#2F7045]" : "text-[#9B3C3C]"}`}>{data.runtime.openAi ? "Configurada" : "Pendente"}</strong><small class="mt-1 block text-[9px] leading-4 text-[#858B99]">Modelo de visão: {data.model}</small></div>
+      <div class="rounded-2xl border border-[#E2E5ED] bg-[#FAFBFD] p-4"><span class="application-text-meta uppercase tracking-[0.06em] text-[#969BA8]">OpenAI</span><strong class={`mt-2 block text-[11px] ${data.runtime.openAi ? "text-[#2F7045]" : "text-[#9B3C3C]"}`}>{data.runtime.openAi ? "Configurada" : "Pendente"}</strong><small class="mt-1 block text-[9px] leading-4 text-[#858B99]">Artigo e validação visual: {data.model}</small></div>
       <div class="rounded-2xl border border-[#E2E5ED] bg-[#FAFBFD] p-4"><span class="application-text-meta uppercase tracking-[0.06em] text-[#969BA8]">FFmpeg</span><strong class={`mt-2 block text-[11px] ${data.runtime.ffmpeg ? "text-[#2F7045]" : "text-[#9B3C3C]"}`}>{data.runtime.ffmpeg ? "Disponível" : "Não encontrado"}</strong><small class="mt-1 block break-all text-[9px] leading-4 text-[#858B99]">{data.runtime.ffmpegPath}</small></div>
       <div class="rounded-2xl border border-[#E2E5ED] bg-[#FAFBFD] p-4"><span class="application-text-meta uppercase tracking-[0.06em] text-[#969BA8]">YouTube</span><strong class={`mt-2 block text-[11px] ${data.runtime.youtube ? "text-[#2F7045]" : "text-[#A9510D]"}`}>{data.runtime.youtube ? "yt-dlp disponível" : "yt-dlp pendente"}</strong><small class="mt-1 block break-all text-[9px] leading-4 text-[#858B99]">{data.runtime.ytDlpPath}</small></div>
-      <div class="rounded-2xl border border-[#E2E5ED] bg-[#FAFBFD] p-4"><span class="application-text-meta uppercase tracking-[0.06em] text-[#969BA8]">Transcrição</span><strong class="mt-2 block text-[11px] text-[#303645]">gpt-4o-mini-transcribe</strong><small class="mt-1 block text-[9px] leading-4 text-[#858B99]">Áudio extraído localmente antes da API.</small></div>
+      <div class="rounded-2xl border border-[#E2E5ED] bg-[#FAFBFD] p-4"><span class="application-text-meta uppercase tracking-[0.06em] text-[#969BA8]">Transcrição</span><strong class="mt-2 block text-[11px] text-[#303645]">whisper-1</strong><small class="mt-1 block text-[9px] leading-4 text-[#858B99]">Segmentos com timestamps para planejar os cortes.</small></div>
     </div>
 
     <div class="mt-5 grid gap-3 sm:grid-cols-2">
-      <div class={`rounded-2xl border p-4 ${youtubeReady ? "border-[#CFE4D6] bg-[#F5FBF7]" : "border-[#F0D8C3] bg-[#FFF9F3]"}`}><strong class="text-[11px] text-[#343B4B]">Link do YouTube</strong><p class="mt-2 text-[10px] leading-5 text-[#727887]">O link pode ser informado diretamente no F10. O servidor usa <strong>yt-dlp</strong> para obter o vídeo e depois processa áudio e frames localmente. A URL do YouTube também vira o vídeo principal do artigo.</p></div>
-      <div class={`rounded-2xl border p-4 ${mp4Ready ? "border-[#CFE4D6] bg-[#F5FBF7]" : "border-[#F0D8C3] bg-[#FFF9F3]"}`}><strong class="text-[11px] text-[#343B4B]">Arquivo .mp4</strong><p class="mt-2 text-[10px] leading-5 text-[#727887]">Não depende de yt-dlp; exige apenas FFmpeg e OpenAI. O arquivo é usado para análise. Uma URL pública do vídeo pode ser informada separadamente para aparecer no topo do artigo.</p></div>
+      <div class={`rounded-2xl border p-4 ${youtubeReady ? "border-[#CFE4D6] bg-[#F5FBF7]" : "border-[#F0D8C3] bg-[#FFF9F3]"}`}><strong class="text-[11px] text-[#343B4B]">Link do YouTube</strong><p class="mt-2 text-[10px] leading-5 text-[#727887]">O servidor usa <strong>yt-dlp</strong> para obter o vídeo temporariamente. A URL original continua sendo o vídeo principal do artigo.</p></div>
+      <div class={`rounded-2xl border p-4 ${mp4Ready ? "border-[#CFE4D6] bg-[#F5FBF7]" : "border-[#F0D8C3] bg-[#FFF9F3]"}`}><strong class="text-[11px] text-[#343B4B]">Arquivo .mp4</strong><p class="mt-2 text-[10px] leading-5 text-[#727887]">Não depende de yt-dlp. O MP4 enviado é usado na análise, armazenado no F10 e vinculado automaticamente como vídeo principal do artigo.</p></div>
     </div>
 
     <div class="mt-5 rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4">
-      <div class="flex items-start gap-3"><Bot size={17} class="mt-0.5 shrink-0 text-[#000A57]"/><p class="text-[10px] leading-5 text-[#5D6475]">A OpenAI não recebe o vídeo bruto neste fluxo. O F10 envia o áudio para transcrição e somente os frames deduplicados para visão. Isso reduz custo e mantém o screenshot original da tela inteira.</p></div>
+      <div class="flex items-start gap-3"><Bot size={17} class="mt-0.5 shrink-0 text-[#000A57]"/><p class="text-[10px] leading-5 text-[#5D6475]">A OpenAI não recebe o vídeo bruto. Primeiro o F10 envia apenas o áudio para obter transcrição e timestamps. O artigo é estruturado somente com texto; depois o FFmpeg extrai até três candidatos por etapa nas janelas planejadas. A visão começa em baixa resolução e usa alta resolução somente quando precisar ler detalhes pequenos.</p></div>
     </div>
 
     <form method="POST" action="?/save" class="mt-6">
