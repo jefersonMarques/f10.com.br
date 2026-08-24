@@ -1,5 +1,6 @@
 import { error, fail, redirect, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
+import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import {
@@ -46,7 +47,9 @@ export const load: PageServerLoad = async ({ parent }) => {
       ...content,
       publishedSlug: publishedById.get(content.id)?.slug ?? null,
     })),
-    categories,
+    categories: categories.filter(
+      (category) => category.active && category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG,
+    ),
     canEdit: hasPermission(permissions, "help.edit"),
     canArchive: hasPermission(permissions, "help.publish"),
   };
