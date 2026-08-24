@@ -14,5 +14,8 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   if (!hasPermission(permissions, "help.view")) throw error(403, "Acesso não autorizado.");
   const content = await getStructuredHelpContent(params.contentId);
   if (!content) throw error(404, "Conteúdo não encontrado.");
-  return { content };
+  return {
+    content,
+    canEdit: content.status !== "archived" && hasPermission(permissions, "help.edit"),
+  };
 };
