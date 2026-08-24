@@ -37,12 +37,15 @@ Além do JSON, extraia do próprio vídeo os screenshots das telas relevantes e 
 - Não transforme inferência em fato.
 - O texto público do artigo é a principal fonte do assistente. Não duplique informação em campos adicionais.
 - Cada passo do artigo pode possuir **no máximo um screenshot**. Se uma segunda tela for realmente necessária para explicar a sequência, crie outro passo específico.
+- Para elementos literais da interface, prefira Markdown inline code: \`Cadastros > Funcionários\`, \`Salvar\`, \`E-mail\`, \`Ativo\`, \`F10-123\`. Use negrito para ênfase semântica, não como padrão para nomes de elementos da tela.
 
 ## Identidade e reimportação
 
 \`source\` e \`contents[].externalId\` formam a identidade estável da importação.
 
 Mantenha ambos estáveis quando regenerar o mesmo artigo. Se o F10 receber novamente o mesmo \`source + externalId\`, a nova importação substituirá o rascunho anterior mantendo o mesmo conteúdo/ID.
+
+O F10 também tenta reconciliar uma reimportação pela combinação da mesma origem e do mesmo slug para evitar duplicidade quando uma IA variar o \`externalId\`. Mesmo assim, não dependa desse fallback: mantenha o \`externalId\` estável sempre que o conteúdo for o mesmo.
 
 Não gere um novo \`externalId\` só porque o texto, screenshots ou passos foram revisados.
 
@@ -121,6 +124,22 @@ Capture preferencialmente:
 
 **Escolha somente um desses frames por passo.** Se duas telas distintas forem indispensáveis, divida a explicação em dois passos, cada um com seu próprio screenshot.
 
+### Regra de correspondência entre passo e screenshot
+
+O screenshot precisa representar **exatamente a etapa à qual está associado**. Não escolha um frame apenas porque ele está cronologicamente próximo da fala.
+
+Antes de usar um frame, confirme visualmente que a tela, modal, menu, campo, botão ou estado descrito naquele passo realmente aparece no frame escolhido.
+
+Regras obrigatórias:
+
+- prefira um frame estável imediatamente depois da ação ter sido concluída, quando o resultado visual já estiver carregado;
+- quando a instrução ensina a localizar um elemento antes do clique, escolha um frame em que esse elemento esteja claramente visível;
+- não use frames de carregamento, animação, transição, tela parcialmente atualizada ou com menu/modal de outra etapa;
+- não use o frame anterior ou seguinte apenas para garantir que o passo tenha uma imagem;
+- não reutilize o mesmo frame em passos diferentes;
+- se nenhum frame disponível representar corretamente a etapa, **não gere screenshot para aquele passo**; é melhor deixar a etapa sem imagem do que associar uma imagem incorreta;
+- o \`altText\` e o \`assistantDescription\` devem descrever o que está realmente visível no frame selecionado e funcionar como uma verificação adicional de coerência.
+
 ### Enquadramento obrigatório: tela inteira
 
 O screenshot deve preservar a **tela inteira do F10 mostrada no vídeo**, e não apenas a área que será destacada.
@@ -168,9 +187,9 @@ Exemplo:
 
 \`\`\`text
 🚀 **Passo 1:** Abra o F10 e faça login
-👥 **Passo 2:** Entre em **Cadastros > Funcionários** e clique em **+**
+👥 **Passo 2:** Entre em \`Cadastros > Funcionários\` e clique em \`+\`
 📝 **Passo 3:** Preencha os dados obrigatórios
-✅ **Passo 4:** Clique em **Salvar**
+✅ **Passo 4:** Clique em \`Salvar\`
 \`\`\`
 
 O resumo deve ser curto, sequencial e suficiente para que muitos usuários consigam concluir a tarefa sem ler todos os detalhes.
@@ -179,14 +198,26 @@ O resumo deve ser curto, sequencial e suficiente para que muitos usuários consi
 
 Use Markdown apenas quando melhorar a leitura. O F10 suporta:
 
-- \`**texto**\` para negrito;
+- \`**texto**\` para negrito semântico;
 - \`*texto*\` para itálico;
-- \`\`código\`\` para nomes técnicos/comandos curtos;
+- \`\`código\`\` para elementos literais da interface, nomes técnicos, códigos e valores;
 - listas iniciadas por \`- \` ou \`• \`;
 - linhas numeradas como \`1. \`, \`2. \`;
 - emojis.
 
-Use principalmente negrito para caminhos, botões, campos e ações importantes.
+### Preferência de apresentação
+
+Quando estiver destacando algo que o usuário deve **ler, localizar, selecionar, preencher ou clicar exatamente como aparece na tela**, prefira inline code.
+
+Exemplos preferidos:
+
+- menu/caminho: \`Cadastros > Funcionários\`;
+- botão: \`Salvar\`;
+- campo: \`E-mail\`;
+- status: \`Ativo\`;
+- valor/código: \`12345\` ou \`F10-123\`.
+
+Use negrito para chamar atenção para conceitos, alertas ou partes importantes da explicação, e não como formatação padrão dos controles da interface.
 
 Para instruções operacionais, prefira listas numeradas em vez de juntar várias ações no mesmo parágrafo.
 
@@ -247,13 +278,13 @@ Evite transformar duas ou mais ações em um único parágrafo corrido.
 **Evite:**
 
 \`\`\`text
-Acesse **Cadastros > Funcionários**. Na tela de funcionários, use a ação de inclusão para criar um novo registro.
+Acesse \`Cadastros > Funcionários\`. Na tela de funcionários, use a ação de inclusão para criar um novo registro.
 \`\`\`
 
 **Prefira:**
 
 \`\`\`text
-**1.** Abra **Cadastros > Funcionários**.
+**1.** Abra \`Cadastros > Funcionários\`.
 **2.** Clique no botão de inclusão para criar um novo cadastro.
 
 Nessa mesma área também ficam as ações de edição, exclusão e filtro.
@@ -266,18 +297,18 @@ Regras:
 - mantenha uma ação principal por número;
 - se uma ação tiver uma consequência imediata simples, ela pode permanecer na mesma linha;
 - informações complementares, contexto, observações ou recursos disponíveis na tela devem vir **depois da lista numerada**, em parágrafo separado e sem receber número;
-- use negrito em caminhos, menus, botões e campos relevantes dentro de cada item;
+- use inline code em caminhos, menus, botões, campos, status e valores relevantes dentro de cada item;
 - preserve a ordem real mostrada no vídeo/subtitles;
 - não crie números para ações que não estejam sustentadas pelos materiais.
 
 Exemplo adicional:
 
 \`\`\`text
-**1.** Abra **Financeiro > Contas a Receber**.
+**1.** Abra \`Financeiro > Contas a Receber\`.
 **2.** Localize o lançamento desejado.
-**3.** Clique em **Editar**.
+**3.** Clique em \`Editar\`.
 **4.** Altere os dados necessários.
-**5.** Clique em **Salvar**.
+**5.** Clique em \`Salvar\`.
 
 Use os filtros disponíveis na tela quando precisar localizar um lançamento específico.
 \`\`\`
@@ -296,9 +327,10 @@ Para screenshots extraídos do vídeo, use \`assetPath\`, nunca URL externa.
 - Não concentre várias ações em um único parágrafo quando elas puderem ser separadas em passos numerados.
 - Screenshots complementam o texto e não o substituem.
 - Use no máximo um screenshot por passo; uma segunda tela relevante exige outro passo.
+- Só associe screenshot quando o frame representar exatamente a etapa; na dúvida, deixe o passo sem imagem.
 - Todo screenshot deve preservar a tela completa do F10 e contexto suficiente para orientação; nunca recorte apenas o elemento da ação.
 - O screenshot original deve permanecer limpo; destaques visuais serão adicionados manualmente no editor do F10.
-- Use Markdown para destacar, não para decorar excessivamente.
+- Prefira inline code para elementos literais da interface e negrito para ênfase semântica.
 - Preserve nomenclaturas do F10 quando estiverem claras.
 - Mantenha passos e screenshots na ordem do procedimento.
 - Não crie etapas ausentes dos materiais.
