@@ -31,6 +31,7 @@ function uploadErrorMessage(cause: unknown): string {
   if (code === "ASSET_SIZE_NOT_ALLOWED") return "A imagem deve ter no máximo 10 MB.";
   if (code === "ASSET_CONTENT_MISMATCH") return "O conteúdo do arquivo não corresponde ao formato da imagem.";
   if (code === "ASSET_ATTACHMENT_NOT_FOUND") return "O passo selecionado não está mais disponível.";
+  if (code === "STEP_IMAGE_ALREADY_EXISTS") return "Cada passo pode ter apenas uma imagem. Remova ou substitua a imagem atual antes de adicionar outra.";
   return "Não foi possível enviar a imagem.";
 }
 
@@ -62,8 +63,15 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
   }
 
   const content = await getStructuredHelpContent(params.contentId);
-  if (!content || !content.steps.some((step) => step.id === stepId)) {
+  const step = content?.steps.find((item) => item.id === stepId);
+  if (!content || !step) {
     return json({ success: false, message: "O passo selecionado não pertence a este conteúdo." }, { status: 400 });
+  }
+  if (step.blocks.some((block) => block.blockType === "image")) {
+    return json(
+      { success: false, message: "Cada passo pode ter apenas uma imagem. Remova ou substitua a imagem atual antes de adicionar outra." },
+      { status: 409 },
+    );
   }
 
   let createdAssetId: string | null = null;
