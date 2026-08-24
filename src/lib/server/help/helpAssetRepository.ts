@@ -14,6 +14,7 @@ import {
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
+const MAX_EXTRACTED_TEXT_CHARS = 200_000;
 
 const ALLOWED_MIME_TYPES = new Map<
   string,
@@ -71,6 +72,15 @@ function normalizeMimeType(value: string): string {
 
 function checksum(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+function extractPlainText(mimeType: string, bytes: Uint8Array): string {
+  if (mimeType !== "text/plain" && mimeType !== "text/csv") return "";
+  return new TextDecoder("utf-8", { fatal: false })
+    .decode(bytes)
+    .replace(/\u0000/g, "")
+    .trim()
+    .slice(0, MAX_EXTRACTED_TEXT_CHARS);
 }
 
 function snapshotReferencesAsset(snapshot: Record<string, unknown>, assetId: string): boolean {
@@ -136,13 +146,27 @@ export async function createManagedHelpAsset(
   if (!validateMagicBytes(mimeType, input.bytes)) throw new Error("ASSET_CONTENT_MISMATCH");
 
   const digest = checksum(input.bytes);
+  const extractedText = (
+    input.extractedText?.trim() || extractPlainText(mimeType, input.bytes)
+  ).slice(0, MAX_EXTRACTED_TEXT_CHARS);
   const db = getDatabase();
   const [existing] = await db
     .select()
     .from(helpAssets)
     .where(and(eq(helpAssets.checksumSha256, digest), isNotNull(helpAssets.storageKey)))
     .limit(1);
-  if (existing) return { asset: existing, reused: true };
+
+  if (existing) {
+    if (!existing.extractedText && extractedText) {
+      const [updated] = await db
+        .update(helpAssets)
+        .set({ extractedText, updatedAt: new Date() })
+        .where(eq(helpAssets.id, existing.id))
+        .returning();
+      return { asset: updated ?? existing, reused: true };
+    }
+    return { asset: existing, reused: true };
+  }
 
   const storageKey = `help-assets/${digest.slice(0, 2)}/${digest.slice(2, 4)}/${digest}.${rule.extension}`;
   await putAssetObject(storageKey, input.bytes, mimeType);
@@ -161,7 +185,7 @@ export async function createManagedHelpAsset(
         altText: input.altText?.trim().slice(0, 500) ?? "",
         assistantDescription: input.assistantDescription?.trim().slice(0, 20_000) ?? "",
         assistantSummary: input.assistantSummary?.trim().slice(0, 20_000) ?? "",
-        extractedText: input.extractedText?.trim().slice(0, 200_000) ?? "",
+        extractedText,
         metadata: { managed: true },
         createdBy: actorUserId,
       })
