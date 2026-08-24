@@ -3,6 +3,7 @@ import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
+import { moveHelpBlock, moveHelpStep, type HelpMoveDirection } from "$lib/server/help/helpContentOrdering";
 import { publishHelpKnowledgeContent } from "$lib/server/help/helpKnowledgePublisher";
 import {
   addStructuredHelpBlock,
@@ -28,6 +29,11 @@ function isUuid(value: string): boolean {
 function readFormValue(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function readMoveDirection(formData: FormData): HelpMoveDirection | null {
+  const value = readFormValue(formData, "direction");
+  return value === "up" || value === "down" ? value : null;
 }
 
 function readAliases(value: string): string[] {
@@ -272,6 +278,21 @@ export const actions: Actions = {
     redirectToContentEditor(params.contentId);
   },
 
+  moveStep: async ({ cookies, params, request }) => {
+    if (!isUuid(params.contentId)) return fail(404, { success: false, message: "Conteúdo não encontrado." });
+    const { session } = await requireAppPermission(cookies, "help.edit", contentEditorPath(params.contentId));
+    const formData = await request.formData();
+    const stepId = readFormValue(formData, "stepId");
+    const direction = readMoveDirection(formData);
+    if (!isUuid(stepId) || !direction) return fail(400, { success: false, message: "Movimentação inválida." });
+    try {
+      await moveHelpStep(session.user.id, params.contentId, stepId, direction);
+    } catch {
+      return fail(409, { success: false, message: "Não foi possível reordenar este passo." });
+    }
+    redirectToContentEditor(params.contentId);
+  },
+
   updateStep: async ({ cookies, params, request }) => {
     if (!isUuid(params.contentId)) return fail(404, { success: false, message: "Conteúdo não encontrado." });
     const { session } = await requireAppPermission(cookies, "help.edit", contentEditorPath(params.contentId));
@@ -327,6 +348,21 @@ export const actions: Actions = {
       await addStructuredHelpBlock(session.user.id, params.contentId, stepId, input);
     } catch {
       return fail(409, { success: false, message: "Não foi possível adicionar este bloco." });
+    }
+    redirectToContentEditor(params.contentId);
+  },
+
+  moveBlock: async ({ cookies, params, request }) => {
+    if (!isUuid(params.contentId)) return fail(404, { success: false, message: "Conteúdo não encontrado." });
+    const { session } = await requireAppPermission(cookies, "help.edit", contentEditorPath(params.contentId));
+    const formData = await request.formData();
+    const blockId = readFormValue(formData, "blockId");
+    const direction = readMoveDirection(formData);
+    if (!isUuid(blockId) || !direction) return fail(400, { success: false, message: "Movimentação inválida." });
+    try {
+      await moveHelpBlock(session.user.id, params.contentId, blockId, direction);
+    } catch {
+      return fail(409, { success: false, message: "Não foi possível reordenar este bloco." });
     }
     redirectToContentEditor(params.contentId);
   },
