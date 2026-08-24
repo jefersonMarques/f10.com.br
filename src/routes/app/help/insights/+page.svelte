@@ -106,6 +106,46 @@
     </section>
   </div>
 
+  <div class="mt-5 grid gap-5 xl:grid-cols-2">
+    <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
+      <header class="border-b border-[#EEF0F5] px-5 py-4 sm:px-6">
+        <div class="flex items-center gap-3"><CircleAlert size={18} class="text-[#A9510D]"/><div><h2 class="text-[14px] font-semibold text-[#222839]">Artigos com mais lacunas contextuais</h2><p class="mt-1 text-[10px] text-[#8A909E]">Artigos em que o assistente contextual mais terminou como <code>not_found</code>.</p></div></div>
+      </header>
+      {#if data.knowledge.articleGaps.length === 0}
+        <div class="px-6 py-12 text-center text-[11px] text-[#9297A5]">Nenhum artigo com lacuna contextual registrada.</div>
+      {:else}
+        <div class="divide-y divide-[#EEF0F5]">
+          {#each data.knowledge.articleGaps as item}
+            <div class="px-5 py-4 sm:px-6">
+              <div class="flex items-start justify-between gap-4"><a href={`/ajuda-f10/${encodeURIComponent(item.contextSlug)}`} target="_blank" rel="noopener noreferrer" class="text-[12px] font-semibold text-[#000A57] hover:underline">/{item.contextSlug}</a><span class="shrink-0 rounded-full bg-[#FFF4E9] px-2.5 py-1 text-[9px] font-bold text-[#A9510D]">{item.attempts}x</span></div>
+              <p class="mt-2 line-clamp-2 text-[10px] leading-5 text-[#707788]">Exemplo: {item.sampleQuestion}</p>
+              <span class="mt-2 block text-[9px] text-[#A0A5B0]">Última em {formatDate(item.lastAskedAt)}</span>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </section>
+
+    <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
+      <header class="border-b border-[#EEF0F5] px-5 py-4 sm:px-6">
+        <div class="flex items-center gap-3"><CircleAlert size={18} class="text-[#76510A]"/><div><h2 class="text-[14px] font-semibold text-[#222839]">Perguntas que viraram atendimento humano</h2><p class="mt-1 text-[10px] text-[#8A909E]">Busca correlacionada ao ticket quando o cliente escolheu falar com a equipe.</p></div></div>
+      </header>
+      {#if data.escalatedQueries.length === 0}
+        <div class="px-6 py-12 text-center text-[11px] text-[#9297A5]">Nenhum handoff correlacionado até agora.</div>
+      {:else}
+        <div class="divide-y divide-[#EEF0F5]">
+          {#each data.escalatedQueries as item}
+            <div class="px-5 py-4 sm:px-6">
+              <strong class="text-[12px] font-semibold leading-5 text-[#303645]">{item.query}</strong>
+              <div class="mt-2 flex flex-wrap gap-2 text-[9px] text-[#9297A5]"><span>{item.source}</span><span>·</span><span>{item.resultCount} resultado{item.resultCount === 1 ? "" : "s"}</span><span>·</span><span>{formatDate(item.createdAt)}</span></div>
+              {#if item.ticketId}<p class="mt-2 text-[9px] text-[#858B99]">Atendimento vinculado: {item.ticketId}</p>{/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </section>
+  </div>
+
   <section class="mt-5 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
     <header class="border-b border-[#EEF0F5] px-5 py-4 sm:px-6"><div class="flex items-center gap-3"><Activity size={18} class="text-[#000A57]"/><div><h2 class="text-[14px] font-semibold text-[#222839]">Execuções recentes</h2><p class="mt-1 text-[10px] text-[#8A909E]">Central, artigos e chat registrados no mesmo formato.</p></div></div></header>
     {#if data.knowledge.recentRuns.length === 0}
@@ -115,7 +155,7 @@
         {#each data.knowledge.recentRuns as run}
           <div class="grid gap-2 px-5 py-4 sm:px-6 lg:grid-cols-[110px_1fr_160px_120px] lg:items-center">
             <div><span class="block text-[9px] font-bold uppercase text-[#737A8B]">{run.source} · {run.scope}</span><span class="mt-1 block text-[8px] text-[#A0A5B0]">{formatDate(run.createdAt)}</span></div>
-            <div class="min-w-0"><strong class="block truncate text-[11px] font-semibold text-[#303645]">{run.question}</strong>{#if run.targetSlug}<span class="mt-1 block truncate text-[9px] text-[#9297A5]">Destino: /{run.targetSlug} · {run.targetType}</span>{/if}</div>
+            <div class="min-w-0"><strong class="block truncate text-[11px] font-semibold text-[#303645]">{run.question}</strong>{#if run.normalizedQuery && run.normalizedQuery !== run.question.toLowerCase()}<span class="mt-1 block truncate text-[9px] text-[#9297A5]">Retrieval: {run.normalizedQuery}</span>{/if}{#if run.targetSlug}<span class="mt-1 block truncate text-[9px] text-[#9297A5]">Destino: /{run.targetSlug} · {run.targetType}</span>{/if}</div>
             <span class={`w-fit rounded-full px-2.5 py-1 text-[9px] font-semibold ${run.resolution === "not_found" || run.resolution === "failed" ? "bg-[#FFF3EB] text-[#A9510D]" : "bg-[#EEF8F1] text-[#2F7045]"}`}>{resolutionLabel(run.resolution)}</span>
             <div class="text-[9px] text-[#858B99]"><span>{run.latencyMs} ms</span>{#if run.inputTokens !== null || run.outputTokens !== null}<span class="block">{formatNumber((run.inputTokens ?? 0) + (run.outputTokens ?? 0))} tokens</span>{/if}</div>
           </div>
