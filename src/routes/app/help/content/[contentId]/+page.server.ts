@@ -56,7 +56,6 @@ function isBlockType(value: string): value is StructuredHelpBlockType {
   return (
     value === "text" ||
     value === "image" ||
-    value === "video" ||
     value === "notice" ||
     value === "link" ||
     value === "file"
@@ -151,8 +150,6 @@ function getPublishErrorMessage(cause: unknown): string {
       return "Todos os passos precisam ter pelo menos um conteúdo público: texto, imagem, aviso, link ou arquivo.";
     case "IMAGE_DESCRIPTION_REQUIRED":
       return "Um passo formado apenas por imagens possui imagem sem texto alternativo ou descrição para o assistente.";
-    case "LEGACY_VIDEO_REVIEW_REQUIRED":
-      return "Remova vídeos antigos dos passos e mantenha somente o Vídeo principal no topo.";
     default:
       return "Não foi possível publicar. Revise o conteúdo e tente novamente.";
   }
@@ -322,9 +319,6 @@ export const actions: Actions = {
     const stepId = readFormValue(formData, "stepId");
     const input = parseBlockInput(formData);
     if (!isUuid(stepId) || !input) return fail(400, { success: false, message: "Bloco inválido." });
-    if (input.blockType === "video") {
-      return fail(400, { success: false, message: "Use a seção Vídeo principal. Vídeos não podem ficar dentro dos passos." });
-    }
     const validationMessage = validateBlockInput(input);
     if (validationMessage) return fail(400, { success: false, message: validationMessage });
     try {
