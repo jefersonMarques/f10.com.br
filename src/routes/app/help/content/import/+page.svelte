@@ -32,12 +32,12 @@
   </div>
 
   <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
-    <div class="flex items-start gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Video size={20}/></span><div><h1 class="text-[18px] font-semibold text-[#11182C]">Criar conteúdo a partir dos subtitles</h1><p class="mt-1 max-w-[760px] text-[11px] leading-5 text-[#858A98]">Use exatamente os dois arquivos acima junto com os subtitles do vídeo. O prompt é gerado na hora e contém somente as categorias ativas atuais.</p></div></div>
+    <div class="flex items-start gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Video size={20}/></span><div><h1 class="text-[18px] font-semibold text-[#11182C]">Criar conteúdo a partir dos subtitles</h1><p class="mt-1 max-w-[760px] text-[11px] leading-5 text-[#858A98]">Use exatamente os dois arquivos acima junto com os subtitles e a URL real do vídeo. O prompt é gerado na hora e contém somente as categorias ativas atuais.</p></div></div>
 
     <ol class="mt-5 grid gap-3 md:grid-cols-4">
       <li class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4"><strong class="text-[11px] text-[#000A57]">1. Baixe</strong><p class="mt-2 text-[10px] leading-5 text-[#777D8D]">Prompt dinâmico e template JSON.</p></li>
-      <li class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4"><strong class="text-[11px] text-[#000A57]">2. Envie à IA</strong><p class="mt-2 text-[10px] leading-5 text-[#777D8D]">Prompt + template + subtitles do vídeo.</p></li>
-      <li class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4"><strong class="text-[11px] text-[#000A57]">3. Receba</strong><p class="mt-2 text-[10px] leading-5 text-[#777D8D]">Um JSON no contrato F10 Help Import.</p></li>
+      <li class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4"><strong class="text-[11px] text-[#000A57]">2. Envie à IA</strong><p class="mt-2 text-[10px] leading-5 text-[#777D8D]">Prompt + template + subtitles + URL real do vídeo.</p></li>
+      <li class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4"><strong class="text-[11px] text-[#000A57]">3. Receba</strong><p class="mt-2 text-[10px] leading-5 text-[#777D8D]">Um JSON no contrato F10 Help Import, sem placeholders.</p></li>
       <li class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4"><strong class="text-[11px] text-[#000A57]">4. Importe</strong><p class="mt-2 text-[10px] leading-5 text-[#777D8D]">O F10 valida tudo e cria rascunhos para revisão.</p></li>
     </ol>
   </section>
@@ -73,7 +73,7 @@
 
   {#if data.canImport}
     <section class="mt-5 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
-      <div class="flex items-start gap-3"><span class="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><UploadCloud size={20}/></span><div><h2 class="text-[15px] font-semibold">Importar JSON gerado pela IA</h2><p class="application-text-caption mt-1 text-[#858B99]">Até {formatMegabytes(data.maxImportBytes)}. Categorias desconhecidas, subtitles ausentes ou contrato inválido cancelam o lote.</p></div></div>
+      <div class="flex items-start gap-3"><span class="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><UploadCloud size={20}/></span><div><h2 class="text-[15px] font-semibold">Importar JSON gerado pela IA</h2><p class="application-text-caption mt-1 text-[#858B99]">Até {formatMegabytes(data.maxImportBytes)}. Categorias desconhecidas, subtitles ausentes, placeholders ou contrato inválido cancelam o lote.</p></div></div>
       <form method="POST" action="?/import" enctype="multipart/form-data" class="mt-6">
         <label class="block rounded-2xl border border-dashed border-[#CBD0DC] bg-[#FAFBFD] p-6 text-center"><FileJson2 size={30} class="mx-auto text-[#A7ADBA]"/><span class="mt-3 block text-[12px] font-semibold">Selecione o JSON final</span><span class="application-text-caption mt-1 block text-[#9297A5]">Somente f10-help-import version 1</span><input type="file" name="file" accept="application/json,.json" required class="application-text-caption mx-auto mt-4 block max-w-full" /></label>
         <div class="application-text-caption mt-4 rounded-xl bg-[#F8F9FF] px-4 py-3 leading-5 text-[#5F6575]">A importação nunca publica automaticamente. Revise categorias, links, textos e subtitles no editor antes de publicar.</div>
