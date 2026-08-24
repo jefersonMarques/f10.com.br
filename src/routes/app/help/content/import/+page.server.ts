@@ -57,6 +57,17 @@ function countJsonAssets(file: HelpImportFile): number {
   );
 }
 
+function multipleImageStepIssues(file: HelpImportFile): string[] {
+  return file.contents.flatMap((content) =>
+    content.steps.flatMap((step, stepIndex) => {
+      const imageCount = step.blocks.filter((block) => block.type === "image").length;
+      return imageCount > 1
+        ? [`${content.title} — Passo ${stepIndex + 1} (${step.title}): use no máximo um screenshot por passo. Divida o conteúdo em outro passo se precisar mostrar uma segunda tela.`]
+        : [];
+    }),
+  );
+}
+
 export const load: PageServerLoad = async ({ parent }) => {
   const layout = await parent();
   const permissions = permissionMap(layout.permissions);
@@ -142,6 +153,23 @@ export const actions: Actions = {
         action: "import",
         message: "O JSON do pacote não segue o contrato atual de importação do F10.",
         issues: validation.issues,
+        summary: {
+          source: validation.source,
+          contentCount: validation.contentCount,
+          stepCount: validation.stepCount,
+          blockCount: validation.blockCount,
+          assetCount: prepared.referencedAssetCount,
+        },
+      });
+    }
+
+    const screenshotIssues = multipleImageStepIssues(validation.parsed);
+    if (screenshotIssues.length > 0) {
+      return fail(400, {
+        success: false,
+        action: "import",
+        message: "Cada passo da Base de Conhecimento pode ter apenas um screenshot.",
+        issues: screenshotIssues,
         summary: {
           source: validation.source,
           contentCount: validation.contentCount,
