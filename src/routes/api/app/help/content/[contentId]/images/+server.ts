@@ -81,11 +81,12 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
 
     createdAssetId = result.asset.id;
     reused = result.reused;
-    await attachHelpAssetToStep(session.user.id, result.asset.id, stepId, "");
+    const attachment = await attachHelpAssetToStep(session.user.id, result.asset.id, stepId, "");
 
     return json({
       success: true,
       assetId: result.asset.id,
+      blockId: attachment.blockId,
       reused,
       message: reused
         ? "Imagem existente reutilizada e adicionada ao passo."
