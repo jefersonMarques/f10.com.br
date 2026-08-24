@@ -3,6 +3,7 @@ import type { Actions, PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { getOpenAiModel, isOpenAiConfigured } from "$lib/server/ai/openAiResponses";
 import { isHelpPublicAiSecretConfigured } from "$lib/server/help/helpPublicAiProtection";
+import { getHelpVideoAutomationRuntimeStatus } from "$lib/server/help/helpVideoImportAutomation";
 import {
   getMeshCentralControlStatus,
   listMeshCentralDeviceGroups,
@@ -14,8 +15,10 @@ import {
 import {
   getGeneralOperationsSettings,
   getHelpPublicAiSettings,
+  getHelpVideoAutomationSettings,
   updateGeneralOperationsSettings,
   updateHelpPublicAiSettings,
+  updateHelpVideoAutomationSettings,
 } from "$lib/server/settings/operationsSettingsRepository";
 import {
   getAssetStorageStatus,
@@ -38,14 +41,18 @@ function isValidOptionalEmail(value: string): boolean {
 
 export const load: PageServerLoad = async ({ cookies }) => {
   await requireAppPermission(cookies, "system.settings.manage", "/app/settings");
-  const [general, helpPublicAi] = await Promise.all([
+  const [general, helpPublicAi, helpVideoAutomation, helpVideoRuntime] = await Promise.all([
     getGeneralOperationsSettings(),
     getHelpPublicAiSettings(),
+    getHelpVideoAutomationSettings(),
+    getHelpVideoAutomationRuntimeStatus(),
   ]);
 
   return {
     general,
     helpPublicAi,
+    helpVideoAutomation,
+    helpVideoRuntime,
     storage: getAssetStorageStatus(),
     ai: {
       configured: isOpenAiConfigured(),
@@ -155,6 +162,23 @@ export const actions: Actions = {
     };
   },
 
+  saveHelpVideoAutomation: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(
+      cookies,
+      "system.settings.manage",
+      "/app/settings",
+    );
+    const formData = await request.formData();
+    await updateHelpVideoAutomationSettings(session.user.id, {
+      enabled: readBoolean(formData, "enabled"),
+    });
+    return {
+      success: true,
+      action: "saveHelpVideoAutomation",
+      message: "Geração automática de conteúdo por vídeo atualizada.",
+    };
+  },
+
   testStorage: async ({ cookies }) => {
     await requireAppPermission(cookies, "system.settings.manage", "/app/settings");
     const ok = await testAssetStorageConnection();
@@ -183,7 +207,7 @@ export const actions: Actions = {
       : fail(503, {
           success: false,
           action: "testRemote",
-          message: "Não foi possível acessar a interface pública do MeshCentral.",
+          message: "Não foi possível acessar a interface pública do MeshCentral. Revise a configuração.",
         });
   },
 
