@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import {
   helpKnowledgeRuns,
@@ -70,7 +70,7 @@ export async function recordHelpKnowledgeRun(
 export async function getHelpKnowledgeInsights() {
   const db = getDatabase();
 
-  const [summaryRows, gapRows, elsewhereRows, recentRuns] = await Promise.all([
+  const [summaryRows, gapRows, elsewhereRows, articleGapRows, recentRuns] = await Promise.all([
     db
       .select({
         runs: sql<number>`count(*)::integer`,
@@ -113,6 +113,24 @@ export async function getHelpKnowledgeInsights() {
         helpKnowledgeRuns.targetContentId,
         helpKnowledgeRuns.targetSlug,
       )
+      .orderBy(desc(sql`count(*)`), desc(sql`max(${helpKnowledgeRuns.createdAt})`))
+      .limit(20),
+    db
+      .select({
+        contextSlug: helpKnowledgeRuns.contextSlug,
+        sampleQuestion: sql<string>`max(${helpKnowledgeRuns.question})`,
+        attempts: sql<number>`count(*)::integer`,
+        lastAskedAt: sql<Date>`max(${helpKnowledgeRuns.createdAt})`,
+      })
+      .from(helpKnowledgeRuns)
+      .where(
+        and(
+          eq(helpKnowledgeRuns.scope, "article"),
+          eq(helpKnowledgeRuns.resolution, "not_found"),
+          ne(helpKnowledgeRuns.contextSlug, ""),
+        ),
+      )
+      .groupBy(helpKnowledgeRuns.contextSlug)
       .orderBy(desc(sql`count(*)`), desc(sql`max(${helpKnowledgeRuns.createdAt})`))
       .limit(20),
     db
@@ -171,6 +189,10 @@ export async function getHelpKnowledgeInsights() {
       articleAttempts: Number(row.articleAttempts ?? 0),
     })),
     foundElsewhere: elsewhereRows.map((row) => ({
+      ...row,
+      attempts: Number(row.attempts ?? 0),
+    })),
+    articleGaps: articleGapRows.map((row) => ({
       ...row,
       attempts: Number(row.attempts ?? 0),
     })),
