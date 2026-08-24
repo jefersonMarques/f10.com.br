@@ -33,12 +33,30 @@ function automationErrorMessage(code: string): string {
   }
   if (code === "HELP_VIDEO_UPLOAD_FORMAT_INVALID") return "Use um arquivo .mp4 válido.";
   if (code === "HELP_VIDEO_TRANSCRIPTION_EMPTY") return "A transcrição retornou vazia. Revise o áudio do vídeo.";
+  if (code === "HELP_VIDEO_FRAMES_NOT_FOUND") return "O F10 não encontrou telas válidas para analisar no vídeo.";
+  if (code === "HELP_VIDEO_ARTICLE_GENERATION_EMPTY") {
+    return "A OpenAI não retornou o artigo estruturado. Tente processar o vídeo novamente.";
+  }
   if (code === "HELP_VIDEO_NO_SCREENSHOTS_SELECTED") return "A análise não selecionou screenshots suficientes. Tente novamente ou use o fluxo por ZIP.";
+  if (code === "IMPORT_CONTENT_NOT_CREATED") return "O conteúdo foi analisado, mas o F10 não conseguiu criar o rascunho.";
+  if (code === "IMPORT_VIDEO_NOT_CREATED") return "O conteúdo foi criado, mas o F10 não conseguiu salvar o vídeo principal.";
+  if (code === "IMPORT_STEP_NOT_CREATED") return "O F10 não conseguiu salvar uma das etapas do conteúdo gerado.";
+  if (code === "CONTENT_NOT_FOUND") return "O conteúdo importado não foi encontrado ao salvar o vídeo principal.";
+  if (code === "CONTENT_ARCHIVED") return "O conteúdo está arquivado e não pode receber o vídeo principal.";
   if (code.startsWith("HELP_VIDEO_TRANSCRIPTION_FAILED:")) return "A OpenAI não conseguiu transcrever o áudio do vídeo.";
   if (code.startsWith("HELP_VIDEO_ARTICLE_GENERATION_FAILED:")) return "A OpenAI não conseguiu estruturar o artigo a partir do vídeo.";
   if (code.startsWith("HELP_VIDEO_COMMAND_FAILED:")) return "O servidor não conseguiu processar o vídeo com as ferramentas locais.";
+  if (code.startsWith("IMPORT_CATEGORY_INVALID:")) return "O conteúdo gerado usou uma categoria que não está mais disponível.";
+  if (code.startsWith("IMPORT_SLUG_CONFLICT:")) return "O endereço gerado para o artigo já pertence a outro conteúdo.";
+  if (code.startsWith("IMPORT_PACKAGE_ASSET_MISSING:")) return "Um screenshot selecionado não foi encontrado no pacote temporário.";
+  if (code === "IMPORT_INVALID_SLUG") return "O F10 não conseguiu gerar um endereço válido para o conteúdo.";
   if (code === "HELP_VIDEO_COMMAND_TIMEOUT") return "O processamento local do vídeo excedeu o tempo permitido.";
   return "Não foi possível gerar o conteúdo automaticamente a partir do vídeo.";
+}
+
+function technicalErrorCode(code: string): string {
+  const prefix = code.split(":", 1)[0]?.trim() ?? "";
+  return /^[A-Z][A-Z0-9_]*$/.test(prefix) ? prefix : "HELP_VIDEO_AUTOMATION_FAILED";
 }
 
 function buildSource(formData: FormData): HelpVideoAutomationSource {
@@ -141,6 +159,8 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      let lastProgressStage = "runtime";
+
       const write = (payload: Record<string, unknown>) => {
         if (streamClosed) return;
         try {
@@ -160,6 +180,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
       }, 15_000);
 
       const progress = (item: HelpVideoAutomationProgress) => {
+        lastProgressStage = item.stage;
         write({ type: "progress", ...item });
       };
 
@@ -177,6 +198,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
         }
         const selectedScreenshotCount = countScreenshots(generated.file);
 
+        lastProgressStage = "validate";
         write({
           type: "progress",
           stage: "validate",
@@ -200,6 +222,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
           label: "Conteúdo validado e identidade conferida pelo F10",
         });
 
+        lastProgressStage = "import";
         write({
           type: "progress",
           stage: "import",
@@ -257,7 +280,20 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
         });
       } catch (cause) {
         const code = cause instanceof Error ? cause.message : "HELP_VIDEO_AUTOMATION_FAILED";
-        write({ type: "error", message: automationErrorMessage(code), issues: [] });
+        const technicalCode = technicalErrorCode(code);
+        console.error("[help-video-import] processing failed", {
+          stage: lastProgressStage,
+          technicalCode,
+          cause,
+        });
+        write({
+          type: "error",
+          message: automationErrorMessage(code),
+          issues: [
+            `Etapa: ${lastProgressStage}`,
+            `Código técnico: ${technicalCode}`,
+          ],
+        });
       } finally {
         clearInterval(heartbeat);
         if (!streamClosed) {
