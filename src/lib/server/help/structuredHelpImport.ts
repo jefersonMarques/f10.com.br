@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
+import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -12,6 +14,12 @@ import {
 } from "$lib/server/db/structuredHelpSchema";
 import { normalizeHelpSlug } from "$lib/server/help/helpArticleRepository";
 import { normalizeHelpCategorySlug } from "$lib/server/help/helpCategoryRepository";
+import {
+  getHelpImportPackageAssetPath,
+  isHelpImportPackageAssetUrl,
+  type HelpImportPackageAsset,
+} from "$lib/server/help/helpImportPackage";
+import { deleteAssetObject, putAssetObject } from "$lib/server/storage/assetStorage";
 
 const IMPORT_FORMAT = "f10-help-import";
 const IMPORT_VERSION = 1 as const;
@@ -91,6 +99,10 @@ export type HelpImportValidation = {
   parsed: HelpImportFile | null;
 };
 
+export type ImportStructuredHelpOptions = {
+  packageAssets?: ReadonlyMap<string, HelpImportPackageAsset>;
+};
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -132,6 +144,7 @@ function parseStringArray(
     return [];
   }
   if (value.length > maxItems) issues.push(`${path}: máximo de ${maxItems} itens.`);
+
   const result: string[] = [];
   for (const [index, item] of value.entries()) {
     if (typeof item !== "string" || !item.trim()) {
@@ -154,8 +167,7 @@ function parseCategories(
   issues: string[],
 ): HelpImportCategory[] {
   if (!Array.isArray(value) || value.length === 0) {
-    issues.push(`${path}: todo conteúdo precisa de pelo menos uma categoria.`);
-    return [];
+    return [{ slug: UNCATEGORIZED_HELP_CATEGORY_SLUG, destinationUrl: "" }];
   }
   if (value.length > MAX_CATEGORIES_PER_CONTENT) {
     issues.push(`${path}: máximo de ${MAX_CATEGORIES_PER_CONTENT} categorias por conteúdo.`);
@@ -212,11 +224,7 @@ function parseFeaturedVideo(
   return { url, description, subtitles, assistantSummary };
 }
 
-function parseBlock(
-  value: unknown,
-  path: string,
-  issues: string[],
-): HelpImportBlock | null {
+function parseBlock(value: unknown, path: string, issues: string[]): HelpImportBlock | null {
   const record = asRecord(value);
   if (!record) {
     issues.push(`${path}: bloco inválido.`);
@@ -262,8 +270,8 @@ function parseBlock(
     const url = readString(record, "url");
     const altText = optionalString(record, "altText");
     const assistantDescription = optionalString(record, "assistantDescription");
-    if (!isHttpUrl(url)) {
-      issues.push(`${path}.url: imagem precisa de URL http/https válida.`);
+    if (!isHttpUrl(url) && !isHelpImportPackageAssetUrl(url)) {
+      issues.push(`${path}.url: imagem precisa de URL http/https ou assetPath válido do pacote.`);
       return null;
     }
     if ((altText?.length ?? 0) > 500) issues.push(`${path}.altText: máximo de 500 caracteres.`);
@@ -300,11 +308,7 @@ function parseBlock(
   return null;
 }
 
-function parseStep(
-  value: unknown,
-  path: string,
-  issues: string[],
-): HelpImportStep | null {
+function parseStep(value: unknown, path: string, issues: string[]): HelpImportStep | null {
   const record = asRecord(value);
   if (!record) {
     issues.push(`${path}: passo inválido.`);
@@ -338,11 +342,7 @@ function parseStep(
   return { title, description, assistantKnowledge, blocks };
 }
 
-function parseContent(
-  value: unknown,
-  index: number,
-  issues: string[],
-): HelpImportContent | null {
+function parseContent(value: unknown, index: number, issues: string[]): HelpImportContent | null {
   const path = `contents[${index}]`;
   const record = asRecord(value);
   if (!record) {
@@ -480,9 +480,7 @@ export function validateHelpImportJson(rawJson: string): HelpImportValidation {
       contentTotal + content.steps.reduce((stepTotal, step) => stepTotal + step.blocks.length, 0),
     0,
   );
-  if (blockCount > MAX_TOTAL_BLOCKS) {
-    issues.push(`Máximo de ${MAX_TOTAL_BLOCKS} blocos por arquivo.`);
-  }
+  if (blockCount > MAX_TOTAL_BLOCKS) issues.push(`Máximo de ${MAX_TOTAL_BLOCKS} blocos por arquivo.`);
 
   const parsed: HelpImportFile | null =
     format === IMPORT_FORMAT &&
@@ -505,9 +503,31 @@ export function validateHelpImportJson(rawJson: string): HelpImportValidation {
   };
 }
 
+function packageAssetExtension(mimeType: HelpImportPackageAsset["mimeType"]): string {
+  if (mimeType === "image/jpeg") return "jpg";
+  if (mimeType === "image/webp") return "webp";
+  return "png";
+}
+
+async function storePackageImage(
+  contentId: string,
+  blockIndex: number,
+  packageAsset: HelpImportPackageAsset,
+): Promise<{
+  storageKey: string;
+  checksumSha256: string;
+}> {
+  const checksumSha256 = createHash("sha256").update(packageAsset.bytes).digest("hex");
+  const extension = packageAssetExtension(packageAsset.mimeType);
+  const storageKey = `help-imports/${contentId}/${checksumSha256}-${blockIndex + 1}.${extension}`;
+  await putAssetObject(storageKey, packageAsset.bytes, packageAsset.mimeType);
+  return { storageKey, checksumSha256 };
+}
+
 export async function importStructuredHelpFile(
   actorUserId: string,
   file: HelpImportFile,
+  options: ImportStructuredHelpOptions = {},
 ) {
   const db = getDatabase();
   const requestedCategorySlugs = Array.from(
@@ -565,115 +585,151 @@ export async function importStructuredHelpFile(
   }
 
   const imported: Array<{ id: string; externalId: string; title: string }> = [];
+  const storedKeys: string[] = [];
 
-  await db.transaction(async (tx) => {
-    for (const content of normalizedContents) {
-      const [created] = await tx
-        .insert(helpContents)
-        .values({
-          slug: content.normalizedSlug,
-          title: content.title.trim(),
-          summary: content.summary?.trim() ?? "",
-          searchAliases: Array.from(new Set(content.searchAliases.map((item) => item.trim().toLowerCase()))),
-          assistantKnowledge: content.assistantKnowledge?.trim() ?? "",
-          internalSupportNotes: content.internalSupportNotes?.trim() ?? "",
-          status: "draft",
-          importSource: file.source,
-          importExternalId: content.externalId,
-          createdBy: actorUserId,
-          updatedBy: actorUserId,
-        })
-        .returning({ id: helpContents.id });
-      if (!created) throw new Error("IMPORT_CONTENT_NOT_CREATED");
-
-      await tx.insert(helpContentCategories).values(
-        content.categories.map((category, categoryIndex) => ({
-          contentId: created.id,
-          categoryId: categoryBySlug.get(category.slug)!,
-          destinationUrl: category.destinationUrl?.trim() ?? "",
-          sortOrder: (categoryIndex + 1) * 10,
-        })),
-      );
-
-      if (content.featuredVideo) {
-        const [videoAsset] = await tx
-          .insert(helpAssets)
+  try {
+    await db.transaction(async (tx) => {
+      for (const content of normalizedContents) {
+        const [created] = await tx
+          .insert(helpContents)
           .values({
-            contentId: created.id,
-            assetType: "video",
-            sourceUrl: content.featuredVideo.url,
-            altText: content.featuredVideo.description ?? "",
-            subtitles: content.featuredVideo.subtitles,
-            assistantSummary: content.featuredVideo.assistantSummary ?? "",
+            slug: content.normalizedSlug,
+            title: content.title.trim(),
+            summary: content.summary?.trim() ?? "",
+            searchAliases: Array.from(
+              new Set(content.searchAliases.map((item) => item.trim().toLowerCase())),
+            ),
+            assistantKnowledge: content.assistantKnowledge?.trim() ?? "",
+            internalSupportNotes: content.internalSupportNotes?.trim() ?? "",
+            status: "draft",
+            importSource: file.source,
+            importExternalId: content.externalId,
             createdBy: actorUserId,
+            updatedBy: actorUserId,
           })
-          .returning({ id: helpAssets.id });
-        if (!videoAsset) throw new Error("IMPORT_VIDEO_NOT_CREATED");
-        await tx.insert(helpContentFeaturedVideos).values({
-          contentId: created.id,
-          assetId: videoAsset.id,
-        });
-      }
+          .returning({ id: helpContents.id });
+        if (!created) throw new Error("IMPORT_CONTENT_NOT_CREATED");
 
-      for (const [stepIndex, step] of content.steps.entries()) {
-        const [createdStep] = await tx
-          .insert(helpContentSteps)
-          .values({
+        await tx.insert(helpContentCategories).values(
+          content.categories.map((category, categoryIndex) => ({
             contentId: created.id,
-            title: step.title,
-            description: step.description ?? "",
-            assistantKnowledge: step.assistantKnowledge ?? "",
-            sortOrder: (stepIndex + 1) * 10,
-          })
-          .returning({ id: helpContentSteps.id });
-        if (!createdStep) throw new Error("IMPORT_STEP_NOT_CREATED");
+            categoryId: categoryBySlug.get(category.slug)!,
+            destinationUrl: category.destinationUrl?.trim() ?? "",
+            sortOrder: (categoryIndex + 1) * 10,
+          })),
+        );
 
-        for (const [blockIndex, block] of step.blocks.entries()) {
-          let assetId: string | null = null;
-          if (block.type === "image") {
-            const [asset] = await tx
-              .insert(helpAssets)
-              .values({
-                contentId: created.id,
-                assetType: "image",
-                sourceUrl: block.url,
-                altText: block.altText ?? "",
-                assistantDescription: block.assistantDescription ?? "",
-                createdBy: actorUserId,
-              })
-              .returning({ id: helpAssets.id });
-            assetId = asset?.id ?? null;
-          } else if (block.type === "file") {
-            const [asset] = await tx
-              .insert(helpAssets)
-              .values({
-                contentId: created.id,
-                assetType: "file",
-                sourceUrl: block.url,
-                extractedText: block.extractedText ?? "",
-                assistantSummary: block.assistantSummary ?? "",
-                createdBy: actorUserId,
-              })
-              .returning({ id: helpAssets.id });
-            assetId = asset?.id ?? null;
-          }
-
-          await tx.insert(helpStepBlocks).values({
-            stepId: createdStep.id,
-            blockType: block.type,
-            textContent: block.type === "text" || block.type === "notice" ? block.text : "",
-            assetId,
-            linkUrl: block.type === "link" ? block.url : null,
-            linkLabel: block.type === "link" || block.type === "file" ? block.label : null,
-            noticeVariant: block.type === "notice" ? block.variant ?? "info" : null,
-            sortOrder: (blockIndex + 1) * 10,
+        if (content.featuredVideo) {
+          const [videoAsset] = await tx
+            .insert(helpAssets)
+            .values({
+              contentId: created.id,
+              assetType: "video",
+              sourceUrl: content.featuredVideo.url,
+              altText: content.featuredVideo.description ?? "",
+              subtitles: content.featuredVideo.subtitles,
+              assistantSummary: content.featuredVideo.assistantSummary ?? "",
+              createdBy: actorUserId,
+            })
+            .returning({ id: helpAssets.id });
+          if (!videoAsset) throw new Error("IMPORT_VIDEO_NOT_CREATED");
+          await tx.insert(helpContentFeaturedVideos).values({
+            contentId: created.id,
+            assetId: videoAsset.id,
           });
         }
-      }
 
-      imported.push({ id: created.id, externalId: content.externalId, title: content.title });
-    }
-  });
+        for (const [stepIndex, step] of content.steps.entries()) {
+          const [createdStep] = await tx
+            .insert(helpContentSteps)
+            .values({
+              contentId: created.id,
+              title: step.title,
+              description: step.description ?? "",
+              assistantKnowledge: step.assistantKnowledge ?? "",
+              sortOrder: (stepIndex + 1) * 10,
+            })
+            .returning({ id: helpContentSteps.id });
+          if (!createdStep) throw new Error("IMPORT_STEP_NOT_CREATED");
+
+          for (const [blockIndex, block] of step.blocks.entries()) {
+            let assetId: string | null = null;
+
+            if (block.type === "image") {
+              const packagePath = getHelpImportPackageAssetPath(block.url);
+              if (packagePath) {
+                const packageAsset = options.packageAssets?.get(packagePath);
+                if (!packageAsset) throw new Error(`IMPORT_PACKAGE_ASSET_MISSING:${packagePath}`);
+                const stored = await storePackageImage(created.id, blockIndex, packageAsset);
+                storedKeys.push(stored.storageKey);
+                const [asset] = await tx
+                  .insert(helpAssets)
+                  .values({
+                    contentId: created.id,
+                    assetType: "image",
+                    storageKey: stored.storageKey,
+                    originalName: packageAsset.fileName,
+                    mimeType: packageAsset.mimeType,
+                    sizeBytes: packageAsset.bytes.byteLength,
+                    checksumSha256: stored.checksumSha256,
+                    altText: block.altText ?? "",
+                    assistantDescription: block.assistantDescription ?? "",
+                    metadata: { managed: true, imported: true, assetPath: packagePath },
+                    createdBy: actorUserId,
+                  })
+                  .returning({ id: helpAssets.id });
+                assetId = asset?.id ?? null;
+              } else {
+                const [asset] = await tx
+                  .insert(helpAssets)
+                  .values({
+                    contentId: created.id,
+                    assetType: "image",
+                    sourceUrl: block.url,
+                    altText: block.altText ?? "",
+                    assistantDescription: block.assistantDescription ?? "",
+                    createdBy: actorUserId,
+                  })
+                  .returning({ id: helpAssets.id });
+                assetId = asset?.id ?? null;
+              }
+              if (!assetId) throw new Error("IMPORT_IMAGE_NOT_CREATED");
+            } else if (block.type === "file") {
+              const [asset] = await tx
+                .insert(helpAssets)
+                .values({
+                  contentId: created.id,
+                  assetType: "file",
+                  sourceUrl: block.url,
+                  extractedText: block.extractedText ?? "",
+                  assistantSummary: block.assistantSummary ?? "",
+                  createdBy: actorUserId,
+                })
+                .returning({ id: helpAssets.id });
+              assetId = asset?.id ?? null;
+              if (!assetId) throw new Error("IMPORT_FILE_NOT_CREATED");
+            }
+
+            await tx.insert(helpStepBlocks).values({
+              stepId: createdStep.id,
+              blockType: block.type,
+              textContent: block.type === "text" || block.type === "notice" ? block.text : "",
+              assetId,
+              linkUrl: block.type === "link" ? block.url : null,
+              linkLabel: block.type === "link" || block.type === "file" ? block.label : null,
+              noticeVariant: block.type === "notice" ? block.variant ?? "info" : null,
+              sortOrder: (blockIndex + 1) * 10,
+            });
+          }
+        }
+
+        imported.push({ id: created.id, externalId: content.externalId, title: content.title });
+      }
+    });
+  } catch (cause) {
+    await Promise.allSettled(storedKeys.map((key) => deleteAssetObject(key)));
+    throw cause;
+  }
 
   await recordAuditEvent({
     actorUserId,
@@ -683,6 +739,7 @@ export async function importStructuredHelpFile(
       source: file.source,
       contentCount: imported.length,
       version: file.version,
+      packagedScreenshotCount: options.packageAssets?.size ?? 0,
     },
   });
 
