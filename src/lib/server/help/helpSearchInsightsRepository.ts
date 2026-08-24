@@ -4,11 +4,12 @@ import {
   helpSearchEvents,
   helpSearchResults,
 } from "$lib/server/db/helpSearchSchema";
+import { getHelpKnowledgeInsights } from "$lib/server/help/helpKnowledgeTelemetryRepository";
 
 export async function getHelpSearchInsights() {
   const db = getDatabase();
 
-  const [summaryRows, topQueries, noResultQueries, clickedContents] =
+  const [summaryRows, topQueries, noResultQueries, clickedContents, knowledge] =
     await Promise.all([
       db
         .select({
@@ -54,6 +55,7 @@ export async function getHelpSearchInsights() {
         .groupBy(helpSearchResults.contentId)
         .orderBy(desc(sql`count(*) filter (where ${helpSearchResults.clickedAt} is not null)`))
         .limit(20),
+      getHelpKnowledgeInsights(),
     ]);
 
   const summary = summaryRows[0] ?? {
@@ -86,5 +88,6 @@ export async function getHelpSearchInsights() {
       impressions: Number(row.impressions ?? 0),
       clicks: Number(row.clicks ?? 0),
     })),
+    knowledge,
   };
 }
