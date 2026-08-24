@@ -15,6 +15,14 @@ import {
 import { getStructuredHelpContent } from "$lib/server/help/structuredHelpRepository";
 import { saveHelpContentVersion } from "$lib/server/help/helpVersionRepository";
 
+const MAX_KNOWLEDGE_PUBLIC_TEXT_CHARS = 3_000;
+const MAX_KNOWLEDGE_SEARCH_TEXT_CHARS = 8_000;
+
+function appendKnowledgeText(current: string, addition: string, limit: number): string {
+  const values = [current.trim(), addition.trim()].filter(Boolean);
+  return values.join("\n").slice(0, limit);
+}
+
 export async function publishHelpKnowledgeContent(
   actorUserId: string,
   contentId: string,
@@ -63,6 +71,25 @@ export async function publishHelpKnowledgeContent(
       searchText: quickGuide,
     });
   }
+
+  for (const fragment of knowledge.fragments) {
+    if (!fragment.blockId) continue;
+    const annotationText = (annotationsByBlockId.get(fragment.blockId) ?? [])
+      .flatMap((annotation) => annotation.type === "text" ? [annotation.text] : [])
+      .join("\n");
+    if (!annotationText) continue;
+    fragment.publicText = appendKnowledgeText(
+      fragment.publicText,
+      annotationText,
+      MAX_KNOWLEDGE_PUBLIC_TEXT_CHARS,
+    );
+    fragment.searchText = appendKnowledgeText(
+      fragment.searchText,
+      annotationText,
+      MAX_KNOWLEDGE_SEARCH_TEXT_CHARS,
+    );
+  }
+
   const snapshot = { public: publicSnapshot, knowledge };
   const db = getDatabase();
 
