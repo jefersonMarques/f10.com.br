@@ -16,7 +16,8 @@ const MAX_UPLOAD_VIDEO_BYTES = 90 * 1024 * 1024;
 const MAX_FRAMES = 72;
 const MAX_EXTRACTED_FRAMES = 900;
 const COMMAND_TIMEOUT_MS = 8 * 60 * 1_000;
-const OPENAI_AUTOMATION_TIMEOUT_MS = 3 * 60 * 1_000;
+const OPENAI_TRANSCRIPTION_TIMEOUT_MS = 3 * 60 * 1_000;
+const OPENAI_ARTICLE_TIMEOUT_MS = 10 * 60 * 1_000;
 
 export type HelpVideoAutomationSource =
   | { type: "youtube"; url: string }
@@ -320,7 +321,7 @@ async function transcribeAudio(audioPath: string): Promise<string> {
   form.set("response_format", "json");
   form.set("file", new Blob([new Uint8Array(bytes)], { type: "audio/mpeg" }), "audio.mp3");
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), OPENAI_AUTOMATION_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), OPENAI_TRANSCRIPTION_TIMEOUT_MS);
   try {
     const response = await fetch(OPENAI_TRANSCRIPTIONS_URL, {
       method: "POST",
@@ -485,7 +486,7 @@ async function generateArticle(
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), OPENAI_AUTOMATION_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), OPENAI_ARTICLE_TIMEOUT_MS);
   try {
     const response = await fetch(OPENAI_RESPONSES_URL, {
       method: "POST",
