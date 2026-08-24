@@ -5,6 +5,7 @@ import {
   answerHelpQuestion,
   type HelpKnowledgeScope,
 } from "$lib/server/help/helpKnowledgeEngine";
+import { recordHelpKnowledgeRun } from "$lib/server/help/helpKnowledgeTelemetryRepository";
 import {
   claimHelpPublicAiRequest,
   createHelpPublicAiIpKey,
@@ -80,25 +81,52 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
   }
 
   let requestId: string | null = null;
+  let knowledgeStartedAt: number | null = null;
   try {
     const sessionKey = getOrCreateHelpPublicAiSessionKey(cookies);
     const ipKey = createHelpPublicAiIpKey(clientAddress);
     requestId = await claimHelpPublicAiRequest(sessionKey, ipKey, settings);
 
+    knowledgeStartedAt = Date.now();
     const result = await answerHelpQuestion({
       question,
       scope,
       source: "public",
     });
-    await finishHelpPublicAiRequest(requestId, {
-      status:
-        result.resolution === "answered" || result.resolution === "navigate"
-          ? "answered"
-          : "not_found",
-      model: result.model ?? "",
-      inputTokens: result.inputTokens,
-      outputTokens: result.outputTokens,
-    });
+    const latencyMs = Date.now() - knowledgeStartedAt;
+
+    await Promise.all([
+      finishHelpPublicAiRequest(requestId, {
+        status:
+          result.resolution === "answered" || result.resolution === "navigate"
+            ? "answered"
+            : "not_found",
+        model: result.model ?? "",
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+      }),
+      recordHelpKnowledgeRun({
+        source: "public",
+        scope: scope.type,
+        searchEventId: result.searchEventId,
+        question,
+        contextSlug: scope.type === "article" ? scope.slug : "",
+        resolution: result.resolution,
+        target: result.target
+          ? {
+              contentId: result.target.contentId,
+              slug: result.target.slug,
+              targetType: result.target.targetType,
+            }
+          : null,
+        sources: result.sources,
+        model: result.model,
+        providerResponseId: result.providerResponseId,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        latencyMs,
+      }),
+    ]);
 
     return json(
       {
@@ -111,9 +139,21 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
     );
   } catch (cause) {
     const code = cause instanceof Error ? cause.message : "HELP_PUBLIC_AI_FAILED";
+    const failureCode = cause instanceof OpenAiResponseError ? cause.code : code;
+
+    if (knowledgeStartedAt !== null) {
+      await recordHelpKnowledgeRun({
+        source: "public",
+        scope: scope.type,
+        question,
+        contextSlug: scope.type === "article" ? scope.slug : "",
+        resolution: "failed",
+        latencyMs: Date.now() - knowledgeStartedAt,
+        failureCode,
+      }).catch(() => undefined);
+    }
 
     if (requestId) {
-      const failureCode = cause instanceof OpenAiResponseError ? cause.code : code;
       await finishHelpPublicAiRequest(requestId, {
         status: "failed",
         failureCode,
