@@ -22,6 +22,10 @@ function isBodyTooLarge(request: Request): boolean {
   return Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES;
 }
 
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 function errorResponse(error: string, status: number, retryAfter?: number) {
   return json(
     { error },
@@ -37,10 +41,15 @@ function errorResponse(error: string, status: number, retryAfter?: number) {
 
 function parseScope(payload: Record<string, unknown>): HelpKnowledgeScope | null {
   const scope = payload.scope === "article" ? "article" : "global";
-  if (scope === "global") return { type: "global" };
-  const articleSlug = typeof payload.articleSlug === "string" ? payload.articleSlug.trim() : "";
-  if (!articleSlug || articleSlug.length > 160) return null;
-  return { type: "article", slug: articleSlug };
+  if (scope === "article") {
+    const articleSlug = typeof payload.articleSlug === "string" ? payload.articleSlug.trim() : "";
+    if (!articleSlug || articleSlug.length > 160) return null;
+    return { type: "article", slug: articleSlug };
+  }
+
+  const categoryId = typeof payload.categoryId === "string" ? payload.categoryId.trim() : "";
+  if (categoryId && !isUuid(categoryId)) return null;
+  return { type: "global", categoryId: categoryId || null };
 }
 
 export const POST: RequestHandler = async ({ request, cookies, getClientAddress, url }) => {
