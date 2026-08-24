@@ -1,6 +1,5 @@
 <script lang="ts">
   import {
-    Archive,
     BrainCircuit,
     CheckCircle2,
     CircleAlert,
@@ -37,6 +36,44 @@
   function assignedCategory(categoryId: string) {
     return data.content.categories.find((category) => category.id === categoryId);
   }
+
+  $: allBlocks = data.content.steps.flatMap((step) => step.blocks);
+  $: imageBlocks = allBlocks.filter((block) => block.blockType === "image");
+  $: describedImageCount = imageBlocks.filter(
+    (block) => Boolean(block.asset?.altText.trim() || block.asset?.assistantDescription.trim()),
+  ).length;
+  $: fileBlocks = allBlocks.filter((block) => block.blockType === "file");
+  $: indexedFileCount = fileBlocks.filter(
+    (block) => Boolean(block.asset?.extractedText.trim() || block.asset?.assistantSummary.trim()),
+  ).length;
+  $: stepsWithContent = data.content.steps.filter((step) => step.blocks.length > 0).length;
+  $: imageOnlyStepsReady = data.content.steps.every((step) => {
+    const images = step.blocks.filter((block) => block.blockType === "image");
+    if (images.length === 0 || images.length !== step.blocks.length) return true;
+    return images.every(
+      (block) => Boolean(block.asset?.altText.trim() || block.asset?.assistantDescription.trim()),
+    );
+  });
+  $: videoReady = !data.content.featuredVideo || Boolean(data.content.featuredVideo.subtitles.trim());
+  $: publicationReady =
+    data.content.categories.length > 0 &&
+    data.content.categories.every((category) => category.active) &&
+    data.content.steps.length > 0 &&
+    stepsWithContent === data.content.steps.length &&
+    imageOnlyStepsReady &&
+    videoReady;
+  $: knowledgeTopics = Array.from(
+    new Set(
+      [
+        data.content.title,
+        ...data.content.categories.map((category) => category.name),
+        ...data.content.searchAliases,
+        ...data.content.steps.map((step) => step.title),
+      ]
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ).slice(0, 12);
 </script>
 
 <svelte:head><title>{data.content.title} | Base de Conhecimento | F10 Operations</title></svelte:head>
@@ -183,5 +220,37 @@
 
   {#if data.canEdit}<form method="POST" action="?/addStep" class="mt-5"><button type="submit" class="flex min-h-14 w-full items-center justify-center gap-2 rounded-[20px] border border-dashed border-[#BCC2CF] bg-white text-[12px] font-semibold text-[#000A57]"><Plus size={18}/>Adicionar próximo passo</button></form>{/if}
 
-  <section class="mt-5 rounded-[22px] border border-[#D8DDF4] bg-[#F8F9FF] p-5 sm:p-6"><div class="flex items-start gap-3"><BrainCircuit size={20} class="mt-0.5 shrink-0 text-[#000A57]"/><div><h2 class="text-[13px] font-semibold text-[#000A57]">Cobertura do conhecimento</h2><p class="mt-2 text-[11px] leading-6 text-[#646B7D]">Categorias: {data.content.categories.length} · Passos: {data.content.steps.length} · Vídeo com subtitles: {data.content.featuredVideo ? (data.content.featuredVideo.subtitles ? "sim" : "não") : "sem vídeo"}. A publicação gera o snapshot usado pela Central, pelo chat e pelo assistente contextual.</p></div></div></section>
+  <section class="mt-5 rounded-[22px] border border-[#D8DDF4] bg-[#F8F9FF] p-5 sm:p-6">
+    <div class="flex items-start gap-3">
+      <BrainCircuit size={20} class="mt-0.5 shrink-0 text-[#000A57]"/>
+      <div class="min-w-0 flex-1">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 class="text-[13px] font-semibold text-[#000A57]">Cobertura do conhecimento</h2><p class="mt-1 text-[10px] leading-5 text-[#777D8D]">Verificação determinística do que ficará disponível para pesquisa e respostas depois da publicação.</p></div>
+          <span class={`rounded-full px-3 py-1.5 text-[9px] font-bold ${publicationReady ? "bg-[#E7F6EC] text-[#2F7045]" : "bg-[#FFF1E7] text-[#A9510D]"}`}>{publicationReady ? "Estrutura pronta" : "Revisão necessária"}</span>
+        </div>
+
+        <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if data.content.categories.length > 0 && data.content.categories.every((category) => category.active)}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Categorias</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{data.content.categories.length} associada{data.content.categories.length === 1 ? "" : "s"}. Pelo menos uma categoria ativa é obrigatória.</p></div>
+          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if stepsWithContent === data.content.steps.length && data.content.steps.length > 0}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Passos públicos</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{stepsWithContent}/{data.content.steps.length} com conteúdo público estruturado.</p></div>
+          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if imageOnlyStepsReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Imagens compreensíveis</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{describedImageCount}/{imageBlocks.length} imagens possuem texto alternativo ou descrição adicional.</p></div>
+          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if videoReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Vídeo e subtitles</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{data.content.featuredVideo ? (videoReady ? "Vídeo com fonte textual disponível." : "Vídeo sem subtitles.") : "Sem vídeo principal."}</p></div>
+          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if fileBlocks.length === 0 || indexedFileCount === fileBlocks.length}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<Info size={15} class="text-[#76510A]"/>{/if}<strong class="text-[10px] text-[#303645]">Arquivos indexáveis</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{indexedFileCount}/{fileBlocks.length} possuem texto extraído ou resumo. Não bloqueia publicação.</p></div>
+          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if data.content.searchAliases.length > 0}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<Info size={15} class="text-[#76510A]"/>{/if}<strong class="text-[10px] text-[#303645]">Termos relacionados</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{data.content.searchAliases.length} alias{data.content.searchAliases.length === 1 ? "" : "es"} para melhorar retrieval lexical. Opcional.</p></div>
+        </div>
+
+        {#if knowledgeTopics.length > 0}
+          <div class="mt-5 border-t border-[#DDE1EA] pt-4">
+            <strong class="text-[10px] font-semibold text-[#303645]">O motor conseguirá localizar este artigo por</strong>
+            <div class="mt-2 flex flex-wrap gap-2">
+              {#each knowledgeTopics as topic}
+                <span class="rounded-full border border-[#D8DDF4] bg-white px-2.5 py-1 text-[9px] font-medium text-[#4F5870]">{topic}</span>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        <p class="mt-4 text-[9px] leading-5 text-[#858B99]">A publicação gera o snapshot consumido pelo mesmo Help Knowledge Core na Central, no chat e no assistente contextual do artigo. Nenhuma chamada de IA é feita para calcular esta cobertura.</p>
+      </div>
+    </div>
+  </section>
 </ApplicationContent>
