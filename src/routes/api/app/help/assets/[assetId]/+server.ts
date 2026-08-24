@@ -1,7 +1,8 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { resolveUserPermissions } from "$lib/server/auth/permissions";
 import { getSessionUser, SESSION_COOKIE_NAME } from "$lib/server/auth/session";
-import { readManagedHelpAsset } from "$lib/server/help/helpAssetRepository";
+import { getHelpAsset } from "$lib/server/help/helpAssetRepository";
+import { createHelpAssetHttpResponse } from "$lib/server/help/helpAssetHttpResponse";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -12,7 +13,7 @@ function supportsInlinePreview(assetType: string, mimeType: string | null): bool
   return ["application/pdf", "text/plain", "text/csv", "text/vtt"].includes(mimeType ?? "");
 }
 
-export const GET: RequestHandler = async ({ params, cookies, url }) => {
+export const GET: RequestHandler = async ({ params, cookies, url, request }) => {
   const assetId = params.assetId ?? "";
   if (!isUuid(assetId)) return json({ error: "NOT_FOUND" }, { status: 404 });
 
@@ -23,23 +24,20 @@ export const GET: RequestHandler = async ({ params, cookies, url }) => {
   if (!permissions.has("help.view")) return json({ error: "FORBIDDEN" }, { status: 403 });
 
   try {
-    const { asset, response } = await readManagedHelpAsset(assetId);
-    const bytes = await response.arrayBuffer();
+    const asset = await getHelpAsset(assetId);
+    if (!asset) return json({ error: "NOT_FOUND" }, { status: 404 });
     const previewRequested = url.searchParams.get("preview") === "1";
     const disposition = previewRequested && supportsInlinePreview(asset.assetType, asset.mimeType)
       ? "inline"
       : asset.assetType === "image" || asset.assetType === "video" || asset.mimeType === "text/vtt"
         ? "inline"
         : "attachment";
-    const safeName = (asset.originalName ?? "arquivo").replace(/[\r\n"\\]/g, "_");
-    return new Response(bytes, {
-      headers: {
-        "Content-Type": asset.mimeType || response.headers.get("content-type") || "application/octet-stream",
-        "Content-Length": String(bytes.byteLength),
-        "Content-Disposition": `${disposition}; filename="${safeName}"`,
-        "Cache-Control": "private, max-age=300",
-        "X-Content-Type-Options": "nosniff",
-      },
+
+    return await createHelpAssetHttpResponse({
+      assetId,
+      rangeHeader: request.headers.get("range"),
+      disposition,
+      cacheControl: "private, max-age=300",
     });
   } catch {
     return json({ error: "NOT_FOUND" }, { status: 404 });
