@@ -9,6 +9,7 @@
     Send,
     Sparkles,
   } from "lucide-svelte";
+  import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
   import SupportChatDialog from "$lib/components/onboarding/SupportChatDialog.svelte";
   import type { PageData } from "./$types";
 
@@ -34,15 +35,9 @@
   let errorMessage = "";
 
   function errorFor(code: string): string {
-    if (code === "AUTH_REQUIRED") {
-      return "Para usar a pesquisa inteligente, entre na Área do Cliente e selecione sua unidade.";
-    }
-    if (code === "RATE_LIMITED") {
-      return "O limite de perguntas foi atingido. Aguarde alguns minutos antes de tentar novamente.";
-    }
-    if (code === "REQUEST_IN_PROGRESS") {
-      return "Já existe uma pergunta em processamento nesta sessão.";
-    }
+    if (code === "AUTH_REQUIRED") return "Para usar a pesquisa inteligente, entre na Área do Cliente e selecione sua unidade.";
+    if (code === "RATE_LIMITED") return "O limite de perguntas foi atingido. Aguarde alguns minutos antes de tentar novamente.";
+    if (code === "REQUEST_IN_PROGRESS") return "Já existe uma pergunta em processamento nesta sessão.";
     return "A pesquisa inteligente está temporariamente indisponível.";
   }
 
@@ -54,13 +49,11 @@
   async function askHelp(): Promise<void> {
     const normalized = question.trim();
     if (!data.helpPublicAi.available || loading || normalized.length < 3) return;
-
     loading = true;
     answer = "";
     target = null;
     resolution = null;
     errorMessage = "";
-
     try {
       const response = await fetch("/api/help/ask", {
         method: "POST",
@@ -105,17 +98,8 @@
       <form class="mx-auto mt-8 max-w-[820px]" on:submit|preventDefault={askHelp}>
         <div class="flex items-end gap-2 rounded-[22px] border border-white/15 bg-white p-2 shadow-[0_18px_60px_rgba(0,0,0,0.16)] focus-within:border-[#EA6D0B] focus-within:ring-4 focus-within:ring-[#EA6D0B]/15">
           <Search size={19} class="mb-3 ml-2 shrink-0 text-[#7E8698]"/>
-          <textarea
-            bind:value={question}
-            rows="2"
-            maxlength="600"
-            disabled={!data.helpPublicAi.available || loading}
-            placeholder={data.helpPublicAi.available ? "Ex.: Como cadastrar um funcionário?" : "Pesquisa inteligente temporariamente indisponível"}
-            class="max-h-28 min-h-[48px] flex-1 resize-none bg-transparent px-1 py-3 text-[13px] leading-5 text-[#10172A] outline-none placeholder:text-[#8B91A0] disabled:cursor-not-allowed"
-          ></textarea>
-          <button type="submit" disabled={!data.helpPublicAi.available || loading || question.trim().length < 3} class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#EA6D0B] text-white transition hover:bg-[#D96208] disabled:cursor-not-allowed disabled:opacity-45" aria-label="Perguntar">
-            {#if loading}<LoaderCircle size={18} class="animate-spin"/>{:else}<Send size={17}/>{/if}
-          </button>
+          <textarea bind:value={question} rows="2" maxlength="600" disabled={!data.helpPublicAi.available || loading} placeholder={data.helpPublicAi.available ? "Ex.: Como cadastrar um funcionário?" : "Pesquisa inteligente temporariamente indisponível"} class="max-h-28 min-h-[48px] flex-1 resize-none bg-transparent px-1 py-3 text-[13px] leading-5 text-[#10172A] outline-none placeholder:text-[#8B91A0] disabled:cursor-not-allowed"></textarea>
+          <button type="submit" disabled={!data.helpPublicAi.available || loading || question.trim().length < 3} class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#EA6D0B] text-white transition hover:bg-[#D96208] disabled:cursor-not-allowed disabled:opacity-45" aria-label="Perguntar">{#if loading}<LoaderCircle size={18} class="animate-spin"/>{:else}<Send size={17}/>{/if}</button>
         </div>
       </form>
 
@@ -145,12 +129,8 @@
             <details class="group rounded-[22px] border border-[#E2E5EC] bg-white shadow-[0_8px_24px_rgba(1,13,40,0.025)]">
               <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 sm:px-6">
                 <div class="flex min-w-0 items-center gap-3">
-                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F7F8FB] text-[18px]">{category.icon || "📘"}</span>
-                  <div class="min-w-0">
-                    <strong class="block truncate text-[13px] font-semibold text-[#303746]">{category.name}</strong>
-                    {#if category.description}<span class="mt-0.5 block truncate text-[10px] text-[#858B99]">{category.description}</span>{/if}
-                    <a href={`/ajuda-f10/categorias/${encodeURIComponent(category.slug)}`} on:click|stopPropagation class="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold text-[#000A57] hover:underline">Abrir categoria<ArrowRight size={11}/></a>
-                  </div>
+                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F7F8FB] text-[#000A57]"><HelpCategoryIcon name={category.icon} size={18}/></span>
+                  <div class="min-w-0"><strong class="block truncate text-[13px] font-semibold text-[#303746]">{category.name}</strong>{#if category.description}<span class="mt-0.5 block truncate text-[10px] text-[#858B99]">{category.description}</span>{/if}<a href={`/ajuda-f10/categorias/${encodeURIComponent(category.slug)}`} on:click|stopPropagation class="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold text-[#000A57] hover:underline">Abrir categoria<ArrowRight size={11}/></a></div>
                 </div>
                 <div class="flex items-center gap-3"><span class="rounded-full bg-[#ECEEF3] px-2 py-1 text-[9px] font-semibold text-[#737A8B]">{category.articles.length}</span><ChevronDown size={15} class="text-[#818797] transition group-open:rotate-180"/></div>
               </summary>
