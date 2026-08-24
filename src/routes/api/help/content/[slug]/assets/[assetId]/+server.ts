@@ -16,7 +16,7 @@ export const GET: RequestHandler = async ({ params }) => {
   try {
     const { asset, response } = await readManagedHelpAsset(assetId);
     const bytes = await response.arrayBuffer();
-    const disposition = asset.assetType === "image" ? "inline" : "attachment";
+    const disposition = asset.assetType === "image" || asset.assetType === "video" ? "inline" : "attachment";
     const safeName = (asset.originalName ?? "arquivo").replace(/[\r\n"\\]/g, "_");
     return new Response(bytes, {
       headers: {
