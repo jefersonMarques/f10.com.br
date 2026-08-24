@@ -54,3 +54,29 @@ BEFORE UPDATE OR DELETE
 ON help_categories
 FOR EACH ROW
 EXECUTE FUNCTION protect_help_uncategorized_category();
+
+CREATE OR REPLACE FUNCTION reject_uncategorized_help_publication()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.entity_type = 'content' AND EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(
+      COALESCE(NEW.snapshot -> 'public' -> 'categories', '[]'::jsonb)
+    ) AS category
+    WHERE category ->> 'slug' = 'uncategorized'
+  ) THEN
+    RAISE EXCEPTION 'CONTENT_REAL_CATEGORY_REQUIRED';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS help_publications_real_category_guard ON help_publications;
+CREATE TRIGGER help_publications_real_category_guard
+BEFORE INSERT OR UPDATE OF snapshot
+ON help_publications
+FOR EACH ROW
+EXECUTE FUNCTION reject_uncategorized_help_publication();
