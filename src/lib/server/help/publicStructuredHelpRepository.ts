@@ -21,7 +21,7 @@ export type PublishedHelpCategory = {
 
 export type PublishedHelpBlock = {
   id: string;
-  blockType: "text" | "image" | "video" | "notice" | "link" | "file";
+  blockType: "text" | "image" | "notice" | "link" | "file";
   textContent: string;
   linkUrl: string | null;
   linkLabel: string | null;
@@ -115,7 +115,7 @@ function parseBlock(value: unknown): PublishedHelpBlock | null {
   const record = asRecord(value);
   if (!record) return null;
   const blockType = readString(record, "blockType");
-  if (!["text", "image", "video", "notice", "link", "file"].includes(blockType)) return null;
+  if (!["text", "image", "notice", "link", "file"].includes(blockType)) return null;
   const id = readString(record, "id");
   if (!id) return null;
   return {
@@ -144,7 +144,7 @@ function parseStep(value: unknown): PublishedHelpStep | null {
     title,
     description: readString(record, "description"),
     sortOrder: typeof record.sortOrder === "number" ? record.sortOrder : 0,
-    blocks: blocks.filter((block) => block.blockType !== "video"),
+    blocks,
   };
 }
 
