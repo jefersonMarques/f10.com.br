@@ -6,6 +6,7 @@ import { hasPermission } from "$lib/server/auth/permissions";
 import {
   archiveStructuredHelpContent,
   discardStructuredHelpContent,
+  restoreArchivedStructuredHelpContent,
 } from "$lib/server/help/helpContentLifecycle";
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import {
@@ -14,6 +15,8 @@ import {
 } from "$lib/server/help/structuredHelpRepository";
 import { listPublishedStructuredHelpLinks } from "$lib/server/help/publicStructuredHelpRepository";
 
+const DELETE_CONFIRMATION = "quero excluir";
+
 function readFormValue(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === "string" ? value.trim() : "";
@@ -21,6 +24,10 @@ function readFormValue(formData: FormData, name: string): string {
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function normalizeConfirmation(value: string): string {
+  return value.trim().toLocaleLowerCase("pt-BR").replace(/\s+/g, " ");
 }
 
 function isManualCategoryAllowed(
@@ -139,9 +146,17 @@ export const actions: Actions = {
 
   discard: async ({ cookies, request }) => {
     const { session } = await requireAppPermission(cookies, "help.edit", "/app/help/content");
-    const contentId = readFormValue(await request.formData(), "contentId");
+    const formData = await request.formData();
+    const contentId = readFormValue(formData, "contentId");
+    const confirmation = normalizeConfirmation(readFormValue(formData, "confirmation"));
     if (!isUuid(contentId)) {
       return fail(400, { success: false, message: "Conteúdo inválido." });
+    }
+    if (confirmation !== DELETE_CONFIRMATION) {
+      return fail(400, {
+        success: false,
+        message: `Para excluir definitivamente, digite exatamente “${DELETE_CONFIRMATION}”.`,
+      });
     }
 
     try {
@@ -150,9 +165,9 @@ export const actions: Actions = {
       return fail(409, {
         success: false,
         message:
-          cause instanceof Error && cause.message === "CONTENT_ALREADY_PUBLISHED"
-            ? "Conteúdo que já foi publicado não pode ser descartado. Arquive-o para retirá-lo da Central e da IA."
-            : "Não foi possível descartar este conteúdo.",
+          cause instanceof Error && cause.message === "CONTENT_NOT_DRAFT"
+            ? "Somente conteúdos em rascunho podem ser excluídos. Restaure o arquivado como rascunho ou arquive o conteúdo publicado primeiro."
+            : "Não foi possível excluir este conteúdo.",
       });
     }
     throw redirect(303, "/app/help/content");
@@ -172,10 +187,25 @@ export const actions: Actions = {
         success: false,
         message:
           cause instanceof Error && cause.message === "CONTENT_NEVER_PUBLISHED"
-            ? "Este conteúdo nunca foi publicado. Use Descartar se não quiser mantê-lo."
+            ? "Este conteúdo nunca foi publicado. Exclua o rascunho se não quiser mantê-lo."
             : "Não foi possível arquivar este conteúdo.",
       });
     }
     throw redirect(303, "/app/help/content");
+  },
+
+  restore: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(cookies, "help.edit", "/app/help/content");
+    const contentId = readFormValue(await request.formData(), "contentId");
+    if (!isUuid(contentId)) {
+      return fail(400, { success: false, message: "Conteúdo inválido." });
+    }
+
+    try {
+      await restoreArchivedStructuredHelpContent(session.user.id, contentId);
+    } catch {
+      return fail(409, { success: false, message: "Não foi possível restaurar este conteúdo." });
+    }
+    throw redirect(303, `/app/help/content/${contentId}`);
   },
 };
