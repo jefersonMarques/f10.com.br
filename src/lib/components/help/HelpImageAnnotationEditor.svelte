@@ -1,7 +1,11 @@
 <script lang="ts">
   import { ArrowUpRight, Hash, Highlighter, Trash2, Type, X } from "lucide-svelte";
   import HelpAnnotatedImage from "$lib/components/help/HelpAnnotatedImage.svelte";
-  import type { HelpImageAnnotation, HelpImageAnnotationType } from "$lib/help/helpImageAnnotations";
+  import {
+    MAX_HELP_IMAGE_ANNOTATIONS,
+    type HelpImageAnnotation,
+    type HelpImageAnnotationType,
+  } from "$lib/help/helpImageAnnotations";
 
   export let imageUrl: string;
   export let altText = "";
@@ -17,15 +21,11 @@
   let drawing: DrawingState | null = null;
   let draft: HelpImageAnnotation | null = null;
 
-  const toolOptions: Array<{
-    type: DrawingTool;
-    label: string;
-    icon: typeof Hash;
-  }> = [
-    { type: "numbered", label: "Número", icon: Hash },
-    { type: "highlight", label: "Destaque", icon: Highlighter },
-    { type: "arrow", label: "Seta", icon: ArrowUpRight },
-    { type: "text", label: "Texto", icon: Type },
+  const toolOptions: Array<{ type: DrawingTool; label: string }> = [
+    { type: "numbered", label: "Número" },
+    { type: "highlight", label: "Destaque" },
+    { type: "arrow", label: "Seta" },
+    { type: "text", label: "Texto" },
   ];
 
   function clamp(value: number): number {
@@ -70,13 +70,25 @@
   function buildDraft(tool: DrawingTool, start: Point, end: Point): HelpImageAnnotation {
     const id = draft?.id ?? createId();
     if (tool === "numbered") {
-      return { id, type: "numbered", number: draft?.type === "numbered" ? draft.number : nextNumber(), ...rectangle(start, end) };
+      return {
+        id,
+        type: "numbered",
+        number: draft?.type === "numbered" ? draft.number : nextNumber(),
+        ...rectangle(start, end),
+      };
     }
     if (tool === "highlight") {
       return { id, type: "highlight", ...rectangle(start, end) };
     }
     if (tool === "arrow") {
-      return { id, type: "arrow", startX: start.x, startY: start.y, endX: end.x, endY: end.y };
+      return {
+        id,
+        type: "arrow",
+        startX: start.x,
+        startY: start.y,
+        endX: end.x,
+        endY: end.y,
+      };
     }
 
     const rect = rectangle(start, end);
@@ -101,7 +113,7 @@
   }
 
   function handlePointerDown(event: PointerEvent): void {
-    if (disabled || event.button !== 0) return;
+    if (disabled || annotations.length >= MAX_HELP_IMAGE_ANNOTATIONS || event.button !== 0) return;
     event.preventDefault();
     const start = pointerPosition(event);
     drawing = { tool: activeTool, start, pointerId: event.pointerId };
@@ -117,7 +129,9 @@
   function finishDrawing(event: PointerEvent): void {
     if (!drawing || event.pointerId !== drawing.pointerId) return;
     const finished = buildDraft(drawing.tool, drawing.start, pointerPosition(event));
-    if (validDraft(finished)) annotations = [...annotations, finished];
+    if (validDraft(finished) && annotations.length < MAX_HELP_IMAGE_ANNOTATIONS) {
+      annotations = [...annotations, finished];
+    }
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
     drawing = null;
     draft = null;
@@ -165,11 +179,11 @@
       {#each toolOptions as option}
         <button
           type="button"
-          disabled={disabled}
+          disabled={disabled || annotations.length >= MAX_HELP_IMAGE_ANNOTATIONS}
           on:click={() => { activeTool = option.type; cancelDrawing(); }}
-          class={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-[10px] font-semibold transition ${activeTool === option.type ? "bg-[#000A57] text-white" : "border border-[#DDE1EA] bg-white text-[#4F5667] hover:border-[#B8BECD]"}`}
+          class={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${activeTool === option.type ? "bg-[#000A57] text-white" : "border border-[#DDE1EA] bg-white text-[#4F5667] hover:border-[#B8BECD]"}`}
         >
-          <svelte:component this={option.icon} size={14}/>{option.label}
+          {#if option.type === "numbered"}<Hash size={14}/>{:else if option.type === "highlight"}<Highlighter size={14}/>{:else if option.type === "arrow"}<ArrowUpRight size={14}/>{:else}<Type size={14}/>{/if}{option.label}
         </button>
       {/each}
       {#if draft}
@@ -180,10 +194,13 @@
     <p class="mb-3 text-[10px] leading-5 text-[#777E8E]">
       Selecione uma ferramenta e arraste diretamente sobre a tela. As coordenadas são proporcionais, então as marcações acompanham a imagem em qualquer tamanho.
     </p>
+    {#if annotations.length >= MAX_HELP_IMAGE_ANNOTATIONS}
+      <p class="mb-3 rounded-lg bg-[#FFF3E9] px-3 py-2 text-[9px] font-semibold text-[#A9510D]">Limite de {MAX_HELP_IMAGE_ANNOTATIONS} marcações atingido. Exclua uma marcação para adicionar outra.</p>
+    {/if}
 
     <div
       bind:this={canvas}
-      class={`relative touch-none select-none ${disabled ? "cursor-default" : "cursor-crosshair"}`}
+      class={`relative touch-none select-none ${disabled || annotations.length >= MAX_HELP_IMAGE_ANNOTATIONS ? "cursor-default" : "cursor-crosshair"}`}
       role="application"
       aria-label="Editor de marcações da imagem"
       on:pointerdown={handlePointerDown}
@@ -203,7 +220,7 @@
 
   <aside class="rounded-[20px] border border-[#E2E5ED] bg-white p-4">
     <div class="flex items-center justify-between gap-3">
-      <div><h3 class="text-[12px] font-semibold text-[#303645]">Marcações</h3><p class="mt-1 text-[9px] text-[#8A909D]">{annotations.length} de 40</p></div>
+      <div><h3 class="text-[12px] font-semibold text-[#303645]">Marcações</h3><p class="mt-1 text-[9px] text-[#8A909D]">{annotations.length} de {MAX_HELP_IMAGE_ANNOTATIONS}</p></div>
       {#if annotations.length > 0 && !disabled}
         <button type="button" on:click={() => (annotations = [])} class="text-[9px] font-semibold text-[#A34242]">Limpar tudo</button>
       {/if}
