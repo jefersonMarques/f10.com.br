@@ -15,7 +15,7 @@
 <svelte:head><title>Marcar imagem | {data.content.title} | F10 Operations</title></svelte:head>
 
 <ApplicationContent width="wide">
-  <ApplicationBackLink href={`/app/help/content/${data.content.id}`} label="Voltar ao editor" className="mb-4" />
+  <ApplicationBackLink href={`/app/help/content/${data.content.id}/images`} label="Marcar imagens" className="mb-4" />
 
   <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
     <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
