@@ -13,8 +13,8 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-function editorPath(contentId: string): string {
-  return `/app/help/content/${contentId}`;
+function imagesPath(contentId: string): string {
+  return `/app/help/content/${contentId}/images`;
 }
 
 export const load: PageServerLoad = async ({ params, parent }) => {
@@ -93,6 +93,6 @@ export const actions: Actions = {
       });
     }
 
-    throw redirect(303, editorPath(params.contentId));
+    throw redirect(303, imagesPath(params.contentId));
   },
 };
