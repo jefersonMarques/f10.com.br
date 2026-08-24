@@ -96,6 +96,7 @@ function signHeaders(input: {
   secretKey: string;
   region: string;
   contentType?: string;
+  range?: string;
 }) {
   const date = new Date();
   const { full, short } = amzDate(date);
@@ -106,6 +107,7 @@ function signHeaders(input: {
     ["x-amz-date", full],
   ];
   if (input.contentType) headerEntries.push(["content-type", input.contentType]);
+  if (input.range) headerEntries.push(["range", input.range]);
   headerEntries.sort(([a], [b]) => a.localeCompare(b));
 
   const canonicalHeaders = headerEntries
@@ -139,6 +141,7 @@ function signHeaders(input: {
     Authorization: `AWS4-HMAC-SHA256 Credential=${input.accessKey}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
   });
   if (input.contentType) headers.set("Content-Type", input.contentType);
+  if (input.range) headers.set("Range", input.range);
   return headers;
 }
 
@@ -147,6 +150,7 @@ async function signedFetch(
   key: string,
   body?: Uint8Array,
   contentType?: string,
+  range?: string,
 ): Promise<Response> {
   const config = requireConfiguration();
   const url = buildObjectUrl(config.endpoint, config.bucket, key);
@@ -159,6 +163,7 @@ async function signedFetch(
     secretKey: config.secretKey,
     region: config.region,
     contentType,
+    range,
   });
   const requestBody = body && method === "PUT" ? new Uint8Array(body) : undefined;
 
@@ -196,9 +201,11 @@ export async function putAssetObject(
   };
 }
 
-export async function getAssetObject(key: string): Promise<Response> {
-  const response = await signedFetch("GET", key);
-  if (!response.ok) throw new Error(`ASSET_STORAGE_GET_${response.status}`);
+export async function getAssetObject(key: string, range?: string): Promise<Response> {
+  const response = await signedFetch("GET", key, undefined, undefined, range);
+  if (!response.ok && response.status !== 416) {
+    throw new Error(`ASSET_STORAGE_GET_${response.status}`);
+  }
   return response;
 }
 
