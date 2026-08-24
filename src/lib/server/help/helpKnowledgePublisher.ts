@@ -4,6 +4,7 @@ import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
 import { helpContents } from "$lib/server/db/structuredHelpSchema";
+import { cleanupObsoleteImportedHelpAssets } from "$lib/server/help/helpImportedAssetCleanup";
 import {
   compileHelpKnowledgeDocument,
   compileHelpPublicSnapshot,
@@ -102,4 +103,6 @@ export async function publishHelpKnowledgeContent(
       knowledgeFragmentCount: snapshot.knowledge.fragments.length,
     },
   });
+
+  await cleanupObsoleteImportedHelpAssets(contentId).catch(() => undefined);
 }
