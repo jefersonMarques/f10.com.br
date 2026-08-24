@@ -3,6 +3,7 @@ import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
+import { publishHelpKnowledgeContent } from "$lib/server/help/helpKnowledgePublisher";
 import {
   addStructuredHelpBlock,
   addStructuredHelpStep,
@@ -10,7 +11,6 @@ import {
   deleteStructuredHelpFeaturedVideo,
   deleteStructuredHelpStep,
   getStructuredHelpContent,
-  publishStructuredHelpContent,
   updateStructuredHelpBlock,
   updateStructuredHelpContent,
   updateStructuredHelpStep,
@@ -363,7 +363,7 @@ export const actions: Actions = {
     if (!isUuid(params.contentId)) return fail(404, { success: false, message: "Conteúdo não encontrado." });
     const { session } = await requireAppPermission(cookies, "help.publish", contentEditorPath(params.contentId));
     try {
-      await publishStructuredHelpContent(session.user.id, params.contentId);
+      await publishHelpKnowledgeContent(session.user.id, params.contentId);
     } catch (cause) {
       return fail(409, { success: false, message: getPublishErrorMessage(cause) });
     }
