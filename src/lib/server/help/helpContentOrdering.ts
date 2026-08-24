@@ -16,6 +16,10 @@ async function markDraft(contentId: string, actorUserId: string): Promise<void> 
     .where(eq(helpContents.id, contentId));
 }
 
+function temporarySortOrder(values: Array<{ sortOrder: number }>): number {
+  return Math.min(0, ...values.map((item) => item.sortOrder)) - 10;
+}
+
 export async function moveHelpStep(
   actorUserId: string,
   contentId: string,
@@ -43,15 +47,21 @@ export async function moveHelpStep(
   const current = steps[index];
   if (!current || !target) return;
 
+  const temporary = temporarySortOrder(steps);
+  const updatedAt = new Date();
   await db.transaction(async (tx) => {
     await tx
       .update(helpContentSteps)
-      .set({ sortOrder: target.sortOrder, updatedAt: new Date() })
+      .set({ sortOrder: temporary, updatedAt })
       .where(eq(helpContentSteps.id, current.id));
     await tx
       .update(helpContentSteps)
-      .set({ sortOrder: current.sortOrder, updatedAt: new Date() })
+      .set({ sortOrder: current.sortOrder, updatedAt })
       .where(eq(helpContentSteps.id, target.id));
+    await tx
+      .update(helpContentSteps)
+      .set({ sortOrder: target.sortOrder, updatedAt })
+      .where(eq(helpContentSteps.id, current.id));
   });
   await markDraft(contentId, actorUserId);
   await recordAuditEvent({
@@ -96,15 +106,21 @@ export async function moveHelpBlock(
   const current = blocks[index];
   if (!current || !target) return;
 
+  const temporary = temporarySortOrder(blocks);
+  const updatedAt = new Date();
   await db.transaction(async (tx) => {
     await tx
       .update(helpStepBlocks)
-      .set({ sortOrder: target.sortOrder, updatedAt: new Date() })
+      .set({ sortOrder: temporary, updatedAt })
       .where(eq(helpStepBlocks.id, current.id));
     await tx
       .update(helpStepBlocks)
-      .set({ sortOrder: current.sortOrder, updatedAt: new Date() })
+      .set({ sortOrder: current.sortOrder, updatedAt })
       .where(eq(helpStepBlocks.id, target.id));
+    await tx
+      .update(helpStepBlocks)
+      .set({ sortOrder: target.sortOrder, updatedAt })
+      .where(eq(helpStepBlocks.id, current.id));
   });
   await markDraft(contentId, actorUserId);
   await recordAuditEvent({
