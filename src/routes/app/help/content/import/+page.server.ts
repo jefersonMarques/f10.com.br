@@ -4,12 +4,16 @@ import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import {
+  MAX_HELP_IMPORT_PACKAGE_BYTES,
+  parseHelpImportPackage,
+  prepareHelpImportPackageJson,
+} from "$lib/server/help/helpImportPackage";
+import {
   importStructuredHelpFile,
   validateHelpImportJson,
   type HelpImportFile,
 } from "$lib/server/help/structuredHelpImport";
 
-const MAX_JSON_BYTES = 5 * 1024 * 1024;
 const TEMPLATE_PLACEHOLDER_PATTERN = /\bREPLACE_[A-Z0-9_]+\b/;
 
 function permissionMap(
@@ -23,12 +27,18 @@ function conflictMessage(message: string): string {
     return `Já existem conteúdos com estes endereços: ${message.slice("IMPORT_SLUG_CONFLICT:".length)}.`;
   }
   if (message.startsWith("IMPORT_EXTERNAL_ID_CONFLICT:")) {
-    return `Este arquivo contém itens já importados desta mesma origem: ${message.slice("IMPORT_EXTERNAL_ID_CONFLICT:".length)}.`;
+    return `Este pacote contém itens já importados desta mesma origem: ${message.slice("IMPORT_EXTERNAL_ID_CONFLICT:".length)}.`;
   }
   if (message.startsWith("IMPORT_CATEGORY_INVALID:")) {
-    return `Estas categorias não existem ou estão inativas: ${message.slice("IMPORT_CATEGORY_INVALID:".length)}. Atualize o prompt e gere o JSON novamente.`;
+    return `Estas categorias não existem ou estão inativas: ${message.slice("IMPORT_CATEGORY_INVALID:".length)}. Atualize o prompt e gere o pacote novamente.`;
   }
-  return "Não foi possível importar o arquivo. Nenhum conteúdo foi alterado.";
+  if (message.startsWith("IMPORT_PACKAGE_ASSET_MISSING:")) {
+    return `Um screenshot referenciado não foi encontrado no pacote: ${message.slice("IMPORT_PACKAGE_ASSET_MISSING:".length)}.`;
+  }
+  if (message === "ASSET_STORAGE_NOT_CONFIGURED" || message.startsWith("ASSET_STORAGE_PUT_")) {
+    return "O armazenamento de assets não está disponível. Configure S3/MinIO antes de importar screenshots.";
+  }
+  return "Não foi possível importar o pacote. Nenhum conteúdo foi alterado.";
 }
 
 function countJsonAssets(file: HelpImportFile): number {
@@ -51,7 +61,7 @@ export const load: PageServerLoad = async ({ parent }) => {
   if (!hasPermission(permissions, "help.view")) throw error(403, "Acesso não autorizado.");
   return {
     canImport: hasPermission(permissions, "help.edit"),
-    maxImportBytes: MAX_JSON_BYTES,
+    maxImportBytes: MAX_HELP_IMPORT_PACKAGE_BYTES,
     categories: await listHelpCategories(true),
   };
 };
@@ -67,56 +77,77 @@ export const actions: Actions = {
     if (!(fileValue instanceof File) || fileValue.size === 0) {
       return fail(400, {
         success: false,
-        message: "Selecione o JSON gerado pela IA.",
+        message: "Selecione o ZIP gerado pela IA.",
         issues: [],
       });
     }
-    if (!fileValue.name.toLowerCase().endsWith(".json")) {
+    if (!fileValue.name.toLowerCase().endsWith(".zip")) {
       return fail(400, {
         success: false,
-        message: "Use um arquivo .json no formato F10 Help Import.",
+        message: "Use um arquivo .zip no formato F10 Help Import.",
         issues: [],
       });
     }
-    if (fileValue.size > MAX_JSON_BYTES) {
+    if (fileValue.size > MAX_HELP_IMPORT_PACKAGE_BYTES) {
       return fail(413, {
         success: false,
-        message: `O arquivo excede o limite de ${Math.round(MAX_JSON_BYTES / 1024 / 1024)} MB.`,
+        message: `O pacote excede o limite de ${Math.round(MAX_HELP_IMPORT_PACKAGE_BYTES / 1024 / 1024)} MB.`,
         issues: [],
       });
     }
 
-    const rawJson = await fileValue.text();
-    if (TEMPLATE_PLACEHOLDER_PATTERN.test(rawJson)) {
+    let packageFile;
+    try {
+      packageFile = parseHelpImportPackage(new Uint8Array(await fileValue.arrayBuffer()));
+    } catch (cause) {
       return fail(400, {
         success: false,
-        message: "O JSON ainda contém placeholders do template. Gere o conteúdo final antes de importar.",
-        issues: ["Substitua ou remova todos os valores REPLACE_* do template."],
+        message: "O ZIP não segue a estrutura esperada do F10 Help Import.",
+        issues: [cause instanceof Error ? cause.message : "Pacote ZIP inválido."],
       });
     }
 
-    const validation = validateHelpImportJson(rawJson);
+    if (TEMPLATE_PLACEHOLDER_PATTERN.test(packageFile.jsonText)) {
+      return fail(400, {
+        success: false,
+        message: "O JSON do pacote ainda contém placeholders do template.",
+        issues: ["Substitua ou remova todos os valores REPLACE_* antes de gerar o ZIP final."],
+      });
+    }
+
+    const prepared = prepareHelpImportPackageJson(packageFile.jsonText, packageFile.assets);
+    if (prepared.issues.length > 0) {
+      return fail(400, {
+        success: false,
+        message: "O pacote possui inconsistências entre o JSON e os screenshots.",
+        issues: prepared.issues,
+      });
+    }
+
+    const validation = validateHelpImportJson(prepared.jsonText);
     if (!validation.valid || !validation.parsed) {
       return fail(400, {
         success: false,
-        message: "O arquivo não segue o contrato atual de importação do F10.",
+        message: "O JSON do pacote não segue o contrato atual de importação do F10.",
         issues: validation.issues,
         summary: {
           source: validation.source,
           contentCount: validation.contentCount,
           stepCount: validation.stepCount,
           blockCount: validation.blockCount,
-          assetCount: 0,
+          assetCount: prepared.referencedAssetCount,
         },
       });
     }
 
     const assetCount = countJsonAssets(validation.parsed);
     try {
-      const result = await importStructuredHelpFile(session.user.id, validation.parsed);
+      const result = await importStructuredHelpFile(session.user.id, validation.parsed, {
+        packageAssets: packageFile.assets,
+      });
       return {
         success: true,
-        message: `${result.contentCount} conteúdo(s) importado(s) como rascunho. Revise antes de publicar.`,
+        message: `${result.contentCount} conteúdo(s) importado(s) como rascunho. Revise as categorias reais antes de publicar.`,
         issues: [],
         summary: {
           source: result.source,
