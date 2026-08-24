@@ -3,6 +3,7 @@ import type { RequestHandler } from "./$types";
 import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
+import { stabilizeHelpImportIdentity } from "$lib/server/help/helpImportIdentity";
 import { attachImportedMp4AsFeaturedVideo } from "$lib/server/help/helpImportedFeaturedVideo";
 import {
   generateHelpImportFromVideo,
@@ -200,11 +201,12 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
           });
           return;
         }
+        const stabilizedFile = await stabilizeHelpImportIdentity(validation.parsed);
         write({
           type: "progress",
           stage: "validate",
           status: "done",
-          label: "Conteúdo validado pelo F10",
+          label: "Conteúdo validado e identidade conferida pelo F10",
         });
 
         write({
@@ -215,13 +217,13 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
         });
         const result = await importStructuredHelpFile(
           session.user.id,
-          validation.parsed,
+          stabilizedFile,
           generated.assets,
         );
 
         if (source.type === "upload") {
           const importedContent = result.imported[0];
-          const content = validation.parsed.contents[0];
+          const content = stabilizedFile.contents[0];
           if (!importedContent || !content) throw new Error("IMPORT_CONTENT_NOT_CREATED");
           await attachImportedMp4AsFeaturedVideo({
             actorUserId: session.user.id,
