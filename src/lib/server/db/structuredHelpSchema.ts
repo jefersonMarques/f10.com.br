@@ -57,6 +57,7 @@ export const helpContents = pgTable(
     slug: text("slug").notNull(),
     title: text("title").notNull(),
     summary: text("summary").notNull().default(""),
+    quickGuide: text("quick_guide").notNull().default(""),
     searchAliases: jsonb("search_aliases").$type<string[]>().notNull().default([]),
     assistantKnowledge: text("assistant_knowledge").notNull().default(""),
     internalSupportNotes: text("internal_support_notes").notNull().default(""),
