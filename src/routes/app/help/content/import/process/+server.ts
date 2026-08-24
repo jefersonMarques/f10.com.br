@@ -2,9 +2,11 @@ import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
 import { requireAppPermission } from "$lib/server/auth/authorization";
+import { recordHelpAiUsage } from "$lib/server/help/helpAiUsageRepository";
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import { stabilizeHelpImportIdentity } from "$lib/server/help/helpImportIdentity";
 import { attachImportedMp4AsFeaturedVideo } from "$lib/server/help/helpImportedFeaturedVideo";
+import { replaceHelpScreenshotReviewCandidates } from "$lib/server/help/helpScreenshotReviewRepository";
 import {
   generateHelpImportFromVideo,
   HELP_VIDEO_AUTOMATION_MAX_UPLOAD_BYTES,
@@ -214,6 +216,11 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
           categories,
           externalIdHint,
           onProgress: progress,
+          onAiUsage: (usage) => recordHelpAiUsage({
+            actorUserId: session.user.id,
+            ...usage,
+            metadata: { sourceType: source.type },
+          }),
         });
 
         normalizeSingleScreenshotPerStep(generated.file);
@@ -251,18 +258,18 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
           type: "progress",
           stage: "import",
           status: "active",
-          label: "Salvando rascunho, vídeo e screenshots",
+          label: "Salvando rascunho, vídeo e opções de screenshots",
         });
         const result = await importStructuredHelpFile(
           session.user.id,
           stabilizedFile,
           generated.assets,
         );
+        const importedContent = result.imported[0];
+        const content = stabilizedFile.contents[0];
+        if (!importedContent || !content) throw new Error("IMPORT_CONTENT_NOT_CREATED");
 
         if (source.type === "upload") {
-          const importedContent = result.imported[0];
-          const content = stabilizedFile.contents[0];
-          if (!importedContent || !content) throw new Error("IMPORT_CONTENT_NOT_CREATED");
           await attachImportedMp4AsFeaturedVideo({
             actorUserId: session.user.id,
             contentId: importedContent.id,
@@ -274,11 +281,17 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
           });
         }
 
+        await replaceHelpScreenshotReviewCandidates(
+          session.user.id,
+          importedContent.id,
+          generated.reviewCandidates,
+        );
+
         write({
           type: "progress",
           stage: "import",
           status: "done",
-          label: "Rascunho, vídeo e screenshots salvos",
+          label: "Rascunho, vídeo e opções de screenshots salvos",
         });
 
         const overwriteMessage = result.overwrittenCount > 0
@@ -286,7 +299,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
           : "";
         write({
           type: "success",
-          message: `Vídeo processado e ${result.contentCount} conteúdo(s) criado(s) como rascunho.${overwriteMessage} Revise as categorias e marcações antes de publicar.`,
+          message: `Vídeo processado e ${result.contentCount} conteúdo(s) criado(s) como rascunho.${overwriteMessage} Revise os screenshots, faça as marcações e publique quando estiver correto.`,
           summary: {
             source: result.source,
             contentCount: result.contentCount,
