@@ -17,7 +17,6 @@ import { saveHelpContentVersion } from "$lib/server/help/helpVersionRepository";
 export type StructuredHelpBlockType =
   | "text"
   | "image"
-  | "video"
   | "notice"
   | "link"
   | "file";
@@ -150,21 +149,6 @@ async function getBlockRow(blockId: string) {
   return block ?? null;
 }
 
-async function getContentVideoBlocks(contentId: string) {
-  const db = getDatabase();
-  const steps = await db
-    .select({ id: helpContentSteps.id })
-    .from(helpContentSteps)
-    .where(eq(helpContentSteps.contentId, contentId));
-  const stepIds = steps.map((step) => step.id);
-  if (stepIds.length === 0) return [];
-  return db
-    .select()
-    .from(helpStepBlocks)
-    .where(inArray(helpStepBlocks.stepId, stepIds))
-    .then((blocks) => blocks.filter((block) => block.blockType === "video"));
-}
-
 export async function listStructuredHelpContents() {
   const db = getDatabase();
   const rows = await db
@@ -289,12 +273,6 @@ export async function getStructuredHelpContent(contentId: string) {
     for (const asset of assets) assetsById.set(asset.id, asset);
   }
 
-  const legacyVideoCount = allBlocks.filter(
-    (block) =>
-      block.blockType === "video" &&
-      (!featuredAssetId || block.assetId !== featuredAssetId),
-  ).length;
-
   return {
     ...content,
     categories: categories.map((category) => ({
@@ -302,24 +280,14 @@ export async function getStructuredHelpContent(contentId: string) {
       effectiveDestinationUrl: category.destinationUrl || category.defaultDestinationUrl,
     })),
     featuredVideo: featuredAssetId ? (assetsById.get(featuredAssetId) ?? null) : null,
-    legacyVideoCount,
     hasPublishedVersion: publication.length > 0,
     publishedVersionAt: publication[0]?.publishedAt ?? null,
     steps: steps.map((step) => ({
       ...step,
-      blocks: (blocksByStep.get(step.id) ?? [])
-        .filter(
-          (block) =>
-            !(
-              block.blockType === "video" &&
-              featuredAssetId &&
-              block.assetId === featuredAssetId
-            ),
-        )
-        .map((block) => ({
-          ...block,
-          asset: block.assetId ? (assetsById.get(block.assetId) ?? null) : null,
-        })),
+      blocks: (blocksByStep.get(step.id) ?? []).map((block) => ({
+        ...block,
+        asset: block.assetId ? (assetsById.get(block.assetId) ?? null) : null,
+      })),
     })),
   };
 }
@@ -502,11 +470,6 @@ export async function upsertStructuredHelpFeaturedVideo(
     .limit(1);
 
   let assetId = currentFeatured?.assetId ?? null;
-  if (!assetId) {
-    const legacyVideos = await getContentVideoBlocks(contentId);
-    if (legacyVideos.length > 1) throw new Error("MULTIPLE_LEGACY_VIDEOS");
-    assetId = legacyVideos[0]?.assetId ?? null;
-  }
 
   await db.transaction(async (tx) => {
     const values = {
@@ -571,25 +534,7 @@ export async function deleteStructuredHelpFeaturedVideo(
     .limit(1);
   if (!featured) return;
 
-  const stepRows = await db
-    .select({ id: helpContentSteps.id })
-    .from(helpContentSteps)
-    .where(eq(helpContentSteps.contentId, contentId));
-  const stepIds = stepRows.map((step) => step.id);
-
   await db.transaction(async (tx) => {
-    if (stepIds.length > 0) {
-      const mirrors = await tx
-        .select({ id: helpStepBlocks.id, assetId: helpStepBlocks.assetId })
-        .from(helpStepBlocks)
-        .where(inArray(helpStepBlocks.stepId, stepIds));
-      const mirrorIds = mirrors
-        .filter((block) => block.assetId === featured.assetId)
-        .map((block) => block.id);
-      if (mirrorIds.length > 0) {
-        await tx.delete(helpStepBlocks).where(inArray(helpStepBlocks.id, mirrorIds));
-      }
-    }
     await tx
       .delete(helpContentFeaturedVideos)
       .where(eq(helpContentFeaturedVideos.contentId, contentId));
@@ -702,7 +647,7 @@ async function createAssetForBlock(
   contentId: string,
   input: StructuredHelpBlockInput,
 ): Promise<string | null> {
-  if (input.blockType !== "image" && input.blockType !== "video" && input.blockType !== "file") {
+  if (input.blockType !== "image" && input.blockType !== "file") {
     return null;
   }
 
@@ -714,7 +659,7 @@ async function createAssetForBlock(
       sourceUrl: input.sourceUrl.trim() || null,
       altText: input.altText.trim(),
       assistantDescription: input.assistantDescription.trim(),
-      subtitles: input.subtitles.trim(),
+      subtitles: "",
       assistantSummary: input.assistantSummary.trim(),
       extractedText: input.extractedText.trim(),
       createdBy: actorUserId,
@@ -730,7 +675,6 @@ export async function addStructuredHelpBlock(
   stepId: string,
   input: StructuredHelpBlockInput,
 ): Promise<void> {
-  if (input.blockType === "video") throw new Error("VIDEO_BLOCK_NOT_ALLOWED");
   validateBlockInput(input);
 
   const db = getDatabase();
@@ -774,19 +718,16 @@ export async function updateStructuredHelpBlock(
   if (!block) throw new Error("BLOCK_NOT_FOUND");
   const step = await getStepRow(block.stepId);
   if (!step || step.contentId !== contentId) throw new Error("BLOCK_NOT_FOUND");
-  if (input.blockType === "video" && block.blockType !== "video") {
-    throw new Error("VIDEO_BLOCK_NOT_ALLOWED");
-  }
   validateBlockInput(input);
 
   let assetId = block.assetId;
-  if (input.blockType === "image" || input.blockType === "video" || input.blockType === "file") {
+  if (input.blockType === "image" || input.blockType === "file") {
     const values = {
       assetType: input.blockType,
       sourceUrl: input.sourceUrl.trim() || null,
       altText: input.altText.trim(),
       assistantDescription: input.assistantDescription.trim(),
-      subtitles: input.subtitles.trim(),
+      subtitles: "",
       assistantSummary: input.assistantSummary.trim(),
       extractedText: input.extractedText.trim(),
       updatedAt: new Date(),
@@ -924,7 +865,6 @@ function validateForPublication(
   if (content.categories.length === 0 || content.categories.some((category) => !category.active)) {
     throw new Error("CONTENT_CATEGORY_REQUIRED");
   }
-  if (content.legacyVideoCount > 0) throw new Error("LEGACY_VIDEO_REVIEW_REQUIRED");
   if (content.featuredVideo && !content.featuredVideo.subtitles.trim()) {
     throw new Error("FEATURED_VIDEO_SUBTITLES_REQUIRED");
   }
