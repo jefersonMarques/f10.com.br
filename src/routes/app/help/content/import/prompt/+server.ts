@@ -111,6 +111,43 @@ Use o vídeo para:
 
 Quando houver diferença entre o ícone mostrado no vídeo e a interface atual sugerida por outros materiais, descreva a ação pelo título/label textual, nunca pelo formato do ícone.
 
+## Regras, obrigatoriedades, condições e exceções
+
+Trate como **fatos prioritários** todas as regras explicitamente afirmadas no vídeo ou nos subtitles.
+
+Dê atenção especial a expressões como:
+
+- \`é obrigatório\`;
+- \`precisa\` / \`deve\`;
+- \`somente\`;
+- \`se\` / \`caso\`;
+- \`exceto\`;
+- \`não pode\`;
+- dependências entre um tipo de cadastro, permissão, status, campo ou ação e outro comportamento.
+
+Regras obrigatórias:
+
+- não descarte uma obrigatoriedade ou condição apenas porque ela não é uma ação de clique/preenchimento;
+- não generalize condições. Se algo é obrigatório somente em uma situação, preserve exatamente essa condição;
+- quando a regra for importante para o usuário executar o procedimento corretamente, coloque-a no texto público do passo correspondente;
+- quando for segura para o cliente e útil para responder dúvidas, mas detalhada demais para o artigo, preserve-a em \`assistantKnowledge\`;
+- não duplique em \`assistantKnowledge\` o que já estiver completo e inequívoco no texto público;
+- preserve também o motivo quando ele for explicitamente informado e ajudar a compreender a regra.
+
+Exemplo correto:
+
+\`\`\`text
+Se o funcionário também for \`Usuário\` e fizer login no F10, o campo \`E-mail\` é obrigatório e deve ser válido para receber o link de definição de senha.
+\`\`\`
+
+Exemplo incorreto, por generalizar a condição:
+
+\`\`\`text
+O campo \`E-mail\` é obrigatório para todo funcionário.
+\`\`\`
+
+Antes de finalizar o JSON, revise os subtitles procurando explicitamente por obrigatoriedades, condições, exceções e dependências e confirme que nenhuma delas foi perdida entre o vídeo e o artigo/\`assistantKnowledge\`.
+
 ## Screenshots obrigatórios
 
 Gere screenshots apenas quando ajudarem o usuário a localizar ou confirmar uma ação.
@@ -246,7 +283,7 @@ Uma ou mais categorias válidas. Use \`${UNCATEGORIZED_HELP_CATEGORY_SLUG}\` som
 Termos e sinônimos que usuários provavelmente pesquisariam. Servem somente para retrieval.
 
 ### assistantKnowledge
-Informação segura para o cliente que ajuda a responder dúvidas, mas que não precisa aparecer no artigo. Não repita o texto público.
+Informação segura para o cliente que ajuda a responder dúvidas, mas que não precisa aparecer no artigo. Preserve aqui obrigatoriedades, condições, exceções e dependências explícitas dos materiais quando elas forem úteis para responder dúvidas e não estiverem completas no texto público. Não repita o texto público.
 
 ### internalSupportNotes
 Por padrão, vazio. Nunca coloque segredos, senhas, tokens ou dados pessoais.
@@ -325,6 +362,8 @@ Para screenshots extraídos do vídeo, use \`assetPath\`, nunca URL externa.
 - O \`quickGuide\` deve permitir resolver tarefas simples rapidamente.
 - Toda ação executável deve ser apresentada de forma numerada quando houver procedimento sequencial.
 - Não concentre várias ações em um único parágrafo quando elas puderem ser separadas em passos numerados.
+- Não perca obrigatoriedades, condições, exceções ou dependências explicitamente informadas nos subtitles.
+- Não generalize uma regra que só vale sob determinada condição.
 - Screenshots complementam o texto e não o substituem.
 - Use no máximo um screenshot por passo; uma segunda tela relevante exige outro passo.
 - Só associe screenshot quando o frame representar exatamente a etapa; na dúvida, deixe o passo sem imagem.
