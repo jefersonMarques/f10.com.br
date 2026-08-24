@@ -45,6 +45,8 @@ Preencha exatamente o formato do arquivo JSON fornecido:
 
 Não acrescente campos fora do contrato.
 
+O template contém valores marcados como \`REPLACE_*\` apenas para mostrar campos obrigatórios. Nenhum valor \`REPLACE_*\` pode permanecer na saída final. Se uma estrutura opcional não tiver informação real nos materiais, remova o objeto opcional inteiro em vez de inventar ou manter placeholders.
+
 ## Categorias
 
 Todo conteúdo precisa pertencer a pelo menos uma das categorias ativas abaixo. Use somente os slugs listados. Não crie categorias novas.
@@ -107,12 +109,12 @@ Nunca coloque senhas, tokens, dados pessoais ou segredos.
 
 Quando o artigo estiver baseado no vídeo fornecido, preencha \`featuredVideo\`:
 
-- \`url\`: URL real do vídeo, se fornecida;
+- \`url\`: URL real do vídeo fornecida junto com os materiais;
 - \`description\`: descrição pública curta;
 - \`subtitles\`: preserve os subtitles fornecidos integralmente ou em forma textual equivalente sem perder conteúdo factual;
 - \`assistantSummary\`: resumo operacional curto do vídeo, sem inventar informação.
 
-Se houver \`featuredVideo\`, \`subtitles\` é obrigatório.
+Se houver \`featuredVideo\`, \`url\` e \`subtitles\` são obrigatórios. Se a URL real do vídeo não foi fornecida, não invente uma URL: informe ao operador que falta esse dado em vez de gerar um JSON importável com endereço fictício.
 
 Nunca crie bloco \`video\` dentro de \`steps[].blocks\`.
 
@@ -146,13 +148,13 @@ Use para instrução pública.
 Use somente para informação, atenção, sucesso ou perigo realmente sustentados pelo material.
 
 ### link
-Use somente URL real fornecida nos materiais. Não invente links.
+Inclua o bloco somente quando uma URL real tiver sido fornecida nos materiais. Nunca mantenha URL de exemplo ou placeholder.
 
 ### image
-Só inclua quando houver URL HTTP/HTTPS real fornecida. \`altText\` identifica a imagem; \`assistantDescription\` explica informação visual relevante que não esteja no texto.
+Inclua o bloco somente quando houver URL HTTP/HTTPS real fornecida. \`altText\` identifica a imagem; \`assistantDescription\` explica informação visual relevante que não esteja no texto.
 
 ### file
-Só inclua quando houver URL HTTP/HTTPS real fornecida. \`extractedText\` deve conter apenas texto efetivamente extraído/fornecido. \`assistantSummary\` é opcional.
+Inclua o bloco somente quando houver URL HTTP/HTTPS real fornecida. \`extractedText\` deve conter apenas texto efetivamente extraído/fornecido. \`assistantSummary\` é opcional.
 
 ## Qualidade editorial
 
@@ -164,6 +166,7 @@ Só inclua quando houver URL HTTP/HTTPS real fornecida. \`extractedText\` deve c
 - Mantenha passos na ordem do procedimento.
 - Não crie etapas que não existam nos subtitles.
 - Não marque conteúdo como publicado.
+- Não mantenha valores de exemplo, placeholders, domínios fictícios ou URLs não fornecidas.
 
 ## Saída
 
