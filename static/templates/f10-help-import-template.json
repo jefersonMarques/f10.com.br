@@ -10,7 +10,7 @@
       "summary": "REPLACE_WITH_PUBLIC_SUMMARY",
       "categories": [
         {
-          "slug": "REPLACE_WITH_VALID_CATEGORY_SLUG",
+          "slug": "uncategorized",
           "destinationUrl": ""
         }
       ],
@@ -32,6 +32,12 @@
             {
               "type": "text",
               "text": "REPLACE_WITH_PUBLIC_INSTRUCTION"
+            },
+            {
+              "type": "image",
+              "assetPath": "screenshots/REPLACE_WITH_ARTICLE_SLUG/step-01-01.png",
+              "altText": "REPLACE_WITH_SCREEN_DESCRIPTION",
+              "assistantDescription": ""
             }
           ]
         }
