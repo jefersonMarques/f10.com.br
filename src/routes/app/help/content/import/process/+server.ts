@@ -14,7 +14,6 @@ import {
 import {
   importStructuredHelpFile,
   validateHelpImportJson,
-  type HelpImportContent,
   type HelpImportFile,
 } from "$lib/server/help/structuredHelpImport";
 import { getHelpVideoAutomationSettings } from "$lib/server/settings/operationsSettingsRepository";
@@ -85,14 +84,6 @@ function countScreenshots(file: HelpImportFile): number {
     ),
     0,
   );
-}
-
-function buildFeaturedVideoText(content: HelpImportContent): string {
-  return content.steps
-    .flatMap((step) => step.blocks.flatMap((block) => block.type === "text" ? [block.text] : []))
-    .join("\n\n")
-    .trim()
-    .slice(0, 200_000);
 }
 
 export const POST: RequestHandler = async ({ cookies, request }) => {
@@ -230,7 +221,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
             contentId: importedContent.id,
             bytes: source.bytes,
             fileName: source.fileName,
-            subtitles: buildFeaturedVideoText(content),
+            subtitles: generated.transcript,
             altText: content.summary || content.title,
             assistantSummary: content.quickGuide || content.summary || content.title,
           });
