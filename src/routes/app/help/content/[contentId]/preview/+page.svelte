@@ -63,10 +63,6 @@
       </section>
     {/if}
 
-    {#if data.content.legacyVideoCount > 0}
-      <div class="mt-5 flex items-start gap-3 rounded-2xl border border-[#F0C8C8] bg-[#FFF8F7] px-4 py-3 text-[#8D3333]"><TriangleAlert size={17} class="mt-0.5 shrink-0"/><p class="text-[11px] leading-5">Este rascunho ainda possui {data.content.legacyVideoCount} {data.content.legacyVideoCount === 1 ? "vídeo legado" : "vídeos legados"} dentro dos passos. A publicação fica bloqueada até a revisão.</p></div>
-    {/if}
-
     <div class="mt-5 space-y-5">
       {#each data.content.steps as step, index}
         <section id={`help-step-${step.id}`} data-help-step-id={step.id} class="scroll-mt-24 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
@@ -77,7 +73,6 @@
                 {#if block.blockType === "text"}<p class="whitespace-pre-wrap text-[13px] leading-7 text-[#505767]">{block.textContent}</p>
                 {:else if block.blockType === "notice"}<div class={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${block.noticeVariant === "warning" || block.noticeVariant === "danger" ? "border-[#F0D0C8] bg-[#FFF8F5]" : "border-[#D8DEF2] bg-[#F8F9FF]"}`}>{#if block.noticeVariant === "warning" || block.noticeVariant === "danger"}<TriangleAlert size={16}/>{:else}<Info size={16}/>{/if}<p class="text-[11px] leading-6">{block.textContent}</p></div>
                 {:else if block.blockType === "image" && block.asset}{@const imageUrl = block.asset.storageKey ? assetUrl(block.asset.id) : block.asset.sourceUrl}{#if imageUrl}<img src={imageUrl} alt={block.asset.altText || "Imagem do passo"} class="w-full rounded-2xl border border-[#E6E8EE] object-contain" />{/if}
-                {:else if block.blockType === "video" && block.asset}{@const embed = youtubeEmbedUrl(block.asset.sourceUrl)}{#if embed}<div class="aspect-video overflow-hidden rounded-2xl bg-black"><iframe src={embed} title={block.asset.altText || step.title} class="h-full w-full" allowfullscreen></iframe></div>{:else if block.asset.sourceUrl}<a href={block.asset.sourceUrl} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-[11px] font-semibold text-[#000A57]"><PlayCircle size={16}/>Abrir vídeo legado<ExternalLink size={12}/></a>{/if}
                 {:else if block.blockType === "file" && block.asset}{@const fileUrl = block.asset.storageKey ? assetUrl(block.asset.id) : block.asset.sourceUrl}{#if fileUrl}<a href={fileUrl} target="_blank" rel="noopener noreferrer" class="flex items-center justify-between rounded-2xl border border-[#E1E4EC] bg-[#FAFAFC] px-4 py-4"><span class="text-[11px] font-semibold text-[#303645]">{block.linkLabel || "Baixar arquivo"}</span><Download size={17} class="text-[#000A57]"/></a>{/if}
                 {:else if block.blockType === "link" && block.linkUrl}<a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption inline-flex items-center gap-2 rounded-xl bg-[#EEF0FF] px-4 py-2.5 font-semibold text-[#000A57]">{block.linkLabel || "Abrir link"}<ExternalLink size={12}/></a>{/if}
               </div>
