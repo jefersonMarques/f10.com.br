@@ -1,4 +1,4 @@
-import { asc, eq, max } from "drizzle-orm";
+import { and, asc, eq, max } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -40,6 +40,20 @@ export async function attachHelpAssetToStep(
     throw new Error("ASSET_ATTACHMENT_TYPE_NOT_SUPPORTED");
   }
   if (!asset.storageKey && !asset.sourceUrl) throw new Error("ASSET_ATTACHMENT_UNAVAILABLE");
+
+  if (asset.assetType === "image") {
+    const [existingImage] = await db
+      .select({ id: helpStepBlocks.id })
+      .from(helpStepBlocks)
+      .where(
+        and(
+          eq(helpStepBlocks.stepId, stepId),
+          eq(helpStepBlocks.blockType, "image"),
+        ),
+      )
+      .limit(1);
+    if (existingImage) throw new Error("STEP_IMAGE_ALREADY_EXISTS");
+  }
 
   const [{ value: currentMax }] = await db
     .select({ value: max(helpStepBlocks.sortOrder) })
