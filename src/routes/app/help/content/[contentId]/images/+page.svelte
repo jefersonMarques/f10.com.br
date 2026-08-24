@@ -48,7 +48,7 @@
   </div>
 
   <section class="mb-4 rounded-[18px] border border-[#D8DDF4] bg-[#F8F9FF] px-4 py-3">
-    <p class="text-[10px] leading-5 text-[#5F6678]">Percorra o artigo na ordem do Preview. Quando houver opções, confirme primeiro o screenshot mais correto; em seguida a ferramenta de marcação aparece no mesmo local. Cada passo mantém apenas uma imagem.</p>
+    <p class="text-[10px] leading-5 text-[#5F6678]">Percorra o artigo na ordem do Preview. Quando houver opções, escolha o melhor frame no carrossel e faça as marcações diretamente nele. Ao salvar, a escolha e as marcações são confirmadas juntas e os outros frames são descartados. Cada passo mantém apenas uma imagem.</p>
   </section>
 
   <main data-help-content-id={data.content.id}>
