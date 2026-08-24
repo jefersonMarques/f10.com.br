@@ -20,6 +20,7 @@ export type RecordHelpKnowledgeRunInput = {
   customerContactId?: string | null;
   searchEventId?: string | null;
   question: string;
+  retrievalQuery?: string;
   contextSlug?: string;
   resolution: HelpKnowledgeTelemetryResolution;
   target?: {
@@ -41,6 +42,7 @@ export async function recordHelpKnowledgeRun(
 ): Promise<void> {
   const question = input.question.trim().slice(0, 600);
   if (!question) return;
+  const retrievalQuery = (input.retrievalQuery ?? question).trim().slice(0, 500);
 
   await getDatabase().insert(helpKnowledgeRuns).values({
     source: input.source,
@@ -49,7 +51,7 @@ export async function recordHelpKnowledgeRun(
     customerContactId: input.customerContactId ?? null,
     searchEventId: input.searchEventId ?? null,
     question,
-    normalizedQuery: normalizeHelpSearchQuery(question),
+    normalizedQuery: normalizeHelpSearchQuery(retrievalQuery || question),
     contextSlug: (input.contextSlug ?? "").trim().slice(0, 160),
     resolution: input.resolution,
     targetContentId: input.target?.contentId ?? null,
@@ -119,6 +121,7 @@ export async function getHelpKnowledgeInsights() {
         source: helpKnowledgeRuns.source,
         scope: helpKnowledgeRuns.scope,
         question: helpKnowledgeRuns.question,
+        normalizedQuery: helpKnowledgeRuns.normalizedQuery,
         contextSlug: helpKnowledgeRuns.contextSlug,
         resolution: helpKnowledgeRuns.resolution,
         targetContentId: helpKnowledgeRuns.targetContentId,
