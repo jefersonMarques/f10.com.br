@@ -3,6 +3,7 @@ import type { RequestHandler } from "./$types";
 import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
+import { attachImportedMp4AsFeaturedVideo } from "$lib/server/help/helpImportedFeaturedVideo";
 import {
   generateHelpImportFromVideo,
   HELP_VIDEO_AUTOMATION_MAX_UPLOAD_BYTES,
@@ -12,6 +13,8 @@ import {
 import {
   importStructuredHelpFile,
   validateHelpImportJson,
+  type HelpImportContent,
+  type HelpImportFile,
 } from "$lib/server/help/structuredHelpImport";
 import { getHelpVideoAutomationSettings } from "$lib/server/settings/operationsSettingsRepository";
 
@@ -57,6 +60,38 @@ function buildSource(formData: FormData): HelpVideoAutomationSource {
     bytes: new Uint8Array(),
     publishedVideoUrl: readString(formData, "publishedVideoUrl"),
   };
+}
+
+function normalizeSingleScreenshotPerStep(file: HelpImportFile): void {
+  for (const content of file.contents) {
+    for (const step of content.steps) {
+      let imageFound = false;
+      step.blocks = step.blocks.filter((block) => {
+        if (block.type !== "image") return true;
+        if (imageFound) return false;
+        imageFound = true;
+        return true;
+      });
+    }
+  }
+}
+
+function countScreenshots(file: HelpImportFile): number {
+  return file.contents.reduce(
+    (contentTotal, content) => contentTotal + content.steps.reduce(
+      (stepTotal, step) => stepTotal + step.blocks.filter((block) => block.type === "image").length,
+      0,
+    ),
+    0,
+  );
+}
+
+function buildFeaturedVideoText(content: HelpImportContent): string {
+  return content.steps
+    .flatMap((step) => step.blocks.flatMap((block) => block.type === "text" ? [block.text] : []))
+    .join("\n\n")
+    .trim()
+    .slice(0, 200_000);
 }
 
 export const POST: RequestHandler = async ({ cookies, request }) => {
@@ -144,6 +179,12 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
           onProgress: progress,
         });
 
+        normalizeSingleScreenshotPerStep(generated.file);
+        if (source.type === "upload") {
+          for (const content of generated.file.contents) content.featuredVideo = undefined;
+        }
+        const selectedScreenshotCount = countScreenshots(generated.file);
+
         write({
           type: "progress",
           stage: "validate",
@@ -170,18 +211,34 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
           type: "progress",
           stage: "import",
           status: "active",
-          label: "Salvando rascunho e screenshots",
+          label: "Salvando rascunho, vídeo e screenshots",
         });
         const result = await importStructuredHelpFile(
           session.user.id,
           validation.parsed,
           generated.assets,
         );
+
+        if (source.type === "upload") {
+          const importedContent = result.imported[0];
+          const content = validation.parsed.contents[0];
+          if (!importedContent || !content) throw new Error("IMPORT_CONTENT_NOT_CREATED");
+          await attachImportedMp4AsFeaturedVideo({
+            actorUserId: session.user.id,
+            contentId: importedContent.id,
+            bytes: source.bytes,
+            fileName: source.fileName,
+            subtitles: buildFeaturedVideoText(content),
+            altText: content.summary || content.title,
+            assistantSummary: content.quickGuide || content.summary || content.title,
+          });
+        }
+
         write({
           type: "progress",
           stage: "import",
           status: "done",
-          label: "Rascunho e screenshots salvos",
+          label: "Rascunho, vídeo e screenshots salvos",
         });
 
         const overwriteMessage = result.overwrittenCount > 0
@@ -195,13 +252,13 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
             contentCount: result.contentCount,
             stepCount: result.stepCount,
             blockCount: result.blockCount,
-            assetCount: generated.selectedScreenshotCount,
+            assetCount: selectedScreenshotCount,
           },
           automation: {
             sourceType: generated.sourceType,
             transcriptChars: generated.transcriptChars,
             analyzedFrameCount: generated.analyzedFrameCount,
-            selectedScreenshotCount: generated.selectedScreenshotCount,
+            selectedScreenshotCount,
           },
           imported: result.imported,
         });
