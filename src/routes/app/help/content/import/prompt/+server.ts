@@ -181,10 +181,9 @@ Use Markdown apenas quando melhorar a leitura. O F10 suporta:
 - linhas numeradas como \`1. \`, \`2. \`;
 - emojis.
 
-Use principalmente negrito para caminhos, botões, campos e ações importantes, por exemplo:
+Use principalmente negrito para caminhos, botões, campos e ações importantes.
 
-- \`Acesse **Cadastros > Funcionários**.\`
-- \`Clique em **Salvar**.\`
+Para instruções operacionais, prefira listas numeradas em vez de juntar várias ações no mesmo parágrafo.
 
 Não use HTML, tabelas Markdown, headings com \`#\`, imagens Markdown ou links Markdown.
 
@@ -228,6 +227,54 @@ Nunca crie bloco \`video\` em \`steps[].blocks\`.
 
 Divida o procedimento em ações compreensíveis isoladamente. Cada passo precisa de título específico e pelo menos um bloco público.
 
+### Numeração obrigatória das ações dentro de cada etapa
+
+Sempre que uma etapa contiver uma ou mais ações que o usuário precisa executar, escreva essas ações como uma **lista numerada explícita**.
+
+Cada ação executável deve ocupar sua própria linha e receber seu próprio número.
+
+Evite transformar duas ou mais ações em um único parágrafo corrido.
+
+**Evite:**
+
+\`\`\`text
+Acesse **Cadastros > Funcionários**. Na tela de funcionários, use a ação de inclusão para criar um novo registro.
+\`\`\`
+
+**Prefira:**
+
+\`\`\`text
+**1.** Abra **Cadastros > Funcionários**.
+**2.** Clique no botão de inclusão para criar um novo cadastro.
+
+Nessa mesma área também ficam as ações de edição, exclusão e filtro.
+\`\`\`
+
+Regras:
+
+- numere somente ações que o usuário deve executar;
+- use \`**1.**\`, \`**2.**\`, \`**3.**\` e assim por diante;
+- mantenha uma ação principal por número;
+- se uma ação tiver uma consequência imediata simples, ela pode permanecer na mesma linha;
+- informações complementares, contexto, observações ou recursos disponíveis na tela devem vir **depois da lista numerada**, em parágrafo separado e sem receber número;
+- use negrito em caminhos, menus, botões e campos relevantes dentro de cada item;
+- preserve a ordem real mostrada no vídeo/subtitles;
+- não crie números para ações que não estejam sustentadas pelos materiais.
+
+Exemplo adicional:
+
+\`\`\`text
+**1.** Abra **Financeiro > Contas a Receber**.
+**2.** Localize o lançamento desejado.
+**3.** Clique em **Editar**.
+**4.** Altere os dados necessários.
+**5.** Clique em **Salvar**.
+
+Use os filtros disponíveis na tela quando precisar localizar um lançamento específico.
+\`\`\`
+
+Essa regra vale principalmente para os blocos \`text\` que ensinam o procedimento e também deve orientar o \`quickGuide\`.
+
 Use somente: \`text\`, \`notice\`, \`link\`, \`image\`, \`file\`.
 
 Para screenshots extraídos do vídeo, use \`assetPath\`, nunca URL externa.
@@ -236,6 +283,8 @@ Para screenshots extraídos do vídeo, use \`assetPath\`, nunca URL externa.
 
 - O artigo deve ser útil sem assistir ao vídeo.
 - O \`quickGuide\` deve permitir resolver tarefas simples rapidamente.
+- Toda ação executável deve ser apresentada de forma numerada quando houver procedimento sequencial.
+- Não concentre várias ações em um único parágrafo quando elas puderem ser separadas em passos numerados.
 - Screenshots complementam o texto e não o substituem.
 - Todo screenshot deve preservar a tela completa do F10 e contexto suficiente para orientação; nunca recorte apenas o elemento da ação.
 - O screenshot original deve permanecer limpo; destaques visuais serão adicionados manualmente no editor do F10.
