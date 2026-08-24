@@ -9,6 +9,10 @@
   export let altText = "";
   export let initialAnnotations: HelpImageAnnotation[] = [];
   export let disabled = false;
+  export let saveLabel = "Salvar marcações";
+  export let saveHandler:
+    | ((annotations: HelpImageAnnotation[]) => Promise<{ success: boolean; message?: string }>)
+    | null = null;
 
   let annotations: HelpImageAnnotation[] = initialAnnotations;
   let saving = false;
@@ -21,6 +25,13 @@
     message = "";
     success = false;
     try {
+      if (saveHandler) {
+        const result = await saveHandler(annotations);
+        success = result.success;
+        message = result.message ?? (success ? "Marcações salvas." : "Não foi possível salvar as marcações.");
+        return;
+      }
+
       const response = await fetch(
         `/api/app/help/content/${contentId}/images/${blockId}/annotations`,
         {
@@ -62,7 +73,7 @@
         disabled={saving}
         on:click={saveAnnotations}
         class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 font-semibold text-white disabled:cursor-wait disabled:opacity-60"
-      ><Save size={14}/>{saving ? "Salvando..." : "Salvar marcações"}</button>
+      ><Save size={14}/>{saving ? "Salvando..." : saveLabel}</button>
     {/if}
   </div>
 </div>
