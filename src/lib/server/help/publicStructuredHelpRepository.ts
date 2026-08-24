@@ -1,4 +1,8 @@
 import { and, eq, sql } from "drizzle-orm";
+import {
+  parseHelpImageAnnotations,
+  type HelpImageAnnotation,
+} from "$lib/help/helpImageAnnotations";
 import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
 
@@ -27,6 +31,7 @@ export type PublishedHelpBlock = {
   linkLabel: string | null;
   noticeVariant: string | null;
   sortOrder: number;
+  annotations: HelpImageAnnotation[];
   asset: PublishedHelpAsset | null;
 };
 
@@ -127,6 +132,7 @@ function parseBlock(value: unknown): PublishedHelpBlock | null {
     linkLabel: readString(record, "linkLabel") || null,
     noticeVariant: readString(record, "noticeVariant") || null,
     sortOrder: typeof record.sortOrder === "number" ? record.sortOrder : 0,
+    annotations: parseHelpImageAnnotations(record.annotations) ?? [],
     asset: parseAsset(record.asset),
   };
 }
