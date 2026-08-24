@@ -39,16 +39,19 @@ export async function cleanupObsoleteImportedHelpAssets(contentId: string): Prom
   ]);
   const importPrefix = `help/import/${contentId}/`;
   const obsolete = assets.filter(
-    (asset) =>
+    (asset): asset is { id: string; storageKey: string } =>
       !referencedAssetIds.has(asset.id) &&
       Boolean(asset.storageKey?.startsWith(importPrefix)),
   );
   if (obsolete.length === 0) return;
 
-  await db.delete(helpAssets).where(inArray(helpAssets.id, obsolete.map((asset) => asset.id)));
-  await Promise.allSettled(
-    obsolete.flatMap((asset) =>
-      asset.storageKey ? [deleteAssetObject(asset.storageKey)] : [],
-    ),
+  const deletionResults = await Promise.allSettled(
+    obsolete.map((asset) => deleteAssetObject(asset.storageKey)),
   );
+  const deletedAssetIds = obsolete.flatMap((asset, index) =>
+    deletionResults[index]?.status === "fulfilled" ? [asset.id] : [],
+  );
+  if (deletedAssetIds.length === 0) return;
+
+  await db.delete(helpAssets).where(inArray(helpAssets.id, deletedAssetIds));
 }
