@@ -8,9 +8,12 @@
     CircleAlert,
     Clock3,
     Compass,
+    Cpu,
+    DollarSign,
     MousePointerClick,
     Search,
     SearchX,
+    Volume2,
   } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
@@ -27,6 +30,28 @@
 
   function formatNumber(value: number): string {
     return new Intl.NumberFormat("pt-BR").format(value);
+  }
+
+  function formatUsdMicros(value: number): string {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4,
+    }).format(value / 1_000_000);
+  }
+
+  function formatAudioSeconds(value: number): string {
+    const minutes = Math.floor(value / 60);
+    const seconds = Math.round(value % 60);
+    return `${minutes}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  function operationLabel(value: string): string {
+    if (value === "help_assistant") return "Assistente de ajuda";
+    if (value === "video_transcription") return "Transcrição de vídeo";
+    if (value === "video_article") return "Geração de artigo por vídeo";
+    return value;
   }
 
   function resolutionLabel(value: string): string {
@@ -65,6 +90,47 @@
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><Compass size={19} class="text-[#76510A]"/><strong class="mt-4 block text-[25px] font-semibold">{data.knowledge.summary.foundElsewhere}</strong><span class="text-[10px] text-[#858A98]">encontradas em outro artigo</span></div>
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><Clock3 size={19} class="text-[#5C6475]"/><strong class="mt-4 block text-[25px] font-semibold">{data.knowledge.summary.averageLatencyMs} ms</strong><span class="text-[10px] text-[#858A98]">latência média</span></div>
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><BrainCircuit size={19} class="text-[#EA6D0B]"/><strong class="mt-4 block text-[25px] font-semibold">{formatNumber(data.knowledge.summary.inputTokens + data.knowledge.summary.outputTokens)}</strong><span class="text-[10px] text-[#858A98]">tokens registrados</span></div>
+  </section>
+
+  <section class="mt-5 overflow-hidden rounded-[22px] border border-[#D8DDF4] bg-white">
+    <header class="border-b border-[#EEF0F5] bg-[#F8F9FF] px-5 py-4 sm:px-6">
+      <div class="flex items-start gap-3">
+        <DollarSign size={18} class="mt-0.5 shrink-0 text-[#2F7045]"/>
+        <div>
+          <h2 class="text-[14px] font-semibold text-[#222839]">Consumo de IA</h2>
+          <p class="mt-1 max-w-[820px] text-[10px] leading-5 text-[#7B8292]">Consolida o assistente da Base de Conhecimento e a automação de vídeos. O custo é uma estimativa calculada a partir do modelo, tokens registrados e duração do áudio.</p>
+        </div>
+      </div>
+    </header>
+
+    <div class="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-5 sm:p-6">
+      <div class="rounded-2xl border border-[#DCEDE2] bg-[#F6FBF7] p-4"><DollarSign size={17} class="text-[#2F7045]"/><strong class="mt-3 block text-[22px] font-semibold text-[#255D38]">{formatUsdMicros(data.aiUsage.summary.estimatedCostUsdMicros)}</strong><span class="text-[9px] text-[#63816D]">custo estimado acumulado</span></div>
+      <div class="rounded-2xl border border-[#E2E5ED] bg-[#FAFBFD] p-4"><Cpu size={17} class="text-[#000A57]"/><strong class="mt-3 block text-[22px] font-semibold">{formatNumber(data.aiUsage.summary.runs)}</strong><span class="text-[9px] text-[#858A98]">execuções de IA registradas</span></div>
+      <div class="rounded-2xl border border-[#E2E5ED] bg-[#FAFBFD] p-4"><BrainCircuit size={17} class="text-[#EA6D0B]"/><strong class="mt-3 block text-[22px] font-semibold">{formatNumber(data.aiUsage.summary.inputTokens + data.aiUsage.summary.outputTokens)}</strong><span class="text-[9px] text-[#858A98]">tokens de texto</span></div>
+      <div class="rounded-2xl border border-[#E2E5ED] bg-[#FAFBFD] p-4"><Volume2 size={17} class="text-[#76510A]"/><strong class="mt-3 block text-[22px] font-semibold">{formatAudioSeconds(data.aiUsage.summary.audioSeconds)}</strong><span class="text-[9px] text-[#858A98]">áudio transcrito</span></div>
+      <div class="rounded-2xl border border-[#E2E5ED] bg-[#FAFBFD] p-4"><CircleAlert size={17} class="text-[#A9510D]"/><strong class="mt-3 block text-[22px] font-semibold">{formatNumber(data.aiUsage.summary.failed)}</strong><span class="text-[9px] text-[#858A98]">chamadas da automação com falha</span></div>
+    </div>
+
+    <div class="border-t border-[#EEF0F5] px-5 py-4 sm:px-6">
+      <div class="grid gap-2 text-[9px] text-[#858B99] sm:grid-cols-3">
+        <span>Assistente: <strong class="text-[#4D5565]">{formatNumber(data.aiUsage.summary.assistantRuns)}</strong> execuções</span>
+        <span>Automação de vídeo: <strong class="text-[#4D5565]">{formatNumber(data.aiUsage.summary.automationRuns)}</strong> chamadas</span>
+        {#if data.aiUsage.summary.costUnknownRuns > 0}<span class="text-[#A9510D]">{data.aiUsage.summary.costUnknownRuns} execução(ões) usam modelo sem preço cadastrado.</span>{:else}<span>Todos os modelos registrados possuem preço configurado.</span>{/if}
+      </div>
+    </div>
+
+    <div class="overflow-x-auto border-t border-[#EEF0F5]">
+      <table class="min-w-full text-left text-[9px]">
+        <thead class="bg-[#FAFBFD] text-[#7A8190]"><tr><th class="px-5 py-3 font-semibold sm:px-6">Operação</th><th class="px-4 py-3 font-semibold">Modelo</th><th class="px-4 py-3 text-right font-semibold">Execuções</th><th class="px-4 py-3 text-right font-semibold">Tokens</th><th class="px-4 py-3 text-right font-semibold">Áudio</th><th class="px-5 py-3 text-right font-semibold sm:px-6">Custo estimado</th></tr></thead>
+        <tbody class="divide-y divide-[#EEF0F5]">
+          {#each data.aiUsage.byOperation as item}
+            <tr><td class="px-5 py-3 font-semibold text-[#343B4B] sm:px-6">{operationLabel(item.operation)}</td><td class="px-4 py-3 text-[#777D8D]">{item.model}</td><td class="px-4 py-3 text-right">{formatNumber(item.runs)}</td><td class="px-4 py-3 text-right">{formatNumber(item.inputTokens + item.outputTokens)}</td><td class="px-4 py-3 text-right">{item.audioSeconds > 0 ? formatAudioSeconds(item.audioSeconds) : "—"}</td><td class="px-5 py-3 text-right font-semibold text-[#2F7045] sm:px-6">{formatUsdMicros(item.costUsdMicros)}</td></tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="border-t border-[#EEF0F5] bg-[#FCFCFD] px-5 py-3 text-[8px] leading-4 text-[#969BA8] sm:px-6">Estimativa atual: `gpt-5-mini` usa preço por tokens de entrada/saída e `whisper-1` usa preço por minuto de áudio. Mudanças futuras de preço precisam ser atualizadas no cálculo interno.</div>
   </section>
 
   <div class="mt-5 grid gap-5 xl:grid-cols-2">
