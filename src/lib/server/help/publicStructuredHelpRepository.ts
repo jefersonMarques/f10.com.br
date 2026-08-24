@@ -43,6 +43,7 @@ export type PublishedStructuredHelp = {
   slug: string;
   title: string;
   summary: string;
+  quickGuide: string;
   categories: PublishedHelpCategory[];
   featuredVideo: PublishedHelpAsset | null;
   steps: PublishedHelpStep[];
@@ -160,14 +161,10 @@ function parsePublication(
   if (!slug || !title) return null;
 
   const categories = Array.isArray(publicSnapshot.categories)
-    ? publicSnapshot.categories
-        .map(parseCategory)
-        .filter((category): category is PublishedHelpCategory => Boolean(category))
+    ? publicSnapshot.categories.map(parseCategory).filter((category): category is PublishedHelpCategory => Boolean(category))
     : [];
   const steps = Array.isArray(publicSnapshot.steps)
-    ? publicSnapshot.steps
-        .map(parseStep)
-        .filter((step): step is PublishedHelpStep => Boolean(step))
+    ? publicSnapshot.steps.map(parseStep).filter((step): step is PublishedHelpStep => Boolean(step))
     : [];
   const featuredVideo = parseAsset(publicSnapshot.featuredVideo);
 
@@ -176,6 +173,7 @@ function parsePublication(
     slug,
     title,
     summary: readString(publicSnapshot, "summary"),
+    quickGuide: readString(publicSnapshot, "quickGuide"),
     categories,
     featuredVideo: featuredVideo?.assetType === "video" ? featuredVideo : null,
     steps,
@@ -188,36 +186,22 @@ function publicationSearchText(content: PublishedStructuredHelp): string {
     [
       content.title,
       content.summary,
-      ...content.categories.flatMap((category) => [
-        category.slug,
-        category.name,
-        category.description,
-      ]),
+      content.quickGuide,
+      ...content.categories.flatMap((category) => [category.slug, category.name, category.description]),
       ...content.steps.flatMap((step) => [
         step.title,
         step.description,
-        ...step.blocks.flatMap((block) => [
-          block.textContent,
-          block.linkLabel ?? "",
-          block.asset?.altText ?? "",
-        ]),
+        ...step.blocks.flatMap((block) => [block.textContent, block.linkLabel ?? "", block.asset?.altText ?? ""]),
       ]),
     ].join(" "),
   );
 }
 
-export async function listPublishedStructuredHelpCatalog(
-  query = "",
-): Promise<PublishedStructuredHelpSummary[]> {
+export async function listPublishedStructuredHelpCatalog(query = ""): Promise<PublishedStructuredHelpSummary[]> {
   const rows = await getDatabase()
-    .select({
-      entityId: helpPublications.entityId,
-      snapshot: helpPublications.snapshot,
-      publishedAt: helpPublications.publishedAt,
-    })
+    .select({ entityId: helpPublications.entityId, snapshot: helpPublications.snapshot, publishedAt: helpPublications.publishedAt })
     .from(helpPublications)
     .where(eq(helpPublications.entityType, "content"));
-
   const terms = normalizeSearchText(query).split(" ").filter(Boolean);
 
   return rows
@@ -247,11 +231,7 @@ export async function listPublishedStructuredHelpCatalog(
 
 export async function listPublishedStructuredHelpLinks() {
   const rows = await getDatabase()
-    .select({
-      entityId: helpPublications.entityId,
-      snapshot: helpPublications.snapshot,
-      publishedAt: helpPublications.publishedAt,
-    })
+    .select({ entityId: helpPublications.entityId, snapshot: helpPublications.snapshot, publishedAt: helpPublications.publishedAt })
     .from(helpPublications)
     .where(eq(helpPublications.entityType, "content"));
 
@@ -264,11 +244,7 @@ export async function listPublishedStructuredHelpLinks() {
 
 export async function getPublishedStructuredHelpBySlug(slug: string) {
   const [row] = await getDatabase()
-    .select({
-      entityId: helpPublications.entityId,
-      snapshot: helpPublications.snapshot,
-      publishedAt: helpPublications.publishedAt,
-    })
+    .select({ entityId: helpPublications.entityId, snapshot: helpPublications.snapshot, publishedAt: helpPublications.publishedAt })
     .from(helpPublications)
     .where(
       and(
