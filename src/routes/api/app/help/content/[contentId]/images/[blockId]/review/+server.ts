@@ -1,5 +1,6 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
+import { parseHelpImageAnnotationsJson } from "$lib/help/helpImageAnnotations";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { confirmHelpScreenshotReviewSelection } from "$lib/server/help/helpScreenshotReviewRepository";
 
@@ -19,15 +20,17 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
   );
 
   let assetId = "";
+  let annotations = null;
   try {
-    const payload = await request.json() as { assetId?: unknown };
+    const payload = await request.json() as { assetId?: unknown; annotations?: unknown };
     assetId = typeof payload.assetId === "string" ? payload.assetId.trim() : "";
+    annotations = parseHelpImageAnnotationsJson(JSON.stringify(payload.annotations ?? []));
   } catch {
-    return json({ success: false, message: "Seleção inválida." }, { status: 400 });
+    return json({ success: false, message: "Seleção ou marcações inválidas." }, { status: 400 });
   }
 
-  if (!isUuid(assetId)) {
-    return json({ success: false, message: "Seleção inválida." }, { status: 400 });
+  if (!isUuid(assetId) || !annotations) {
+    return json({ success: false, message: "Seleção ou marcações inválidas." }, { status: 400 });
   }
 
   try {
@@ -36,8 +39,9 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
       contentId: params.contentId,
       blockId: params.blockId,
       assetId,
+      annotations,
     });
-    return json({ success: true, message: "Screenshot confirmado." });
+    return json({ success: true, message: "Screenshot e marcações salvos." });
   } catch (cause) {
     const code = cause instanceof Error ? cause.message : "";
     const message =
@@ -47,7 +51,7 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
           ? "A opção selecionada não pertence a esta revisão."
           : code === "IMAGE_BLOCK_NOT_FOUND"
             ? "Imagem não encontrada."
-            : "Não foi possível confirmar o screenshot.";
+            : "Não foi possível salvar o screenshot e as marcações.";
     return json({ success: false, message }, { status: 409 });
   }
 };
