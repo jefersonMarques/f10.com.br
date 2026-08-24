@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
@@ -19,6 +20,9 @@ export async function publishHelpKnowledgeContent(
   const content = await getStructuredHelpContent(contentId);
   if (!content) throw new Error("CONTENT_NOT_FOUND");
   if (content.status === "archived") throw new Error("CONTENT_ARCHIVED");
+  if (content.categories.some((category) => category.slug === UNCATEGORIZED_HELP_CATEGORY_SLUG)) {
+    throw new Error("CONTENT_REAL_CATEGORY_REQUIRED");
+  }
 
   validateHelpKnowledgePublication(content);
 
