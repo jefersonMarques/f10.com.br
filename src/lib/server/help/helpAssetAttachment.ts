@@ -29,7 +29,7 @@ export async function attachHelpAssetToStep(
   assetId: string,
   stepId: string,
   label: string,
-): Promise<void> {
+): Promise<{ blockId: string; contentId: string }> {
   const db = getDatabase();
   const [[asset], [step]] = await Promise.all([
     db.select().from(helpAssets).where(eq(helpAssets.id, assetId)).limit(1),
@@ -46,16 +46,20 @@ export async function attachHelpAssetToStep(
     .from(helpStepBlocks)
     .where(eq(helpStepBlocks.stepId, stepId));
 
-  await db.insert(helpStepBlocks).values({
-    stepId,
-    blockType: asset.assetType,
-    assetId: asset.id,
-    linkLabel:
-      asset.assetType === "file"
-        ? label.trim().slice(0, 240) || asset.originalName || "Baixar arquivo"
-        : null,
-    sortOrder: Number(currentMax ?? 0) + 10,
-  });
+  const [createdBlock] = await db
+    .insert(helpStepBlocks)
+    .values({
+      stepId,
+      blockType: asset.assetType,
+      assetId: asset.id,
+      linkLabel:
+        asset.assetType === "file"
+          ? label.trim().slice(0, 240) || asset.originalName || "Baixar arquivo"
+          : null,
+      sortOrder: Number(currentMax ?? 0) + 10,
+    })
+    .returning({ id: helpStepBlocks.id });
+  if (!createdBlock) throw new Error("ASSET_ATTACHMENT_NOT_CREATED");
 
   await updateStructuredHelpStep(actorUserId, step.contentId, step.id, {
     title: step.title,
@@ -68,6 +72,13 @@ export async function attachHelpAssetToStep(
     action: "help.asset.attached",
     entityType: "help_asset",
     entityId: asset.id,
-    metadata: { contentId: step.contentId, stepId, blockType: asset.assetType },
+    metadata: {
+      contentId: step.contentId,
+      stepId,
+      blockId: createdBlock.id,
+      blockType: asset.assetType,
+    },
   });
+
+  return { blockId: createdBlock.id, contentId: step.contentId };
 }
