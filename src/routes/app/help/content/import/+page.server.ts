@@ -24,10 +24,7 @@ function permissionMap(
 
 function conflictMessage(message: string): string {
   if (message.startsWith("IMPORT_SLUG_CONFLICT:")) {
-    return `Já existem conteúdos com estes endereços: ${message.slice("IMPORT_SLUG_CONFLICT:".length)}.`;
-  }
-  if (message.startsWith("IMPORT_EXTERNAL_ID_CONFLICT:")) {
-    return `Este pacote contém itens já importados desta mesma origem: ${message.slice("IMPORT_EXTERNAL_ID_CONFLICT:".length)}.`;
+    return `Já existe outro conteúdo usando estes endereços: ${message.slice("IMPORT_SLUG_CONFLICT:".length)}.`;
   }
   if (message.startsWith("IMPORT_CATEGORY_INVALID:")) {
     return `Estas categorias não existem ou estão inativas: ${message.slice("IMPORT_CATEGORY_INVALID:".length)}. Atualize o prompt e gere o pacote novamente.`;
@@ -68,25 +65,13 @@ export const load: PageServerLoad = async ({ parent }) => {
 
 export const actions: Actions = {
   import: async ({ cookies, request }) => {
-    const { session } = await requireAppPermission(
-      cookies,
-      "help.edit",
-      "/app/help/content/import",
-    );
+    const { session } = await requireAppPermission(cookies, "help.edit", "/app/help/content/import");
     const fileValue = (await request.formData()).get("file");
     if (!(fileValue instanceof File) || fileValue.size === 0) {
-      return fail(400, {
-        success: false,
-        message: "Selecione o ZIP gerado pela IA.",
-        issues: [],
-      });
+      return fail(400, { success: false, message: "Selecione o ZIP gerado pela IA.", issues: [] });
     }
     if (!fileValue.name.toLowerCase().endsWith(".zip")) {
-      return fail(400, {
-        success: false,
-        message: "Use um arquivo .zip no formato F10 Help Import.",
-        issues: [],
-      });
+      return fail(400, { success: false, message: "Use um arquivo .zip no formato F10 Help Import.", issues: [] });
     }
     if (fileValue.size > MAX_HELP_IMPORT_PACKAGE_BYTES) {
       return fail(413, {
@@ -150,12 +135,13 @@ export const actions: Actions = {
 
     const assetCount = countJsonAssets(validation.parsed);
     try {
-      const result = await importStructuredHelpFile(session.user.id, validation.parsed, {
-        packageAssets: packageFile.assets,
-      });
+      const result = await importStructuredHelpFile(session.user.id, validation.parsed, packageFile.assets);
+      const overwriteMessage = result.overwrittenCount > 0
+        ? ` ${result.overwrittenCount} conteúdo(s) anterior(es) foram substituídos mantendo o mesmo ID.`
+        : "";
       return {
         success: true,
-        message: `${result.contentCount} conteúdo(s) importado(s) como rascunho. Revise as categorias reais antes de publicar.`,
+        message: `${result.contentCount} conteúdo(s) importado(s) como rascunho.${overwriteMessage} Revise as categorias reais antes de publicar.`,
         issues: [],
         summary: {
           source: result.source,
