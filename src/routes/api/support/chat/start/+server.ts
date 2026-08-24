@@ -3,6 +3,7 @@ import { json, type RequestHandler } from "@sveltejs/kit";
 import { recordCustomerActivity } from "$lib/server/customerPortal/customerActivityRepository";
 import { bindTicketF10Context } from "$lib/server/customerPortal/customerF10TicketRepository";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
+import { markHelpSearchOutcome } from "$lib/server/help/helpSearchRepository";
 import {
   isSupportAiChatEnabled,
   processSupportAiChatMessage,
@@ -22,6 +23,7 @@ import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTe
 
 const MAX_BODY_BYTES = 32 * 1024;
 const MAX_HANDOFF_TRANSCRIPT_CHARS = 8_000;
+const LAST_HELP_SEARCH_COOKIE = "f10_support_last_help_search";
 
 type ChatStartDiagnosticCode =
   | "RATE_LIMIT_NOT_CONFIGURED"
@@ -132,6 +134,8 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
   const helpContext = readString(body.helpContext).slice(0, 200);
   const forceHuman = body.forceHuman === true;
   const handoffTranscript = readString(body.handoffTranscript).slice(0, MAX_HANDOFF_TRANSCRIPT_CHARS);
+  const storedSearchEventId = cookies.get(LAST_HELP_SEARCH_COOKIE) ?? "";
+  const correlatedSearchEventId = isUuid(storedSearchEventId) ? storedSearchEventId : null;
 
   if (name.length < 1 || name.length > 120 || email.length > 254) {
     return json({ error: "INVALID_CONTACT" }, { status: 400 });
@@ -184,6 +188,20 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
     });
 
     await bindTicketF10Context(session.ticketId, customer);
+
+    if (forceHuman && correlatedSearchEventId) {
+      await markHelpSearchOutcome(correlatedSearchEventId, {
+        escalated: true,
+        ticketId: session.ticketId,
+      }).catch((cause) => {
+        console.error("[support.chat.help_handoff]", {
+          ticketId: session.ticketId,
+          causeType: cause instanceof Error ? cause.name : typeof cause,
+        });
+      });
+      cookies.delete(LAST_HELP_SEARCH_COOKIE, { path: "/" });
+    }
+
     if (handoffTranscript) {
       await persistSupportChatHandoffContext(session.ticketId, handoffTranscript).catch((cause) => {
         console.error("[support.chat.handoff_context]", {
@@ -203,6 +221,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
         entryOptionId: effectiveEntryOptionId,
         entryOptionLabel: session.entryOptionLabel,
         assistantHandoff: forceHuman,
+        helpSearchEventId: forceHuman ? correlatedSearchEventId : null,
         outsideSupportHours: availability.isOpen === false,
       },
     }).catch(() => undefined);
