@@ -116,6 +116,30 @@ Capture preferencialmente:
 - a tela após uma ação quando confirma o resultado;
 - avisos ou estados importantes.
 
+### Enquadramento obrigatório: tela inteira
+
+O screenshot deve preservar a **tela inteira do F10 mostrada no vídeo**, e não apenas a área que será destacada.
+
+Regras obrigatórias:
+
+- mantenha menus, abas, títulos, barras e demais elementos do F10 necessários para o usuário reconhecer onde está;
+- **não recorte somente o campo, botão, menu ou área de interesse**;
+- **não aplique zoom ou crop para transformar o destaque na imagem inteira**;
+- preserve o contexto visual ao redor da ação, mesmo quando apenas uma pequena região seja importante naquele passo;
+- quando o vídeo mostrar o F10 dentro de um player ou desktop maior, capture toda a área útil do aplicativo F10; controles do player, bordas externas e partes do desktop sem relação com o procedimento não precisam ser incluídos;
+- escolha um frame limpo, estável e legível, com a interface completa disponível naquele momento.
+
+Os screenshots entregues no ZIP devem ser **limpos e sem marcações adicionadas**. Não desenhe números, retângulos, setas, círculos ou textos sobre o arquivo da imagem.
+
+O F10 possui uma ferramenta editorial própria para adicionar posteriormente, sem alterar o screenshot original:
+
+- marcação numerada;
+- retângulo de destaque;
+- seta;
+- texto curto.
+
+Portanto, nunca recorte a imagem para simular um destaque. Entregue a tela completa e deixe a marcação específica para a revisão editorial dentro do F10.
+
 Não gere prints redundantes, borrados, em transição ou artificialmente anotados.
 
 Cada screenshot usado deve virar um bloco \`image\` com \`assetPath\`:
@@ -213,6 +237,8 @@ Para screenshots extraídos do vídeo, use \`assetPath\`, nunca URL externa.
 - O artigo deve ser útil sem assistir ao vídeo.
 - O \`quickGuide\` deve permitir resolver tarefas simples rapidamente.
 - Screenshots complementam o texto e não o substituem.
+- Todo screenshot deve preservar a tela completa do F10 e contexto suficiente para orientação; nunca recorte apenas o elemento da ação.
+- O screenshot original deve permanecer limpo; destaques visuais serão adicionados manualmente no editor do F10.
 - Use Markdown para destacar, não para decorar excessivamente.
 - Preserve nomenclaturas do F10 quando estiverem claras.
 - Mantenha passos e screenshots na ordem do procedimento.
