@@ -107,6 +107,14 @@ export const actions: Actions = {
       });
     }
 
+    if (packageFile.assets.size === 0) {
+      return fail(400, {
+        success: false,
+        message: "O pacote não contém screenshots do vídeo.",
+        issues: ["Capture ao menos uma tela relevante do procedimento e inclua-a em screenshots/ com assetPath correspondente no JSON."],
+      });
+    }
+
     if (TEMPLATE_PLACEHOLDER_PATTERN.test(packageFile.jsonText)) {
       return fail(400, {
         success: false,
