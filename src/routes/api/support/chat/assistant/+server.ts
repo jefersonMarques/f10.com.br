@@ -1,3 +1,4 @@
+import { dev } from "$app/environment";
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { isSupportAiChatEnabled } from "$lib/server/support/supportAiChat";
 import { runSupportAi } from "$lib/server/support/supportAiAgent";
@@ -8,6 +9,7 @@ const MAX_MESSAGE_CHARS = 2_000;
 const MAX_CONTEXT_CHARS = 6_000;
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 const RATE_BLOCK_MS = 30 * 60 * 1000;
+const LAST_HELP_SEARCH_COOKIE = "f10_support_last_help_search";
 
 function isBodyTooLarge(request: Request): boolean {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
@@ -44,7 +46,7 @@ function localAssistantReply(message: string): string | null {
   return null;
 }
 
-export const POST: RequestHandler = async ({ request, getClientAddress }) => {
+export const POST: RequestHandler = async ({ request, getClientAddress, cookies }) => {
   if (isBodyTooLarge(request)) {
     return json({ error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
   }
@@ -106,11 +108,22 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
       maxOutputTokens: 500,
     });
 
+    if (result.searchEventId) {
+      cookies.set(LAST_HELP_SEARCH_COOKIE, result.searchEventId, {
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        secure: !dev,
+        maxAge: 30 * 60,
+      });
+    }
+
     return json({
       answer: result.answer,
       requiresHuman: false,
       aiAvailable: result.resolution !== "failed",
       canEscalate: result.resolution !== "answered",
+      searchEventId: result.searchEventId,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (cause) {
     console.error("[support.chat.assistant]", {
