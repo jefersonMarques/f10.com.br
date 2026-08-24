@@ -2,11 +2,12 @@ import { desc, eq } from "drizzle-orm";
 import { getOpenAiModel, isOpenAiConfigured } from "$lib/server/ai/openAiResponses";
 import { getDatabase } from "$lib/server/db";
 import { supportAiRuns } from "$lib/server/db/supportAiSchema";
-import { markHelpSearchOutcome } from "$lib/server/help/helpSearchRepository";
 import {
   answerHelpQuestion,
   type HelpKnowledgeResult,
 } from "$lib/server/help/helpKnowledgeEngine";
+import { recordHelpKnowledgeRun } from "$lib/server/help/helpKnowledgeTelemetryRepository";
+import { markHelpSearchOutcome } from "$lib/server/help/helpSearchRepository";
 
 const NOT_FOUND_MESSAGE =
   "Não encontrei informação suficiente para responder isso com segurança. Você pode reformular a pergunta ou, se preferir, falar com a equipe F10.";
@@ -140,6 +141,29 @@ export async function runSupportAi(
       });
     }
 
+    await recordHelpKnowledgeRun({
+      source: "chat_ai",
+      scope: "global",
+      actorUserId: input.actorUserId,
+      customerContactId: input.customerContactId,
+      searchEventId: knowledge.searchEventId,
+      question,
+      resolution: knowledge.resolution,
+      target: knowledge.target
+        ? {
+            contentId: knowledge.target.contentId,
+            slug: knowledge.target.slug,
+            targetType: knowledge.target.targetType,
+          }
+        : null,
+      sources: knowledge.sources,
+      model: knowledge.model,
+      providerResponseId: knowledge.providerResponseId,
+      inputTokens: knowledge.inputTokens,
+      outputTokens: knowledge.outputTokens,
+      latencyMs,
+    }).catch(() => undefined);
+
     const runId = await saveRun({
       actorUserId: input.actorUserId,
       searchEventId: knowledge.searchEventId,
@@ -178,6 +202,18 @@ export async function runSupportAi(
       failureCode === "OPENAI_NOT_CONFIGURED"
         ? "A integração com a OpenAI não está configurada neste ambiente."
         : "Falha técnica durante a consulta ao motor de conhecimento.";
+
+    await recordHelpKnowledgeRun({
+      source: "chat_ai",
+      scope: "global",
+      actorUserId: input.actorUserId,
+      customerContactId: input.customerContactId,
+      question,
+      resolution: "failed",
+      latencyMs,
+      failureCode,
+    }).catch(() => undefined);
+
     const runId = await saveRun({
       actorUserId: input.actorUserId,
       searchEventId: null,
