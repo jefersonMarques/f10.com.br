@@ -10,6 +10,7 @@ import {
 } from "$lib/server/help/structuredHelpImport";
 
 const MAX_JSON_BYTES = 5 * 1024 * 1024;
+const TEMPLATE_PLACEHOLDER_PATTERN = /\bREPLACE_[A-Z0-9_]+\b/;
 
 function permissionMap(
   permissions: Array<{ code: string; scope: "own" | "team" | "all" }>,
@@ -85,7 +86,16 @@ export const actions: Actions = {
       });
     }
 
-    const validation = validateHelpImportJson(await fileValue.text());
+    const rawJson = await fileValue.text();
+    if (TEMPLATE_PLACEHOLDER_PATTERN.test(rawJson)) {
+      return fail(400, {
+        success: false,
+        message: "O JSON ainda contém placeholders do template. Gere o conteúdo final antes de importar.",
+        issues: ["Substitua ou remova todos os valores REPLACE_* do template."],
+      });
+    }
+
+    const validation = validateHelpImportJson(rawJson);
     if (!validation.valid || !validation.parsed) {
       return fail(400, {
         success: false,
