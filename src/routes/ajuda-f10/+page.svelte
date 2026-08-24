@@ -143,7 +143,17 @@
         <div class="mt-6 space-y-3">
           {#each data.categories as category}
             <details class="group rounded-[22px] border border-[#E2E5EC] bg-white shadow-[0_8px_24px_rgba(1,13,40,0.025)]">
-              <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 sm:px-6"><div class="flex min-w-0 items-center gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F7F8FB] text-[18px]">{category.icon || "📘"}</span><div class="min-w-0"><strong class="block truncate text-[13px] font-semibold text-[#303746]">{category.name}</strong>{#if category.description}<span class="mt-0.5 block truncate text-[10px] text-[#858B99]">{category.description}</span>{/if}</div></div><div class="flex items-center gap-3"><span class="rounded-full bg-[#ECEEF3] px-2 py-1 text-[9px] font-semibold text-[#737A8B]">{category.articles.length}</span><ChevronDown size={15} class="text-[#818797] transition group-open:rotate-180"/></div></summary>
+              <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 sm:px-6">
+                <div class="flex min-w-0 items-center gap-3">
+                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F7F8FB] text-[18px]">{category.icon || "📘"}</span>
+                  <div class="min-w-0">
+                    <strong class="block truncate text-[13px] font-semibold text-[#303746]">{category.name}</strong>
+                    {#if category.description}<span class="mt-0.5 block truncate text-[10px] text-[#858B99]">{category.description}</span>{/if}
+                    <a href={`/ajuda-f10/categorias/${encodeURIComponent(category.slug)}`} on:click|stopPropagation class="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold text-[#000A57] hover:underline">Abrir categoria<ArrowRight size={11}/></a>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3"><span class="rounded-full bg-[#ECEEF3] px-2 py-1 text-[9px] font-semibold text-[#737A8B]">{category.articles.length}</span><ChevronDown size={15} class="text-[#818797] transition group-open:rotate-180"/></div>
+              </summary>
               <div class="grid gap-2 border-t border-[#EEF0F5] p-3 md:grid-cols-2 sm:p-4">
                 {#each category.articles as article}
                   <a href={`/ajuda-f10/${encodeURIComponent(article.slug)}`} class="group/article rounded-2xl border border-[#ECEEF3] bg-[#FAFAFC] p-4 transition hover:border-[#CCD1DD] hover:bg-white"><div class="flex items-start gap-3"><BookOpen size={15} class="mt-0.5 shrink-0 text-[#EA6D0B]"/><div class="min-w-0"><h3 class="text-[12px] font-semibold leading-5 text-[#303746] group-hover/article:text-[#000A57]">{article.title}</h3>{#if article.summary}<p class="mt-1 line-clamp-2 text-[10px] leading-5 text-[#7D8493]">{article.summary}</p>{/if}<span class="mt-2 inline-block text-[9px] font-semibold text-[#959BA8]">{article.stepCount} {article.stepCount === 1 ? "passo" : "passos"}</span></div></div></a>
