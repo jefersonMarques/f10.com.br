@@ -26,6 +26,7 @@
   import HelpQuickGuideEditor from "$lib/components/help/HelpQuickGuideEditor.svelte";
   import HelpImageUploader from "$lib/components/operations/HelpImageUploader.svelte";
   import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
+  import { isHelpHumanReviewComplete } from "$lib/help/helpHumanReview";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -51,6 +52,12 @@
   $: imageBlocks = allBlocks.filter((block) => block.blockType === "image");
   $: describedImageCount = imageBlocks.filter(
     (block) => Boolean(block.asset?.altText.trim() || block.asset?.assistantDescription.trim()),
+  ).length;
+  $: humanReviewReady = imageBlocks.every(
+    (block) => isHelpHumanReviewComplete(block.metadata, block.asset?.id),
+  );
+  $: reviewedImageCount = imageBlocks.filter(
+    (block) => isHelpHumanReviewComplete(block.metadata, block.asset?.id),
   ).length;
   $: fileBlocks = allBlocks.filter((block) => block.blockType === "file");
   $: indexedFileCount = fileBlocks.filter(
@@ -79,6 +86,7 @@
     stepsWithContent === data.content.steps.length &&
     singleImagePerStep &&
     imageOnlyStepsReady &&
+    humanReviewReady &&
     videoReady;
   $: knowledgeTopics = Array.from(
     new Set(
@@ -112,11 +120,11 @@
       <div class="min-w-0"><h1 class="truncate text-[18px] font-semibold text-[#11182C]">{data.content.title}</h1><p class="mt-1 truncate text-[11px] text-[#838897]">/{data.content.slug}</p></div>
       <div class="flex flex-wrap gap-2">
         <a href={`/app/help/content/${data.content.id}/preview`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]">Preview<ExternalLink size={12}/></a>
-        <a href={`/app/help/content/${data.content.id}/images`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><PenTool size={13}/>Marcar imagens</a>
+        <a href={`/app/help/content/${data.content.id}/images`} class={`application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border px-3.5 font-semibold ${humanReviewReady ? "border-[#CFE4D6] bg-[#F7FCF8] text-[#2F7045]" : "border-[#F1D7BD] bg-[#FFF9F3] text-[#A9510D]"}`}><PenTool size={13}/>Revisão humana{#if imageBlocks.length > 0}<span class="rounded-full bg-white px-1.5 py-0.5 text-[8px]">{reviewedImageCount}/{imageBlocks.length}</span>{/if}</a>
         <a href="/app/help/categories" class="application-text-caption inline-flex min-h-10 items-center justify-center rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]">Categorias</a>
         <a href="/app/help/assets" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><HardDrive size={14}/>Biblioteca</a>
         {#if data.canPublish && data.content.status !== "published"}
-          <form method="POST" action="?/publish"><button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[11px] font-semibold text-white"><CloudUpload size={15}/>Publicar conteúdo</button></form>
+          <form method="POST" action="?/publish"><button type="submit" disabled={!publicationReady} title={!humanReviewReady ? "Conclua a revisão humana das imagens antes de publicar." : !publicationReady ? "Ainda existem pendências de publicação." : "Publicar conteúdo"} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#B8BCC8]"><CloudUpload size={15}/>Publicar conteúdo</button></form>
         {/if}
       </div>
     </div>
@@ -255,7 +263,7 @@
               <div class="mt-5 grid gap-3 lg:grid-cols-2">
                 <details class="rounded-2xl border border-[#DDE1EA] bg-white p-4"><summary class="application-text-caption flex cursor-pointer list-none items-center gap-2 font-semibold text-[#000A57]"><FileText size={15}/>Adicionar texto</summary><form method="POST" action="?/addBlock" class="mt-4 space-y-3"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockType" value="text"/><p class="text-[9px] leading-4 text-[#9297A5]">Use **negrito**, *itálico*, `código`, listas e emojis quando ajudarem a destacar a ação.</p><textarea name="textContent" required maxlength="50000" rows="5" placeholder="Explique o que o usuário deve fazer." class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2 text-[11px] leading-5"></textarea><button type="submit" class="application-text-caption min-h-9 w-full rounded-xl bg-[#000A57] px-3 font-semibold text-white">Adicionar texto</button></form></details>
                 {#if stepHasImage(step)}
-                  <div class="rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4"><div class="flex items-start gap-3"><ImageIcon size={16} class="mt-0.5 text-[#000A57]"/><div><strong class="application-text-caption block text-[#000A57]">Screenshot já definido</strong><p class="mt-1 text-[9px] leading-5 text-[#777D8D]">Cada passo aceita uma única imagem. Remova a atual antes de adicionar outra.</p></div></div></div>
+                  <div class="rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4"><div class="flex items-start gap-3"><ImageIcon size={16} class="mt-0.5 text-[#000A57]"/><div><strong class="application-text-caption block text-[#000A57]">Screenshot já definido</strong><p class="mt-1 text-[9px] leading-5 text-[#777D8D]">Cada passo aceita uma única imagem. Use “Revisão humana” para revisar ou substituir a imagem atual.</p></div></div></div>
                 {:else}
                   <HelpImageUploader contentId={data.content.id} stepId={step.id}/>
                 {/if}
@@ -285,6 +293,7 @@
           <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if stepsWithContent === data.content.steps.length && data.content.steps.length > 0}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Passos públicos</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{stepsWithContent}/{data.content.steps.length} com conteúdo público estruturado.</p></div>
           <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if singleImagePerStep}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Uma imagem por passo</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">A estrutura editorial aceita no máximo um screenshot em cada passo.</p></div>
           <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if imageOnlyStepsReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Imagens compreensíveis</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{describedImageCount}/{imageBlocks.length} possuem texto alternativo ou descrição adicional.</p></div>
+          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if humanReviewReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Revisão humana</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{reviewedImageCount}/{imageBlocks.length} imagens confirmadas por uma pessoa. É obrigatório antes de publicar.</p></div>
           <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if videoReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Vídeo e subtitles</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{data.content.featuredVideo ? (videoReady ? "Vídeo com fonte textual disponível." : "Vídeo sem subtitles.") : "Sem vídeo principal."}</p></div>
           <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if fileBlocks.length === 0 || indexedFileCount === fileBlocks.length}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<Info size={15} class="text-[#76510A]"/>{/if}<strong class="text-[10px] text-[#303645]">Arquivos indexáveis</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{indexedFileCount}/{fileBlocks.length} possuem texto extraído ou resumo.</p></div>
         </div>
