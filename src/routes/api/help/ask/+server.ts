@@ -15,7 +15,8 @@ import {
 } from "$lib/server/help/helpPublicAiProtection";
 import { getHelpPublicAiSettings } from "$lib/server/settings/operationsSettingsRepository";
 
-const MAX_BODY_BYTES = 4 * 1024;
+const MAX_BODY_BYTES = 12 * 1024;
+const MAX_CONVERSATION_CONTEXT_CHARS = 6_000;
 
 function isBodyTooLarge(request: Request): boolean {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
@@ -77,8 +78,16 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
   }
 
   const question = typeof payload.question === "string" ? payload.question.trim() : "";
+  const conversationContext = typeof payload.conversationContext === "string"
+    ? payload.conversationContext.trim()
+    : "";
   const scope = parseScope(payload);
-  if (question.length < 3 || question.length > 600 || !scope) {
+  if (
+    question.length < 3 ||
+    question.length > 600 ||
+    conversationContext.length > MAX_CONVERSATION_CONTEXT_CHARS ||
+    !scope
+  ) {
     return errorResponse("INVALID_QUESTION", 400);
   }
 
@@ -101,6 +110,7 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
       question,
       scope,
       source: "public",
+      conversationContext,
     });
     const latencyMs = Date.now() - knowledgeStartedAt;
 
