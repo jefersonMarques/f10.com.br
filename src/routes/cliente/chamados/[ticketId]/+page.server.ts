@@ -43,29 +43,47 @@ export const actions: Actions = {
     const formData = await request.formData();
     const value = formData.get("body");
     const body = typeof value === "string" ? value.trim() : "";
+    const files = formData
+      .getAll("files")
+      .filter((item): item is File => item instanceof File && item.size > 0);
 
-    if (body.length < 1 || body.length > 4000) {
+    if (body.length > 4000 || (body.length < 1 && files.length === 0)) {
       return fail(400, {
         success: false,
-        message: "A mensagem deve ter entre 1 e 4.000 caracteres.",
+        message: "Escreva uma mensagem ou adicione um anexo. O texto pode ter até 4.000 caracteres.",
         body,
       });
     }
 
     try {
-      await replyCustomerF10Ticket(session, params.ticketId, body);
+      await replyCustomerF10Ticket(session, params.ticketId, body, files);
       await recordCustomerActivity(session, {
         eventType: "ticket.reply",
         source: "customer_portal",
         path: `/cliente/chamados/${params.ticketId}`,
-        metadata: { ticketId: params.ticketId, bodyLength: body.length },
+        metadata: {
+          ticketId: params.ticketId,
+          bodyLength: body.length,
+          attachmentCount: files.length,
+        },
       }).catch(() => undefined);
       return { success: true, message: "Mensagem enviada." };
     } catch (cause) {
       if (cause instanceof Error && cause.message === "CUSTOMER_TICKET_CLOSED") {
         return fail(409, { success: false, message: "Este chamado já foi fechado." });
       }
-      return fail(404, { success: false, message: "Não foi possível responder este chamado." });
+      if (cause instanceof Error && cause.message.startsWith("SUPPORT_ATTACHMENT_")) {
+        return fail(400, {
+          success: false,
+          message: "Revise os anexos. São aceitos PNG, JPG, WEBP e PDF, com até 10 MB por arquivo.",
+          body,
+        });
+      }
+      return fail(404, {
+        success: false,
+        message: "Não foi possível responder este chamado.",
+        body,
+      });
     }
   },
 };
