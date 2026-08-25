@@ -101,7 +101,11 @@ Nesta requisição você é o assistente contextual de UM ÚNICO ARTIGO.
 Responda somente se o artigo atual sustentar a resposta. Não complemente com assuntos de outros artigos.
 Use o histórico apenas para resolver referências como “onde?”, “isso”, “ele”, “depois” e perguntas sequenciais.
 Se a pergunta atual pedir onde ou como executar algo, responda com a localização ou ação mais específica sustentada pelos trechos disponíveis.
-Se a pergunta estiver fora do escopo ou não puder ser sustentada pelo artigo atual, use resolved=false. O servidor decidirá se existe outro conteúdo apropriado.`;
+É permitida uma única forma de inferência operacional controlada: quando os trechos descrevem de forma inequívoca um controle binário ou reversível da própria interface, como checkbox, switch, Ativo/Inativo, Habilitado/Desabilitado ou marcado/desmarcado, você pode concluir a ação inversa usando exatamente o mesmo controle.
+Exemplo permitido: se o artigo afirma que marcar “Usuário Ativo” ativa ou libera o usuário, você pode responder que desmarcar “Usuário Ativo” desativa ou bloqueia esse usuário.
+Ao usar essa inferência, limite a resposta ao efeito binário sustentado pelo artigo e deixe claro que a conclusão decorre do mesmo controle descrito. Não invente efeitos adicionais.
+Não use essa exceção para exclusão/restauração, permissões, valores, prazos, integrações, efeitos irreversíveis, regras de negócio ou qualquer situação sem estado binário inequívoco.
+Se a pergunta estiver fora do escopo ou não puder ser sustentada pelo artigo atual nem por essa inferência binária controlada, use resolved=false. O servidor decidirá se existe outro conteúdo apropriado.`;
 
 type ModelAnswer = {
   resolved: boolean;
@@ -220,6 +224,32 @@ function retrievalQueryFor(input: AnswerHelpQuestionInput): string {
   return previousTopic ? `${previousTopic} ${question}`.slice(0, 500) : question;
 }
 
+function expandControlledOperationalQuery(query: string, question: string): string {
+  const normalized = normalizeQuestion(question);
+  const additions: string[] = [];
+
+  if (
+    /\b(bloque\w*|desativ\w*|inativ\w*|desabilit\w*)\b/.test(normalized) ||
+    /\b(imped\w*|retir\w*)\b.*\b(acess\w*|login)\b/.test(normalized)
+  ) {
+    additions.push("ativo ativar usuario ativo habilitado habilitar marcado marcar acesso login");
+  }
+
+  if (
+    /\b(ativ\w*|habilit\w*|liber\w*)\b/.test(normalized) &&
+    /\b(usuario|acess\w*|login)\b/.test(normalized)
+  ) {
+    additions.push("ativo usuario ativo habilitado marcar acesso login");
+  }
+
+  return [query, ...additions]
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 500);
+}
+
 function scoreFragment(question: string, searchText: string, sourceRank: number): number {
   const normalizedQuestion = normalizeHelpSearchQuery(question);
   const searchable = normalizeHelpSearchQuery(searchText);
@@ -267,7 +297,7 @@ function asksForPreciseTarget(question: string): boolean {
   const normalized = normalizeQuestion(question);
   return (
     /^(onde|como)\b/.test(normalized) ||
-    /\b(campo|tela|aba|menu|botao|clic\w*|preench\w*|inform\w*|digit\w*|insir\w*|selecion\w*|cadastro|acess\w*|localiz\w*|encontr\w*|coloc\w*)\b/.test(normalized)
+    /\b(campo|tela|aba|menu|botao|clic\w*|preench\w*|inform\w*|digit\w*|insir\w*|selecion\w*|cadastro|acess\w*|localiz\w*|encontr\w*|coloc\w*|ativ\w*|desativ\w*|inativ\w*|bloque\w*|habilit\w*|desabilit\w*|marc\w*|desmarc\w*)\b/.test(normalized)
   );
 }
 
@@ -541,7 +571,10 @@ async function answerArticleScope(
 ): Promise<HelpKnowledgeResult> {
   const row = await getPublicationBySlug(input.scope.slug);
   if (!row) throw new Error("HELP_ARTICLE_NOT_FOUND");
-  const retrievalQuery = retrievalQueryFor(input);
+  const retrievalQuery = expandControlledOperationalQuery(
+    retrievalQueryFor(input),
+    input.question,
+  );
 
   const allFragments = buildFragments(retrievalQuery, row, 1);
   const fragments = selectArticleFragments(input.question, retrievalQuery, allFragments);
