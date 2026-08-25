@@ -5,6 +5,7 @@ export const load: LayoutServerLoad = async ({ cookies, url }) => {
   const session = await requireCustomerF10PortalSession(
     cookies,
     `${url.pathname}${url.search}`,
+    false,
   );
   return {
     customer: {
@@ -16,6 +17,7 @@ export const load: LayoutServerLoad = async ({ cookies, url }) => {
       groupName: session.selectedGroupName,
       unitId: session.selectedUnitId,
       unitName: session.selectedUnitName,
+      groups: session.groups,
     },
   };
 };
