@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
 import { readHelpImageAnnotationsFromMetadata } from "$lib/help/helpImageAnnotations";
+import { isHelpHumanReviewComplete } from "$lib/help/helpHumanReview";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
@@ -39,6 +40,17 @@ export async function publishHelpKnowledgeContent(
     )
   ) {
     throw new Error("STEP_IMAGE_LIMIT_EXCEEDED");
+  }
+  if (
+    content.steps.some((step) =>
+      step.blocks.some(
+        (block) =>
+          block.blockType === "image" &&
+          !isHelpHumanReviewComplete(block.metadata, block.asset?.id),
+      ),
+    )
+  ) {
+    throw new Error("HUMAN_REVIEW_REQUIRED");
   }
 
   validateHelpKnowledgePublication(content);
