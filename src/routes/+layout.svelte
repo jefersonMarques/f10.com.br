@@ -70,7 +70,9 @@
       pathname === "/login" ||
       pathname.startsWith("/login/") ||
       pathname === "/app" ||
-      pathname.startsWith("/app/")
+      pathname.startsWith("/app/") ||
+      pathname === "/cliente" ||
+      pathname.startsWith("/cliente/")
     );
   }
 
