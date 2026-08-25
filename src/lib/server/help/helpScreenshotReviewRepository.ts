@@ -2,8 +2,16 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import {
   HELP_IMAGE_ANNOTATIONS_METADATA_KEY,
+  readHelpImageAnnotationsFromMetadata,
   type HelpImageAnnotation,
 } from "$lib/help/helpImageAnnotations";
+import {
+  isHelpHumanReviewComplete,
+  readHelpHumanReviewFromMetadata,
+  withHelpHumanReview,
+  withoutHelpHumanReview,
+  type HelpHumanReviewInteraction,
+} from "$lib/help/helpHumanReview";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -12,9 +20,10 @@ import {
   helpContents,
   helpStepBlocks,
 } from "$lib/server/db/structuredHelpSchema";
+import { createManagedHelpAsset } from "$lib/server/help/helpAssetRepository";
 import { deleteAssetObject, putAssetObject } from "$lib/server/storage/assetStorage";
 
-const REVIEW_TTL_MS = 24 * 60 * 60 * 1_000;
+const REVIEW_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
 
 type ScreenshotReviewMetadata = {
   screenshotReview?: {
@@ -46,6 +55,19 @@ export type HelpScreenshotReviewGroup = {
     candidateIndex: number;
     timeSeconds: number | null;
     recommended: boolean;
+  }>;
+};
+
+export type HelpHumanReviewStatus = {
+  total: number;
+  reviewed: number;
+  pending: number;
+  items: Array<{
+    blockId: string;
+    stepId: string;
+    assetId: string;
+    reviewed: boolean;
+    reviewedAt: string | null;
   }>;
 };
 
@@ -143,6 +165,50 @@ async function imageBlocksByStep(stepIds: string[]) {
     }
   }
   return result;
+}
+
+async function imageReviewRows(contentId: string) {
+  return getDatabase()
+    .select({
+      blockId: helpStepBlocks.id,
+      stepId: helpStepBlocks.stepId,
+      assetId: helpStepBlocks.assetId,
+      metadata: helpStepBlocks.metadata,
+    })
+    .from(helpStepBlocks)
+    .innerJoin(helpContentSteps, eq(helpStepBlocks.stepId, helpContentSteps.id))
+    .where(
+      and(
+        eq(helpContentSteps.contentId, contentId),
+        eq(helpStepBlocks.blockType, "image"),
+      ),
+    )
+    .orderBy(helpContentSteps.sortOrder, helpStepBlocks.sortOrder);
+}
+
+export async function getHelpHumanReviewStatus(
+  contentId: string,
+): Promise<HelpHumanReviewStatus> {
+  const rows = await imageReviewRows(contentId);
+  const items = rows.flatMap((row) => {
+    if (!row.assetId) return [];
+    const review = readHelpHumanReviewFromMetadata(row.metadata);
+    const reviewed = isHelpHumanReviewComplete(row.metadata, row.assetId);
+    return [{
+      blockId: row.blockId,
+      stepId: row.stepId,
+      assetId: row.assetId,
+      reviewed,
+      reviewedAt: reviewed ? review?.reviewedAt ?? null : null,
+    }];
+  });
+  const reviewed = items.filter((item) => item.reviewed).length;
+  return {
+    total: items.length,
+    reviewed,
+    pending: items.length - reviewed,
+    items,
+  };
 }
 
 export async function replaceHelpScreenshotReviewCandidates(
@@ -313,6 +379,7 @@ export async function confirmHelpScreenshotReviewSelection(input: {
   blockId: string;
   assetId: string;
   annotations: HelpImageAnnotation[];
+  interactions?: HelpHumanReviewInteraction[];
 }): Promise<void> {
   const db = getDatabase();
   const [row] = await db
@@ -364,11 +431,28 @@ export async function confirmHelpScreenshotReviewSelection(input: {
     if (review?.role === "recommended" && review.stepId === row.stepId) removable.push(current);
   }
 
+  const previousAnnotations = readHelpImageAnnotationsFromMetadata(row.blockMetadata);
+  const annotationsChanged = JSON.stringify(previousAnnotations) !== JSON.stringify(input.annotations);
+  const imageChanged = selected.id !== row.currentAssetId;
+  const publicChanged = annotationsChanged || imageChanged;
   const updatedAt = new Date();
-  const blockMetadata = {
-    ...(row.blockMetadata ?? {}),
-    [HELP_IMAGE_ANNOTATIONS_METADATA_KEY]: input.annotations,
-  };
+  const interactions = Array.from(new Set([
+    ...(input.interactions ?? []),
+    ...(imageChanged ? ["image_selected" as const] : []),
+    ...(annotationsChanged ? ["annotated" as const] : []),
+  ]));
+  const blockMetadata = withHelpHumanReview(
+    {
+      ...(row.blockMetadata ?? {}),
+      [HELP_IMAGE_ANNOTATIONS_METADATA_KEY]: input.annotations,
+    },
+    {
+      actorUserId: input.actorUserId,
+      assetId: selected.id,
+      interactions: interactions.length > 0 ? interactions : ["confirmed"],
+      reviewedAt: updatedAt,
+    },
+  );
 
   await db.transaction(async (tx) => {
     await tx
@@ -387,7 +471,11 @@ export async function confirmHelpScreenshotReviewSelection(input: {
 
     await tx
       .update(helpContents)
-      .set({ status: "draft", updatedBy: input.actorUserId, updatedAt })
+      .set({
+        ...(publicChanged || row.contentStatus !== "published" ? { status: "draft" as const } : {}),
+        updatedBy: input.actorUserId,
+        updatedAt,
+      })
       .where(eq(helpContents.id, input.contentId));
   });
 
@@ -400,9 +488,127 @@ export async function confirmHelpScreenshotReviewSelection(input: {
     metadata: {
       contentId: input.contentId,
       selectedAssetId: selected.id,
-      changed: selected.id !== row.currentAssetId,
+      changed: imageChanged,
       annotationCount: input.annotations.length,
+      interactions,
       discardedCandidates: removable.length,
+    },
+  });
+}
+
+export async function saveHelpHumanReviewBatch(input: {
+  actorUserId: string;
+  contentId: string;
+  confirmUntouched: boolean;
+  items: Array<{
+    blockId: string;
+    assetId: string;
+    annotations: HelpImageAnnotation[];
+    interactions: HelpHumanReviewInteraction[];
+  }>;
+}): Promise<HelpHumanReviewStatus> {
+  const status = await getHelpHumanReviewStatus(input.contentId);
+  const expected = new Map(status.items.map((item) => [item.blockId, item]));
+  const supplied = new Map(input.items.map((item) => [item.blockId, item]));
+  if (expected.size !== supplied.size || Array.from(expected.keys()).some((blockId) => !supplied.has(blockId))) {
+    throw new Error("HUMAN_REVIEW_INCOMPLETE");
+  }
+
+  const untouchedPending = status.items.filter((item) => {
+    if (item.reviewed) return false;
+    return (supplied.get(item.blockId)?.interactions.length ?? 0) === 0;
+  });
+  if (untouchedPending.length > 0 && !input.confirmUntouched) {
+    throw new Error("HUMAN_REVIEW_CONFIRMATION_REQUIRED");
+  }
+
+  for (const item of input.items) {
+    const previous = expected.get(item.blockId);
+    await confirmHelpScreenshotReviewSelection({
+      actorUserId: input.actorUserId,
+      contentId: input.contentId,
+      blockId: item.blockId,
+      assetId: item.assetId,
+      annotations: item.annotations,
+      interactions:
+        item.interactions.length > 0
+          ? item.interactions
+          : previous?.reviewed
+            ? []
+            : ["confirmed"],
+    });
+  }
+
+  return getHelpHumanReviewStatus(input.contentId);
+}
+
+export async function replaceHelpHumanReviewImage(input: {
+  actorUserId: string;
+  contentId: string;
+  blockId: string;
+  fileName: string;
+  mimeType: string;
+  bytes: Uint8Array;
+}): Promise<void> {
+  const db = getDatabase();
+  const [row] = await db
+    .select({
+      blockId: helpStepBlocks.id,
+      blockType: helpStepBlocks.blockType,
+      blockMetadata: helpStepBlocks.metadata,
+      currentAssetId: helpStepBlocks.assetId,
+      contentStatus: helpContents.status,
+    })
+    .from(helpStepBlocks)
+    .innerJoin(helpContentSteps, eq(helpStepBlocks.stepId, helpContentSteps.id))
+    .innerJoin(helpContents, eq(helpContentSteps.contentId, helpContents.id))
+    .where(
+      and(
+        eq(helpStepBlocks.id, input.blockId),
+        eq(helpContentSteps.contentId, input.contentId),
+      ),
+    )
+    .limit(1);
+  if (!row || row.blockType !== "image" || !row.currentAssetId) {
+    throw new Error("IMAGE_BLOCK_NOT_FOUND");
+  }
+  if (row.contentStatus === "archived") throw new Error("CONTENT_ARCHIVED");
+
+  const created = await createManagedHelpAsset(input.actorUserId, {
+    fileName: input.fileName,
+    mimeType: input.mimeType,
+    bytes: input.bytes,
+    contentId: input.contentId,
+  });
+  if (created.asset.assetType !== "image") throw new Error("ASSET_MIME_NOT_ALLOWED");
+  if (created.asset.id === row.currentAssetId) return;
+
+  const updatedAt = new Date();
+  const metadata = withoutHelpHumanReview({
+    ...(row.blockMetadata ?? {}),
+    [HELP_IMAGE_ANNOTATIONS_METADATA_KEY]: [],
+  });
+  await db.transaction(async (tx) => {
+    await tx
+      .update(helpStepBlocks)
+      .set({ assetId: created.asset.id, metadata, updatedAt })
+      .where(eq(helpStepBlocks.id, input.blockId));
+    await tx
+      .update(helpContents)
+      .set({ status: "draft", updatedBy: input.actorUserId, updatedAt })
+      .where(eq(helpContents.id, input.contentId));
+  });
+
+  await recordAuditEvent({
+    actorUserId: input.actorUserId,
+    action: "help.image.review.replaced",
+    entityType: "help_step_block",
+    entityId: input.blockId,
+    metadata: {
+      contentId: input.contentId,
+      previousAssetId: row.currentAssetId,
+      selectedAssetId: created.asset.id,
+      reusedAsset: created.reused,
     },
   });
 }
