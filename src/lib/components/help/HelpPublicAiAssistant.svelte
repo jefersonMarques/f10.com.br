@@ -114,12 +114,29 @@
     if (code === "ARTICLE_NOT_FOUND") {
       return "Este conteúdo não está disponível para o assistente.";
     }
-    return "O assistente está temporariamente indisponível.";
+    return "Não consegui concluir essa resposta agora. Sua pergunta ficou no campo para você tentar novamente.";
   }
 
   function conversationContext(): string {
-    const context = messages
-      .filter((message) => !message.error)
+    const recent = messages.slice(-12);
+    const completed: ChatMessage[] = [];
+
+    for (let index = 0; index < recent.length; index += 1) {
+      const message = recent[index];
+      if (!message) continue;
+      if (message.role === "user") {
+        const next = recent[index + 1];
+        if (next?.role === "assistant" && next.error) {
+          index += 1;
+          continue;
+        }
+        completed.push(message);
+        continue;
+      }
+      if (!message.error) completed.push(message);
+    }
+
+    const context = completed
       .slice(-8)
       .map((message) => `${message.role === "user" ? "Cliente" : "Assistente"}: ${message.text}`)
       .join("\n");
@@ -160,6 +177,7 @@
       };
 
       if (!response.ok) {
+        question = normalized;
         addMessage({ role: "assistant", text: errorFor(payload.error ?? ""), error: true });
         return;
       }
@@ -170,11 +188,8 @@
       const resolution = payload.resolution ?? "not_found";
       const target = payload.target ?? null;
       addMessage({ role: "assistant", text: answer, resolution, target });
-
-      if (resolution === "answered" && target?.slug === articleSlug) {
-        await revealTarget(target);
-      }
     } catch {
+      question = normalized;
       addMessage({ role: "assistant", text: errorFor(""), error: true });
     } finally {
       loading = false;
@@ -250,7 +265,7 @@
                   <div class={`max-w-[86%] rounded-2xl rounded-tl-md border px-4 py-3 ${message.error ? "border-[#F1D7BD] bg-[#FFF9F3]" : "border-[#E7EAF1] bg-white"}`}>
                     <p class={`whitespace-pre-wrap text-[12px] leading-6 ${message.error ? "text-[#7A3B08]" : "text-[#424A5D]"}`}>{message.text}</p>
                     {#if message.target && message.resolution === "answered"}
-                      <button type="button" class="mt-3 inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#EEF0FF] px-3 text-[10px] font-semibold text-[#000A57]" on:click={() => message.target && openTarget(message.target)}>Mostrar no artigo<ArrowUpRight size={13}/></button>
+                      <button type="button" class="mt-3 inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#EEF0FF] px-3 text-[10px] font-semibold text-[#000A57]" on:click={() => message.target && openTarget(message.target)}>Ver ponto no artigo<ArrowUpRight size={13}/></button>
                     {:else if message.target && message.resolution === "found_elsewhere"}
                       <button type="button" class="mt-3 inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#EEF0FF] px-3 text-[10px] font-semibold text-[#000A57]" on:click={() => message.target && openTarget(message.target)}>Abrir {message.target.title}<ArrowUpRight size={13}/></button>
                     {/if}
