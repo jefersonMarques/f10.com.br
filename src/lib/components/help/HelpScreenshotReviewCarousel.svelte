@@ -19,19 +19,53 @@
   export let disabled = false;
 
   const dispatch = createEventDispatcher<{ interaction: void; replaced: void }>();
-  const initialAssetId = candidates.find((candidate) => candidate.recommended)?.assetId
-    ?? candidates[0]?.assetId
-    ?? "";
-  let selectedAssetId = initialAssetId;
-  let annotations: HelpImageAnnotation[] = initialAnnotations;
-  let annotationDrafts = new Map<string, HelpImageAnnotation[]>([[initialAssetId, initialAnnotations]]);
+  let selectedAssetId = "";
+  let annotations: HelpImageAnnotation[] = [];
+  let annotationDrafts = new Map<string, HelpImageAnnotation[]>();
   let stripElement: HTMLDivElement | null = null;
   let imageInteracted = false;
   let annotationInteracted = false;
-  let lastAnnotationSignature = JSON.stringify(initialAnnotations);
+  let lastAnnotationSignature = "[]";
+  let appliedServerState = "";
   let replacementFile: File | null = null;
   let replacing = false;
   let replacementMessage = "";
+
+  function preferredAssetId(): string {
+    return candidates.find((candidate) => candidate.recommended)?.assetId
+      ?? candidates[0]?.assetId
+      ?? "";
+  }
+
+  function serverStateSignature(): string {
+    return JSON.stringify({
+      candidates: candidates.map((candidate) => [
+        candidate.assetId,
+        candidate.candidateIndex,
+        candidate.timeSeconds,
+        candidate.recommended,
+      ]),
+      annotations: initialAnnotations,
+      reviewed,
+    });
+  }
+
+  $: {
+    const nextServerState = serverStateSignature();
+    if (nextServerState !== appliedServerState) {
+      appliedServerState = nextServerState;
+      selectedAssetId = preferredAssetId();
+      annotations = initialAnnotations;
+      annotationDrafts = selectedAssetId
+        ? new Map([[selectedAssetId, initialAnnotations]])
+        : new Map();
+      imageInteracted = false;
+      annotationInteracted = false;
+      lastAnnotationSignature = JSON.stringify(initialAnnotations);
+      replacementFile = null;
+      replacementMessage = "";
+    }
+  }
 
   $: selected = candidates.find((candidate) => candidate.assetId === selectedAssetId)
     ?? candidates[0]
