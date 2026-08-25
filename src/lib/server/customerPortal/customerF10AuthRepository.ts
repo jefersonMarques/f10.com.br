@@ -6,6 +6,7 @@ import {
   customerF10Identities,
   customerPortalSessions,
   type CustomerF10GroupSnapshot,
+  type CustomerF10UnitSnapshot,
 } from "$lib/server/db/customerPortalSchema";
 import { customerContacts } from "$lib/server/db/supportSchema";
 import {
@@ -36,6 +37,14 @@ export function countF10Units(groups: CustomerF10GroupSnapshot[]): number {
   return groups.reduce((total, group) => total + group.unidades.length, 0);
 }
 
+export type CustomerF10AuthorizedContext = {
+  groupId: number;
+  groupName: string;
+  unitId: number;
+  unitName: string;
+  unitSchema: string;
+};
+
 export type CustomerF10PortalSession = {
   sessionId: string;
   contactId: string;
@@ -51,7 +60,36 @@ export type CustomerF10PortalSession = {
   expiresAt: Date;
 };
 
-async function findOrCreateCustomerContact(legacyUserId: string, email: string): Promise<{ id: string; name: string }> {
+export function listAuthorizedF10Contexts(
+  session: Pick<CustomerF10PortalSession, "groups">,
+): CustomerF10AuthorizedContext[] {
+  return session.groups.flatMap((group) =>
+    group.unidades.map((unit) => ({
+      groupId: group.grupo_id,
+      groupName: group.grupo,
+      unitId: unit.unidade_id,
+      unitName: unit.unidade,
+      unitSchema: unit.schema,
+    })),
+  );
+}
+
+export function isAuthorizedF10Context(
+  session: Pick<CustomerF10PortalSession, "groups">,
+  groupId: number,
+  unitId: number,
+): boolean {
+  return session.groups.some(
+    (group) =>
+      group.grupo_id === groupId &&
+      group.unidades.some((unit) => unit.unidade_id === unitId),
+  );
+}
+
+async function findOrCreateCustomerContact(
+  legacyUserId: string,
+  email: string,
+): Promise<{ id: string; name: string }> {
   const db = getDatabase();
   const [identity] = await db
     .select({
@@ -122,11 +160,13 @@ async function findOrCreateCustomerContact(legacyUserId: string, email: string):
   return contact;
 }
 
-function onlyUnit(groups: CustomerF10GroupSnapshot[]) {
-  const flattened = groups.flatMap((group) =>
-    group.unidades.map((unit) => ({ group, unit })),
-  );
-  return flattened.length === 1 ? flattened[0] : null;
+function initialSelection(groups: CustomerF10GroupSnapshot[]): {
+  group: CustomerF10GroupSnapshot | null;
+  unit: CustomerF10UnitSnapshot | null;
+} {
+  const group = groups.length === 1 ? groups[0] ?? null : null;
+  const unit = group?.unidades.length === 1 ? group.unidades[0] ?? null : null;
+  return { group, unit };
 }
 
 export async function createF10CustomerPortalSession(email: string, password: string) {
@@ -134,7 +174,7 @@ export async function createF10CustomerPortalSession(email: string, password: st
   const contact = await findOrCreateCustomerContact(authenticated.userId, authenticated.login);
   const sessionToken = createSessionToken();
   const now = new Date();
-  const selected = onlyUnit(authenticated.groups);
+  const selected = initialSelection(authenticated.groups);
   const db = getDatabase();
 
   const [session] = await db
@@ -148,11 +188,11 @@ export async function createF10CustomerPortalSession(email: string, password: st
       legacyTokenEncrypted: encryptF10CustomerToken(authenticated.token),
       legacyTokenExpiresAt: authenticated.expiresAt,
       legacyGroups: authenticated.groups,
-      selectedGroupId: selected?.group.grupo_id ?? null,
-      selectedGroupName: selected?.group.grupo ?? null,
-      selectedUnitId: selected?.unit.unidade_id ?? null,
-      selectedUnitName: selected?.unit.unidade ?? null,
-      selectedUnitSchema: selected?.unit.schema ?? null,
+      selectedGroupId: selected.group?.grupo_id ?? null,
+      selectedGroupName: selected.group?.grupo ?? null,
+      selectedUnitId: selected.unit?.unidade_id ?? null,
+      selectedUnitName: selected.unit?.unidade ?? null,
+      selectedUnitSchema: selected.unit?.schema ?? null,
       expiresAt: authenticated.expiresAt,
       lastSeenAt: now,
     })
@@ -164,22 +204,23 @@ export async function createF10CustomerPortalSession(email: string, password: st
     customerContactId: contact.id,
     portalSessionId: session.id,
     legacyUserId: authenticated.userId,
-    groupId: selected?.group.grupo_id ?? null,
-    unitId: selected?.unit.unidade_id ?? null,
+    groupId: selected.group?.grupo_id ?? null,
+    unitId: selected.unit?.unidade_id ?? null,
     eventType: "auth.f10.login",
     source: "customer_portal",
     path: "/cliente",
     metadata: {
       authorizedGroupCount: authenticated.groups.length,
       authorizedUnitCount: countF10Units(authenticated.groups),
-      unitAutoSelected: Boolean(selected),
+      groupAutoSelected: Boolean(selected.group),
+      unitAutoSelected: Boolean(selected.unit),
     },
   });
 
   return {
     token: sessionToken,
     expiresAt: authenticated.expiresAt,
-    needsUnitSelection: !selected,
+    needsGroupSelection: authenticated.groups.length > 1,
   };
 }
 
@@ -251,14 +292,7 @@ export async function authorizeF10CustomerPortalSession(
   };
 }
 
-export async function selectF10CustomerUnit(
-  sessionToken: string,
-  groupId: number,
-  unitId: number,
-): Promise<CustomerF10PortalSession> {
-  const current = await authorizeF10CustomerPortalSession(sessionToken);
-  if (!current) throw new Error("F10_CUSTOMER_SESSION_INVALID");
-
+async function refreshAuthorizedGroups(current: CustomerF10PortalSession) {
   const db = getDatabase();
   const [stored] = await db
     .select({ encryptedToken: customerPortalSessions.legacyTokenEncrypted })
@@ -268,12 +302,72 @@ export async function selectF10CustomerUnit(
   if (!stored?.encryptedToken) throw new Error("F10_CUSTOMER_TOKEN_MISSING");
 
   const legacyToken = decryptF10CustomerToken(stored.encryptedToken);
-  const groups = await getAuthenticatedF10CustomerGroups(legacyToken);
+  return getAuthenticatedF10CustomerGroups(legacyToken);
+}
+
+export async function selectF10CustomerGroup(
+  sessionToken: string,
+  groupId: number,
+): Promise<CustomerF10PortalSession> {
+  const current = await authorizeF10CustomerPortalSession(sessionToken);
+  if (!current) throw new Error("F10_CUSTOMER_SESSION_INVALID");
+
+  const groups = await refreshAuthorizedGroups(current);
+  const group = groups.find((item) => item.grupo_id === groupId);
+  if (!group) throw new Error("F10_CUSTOMER_GROUP_NOT_AUTHORIZED");
+
+  const unit = group.unidades.length === 1 ? group.unidades[0] ?? null : null;
+  const now = new Date();
+  const db = getDatabase();
+  await db
+    .update(customerPortalSessions)
+    .set({
+      legacyGroups: groups,
+      selectedGroupId: group.grupo_id,
+      selectedGroupName: group.grupo,
+      selectedUnitId: unit?.unidade_id ?? null,
+      selectedUnitName: unit?.unidade ?? null,
+      selectedUnitSchema: unit?.schema ?? null,
+      lastSeenAt: now,
+    })
+    .where(eq(customerPortalSessions.id, current.sessionId));
+
+  await db.insert(customerActivityEvents).values({
+    customerContactId: current.contactId,
+    portalSessionId: current.sessionId,
+    legacyUserId: current.legacyUserId,
+    groupId: group.grupo_id,
+    unitId: unit?.unidade_id ?? null,
+    eventType: "auth.f10.group_selected",
+    source: "customer_portal",
+    path: "/cliente/grupo",
+    metadata: {
+      groupName: group.grupo,
+      authorizedUnitCount: group.unidades.length,
+      unitAutoSelected: Boolean(unit),
+    },
+  });
+
+  const updated = await authorizeF10CustomerPortalSession(sessionToken);
+  if (!updated) throw new Error("F10_CUSTOMER_SESSION_INVALID");
+  return updated;
+}
+
+export async function selectF10CustomerUnit(
+  sessionToken: string,
+  groupId: number,
+  unitId: number,
+): Promise<CustomerF10PortalSession> {
+  const current = await authorizeF10CustomerPortalSession(sessionToken);
+  if (!current) throw new Error("F10_CUSTOMER_SESSION_INVALID");
+
+  const groups = await refreshAuthorizedGroups(current);
   const group = groups.find((item) => item.grupo_id === groupId);
   const unit = group?.unidades.find((item) => item.unidade_id === unitId);
   if (!group || !unit) throw new Error("F10_CUSTOMER_UNIT_NOT_AUTHORIZED");
 
   const now = new Date();
+  const db = getDatabase();
   await db
     .update(customerPortalSessions)
     .set({
