@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   and,
   desc,
@@ -11,7 +12,8 @@ import {
 } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
-import { ticketMessages, tickets } from "$lib/server/db/supportSchema";
+import { ticketMessageAttachments } from "$lib/server/db/supportChatEntrySchema";
+import { ticketEvents, ticketMessages, tickets } from "$lib/server/db/supportSchema";
 import {
   getCustomerPortalTicket,
   replyCustomerPortalTicket,
@@ -22,6 +24,11 @@ import {
   type CustomerF10AuthorizedContext,
   type CustomerF10PortalSession,
 } from "$lib/server/customerPortal/customerF10AuthRepository";
+import { resolveSupportChatEntryOption } from "$lib/server/support/supportChatEntryRepository";
+import {
+  deleteStoredSupportImages,
+  uploadSupportMessageAttachments,
+} from "$lib/server/support/supportMessageAttachmentRepository";
 
 export const CUSTOMER_TICKET_STATUSES = [
   "new",
@@ -32,13 +39,7 @@ export const CUSTOMER_TICKET_STATUSES = [
   "closed",
 ] as const;
 
-export const CUSTOMER_TICKET_PRIORITIES = [
-  "low",
-  "normal",
-  "high",
-  "urgent",
-] as const;
-
+export const CUSTOMER_TICKET_PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 export const CUSTOMER_TICKET_PERIODS = ["all", "7d", "30d", "90d"] as const;
 
 export type CustomerTicketStatus = (typeof CUSTOMER_TICKET_STATUSES)[number];
@@ -54,6 +55,15 @@ export type CustomerTicketListFilters = {
   search: string;
   page: number;
   pageSize: number;
+};
+
+export type CreateCustomerF10TicketInput = {
+  groupId: number;
+  unitId: number;
+  entryOptionId: string | null;
+  subject: string;
+  message: string;
+  files?: File[];
 };
 
 function hasSelectedUnitContext(session: CustomerF10PortalSession): boolean {
@@ -86,7 +96,7 @@ function contextAuthorizationCondition(
   contexts: CustomerF10AuthorizedContext[],
 ): SQL | null {
   if (contexts.length === 0) return null;
-  const condition = or(
+  return or(
     ...contexts.map((context) =>
       and(
         eq(ticketCustomerContexts.legacyUserId, session.legacyUserId),
@@ -94,8 +104,7 @@ function contextAuthorizationCondition(
         eq(ticketCustomerContexts.unitId, context.unitId),
       ),
     ),
-  );
-  return condition ?? null;
+  ) ?? null;
 }
 
 function ticketContextFromRow(
@@ -235,8 +244,7 @@ export async function getCustomerF10Ticket(
   const authorizedContexts = listAuthorizedF10Contexts(session);
   if (authorizedContexts.length === 0) return null;
 
-  const db = getDatabase();
-  const [context] = await db
+  const [context] = await getDatabase()
     .select({
       legacyUserId: ticketCustomerContexts.legacyUserId,
       groupId: ticketCustomerContexts.groupId,
@@ -273,14 +281,113 @@ export async function getCustomerF10Ticket(
   };
 }
 
+export async function createCustomerF10Ticket(
+  session: CustomerF10PortalSession,
+  input: CreateCustomerF10TicketInput,
+) {
+  const context = listAuthorizedF10Contexts(session).find(
+    (item) => item.groupId === input.groupId && item.unitId === input.unitId,
+  );
+  if (!context) throw new Error("CUSTOMER_TICKET_CONTEXT_NOT_AUTHORIZED");
+
+  const subject = input.subject.trim();
+  const message = input.message.trim();
+  if (subject.length < 3 || subject.length > 180) throw new Error("CUSTOMER_TICKET_SUBJECT_INVALID");
+  if (message.length < 1 || message.length > 10_000) throw new Error("CUSTOMER_TICKET_MESSAGE_INVALID");
+
+  const entryOption = await resolveSupportChatEntryOption(input.entryOptionId);
+  const ticketId = randomUUID();
+  const messageId = randomUUID();
+  const storedAttachments = await uploadSupportMessageAttachments(
+    ticketId,
+    messageId,
+    input.files ?? [],
+  );
+  const db = getDatabase();
+  const now = new Date();
+
+  try {
+    return await db.transaction(async (tx) => {
+      const [ticket] = await tx
+        .insert(tickets)
+        .values({
+          id: ticketId,
+          customerContactId: session.contactId,
+          queueId: entryOption.queueId,
+          subject,
+          status: "new",
+          priority: "normal",
+          channel: "portal",
+          dueOn: sql`CURRENT_DATE + ${entryOption.defaultDueDays}::integer`,
+        })
+        .returning({ id: tickets.id, ticketNumber: tickets.ticketNumber });
+      if (!ticket) throw new Error("CUSTOMER_TICKET_NOT_CREATED");
+
+      await tx.insert(ticketMessages).values({
+        id: messageId,
+        ticketId,
+        authorType: "customer",
+        customerContactId: session.contactId,
+        visibility: "public",
+        channel: "portal",
+        body: message,
+      });
+
+      if (storedAttachments.length > 0) {
+        await tx.insert(ticketMessageAttachments).values(
+          storedAttachments.map((attachment) => ({
+            messageId,
+            ticketId,
+            storageKey: attachment.storageKey,
+            originalName: attachment.originalName,
+            mimeType: attachment.mimeType,
+            sizeBytes: attachment.sizeBytes,
+            checksumSha256: attachment.checksumSha256,
+          })),
+        );
+      }
+
+      await tx.insert(ticketCustomerContexts).values({
+        ticketId,
+        customerContactId: session.contactId,
+        legacyUserId: session.legacyUserId,
+        groupId: context.groupId,
+        groupName: context.groupName,
+        unitId: context.unitId,
+        unitName: context.unitName,
+        unitSchema: context.unitSchema,
+        updatedAt: now,
+      });
+
+      await tx.insert(ticketEvents).values({
+        ticketId,
+        eventType: "portal.ticket.created",
+        metadata: {
+          entryOptionId: entryOption.id,
+          entryOptionLabel: entryOption.label,
+          groupId: context.groupId,
+          unitId: context.unitId,
+          attachmentCount: storedAttachments.length,
+        },
+      });
+
+      return ticket;
+    });
+  } catch (cause) {
+    await deleteStoredSupportImages(storedAttachments);
+    throw cause;
+  }
+}
+
 export async function replyCustomerF10Ticket(
   session: CustomerF10PortalSession,
   ticketId: string,
   body: string,
+  files: File[] = [],
 ): Promise<void> {
   const ticket = await getCustomerF10Ticket(session, ticketId);
   if (!ticket) throw new Error("CUSTOMER_TICKET_NOT_FOUND");
-  await replyCustomerPortalTicket(session.contactId, ticketId, body);
+  await replyCustomerPortalTicket(session.contactId, ticketId, body, files);
 }
 
 export async function bindTicketF10Context(
@@ -298,10 +405,7 @@ export async function bindTicketF10Context(
   await db.transaction(async (tx) => {
     await tx
       .update(tickets)
-      .set({
-        customerContactId: session.contactId,
-        updatedAt: now,
-      })
+      .set({ customerContactId: session.contactId, updatedAt: now })
       .where(eq(tickets.id, ticketId));
 
     await tx
