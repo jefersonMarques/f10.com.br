@@ -17,6 +17,7 @@ import { getHelpPublicAiSettings } from "$lib/server/settings/operationsSettings
 
 const MAX_BODY_BYTES = 12 * 1024;
 const MAX_CONVERSATION_CONTEXT_CHARS = 6_000;
+const ARTICLE_MAX_OUTPUT_TOKENS = 1_200;
 
 function isBodyTooLarge(request: Request): boolean {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
@@ -111,6 +112,7 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
       scope,
       source: "public",
       conversationContext,
+      maxOutputTokens: scope.type === "article" ? ARTICLE_MAX_OUTPUT_TOKENS : undefined,
     });
     const latencyMs = Date.now() - knowledgeStartedAt;
 
