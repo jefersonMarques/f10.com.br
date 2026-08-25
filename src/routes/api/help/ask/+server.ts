@@ -1,6 +1,7 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { isOpenAiConfigured, OpenAiResponseError } from "$lib/server/ai/openAiResponses";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
+import { tryAnswerHelpArticleDeterministically } from "$lib/server/help/helpArticleDeterministicAnswer";
 import {
   answerHelpQuestion,
   type HelpKnowledgeScope,
@@ -90,6 +91,42 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
     !scope
   ) {
     return errorResponse("INVALID_QUESTION", 400);
+  }
+
+  if (scope.type === "article") {
+    const deterministic = await tryAnswerHelpArticleDeterministically({
+      question,
+      slug: scope.slug,
+    });
+    if (deterministic) {
+      await recordHelpKnowledgeRun({
+        source: "public",
+        scope: "article",
+        question,
+        retrievalQuery: deterministic.retrievalQuery,
+        contextSlug: scope.slug,
+        resolution: deterministic.resolution,
+        target: deterministic.target
+          ? {
+              contentId: deterministic.target.contentId,
+              slug: deterministic.target.slug,
+              targetType: deterministic.target.targetType,
+            }
+          : null,
+        sources: deterministic.sources,
+        latencyMs: 0,
+      }).catch(() => undefined);
+
+      return json(
+        {
+          resolution: deterministic.resolution,
+          resolved: deterministic.resolved,
+          answer: deterministic.answer,
+          target: deterministic.target,
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
   }
 
   let clientAddress = "unknown";
