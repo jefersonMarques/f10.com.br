@@ -79,6 +79,13 @@ export const actions: Actions = {
           body,
         });
       }
+      if (cause instanceof Error && cause.message.startsWith("ASSET_STORAGE_")) {
+        return fail(503, {
+          success: false,
+          message: "O envio de anexos está temporariamente indisponível. Remova os arquivos e tente novamente.",
+          body,
+        });
+      }
       return fail(404, {
         success: false,
         message: "Não foi possível responder este chamado.",
