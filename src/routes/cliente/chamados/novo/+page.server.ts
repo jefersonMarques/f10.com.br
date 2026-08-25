@@ -105,7 +105,9 @@ export const actions: Actions = {
         ? "A escola selecionada não está disponível para sua conta."
         : errorCode.startsWith("SUPPORT_ATTACHMENT_")
           ? "Revise os anexos. São aceitos PNG, JPG, WEBP e PDF, com até 10 MB por arquivo."
-          : "Não foi possível abrir o chamado. Tente novamente.";
+          : errorCode.startsWith("ASSET_STORAGE_")
+            ? "O envio de anexos está temporariamente indisponível. Remova os arquivos e tente novamente."
+            : "Não foi possível abrir o chamado. Tente novamente.";
       return fail(errorCode === "CUSTOMER_TICKET_CONTEXT_NOT_AUTHORIZED" ? 403 : 409, {
         success: false,
         message: messageText,
