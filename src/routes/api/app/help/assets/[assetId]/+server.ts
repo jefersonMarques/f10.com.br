@@ -13,6 +13,16 @@ function supportsInlinePreview(assetType: string, mimeType: string | null): bool
   return ["application/pdf", "text/plain", "text/csv", "text/vtt"].includes(mimeType ?? "");
 }
 
+function externalAssetUrl(value: string | null): URL | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 export const GET: RequestHandler = async ({ params, cookies, url, request }) => {
   const assetId = params.assetId ?? "";
   if (!isUuid(assetId)) return json({ error: "NOT_FOUND" }, { status: 404 });
@@ -26,6 +36,20 @@ export const GET: RequestHandler = async ({ params, cookies, url, request }) => 
   try {
     const asset = await getHelpAsset(assetId);
     if (!asset) return json({ error: "NOT_FOUND" }, { status: 404 });
+    if (!asset.storageKey) {
+      const sourceUrl = externalAssetUrl(asset.sourceUrl);
+      return sourceUrl
+        ? new Response(null, {
+            status: 302,
+            headers: {
+              Location: sourceUrl.toString(),
+              "Cache-Control": "private, max-age=300",
+              "X-Content-Type-Options": "nosniff",
+            },
+          })
+        : json({ error: "NOT_FOUND" }, { status: 404 });
+    }
+
     const previewRequested = url.searchParams.get("preview") === "1";
     const disposition = previewRequested && supportsInlinePreview(asset.assetType, asset.mimeType)
       ? "inline"
