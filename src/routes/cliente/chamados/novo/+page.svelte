@@ -27,8 +27,10 @@
     unitValue = String(availableUnits[0].unidade_id);
   }
 
-  function handleGroupChange(): void {
-    unitValue = availableUnits.length === 1 ? String(availableUnits[0].unidade_id) : "";
+  function handleGroupChange(event: Event): void {
+    const nextGroupId = Number((event.currentTarget as HTMLSelectElement).value);
+    const nextUnits = data.groups.find((group) => group.grupo_id === nextGroupId)?.unidades ?? [];
+    unitValue = nextUnits.length === 1 ? String(nextUnits[0].unidade_id) : "";
   }
 </script>
 
