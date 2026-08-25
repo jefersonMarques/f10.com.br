@@ -1,4 +1,5 @@
 import { error, type RequestHandler } from "@sveltejs/kit";
+import { isAuthorizedF10Context } from "$lib/server/customerPortal/customerF10AuthRepository";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { authorizePublicChatSession } from "$lib/server/support/publicChatRepository";
 import { getTicketCustomerContext } from "$lib/server/support/ticketCustomerContextRepository";
@@ -39,15 +40,13 @@ export const GET: RequestHandler = async ({ params, request, url, cookies }) => 
   try {
     const session = await authorizePublicChatSession(sessionId, token);
     const customer = await getOptionalCustomerF10PortalSession(cookies);
-    if (!customer || customer.selectedUnitId === null) {
-      throw error(401, "Anexo não autorizado.");
-    }
+    if (!customer) throw error(401, "Anexo não autorizado.");
 
     const context = await getTicketCustomerContext(session.ticketId);
     if (
       !context ||
       context.legacyUserId !== customer.legacyUserId ||
-      context.unitId !== customer.selectedUnitId
+      !isAuthorizedF10Context(customer, context.groupId, context.unitId)
     ) {
       throw error(401, "Anexo não autorizado.");
     }
