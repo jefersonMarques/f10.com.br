@@ -1,4 +1,5 @@
 import { json, type Cookies, type RequestHandler } from "@sveltejs/kit";
+import { isAuthorizedF10Context } from "$lib/server/customerPortal/customerF10AuthRepository";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { getTicketCustomerContext } from "$lib/server/support/ticketCustomerContextRepository";
 import { handoffSupportChatForAttachment } from "$lib/server/support/supportAiAttachmentHandoff";
@@ -22,7 +23,6 @@ function isUuid(value: string): boolean {
 function getBearerToken(request: Request): string {
   const authorization = request.headers.get("authorization") ?? "";
   if (!authorization.startsWith("Bearer ")) return "";
-
   const token = authorization.slice(7).trim();
   return /^[A-Za-z0-9_-]{40,120}$/.test(token) ? token : "";
 }
@@ -58,12 +58,11 @@ async function authorizeF10CustomerForTicket(
   ticketId: string,
 ): Promise<boolean> {
   const customer = await getOptionalCustomerF10PortalSession(cookies);
-  if (!customer || customer.selectedUnitId === null) return false;
+  if (!customer) return false;
 
   const context = await getTicketCustomerContext(ticketId);
-  if (!context) return false;
-  return context.legacyUserId === customer.legacyUserId &&
-    context.unitId === customer.selectedUnitId;
+  if (!context || context.legacyUserId !== customer.legacyUserId) return false;
+  return isAuthorizedF10Context(customer, context.groupId, context.unitId);
 }
 
 export const GET: RequestHandler = async ({ params, request, cookies }) => {
