@@ -156,6 +156,10 @@ function getPublishErrorMessage(cause: unknown): string {
       return "Todos os passos precisam de um título.";
     case "STEP_BLOCK_REQUIRED":
       return "Todos os passos precisam ter pelo menos um conteúdo público: texto, imagem, aviso, link ou arquivo.";
+    case "STEP_IMAGE_LIMIT_EXCEEDED":
+      return "Cada passo pode ter no máximo um screenshot. Remova a imagem excedente antes de publicar.";
+    case "HUMAN_REVIEW_REQUIRED":
+      return "Conclua a Revisão humana de todas as imagens e use “Salvar tudo” antes de publicar.";
     case "IMAGE_DESCRIPTION_REQUIRED":
       return "Um passo formado apenas por imagens possui imagem sem texto alternativo ou descrição para o assistente.";
     default:
