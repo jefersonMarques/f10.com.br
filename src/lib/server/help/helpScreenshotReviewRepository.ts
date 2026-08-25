@@ -407,16 +407,26 @@ export async function confirmHelpScreenshotReviewSelection(input: {
   }
   if (row.contentStatus === "archived") throw new Error("CONTENT_ARCHIVED");
 
-  const assets = await db
-    .select({
-      id: helpAssets.id,
-      storageKey: helpAssets.storageKey,
-      metadata: helpAssets.metadata,
-    })
-    .from(helpAssets)
-    .where(and(eq(helpAssets.contentId, input.contentId), eq(helpAssets.assetType, "image")));
-  const current = assets.find((asset) => asset.id === row.currentAssetId);
-  const candidates = assets.filter((asset) => {
+  const [[current], reviewAssets] = await Promise.all([
+    db
+      .select({
+        id: helpAssets.id,
+        storageKey: helpAssets.storageKey,
+        metadata: helpAssets.metadata,
+      })
+      .from(helpAssets)
+      .where(eq(helpAssets.id, row.currentAssetId))
+      .limit(1),
+    db
+      .select({
+        id: helpAssets.id,
+        storageKey: helpAssets.storageKey,
+        metadata: helpAssets.metadata,
+      })
+      .from(helpAssets)
+      .where(and(eq(helpAssets.contentId, input.contentId), eq(helpAssets.assetType, "image"))),
+  ]);
+  const candidates = reviewAssets.filter((asset) => {
     const review = reviewMetadata(asset.metadata);
     return review?.role === "candidate" && review.stepId === row.stepId;
   });
