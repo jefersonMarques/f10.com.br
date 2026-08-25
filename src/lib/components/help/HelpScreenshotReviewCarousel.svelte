@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { createEventDispatcher } from "svelte";
   import { invalidateAll } from "$app/navigation";
-  import { Check, ChevronLeft, ChevronRight, Sparkles } from "lucide-svelte";
+  import { Check, CheckCircle2, ChevronLeft, ChevronRight, ImagePlus, LoaderCircle, Sparkles } from "lucide-svelte";
   import HelpInlineImageAnnotationEditor from "$lib/components/help/HelpInlineImageAnnotationEditor.svelte";
   import type { HelpImageAnnotation } from "$lib/help/helpImageAnnotations";
+  import type { HelpHumanReviewInteraction } from "$lib/help/helpHumanReview";
 
   export let contentId: string;
   export let blockId: string;
@@ -12,12 +14,24 @@
     timeSeconds: number | null;
     recommended: boolean;
   }> = [];
+  export let initialAnnotations: HelpImageAnnotation[] = [];
+  export let reviewed = false;
   export let disabled = false;
 
-  let selectedAssetId = candidates.find((candidate) => candidate.recommended)?.assetId
+  const dispatch = createEventDispatcher<{ interaction: void; replaced: void }>();
+  const initialAssetId = candidates.find((candidate) => candidate.recommended)?.assetId
     ?? candidates[0]?.assetId
     ?? "";
+  let selectedAssetId = initialAssetId;
+  let annotations: HelpImageAnnotation[] = initialAnnotations;
+  let annotationDrafts = new Map<string, HelpImageAnnotation[]>([[initialAssetId, initialAnnotations]]);
   let stripElement: HTMLDivElement | null = null;
+  let imageInteracted = false;
+  let annotationInteracted = false;
+  let lastAnnotationSignature = JSON.stringify(initialAnnotations);
+  let replacementFile: File | null = null;
+  let replacing = false;
+  let replacementMessage = "";
 
   $: selected = candidates.find((candidate) => candidate.assetId === selectedAssetId)
     ?? candidates[0]
@@ -25,6 +39,18 @@
   $: selectedIndex = selected
     ? candidates.findIndex((candidate) => candidate.assetId === selected.assetId)
     : -1;
+  $: annotationSignature = JSON.stringify(annotations);
+  $: if (annotationSignature !== lastAnnotationSignature) {
+    annotationInteracted = true;
+    lastAnnotationSignature = annotationSignature;
+    if (selectedAssetId) annotationDrafts.set(selectedAssetId, annotations);
+    dispatch("interaction");
+  }
+  $: interactions = [
+    ...(imageInteracted ? ["image_selected" as const] : []),
+    ...(annotationInteracted ? ["annotated" as const] : []),
+  ] satisfies HelpHumanReviewInteraction[];
+  $: interacted = imageInteracted || annotationInteracted;
 
   function assetUrl(assetId: string): string {
     return `/api/app/help/assets/${assetId}`;
@@ -38,7 +64,17 @@
   }
 
   function selectCandidate(assetId: string): void {
+    if (assetId === selectedAssetId) {
+      imageInteracted = true;
+      dispatch("interaction");
+      return;
+    }
+    if (selectedAssetId) annotationDrafts.set(selectedAssetId, annotations);
     selectedAssetId = assetId;
+    annotations = annotationDrafts.get(assetId) ?? [];
+    lastAnnotationSignature = JSON.stringify(annotations);
+    imageInteracted = true;
+    dispatch("interaction");
     const index = candidates.findIndex((candidate) => candidate.assetId === assetId);
     if (index >= 0) {
       stripElement?.children.item(index)?.scrollIntoView({
@@ -56,77 +92,79 @@
     if (next) selectCandidate(next.assetId);
   }
 
-  async function saveReview(
-    annotations: HelpImageAnnotation[],
-  ): Promise<{ success: boolean; message?: string }> {
-    if (!selectedAssetId) return { success: false, message: "Selecione um screenshot." };
+  function chooseReplacement(event: Event): void {
+    const input = event.currentTarget as HTMLInputElement;
+    replacementFile = input.files?.[0] ?? null;
+    replacementMessage = "";
+  }
+
+  async function replaceImage(): Promise<void> {
+    if (!replacementFile || replacing || disabled) return;
+    if (interacted) {
+      replacementMessage = "Salve a revisão atual antes de substituir a imagem por um arquivo.";
+      return;
+    }
+    replacing = true;
+    replacementMessage = "";
     try {
+      const formData = new FormData();
+      formData.set("file", replacementFile);
       const response = await fetch(
-        `/api/app/help/content/${contentId}/images/${blockId}/review`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ assetId: selectedAssetId, annotations }),
-        },
+        `/api/app/help/content/${contentId}/images/${blockId}/review/replace`,
+        { method: "POST", body: formData },
       );
-      const payload = await response.json().catch(() => ({})) as {
-        success?: boolean;
-        message?: string;
-      };
-      const success = response.ok && Boolean(payload.success);
-      if (!success) {
-        return {
-          success: false,
-          message: payload.message || "Não foi possível salvar o screenshot e as marcações.",
-        };
+      const payload = await response.json().catch(() => ({})) as { success?: boolean; message?: string };
+      if (!response.ok || !payload.success) {
+        replacementMessage = payload.message || "Não foi possível substituir a imagem.";
+        return;
       }
+      replacementMessage = payload.message || "Imagem substituída.";
+      dispatch("replaced");
       await invalidateAll();
-      return { success: true, message: payload.message || "Screenshot e marcações salvos." };
     } catch {
-      return {
-        success: false,
-        message: "A conexão foi interrompida ao salvar o screenshot e as marcações.",
-      };
+      replacementMessage = "A conexão foi interrompida ao substituir a imagem.";
+    } finally {
+      replacing = false;
     }
   }
 </script>
 
 {#if selected}
-  <section class="overflow-hidden rounded-[20px] border border-[#D8DDF4] bg-[#F8F9FF]">
+  <section
+    class={`overflow-hidden rounded-[20px] border ${reviewed && !interacted ? "border-[#CFE4D6] bg-[#F7FCF8]" : "border-[#D8DDF4] bg-[#F8F9FF]"}`}
+    data-human-review-item
+    data-block-id={blockId}
+    data-asset-id={selectedAssetId}
+    data-reviewed={reviewed ? "true" : "false"}
+    data-touched={interacted ? "true" : "false"}
+  >
+    <input type="hidden" data-review-annotations value={JSON.stringify(annotations)} />
+    <input type="hidden" data-review-interactions value={JSON.stringify(interactions)} />
+
     <header class="flex flex-wrap items-start justify-between gap-3 border-b border-[#E1E4F2] px-4 py-3 sm:px-5">
       <div>
         <div class="flex items-center gap-2">
-          <Sparkles size={15} class="text-[#EA6D0B]" />
-          <strong class="text-[12px] font-semibold text-[#222A3D]">Revisar screenshot e fazer marcações</strong>
+          {#if reviewed && !interacted}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<Sparkles size={15} class="text-[#EA6D0B]"/>{/if}
+          <strong class="text-[12px] font-semibold text-[#222A3D]">Revisão humana da imagem</strong>
         </div>
-        <p class="mt-1 max-w-[700px] text-[9px] leading-4 text-[#7B8292]">
-          A sugestão automática já vem selecionada. Troque pelo carrossel se outro frame representar melhor a etapa e faça as marcações diretamente na imagem escolhida. Um único salvamento confirma tudo.
+        <p class="mt-1 max-w-[720px] text-[9px] leading-4 text-[#7B8292]">
+          Confira se o screenshot representa exatamente esta etapa. Quando houver opções, a sugestão do F10 vem selecionada. As marcações e a escolha da imagem serão salvas pelo botão “Salvar tudo”.
         </p>
       </div>
-      {#if selected.recommended}
-        <span class="rounded-full bg-[#FFF0E4] px-2.5 py-1 text-[8px] font-bold text-[#A9510D]">SUGESTÃO F10</span>
-      {/if}
+      <div class="flex flex-wrap gap-2">
+        {#if reviewed && !interacted}<span class="rounded-full bg-[#EAF7EE] px-2.5 py-1 text-[8px] font-bold text-[#2F7045]">REVISADO</span>{/if}
+        {#if selected.recommended && candidates.length > 1}<span class="rounded-full bg-[#FFF0E4] px-2.5 py-1 text-[8px] font-bold text-[#A9510D]">SUGESTÃO F10</span>{/if}
+        {#if interacted}<span class="rounded-full bg-[#EEF0FF] px-2.5 py-1 text-[8px] font-bold text-[#000A57]">ALTERAÇÃO PENDENTE</span>{/if}
+      </div>
     </header>
 
     <div class="p-4 sm:p-5">
       <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <span class="text-[9px] font-semibold text-[#626A7A]">Frame {selectedIndex + 1} de {candidates.length}{selected.timeSeconds !== null ? ` · ${formatSeconds(selected.timeSeconds)}` : ""}</span>
+        <span class="text-[9px] font-semibold text-[#626A7A]">Imagem {selectedIndex + 1} de {candidates.length}{selected.timeSeconds !== null ? ` · ${formatSeconds(selected.timeSeconds)}` : ""}</span>
         {#if candidates.length > 1}
           <div class="flex gap-1.5">
-            <button
-              type="button"
-              aria-label="Frame anterior"
-              disabled={selectedIndex <= 0}
-              on:click={() => move(-1)}
-              class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#000A57] disabled:opacity-30"
-            ><ChevronLeft size={16}/></button>
-            <button
-              type="button"
-              aria-label="Próximo frame"
-              disabled={selectedIndex >= candidates.length - 1}
-              on:click={() => move(1)}
-              class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#000A57] disabled:opacity-30"
-            ><ChevronRight size={16}/></button>
+            <button type="button" aria-label="Imagem anterior" disabled={selectedIndex <= 0 || disabled} on:click={() => move(-1)} class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#000A57] disabled:opacity-30"><ChevronLeft size={16}/></button>
+            <button type="button" aria-label="Próxima imagem" disabled={selectedIndex >= candidates.length - 1 || disabled} on:click={() => move(1)} class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#000A57] disabled:opacity-30"><ChevronRight size={16}/></button>
           </div>
         {/if}
       </div>
@@ -137,33 +175,35 @@
           {blockId}
           imageUrl={assetUrl(selected.assetId)}
           altText="Screenshot em revisão"
-          initialAnnotations={[]}
+          initialAnnotations={annotationDrafts.get(selected.assetId) ?? []}
+          bind:annotations
           {disabled}
-          saveLabel="Salvar screenshot e marcações"
-          saveHandler={saveReview}
+          showSaveButton={false}
         />
       {/key}
 
-      <div bind:this={stripElement} class="mt-3 flex gap-2 overflow-x-auto pb-1">
-        {#each candidates as candidate, index}
-          <button
-            type="button"
-            on:click={() => selectCandidate(candidate.assetId)}
-            class={`relative w-[132px] shrink-0 overflow-hidden rounded-xl border-2 bg-white text-left transition ${selectedAssetId === candidate.assetId ? "border-[#000A57]" : "border-transparent hover:border-[#C9CEDA]"}`}
-          >
-            <img src={assetUrl(candidate.assetId)} alt={`Frame ${index + 1}`} class="aspect-video w-full object-cover" />
-            <span class="flex items-center justify-between gap-1 px-2 py-1.5 text-[8px] text-[#747B8B]">
-              <span>Frame {index + 1}{candidate.timeSeconds !== null ? ` · ${formatSeconds(candidate.timeSeconds)}` : ""}</span>
-              {#if candidate.recommended}<Sparkles size={10} class="shrink-0 text-[#EA6D0B]"/>{/if}
-            </span>
-            {#if selectedAssetId === candidate.assetId}
-              <span class="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#000A57] text-white"><Check size={12}/></span>
-            {/if}
-          </button>
-        {/each}
-      </div>
+      {#if candidates.length > 1}
+        <div bind:this={stripElement} class="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {#each candidates as candidate, index}
+            <button type="button" disabled={disabled} on:click={() => selectCandidate(candidate.assetId)} class={`relative w-[132px] shrink-0 overflow-hidden rounded-xl border-2 bg-white text-left transition ${selectedAssetId === candidate.assetId ? "border-[#000A57]" : "border-transparent hover:border-[#C9CEDA]"}`}>
+              <img src={assetUrl(candidate.assetId)} alt={`Imagem ${index + 1}`} class="aspect-video w-full object-cover" />
+              <span class="flex items-center justify-between gap-1 px-2 py-1.5 text-[8px] text-[#747B8B]"><span>Imagem {index + 1}{candidate.timeSeconds !== null ? ` · ${formatSeconds(candidate.timeSeconds)}` : ""}</span>{#if candidate.recommended}<Sparkles size={10} class="shrink-0 text-[#EA6D0B]"/>{/if}</span>
+              {#if selectedAssetId === candidate.assetId}<span class="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#000A57] text-white"><Check size={12}/></span>{/if}
+            </button>
+          {/each}
+        </div>
+        <p class="mt-3 text-[9px] leading-4 text-[#8A909E]">Após “Salvar tudo”, somente a imagem escolhida permanece; as alternativas temporárias são removidas do armazenamento.</p>
+      {/if}
 
-      <p class="mt-3 text-[9px] leading-4 text-[#8A909E]">Ao salvar, somente o frame escolhido permanece. As outras opções são removidas do banco e do armazenamento.</p>
+      {#if !disabled}
+        <div class="mt-4 rounded-2xl border border-[#E2E5ED] bg-white p-3">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <label class="min-w-0 flex-1"><span class="text-[9px] font-semibold text-[#596071]">Trocar por outro arquivo</span><span class="mt-0.5 block text-[8px] text-[#959AA8]">Disponível também depois da publicação. A versão pública anterior continua ativa até republicar.</span><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" on:change={chooseReplacement} class="mt-2 block max-w-full text-[9px]" /></label>
+            <button type="button" disabled={!replacementFile || replacing || interacted} on:click={replaceImage} class="inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-3 text-[9px] font-semibold text-[#000A57] disabled:cursor-not-allowed disabled:opacity-40">{#if replacing}<LoaderCircle size={13} class="animate-spin"/>{:else}<ImagePlus size={13}/>{/if}{replacing ? "Trocando..." : "Trocar imagem"}</button>
+          </div>
+          {#if replacementMessage}<p class="mt-2 text-[8px] font-medium text-[#7A3B08]">{replacementMessage}</p>{/if}
+        </div>
+      {/if}
     </div>
   </section>
 {/if}
