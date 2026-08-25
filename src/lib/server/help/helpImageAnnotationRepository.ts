@@ -3,6 +3,7 @@ import {
   HELP_IMAGE_ANNOTATIONS_METADATA_KEY,
   type HelpImageAnnotation,
 } from "$lib/help/helpImageAnnotations";
+import { withoutHelpHumanReview } from "$lib/help/helpHumanReview";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -46,10 +47,10 @@ export async function updateHelpImageBlockAnnotations(
   if (row.contentStatus === "archived") throw new Error("CONTENT_ARCHIVED");
 
   const updatedAt = new Date();
-  const metadata = {
+  const metadata = withoutHelpHumanReview({
     ...(row.metadata ?? {}),
     [HELP_IMAGE_ANNOTATIONS_METADATA_KEY]: annotations,
-  };
+  });
 
   await db.transaction(async (tx) => {
     await tx
@@ -75,6 +76,7 @@ export async function updateHelpImageBlockAnnotations(
       contentId,
       annotationCount: annotations.length,
       annotationTypes: Array.from(new Set(annotations.map((annotation) => annotation.type))),
+      humanReviewInvalidated: true,
     },
   });
 }
