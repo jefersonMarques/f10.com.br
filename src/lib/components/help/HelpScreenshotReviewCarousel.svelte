@@ -153,7 +153,7 @@
         return;
       }
       replacementMessage = payload.message || "Imagem substituída.";
-      dispatch("replaced");
+      dispatch("interaction");
       await invalidateAll();
     } catch {
       replacementMessage = "A conexão foi interrompida ao substituir a imagem.";
