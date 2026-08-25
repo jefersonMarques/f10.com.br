@@ -6,6 +6,8 @@ import { deleteAssetObject, getAssetObject, putAssetObject } from "$lib/server/s
 
 export const SUPPORT_IMAGE_MAX_FILES = 4;
 export const SUPPORT_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+export const SUPPORT_ATTACHMENT_MAX_FILES = 4;
+export const SUPPORT_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
 const ALLOWED_IMAGE_TYPES = new Map([
   ["image/png", "png"],
@@ -13,7 +15,12 @@ const ALLOWED_IMAGE_TYPES = new Map([
   ["image/webp", "webp"],
 ]);
 
-export type StoredSupportImage = {
+const ALLOWED_PORTAL_TYPES = new Map([
+  ...ALLOWED_IMAGE_TYPES,
+  ["application/pdf", "pdf"],
+]);
+
+export type StoredSupportAttachment = {
   storageKey: string;
   originalName: string;
   mimeType: string;
@@ -21,13 +28,15 @@ export type StoredSupportImage = {
   checksumSha256: string;
 };
 
+export type StoredSupportImage = StoredSupportAttachment;
+
 function safeFileName(value: string): string {
   const cleaned = value
     .replace(/[\\/\u0000-\u001f\u007f]/g, "-")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 180);
-  return cleaned || "imagem";
+  return cleaned || "arquivo";
 }
 
 function detectedImageType(bytes: Uint8Array): "image/png" | "image/jpeg" | "image/webp" | null {
@@ -57,30 +66,53 @@ function detectedImageType(bytes: Uint8Array): "image/png" | "image/jpeg" | "ima
   return null;
 }
 
-export async function uploadSupportMessageImages(
+function detectedPortalType(bytes: Uint8Array): string | null {
+  const imageType = detectedImageType(bytes);
+  if (imageType) return imageType;
+  if (
+    bytes.length >= 5 &&
+    bytes[0] === 0x25 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x44 &&
+    bytes[3] === 0x46 &&
+    bytes[4] === 0x2d
+  ) {
+    return "application/pdf";
+  }
+  return null;
+}
+
+async function storeAttachments(
   ticketId: string,
   messageId: string,
   files: File[],
-): Promise<StoredSupportImage[]> {
+  options: {
+    maxFiles: number;
+    maxBytes: number;
+    allowedTypes: Map<string, string>;
+    detectType: (bytes: Uint8Array) => string | null;
+    errorPrefix: "SUPPORT_IMAGE" | "SUPPORT_ATTACHMENT";
+  },
+): Promise<StoredSupportAttachment[]> {
   if (files.length === 0) return [];
-  if (files.length > SUPPORT_IMAGE_MAX_FILES) throw new Error("SUPPORT_IMAGE_TOO_MANY");
+  if (files.length > options.maxFiles) throw new Error(`${options.errorPrefix}_TOO_MANY`);
 
-  const stored: StoredSupportImage[] = [];
+  const stored: StoredSupportAttachment[] = [];
   try {
     for (const file of files) {
-      if (file.size < 1 || file.size > SUPPORT_IMAGE_MAX_BYTES) {
-        throw new Error("SUPPORT_IMAGE_SIZE_INVALID");
+      if (file.size < 1 || file.size > options.maxBytes) {
+        throw new Error(`${options.errorPrefix}_SIZE_INVALID`);
       }
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const detectedType = detectedImageType(bytes);
-      if (!detectedType || !ALLOWED_IMAGE_TYPES.has(detectedType)) {
-        throw new Error("SUPPORT_IMAGE_TYPE_INVALID");
+      const detectedType = options.detectType(bytes);
+      if (!detectedType || !options.allowedTypes.has(detectedType)) {
+        throw new Error(`${options.errorPrefix}_TYPE_INVALID`);
       }
       if (file.type && file.type !== detectedType) {
-        throw new Error("SUPPORT_IMAGE_TYPE_INVALID");
+        throw new Error(`${options.errorPrefix}_TYPE_INVALID`);
       }
 
-      const extension = ALLOWED_IMAGE_TYPES.get(detectedType)!;
+      const extension = options.allowedTypes.get(detectedType)!;
       const storageKey = `support/tickets/${ticketId}/${messageId}/${randomUUID()}.${extension}`;
       const asset = await putAssetObject(storageKey, bytes, detectedType);
       stored.push({
@@ -98,7 +130,35 @@ export async function uploadSupportMessageImages(
   }
 }
 
-export async function deleteStoredSupportImages(images: StoredSupportImage[]): Promise<void> {
+export async function uploadSupportMessageImages(
+  ticketId: string,
+  messageId: string,
+  files: File[],
+): Promise<StoredSupportImage[]> {
+  return storeAttachments(ticketId, messageId, files, {
+    maxFiles: SUPPORT_IMAGE_MAX_FILES,
+    maxBytes: SUPPORT_IMAGE_MAX_BYTES,
+    allowedTypes: ALLOWED_IMAGE_TYPES,
+    detectType: detectedImageType,
+    errorPrefix: "SUPPORT_IMAGE",
+  });
+}
+
+export async function uploadSupportMessageAttachments(
+  ticketId: string,
+  messageId: string,
+  files: File[],
+): Promise<StoredSupportAttachment[]> {
+  return storeAttachments(ticketId, messageId, files, {
+    maxFiles: SUPPORT_ATTACHMENT_MAX_FILES,
+    maxBytes: SUPPORT_ATTACHMENT_MAX_BYTES,
+    allowedTypes: ALLOWED_PORTAL_TYPES,
+    detectType: detectedPortalType,
+    errorPrefix: "SUPPORT_ATTACHMENT",
+  });
+}
+
+export async function deleteStoredSupportImages(images: StoredSupportAttachment[]): Promise<void> {
   await Promise.all(images.map((image) => deleteAssetObject(image.storageKey).catch(() => undefined)));
 }
 
@@ -112,6 +172,7 @@ export async function listSupportMessageAttachments(messageIds: string[]) {
       originalName: ticketMessageAttachments.originalName,
       mimeType: ticketMessageAttachments.mimeType,
       sizeBytes: ticketMessageAttachments.sizeBytes,
+      createdAt: ticketMessageAttachments.createdAt,
     })
     .from(ticketMessageAttachments)
     .where(inArray(ticketMessageAttachments.messageId, messageIds))
