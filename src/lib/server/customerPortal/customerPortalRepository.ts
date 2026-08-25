@@ -1,10 +1,11 @@
-import { createHash, randomBytes } from "node:crypto";
-import { and, asc, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { and, asc, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import {
   customerPortalLoginTokens,
   customerPortalSessions,
 } from "$lib/server/db/customerPortalSchema";
+import { ticketMessageAttachments } from "$lib/server/db/supportChatEntrySchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import {
   customerContacts,
@@ -12,9 +13,25 @@ import {
   ticketMessages,
   tickets,
 } from "$lib/server/db/supportSchema";
+import {
+  deleteStoredSupportImages,
+  listSupportMessageAttachments,
+  uploadSupportMessageAttachments,
+} from "$lib/server/support/supportMessageAttachmentRepository";
 
 const LOGIN_TOKEN_TTL_MS = 15 * 60 * 1000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+const PUBLIC_TICKET_EVENTS = [
+  "ticket.created",
+  "portal.ticket.created",
+  "ticket.status.changed",
+  "portal.customer.message",
+  "ticket.replied",
+  "chat.started",
+  "chat.closed",
+  "chat.ai.escalated",
+] as const;
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -165,8 +182,7 @@ export async function revokeCustomerPortalSession(token: string): Promise<void> 
 }
 
 export async function listCustomerPortalTickets(contactId: string) {
-  const db = getDatabase();
-  return db
+  return getDatabase()
     .select({
       id: tickets.id,
       ticketNumber: tickets.ticketNumber,
@@ -205,39 +221,70 @@ export async function getCustomerPortalTicket(contactId: string, ticketId: strin
       updatedAt: tickets.updatedAt,
     })
     .from(tickets)
-    .where(
-      and(
-        eq(tickets.id, ticketId),
-        eq(tickets.customerContactId, contactId),
-      ),
-    )
+    .where(and(eq(tickets.id, ticketId), eq(tickets.customerContactId, contactId)))
     .limit(1);
 
   if (!ticket) return null;
 
-  const messages = await db
-    .select({
-      id: ticketMessages.id,
-      authorType: ticketMessages.authorType,
-      body: ticketMessages.body,
-      createdAt: ticketMessages.createdAt,
-    })
-    .from(ticketMessages)
-    .where(
-      and(
-        eq(ticketMessages.ticketId, ticket.id),
-        eq(ticketMessages.visibility, "public"),
-      ),
-    )
-    .orderBy(asc(ticketMessages.createdAt));
+  const [messages, events] = await Promise.all([
+    db
+      .select({
+        id: ticketMessages.id,
+        authorType: ticketMessages.authorType,
+        body: ticketMessages.body,
+        createdAt: ticketMessages.createdAt,
+      })
+      .from(ticketMessages)
+      .where(
+        and(
+          eq(ticketMessages.ticketId, ticket.id),
+          eq(ticketMessages.visibility, "public"),
+        ),
+      )
+      .orderBy(asc(ticketMessages.createdAt)),
+    db
+      .select({
+        id: ticketEvents.id,
+        eventType: ticketEvents.eventType,
+        metadata: ticketEvents.metadata,
+        createdAt: ticketEvents.createdAt,
+      })
+      .from(ticketEvents)
+      .where(
+        and(
+          eq(ticketEvents.ticketId, ticket.id),
+          inArray(ticketEvents.eventType, [...PUBLIC_TICKET_EVENTS]),
+        ),
+      )
+      .orderBy(asc(ticketEvents.createdAt)),
+  ]);
 
-  return { ticket, messages };
+  const attachmentRows = await listSupportMessageAttachments(messages.map((message) => message.id));
+  const attachmentsByMessage = new Map<string, typeof attachmentRows>();
+  for (const attachment of attachmentRows) {
+    const current = attachmentsByMessage.get(attachment.messageId) ?? [];
+    current.push(attachment);
+    attachmentsByMessage.set(attachment.messageId, current);
+  }
+
+  return {
+    ticket,
+    messages: messages.map((message) => ({
+      ...message,
+      attachments: (attachmentsByMessage.get(message.id) ?? []).map((attachment) => ({
+        ...attachment,
+        href: `/cliente/chamados/${ticket.id}/anexos/${attachment.id}`,
+      })),
+    })),
+    events,
+  };
 }
 
 export async function replyCustomerPortalTicket(
   contactId: string,
   ticketId: string,
   body: string,
+  files: File[] = [],
 ): Promise<void> {
   const db = getDatabase();
   const [ticket] = await db
@@ -248,60 +295,73 @@ export async function replyCustomerPortalTicket(
       subject: tickets.subject,
     })
     .from(tickets)
-    .where(
-      and(
-        eq(tickets.id, ticketId),
-        eq(tickets.customerContactId, contactId),
-      ),
-    )
+    .where(and(eq(tickets.id, ticketId), eq(tickets.customerContactId, contactId)))
     .limit(1);
 
   if (!ticket) throw new Error("CUSTOMER_TICKET_NOT_FOUND");
   if (ticket.status === "closed") throw new Error("CUSTOMER_TICKET_CLOSED");
 
+  const messageId = randomUUID();
+  const storedAttachments = await uploadSupportMessageAttachments(ticketId, messageId, files);
   const now = new Date();
-  await db.transaction(async (tx) => {
-    await tx.insert(ticketMessages).values({
-      ticketId,
-      authorType: "customer",
-      customerContactId: contactId,
-      visibility: "public",
-      channel: "portal",
-      body: body.trim(),
-    });
 
-    await tx
-      .update(tickets)
-      .set({
-        status:
-          ticket.status === "resolved" || ticket.status === "waiting_customer"
-            ? "open"
-            : ticket.status,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(tickets.id, ticketId),
-          eq(tickets.customerContactId, contactId),
-        ),
-      );
-
-    await tx.insert(ticketEvents).values({
-      ticketId,
-      eventType: "portal.customer.message",
-      metadata: {},
-    });
-
-    if (ticket.assignedUserId) {
-      await tx.insert(internalNotifications).values({
-        userId: ticket.assignedUserId,
-        kind: "ticket.customer_reply",
-        title: `Cliente respondeu o ticket #${ticket.ticketNumber}`,
-        body: body.trim().slice(0, 500),
-        href: `/app/tickets/${ticketId}`,
-        entityType: "ticket",
-        entityId: ticketId,
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(ticketMessages).values({
+        id: messageId,
+        ticketId,
+        authorType: "customer",
+        customerContactId: contactId,
+        visibility: "public",
+        channel: "portal",
+        body: body.trim(),
       });
-    }
-  });
+
+      if (storedAttachments.length > 0) {
+        await tx.insert(ticketMessageAttachments).values(
+          storedAttachments.map((attachment) => ({
+            messageId,
+            ticketId,
+            storageKey: attachment.storageKey,
+            originalName: attachment.originalName,
+            mimeType: attachment.mimeType,
+            sizeBytes: attachment.sizeBytes,
+            checksumSha256: attachment.checksumSha256,
+          })),
+        );
+      }
+
+      await tx
+        .update(tickets)
+        .set({
+          status:
+            ticket.status === "resolved" || ticket.status === "waiting_customer"
+              ? "open"
+              : ticket.status,
+          updatedAt: now,
+        })
+        .where(and(eq(tickets.id, ticketId), eq(tickets.customerContactId, contactId)));
+
+      await tx.insert(ticketEvents).values({
+        ticketId,
+        eventType: "portal.customer.message",
+        metadata: { attachmentCount: storedAttachments.length },
+      });
+
+      if (ticket.assignedUserId) {
+        await tx.insert(internalNotifications).values({
+          userId: ticket.assignedUserId,
+          kind: "ticket.customer_reply",
+          title: `Cliente respondeu o ticket #${ticket.ticketNumber}`,
+          body: body.trim().slice(0, 500) || "Cliente enviou um anexo.",
+          href: `/app/tickets/${ticketId}`,
+          entityType: "ticket",
+          entityId: ticketId,
+        });
+      }
+    });
+  } catch (cause) {
+    await deleteStoredSupportImages(storedAttachments);
+    throw cause;
+  }
 }
