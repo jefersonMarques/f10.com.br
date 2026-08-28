@@ -17,6 +17,18 @@ function readPositiveInteger(formData: FormData, name: string): number | null {
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 
+function readCauseCode(cause: unknown): string {
+  if (!cause || typeof cause !== "object" || !("code" in cause)) return "";
+  const code = cause.code;
+  return typeof code === "string" ? code : "";
+}
+
+function readCauseConstraint(cause: unknown): string {
+  if (!cause || typeof cause !== "object" || !("constraint_name" in cause)) return "";
+  const constraint = cause.constraint_name;
+  return typeof constraint === "string" ? constraint : "";
+}
+
 function isIntakeConfigurationError(errorCode: string): boolean {
   return [
     "CUSTOMER_PORTAL_GLOBAL_WORKFLOW_NOT_CONFIGURED",
@@ -115,13 +127,28 @@ export const actions: Actions = {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) {
         throw cause;
       }
+
       const errorCode = cause instanceof Error ? cause.message : "";
+      const databaseCode = readCauseCode(cause);
+      const databaseConstraint = readCauseConstraint(cause);
       const configurationError = isIntakeConfigurationError(errorCode);
+      const schemaOutdated = databaseCode === "42703" || databaseCode === "42P01";
+
+      console.error("[customer.portal.ticket.create]", {
+        errorCode,
+        databaseCode,
+        databaseConstraint,
+        causeType: cause instanceof Error ? cause.name : typeof cause,
+        scope,
+        groupId,
+        unitId,
+      });
+
       const messageText = errorCode === "CUSTOMER_TICKET_CONTEXT_NOT_AUTHORIZED"
         ? "A escola selecionada não está disponível para sua conta."
         : errorCode === "CUSTOMER_TICKET_GLOBAL_CONTEXT_NOT_ALLOWED"
           ? "A opção Global não está disponível para esta conta."
-          : configurationError
+          : configurationError || schemaOutdated
             ? "Não foi possível iniciar o fluxo deste chamado. Tente novamente em instantes."
             : errorCode.startsWith("SUPPORT_ATTACHMENT_")
               ? "Revise os anexos. São aceitos PNG, JPG, WEBP e PDF, com até 10 MB por arquivo."
@@ -131,7 +158,7 @@ export const actions: Actions = {
       const status = errorCode === "CUSTOMER_TICKET_CONTEXT_NOT_AUTHORIZED" ||
           errorCode === "CUSTOMER_TICKET_GLOBAL_CONTEXT_NOT_ALLOWED"
         ? 403
-        : configurationError
+        : configurationError || schemaOutdated
           ? 503
           : 409;
       return fail(status, {
