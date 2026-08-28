@@ -39,7 +39,7 @@ export const GET: RequestHandler = async ({ params, request, url, cookies }) => 
 
   try {
     const session = await authorizePublicChatSession(sessionId, token);
-    const customer = await getOptionalCustomerF10PortalSession(cookies);
+    const customer = await getOptionalCustomerF10PortalSession(cookies, { touchActivity: false });
     if (!customer) throw error(401, "Anexo não autorizado.");
 
     const context = await getTicketCustomerContext(session.ticketId);
