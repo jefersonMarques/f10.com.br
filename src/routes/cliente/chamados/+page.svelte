@@ -153,6 +153,16 @@
     }).format(new Date(value));
   }
 
+  function activityAge(value: Date | string): string {
+    const difference = Math.max(0, Date.now() - new Date(value).getTime());
+    const minutes = Math.floor(difference / 60_000);
+    if (minutes < 1) return "agora";
+    if (minutes < 60) return `há ${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `há ${hours} h`;
+    return formatDate(value);
+  }
+
   function slaLabel(ticket: PageData["tickets"][number]): string {
     if (ticket.status === "resolved" || ticket.status === "closed") return "Concluído";
     const due = ticket.firstResponseAt ? ticket.resolutionDueAt : ticket.firstResponseDueAt;
@@ -291,16 +301,18 @@
   {:else}
     <div class={data.filters.view === "cards" ? "space-y-3" : "space-y-3 md:hidden"}>
       {#each data.tickets as ticket}
-        <a href={`/cliente/chamados/${ticket.id}`} class="group block rounded-[22px] border border-[#E1E4EC] bg-white p-5 shadow-[0_8px_28px_rgba(1,13,40,0.035)] transition hover:border-[#C8CEDB] hover:shadow-[0_12px_32px_rgba(1,13,40,0.07)]">
+        <a href={`/cliente/chamados/${ticket.id}`} class={`group block rounded-[22px] border bg-white p-5 shadow-[0_8px_28px_rgba(1,13,40,0.035)] transition hover:shadow-[0_12px_32px_rgba(1,13,40,0.07)] ${ticket.hasUnreadUpdate ? "border-[#E6A36E]" : "border-[#E1E4EC] hover:border-[#C8CEDB]"}`}>
           <div class="flex items-start justify-between gap-4">
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
                 <span class="application-text-caption font-bold text-[#EA6D0B]">#{ticket.ticketNumber}</span>
                 <span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${statusClass(ticket.status)}`}>{statusLabels[ticket.status] ?? ticket.status}</span>
                 <span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${priorityClass(ticket.priority)}`}>{priorityLabels[ticket.priority] ?? ticket.priority}</span>
+                {#if ticket.hasUnreadUpdate}<span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#FFF1E5] px-2.5 py-1 font-semibold text-[#A9500C]"><span class="h-1.5 w-1.5 rounded-full bg-[#EA6D0B]"></span>Nova atualização</span>{/if}
               </div>
               <h3 class="mt-2 truncate text-[15px] font-semibold text-[#262D3D]">{ticket.subject}</h3>
               <p class="application-text-meta mt-2 text-[#8A91A0]">{ticket.context ? `${ticket.context.groupName} · ${ticket.context.unitName}` : "Contexto do atendimento"} · {channelLabels[ticket.channel] ?? ticket.channel}</p>
+              {#if ticket.lastTeamActivityAt}<p class={`application-text-meta mt-2 font-semibold ${ticket.hasUnreadUpdate ? "text-[#A9500C]" : "text-[#687081]"}`}>Equipe movimentou este chamado {activityAge(ticket.lastTeamActivityAt)}</p>{/if}
               <div class="application-text-meta mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[#8A91A0]"><span>Atualizado {formatDate(ticket.updatedAt)}</span><span class="inline-flex items-center gap-1"><Clock3 size={12} />{slaLabel(ticket)}</span></div>
             </div>
             <ArrowRight size={17} class="mt-1 shrink-0 text-[#A1A7B4] transition group-hover:translate-x-0.5 group-hover:text-[#000A57]" />
@@ -315,14 +327,14 @@
           <thead class="bg-[#F7F8FA] text-[10px] font-bold uppercase tracking-[0.06em] text-[#747C8D]"><tr><th class="px-4 py-3">Chamado</th><th class="px-4 py-3">Assunto</th><th class="px-4 py-3">Grupo / Escola</th><th class="px-4 py-3">Origem</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Prioridade</th><th class="px-4 py-3">Atualização</th></tr></thead>
           <tbody class="divide-y divide-[#ECEEF3]">
             {#each data.tickets as ticket}
-              <tr class="hover:bg-[#FAFBFC]">
+              <tr class={ticket.hasUnreadUpdate ? "bg-[#FFFBF7] hover:bg-[#FFF8F1]" : "hover:bg-[#FAFBFC]"}>
                 <td class="px-4 py-3"><a class="font-semibold text-[#000A57]" href={`/cliente/chamados/${ticket.id}`}>#{ticket.ticketNumber}</a></td>
                 <td class="max-w-[300px] px-4 py-3 text-[12px] font-medium text-[#303746]"><a class="block truncate" href={`/cliente/chamados/${ticket.id}`}>{ticket.subject}</a></td>
                 <td class="px-4 py-3 text-[11px] text-[#6D7484]">{ticket.context ? `${ticket.context.groupName} · ${ticket.context.unitName}` : "—"}</td>
                 <td class="px-4 py-3 text-[11px] text-[#6D7484]">{channelLabels[ticket.channel] ?? ticket.channel}</td>
                 <td class="px-4 py-3"><span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${statusClass(ticket.status)}`}>{statusLabels[ticket.status] ?? ticket.status}</span></td>
                 <td class="px-4 py-3"><span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${priorityClass(ticket.priority)}`}>{priorityLabels[ticket.priority] ?? ticket.priority}</span></td>
-                <td class="px-4 py-3 text-[11px] text-[#7D8493]">{formatDate(ticket.updatedAt)}</td>
+                <td class="px-4 py-3 text-[11px] text-[#7D8493]">{#if ticket.hasUnreadUpdate}<span class="mb-1 inline-flex items-center gap-1.5 font-semibold text-[#A9500C]"><span class="h-1.5 w-1.5 rounded-full bg-[#EA6D0B]"></span>Nova atualização</span><br />{/if}{ticket.lastTeamActivityAt ? activityAge(ticket.lastTeamActivityAt) : formatDate(ticket.updatedAt)}</td>
               </tr>
             {/each}
           </tbody>
