@@ -222,6 +222,7 @@ export async function startPublicChat(
       sessionId: session.id,
       authorType: "customer",
       customerContactId,
+      visibility: "public",
       body: normalizedMessage,
     });
 
@@ -273,6 +274,7 @@ export async function addPublicChatSystemMessage(
       await tx.insert(webChatMessages).values({
         sessionId,
         authorType: "system",
+        visibility: "public",
         body: normalizedBody,
       });
     }
@@ -372,7 +374,12 @@ export async function listPublicChatMessages(
         })
         .from(webChatMessages)
         .leftJoin(users, eq(webChatMessages.authorUserId, users.id))
-        .where(eq(webChatMessages.sessionId, sessionId))
+        .where(
+          and(
+            eq(webChatMessages.sessionId, sessionId),
+            eq(webChatMessages.visibility, "public"),
+          ),
+        )
         .orderBy(asc(webChatMessages.createdAt));
 
   const [attachmentRows, onlineRows] = await Promise.all([
@@ -457,6 +464,7 @@ export async function addPublicChatMessage(
           sessionId,
           authorType: "customer",
           customerContactId: session.customerContactId,
+          visibility: "public",
           body: normalizedBody,
         });
 
