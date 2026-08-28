@@ -1,5 +1,6 @@
 import {
   bigint,
+  bigserial,
   index,
   integer,
   jsonb,
@@ -30,6 +31,7 @@ export const webChatSessions = pgTable(
   "web_chat_sessions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    chatNumber: bigserial("chat_number", { mode: "number" }).notNull(),
     ticketId: uuid("ticket_id").references(() => tickets.id, { onDelete: "set null" }),
     customerContactId: uuid("customer_contact_id").references(() => customerContacts.id, {
       onDelete: "set null",
@@ -72,6 +74,7 @@ export const webChatSessions = pgTable(
       .defaultNow(),
   },
   (table) => [
+    uniqueIndex("web_chat_sessions_chat_number_unique").on(table.chatNumber),
     uniqueIndex("web_chat_sessions_ticket_unique").on(table.ticketId),
     uniqueIndex("web_chat_sessions_token_unique").on(table.tokenHash),
     index("web_chat_sessions_expires_idx").on(table.expiresAt),
