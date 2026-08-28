@@ -64,6 +64,9 @@
   function matchesQuery(chat: PageData["chats"][number], value: string): boolean {
     const normalized = value.trim().toLocaleLowerCase("pt-BR");
     if (!normalized) return true;
+    const ticketTerms = chat.ticketNumber
+      ? [`#${chat.ticketNumber}`, String(chat.ticketNumber)]
+      : [];
     const haystack = [
       chat.customerName,
       chat.customerEmail,
@@ -73,8 +76,7 @@
       chat.customerContext?.legacyUserId,
       chat.subject,
       chat.lastMessageBody,
-      `#${chat.ticketNumber}`,
-      String(chat.ticketNumber),
+      ...ticketTerms,
     ]
       .filter(Boolean)
       .join(" ")
@@ -98,6 +100,7 @@
   }
 
   function slaText(chat: PageData["chats"][number]): string {
+    if (!chat.ticketId) return "";
     const dueAt = !chat.firstResponseAt ? chat.firstResponseDueAt : chat.resolutionDueAt;
     if (!dueAt || ["resolved", "closed"].includes(chat.status)) return "";
     const minutes = Math.round((new Date(dueAt).getTime() - Date.now()) / 60_000);
@@ -149,7 +152,7 @@
         <div class="flex flex-col gap-2 lg:flex-row lg:items-center">
           <label class="relative block w-full lg:w-[340px]">
             <Search size={15} class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#979CAA]" aria-hidden="true" />
-            <input bind:this={searchElement} bind:value={query} placeholder="Buscar cliente, escola, unidade, e-mail ou #ticket" class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-10 pr-4 text-[11px] text-[#303645] outline-none transition focus:border-[#000A57] focus:bg-white focus:ring-2 focus:ring-[#000A57]/10" />
+            <input bind:this={searchElement} bind:value={query} placeholder="Buscar cliente, escola, e-mail ou #chamado" class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-10 pr-4 text-[11px] text-[#303645] outline-none transition focus:border-[#000A57] focus:bg-white focus:ring-2 focus:ring-[#000A57]/10" />
             <span class="application-text-meta pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-[#E0E3EA] bg-white px-1.5 py-0.5 text-[#999EAA]">/</span>
           </label>
           <div class="flex gap-2">
@@ -191,9 +194,13 @@
                 <div class="min-w-0 flex-1">
                   <div class="flex flex-wrap items-center gap-2">
                     <strong class="truncate text-[12px] font-semibold text-[#303645]">{chat.customerName ?? "Cliente"}</strong>
-                    <span class="application-text-meta font-bold text-[#EA6D0B]">#{chat.ticketNumber}</span>
+                    {#if chat.ticketNumber}
+                      <span class="application-text-meta rounded-full bg-[#FFF0E4] px-2 py-1 font-bold text-[#C45C0B]">Chamado #{chat.ticketNumber}</span>
+                    {:else}
+                      <span class="application-text-meta rounded-full bg-[#EEF0FF] px-2 py-1 font-bold text-[#000A57]">Chat</span>
+                    {/if}
                     <span class="application-text-meta rounded-full bg-[#EEF0FF] px-2 py-1 font-bold text-[#000A57]">{statusLabels[chat.status]}</span>
-                    <span class={`application-text-meta rounded-full px-2 py-1 font-bold ${priorityClass(chat.priority)}`}>{priorityLabels[chat.priority]}</span>
+                    {#if chat.ticketId}<span class={`application-text-meta rounded-full px-2 py-1 font-bold ${priorityClass(chat.priority)}`}>{priorityLabels[chat.priority]}</span>{/if}
                     {#if chat.aiState === "escalated" || chat.aiState === "active"}
                       <span class={`application-text-meta rounded-full px-2 py-1 font-bold ${chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#9B3C3C]" : "bg-[#F0EEFF] text-[#5142A6]"}`}>{aiLabels[chat.aiState]}</span>
                     {/if}
