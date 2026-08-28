@@ -49,8 +49,7 @@ export const actions: Actions = {
       false,
     );
     const formData = await request.formData();
-    const unitValue = readText(formData, "unitId");
-    const scope = unitValue === "global" ? "global" as const : "unit" as const;
+    const scope = readText(formData, "globalContext") === "on" ? "global" as const : "unit" as const;
     const groupId = scope === "unit" ? readPositiveInteger(formData, "groupId") : null;
     const unitId = scope === "unit" ? readPositiveInteger(formData, "unitId") : null;
     const subject = readText(formData, "subject");
