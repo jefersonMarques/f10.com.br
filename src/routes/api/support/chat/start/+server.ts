@@ -1,10 +1,16 @@
 import { dev } from "$app/environment";
 import { json, type RequestHandler } from "@sveltejs/kit";
+import { eq } from "drizzle-orm";
 import { recordCustomerActivity } from "$lib/server/customerPortal/customerActivityRepository";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
+import { getDatabase } from "$lib/server/db";
+import { webChatSessions } from "$lib/server/db/chatSchema";
 import { markHelpSearchOutcome } from "$lib/server/help/helpSearchRepository";
 import { listPublicSupportChatEntryOptions } from "$lib/server/support/supportChatEntryRepository";
-import { startPublicChat } from "$lib/server/support/publicChatRepository";
+import {
+  addPublicChatSystemMessage,
+  startPublicChat,
+} from "$lib/server/support/publicChatRepository";
 import { getSupportAvailabilityStatus } from "$lib/server/support/publicSupportStatus";
 import { notifySupportChatNeedsAttention } from "$lib/server/support/supportTeamNotifications";
 
@@ -170,6 +176,13 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
       },
     });
 
+    const [chatIdentity] = await getDatabase()
+      .select({ chatNumber: webChatSessions.chatNumber })
+      .from(webChatSessions)
+      .where(eq(webChatSessions.id, session.sessionId))
+      .limit(1);
+    if (!chatIdentity) throw new Error("CHAT_SESSION_NOT_CREATED");
+
     if (correlatedSearchEventId) {
       await markHelpSearchOutcome(correlatedSearchEventId, { escalated: true }).catch((cause) => {
         console.error("[support.chat.help_handoff]", {
@@ -186,6 +199,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
       path: contextUrl || "/ajuda-f10",
       metadata: {
         sessionId: session.sessionId,
+        chatNumber: chatIdentity.chatNumber,
         entryOptionId: effectiveEntryOptionId,
         entryOptionLabel: session.entryOptionLabel,
         assistantHandoff: true,
@@ -195,7 +209,6 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
     }).catch(() => undefined);
 
     if (availability.isOpen === false) {
-      const { addPublicChatSystemMessage } = await import("$lib/server/support/publicChatRepository");
       await addPublicChatSystemMessage(
         session.sessionId,
         buildOutOfHoursMessage(availability.nextOpenLabel),
@@ -211,8 +224,10 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
       {
         sessionId: session.sessionId,
         token: session.token,
+        chatNumber: chatIdentity.chatNumber,
         ticketId: null,
-        ticketNumber: null,
+        // Mantido temporariamente para compatibilidade com o componente existente do chat.
+        ticketNumber: chatIdentity.chatNumber,
         entryOptionLabel: session.entryOptionLabel,
         expiresAt: session.expiresAt.toISOString(),
         aiState: session.aiState,
