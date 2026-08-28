@@ -93,7 +93,7 @@ CREATE INDEX IF NOT EXISTS web_chat_sessions_legacy_context_idx
 CREATE TABLE IF NOT EXISTS web_chat_messages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id uuid NOT NULL REFERENCES web_chat_sessions(id) ON DELETE CASCADE,
-  author_type ticket_message_author_type NOT NULL,
+  author_type support_message_author NOT NULL,
   author_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
   customer_contact_id uuid REFERENCES customer_contacts(id) ON DELETE SET NULL,
   body text NOT NULL DEFAULT '',
