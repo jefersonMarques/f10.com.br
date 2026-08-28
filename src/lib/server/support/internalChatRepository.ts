@@ -108,7 +108,7 @@ export async function listInternalChats(
         (
           select cm.body
           from web_chat_messages cm
-          where cm.session_id = ${webChatSessions.id}
+          where cm.session_id = ${webChatSessions.id} and cm.visibility = 'public'
           order by cm.created_at desc
           limit 1
         )
@@ -124,7 +124,7 @@ export async function listInternalChats(
         (
           select cm.author_type::text
           from web_chat_messages cm
-          where cm.session_id = ${webChatSessions.id}
+          where cm.session_id = ${webChatSessions.id} and cm.visibility = 'public'
           order by cm.created_at desc
           limit 1
         )
@@ -263,18 +263,15 @@ export async function listInternalChatMessages(
           id: webChatMessages.id,
           authorType: webChatMessages.authorType,
           authorUserName: users.name,
+          visibility: webChatMessages.visibility,
+          channel: sql<"web_chat">`'web_chat'`,
           body: webChatMessages.body,
           createdAt: webChatMessages.createdAt,
         })
         .from(webChatMessages)
         .leftJoin(users, eq(webChatMessages.authorUserId, users.id))
         .where(eq(webChatMessages.sessionId, sessionId))
-        .orderBy(asc(webChatMessages.createdAt))
-        .then((rows) => rows.map((message) => ({
-          ...message,
-          visibility: "public" as const,
-          channel: "web_chat" as const,
-        })));
+        .orderBy(asc(webChatMessages.createdAt));
 
   return { chat, messages };
 }
@@ -350,6 +347,7 @@ export async function claimInternalChat(
       await tx.insert(webChatMessages).values({
         sessionId,
         authorType: "system",
+        visibility: "public",
         body: "Um atendente da equipe F10 assumiu o atendimento.",
       });
     }
@@ -436,6 +434,7 @@ export async function assignInternalChat(
       await tx.insert(webChatMessages).values({
         sessionId,
         authorType: "system",
+        visibility: "public",
         body: "Seu atendimento foi encaminhado para a equipe responsável.",
       });
     }
@@ -531,6 +530,7 @@ export async function respondToInternalChat(
         sessionId,
         authorType: "user",
         authorUserId: actorUserId,
+        visibility: "public",
         body: body.trim(),
       });
     }
