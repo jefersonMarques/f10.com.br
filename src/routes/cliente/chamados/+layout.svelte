@@ -1,14 +1,32 @@
 <script lang="ts">
   import { page } from "$app/stores";
+  import { onMount } from "svelte";
   import { CircleHelp, LogOut, MessageCircleMore, Plus } from "lucide-svelte";
   import ApplicationHeader from "$lib/components/application/ApplicationHeader.svelte";
   import SupportChatDialog from "$lib/components/onboarding/SupportChatDialog.svelte";
   import { resolveCustomerRouteMetadata } from "$lib/application/routeMetadata";
   import type { LayoutData } from "./$types";
 
+  type StoredChatSession = {
+    sessionId: string;
+    token: string;
+    expiresAt: string;
+  };
+
+  type ChatMessagePreview = {
+    id: string;
+    authorType: "customer" | "user" | "system";
+  };
+
   export let data: LayoutData;
 
+  const CHAT_SESSION_KEY = "f10-support-chat-session-v1";
+  const CHAT_NOTIFICATION_INTERVAL_MS = 4_000;
+
   let chatOpen = false;
+  let chatUnread = false;
+  let observedSessionId = "";
+  let observedAgentMessageId = "";
 
   $: routeMetadata = resolveCustomerRouteMetadata($page.url.pathname);
   $: customerContext = data.customer.groupName
@@ -30,6 +48,92 @@
       })),
     })),
   };
+
+  function readStoredChatSession(): StoredChatSession | null {
+    const raw = window.sessionStorage.getItem(CHAT_SESSION_KEY);
+    if (!raw) return null;
+
+    try {
+      const session = JSON.parse(raw) as StoredChatSession;
+      if (
+        typeof session.sessionId !== "string" ||
+        typeof session.token !== "string" ||
+        !session.sessionId ||
+        !session.token ||
+        !session.expiresAt ||
+        new Date(session.expiresAt).getTime() <= Date.now()
+      ) {
+        return null;
+      }
+      return session;
+    } catch {
+      return null;
+    }
+  }
+
+  async function checkChatNotification(markAsRead = false): Promise<void> {
+    const session = readStoredChatSession();
+    if (!session) {
+      observedSessionId = "";
+      observedAgentMessageId = "";
+      chatUnread = false;
+      return;
+    }
+
+    const sessionChanged = observedSessionId !== session.sessionId;
+    if (sessionChanged) {
+      observedSessionId = session.sessionId;
+      observedAgentMessageId = "";
+      chatUnread = false;
+    }
+
+    try {
+      const response = await fetch(`/api/support/chat/${encodeURIComponent(session.sessionId)}/messages`, {
+        headers: { Authorization: `Bearer ${session.token}` },
+        cache: "no-store",
+      });
+      if (!response.ok) return;
+
+      const payload = await response.json() as { messages?: ChatMessagePreview[] };
+      const messages = Array.isArray(payload.messages) ? payload.messages : [];
+      const latestAgentMessageId = [...messages]
+        .reverse()
+        .find((message) => message.authorType === "user")?.id ?? "";
+
+      if (sessionChanged || !observedAgentMessageId || markAsRead || chatOpen) {
+        observedAgentMessageId = latestAgentMessageId;
+        if (markAsRead || chatOpen) chatUnread = false;
+        return;
+      }
+
+      if (latestAgentMessageId && latestAgentMessageId !== observedAgentMessageId) {
+        chatUnread = true;
+      }
+      observedAgentMessageId = latestAgentMessageId;
+    } catch {
+      // O próximo polling tenta novamente sem afetar o restante do Portal do Cliente.
+    }
+  }
+
+  function openChat(): void {
+    chatUnread = false;
+    chatOpen = true;
+    void checkChatNotification(true);
+  }
+
+  function closeChat(): void {
+    void checkChatNotification(true);
+    chatOpen = false;
+  }
+
+  onMount(() => {
+    void checkChatNotification();
+    const timer = window.setInterval(
+      () => void checkChatNotification(),
+      CHAT_NOTIFICATION_INTERVAL_MS,
+    );
+    return () => window.clearInterval(timer);
+  });
 </script>
 
 <div class="min-h-screen bg-[#F7F8FB] text-[#10172A]">
@@ -62,17 +166,20 @@
     <button
       type="button"
       class="fixed bottom-5 right-5 z-[10010] inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#000A57] text-white shadow-[0_14px_36px_rgba(1,13,40,0.24)] transition hover:-translate-y-0.5 hover:bg-[#111B71] hover:shadow-[0_18px_42px_rgba(1,13,40,0.3)] sm:bottom-6 sm:right-6"
-      aria-label="Abrir Assistente F10"
-      title="Assistente F10"
-      on:click={() => (chatOpen = true)}
+      aria-label={chatUnread ? "Abrir Assistente F10 — nova mensagem" : "Abrir Assistente F10"}
+      title={chatUnread ? "Nova mensagem no Assistente F10" : "Assistente F10"}
+      on:click={openChat}
     >
       <MessageCircleMore size={23} aria-hidden="true" />
+      {#if chatUnread}
+        <span class="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-[#F7F8FB] bg-[#E53935]" aria-hidden="true"></span>
+      {/if}
     </button>
   {/if}
 </div>
 
 <SupportChatDialog
   isOpen={chatOpen}
-  onClose={() => (chatOpen = false)}
+  onClose={closeChat}
   customerSupport={customerSupport}
 />
