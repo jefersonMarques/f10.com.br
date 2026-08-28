@@ -22,6 +22,7 @@
   } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
+  import ChatInbox from "$lib/components/support/ChatInbox.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -34,9 +35,11 @@
     sizeBytes: number;
     url: string;
   };
+
   type ChatMessage = PageData["initial"]["messages"][number] & {
     attachments?: ChatAttachment[];
   };
+
   type ChatDetails = PageData["initial"]["chat"];
   type ComposerMode = "reply" | "note";
 
@@ -58,6 +61,7 @@
   $: f10GroupName = chat.customerContext?.groupName ?? "";
   $: f10UnitName = chat.customerContext?.unitName ?? "";
   $: f10LegacyUserId = chat.customerContext?.legacyUserId ?? "";
+  $: if (!canWrite && data.canInternalNote && composerMode === "reply") composerMode = "note";
 
   const statusLabels: Record<string, string> = {
     new: "Novo",
@@ -77,17 +81,23 @@
 
   const aiLabels: Record<string, string> = {
     active: "Automação atendendo",
-    escalated: "Aguardando humano",
+    escalated: "Aguardando equipe",
     human: "Atendimento humano",
     disabled: "Aguardando equipe",
   };
 
   function formatTime(value: string | Date): string {
-    return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+    return new Intl.DateTimeFormat("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
   }
 
   function formatDateTime(value: string | Date): string {
-    return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+    return new Intl.DateTimeFormat("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(new Date(value));
   }
 
   function messageAuthor(message: ChatMessage): string {
@@ -97,9 +107,10 @@
   }
 
   function slaText(): string {
-    if (!chat.ticketId) return "Sem chamado vinculado";
+    if (!chat.ticketId) return "Não iniciado";
     const dueAt = !chat.firstResponseAt ? chat.firstResponseDueAt : chat.resolutionDueAt;
     if (!dueAt || ["resolved", "closed"].includes(chat.status)) return "Sem prazo ativo";
+
     const minutes = Math.round((new Date(dueAt).getTime() - Date.now()) / 60_000);
     if (minutes < 0) return `Vencido há ${Math.abs(minutes)} min`;
     if (minutes < 60) return `${minutes} min restantes`;
@@ -128,6 +139,7 @@
 
   async function refreshMessages(forceScroll = false): Promise<void> {
     if (document.visibilityState !== "visible") return;
+
     const wasNearBottom = isNearBottom();
     const previousLength = messages.length;
     const previousLastId = messages.at(-1)?.id;
@@ -139,11 +151,18 @@
       });
       if (!response.ok) return;
 
-      const payload = (await response.json()) as { messages?: ChatMessage[]; chat?: ChatDetails };
+      const payload = (await response.json()) as {
+        messages?: ChatMessage[];
+        chat?: ChatDetails;
+      };
       const nextMessages = payload.messages ?? [];
-      const changed = nextMessages.length !== previousLength ||
+      const changed =
+        nextMessages.length !== previousLength ||
         nextMessages.at(-1)?.id !== previousLastId ||
-        nextMessages.some((message, index) => message.attachments?.length !== messages[index]?.attachments?.length);
+        nextMessages.some(
+          (message, index) => message.attachments?.length !== messages[index]?.attachments?.length,
+        );
+
       if (payload.chat) chat = payload.chat;
       if (!changed) return;
 
@@ -161,6 +180,7 @@
   async function sendMessage(): Promise<void> {
     const body = messageBody.trim();
     if (!body || sending || !canWrite) return;
+
     sending = true;
     errorMessage = "";
 
@@ -170,10 +190,12 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body }),
       });
+
       if (!response.ok) {
         errorMessage = "Não foi possível enviar a mensagem. Verifique se o atendimento continua atribuído a você.";
         return;
       }
+
       messageBody = "";
       persistDraft();
       await refreshMessages(true);
@@ -199,8 +221,8 @@
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") void refreshMessages();
     };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
 
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -212,116 +234,137 @@
   <title>{chat.ticketNumber ? `Chamado #${chat.ticketNumber}` : "Chat"} | F10 Operations</title>
 </svelte:head>
 
-<ApplicationContent width="wide" className="flex min-h-[calc(100dvh-var(--application-header-height))] flex-col">
-  <div class="flex shrink-0 flex-col justify-between gap-4 pb-4 xl:flex-row xl:items-center">
-    <div class="flex min-w-0 items-center gap-3">
-      <a href="/app/chat" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#606676] shadow-sm transition hover:text-[#000A57]" aria-label="Voltar para conversas"><ArrowLeft size={18}/></a>
-      <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><UserRound size={20}/></span>
-      <div class="min-w-0">
-        <div class="flex flex-wrap items-center gap-2">
-          <h2 class="truncate text-[16px] font-semibold text-[#222838]">{chat.customerName ?? "Cliente"}</h2>
-          {#if chat.ticketNumber}
-            <span class="application-text-meta rounded-full bg-[#FFF0E4] px-2 py-1 font-bold text-[#C45C0B]">Chamado #{chat.ticketNumber}</span>
-          {:else}
-            <span class="application-text-meta rounded-full bg-[#EEF0FF] px-2 py-1 font-bold text-[#000A57]">Conversa sem chamado</span>
-          {/if}
-          <span class="application-text-meta rounded-full bg-[#EEF0FF] px-2 py-1 font-bold text-[#000A57]">{statusLabels[chat.status]}</span>
-          {#if chat.ticketId}
-            <span class="application-text-meta rounded-full bg-[#F3F4F7] px-2 py-1 font-bold text-[#777D8D]">{priorityLabels[chat.priority]}</span>
-          {/if}
-          <span class={`application-text-meta rounded-full px-2 py-1 font-bold ${chat.aiState === "active" ? "bg-[#F0EEFF] text-[#5142A6]" : chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#9B3C3C]" : "bg-[#F3F4F7] text-[#777D8D]"}`}>{aiLabels[chat.aiState]}</span>
+<ApplicationContent
+  width="full"
+  padding="none"
+  className="h-[calc(100dvh-var(--application-header-height))] min-h-[620px] overflow-hidden bg-white"
+>
+  <div class="grid h-full min-h-0 grid-cols-1 bg-white lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(520px,1fr)_300px]">
+    <aside class="hidden min-h-0 border-r border-[#E4E6EC] lg:block">
+      <ChatInbox
+        chats={data.chatInbox}
+        currentUserId={data.chatCurrentUserId}
+        selectedSessionId={chat.sessionId}
+        compact
+      />
+    </aside>
+
+    <main class="flex min-h-0 min-w-0 flex-col bg-white">
+      <header class="shrink-0 border-b border-[#E5E7ED] bg-white px-4 py-3 sm:px-5">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex min-w-0 items-center gap-3">
+            <a
+              href="/app/chat"
+              class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#E1E4EA] text-[#69707E] transition hover:bg-[#F6F7F9] hover:text-[#000A57] lg:hidden"
+              aria-label="Voltar para conversas"
+            >
+              <ArrowLeft size={16} />
+            </a>
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F0F1F4] text-[#626978]">
+              <UserRound size={16} />
+            </span>
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <h1 class="truncate text-[13px] font-semibold text-[#262C3A]">{chat.customerName ?? "Cliente"}</h1>
+                {#if chat.ticketNumber}
+                  <span class="rounded-md bg-[#FFF0E4] px-1.5 py-1 text-[8px] font-bold text-[#B95B12]">Chamado #{chat.ticketNumber}</span>
+                {:else}
+                  <span class="rounded-md bg-[#EEF0FF] px-1.5 py-1 text-[8px] font-bold text-[#000A57]">CHAT</span>
+                {/if}
+                <span class="rounded-md bg-[#F1F2F5] px-1.5 py-1 text-[8px] font-semibold text-[#6C7280]">{statusLabels[chat.status]}</span>
+                {#if chat.aiState === "escalated" || chat.aiState === "active"}
+                  <span class={`rounded-md px-1.5 py-1 text-[8px] font-semibold ${chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#9B4343]" : "bg-[#F0EEFF] text-[#5E51A6]"}`}>{aiLabels[chat.aiState]}</span>
+                {/if}
+              </div>
+              <p class="mt-1 truncate text-[9px] text-[#858B98]">
+                {f10UnitName ? `${f10UnitName}${f10GroupName ? ` · ${f10GroupName}` : ""}` : chat.organizationName ?? chat.customerEmail ?? "Atendimento F10"}
+              </p>
+            </div>
+          </div>
+
+          <div class="flex shrink-0 items-center gap-1.5">
+            {#if chat.contextUrl}
+              <a href={chat.contextUrl} target="_blank" rel="noopener noreferrer" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E0E3EA] text-[#69707E] transition hover:bg-[#F6F7F9] hover:text-[#000A57]" aria-label="Abrir página de origem">
+                <ExternalLink size={14} />
+              </a>
+            {/if}
+            <a href="/app/help" target="_blank" rel="noopener noreferrer" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E0E3EA] text-[#69707E] transition hover:bg-[#F6F7F9] hover:text-[#000A57]" aria-label="Abrir base de conhecimento">
+              <BookOpen size={14} />
+            </a>
+
+            {#if data.canRespond && !chat.assignedUserId && chat.status !== "closed"}
+              <form method="POST" action="?/claim">
+                <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#176B35] px-3 text-[9px] font-semibold text-white">
+                  <Hand size={12} /> Pegar
+                </button>
+              </form>
+            {/if}
+
+            {#if chat.ticketId && chat.ticketNumber}
+              <a href={`/app/tickets/${chat.ticketId}`} class="hidden h-9 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 text-[9px] font-semibold text-white sm:inline-flex">
+                <TicketCheck size={12} /> #{chat.ticketNumber}
+              </a>
+            {:else if data.canCreateTicket && chat.status !== "closed"}
+              <form method="POST" action="?/createTicket" class="hidden sm:block" on:submit={(event) => { if (!confirm("Criar um chamado a partir desta conversa? O histórico público e as notas internas serão preservados.")) event.preventDefault(); }}>
+                <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 text-[9px] font-semibold text-white">
+                  <TicketCheck size={12} /> Criar chamado
+                </button>
+              </form>
+            {/if}
+
+            {#if canWrite && chat.status !== "closed"}
+              <form method="POST" action="?/finish" on:submit={(event) => { if (!confirm(chat.ticketId ? "Finalizar este atendimento? A conversa e o chamado vinculado serão encerrados." : "Finalizar esta conversa? Nenhum chamado será criado.")) event.preventDefault(); }}>
+                <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E5C6C6] bg-[#FFF8F8] px-2.5 text-[9px] font-semibold text-[#984343]">
+                  <CheckCircle2 size={12} /> <span class="hidden sm:inline">Finalizar</span>
+                </button>
+              </form>
+            {/if}
+          </div>
         </div>
-        {#if f10UnitName}
-          <p class="application-text-caption mt-1 truncate font-medium text-[#666D7C]">{f10UnitName}{f10GroupName ? ` · ${f10GroupName}` : ""}</p>
-        {:else}
-          <p class="application-text-caption mt-1 truncate text-[#898E9B]">{chat.organizationName ?? chat.customerEmail ?? "Chat do site"}</p>
+
+        {#if form?.message}
+          <div class={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-[9px] font-medium ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>
+            {#if form.success}<CheckCircle2 size={12} />{:else}<CircleAlert size={12} />{/if}
+            {form.message}
+          </div>
         {/if}
-        {#if chat.aiHandoffReason && chat.aiState === "escalated"}<p class="application-text-meta mt-1 line-clamp-1 text-[#9A6464]">{chat.aiHandoffReason}</p>{/if}
-      </div>
-    </div>
-
-    <div class="flex flex-wrap items-center gap-2">
-      {#if data.canRespond && !chat.assignedUserId && chat.status !== "closed"}
-        <form method="POST" action="?/claim"><button type="submit" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#176B35] px-3 font-semibold text-white"><Hand size={14}/>Pegar atendimento</button></form>
-      {/if}
-
-      {#if chat.contextUrl}<a href={chat.contextUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#666C7B]">Página de origem<ExternalLink size={13}/></a>{/if}
-      <a href="/app/help" target="_blank" rel="noopener noreferrer" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]"><BookOpen size={14}/>Base de conhecimento</a>
-
-      {#if data.remoteReady}
-        {#if onlineRemoteDevices.length === 1 && data.canUseRemote}
-          <form method="POST" action="?/startRemote"><input type="hidden" name="deviceId" value={onlineRemoteDevices[0].id}/><button type="submit" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]"><MonitorCog size={14}/>Iniciar acesso remoto</button></form>
-        {:else if onlineRemoteDevices.length > 0 && data.canRequestRemote && chat.ticketId}
-          <a href={`/app/tickets/${chat.ticketId}/remote`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]"><MonitorCog size={14}/>Escolher computador</a>
-        {:else if data.remoteDevices.length === 0 && data.canRequestRemote}
-          <form method="POST" action="?/enrollRemote"><button type="submit" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]"><Download size={14}/>Instalar suporte remoto</button></form>
-        {:else if data.remoteDevices.length > 0 && data.canRequestRemote && chat.ticketId}
-          <a href={`/app/tickets/${chat.ticketId}/remote`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#E4E6EC] bg-[#F7F8FA] px-3 font-semibold text-[#777D8D]"><MonitorCog size={14}/>Computador offline</a>
-        {/if}
-      {/if}
-
-      {#if canWrite && chat.status !== "closed"}
-        <form method="POST" action="?/finish" on:submit={(event) => { if (!confirm(chat.ticketId ? "Finalizar este atendimento? A conversa e o chamado vinculado serão encerrados." : "Finalizar esta conversa? Nenhum chamado será criado.")) event.preventDefault(); }}>
-          <button type="submit" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#E7C4C4] bg-[#FFF7F7] px-3 font-semibold text-[#9B3C3C]"><CheckCircle2 size={14}/>Finalizar atendimento</button>
-        </form>
-      {/if}
-
-      {#if chat.ticketId && chat.ticketNumber}
-        <a href={`/app/tickets/${chat.ticketId}`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Abrir chamado #{chat.ticketNumber}<TicketCheck size={14}/></a>
-      {:else if data.canCreateTicket && chat.status !== "closed"}
-        <form method="POST" action="?/createTicket" on:submit={(event) => { if (!confirm("Criar um chamado a partir desta conversa? O histórico público e as notas internas serão preservados no novo chamado.")) event.preventDefault(); }}>
-          <button type="submit" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 font-semibold text-white"><TicketCheck size={14}/>Criar chamado</button>
-        </form>
-      {/if}
-    </div>
-  </div>
-
-  {#if form?.message}
-    <div class={`application-text-caption mb-4 flex shrink-0 items-center gap-2 rounded-xl px-4 py-3 font-medium ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>
-      {#if form.success}<CheckCircle2 size={14}/>{:else}<CircleAlert size={14}/>{/if}{form.message}
-    </div>
-  {/if}
-
-  {#if !chat.ticketId}
-    <div class="application-text-caption mb-4 flex shrink-0 items-start gap-2 rounded-xl border border-[#DCE1F2] bg-[#F7F8FF] px-4 py-3 text-[#555D73]">
-      <MessageCircleMore size={15} class="mt-0.5 shrink-0 text-[#000A57]"/>
-      <span>Esta é uma conversa de atendimento e ainda não é um chamado. A equipe pode conversar internamente, atender e encerrar o chat normalmente; use <strong>Criar chamado</strong> somente quando houver necessidade de acompanhamento.</span>
-    </div>
-  {/if}
-
-  <div class="grid min-h-0 flex-1 gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
-    <section class="flex min-h-[640px] flex-col overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white shadow-[0_14px_40px_rgba(1,13,40,0.05)] xl:min-h-0">
-      <header class="flex shrink-0 items-center justify-between border-b border-[#EEF0F5] px-5 py-3.5">
-        <div class="flex items-center gap-2"><MessageCircleMore size={16} class="text-[#000A57]"/><span class="text-[11px] font-semibold text-[#444A59]">Conversa em tempo real</span></div>
-        <span class="application-text-meta text-[#989DAA]">{chat.assignedUserName ? `Atendendo: ${chat.assignedUserName}` : chat.aiState === "active" ? "Automação F10" : "Aguardando atendente"}</span>
       </header>
 
-      <div class="relative min-h-0 flex-1">
-        <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="h-full overflow-y-auto bg-[#F8F9FB] px-4 py-5 sm:px-6">
-          <div class="mx-auto max-w-[860px] space-y-3">
+      <div class="relative min-h-0 flex-1 bg-[#F7F8FA]">
+        <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="h-full overflow-y-auto px-4 py-5 sm:px-6">
+          <div class="mx-auto max-w-[820px] space-y-3">
             {#each messages as message (message.id)}
               {#if message.visibility === "internal"}
-                <div class="flex justify-center">
-                  <article class="w-full max-w-[88%] rounded-2xl border border-[#E9D6C1] bg-[#FFF9F3] px-4 py-3 text-[#6F4B29] shadow-sm">
-                    <div class="mb-2 flex items-center justify-between gap-3"><span class="application-text-meta font-bold uppercase tracking-[0.08em] text-[#9A5513]">Nota interna · {messageAuthor(message)}</span><span class="application-text-meta text-[#AC8B6A]">{formatTime(message.createdAt)}</span></div>
-                    <p class="whitespace-pre-wrap text-[12px] leading-5">{message.body}</p>
+                <div class="flex justify-center py-1">
+                  <article class="w-full max-w-[88%] rounded-xl border border-[#E9D6C1] bg-[#FFF9F3] px-3.5 py-3 text-[#6F4B29]">
+                    <div class="mb-1.5 flex items-center justify-between gap-3">
+                      <span class="text-[8px] font-bold uppercase tracking-[0.08em] text-[#9A5513]">Nota interna · {messageAuthor(message)}</span>
+                      <span class="text-[8px] text-[#AC8B6A]">{formatTime(message.createdAt)}</span>
+                    </div>
+                    <p class="whitespace-pre-wrap text-[10.5px] leading-5">{message.body}</p>
                   </article>
                 </div>
               {:else}
                 <div class={`flex ${message.authorType === "customer" ? "justify-start" : "justify-end"}`}>
-                  <article class={`max-w-[82%] rounded-2xl px-4 py-3 shadow-sm ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3EA] bg-white text-[#565C6B]" : message.authorType === "system" ? "rounded-br-md border border-[#D9D4F5] bg-[#F2F0FF] text-[#403878]" : "rounded-br-md bg-[#000A57] text-white"}`}>
-                    {#if message.authorType === "system"}<div class="application-text-meta mb-2 flex items-center gap-1.5 font-bold uppercase tracking-[0.08em] text-[#6255A8]"><Bot size={12}/>Atendimento F10</div>{/if}
+                  <article class={`max-w-[78%] rounded-2xl px-3.5 py-2.5 ${message.authorType === "customer" ? "rounded-bl-md border border-[#DFE2E8] bg-white text-[#4D5361]" : message.authorType === "system" ? "rounded-br-md border border-[#DDD8F4] bg-[#F2F0FF] text-[#453D78]" : "rounded-br-md bg-[#DCEBFF] text-[#273246]"}`}>
+                    {#if message.authorType === "system"}
+                      <div class="mb-1.5 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-[0.07em] text-[#6255A8]"><Bot size={11} />Atendimento F10</div>
+                    {/if}
+
                     {#if message.attachments && message.attachments.length > 0}
-                      <div class={`mb-2 grid gap-2 ${message.attachments.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                      <div class={`mb-2 grid gap-1.5 ${message.attachments.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
                         {#each message.attachments as attachment}
-                          <a href={attachment.url} target="_blank" rel="noopener noreferrer" class="block overflow-hidden rounded-xl border border-black/5 bg-[#F2F3F6]">
-                            <img src={attachment.url} alt={attachment.originalName} class="max-h-[320px] w-full object-contain"/>
+                          <a href={attachment.url} target="_blank" rel="noopener noreferrer" class="block overflow-hidden rounded-lg border border-black/5 bg-[#F2F3F6]">
+                            <img src={attachment.url} alt={attachment.originalName} class="max-h-[280px] w-full object-contain" />
                           </a>
                         {/each}
                       </div>
                     {/if}
-                    {#if message.body}<p class="whitespace-pre-wrap text-[12px] leading-5">{message.body}</p>{/if}
-                    <div class={`application-text-meta mt-2 flex items-center gap-2 ${message.authorType === "customer" ? "text-[#9A9FAC]" : message.authorType === "system" ? "text-[#8178B5]" : "text-white/60"}`}><span>{messageAuthor(message)}</span><span>·</span><span>{formatTime(message.createdAt)}</span></div>
+
+                    {#if message.body}<p class="whitespace-pre-wrap text-[10.5px] leading-5">{message.body}</p>{/if}
+                    <div class={`mt-1.5 flex items-center gap-1.5 text-[8px] ${message.authorType === "customer" ? "text-[#9A9FAC]" : message.authorType === "system" ? "text-[#8178B5]" : "text-[#6D7E95]"}`}>
+                      <span>{messageAuthor(message)}</span><span>·</span><span>{formatTime(message.createdAt)}</span>
+                    </div>
                   </article>
                 </div>
               {/if}
@@ -330,100 +373,215 @@
         </div>
 
         {#if newMessageCount > 0}
-          <button type="button" on:click={() => void scrollToLatest()} class="application-text-caption absolute bottom-4 left-1/2 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-[#000A57] px-4 py-2 font-semibold text-white shadow-lg">
-            {newMessageCount} {newMessageCount === 1 ? "nova mensagem" : "novas mensagens"}<ArrowDown size={14}/>
+          <button type="button" on:click={() => void scrollToLatest()} class="absolute bottom-4 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#000A57] px-3 py-2 text-[9px] font-semibold text-white shadow-lg">
+            {newMessageCount} {newMessageCount === 1 ? "nova" : "novas"}<ArrowDown size={12} />
           </button>
         {/if}
       </div>
 
       {#if chat.status !== "closed" && (canWrite || data.canInternalNote)}
-        <footer class="shrink-0 border-t border-[#E6E8EE] bg-white p-4 sm:p-5">
-          <div class="mx-auto max-w-[860px]">
-            <div class="mb-3 flex items-center gap-2">
-              {#if canWrite}<button type="button" on:click={() => composerMode = "reply"} class={`application-text-meta rounded-full px-3 py-1.5 font-semibold ${composerMode === "reply" ? "bg-[#000A57] text-white" : "bg-[#F2F3F6] text-[#6D7382]"}`}>Resposta ao cliente</button>{/if}
-              {#if data.canInternalNote}<button type="button" on:click={() => composerMode = "note"} class={`application-text-meta rounded-full px-3 py-1.5 font-semibold ${composerMode === "note" ? "bg-[#9A5513] text-white" : "bg-[#FFF3E7] text-[#8B4D12]"}`}>Nota interna</button>{/if}
+        <footer class="shrink-0 border-t border-[#E1E4EA] bg-white p-3.5 sm:p-4">
+          <div class="mx-auto max-w-[820px] overflow-hidden rounded-xl border border-[#DDE1E8] bg-white focus-within:border-[#B9C0D2] focus-within:shadow-sm">
+            <div class="flex items-center gap-1 border-b border-[#ECEEF2] px-2.5 py-2">
+              {#if canWrite}
+                <button type="button" on:click={() => composerMode = "reply"} class={`rounded-md px-2.5 py-1.5 text-[9px] font-semibold transition ${composerMode === "reply" ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#717785] hover:bg-[#F5F6F8]"}`}>Resposta</button>
+              {/if}
+              {#if data.canInternalNote}
+                <button type="button" on:click={() => composerMode = "note"} class={`rounded-md px-2.5 py-1.5 text-[9px] font-semibold transition ${composerMode === "note" ? "bg-[#FFF0E4] text-[#9A5513]" : "text-[#717785] hover:bg-[#F5F6F8]"}`}>Nota interna</button>
+              {/if}
+              <span class="ml-auto text-[8px] text-[#A0A5B0]">{composerMode === "note" ? "Somente equipe F10" : "Visível ao cliente"}</span>
             </div>
 
             {#if composerMode === "reply" && canWrite}
-              {#if chat.aiState === "active"}<div class="application-text-meta mb-3 flex items-center gap-2 rounded-xl bg-[#F4F2FF] px-3 py-2 font-medium text-[#6255A8]"><Bot size={14}/>Sua primeira resposta assume a conversa e interrompe a automação nesta sessão.</div>{/if}
-              {#if errorMessage}<div class="application-text-caption mb-3 flex items-center gap-2 rounded-xl bg-[#FFF3F3] px-3 py-2 font-medium text-[#A13C3C]"><CircleAlert size={14}/>{errorMessage}</div>{/if}
-              <form on:submit|preventDefault={() => void sendMessage()} class="flex items-end gap-3">
-                <label class="min-w-0 flex-1"><span class="sr-only">Mensagem</span><textarea bind:value={messageBody} on:input={persistDraft} on:keydown={handleComposerKeydown} maxlength="4000" rows="2" placeholder="Escreva uma mensagem..." class="max-h-32 min-h-[52px] w-full resize-none rounded-2xl border border-[#DDE1EA] px-4 py-3 text-[12px] leading-5 outline-none focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"></textarea></label>
-                <button type="submit" disabled={sending || !messageBody.trim()} class="inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl bg-[#000A57] text-white transition hover:bg-[#111B71] disabled:bg-[#D6D9E2]" aria-label="Enviar mensagem"><Send size={18}/></button>
+              {#if chat.aiState === "active"}
+                <div class="mx-3 mt-3 flex items-center gap-2 rounded-lg bg-[#F4F2FF] px-3 py-2 text-[8.5px] font-medium text-[#6255A8]"><Bot size={12} />Sua resposta assume a conversa e encerra a automação.</div>
+              {/if}
+              {#if errorMessage}
+                <div class="mx-3 mt-3 flex items-center gap-2 rounded-lg bg-[#FFF3F3] px-3 py-2 text-[8.5px] font-medium text-[#A13C3C]"><CircleAlert size={12} />{errorMessage}</div>
+              {/if}
+              <form on:submit|preventDefault={() => void sendMessage()}>
+                <textarea
+                  bind:value={messageBody}
+                  on:input={persistDraft}
+                  on:keydown={handleComposerKeydown}
+                  maxlength="4000"
+                  rows="3"
+                  placeholder="Escreva uma mensagem..."
+                  class="max-h-36 min-h-[78px] w-full resize-none border-0 px-3.5 py-3 text-[10.5px] leading-5 outline-none"
+                ></textarea>
+                <div class="flex items-center justify-between border-t border-[#F0F1F4] px-3 py-2">
+                  <span class="text-[8px] text-[#A0A5B0]">Ctrl/⌘ + Enter envia</span>
+                  <button type="submit" disabled={sending || !messageBody.trim()} class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 text-[9px] font-semibold text-white disabled:bg-[#D6D9E2]">
+                    Enviar <Send size={12} />
+                  </button>
+                </div>
               </form>
-              <div class="application-text-meta mt-2 flex items-center justify-between gap-3 text-[#999EAA]"><span>Ctrl/⌘ + Enter envia · Enter cria nova linha</span><a href="/app/help" target="_blank" rel="noopener noreferrer" class="font-semibold text-[#000A57] hover:underline">Consultar base de conhecimento</a></div>
             {:else if composerMode === "note" && data.canInternalNote}
-              <form method="POST" action="?/note" class="rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] p-3">
-                <MentionTextarea users={data.mentionUsers} name="body" rows={3} maxlength={10000} placeholder="Ex.: @jeferson pode verificar este caso?" className="w-full resize-y rounded-xl border border-[#E9D6C1] bg-white px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#C46C17]" />
-                <div class="mt-2 flex items-center justify-between gap-3"><span class="application-text-meta text-[#9A744F]">Use @ para chamar alguém da equipe. O cliente nunca vê esta nota.</span><button type="submit" class="application-text-caption min-h-9 rounded-xl bg-[#9A5513] px-4 font-semibold text-white">Adicionar nota</button></div>
+              <form method="POST" action="?/note" class="bg-[#FFFDFC]">
+                <MentionTextarea
+                  users={data.mentionUsers}
+                  name="body"
+                  rows={3}
+                  maxlength={10000}
+                  placeholder="Escreva uma nota interna. Use @ para chamar alguém da equipe..."
+                  className="min-h-[78px] w-full resize-none border-0 bg-transparent px-3.5 py-3 text-[10.5px] leading-5 outline-none"
+                />
+                <div class="flex items-center justify-between border-t border-[#F1E7DD] px-3 py-2">
+                  <span class="text-[8px] text-[#9A744F]">O cliente nunca vê esta nota.</span>
+                  <button type="submit" class="inline-flex h-8 items-center rounded-lg bg-[#9A5513] px-3 text-[9px] font-semibold text-white">Adicionar nota</button>
+                </div>
               </form>
             {/if}
           </div>
         </footer>
       {:else if data.canRespond && chat.assignedUserId && !assignedToMe && chat.status !== "closed"}
-        <footer class="application-text-caption shrink-0 border-t border-[#E6E8EE] bg-[#FAFAFC] px-5 py-4 text-center text-[#777D8D]">Este atendimento está atribuído a <strong>{chat.assignedUserName ?? "outro atendente"}</strong>. Reatribua antes de responder.</footer>
+        <footer class="shrink-0 border-t border-[#E1E4EA] bg-[#FAFAFC] px-4 py-3 text-center text-[9px] text-[#777D8D]">
+          Este atendimento está atribuído a <strong>{chat.assignedUserName ?? "outro atendente"}</strong>.
+        </footer>
       {/if}
-    </section>
+    </main>
 
-    <aside class="space-y-4 xl:overflow-y-auto xl:pr-1">
-      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
-        <div class="flex items-center gap-2"><UserRound size={16} class="text-[#000A57]"/><h2 class="text-[12px] font-semibold text-[#333948]">Cliente</h2></div>
-        <p class="mt-4 text-[12px] font-semibold text-[#303645]">{chat.customerName ?? "Cliente"}</p>
-        {#if chat.organizationName}<p class="application-text-caption mt-1 text-[#747B8D]">{chat.organizationName}</p>{/if}
-        {#if chat.customerEmail}<p class="application-text-caption mt-3 break-all text-[#5E6575]">{chat.customerEmail}</p>{/if}
-        {#if chat.customerPhone}<p class="application-text-caption mt-1 text-[#5E6575]">{chat.customerPhone}</p>{/if}
-        {#if f10UnitName}
-          <div class="mt-4 rounded-2xl border border-[#DDE3EC] bg-[#F7F9FC] p-3">
-            <span class="application-text-meta block font-bold uppercase tracking-[0.1em] text-[#808797]">Contexto F10 autenticado</span>
-            <div class="mt-2 grid gap-2">
-              <div><span class="application-text-meta block text-[#969CAA]">Escola / unidade</span><strong class="application-text-caption mt-0.5 block text-[#3F4656]">{f10UnitName}</strong></div>
-              {#if f10GroupName}<div><span class="application-text-meta block text-[#969CAA]">Grupo</span><strong class="application-text-caption mt-0.5 block text-[#3F4656]">{f10GroupName}</strong></div>{/if}
-              {#if f10LegacyUserId}<div><span class="application-text-meta block text-[#969CAA]">Usuário F10</span><strong class="application-text-meta mt-0.5 block font-mono text-[#5C6372]">{f10LegacyUserId}</strong></div>{/if}
-            </div>
+    <aside class="hidden min-h-0 overflow-y-auto border-l border-[#E4E6EC] bg-white xl:block">
+      <section class="border-b border-[#ECEEF2] p-4">
+        <div class="flex items-center gap-2">
+          <span class="flex h-9 w-9 items-center justify-center rounded-full bg-[#F0F1F4] text-[#626978]"><UserRound size={15} /></span>
+          <div class="min-w-0">
+            <h2 class="truncate text-[11px] font-semibold text-[#303644]">{chat.customerName ?? "Cliente"}</h2>
+            <p class="truncate text-[8.5px] text-[#9398A4]">{chat.customerEmail ?? "Sem e-mail informado"}</p>
           </div>
-        {/if}
-        <p class="application-text-meta mt-3 text-[#9A9FAC]">Conversa iniciada em {formatDateTime(chat.createdAt)}</p>
+        </div>
+        {#if chat.organizationName}<p class="mt-3 text-[9px] text-[#686F7E]">{chat.organizationName}</p>{/if}
+        {#if chat.customerPhone}<p class="mt-1 text-[9px] text-[#686F7E]">{chat.customerPhone}</p>{/if}
       </section>
 
-      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
-        <div class="flex items-center gap-2"><Clock3 size={16} class="text-[#000A57]"/><h2 class="text-[12px] font-semibold text-[#333948]">Atendimento</h2></div>
-        <div class="mt-4 grid grid-cols-2 gap-2">
-          <div class="rounded-xl bg-[#F7F8FA] px-3 py-2"><span class="application-text-meta block uppercase tracking-[0.06em] text-[#999EAA]">Fila</span><strong class="application-text-caption mt-1 block text-[#4A5060]">{chat.queueName}</strong></div>
-          <div class="rounded-xl bg-[#F7F8FA] px-3 py-2"><span class="application-text-meta block uppercase tracking-[0.06em] text-[#999EAA]">{chat.ticketId ? "SLA" : "Registro"}</span><strong class={`application-text-caption mt-1 block ${slaText().includes("Vencido") ? "text-[#A13C3C]" : "text-[#4A5060]"}`}>{slaText()}</strong></div>
+      {#if f10UnitName}
+        <section class="border-b border-[#ECEEF2] p-4">
+          <h3 class="text-[8px] font-bold uppercase tracking-[0.1em] text-[#9398A4]">Contexto F10</h3>
+          <dl class="mt-3 space-y-2.5">
+            <div><dt class="text-[8px] text-[#A0A5B0]">Escola / unidade</dt><dd class="mt-0.5 text-[9.5px] font-semibold text-[#454B59]">{f10UnitName}</dd></div>
+            {#if f10GroupName}<div><dt class="text-[8px] text-[#A0A5B0]">Grupo</dt><dd class="mt-0.5 text-[9.5px] font-semibold text-[#454B59]">{f10GroupName}</dd></div>{/if}
+            {#if f10LegacyUserId}<div><dt class="text-[8px] text-[#A0A5B0]">Usuário F10</dt><dd class="mt-0.5 truncate font-mono text-[8.5px] text-[#666D7C]">{f10LegacyUserId}</dd></div>{/if}
+          </dl>
+        </section>
+      {/if}
+
+      <section class="border-b border-[#ECEEF2] p-4">
+        <div class="flex items-center justify-between gap-2">
+          <h3 class="text-[8px] font-bold uppercase tracking-[0.1em] text-[#9398A4]">Atendimento</h3>
+          <span class="text-[8px] text-[#A0A5B0]">{formatDateTime(chat.createdAt)}</span>
         </div>
 
-        {#if data.canManageTicket && chat.status !== "closed"}
-          <form method="POST" action="?/status" class="mt-4"><label class="block"><span class="application-text-meta mb-1.5 block font-semibold text-[#666C7B]">Status do chamado</span><div class="flex gap-2"><select name="status" value={chat.status} class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="new">Novo</option><option value="open">Aberto</option><option value="in_progress">Em andamento</option><option value="waiting_customer">Aguardando cliente</option><option value="resolved">Resolvido</option></select><button type="submit" class="application-text-meta h-10 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Salvar</button></div></label></form>
-          <form method="POST" action="?/priority" class="mt-3"><label class="block"><span class="application-text-meta mb-1.5 block font-semibold text-[#666C7B]">Prioridade do chamado</span><div class="flex gap-2"><select name="priority" value={chat.priority} class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select><button type="submit" class="application-text-meta h-10 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Salvar</button></div></label></form>
-        {/if}
+        <dl class="mt-3 grid grid-cols-2 gap-2">
+          <div class="rounded-lg bg-[#F7F8FA] px-2.5 py-2"><dt class="text-[7.5px] uppercase text-[#A0A5B0]">Fila</dt><dd class="mt-1 truncate text-[9px] font-semibold text-[#4A5060]">{chat.queueName}</dd></div>
+          <div class="rounded-lg bg-[#F7F8FA] px-2.5 py-2"><dt class="text-[7.5px] uppercase text-[#A0A5B0]">{chat.ticketId ? "SLA" : "Chamado"}</dt><dd class={`mt-1 truncate text-[9px] font-semibold ${slaText().includes("Vencido") ? "text-[#A13C3C]" : "text-[#4A5060]"}`}>{slaText()}</dd></div>
+        </dl>
 
-        <div class="mt-4 border-t border-[#EEF0F5] pt-4">
-          <span class="application-text-meta font-semibold text-[#666C7B]">Responsável pelo chat</span>
-          <p class="application-text-caption mt-1 font-medium text-[#414756]">{chat.assignedUserName ?? "Não atribuído"}</p>
+        <div class="mt-3">
+          <span class="text-[8px] text-[#9398A4]">Responsável</span>
+          <p class="mt-0.5 text-[9.5px] font-semibold text-[#454B59]">{chat.assignedUserName ?? "Não atribuído"}</p>
           {#if data.canAssign && chat.status !== "closed"}
-            <form method="POST" action="?/assign" class="mt-2 flex gap-2"><select name="assignedUserId" required class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="" disabled selected={!chat.assignedUserId}>Selecionar...</option>{#each data.assignees as assignee}<option value={assignee.id} selected={assignee.id === chat.assignedUserId}>{assignee.name}</option>{/each}</select><button type="submit" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#DDE1EA] bg-white text-[#000A57]" aria-label="Atribuir"><UserRoundCog size={15}/></button></form>
+            <form method="POST" action="?/assign" class="mt-2 flex gap-1.5">
+              <select name="assignedUserId" required class="h-8 min-w-0 flex-1 rounded-lg border border-[#DDE1E8] bg-white px-2 text-[8.5px]">
+                <option value="" disabled selected={!chat.assignedUserId}>Selecionar...</option>
+                {#each data.assignees as assignee}<option value={assignee.id} selected={assignee.id === chat.assignedUserId}>{assignee.name}</option>{/each}
+              </select>
+              <button type="submit" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#DDE1E8] text-[#000A57]" aria-label="Atribuir"><UserRoundCog size={12} /></button>
+            </form>
           {/if}
         </div>
       </section>
 
+      {#if chat.ticketId}
+        <section class="border-b border-[#ECEEF2] p-4">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="text-[8px] font-bold uppercase tracking-[0.1em] text-[#9398A4]">Chamado #{chat.ticketNumber}</h3>
+            <a href={`/app/tickets/${chat.ticketId}`} class="text-[8px] font-semibold text-[#000A57] hover:underline">Abrir</a>
+          </div>
+
+          {#if data.canManageTicket && chat.status !== "closed"}
+            <form method="POST" action="?/status" class="mt-3">
+              <label class="text-[8px] text-[#9398A4]">Status</label>
+              <div class="mt-1 flex gap-1.5">
+                <select name="status" value={chat.status} class="h-8 min-w-0 flex-1 rounded-lg border border-[#DDE1E8] bg-white px-2 text-[8.5px]"><option value="new">Novo</option><option value="open">Aberto</option><option value="in_progress">Em andamento</option><option value="waiting_customer">Aguardando cliente</option><option value="resolved">Resolvido</option></select>
+                <button type="submit" class="h-8 rounded-lg bg-[#000A57] px-2.5 text-[8px] font-semibold text-white">Salvar</button>
+              </div>
+            </form>
+
+            <form method="POST" action="?/priority" class="mt-2.5">
+              <label class="text-[8px] text-[#9398A4]">Prioridade</label>
+              <div class="mt-1 flex gap-1.5">
+                <select name="priority" value={chat.priority} class="h-8 min-w-0 flex-1 rounded-lg border border-[#DDE1E8] bg-white px-2 text-[8.5px]"><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select>
+                <button type="submit" class="h-8 rounded-lg bg-[#000A57] px-2.5 text-[8px] font-semibold text-white">Salvar</button>
+              </div>
+            </form>
+          {/if}
+        </section>
+      {:else}
+        <section class="border-b border-[#ECEEF2] p-4">
+          <div class="flex items-center gap-2 text-[#000A57]"><TicketCheck size={13} /><h3 class="text-[9px] font-semibold">Conversa sem chamado</h3></div>
+          <p class="mt-2 text-[8.5px] leading-4 text-[#858B99]">Atenda e converse internamente sem gerar ticket. Crie um chamado somente quando o caso precisar de acompanhamento.</p>
+          {#if data.canCreateTicket && chat.status !== "closed"}
+            <form method="POST" action="?/createTicket" class="mt-3" on:submit={(event) => { if (!confirm("Criar um chamado a partir desta conversa? O histórico público e as notas internas serão preservados.")) event.preventDefault(); }}>
+              <button type="submit" class="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-[#000A57] text-[8.5px] font-semibold text-white"><TicketCheck size={11} />Criar chamado</button>
+            </form>
+          {/if}
+        </section>
+      {/if}
+
       {#if data.canViewTasks}
-        <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
-          <div class="flex items-center justify-between gap-3"><div class="flex items-center gap-2"><ListTodo size={16} class="text-[#000A57]"/><h2 class="text-[12px] font-semibold text-[#333948]">Tarefas do chamado</h2></div><span class="application-text-meta rounded-full bg-[#F3F4F7] px-2 py-1 font-bold text-[#676D7D]">{data.linkedTasks.length}</span></div>
+        <section class="border-b border-[#ECEEF2] p-4">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5"><ListTodo size={12} class="text-[#000A57]" /><h3 class="text-[8px] font-bold uppercase tracking-[0.1em] text-[#9398A4]">Tarefas</h3></div>
+            <span class="rounded-full bg-[#F1F2F5] px-1.5 py-0.5 text-[8px] font-semibold text-[#717785]">{data.linkedTasks.length}</span>
+          </div>
+
           {#if data.linkedTasks.length > 0}
-            <div class="mt-3 space-y-2">{#each data.linkedTasks as task}<a href={`/app/tasks/${task.id}`} class="block rounded-xl border border-[#E7E9EF] bg-[#FAFAFC] px-3 py-3 transition hover:border-[#C9CFE6]"><div class="flex items-start justify-between gap-2"><strong class="application-text-meta leading-4 text-[#3D4454]">{task.title}</strong><span class={`application-text-meta shrink-0 rounded-full px-2 py-1 font-bold ${task.statusClosed ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#EEF0FF] text-[#000A57]"}`}>{task.statusName}</span></div><p class="application-text-meta mt-1 text-[#8A909E]">{task.projectName}{task.dueOn ? ` · ${task.dueOn}` : ""}</p></a>{/each}</div>
-          {:else}<p class="application-text-meta mt-3 leading-4 text-[#858B99]">Nenhuma tarefa vinculada a este chamado.</p>{/if}
+            <div class="mt-2.5 space-y-1.5">
+              {#each data.linkedTasks as task}
+                <a href={`/app/tasks/${task.id}`} class="block rounded-lg border border-[#E7E9EF] px-2.5 py-2 transition hover:bg-[#FAFAFC]">
+                  <strong class="line-clamp-1 text-[8.5px] text-[#454B59]">{task.title}</strong>
+                  <span class="mt-0.5 block text-[7.5px] text-[#9A9FAC]">{task.projectName}{task.dueOn ? ` · ${task.dueOn}` : ""}</span>
+                </a>
+              {/each}
+            </div>
+          {/if}
 
           {#if data.canCreateTask && data.taskProjects.length > 0 && chat.status !== "closed"}
-            <details class="mt-4 border-t border-[#EEF0F5] pt-4"><summary class="application-text-meta flex cursor-pointer list-none items-center gap-2 font-semibold text-[#000A57]"><Plus size={13}/>Criar tarefa vinculada</summary><form method="POST" action="?/createTask" class="mt-3 space-y-2"><select name="projectId" required class="application-text-meta h-9 w-full rounded-xl border border-[#DDE1EA] bg-white px-2">{#each data.taskProjects as project}<option value={project.id}>{project.name}</option>{/each}</select><input name="title" required maxlength="180" value={`Chamado #${chat.ticketNumber} · ${chat.subject}`.slice(0, 180)} class="application-text-meta h-9 w-full rounded-xl border border-[#DDE1EA] px-2"/><textarea name="description" rows="3" maxlength="5000" placeholder="O que precisa ser feito?" class="application-text-meta w-full rounded-xl border border-[#DDE1EA] px-2 py-2"></textarea><div class="grid grid-cols-2 gap-2"><select name="priority" class="application-text-meta h-9 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select><input name="dueOn" type="date" class="application-text-meta h-9 rounded-xl border border-[#DDE1EA] px-2"/></div><button type="submit" class="application-text-meta min-h-9 w-full rounded-xl bg-[#000A57] px-3 font-semibold text-white">Criar tarefa</button></form></details>
+            <details class="mt-3">
+              <summary class="flex cursor-pointer list-none items-center gap-1 text-[8px] font-semibold text-[#000A57]"><Plus size={10} />Criar tarefa</summary>
+              <form method="POST" action="?/createTask" class="mt-2 space-y-1.5">
+                <select name="projectId" required class="h-8 w-full rounded-lg border border-[#DDE1E8] bg-white px-2 text-[8px]">{#each data.taskProjects as project}<option value={project.id}>{project.name}</option>{/each}</select>
+                <input name="title" required maxlength="180" value={`Chamado #${chat.ticketNumber} · ${chat.subject}`.slice(0, 180)} class="h-8 w-full rounded-lg border border-[#DDE1E8] px-2 text-[8px]" />
+                <textarea name="description" rows="2" maxlength="5000" placeholder="O que precisa ser feito?" class="w-full rounded-lg border border-[#DDE1E8] px-2 py-2 text-[8px]"></textarea>
+                <div class="grid grid-cols-2 gap-1.5"><select name="priority" class="h-8 rounded-lg border border-[#DDE1E8] bg-white px-2 text-[8px]"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select><input name="dueOn" type="date" class="h-8 rounded-lg border border-[#DDE1E8] px-2 text-[8px]" /></div>
+                <button type="submit" class="h-8 w-full rounded-lg bg-[#000A57] text-[8px] font-semibold text-white">Criar tarefa</button>
+              </form>
+            </details>
           {/if}
         </section>
       {/if}
 
       {#if chat.ticketId}
-        <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
-          <div class="flex items-center gap-2"><MonitorCog size={16} class="text-[#000A57]"/><h2 class="text-[12px] font-semibold text-[#333948]">Acesso remoto</h2></div>
-          {#if onlineRemoteDevices.length > 0}<p class="application-text-meta mt-3 text-[#398155]">{onlineRemoteDevices.length} {onlineRemoteDevices.length === 1 ? "computador online" : "computadores online"}</p>{:else if data.remoteDevices.length > 0}<p class="application-text-meta mt-3 text-[#858B99]">Computadores vinculados estão offline.</p>{:else}<p class="application-text-meta mt-3 text-[#858B99]">Nenhum computador vinculado a este cliente.</p>{/if}
-          {#if data.canRequestRemote}<a href={`/app/tickets/${chat.ticketId}/remote`} class="application-text-meta mt-3 inline-flex min-h-9 w-full items-center justify-center rounded-xl border border-[#DDE1EA] font-semibold text-[#000A57]">Gerenciar acesso remoto</a>{/if}
+        <section class="p-4">
+          <div class="flex items-center gap-1.5"><MonitorCog size={12} class="text-[#000A57]" /><h3 class="text-[8px] font-bold uppercase tracking-[0.1em] text-[#9398A4]">Acesso remoto</h3></div>
+          {#if onlineRemoteDevices.length > 0}
+            <p class="mt-2 text-[8.5px] font-medium text-[#398155]">{onlineRemoteDevices.length} {onlineRemoteDevices.length === 1 ? "computador online" : "computadores online"}</p>
+          {:else if data.remoteDevices.length > 0}
+            <p class="mt-2 text-[8.5px] text-[#858B99]">Computadores vinculados estão offline.</p>
+          {:else}
+            <p class="mt-2 text-[8.5px] text-[#858B99]">Nenhum computador vinculado.</p>
+          {/if}
+
+          <div class="mt-2 flex flex-col gap-1.5">
+            {#if onlineRemoteDevices.length === 1 && data.canUseRemote}
+              <form method="POST" action="?/startRemote"><input type="hidden" name="deviceId" value={onlineRemoteDevices[0].id} /><button type="submit" class="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-[#000A57] text-[8px] font-semibold text-white"><MonitorCog size={10} />Iniciar acesso remoto</button></form>
+            {:else if data.canRequestRemote && data.remoteDevices.length === 0}
+              <form method="POST" action="?/enrollRemote"><button type="submit" class="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-[#DDE1E8] text-[8px] font-semibold text-[#000A57]"><Download size={10} />Instalar suporte remoto</button></form>
+            {/if}
+            {#if data.canRequestRemote}
+              <a href={`/app/tickets/${chat.ticketId}/remote`} class="inline-flex h-8 w-full items-center justify-center rounded-lg border border-[#DDE1E8] text-[8px] font-semibold text-[#000A57]">Gerenciar computadores</a>
+            {/if}
+          </div>
         </section>
       {/if}
     </aside>
