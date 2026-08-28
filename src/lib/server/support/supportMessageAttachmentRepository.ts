@@ -31,6 +31,15 @@ export type StoredSupportAttachment = {
 
 export type StoredSupportImage = StoredSupportAttachment;
 
+export type SupportMessageAttachmentListItem = {
+  id: string;
+  messageId: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: Date;
+};
+
 function safeFileName(value: string): string {
   const cleaned = value
     .replace(/[\\/\u0000-\u001f\u007f]/g, "-")
@@ -177,7 +186,9 @@ export async function deleteStoredSupportImages(images: StoredSupportAttachment[
   await Promise.all(images.map((image) => deleteAssetObject(image.storageKey).catch(() => undefined)));
 }
 
-export async function listSupportMessageAttachments(messageIds: string[]) {
+export async function listSupportMessageAttachments(
+  messageIds: string[],
+): Promise<SupportMessageAttachmentListItem[]> {
   if (messageIds.length === 0) return [];
   return getDatabase()
     .select({
@@ -194,7 +205,9 @@ export async function listSupportMessageAttachments(messageIds: string[]) {
     .orderBy(asc(ticketMessageAttachments.createdAt));
 }
 
-export async function listSupportChatMessageAttachments(messageIds: string[]) {
+export async function listSupportChatMessageAttachments(
+  messageIds: string[],
+): Promise<SupportMessageAttachmentListItem[]> {
   if (messageIds.length === 0) return [];
   return getDatabase()
     .select({
