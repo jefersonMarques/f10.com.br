@@ -14,8 +14,8 @@ import { users } from "$lib/server/db/schema";
 import { supportAiRuns } from "$lib/server/db/supportAiSchema";
 import {
   customerContacts,
+  supportMessageAuthor,
   supportQueues,
-  ticketMessageAuthorType,
   tickets,
 } from "$lib/server/db/supportSchema";
 
@@ -92,7 +92,7 @@ export const webChatMessages = pgTable(
     sessionId: uuid("session_id")
       .notNull()
       .references(() => webChatSessions.id, { onDelete: "cascade" }),
-    authorType: ticketMessageAuthorType("author_type").notNull(),
+    authorType: supportMessageAuthor("author_type").notNull(),
     authorUserId: uuid("author_user_id").references(() => users.id, { onDelete: "set null" }),
     customerContactId: uuid("customer_contact_id").references(() => customerContacts.id, {
       onDelete: "set null",
