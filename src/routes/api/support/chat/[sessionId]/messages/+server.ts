@@ -8,11 +8,14 @@ import { handlePureSupportGreeting } from "$lib/server/support/supportChatLocalI
 import {
   addPublicChatMessage,
   authorizePublicChatSession,
+  authorizePublicChatSessionForRead,
   listPublicChatMessages,
 } from "$lib/server/support/publicChatRepository";
 import { SUPPORT_IMAGE_MAX_FILES } from "$lib/server/support/supportMessageAttachmentRepository";
 
 const MAX_BODY_BYTES = 36 * 1024 * 1024;
+
+type AuthorizedChatSession = Awaited<ReturnType<typeof authorizePublicChatSessionForRead>>;
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -53,15 +56,25 @@ async function readMessagePayload(request: Request): Promise<{ body: string; fil
   };
 }
 
-async function authorizeF10CustomerForTicket(
+async function authorizeF10CustomerForChat(
   cookies: Cookies,
-  ticketId: string,
+  session: AuthorizedChatSession,
   touchActivity: boolean,
 ): Promise<boolean> {
   const customer = await getOptionalCustomerF10PortalSession(cookies, { touchActivity });
   if (!customer) return false;
 
-  const context = await getTicketCustomerContext(ticketId);
+  if (
+    session.legacyUserId &&
+    session.groupId !== null &&
+    session.unitId !== null
+  ) {
+    return session.legacyUserId === customer.legacyUserId &&
+      isAuthorizedF10Context(customer, session.groupId, session.unitId);
+  }
+
+  if (!session.ticketId) return false;
+  const context = await getTicketCustomerContext(session.ticketId);
   if (
     !context ||
     context.scope !== "unit" ||
@@ -77,19 +90,18 @@ async function authorizeF10CustomerForTicket(
 export const GET: RequestHandler = async ({ params, request, cookies }) => {
   const sessionId = params.sessionId ?? "";
   const token = getBearerToken(request);
-
   if (!isUuid(sessionId) || !token) {
     return json({ error: "INVALID_SESSION" }, { status: 401 });
   }
 
-  let session: Awaited<ReturnType<typeof authorizePublicChatSession>>;
+  let session: AuthorizedChatSession;
   try {
-    session = await authorizePublicChatSession(sessionId, token);
+    session = await authorizePublicChatSessionForRead(sessionId, token);
   } catch {
     return json({ error: "INVALID_SESSION" }, { status: 401 });
   }
 
-  if (!await authorizeF10CustomerForTicket(cookies, session.ticketId, false)) {
+  if (!await authorizeF10CustomerForChat(cookies, session, false)) {
     return json(
       {
         error: "CUSTOMER_AUTH_REQUIRED",
@@ -102,7 +114,7 @@ export const GET: RequestHandler = async ({ params, request, cookies }) => {
   try {
     const messages = await listPublicChatMessages(sessionId, token);
     return json(
-      { messages, aiState: session.aiState },
+      { messages, aiState: session.aiState, ticketId: session.ticketId },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (cause) {
@@ -122,7 +134,6 @@ export const POST: RequestHandler = async ({
 }) => {
   const sessionId = params.sessionId ?? "";
   const token = getBearerToken(request);
-
   if (!isUuid(sessionId) || !token) {
     return json({ error: "INVALID_SESSION" }, { status: 401 });
   }
@@ -134,7 +145,7 @@ export const POST: RequestHandler = async ({
     return json({ error: "INVALID_SESSION" }, { status: 401 });
   }
 
-  if (!await authorizeF10CustomerForTicket(cookies, chatSession.ticketId, true)) {
+  if (!await authorizeF10CustomerForChat(cookies, chatSession, true)) {
     return json(
       {
         error: "CUSTOMER_AUTH_REQUIRED",
@@ -180,7 +191,7 @@ export const POST: RequestHandler = async ({
     );
 
     let ai: { state: "active" | "escalated" | "human" | "disabled"; processed: boolean } | null = null;
-    if (messageResult.aiState === "active") {
+    if (messageResult.aiState === "active" && messageResult.ticketId) {
       if (files.length > 0) {
         ai = await handoffSupportChatForAttachment(sessionId);
       } else {
@@ -197,6 +208,7 @@ export const POST: RequestHandler = async ({
         messageId: messageResult.messageId,
         aiState: ai?.state ?? messageResult.aiState,
         aiProcessed: ai?.processed ?? false,
+        ticketId: messageResult.ticketId,
       },
       { headers: { "Cache-Control": "no-store" } },
     );
@@ -213,7 +225,6 @@ export const POST: RequestHandler = async ({
     if (cause instanceof Error && cause.message.startsWith("ASSET_STORAGE_")) {
       return json({ error: "ATTACHMENT_STORAGE_UNAVAILABLE" }, { status: 503 });
     }
-
     return json({ error: "INVALID_SESSION" }, { status: 401 });
   }
 };
