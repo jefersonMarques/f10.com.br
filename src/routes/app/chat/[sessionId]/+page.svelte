@@ -269,7 +269,7 @@
       {#if chat.ticketId && chat.ticketNumber}
         <a href={`/app/tickets/${chat.ticketId}`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Abrir chamado #{chat.ticketNumber}<TicketCheck size={14}/></a>
       {:else if data.canCreateTicket && chat.status !== "closed"}
-        <form method="POST" action="?/createTicket" on:submit={(event) => { if (!confirm("Criar um chamado a partir desta conversa? O histórico público será vinculado ao novo chamado.")) event.preventDefault(); }}>
+        <form method="POST" action="?/createTicket" on:submit={(event) => { if (!confirm("Criar um chamado a partir desta conversa? O histórico público e as notas internas serão preservados no novo chamado.")) event.preventDefault(); }}>
           <button type="submit" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 font-semibold text-white"><TicketCheck size={14}/>Criar chamado</button>
         </form>
       {/if}
@@ -285,7 +285,7 @@
   {#if !chat.ticketId}
     <div class="application-text-caption mb-4 flex shrink-0 items-start gap-2 rounded-xl border border-[#DCE1F2] bg-[#F7F8FF] px-4 py-3 text-[#555D73]">
       <MessageCircleMore size={15} class="mt-0.5 shrink-0 text-[#000A57]"/>
-      <span>Esta é uma conversa de atendimento e ainda não é um chamado. A equipe pode atender e encerrar o chat normalmente; use <strong>Criar chamado</strong> somente quando houver necessidade de acompanhamento.</span>
+      <span>Esta é uma conversa de atendimento e ainda não é um chamado. A equipe pode conversar internamente, atender e encerrar o chat normalmente; use <strong>Criar chamado</strong> somente quando houver necessidade de acompanhamento.</span>
     </div>
   {/if}
 
@@ -336,12 +336,12 @@
         {/if}
       </div>
 
-      {#if chat.status !== "closed" && (canWrite || data.canManageTicket)}
+      {#if chat.status !== "closed" && (canWrite || data.canInternalNote)}
         <footer class="shrink-0 border-t border-[#E6E8EE] bg-white p-4 sm:p-5">
           <div class="mx-auto max-w-[860px]">
             <div class="mb-3 flex items-center gap-2">
               {#if canWrite}<button type="button" on:click={() => composerMode = "reply"} class={`application-text-meta rounded-full px-3 py-1.5 font-semibold ${composerMode === "reply" ? "bg-[#000A57] text-white" : "bg-[#F2F3F6] text-[#6D7382]"}`}>Resposta ao cliente</button>{/if}
-              {#if data.canManageTicket}<button type="button" on:click={() => composerMode = "note"} class={`application-text-meta rounded-full px-3 py-1.5 font-semibold ${composerMode === "note" ? "bg-[#9A5513] text-white" : "bg-[#FFF3E7] text-[#8B4D12]"}`}>Nota interna</button>{/if}
+              {#if data.canInternalNote}<button type="button" on:click={() => composerMode = "note"} class={`application-text-meta rounded-full px-3 py-1.5 font-semibold ${composerMode === "note" ? "bg-[#9A5513] text-white" : "bg-[#FFF3E7] text-[#8B4D12]"}`}>Nota interna</button>{/if}
             </div>
 
             {#if composerMode === "reply" && canWrite}
@@ -352,10 +352,10 @@
                 <button type="submit" disabled={sending || !messageBody.trim()} class="inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl bg-[#000A57] text-white transition hover:bg-[#111B71] disabled:bg-[#D6D9E2]" aria-label="Enviar mensagem"><Send size={18}/></button>
               </form>
               <div class="application-text-meta mt-2 flex items-center justify-between gap-3 text-[#999EAA]"><span>Ctrl/⌘ + Enter envia · Enter cria nova linha</span><a href="/app/help" target="_blank" rel="noopener noreferrer" class="font-semibold text-[#000A57] hover:underline">Consultar base de conhecimento</a></div>
-            {:else if composerMode === "note" && data.canManageTicket}
+            {:else if composerMode === "note" && data.canInternalNote}
               <form method="POST" action="?/note" class="rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] p-3">
                 <MentionTextarea users={data.mentionUsers} name="body" rows={3} maxlength={10000} placeholder="Ex.: @jeferson pode verificar este caso?" className="w-full resize-y rounded-xl border border-[#E9D6C1] bg-white px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#C46C17]" />
-                <div class="mt-2 flex items-center justify-between gap-3"><span class="application-text-meta text-[#9A744F]">Use @ para mencionar. O cliente nunca vê esta nota.</span><button type="submit" class="application-text-caption min-h-9 rounded-xl bg-[#9A5513] px-4 font-semibold text-white">Adicionar nota</button></div>
+                <div class="mt-2 flex items-center justify-between gap-3"><span class="application-text-meta text-[#9A744F]">Use @ para chamar alguém da equipe. O cliente nunca vê esta nota.</span><button type="submit" class="application-text-caption min-h-9 rounded-xl bg-[#9A5513] px-4 font-semibold text-white">Adicionar nota</button></div>
               </form>
             {/if}
           </div>
