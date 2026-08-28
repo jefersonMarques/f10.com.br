@@ -50,13 +50,9 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
   );
 
   const groupParam = url.searchParams.get("groupId");
-  const defaultGroupId = session.selectedGroupId ??
-    (session.groups.length === 1 ? session.groups[0]?.grupo_id ?? null : null);
-  const groupId = groupParam === "all"
+  const groupId = groupParam === null || groupParam === "all"
     ? null
-    : groupParam === null
-      ? defaultGroupId
-      : parseId(groupParam);
+    : parseId(groupParam);
   const unitId = groupId === null ? null : parseId(url.searchParams.get("unitId"));
   const status = parseStatus(url.searchParams.get("status"));
   const priority = parsePriority(url.searchParams.get("priority"));
