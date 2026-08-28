@@ -54,6 +54,7 @@ export const CUSTOMER_TICKET_PERIODS = ["all", "7d", "30d", "90d"] as const;
 export type CustomerTicketStatus = (typeof CUSTOMER_TICKET_STATUSES)[number];
 export type CustomerTicketPriority = (typeof CUSTOMER_TICKET_PRIORITIES)[number];
 export type CustomerTicketPeriod = (typeof CUSTOMER_TICKET_PERIODS)[number];
+export type CustomerTicketContextScope = "unit" | "global";
 
 export type CustomerTicketListFilters = {
   groupId: number | null;
@@ -66,13 +67,27 @@ export type CustomerTicketListFilters = {
   pageSize: number;
 };
 
+export type CustomerTicketDisplayContext = {
+  scope: CustomerTicketContextScope;
+  groupId: number | null;
+  groupName: string;
+  unitId: number | null;
+  unitName: string;
+  unitSchema: string | null;
+};
+
 export type CreateCustomerF10TicketInput = {
-  groupId: number;
-  unitId: number;
+  scope: CustomerTicketContextScope;
+  groupId: number | null;
+  unitId: number | null;
   subject: string;
   message: string;
   files?: File[];
 };
+
+export function canUseGlobalCustomerContext(session: CustomerF10PortalSession): boolean {
+  return session.groups.length > 1 || listAuthorizedF10Contexts(session).length > 1;
+}
 
 function hasSelectedUnitContext(session: CustomerF10PortalSession): boolean {
   return session.selectedGroupId !== null &&
@@ -103,21 +118,52 @@ function contextAuthorizationCondition(
   session: CustomerF10PortalSession,
   contexts: CustomerF10AuthorizedContext[],
 ): SQL | null {
-  if (contexts.length === 0) return null;
-  return or(
-    ...contexts.map((context) =>
-      and(
-        eq(ticketCustomerContexts.legacyUserId, session.legacyUserId),
-        eq(ticketCustomerContexts.groupId, context.groupId),
-        eq(ticketCustomerContexts.unitId, context.unitId),
-      ),
-    ),
-  ) ?? null;
+  const conditions: SQL[] = [];
+  const globalCondition = and(
+    eq(ticketCustomerContexts.legacyUserId, session.legacyUserId),
+    eq(ticketCustomerContexts.contextScope, "global"),
+  );
+  if (globalCondition) conditions.push(globalCondition);
+
+  for (const context of contexts) {
+    const unitCondition = and(
+      eq(ticketCustomerContexts.legacyUserId, session.legacyUserId),
+      eq(ticketCustomerContexts.contextScope, "unit"),
+      eq(ticketCustomerContexts.groupId, context.groupId),
+      eq(ticketCustomerContexts.unitId, context.unitId),
+    );
+    if (unitCondition) conditions.push(unitCondition);
+  }
+
+  return conditions.length > 0 ? or(...conditions) ?? null : null;
+}
+
+function globalDisplayContext(): CustomerTicketDisplayContext {
+  return {
+    scope: "global",
+    groupId: null,
+    groupName: "Todos os grupos",
+    unitId: null,
+    unitName: "Global",
+    unitSchema: null,
+  };
+}
+
+function unitDisplayContext(context: CustomerF10AuthorizedContext): CustomerTicketDisplayContext {
+  return {
+    scope: "unit",
+    groupId: context.groupId,
+    groupName: context.groupName,
+    unitId: context.unitId,
+    unitName: context.unitName,
+    unitSchema: context.unitSchema,
+  };
 }
 
 function ticketContextFromRow(
   row: {
     contextTicketId: string | null;
+    contextScope: string | null;
     groupId: number | null;
     groupName: string | null;
     unitId: number | null;
@@ -125,7 +171,8 @@ function ticketContextFromRow(
     unitSchema: string | null;
   },
   fallback: CustomerF10AuthorizedContext | null,
-): CustomerF10AuthorizedContext | null {
+): CustomerTicketDisplayContext | null {
+  if (row.contextTicketId && row.contextScope === "global") return globalDisplayContext();
   if (
     row.contextTicketId &&
     row.groupId !== null &&
@@ -135,6 +182,7 @@ function ticketContextFromRow(
     row.unitSchema
   ) {
     return {
+      scope: "unit",
       groupId: row.groupId,
       groupName: row.groupName,
       unitId: row.unitId,
@@ -142,7 +190,7 @@ function ticketContextFromRow(
       unitSchema: row.unitSchema,
     };
   }
-  return fallback;
+  return fallback ? unitDisplayContext(fallback) : null;
 }
 
 export async function listCustomerF10Tickets(
@@ -150,14 +198,24 @@ export async function listCustomerF10Tickets(
   filters: CustomerTicketListFilters,
 ) {
   const authorizedContexts = listAuthorizedF10Contexts(session);
+  if (authorizedContexts.length === 0) {
+    return { tickets: [], total: 0, page: 1, pageSize: filters.pageSize, totalPages: 0 };
+  }
+
   const scopedContexts = filterAuthorizedContexts(authorizedContexts, filters);
-  const contextCondition = contextAuthorizationCondition(session, scopedContexts);
+  const hasContextFilter = filters.groupId !== null || filters.unitId !== null;
+  if (hasContextFilter && scopedContexts.length === 0) {
+    return { tickets: [], total: 0, page: 1, pageSize: filters.pageSize, totalPages: 0 };
+  }
+
+  const contextsForAuthorization = hasContextFilter ? scopedContexts : authorizedContexts;
+  const contextCondition = contextAuthorizationCondition(session, contextsForAuthorization);
   if (!contextCondition) {
     return { tickets: [], total: 0, page: 1, pageSize: filters.pageSize, totalPages: 0 };
   }
 
   const conditions: SQL[] = [eq(tickets.customerContactId, session.contactId)];
-  const allowLegacyWithoutContext = authorizedContexts.length === 1 && scopedContexts.length === 1;
+  const allowLegacyWithoutContext = authorizedContexts.length === 1 && contextsForAuthorization.length === 1;
   const authorizedTicketCondition = allowLegacyWithoutContext
     ? or(contextCondition, isNull(ticketCustomerContexts.ticketId))
     : contextCondition;
@@ -205,6 +263,7 @@ export async function listCustomerF10Tickets(
       createdAt: tickets.createdAt,
       updatedAt: tickets.updatedAt,
       contextTicketId: ticketCustomerContexts.ticketId,
+      contextScope: ticketCustomerContexts.contextScope,
       groupId: ticketCustomerContexts.groupId,
       groupName: ticketCustomerContexts.groupName,
       unitId: ticketCustomerContexts.unitId,
@@ -301,11 +360,10 @@ export async function getCustomerF10Ticket(
   if (!details) return null;
 
   const authorizedContexts = listAuthorizedF10Contexts(session);
-  if (authorizedContexts.length === 0) return null;
-
   const [context] = await getDatabase()
     .select({
       legacyUserId: ticketCustomerContexts.legacyUserId,
+      contextScope: ticketCustomerContexts.contextScope,
       groupId: ticketCustomerContexts.groupId,
       groupName: ticketCustomerContexts.groupName,
       unitId: ticketCustomerContexts.unitId,
@@ -318,11 +376,20 @@ export async function getCustomerF10Ticket(
 
   if (!context) {
     if (authorizedContexts.length !== 1) return null;
-    return { ...details, context: authorizedContexts[0] };
+    return { ...details, context: unitDisplayContext(authorizedContexts[0]) };
+  }
+
+  if (context.legacyUserId !== session.legacyUserId) return null;
+  if (context.contextScope === "global") {
+    return { ...details, context: globalDisplayContext() };
   }
 
   if (
-    context.legacyUserId !== session.legacyUserId ||
+    context.groupId === null ||
+    !context.groupName ||
+    context.unitId === null ||
+    !context.unitName ||
+    !context.unitSchema ||
     !isAuthorizedF10Context(session, context.groupId, context.unitId)
   ) {
     return null;
@@ -331,6 +398,7 @@ export async function getCustomerF10Ticket(
   return {
     ...details,
     context: {
+      scope: "unit" as const,
       groupId: context.groupId,
       groupName: context.groupName,
       unitId: context.unitId,
@@ -344,10 +412,19 @@ export async function createCustomerF10Ticket(
   session: CustomerF10PortalSession,
   input: CreateCustomerF10TicketInput,
 ) {
-  const context = listAuthorizedF10Contexts(session).find(
-    (item) => item.groupId === input.groupId && item.unitId === input.unitId,
-  );
-  if (!context) throw new Error("CUSTOMER_TICKET_CONTEXT_NOT_AUTHORIZED");
+  const authorizedContexts = listAuthorizedF10Contexts(session);
+  const unitContext = input.scope === "unit"
+    ? authorizedContexts.find(
+        (item) => item.groupId === input.groupId && item.unitId === input.unitId,
+      ) ?? null
+    : null;
+
+  if (input.scope === "unit" && !unitContext) {
+    throw new Error("CUSTOMER_TICKET_CONTEXT_NOT_AUTHORIZED");
+  }
+  if (input.scope === "global" && !canUseGlobalCustomerContext(session)) {
+    throw new Error("CUSTOMER_TICKET_GLOBAL_CONTEXT_NOT_ALLOWED");
+  }
 
   const subject = input.subject.trim();
   const message = input.message.trim();
@@ -375,7 +452,7 @@ export async function createCustomerF10Ticket(
           customerContactId: session.contactId,
           queueId: intake.queueId,
           subject,
-          status: "new",
+          status: intake.lifecycleStatus,
           priority: "normal",
           channel: "portal",
           dueOn: sql`CURRENT_DATE + ${intake.defaultDueDays}::integer`,
@@ -411,11 +488,12 @@ export async function createCustomerF10Ticket(
         ticketId,
         customerContactId: session.contactId,
         legacyUserId: session.legacyUserId,
-        groupId: context.groupId,
-        groupName: context.groupName,
-        unitId: context.unitId,
-        unitName: context.unitName,
-        unitSchema: context.unitSchema,
+        contextScope: input.scope,
+        groupId: unitContext?.groupId ?? null,
+        groupName: unitContext?.groupName ?? null,
+        unitId: unitContext?.unitId ?? null,
+        unitName: unitContext?.unitName ?? null,
+        unitSchema: unitContext?.unitSchema ?? null,
         updatedAt: now,
       });
 
@@ -431,8 +509,9 @@ export async function createCustomerF10Ticket(
         ticketId,
         eventType: "portal.ticket.created",
         metadata: {
-          groupId: context.groupId,
-          unitId: context.unitId,
+          contextScope: input.scope,
+          groupId: unitContext?.groupId ?? null,
+          unitId: unitContext?.unitId ?? null,
           attachmentCount: storedAttachments.length,
         },
       });
@@ -502,6 +581,7 @@ export async function bindTicketF10Context(
         ticketId,
         customerContactId: session.contactId,
         legacyUserId: session.legacyUserId,
+        contextScope: "unit",
         groupId: session.selectedGroupId as number,
         groupName: session.selectedGroupName ?? "",
         unitId: session.selectedUnitId as number,
@@ -514,6 +594,7 @@ export async function bindTicketF10Context(
         set: {
           customerContactId: session.contactId,
           legacyUserId: session.legacyUserId,
+          contextScope: "unit",
           groupId: session.selectedGroupId as number,
           groupName: session.selectedGroupName ?? "",
           unitId: session.selectedUnitId as number,
