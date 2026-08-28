@@ -55,22 +55,7 @@
     {/if}
 
     <form method="POST" action="?/create" enctype="multipart/form-data" class="mt-6 space-y-5">
-      {#if data.allowGlobalContext}
-        <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#DDE1E9] bg-[#FAFBFC] p-4">
-          <input
-            type="checkbox"
-            name="globalContext"
-            bind:checked={globalContext}
-            class="mt-0.5 h-4 w-4 rounded border-[#C7CCD6] text-[#000A57] focus:ring-[#000A57]"
-          />
-          <span>
-            <span class="block text-[12px] font-semibold text-[#404858]">Problema global</span>
-            <span class="application-text-meta mt-1 block leading-4 text-[#858C9C]">Marque quando o problema afetar todos os grupos e escolas da sua conta.</span>
-          </span>
-        </label>
-      {/if}
-
-      <div class="grid gap-4 sm:grid-cols-2">
+      <div class={`grid gap-4 ${data.allowGlobalContext ? "sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" : "sm:grid-cols-2"}`}>
         <label>
           <span class="application-text-caption font-semibold text-[#555D6E]">Grupo</span>
           <select
@@ -103,6 +88,18 @@
             {/each}
           </select>
         </label>
+
+        {#if data.allowGlobalContext}
+          <label class="flex h-11 cursor-pointer items-center gap-2 self-end whitespace-nowrap px-1 text-[12px] font-semibold text-[#555D6E]">
+            <input
+              type="checkbox"
+              name="globalContext"
+              bind:checked={globalContext}
+              class="h-4 w-4 rounded border-[#C7CCD6] text-[#000A57] focus:ring-[#000A57]"
+            />
+            Todas Unidades
+          </label>
+        {/if}
       </div>
 
       <label class="block">
