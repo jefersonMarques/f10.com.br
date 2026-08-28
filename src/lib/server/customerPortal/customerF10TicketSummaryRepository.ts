@@ -133,35 +133,36 @@ export async function getCustomerF10TicketSummary(
   if (!where) return EMPTY_SUMMARY;
 
   const db = getDatabase();
-  const [summaryRow, matchingRows] = await Promise.all([
-    db
-      .select({
-        total: sql<number>`count(*)::int`,
-        awaiting: sql<number>`count(*) filter (where ${tickets.status} = 'new')::int`,
-        inProgress: sql<number>`count(*) filter (where ${tickets.status} in ('open', 'in_progress'))::int`,
-        resolved: sql<number>`count(*) filter (where ${tickets.status} in ('resolved', 'closed'))::int`,
-      })
-      .from(tickets)
-      .leftJoin(ticketCustomerContexts, eq(ticketCustomerContexts.ticketId, tickets.id))
-      .where(where),
-    db
-      .select({ id: tickets.id })
-      .from(tickets)
-      .leftJoin(ticketCustomerContexts, eq(ticketCustomerContexts.ticketId, tickets.id))
-      .where(where),
-  ]);
+  const matchingRows = await db
+    .select({
+      id: tickets.id,
+      status: tickets.status,
+    })
+    .from(tickets)
+    .leftJoin(ticketCustomerContexts, eq(ticketCustomerContexts.ticketId, tickets.id))
+    .where(where);
+
+  if (matchingRows.length === 0) return EMPTY_SUMMARY;
+
+  const statusSummary = matchingRows.reduce(
+    (summary, row) => {
+      if (row.status === "new") {
+        summary.awaiting += 1;
+      } else if (["open", "in_progress", "waiting_customer"].includes(row.status)) {
+        summary.inProgress += 1;
+      } else if (row.status === "resolved" || row.status === "closed") {
+        summary.resolved += 1;
+      }
+      return summary;
+    },
+    {
+      awaiting: 0,
+      inProgress: 0,
+      resolved: 0,
+    },
+  );
 
   const ticketIds = matchingRows.map((row) => row.id);
-  if (ticketIds.length === 0) {
-    return {
-      total: summaryRow?.total ?? 0,
-      awaiting: summaryRow?.awaiting ?? 0,
-      inProgress: summaryRow?.inProgress ?? 0,
-      resolved: summaryRow?.resolved ?? 0,
-      unread: 0,
-    };
-  }
-
   const detailPaths = ticketIds.map((ticketId) => `/cliente/chamados/${ticketId}`);
   const [teamActivityRows, viewedRows] = await Promise.all([
     db
@@ -203,10 +204,10 @@ export async function getCustomerF10TicketSummary(
   }, 0);
 
   return {
-    total: summaryRow?.total ?? 0,
-    awaiting: summaryRow?.awaiting ?? 0,
-    inProgress: summaryRow?.inProgress ?? 0,
-    resolved: summaryRow?.resolved ?? 0,
+    total: matchingRows.length,
+    awaiting: statusSummary.awaiting,
+    inProgress: statusSummary.inProgress,
+    resolved: statusSummary.resolved,
     unread,
   };
 }
