@@ -55,9 +55,9 @@
   $: assignedToMe = chat.assignedUserId === data.currentUserId;
   $: canWrite = data.canRespond && (!chat.assignedUserId || assignedToMe);
   $: draftKey = `f10:chat-draft:${chat.sessionId}`;
-  $: f10GroupName = chatContextValue("groupName");
-  $: f10UnitName = chatContextValue("unitName");
-  $: f10LegacyUserId = chatContextValue("legacyUserId");
+  $: f10GroupName = chat.customerContext?.groupName ?? "";
+  $: f10UnitName = chat.customerContext?.unitName ?? "";
+  $: f10LegacyUserId = chat.customerContext?.legacyUserId ?? "";
 
   const statusLabels: Record<string, string> = {
     new: "Novo",
@@ -79,17 +79,8 @@
     active: "Automação atendendo",
     escalated: "Aguardando humano",
     human: "Atendimento humano",
-    disabled: "Automação desativada",
+    disabled: "Aguardando equipe",
   };
-
-  function chatContextValue(key: string): string {
-    const value = chat.contextData;
-    if (!value || typeof value !== "object" || Array.isArray(value)) return "";
-    const field = (value as Record<string, unknown>)[key];
-    if (typeof field === "string") return field.trim();
-    if (typeof field === "number") return String(field);
-    return "";
-  }
 
   function formatTime(value: string | Date): string {
     return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
@@ -101,11 +92,12 @@
 
   function messageAuthor(message: ChatMessage): string {
     if (message.authorType === "customer") return chat.customerName ?? "Cliente";
-    if (message.authorType === "system") return "Automação F10";
+    if (message.authorType === "system") return "Atendimento F10";
     return message.authorUserName ?? "Equipe F10";
   }
 
   function slaText(): string {
+    if (!chat.ticketId) return "Sem chamado vinculado";
     const dueAt = !chat.firstResponseAt ? chat.firstResponseDueAt : chat.resolutionDueAt;
     if (!dueAt || ["resolved", "closed"].includes(chat.status)) return "Sem prazo ativo";
     const minutes = Math.round((new Date(dueAt).getTime() - Date.now()) / 60_000);
@@ -149,7 +141,9 @@
 
       const payload = (await response.json()) as { messages?: ChatMessage[]; chat?: ChatDetails };
       const nextMessages = payload.messages ?? [];
-      const changed = nextMessages.length !== previousLength || nextMessages.at(-1)?.id !== previousLastId || nextMessages.some((message, index) => message.attachments?.length !== messages[index]?.attachments?.length);
+      const changed = nextMessages.length !== previousLength ||
+        nextMessages.at(-1)?.id !== previousLastId ||
+        nextMessages.some((message, index) => message.attachments?.length !== messages[index]?.attachments?.length);
       if (payload.chat) chat = payload.chat;
       if (!changed) return;
 
@@ -214,7 +208,9 @@
   });
 </script>
 
-<svelte:head><title>Chat #{chat.ticketNumber} | F10 Operations</title></svelte:head>
+<svelte:head>
+  <title>{chat.ticketNumber ? `Chamado #${chat.ticketNumber}` : "Chat"} | F10 Operations</title>
+</svelte:head>
 
 <ApplicationContent width="wide" className="flex min-h-[calc(100dvh-var(--application-header-height))] flex-col">
   <div class="flex shrink-0 flex-col justify-between gap-4 pb-4 xl:flex-row xl:items-center">
@@ -224,9 +220,15 @@
       <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-2">
           <h2 class="truncate text-[16px] font-semibold text-[#222838]">{chat.customerName ?? "Cliente"}</h2>
-          <span class="application-text-meta font-bold text-[#EA6D0B]">#{chat.ticketNumber}</span>
+          {#if chat.ticketNumber}
+            <span class="application-text-meta rounded-full bg-[#FFF0E4] px-2 py-1 font-bold text-[#C45C0B]">Chamado #{chat.ticketNumber}</span>
+          {:else}
+            <span class="application-text-meta rounded-full bg-[#EEF0FF] px-2 py-1 font-bold text-[#000A57]">Conversa sem chamado</span>
+          {/if}
           <span class="application-text-meta rounded-full bg-[#EEF0FF] px-2 py-1 font-bold text-[#000A57]">{statusLabels[chat.status]}</span>
-          <span class="application-text-meta rounded-full bg-[#F3F4F7] px-2 py-1 font-bold text-[#777D8D]">{priorityLabels[chat.priority]}</span>
+          {#if chat.ticketId}
+            <span class="application-text-meta rounded-full bg-[#F3F4F7] px-2 py-1 font-bold text-[#777D8D]">{priorityLabels[chat.priority]}</span>
+          {/if}
           <span class={`application-text-meta rounded-full px-2 py-1 font-bold ${chat.aiState === "active" ? "bg-[#F0EEFF] text-[#5142A6]" : chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#9B3C3C]" : "bg-[#F3F4F7] text-[#777D8D]"}`}>{aiLabels[chat.aiState]}</span>
         </div>
         {#if f10UnitName}
@@ -249,30 +251,41 @@
       {#if data.remoteReady}
         {#if onlineRemoteDevices.length === 1 && data.canUseRemote}
           <form method="POST" action="?/startRemote"><input type="hidden" name="deviceId" value={onlineRemoteDevices[0].id}/><button type="submit" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]"><MonitorCog size={14}/>Iniciar acesso remoto</button></form>
-        {:else if onlineRemoteDevices.length > 0 && data.canRequestRemote}
+        {:else if onlineRemoteDevices.length > 0 && data.canRequestRemote && chat.ticketId}
           <a href={`/app/tickets/${chat.ticketId}/remote`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]"><MonitorCog size={14}/>Escolher computador</a>
         {:else if data.remoteDevices.length === 0 && data.canRequestRemote}
           <form method="POST" action="?/enrollRemote"><button type="submit" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]"><Download size={14}/>Instalar suporte remoto</button></form>
-        {:else if data.remoteDevices.length > 0 && data.canRequestRemote}
+        {:else if data.remoteDevices.length > 0 && data.canRequestRemote && chat.ticketId}
           <a href={`/app/tickets/${chat.ticketId}/remote`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#E4E6EC] bg-[#F7F8FA] px-3 font-semibold text-[#777D8D]"><MonitorCog size={14}/>Computador offline</a>
         {/if}
-      {:else if data.canRequestRemote}
-        <a href={`/app/tickets/${chat.ticketId}/remote`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#777D8D]"><MonitorCog size={14}/>Acesso remoto</a>
       {/if}
 
       {#if canWrite && chat.status !== "closed"}
-        <form method="POST" action="?/finish" on:submit={(event) => { if (!confirm("Finalizar este atendimento? A conversa e o ticket serão encerrados.")) event.preventDefault(); }}>
+        <form method="POST" action="?/finish" on:submit={(event) => { if (!confirm(chat.ticketId ? "Finalizar este atendimento? A conversa e o chamado vinculado serão encerrados." : "Finalizar esta conversa? Nenhum chamado será criado.")) event.preventDefault(); }}>
           <button type="submit" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#E7C4C4] bg-[#FFF7F7] px-3 font-semibold text-[#9B3C3C]"><CheckCircle2 size={14}/>Finalizar atendimento</button>
         </form>
       {/if}
 
-      <a href={`/app/tickets/${chat.ticketId}`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Abrir ticket<TicketCheck size={14}/></a>
+      {#if chat.ticketId && chat.ticketNumber}
+        <a href={`/app/tickets/${chat.ticketId}`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Abrir chamado #${chat.ticketNumber}<TicketCheck size={14}/></a>
+      {:else if data.canCreateTicket && chat.status !== "closed"}
+        <form method="POST" action="?/createTicket" on:submit={(event) => { if (!confirm("Criar um chamado a partir desta conversa? O histórico público será vinculado ao novo chamado.")) event.preventDefault(); }}>
+          <button type="submit" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 font-semibold text-white"><TicketCheck size={14}/>Criar chamado</button>
+        </form>
+      {/if}
     </div>
   </div>
 
   {#if form?.message}
     <div class={`application-text-caption mb-4 flex shrink-0 items-center gap-2 rounded-xl px-4 py-3 font-medium ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>
       {#if form.success}<CheckCircle2 size={14}/>{:else}<CircleAlert size={14}/>{/if}{form.message}
+    </div>
+  {/if}
+
+  {#if !chat.ticketId}
+    <div class="application-text-caption mb-4 flex shrink-0 items-start gap-2 rounded-xl border border-[#DCE1F2] bg-[#F7F8FF] px-4 py-3 text-[#555D73]">
+      <MessageCircleMore size={15} class="mt-0.5 shrink-0 text-[#000A57]"/>
+      <span>Esta é uma conversa de atendimento e ainda não é um chamado. A equipe pode atender e encerrar o chat normalmente; use <strong>Criar chamado</strong> somente quando houver necessidade de acompanhamento.</span>
     </div>
   {/if}
 
@@ -297,7 +310,7 @@
               {:else}
                 <div class={`flex ${message.authorType === "customer" ? "justify-start" : "justify-end"}`}>
                   <article class={`max-w-[82%] rounded-2xl px-4 py-3 shadow-sm ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3EA] bg-white text-[#565C6B]" : message.authorType === "system" ? "rounded-br-md border border-[#D9D4F5] bg-[#F2F0FF] text-[#403878]" : "rounded-br-md bg-[#000A57] text-white"}`}>
-                    {#if message.authorType === "system"}<div class="application-text-meta mb-2 flex items-center gap-1.5 font-bold uppercase tracking-[0.08em] text-[#6255A8]"><Bot size={12}/>Automação F10</div>{/if}
+                    {#if message.authorType === "system"}<div class="application-text-meta mb-2 flex items-center gap-1.5 font-bold uppercase tracking-[0.08em] text-[#6255A8]"><Bot size={12}/>Atendimento F10</div>{/if}
                     {#if message.attachments && message.attachments.length > 0}
                       <div class={`mb-2 grid gap-2 ${message.attachments.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
                         {#each message.attachments as attachment}
@@ -376,16 +389,16 @@
         <div class="flex items-center gap-2"><Clock3 size={16} class="text-[#000A57]"/><h2 class="text-[12px] font-semibold text-[#333948]">Atendimento</h2></div>
         <div class="mt-4 grid grid-cols-2 gap-2">
           <div class="rounded-xl bg-[#F7F8FA] px-3 py-2"><span class="application-text-meta block uppercase tracking-[0.06em] text-[#999EAA]">Fila</span><strong class="application-text-caption mt-1 block text-[#4A5060]">{chat.queueName}</strong></div>
-          <div class="rounded-xl bg-[#F7F8FA] px-3 py-2"><span class="application-text-meta block uppercase tracking-[0.06em] text-[#999EAA]">SLA</span><strong class={`application-text-caption mt-1 block ${slaText().includes("Vencido") ? "text-[#A13C3C]" : "text-[#4A5060]"}`}>{slaText()}</strong></div>
+          <div class="rounded-xl bg-[#F7F8FA] px-3 py-2"><span class="application-text-meta block uppercase tracking-[0.06em] text-[#999EAA]">{chat.ticketId ? "SLA" : "Registro"}</span><strong class={`application-text-caption mt-1 block ${slaText().includes("Vencido") ? "text-[#A13C3C]" : "text-[#4A5060]"}`}>{slaText()}</strong></div>
         </div>
 
         {#if data.canManageTicket && chat.status !== "closed"}
-          <form method="POST" action="?/status" class="mt-4"><label class="block"><span class="application-text-meta mb-1.5 block font-semibold text-[#666C7B]">Status</span><div class="flex gap-2"><select name="status" value={chat.status} class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="new">Novo</option><option value="open">Aberto</option><option value="in_progress">Em andamento</option><option value="waiting_customer">Aguardando cliente</option><option value="resolved">Resolvido</option></select><button type="submit" class="application-text-meta h-10 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Salvar</button></div></label></form>
-          <form method="POST" action="?/priority" class="mt-3"><label class="block"><span class="application-text-meta mb-1.5 block font-semibold text-[#666C7B]">Prioridade</span><div class="flex gap-2"><select name="priority" value={chat.priority} class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select><button type="submit" class="application-text-meta h-10 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Salvar</button></div></label></form>
+          <form method="POST" action="?/status" class="mt-4"><label class="block"><span class="application-text-meta mb-1.5 block font-semibold text-[#666C7B]">Status do chamado</span><div class="flex gap-2"><select name="status" value={chat.status} class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="new">Novo</option><option value="open">Aberto</option><option value="in_progress">Em andamento</option><option value="waiting_customer">Aguardando cliente</option><option value="resolved">Resolvido</option></select><button type="submit" class="application-text-meta h-10 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Salvar</button></div></label></form>
+          <form method="POST" action="?/priority" class="mt-3"><label class="block"><span class="application-text-meta mb-1.5 block font-semibold text-[#666C7B]">Prioridade do chamado</span><div class="flex gap-2"><select name="priority" value={chat.priority} class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select><button type="submit" class="application-text-meta h-10 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Salvar</button></div></label></form>
         {/if}
 
         <div class="mt-4 border-t border-[#EEF0F5] pt-4">
-          <span class="application-text-meta font-semibold text-[#666C7B]">Responsável</span>
+          <span class="application-text-meta font-semibold text-[#666C7B]">Responsável pelo chat</span>
           <p class="application-text-caption mt-1 font-medium text-[#414756]">{chat.assignedUserName ?? "Não atribuído"}</p>
           {#if data.canAssign && chat.status !== "closed"}
             <form method="POST" action="?/assign" class="mt-2 flex gap-2"><select name="assignedUserId" required class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="" disabled selected={!chat.assignedUserId}>Selecionar...</option>{#each data.assignees as assignee}<option value={assignee.id} selected={assignee.id === chat.assignedUserId}>{assignee.name}</option>{/each}</select><button type="submit" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#DDE1EA] bg-white text-[#000A57]" aria-label="Atribuir"><UserRoundCog size={15}/></button></form>
@@ -395,22 +408,24 @@
 
       {#if data.canViewTasks}
         <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
-          <div class="flex items-center justify-between gap-3"><div class="flex items-center gap-2"><ListTodo size={16} class="text-[#000A57]"/><h2 class="text-[12px] font-semibold text-[#333948]">Tarefas</h2></div><span class="application-text-meta rounded-full bg-[#F3F4F7] px-2 py-1 font-bold text-[#676D7D]">{data.linkedTasks.length}</span></div>
+          <div class="flex items-center justify-between gap-3"><div class="flex items-center gap-2"><ListTodo size={16} class="text-[#000A57]"/><h2 class="text-[12px] font-semibold text-[#333948]">Tarefas do chamado</h2></div><span class="application-text-meta rounded-full bg-[#F3F4F7] px-2 py-1 font-bold text-[#676D7D]">{data.linkedTasks.length}</span></div>
           {#if data.linkedTasks.length > 0}
             <div class="mt-3 space-y-2">{#each data.linkedTasks as task}<a href={`/app/tasks/${task.id}`} class="block rounded-xl border border-[#E7E9EF] bg-[#FAFAFC] px-3 py-3 transition hover:border-[#C9CFE6]"><div class="flex items-start justify-between gap-2"><strong class="application-text-meta leading-4 text-[#3D4454]">{task.title}</strong><span class={`application-text-meta shrink-0 rounded-full px-2 py-1 font-bold ${task.statusClosed ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#EEF0FF] text-[#000A57]"}`}>{task.statusName}</span></div><p class="application-text-meta mt-1 text-[#8A909E]">{task.projectName}{task.dueOn ? ` · ${task.dueOn}` : ""}</p></a>{/each}</div>
-          {:else}<p class="application-text-meta mt-3 leading-4 text-[#858B99]">Nenhuma tarefa vinculada a este atendimento.</p>{/if}
+          {:else}<p class="application-text-meta mt-3 leading-4 text-[#858B99]">Nenhuma tarefa vinculada a este chamado.</p>{/if}
 
           {#if data.canCreateTask && data.taskProjects.length > 0 && chat.status !== "closed"}
-            <details class="mt-4 border-t border-[#EEF0F5] pt-4"><summary class="application-text-meta flex cursor-pointer list-none items-center gap-2 font-semibold text-[#000A57]"><Plus size={13}/>Criar tarefa vinculada</summary><form method="POST" action="?/createTask" class="mt-3 space-y-2"><select name="projectId" required class="application-text-meta h-9 w-full rounded-xl border border-[#DDE1EA] bg-white px-2">{#each data.taskProjects as project}<option value={project.id}>{project.name}</option>{/each}</select><input name="title" required maxlength="180" value={`Ticket #${chat.ticketNumber} · ${chat.subject}`.slice(0, 180)} class="application-text-meta h-9 w-full rounded-xl border border-[#DDE1EA] px-2"/><textarea name="description" rows="3" maxlength="5000" placeholder="O que precisa ser feito?" class="application-text-meta w-full rounded-xl border border-[#DDE1EA] px-2 py-2"></textarea><div class="grid grid-cols-2 gap-2"><select name="priority" class="application-text-meta h-9 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select><input name="dueOn" type="date" class="application-text-meta h-9 rounded-xl border border-[#DDE1EA] px-2"/></div><button type="submit" class="application-text-meta min-h-9 w-full rounded-xl bg-[#000A57] px-3 font-semibold text-white">Criar tarefa</button></form></details>
+            <details class="mt-4 border-t border-[#EEF0F5] pt-4"><summary class="application-text-meta flex cursor-pointer list-none items-center gap-2 font-semibold text-[#000A57]"><Plus size={13}/>Criar tarefa vinculada</summary><form method="POST" action="?/createTask" class="mt-3 space-y-2"><select name="projectId" required class="application-text-meta h-9 w-full rounded-xl border border-[#DDE1EA] bg-white px-2">{#each data.taskProjects as project}<option value={project.id}>{project.name}</option>{/each}</select><input name="title" required maxlength="180" value={`Chamado #${chat.ticketNumber} · ${chat.subject}`.slice(0, 180)} class="application-text-meta h-9 w-full rounded-xl border border-[#DDE1EA] px-2"/><textarea name="description" rows="3" maxlength="5000" placeholder="O que precisa ser feito?" class="application-text-meta w-full rounded-xl border border-[#DDE1EA] px-2 py-2"></textarea><div class="grid grid-cols-2 gap-2"><select name="priority" class="application-text-meta h-9 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select><input name="dueOn" type="date" class="application-text-meta h-9 rounded-xl border border-[#DDE1EA] px-2"/></div><button type="submit" class="application-text-meta min-h-9 w-full rounded-xl bg-[#000A57] px-3 font-semibold text-white">Criar tarefa</button></form></details>
           {/if}
         </section>
       {/if}
 
-      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
-        <div class="flex items-center gap-2"><MonitorCog size={16} class="text-[#000A57]"/><h2 class="text-[12px] font-semibold text-[#333948]">Acesso remoto</h2></div>
-        {#if onlineRemoteDevices.length > 0}<p class="application-text-meta mt-3 text-[#398155]">{onlineRemoteDevices.length} {onlineRemoteDevices.length === 1 ? "computador online" : "computadores online"}</p>{:else if data.remoteDevices.length > 0}<p class="application-text-meta mt-3 text-[#858B99]">Computadores vinculados estão offline.</p>{:else}<p class="application-text-meta mt-3 text-[#858B99]">Nenhum computador vinculado a este cliente.</p>{/if}
-        {#if data.canRequestRemote}<a href={`/app/tickets/${chat.ticketId}/remote`} class="application-text-meta mt-3 inline-flex min-h-9 w-full items-center justify-center rounded-xl border border-[#DDE1EA] font-semibold text-[#000A57]">Gerenciar acesso remoto</a>{/if}
-      </section>
+      {#if chat.ticketId}
+        <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
+          <div class="flex items-center gap-2"><MonitorCog size={16} class="text-[#000A57]"/><h2 class="text-[12px] font-semibold text-[#333948]">Acesso remoto</h2></div>
+          {#if onlineRemoteDevices.length > 0}<p class="application-text-meta mt-3 text-[#398155]">{onlineRemoteDevices.length} {onlineRemoteDevices.length === 1 ? "computador online" : "computadores online"}</p>{:else if data.remoteDevices.length > 0}<p class="application-text-meta mt-3 text-[#858B99]">Computadores vinculados estão offline.</p>{:else}<p class="application-text-meta mt-3 text-[#858B99]">Nenhum computador vinculado a este cliente.</p>{/if}
+          {#if data.canRequestRemote}<a href={`/app/tickets/${chat.ticketId}/remote`} class="application-text-meta mt-3 inline-flex min-h-9 w-full items-center justify-center rounded-xl border border-[#DDE1EA] font-semibold text-[#000A57]">Gerenciar acesso remoto</a>{/if}
+        </section>
+      {/if}
     </aside>
   </div>
 </ApplicationContent>
