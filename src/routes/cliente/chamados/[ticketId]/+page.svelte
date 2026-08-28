@@ -1,5 +1,19 @@
 <script lang="ts">
-  import { Clock3, Download, MessageSquare, Paperclip, Send } from "lucide-svelte";
+  import {
+    Activity,
+    CalendarDays,
+    CircleAlert,
+    Clock3,
+    Download,
+    Eye,
+    Flag,
+    Globe2,
+    MessageSquare,
+    Paperclip,
+    School,
+    Send,
+    Users,
+  } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
@@ -115,7 +129,7 @@
 
   <section class="rounded-[22px] border border-[#E1E4EC] bg-white p-5 shadow-[0_10px_32px_rgba(1,13,40,0.04)] sm:p-6">
     <div class="flex items-start gap-4 sm:gap-5">
-      <div class="hidden h-[68px] w-[68px] shrink-0 items-center justify-center rounded-2xl bg-[#FFF0E4] text-[30px] font-medium text-[#EA6D0B] sm:flex">!</div>
+      <div class="hidden h-[68px] w-[68px] shrink-0 items-center justify-center rounded-2xl bg-[#FFF0E4] text-[#EA6D0B] sm:flex"><CircleAlert size={31} strokeWidth={1.8} /></div>
       <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-center gap-2">
           <span class="application-text-caption font-bold uppercase tracking-[0.1em] text-[#EA6D0B]">Chamado #{data.details.ticket.ticketNumber}</span>
@@ -128,26 +142,29 @@
 
     <dl class="mt-5 grid overflow-hidden rounded-2xl border border-[#E7E9EF] bg-[#FAFBFC] sm:grid-cols-2 lg:grid-cols-4">
       <div class="border-b border-[#E7E9EF] p-4 sm:border-r lg:border-b-0">
-        <dt class="application-text-meta font-medium text-[#9298A5]">Grupo</dt>
+        <dt class="application-text-meta inline-flex items-center gap-1.5 font-medium text-[#9298A5]"><Users size={13} />Grupo</dt>
         <dd class="mt-1 text-[12px] font-semibold text-[#424A5B]">{data.details.context.groupName}</dd>
       </div>
       <div class="border-b border-[#E7E9EF] p-4 lg:border-b-0 lg:border-r">
-        <dt class="application-text-meta font-medium text-[#9298A5]">Escola</dt>
+        <dt class="application-text-meta inline-flex items-center gap-1.5 font-medium text-[#9298A5]"><School size={13} />Escola</dt>
         <dd class="mt-1 text-[12px] font-semibold text-[#424A5B]">{data.details.context.unitName}</dd>
       </div>
       <div class="border-b border-[#E7E9EF] p-4 sm:border-r sm:border-b-0">
-        <dt class="application-text-meta font-medium text-[#9298A5]">Origem</dt>
+        <dt class="application-text-meta inline-flex items-center gap-1.5 font-medium text-[#9298A5]">
+          {#if data.details.ticket.channel === "web_chat"}<MessageSquare size={13} />{:else}<Globe2 size={13} />{/if}
+          Origem
+        </dt>
         <dd class="mt-1 text-[12px] font-semibold text-[#424A5B]">{channelLabels[data.details.ticket.channel] ?? data.details.ticket.channel}</dd>
       </div>
       <div class="p-4">
-        <dt class="application-text-meta font-medium text-[#9298A5]">Aberto em</dt>
+        <dt class="application-text-meta inline-flex items-center gap-1.5 font-medium text-[#9298A5]"><CalendarDays size={13} />Aberto em</dt>
         <dd class="mt-1 text-[12px] font-semibold text-[#424A5B]">{formatDate(data.details.ticket.createdAt)}</dd>
       </div>
     </dl>
 
     <div class="application-text-meta mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[#858C9C]">
       <span class="inline-flex items-center gap-1.5"><Clock3 size={13} />Atualizado {formatDate(data.details.ticket.updatedAt)}</span>
-      <span class={`inline-flex items-center gap-1.5 font-semibold ${dueLabel().startsWith("Prazo excedido") ? "text-[#A44E3B]" : "text-[#5F687B]"}`}><Clock3 size={13} />{dueLabel()}</span>
+      <span class={`inline-flex items-center gap-1.5 font-semibold ${dueLabel().startsWith("Prazo excedido") ? "text-[#A44E3B]" : "text-[#5F687B]"}`}><Activity size={13} />{dueLabel()}</span>
     </div>
   </section>
 
@@ -197,7 +214,15 @@
           {:else}
             <div class="relative z-10 flex justify-center py-0.5">
               <span class="application-text-meta inline-flex max-w-[94%] items-center gap-2 rounded-full border border-[#DDE2EA] bg-white px-3.5 py-2 text-center font-semibold text-[#687081] shadow-[0_3px_12px_rgba(1,13,40,0.025)]">
-                <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-[#5262D9]"></span>
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#F0F2FF] text-[#5262D9]">
+                  {#if entry.event.eventType === "ticket.agent.first_viewed"}
+                    <Eye size={12} />
+                  {:else if entry.event.eventType === "portal.ticket.created" || entry.event.eventType === "ticket.created"}
+                    <Flag size={12} />
+                  {:else}
+                    <Activity size={12} />
+                  {/if}
+                </span>
                 {eventLabel(entry.event)}
                 <span class="font-normal text-[#9A9FAC]">· {formatDate(entry.event.createdAt)}</span>
               </span>
@@ -206,7 +231,7 @@
         {/each}
 
         <div class="relative z-10 flex justify-center pt-1">
-          <div class="application-text-meta rounded-xl border border-dashed border-[#D8DDE7] bg-[#F8F9FB] px-4 py-2 text-center text-[#9A9FAC]">Novas atualizações aparecerão aqui</div>
+          <div class="application-text-meta inline-flex items-center gap-2 rounded-xl border border-dashed border-[#D8DDE7] bg-[#F8F9FB] px-4 py-2 text-center text-[#9A9FAC]"><Activity size={12} />Novas atualizações aparecerão aqui</div>
         </div>
       </div>
     </div>
