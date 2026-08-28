@@ -1,3 +1,4 @@
+import { dev } from "$app/environment";
 import { fail, redirect, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { recordCustomerActivity } from "$lib/server/customerPortal/customerActivityRepository";
@@ -17,16 +18,18 @@ function readPositiveInteger(formData: FormData, name: string): number | null {
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 
-function readCauseCode(cause: unknown): string {
-  if (!cause || typeof cause !== "object" || !("code" in cause)) return "";
-  const code = cause.code;
-  return typeof code === "string" ? code : "";
-}
-
-function readCauseConstraint(cause: unknown): string {
-  if (!cause || typeof cause !== "object" || !("constraint_name" in cause)) return "";
-  const constraint = cause.constraint_name;
-  return typeof constraint === "string" ? constraint : "";
+function readNestedCauseProperty(cause: unknown, property: string): string {
+  let current: unknown = cause;
+  for (let depth = 0; depth < 6; depth += 1) {
+    if (!current || typeof current !== "object") return "";
+    if (property in current) {
+      const value = (current as Record<string, unknown>)[property];
+      if (typeof value === "string" && value.trim()) return value.trim();
+    }
+    if (!("cause" in current)) return "";
+    current = (current as { cause?: unknown }).cause;
+  }
+  return "";
 }
 
 function isIntakeConfigurationError(errorCode: string): boolean {
@@ -37,6 +40,17 @@ function isIntakeConfigurationError(errorCode: string): boolean {
     "CUSTOMER_PORTAL_MAIN_WORKFLOW_NOT_CONFIGURED",
     "CUSTOMER_PORTAL_NEW_STAGE_NOT_CONFIGURED",
   ].includes(errorCode);
+}
+
+function localDiagnostic(cause: unknown): string {
+  if (!dev) return "";
+  const parts = [
+    readNestedCauseProperty(cause, "code"),
+    readNestedCauseProperty(cause, "constraint_name"),
+    readNestedCauseProperty(cause, "table_name"),
+    readNestedCauseProperty(cause, "column_name"),
+  ].filter(Boolean);
+  return parts.length > 0 ? ` Diagnóstico local: ${parts.join(" · ")}.` : "";
 }
 
 export const load: PageServerLoad = async ({ cookies, url }) => {
@@ -129,8 +143,11 @@ export const actions: Actions = {
       }
 
       const errorCode = cause instanceof Error ? cause.message : "";
-      const databaseCode = readCauseCode(cause);
-      const databaseConstraint = readCauseConstraint(cause);
+      const databaseCode = readNestedCauseProperty(cause, "code");
+      const databaseConstraint = readNestedCauseProperty(cause, "constraint_name");
+      const databaseTable = readNestedCauseProperty(cause, "table_name");
+      const databaseColumn = readNestedCauseProperty(cause, "column_name");
+      const databaseDetail = readNestedCauseProperty(cause, "detail");
       const configurationError = isIntakeConfigurationError(errorCode);
       const schemaOutdated = databaseCode === "42703" || databaseCode === "42P01";
 
@@ -138,23 +155,27 @@ export const actions: Actions = {
         errorCode,
         databaseCode,
         databaseConstraint,
+        databaseTable,
+        databaseColumn,
+        databaseDetail,
         causeType: cause instanceof Error ? cause.name : typeof cause,
         scope,
         groupId,
         unitId,
       });
 
+      const diagnostic = localDiagnostic(cause);
       const messageText = errorCode === "CUSTOMER_TICKET_CONTEXT_NOT_AUTHORIZED"
         ? "A escola selecionada não está disponível para sua conta."
         : errorCode === "CUSTOMER_TICKET_GLOBAL_CONTEXT_NOT_ALLOWED"
           ? "A opção Global não está disponível para esta conta."
           : configurationError || schemaOutdated
-            ? "Não foi possível iniciar o fluxo deste chamado. Tente novamente em instantes."
+            ? `Não foi possível iniciar o fluxo deste chamado. Tente novamente em instantes.${diagnostic}`
             : errorCode.startsWith("SUPPORT_ATTACHMENT_")
               ? "Revise os anexos. São aceitos PNG, JPG, WEBP e PDF, com até 10 MB por arquivo."
               : errorCode.startsWith("ASSET_STORAGE_")
                 ? "O envio de anexos está temporariamente indisponível. Remova os arquivos e tente novamente."
-                : "Não foi possível abrir o chamado. Tente novamente.";
+                : `Não foi possível abrir o chamado. Tente novamente.${diagnostic}`;
       const status = errorCode === "CUSTOMER_TICKET_CONTEXT_NOT_AUTHORIZED" ||
           errorCode === "CUSTOMER_TICKET_GLOBAL_CONTEXT_NOT_ALLOWED"
         ? 403
