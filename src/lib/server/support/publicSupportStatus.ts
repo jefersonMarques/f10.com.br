@@ -1,7 +1,8 @@
-import { and, asc, eq, gte } from "drizzle-orm";
+import { and, asc, eq, gte, isNotNull } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { webChatSessions } from "$lib/server/db/chatSchema";
 import { supportChatEntryOptions } from "$lib/server/db/supportChatEntrySchema";
-import { supportQueues, ticketMessages, tickets } from "$lib/server/db/supportSchema";
+import { supportQueues } from "$lib/server/db/supportSchema";
 import { getGeneralOperationsSettings } from "$lib/server/settings/operationsSettingsRepository";
 import {
   getSupportHoursSettings,
@@ -186,37 +187,24 @@ export async function getPublicSupportStatus() {
       ? 0
       : await countAvailableSupportRespondersForQueue(queueId);
 
-    const humanResponses = await db
+    const answeredChats = await db
       .select({
-        ticketId: tickets.id,
-        ticketCreatedAt: tickets.createdAt,
-        responseAt: ticketMessages.createdAt,
+        createdAt: webChatSessions.createdAt,
+        firstResponseAt: webChatSessions.firstResponseAt,
       })
-      .from(tickets)
-      .innerJoin(ticketMessages, eq(ticketMessages.ticketId, tickets.id))
+      .from(webChatSessions)
       .where(
         and(
-          eq(tickets.queueId, queueId),
-          gte(tickets.createdAt, new Date(now.getTime() - WAIT_SAMPLE_WINDOW_MS)),
-          eq(ticketMessages.authorType, "user"),
-          eq(ticketMessages.visibility, "public"),
+          eq(webChatSessions.queueId, queueId),
+          gte(webChatSessions.createdAt, new Date(now.getTime() - WAIT_SAMPLE_WINDOW_MS)),
+          isNotNull(webChatSessions.firstResponseAt),
         ),
       )
-      .orderBy(asc(tickets.id), asc(ticketMessages.createdAt));
+      .orderBy(asc(webChatSessions.createdAt));
 
-    const firstByTicket = new Map<string, { ticketCreatedAt: Date; responseAt: Date }>();
-    for (const row of humanResponses) {
-      if (!firstByTicket.has(row.ticketId)) {
-        firstByTicket.set(row.ticketId, {
-          ticketCreatedAt: row.ticketCreatedAt,
-          responseAt: row.responseAt,
-        });
-      }
-    }
-
-    const waits = Array.from(firstByTicket.values()).map((ticket) =>
-      Math.max(0, ticket.responseAt.getTime() - ticket.ticketCreatedAt.getTime()),
-    );
+    const waits = answeredChats
+      .filter((chat): chat is typeof chat & { firstResponseAt: Date } => Boolean(chat.firstResponseAt))
+      .map((chat) => Math.max(0, chat.firstResponseAt.getTime() - chat.createdAt.getTime()));
     waitSampleCount = waits.length;
     if (waits.length >= MIN_WAIT_SAMPLES) {
       averageWaitMinutes = roundWaitMinutes(
