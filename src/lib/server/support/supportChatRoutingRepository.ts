@@ -28,7 +28,7 @@ export async function autoAssignChatIfConfigured(
   const activeAfter = new Date(now.getTime() - SUPPORT_AWAY_AFTER_MS);
 
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('f10-support-chat-routing'))`);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('f10-support-ticket-routing'))`);
 
     const [chat] = await tx
       .select({
