@@ -31,6 +31,11 @@ function normalizeText(value: string): string {
     .trim();
 }
 
+function requestsTicketCreation(message: string): boolean {
+  const normalized = normalizeText(message);
+  return /(?:quero|preciso|gostaria|pode|poderia|vamos|vou).{0,28}(?:abrir|criar|registrar).{0,20}(?:chamado|ticket)|(?:abrir|criar|registrar).{0,20}(?:um |o )?(?:chamado|ticket)/i.test(normalized);
+}
+
 function requestsHumanSupport(message: string): boolean {
   const normalized = normalizeText(message);
   return /(?:quero|preciso|gostaria|posso|pode|chama|chamar|falar|conversar).{0,28}(?:atendente|humano|pessoa)|(?:atendente humano|suporte humano|falar com alguem)/i.test(normalized);
@@ -81,9 +86,19 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
     });
     if (!allowed) return json({ error: "RATE_LIMITED" }, { status: 429 });
 
+    if (requestsTicketCreation(message)) {
+      return json({
+        answer: "Posso encaminhar você para a abertura de um chamado, mas ele só será criado depois da sua confirmação no formulário.",
+        requiresHuman: false,
+        offerTicket: true,
+        ticketUrl: "/cliente/chamados/novo",
+        aiAvailable: isSupportAiChatEnabled(),
+      }, { headers: { "Cache-Control": "no-store" } });
+    }
+
     if (requestsHumanSupport(message)) {
       return json({
-        answer: "Certo. Para falar com alguém da equipe F10, vou usar sua sessão identificada quando ela estiver ativa e solicitar apenas o contexto necessário para o atendimento.",
+        answer: "Certo. Vou abrir uma conversa com a equipe F10. Isso não cria um chamado automaticamente.",
         requiresHuman: true,
         aiAvailable: isSupportAiChatEnabled(),
       }, { headers: { "Cache-Control": "no-store" } });
