@@ -45,7 +45,7 @@
       <div>
         <p class="application-text-caption font-bold uppercase tracking-[0.1em] text-[#EA6D0B]">Central de suporte</p>
         <h1 class="mt-1 text-[22px] font-semibold tracking-[-0.03em] text-[#202737]">Abrir novo chamado</h1>
-        <p class="application-text-meta mt-1 leading-5 text-[#858C9C]">Descreva um assunto por chamado para facilitar o acompanhamento e a resolução.</p>
+        <p class="application-text-meta mt-1 leading-5 text-[#858C9C]">Descreva o que aconteceu. A equipe F10 faz a triagem e direciona o chamado internamente.</p>
       </div>
     </div>
 
@@ -75,22 +75,6 @@
           </select>
         </label>
       </div>
-
-      <label class="block">
-        <span class="application-text-caption font-semibold text-[#555D6E]">Tipo de atendimento</span>
-        {#if data.entryOptions.length > 0}
-          <select name="entryOptionId" required class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none focus:border-[#000A57]">
-            <option value="" disabled selected={!formValues?.entryOptionId}>Selecione o assunto principal</option>
-            {#each data.entryOptions as option}
-              <option value={option.id ?? ""} selected={formValues?.entryOptionId === option.id}>{option.label}</option>
-            {/each}
-          </select>
-          <p class="application-text-meta mt-1.5 text-[#9399A6]">Essa escolha direciona o chamado para a equipe correta.</p>
-        {:else}
-          <input type="hidden" name="entryOptionId" value="" />
-          <div class="application-text-control mt-1.5 flex h-11 items-center rounded-xl border border-[#E5E7ED] bg-[#F8F9FB] px-3 text-[#596172]">Suporte F10</div>
-        {/if}
-      </label>
 
       <label class="block">
         <span class="application-text-caption font-semibold text-[#555D6E]">Assunto</span>
