@@ -56,8 +56,9 @@ async function readMessagePayload(request: Request): Promise<{ body: string; fil
 async function authorizeF10CustomerForTicket(
   cookies: Cookies,
   ticketId: string,
+  touchActivity: boolean,
 ): Promise<boolean> {
-  const customer = await getOptionalCustomerF10PortalSession(cookies);
+  const customer = await getOptionalCustomerF10PortalSession(cookies, { touchActivity });
   if (!customer) return false;
 
   const context = await getTicketCustomerContext(ticketId);
@@ -80,7 +81,7 @@ export const GET: RequestHandler = async ({ params, request, cookies }) => {
     return json({ error: "INVALID_SESSION" }, { status: 401 });
   }
 
-  if (!await authorizeF10CustomerForTicket(cookies, session.ticketId)) {
+  if (!await authorizeF10CustomerForTicket(cookies, session.ticketId, false)) {
     return json(
       {
         error: "CUSTOMER_AUTH_REQUIRED",
@@ -125,7 +126,7 @@ export const POST: RequestHandler = async ({
     return json({ error: "INVALID_SESSION" }, { status: 401 });
   }
 
-  if (!await authorizeF10CustomerForTicket(cookies, chatSession.ticketId)) {
+  if (!await authorizeF10CustomerForTicket(cookies, chatSession.ticketId, true)) {
     return json(
       {
         error: "CUSTOMER_AUTH_REQUIRED",
