@@ -47,15 +47,15 @@ DO $$
 DECLARE
   constraint_name text;
 BEGIN
-  SELECT constraint.conname
+  SELECT fk_constraint.conname
     INTO constraint_name
-  FROM pg_constraint AS constraint
-  JOIN pg_attribute AS attribute
-    ON attribute.attrelid = constraint.conrelid
-   AND attribute.attnum = ANY(constraint.conkey)
-  WHERE constraint.conrelid = 'web_chat_sessions'::regclass
-    AND constraint.contype = 'f'
-    AND attribute.attname = 'ticket_id'
+  FROM pg_constraint AS fk_constraint
+  JOIN pg_attribute AS column_attribute
+    ON column_attribute.attrelid = fk_constraint.conrelid
+   AND column_attribute.attnum = ANY(fk_constraint.conkey)
+  WHERE fk_constraint.conrelid = 'web_chat_sessions'::regclass
+    AND fk_constraint.contype = 'f'
+    AND column_attribute.attname = 'ticket_id'
   LIMIT 1;
 
   IF constraint_name IS NOT NULL THEN
