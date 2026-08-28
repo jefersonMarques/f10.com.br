@@ -20,20 +20,20 @@
     description={customerContext}
   >
     <svelte:fragment slot="actions">
-      <a href="/ajuda-f10?chat=1" class="hidden min-h-10 items-center gap-2 rounded-xl border border-[#E0E3EA] bg-white px-3 text-[11px] font-semibold text-[#5E6575] transition hover:border-[#C8CEDB] hover:text-[#000A57] sm:inline-flex">
+      <a href="/ajuda-f10?chat=1" aria-label="Assistente F10" class="inline-flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-xl border border-[#E0E3EA] bg-white px-2.5 text-[11px] font-semibold text-[#5E6575] transition hover:border-[#C8CEDB] hover:text-[#000A57] lg:px-3">
         <MessageCircleMore size={15} />
-        Assistente F10
+        <span class="hidden lg:inline">Assistente F10</span>
       </a>
-      <a href="/ajuda-f10" class="hidden min-h-10 items-center gap-2 rounded-xl border border-[#E0E3EA] bg-white px-3 text-[11px] font-semibold text-[#5E6575] transition hover:border-[#C8CEDB] hover:text-[#000A57] md:inline-flex">
+      <a href="/ajuda-f10" aria-label="Central de ajuda" class="inline-flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-xl border border-[#E0E3EA] bg-white px-2.5 text-[11px] font-semibold text-[#5E6575] transition hover:border-[#C8CEDB] hover:text-[#000A57] lg:px-3">
         <CircleHelp size={15} />
-        Central de ajuda
+        <span class="hidden xl:inline">Central de ajuda</span>
       </a>
-      <a href="/cliente/chamados/novo" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-3.5 text-[11px] font-semibold text-white transition hover:bg-[#111B71]">
+      <a href="/cliente/chamados/novo" aria-label="Novo chamado" class="inline-flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-2.5 text-[11px] font-semibold text-white transition hover:bg-[#111B71] sm:px-3.5">
         <Plus size={15} />
         <span class="hidden sm:inline">Novo chamado</span>
       </a>
       <form method="POST" action="/cliente/sair">
-        <button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#F1F3F7] px-3 text-[11px] font-semibold text-[#5E6575] transition hover:bg-[#E9ECF2] hover:text-[#000A57]">
+        <button type="submit" aria-label="Sair" class="inline-flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-xl bg-[#F1F3F7] px-2.5 text-[11px] font-semibold text-[#5E6575] transition hover:bg-[#E9ECF2] hover:text-[#000A57] sm:px-3">
           <LogOut size={15} />
           <span class="hidden sm:inline">Sair</span>
         </button>
