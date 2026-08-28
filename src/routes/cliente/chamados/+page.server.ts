@@ -9,6 +9,7 @@ import {
   type CustomerTicketPriority,
   type CustomerTicketStatus,
 } from "$lib/server/customerPortal/customerF10TicketRepository";
+import { getCustomerF10TicketSummary } from "$lib/server/customerPortal/customerF10TicketSummaryRepository";
 import { requireCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 
 const PAGE_SIZE = 20;
@@ -61,16 +62,23 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
   const page = parsePage(url.searchParams.get("page"));
   const view = url.searchParams.get("view") === "table" ? "table" : "cards";
 
-  const result = await listCustomerF10Tickets(session, {
+  const summaryFilters = {
     groupId,
     unitId,
     status,
     priority,
     period,
     search,
-    page,
-    pageSize: PAGE_SIZE,
-  });
+  };
+
+  const [result, summary] = await Promise.all([
+    listCustomerF10Tickets(session, {
+      ...summaryFilters,
+      page,
+      pageSize: PAGE_SIZE,
+    }),
+    getCustomerF10TicketSummary(session, summaryFilters),
+  ]);
 
   await recordCustomerActivity(session, {
     eventType: "ticket.list.view",
@@ -92,6 +100,7 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
 
   return {
     ...result,
+    summary,
     groups: session.groups,
     filters: {
       groupId,
