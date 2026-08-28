@@ -368,10 +368,17 @@ export async function autoAssignTicketIfConfigured(
       .set({ lastAssignedAt: now, updatedAt: now })
       .where(eq(supportChatRoutingMembers.userId, candidate.userId));
 
+    const [chatSession] = await tx
+      .select({ id: webChatSessions.id })
+      .from(webChatSessions)
+      .where(eq(webChatSessions.ticketId, ticketId))
+      .limit(1);
+    const isChat = Boolean(chatSession?.id);
+
     await tx.insert(ticketEvents).values({
       ticketId,
       actorUserId: null,
-      eventType: "chat.auto_assigned",
+      eventType: isChat ? "chat.auto_assigned" : "ticket.auto_assigned",
       metadata: {
         assignedUserId: candidate.userId,
         strategy: "round_robin",
@@ -379,18 +386,18 @@ export async function autoAssignTicketIfConfigured(
       },
     });
 
-    const [chatSession] = await tx
-      .select({ id: webChatSessions.id })
-      .from(webChatSessions)
-      .where(eq(webChatSessions.ticketId, ticketId))
-      .limit(1);
-
     await tx.insert(internalNotifications).values({
       userId: candidate.userId,
-      kind: "chat.assigned",
-      title: `Novo atendimento atribuído${ticket.ticketNumber ? ` · #${ticket.ticketNumber}` : ""}`,
-      body: "Um atendimento do chat foi atribuído automaticamente a você.",
-      href: chatSession?.id ? `/app/chat/${chatSession.id}` : `/app/tickets/${ticketId}`,
+      kind: isChat ? "chat.assigned" : "ticket.assigned",
+      title: isChat
+        ? `Novo atendimento atribuído${ticket.ticketNumber ? ` · #${ticket.ticketNumber}` : ""}`
+        : `Ticket #${ticket.ticketNumber} atribuído automaticamente`,
+      body: isChat
+        ? "Um atendimento do chat foi atribuído automaticamente a você."
+        : "Um novo ticket foi atribuído automaticamente a você.",
+      href: isChat && chatSession?.id
+        ? `/app/chat/${chatSession.id}`
+        : `/app/tickets/${ticketId}`,
       entityType: "ticket",
       entityId: ticketId,
     });
