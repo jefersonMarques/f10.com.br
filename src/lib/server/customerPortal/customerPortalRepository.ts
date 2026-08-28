@@ -14,6 +14,9 @@ import {
   tickets,
 } from "$lib/server/db/supportSchema";
 import {
+  CUSTOMER_INTERNAL_MOVEMENT_EVENT_TYPES,
+} from "$lib/server/support/ticketCustomerProgressRepository";
+import {
   deleteStoredSupportImages,
   listSupportMessageAttachments,
   uploadSupportMessageAttachments,
@@ -21,17 +24,31 @@ import {
 
 const LOGIN_TOKEN_TTL_MS = 15 * 60 * 1000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const INTERNAL_MOVEMENT_GROUP_MS = 15 * 60 * 1000;
 
 const PUBLIC_TICKET_EVENTS = [
   "ticket.created",
   "portal.ticket.created",
+  "ticket.agent.first_viewed",
   "ticket.status.changed",
   "portal.customer.message",
   "ticket.replied",
   "chat.started",
   "chat.closed",
   "chat.ai.escalated",
+  ...CUSTOMER_INTERNAL_MOVEMENT_EVENT_TYPES,
 ] as const;
+
+const INTERNAL_MOVEMENT_EVENTS = new Set<string>(CUSTOMER_INTERNAL_MOVEMENT_EVENT_TYPES);
+
+type RawPublicTicketEvent = {
+  id: string;
+  eventType: string;
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+};
+
+type PublicTicketEvent = RawPublicTicketEvent;
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -39,6 +56,40 @@ function hashToken(token: string): string {
 
 function createToken(): string {
   return randomBytes(32).toString("base64url");
+}
+
+function safeEventMetadata(event: RawPublicTicketEvent): Record<string, unknown> {
+  if (event.eventType !== "ticket.status.changed") return {};
+  const status = typeof event.metadata?.status === "string" ? event.metadata.status : "";
+  return status ? { status } : {};
+}
+
+function projectPublicTicketEvents(events: RawPublicTicketEvent[]): PublicTicketEvent[] {
+  const projected: PublicTicketEvent[] = [];
+
+  for (const event of events) {
+    const isInternalMovement = INTERNAL_MOVEMENT_EVENTS.has(event.eventType);
+    const next: PublicTicketEvent = {
+      id: event.id,
+      eventType: isInternalMovement ? "ticket.internal.movement" : event.eventType,
+      metadata: safeEventMetadata(event),
+      createdAt: event.createdAt,
+    };
+
+    const previous = projected.at(-1);
+    if (
+      isInternalMovement &&
+      previous?.eventType === "ticket.internal.movement" &&
+      next.createdAt.getTime() - previous.createdAt.getTime() <= INTERNAL_MOVEMENT_GROUP_MS
+    ) {
+      projected[projected.length - 1] = next;
+      continue;
+    }
+
+    projected.push(next);
+  }
+
+  return projected;
 }
 
 export type CustomerPortalSession = {
@@ -276,7 +327,7 @@ export async function getCustomerPortalTicket(contactId: string, ticketId: strin
         href: `/cliente/chamados/${ticket.id}/anexos/${attachment.id}`,
       })),
     })),
-    events,
+    events: projectPublicTicketEvents(events),
   };
 }
 
