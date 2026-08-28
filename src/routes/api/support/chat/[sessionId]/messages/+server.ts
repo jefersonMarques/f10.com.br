@@ -62,7 +62,15 @@ async function authorizeF10CustomerForTicket(
   if (!customer) return false;
 
   const context = await getTicketCustomerContext(ticketId);
-  if (!context || context.legacyUserId !== customer.legacyUserId) return false;
+  if (
+    !context ||
+    context.scope !== "unit" ||
+    context.legacyUserId !== customer.legacyUserId ||
+    context.groupId === null ||
+    context.unitId === null
+  ) {
+    return false;
+  }
   return isAuthorizedF10Context(customer, context.groupId, context.unitId);
 }
 
