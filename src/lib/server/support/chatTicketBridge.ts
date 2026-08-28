@@ -121,6 +121,7 @@ export async function createTicketFromChat(
         authorType: webChatMessages.authorType,
         authorUserId: webChatMessages.authorUserId,
         customerContactId: webChatMessages.customerContactId,
+        visibility: webChatMessages.visibility,
         body: webChatMessages.body,
         createdAt: webChatMessages.createdAt,
       })
@@ -135,7 +136,7 @@ export async function createTicketFromChat(
           authorType: message.authorType,
           authorUserId: message.authorUserId,
           customerContactId: message.customerContactId,
-          visibility: "public" as const,
+          visibility: message.visibility,
           channel: "web_chat" as const,
           body: message.body,
           createdAt: message.createdAt,
