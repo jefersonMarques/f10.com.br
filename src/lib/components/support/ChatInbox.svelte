@@ -7,7 +7,7 @@
     UserRound,
   } from "lucide-svelte";
 
-  export type ChatInboxItem = {
+  type ChatInboxItem = {
     sessionId: string;
     ticketId: string | null;
     ticketNumber: number | null;
