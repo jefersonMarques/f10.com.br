@@ -5,13 +5,18 @@ import {
   eq,
   gte,
   ilike,
+  inArray,
   isNull,
   or,
   sql,
   type SQL,
 } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
-import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
+import {
+  customerActivityEvents,
+  ticketCustomerContexts,
+} from "$lib/server/db/customerPortalSchema";
+import { ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
 import { ticketMessageAttachments } from "$lib/server/db/supportChatEntrySchema";
 import { ticketEvents, ticketMessages, tickets } from "$lib/server/db/supportSchema";
 import {
@@ -24,7 +29,11 @@ import {
   type CustomerF10AuthorizedContext,
   type CustomerF10PortalSession,
 } from "$lib/server/customerPortal/customerF10AuthRepository";
-import { resolveSupportChatEntryOption } from "$lib/server/support/supportChatEntryRepository";
+import { resolveCustomerPortalTicketIntake } from "$lib/server/customerPortal/customerPortalTicketIntake";
+import {
+  CUSTOMER_TEAM_ACTIVITY_EVENT_TYPES,
+} from "$lib/server/support/ticketCustomerProgressRepository";
+import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
 import {
   deleteStoredSupportImages,
   uploadSupportMessageAttachments,
@@ -60,7 +69,6 @@ export type CustomerTicketListFilters = {
 export type CreateCustomerF10TicketInput = {
   groupId: number;
   unitId: number;
-  entryOptionId: string | null;
   subject: string;
   message: string;
   files?: File[];
@@ -210,23 +218,74 @@ export async function listCustomerF10Tickets(
     .limit(filters.pageSize)
     .offset((page - 1) * filters.pageSize);
 
+  const ticketIds = rows.map((row) => row.id);
+  const detailPaths = ticketIds.map((ticketId) => `/cliente/chamados/${ticketId}`);
+  const [teamActivityRows, viewedRows] = ticketIds.length > 0
+    ? await Promise.all([
+        db
+          .select({
+            ticketId: ticketEvents.ticketId,
+            lastTeamActivityAt: sql<Date | null>`max(${ticketEvents.createdAt})`,
+          })
+          .from(ticketEvents)
+          .where(
+            and(
+              inArray(ticketEvents.ticketId, ticketIds),
+              inArray(ticketEvents.eventType, [...CUSTOMER_TEAM_ACTIVITY_EVENT_TYPES]),
+            ),
+          )
+          .groupBy(ticketEvents.ticketId),
+        db
+          .select({
+            path: customerActivityEvents.path,
+            lastViewedAt: sql<Date | null>`max(${customerActivityEvents.createdAt})`,
+          })
+          .from(customerActivityEvents)
+          .where(
+            and(
+              eq(customerActivityEvents.customerContactId, session.contactId),
+              eq(customerActivityEvents.eventType, "ticket.detail.view"),
+              inArray(customerActivityEvents.path, detailPaths),
+            ),
+          )
+          .groupBy(customerActivityEvents.path),
+      ])
+    : [[], []];
+
+  const teamActivityByTicket = new Map(
+    teamActivityRows.map((row) => [row.ticketId, row.lastTeamActivityAt]),
+  );
+  const lastViewedByPath = new Map(
+    viewedRows.map((row) => [row.path, row.lastViewedAt]),
+  );
   const fallbackContext = authorizedContexts.length === 1 ? authorizedContexts[0] ?? null : null;
+
   return {
-    tickets: rows.map((row) => ({
-      id: row.id,
-      ticketNumber: row.ticketNumber,
-      subject: row.subject,
-      status: row.status,
-      priority: row.priority,
-      channel: row.channel,
-      firstResponseDueAt: row.firstResponseDueAt,
-      resolutionDueAt: row.resolutionDueAt,
-      firstResponseAt: row.firstResponseAt,
-      resolvedAt: row.resolvedAt,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      context: ticketContextFromRow(row, fallbackContext),
-    })),
+    tickets: rows.map((row) => {
+      const lastTeamActivityAt = teamActivityByTicket.get(row.id) ?? null;
+      const lastViewedAt = lastViewedByPath.get(`/cliente/chamados/${row.id}`) ?? null;
+      const hasUnreadUpdate = Boolean(
+        lastTeamActivityAt &&
+        (!lastViewedAt || new Date(lastTeamActivityAt).getTime() > new Date(lastViewedAt).getTime()),
+      );
+      return {
+        id: row.id,
+        ticketNumber: row.ticketNumber,
+        subject: row.subject,
+        status: row.status,
+        priority: row.priority,
+        channel: row.channel,
+        firstResponseDueAt: row.firstResponseDueAt,
+        resolutionDueAt: row.resolutionDueAt,
+        firstResponseAt: row.firstResponseAt,
+        resolvedAt: row.resolvedAt,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        lastTeamActivityAt,
+        hasUnreadUpdate,
+        context: ticketContextFromRow(row, fallbackContext),
+      };
+    }),
     total,
     page,
     pageSize: filters.pageSize,
@@ -295,7 +354,7 @@ export async function createCustomerF10Ticket(
   if (subject.length < 3 || subject.length > 180) throw new Error("CUSTOMER_TICKET_SUBJECT_INVALID");
   if (message.length < 1 || message.length > 10_000) throw new Error("CUSTOMER_TICKET_MESSAGE_INVALID");
 
-  const entryOption = await resolveSupportChatEntryOption(input.entryOptionId);
+  const intake = await resolveCustomerPortalTicketIntake();
   const ticketId = randomUUID();
   const messageId = randomUUID();
   const storedAttachments = await uploadSupportMessageAttachments(
@@ -306,22 +365,23 @@ export async function createCustomerF10Ticket(
   const db = getDatabase();
   const now = new Date();
 
+  let ticket: { id: string; ticketNumber: number };
   try {
-    return await db.transaction(async (tx) => {
-      const [ticket] = await tx
+    ticket = await db.transaction(async (tx) => {
+      const [created] = await tx
         .insert(tickets)
         .values({
           id: ticketId,
           customerContactId: session.contactId,
-          queueId: entryOption.queueId,
+          queueId: intake.queueId,
           subject,
           status: "new",
           priority: "normal",
           channel: "portal",
-          dueOn: sql`CURRENT_DATE + ${entryOption.defaultDueDays}::integer`,
+          dueOn: sql`CURRENT_DATE + ${intake.defaultDueDays}::integer`,
         })
         .returning({ id: tickets.id, ticketNumber: tickets.ticketNumber });
-      if (!ticket) throw new Error("CUSTOMER_TICKET_NOT_CREATED");
+      if (!created) throw new Error("CUSTOMER_TICKET_NOT_CREATED");
 
       await tx.insert(ticketMessages).values({
         id: messageId,
@@ -359,24 +419,42 @@ export async function createCustomerF10Ticket(
         updatedAt: now,
       });
 
+      await tx.insert(ticketWorkflowStates).values({
+        ticketId,
+        globalWorkflowId: intake.workflowId,
+        globalStageId: intake.stageId,
+        enteredAt: now,
+        updatedAt: now,
+      });
+
       await tx.insert(ticketEvents).values({
         ticketId,
         eventType: "portal.ticket.created",
         metadata: {
-          entryOptionId: entryOption.id,
-          entryOptionLabel: entryOption.label,
           groupId: context.groupId,
           unitId: context.unitId,
           attachmentCount: storedAttachments.length,
         },
       });
 
-      return ticket;
+      return created;
     });
   } catch (cause) {
     await deleteStoredSupportImages(storedAttachments);
     throw cause;
   }
+
+  await notifySupportTicketNeedsAttention(
+    ticket.id,
+    "Novo chamado aberto pelo Portal do Cliente.",
+  ).catch((cause) => {
+    console.error("[customer.portal.ticket.notification]", {
+      ticketId: ticket.id,
+      causeType: cause instanceof Error ? cause.name : typeof cause,
+    });
+  });
+
+  return ticket;
 }
 
 export async function replyCustomerF10Ticket(
