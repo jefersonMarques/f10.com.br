@@ -8,7 +8,10 @@ import {
   listInternalChatMessages,
   respondToInternalChat,
 } from "$lib/server/support/internalChatRepository";
-import { listSupportMessageAttachments } from "$lib/server/support/supportMessageAttachmentRepository";
+import {
+  listSupportChatMessageAttachments,
+  listSupportMessageAttachments,
+} from "$lib/server/support/supportMessageAttachmentRepository";
 
 const MAX_BODY_BYTES = 8 * 1024;
 
@@ -53,9 +56,10 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
       authentication.permissions,
       sessionId,
     );
-    const attachmentRows = await listSupportMessageAttachments(
-      result.messages.map((message) => message.id),
-    );
+    const messageIds = result.messages.map((message) => message.id);
+    const attachmentRows = result.chat.ticketId
+      ? await listSupportMessageAttachments(messageIds)
+      : await listSupportChatMessageAttachments(messageIds);
     const attachmentsByMessage = new Map<string, typeof attachmentRows>();
     for (const attachment of attachmentRows) {
       const current = attachmentsByMessage.get(attachment.messageId) ?? [];
