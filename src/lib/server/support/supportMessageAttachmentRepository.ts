@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { webChatMessageAttachments } from "$lib/server/db/chatSchema";
 import { ticketMessageAttachments } from "$lib/server/db/supportChatEntrySchema";
 import { deleteAssetObject, getAssetObject, putAssetObject } from "$lib/server/storage/assetStorage";
 
@@ -83,7 +84,7 @@ function detectedPortalType(bytes: Uint8Array): string | null {
 }
 
 async function storeAttachments(
-  ticketId: string,
+  storageScope: string,
   messageId: string,
   files: File[],
   options: {
@@ -113,7 +114,7 @@ async function storeAttachments(
       }
 
       const extension = options.allowedTypes.get(detectedType)!;
-      const storageKey = `support/tickets/${ticketId}/${messageId}/${randomUUID()}.${extension}`;
+      const storageKey = `support/${storageScope}/${messageId}/${randomUUID()}.${extension}`;
       const asset = await putAssetObject(storageKey, bytes, detectedType);
       stored.push({
         storageKey: asset.key,
@@ -135,7 +136,21 @@ export async function uploadSupportMessageImages(
   messageId: string,
   files: File[],
 ): Promise<StoredSupportImage[]> {
-  return storeAttachments(ticketId, messageId, files, {
+  return storeAttachments(`tickets/${ticketId}`, messageId, files, {
+    maxFiles: SUPPORT_IMAGE_MAX_FILES,
+    maxBytes: SUPPORT_IMAGE_MAX_BYTES,
+    allowedTypes: ALLOWED_IMAGE_TYPES,
+    detectType: detectedImageType,
+    errorPrefix: "SUPPORT_IMAGE",
+  });
+}
+
+export async function uploadSupportChatMessageImages(
+  sessionId: string,
+  messageId: string,
+  files: File[],
+): Promise<StoredSupportImage[]> {
+  return storeAttachments(`chats/${sessionId}`, messageId, files, {
     maxFiles: SUPPORT_IMAGE_MAX_FILES,
     maxBytes: SUPPORT_IMAGE_MAX_BYTES,
     allowedTypes: ALLOWED_IMAGE_TYPES,
@@ -149,7 +164,7 @@ export async function uploadSupportMessageAttachments(
   messageId: string,
   files: File[],
 ): Promise<StoredSupportAttachment[]> {
-  return storeAttachments(ticketId, messageId, files, {
+  return storeAttachments(`tickets/${ticketId}`, messageId, files, {
     maxFiles: SUPPORT_ATTACHMENT_MAX_FILES,
     maxBytes: SUPPORT_ATTACHMENT_MAX_BYTES,
     allowedTypes: ALLOWED_PORTAL_TYPES,
@@ -179,6 +194,23 @@ export async function listSupportMessageAttachments(messageIds: string[]) {
     .orderBy(asc(ticketMessageAttachments.createdAt));
 }
 
+export async function listSupportChatMessageAttachments(messageIds: string[]) {
+  if (messageIds.length === 0) return [];
+  return getDatabase()
+    .select({
+      id: webChatMessageAttachments.id,
+      messageId: webChatMessageAttachments.messageId,
+      sessionId: webChatMessageAttachments.sessionId,
+      originalName: webChatMessageAttachments.originalName,
+      mimeType: webChatMessageAttachments.mimeType,
+      sizeBytes: webChatMessageAttachments.sizeBytes,
+      createdAt: webChatMessageAttachments.createdAt,
+    })
+    .from(webChatMessageAttachments)
+    .where(inArray(webChatMessageAttachments.messageId, messageIds))
+    .orderBy(asc(webChatMessageAttachments.createdAt));
+}
+
 export async function getSupportMessageAttachment(
   attachmentId: string,
   ticketId?: string,
@@ -201,6 +233,31 @@ export async function getSupportMessageAttachment(
             eq(ticketMessageAttachments.ticketId, ticketId),
           )
         : eq(ticketMessageAttachments.id, attachmentId),
+    )
+    .limit(1);
+  return attachment ?? null;
+}
+
+export async function getSupportChatMessageAttachment(
+  attachmentId: string,
+  sessionId: string,
+) {
+  const [attachment] = await getDatabase()
+    .select({
+      id: webChatMessageAttachments.id,
+      messageId: webChatMessageAttachments.messageId,
+      sessionId: webChatMessageAttachments.sessionId,
+      storageKey: webChatMessageAttachments.storageKey,
+      originalName: webChatMessageAttachments.originalName,
+      mimeType: webChatMessageAttachments.mimeType,
+      sizeBytes: webChatMessageAttachments.sizeBytes,
+    })
+    .from(webChatMessageAttachments)
+    .where(
+      and(
+        eq(webChatMessageAttachments.id, attachmentId),
+        eq(webChatMessageAttachments.sessionId, sessionId),
+      ),
     )
     .limit(1);
   return attachment ?? null;
