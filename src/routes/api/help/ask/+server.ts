@@ -67,9 +67,7 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
 
   if (!settings.anonymousAccessEnabled) {
     const customer = await getOptionalCustomerF10PortalSession(cookies);
-    if (!customer || customer.selectedUnitId === null) {
-      return errorResponse("AUTH_REQUIRED", 401);
-    }
+    if (!customer) return errorResponse("AUTH_REQUIRED", 401);
   }
 
   let payload: Record<string, unknown>;
