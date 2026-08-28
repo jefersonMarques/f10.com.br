@@ -1,4 +1,5 @@
 ALTER TABLE web_chat_sessions
+  ADD COLUMN IF NOT EXISTS chat_number bigserial NOT NULL,
   ADD COLUMN IF NOT EXISTS customer_contact_id uuid REFERENCES customer_contacts(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS queue_id uuid REFERENCES support_queues(id) ON DELETE RESTRICT,
   ADD COLUMN IF NOT EXISTS assigned_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
@@ -81,6 +82,8 @@ BEGIN
   END IF;
 END $$;
 
+CREATE UNIQUE INDEX IF NOT EXISTS web_chat_sessions_chat_number_unique
+  ON web_chat_sessions(chat_number);
 CREATE INDEX IF NOT EXISTS web_chat_sessions_queue_idx
   ON web_chat_sessions(queue_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS web_chat_sessions_assigned_idx
