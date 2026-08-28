@@ -16,6 +16,7 @@ import { supportAiRuns } from "$lib/server/db/supportAiSchema";
 import {
   customerContacts,
   supportMessageAuthor,
+  supportMessageVisibility,
   supportQueues,
   tickets,
 } from "$lib/server/db/supportSchema";
@@ -100,11 +101,17 @@ export const webChatMessages = pgTable(
     customerContactId: uuid("customer_contact_id").references(() => customerContacts.id, {
       onDelete: "set null",
     }),
+    visibility: supportMessageVisibility("visibility").notNull().default("public"),
     body: text("body").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index("web_chat_messages_session_idx").on(table.sessionId, table.createdAt),
+    index("web_chat_messages_session_visibility_idx").on(
+      table.sessionId,
+      table.visibility,
+      table.createdAt,
+    ),
     index("web_chat_messages_author_user_idx").on(table.authorUserId, table.createdAt),
   ],
 );
