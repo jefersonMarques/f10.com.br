@@ -22,7 +22,7 @@ function isBodyTooLarge(request: Request): boolean {
 
 function publicCustomer(session: CustomerF10PortalSession) {
   return {
-    authenticated: session.selectedUnitId !== null,
+    authenticated: true,
     name: session.name,
     email: session.email,
     groupName: session.selectedGroupName,
