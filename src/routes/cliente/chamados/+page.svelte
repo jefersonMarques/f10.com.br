@@ -1,14 +1,22 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import {
+    Activity,
     ArrowRight,
+    Bell,
+    Building2,
+    CheckCircle2,
     ChevronLeft,
     ChevronRight,
     Clock3,
+    Globe2,
     Inbox,
     LayoutGrid,
     List,
+    MessageCircle,
+    School,
     Search,
+    Users,
   } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { PageData } from "./$types";
@@ -278,6 +286,44 @@
           </select>
         </label>
       </div>
+
+      <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="flex min-h-[88px] items-center gap-3 rounded-2xl border border-[#EEE4DA] bg-[#FFFCF9] px-4 py-3.5">
+          <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF0E2] text-[#EA6D0B]"><Clock3 size={19} /></span>
+          <div class="min-w-0">
+            <p class="application-text-meta font-semibold text-[#6F7480]">Aguardando atendimento</p>
+            <div class="mt-0.5 flex items-baseline gap-2"><span class="text-[20px] font-semibold tracking-[-0.03em] text-[#C85D08]">{data.summary.awaiting}</span><span class="application-text-meta text-[#A1A5AF]">de {data.summary.total}</span></div>
+            <p class="application-text-meta truncate text-[#9A9FAC]">aguardando triagem</p>
+          </div>
+        </div>
+
+        <div class="flex min-h-[88px] items-center gap-3 rounded-2xl border border-[#E3E6F7] bg-[#FCFCFF] px-4 py-3.5">
+          <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#3444B5]"><MessageCircle size={19} /></span>
+          <div class="min-w-0">
+            <p class="application-text-meta font-semibold text-[#6F7480]">Em andamento</p>
+            <div class="mt-0.5 flex items-baseline gap-2"><span class="text-[20px] font-semibold tracking-[-0.03em] text-[#283AAE]">{data.summary.inProgress}</span><span class="application-text-meta text-[#A1A5AF]">de {data.summary.total}</span></div>
+            <p class="application-text-meta truncate text-[#9A9FAC]">em acompanhamento</p>
+          </div>
+        </div>
+
+        <div class="flex min-h-[88px] items-center gap-3 rounded-2xl border border-[#DDEDE3] bg-[#FBFEFC] px-4 py-3.5">
+          <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EAF6EE] text-[#39815A]"><CheckCircle2 size={19} /></span>
+          <div class="min-w-0">
+            <p class="application-text-meta font-semibold text-[#6F7480]">Resolvidos</p>
+            <div class="mt-0.5 flex items-baseline gap-2"><span class="text-[20px] font-semibold tracking-[-0.03em] text-[#33734F]">{data.summary.resolved}</span><span class="application-text-meta text-[#A1A5AF]">de {data.summary.total}</span></div>
+            <p class="application-text-meta truncate text-[#9A9FAC]">resolvidos ou fechados</p>
+          </div>
+        </div>
+
+        <div class="flex min-h-[88px] items-center gap-3 rounded-2xl border border-[#E8E2F6] bg-[#FDFCFF] px-4 py-3.5">
+          <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#F3EDFF] text-[#7047C8]"><Bell size={19} /></span>
+          <div class="min-w-0">
+            <p class="application-text-meta font-semibold text-[#6F7480]">Nova atualização</p>
+            <div class="mt-0.5 flex items-baseline gap-2"><span class="text-[20px] font-semibold tracking-[-0.03em] text-[#6840BF]">{data.summary.unread}</span><span class="application-text-meta text-[#A1A5AF]">de {data.summary.total}</span></div>
+            <p class="application-text-meta truncate text-[#9A9FAC]">desde sua última visualização</p>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -301,31 +347,42 @@
       <p class="mx-auto mt-2 max-w-[520px] text-[11px] leading-5 text-[#777E8D]">Ajuste os filtros ou use “Novo chamado” na barra superior para falar com a equipe F10.</p>
     </section>
   {:else}
-    <div class={data.filters.view === "cards" ? "space-y-2.5" : "space-y-2.5 md:hidden"}>
+    <div class={data.filters.view === "cards" ? "overflow-hidden rounded-[18px] border border-[#E1E4EC] bg-white shadow-[0_8px_26px_rgba(1,13,40,0.035)]" : "overflow-hidden rounded-[18px] border border-[#E1E4EC] bg-white shadow-[0_8px_26px_rgba(1,13,40,0.035)] md:hidden"}>
       {#each data.tickets as ticket}
-        <a href={`/cliente/chamados/${ticket.id}`} class={`group block overflow-hidden rounded-[18px] border bg-white shadow-[0_6px_22px_rgba(1,13,40,0.028)] transition hover:-translate-y-[1px] hover:shadow-[0_10px_26px_rgba(1,13,40,0.06)] ${ticket.hasUnreadUpdate ? "border-[#E7A16A]" : "border-[#E1E4EC] hover:border-[#C9CED9]"}`}>
-          <div class={`h-[2px] w-full ${ticket.hasUnreadUpdate ? "bg-[#EA6D0B]" : "bg-transparent"}`}></div>
-          <div class="grid gap-4 px-4 py-4 lg:grid-cols-[190px_minmax(260px,1.5fr)_minmax(210px,1fr)_155px_170px_22px] lg:items-center xl:px-5">
+        <a href={`/cliente/chamados/${ticket.id}`} class={`group relative block border-b border-[#ECEEF3] transition last:border-b-0 hover:bg-[#FAFBFD] ${ticket.hasUnreadUpdate ? "bg-[#FFFCF9]" : "bg-white"}`}>
+          {#if ticket.hasUnreadUpdate}<span class="absolute inset-y-0 left-0 w-[3px] bg-[#EA6D0B]"></span>{/if}
+          <div class="grid gap-4 px-4 py-3.5 lg:grid-cols-[185px_minmax(260px,1.55fr)_minmax(205px,1fr)_145px_165px_22px] lg:items-center xl:px-5">
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
                 <span class="application-text-caption font-bold text-[#EA6D0B]">#{ticket.ticketNumber}</span>
                 <span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${statusClass(ticket.status)}`}>{statusLabels[ticket.status] ?? ticket.status}</span>
               </div>
-              <div class="mt-2 flex flex-wrap items-center gap-2">
+              <div class="mt-1.5 flex flex-wrap items-center gap-2">
                 <span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${priorityClass(ticket.priority)}`}>{priorityLabels[ticket.priority] ?? ticket.priority}</span>
                 {#if ticket.hasUnreadUpdate}
-                  <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#FFF1E5] px-2.5 py-1 font-semibold text-[#A9500C]"><span class="h-1.5 w-1.5 rounded-full bg-[#EA6D0B]"></span>Nova atualização</span>
+                  <span class="application-text-meta inline-flex items-center gap-1 rounded-full bg-[#FFF1E5] px-2 py-1 font-semibold text-[#A9500C]"><Bell size={11} />Nova atualização</span>
                 {/if}
               </div>
             </div>
 
             <div class="min-w-0">
-              <h3 class="truncate text-[14px] font-semibold tracking-[-0.01em] text-[#262D3D] group-hover:text-[#000A57]">{ticket.subject}</h3>
-              <p class="application-text-meta mt-1.5 truncate text-[#8A91A0]">{ticket.context ? `${ticket.context.groupName} · ${ticket.context.unitName}` : "Contexto do atendimento"} · {channelLabels[ticket.channel] ?? ticket.channel}</p>
+              <h3 class="truncate text-[14px] font-semibold tracking-[-0.01em] text-[#262D3D] transition group-hover:text-[#000A57]">{ticket.subject}</h3>
+              <div class="application-text-meta mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-[#8A91A0]">
+                {#if ticket.context?.scope === "global"}
+                  <span class="inline-flex items-center gap-1"><Globe2 size={12} />Todos os grupos</span>
+                  <span class="inline-flex items-center gap-1"><Building2 size={12} />Global</span>
+                {:else if ticket.context}
+                  <span class="inline-flex items-center gap-1"><Users size={12} />{ticket.context.groupName}</span>
+                  <span class="inline-flex items-center gap-1"><School size={12} />{ticket.context.unitName}</span>
+                {:else}
+                  <span class="inline-flex items-center gap-1"><Building2 size={12} />Contexto do atendimento</span>
+                {/if}
+                <span class="inline-flex items-center gap-1"><MessageCircle size={12} />{channelLabels[ticket.channel] ?? ticket.channel}</span>
+              </div>
             </div>
 
             <div class="min-w-0">
-              <p class="application-text-meta font-medium text-[#9A9FAC]">Última atividade da equipe</p>
+              <p class="application-text-meta inline-flex items-center gap-1.5 font-medium text-[#9A9FAC]"><Activity size={12} />Última atividade da equipe</p>
               {#if ticket.lastTeamActivityAt}
                 <p class={`mt-1 truncate text-[11px] font-semibold ${ticket.hasUnreadUpdate ? "text-[#A9500C]" : "text-[#626A7B]"}`}>Equipe movimentou este chamado {activityAge(ticket.lastTeamActivityAt)}</p>
               {:else}
@@ -334,13 +391,16 @@
             </div>
 
             <div>
-              <p class="application-text-meta font-medium text-[#9A9FAC]">Atualizado</p>
+              <p class="application-text-meta inline-flex items-center gap-1.5 font-medium text-[#9A9FAC]"><Clock3 size={12} />Atualizado</p>
               <p class="mt-1 text-[11px] font-semibold text-[#596172]">{formatDate(ticket.updatedAt)}</p>
             </div>
 
             <div>
               <p class="application-text-meta font-medium text-[#9A9FAC]">Acompanhamento</p>
-              <p class={`mt-1 inline-flex items-center gap-1.5 text-[11px] font-semibold ${slaClass(ticket)}`}><Clock3 size={13} />{slaLabel(ticket)}</p>
+              <p class={`mt-1 inline-flex items-center gap-1.5 text-[11px] font-semibold ${slaClass(ticket)}`}>
+                {#if ticket.status === "resolved" || ticket.status === "closed"}<CheckCircle2 size={13} />{:else}<Clock3 size={13} />{/if}
+                {slaLabel(ticket)}
+              </p>
             </div>
 
             <ArrowRight size={17} class="hidden text-[#A1A7B4] transition group-hover:translate-x-0.5 group-hover:text-[#000A57] lg:block" />
@@ -368,14 +428,21 @@
               <tr class={ticket.hasUnreadUpdate ? "bg-[#FFFBF7] transition hover:bg-[#FFF8F1]" : "transition hover:bg-[#FAFBFC]"}>
                 <td class="px-4 py-3">
                   <a class="font-semibold text-[#EA6D0B]" href={`/cliente/chamados/${ticket.id}`}>#{ticket.ticketNumber}</a>
-                  {#if ticket.hasUnreadUpdate}<div class="application-text-meta mt-1 inline-flex items-center gap-1.5 font-semibold text-[#A9500C]"><span class="h-1.5 w-1.5 rounded-full bg-[#EA6D0B]"></span>Nova atualização</div>{/if}
+                  {#if ticket.hasUnreadUpdate}<div class="application-text-meta mt-1 inline-flex items-center gap-1 font-semibold text-[#A9500C]"><Bell size={11} />Nova atualização</div>{/if}
                 </td>
                 <td class="max-w-[320px] px-4 py-3 text-[12px] font-medium text-[#303746]"><a class="block truncate hover:text-[#000A57]" href={`/cliente/chamados/${ticket.id}`}>{ticket.subject}</a></td>
-                <td class="px-4 py-3 text-[11px] text-[#6D7484]">{ticket.context ? `${ticket.context.groupName} · ${ticket.context.unitName}` : "—"}<div class="application-text-meta mt-1 text-[#9A9FAC]">{channelLabels[ticket.channel] ?? ticket.channel}</div></td>
+                <td class="px-4 py-3 text-[11px] text-[#6D7484]">
+                  {#if ticket.context?.scope === "global"}
+                    <span class="inline-flex items-center gap-1"><Globe2 size={12} />Todos os grupos · Global</span>
+                  {:else if ticket.context}
+                    <span class="inline-flex items-center gap-1"><School size={12} />{ticket.context.groupName} · {ticket.context.unitName}</span>
+                  {:else}—{/if}
+                  <div class="application-text-meta mt-1 inline-flex items-center gap-1 text-[#9A9FAC]"><MessageCircle size={11} />{channelLabels[ticket.channel] ?? ticket.channel}</div>
+                </td>
                 <td class="px-4 py-3"><span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${statusClass(ticket.status)}`}>{statusLabels[ticket.status] ?? ticket.status}</span><div class="mt-2"><span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${priorityClass(ticket.priority)}`}>{priorityLabels[ticket.priority] ?? ticket.priority}</span></div></td>
                 <td class="px-4 py-3 text-[11px] text-[#687081]">{ticket.lastTeamActivityAt ? activityAge(ticket.lastTeamActivityAt) : "Aguardando movimentação"}</td>
                 <td class="px-4 py-3 text-[11px] font-medium text-[#687081]">{formatDate(ticket.updatedAt)}</td>
-                <td class={`px-4 py-3 text-[11px] font-semibold ${slaClass(ticket)}`}><span class="inline-flex items-center gap-1.5"><Clock3 size={13} />{slaLabel(ticket)}</span></td>
+                <td class={`px-4 py-3 text-[11px] font-semibold ${slaClass(ticket)}`}><span class="inline-flex items-center gap-1.5">{#if ticket.status === "resolved" || ticket.status === "closed"}<CheckCircle2 size={13} />{:else}<Clock3 size={13} />{/if}{slaLabel(ticket)}</span></td>
               </tr>
             {/each}
           </tbody>
