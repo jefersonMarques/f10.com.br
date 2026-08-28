@@ -45,7 +45,10 @@ export const GET: RequestHandler = async ({ params, request, url, cookies }) => 
     const context = await getTicketCustomerContext(session.ticketId);
     if (
       !context ||
+      context.scope !== "unit" ||
       context.legacyUserId !== customer.legacyUserId ||
+      context.groupId === null ||
+      context.unitId === null ||
       !isAuthorizedF10Context(customer, context.groupId, context.unitId)
     ) {
       throw error(401, "Anexo não autorizado.");
