@@ -17,6 +17,7 @@ import { getMeshCentralControlStatus } from "$lib/server/remote/meshCentralContr
 import { getRemoteProviderStatus } from "$lib/server/remote/remoteSupportProvider";
 import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { finishInternalChat } from "$lib/server/support/chatLifecycleRepository";
+import { createTicketFromChat } from "$lib/server/support/chatTicketBridge";
 import {
   assignInternalChat,
   claimInternalChat,
@@ -108,6 +109,11 @@ function isTaskPriority(value: string): value is TaskPriority {
   return ["low", "normal", "high", "urgent"].includes(value);
 }
 
+function requireLinkedTicket(ticketId: string | null): string {
+  if (!ticketId) throw new Error("CHAT_TICKET_REQUIRED");
+  return ticketId;
+}
+
 export const load: PageServerLoad = async ({ params, parent }) => {
   if (!isUuid(params.sessionId)) throw error(404, "Conversa não encontrada.");
 
@@ -121,18 +127,17 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   }
 
   try {
-    const initial = await listInternalChatMessages(
-      layout.user.id,
-      permissions,
-      params.sessionId,
-    );
+    const initial = await listInternalChatMessages(layout.user.id, permissions, params.sessionId);
+    const ticketId = initial.chat.ticketId;
+    const hasTicket = Boolean(ticketId);
     const canRespond = hasPermission(permissions, "chat.respond");
-    const canManageTicket = hasPermission(permissions, "tickets.reply");
-    const canAssign = hasPermission(permissions, "tickets.assign");
-    const canViewTasks = hasPermission(permissions, "tasks.view");
+    const canCreateTicket = !hasTicket && hasPermission(permissions, "tickets.create");
+    const canManageTicket = hasTicket && hasPermission(permissions, "tickets.reply");
+    const canAssign = hasPermission(permissions, "chat.manage") || hasPermission(permissions, "tickets.assign");
+    const canViewTasks = hasTicket && hasPermission(permissions, "tasks.view");
     const canCreateTask = canManageTicket && hasPermission(permissions, "tasks.create");
-    const canRequestRemote = hasPermission(permissions, "remote.request");
-    const canUseRemote = hasPermission(permissions, "remote.use");
+    const canRequestRemote = hasTicket && hasPermission(permissions, "remote.request");
+    const canUseRemote = hasTicket && hasPermission(permissions, "remote.use");
     const provider = getRemoteProviderStatus();
     const control = getMeshCentralControlStatus();
     const remoteVisible = canRequestRemote || canUseRemote;
@@ -140,33 +145,36 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     const [assignees, supportAgents, linkedTasks, taskProjects] = await Promise.all([
       canAssign ? listChatAssignees() : Promise.resolve([]),
       canManageTicket ? listSupportAgents() : Promise.resolve([]),
-      canViewTasks
-        ? listTicketTasks(layout.user.id, permissions, initial.chat.ticketId)
+      canViewTasks && ticketId
+        ? listTicketTasks(layout.user.id, permissions, ticketId)
         : Promise.resolve([]),
       canCreateTask
         ? listTaskProjects(layout.user.id, permissions).catch(() => [])
         : Promise.resolve([]),
     ]);
-    const mentionUsers = canManageTicket
-      ? await filterMentionUsersForTicket(supportAgents, initial.chat.ticketId)
+    const mentionUsers = canManageTicket && ticketId
+      ? await filterMentionUsersForTicket(supportAgents, ticketId)
       : [];
 
-    if (remoteVisible && provider.configured && control.configured) {
+    if (remoteVisible && provider.configured && control.configured && ticketId) {
       try {
-        await syncRemoteDevicesForTicket(initial.chat.ticketId);
+        await syncRemoteDevicesForTicket(ticketId);
       } catch {
         // O chat continua funcional mesmo se a infraestrutura remota estiver indisponível.
       }
     }
 
-    await markEntityNotificationsRead(layout.user.id, "ticket", initial.chat.ticketId).catch(
-      () => undefined,
-    );
+    await markEntityNotificationsRead(
+      layout.user.id,
+      ticketId ? "ticket" : "chat",
+      ticketId ?? params.sessionId,
+    ).catch(() => undefined);
 
     return {
       initial,
       currentUserId: layout.user.id,
       canRespond,
+      canCreateTicket,
       canManageTicket,
       canAssign,
       assignees,
@@ -177,10 +185,10 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       taskProjects,
       canRequestRemote,
       canUseRemote,
-      remoteDevices: remoteVisible
-        ? await listKnownRemoteDevicesForTicket(initial.chat.ticketId)
+      remoteDevices: remoteVisible && ticketId
+        ? await listKnownRemoteDevicesForTicket(ticketId)
         : [],
-      remoteReady: provider.configured && control.configured,
+      remoteReady: hasTicket && provider.configured && control.configured,
     };
   } catch {
     throw error(404, "Conversa não encontrada ou fora do seu escopo.");
@@ -262,18 +270,40 @@ export const actions: Actions = {
       return fail(400, { success: false, action: "assign", message: "Selecione um atendente válido." });
     }
     try {
-      await assignInternalChat(
-        session.user.id,
-        permissions,
-        params.sessionId,
-        targetUserId,
-      );
+      await assignInternalChat(session.user.id, permissions, params.sessionId, targetUserId);
       return { success: true, action: "assign", message: "Atendimento atribuído." };
     } catch {
       return fail(409, {
         success: false,
         action: "assign",
         message: "Não foi possível atribuir este atendimento ao usuário selecionado.",
+      });
+    }
+  },
+
+  createTicket: async ({ params, cookies }) => {
+    if (!isUuid(params.sessionId)) {
+      return fail(404, { success: false, action: "createTicket", message: "Conversa não encontrada." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.create",
+      `/app/chat/${params.sessionId}`,
+    );
+    try {
+      const result = await createTicketFromChat(session.user.id, permissions, params.sessionId);
+      return {
+        success: true,
+        action: "createTicket",
+        message: result.created
+          ? `Chamado #${result.ticketNumber} criado a partir desta conversa.`
+          : `Esta conversa já está vinculada ao chamado #${result.ticketNumber}.`,
+      };
+    } catch {
+      return fail(409, {
+        success: false,
+        action: "createTicket",
+        message: "Não foi possível criar o chamado a partir desta conversa.",
       });
     }
   },
@@ -296,14 +326,12 @@ export const actions: Actions = {
 
     try {
       const initial = await listInternalChatMessages(session.user.id, permissions, params.sessionId);
-      const mentionedUserIds = await validateMentionedUserIds(
-        initial.chat.ticketId,
-        requestedMentionIds,
-      );
+      const ticketId = requireLinkedTicket(initial.chat.ticketId);
+      const mentionedUserIds = await validateMentionedUserIds(ticketId, requestedMentionIds);
       await addTicketMessage(
         session.user.id,
         permissions,
-        initial.chat.ticketId,
+        ticketId,
         body,
         "internal",
         mentionedUserIds,
@@ -315,8 +343,14 @@ export const actions: Actions = {
           ? "Nota interna adicionada e menções notificadas."
           : "Nota interna adicionada.",
       };
-    } catch {
-      return fail(403, { success: false, action: "note", message: "Não foi possível adicionar a nota interna." });
+    } catch (cause) {
+      return fail(cause instanceof Error && cause.message === "CHAT_TICKET_REQUIRED" ? 409 : 403, {
+        success: false,
+        action: "note",
+        message: cause instanceof Error && cause.message === "CHAT_TICKET_REQUIRED"
+          ? "Crie um chamado antes de adicionar notas internas."
+          : "Não foi possível adicionar a nota interna.",
+      });
     }
   },
 
@@ -339,10 +373,17 @@ export const actions: Actions = {
     }
     try {
       const initial = await listInternalChatMessages(session.user.id, permissions, params.sessionId);
-      await updateTicketStatus(session.user.id, permissions, initial.chat.ticketId, status);
+      const ticketId = requireLinkedTicket(initial.chat.ticketId);
+      await updateTicketStatus(session.user.id, permissions, ticketId, status);
       return { success: true, action: "status", message: "Status atualizado." };
-    } catch {
-      return fail(403, { success: false, action: "status", message: "Não foi possível alterar o status." });
+    } catch (cause) {
+      return fail(cause instanceof Error && cause.message === "CHAT_TICKET_REQUIRED" ? 409 : 403, {
+        success: false,
+        action: "status",
+        message: cause instanceof Error && cause.message === "CHAT_TICKET_REQUIRED"
+          ? "Crie um chamado antes de alterar o status."
+          : "Não foi possível alterar o status.",
+      });
     }
   },
 
@@ -361,10 +402,17 @@ export const actions: Actions = {
     }
     try {
       const initial = await listInternalChatMessages(session.user.id, permissions, params.sessionId);
-      await updateTicketPriority(session.user.id, permissions, initial.chat.ticketId, priority);
+      const ticketId = requireLinkedTicket(initial.chat.ticketId);
+      await updateTicketPriority(session.user.id, permissions, ticketId, priority);
       return { success: true, action: "priority", message: "Prioridade atualizada." };
-    } catch {
-      return fail(403, { success: false, action: "priority", message: "Não foi possível alterar a prioridade." });
+    } catch (cause) {
+      return fail(cause instanceof Error && cause.message === "CHAT_TICKET_REQUIRED" ? 409 : 403, {
+        success: false,
+        action: "priority",
+        message: cause instanceof Error && cause.message === "CHAT_TICKET_REQUIRED"
+          ? "Crie um chamado antes de alterar a prioridade."
+          : "Não foi possível alterar a prioridade.",
+      });
     }
   },
 
@@ -393,32 +441,28 @@ export const actions: Actions = {
 
     try {
       const initial = await listInternalChatMessages(session.user.id, permissions, params.sessionId);
+      const ticketId = requireLinkedTicket(initial.chat.ticketId);
       const task = await createTaskFromTicket(
         session.user.id,
         permissions,
-        initial.chat.ticketId,
-        {
-          projectId,
-          title,
-          description,
-          priority,
-          dueOn,
-          assigneeId: null,
-        },
+        ticketId,
+        { projectId, title, description, priority, dueOn, assigneeId: null },
       );
       return { success: true, action: "createTask", message: `Tarefa “${task.title}” criada e vinculada ao ticket.` };
-    } catch {
-      return fail(403, { success: false, action: "createTask", message: "Não foi possível criar a tarefa." });
+    } catch (cause) {
+      return fail(cause instanceof Error && cause.message === "CHAT_TICKET_REQUIRED" ? 409 : 403, {
+        success: false,
+        action: "createTask",
+        message: cause instanceof Error && cause.message === "CHAT_TICKET_REQUIRED"
+          ? "Crie um chamado antes de criar uma tarefa vinculada."
+          : "Não foi possível criar a tarefa.",
+      });
     }
   },
 
   enrollRemote: async ({ params, cookies, url }) => {
     if (!isUuid(params.sessionId)) {
-      return fail(404, {
-        success: false,
-        action: "enrollRemote",
-        message: "Conversa não encontrada.",
-      });
+      return fail(404, { success: false, action: "enrollRemote", message: "Conversa não encontrada." });
     }
     const { session, permissions } = await requireAppPermission(
       cookies,
@@ -427,37 +471,28 @@ export const actions: Actions = {
     );
 
     try {
-      const initial = await listInternalChatMessages(
-        session.user.id,
-        permissions,
-        params.sessionId,
-      );
-      await createRemoteDeviceEnrollment(
-        session.user.id,
-        initial.chat.ticketId,
-        url.origin,
-      );
+      const initial = await listInternalChatMessages(session.user.id, permissions, params.sessionId);
+      const ticketId = requireLinkedTicket(initial.chat.ticketId);
+      await createRemoteDeviceEnrollment(session.user.id, ticketId, url.origin);
       return {
         success: true,
         action: "enrollRemote",
         message: "O link do Suporte Remoto F10 foi enviado nesta conversa.",
       };
-    } catch {
+    } catch (cause) {
       return fail(409, {
         success: false,
         action: "enrollRemote",
-        message: "Não foi possível gerar o instalador remoto para esta conversa.",
+        message: cause instanceof Error && cause.message === "CHAT_TICKET_REQUIRED"
+          ? "Crie um chamado antes de iniciar o suporte remoto."
+          : "Não foi possível gerar o instalador remoto para esta conversa.",
       });
     }
   },
 
   startRemote: async ({ params, cookies, request }) => {
     if (!isUuid(params.sessionId)) {
-      return fail(404, {
-        success: false,
-        action: "startRemote",
-        message: "Conversa não encontrada.",
-      });
+      return fail(404, { success: false, action: "startRemote", message: "Conversa não encontrada." });
     }
     const { session, permissions } = await requireAppPermission(
       cookies,
@@ -467,42 +502,28 @@ export const actions: Actions = {
     const formData = await request.formData();
     const deviceId = readString(formData, "deviceId");
     if (!isUuid(deviceId)) {
-      return fail(400, {
-        success: false,
-        action: "startRemote",
-        message: "Computador inválido.",
-      });
+      return fail(400, { success: false, action: "startRemote", message: "Computador inválido." });
     }
 
     try {
-      const initial = await listInternalChatMessages(
-        session.user.id,
-        permissions,
-        params.sessionId,
-      );
-      await syncRemoteDevicesForTicket(initial.chat.ticketId);
-      const remoteSessionId = await createKnownDeviceRemoteSession(
-        session.user.id,
-        initial.chat.ticketId,
-        deviceId,
-      );
+      const initial = await listInternalChatMessages(session.user.id, permissions, params.sessionId);
+      const ticketId = requireLinkedTicket(initial.chat.ticketId);
+      await syncRemoteDevicesForTicket(ticketId);
+      const remoteSessionId = await createKnownDeviceRemoteSession(session.user.id, ticketId, deviceId);
       throw redirect(303, `/app/remote/${remoteSessionId}/launch`);
     } catch (cause) {
-      if (
-        cause &&
-        typeof cause === "object" &&
-        "status" in cause &&
-        cause.status === 303
-      ) {
+      if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) {
         throw cause;
       }
       return fail(409, {
         success: false,
         action: "startRemote",
         message:
-          cause instanceof Error && cause.message === "REMOTE_DEVICE_OFFLINE"
-            ? "Este computador está offline."
-            : "Não foi possível iniciar o acesso remoto.",
+          cause instanceof Error && cause.message === "CHAT_TICKET_REQUIRED"
+            ? "Crie um chamado antes de iniciar o suporte remoto."
+            : cause instanceof Error && cause.message === "REMOTE_DEVICE_OFFLINE"
+              ? "Este computador está offline."
+              : "Não foi possível iniciar o acesso remoto.",
       });
     }
   },
