@@ -25,6 +25,10 @@ import {
   listInternalChatMessages,
 } from "$lib/server/support/internalChatRepository";
 import {
+  addInternalChatNote,
+  listInternalChatMentionUsers,
+} from "$lib/server/support/internalChatNoteRepository";
+import {
   addTicketMessage,
   listSupportAgents,
   updateTicketPriority,
@@ -133,6 +137,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     const canRespond = hasPermission(permissions, "chat.respond");
     const canCreateTicket = !hasTicket && hasPermission(permissions, "tickets.create");
     const canManageTicket = hasTicket && hasPermission(permissions, "tickets.reply");
+    const canInternalNote = hasTicket ? canManageTicket : canRespond;
     const canAssign = hasPermission(permissions, "chat.manage") || hasPermission(permissions, "tickets.assign");
     const canViewTasks = hasTicket && hasPermission(permissions, "tasks.view");
     const canCreateTask = canManageTicket && hasPermission(permissions, "tasks.create");
@@ -152,9 +157,11 @@ export const load: PageServerLoad = async ({ params, parent }) => {
         ? listTaskProjects(layout.user.id, permissions).catch(() => [])
         : Promise.resolve([]),
     ]);
-    const mentionUsers = canManageTicket && ticketId
-      ? await filterMentionUsersForTicket(supportAgents, ticketId)
-      : [];
+    const mentionUsers = !canInternalNote
+      ? []
+      : ticketId
+        ? await filterMentionUsersForTicket(supportAgents, ticketId)
+        : await listInternalChatMentionUsers(layout.user.id, permissions, params.sessionId);
 
     if (remoteVisible && provider.configured && control.configured && ticketId) {
       try {
@@ -176,6 +183,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       canRespond,
       canCreateTicket,
       canManageTicket,
+      canInternalNote,
       canAssign,
       assignees,
       mentionUsers,
@@ -262,7 +270,7 @@ export const actions: Actions = {
     }
     const { session, permissions } = await requireAppPermission(
       cookies,
-      "tickets.assign",
+      "chat.view",
       `/app/chat/${params.sessionId}`,
     );
     const targetUserId = readString(await request.formData(), "assignedUserId");
@@ -314,7 +322,7 @@ export const actions: Actions = {
     }
     const { session, permissions } = await requireAppPermission(
       cookies,
-      "tickets.reply",
+      "chat.view",
       `/app/chat/${params.sessionId}`,
     );
     const formData = await request.formData();
@@ -326,30 +334,61 @@ export const actions: Actions = {
 
     try {
       const initial = await listInternalChatMessages(session.user.id, permissions, params.sessionId);
-      const ticketId = requireLinkedTicket(initial.chat.ticketId);
-      const mentionedUserIds = await validateMentionedUserIds(ticketId, requestedMentionIds);
-      await addTicketMessage(
+      if (initial.chat.ticketId) {
+        if (!hasPermission(permissions, "tickets.reply")) {
+          return fail(403, {
+            success: false,
+            action: "note",
+            message: "Você não tem permissão para adicionar notas internas neste chamado.",
+          });
+        }
+        const mentionedUserIds = await validateMentionedUserIds(
+          initial.chat.ticketId,
+          requestedMentionIds,
+        );
+        await addTicketMessage(
+          session.user.id,
+          permissions,
+          initial.chat.ticketId,
+          body,
+          "internal",
+          mentionedUserIds,
+        );
+        return {
+          success: true,
+          action: "note",
+          message: mentionedUserIds.length > 0
+            ? "Nota interna adicionada e menções notificadas."
+            : "Nota interna adicionada.",
+        };
+      }
+
+      if (!hasPermission(permissions, "chat.respond")) {
+        return fail(403, {
+          success: false,
+          action: "note",
+          message: "Você não tem permissão para adicionar notas internas nesta conversa.",
+        });
+      }
+      const result = await addInternalChatNote(
         session.user.id,
         permissions,
-        ticketId,
+        params.sessionId,
         body,
-        "internal",
-        mentionedUserIds,
+        requestedMentionIds,
       );
       return {
         success: true,
         action: "note",
-        message: mentionedUserIds.length > 0
+        message: result.mentionedUserIds.length > 0
           ? "Nota interna adicionada e menções notificadas."
           : "Nota interna adicionada.",
       };
-    } catch (cause) {
-      return fail(cause instanceof Error && cause.message === "CHAT_TICKET_REQUIRED" ? 409 : 403, {
+    } catch {
+      return fail(403, {
         success: false,
         action: "note",
-        message: cause instanceof Error && cause.message === "CHAT_TICKET_REQUIRED"
-          ? "Crie um chamado antes de adicionar notas internas."
-          : "Não foi possível adicionar a nota interna.",
+        message: "Não foi possível adicionar a nota interna.",
       });
     }
   },
