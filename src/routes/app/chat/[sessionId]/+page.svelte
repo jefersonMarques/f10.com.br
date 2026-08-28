@@ -237,10 +237,10 @@
 <ApplicationContent
   width="full"
   padding="none"
-  className="h-[calc(100dvh-var(--application-header-height))] min-h-[620px] overflow-hidden bg-white"
+  className="h-[calc(100dvh-var(--application-header-height))] min-h-[620px] overflow-hidden bg-[#F5F6FA]"
 >
-  <div class="grid h-full min-h-0 grid-cols-1 bg-white lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(520px,1fr)_300px]">
-    <aside class="hidden min-h-0 border-r border-[#E4E6EC] lg:block">
+  <div class="grid h-full min-h-0 grid-cols-1 gap-3 p-3 lg:grid-cols-[315px_minmax(0,1fr)] lg:gap-4 lg:p-4 xl:grid-cols-[315px_minmax(520px,1fr)_310px]">
+    <aside class="hidden min-h-0 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)] lg:block">
       <ChatInbox
         chats={data.chatInbox}
         currentUserId={data.chatCurrentUserId}
@@ -249,73 +249,75 @@
       />
     </aside>
 
-    <main class="flex min-h-0 min-w-0 flex-col bg-white">
-      <header class="shrink-0 border-b border-[#E5E7ED] bg-white px-4 py-3 sm:px-5">
+    <main class="relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)]">
+      <span class="absolute inset-x-0 top-0 z-10 h-1 bg-[#EA6D0B]"></span>
+
+      <header class="shrink-0 border-b border-[#E9EBF1] bg-white px-4 pb-3 pt-4 sm:px-5">
         <div class="flex items-start justify-between gap-3">
           <div class="flex min-w-0 items-center gap-3">
             <a
               href="/app/chat"
-              class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#E1E4EA] text-[#69707E] transition hover:bg-[#F6F7F9] hover:text-[#000A57] lg:hidden"
+              class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#E1E4EA] text-[#69707E] transition hover:bg-[#F6F7F9] hover:text-[#000A57] lg:hidden"
               aria-label="Voltar para conversas"
             >
               <ArrowLeft size={16} />
             </a>
-            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F0F1F4] text-[#626978]">
-              <UserRound size={16} />
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]">
+              <MessageCircleMore size={19} />
             </span>
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
-                <h1 class="truncate text-[13px] font-semibold text-[#262C3A]">{chat.customerName ?? "Cliente"}</h1>
+                <h1 class="truncate text-[14px] font-semibold text-[#202637]">{chat.customerName ?? "Cliente"}</h1>
                 {#if chat.ticketNumber}
-                  <span class="rounded-md bg-[#FFF0E4] px-1.5 py-1 text-[8px] font-bold text-[#B95B12]">Chamado #{chat.ticketNumber}</span>
+                  <span class="rounded-full bg-[#FFF0E4] px-2 py-1 text-[9px] font-bold text-[#B95B12]">Chamado #{chat.ticketNumber}</span>
                 {:else}
-                  <span class="rounded-md bg-[#EEF0FF] px-1.5 py-1 text-[8px] font-bold text-[#000A57]">CHAT</span>
+                  <span class="rounded-full bg-[#EEF0FF] px-2 py-1 text-[9px] font-bold text-[#000A57]">Chat</span>
                 {/if}
-                <span class="rounded-md bg-[#F1F2F5] px-1.5 py-1 text-[8px] font-semibold text-[#6C7280]">{statusLabels[chat.status]}</span>
+                <span class="rounded-full bg-[#F2F3F6] px-2 py-1 text-[9px] font-semibold text-[#666D7C]">{statusLabels[chat.status]}</span>
                 {#if chat.aiState === "escalated" || chat.aiState === "active"}
-                  <span class={`rounded-md px-1.5 py-1 text-[8px] font-semibold ${chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#9B4343]" : "bg-[#F0EEFF] text-[#5E51A6]"}`}>{aiLabels[chat.aiState]}</span>
+                  <span class={`rounded-full px-2 py-1 text-[9px] font-semibold ${chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#9B4343]" : "bg-[#F0EEFF] text-[#5E51A6]"}`}>{aiLabels[chat.aiState]}</span>
                 {/if}
               </div>
-              <p class="mt-1 truncate text-[9px] text-[#858B98]">
+              <p class="mt-1 truncate text-[10px] text-[#858B98]">
                 {f10UnitName ? `${f10UnitName}${f10GroupName ? ` · ${f10GroupName}` : ""}` : chat.organizationName ?? chat.customerEmail ?? "Atendimento F10"}
               </p>
             </div>
           </div>
 
-          <div class="flex shrink-0 items-center gap-1.5">
+          <div class="flex shrink-0 items-center gap-2">
             {#if chat.contextUrl}
-              <a href={chat.contextUrl} target="_blank" rel="noopener noreferrer" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E0E3EA] text-[#69707E] transition hover:bg-[#F6F7F9] hover:text-[#000A57]" aria-label="Abrir página de origem">
+              <a href={chat.contextUrl} target="_blank" rel="noopener noreferrer" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#E0E3EA] bg-white text-[#69707E] transition hover:bg-[#F6F7F9] hover:text-[#000A57]" aria-label="Abrir página de origem">
                 <ExternalLink size={14} />
               </a>
             {/if}
-            <a href="/app/help" target="_blank" rel="noopener noreferrer" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#E0E3EA] text-[#69707E] transition hover:bg-[#F6F7F9] hover:text-[#000A57]" aria-label="Abrir base de conhecimento">
+            <a href="/app/help" target="_blank" rel="noopener noreferrer" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#E0E3EA] bg-white text-[#69707E] transition hover:bg-[#F6F7F9] hover:text-[#000A57]" aria-label="Abrir base de conhecimento">
               <BookOpen size={14} />
             </a>
 
             {#if data.canRespond && !chat.assignedUserId && chat.status !== "closed"}
               <form method="POST" action="?/claim">
-                <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#176B35] px-3 text-[9px] font-semibold text-white">
-                  <Hand size={12} /> Pegar
+                <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#176B35] px-3 text-[10px] font-semibold text-white">
+                  <Hand size={13} /> Pegar
                 </button>
               </form>
             {/if}
 
             {#if chat.ticketId && chat.ticketNumber}
-              <a href={`/app/tickets/${chat.ticketId}`} class="hidden h-9 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 text-[9px] font-semibold text-white sm:inline-flex">
-                <TicketCheck size={12} /> #{chat.ticketNumber}
+              <a href={`/app/tickets/${chat.ticketId}`} class="hidden h-9 items-center gap-1.5 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white sm:inline-flex xl:hidden">
+                <TicketCheck size={13} /> #{chat.ticketNumber}
               </a>
             {:else if data.canCreateTicket && chat.status !== "closed"}
-              <form method="POST" action="?/createTicket" class="hidden sm:block" on:submit={(event) => { if (!confirm("Criar um chamado a partir desta conversa? O histórico público e as notas internas serão preservados.")) event.preventDefault(); }}>
-                <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 text-[9px] font-semibold text-white">
-                  <TicketCheck size={12} /> Criar chamado
+              <form method="POST" action="?/createTicket" class="hidden sm:block xl:hidden" on:submit={(event) => { if (!confirm("Criar um chamado a partir desta conversa? O histórico público e as notas internas serão preservados.")) event.preventDefault(); }}>
+                <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white">
+                  <TicketCheck size={13} /> Criar chamado
                 </button>
               </form>
             {/if}
 
             {#if canWrite && chat.status !== "closed"}
               <form method="POST" action="?/finish" on:submit={(event) => { if (!confirm(chat.ticketId ? "Finalizar este atendimento? A conversa e o chamado vinculado serão encerrados." : "Finalizar esta conversa? Nenhum chamado será criado.")) event.preventDefault(); }}>
-                <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E5C6C6] bg-[#FFF8F8] px-2.5 text-[9px] font-semibold text-[#984343]">
-                  <CheckCircle2 size={12} /> <span class="hidden sm:inline">Finalizar</span>
+                <button type="submit" class="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#E5C6C6] bg-[#FFF8F8] px-2.5 text-[10px] font-semibold text-[#984343]">
+                  <CheckCircle2 size={13} /> <span class="hidden sm:inline">Finalizar</span>
                 </button>
               </form>
             {/if}
@@ -323,46 +325,46 @@
         </div>
 
         {#if form?.message}
-          <div class={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-[9px] font-medium ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>
-            {#if form.success}<CheckCircle2 size={12} />{:else}<CircleAlert size={12} />{/if}
+          <div class={`mt-3 flex items-center gap-2 rounded-xl px-3 py-2.5 text-[10px] font-medium ${form.success ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>
+            {#if form.success}<CheckCircle2 size={13} />{:else}<CircleAlert size={13} />{/if}
             {form.message}
           </div>
         {/if}
       </header>
 
-      <div class="relative min-h-0 flex-1 bg-[#F7F8FA]">
+      <div class="relative min-h-0 flex-1 bg-[#F7F8FB]">
         <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="h-full overflow-y-auto px-4 py-5 sm:px-6">
-          <div class="mx-auto max-w-[820px] space-y-3">
+          <div class="mx-auto max-w-[840px] space-y-3.5">
             {#each messages as message (message.id)}
               {#if message.visibility === "internal"}
                 <div class="flex justify-center py-1">
-                  <article class="w-full max-w-[88%] rounded-xl border border-[#E9D6C1] bg-[#FFF9F3] px-3.5 py-3 text-[#6F4B29]">
-                    <div class="mb-1.5 flex items-center justify-between gap-3">
-                      <span class="text-[8px] font-bold uppercase tracking-[0.08em] text-[#9A5513]">Nota interna · {messageAuthor(message)}</span>
-                      <span class="text-[8px] text-[#AC8B6A]">{formatTime(message.createdAt)}</span>
+                  <article class="w-full max-w-[88%] rounded-2xl border border-[#E9D6C1] bg-[#FFF9F3] px-4 py-3 text-[#6F4B29] shadow-sm">
+                    <div class="mb-2 flex items-center justify-between gap-3">
+                      <span class="text-[9px] font-bold uppercase tracking-[0.08em] text-[#9A5513]">Nota interna · {messageAuthor(message)}</span>
+                      <span class="text-[9px] text-[#AC8B6A]">{formatTime(message.createdAt)}</span>
                     </div>
-                    <p class="whitespace-pre-wrap text-[10.5px] leading-5">{message.body}</p>
+                    <p class="whitespace-pre-wrap text-[11.5px] leading-5">{message.body}</p>
                   </article>
                 </div>
               {:else}
                 <div class={`flex ${message.authorType === "customer" ? "justify-start" : "justify-end"}`}>
-                  <article class={`max-w-[78%] rounded-2xl px-3.5 py-2.5 ${message.authorType === "customer" ? "rounded-bl-md border border-[#DFE2E8] bg-white text-[#4D5361]" : message.authorType === "system" ? "rounded-br-md border border-[#DDD8F4] bg-[#F2F0FF] text-[#453D78]" : "rounded-br-md bg-[#DCEBFF] text-[#273246]"}`}>
+                  <article class={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3EA] bg-white text-[#4D5361]" : message.authorType === "system" ? "rounded-br-md border border-[#DDD8F4] bg-[#F2F0FF] text-[#453D78]" : "rounded-br-md bg-[#000A57] text-white"}`}>
                     {#if message.authorType === "system"}
-                      <div class="mb-1.5 flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-[0.07em] text-[#6255A8]"><Bot size={11} />Atendimento F10</div>
+                      <div class="mb-2 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.07em] text-[#6255A8]"><Bot size={12} />Atendimento F10</div>
                     {/if}
 
                     {#if message.attachments && message.attachments.length > 0}
-                      <div class={`mb-2 grid gap-1.5 ${message.attachments.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                      <div class={`mb-2 grid gap-2 ${message.attachments.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
                         {#each message.attachments as attachment}
-                          <a href={attachment.url} target="_blank" rel="noopener noreferrer" class="block overflow-hidden rounded-lg border border-black/5 bg-[#F2F3F6]">
-                            <img src={attachment.url} alt={attachment.originalName} class="max-h-[280px] w-full object-contain" />
+                          <a href={attachment.url} target="_blank" rel="noopener noreferrer" class="block overflow-hidden rounded-xl border border-black/5 bg-[#F2F3F6]">
+                            <img src={attachment.url} alt={attachment.originalName} class="max-h-[300px] w-full object-contain" />
                           </a>
                         {/each}
                       </div>
                     {/if}
 
-                    {#if message.body}<p class="whitespace-pre-wrap text-[10.5px] leading-5">{message.body}</p>{/if}
-                    <div class={`mt-1.5 flex items-center gap-1.5 text-[8px] ${message.authorType === "customer" ? "text-[#9A9FAC]" : message.authorType === "system" ? "text-[#8178B5]" : "text-[#6D7E95]"}`}>
+                    {#if message.body}<p class="whitespace-pre-wrap text-[11.5px] leading-5">{message.body}</p>{/if}
+                    <div class={`mt-2 flex items-center gap-1.5 text-[9px] ${message.authorType === "customer" ? "text-[#989EAB]" : message.authorType === "system" ? "text-[#8178B5]" : "text-white/65"}`}>
                       <span>{messageAuthor(message)}</span><span>·</span><span>{formatTime(message.createdAt)}</span>
                     </div>
                   </article>
@@ -373,31 +375,31 @@
         </div>
 
         {#if newMessageCount > 0}
-          <button type="button" on:click={() => void scrollToLatest()} class="absolute bottom-4 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#000A57] px-3 py-2 text-[9px] font-semibold text-white shadow-lg">
-            {newMessageCount} {newMessageCount === 1 ? "nova" : "novas"}<ArrowDown size={12} />
+          <button type="button" on:click={() => void scrollToLatest()} class="absolute bottom-4 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#000A57] px-3.5 py-2 text-[10px] font-semibold text-white shadow-lg">
+            {newMessageCount} {newMessageCount === 1 ? "nova mensagem" : "novas mensagens"}<ArrowDown size={13} />
           </button>
         {/if}
       </div>
 
       {#if chat.status !== "closed" && (canWrite || data.canInternalNote)}
-        <footer class="shrink-0 border-t border-[#E1E4EA] bg-white p-3.5 sm:p-4">
-          <div class="mx-auto max-w-[820px] overflow-hidden rounded-xl border border-[#DDE1E8] bg-white focus-within:border-[#B9C0D2] focus-within:shadow-sm">
-            <div class="flex items-center gap-1 border-b border-[#ECEEF2] px-2.5 py-2">
+        <footer class="shrink-0 border-t border-[#E2E5ED] bg-white p-4">
+          <div class="mx-auto max-w-[840px] overflow-hidden rounded-2xl border border-[#DDE1E8] bg-white shadow-[0_8px_22px_rgba(1,13,40,0.04)] focus-within:border-[#B8BFCE]">
+            <div class="flex items-center gap-2 border-b border-[#ECEEF2] px-3 py-2.5">
               {#if canWrite}
-                <button type="button" on:click={() => composerMode = "reply"} class={`rounded-md px-2.5 py-1.5 text-[9px] font-semibold transition ${composerMode === "reply" ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#717785] hover:bg-[#F5F6F8]"}`}>Resposta</button>
+                <button type="button" on:click={() => composerMode = "reply"} class={`rounded-full px-3 py-1.5 text-[10px] font-semibold transition ${composerMode === "reply" ? "bg-[#000A57] text-white" : "bg-[#F3F4F7] text-[#6D7382] hover:bg-[#ECEEF2]"}`}>Resposta</button>
               {/if}
               {#if data.canInternalNote}
-                <button type="button" on:click={() => composerMode = "note"} class={`rounded-md px-2.5 py-1.5 text-[9px] font-semibold transition ${composerMode === "note" ? "bg-[#FFF0E4] text-[#9A5513]" : "text-[#717785] hover:bg-[#F5F6F8]"}`}>Nota interna</button>
+                <button type="button" on:click={() => composerMode = "note"} class={`rounded-full px-3 py-1.5 text-[10px] font-semibold transition ${composerMode === "note" ? "bg-[#9A5513] text-white" : "bg-[#FFF3E7] text-[#8B4D12] hover:bg-[#FBE9D7]"}`}>Nota interna</button>
               {/if}
-              <span class="ml-auto text-[8px] text-[#A0A5B0]">{composerMode === "note" ? "Somente equipe F10" : "Visível ao cliente"}</span>
+              <span class="ml-auto text-[9px] text-[#999FAA]">{composerMode === "note" ? "Somente equipe F10" : "Visível ao cliente"}</span>
             </div>
 
             {#if composerMode === "reply" && canWrite}
               {#if chat.aiState === "active"}
-                <div class="mx-3 mt-3 flex items-center gap-2 rounded-lg bg-[#F4F2FF] px-3 py-2 text-[8.5px] font-medium text-[#6255A8]"><Bot size={12} />Sua resposta assume a conversa e encerra a automação.</div>
+                <div class="mx-3 mt-3 flex items-center gap-2 rounded-xl bg-[#F4F2FF] px-3 py-2 text-[9.5px] font-medium text-[#6255A8]"><Bot size={13} />Sua resposta assume a conversa e encerra a automação.</div>
               {/if}
               {#if errorMessage}
-                <div class="mx-3 mt-3 flex items-center gap-2 rounded-lg bg-[#FFF3F3] px-3 py-2 text-[8.5px] font-medium text-[#A13C3C]"><CircleAlert size={12} />{errorMessage}</div>
+                <div class="mx-3 mt-3 flex items-center gap-2 rounded-xl bg-[#FFF3F3] px-3 py-2 text-[9.5px] font-medium text-[#A13C3C]"><CircleAlert size={13} />{errorMessage}</div>
               {/if}
               <form on:submit|preventDefault={() => void sendMessage()}>
                 <textarea
@@ -406,13 +408,13 @@
                   on:keydown={handleComposerKeydown}
                   maxlength="4000"
                   rows="3"
-                  placeholder="Escreva uma mensagem..."
-                  class="max-h-36 min-h-[78px] w-full resize-none border-0 px-3.5 py-3 text-[10.5px] leading-5 outline-none"
+                  placeholder="Escreva uma mensagem para o cliente..."
+                  class="max-h-40 min-h-[86px] w-full resize-none border-0 px-4 py-3.5 text-[11.5px] leading-5 outline-none"
                 ></textarea>
-                <div class="flex items-center justify-between border-t border-[#F0F1F4] px-3 py-2">
-                  <span class="text-[8px] text-[#A0A5B0]">Ctrl/⌘ + Enter envia</span>
-                  <button type="submit" disabled={sending || !messageBody.trim()} class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 text-[9px] font-semibold text-white disabled:bg-[#D6D9E2]">
-                    Enviar <Send size={12} />
+                <div class="flex items-center justify-between border-t border-[#F0F1F4] px-3.5 py-2.5">
+                  <span class="text-[9px] text-[#999FAA]">Ctrl/⌘ + Enter envia</span>
+                  <button type="submit" disabled={sending || !messageBody.trim()} class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white transition hover:bg-[#111B71] disabled:bg-[#D6D9E2]">
+                    Enviar <Send size={13} />
                   </button>
                 </div>
               </form>
@@ -424,137 +426,140 @@
                   rows={3}
                   maxlength={10000}
                   placeholder="Escreva uma nota interna. Use @ para chamar alguém da equipe..."
-                  className="min-h-[78px] w-full resize-none border-0 bg-transparent px-3.5 py-3 text-[10.5px] leading-5 outline-none"
+                  className="min-h-[86px] w-full resize-none border-0 bg-transparent px-4 py-3.5 text-[11.5px] leading-5 outline-none"
                 />
-                <div class="flex items-center justify-between border-t border-[#F1E7DD] px-3 py-2">
-                  <span class="text-[8px] text-[#9A744F]">O cliente nunca vê esta nota.</span>
-                  <button type="submit" class="inline-flex h-8 items-center rounded-lg bg-[#9A5513] px-3 text-[9px] font-semibold text-white">Adicionar nota</button>
+                <div class="flex items-center justify-between border-t border-[#F1E7DD] px-3.5 py-2.5">
+                  <span class="text-[9px] text-[#9A744F]">O cliente nunca vê esta nota.</span>
+                  <button type="submit" class="inline-flex h-9 items-center rounded-xl bg-[#9A5513] px-4 text-[10px] font-semibold text-white">Adicionar nota</button>
                 </div>
               </form>
             {/if}
           </div>
         </footer>
       {:else if data.canRespond && chat.assignedUserId && !assignedToMe && chat.status !== "closed"}
-        <footer class="shrink-0 border-t border-[#E1E4EA] bg-[#FAFAFC] px-4 py-3 text-center text-[9px] text-[#777D8D]">
+        <footer class="shrink-0 border-t border-[#E2E5ED] bg-[#FAFAFC] px-4 py-3 text-center text-[10px] text-[#777D8D]">
           Este atendimento está atribuído a <strong>{chat.assignedUserName ?? "outro atendente"}</strong>.
         </footer>
       {/if}
     </main>
 
-    <aside class="hidden min-h-0 overflow-y-auto border-l border-[#E4E6EC] bg-white xl:block">
-      <section class="border-b border-[#ECEEF2] p-4">
-        <div class="flex items-center gap-2">
-          <span class="flex h-9 w-9 items-center justify-center rounded-full bg-[#F0F1F4] text-[#626978]"><UserRound size={15} /></span>
+    <aside class="hidden min-h-0 space-y-3 overflow-y-auto pr-1 xl:block">
+      <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><UserRound size={17} /></span>
           <div class="min-w-0">
-            <h2 class="truncate text-[11px] font-semibold text-[#303644]">{chat.customerName ?? "Cliente"}</h2>
-            <p class="truncate text-[8.5px] text-[#9398A4]">{chat.customerEmail ?? "Sem e-mail informado"}</p>
+            <h2 class="truncate text-[12px] font-semibold text-[#303644]">{chat.customerName ?? "Cliente"}</h2>
+            <p class="mt-0.5 truncate text-[9.5px] text-[#8B919F]">{chat.customerEmail ?? "Sem e-mail informado"}</p>
           </div>
         </div>
-        {#if chat.organizationName}<p class="mt-3 text-[9px] text-[#686F7E]">{chat.organizationName}</p>{/if}
-        {#if chat.customerPhone}<p class="mt-1 text-[9px] text-[#686F7E]">{chat.customerPhone}</p>{/if}
+        {#if chat.organizationName}<p class="mt-3 text-[10px] font-medium text-[#646B7A]">{chat.organizationName}</p>{/if}
+        {#if chat.customerPhone}<p class="mt-1 text-[10px] text-[#777E8D]">{chat.customerPhone}</p>{/if}
+
+        {#if f10UnitName}
+          <div class="mt-4 border-t border-[#EEF0F5] pt-4">
+            <h3 class="text-[9px] font-bold uppercase tracking-[0.09em] text-[#858C9B]">Contexto F10</h3>
+            <dl class="mt-3 space-y-2.5">
+              <div><dt class="text-[9px] text-[#969CAA]">Escola / unidade</dt><dd class="mt-0.5 text-[10.5px] font-semibold text-[#414857]">{f10UnitName}</dd></div>
+              {#if f10GroupName}<div><dt class="text-[9px] text-[#969CAA]">Grupo</dt><dd class="mt-0.5 text-[10.5px] font-semibold text-[#414857]">{f10GroupName}</dd></div>{/if}
+              {#if f10LegacyUserId}<div><dt class="text-[9px] text-[#969CAA]">Usuário F10</dt><dd class="mt-0.5 truncate font-mono text-[9.5px] text-[#5C6372]">{f10LegacyUserId}</dd></div>{/if}
+            </dl>
+          </div>
+        {/if}
       </section>
 
-      {#if f10UnitName}
-        <section class="border-b border-[#ECEEF2] p-4">
-          <h3 class="text-[8px] font-bold uppercase tracking-[0.1em] text-[#9398A4]">Contexto F10</h3>
-          <dl class="mt-3 space-y-2.5">
-            <div><dt class="text-[8px] text-[#A0A5B0]">Escola / unidade</dt><dd class="mt-0.5 text-[9.5px] font-semibold text-[#454B59]">{f10UnitName}</dd></div>
-            {#if f10GroupName}<div><dt class="text-[8px] text-[#A0A5B0]">Grupo</dt><dd class="mt-0.5 text-[9.5px] font-semibold text-[#454B59]">{f10GroupName}</dd></div>{/if}
-            {#if f10LegacyUserId}<div><dt class="text-[8px] text-[#A0A5B0]">Usuário F10</dt><dd class="mt-0.5 truncate font-mono text-[8.5px] text-[#666D7C]">{f10LegacyUserId}</dd></div>{/if}
-          </dl>
-        </section>
-      {/if}
-
-      <section class="border-b border-[#ECEEF2] p-4">
+      <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
         <div class="flex items-center justify-between gap-2">
-          <h3 class="text-[8px] font-bold uppercase tracking-[0.1em] text-[#9398A4]">Atendimento</h3>
-          <span class="text-[8px] text-[#A0A5B0]">{formatDateTime(chat.createdAt)}</span>
+          <div class="flex items-center gap-2"><Clock3 size={14} class="text-[#000A57]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Atendimento</h3></div>
+          <span class="text-[9px] text-[#9A9FAC]">{formatDateTime(chat.createdAt)}</span>
         </div>
 
-        <dl class="mt-3 grid grid-cols-2 gap-2">
-          <div class="rounded-lg bg-[#F7F8FA] px-2.5 py-2"><dt class="text-[7.5px] uppercase text-[#A0A5B0]">Fila</dt><dd class="mt-1 truncate text-[9px] font-semibold text-[#4A5060]">{chat.queueName}</dd></div>
-          <div class="rounded-lg bg-[#F7F8FA] px-2.5 py-2"><dt class="text-[7.5px] uppercase text-[#A0A5B0]">{chat.ticketId ? "SLA" : "Chamado"}</dt><dd class={`mt-1 truncate text-[9px] font-semibold ${slaText().includes("Vencido") ? "text-[#A13C3C]" : "text-[#4A5060]"}`}>{slaText()}</dd></div>
-        </dl>
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <div class="rounded-xl bg-[#F7F8FA] px-3 py-2.5"><span class="text-[9px] text-[#969CAA]">Fila</span><strong class="mt-1 block truncate text-[10px] text-[#454B5B]">{chat.queueName}</strong></div>
+          <div class="rounded-xl bg-[#F7F8FA] px-3 py-2.5"><span class="text-[9px] text-[#969CAA]">{chat.ticketId ? "SLA" : "Chamado"}</span><strong class={`mt-1 block truncate text-[10px] ${slaText().includes("Vencido") ? "text-[#A13C3C]" : "text-[#454B5B]"}`}>{slaText()}</strong></div>
+        </div>
 
-        <div class="mt-3">
-          <span class="text-[8px] text-[#9398A4]">Responsável</span>
-          <p class="mt-0.5 text-[9.5px] font-semibold text-[#454B59]">{chat.assignedUserName ?? "Não atribuído"}</p>
+        <div class="mt-4 border-t border-[#EEF0F5] pt-3">
+          <span class="text-[9px] text-[#8D93A0]">Responsável pelo chat</span>
+          <p class="mt-1 text-[10.5px] font-semibold text-[#414857]">{chat.assignedUserName ?? "Não atribuído"}</p>
           {#if data.canAssign && chat.status !== "closed"}
-            <form method="POST" action="?/assign" class="mt-2 flex gap-1.5">
-              <select name="assignedUserId" required class="h-8 min-w-0 flex-1 rounded-lg border border-[#DDE1E8] bg-white px-2 text-[8.5px]">
+            <form method="POST" action="?/assign" class="mt-2.5 flex gap-2">
+              <select name="assignedUserId" required class="h-9 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2.5 text-[10px]">
                 <option value="" disabled selected={!chat.assignedUserId}>Selecionar...</option>
                 {#each data.assignees as assignee}<option value={assignee.id} selected={assignee.id === chat.assignedUserId}>{assignee.name}</option>{/each}
               </select>
-              <button type="submit" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#DDE1E8] text-[#000A57]" aria-label="Atribuir"><UserRoundCog size={12} /></button>
+              <button type="submit" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#DDE1EA] bg-white text-[#000A57]" aria-label="Atribuir atendimento"><UserRoundCog size={14} /></button>
             </form>
           {/if}
         </div>
       </section>
 
       {#if chat.ticketId}
-        <section class="border-b border-[#ECEEF2] p-4">
+        <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
           <div class="flex items-center justify-between gap-2">
-            <h3 class="text-[8px] font-bold uppercase tracking-[0.1em] text-[#9398A4]">Chamado #{chat.ticketNumber}</h3>
-            <a href={`/app/tickets/${chat.ticketId}`} class="text-[8px] font-semibold text-[#000A57] hover:underline">Abrir</a>
+            <div class="flex items-center gap-2"><TicketCheck size={14} class="text-[#EA6D0B]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Chamado #{chat.ticketNumber}</h3></div>
+            <a href={`/app/tickets/${chat.ticketId}`} class="text-[9.5px] font-semibold text-[#000A57] hover:underline">Abrir</a>
           </div>
+          <p class="mt-2 text-[9.5px] text-[#8B919F]">Prioridade atual: <strong class="text-[#555C6B]">{priorityLabels[chat.priority]}</strong></p>
 
           {#if data.canManageTicket && chat.status !== "closed"}
-            <form method="POST" action="?/status" class="mt-3">
-              <label class="text-[8px] text-[#9398A4]">Status</label>
-              <div class="mt-1 flex gap-1.5">
-                <select name="status" value={chat.status} class="h-8 min-w-0 flex-1 rounded-lg border border-[#DDE1E8] bg-white px-2 text-[8.5px]"><option value="new">Novo</option><option value="open">Aberto</option><option value="in_progress">Em andamento</option><option value="waiting_customer">Aguardando cliente</option><option value="resolved">Resolvido</option></select>
-                <button type="submit" class="h-8 rounded-lg bg-[#000A57] px-2.5 text-[8px] font-semibold text-white">Salvar</button>
+            <form method="POST" action="?/status" class="mt-4">
+              <label for="chat-ticket-status" class="text-[9px] font-semibold text-[#666D7C]">Status</label>
+              <div class="mt-1.5 flex gap-2">
+                <select id="chat-ticket-status" name="status" value={chat.status} class="h-9 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2.5 text-[10px]"><option value="new">Novo</option><option value="open">Aberto</option><option value="in_progress">Em andamento</option><option value="waiting_customer">Aguardando cliente</option><option value="resolved">Resolvido</option></select>
+                <button type="submit" class="h-9 rounded-xl bg-[#000A57] px-3 text-[9.5px] font-semibold text-white">Salvar</button>
               </div>
             </form>
 
-            <form method="POST" action="?/priority" class="mt-2.5">
-              <label class="text-[8px] text-[#9398A4]">Prioridade</label>
-              <div class="mt-1 flex gap-1.5">
-                <select name="priority" value={chat.priority} class="h-8 min-w-0 flex-1 rounded-lg border border-[#DDE1E8] bg-white px-2 text-[8.5px]"><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select>
-                <button type="submit" class="h-8 rounded-lg bg-[#000A57] px-2.5 text-[8px] font-semibold text-white">Salvar</button>
+            <form method="POST" action="?/priority" class="mt-3">
+              <label for="chat-ticket-priority" class="text-[9px] font-semibold text-[#666D7C]">Prioridade</label>
+              <div class="mt-1.5 flex gap-2">
+                <select id="chat-ticket-priority" name="priority" value={chat.priority} class="h-9 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2.5 text-[10px]"><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select>
+                <button type="submit" class="h-9 rounded-xl bg-[#000A57] px-3 text-[9.5px] font-semibold text-white">Salvar</button>
               </div>
             </form>
           {/if}
         </section>
       {:else}
-        <section class="border-b border-[#ECEEF2] p-4">
-          <div class="flex items-center gap-2 text-[#000A57]"><TicketCheck size={13} /><h3 class="text-[9px] font-semibold">Conversa sem chamado</h3></div>
-          <p class="mt-2 text-[8.5px] leading-4 text-[#858B99]">Atenda e converse internamente sem gerar ticket. Crie um chamado somente quando o caso precisar de acompanhamento.</p>
+        <section class="rounded-[20px] border border-[#DCE1F2] bg-[#F8F9FF] p-4 shadow-[0_10px_28px_rgba(1,13,40,0.035)]">
+          <div class="flex items-center gap-2 text-[#000A57]"><TicketCheck size={15} /><h3 class="text-[11px] font-semibold">Conversa sem chamado</h3></div>
+          <p class="mt-2 text-[9.5px] leading-4 text-[#747C8D]">Continue o atendimento normalmente. Crie um chamado apenas quando o caso precisar de acompanhamento formal.</p>
           {#if data.canCreateTicket && chat.status !== "closed"}
             <form method="POST" action="?/createTicket" class="mt-3" on:submit={(event) => { if (!confirm("Criar um chamado a partir desta conversa? O histórico público e as notas internas serão preservados.")) event.preventDefault(); }}>
-              <button type="submit" class="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-[#000A57] text-[8.5px] font-semibold text-white"><TicketCheck size={11} />Criar chamado</button>
+              <button type="submit" class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] text-[10px] font-semibold text-white"><TicketCheck size={13} />Criar chamado</button>
             </form>
           {/if}
         </section>
       {/if}
 
       {#if data.canViewTasks}
-        <section class="border-b border-[#ECEEF2] p-4">
+        <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
           <div class="flex items-center justify-between gap-2">
-            <div class="flex items-center gap-1.5"><ListTodo size={12} class="text-[#000A57]" /><h3 class="text-[8px] font-bold uppercase tracking-[0.1em] text-[#9398A4]">Tarefas</h3></div>
-            <span class="rounded-full bg-[#F1F2F5] px-1.5 py-0.5 text-[8px] font-semibold text-[#717785]">{data.linkedTasks.length}</span>
+            <div class="flex items-center gap-2"><ListTodo size={14} class="text-[#000A57]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Tarefas do chamado</h3></div>
+            <span class="rounded-full bg-[#F2F3F6] px-2 py-1 text-[9px] font-semibold text-[#6D7382]">{data.linkedTasks.length}</span>
           </div>
 
           {#if data.linkedTasks.length > 0}
-            <div class="mt-2.5 space-y-1.5">
+            <div class="mt-3 space-y-2">
               {#each data.linkedTasks as task}
-                <a href={`/app/tasks/${task.id}`} class="block rounded-lg border border-[#E7E9EF] px-2.5 py-2 transition hover:bg-[#FAFAFC]">
-                  <strong class="line-clamp-1 text-[8.5px] text-[#454B59]">{task.title}</strong>
-                  <span class="mt-0.5 block text-[7.5px] text-[#9A9FAC]">{task.projectName}{task.dueOn ? ` · ${task.dueOn}` : ""}</span>
+                <a href={`/app/tasks/${task.id}`} class="block rounded-xl border border-[#E7E9EF] bg-[#FAFAFC] px-3 py-2.5 transition hover:border-[#C9CFE0] hover:bg-white">
+                  <strong class="line-clamp-1 text-[9.5px] text-[#454B59]">{task.title}</strong>
+                  <span class="mt-1 block text-[8.5px] text-[#9298A5]">{task.projectName}{task.dueOn ? ` · ${task.dueOn}` : ""}</span>
                 </a>
               {/each}
             </div>
+          {:else}
+            <p class="mt-3 text-[9.5px] text-[#8B919F]">Nenhuma tarefa vinculada.</p>
           {/if}
 
           {#if data.canCreateTask && data.taskProjects.length > 0 && chat.status !== "closed"}
-            <details class="mt-3">
-              <summary class="flex cursor-pointer list-none items-center gap-1 text-[8px] font-semibold text-[#000A57]"><Plus size={10} />Criar tarefa</summary>
-              <form method="POST" action="?/createTask" class="mt-2 space-y-1.5">
-                <select name="projectId" required class="h-8 w-full rounded-lg border border-[#DDE1E8] bg-white px-2 text-[8px]">{#each data.taskProjects as project}<option value={project.id}>{project.name}</option>{/each}</select>
-                <input name="title" required maxlength="180" value={`Chamado #${chat.ticketNumber} · ${chat.subject}`.slice(0, 180)} class="h-8 w-full rounded-lg border border-[#DDE1E8] px-2 text-[8px]" />
-                <textarea name="description" rows="2" maxlength="5000" placeholder="O que precisa ser feito?" class="w-full rounded-lg border border-[#DDE1E8] px-2 py-2 text-[8px]"></textarea>
-                <div class="grid grid-cols-2 gap-1.5"><select name="priority" class="h-8 rounded-lg border border-[#DDE1E8] bg-white px-2 text-[8px]"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select><input name="dueOn" type="date" class="h-8 rounded-lg border border-[#DDE1E8] px-2 text-[8px]" /></div>
-                <button type="submit" class="h-8 w-full rounded-lg bg-[#000A57] text-[8px] font-semibold text-white">Criar tarefa</button>
+            <details class="mt-3 border-t border-[#EEF0F5] pt-3">
+              <summary class="flex cursor-pointer list-none items-center gap-1.5 text-[9.5px] font-semibold text-[#000A57]"><Plus size={12} />Criar tarefa</summary>
+              <form method="POST" action="?/createTask" class="mt-3 space-y-2">
+                <select name="projectId" required class="h-9 w-full rounded-xl border border-[#DDE1EA] bg-white px-2.5 text-[9.5px]">{#each data.taskProjects as project}<option value={project.id}>{project.name}</option>{/each}</select>
+                <input name="title" required maxlength="180" value={`Chamado #${chat.ticketNumber} · ${chat.subject}`.slice(0, 180)} class="h-9 w-full rounded-xl border border-[#DDE1EA] px-2.5 text-[9.5px]" />
+                <textarea name="description" rows="2" maxlength="5000" placeholder="O que precisa ser feito?" class="w-full rounded-xl border border-[#DDE1EA] px-2.5 py-2 text-[9.5px]"></textarea>
+                <div class="grid grid-cols-2 gap-2"><select name="priority" class="h-9 rounded-xl border border-[#DDE1EA] bg-white px-2 text-[9.5px]"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select><input name="dueOn" type="date" class="h-9 rounded-xl border border-[#DDE1EA] px-2 text-[9.5px]" /></div>
+                <button type="submit" class="h-9 w-full rounded-xl bg-[#000A57] text-[9.5px] font-semibold text-white">Criar tarefa</button>
               </form>
             </details>
           {/if}
@@ -562,24 +567,24 @@
       {/if}
 
       {#if chat.ticketId}
-        <section class="p-4">
-          <div class="flex items-center gap-1.5"><MonitorCog size={12} class="text-[#000A57]" /><h3 class="text-[8px] font-bold uppercase tracking-[0.1em] text-[#9398A4]">Acesso remoto</h3></div>
+        <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
+          <div class="flex items-center gap-2"><MonitorCog size={14} class="text-[#000A57]" /><h3 class="text-[11px] font-semibold text-[#343A49]">Acesso remoto</h3></div>
           {#if onlineRemoteDevices.length > 0}
-            <p class="mt-2 text-[8.5px] font-medium text-[#398155]">{onlineRemoteDevices.length} {onlineRemoteDevices.length === 1 ? "computador online" : "computadores online"}</p>
+            <p class="mt-2 text-[9.5px] font-medium text-[#398155]">{onlineRemoteDevices.length} {onlineRemoteDevices.length === 1 ? "computador online" : "computadores online"}</p>
           {:else if data.remoteDevices.length > 0}
-            <p class="mt-2 text-[8.5px] text-[#858B99]">Computadores vinculados estão offline.</p>
+            <p class="mt-2 text-[9.5px] text-[#858B99]">Computadores vinculados estão offline.</p>
           {:else}
-            <p class="mt-2 text-[8.5px] text-[#858B99]">Nenhum computador vinculado.</p>
+            <p class="mt-2 text-[9.5px] text-[#858B99]">Nenhum computador vinculado.</p>
           {/if}
 
-          <div class="mt-2 flex flex-col gap-1.5">
-            {#if onlineRemoteDevices.length === 1 && data.canUseRemote}
-              <form method="POST" action="?/startRemote"><input type="hidden" name="deviceId" value={onlineRemoteDevices[0].id} /><button type="submit" class="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-[#000A57] text-[8px] font-semibold text-white"><MonitorCog size={10} />Iniciar acesso remoto</button></form>
-            {:else if data.canRequestRemote && data.remoteDevices.length === 0}
-              <form method="POST" action="?/enrollRemote"><button type="submit" class="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-[#DDE1E8] text-[8px] font-semibold text-[#000A57]"><Download size={10} />Instalar suporte remoto</button></form>
+          <div class="mt-3 flex flex-col gap-2">
+            {#if data.remoteReady && onlineRemoteDevices.length === 1 && data.canUseRemote}
+              <form method="POST" action="?/startRemote"><input type="hidden" name="deviceId" value={onlineRemoteDevices[0].id} /><button type="submit" class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] text-[9.5px] font-semibold text-white"><MonitorCog size={12} />Iniciar acesso remoto</button></form>
+            {:else if data.remoteReady && data.canRequestRemote && data.remoteDevices.length === 0}
+              <form method="POST" action="?/enrollRemote"><button type="submit" class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white text-[9.5px] font-semibold text-[#000A57]"><Download size={12} />Instalar suporte remoto</button></form>
             {/if}
             {#if data.canRequestRemote}
-              <a href={`/app/tickets/${chat.ticketId}/remote`} class="inline-flex h-8 w-full items-center justify-center rounded-lg border border-[#DDE1E8] text-[8px] font-semibold text-[#000A57]">Gerenciar computadores</a>
+              <a href={`/app/tickets/${chat.ticketId}/remote`} class="inline-flex h-9 w-full items-center justify-center rounded-xl border border-[#DDE1EA] bg-white text-[9.5px] font-semibold text-[#000A57]">Gerenciar computadores</a>
             {/if}
           </div>
         </section>
