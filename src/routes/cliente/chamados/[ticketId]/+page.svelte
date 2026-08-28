@@ -77,6 +77,12 @@
     if (event.eventType === "portal.ticket.created" || event.eventType === "ticket.created") {
       return "Chamado aberto";
     }
+    if (event.eventType === "ticket.agent.first_viewed") {
+      return "Equipe visualizou seu chamado";
+    }
+    if (event.eventType === "ticket.internal.movement") {
+      return "Movimentação interna";
+    }
     if (event.eventType === "chat.started") return "Atendimento iniciado pelo chat";
     if (event.eventType === "chat.closed") return "Atendimento de chat encerrado";
     if (event.eventType === "chat.ai.escalated") return "Conversa encaminhada para a equipe F10";
@@ -117,7 +123,7 @@
   <section class="mt-4 overflow-hidden rounded-[22px] border border-[#E1E4EC] bg-white">
     <header class="border-b border-[#ECEEF3] px-5 py-4 sm:px-6">
       <div class="flex items-center gap-2"><MessageSquare size={16} class="text-[#000A57]" /><h2 class="text-[14px] font-semibold text-[#303746]">Histórico do atendimento</h2></div>
-      <p class="application-text-meta mt-1 text-[#8B91A0]">Somente mensagens e eventos públicos aparecem aqui. Notas internas da equipe não são exibidas.</p>
+      <p class="application-text-meta mt-1 text-[#8B91A0]">Aqui aparecem suas mensagens, respostas e sinais de andamento. Detalhes do processo interno da equipe permanecem privados.</p>
     </header>
 
     <div class="space-y-4 bg-[#F8F9FB] px-4 py-5 sm:px-6 sm:py-6">
