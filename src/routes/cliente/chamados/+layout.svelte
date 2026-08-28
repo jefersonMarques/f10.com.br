@@ -72,6 +72,8 @@
   }
 
   async function checkChatNotification(markAsRead = false): Promise<void> {
+    if (chatOpen && !markAsRead) return;
+
     const session = readStoredChatSession();
     if (!session) {
       observedSessionId = "";
@@ -100,9 +102,9 @@
         .reverse()
         .find((message) => message.authorType === "user")?.id ?? "";
 
-      if (sessionChanged || !observedAgentMessageId || markAsRead || chatOpen) {
+      if (sessionChanged || !observedAgentMessageId || markAsRead) {
         observedAgentMessageId = latestAgentMessageId;
-        if (markAsRead || chatOpen) chatUnread = false;
+        if (markAsRead) chatUnread = false;
         return;
       }
 
@@ -170,10 +172,12 @@
       title={chatUnread ? "Nova mensagem no Assistente F10" : "Assistente F10"}
       on:click={openChat}
     >
-      <MessageCircleMore size={23} aria-hidden="true" />
-      {#if chatUnread}
-        <span class="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-[#F7F8FB] bg-[#E53935]" aria-hidden="true"></span>
-      {/if}
+      <span class="relative inline-flex h-full w-full items-center justify-center">
+        <MessageCircleMore size={23} aria-hidden="true" />
+        {#if chatUnread}
+          <span class="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-[#F7F8FB] bg-[#E53935]" aria-hidden="true"></span>
+        {/if}
+      </span>
     </button>
   {/if}
 </div>
