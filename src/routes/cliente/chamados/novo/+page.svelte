@@ -7,19 +7,25 @@
   export let data: PageData;
   export let form: ActionData;
 
+  const GLOBAL_UNIT_VALUE = "global";
   const formValues = form && "values" in form ? form.values : null;
-  let groupValue = formValues?.groupId
-    ? String(formValues.groupId)
-    : data.selectedGroupId
-      ? String(data.selectedGroupId)
-      : data.groups.length === 1
-        ? String(data.groups[0].grupo_id)
+  const formUsesGlobal = formValues?.scope === "global";
+  let groupValue = formUsesGlobal
+    ? ""
+    : formValues?.groupId
+      ? String(formValues.groupId)
+      : data.selectedGroupId
+        ? String(data.selectedGroupId)
+        : data.groups.length === 1
+          ? String(data.groups[0].grupo_id)
+          : "";
+  let unitValue = formUsesGlobal
+    ? GLOBAL_UNIT_VALUE
+    : formValues?.unitId
+      ? String(formValues.unitId)
+      : data.selectedUnitId
+        ? String(data.selectedUnitId)
         : "";
-  let unitValue = formValues?.unitId
-    ? String(formValues.unitId)
-    : data.selectedUnitId
-      ? String(data.selectedUnitId)
-      : "";
 
   $: selectedGroup = data.groups.find((group) => group.grupo_id === Number(groupValue)) ?? null;
   $: availableUnits = selectedGroup?.unidades ?? [];
@@ -31,6 +37,11 @@
     const nextGroupId = Number((event.currentTarget as HTMLSelectElement).value);
     const nextUnits = data.groups.find((group) => group.grupo_id === nextGroupId)?.unidades ?? [];
     unitValue = nextUnits.length === 1 ? String(nextUnits[0].unidade_id) : "";
+  }
+
+  function handleUnitChange(event: Event): void {
+    unitValue = (event.currentTarget as HTMLSelectElement).value;
+    if (unitValue === GLOBAL_UNIT_VALUE) groupValue = "";
   }
 </script>
 
@@ -57,7 +68,7 @@
       <div class="grid gap-4 sm:grid-cols-2">
         <label>
           <span class="application-text-caption font-semibold text-[#555D6E]">Grupo</span>
-          <select name="groupId" bind:value={groupValue} on:change={handleGroupChange} required class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none focus:border-[#000A57]">
+          <select name="groupId" bind:value={groupValue} on:change={handleGroupChange} required={unitValue !== GLOBAL_UNIT_VALUE} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none focus:border-[#000A57]">
             <option value="" disabled>Selecione o grupo</option>
             {#each data.groups as group}
               <option value={String(group.grupo_id)}>{group.grupo}</option>
@@ -67,12 +78,18 @@
 
         <label>
           <span class="application-text-caption font-semibold text-[#555D6E]">Escola</span>
-          <select name="unitId" bind:value={unitValue} required disabled={!selectedGroup} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none disabled:bg-[#F5F6F8] focus:border-[#000A57]">
-            <option value="" disabled>{selectedGroup ? "Selecione a escola" : "Selecione o grupo primeiro"}</option>
+          <select name="unitId" bind:value={unitValue} on:change={handleUnitChange} required disabled={!selectedGroup && !data.allowGlobalContext} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none disabled:bg-[#F5F6F8] focus:border-[#000A57]">
+            <option value="" disabled>{selectedGroup ? "Selecione a escola" : data.allowGlobalContext ? "Selecione um grupo ou Global" : "Selecione o grupo primeiro"}</option>
+            {#if data.allowGlobalContext}
+              <option value={GLOBAL_UNIT_VALUE}>Global · todos os grupos e escolas</option>
+            {/if}
             {#each availableUnits as unit}
               <option value={String(unit.unidade_id)}>{unit.unidade}</option>
             {/each}
           </select>
+          {#if data.allowGlobalContext}
+            <p class="application-text-meta mt-1.5 text-[#9399A6]">Use Global quando o problema afetar mais de uma escola ou grupo.</p>
+          {/if}
         </label>
       </div>
 
