@@ -4,6 +4,7 @@ import { webChatSessions } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { teamMembers, users } from "$lib/server/db/schema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
+import { autoAssignTicketIfConfigured } from "$lib/server/support/supportRoutingRepository";
 
 export async function notifySupportTicketNeedsAttention(
   ticketId: string,
@@ -24,6 +25,11 @@ export async function notifySupportTicketNeedsAttention(
     .limit(1);
 
   if (!ticket) return;
+
+  if (!ticket.assignedUserId) {
+    const autoAssignedUserId = await autoAssignTicketIfConfigured(ticketId);
+    if (autoAssignedUserId) return;
+  }
 
   let recipientIds: string[] = [];
   if (ticket.assignedUserId) {
