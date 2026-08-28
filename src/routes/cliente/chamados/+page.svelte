@@ -8,7 +8,6 @@
     Inbox,
     LayoutGrid,
     List,
-    Plus,
     Search,
   } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
@@ -175,8 +174,9 @@
 
   function statusClass(status: string): string {
     if (status === "waiting_customer") return "bg-[#FFF4E8] text-[#9A541A]";
-    if (status === "resolved" || status === "closed") return "bg-[#EEF5F0] text-[#47705A]";
+    if (status === "resolved" || status === "closed") return "bg-[#EEF7F1] text-[#3F7257]";
     if (status === "in_progress") return "bg-[#EEF0FF] text-[#303C91]";
+    if (status === "new") return "bg-[#FFF2E7] text-[#A9500C]";
     return "bg-[#F1F3F7] text-[#626A7B]";
   }
 
@@ -185,27 +185,28 @@
     if (priority === "high") return "bg-[#FFF4E8] text-[#9A541A]";
     return "bg-[#F4F5F8] text-[#6A7180]";
   }
+
+  function slaClass(ticket: PageData["tickets"][number]): string {
+    const label = slaLabel(ticket);
+    if (label === "Concluído") return "text-[#47705A]";
+    if (label === "Prazo excedido") return "text-[#A04435]";
+    return "text-[#5F687B]";
+  }
 </script>
 
 <svelte:head><title>Meus chamados | F10 Software</title></svelte:head>
 
-<ApplicationContent width="wide">
-  <section class="mb-4 rounded-[22px] border border-[#E1E4EC] bg-white p-4 shadow-[0_8px_28px_rgba(1,13,40,0.035)] sm:p-5">
-    <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-      <div>
-        <p class="application-text-caption font-bold uppercase tracking-[0.1em] text-[#EA6D0B]">Central de suporte</p>
-        <h2 class="mt-1 text-[20px] font-semibold tracking-[-0.03em] text-[#202737]">Seus chamados</h2>
-        <p class="application-text-meta mt-1 text-[#858C9C]">Cada alteração nos filtros atualiza a consulta automaticamente.</p>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        <a href="/ajuda-f10" class="inline-flex min-h-10 items-center justify-center rounded-xl border border-[#DDE1E9] px-4 text-[11px] font-semibold text-[#000A57] hover:bg-[#F8F9FC]">Central de Ajuda</a>
-        <a href="/cliente/chamados/novo" class="inline-flex min-h-10 items-center gap-2 justify-center rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white hover:bg-[#111B71]"><Plus size={15} />Novo chamado</a>
-      </div>
+<ApplicationContent width="wide" className="pb-10">
+  <section class="mb-5 rounded-[22px] border border-[#E1E4EC] bg-white p-4 shadow-[0_8px_28px_rgba(1,13,40,0.035)] sm:p-5">
+    <div>
+      <p class="application-text-caption font-bold uppercase tracking-[0.1em] text-[#EA6D0B]">Central de suporte</p>
+      <h2 class="mt-1 text-[22px] font-semibold tracking-[-0.035em] text-[#202737]">Seus chamados</h2>
+      <p class="application-text-meta mt-1 text-[#858C9C]">Cada alteração nos filtros atualiza a consulta automaticamente.</p>
     </div>
 
     <div class="mt-5 border-t border-[#ECEEF3] pt-4">
-      <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-        <label class="md:col-span-2 xl:col-span-2">
+      <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(260px,2fr)_repeat(5,minmax(130px,1fr))]">
+        <label>
           <span class="application-text-caption font-semibold text-[#596172]">Buscar chamado</span>
           <div class="relative mt-1.5">
             <Search size={15} class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E95A4]" />
@@ -215,7 +216,7 @@
               bind:value={searchValue}
               on:input={handleSearchInput}
               placeholder="Número ou assunto"
-              class="application-text-control h-11 w-full rounded-xl border border-[#DDE1E9] bg-white pl-10 pr-3 outline-none focus:border-[#000A57] focus:ring-4 focus:ring-[#000A57]/10"
+              class="application-text-control h-11 w-full rounded-xl border border-[#DDE1E9] bg-white pl-10 pr-3 outline-none transition focus:border-[#000A57] focus:ring-4 focus:ring-[#000A57]/10"
             />
           </div>
         </label>
@@ -223,7 +224,7 @@
         {#if data.groups.length > 1}
           <label>
             <span class="application-text-caption font-semibold text-[#596172]">Grupo</span>
-            <select bind:value={groupValue} on:change={handleGroupChange} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none focus:border-[#000A57]">
+            <select bind:value={groupValue} on:change={handleGroupChange} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none transition focus:border-[#000A57]">
               <option value="all">Todos os grupos</option>
               {#each data.groups as group}
                 <option value={String(group.grupo_id)}>{group.grupo}</option>
@@ -239,7 +240,7 @@
 
         <label>
           <span class="application-text-caption font-semibold text-[#596172]">Escola</span>
-          <select bind:value={unitValue} on:change={handleUnitChange} disabled={!selectedGroup} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none disabled:bg-[#F5F6F8] disabled:text-[#A1A6B0] focus:border-[#000A57]">
+          <select bind:value={unitValue} on:change={handleUnitChange} disabled={!selectedGroup} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none transition disabled:bg-[#F5F6F8] disabled:text-[#A1A6B0] focus:border-[#000A57]">
             <option value="all">{selectedGroup ? "Todas as escolas" : "Selecione um grupo"}</option>
             {#each availableUnits as unit}
               <option value={String(unit.unidade_id)}>{unit.unidade}</option>
@@ -249,7 +250,7 @@
 
         <label>
           <span class="application-text-caption font-semibold text-[#596172]">Status</span>
-          <select bind:value={statusValue} on:change={handleStatusChange} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none focus:border-[#000A57]">
+          <select bind:value={statusValue} on:change={handleStatusChange} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none transition focus:border-[#000A57]">
             <option value="">Todos</option>
             {#each Object.entries(statusLabels) as [value, label]}
               <option value={value}>{label}</option>
@@ -259,35 +260,37 @@
 
         <label>
           <span class="application-text-caption font-semibold text-[#596172]">Prioridade</span>
-          <select bind:value={priorityValue} on:change={handlePriorityChange} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none focus:border-[#000A57]">
+          <select bind:value={priorityValue} on:change={handlePriorityChange} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none transition focus:border-[#000A57]">
             <option value="">Todas</option>
             {#each Object.entries(priorityLabels) as [value, label]}
               <option value={value}>{label}</option>
             {/each}
           </select>
         </label>
-      </div>
 
-      <label class="mt-3 block sm:w-[210px]">
-        <span class="application-text-caption font-semibold text-[#596172]">Período de abertura</span>
-        <select bind:value={periodValue} on:change={handlePeriodChange} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none focus:border-[#000A57]">
-          <option value="all">Todo o período</option>
-          <option value="7d">Últimos 7 dias</option>
-          <option value="30d">Últimos 30 dias</option>
-          <option value="90d">Últimos 90 dias</option>
-        </select>
-      </label>
+        <label>
+          <span class="application-text-caption font-semibold text-[#596172]">Período de abertura</span>
+          <select bind:value={periodValue} on:change={handlePeriodChange} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none transition focus:border-[#000A57]">
+            <option value="all">Todo o período</option>
+            <option value="7d">Últimos 7 dias</option>
+            <option value="30d">Últimos 30 dias</option>
+            <option value="90d">Últimos 90 dias</option>
+          </select>
+        </label>
+      </div>
     </div>
   </section>
 
-  <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+  <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
     <div>
       <p class="text-[13px] font-semibold text-[#303746]">{data.total} {data.total === 1 ? "chamado encontrado" : "chamados encontrados"}</p>
-      {#if data.total > 0}<p class="application-text-meta mt-0.5 text-[#9298A5]">Exibindo {firstVisible}–{lastVisible} de {data.total}</p>{/if}
+      {#if data.total > 0}
+        <p class="application-text-meta mt-0.5 text-[#9298A5]">Exibindo {firstVisible}–{lastVisible} de {data.total}</p>
+      {/if}
     </div>
-    <div class="inline-flex w-fit rounded-xl border border-[#DDE1E9] bg-white p-1">
-      <a href={buildHref({ view: "cards", page: 1 })} class={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-[11px] font-semibold ${data.filters.view === "cards" ? "bg-[#000A57] text-white" : "text-[#6B7280] hover:text-[#000A57]"}`}><LayoutGrid size={14} />Cards</a>
-      <a href={buildHref({ view: "table", page: 1 })} class={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-[11px] font-semibold ${data.filters.view === "table" ? "bg-[#000A57] text-white" : "text-[#6B7280] hover:text-[#000A57]"}`}><List size={14} />Tabela</a>
+    <div class="inline-flex w-fit rounded-xl border border-[#DDE1E9] bg-white p-1 shadow-[0_4px_14px_rgba(1,13,40,0.03)]">
+      <a href={buildHref({ view: "cards", page: 1 })} class={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-[11px] font-semibold transition ${data.filters.view === "cards" ? "bg-[#000A57] text-white" : "text-[#6B7280] hover:bg-[#F7F8FA] hover:text-[#000A57]"}`}><LayoutGrid size={14} />Cards</a>
+      <a href={buildHref({ view: "table", page: 1 })} class={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-[11px] font-semibold transition ${data.filters.view === "table" ? "bg-[#000A57] text-white" : "text-[#6B7280] hover:bg-[#F7F8FA] hover:text-[#000A57]"}`}><List size={14} />Tabela</a>
     </div>
   </div>
 
@@ -295,46 +298,84 @@
     <section class="rounded-[22px] border border-dashed border-[#CBD1DE] bg-white px-6 py-12 text-center">
       <Inbox size={30} class="mx-auto text-[#9BA1AE]" />
       <h2 class="mt-4 text-[17px] font-semibold text-[#303746]">Nenhum chamado encontrado</h2>
-      <p class="mx-auto mt-2 max-w-[520px] text-[11px] leading-5 text-[#777E8D]">Altere os filtros ou abra um novo chamado para falar com a equipe F10.</p>
-      <a href="/cliente/chamados/novo" class="mt-5 inline-flex min-h-11 items-center gap-2 justify-center rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white"><Plus size={15} />Novo chamado</a>
+      <p class="mx-auto mt-2 max-w-[520px] text-[11px] leading-5 text-[#777E8D]">Ajuste os filtros ou use “Novo chamado” na barra superior para falar com a equipe F10.</p>
     </section>
   {:else}
-    <div class={data.filters.view === "cards" ? "space-y-3" : "space-y-3 md:hidden"}>
+    <div class={data.filters.view === "cards" ? "space-y-2.5" : "space-y-2.5 md:hidden"}>
       {#each data.tickets as ticket}
-        <a href={`/cliente/chamados/${ticket.id}`} class={`group block rounded-[22px] border bg-white p-5 shadow-[0_8px_28px_rgba(1,13,40,0.035)] transition hover:shadow-[0_12px_32px_rgba(1,13,40,0.07)] ${ticket.hasUnreadUpdate ? "border-[#E6A36E]" : "border-[#E1E4EC] hover:border-[#C8CEDB]"}`}>
-          <div class="flex items-start justify-between gap-4">
+        <a href={`/cliente/chamados/${ticket.id}`} class={`group block overflow-hidden rounded-[18px] border bg-white shadow-[0_6px_22px_rgba(1,13,40,0.028)] transition hover:-translate-y-[1px] hover:shadow-[0_10px_26px_rgba(1,13,40,0.06)] ${ticket.hasUnreadUpdate ? "border-[#E7A16A]" : "border-[#E1E4EC] hover:border-[#C9CED9]"}`}>
+          <div class={`h-[2px] w-full ${ticket.hasUnreadUpdate ? "bg-[#EA6D0B]" : "bg-transparent"}`}></div>
+          <div class="grid gap-4 px-4 py-4 lg:grid-cols-[190px_minmax(260px,1.5fr)_minmax(210px,1fr)_155px_170px_22px] lg:items-center xl:px-5">
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
                 <span class="application-text-caption font-bold text-[#EA6D0B]">#{ticket.ticketNumber}</span>
                 <span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${statusClass(ticket.status)}`}>{statusLabels[ticket.status] ?? ticket.status}</span>
-                <span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${priorityClass(ticket.priority)}`}>{priorityLabels[ticket.priority] ?? ticket.priority}</span>
-                {#if ticket.hasUnreadUpdate}<span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#FFF1E5] px-2.5 py-1 font-semibold text-[#A9500C]"><span class="h-1.5 w-1.5 rounded-full bg-[#EA6D0B]"></span>Nova atualização</span>{/if}
               </div>
-              <h3 class="mt-2 truncate text-[15px] font-semibold text-[#262D3D]">{ticket.subject}</h3>
-              <p class="application-text-meta mt-2 text-[#8A91A0]">{ticket.context ? `${ticket.context.groupName} · ${ticket.context.unitName}` : "Contexto do atendimento"} · {channelLabels[ticket.channel] ?? ticket.channel}</p>
-              {#if ticket.lastTeamActivityAt}<p class={`application-text-meta mt-2 font-semibold ${ticket.hasUnreadUpdate ? "text-[#A9500C]" : "text-[#687081]"}`}>Equipe movimentou este chamado {activityAge(ticket.lastTeamActivityAt)}</p>{/if}
-              <div class="application-text-meta mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[#8A91A0]"><span>Atualizado {formatDate(ticket.updatedAt)}</span><span class="inline-flex items-center gap-1"><Clock3 size={12} />{slaLabel(ticket)}</span></div>
+              <div class="mt-2 flex flex-wrap items-center gap-2">
+                <span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${priorityClass(ticket.priority)}`}>{priorityLabels[ticket.priority] ?? ticket.priority}</span>
+                {#if ticket.hasUnreadUpdate}
+                  <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#FFF1E5] px-2.5 py-1 font-semibold text-[#A9500C]"><span class="h-1.5 w-1.5 rounded-full bg-[#EA6D0B]"></span>Nova atualização</span>
+                {/if}
+              </div>
             </div>
-            <ArrowRight size={17} class="mt-1 shrink-0 text-[#A1A7B4] transition group-hover:translate-x-0.5 group-hover:text-[#000A57]" />
+
+            <div class="min-w-0">
+              <h3 class="truncate text-[14px] font-semibold tracking-[-0.01em] text-[#262D3D] group-hover:text-[#000A57]">{ticket.subject}</h3>
+              <p class="application-text-meta mt-1.5 truncate text-[#8A91A0]">{ticket.context ? `${ticket.context.groupName} · ${ticket.context.unitName}` : "Contexto do atendimento"} · {channelLabels[ticket.channel] ?? ticket.channel}</p>
+            </div>
+
+            <div class="min-w-0">
+              <p class="application-text-meta font-medium text-[#9A9FAC]">Última atividade da equipe</p>
+              {#if ticket.lastTeamActivityAt}
+                <p class={`mt-1 truncate text-[11px] font-semibold ${ticket.hasUnreadUpdate ? "text-[#A9500C]" : "text-[#626A7B]"}`}>Equipe movimentou este chamado {activityAge(ticket.lastTeamActivityAt)}</p>
+              {:else}
+                <p class="mt-1 text-[11px] text-[#8A91A0]">Aguardando primeira movimentação</p>
+              {/if}
+            </div>
+
+            <div>
+              <p class="application-text-meta font-medium text-[#9A9FAC]">Atualizado</p>
+              <p class="mt-1 text-[11px] font-semibold text-[#596172]">{formatDate(ticket.updatedAt)}</p>
+            </div>
+
+            <div>
+              <p class="application-text-meta font-medium text-[#9A9FAC]">Acompanhamento</p>
+              <p class={`mt-1 inline-flex items-center gap-1.5 text-[11px] font-semibold ${slaClass(ticket)}`}><Clock3 size={13} />{slaLabel(ticket)}</p>
+            </div>
+
+            <ArrowRight size={17} class="hidden text-[#A1A7B4] transition group-hover:translate-x-0.5 group-hover:text-[#000A57] lg:block" />
           </div>
         </a>
       {/each}
     </div>
 
     {#if data.filters.view === "table"}
-      <div class="hidden overflow-hidden rounded-[20px] border border-[#E1E4EC] bg-white md:block">
+      <div class="hidden overflow-hidden rounded-[18px] border border-[#E1E4EC] bg-white shadow-[0_6px_22px_rgba(1,13,40,0.028)] md:block">
         <table class="w-full border-collapse text-left">
-          <thead class="bg-[#F7F8FA] text-[10px] font-bold uppercase tracking-[0.06em] text-[#747C8D]"><tr><th class="px-4 py-3">Chamado</th><th class="px-4 py-3">Assunto</th><th class="px-4 py-3">Grupo / Escola</th><th class="px-4 py-3">Origem</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Prioridade</th><th class="px-4 py-3">Atualização</th></tr></thead>
+          <thead class="bg-[#F7F8FA] text-[10px] font-bold uppercase tracking-[0.06em] text-[#747C8D]">
+            <tr>
+              <th class="px-4 py-3">Chamado</th>
+              <th class="px-4 py-3">Assunto</th>
+              <th class="px-4 py-3">Contexto</th>
+              <th class="px-4 py-3">Status</th>
+              <th class="px-4 py-3">Atividade da equipe</th>
+              <th class="px-4 py-3">Atualizado</th>
+              <th class="px-4 py-3">Acompanhamento</th>
+            </tr>
+          </thead>
           <tbody class="divide-y divide-[#ECEEF3]">
             {#each data.tickets as ticket}
-              <tr class={ticket.hasUnreadUpdate ? "bg-[#FFFBF7] hover:bg-[#FFF8F1]" : "hover:bg-[#FAFBFC]"}>
-                <td class="px-4 py-3"><a class="font-semibold text-[#000A57]" href={`/cliente/chamados/${ticket.id}`}>#{ticket.ticketNumber}</a></td>
-                <td class="max-w-[300px] px-4 py-3 text-[12px] font-medium text-[#303746]"><a class="block truncate" href={`/cliente/chamados/${ticket.id}`}>{ticket.subject}</a></td>
-                <td class="px-4 py-3 text-[11px] text-[#6D7484]">{ticket.context ? `${ticket.context.groupName} · ${ticket.context.unitName}` : "—"}</td>
-                <td class="px-4 py-3 text-[11px] text-[#6D7484]">{channelLabels[ticket.channel] ?? ticket.channel}</td>
-                <td class="px-4 py-3"><span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${statusClass(ticket.status)}`}>{statusLabels[ticket.status] ?? ticket.status}</span></td>
-                <td class="px-4 py-3"><span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${priorityClass(ticket.priority)}`}>{priorityLabels[ticket.priority] ?? ticket.priority}</span></td>
-                <td class="px-4 py-3 text-[11px] text-[#7D8493]">{#if ticket.hasUnreadUpdate}<span class="mb-1 inline-flex items-center gap-1.5 font-semibold text-[#A9500C]"><span class="h-1.5 w-1.5 rounded-full bg-[#EA6D0B]"></span>Nova atualização</span><br />{/if}{ticket.lastTeamActivityAt ? activityAge(ticket.lastTeamActivityAt) : formatDate(ticket.updatedAt)}</td>
+              <tr class={ticket.hasUnreadUpdate ? "bg-[#FFFBF7] transition hover:bg-[#FFF8F1]" : "transition hover:bg-[#FAFBFC]"}>
+                <td class="px-4 py-3">
+                  <a class="font-semibold text-[#EA6D0B]" href={`/cliente/chamados/${ticket.id}`}>#{ticket.ticketNumber}</a>
+                  {#if ticket.hasUnreadUpdate}<div class="application-text-meta mt-1 inline-flex items-center gap-1.5 font-semibold text-[#A9500C]"><span class="h-1.5 w-1.5 rounded-full bg-[#EA6D0B]"></span>Nova atualização</div>{/if}
+                </td>
+                <td class="max-w-[320px] px-4 py-3 text-[12px] font-medium text-[#303746]"><a class="block truncate hover:text-[#000A57]" href={`/cliente/chamados/${ticket.id}`}>{ticket.subject}</a></td>
+                <td class="px-4 py-3 text-[11px] text-[#6D7484]">{ticket.context ? `${ticket.context.groupName} · ${ticket.context.unitName}` : "—"}<div class="application-text-meta mt-1 text-[#9A9FAC]">{channelLabels[ticket.channel] ?? ticket.channel}</div></td>
+                <td class="px-4 py-3"><span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${statusClass(ticket.status)}`}>{statusLabels[ticket.status] ?? ticket.status}</span><div class="mt-2"><span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${priorityClass(ticket.priority)}`}>{priorityLabels[ticket.priority] ?? ticket.priority}</span></div></td>
+                <td class="px-4 py-3 text-[11px] text-[#687081]">{ticket.lastTeamActivityAt ? activityAge(ticket.lastTeamActivityAt) : "Aguardando movimentação"}</td>
+                <td class="px-4 py-3 text-[11px] font-medium text-[#687081]">{formatDate(ticket.updatedAt)}</td>
+                <td class={`px-4 py-3 text-[11px] font-semibold ${slaClass(ticket)}`}><span class="inline-flex items-center gap-1.5"><Clock3 size={13} />{slaLabel(ticket)}</span></td>
               </tr>
             {/each}
           </tbody>
@@ -344,7 +385,7 @@
   {/if}
 
   {#if data.totalPages > 1}
-    <nav class="mt-5 flex items-center justify-between rounded-2xl border border-[#E1E4EC] bg-white px-3 py-2">
+    <nav class="mt-5 flex items-center justify-between rounded-2xl border border-[#E1E4EC] bg-white px-3 py-2 shadow-[0_4px_14px_rgba(1,13,40,0.025)]">
       {#if data.page > 1}<a href={buildHref({ page: data.page - 1 })} class="inline-flex min-h-9 items-center gap-1 rounded-lg px-3 text-[11px] font-semibold text-[#000A57] hover:bg-[#F5F6F8]"><ChevronLeft size={14} />Anterior</a>{:else}<span></span>{/if}
       <span class="application-text-meta text-[#777E8D]">Página {data.page} de {data.totalPages}</span>
       {#if data.page < data.totalPages}<a href={buildHref({ page: data.page + 1 })} class="inline-flex min-h-9 items-center gap-1 rounded-lg px-3 text-[11px] font-semibold text-[#000A57] hover:bg-[#F5F6F8]">Próxima<ChevronRight size={14} /></a>{:else}<span></span>{/if}
