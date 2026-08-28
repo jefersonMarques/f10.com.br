@@ -36,6 +36,7 @@
   export let selectedSessionId: string | null = null;
   export let compact = false;
 
+  let inboxChats: ChatInboxItem[] = chats;
   let query = "";
   let scope: InboxScope = "all";
   let searchElement: HTMLInputElement;
@@ -84,7 +85,7 @@
   }
 
   function scopeCount(value: InboxScope): number {
-    return chats.filter((chat) => matchesScope(chat, value)).length;
+    return inboxChats.filter((chat) => matchesScope(chat, value)).length;
   }
 
   function formatRelative(value: string | Date): string {
@@ -104,7 +105,25 @@
     return "";
   }
 
-  $: filteredChats = chats.filter((chat) => matchesScope(chat, scope) && matchesQuery(chat, query));
+  async function refreshInbox(): Promise<void> {
+    if (document.visibilityState !== "visible") return;
+
+    try {
+      const response = await fetch("/api/app/chat/inbox", {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      if (!response.ok) return;
+
+      const payload = (await response.json()) as { chats?: ChatInboxItem[] };
+      if (payload.chats) inboxChats = payload.chats;
+    } catch {
+      // O inbox mantém o último estado conhecido em falhas transitórias.
+    }
+  }
+
+  $: inboxChats = chats;
+  $: filteredChats = inboxChats.filter((chat) => matchesScope(chat, scope) && matchesQuery(chat, query));
 
   onMount(() => {
     const handleKeydown = (event: KeyboardEvent) => {
@@ -114,9 +133,20 @@
       event.preventDefault();
       searchElement?.focus();
     };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void refreshInbox();
+    };
 
+    void refreshInbox();
+    const intervalId = window.setInterval(() => void refreshInbox(), 5_000);
     window.addEventListener("keydown", handleKeydown);
-    return () => window.removeEventListener("keydown", handleKeydown);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("keydown", handleKeydown);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   });
 </script>
 
@@ -129,7 +159,7 @@
         </span>
         <div class="min-w-0">
           <h2 class="truncate text-[13px] font-semibold text-[#252B3A]">Conversas</h2>
-          <p class="text-[9px] text-[#969BA8]">{chats.length} no seu escopo</p>
+          <p class="text-[9px] text-[#969BA8]">{inboxChats.length} no seu escopo</p>
         </div>
       </div>
     </div>
