@@ -1,5 +1,6 @@
 import { dev } from "$app/environment";
 import { json, type RequestHandler } from "@sveltejs/kit";
+import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { isSupportAiChatEnabled } from "$lib/server/support/supportAiChat";
 import { runSupportAi } from "$lib/server/support/supportAiAgent";
 import { consumeSupportPublicRateLimit } from "$lib/server/support/supportPublicRateLimit";
@@ -62,6 +63,9 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
   const conversationContext = readString(body.conversationContext, MAX_CONTEXT_CHARS);
   if (!message) return json({ error: "INVALID_MESSAGE" }, { status: 400 });
 
+  // Mensagem enviada pelo cliente é atividade real; polling continua sem renovar a sessão.
+  await getOptionalCustomerF10PortalSession(cookies).catch(() => null);
+
   let clientAddress = "unknown";
   try {
     clientAddress = getClientAddress();
@@ -79,7 +83,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
 
     if (requestsHumanSupport(message)) {
       return json({
-        answer: "Certo. Para falar com alguém da equipe F10, vou pedir a identificação da sua conta aqui no chat.",
+        answer: "Certo. Para falar com alguém da equipe F10, vou usar sua sessão identificada quando ela estiver ativa e solicitar apenas o contexto necessário para o atendimento.",
         requiresHuman: true,
         aiAvailable: isSupportAiChatEnabled(),
       }, { headers: { "Cache-Control": "no-store" } });
