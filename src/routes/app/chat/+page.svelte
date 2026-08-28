@@ -1,240 +1,57 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import {
-    Clock3,
-    MessageCircleMore,
-    Search,
-    Sparkles,
-    UserRound,
-  } from "lucide-svelte";
+  import { ArrowRight, BookOpen, MessageCircleMore, Sparkles } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
+  import ChatInbox from "$lib/components/support/ChatInbox.svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;
-
-  type InboxScope = "mine" | "needs_human" | "waiting_customer" | "unassigned" | "active" | "resolved" | "all";
-
-  let scope: InboxScope = "mine";
-  let query = "";
-  let searchElement: HTMLInputElement;
-
-  const statusLabels: Record<string, string> = {
-    new: "Aguardando",
-    open: "Em atendimento",
-    in_progress: "Em atendimento",
-    waiting_customer: "Aguardando cliente",
-    resolved: "Resolvido",
-    closed: "Fechado",
-  };
-
-  const aiLabels: Record<string, string> = {
-    active: "Atendimento F10",
-    escalated: "Aguardando humano",
-    human: "Atendimento humano",
-    disabled: "Sem automação",
-  };
-
-  const priorityLabels: Record<string, string> = {
-    low: "Baixa",
-    normal: "Normal",
-    high: "Alta",
-    urgent: "Urgente",
-  };
-
-  const scopes: Array<{ value: InboxScope; label: string }> = [
-    { value: "mine", label: "Meus atendimentos" },
-    { value: "needs_human", label: "Aguardando atendente" },
-    { value: "waiting_customer", label: "Aguardando cliente" },
-    { value: "unassigned", label: "Não atribuídos" },
-    { value: "active", label: "Em atendimento" },
-    { value: "resolved", label: "Resolvidos" },
-    { value: "all", label: "Todos" },
-  ];
-
-  function matchesScope(chat: PageData["chats"][number], value: InboxScope): boolean {
-    if (value === "mine") return chat.assignedUserId === data.currentUserId && !["resolved", "closed"].includes(chat.status);
-    if (value === "needs_human") return chat.aiState === "escalated" || (!chat.assignedUserId && ["new", "open", "in_progress"].includes(chat.status));
-    if (value === "waiting_customer") return chat.status === "waiting_customer";
-    if (value === "unassigned") return !chat.assignedUserId && !["resolved", "closed"].includes(chat.status);
-    if (value === "active") return ["new", "open", "in_progress"].includes(chat.status);
-    if (value === "resolved") return ["resolved", "closed"].includes(chat.status);
-    return true;
-  }
-
-  function matchesQuery(chat: PageData["chats"][number], value: string): boolean {
-    const normalized = value.trim().toLocaleLowerCase("pt-BR");
-    if (!normalized) return true;
-    const ticketTerms = chat.ticketNumber
-      ? [`#${chat.ticketNumber}`, String(chat.ticketNumber)]
-      : [];
-    const haystack = [
-      chat.customerName,
-      chat.customerEmail,
-      chat.organizationName,
-      chat.customerContext?.groupName,
-      chat.customerContext?.unitName,
-      chat.customerContext?.legacyUserId,
-      chat.subject,
-      chat.lastMessageBody,
-      ...ticketTerms,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLocaleLowerCase("pt-BR");
-    return haystack.includes(normalized);
-  }
-
-  function scopeCount(value: InboxScope): number {
-    return data.chats.filter((chat) => matchesScope(chat, value)).length;
-  }
-
-  function formatRelative(value: string | Date): string {
-    const date = new Date(value);
-    const minutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60_000));
-    if (minutes < 1) return "agora";
-    if (minutes < 60) return `${minutes} min`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours} h`;
-    const days = Math.floor(hours / 24);
-    return `${days} d`;
-  }
-
-  function slaText(chat: PageData["chats"][number]): string {
-    if (!chat.ticketId) return "";
-    const dueAt = !chat.firstResponseAt ? chat.firstResponseDueAt : chat.resolutionDueAt;
-    if (!dueAt || ["resolved", "closed"].includes(chat.status)) return "";
-    const minutes = Math.round((new Date(dueAt).getTime() - Date.now()) / 60_000);
-    if (minutes < 0) return `SLA vencido há ${Math.abs(minutes)} min`;
-    if (minutes < 60) return `SLA em ${minutes} min`;
-    return `SLA em ${Math.ceil(minutes / 60)} h`;
-  }
-
-  function priorityClass(priority: string): string {
-    if (priority === "urgent") return "bg-[#FFF0F0] text-[#9B3030]";
-    if (priority === "high") return "bg-[#FFF5E8] text-[#9A5D18]";
-    if (priority === "low") return "bg-[#F3F4F7] text-[#777D8D]";
-    return "bg-[#EEF0FF] text-[#000A57]";
-  }
-
-  $: filteredChats = data.chats.filter((chat) => matchesScope(chat, scope) && matchesQuery(chat, query));
-
-  onMount(() => {
-    const handleKeydown = (event: KeyboardEvent) => {
-      if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey) return;
-      const target = event.target as HTMLElement | null;
-      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable) return;
-      event.preventDefault();
-      searchElement?.focus();
-    };
-    window.addEventListener("keydown", handleKeydown);
-    return () => window.removeEventListener("keydown", handleKeydown);
-  });
 </script>
 
 <svelte:head>
   <title>Chat | F10 Operations</title>
 </svelte:head>
 
-<ApplicationContent width="wide">
-  <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
-    <header class="border-b border-[#EEF0F5] px-4 py-4 sm:px-5">
-      <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div class="flex items-center gap-3">
-          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]">
-            <MessageCircleMore size={19} aria-hidden="true" />
-          </span>
-          <div>
-            <h2 class="text-[15px] font-semibold text-[#11182C]">Caixa de entrada</h2>
-            <p class="mt-0.5 text-[11px] text-[#858A98]">{filteredChats.length} de {data.chats.length} conversas no seu escopo</p>
-          </div>
-        </div>
+<ApplicationContent
+  width="full"
+  padding="none"
+  className="h-[calc(100dvh-var(--application-header-height))] min-h-[620px] overflow-hidden bg-white"
+>
+  <div class="grid h-full min-h-0 grid-cols-1 bg-white lg:grid-cols-[330px_minmax(0,1fr)]">
+    <aside class="min-h-0 border-r border-[#E4E6EC]">
+      <ChatInbox chats={data.chatInbox} currentUserId={data.chatCurrentUserId} />
+    </aside>
 
-        <div class="flex flex-col gap-2 lg:flex-row lg:items-center">
-          <label class="relative block w-full lg:w-[340px]">
-            <Search size={15} class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#979CAA]" aria-hidden="true" />
-            <input bind:this={searchElement} bind:value={query} placeholder="Buscar cliente, escola, e-mail ou #chamado" class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-10 pr-4 text-[11px] text-[#303645] outline-none transition focus:border-[#000A57] focus:bg-white focus:ring-2 focus:ring-[#000A57]/10" />
-            <span class="application-text-meta pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-[#E0E3EA] bg-white px-1.5 py-0.5 text-[#999EAA]">/</span>
-          </label>
-          <div class="flex gap-2">
-            <a href="/app/chat/preview" class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] font-semibold text-[#000A57] transition hover:bg-[#F8F9FF]"><MessageCircleMore size={15} aria-hidden="true" />Preview</a>
-            <a href="/app/chat/lab" class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 text-[11px] font-semibold text-white transition hover:bg-[#111B71]"><Sparkles size={15} aria-hidden="true" />Testar IA</a>
-          </div>
-        </div>
-      </div>
+    <main class="hidden min-h-0 items-center justify-center bg-[#FAFAFC] p-8 lg:flex">
+      <div class="max-w-[520px] text-center">
+        <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-[#E1E4EC] bg-white text-[#000A57] shadow-sm">
+          <MessageCircleMore size={25} aria-hidden="true" />
+        </span>
+        <h1 class="mt-5 text-[18px] font-semibold text-[#252B3A]">Selecione uma conversa</h1>
+        <p class="mx-auto mt-2 max-w-[420px] text-[11px] leading-5 text-[#858B99]">
+          A caixa de entrada permanece ao lado do atendimento para você navegar entre clientes sem perder o contexto da operação.
+        </p>
 
-      <div class="mt-4 flex gap-2 overflow-x-auto pb-1">
-        {#each scopes as item}
-          <button type="button" on:click={() => scope = item.value} class={`application-text-caption inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 font-semibold transition ${scope === item.value ? "border-[#000A57] bg-[#000A57] text-white" : "border-[#E1E4EB] bg-white text-[#656C7D] hover:border-[#C6CAD5]"}`}>
-            {item.label}
-            <span class={`application-text-meta rounded-full px-1.5 py-0.5 ${scope === item.value ? "bg-white/15 text-white" : "bg-[#F2F3F6] text-[#858A98]"}`}>{scopeCount(item.value)}</span>
-          </button>
-        {/each}
-      </div>
-    </header>
-
-    {#if filteredChats.length === 0}
-      <div class="px-6 py-16 text-center">
-        <MessageCircleMore size={34} class="mx-auto text-[#B6BBC7]" aria-hidden="true" />
-        <p class="mt-4 text-[13px] font-semibold text-[#4B5160]">Nenhuma conversa neste filtro</p>
-        <p class="mt-1 text-[11px] text-[#9297A5]">Altere o filtro ou a busca para visualizar outros atendimentos.</p>
-      </div>
-    {:else}
-      <div class="divide-y divide-[#EEF0F5]">
-        {#each filteredChats as chat}
-          <a href={`/app/chat/${chat.sessionId}`} class={`block px-5 py-4 transition hover:bg-[#FAFAFC] sm:px-6 ${chat.aiState === "escalated" ? "bg-[#FFFCFC]" : ""}`}>
-            <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-              <div class="flex min-w-0 flex-1 items-start gap-3">
-                <span class={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#A14040]" : "bg-[#F3F4F7] text-[#6E7483]"}`}>
-                  <UserRound size={17} aria-hidden="true" />
-                  {#if chat.lastMessageAuthorType === "customer" && !["waiting_customer", "resolved", "closed"].includes(chat.status)}
-                    <span class="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-[#EA6D0B]"></span>
-                  {/if}
-                </span>
-
-                <div class="min-w-0 flex-1">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <strong class="truncate text-[12px] font-semibold text-[#303645]">{chat.customerName ?? "Cliente"}</strong>
-                    {#if chat.ticketNumber}
-                      <span class="application-text-meta rounded-full bg-[#FFF0E4] px-2 py-1 font-bold text-[#C45C0B]">Chamado #{chat.ticketNumber}</span>
-                    {:else}
-                      <span class="application-text-meta rounded-full bg-[#EEF0FF] px-2 py-1 font-bold text-[#000A57]">Chat</span>
-                    {/if}
-                    <span class="application-text-meta rounded-full bg-[#EEF0FF] px-2 py-1 font-bold text-[#000A57]">{statusLabels[chat.status]}</span>
-                    {#if chat.ticketId}<span class={`application-text-meta rounded-full px-2 py-1 font-bold ${priorityClass(chat.priority)}`}>{priorityLabels[chat.priority]}</span>{/if}
-                    {#if chat.aiState === "escalated" || chat.aiState === "active"}
-                      <span class={`application-text-meta rounded-full px-2 py-1 font-bold ${chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#9B3C3C]" : "bg-[#F0EEFF] text-[#5142A6]"}`}>{aiLabels[chat.aiState]}</span>
-                    {/if}
-                  </div>
-
-                  {#if chat.customerContext}
-                    <p class="application-text-caption mt-1 truncate font-medium text-[#5F6676]">
-                      {chat.customerContext.unitName} · {chat.customerContext.groupName}
-                    </p>
-                  {:else}
-                    <p class="application-text-caption mt-1 truncate text-[#858B99]">{chat.organizationName ?? chat.customerEmail ?? chat.subject}</p>
-                  {/if}
-                  <p class={`mt-2 line-clamp-1 text-[11px] ${chat.lastMessageAuthorType === "customer" ? "font-medium text-[#454B5B]" : "text-[#777D8D]"}`}>
-                    {chat.lastMessageAuthorType === "customer" ? "Cliente: " : chat.lastMessageAuthorType === "user" ? "Equipe: " : "Atendimento F10: "}{chat.lastMessageBody ?? chat.subject}
-                  </p>
-                </div>
-              </div>
-
-              <div class="flex shrink-0 items-center justify-between gap-4 lg:min-w-[250px] lg:justify-end lg:text-right">
-                <div>
-                  <p class={`application-text-caption font-semibold ${chat.assignedUserName ? "text-[#5D6372]" : "text-[#A05C3E]"}`}>{chat.assignedUserName ?? "Não atribuído"}</p>
-                  {#if slaText(chat)}
-                    <p class={`application-text-meta mt-1 font-medium ${slaText(chat).includes("vencido") ? "text-[#A13C3C]" : "text-[#8C6B35]"}`}>{slaText(chat)}</p>
-                  {/if}
-                </div>
-                <div class="application-text-meta flex items-center gap-1.5 text-[#A0A4B0]">
-                  <Clock3 size={12} aria-hidden="true" />
-                  {formatRelative(chat.updatedAt)}
-                </div>
-              </div>
-            </div>
+        <div class="mt-6 grid gap-2 sm:grid-cols-2">
+          <a href="/app/chat/preview" class="flex items-center justify-between rounded-xl border border-[#E0E3EA] bg-white px-4 py-3 text-left transition hover:border-[#C9CDDA] hover:shadow-sm">
+            <span>
+              <strong class="block text-[10px] font-semibold text-[#343A49]">Preview do chat</strong>
+              <span class="mt-0.5 block text-[9px] text-[#959AA6]">Validar experiência do cliente</span>
+            </span>
+            <ArrowRight size={14} class="text-[#000A57]" />
           </a>
-        {/each}
+          <a href="/app/chat/lab" class="flex items-center justify-between rounded-xl border border-[#E0E3EA] bg-white px-4 py-3 text-left transition hover:border-[#C9CDDA] hover:shadow-sm">
+            <span>
+              <strong class="flex items-center gap-1.5 text-[10px] font-semibold text-[#343A49]"><Sparkles size={12} class="text-[#000A57]" />Testar IA</strong>
+              <span class="mt-0.5 block text-[9px] text-[#959AA6]">Laboratório do Assistente F10</span>
+            </span>
+            <ArrowRight size={14} class="text-[#000A57]" />
+          </a>
+        </div>
+
+        <a href="/app/help" class="mt-4 inline-flex items-center gap-2 text-[9px] font-semibold text-[#000A57] hover:underline">
+          <BookOpen size={12} /> Abrir base de conhecimento
+        </a>
       </div>
-    {/if}
-  </section>
+    </main>
+  </div>
 </ApplicationContent>
