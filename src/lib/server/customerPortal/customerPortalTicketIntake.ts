@@ -49,6 +49,7 @@ export async function resolveCustomerPortalTicketIntake(): Promise<CustomerPorta
       and(
         eq(ticketWorkflowStages.workflowId, workflow.id),
         eq(ticketWorkflowStages.active, true),
+        eq(ticketWorkflowStages.lifecycleStatus, "new"),
       ),
     )
     .orderBy(
@@ -60,8 +61,8 @@ export async function resolveCustomerPortalTicketIntake(): Promise<CustomerPorta
   const stage = stages.find((item) => item.name.trim().toLocaleLowerCase("pt-BR") === "novo")
     ?? stages.find((item) => item.code?.trim().toLowerCase() === "new")
     ?? stages.find((item) => item.code?.trim().toLowerCase() === "novo")
-    ?? stages.find((item) => item.lifecycleStatus === "new" && item.isInitial)
-    ?? stages.find((item) => item.lifecycleStatus === "new");
+    ?? stages.find((item) => item.isInitial)
+    ?? stages[0];
 
   if (!stage) {
     throw new Error("CUSTOMER_PORTAL_NEW_STAGE_NOT_CONFIGURED");
