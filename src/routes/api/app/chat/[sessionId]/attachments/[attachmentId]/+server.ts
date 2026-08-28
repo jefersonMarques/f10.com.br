@@ -2,6 +2,7 @@ import { error, type RequestHandler } from "@sveltejs/kit";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { getInternalChat } from "$lib/server/support/internalChatRepository";
 import {
+  getSupportChatMessageAttachment,
   getSupportMessageAttachment,
   readSupportMessageAttachment,
 } from "$lib/server/support/supportMessageAttachmentRepository";
@@ -27,7 +28,9 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
     `/app/chat/${sessionId}`,
   );
   const chat = await getInternalChat(session.user.id, permissions, sessionId);
-  const attachment = await getSupportMessageAttachment(attachmentId, chat.ticketId);
+  const attachment = chat.ticketId
+    ? await getSupportMessageAttachment(attachmentId, chat.ticketId)
+    : await getSupportChatMessageAttachment(attachmentId, sessionId);
   if (!attachment) throw error(404, "Anexo não encontrado.");
 
   try {
