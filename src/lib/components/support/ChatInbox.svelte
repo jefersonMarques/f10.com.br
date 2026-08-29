@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { Clock3, MessageCircleMore, Search, UserRound } from "lucide-svelte";
+  import { Clock3, History, MessageCircleMore, Search, UserRound } from "lucide-svelte";
 
   type ChatInboxItem = {
+    conversationKey: string;
+    sessionCount: number;
     sessionId: string;
     ticketId: string | null;
     ticketNumber: number | null;
@@ -28,7 +30,7 @@
 
   export let chats: ChatInboxItem[] = [];
   export let currentUserId = "";
-  export let selectedSessionId: string | null = null;
+  export let selectedConversationKey: string | null = null;
   export let compact = false;
 
   let inboxChats: ChatInboxItem[] = chats;
@@ -154,7 +156,7 @@
       </span>
       <div class="min-w-0">
         <h2 class="truncate text-[14px] font-semibold text-[#202637]">Conversas</h2>
-        <p class="mt-0.5 text-[10px] text-[#8B919F]">{inboxChats.length} atendimentos no seu escopo</p>
+        <p class="mt-0.5 text-[10px] text-[#8B919F]">{inboxChats.length} clientes/contextos no seu escopo</p>
       </div>
     </div>
 
@@ -195,9 +197,9 @@
         {#each filteredChats as chat}
           <a
             href={`/app/chat/${chat.sessionId}`}
-            class={`relative block overflow-hidden rounded-2xl border px-3.5 py-3 transition ${selectedSessionId === chat.sessionId ? "border-[#000A57] bg-[#F6F7FF] shadow-[0_8px_20px_rgba(0,10,87,0.08)]" : "border-[#E7E9EF] bg-white hover:border-[#CDD2DE] hover:shadow-sm"}`}
+            class={`relative block overflow-hidden rounded-2xl border px-3.5 py-3 transition ${selectedConversationKey === chat.conversationKey ? "border-[#000A57] bg-[#F6F7FF] shadow-[0_8px_20px_rgba(0,10,87,0.08)]" : "border-[#E7E9EF] bg-white hover:border-[#CDD2DE] hover:shadow-sm"}`}
           >
-            {#if selectedSessionId === chat.sessionId}
+            {#if selectedConversationKey === chat.conversationKey}
               <span class="absolute inset-y-3 left-0 w-1 rounded-r-full bg-[#EA6D0B]"></span>
             {/if}
 
@@ -215,15 +217,20 @@
                   <span class="flex shrink-0 items-center gap-1 text-[9px] text-[#9CA1AD]"><Clock3 size={10} />{formatRelative(chat.updatedAt)}</span>
                 </div>
 
-                <div class="mt-1 flex min-w-0 items-center gap-2">
+                <div class="mt-1 flex min-w-0 flex-wrap items-center gap-2">
                   {#if chat.ticketNumber}
                     <span class="shrink-0 rounded-md bg-[#FFF0E4] px-1.5 py-0.5 text-[9px] font-bold text-[#B95B12]">#{chat.ticketNumber}</span>
                   {:else}
                     <span class="shrink-0 rounded-md bg-[#EEF0FF] px-1.5 py-0.5 text-[9px] font-bold text-[#000A57]">CHAT</span>
                   {/if}
-                  <span class="truncate text-[9.5px] font-medium text-[#747B8B]">
+                  <span class="min-w-0 flex-1 truncate text-[9.5px] font-medium text-[#747B8B]">
                     {chat.customerContext?.unitName ?? chat.organizationName ?? chat.customerEmail ?? "Atendimento F10"}
                   </span>
+                  {#if chat.sessionCount > 1}
+                    <span class="inline-flex shrink-0 items-center gap-1 rounded-md bg-[#F1F2F5] px-1.5 py-0.5 text-[8.5px] font-semibold text-[#747B8B]" title={`${chat.sessionCount} sessões de atendimento agrupadas`}>
+                      <History size={9} aria-hidden="true" /> {chat.sessionCount}
+                    </span>
+                  {/if}
                 </div>
 
                 <p class={`mt-2 line-clamp-1 text-[10.5px] leading-4 ${chat.lastMessageAuthorType === "customer" ? "font-medium text-[#474E5D]" : "text-[#777E8D]"}`}>
