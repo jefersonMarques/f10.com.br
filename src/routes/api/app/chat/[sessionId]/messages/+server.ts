@@ -4,16 +4,12 @@ import {
   getSessionUser,
   SESSION_COOKIE_NAME,
 } from "$lib/server/auth/session";
-import {
-  listInternalChatMessages,
-  respondToInternalChat,
-} from "$lib/server/support/internalChatRepository";
-import {
-  listSupportChatMessageAttachments,
-  listSupportMessageAttachments,
-} from "$lib/server/support/supportMessageAttachmentRepository";
+import { listInternalChatConversationMessages } from "$lib/server/support/internalChatConversationRepository";
+import { respondToInternalChat } from "$lib/server/support/internalChatRepository";
 
 const MAX_BODY_BYTES = 8 * 1024;
+const DEFAULT_PAGE_SIZE = 40;
+const MAX_PAGE_SIZE = 100;
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -24,6 +20,23 @@ function isUuid(value: string): boolean {
 function isBodyTooLarge(request: Request): boolean {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   return Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES;
+}
+
+function readCursor(searchParams: URLSearchParams, prefix: "before" | "after") {
+  const rawAt = searchParams.get(`${prefix}At`)?.trim() ?? "";
+  const id = searchParams.get(`${prefix}Id`)?.trim() ?? "";
+  if (!rawAt && !id) return null;
+  if (!rawAt || !isUuid(id)) throw new Error("INVALID_CURSOR");
+
+  const createdAt = new Date(rawAt);
+  if (Number.isNaN(createdAt.getTime())) throw new Error("INVALID_CURSOR");
+  return { createdAt, id };
+}
+
+function readLimit(searchParams: URLSearchParams): number {
+  const raw = Number(searchParams.get("limit") ?? DEFAULT_PAGE_SIZE);
+  if (!Number.isFinite(raw)) return DEFAULT_PAGE_SIZE;
+  return Math.min(Math.max(Math.trunc(raw), 1), MAX_PAGE_SIZE);
 }
 
 async function getAuthenticatedContext(cookies: Parameters<RequestHandler>[0]["cookies"]) {
@@ -39,7 +52,7 @@ async function getAuthenticatedContext(cookies: Parameters<RequestHandler>[0]["c
   };
 }
 
-export const GET: RequestHandler = async ({ params, cookies }) => {
+export const GET: RequestHandler = async ({ params, cookies, url }) => {
   const sessionId = params.sessionId ?? "";
   if (!isUuid(sessionId)) {
     return json({ error: "CHAT_NOT_FOUND" }, { status: 404 });
@@ -51,39 +64,34 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
   }
 
   try {
-    const result = await listInternalChatMessages(
+    const before = readCursor(url.searchParams, "before");
+    const after = readCursor(url.searchParams, "after");
+    if (before && after) return json({ error: "INVALID_CURSOR" }, { status: 400 });
+
+    const result = await listInternalChatConversationMessages(
       authentication.session.user.id,
       authentication.permissions,
       sessionId,
+      {
+        before,
+        after,
+        limit: readLimit(url.searchParams),
+      },
     );
-    const messageIds = result.messages.map((message) => message.id);
-    const attachmentRows = result.chat.ticketId
-      ? await listSupportMessageAttachments(messageIds)
-      : await listSupportChatMessageAttachments(messageIds);
-    const attachmentsByMessage = new Map<string, typeof attachmentRows>();
-    for (const attachment of attachmentRows) {
-      const current = attachmentsByMessage.get(attachment.messageId) ?? [];
-      current.push(attachment);
-      attachmentsByMessage.set(attachment.messageId, current);
-    }
 
     return json(
       {
         chat: result.chat,
-        messages: result.messages.map((message) => ({
-          ...message,
-          attachments: (attachmentsByMessage.get(message.id) ?? []).map((attachment) => ({
-            id: attachment.id,
-            originalName: attachment.originalName,
-            mimeType: attachment.mimeType,
-            sizeBytes: attachment.sizeBytes,
-            url: `/api/app/chat/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachment.id)}`,
-          })),
-        })),
+        conversationKey: result.conversationKey,
+        hasOlder: result.hasOlder,
+        messages: result.messages,
       },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch {
+  } catch (cause) {
+    if (cause instanceof Error && cause.message === "INVALID_CURSOR") {
+      return json({ error: "INVALID_CURSOR" }, { status: 400 });
+    }
     return json({ error: "CHAT_NOT_FOUND" }, { status: 404 });
   }
 };
