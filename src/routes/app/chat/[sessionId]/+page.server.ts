@@ -17,6 +17,10 @@ import { getMeshCentralControlStatus } from "$lib/server/remote/meshCentralContr
 import { getRemoteProviderStatus } from "$lib/server/remote/remoteSupportProvider";
 import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { finishInternalChat } from "$lib/server/support/chatLifecycleRepository";
+import {
+  listInternalChatConversationMessages,
+  listInternalChatRelatedTickets,
+} from "$lib/server/support/internalChatConversationRepository";
 import { createTicketFromChat } from "$lib/server/support/chatTicketBridge";
 import {
   assignInternalChat,
@@ -131,7 +135,15 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   }
 
   try {
-    const initial = await listInternalChatMessages(layout.user.id, permissions, params.sessionId);
+    const [initial, relatedTickets] = await Promise.all([
+      listInternalChatConversationMessages(
+        layout.user.id,
+        permissions,
+        params.sessionId,
+        { limit: 40 },
+      ),
+      listInternalChatRelatedTickets(layout.user.id, permissions, params.sessionId),
+    ]);
     const ticketId = initial.chat.ticketId;
     const hasTicket = Boolean(ticketId);
     const canRespond = hasPermission(permissions, "chat.respond");
@@ -179,6 +191,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 
     return {
       initial,
+      relatedTickets,
       currentUserId: layout.user.id,
       canRespond,
       canCreateTicket,
