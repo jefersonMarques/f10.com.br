@@ -1,7 +1,7 @@
 import { error } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
 import { hasPermission } from "$lib/server/auth/permissions";
-import { listInternalChats } from "$lib/server/support/internalChatRepository";
+import { listInternalChatConversations } from "$lib/server/support/internalChatConversationRepository";
 
 export const load: LayoutServerLoad = async ({ parent }) => {
   const layout = await parent();
@@ -15,6 +15,6 @@ export const load: LayoutServerLoad = async ({ parent }) => {
 
   return {
     chatCurrentUserId: layout.user.id,
-    chatInbox: await listInternalChats(layout.user.id, permissions),
+    chatInbox: await listInternalChatConversations(layout.user.id, permissions),
   };
 };
