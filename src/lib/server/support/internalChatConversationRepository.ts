@@ -19,7 +19,11 @@ import {
   getInternalChat,
   listInternalChats,
 } from "$lib/server/support/internalChatRepository";
-import { canAccessTicket, type SupportPermissionMap } from "$lib/server/support/supportAccess";
+import {
+  canAccessTicket,
+  getUserSupportQueueIds,
+  type SupportPermissionMap,
+} from "$lib/server/support/supportAccess";
 import {
   listSupportChatMessageAttachments,
   listSupportMessageAttachments,
@@ -122,7 +126,10 @@ function compareMessagesDescending(
 
 function normalizedPageSize(value?: number): number {
   if (!Number.isFinite(value)) return DEFAULT_MESSAGE_PAGE_SIZE;
-  return Math.min(Math.max(Math.trunc(value ?? DEFAULT_MESSAGE_PAGE_SIZE), 1), MAX_MESSAGE_PAGE_SIZE);
+  return Math.min(
+    Math.max(Math.trunc(value ?? DEFAULT_MESSAGE_PAGE_SIZE), 1),
+    MAX_MESSAGE_PAGE_SIZE,
+  );
 }
 
 async function listSessionIdentities(sessionIds: string[]): Promise<SessionIdentity[]> {
@@ -148,9 +155,12 @@ export async function listInternalChatConversations(
   if (chats.length === 0) return [];
 
   const identities = await listSessionIdentities(chats.map((chat) => chat.sessionId));
-  const identityBySessionId = new Map(identities.map((identity) => [identity.sessionId, identity]));
-  const grouped = new Map<string, typeof chats>();
+  const identityBySessionId = new Map<string, SessionIdentity>();
+  for (const identity of identities) {
+    identityBySessionId.set(identity.sessionId, identity);
+  }
 
+  const grouped = new Map<string, typeof chats>();
   for (const chat of chats) {
     const identity = identityBySessionId.get(chat.sessionId) ?? {
       sessionId: chat.sessionId,
@@ -165,29 +175,31 @@ export async function listInternalChatConversations(
     grouped.set(key, current);
   }
 
-  return Array.from(grouped.entries())
-    .map(([conversationKey, rows]) => {
-      const byRecentActivity = [...rows].sort(
-        (left, right) => right.updatedAt.getTime() - left.updatedAt.getTime(),
-      );
-      const activeRows = byRecentActivity.filter(
-        (row) => !["resolved", "closed"].includes(row.status),
-      );
-      const representative = activeRows[0] ?? byRecentActivity[0];
-      const latestActivity = byRecentActivity[0];
-      if (!representative || !latestActivity) return null;
+  const conversations = [];
+  for (const [conversationKey, rows] of grouped.entries()) {
+    const byRecentActivity = [...rows].sort(
+      (left, right) => right.updatedAt.getTime() - left.updatedAt.getTime(),
+    );
+    const activeRows = byRecentActivity.filter(
+      (row) => !["resolved", "closed"].includes(row.status),
+    );
+    const representative = activeRows[0] ?? byRecentActivity[0];
+    const latestActivity = byRecentActivity[0];
+    if (!representative || !latestActivity) continue;
 
-      return {
-        ...representative,
-        conversationKey,
-        sessionCount: rows.length,
-        lastMessageBody: latestActivity.lastMessageBody,
-        lastMessageAuthorType: latestActivity.lastMessageAuthorType,
-        updatedAt: latestActivity.updatedAt,
-      };
-    })
-    .filter((conversation): conversation is NonNullable<typeof conversation> => Boolean(conversation))
-    .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime());
+    conversations.push({
+      ...representative,
+      conversationKey,
+      sessionCount: rows.length,
+      lastMessageBody: latestActivity.lastMessageBody,
+      lastMessageAuthorType: latestActivity.lastMessageAuthorType,
+      updatedAt: latestActivity.updatedAt,
+    });
+  }
+
+  return conversations.sort(
+    (left, right) => right.updatedAt.getTime() - left.updatedAt.getTime(),
+  );
 }
 
 async function listAccessibleConversationSessions(
@@ -195,13 +207,11 @@ async function listAccessibleConversationSessions(
   permissions: SupportPermissionMap,
   anchorSessionId: string,
 ): Promise<{ conversationKey: string; sessions: AccessibleConversationSession[] }> {
+  const scope = getPermissionScope(permissions, "chat.view");
+  if (!scope) throw new Error("CHAT_PERMISSION_NOT_ALLOWED");
+
   const anchor = await getInternalChat(actorUserId, permissions, anchorSessionId);
-  const conversations = await listInternalChats(actorUserId, permissions);
-  const sessionIds = Array.from(
-    new Set([anchorSessionId, ...conversations.map((chat) => chat.sessionId)]),
-  );
-  const identities = await listSessionIdentities(sessionIds);
-  const anchorIdentity = identities.find((identity) => identity.sessionId === anchorSessionId) ?? {
+  const anchorIdentity: SessionIdentity = {
     sessionId: anchorSessionId,
     customerContactId: anchor.customerContactId,
     legacyUserId: anchor.customerContext?.legacyUserId ?? null,
@@ -209,17 +219,52 @@ async function listAccessibleConversationSessions(
     unitId: anchor.customerContext?.unitId ?? null,
   };
   const conversationKey = buildConversationKey(anchorIdentity);
-  const accessibleById = new Map(
-    conversations.map((chat) => [chat.sessionId, chat.ticketId]),
-  );
-  accessibleById.set(anchorSessionId, anchor.ticketId);
 
-  const sessions = identities
-    .filter((identity) => buildConversationKey(identity) === conversationKey)
-    .filter((identity) => accessibleById.has(identity.sessionId))
-    .map((identity) => ({
-      ...identity,
-      ticketId: accessibleById.get(identity.sessionId) ?? null,
+  const candidates = await getDatabase()
+    .select({
+      sessionId: webChatSessions.id,
+      customerContactId: webChatSessions.customerContactId,
+      legacyUserId: webChatSessions.legacyUserId,
+      groupId: webChatSessions.groupId,
+      unitId: webChatSessions.unitId,
+      ticketId: webChatSessions.ticketId,
+      queueId: webChatSessions.queueId,
+      assignedUserId: webChatSessions.assignedUserId,
+    })
+    .from(webChatSessions)
+    .where(
+      anchor.customerContactId
+        ? eq(webChatSessions.customerContactId, anchor.customerContactId)
+        : eq(webChatSessions.id, anchorSessionId),
+    );
+
+  const sameConversation = candidates.filter(
+    (candidate) => buildConversationKey(candidate) === conversationKey,
+  );
+  const teamQueueIds = scope === "team"
+    ? await getUserSupportQueueIds(actorUserId)
+    : [];
+
+  const access = await Promise.all(
+    sameConversation.map(async (candidate) => {
+      if (candidate.sessionId === anchorSessionId) return true;
+      if (candidate.ticketId) {
+        return canAccessTicket(actorUserId, scope, candidate.ticketId);
+      }
+      if (scope === "all" || candidate.assignedUserId === actorUserId) return true;
+      return scope === "team" && teamQueueIds.includes(candidate.queueId);
+    }),
+  );
+
+  const sessions: AccessibleConversationSession[] = sameConversation
+    .filter((_, index) => access[index])
+    .map((candidate) => ({
+      sessionId: candidate.sessionId,
+      customerContactId: candidate.customerContactId,
+      legacyUserId: candidate.legacyUserId,
+      groupId: candidate.groupId,
+      unitId: candidate.unitId,
+      ticketId: candidate.ticketId,
     }));
 
   if (!sessions.some((session) => session.sessionId === anchorSessionId)) {
@@ -244,15 +289,14 @@ async function listRawConversationMessages(
   const chatSessionIds = sessions
     .filter((session) => !session.ticketId)
     .map((session) => session.sessionId);
-  const linkedSessions = sessions.filter((session) => Boolean(session.ticketId));
-  const ticketIds = linkedSessions
-    .map((session) => session.ticketId)
-    .filter((ticketId): ticketId is string => Boolean(ticketId));
-  const sourceSessionByTicketId = new Map(
-    linkedSessions
-      .filter((session): session is AccessibleConversationSession & { ticketId: string } => Boolean(session.ticketId))
-      .map((session) => [session.ticketId, session.sessionId]),
+  const linkedSessions = sessions.filter(
+    (session): session is AccessibleConversationSession & { ticketId: string } => Boolean(session.ticketId),
   );
+  const ticketIds = linkedSessions.map((session) => session.ticketId);
+  const sourceSessionByTicketId = new Map<string, string>();
+  for (const session of linkedSessions) {
+    sourceSessionByTicketId.set(session.ticketId, session.sessionId);
+  }
 
   const descending = !after;
   const sourceLimit = limit + 1;
@@ -301,7 +345,10 @@ async function listRawConversationMessages(
           descending ? desc(webChatMessages.id) : asc(webChatMessages.id),
         )
         .limit(sourceLimit)
-        .then((rows) => rows.map((row) => ({ ...row, storageSource: "chat" as const })));
+        .then((rows) => rows.map((row) => ({
+          ...row,
+          storageSource: "chat" as const,
+        })));
 
   const ticketMessagesPromise = ticketIds.length === 0
     ? Promise.resolve([] as RawConversationMessage[])
@@ -362,18 +409,22 @@ async function listRawConversationMessages(
     chatMessagesPromise,
     ticketMessagesPromise,
   ]);
-  const merged = [...chatMessages, ...linkedTicketMessages]
-    .filter((message) => Boolean(message.sourceSessionId));
+  const merged = [...chatMessages, ...linkedTicketMessages].filter(
+    (message) => Boolean(message.sourceSessionId),
+  );
 
   if (after) {
-    const messages = merged.sort(compareMessagesAscending).slice(0, limit);
-    return { messages, hasOlder: false };
+    return {
+      messages: merged.sort(compareMessagesAscending).slice(0, limit),
+      hasOlder: false,
+    };
   }
 
   const newestFirst = merged.sort(compareMessagesDescending);
-  const hasOlder = newestFirst.length > limit;
-  const messages = newestFirst.slice(0, limit).sort(compareMessagesAscending);
-  return { messages, hasOlder };
+  return {
+    messages: newestFirst.slice(0, limit).sort(compareMessagesAscending),
+    hasOlder: newestFirst.length > limit,
+  };
 }
 
 async function hydrateMessageAttachments(
