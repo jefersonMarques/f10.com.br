@@ -1,11 +1,18 @@
 import { and, eq } from "drizzle-orm";
 import { json, type RequestHandler } from "@sveltejs/kit";
-import { requireAppPermission } from "$lib/server/auth/authorization";
+import { requireAppAnyPermission } from "$lib/server/auth/authorization";
 import { checkF10CalendarAvailability } from "$lib/server/calendar/f10CalendarAvailabilityRepository";
 import { getGoogleCalendarEvent } from "$lib/server/calendar/googleCalendarRepository";
 import { getDatabase } from "$lib/server/db";
 import { taskGoogleCalendarLinks } from "$lib/server/db/googleCalendarSchema";
 import { listActiveTaskUsers } from "$lib/server/tasks/taskRepository";
+
+const AVAILABILITY_ACCESS_PERMISSIONS = [
+  "tasks.view",
+  "tickets.view",
+  "scheduling.view",
+  "scheduling.create",
+] as const;
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -35,7 +42,11 @@ function isValidTimeZone(value: string): boolean {
 }
 
 export const POST: RequestHandler = async ({ cookies, request }) => {
-  const { session } = await requireAppPermission(cookies, "tasks.view", "/app/tasks/calendar");
+  const { session } = await requireAppAnyPermission(
+    cookies,
+    [...AVAILABILITY_ACCESS_PERMISSIONS],
+    "/app/tasks/calendar",
+  );
 
   const body = await request.json().catch(() => null) as null | {
     userIds?: unknown;
