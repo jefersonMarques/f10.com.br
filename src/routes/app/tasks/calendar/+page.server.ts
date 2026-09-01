@@ -17,6 +17,10 @@ import {
   synchronizeGoogleCalendar,
   type GoogleAgendaEvent,
 } from "$lib/server/calendar/googleCalendarSyncService";
+import {
+  createAgendaSchedulingEvent,
+  listAgendaSchedulingEvents,
+} from "$lib/server/calendar/schedulingEventService";
 import { syncAllTicketGoogleCalendarLinks } from "$lib/server/calendar/ticketGoogleCalendarLifecycle";
 import {
   DEFAULT_SCHEDULING_AVAILABILITY,
@@ -117,7 +121,7 @@ function schedulingMessage(errorValue: unknown): string {
   const messages: Record<string, string> = {
     SCHEDULING_HOST_NOT_ALLOWED: "Você não pode criar agendamentos para este responsável.",
     SCHEDULING_HOST_NOT_FOUND: "Responsável inválido ou inativo.",
-    SCHEDULING_HOST_GOOGLE_REQUIRED: "O responsável precisa conectar o Google Calendar antes de receber agendamentos.",
+    SCHEDULING_GOOGLE_MEET_CONNECTION_REQUIRED: "Conecte o Google Calendar do responsável somente se quiser gerar um Google Meet.",
     SCHEDULING_CUSTOMER_EMAIL_REQUIRED: "Selecione um cliente ativo com e-mail cadastrado.",
     SCHEDULING_INVALID_TITLE: "Informe um título entre 3 e 180 caracteres.",
     SCHEDULING_INVALID_DURATION: "A duração deve ficar entre 15 e 240 minutos.",
@@ -126,6 +130,19 @@ function schedulingMessage(errorValue: unknown): string {
     SCHEDULING_DATE_RANGE_TOO_LONG: "A janela escolhida ultrapassa o horizonte configurado para o responsável.",
   };
   return messages[code] ?? "Não foi possível criar o link de agendamento.";
+}
+
+function schedulingEventMessage(errorValue: unknown): string {
+  const code = errorValue instanceof Error ? errorValue.message : "";
+  const messages: Record<string, string> = {
+    SCHEDULING_HOST_NOT_ALLOWED: "Você não pode criar compromissos para este responsável.",
+    SCHEDULING_INVALID_TITLE: "Informe um título entre 3 e 180 caracteres.",
+    SCHEDULING_EVENT_INVALID_DESCRIPTION: "A descrição deve ter no máximo 5.000 caracteres.",
+    SCHEDULING_EVENT_INVALID_RANGE: "Informe uma data e horários válidos para o compromisso.",
+    SCHEDULING_INVALID_TIME_ZONE: "Fuso horário inválido.",
+    SCHEDULING_EVENT_INVALID_PARTICIPANT: "Revise os participantes do compromisso.",
+  };
+  return messages[code] ?? "Não foi possível criar o compromisso na Agenda F10.";
 }
 
 async function googleWriteConfiguration(userId: string) {
@@ -200,10 +217,11 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const canSearchCustomers = canCreateTicket && hasPermission(permissions, "customers.view");
   const canChangeTicketDueOn = canViewTickets && hasPermission(permissions, "tickets.reply");
   const canManageScheduling = hasPermission(permissions, "scheduling.manage");
-  const canCreateScheduling = Boolean(schedulingCreateScope) && hasPermission(permissions, "customers.view");
+  const canCreateSchedulingEvent = Boolean(schedulingCreateScope);
+  const canCreateScheduling = canCreateSchedulingEvent && hasPermission(permissions, "customers.view");
   const canConfigureScheduling = Boolean(schedulingCreateScope) || canManageScheduling;
   const needsSchedulingTeamUsers = schedulingCreateScope === "team" || schedulingViewScope === "team";
-  const schedulingTeamUserIds = canViewScheduling && needsSchedulingTeamUsers
+  const schedulingTeamUserIds = (canViewScheduling || canCreateSchedulingEvent) && needsSchedulingTeamUsers
     ? await listSchedulingTeamUserIds(layout.user.id)
     : [layout.user.id];
   const schedulingVisibility: "own" | "team" | "all" = canManageScheduling || schedulingViewScope === "all"
@@ -237,6 +255,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     rawSchedulingHosts,
     schedulingCustomers,
     schedulingInvitations,
+    schedulingEvents,
   ] = await Promise.all([
     canAssign
       ? Promise.all(
@@ -246,7 +265,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     canViewTasks && googleCalendar.connected
       ? listUserTaskGoogleCalendarLinks(layout.user.id).catch(() => [])
       : Promise.resolve([]),
-    canViewTasks
+    canViewTasks || canCreateSchedulingEvent
       ? listActiveTaskUsers()
       : Promise.resolve([]),
     canViewTickets
@@ -255,7 +274,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     canCreateTicket
       ? listSupportQueues()
       : Promise.resolve([]),
-    canCreateScheduling
+    canCreateScheduling || canCreateSchedulingEvent
       ? listSchedulingHosts()
       : Promise.resolve([]),
     canCreateScheduling
@@ -263,6 +282,9 @@ export const load: PageServerLoad = async ({ parent, url }) => {
       : Promise.resolve([]),
     canViewScheduling
       ? listSchedulingInvitations(layout.user.id, schedulingVisibility, schedulingTeamUserIds)
+      : Promise.resolve([]),
+    canViewScheduling
+      ? listAgendaSchedulingEvents(layout.user.id, permissions, range.timeMin, range.timeMax)
       : Promise.resolve([]),
   ]);
 
@@ -302,11 +324,13 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     canSearchCustomers,
     canChangeTicketDueOn,
     canViewScheduling,
+    canCreateSchedulingEvent,
     canCreateScheduling,
     canConfigureScheduling,
     schedulingHosts,
     schedulingCustomers,
     schedulingInvitations: schedulingInvitations.slice(0, 20),
+    schedulingEvents,
     calendarAnchor,
     googleCalendar,
     googleEvents,
@@ -350,6 +374,58 @@ export const actions: Actions = {
         success: false,
         action: "updateTicketDueOn",
         message: "Não foi possível alterar a conclusão planejada deste ticket.",
+      });
+    }
+  },
+
+  createSchedulingEvent: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "scheduling.create",
+      "/app/tasks/calendar",
+    );
+    const formData = await request.formData();
+
+    let attendees: Awaited<ReturnType<typeof readGoogleEventDetailsFromForm>>["attendees"] = [];
+    try {
+      attendees = (await readGoogleEventDetailsFromForm(session.user.id, formData)).attendees;
+    } catch {
+      return fail(400, {
+        success: false,
+        action: "createSchedulingEvent",
+        message: "Revise os participantes do compromisso.",
+      });
+    }
+
+    try {
+      const result = await createAgendaSchedulingEvent(session.user.id, permissions, {
+        organizerUserId: readFormValue(formData, "organizerUserId") || session.user.id,
+        title: readFormValue(formData, "title"),
+        description: readFormValue(formData, "description"),
+        date: readFormValue(formData, "date"),
+        startTime: readFormValue(formData, "startTime"),
+        endTime: readFormValue(formData, "endTime"),
+        timeZone: readFormValue(formData, "timeZone"),
+        attendees: attendees.map((attendee) => ({
+          userId: attendee.userId,
+          name: attendee.name,
+          email: attendee.email,
+        })),
+        ticketId: isUuid(readFormValue(formData, "ticketId")) ? readFormValue(formData, "ticketId") : null,
+        taskId: isUuid(readFormValue(formData, "taskId")) ? readFormValue(formData, "taskId") : null,
+      });
+      return {
+        success: true,
+        action: "createSchedulingEvent",
+        message: result.googleSynchronized
+          ? "Compromisso criado na Agenda F10 e sincronizado com o Google Calendar."
+          : "Compromisso criado na Agenda F10.",
+      };
+    } catch (errorValue) {
+      return fail(400, {
+        success: false,
+        action: "createSchedulingEvent",
+        message: schedulingEventMessage(errorValue),
       });
     }
   },
