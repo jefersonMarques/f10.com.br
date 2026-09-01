@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import {
   lockSchedulingUsers,
   schedulingIntervalsConflict,
@@ -185,9 +185,11 @@ export async function updateSchedulingEvent(
       .where(
         and(
           inArray(schedulingInvitations.hostUserId, busyUserIds),
-          sql`${schedulingInvitations.eventId} is distinct from ${input.eventId}`,
           or(
-            eq(schedulingInvitations.status, "booked"),
+            and(
+              eq(schedulingInvitations.status, "booked"),
+              isNull(schedulingInvitations.eventId),
+            ),
             and(
               eq(schedulingInvitations.status, "booking"),
               isNotNull(schedulingInvitations.bookingStartedAt),
