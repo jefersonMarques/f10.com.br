@@ -4,7 +4,10 @@ import {
   authorizeCustomerPortalSession,
   revokeCustomerPortalSession,
 } from "$lib/server/customerPortal/customerPortalRepository";
-import { authorizeF10CustomerPortalSession } from "$lib/server/customerPortal/customerF10AuthRepository";
+import {
+  authorizeF10CustomerPortalSession,
+  type AuthorizeF10CustomerSessionOptions,
+} from "$lib/server/customerPortal/customerF10AuthRepository";
 
 export const CUSTOMER_PORTAL_SESSION_COOKIE = "f10_customer_session";
 
@@ -18,12 +21,9 @@ const COOKIE_OPTIONS = {
 export function setCustomerPortalSessionCookie(
   cookies: Cookies,
   token: string,
-  expiresAt: Date,
+  _expiresAt: Date,
 ): void {
-  cookies.set(CUSTOMER_PORTAL_SESSION_COOKIE, token, {
-    ...COOKIE_OPTIONS,
-    expires: expiresAt,
-  });
+  cookies.set(CUSTOMER_PORTAL_SESSION_COOKIE, token, COOKIE_OPTIONS);
 }
 
 export function clearCustomerPortalSessionCookie(cookies: Cookies): void {
@@ -43,11 +43,14 @@ export async function getOptionalCustomerPortalSession(cookies: Cookies) {
   return session;
 }
 
-export async function getOptionalCustomerF10PortalSession(cookies: Cookies) {
+export async function getOptionalCustomerF10PortalSession(
+  cookies: Cookies,
+  options: AuthorizeF10CustomerSessionOptions = {},
+) {
   const token = getCustomerPortalSessionToken(cookies);
   if (!token) return null;
 
-  const session = await authorizeF10CustomerPortalSession(token);
+  const session = await authorizeF10CustomerPortalSession(token, options);
   if (!session) clearCustomerPortalSessionCookie(cookies);
   return session;
 }

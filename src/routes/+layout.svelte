@@ -70,7 +70,9 @@
       pathname === "/login" ||
       pathname.startsWith("/login/") ||
       pathname === "/app" ||
-      pathname.startsWith("/app/")
+      pathname.startsWith("/app/") ||
+      pathname === "/cliente" ||
+      pathname.startsWith("/cliente/")
     );
   }
 
@@ -79,7 +81,7 @@
   $: isStandalonePage = standalonePaths.has(pathname);
   $: isInternalAppPage = isInternalPath(pathname);
   $: isOnboardingPage = pathname === "/primeiros-passos-f10";
-  $: isHelpPage = pathname === "/ajuda-f10";
+  $: isHelpPage = pathname === "/ajuda-f10" || pathname.startsWith("/ajuda-f10/");
   $: seoOverride = seoOverrides[pathname];
 
   onMount(() => {

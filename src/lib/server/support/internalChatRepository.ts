@@ -4,14 +4,15 @@ import {
   desc,
   eq,
   inArray,
+  isNull,
   or,
   sql,
 } from "drizzle-orm";
 import { getPermissionScope, hasPermission, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { webChatMessages, webChatSessions } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { users } from "$lib/server/db/schema";
-import { webChatSessions } from "$lib/server/db/chatSchema";
 import {
   customerContacts,
   customerOrganizations,
@@ -36,76 +37,130 @@ function requireChatScope(
   return scope;
 }
 
+async function requireChatAccess(
+  actorUserId: string,
+  scope: "own" | "team" | "all",
+  chat: {
+    ticketId: string | null;
+    queueId: string;
+    assignedUserId: string | null;
+  },
+): Promise<void> {
+  if (chat.ticketId) {
+    await requireTicketAccess(actorUserId, scope, chat.ticketId);
+    return;
+  }
+  if (scope === "all" || chat.assignedUserId === actorUserId) return;
+  if (scope === "team") {
+    const queueIds = await getUserSupportQueueIds(actorUserId);
+    if (queueIds.includes(chat.queueId)) return;
+  }
+  throw new Error("CHAT_ACCESS_DENIED");
+}
+
+function chatAssignmentScope(permissions: SupportPermissionMap) {
+  return getPermissionScope(permissions, "chat.manage") ?? getPermissionScope(permissions, "tickets.assign");
+}
+
 export async function listInternalChats(
   actorUserId: string,
   permissions: SupportPermissionMap,
 ) {
   const scope = requireChatScope(permissions, "chat.view");
-  const ownCondition = eq(tickets.assignedUserId, actorUserId);
+  const ownCondition = eq(webChatSessions.assignedUserId, actorUserId);
   let accessCondition = ownCondition;
 
   if (scope === "all") {
     accessCondition = undefined;
   } else if (scope === "team") {
     const queueIds = await getUserSupportQueueIds(actorUserId);
-    accessCondition =
-      queueIds.length > 0
-        ? or(ownCondition, inArray(tickets.queueId, queueIds))
-        : ownCondition;
+    accessCondition = queueIds.length > 0
+      ? or(ownCondition, inArray(webChatSessions.queueId, queueIds))
+      : ownCondition;
   }
-
-  const baseCondition = and(
-    eq(tickets.channel, "web_chat"),
-    accessCondition,
-  );
 
   return getDatabase()
     .select({
       sessionId: webChatSessions.id,
-      ticketId: tickets.id,
+      ticketId: webChatSessions.ticketId,
       ticketNumber: tickets.ticketNumber,
-      subject: tickets.subject,
-      status: tickets.status,
-      priority: tickets.priority,
+      subject: webChatSessions.subject,
+      status: sql<string>`coalesce(${tickets.status}::text, case when ${webChatSessions.closedAt} is null then 'open' else 'closed' end)`,
+      priority: sql<string>`coalesce(${tickets.priority}::text, 'normal')`,
       aiState: webChatSessions.aiState,
       aiHandoffReason: webChatSessions.aiHandoffReason,
-      assignedUserId: tickets.assignedUserId,
+      assignedUserId: webChatSessions.assignedUserId,
       assignedUserName: users.name,
       customerName: customerContacts.name,
       customerEmail: customerContacts.email,
       organizationName: customerOrganizations.name,
       firstResponseDueAt: tickets.firstResponseDueAt,
       resolutionDueAt: tickets.resolutionDueAt,
-      firstResponseAt: tickets.firstResponseAt,
-      lastMessageBody: sql<string | null>`(
-        select tm.body
-        from ticket_messages tm
-        where tm.ticket_id = ${tickets.id} and tm.visibility = 'public'
-        order by tm.created_at desc
-        limit 1
+      firstResponseAt: sql<Date | null>`coalesce(${tickets.firstResponseAt}, ${webChatSessions.firstResponseAt})`,
+      lastMessageBody: sql<string | null>`coalesce(
+        (
+          select tm.body
+          from ticket_messages tm
+          where tm.ticket_id = ${webChatSessions.ticketId} and tm.visibility = 'public'
+          order by tm.created_at desc
+          limit 1
+        ),
+        (
+          select cm.body
+          from web_chat_messages cm
+          where cm.session_id = ${webChatSessions.id} and cm.visibility = 'public'
+          order by cm.created_at desc
+          limit 1
+        )
       )`,
-      lastMessageAuthorType: sql<string | null>`(
-        select tm.author_type::text
-        from ticket_messages tm
-        where tm.ticket_id = ${tickets.id} and tm.visibility = 'public'
-        order by tm.created_at desc
-        limit 1
+      lastMessageAuthorType: sql<string | null>`coalesce(
+        (
+          select tm.author_type::text
+          from ticket_messages tm
+          where tm.ticket_id = ${webChatSessions.ticketId} and tm.visibility = 'public'
+          order by tm.created_at desc
+          limit 1
+        ),
+        (
+          select cm.author_type::text
+          from web_chat_messages cm
+          where cm.session_id = ${webChatSessions.id} and cm.visibility = 'public'
+          order by cm.created_at desc
+          limit 1
+        )
       )`,
       lastSeenAt: webChatSessions.lastSeenAt,
-      updatedAt: tickets.updatedAt,
+      updatedAt: webChatSessions.updatedAt,
       closedAt: webChatSessions.closedAt,
+      legacyUserId: webChatSessions.legacyUserId,
+      groupId: webChatSessions.groupId,
+      groupName: webChatSessions.groupName,
+      unitId: webChatSessions.unitId,
+      unitName: webChatSessions.unitName,
+      unitSchema: webChatSessions.unitSchema,
     })
     .from(webChatSessions)
-    .innerJoin(tickets, eq(webChatSessions.ticketId, tickets.id))
-    .leftJoin(users, eq(tickets.assignedUserId, users.id))
-    .leftJoin(customerContacts, eq(tickets.customerContactId, customerContacts.id))
-    .leftJoin(
-      customerOrganizations,
-      eq(customerContacts.organizationId, customerOrganizations.id),
-    )
-    .where(baseCondition)
-    .orderBy(desc(tickets.updatedAt))
-    .limit(300);
+    .leftJoin(tickets, eq(webChatSessions.ticketId, tickets.id))
+    .leftJoin(users, eq(webChatSessions.assignedUserId, users.id))
+    .leftJoin(customerContacts, eq(webChatSessions.customerContactId, customerContacts.id))
+    .leftJoin(customerOrganizations, eq(customerContacts.organizationId, customerOrganizations.id))
+    .where(accessCondition)
+    .orderBy(desc(webChatSessions.updatedAt))
+    .limit(300)
+    .then((rows) => rows.map((row) => ({
+      ...row,
+      customerContext: row.legacyUserId && row.groupId !== null && row.groupName && row.unitId !== null && row.unitName
+        ? {
+            scope: "unit" as const,
+            legacyUserId: row.legacyUserId,
+            groupId: row.groupId,
+            groupName: row.groupName,
+            unitId: row.unitId,
+            unitName: row.unitName,
+            unitSchema: row.unitSchema,
+          }
+        : null,
+    })));
 }
 
 export async function getInternalChat(
@@ -118,18 +173,19 @@ export async function getInternalChat(
   const [chat] = await db
     .select({
       sessionId: webChatSessions.id,
-      ticketId: tickets.id,
+      ticketId: webChatSessions.ticketId,
       ticketNumber: tickets.ticketNumber,
-      subject: tickets.subject,
-      status: tickets.status,
-      priority: tickets.priority,
+      subject: webChatSessions.subject,
+      status: sql<string>`coalesce(${tickets.status}::text, case when ${webChatSessions.closedAt} is null then 'open' else 'closed' end)`,
+      priority: sql<string>`coalesce(${tickets.priority}::text, 'normal')`,
+      queueId: webChatSessions.queueId,
       queueName: supportQueues.name,
       aiState: webChatSessions.aiState,
       aiHandoffReason: webChatSessions.aiHandoffReason,
       aiHandoffAt: webChatSessions.aiHandoffAt,
-      assignedUserId: tickets.assignedUserId,
+      assignedUserId: webChatSessions.assignedUserId,
       assignedUserName: users.name,
-      customerContactId: tickets.customerContactId,
+      customerContactId: webChatSessions.customerContactId,
       customerName: customerContacts.name,
       customerEmail: customerContacts.email,
       customerPhone: customerContacts.phone,
@@ -138,28 +194,45 @@ export async function getInternalChat(
       contextData: webChatSessions.contextData,
       firstResponseDueAt: tickets.firstResponseDueAt,
       resolutionDueAt: tickets.resolutionDueAt,
-      firstResponseAt: tickets.firstResponseAt,
+      firstResponseAt: sql<Date | null>`coalesce(${tickets.firstResponseAt}, ${webChatSessions.firstResponseAt})`,
       linkedTaskId: tickets.linkedTaskId,
       lastSeenAt: webChatSessions.lastSeenAt,
       createdAt: webChatSessions.createdAt,
-      updatedAt: tickets.updatedAt,
+      updatedAt: webChatSessions.updatedAt,
+      closedAt: webChatSessions.closedAt,
+      legacyUserId: webChatSessions.legacyUserId,
+      groupId: webChatSessions.groupId,
+      groupName: webChatSessions.groupName,
+      unitId: webChatSessions.unitId,
+      unitName: webChatSessions.unitName,
+      unitSchema: webChatSessions.unitSchema,
     })
     .from(webChatSessions)
-    .innerJoin(tickets, eq(webChatSessions.ticketId, tickets.id))
-    .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
-    .leftJoin(users, eq(tickets.assignedUserId, users.id))
-    .leftJoin(customerContacts, eq(tickets.customerContactId, customerContacts.id))
-    .leftJoin(
-      customerOrganizations,
-      eq(customerContacts.organizationId, customerOrganizations.id),
-    )
+    .innerJoin(supportQueues, eq(webChatSessions.queueId, supportQueues.id))
+    .leftJoin(tickets, eq(webChatSessions.ticketId, tickets.id))
+    .leftJoin(users, eq(webChatSessions.assignedUserId, users.id))
+    .leftJoin(customerContacts, eq(webChatSessions.customerContactId, customerContacts.id))
+    .leftJoin(customerOrganizations, eq(customerContacts.organizationId, customerOrganizations.id))
     .where(eq(webChatSessions.id, sessionId))
     .limit(1);
 
   if (!chat) throw new Error("CHAT_NOT_FOUND");
-  await requireTicketAccess(actorUserId, scope, chat.ticketId);
+  await requireChatAccess(actorUserId, scope, chat);
 
-  return chat;
+  return {
+    ...chat,
+    customerContext: chat.legacyUserId && chat.groupId !== null && chat.groupName && chat.unitId !== null && chat.unitName
+      ? {
+          scope: "unit" as const,
+          legacyUserId: chat.legacyUserId,
+          groupId: chat.groupId,
+          groupName: chat.groupName,
+          unitId: chat.unitId,
+          unitName: chat.unitName,
+          unitSchema: chat.unitSchema,
+        }
+      : null,
+  };
 }
 
 export async function listInternalChatMessages(
@@ -170,20 +243,35 @@ export async function listInternalChatMessages(
   const chat = await getInternalChat(actorUserId, permissions, sessionId);
   const db = getDatabase();
 
-  const messages = await db
-    .select({
-      id: ticketMessages.id,
-      authorType: ticketMessages.authorType,
-      authorUserName: users.name,
-      visibility: ticketMessages.visibility,
-      channel: ticketMessages.channel,
-      body: ticketMessages.body,
-      createdAt: ticketMessages.createdAt,
-    })
-    .from(ticketMessages)
-    .leftJoin(users, eq(ticketMessages.authorUserId, users.id))
-    .where(eq(ticketMessages.ticketId, chat.ticketId))
-    .orderBy(asc(ticketMessages.createdAt));
+  const messages = chat.ticketId
+    ? await db
+        .select({
+          id: ticketMessages.id,
+          authorType: ticketMessages.authorType,
+          authorUserName: users.name,
+          visibility: ticketMessages.visibility,
+          channel: ticketMessages.channel,
+          body: ticketMessages.body,
+          createdAt: ticketMessages.createdAt,
+        })
+        .from(ticketMessages)
+        .leftJoin(users, eq(ticketMessages.authorUserId, users.id))
+        .where(eq(ticketMessages.ticketId, chat.ticketId))
+        .orderBy(asc(ticketMessages.createdAt))
+    : await db
+        .select({
+          id: webChatMessages.id,
+          authorType: webChatMessages.authorType,
+          authorUserName: users.name,
+          visibility: webChatMessages.visibility,
+          channel: sql<"web_chat">`'web_chat'`,
+          body: webChatMessages.body,
+          createdAt: webChatMessages.createdAt,
+        })
+        .from(webChatMessages)
+        .leftJoin(users, eq(webChatMessages.authorUserId, users.id))
+        .where(eq(webChatMessages.sessionId, sessionId))
+        .orderBy(asc(webChatMessages.createdAt));
 
   return { chat, messages };
 }
@@ -201,17 +289,19 @@ export async function claimInternalChat(
   const db = getDatabase();
   const [chat] = await db
     .select({
-      ticketId: tickets.id,
-      assignedUserId: tickets.assignedUserId,
-      status: tickets.status,
+      ticketId: webChatSessions.ticketId,
+      queueId: webChatSessions.queueId,
+      assignedUserId: webChatSessions.assignedUserId,
+      closedAt: webChatSessions.closedAt,
+      ticketStatus: tickets.status,
     })
     .from(webChatSessions)
-    .innerJoin(tickets, eq(webChatSessions.ticketId, tickets.id))
+    .leftJoin(tickets, eq(webChatSessions.ticketId, tickets.id))
     .where(eq(webChatSessions.id, sessionId))
     .limit(1);
   if (!chat) throw new Error("CHAT_NOT_FOUND");
-  await requireTicketAccess(actorUserId, scope, chat.ticketId);
-  if (chat.status === "closed") throw new Error("CHAT_CLOSED");
+  await requireChatAccess(actorUserId, scope, chat);
+  if (chat.closedAt) throw new Error("CHAT_CLOSED");
   if (chat.assignedUserId && chat.assignedUserId !== actorUserId) {
     throw new Error("CHAT_ALREADY_ASSIGNED");
   }
@@ -220,35 +310,47 @@ export async function claimInternalChat(
   const now = new Date();
   await db.transaction(async (tx) => {
     await tx
-      .update(tickets)
-      .set({
-        assignedUserId: actorUserId,
-        status: chat.status === "new" ? "open" : chat.status,
-        updatedAt: now,
-      })
-      .where(eq(tickets.id, chat.ticketId));
-    await tx
       .update(webChatSessions)
       .set({
+        assignedUserId: actorUserId,
         aiState: "human",
         aiHandoffReason: "Conversa assumida por um atendente humano.",
         aiHandoffAt: now,
         aiProcessingAt: null,
+        updatedAt: now,
       })
       .where(eq(webChatSessions.id, sessionId));
-    await tx.insert(ticketEvents).values({
-      ticketId: chat.ticketId,
-      actorUserId,
-      eventType: "chat.claimed",
-      metadata: { assignedUserId: actorUserId },
-    });
-    await tx.insert(ticketMessages).values({
-      ticketId: chat.ticketId,
-      authorType: "system",
-      visibility: "public",
-      channel: "web_chat",
-      body: "Um atendente da equipe F10 assumiu o atendimento.",
-    });
+
+    if (chat.ticketId) {
+      await tx
+        .update(tickets)
+        .set({
+          assignedUserId: actorUserId,
+          status: chat.ticketStatus === "new" ? "open" : chat.ticketStatus,
+          updatedAt: now,
+        })
+        .where(eq(tickets.id, chat.ticketId));
+      await tx.insert(ticketEvents).values({
+        ticketId: chat.ticketId,
+        actorUserId,
+        eventType: "chat.claimed",
+        metadata: { assignedUserId: actorUserId },
+      });
+      await tx.insert(ticketMessages).values({
+        ticketId: chat.ticketId,
+        authorType: "system",
+        visibility: "public",
+        channel: "web_chat",
+        body: "Um atendente da equipe F10 assumiu o atendimento.",
+      });
+    } else {
+      await tx.insert(webChatMessages).values({
+        sessionId,
+        authorType: "system",
+        visibility: "public",
+        body: "Um atendente da equipe F10 assumiu o atendimento.",
+      });
+    }
   });
 }
 
@@ -258,7 +360,7 @@ export async function assignInternalChat(
   sessionId: string,
   targetUserId: string,
 ): Promise<void> {
-  const assignScope = getPermissionScope(permissions, "tickets.assign");
+  const assignScope = chatAssignmentScope(permissions);
   if (!assignScope) throw new Error("CHAT_ASSIGN_NOT_ALLOWED");
 
   const targetPermissions = await resolveUserPermissions(targetUserId);
@@ -275,62 +377,80 @@ export async function assignInternalChat(
       .limit(1),
     db
       .select({
-        ticketId: tickets.id,
+        ticketId: webChatSessions.ticketId,
+        queueId: webChatSessions.queueId,
+        assignedUserId: webChatSessions.assignedUserId,
+        closedAt: webChatSessions.closedAt,
         ticketNumber: tickets.ticketNumber,
-        status: tickets.status,
+        ticketStatus: tickets.status,
       })
       .from(webChatSessions)
-      .innerJoin(tickets, eq(webChatSessions.ticketId, tickets.id))
+      .leftJoin(tickets, eq(webChatSessions.ticketId, tickets.id))
       .where(eq(webChatSessions.id, sessionId))
       .limit(1),
   ]);
   if (!target) throw new Error("CHAT_ASSIGNEE_NOT_ELIGIBLE");
   if (!chat) throw new Error("CHAT_NOT_FOUND");
-  await requireTicketAccess(actorUserId, assignScope, chat.ticketId);
-  if (chat.status === "closed") throw new Error("CHAT_CLOSED");
+  await requireChatAccess(actorUserId, assignScope, chat);
+  if (chat.closedAt) throw new Error("CHAT_CLOSED");
 
   const now = new Date();
   await db.transaction(async (tx) => {
     await tx
-      .update(tickets)
-      .set({
-        assignedUserId: targetUserId,
-        status: chat.status === "new" ? "open" : chat.status,
-        updatedAt: now,
-      })
-      .where(eq(tickets.id, chat.ticketId));
-    await tx
       .update(webChatSessions)
       .set({
+        assignedUserId: targetUserId,
         aiState: "human",
         aiHandoffReason: "Conversa atribuída a um atendente humano.",
         aiHandoffAt: now,
         aiProcessingAt: null,
+        updatedAt: now,
       })
       .where(eq(webChatSessions.id, sessionId));
-    await tx.insert(ticketEvents).values({
-      ticketId: chat.ticketId,
-      actorUserId,
-      eventType: "chat.assigned",
-      metadata: { assignedUserId: targetUserId },
-    });
-    await tx.insert(ticketMessages).values({
-      ticketId: chat.ticketId,
-      authorType: "system",
-      visibility: "public",
-      channel: "web_chat",
-      body: "Seu atendimento foi encaminhado para a equipe responsável.",
-    });
+
+    if (chat.ticketId) {
+      await tx
+        .update(tickets)
+        .set({
+          assignedUserId: targetUserId,
+          status: chat.ticketStatus === "new" ? "open" : chat.ticketStatus,
+          updatedAt: now,
+        })
+        .where(eq(tickets.id, chat.ticketId));
+      await tx.insert(ticketEvents).values({
+        ticketId: chat.ticketId,
+        actorUserId,
+        eventType: "chat.assigned",
+        metadata: { assignedUserId: targetUserId },
+      });
+      await tx.insert(ticketMessages).values({
+        ticketId: chat.ticketId,
+        authorType: "system",
+        visibility: "public",
+        channel: "web_chat",
+        body: "Seu atendimento foi encaminhado para a equipe responsável.",
+      });
+    } else {
+      await tx.insert(webChatMessages).values({
+        sessionId,
+        authorType: "system",
+        visibility: "public",
+        body: "Seu atendimento foi encaminhado para a equipe responsável.",
+      });
+    }
+
     if (targetUserId !== actorUserId) {
       await tx.insert(internalNotifications).values({
         userId: targetUserId,
         actorUserId,
         kind: "chat.assigned",
-        title: `Atendimento atribuído a você · #${chat.ticketNumber}`,
+        title: chat.ticketNumber
+          ? `Atendimento atribuído a você · #${chat.ticketNumber}`
+          : "Atendimento atribuído a você",
         body: "Abra a conversa para continuar o atendimento.",
         href: `/app/chat/${sessionId}`,
-        entityType: "ticket",
-        entityId: chat.ticketId,
+        entityType: chat.ticketId ? "ticket" : "chat",
+        entityId: chat.ticketId ?? sessionId,
       });
     }
   });
@@ -346,19 +466,22 @@ export async function respondToInternalChat(
   const db = getDatabase();
   const [chat] = await db
     .select({
-      ticketId: tickets.id,
-      status: tickets.status,
-      assignedUserId: tickets.assignedUserId,
-      firstResponseAt: tickets.firstResponseAt,
+      ticketId: webChatSessions.ticketId,
+      queueId: webChatSessions.queueId,
+      assignedUserId: webChatSessions.assignedUserId,
+      closedAt: webChatSessions.closedAt,
+      firstResponseAt: webChatSessions.firstResponseAt,
+      ticketStatus: tickets.status,
+      ticketFirstResponseAt: tickets.firstResponseAt,
     })
     .from(webChatSessions)
-    .innerJoin(tickets, eq(webChatSessions.ticketId, tickets.id))
+    .leftJoin(tickets, eq(webChatSessions.ticketId, tickets.id))
     .where(eq(webChatSessions.id, sessionId))
     .limit(1);
 
   if (!chat) throw new Error("CHAT_NOT_FOUND");
-  await requireTicketAccess(actorUserId, respondScope, chat.ticketId);
-  if (chat.status === "closed") throw new Error("CHAT_CLOSED");
+  await requireChatAccess(actorUserId, respondScope, chat);
+  if (chat.closedAt) throw new Error("CHAT_CLOSED");
   if (chat.assignedUserId && chat.assignedUserId !== actorUserId) {
     throw new Error("CHAT_ASSIGNED_TO_OTHER_USER");
   }
@@ -368,37 +491,48 @@ export async function respondToInternalChat(
     await tx
       .update(webChatSessions)
       .set({
+        assignedUserId: chat.assignedUserId ?? actorUserId,
         aiState: "human",
         aiHandoffReason: "Conversa assumida por um atendente humano.",
         aiHandoffAt: now,
         aiProcessingAt: null,
+        firstResponseAt: chat.firstResponseAt ?? now,
+        updatedAt: now,
       })
       .where(eq(webChatSessions.id, sessionId));
 
-    await tx.insert(ticketMessages).values({
-      ticketId: chat.ticketId,
-      authorType: "user",
-      authorUserId: actorUserId,
-      visibility: "public",
-      channel: "web_chat",
-      body: body.trim(),
-    });
-
-    await tx
-      .update(tickets)
-      .set({
-        assignedUserId: chat.assignedUserId ?? actorUserId,
-        firstResponseAt: chat.firstResponseAt ?? now,
-        status: chat.status === "new" ? "open" : chat.status,
-        updatedAt: now,
-      })
-      .where(eq(tickets.id, chat.ticketId));
-
-    await tx.insert(ticketEvents).values({
-      ticketId: chat.ticketId,
-      actorUserId,
-      eventType: "chat.agent.message",
-      metadata: { aiState: "human" },
-    });
+    if (chat.ticketId) {
+      await tx.insert(ticketMessages).values({
+        ticketId: chat.ticketId,
+        authorType: "user",
+        authorUserId: actorUserId,
+        visibility: "public",
+        channel: "web_chat",
+        body: body.trim(),
+      });
+      await tx
+        .update(tickets)
+        .set({
+          assignedUserId: chat.assignedUserId ?? actorUserId,
+          firstResponseAt: chat.ticketFirstResponseAt ?? now,
+          status: chat.ticketStatus === "new" ? "open" : chat.ticketStatus,
+          updatedAt: now,
+        })
+        .where(eq(tickets.id, chat.ticketId));
+      await tx.insert(ticketEvents).values({
+        ticketId: chat.ticketId,
+        actorUserId,
+        eventType: "chat.agent.message",
+        metadata: { aiState: "human" },
+      });
+    } else {
+      await tx.insert(webChatMessages).values({
+        sessionId,
+        authorType: "user",
+        authorUserId: actorUserId,
+        visibility: "public",
+        body: body.trim(),
+      });
+    }
   });
 }

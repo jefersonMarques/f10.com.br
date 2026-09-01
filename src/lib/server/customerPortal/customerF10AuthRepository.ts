@@ -18,7 +18,7 @@ import {
   encryptF10CustomerToken,
 } from "$lib/server/customerPortal/customerF10TokenCrypto";
 
-const SESSION_INACTIVITY_MS = 24 * 60 * 60 * 1000;
+const SESSION_INACTIVITY_MS = 30 * 60 * 1000;
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -58,6 +58,10 @@ export type CustomerF10PortalSession = {
   selectedUnitName: string | null;
   selectedUnitSchema: string | null;
   expiresAt: Date;
+};
+
+export type AuthorizeF10CustomerSessionOptions = {
+  touchActivity?: boolean;
 };
 
 export function listAuthorizedF10Contexts(
@@ -226,6 +230,7 @@ export async function createF10CustomerPortalSession(email: string, password: st
 
 export async function authorizeF10CustomerPortalSession(
   token: string,
+  options: AuthorizeF10CustomerSessionOptions = {},
 ): Promise<CustomerF10PortalSession | null> {
   if (!token) return null;
   const db = getDatabase();
@@ -271,10 +276,12 @@ export async function authorizeF10CustomerPortalSession(
     return null;
   }
 
-  await db
-    .update(customerPortalSessions)
-    .set({ lastSeenAt: now })
-    .where(eq(customerPortalSessions.id, session.sessionId));
+  if (options.touchActivity !== false) {
+    await db
+      .update(customerPortalSessions)
+      .set({ lastSeenAt: now })
+      .where(eq(customerPortalSessions.id, session.sessionId));
+  }
 
   return {
     sessionId: session.sessionId,
