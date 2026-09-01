@@ -15,6 +15,7 @@ import {
   type SchedulingEventParticipantInput,
 } from "$lib/server/calendar/schedulingEventRepository";
 import {
+  getSchedulingHost,
   listSchedulingHosts,
   listSchedulingTeamUserIds,
 } from "$lib/server/calendar/schedulingRepository";
@@ -222,6 +223,11 @@ export async function createAgendaSchedulingEvent(
 ) {
   if (!(await canOperateOrganizer(actorUserId, input.organizerUserId, permissions))) {
     throw new Error("SCHEDULING_HOST_NOT_ALLOWED");
+  }
+
+  const organizer = await getSchedulingHost(input.organizerUserId);
+  if (!organizer || organizer.status !== "active") {
+    throw new Error("SCHEDULING_HOST_NOT_FOUND");
   }
 
   const title = input.title.trim();
