@@ -82,10 +82,16 @@
 
   onMount(() => {
     eventTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || eventTimeZone;
+    const handleCreateRequest = (event: Event) => {
+      const detail = (event as CustomEvent<{ date?: string }>).detail;
+      openCreate(detail?.date);
+    };
+    window.addEventListener("f10-agenda:create-event", handleCreateRequest);
+    return () => window.removeEventListener("f10-agenda:create-event", handleCreateRequest);
   });
 
-  function openCreate(): void {
-    eventDate = agenda.calendarAnchor ?? new Date().toISOString().slice(0, 10);
+  function openCreate(requestedDate?: string): void {
+    eventDate = requestedDate || agenda.calendarAnchor || new Date().toISOString().slice(0, 10);
     organizerUserId = hosts.find((host) => host.id === agenda.organizerUserId)?.id
       ?? hosts[0]?.id
       ?? agenda.organizerUserId
@@ -102,8 +108,8 @@
   function formatEventRange(event: AgendaSchedulingEvent): string {
     const start = asDate(event.startsAt);
     const end = asDate(event.endsAt);
-    const date = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(start);
-    const time = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const date = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", timeZone: event.timeZone }).format(start);
+    const time = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: event.timeZone });
     return `${date} · ${time.format(start)}–${time.format(end)}`;
   }
 
@@ -132,7 +138,7 @@
       {/each}
 
       {#if agenda.canCreateSchedulingEvent}
-        <button type="button" on:click={openCreate} class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 text-[10px] font-semibold text-white">
+        <button type="button" on:click={() => openCreate()} class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 text-[10px] font-semibold text-white">
           <CalendarPlus2 size={13}/>Novo compromisso F10
         </button>
       {/if}
@@ -141,7 +147,7 @@
 {/if}
 
 {#if createOpen}
-  <div class="fixed inset-0 z-[80] flex items-center justify-center bg-[#101426]/45 p-4" role="presentation" on:click={() => (createOpen = false)}>
+  <div class="fixed inset-0 z-[120] flex items-center justify-center bg-[#101426]/45 p-4" role="presentation" on:click={() => (createOpen = false)}>
     <section class="max-h-[92dvh] w-full max-w-[680px] overflow-y-auto rounded-2xl border border-[#DDE1EA] bg-white shadow-[0_24px_80px_rgba(11,18,45,0.28)]" role="dialog" aria-modal="true" aria-label="Novo compromisso F10" on:click|stopPropagation>
       <header class="flex items-start justify-between border-b border-[#ECEEF3] px-5 py-4">
         <div>
