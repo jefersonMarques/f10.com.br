@@ -3,7 +3,7 @@
   import { onMount } from "svelte";
   import { CircleHelp, LogOut, MessageCircleMore, Plus } from "lucide-svelte";
   import ApplicationHeader from "$lib/components/application/ApplicationHeader.svelte";
-  import SupportChatDialog from "$lib/components/onboarding/SupportChatDialog.svelte";
+  import SupportAssistantDialog from "$lib/components/onboarding/SupportAssistantDialog.svelte";
   import { resolveCustomerRouteMetadata } from "$lib/application/routeMetadata";
   import type { LayoutData } from "./$types";
 
@@ -183,7 +183,7 @@
   {/if}
 </div>
 
-<SupportChatDialog
+<SupportAssistantDialog
   isOpen={chatOpen}
   onClose={closeChat}
   customerSupport={customerSupport}
