@@ -95,9 +95,13 @@
     createOpen = true;
   }
 
+  function asDate(value: Date | string): Date {
+    return value instanceof Date ? value : new Date(value);
+  }
+
   function formatEventRange(event: AgendaSchedulingEvent): string {
-    const start = new Date(event.startsAt);
-    const end = new Date(event.endsAt);
+    const start = asDate(event.startsAt);
+    const end = asDate(event.endsAt);
     const date = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(start);
     const time = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" });
     return `${date} · ${time.format(start)}–${time.format(end)}`;
