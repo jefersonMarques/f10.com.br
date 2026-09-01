@@ -141,6 +141,7 @@ function schedulingEventMessage(errorValue: unknown): string {
     SCHEDULING_EVENT_INVALID_RANGE: "Informe uma data e horários válidos para o compromisso.",
     SCHEDULING_INVALID_TIME_ZONE: "Fuso horário inválido.",
     SCHEDULING_EVENT_INVALID_PARTICIPANT: "Revise os participantes do compromisso.",
+    SCHEDULING_EVENT_CONFLICT: "Já existe um compromisso ou reserva nesse horário para um dos participantes internos.",
   };
   return messages[code] ?? "Não foi possível criar o compromisso na Agenda F10.";
 }
@@ -306,6 +307,16 @@ export const load: PageServerLoad = async ({ parent, url }) => {
 
   const googleLinkedTaskIds = taskGoogleLinks.map((link) => link.taskId);
   const googleMeetTaskIds = taskGoogleLinks.filter((link) => link.googleMeetUrl).map((link) => link.taskId);
+  const schedulingGoogleEventIds = new Set(
+    schedulingEvents.map((event) => event.googleEventId).filter((eventId): eventId is string => Boolean(eventId)),
+  );
+  const schedulingGoogleIcalUids = new Set(
+    schedulingEvents.map((event) => event.googleIcalUid).filter((iCalUid): iCalUid is string => Boolean(iCalUid)),
+  );
+  googleEvents = googleEvents.filter((event) =>
+    !schedulingGoogleEventIds.has(event.id)
+    && (!event.iCalUID || !schedulingGoogleIcalUids.has(event.iCalUID)),
+  );
 
   return {
     projects,
