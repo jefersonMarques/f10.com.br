@@ -1,7 +1,16 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { onMount } from "svelte";
-  import { CalendarPlus2, Clock3, ListChecks, Users, X } from "lucide-svelte";
+  import { CalendarPlus2, Clock3, ListChecks, Pencil, Users, X } from "lucide-svelte";
+
+  type AgendaSchedulingEventParticipant = {
+    id: string;
+    kind: "internal" | "external";
+    userId: string | null;
+    customerContactId: string | null;
+    name: string;
+    email: string;
+  };
 
   type AgendaSchedulingEvent = {
     id: string;
@@ -16,6 +25,7 @@
     ticketId: string | null;
     taskId: string | null;
     googleMeetUrl: string | null;
+    participants: AgendaSchedulingEventParticipant[];
   };
 
   type AgendaHost = {
@@ -46,6 +56,7 @@
     organizerUserId?: string;
     canViewScheduling?: boolean;
     canCreateSchedulingEvent?: boolean;
+    canEditSchedulingEvent?: boolean;
     canCancelSchedulingEvent?: boolean;
     schedulingEvents?: AgendaSchedulingEvent[];
     schedulingHosts?: AgendaHost[];
@@ -54,7 +65,10 @@
     tickets?: AgendaTicket[];
   };
 
-  let createOpen = false;
+  let editorOpen = false;
+  let editingEvent: AgendaSchedulingEvent | null = null;
+  let eventTitle = "";
+  let eventDescription = "";
   let eventDate = "";
   let eventStartTime = "09:00";
   let eventEndTime = "09:30";
@@ -62,6 +76,8 @@
   let organizerUserId = "";
   let internalParticipantIds: string[] = [];
   let externalEmails = "";
+  let eventTicketId = "";
+  let eventTaskId = "";
 
   $: agenda = $page.data as AgendaPageData;
   $: events = agenda.schedulingEvents ?? [];
@@ -70,16 +86,19 @@
   $: users = agenda.calendarUsers ?? [];
   $: tasks = agenda.tasks ?? [];
   $: tickets = agenda.tickets ?? [];
+  $: preservedCustomerParticipants = editingEvent?.participants.filter(
+    (participant) => participant.kind === "external" && Boolean(participant.customerContactId),
+  ) ?? [];
   $: attendeesJson = JSON.stringify([
     ...internalParticipantIds
       .map((userId) => users.find((user) => user.id === userId))
       .filter((user): user is AgendaUser => Boolean(user))
-      .map((user) => ({ userId: user.id, name: user.name, email: user.email, optional: false })),
+      .map((user) => ({ userId: user.id, name: user.name, email: user.email })),
     ...externalEmails
       .split(/[;,\n]/)
       .map((email) => email.trim().toLowerCase())
       .filter(Boolean)
-      .map((email) => ({ userId: null, name: "", email, optional: false })),
+      .map((email) => ({ userId: null, name: "", email })),
   ]);
 
   onMount(() => {
@@ -93,18 +112,69 @@
   });
 
   function openCreate(requestedDate?: string): void {
+    editingEvent = null;
+    eventTitle = "";
+    eventDescription = "";
     eventDate = requestedDate || agenda.calendarAnchor || new Date().toISOString().slice(0, 10);
+    eventStartTime = "09:00";
+    eventEndTime = "09:30";
+    eventTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo";
     organizerUserId = hosts.find((host) => host.id === agenda.organizerUserId)?.id
       ?? hosts[0]?.id
       ?? agenda.organizerUserId
       ?? "";
     internalParticipantIds = [];
     externalEmails = "";
-    createOpen = true;
+    eventTicketId = "";
+    eventTaskId = "";
+    editorOpen = true;
+  }
+
+  function openEdit(event: AgendaSchedulingEvent): void {
+    const start = zonedInputParts(event.startsAt, event.timeZone);
+    const end = zonedInputParts(event.endsAt, event.timeZone);
+    editingEvent = event;
+    eventTitle = event.title;
+    eventDescription = event.description;
+    eventDate = start.date;
+    eventStartTime = start.time;
+    eventEndTime = end.time;
+    eventTimeZone = event.timeZone;
+    organizerUserId = event.organizerUserId;
+    internalParticipantIds = event.participants
+      .filter((participant) => participant.kind === "internal" && Boolean(participant.userId))
+      .map((participant) => participant.userId as string);
+    externalEmails = event.participants
+      .filter((participant) => participant.kind === "external" && !participant.customerContactId)
+      .map((participant) => participant.email)
+      .join("; ");
+    eventTicketId = event.ticketId ?? "";
+    eventTaskId = event.taskId ?? "";
+    editorOpen = true;
   }
 
   function asDate(value: Date | string): Date {
     return value instanceof Date ? value : new Date(value);
+  }
+
+  function zonedInputParts(
+    value: Date | string,
+    timeZone: string,
+  ): { date: string; time: string } {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone,
+    }).formatToParts(asDate(value));
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return {
+      date: `${values.year}-${values.month}-${values.day}`,
+      time: `${values.hour}:${values.minute}`,
+    };
   }
 
   function formatEventRange(event: AgendaSchedulingEvent): string {
@@ -123,11 +193,16 @@
     return `${date} · ${time.format(start)}–${time.format(end)}`;
   }
 
+  function canOperateEvent(event: AgendaSchedulingEvent): boolean {
+    return hosts.some((host) => host.id === event.organizerUserId);
+  }
+
+  function canEditEvent(event: AgendaSchedulingEvent): boolean {
+    return Boolean(agenda.canEditSchedulingEvent && canOperateEvent(event));
+  }
+
   function canCancelEvent(event: AgendaSchedulingEvent): boolean {
-    return Boolean(
-      agenda.canCancelSchedulingEvent
-      && hosts.some((host) => host.id === event.organizerUserId),
-    );
+    return Boolean(agenda.canCancelSchedulingEvent && canOperateEvent(event));
   }
 
   function ticketLabel(ticket: AgendaTicket): string {
@@ -159,7 +234,7 @@
           <summary class="inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#555C6D] hover:bg-[#F7F8FB]">
             <ListChecks size={13}/>Gerenciar
           </summary>
-          <div class="absolute right-0 z-50 mt-2 max-h-[420px] w-[min(420px,calc(100vw-24px))] overflow-y-auto rounded-xl border border-[#DDE1EA] bg-white p-2 shadow-[0_18px_50px_rgba(11,18,45,0.18)]">
+          <div class="absolute right-0 z-50 mt-2 max-h-[420px] w-[min(440px,calc(100vw-24px))] overflow-y-auto rounded-xl border border-[#DDE1EA] bg-white p-2 shadow-[0_18px_50px_rgba(11,18,45,0.18)]">
             {#each confirmedEvents as event}
               <article class="flex items-start gap-3 rounded-lg px-2.5 py-2.5 hover:bg-[#F8F9FC]">
                 <Clock3 size={13} class="mt-0.5 shrink-0 text-[#000A57]"/>
@@ -167,6 +242,11 @@
                   <strong class="block truncate text-[11px] font-semibold text-[#303747]">{event.title}</strong>
                   <span class="mt-0.5 block text-[9px] text-[#858B99]">{formatEventRange(event)} · {event.organizerName}</span>
                 </div>
+                {#if canEditEvent(event)}
+                  <button type="button" on:click={() => openEdit(event)} class="flex h-7 w-7 items-center justify-center rounded-md border border-[#DDE1EA] text-[#555C6D] hover:bg-[#F3F5FA]" aria-label={`Editar ${event.title}`} title="Editar compromisso">
+                    <Pencil size={12}/>
+                  </button>
+                {/if}
                 {#if canCancelEvent(event)}
                   <form
                     method="POST"
@@ -196,35 +276,42 @@
   </section>
 {/if}
 
-{#if createOpen}
-  <div class="fixed inset-0 z-[120] flex items-center justify-center bg-[#101426]/45 p-4" role="presentation" on:click={() => (createOpen = false)}>
-    <section class="max-h-[92dvh] w-full max-w-[680px] overflow-y-auto rounded-2xl border border-[#DDE1EA] bg-white shadow-[0_24px_80px_rgba(11,18,45,0.28)]" role="dialog" aria-modal="true" aria-label="Novo compromisso F10" on:click|stopPropagation>
+{#if editorOpen}
+  <div class="fixed inset-0 z-[120] flex items-center justify-center bg-[#101426]/45 p-4" role="presentation" on:click={() => (editorOpen = false)}>
+    <section class="max-h-[92dvh] w-full max-w-[680px] overflow-y-auto rounded-2xl border border-[#DDE1EA] bg-white shadow-[0_24px_80px_rgba(11,18,45,0.28)]" role="dialog" aria-modal="true" aria-label={editingEvent ? "Editar compromisso F10" : "Novo compromisso F10"} on:click|stopPropagation>
       <header class="flex items-start justify-between border-b border-[#ECEEF3] px-5 py-4">
         <div>
           <span class="text-[10px] font-bold uppercase tracking-[0.1em] text-[#EA6D0B]">Agenda F10</span>
-          <h2 class="mt-1 text-[17px] font-semibold text-[#202637]">Novo compromisso</h2>
-          <p class="mt-1 text-[11px] text-[#7A8190]">O compromisso é salvo no F10. A sincronização com Google ocorre apenas quando habilitada.</p>
+          <h2 class="mt-1 text-[17px] font-semibold text-[#202637]">{editingEvent ? "Editar compromisso" : "Novo compromisso"}</h2>
+          <p class="mt-1 text-[11px] text-[#7A8190]">
+            {editingEvent
+              ? "A Agenda F10 é atualizada primeiro. A projeção Google é sincronizada depois, quando aplicável."
+              : "O compromisso é salvo no F10. A sincronização com Google ocorre apenas quando habilitada."}
+          </p>
         </div>
-        <button type="button" on:click={() => (createOpen = false)} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#777E8D] hover:bg-[#F4F5F8]" aria-label="Fechar"><X size={16}/></button>
+        <button type="button" on:click={() => (editorOpen = false)} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#777E8D] hover:bg-[#F4F5F8]" aria-label="Fechar"><X size={16}/></button>
       </header>
 
-      <form method="POST" action="?/createSchedulingEvent" class="space-y-4 p-5">
+      <form method="POST" action={editingEvent ? "?/updateSchedulingEvent" : "?/createSchedulingEvent"} class="space-y-4 p-5">
+        {#if editingEvent}<input type="hidden" name="eventId" value={editingEvent.id}/>{/if}
+
         <div class="grid gap-4 sm:grid-cols-2">
           <label class="sm:col-span-2">
             <span class="mb-1.5 block text-[10px] font-semibold text-[#555C6D]">Título</span>
-            <input name="title" required minlength="3" maxlength="180" class="h-10 w-full rounded-lg border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#000A57]" placeholder="Ex.: Reunião de acompanhamento" />
+            <input name="title" bind:value={eventTitle} required minlength="3" maxlength="180" class="h-10 w-full rounded-lg border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#000A57]" placeholder="Ex.: Reunião de acompanhamento" />
           </label>
 
           <label class="sm:col-span-2">
             <span class="mb-1.5 block text-[10px] font-semibold text-[#555C6D]">Descrição</span>
-            <textarea name="description" maxlength="5000" rows="3" class="w-full rounded-lg border border-[#DDE1EA] px-3 py-2 text-[12px] outline-none focus:border-[#000A57]" placeholder="Contexto opcional do compromisso"></textarea>
+            <textarea name="description" bind:value={eventDescription} maxlength="5000" rows="3" class="w-full rounded-lg border border-[#DDE1EA] px-3 py-2 text-[12px] outline-none focus:border-[#000A57]" placeholder="Contexto opcional do compromisso"></textarea>
           </label>
 
           <label>
             <span class="mb-1.5 block text-[10px] font-semibold text-[#555C6D]">Responsável</span>
-            <select name="organizerUserId" bind:value={organizerUserId} required class="h-10 w-full rounded-lg border border-[#DDE1EA] bg-white px-3 text-[12px] outline-none focus:border-[#000A57]">
+            <select name="organizerUserId" bind:value={organizerUserId} required disabled={Boolean(editingEvent)} class="h-10 w-full rounded-lg border border-[#DDE1EA] bg-white px-3 text-[12px] outline-none disabled:bg-[#F4F5F8] disabled:text-[#777E8D] focus:border-[#000A57]">
               {#each hosts as host}<option value={host.id}>{host.name}</option>{/each}
             </select>
+            {#if editingEvent}<small class="mt-1 block text-[9px] text-[#9298A5]">O responsável não pode ser alterado nesta versão.</small>{/if}
           </label>
 
           <label>
@@ -262,6 +349,18 @@
           </fieldset>
         {/if}
 
+        {#if preservedCustomerParticipants.length > 0}
+          <div class="rounded-xl border border-[#DCE6D8] bg-[#F7FBF5] p-3">
+            <strong class="text-[10px] font-semibold text-[#4F6746]">Participante do agendamento público</strong>
+            <div class="mt-1.5 space-y-1">
+              {#each preservedCustomerParticipants as participant}
+                <span class="block text-[10px] text-[#65725F]">{participant.name || participant.email} · {participant.email}</span>
+              {/each}
+            </div>
+            <small class="mt-1.5 block text-[9px] text-[#7A8873]">Esse participante é preservado pelo vínculo original do booking.</small>
+          </div>
+        {/if}
+
         <label class="block">
           <span class="mb-1.5 block text-[10px] font-semibold text-[#555C6D]">Participantes externos</span>
           <textarea bind:value={externalEmails} rows="2" class="w-full rounded-lg border border-[#DDE1EA] px-3 py-2 text-[12px] outline-none focus:border-[#000A57]" placeholder="email@cliente.com; outro@empresa.com"></textarea>
@@ -269,21 +368,27 @@
         </label>
 
         <div class="grid gap-4 sm:grid-cols-2">
-          {#if tickets.length > 0}
+          {#if tickets.length > 0 || eventTicketId}
             <label>
               <span class="mb-1.5 block text-[10px] font-semibold text-[#555C6D]">Ticket relacionado</span>
-              <select name="ticketId" class="h-10 w-full rounded-lg border border-[#DDE1EA] bg-white px-3 text-[12px] outline-none focus:border-[#000A57]">
+              <select name="ticketId" bind:value={eventTicketId} class="h-10 w-full rounded-lg border border-[#DDE1EA] bg-white px-3 text-[12px] outline-none focus:border-[#000A57]">
                 <option value="">Nenhum</option>
+                {#if eventTicketId && !tickets.some((ticket) => ticket.id === eventTicketId)}
+                  <option value={eventTicketId}>Ticket relacionado atual</option>
+                {/if}
                 {#each tickets as ticket}<option value={ticket.id}>{ticketLabel(ticket)}</option>{/each}
               </select>
             </label>
           {/if}
 
-          {#if tasks.length > 0}
+          {#if tasks.length > 0 || eventTaskId}
             <label>
               <span class="mb-1.5 block text-[10px] font-semibold text-[#555C6D]">Tarefa relacionada</span>
-              <select name="taskId" class="h-10 w-full rounded-lg border border-[#DDE1EA] bg-white px-3 text-[12px] outline-none focus:border-[#000A57]">
+              <select name="taskId" bind:value={eventTaskId} class="h-10 w-full rounded-lg border border-[#DDE1EA] bg-white px-3 text-[12px] outline-none focus:border-[#000A57]">
                 <option value="">Nenhuma</option>
+                {#if eventTaskId && !tasks.some((task) => task.id === eventTaskId)}
+                  <option value={eventTaskId}>Tarefa relacionada atual</option>
+                {/if}
                 {#each tasks as task}<option value={task.id}>{task.title}</option>{/each}
               </select>
             </label>
@@ -291,12 +396,12 @@
         </div>
 
         <input type="hidden" name="attendeesJson" value={attendeesJson} />
-        <input type="hidden" name="location" value="" />
-        <input type="hidden" name="reminderMinutes" value="" />
 
         <footer class="flex justify-end gap-2 border-t border-[#ECEEF3] pt-4">
-          <button type="button" on:click={() => (createOpen = false)} class="h-9 rounded-lg border border-[#DDE1EA] px-4 text-[11px] font-semibold text-[#616879]">Cancelar</button>
-          <button type="submit" class="h-9 rounded-lg bg-[#000A57] px-4 text-[11px] font-semibold text-white">Criar compromisso F10</button>
+          <button type="button" on:click={() => (editorOpen = false)} class="h-9 rounded-lg border border-[#DDE1EA] px-4 text-[11px] font-semibold text-[#616879]">Cancelar</button>
+          <button type="submit" class="h-9 rounded-lg bg-[#000A57] px-4 text-[11px] font-semibold text-white">
+            {editingEvent ? "Salvar alterações" : "Criar compromisso F10"}
+          </button>
         </footer>
       </form>
     </section>
