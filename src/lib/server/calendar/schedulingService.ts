@@ -7,14 +7,14 @@ import {
 } from "$lib/server/calendar/f10CalendarAvailabilityRepository";
 import {
   createGoogleCalendarEvent,
-  deleteGoogleCalendarEvent,
   getGoogleCalendarConnection,
 } from "$lib/server/calendar/googleCalendarRepository";
 import { getGoogleCalendarSyncPreferences } from "$lib/server/calendar/googleCalendarPreferenceRepository";
 import {
-  completeSchedulingGoogleReservation,
-  completeSchedulingWithoutGoogleReservation,
-} from "$lib/server/calendar/schedulingGoogleCalendarRepository";
+  completeSchedulingInvitationWithEvent,
+  updateSchedulingInvitationGoogleProjection,
+  upsertSchedulingEventGoogleLink,
+} from "$lib/server/calendar/schedulingEventRepository";
 import {
   claimSchedulingReservation,
   createSchedulingInvitation,
@@ -201,7 +201,9 @@ export async function generateSchedulingInvitation(
   ]);
 
   if (!host || host.status !== "active") throw new Error("SCHEDULING_HOST_NOT_FOUND");
-  if (!googleConnection.connected) throw new Error("SCHEDULING_HOST_GOOGLE_REQUIRED");
+  if (input.addGoogleMeet && !googleConnection.connected) {
+    throw new Error("SCHEDULING_GOOGLE_MEET_CONNECTION_REQUIRED");
+  }
   const customerEmail = normalizeEmail(customer?.email ?? "");
   if (!customer || !customer.active || !customerEmail || !isValidEmail(customerEmail)) {
     throw new Error("SCHEDULING_CUSTOMER_EMAIL_REQUIRED");
@@ -381,9 +383,6 @@ async function loadAvailabilityContext(
     ),
   ]);
 
-  if (calendar.coverage !== "google") {
-    throw new Error("SCHEDULING_GOOGLE_AVAILABILITY_UNAVAILABLE");
-  }
   return { calendar, reservations };
 }
 
@@ -511,76 +510,102 @@ export async function bookSchedulingSlot(
     throw error;
   }
 
-  const preferences = await getGoogleCalendarSyncPreferences(invitation.hostUserId);
-  const shouldSyncGoogle = preferences.syncSchedulingToGoogle || invitation.addGoogleMeet;
-
-  if (!shouldSyncGoogle) {
-    try {
-      await completeSchedulingWithoutGoogleReservation(invitation.id);
-    } catch (error) {
-      await releaseSchedulingReservation(invitation.id);
-      throw error;
-    }
-
-    await recordAuditEvent({
-      action: "scheduling.invitation.booked",
-      entityType: "scheduling_invitation",
-      entityId: invitation.id,
-      metadata: {
-        hostUserId: invitation.hostUserId,
-        customerContactId: invitation.customerContactId,
-        startAt: startAt.toISOString(),
-        endAt: endAt.toISOString(),
-        googleSynchronized: false,
-      },
-    });
-
-    return {
-      ...resolved.invitation,
-      status: "booked",
-      selectedStartAt: startAt.toISOString(),
-      selectedEndAt: endAt.toISOString(),
-      googleMeetUrl: null,
-    };
-  }
-
-  const localStart = instantToZonedParts(startAt, invitation.timeZone);
-  const localEnd = instantToZonedParts(endAt, invitation.timeZone);
-  let googleEvent: Awaited<ReturnType<typeof createGoogleCalendarEvent>> | null = null;
-  let googleCalendarId = "primary";
-
+  let event: Awaited<ReturnType<typeof completeSchedulingInvitationWithEvent>>;
   try {
-    const created = await createSchedulingGoogleEvent(invitation, localStart, localEnd);
-    googleEvent = created.event;
-    googleCalendarId = created.calendarId;
-    await completeSchedulingGoogleReservation(invitation.id, googleCalendarId, {
-      eventId: googleEvent.id,
-      iCalUid: googleEvent.iCalUID,
-      meetUrl: googleEvent.meetUrl,
-    });
+    event = await completeSchedulingInvitationWithEvent(invitation.id);
   } catch (error) {
-    if (googleEvent) {
-      await deleteGoogleCalendarEvent(invitation.hostUserId, googleCalendarId, googleEvent.id).catch(() => undefined);
-    }
     await releaseSchedulingReservation(invitation.id);
-    if (error instanceof Error && error.message === "SCHEDULING_SLOT_UNAVAILABLE") throw error;
-    throw new Error("SCHEDULING_GOOGLE_CREATE_FAILED");
+    throw error;
   }
 
-  if (!googleEvent) throw new Error("SCHEDULING_GOOGLE_CREATE_FAILED");
+  await recordAuditEvent({
+    action: "scheduling.event.created",
+    entityType: "scheduling_event",
+    entityId: event.id,
+    metadata: {
+      source: "public_booking",
+      invitationId: invitation.id,
+      hostUserId: invitation.hostUserId,
+      startAt: startAt.toISOString(),
+      endAt: endAt.toISOString(),
+    },
+  });
+
+  const [preferences, connection] = await Promise.all([
+    getGoogleCalendarSyncPreferences(invitation.hostUserId),
+    getGoogleCalendarConnection(invitation.hostUserId),
+  ]);
+  const shouldSyncGoogle = preferences.syncSchedulingToGoogle || invitation.addGoogleMeet;
+  let googleSynchronized = false;
+  let googleMeetUrl: string | null = null;
+  let googleCalendarId = preferences.targetCalendarId || "primary";
+  let googleEventId: string | null = null;
+
+  if (shouldSyncGoogle && connection.connected) {
+    const localStart = instantToZonedParts(startAt, invitation.timeZone);
+    const localEnd = instantToZonedParts(endAt, invitation.timeZone);
+    try {
+      const created = await createSchedulingGoogleEvent(invitation, localStart, localEnd);
+      googleCalendarId = created.calendarId;
+      googleEventId = created.event.id;
+      googleMeetUrl = created.event.meetUrl;
+      await upsertSchedulingEventGoogleLink({
+        eventId: event.id,
+        userId: invitation.hostUserId,
+        googleCalendarId,
+        googleEventId: created.event.id,
+        googleIcalUid: created.event.iCalUID,
+        googleHtmlLink: created.event.htmlLink,
+        googleMeetUrl: created.event.meetUrl,
+        lastSyncError: null,
+      });
+      await updateSchedulingInvitationGoogleProjection({
+        invitationId: invitation.id,
+        googleCalendarId,
+        googleEventId: created.event.id,
+        googleIcalUid: created.event.iCalUID,
+        googleMeetUrl: created.event.meetUrl,
+      });
+      googleSynchronized = true;
+    } catch (error) {
+      const syncError = error instanceof Error ? error.message : "GOOGLE_EVENT_SYNC_FAILED";
+      await upsertSchedulingEventGoogleLink({
+        eventId: event.id,
+        userId: invitation.hostUserId,
+        googleCalendarId,
+        googleEventId: null,
+        googleIcalUid: null,
+        googleHtmlLink: null,
+        googleMeetUrl: null,
+        lastSyncError: syncError,
+      }).catch(() => undefined);
+    }
+  } else if (shouldSyncGoogle) {
+    await upsertSchedulingEventGoogleLink({
+      eventId: event.id,
+      userId: invitation.hostUserId,
+      googleCalendarId,
+      googleEventId: null,
+      googleIcalUid: null,
+      googleHtmlLink: null,
+      googleMeetUrl: null,
+      lastSyncError: "GOOGLE_CALENDAR_NOT_CONNECTED",
+    }).catch(() => undefined);
+  }
 
   await recordAuditEvent({
     action: "scheduling.invitation.booked",
     entityType: "scheduling_invitation",
     entityId: invitation.id,
     metadata: {
+      eventId: event.id,
       hostUserId: invitation.hostUserId,
       customerContactId: invitation.customerContactId,
       startAt: startAt.toISOString(),
       endAt: endAt.toISOString(),
-      googleSynchronized: true,
-      googleCalendarId,
-      googleEventId: googleEvent.id,
+      googleSynchronized,
+      googleCalendarId: googleSynchronized ? googleCalendarId : null,
+      googleEventId: googleSynchronized ? googleEventId : null,
     },
   });
 
@@ -589,7 +614,7 @@ export async function bookSchedulingSlot(
     status: "booked",
     selectedStartAt: startAt.toISOString(),
     selectedEndAt: endAt.toISOString(),
-    googleMeetUrl: googleEvent.meetUrl,
+    googleMeetUrl,
   };
 }
 
