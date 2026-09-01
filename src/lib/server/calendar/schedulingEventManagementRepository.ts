@@ -29,6 +29,12 @@ export type UpdateSchedulingEventRepositoryInput = {
   participants: SchedulingEventParticipantInput[];
 };
 
+type BookingParticipant = {
+  customerContactId: string | null;
+  customerName: string;
+  customerEmail: string;
+} | null;
+
 function internalUserIds(participants: SchedulingEventParticipantInput[]): string[] {
   return participants
     .filter((participant) => participant.kind === "internal")
@@ -39,6 +45,7 @@ function internalUserIds(participants: SchedulingEventParticipantInput[]): strin
 function mergeEventParticipants(
   currentParticipants: SchedulingEventParticipantRow[],
   requestedParticipants: SchedulingEventParticipantInput[],
+  bookingParticipant: BookingParticipant,
 ): SchedulingEventParticipantInput[] {
   const participants = new Map<string, SchedulingEventParticipantInput>();
 
@@ -49,6 +56,19 @@ function mergeEventParticipants(
       customerContactId: participant.customerContactId,
       name: participant.name,
       email: participant.email.trim().toLowerCase(),
+    });
+  }
+
+  if (bookingParticipant?.customerEmail.trim()) {
+    const email = bookingParticipant.customerEmail.trim().toLowerCase();
+    const current = currentParticipants.find(
+      (participant) => participant.kind === "external" && participant.email.trim().toLowerCase() === email,
+    );
+    participants.set(`email:${email}`, {
+      kind: "external",
+      customerContactId: current?.customerContactId ?? bookingParticipant.customerContactId,
+      name: current?.name || bookingParticipant.customerName,
+      email,
     });
   }
 
@@ -89,11 +109,26 @@ export async function updateSchedulingEvent(
     if (!currentEvent) throw new Error("SCHEDULING_EVENT_NOT_FOUND");
     if (currentEvent.status !== "confirmed") throw new Error("SCHEDULING_EVENT_NOT_EDITABLE");
 
-    const currentParticipants = await tx
-      .select()
-      .from(schedulingEventParticipants)
-      .where(eq(schedulingEventParticipants.eventId, input.eventId));
-    const participants = mergeEventParticipants(currentParticipants, input.participants);
+    const [currentParticipants, bookingRows] = await Promise.all([
+      tx
+        .select()
+        .from(schedulingEventParticipants)
+        .where(eq(schedulingEventParticipants.eventId, input.eventId)),
+      tx
+        .select({
+          customerContactId: schedulingInvitations.customerContactId,
+          customerName: schedulingInvitations.customerName,
+          customerEmail: schedulingInvitations.customerEmail,
+        })
+        .from(schedulingInvitations)
+        .where(eq(schedulingInvitations.eventId, input.eventId))
+        .limit(1),
+    ]);
+    const participants = mergeEventParticipants(
+      currentParticipants,
+      input.participants,
+      bookingRows[0] ?? null,
+    );
     const busyUserIds = Array.from(new Set([
       currentEvent.organizerUserId,
       ...internalUserIds(participants),
