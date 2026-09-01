@@ -55,7 +55,7 @@ export async function resumeActiveCustomerChatSession(input: {
     if (!session) return null;
 
     const nextAiState = session.aiState === "active" ? "escalated" : session.aiState;
-    const nextContextData = {
+    const nextContextData: Record<string, unknown> = {
       ...(session.contextData ?? {}),
       ...input.contextData,
       resumedAt: now.toISOString(),
