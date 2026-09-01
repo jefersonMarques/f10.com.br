@@ -287,12 +287,21 @@ export async function listSchedulingEventBusyIntervals(
 
 export async function cancelSchedulingEvent(eventId: string): Promise<boolean> {
   const db = getDatabase();
-  const [updated] = await db
-    .update(schedulingEvents)
-    .set({ status: "cancelled", updatedAt: new Date() })
-    .where(and(eq(schedulingEvents.id, eventId), eq(schedulingEvents.status, "confirmed")))
-    .returning({ id: schedulingEvents.id });
-  return Boolean(updated);
+  const now = new Date();
+  return db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(schedulingEvents)
+      .set({ status: "cancelled", updatedAt: now })
+      .where(and(eq(schedulingEvents.id, eventId), eq(schedulingEvents.status, "confirmed")))
+      .returning({ id: schedulingEvents.id });
+    if (!updated) return false;
+
+    await tx
+      .update(schedulingInvitations)
+      .set({ status: "cancelled", updatedAt: now })
+      .where(and(eq(schedulingInvitations.eventId, eventId), eq(schedulingInvitations.status, "booked")));
+    return true;
+  });
 }
 
 export async function getSchedulingInternalParticipantUsers(userIds: string[]) {
