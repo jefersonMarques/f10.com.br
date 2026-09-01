@@ -4,6 +4,9 @@ import {
   createGoogleCalendarEvent,
   deleteGoogleCalendarEvent,
   getGoogleCalendarConnection,
+  updateGoogleCalendarEvent,
+  type CreateGoogleCalendarEventInput,
+  type GoogleCalendarEvent,
 } from "$lib/server/calendar/googleCalendarRepository";
 import { getGoogleCalendarSyncPreferences } from "$lib/server/calendar/googleCalendarPreferenceRepository";
 import {
@@ -11,6 +14,10 @@ import {
   getSchedulingEventGoogleLink,
   markSchedulingEventGoogleSyncError,
 } from "$lib/server/calendar/schedulingEventLifecycleRepository";
+import {
+  listSchedulingEventParticipantsForEvents,
+  updateSchedulingEvent,
+} from "$lib/server/calendar/schedulingEventManagementRepository";
 import {
   cancelSchedulingEvent,
   createSchedulingEvent,
@@ -56,12 +63,66 @@ export type CreateAgendaSchedulingEventInput = {
   taskId?: string | null;
 };
 
+export type UpdateAgendaSchedulingEventInput = Omit<
+  CreateAgendaSchedulingEventInput,
+  "organizerUserId"
+> & {
+  eventId: string;
+};
+
+type NormalizedEventDetails = {
+  title: string;
+  description: string;
+  startsAt: Date;
+  endsAt: Date;
+  timeZone: string;
+};
+
+type SchedulingGoogleSyncResult = {
+  synchronized: boolean;
+  warning: boolean;
+};
+
+type SchedulingGoogleSyncInput = NormalizedEventDetails & {
+  eventId: string;
+  organizerUserId: string;
+  attendees: SchedulingEventParticipantInput[];
+};
+
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
 function isValidEmail(value: string): boolean {
   return value.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function normalizeEventDetails(
+  input: Pick<
+    CreateAgendaSchedulingEventInput,
+    "title" | "description" | "date" | "startTime" | "endTime" | "timeZone"
+  >,
+): NormalizedEventDetails {
+  const title = input.title.trim();
+  const description = input.description.trim();
+  if (title.length < 3 || title.length > 180) throw new Error("SCHEDULING_INVALID_TITLE");
+  if (description.length > 5000) throw new Error("SCHEDULING_EVENT_INVALID_DESCRIPTION");
+  if (!isValidDateKey(input.date) || !isValidTimeValue(input.startTime) || !isValidTimeValue(input.endTime)) {
+    throw new Error("SCHEDULING_EVENT_INVALID_RANGE");
+  }
+  if (!isValidTimeZone(input.timeZone)) throw new Error("SCHEDULING_INVALID_TIME_ZONE");
+
+  const startsAt = localDateTimeToUtc(input.date, input.startTime, input.timeZone);
+  const endsAt = localDateTimeToUtc(input.date, input.endTime, input.timeZone);
+  if (endsAt.getTime() <= startsAt.getTime()) throw new Error("SCHEDULING_EVENT_INVALID_RANGE");
+
+  return {
+    title,
+    description,
+    startsAt,
+    endsAt,
+    timeZone: input.timeZone,
+  };
 }
 
 async function canOperateOrganizer(
@@ -151,91 +212,175 @@ async function validateRelatedEntities(
   }
 }
 
-async function syncSchedulingEventToGoogle(input: {
-  eventId: string;
-  organizerUserId: string;
-  title: string;
-  description: string;
-  startsAt: Date;
-  endsAt: Date;
-  timeZone: string;
-  attendees: SchedulingEventParticipantInput[];
-}): Promise<boolean> {
+async function validateChangedRelatedEntities(
+  actorUserId: string,
+  permissions: SchedulingEventPermissionMap,
+  current: { ticketId: string | null; taskId: string | null },
+  input: Pick<UpdateAgendaSchedulingEventInput, "ticketId" | "taskId">,
+): Promise<void> {
+  await validateRelatedEntities(actorUserId, permissions, {
+    ticketId: input.ticketId && input.ticketId !== current.ticketId ? input.ticketId : null,
+    taskId: input.taskId && input.taskId !== current.taskId ? input.taskId : null,
+  });
+}
+
+function schedulingGoogleEventInput(
+  input: SchedulingGoogleSyncInput,
+): CreateGoogleCalendarEventInput | null {
+  const localStart = instantToZonedParts(input.startsAt, input.timeZone);
+  const localEnd = instantToZonedParts(input.endsAt, input.timeZone);
+  if (localStart.date !== localEnd.date) return null;
+
+  return {
+    title: input.title,
+    description: input.description,
+    date: localStart.date,
+    allDay: false,
+    startTime: localStart.time,
+    endTime: localEnd.time,
+    timeZone: input.timeZone,
+    attendees: input.attendees
+      .filter((attendee) => isValidEmail(attendee.email))
+      .map((attendee) => ({ email: attendee.email })),
+  };
+}
+
+async function createGoogleProjection(
+  input: SchedulingGoogleSyncInput,
+  preferredCalendarId: string,
+): Promise<{ calendarId: string; event: GoogleCalendarEvent }> {
+  const googleInput = schedulingGoogleEventInput(input);
+  if (!googleInput) throw new Error("GOOGLE_EVENT_MULTI_DAY_UNSUPPORTED");
+
+  try {
+    return {
+      calendarId: preferredCalendarId,
+      event: await createGoogleCalendarEvent(
+        input.organizerUserId,
+        googleInput,
+        preferredCalendarId,
+      ),
+    };
+  } catch (cause) {
+    if (preferredCalendarId === "primary") throw cause;
+    return {
+      calendarId: "primary",
+      event: await createGoogleCalendarEvent(
+        input.organizerUserId,
+        googleInput,
+        "primary",
+      ),
+    };
+  }
+}
+
+async function persistGoogleProjection(
+  input: SchedulingGoogleSyncInput,
+  calendarId: string,
+  googleEvent: GoogleCalendarEvent,
+): Promise<void> {
+  await upsertSchedulingEventGoogleLink({
+    eventId: input.eventId,
+    userId: input.organizerUserId,
+    googleCalendarId: calendarId,
+    googleEventId: googleEvent.id,
+    googleIcalUid: googleEvent.iCalUID,
+    googleHtmlLink: googleEvent.htmlLink,
+    googleMeetUrl: googleEvent.meetUrl,
+    lastSyncError: null,
+  });
+}
+
+async function recordGoogleSyncFailure(
+  input: SchedulingGoogleSyncInput,
+  calendarId: string,
+  error: unknown,
+): Promise<void> {
+  await upsertSchedulingEventGoogleLink({
+    eventId: input.eventId,
+    userId: input.organizerUserId,
+    googleCalendarId: calendarId,
+    googleEventId: null,
+    googleIcalUid: null,
+    googleHtmlLink: null,
+    googleMeetUrl: null,
+    lastSyncError: error instanceof Error ? error.message : "GOOGLE_EVENT_SYNC_FAILED",
+  }).catch(() => undefined);
+}
+
+async function syncNewSchedulingEventToGoogle(
+  input: SchedulingGoogleSyncInput,
+): Promise<SchedulingGoogleSyncResult> {
   const [preferences, connection] = await Promise.all([
     getGoogleCalendarSyncPreferences(input.organizerUserId),
     getGoogleCalendarConnection(input.organizerUserId),
   ]);
-  if (!preferences.syncSchedulingToGoogle || !connection.connected) return false;
-
-  const localStart = instantToZonedParts(input.startsAt, input.timeZone);
-  const localEnd = instantToZonedParts(input.endsAt, input.timeZone);
-  if (localStart.date !== localEnd.date) return false;
+  if (!preferences.syncSchedulingToGoogle) return { synchronized: false, warning: false };
 
   const preferredCalendarId = preferences.targetCalendarId || "primary";
-  let calendarId = preferredCalendarId;
+  if (!connection.connected) {
+    await recordGoogleSyncFailure(input, preferredCalendarId, new Error("GOOGLE_CALENDAR_NOT_CONNECTED"));
+    return { synchronized: false, warning: true };
+  }
+
   try {
-    let googleEvent;
-    try {
-      googleEvent = await createGoogleCalendarEvent(
-        input.organizerUserId,
-        {
-          title: input.title,
-          description: input.description,
-          date: localStart.date,
-          allDay: false,
-          startTime: localStart.time,
-          endTime: localEnd.time,
-          timeZone: input.timeZone,
-          attendees: input.attendees
-            .filter((attendee) => isValidEmail(attendee.email))
-            .map((attendee) => ({ email: attendee.email })),
-        },
-        preferredCalendarId,
-      );
-    } catch (cause) {
-      if (preferredCalendarId === "primary") throw cause;
-      calendarId = "primary";
-      googleEvent = await createGoogleCalendarEvent(
-        input.organizerUserId,
-        {
-          title: input.title,
-          description: input.description,
-          date: localStart.date,
-          allDay: false,
-          startTime: localStart.time,
-          endTime: localEnd.time,
-          timeZone: input.timeZone,
-          attendees: input.attendees
-            .filter((attendee) => isValidEmail(attendee.email))
-            .map((attendee) => ({ email: attendee.email })),
-        },
-        "primary",
-      );
+    const projection = await createGoogleProjection(input, preferredCalendarId);
+    await persistGoogleProjection(input, projection.calendarId, projection.event);
+    return { synchronized: true, warning: false };
+  } catch (error) {
+    await recordGoogleSyncFailure(input, preferredCalendarId, error);
+    return { synchronized: false, warning: true };
+  }
+}
+
+async function syncUpdatedSchedulingEventToGoogle(
+  input: SchedulingGoogleSyncInput,
+): Promise<SchedulingGoogleSyncResult> {
+  const googleLink = await getSchedulingEventGoogleLink(input.eventId, input.organizerUserId);
+  if (!googleLink?.googleEventId) return syncNewSchedulingEventToGoogle(input);
+
+  const connection = await getGoogleCalendarConnection(input.organizerUserId);
+  if (!connection.connected) {
+    await markSchedulingEventGoogleSyncError(
+      input.eventId,
+      input.organizerUserId,
+      "GOOGLE_CALENDAR_NOT_CONNECTED",
+    ).catch(() => undefined);
+    return { synchronized: false, warning: true };
+  }
+
+  const googleInput = schedulingGoogleEventInput(input);
+  if (!googleInput) {
+    await markSchedulingEventGoogleSyncError(
+      input.eventId,
+      input.organizerUserId,
+      "GOOGLE_EVENT_MULTI_DAY_UNSUPPORTED",
+    ).catch(() => undefined);
+    return { synchronized: false, warning: true };
+  }
+
+  try {
+    const updated = await updateGoogleCalendarEvent(
+      input.organizerUserId,
+      googleLink.googleCalendarId,
+      googleLink.googleEventId,
+      googleInput,
+    );
+    if (updated) {
+      await persistGoogleProjection(input, googleLink.googleCalendarId, updated);
+      return { synchronized: true, warning: false };
     }
 
-    await upsertSchedulingEventGoogleLink({
-      eventId: input.eventId,
-      userId: input.organizerUserId,
-      googleCalendarId: calendarId,
-      googleEventId: googleEvent.id,
-      googleIcalUid: googleEvent.iCalUID,
-      googleHtmlLink: googleEvent.htmlLink,
-      googleMeetUrl: googleEvent.meetUrl,
-      lastSyncError: null,
-    });
-    return true;
+    const projection = await createGoogleProjection(input, googleLink.googleCalendarId);
+    await persistGoogleProjection(input, projection.calendarId, projection.event);
+    return { synchronized: true, warning: false };
   } catch (error) {
-    await upsertSchedulingEventGoogleLink({
-      eventId: input.eventId,
-      userId: input.organizerUserId,
-      googleCalendarId: calendarId,
-      googleEventId: null,
-      googleIcalUid: null,
-      googleHtmlLink: null,
-      googleMeetUrl: null,
-      lastSyncError: error instanceof Error ? error.message : "GOOGLE_EVENT_SYNC_FAILED",
-    }).catch(() => undefined);
-    return false;
+    await markSchedulingEventGoogleSyncError(
+      input.eventId,
+      input.organizerUserId,
+      error instanceof Error ? error.message : "GOOGLE_EVENT_UPDATE_FAILED",
+    ).catch(() => undefined);
+    return { synchronized: false, warning: true };
   }
 }
 
@@ -253,29 +398,17 @@ export async function createAgendaSchedulingEvent(
     throw new Error("SCHEDULING_HOST_NOT_FOUND");
   }
 
-  const title = input.title.trim();
-  const description = input.description.trim();
-  if (title.length < 3 || title.length > 180) throw new Error("SCHEDULING_INVALID_TITLE");
-  if (description.length > 5000) throw new Error("SCHEDULING_EVENT_INVALID_DESCRIPTION");
-  if (!isValidDateKey(input.date) || !isValidTimeValue(input.startTime) || !isValidTimeValue(input.endTime)) {
-    throw new Error("SCHEDULING_EVENT_INVALID_RANGE");
-  }
-  if (!isValidTimeZone(input.timeZone)) throw new Error("SCHEDULING_INVALID_TIME_ZONE");
-
-  const startsAt = localDateTimeToUtc(input.date, input.startTime, input.timeZone);
-  const endsAt = localDateTimeToUtc(input.date, input.endTime, input.timeZone);
-  if (endsAt.getTime() <= startsAt.getTime()) throw new Error("SCHEDULING_EVENT_INVALID_RANGE");
-
+  const details = normalizeEventDetails(input);
   await validateRelatedEntities(actorUserId, permissions, input);
   const participants = await normalizeParticipants(input.organizerUserId, input.attendees);
   const event = await createSchedulingEvent({
     organizerUserId: input.organizerUserId,
     createdByUserId: actorUserId,
-    title,
-    description,
-    startsAt,
-    endsAt,
-    timeZone: input.timeZone,
+    title: details.title,
+    description: details.description,
+    startsAt: details.startsAt,
+    endsAt: details.endsAt,
+    timeZone: details.timeZone,
     ticketId: input.ticketId ?? null,
     taskId: input.taskId ?? null,
     participants,
@@ -288,24 +421,83 @@ export async function createAgendaSchedulingEvent(
     entityId: event.id,
     metadata: {
       organizerUserId: input.organizerUserId,
-      startsAt: startsAt.toISOString(),
-      endsAt: endsAt.toISOString(),
+      startsAt: details.startsAt.toISOString(),
+      endsAt: details.endsAt.toISOString(),
       participantCount: participants.length,
     },
   });
 
-  const googleSynchronized = await syncSchedulingEventToGoogle({
+  const google = await syncNewSchedulingEventToGoogle({
     eventId: event.id,
     organizerUserId: input.organizerUserId,
-    title,
-    description,
-    startsAt,
-    endsAt,
-    timeZone: input.timeZone,
+    ...details,
     attendees: participants,
   });
 
-  return { event, googleSynchronized };
+  return {
+    event,
+    googleSynchronized: google.synchronized,
+    googleSyncWarning: google.warning,
+  };
+}
+
+export async function updateAgendaSchedulingEvent(
+  actorUserId: string,
+  permissions: SchedulingEventPermissionMap,
+  input: UpdateAgendaSchedulingEventInput,
+) {
+  const currentEvent = await getSchedulingEvent(input.eventId);
+  if (!currentEvent) throw new Error("SCHEDULING_EVENT_NOT_FOUND");
+  if (currentEvent.status !== "confirmed") throw new Error("SCHEDULING_EVENT_NOT_EDITABLE");
+  if (!(await canOperateOrganizer(actorUserId, currentEvent.organizerUserId, permissions))) {
+    throw new Error("SCHEDULING_HOST_NOT_ALLOWED");
+  }
+
+  const details = normalizeEventDetails(input);
+  await validateChangedRelatedEntities(actorUserId, permissions, currentEvent, input);
+  const requestedParticipants = await normalizeParticipants(
+    currentEvent.organizerUserId,
+    input.attendees,
+  );
+  const updated = await updateSchedulingEvent({
+    eventId: input.eventId,
+    title: details.title,
+    description: details.description,
+    startsAt: details.startsAt,
+    endsAt: details.endsAt,
+    timeZone: details.timeZone,
+    ticketId: input.ticketId ?? null,
+    taskId: input.taskId ?? null,
+    participants: requestedParticipants,
+  });
+
+  await recordAuditEvent({
+    actorUserId,
+    action: "scheduling.event.updated",
+    entityType: "scheduling_event",
+    entityId: input.eventId,
+    metadata: {
+      organizerUserId: currentEvent.organizerUserId,
+      previousStartsAt: currentEvent.startsAt.toISOString(),
+      previousEndsAt: currentEvent.endsAt.toISOString(),
+      startsAt: details.startsAt.toISOString(),
+      endsAt: details.endsAt.toISOString(),
+      participantCount: updated.participants.length,
+    },
+  });
+
+  const google = await syncUpdatedSchedulingEventToGoogle({
+    eventId: input.eventId,
+    organizerUserId: currentEvent.organizerUserId,
+    ...details,
+    attendees: updated.participants,
+  });
+
+  return {
+    event: updated.event,
+    googleSynchronized: google.synchronized,
+    googleSyncWarning: google.warning,
+  };
 }
 
 export async function listAgendaSchedulingEvents(
@@ -316,11 +508,26 @@ export async function listAgendaSchedulingEvents(
 ) {
   const visibleUserIds = await visibleSchedulingUserIds(actorUserId, permissions);
   if (visibleUserIds.length === 0) return [];
-  return listSchedulingEvents({
+
+  const events = await listSchedulingEvents({
     visibleUserIds,
     startsBefore: rangeEnd,
     endsAfter: rangeStart,
   });
+  const participants = await listSchedulingEventParticipantsForEvents(
+    events.map((event) => event.id),
+  );
+  const participantsByEvent = new Map<string, typeof participants>();
+  for (const participant of participants) {
+    const eventParticipants = participantsByEvent.get(participant.eventId) ?? [];
+    eventParticipants.push(participant);
+    participantsByEvent.set(participant.eventId, eventParticipants);
+  }
+
+  return events.map((event) => ({
+    ...event,
+    participants: participantsByEvent.get(event.id) ?? [],
+  }));
 }
 
 export async function cancelAgendaSchedulingEvent(
