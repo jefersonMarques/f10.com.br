@@ -1,4 +1,10 @@
-import { and, asc, eq, gt, inArray, lt, or } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNotNull, lt, or } from "drizzle-orm";
+import {
+  lockSchedulingUsers,
+  schedulingIntervalsConflict,
+  SCHEDULING_BOOKING_CLAIM_TIMEOUT_MS,
+  SCHEDULING_MAX_BUFFER_MINUTES,
+} from "$lib/server/calendar/schedulingConcurrency";
 import { getDatabase } from "$lib/server/db";
 import {
   schedulingEventGoogleCalendarLinks,
@@ -41,6 +47,85 @@ export async function createSchedulingEvent(
 ): Promise<SchedulingEventRow> {
   const db = getDatabase();
   return db.transaction(async (tx) => {
+    const lockedUserIds = Array.from(new Set([
+      input.organizerUserId,
+      ...input.participants
+        .filter((participant) => participant.kind === "internal")
+        .map((participant) => participant.userId ?? "")
+        .filter(Boolean),
+    ]));
+    await lockSchedulingUsers((query) => tx.execute(query), lockedUserIds);
+
+    const [eventConflict] = await tx
+      .select({ id: schedulingEvents.id })
+      .from(schedulingEvents)
+      .leftJoin(
+        schedulingEventParticipants,
+        eq(schedulingEventParticipants.eventId, schedulingEvents.id),
+      )
+      .where(
+        and(
+          eq(schedulingEvents.status, "confirmed"),
+          lt(schedulingEvents.startsAt, input.endsAt),
+          gt(schedulingEvents.endsAt, input.startsAt),
+          or(
+            inArray(schedulingEvents.organizerUserId, lockedUserIds),
+            inArray(schedulingEventParticipants.userId, lockedUserIds),
+          ),
+        ),
+      )
+      .limit(1);
+    if (eventConflict) throw new Error("SCHEDULING_EVENT_CONFLICT");
+
+    const now = new Date();
+    const reservationWindowStart = new Date(
+      input.startsAt.getTime() - SCHEDULING_MAX_BUFFER_MINUTES * 60_000,
+    );
+    const reservationWindowEnd = new Date(
+      input.endsAt.getTime() + SCHEDULING_MAX_BUFFER_MINUTES * 60_000,
+    );
+    const activeBookingSince = new Date(
+      now.getTime() - SCHEDULING_BOOKING_CLAIM_TIMEOUT_MS,
+    );
+    const reservations = await tx
+      .select({
+        startAt: schedulingInvitations.selectedStartAt,
+        endAt: schedulingInvitations.selectedEndAt,
+        bufferBeforeMinutes: schedulingInvitations.bufferBeforeMinutes,
+        bufferAfterMinutes: schedulingInvitations.bufferAfterMinutes,
+      })
+      .from(schedulingInvitations)
+      .where(
+        and(
+          inArray(schedulingInvitations.hostUserId, lockedUserIds),
+          or(
+            eq(schedulingInvitations.status, "booked"),
+            and(
+              eq(schedulingInvitations.status, "booking"),
+              isNotNull(schedulingInvitations.bookingStartedAt),
+              gt(schedulingInvitations.bookingStartedAt, activeBookingSince),
+            ),
+          ),
+          isNotNull(schedulingInvitations.selectedStartAt),
+          isNotNull(schedulingInvitations.selectedEndAt),
+          lt(schedulingInvitations.selectedStartAt, reservationWindowEnd),
+          gt(schedulingInvitations.selectedEndAt, reservationWindowStart),
+        ),
+      );
+    if (
+      reservations.some((reservation) =>
+        schedulingIntervalsConflict(
+          input.startsAt,
+          input.endsAt,
+          0,
+          0,
+          reservation,
+        ),
+      )
+    ) {
+      throw new Error("SCHEDULING_EVENT_CONFLICT");
+    }
+
     const [event] = await tx
       .insert(schedulingEvents)
       .values({
@@ -124,7 +209,9 @@ export async function listSchedulingEvents(input: {
       unitId: schedulingEvents.unitId,
       unitName: schedulingEvents.unitName,
       participantUserId: schedulingEventParticipants.userId,
+      googleCalendarId: schedulingEventGoogleCalendarLinks.googleCalendarId,
       googleEventId: schedulingEventGoogleCalendarLinks.googleEventId,
+      googleIcalUid: schedulingEventGoogleCalendarLinks.googleIcalUid,
       googleMeetUrl: schedulingEventGoogleCalendarLinks.googleMeetUrl,
     })
     .from(schedulingEvents)
