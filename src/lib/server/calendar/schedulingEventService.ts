@@ -26,6 +26,8 @@ import {
   isValidTimeZone,
   localDateTimeToUtc,
 } from "$lib/server/calendar/schedulingTime";
+import { getSupportTicket } from "$lib/server/support/supportRepository";
+import { getTaskDetails } from "$lib/server/tasks/taskRepository";
 
 export type SchedulingEventPermissionMap = Map<string, PermissionScope>;
 
@@ -126,6 +128,21 @@ async function normalizeParticipants(
     });
   }
   return Array.from(normalized.values());
+}
+
+async function validateRelatedEntities(
+  actorUserId: string,
+  permissions: SchedulingEventPermissionMap,
+  input: Pick<CreateAgendaSchedulingEventInput, "ticketId" | "taskId">,
+): Promise<void> {
+  try {
+    await Promise.all([
+      input.ticketId ? getSupportTicket(actorUserId, permissions, input.ticketId) : Promise.resolve(null),
+      input.taskId ? getTaskDetails(actorUserId, permissions, input.taskId) : Promise.resolve(null),
+    ]);
+  } catch {
+    throw new Error("SCHEDULING_EVENT_INVALID_RELATION");
+  }
 }
 
 async function syncSchedulingEventToGoogle(input: {
@@ -243,6 +260,7 @@ export async function createAgendaSchedulingEvent(
   const endsAt = localDateTimeToUtc(input.date, input.endTime, input.timeZone);
   if (endsAt.getTime() <= startsAt.getTime()) throw new Error("SCHEDULING_EVENT_INVALID_RANGE");
 
+  await validateRelatedEntities(actorUserId, permissions, input);
   const participants = await normalizeParticipants(input.organizerUserId, input.attendees);
   const event = await createSchedulingEvent({
     organizerUserId: input.organizerUserId,
