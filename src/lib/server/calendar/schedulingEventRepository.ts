@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNotNull, lt, or } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
 import {
   lockSchedulingUsers,
   schedulingIntervalsConflict,
@@ -99,7 +99,10 @@ export async function createSchedulingEvent(
         and(
           inArray(schedulingInvitations.hostUserId, lockedUserIds),
           or(
-            eq(schedulingInvitations.status, "booked"),
+            and(
+              eq(schedulingInvitations.status, "booked"),
+              isNull(schedulingInvitations.eventId),
+            ),
             and(
               eq(schedulingInvitations.status, "booking"),
               isNotNull(schedulingInvitations.bookingStartedAt),
