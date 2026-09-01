@@ -8,6 +8,9 @@
   type Slot = PageData["slots"][number];
 
   $: dates = Array.from(new Set(data.slots.map((slot) => slot.date)));
+  $: showGoogleMeet = data.invitation.status === "booked"
+    ? Boolean(data.invitation.googleMeetUrl)
+    : data.invitation.addGoogleMeet;
 
   function slotsForDate(date: string): Slot[] {
     return data.slots.filter((slot) => slot.date === date);
@@ -52,8 +55,14 @@
         <span class="inline-flex items-center gap-2 rounded-full border border-[#E1E5EC] bg-[#FAFAFC] px-3 py-1.5 text-[9px] font-semibold text-[#69707E]"><ShieldCheck size={13}/>Link protegido</span>
       </div>
       <h1 class="mt-6 text-[28px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[36px]">{data.invitation.title}</h1>
-      <p class="mt-2 text-[13px] leading-6 text-[#6F7585]">Escolha um horário disponível com <strong class="font-semibold text-[#343B4A]">{data.invitation.hostName}</strong>.</p>
-      <div class="mt-5 flex flex-wrap gap-2 text-[9px] font-medium text-[#626978]"><span class="inline-flex items-center gap-1.5 rounded-lg bg-[#F3F4F7] px-3 py-2"><Clock3 size={13}/>{data.invitation.durationMinutes} min</span><span class="rounded-lg bg-[#F3F4F7] px-3 py-2">Fuso: {data.invitation.timeZone}</span>{#if data.invitation.addGoogleMeet}<span class="inline-flex items-center gap-1.5 rounded-lg bg-[#EEF3FF] px-3 py-2 text-[#214A9A]"><Video size={13}/>Google Meet</span>{/if}</div>
+      {#if data.invitation.status === "booked"}
+        <p class="mt-2 text-[13px] leading-6 text-[#6F7585]">Confira os dados atuais do seu compromisso com <strong class="font-semibold text-[#343B4A]">{data.invitation.hostName}</strong>.</p>
+      {:else if data.invitation.status === "booking"}
+        <p class="mt-2 text-[13px] leading-6 text-[#6F7585]">Seu horário com <strong class="font-semibold text-[#343B4A]">{data.invitation.hostName}</strong> está sendo confirmado.</p>
+      {:else}
+        <p class="mt-2 text-[13px] leading-6 text-[#6F7585]">Escolha um horário disponível com <strong class="font-semibold text-[#343B4A]">{data.invitation.hostName}</strong>.</p>
+      {/if}
+      <div class="mt-5 flex flex-wrap gap-2 text-[9px] font-medium text-[#626978]"><span class="inline-flex items-center gap-1.5 rounded-lg bg-[#F3F4F7] px-3 py-2"><Clock3 size={13}/>{data.invitation.durationMinutes} min</span><span class="rounded-lg bg-[#F3F4F7] px-3 py-2">Fuso: {data.invitation.timeZone}</span>{#if showGoogleMeet}<span class="inline-flex items-center gap-1.5 rounded-lg bg-[#EEF3FF] px-3 py-2 text-[#214A9A]"><Video size={13}/>Google Meet</span>{/if}</div>
     </header>
 
     {#if form?.message}
@@ -65,17 +74,17 @@
         <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#EDF9F1] text-[#176B35]"><CalendarCheck2 size={28}/></div>
         <h2 class="mt-4 text-[20px] font-semibold text-[#202637]">Agendamento confirmado</h2>
         <p class="mt-2 capitalize text-[13px] leading-6 text-[#5F6776]">{formatBookedDate(data.invitation.selectedStartAt)}</p>
-        <p class="mt-2 text-[10px] leading-5 text-[#858B98]">O convite foi enviado pelo Google Calendar para o e-mail informado pelo atendimento F10.</p>
+        <p class="mt-2 text-[10px] leading-5 text-[#858B98]">Este é o horário atual registrado na Agenda F10.</p>
         {#if data.invitation.googleMeetUrl}<a href={data.invitation.googleMeetUrl} target="_blank" rel="noopener noreferrer" class="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-[#214A9A] px-5 text-[11px] font-semibold text-white"><Video size={15}/>Abrir Google Meet</a>{/if}
       </section>
     {:else if data.invitation.status === "booking"}
-      <section class="mt-5 rounded-[24px] border border-[#F0D6BD] bg-[#FFF9F3] p-6 text-center"><h2 class="text-[16px] font-semibold text-[#704019]">Confirmação em andamento</h2><p class="mt-2 text-[10px] leading-5 text-[#8A6648]">O horário está sendo confirmado no Google Calendar. Atualize esta página em alguns instantes.</p></section>
+      <section class="mt-5 rounded-[24px] border border-[#F0D6BD] bg-[#FFF9F3] p-6 text-center"><h2 class="text-[16px] font-semibold text-[#704019]">Confirmação em andamento</h2><p class="mt-2 text-[10px] leading-5 text-[#8A6648]">O horário está sendo confirmado na Agenda F10. Atualize esta página em alguns instantes.</p></section>
     {:else}
       <section class="mt-5 rounded-[26px] border border-[#E0E3EA] bg-white p-5 shadow-[0_12px_40px_rgba(1,13,40,0.05)] sm:p-7">
-        <div class="flex items-end justify-between gap-4"><div><span class="text-[10px] font-bold uppercase tracking-[0.08em] text-[#5C6475]">Horários livres</span><h2 class="mt-1 text-[18px] font-semibold text-[#202637]">Selecione data e hora</h2></div><span class="text-right text-[9px] leading-4 text-[#8B909D]">Disponibilidade consultada<br/>na agenda do responsável</span></div>
+        <div class="flex items-end justify-between gap-4"><div><span class="text-[10px] font-bold uppercase tracking-[0.08em] text-[#5C6475]">Horários livres</span><h2 class="mt-1 text-[18px] font-semibold text-[#202637]">Selecione data e hora</h2></div><span class="text-right text-[9px] leading-4 text-[#8B909D]">Disponibilidade consultada<br/>na Agenda F10</span></div>
 
         {#if data.availabilityUnavailable}
-          <div class="mt-5 rounded-xl border border-[#F0D6BD] bg-[#FFF9F3] px-4 py-4 text-[10px] leading-5 text-[#935018]">A agenda do responsável não pôde ser consultada agora. Nenhum horário é oferecido enquanto a disponibilidade do Google não puder ser confirmada.</div>
+          <div class="mt-5 rounded-xl border border-[#F0D6BD] bg-[#FFF9F3] px-4 py-4 text-[10px] leading-5 text-[#935018]">Não foi possível consultar a disponibilidade completa agora. Tente novamente em alguns instantes.</div>
         {:else if dates.length === 0}
           <div class="mt-5 rounded-xl border border-[#E4E6EC] bg-[#FAFAFC] px-4 py-8 text-center text-[10px] leading-5 text-[#858B99]">Não há horários livres dentro desta janela. Entre em contato com a F10 para receber outra opção de agendamento.</div>
         {:else}
