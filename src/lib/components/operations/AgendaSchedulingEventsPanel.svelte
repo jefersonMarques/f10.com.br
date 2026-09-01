@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { onMount } from "svelte";
-  import { CalendarPlus2, Clock3, Users, X } from "lucide-svelte";
+  import { CalendarPlus2, Clock3, ListChecks, Users, X } from "lucide-svelte";
 
   type AgendaSchedulingEvent = {
     id: string;
@@ -46,6 +46,7 @@
     organizerUserId?: string;
     canViewScheduling?: boolean;
     canCreateSchedulingEvent?: boolean;
+    canCancelSchedulingEvent?: boolean;
     schedulingEvents?: AgendaSchedulingEvent[];
     schedulingHosts?: AgendaHost[];
     calendarUsers?: AgendaUser[];
@@ -64,6 +65,7 @@
 
   $: agenda = $page.data as AgendaPageData;
   $: events = agenda.schedulingEvents ?? [];
+  $: confirmedEvents = events.filter((event) => event.status === "confirmed");
   $: hosts = agenda.schedulingHosts ?? [];
   $: users = agenda.calendarUsers ?? [];
   $: tasks = agenda.tasks ?? [];
@@ -108,9 +110,24 @@
   function formatEventRange(event: AgendaSchedulingEvent): string {
     const start = asDate(event.startsAt);
     const end = asDate(event.endsAt);
-    const date = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", timeZone: event.timeZone }).format(start);
-    const time = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: event.timeZone });
+    const date = new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      timeZone: event.timeZone,
+    }).format(start);
+    const time = new Intl.DateTimeFormat("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: event.timeZone,
+    });
     return `${date} · ${time.format(start)}–${time.format(end)}`;
+  }
+
+  function canCancelEvent(event: AgendaSchedulingEvent): boolean {
+    return Boolean(
+      agenda.canCancelSchedulingEvent
+      && hosts.some((host) => host.id === event.organizerUserId),
+    );
   }
 
   function ticketLabel(ticket: AgendaTicket): string {
@@ -125,17 +142,50 @@
         <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#EEF0FF] text-[#000A57]"><CalendarPlus2 size={15}/></span>
         <div class="min-w-0">
           <strong class="block text-[12px] font-semibold text-[#202637]">Agenda F10</strong>
-          <span class="block text-[10px] text-[#7A8190]">{events.filter((event) => event.status === "confirmed").length} compromisso(s) no período</span>
+          <span class="block text-[10px] text-[#7A8190]">{confirmedEvents.length} compromisso(s) no período</span>
         </div>
       </div>
 
-      {#each events.filter((event) => event.status === "confirmed").slice(0, 4) as event}
+      {#each confirmedEvents.slice(0, 4) as event}
         <span class="hidden max-w-[250px] items-center gap-1.5 truncate rounded-lg border border-[#D8DDF4] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#40475A] xl:inline-flex" title={`${event.title} · ${formatEventRange(event)}`}>
           <Clock3 size={11} class="shrink-0 text-[#000A57]"/>
           <span class="truncate">{event.title}</span>
           <span class="shrink-0 font-medium text-[#858B99]">{formatEventRange(event)}</span>
         </span>
       {/each}
+
+      {#if confirmedEvents.length > 0}
+        <details class="relative">
+          <summary class="inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#555C6D] hover:bg-[#F7F8FB]">
+            <ListChecks size={13}/>Gerenciar
+          </summary>
+          <div class="absolute right-0 z-50 mt-2 max-h-[420px] w-[min(420px,calc(100vw-24px))] overflow-y-auto rounded-xl border border-[#DDE1EA] bg-white p-2 shadow-[0_18px_50px_rgba(11,18,45,0.18)]">
+            {#each confirmedEvents as event}
+              <article class="flex items-start gap-3 rounded-lg px-2.5 py-2.5 hover:bg-[#F8F9FC]">
+                <Clock3 size={13} class="mt-0.5 shrink-0 text-[#000A57]"/>
+                <div class="min-w-0 flex-1">
+                  <strong class="block truncate text-[11px] font-semibold text-[#303747]">{event.title}</strong>
+                  <span class="mt-0.5 block text-[9px] text-[#858B99]">{formatEventRange(event)} · {event.organizerName}</span>
+                </div>
+                {#if canCancelEvent(event)}
+                  <form
+                    method="POST"
+                    action="?/cancelSchedulingEvent"
+                    on:submit={(submitEvent) => {
+                      if (!confirm(`Cancelar o compromisso “${event.title}”?`)) submitEvent.preventDefault();
+                    }}
+                  >
+                    <input type="hidden" name="eventId" value={event.id}/>
+                    <button type="submit" class="flex h-7 w-7 items-center justify-center rounded-md border border-[#E9D6D6] text-[#9B3C3C] hover:bg-[#FFF5F5]" aria-label={`Cancelar ${event.title}`} title="Cancelar compromisso">
+                      <X size={12}/>
+                    </button>
+                  </form>
+                {/if}
+              </article>
+            {/each}
+          </div>
+        </details>
+      {/if}
 
       {#if agenda.canCreateSchedulingEvent}
         <button type="button" on:click={() => openCreate()} class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 text-[10px] font-semibold text-white">
