@@ -18,6 +18,7 @@ import {
   type GoogleAgendaEvent,
 } from "$lib/server/calendar/googleCalendarSyncService";
 import {
+  cancelAgendaSchedulingEvent,
   createAgendaSchedulingEvent,
   listAgendaSchedulingEvents,
 } from "$lib/server/calendar/schedulingEventService";
@@ -135,15 +136,17 @@ function schedulingMessage(errorValue: unknown): string {
 function schedulingEventMessage(errorValue: unknown): string {
   const code = errorValue instanceof Error ? errorValue.message : "";
   const messages: Record<string, string> = {
-    SCHEDULING_HOST_NOT_ALLOWED: "Você não pode criar compromissos para este responsável.",
+    SCHEDULING_HOST_NOT_ALLOWED: "Você não pode alterar compromissos deste responsável.",
     SCHEDULING_INVALID_TITLE: "Informe um título entre 3 e 180 caracteres.",
     SCHEDULING_EVENT_INVALID_DESCRIPTION: "A descrição deve ter no máximo 5.000 caracteres.",
     SCHEDULING_EVENT_INVALID_RANGE: "Informe uma data e horários válidos para o compromisso.",
     SCHEDULING_INVALID_TIME_ZONE: "Fuso horário inválido.",
     SCHEDULING_EVENT_INVALID_PARTICIPANT: "Revise os participantes do compromisso.",
     SCHEDULING_EVENT_CONFLICT: "Já existe um compromisso ou reserva nesse horário para um dos participantes internos.",
+    SCHEDULING_EVENT_NOT_FOUND: "Compromisso não encontrado.",
+    SCHEDULING_EVENT_NOT_CANCELLABLE: "Este compromisso não pode mais ser cancelado.",
   };
-  return messages[code] ?? "Não foi possível criar o compromisso na Agenda F10.";
+  return messages[code] ?? "Não foi possível concluir a operação na Agenda F10.";
 }
 
 async function googleWriteConfiguration(userId: string) {
@@ -219,6 +222,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const canChangeTicketDueOn = canViewTickets && hasPermission(permissions, "tickets.reply");
   const canManageScheduling = hasPermission(permissions, "scheduling.manage");
   const canCreateSchedulingEvent = Boolean(schedulingCreateScope);
+  const canCancelSchedulingEvent = canCreateSchedulingEvent || canManageScheduling;
   const canCreateScheduling = canCreateSchedulingEvent && hasPermission(permissions, "customers.view");
   const canConfigureScheduling = Boolean(schedulingCreateScope) || canManageScheduling;
   const needsSchedulingTeamUsers = schedulingCreateScope === "team" || schedulingViewScope === "team";
@@ -336,6 +340,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     canChangeTicketDueOn,
     canViewScheduling,
     canCreateSchedulingEvent,
+    canCancelSchedulingEvent,
     canCreateScheduling,
     canConfigureScheduling,
     schedulingHosts,
@@ -436,6 +441,43 @@ export const actions: Actions = {
       return fail(400, {
         success: false,
         action: "createSchedulingEvent",
+        message: schedulingEventMessage(errorValue),
+      });
+    }
+  },
+
+  cancelSchedulingEvent: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppAnyPermission(
+      cookies,
+      ["scheduling.create", "scheduling.manage"],
+      "/app/tasks/calendar",
+    );
+    const formData = await request.formData();
+    const eventId = readFormValue(formData, "eventId");
+    if (!isUuid(eventId)) {
+      return fail(400, {
+        success: false,
+        action: "cancelSchedulingEvent",
+        message: "Compromisso inválido.",
+      });
+    }
+
+    try {
+      const result = await cancelAgendaSchedulingEvent(session.user.id, permissions, eventId);
+      return {
+        success: true,
+        action: "cancelSchedulingEvent",
+        syncWarning: result.googleSyncWarning,
+        message: result.googleSynchronized
+          ? "Compromisso cancelado na Agenda F10 e removido do Google Calendar."
+          : result.googleSyncWarning
+            ? "Compromisso cancelado na Agenda F10, mas a remoção no Google Calendar ficou pendente."
+            : "Compromisso cancelado na Agenda F10.",
+      };
+    } catch (errorValue) {
+      return fail(409, {
+        success: false,
+        action: "cancelSchedulingEvent",
         message: schedulingEventMessage(errorValue),
       });
     }
