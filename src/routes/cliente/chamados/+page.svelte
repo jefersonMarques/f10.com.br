@@ -50,7 +50,7 @@
   let filterKey = "";
   let groupValue = "all";
   let unitValue = "all";
-  let statusValue = "";
+  let statusValue = "active";
   let priorityValue = "";
   let periodValue = "all";
   let searchValue = "";
@@ -59,7 +59,7 @@
   $: nextFilterKey = [
     data.filters.groupId ?? "all",
     data.filters.unitId ?? "all",
-    data.filters.status ?? "",
+    data.filters.status ?? "active",
     data.filters.priority ?? "",
     data.filters.period,
     data.filters.search,
@@ -69,7 +69,7 @@
     filterKey = nextFilterKey;
     groupValue = data.filters.groupId === null ? "all" : String(data.filters.groupId);
     unitValue = data.filters.unitId === null ? "all" : String(data.filters.unitId);
-    statusValue = data.filters.status ?? "";
+    statusValue = data.filters.status ?? "active";
     priorityValue = data.filters.priority ?? "";
     periodValue = data.filters.period;
     searchValue = data.filters.search;
@@ -102,7 +102,7 @@
 
     params.set("groupId", group);
     if (group !== "all" && unit !== "all") params.set("unitId", unit);
-    if (status) params.set("status", status);
+    if (status && status !== "active") params.set("status", status);
     if (priority) params.set("priority", priority);
     if (period !== "all") params.set("period", period);
     if (search.trim()) params.set("q", search.trim());
@@ -209,7 +209,7 @@
     <div>
       <p class="application-text-caption font-bold uppercase tracking-[0.1em] text-[#EA6D0B]">Central de suporte</p>
       <h2 class="mt-1 text-[22px] font-semibold tracking-[-0.035em] text-[#202737]">Seus chamados</h2>
-      <p class="application-text-meta mt-1 text-[#858C9C]">Cada alteração nos filtros atualiza a consulta automaticamente.</p>
+      <p class="application-text-meta mt-1 text-[#858C9C]">Por padrão mostramos os chamados em aberto. Resolvidos continuam disponíveis no filtro de status.</p>
     </div>
 
     <div class="mt-5 border-t border-[#ECEEF3] pt-4">
@@ -218,14 +218,7 @@
           <span class="application-text-caption font-semibold text-[#596172]">Buscar chamado</span>
           <div class="relative mt-1.5">
             <Search size={15} class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E95A4]" />
-            <input
-              type="search"
-              maxlength="120"
-              bind:value={searchValue}
-              on:input={handleSearchInput}
-              placeholder="Número ou assunto"
-              class="application-text-control h-11 w-full rounded-xl border border-[#DDE1E9] bg-white pl-10 pr-3 outline-none transition focus:border-[#000A57] focus:ring-4 focus:ring-[#000A57]/10"
-            />
+            <input type="search" maxlength="120" bind:value={searchValue} on:input={handleSearchInput} placeholder="Número ou assunto" class="application-text-control h-11 w-full rounded-xl border border-[#DDE1E9] bg-white pl-10 pr-3 outline-none transition focus:border-[#000A57] focus:ring-4 focus:ring-[#000A57]/10" />
           </div>
         </label>
 
@@ -234,9 +227,7 @@
             <span class="application-text-caption font-semibold text-[#596172]">Grupo</span>
             <select bind:value={groupValue} on:change={handleGroupChange} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none transition focus:border-[#000A57]">
               <option value="all">Todos os grupos</option>
-              {#each data.groups as group}
-                <option value={String(group.grupo_id)}>{group.grupo}</option>
-              {/each}
+              {#each data.groups as group}<option value={String(group.grupo_id)}>{group.grupo}</option>{/each}
             </select>
           </label>
         {:else if data.groups[0]}
@@ -250,19 +241,16 @@
           <span class="application-text-caption font-semibold text-[#596172]">Escola</span>
           <select bind:value={unitValue} on:change={handleUnitChange} disabled={!selectedGroup} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none transition disabled:bg-[#F5F6F8] disabled:text-[#A1A6B0] focus:border-[#000A57]">
             <option value="all">{selectedGroup ? "Todas as escolas" : "Selecione um grupo"}</option>
-            {#each availableUnits as unit}
-              <option value={String(unit.unidade_id)}>{unit.unidade}</option>
-            {/each}
+            {#each availableUnits as unit}<option value={String(unit.unidade_id)}>{unit.unidade}</option>{/each}
           </select>
         </label>
 
         <label>
           <span class="application-text-caption font-semibold text-[#596172]">Status</span>
           <select bind:value={statusValue} on:change={handleStatusChange} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none transition focus:border-[#000A57]">
-            <option value="">Todos</option>
-            {#each Object.entries(statusLabels) as [value, label]}
-              <option value={value}>{label}</option>
-            {/each}
+            <option value="active">Em aberto</option>
+            <option value="all">Todos</option>
+            {#each Object.entries(statusLabels) as [value, label]}<option value={value}>{label}</option>{/each}
           </select>
         </label>
 
@@ -270,9 +258,7 @@
           <span class="application-text-caption font-semibold text-[#596172]">Prioridade</span>
           <select bind:value={priorityValue} on:change={handlePriorityChange} class="application-text-control mt-1.5 h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 outline-none transition focus:border-[#000A57]">
             <option value="">Todas</option>
-            {#each Object.entries(priorityLabels) as [value, label]}
-              <option value={value}>{label}</option>
-            {/each}
+            {#each Object.entries(priorityLabels) as [value, label]}<option value={value}>{label}</option>{/each}
           </select>
         </label>
 
@@ -288,40 +274,21 @@
       </div>
 
       <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div class="flex min-h-[88px] items-center gap-3 rounded-2xl border border-[#EEE4DA] bg-[#FFFCF9] px-4 py-3.5">
+        <a href={buildHref({ status: "new" })} class="flex min-h-[88px] items-center gap-3 rounded-2xl border border-[#EEE4DA] bg-[#FFFCF9] px-4 py-3.5 transition hover:border-[#E1CDBA]">
           <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF0E2] text-[#EA6D0B]"><Clock3 size={19} /></span>
-          <div class="min-w-0">
-            <p class="application-text-meta font-semibold text-[#6F7480]">Aguardando atendimento</p>
-            <div class="mt-0.5 flex items-baseline gap-2"><span class="text-[20px] font-semibold tracking-[-0.03em] text-[#C85D08]">{data.summary.awaiting}</span><span class="application-text-meta text-[#A1A5AF]">de {data.summary.total}</span></div>
-            <p class="application-text-meta truncate text-[#9A9FAC]">aguardando triagem</p>
-          </div>
-        </div>
-
-        <div class="flex min-h-[88px] items-center gap-3 rounded-2xl border border-[#E3E6F7] bg-[#FCFCFF] px-4 py-3.5">
+          <div class="min-w-0"><p class="application-text-meta font-semibold text-[#6F7480]">Aguardando atendimento</p><div class="mt-0.5 flex items-baseline gap-2"><span class="text-[20px] font-semibold text-[#C85D08]">{data.summary.awaiting}</span><span class="application-text-meta text-[#A1A5AF]">de {data.summary.total}</span></div></div>
+        </a>
+        <a href={buildHref({ status: "active" })} class="flex min-h-[88px] items-center gap-3 rounded-2xl border border-[#E3E6F7] bg-[#FCFCFF] px-4 py-3.5 transition hover:border-[#CCD1EF]">
           <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#3444B5]"><MessageCircle size={19} /></span>
-          <div class="min-w-0">
-            <p class="application-text-meta font-semibold text-[#6F7480]">Em andamento</p>
-            <div class="mt-0.5 flex items-baseline gap-2"><span class="text-[20px] font-semibold tracking-[-0.03em] text-[#283AAE]">{data.summary.inProgress}</span><span class="application-text-meta text-[#A1A5AF]">de {data.summary.total}</span></div>
-            <p class="application-text-meta truncate text-[#9A9FAC]">em acompanhamento</p>
-          </div>
-        </div>
-
-        <div class="flex min-h-[88px] items-center gap-3 rounded-2xl border border-[#DDEDE3] bg-[#FBFEFC] px-4 py-3.5">
+          <div class="min-w-0"><p class="application-text-meta font-semibold text-[#6F7480]">Em andamento</p><div class="mt-0.5 flex items-baseline gap-2"><span class="text-[20px] font-semibold text-[#283AAE]">{data.summary.inProgress}</span><span class="application-text-meta text-[#A1A5AF]">de {data.summary.total}</span></div></div>
+        </a>
+        <a href={buildHref({ status: "resolved" })} class="flex min-h-[88px] items-center gap-3 rounded-2xl border border-[#DDEDE3] bg-[#FBFEFC] px-4 py-3.5 transition hover:border-[#C7E0D1]">
           <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EAF6EE] text-[#39815A]"><CheckCircle2 size={19} /></span>
-          <div class="min-w-0">
-            <p class="application-text-meta font-semibold text-[#6F7480]">Resolvidos</p>
-            <div class="mt-0.5 flex items-baseline gap-2"><span class="text-[20px] font-semibold tracking-[-0.03em] text-[#33734F]">{data.summary.resolved}</span><span class="application-text-meta text-[#A1A5AF]">de {data.summary.total}</span></div>
-            <p class="application-text-meta truncate text-[#9A9FAC]">resolvidos ou fechados</p>
-          </div>
-        </div>
-
+          <div class="min-w-0"><p class="application-text-meta font-semibold text-[#6F7480]">Resolvidos</p><div class="mt-0.5 flex items-baseline gap-2"><span class="text-[20px] font-semibold text-[#33734F]">{data.summary.resolved}</span><span class="application-text-meta text-[#A1A5AF]">de {data.summary.total}</span></div></div>
+        </a>
         <div class="flex min-h-[88px] items-center gap-3 rounded-2xl border border-[#E8E2F6] bg-[#FDFCFF] px-4 py-3.5">
           <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#F3EDFF] text-[#7047C8]"><Bell size={19} /></span>
-          <div class="min-w-0">
-            <p class="application-text-meta font-semibold text-[#6F7480]">Nova atualização</p>
-            <div class="mt-0.5 flex items-baseline gap-2"><span class="text-[20px] font-semibold tracking-[-0.03em] text-[#6840BF]">{data.summary.unread}</span><span class="application-text-meta text-[#A1A5AF]">de {data.summary.total}</span></div>
-            <p class="application-text-meta truncate text-[#9A9FAC]">desde sua última visualização</p>
-          </div>
+          <div class="min-w-0"><p class="application-text-meta font-semibold text-[#6F7480]">Nova atualização</p><div class="mt-0.5 flex items-baseline gap-2"><span class="text-[20px] font-semibold text-[#6840BF]">{data.summary.unread}</span><span class="application-text-meta text-[#A1A5AF]">de {data.summary.total}</span></div></div>
         </div>
       </div>
     </div>
@@ -330,13 +297,11 @@
   <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
     <div>
       <p class="text-[13px] font-semibold text-[#303746]">{data.total} {data.total === 1 ? "chamado encontrado" : "chamados encontrados"}</p>
-      {#if data.total > 0}
-        <p class="application-text-meta mt-0.5 text-[#9298A5]">Exibindo {firstVisible}–{lastVisible} de {data.total}</p>
-      {/if}
+      {#if data.total > 0}<p class="application-text-meta mt-0.5 text-[#9298A5]">Exibindo {firstVisible}–{lastVisible} de {data.total}</p>{/if}
     </div>
     <div class="inline-flex w-fit rounded-xl border border-[#DDE1E9] bg-white p-1 shadow-[0_4px_14px_rgba(1,13,40,0.03)]">
       <a href={buildHref({ view: "cards", page: 1 })} class={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-[11px] font-semibold transition ${data.filters.view === "cards" ? "bg-[#000A57] text-white" : "text-[#6B7280] hover:bg-[#F7F8FA] hover:text-[#000A57]"}`}><LayoutGrid size={14} />Cards</a>
-      <a href={buildHref({ view: "table", page: 1 })} class={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-[11px] font-semibold transition ${data.filters.view === "table" ? "bg-[#000A57] text-white" : "text-[#6B7280] hover:bg-[#F7F8FA] hover:text-[#000A57]"}`}><List size={14} />Tabela</a>
+      <a href={buildHref({ view: "table", page: 1 })} class={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-[11px] font-semibold transition ${data.filters.view === "table" ? "bg-[#000A57] text-white" : "text-[#6B7280] hover:bg-[#F7F8FA] hover:text-[#000A57]"}`}><List size={14} />Lista</a>
     </div>
   </div>
 
@@ -344,118 +309,64 @@
     <section class="rounded-[22px] border border-dashed border-[#CBD1DE] bg-white px-6 py-12 text-center">
       <Inbox size={30} class="mx-auto text-[#9BA1AE]" />
       <h2 class="mt-4 text-[17px] font-semibold text-[#303746]">Nenhum chamado encontrado</h2>
-      <p class="mx-auto mt-2 max-w-[520px] text-[11px] leading-5 text-[#777E8D]">Ajuste os filtros ou use “Novo chamado” na barra superior para falar com a equipe F10.</p>
+      <p class="mx-auto mt-2 max-w-[520px] text-[11px] leading-5 text-[#777E8D]">Ajuste os filtros ou use “Novo chamado” na barra superior.</p>
     </section>
-  {:else}
-    <div class={data.filters.view === "cards" ? "overflow-hidden rounded-[18px] border border-[#E1E4EC] bg-white shadow-[0_8px_26px_rgba(1,13,40,0.035)]" : "overflow-hidden rounded-[18px] border border-[#E1E4EC] bg-white shadow-[0_8px_26px_rgba(1,13,40,0.035)] md:hidden"}>
+  {:else if data.filters.view === "cards"}
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {#each data.tickets as ticket}
-        <a href={`/cliente/chamados/${ticket.id}`} class={`group relative block border-b border-[#ECEEF3] transition last:border-b-0 hover:bg-[#FAFBFD] ${ticket.hasUnreadUpdate ? "bg-[#FFFCF9]" : "bg-white"}`}>
-          {#if ticket.hasUnreadUpdate}<span class="absolute inset-y-0 left-0 w-[3px] bg-[#EA6D0B]"></span>{/if}
-          <div class="grid gap-4 px-4 py-3.5 lg:grid-cols-[185px_minmax(260px,1.55fr)_minmax(205px,1fr)_145px_165px_22px] lg:items-center xl:px-5">
-            <div class="min-w-0">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="application-text-caption font-bold text-[#EA6D0B]">#{ticket.ticketNumber}</span>
-                <span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${statusClass(ticket.status)}`}>{statusLabels[ticket.status] ?? ticket.status}</span>
-              </div>
-              <div class="mt-1.5 flex flex-wrap items-center gap-2">
-                <span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${priorityClass(ticket.priority)}`}>{priorityLabels[ticket.priority] ?? ticket.priority}</span>
-                {#if ticket.hasUnreadUpdate}
-                  <span class="application-text-meta inline-flex items-center gap-1 rounded-full bg-[#FFF1E5] px-2 py-1 font-semibold text-[#A9500C]"><Bell size={11} />Nova atualização</span>
-                {/if}
-              </div>
-            </div>
+        <a href={`/cliente/chamados/${ticket.id}`} class={`group relative flex min-h-[250px] flex-col rounded-[20px] border bg-white p-5 shadow-[0_8px_28px_rgba(1,13,40,0.035)] transition hover:-translate-y-0.5 hover:border-[#C8CEDB] hover:shadow-[0_14px_34px_rgba(1,13,40,0.08)] ${ticket.hasUnreadUpdate ? "border-[#F0C9A9]" : "border-[#E1E4EC]"}`}>
+          {#if ticket.hasUnreadUpdate}<span class="absolute right-4 top-4 h-2.5 w-2.5 rounded-full bg-[#EA6D0B]" aria-label="Nova atualização"></span>{/if}
+          <div class="flex flex-wrap items-center gap-2 pr-5">
+            <span class="application-text-caption font-bold text-[#EA6D0B]">#{ticket.ticketNumber}</span>
+            <span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${statusClass(ticket.status)}`}>{statusLabels[ticket.status] ?? ticket.status}</span>
+            <span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${priorityClass(ticket.priority)}`}>{priorityLabels[ticket.priority] ?? ticket.priority}</span>
+          </div>
 
-            <div class="min-w-0">
-              <h3 class="truncate text-[14px] font-semibold tracking-[-0.01em] text-[#262D3D] transition group-hover:text-[#000A57]">{ticket.subject}</h3>
-              <div class="application-text-meta mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-[#8A91A0]">
-                {#if ticket.context?.scope === "global"}
-                  <span class="inline-flex items-center gap-1"><Globe2 size={12} />Todos os grupos</span>
-                  <span class="inline-flex items-center gap-1"><Building2 size={12} />Global</span>
-                {:else if ticket.context}
-                  <span class="inline-flex items-center gap-1"><Users size={12} />{ticket.context.groupName}</span>
-                  <span class="inline-flex items-center gap-1"><School size={12} />{ticket.context.unitName}</span>
-                {:else}
-                  <span class="inline-flex items-center gap-1"><Building2 size={12} />Contexto do atendimento</span>
-                {/if}
-                <span class="inline-flex items-center gap-1"><MessageCircle size={12} />{channelLabels[ticket.channel] ?? ticket.channel}</span>
-              </div>
-            </div>
+          <h3 class="mt-4 line-clamp-2 text-[16px] font-semibold leading-6 tracking-[-0.02em] text-[#252C3C] transition group-hover:text-[#000A57]">{ticket.subject}</h3>
+          <div class="application-text-meta mt-3 flex flex-wrap gap-x-3 gap-y-1.5 text-[#7D8493]">
+            {#if ticket.context?.scope === "global"}
+              <span class="inline-flex items-center gap-1"><Globe2 size={12} />Todos os grupos</span><span class="inline-flex items-center gap-1"><Building2 size={12} />Global</span>
+            {:else if ticket.context}
+              <span class="inline-flex items-center gap-1"><Users size={12} />{ticket.context.groupName}</span><span class="inline-flex items-center gap-1"><School size={12} />{ticket.context.unitName}</span>
+            {/if}
+            <span class="inline-flex items-center gap-1"><MessageCircle size={12} />{channelLabels[ticket.channel] ?? ticket.channel}</span>
+          </div>
 
-            <div class="min-w-0">
-              <p class="application-text-meta inline-flex items-center gap-1.5 font-medium text-[#9A9FAC]"><Activity size={12} />Última atividade da equipe</p>
-              {#if ticket.lastTeamActivityAt}
-                <p class={`mt-1 truncate text-[11px] font-semibold ${ticket.hasUnreadUpdate ? "text-[#A9500C]" : "text-[#626A7B]"}`}>Equipe movimentou este chamado {activityAge(ticket.lastTeamActivityAt)}</p>
-              {:else}
-                <p class="mt-1 text-[11px] text-[#8A91A0]">Aguardando primeira movimentação</p>
-              {/if}
-            </div>
+          <div class={`mt-4 rounded-2xl px-3.5 py-3 ${ticket.hasUnreadUpdate ? "bg-[#FFF7F0]" : "bg-[#F7F8FA]"}`}>
+            <p class="application-text-meta inline-flex items-center gap-1.5 font-semibold text-[#777F8F]"><Activity size={12} />Última atividade da equipe</p>
+            <p class={`mt-1 text-[11px] font-semibold ${ticket.hasUnreadUpdate ? "text-[#A9500C]" : "text-[#596172]"}`}>{ticket.lastTeamActivityAt ? `Equipe movimentou este chamado ${activityAge(ticket.lastTeamActivityAt)}` : "Aguardando primeira movimentação"}</p>
+          </div>
 
-            <div>
-              <p class="application-text-meta inline-flex items-center gap-1.5 font-medium text-[#9A9FAC]"><Clock3 size={12} />Atualizado</p>
-              <p class="mt-1 text-[11px] font-semibold text-[#596172]">{formatDate(ticket.updatedAt)}</p>
-            </div>
-
-            <div>
-              <p class="application-text-meta font-medium text-[#9A9FAC]">Acompanhamento</p>
-              <p class={`mt-1 inline-flex items-center gap-1.5 text-[11px] font-semibold ${slaClass(ticket)}`}>
-                {#if ticket.status === "resolved" || ticket.status === "closed"}<CheckCircle2 size={13} />{:else}<Clock3 size={13} />{/if}
-                {slaLabel(ticket)}
-              </p>
-            </div>
-
-            <ArrowRight size={17} class="hidden text-[#A1A7B4] transition group-hover:translate-x-0.5 group-hover:text-[#000A57] lg:block" />
+          <div class="mt-auto flex items-end justify-between gap-3 border-t border-[#ECEEF3] pt-4">
+            <div><p class="application-text-meta text-[#9A9FAC]">Atualizado</p><p class="mt-1 text-[10px] font-semibold text-[#626A7B]">{formatDate(ticket.updatedAt)}</p></div>
+            <div class="text-right"><p class={`inline-flex items-center gap-1 text-[10px] font-semibold ${slaClass(ticket)}`}>{#if ticket.status === "resolved" || ticket.status === "closed"}<CheckCircle2 size={12} />{:else}<Clock3 size={12} />{/if}{slaLabel(ticket)}</p><ArrowRight size={16} class="ml-auto mt-1 text-[#A1A7B4] transition group-hover:translate-x-0.5 group-hover:text-[#000A57]" /></div>
           </div>
         </a>
       {/each}
     </div>
-
-    {#if data.filters.view === "table"}
-      <div class="hidden overflow-hidden rounded-[18px] border border-[#E1E4EC] bg-white shadow-[0_6px_22px_rgba(1,13,40,0.028)] md:block">
-        <table class="w-full border-collapse text-left">
-          <thead class="bg-[#F7F8FA] text-[10px] font-bold uppercase tracking-[0.06em] text-[#747C8D]">
-            <tr>
-              <th class="px-4 py-3">Chamado</th>
-              <th class="px-4 py-3">Assunto</th>
-              <th class="px-4 py-3">Contexto</th>
-              <th class="px-4 py-3">Status</th>
-              <th class="px-4 py-3">Atividade da equipe</th>
-              <th class="px-4 py-3">Atualizado</th>
-              <th class="px-4 py-3">Acompanhamento</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-[#ECEEF3]">
-            {#each data.tickets as ticket}
-              <tr class={ticket.hasUnreadUpdate ? "bg-[#FFFBF7] transition hover:bg-[#FFF8F1]" : "transition hover:bg-[#FAFBFC]"}>
-                <td class="px-4 py-3">
-                  <a class="font-semibold text-[#EA6D0B]" href={`/cliente/chamados/${ticket.id}`}>#{ticket.ticketNumber}</a>
-                  {#if ticket.hasUnreadUpdate}<div class="application-text-meta mt-1 inline-flex items-center gap-1 font-semibold text-[#A9500C]"><Bell size={11} />Nova atualização</div>{/if}
-                </td>
-                <td class="max-w-[320px] px-4 py-3 text-[12px] font-medium text-[#303746]"><a class="block truncate hover:text-[#000A57]" href={`/cliente/chamados/${ticket.id}`}>{ticket.subject}</a></td>
-                <td class="px-4 py-3 text-[11px] text-[#6D7484]">
-                  {#if ticket.context?.scope === "global"}
-                    <span class="inline-flex items-center gap-1"><Globe2 size={12} />Todos os grupos · Global</span>
-                  {:else if ticket.context}
-                    <span class="inline-flex items-center gap-1"><School size={12} />{ticket.context.groupName} · {ticket.context.unitName}</span>
-                  {:else}—{/if}
-                  <div class="application-text-meta mt-1 inline-flex items-center gap-1 text-[#9A9FAC]"><MessageCircle size={11} />{channelLabels[ticket.channel] ?? ticket.channel}</div>
-                </td>
-                <td class="px-4 py-3"><span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${statusClass(ticket.status)}`}>{statusLabels[ticket.status] ?? ticket.status}</span><div class="mt-2"><span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${priorityClass(ticket.priority)}`}>{priorityLabels[ticket.priority] ?? ticket.priority}</span></div></td>
-                <td class="px-4 py-3 text-[11px] text-[#687081]">{ticket.lastTeamActivityAt ? activityAge(ticket.lastTeamActivityAt) : "Aguardando movimentação"}</td>
-                <td class="px-4 py-3 text-[11px] font-medium text-[#687081]">{formatDate(ticket.updatedAt)}</td>
-                <td class={`px-4 py-3 text-[11px] font-semibold ${slaClass(ticket)}`}><span class="inline-flex items-center gap-1.5">{#if ticket.status === "resolved" || ticket.status === "closed"}<CheckCircle2 size={13} />{:else}<Clock3 size={13} />{/if}{slaLabel(ticket)}</span></td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
-    {/if}
+  {:else}
+    <div class="overflow-hidden rounded-[18px] border border-[#E1E4EC] bg-white shadow-[0_6px_22px_rgba(1,13,40,0.028)]">
+      {#each data.tickets as ticket}
+        <a href={`/cliente/chamados/${ticket.id}`} class={`group relative grid gap-3 border-b border-[#ECEEF3] px-4 py-3.5 transition last:border-b-0 hover:bg-[#FAFBFC] md:grid-cols-[100px_minmax(220px,1.5fr)_minmax(170px,1fr)_160px_150px_20px] md:items-center ${ticket.hasUnreadUpdate ? "bg-[#FFFBF7]" : "bg-white"}`}>
+          {#if ticket.hasUnreadUpdate}<span class="absolute inset-y-0 left-0 w-[3px] bg-[#EA6D0B]"></span>{/if}
+          <div><span class="text-[11px] font-bold text-[#EA6D0B]">#{ticket.ticketNumber}</span>{#if ticket.hasUnreadUpdate}<Bell size={11} class="ml-2 inline text-[#EA6D0B]" />{/if}</div>
+          <div class="min-w-0"><h3 class="truncate text-[12px] font-semibold text-[#303746] group-hover:text-[#000A57]">{ticket.subject}</h3><div class="application-text-meta mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[#8A91A0]">{#if ticket.context?.scope === "global"}<span class="inline-flex items-center gap-1"><Globe2 size={11} />Global</span>{:else if ticket.context}<span class="inline-flex items-center gap-1"><School size={11} />{ticket.context.groupName} · {ticket.context.unitName}</span>{/if}<span>{channelLabels[ticket.channel] ?? ticket.channel}</span></div></div>
+          <div class="flex flex-wrap items-center gap-1.5"><span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${statusClass(ticket.status)}`}>{statusLabels[ticket.status] ?? ticket.status}</span><span class={`application-text-meta rounded-full px-2.5 py-1 font-semibold ${priorityClass(ticket.priority)}`}>{priorityLabels[ticket.priority] ?? ticket.priority}</span></div>
+          <div class="text-[10px] text-[#687081]"><span class="application-text-meta block text-[#9A9FAC]">Equipe</span>{ticket.lastTeamActivityAt ? activityAge(ticket.lastTeamActivityAt) : "Aguardando movimentação"}</div>
+          <div><p class="application-text-meta text-[#9A9FAC]">Atualizado</p><p class="mt-1 text-[10px] font-semibold text-[#687081]">{formatDate(ticket.updatedAt)}</p><p class={`mt-1 inline-flex items-center gap-1 text-[9px] font-semibold ${slaClass(ticket)}`}>{slaLabel(ticket)}</p></div>
+          <ArrowRight size={16} class="hidden text-[#A1A7B4] transition group-hover:translate-x-0.5 group-hover:text-[#000A57] md:block" />
+        </a>
+      {/each}
+    </div>
   {/if}
 
   {#if data.totalPages > 1}
-    <nav class="mt-5 flex items-center justify-between rounded-2xl border border-[#E1E4EC] bg-white px-3 py-2 shadow-[0_4px_14px_rgba(1,13,40,0.025)]">
-      {#if data.page > 1}<a href={buildHref({ page: data.page - 1 })} class="inline-flex min-h-9 items-center gap-1 rounded-lg px-3 text-[11px] font-semibold text-[#000A57] hover:bg-[#F5F6F8]"><ChevronLeft size={14} />Anterior</a>{:else}<span></span>{/if}
-      <span class="application-text-meta text-[#777E8D]">Página {data.page} de {data.totalPages}</span>
-      {#if data.page < data.totalPages}<a href={buildHref({ page: data.page + 1 })} class="inline-flex min-h-9 items-center gap-1 rounded-lg px-3 text-[11px] font-semibold text-[#000A57] hover:bg-[#F5F6F8]">Próxima<ChevronRight size={14} /></a>{:else}<span></span>{/if}
+    <nav class="mt-5 flex items-center justify-between rounded-2xl border border-[#E1E4EC] bg-white px-4 py-3" aria-label="Paginação dos chamados">
+      <p class="application-text-meta text-[#858C9B]">Página {data.page} de {data.totalPages}</p>
+      <div class="flex items-center gap-2">
+        {#if data.page > 1}<a href={buildHref({ page: data.page - 1 })} class="inline-flex h-9 items-center gap-1 rounded-xl border border-[#DDE1E9] px-3 text-[10px] font-semibold text-[#606878] hover:text-[#000A57]"><ChevronLeft size={13} />Anterior</a>{/if}
+        {#if data.page < data.totalPages}<a href={buildHref({ page: data.page + 1 })} class="inline-flex h-9 items-center gap-1 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white">Próxima<ChevronRight size={13} /></a>{/if}
+      </div>
     </nav>
   {/if}
 </ApplicationContent>
