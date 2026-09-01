@@ -327,7 +327,7 @@ export async function cancelAgendaSchedulingEvent(
   actorUserId: string,
   permissions: SchedulingEventPermissionMap,
   eventId: string,
-): Promise<{ googleSynchronized: boolean }> {
+): Promise<{ googleSynchronized: boolean; googleSyncWarning: boolean }> {
   const event = await getSchedulingEvent(eventId);
   if (!event) throw new Error("SCHEDULING_EVENT_NOT_FOUND");
   if (!(await canOperateOrganizer(actorUserId, event.organizerUserId, permissions))) {
@@ -345,7 +345,9 @@ export async function cancelAgendaSchedulingEvent(
     metadata: { organizerUserId: event.organizerUserId },
   });
 
-  if (!googleLink?.googleEventId) return { googleSynchronized: false };
+  if (!googleLink?.googleEventId) {
+    return { googleSynchronized: false, googleSyncWarning: false };
+  }
 
   try {
     await deleteGoogleCalendarEvent(
@@ -354,13 +356,13 @@ export async function cancelAgendaSchedulingEvent(
       googleLink.googleEventId,
     );
     await clearSchedulingEventGoogleProjection(eventId, event.organizerUserId);
-    return { googleSynchronized: true };
+    return { googleSynchronized: true, googleSyncWarning: false };
   } catch (error) {
     await markSchedulingEventGoogleSyncError(
       eventId,
       event.organizerUserId,
       error instanceof Error ? error.message : "GOOGLE_EVENT_DELETE_FAILED",
     ).catch(() => undefined);
-    return { googleSynchronized: false };
+    return { googleSynchronized: false, googleSyncWarning: true };
   }
 }
