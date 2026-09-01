@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { MessageCircleMore } from "lucide-svelte";
-  import SupportChatDialog from "$lib/components/onboarding/SupportChatDialog.svelte";
+  import SupportAssistantDialog from "$lib/components/onboarding/SupportAssistantDialog.svelte";
   import type { LayoutData } from "./$types";
 
   export let data: LayoutData;
@@ -40,7 +40,7 @@
   </button>
 {/if}
 
-<SupportChatDialog
+<SupportAssistantDialog
   isOpen={chatOpen}
   onClose={closeChat}
   customerSupport={data.customerSupport}
