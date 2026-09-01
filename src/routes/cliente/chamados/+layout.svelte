@@ -143,6 +143,7 @@
     title={routeMetadata.title}
     section={routeMetadata.section}
     description={customerContext}
+    contentWidth="wide"
   >
     <svelte:fragment slot="actions">
       <a href="/ajuda-f10" aria-label="Central de ajuda" class="inline-flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-xl border border-[#E0E3EA] bg-white px-2.5 text-[11px] font-semibold text-[#5E6575] transition hover:border-[#C8CEDB] hover:text-[#000A57] lg:px-3">
