@@ -124,6 +124,7 @@ export async function listSchedulingEvents(input: {
       unitId: schedulingEvents.unitId,
       unitName: schedulingEvents.unitName,
       participantUserId: schedulingEventParticipants.userId,
+      googleEventId: schedulingEventGoogleCalendarLinks.googleEventId,
       googleMeetUrl: schedulingEventGoogleCalendarLinks.googleMeetUrl,
     })
     .from(schedulingEvents)
