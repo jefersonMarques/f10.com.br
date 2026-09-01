@@ -1,8 +1,10 @@
 import { and, eq } from "drizzle-orm";
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { requireAppAnyPermission } from "$lib/server/auth/authorization";
+import { getPermissionScope, hasPermission } from "$lib/server/auth/permissions";
 import { checkF10CalendarAvailability } from "$lib/server/calendar/f10CalendarAvailabilityRepository";
 import { getGoogleCalendarEvent } from "$lib/server/calendar/googleCalendarRepository";
+import { listSchedulingTeamUserIds } from "$lib/server/calendar/schedulingRepository";
 import { getDatabase } from "$lib/server/db";
 import { taskGoogleCalendarLinks } from "$lib/server/db/googleCalendarSchema";
 import { listActiveTaskUsers } from "$lib/server/tasks/taskRepository";
@@ -41,8 +43,36 @@ function isValidTimeZone(value: string): boolean {
   }
 }
 
+async function filterAvailabilityUserIds(
+  actorUserId: string,
+  permissions: Map<string, "own" | "team" | "all">,
+  requestedUserIds: string[],
+): Promise<string[]> {
+  if (hasPermission(permissions, "tasks.view") || hasPermission(permissions, "tickets.view")) {
+    return requestedUserIds;
+  }
+
+  if (hasPermission(permissions, "scheduling.manage")) return requestedUserIds;
+  const viewScope = getPermissionScope(permissions, "scheduling.view");
+  const createScope = getPermissionScope(permissions, "scheduling.create");
+  const scope = viewScope === "all" || createScope === "all"
+    ? "all"
+    : viewScope === "team" || createScope === "team"
+      ? "team"
+      : viewScope === "own" || createScope === "own"
+        ? "own"
+        : undefined;
+
+  if (scope === "all") return requestedUserIds;
+  if (scope === "team") {
+    const teamUserIds = new Set(await listSchedulingTeamUserIds(actorUserId));
+    return requestedUserIds.filter((userId) => teamUserIds.has(userId));
+  }
+  return requestedUserIds.filter((userId) => userId === actorUserId);
+}
+
 export const POST: RequestHandler = async ({ cookies, request }) => {
-  const { session } = await requireAppAnyPermission(
+  const { session, permissions } = await requireAppAnyPermission(
     cookies,
     [...AVAILABILITY_ACCESS_PERMISSIONS],
     "/app/tasks/calendar",
@@ -58,9 +88,10 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
     excludeGoogleIcalUid?: unknown;
   };
 
-  const userIds = Array.isArray(body?.userIds)
+  const requestedUserIds = Array.isArray(body?.userIds)
     ? Array.from(new Set(body.userIds.filter((value): value is string => typeof value === "string" && isUuid(value)))).slice(0, 30)
     : [];
+  const userIds = await filterAvailabilityUserIds(session.user.id, permissions, requestedUserIds);
   const date = typeof body?.date === "string" ? body.date.trim() : "";
   const startTime = typeof body?.startTime === "string" ? body.startTime.trim() : "";
   const endTime = typeof body?.endTime === "string" ? body.endTime.trim() : "";
