@@ -5,14 +5,6 @@ import {
   schedulingInvitations,
 } from "$lib/server/db/schedulingSchema";
 
-export async function cancelSchedulingInvitationForEvent(eventId: string): Promise<void> {
-  const db = getDatabase();
-  await db
-    .update(schedulingInvitations)
-    .set({ status: "cancelled", updatedAt: new Date() })
-    .where(and(eq(schedulingInvitations.eventId, eventId), eq(schedulingInvitations.status, "booked")));
-}
-
 export async function getSchedulingEventGoogleLink(eventId: string, userId: string) {
   const db = getDatabase();
   const [link] = await db
