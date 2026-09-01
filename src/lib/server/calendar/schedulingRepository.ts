@@ -364,7 +364,10 @@ export async function listSchedulingReservations(
   const base = and(
     eq(schedulingInvitations.hostUserId, hostUserId),
     or(
-      eq(schedulingInvitations.status, "booked"),
+      and(
+        eq(schedulingInvitations.status, "booked"),
+        isNull(schedulingInvitations.eventId),
+      ),
       and(
         eq(schedulingInvitations.status, "booking"),
         isNotNull(schedulingInvitations.bookingStartedAt),
@@ -511,7 +514,13 @@ export async function claimSchedulingReservation(
       .where(
         and(
           eq(schedulingInvitations.hostUserId, invitation.hostUserId),
-          inArray(schedulingInvitations.status, ["booking", "booked"]),
+          or(
+            and(
+              eq(schedulingInvitations.status, "booked"),
+              isNull(schedulingInvitations.eventId),
+            ),
+            eq(schedulingInvitations.status, "booking"),
+          ),
           isNotNull(schedulingInvitations.selectedStartAt),
           isNotNull(schedulingInvitations.selectedEndAt),
           lt(schedulingInvitations.selectedStartAt, nearbyEnd),
