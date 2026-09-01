@@ -7,7 +7,9 @@ import { getDatabase } from "$lib/server/db";
 import { webChatSessions } from "$lib/server/db/chatSchema";
 import { markHelpSearchOutcome } from "$lib/server/help/helpSearchRepository";
 import { listPublicSupportChatEntryOptions } from "$lib/server/support/supportChatEntryRepository";
+import { resumeActiveCustomerChatSession } from "$lib/server/support/customerChatSessionRepository";
 import {
+  addPublicChatMessage,
   addPublicChatSystemMessage,
   startPublicChat,
 } from "$lib/server/support/publicChatRepository";
@@ -16,6 +18,7 @@ import { notifySupportChatNeedsAttention } from "$lib/server/support/supportTeam
 
 const MAX_BODY_BYTES = 32 * 1024;
 const MAX_HANDOFF_TRANSCRIPT_CHARS = 8_000;
+const MAX_HANDOFF_REASON_CHARS = 500;
 const LAST_HELP_SEARCH_COOKIE = "f10_support_last_help_search";
 
 type ChatStartDiagnosticCode =
@@ -125,6 +128,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
   const pageTitle = readString(body.pageTitle).slice(0, 200);
   const helpContext = readString(body.helpContext).slice(0, 200);
   const handoffTranscript = readString(body.handoffTranscript).slice(0, MAX_HANDOFF_TRANSCRIPT_CHARS);
+  const handoffReason = readString(body.handoffReason).slice(0, MAX_HANDOFF_REASON_CHARS);
   const storedSearchEventId = cookies.get(LAST_HELP_SEARCH_COOKIE) ?? "";
   const correlatedSearchEventId = isUuid(storedSearchEventId) ? storedSearchEventId : null;
 
@@ -145,36 +149,66 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
     clientAddress = "unknown";
   }
 
+  const customerContext = {
+    legacyUserId: customer.legacyUserId,
+    groupId: customer.selectedGroupId,
+    groupName: customer.selectedGroupName,
+    unitId: customer.selectedUnitId,
+    unitName: customer.selectedUnitName,
+    unitSchema: customer.selectedUnitSchema,
+  };
+  const handoffContextData = {
+    pageTitle: pageTitle || null,
+    helpContext: helpContext || null,
+    authenticatedCustomer: true,
+    assistantHandoff: true,
+    handoffReason: handoffReason || null,
+    handoffTranscript: handoffTranscript || null,
+  };
+
   try {
     const [effectiveEntryOptionId, availability] = await Promise.all([
       resolveEffectiveEntryOptionId(entryOptionId),
       getSupportAvailabilityStatus(),
     ]);
 
-    const session = await startPublicChat(clientAddress, {
-      name,
-      email,
-      phone,
-      message,
-      entryOptionId: effectiveEntryOptionId,
+    const resumedSession = await resumeActiveCustomerChatSession({
+      customerContext,
       contextUrl,
-      contextData: {
-        pageTitle: pageTitle || null,
-        helpContext: helpContext || null,
-        authenticatedCustomer: true,
-        assistantHandoff: true,
-        handoffTranscript: handoffTranscript || null,
-      },
-      enableAi: false,
-      customerContext: {
-        legacyUserId: customer.legacyUserId,
-        groupId: customer.selectedGroupId,
-        groupName: customer.selectedGroupName,
-        unitId: customer.selectedUnitId,
-        unitName: customer.selectedUnitName,
-        unitSchema: customer.selectedUnitSchema,
-      },
+      contextData: handoffContextData,
+      handoffReason,
     });
+    let session;
+    let reused = false;
+
+    if (resumedSession) {
+      reused = true;
+      await addPublicChatMessage(
+        clientAddress,
+        resumedSession.sessionId,
+        resumedSession.token,
+        message,
+      );
+      session = {
+        sessionId: resumedSession.sessionId,
+        token: resumedSession.token,
+        expiresAt: resumedSession.expiresAt,
+        aiState: resumedSession.aiState,
+        entryOptionLabel: resumedSession.entryOptionLabel,
+      };
+    } else {
+      session = await startPublicChat(clientAddress, {
+        name,
+        email,
+        phone,
+        message,
+        entryOptionId: effectiveEntryOptionId,
+        contextUrl,
+        contextData: handoffContextData,
+        enableAi: false,
+        customerContext,
+      });
+    }
 
     const [chatIdentity] = await getDatabase()
       .select({ chatNumber: webChatSessions.chatNumber })
@@ -194,7 +228,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
     }
 
     await recordCustomerActivity(customer, {
-      eventType: "support.chat.started",
+      eventType: reused ? "support.chat.resumed" : "support.chat.started",
       source: "help_center",
       path: contextUrl || "/ajuda-f10",
       metadata: {
@@ -203,12 +237,14 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
         entryOptionId: effectiveEntryOptionId,
         entryOptionLabel: session.entryOptionLabel,
         assistantHandoff: true,
+        handoffReason: handoffReason || null,
         helpSearchEventId: correlatedSearchEventId,
         outsideSupportHours: availability.isOpen === false,
+        reused,
       },
     }).catch(() => undefined);
 
-    if (availability.isOpen === false) {
+    if (!reused && availability.isOpen === false) {
       await addPublicChatSystemMessage(
         session.sessionId,
         buildOutOfHoursMessage(availability.nextOpenLabel),
@@ -217,7 +253,9 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
 
     await notifySupportChatNeedsAttention(
       session.sessionId,
-      "Novo atendimento solicitado pelo cliente.",
+      reused
+        ? "Cliente retomou uma conversa de atendimento."
+        : "Novo atendimento solicitado pelo cliente.",
     ).catch(() => undefined);
 
     return json(
@@ -233,8 +271,9 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
         aiState: session.aiState,
         outsideSupportHours: availability.isOpen === false,
         nextOpenLabel: availability.nextOpenLabel,
+        reused,
       },
-      { status: 201, headers: { "Cache-Control": "no-store" } },
+      { status: reused ? 200 : 201, headers: { "Cache-Control": "no-store" } },
     );
   } catch (cause) {
     if (cause instanceof Error && cause.message === "CHAT_RATE_LIMITED") {
