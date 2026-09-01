@@ -1,5 +1,7 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   date,
   index,
   integer,
@@ -82,11 +84,12 @@ export const schedulingEvents = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    check("scheduling_events_valid_interval", sql`${table.endsAt} > ${table.startsAt}`),
     index("scheduling_events_organizer_start_idx").on(table.organizerUserId, table.startsAt),
     index("scheduling_events_interval_idx").on(table.startsAt, table.endsAt),
     index("scheduling_events_status_idx").on(table.status),
-    index("scheduling_events_ticket_idx").on(table.ticketId),
-    index("scheduling_events_task_idx").on(table.taskId),
+    index("scheduling_events_ticket_idx").on(table.ticketId).where(sql`${table.ticketId} is not null`),
+    index("scheduling_events_task_idx").on(table.taskId).where(sql`${table.taskId} is not null`),
   ],
 );
 
@@ -105,9 +108,20 @@ export const schedulingEventParticipants = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    check(
+      "scheduling_event_participants_identity_check",
+      sql`(${table.kind} = 'internal' and ${table.userId} is not null) or (${table.kind} = 'external' and (${table.customerContactId} is not null or length(trim(${table.email})) > 0))`,
+    ),
     index("scheduling_event_participants_event_idx").on(table.eventId),
-    index("scheduling_event_participants_user_idx").on(table.userId, table.eventId),
-    uniqueIndex("scheduling_event_participants_internal_unique").on(table.eventId, table.userId),
+    index("scheduling_event_participants_user_idx")
+      .on(table.userId, table.eventId)
+      .where(sql`${table.userId} is not null`),
+    uniqueIndex("scheduling_event_participants_internal_unique")
+      .on(table.eventId, table.userId)
+      .where(sql`${table.kind} = 'internal' and ${table.userId} is not null`),
+    uniqueIndex("scheduling_event_participants_external_email_unique")
+      .on(table.eventId, sql`lower(${table.email})`)
+      .where(sql`${table.kind} = 'external' and length(trim(${table.email})) > 0`),
   ],
 );
 
@@ -133,7 +147,9 @@ export const schedulingEventGoogleCalendarLinks = pgTable(
   (table) => [
     primaryKey({ columns: [table.eventId, table.userId] }),
     index("scheduling_event_google_links_user_idx").on(table.userId),
-    index("scheduling_event_google_links_event_idx").on(table.userId, table.googleCalendarId, table.googleEventId),
+    index("scheduling_event_google_links_event_idx")
+      .on(table.userId, table.googleCalendarId, table.googleEventId)
+      .where(sql`${table.googleEventId} is not null`),
   ],
 );
 
@@ -186,7 +202,9 @@ export const schedulingInvitations = pgTable(
   },
   (table) => [
     uniqueIndex("scheduling_invitations_token_unique").on(table.tokenHash),
-    uniqueIndex("scheduling_invitations_event_unique").on(table.eventId),
+    uniqueIndex("scheduling_invitations_event_unique")
+      .on(table.eventId)
+      .where(sql`${table.eventId} is not null`),
     index("scheduling_invitations_creator_idx").on(table.createdByUserId, table.createdAt),
     index("scheduling_invitations_host_idx").on(table.hostUserId, table.status, table.dateRangeStart, table.dateRangeEnd),
     index("scheduling_invitations_customer_idx").on(table.customerContactId, table.createdAt),
