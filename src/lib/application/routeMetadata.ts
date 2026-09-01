@@ -173,12 +173,6 @@ const operationsRouteRules: ApplicationRouteRule[] = [
     description: "Atualizações que precisam da sua atenção",
   },
   {
-    prefix: "/app/calendar",
-    title: "Agenda",
-    section: "Trabalho interno",
-    description: "Compromissos e disponibilidade",
-  },
-  {
     prefix: "/app",
     exact: true,
     title: "Visão geral",
