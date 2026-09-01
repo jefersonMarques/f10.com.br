@@ -308,9 +308,46 @@ async function recordGoogleSyncFailure(
   }).catch(() => undefined);
 }
 
+async function isSchedulingEventConfirmed(eventId: string): Promise<boolean> {
+  const event = await getSchedulingEvent(eventId);
+  return event?.status === "confirmed";
+}
+
+async function reconcileGoogleProjectionAfterSync(
+  input: SchedulingGoogleSyncInput,
+  calendarId: string,
+  googleEvent: GoogleCalendarEvent,
+): Promise<SchedulingGoogleSyncResult> {
+  await persistGoogleProjection(input, calendarId, googleEvent);
+  if (await isSchedulingEventConfirmed(input.eventId)) {
+    return { synchronized: true, warning: false };
+  }
+
+  try {
+    await deleteGoogleCalendarEvent(
+      input.organizerUserId,
+      calendarId,
+      googleEvent.id,
+    );
+    await clearSchedulingEventGoogleProjection(input.eventId, input.organizerUserId);
+    return { synchronized: false, warning: false };
+  } catch (error) {
+    await markSchedulingEventGoogleSyncError(
+      input.eventId,
+      input.organizerUserId,
+      error instanceof Error ? error.message : "GOOGLE_EVENT_DELETE_FAILED",
+    ).catch(() => undefined);
+    return { synchronized: false, warning: true };
+  }
+}
+
 async function syncNewSchedulingEventToGoogle(
   input: SchedulingGoogleSyncInput,
 ): Promise<SchedulingGoogleSyncResult> {
+  if (!(await isSchedulingEventConfirmed(input.eventId))) {
+    return { synchronized: false, warning: false };
+  }
+
   const [preferences, connection] = await Promise.all([
     getGoogleCalendarSyncPreferences(input.organizerUserId),
     getGoogleCalendarConnection(input.organizerUserId),
@@ -319,15 +356,24 @@ async function syncNewSchedulingEventToGoogle(
 
   const preferredCalendarId = preferences.targetCalendarId || "primary";
   if (!connection.connected) {
-    await recordGoogleSyncFailure(input, preferredCalendarId, new Error("GOOGLE_CALENDAR_NOT_CONNECTED"));
-    return { synchronized: false, warning: true };
+    if (await isSchedulingEventConfirmed(input.eventId)) {
+      await recordGoogleSyncFailure(input, preferredCalendarId, new Error("GOOGLE_CALENDAR_NOT_CONNECTED"));
+      return { synchronized: false, warning: true };
+    }
+    return { synchronized: false, warning: false };
   }
 
   try {
     const projection = await createGoogleProjection(input, preferredCalendarId);
-    await persistGoogleProjection(input, projection.calendarId, projection.event);
-    return { synchronized: true, warning: false };
+    return reconcileGoogleProjectionAfterSync(
+      input,
+      projection.calendarId,
+      projection.event,
+    );
   } catch (error) {
+    if (!(await isSchedulingEventConfirmed(input.eventId))) {
+      return { synchronized: false, warning: false };
+    }
     await recordGoogleSyncFailure(input, preferredCalendarId, error);
     return { synchronized: false, warning: true };
   }
@@ -336,17 +382,24 @@ async function syncNewSchedulingEventToGoogle(
 async function syncUpdatedSchedulingEventToGoogle(
   input: SchedulingGoogleSyncInput,
 ): Promise<SchedulingGoogleSyncResult> {
+  if (!(await isSchedulingEventConfirmed(input.eventId))) {
+    return { synchronized: false, warning: false };
+  }
+
   const googleLink = await getSchedulingEventGoogleLink(input.eventId, input.organizerUserId);
   if (!googleLink?.googleEventId) return syncNewSchedulingEventToGoogle(input);
 
   const connection = await getGoogleCalendarConnection(input.organizerUserId);
   if (!connection.connected) {
-    await markSchedulingEventGoogleSyncError(
-      input.eventId,
-      input.organizerUserId,
-      "GOOGLE_CALENDAR_NOT_CONNECTED",
-    ).catch(() => undefined);
-    return { synchronized: false, warning: true };
+    if (await isSchedulingEventConfirmed(input.eventId)) {
+      await markSchedulingEventGoogleSyncError(
+        input.eventId,
+        input.organizerUserId,
+        "GOOGLE_CALENDAR_NOT_CONNECTED",
+      ).catch(() => undefined);
+      return { synchronized: false, warning: true };
+    }
+    return { synchronized: false, warning: false };
   }
 
   const googleInput = schedulingGoogleEventInput(input);
@@ -367,14 +420,26 @@ async function syncUpdatedSchedulingEventToGoogle(
       googleInput,
     );
     if (updated) {
-      await persistGoogleProjection(input, googleLink.googleCalendarId, updated);
-      return { synchronized: true, warning: false };
+      return reconcileGoogleProjectionAfterSync(
+        input,
+        googleLink.googleCalendarId,
+        updated,
+      );
     }
 
+    if (!(await isSchedulingEventConfirmed(input.eventId))) {
+      return { synchronized: false, warning: false };
+    }
     const projection = await createGoogleProjection(input, googleLink.googleCalendarId);
-    await persistGoogleProjection(input, projection.calendarId, projection.event);
-    return { synchronized: true, warning: false };
+    return reconcileGoogleProjectionAfterSync(
+      input,
+      projection.calendarId,
+      projection.event,
+    );
   } catch (error) {
+    if (!(await isSchedulingEventConfirmed(input.eventId))) {
+      return { synchronized: false, warning: false };
+    }
     await markSchedulingEventGoogleSyncError(
       input.eventId,
       input.organizerUserId,
