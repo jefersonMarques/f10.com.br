@@ -2,9 +2,15 @@ import { getPermissionScope, hasPermission, type PermissionScope } from "$lib/se
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import {
   createGoogleCalendarEvent,
+  deleteGoogleCalendarEvent,
   getGoogleCalendarConnection,
 } from "$lib/server/calendar/googleCalendarRepository";
 import { getGoogleCalendarSyncPreferences } from "$lib/server/calendar/googleCalendarPreferenceRepository";
+import {
+  clearSchedulingEventGoogleProjection,
+  getSchedulingEventGoogleLink,
+  markSchedulingEventGoogleSyncError,
+} from "$lib/server/calendar/schedulingEventLifecycleRepository";
 import {
   cancelSchedulingEvent,
   createSchedulingEvent,
@@ -321,12 +327,14 @@ export async function cancelAgendaSchedulingEvent(
   actorUserId: string,
   permissions: SchedulingEventPermissionMap,
   eventId: string,
-): Promise<void> {
+): Promise<{ googleSynchronized: boolean }> {
   const event = await getSchedulingEvent(eventId);
   if (!event) throw new Error("SCHEDULING_EVENT_NOT_FOUND");
   if (!(await canOperateOrganizer(actorUserId, event.organizerUserId, permissions))) {
     throw new Error("SCHEDULING_HOST_NOT_ALLOWED");
   }
+
+  const googleLink = await getSchedulingEventGoogleLink(eventId, event.organizerUserId);
   if (!(await cancelSchedulingEvent(eventId))) throw new Error("SCHEDULING_EVENT_NOT_CANCELLABLE");
 
   await recordAuditEvent({
@@ -336,4 +344,23 @@ export async function cancelAgendaSchedulingEvent(
     entityId: eventId,
     metadata: { organizerUserId: event.organizerUserId },
   });
+
+  if (!googleLink?.googleEventId) return { googleSynchronized: false };
+
+  try {
+    await deleteGoogleCalendarEvent(
+      event.organizerUserId,
+      googleLink.googleCalendarId,
+      googleLink.googleEventId,
+    );
+    await clearSchedulingEventGoogleProjection(eventId, event.organizerUserId);
+    return { googleSynchronized: true };
+  } catch (error) {
+    await markSchedulingEventGoogleSyncError(
+      eventId,
+      event.organizerUserId,
+      error instanceof Error ? error.message : "GOOGLE_EVENT_DELETE_FAILED",
+    ).catch(() => undefined);
+    return { googleSynchronized: false };
+  }
 }
