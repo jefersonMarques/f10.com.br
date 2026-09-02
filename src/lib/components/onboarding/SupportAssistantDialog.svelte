@@ -3,15 +3,18 @@
   import { onDestroy, tick } from "svelte";
   import {
     CheckCircle2,
+    ExternalLink,
     Image as ImageIcon,
     LoaderCircle,
     LockKeyhole,
     MessageCircleMore,
     Paperclip,
+    PlayCircle,
     Send,
     Sparkles,
     X,
   } from "lucide-svelte";
+  import HelpRichText from "$lib/components/help/HelpRichText.svelte";
 
   type CustomerUnit = { id: number; name: string };
   type CustomerGroup = { id: number; name: string; units: CustomerUnit[] };
@@ -64,6 +67,19 @@
     attachments?: ChatAttachment[];
   };
 
+  type AssistantSource = {
+    contentId: string;
+    slug: string;
+    title: string;
+    href: string;
+  };
+
+  type AssistantMedia = {
+    kind: "youtube" | "video" | "link";
+    title: string;
+    url: string;
+  };
+
   type GuestMessage = {
     id: string;
     role: "assistant" | "customer";
@@ -71,6 +87,8 @@
     createdAt: string;
     actionUrl?: string;
     actionLabel?: string;
+    source?: AssistantSource;
+    media?: AssistantMedia;
   };
 
   type AssistantResponse = {
@@ -81,6 +99,8 @@
     handoffReason?: string;
     offerTicket?: boolean;
     ticketUrl?: string;
+    source?: AssistantSource | null;
+    media?: AssistantMedia | null;
     error?: string;
   };
 
@@ -173,10 +193,47 @@
     selectedUnitId = group?.units.length === 1 ? group.units[0]?.id ?? 0 : 0;
   }
 
+  function isAssistantSource(value: unknown): value is AssistantSource {
+    if (!value || typeof value !== "object") return false;
+    const source = value as Record<string, unknown>;
+    if (
+      typeof source.contentId !== "string" ||
+      typeof source.slug !== "string" ||
+      typeof source.title !== "string" ||
+      typeof source.href !== "string"
+    ) return false;
+    if (!/^[a-z0-9][a-z0-9-]{0,159}$/i.test(source.slug)) return false;
+    return source.href.startsWith(`/ajuda-f10/${encodeURIComponent(source.slug)}`);
+  }
+
+  function isAssistantMedia(value: unknown): value is AssistantMedia {
+    if (!value || typeof value !== "object") return false;
+    const media = value as Record<string, unknown>;
+    if (
+      (media.kind !== "youtube" && media.kind !== "video" && media.kind !== "link") ||
+      typeof media.title !== "string" ||
+      typeof media.url !== "string"
+    ) return false;
+
+    if (media.kind === "youtube") {
+      return /^https:\/\/www\.youtube-nocookie\.com\/embed\/[A-Za-z0-9_-]{6,20}$/.test(media.url);
+    }
+    if (media.kind === "video") {
+      return /^\/api\/help\/content\/[^/]+\/assets\/[0-9a-f-]{36}$/i.test(media.url);
+    }
+    try {
+      const url = new URL(media.url);
+      return url.protocol === "https:" || url.protocol === "http:";
+    } catch {
+      return false;
+    }
+  }
+
   function createGuestMessage(
     role: GuestMessage["role"],
     body: string,
     action?: { url: string; label: string },
+    presentation?: { source?: AssistantSource | null; media?: AssistantMedia | null },
   ): GuestMessage {
     return {
       id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -185,6 +242,8 @@
       createdAt: new Date().toISOString(),
       actionUrl: action?.url,
       actionLabel: action?.label,
+      source: isAssistantSource(presentation?.source) ? presentation.source : undefined,
+      media: isAssistantMedia(presentation?.media) ? presentation.media : undefined,
     };
   }
 
@@ -193,7 +252,7 @@
     guestMessages = [
       createGuestMessage(
         "assistant",
-        "Olá! Sou o Assistente F10. Me conte o que você precisa fazer ou o que não está funcionando.",
+        "Olá! Sou o Assistente F10. Como posso ajudar com o F10 hoje?",
       ),
     ];
   }
@@ -207,6 +266,11 @@
         if (Array.isArray(stored)) {
           guestMessages = stored
             .filter((message) => message && (message.role === "assistant" || message.role === "customer") && typeof message.body === "string")
+            .map((message) => ({
+              ...message,
+              source: isAssistantSource(message.source) ? message.source : undefined,
+              media: isAssistantMedia(message.media) ? message.media : undefined,
+            }))
             .slice(-30);
         }
       }
@@ -272,6 +336,14 @@
       .slice(0, 8_000);
   }
 
+  function latestAssistantSource(): AssistantSource | null {
+    for (let index = guestMessages.length - 1; index >= 0; index -= 1) {
+      const message = guestMessages[index];
+      if (message?.role === "assistant" && isAssistantSource(message.source)) return message.source;
+    }
+    return null;
+  }
+
   function lastCustomerMessage(): string {
     return [...guestMessages].reverse().find((message) => message.role === "customer")?.body.trim() || "Preciso de ajuda com o F10.";
   }
@@ -301,6 +373,7 @@
     errorMessage = "";
     guestReply = "";
     const conversationContext = buildTranscript();
+    const contextSource = latestAssistantSource();
     guestMessages = [...guestMessages, createGuestMessage("customer", body)];
     persistGuestState();
     assistantSending = true;
@@ -313,6 +386,7 @@
         body: JSON.stringify({
           message: body,
           conversationContext,
+          contextSourceSlug: contextSource?.slug ?? "",
           unresolvedCount,
           pageContext: pageContext(),
         }),
@@ -327,7 +401,12 @@
         : undefined;
       guestMessages = [
         ...guestMessages,
-        createGuestMessage("assistant", payload.answer || "Como posso ajudar?", ticketAction),
+        createGuestMessage(
+          "assistant",
+          payload.answer || "Como posso ajudar?",
+          ticketAction,
+          { source: payload.source, media: payload.media },
+        ),
       ];
       persistGuestState();
       await scrollToLatest();
@@ -642,8 +721,44 @@
         <div class="space-y-3">
           {#each guestMessages as message}
             <div class={`flex ${message.role === "customer" ? "justify-end" : "justify-start"}`}>
-              <div class={`max-w-[86%] rounded-2xl px-3.5 py-2.5 text-[12px] leading-5 ${message.role === "customer" ? "rounded-br-md bg-[#000A57] text-white" : "rounded-bl-md border border-[#E4E7EE] bg-white text-[#394052] shadow-[0_3px_12px_rgba(1,13,40,0.035)]"}`}>
-                <p class="whitespace-pre-wrap">{message.body}</p>
+              <div class={`max-w-[90%] rounded-2xl px-3.5 py-2.5 text-[12px] leading-5 ${message.role === "customer" ? "rounded-br-md bg-[#000A57] text-white" : "rounded-bl-md border border-[#E4E7EE] bg-white text-[#394052] shadow-[0_3px_12px_rgba(1,13,40,0.035)]"}`}>
+                {#if message.role === "assistant"}
+                  <HelpRichText text={message.body} className="space-y-1.5" />
+                {:else}
+                  <p class="whitespace-pre-wrap">{message.body}</p>
+                {/if}
+
+                {#if message.role === "assistant" && message.media && isAssistantMedia(message.media)}
+                  <div class="mt-3 overflow-hidden rounded-xl border border-[#E2E5EC] bg-[#F7F8FB]">
+                    {#if message.media.kind === "youtube"}
+                      <div class="aspect-video bg-black">
+                        <iframe
+                          src={message.media.url}
+                          title={message.media.title}
+                          class="h-full w-full"
+                          loading="lazy"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowfullscreen
+                        ></iframe>
+                      </div>
+                    {:else if message.media.kind === "video"}
+                      <video controls preload="metadata" class="aspect-video h-auto w-full bg-black" src={message.media.url}>
+                        <track kind="captions" />
+                      </video>
+                    {:else}
+                      <a href={message.media.url} target="_blank" rel="noopener noreferrer" class="flex items-center justify-between gap-3 px-3.5 py-3 text-[#000A57] transition hover:bg-white">
+                        <span class="flex min-w-0 items-center gap-2.5"><PlayCircle size={18} class="shrink-0" /><span class="truncate text-[10px] font-semibold">Assistir ao vídeo</span></span><ExternalLink size={13} class="shrink-0" />
+                      </a>
+                    {/if}
+                  </div>
+                {/if}
+
+                {#if message.role === "assistant" && message.source && isAssistantSource(message.source)}
+                  <a href={message.source.href} target="_blank" rel="noopener noreferrer" class="mt-2.5 flex items-center justify-between gap-3 rounded-xl border border-[#DDE2F0] bg-[#F7F8FF] px-3 py-2.5 text-[#000A57] transition hover:border-[#BFC7E4] hover:bg-[#F1F3FF]">
+                    <span class="min-w-0"><small class="block text-[8px] font-bold uppercase tracking-[0.08em] text-[#7B839B]">Central de Ajuda</small><strong class="mt-0.5 block truncate text-[10px] font-semibold">{message.source.title}</strong></span><ExternalLink size={13} class="shrink-0" />
+                  </a>
+                {/if}
+
                 {#if message.actionUrl && message.actionLabel}
                   <a href={message.actionUrl} class="mt-2.5 inline-flex items-center gap-1.5 rounded-xl bg-[#000A57] px-3 py-2 text-[10px] font-semibold text-white transition hover:bg-[#111B71]"><CheckCircle2 size={13} />{message.actionLabel}</a>
                 {/if}
