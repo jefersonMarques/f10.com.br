@@ -5,6 +5,7 @@ import { supportAiRuns } from "$lib/server/db/supportAiSchema";
 import {
   answerHelpQuestion,
   type HelpKnowledgeResult,
+  type HelpKnowledgeTarget,
 } from "$lib/server/help/helpKnowledgeEngine";
 import { recordHelpKnowledgeRun } from "$lib/server/help/helpKnowledgeTelemetryRepository";
 import { markHelpSearchOutcome } from "$lib/server/help/helpSearchRepository";
@@ -28,6 +29,7 @@ export type SupportAiResult = {
   resolution: "answered" | "escalate" | "failed";
   answer: string;
   escalationReason: string;
+  target: HelpKnowledgeTarget | null;
   sources: SupportAiSource[];
   model: string;
   providerResponseId: string | null;
@@ -44,6 +46,77 @@ export type RunSupportAiInput = {
   conversationContext?: string;
   maxOutputTokens?: number;
 };
+
+function normalizeText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isConversationalFollowUp(question: string): boolean {
+  const normalized = normalizeText(question);
+  if (!normalized || normalized.length > 140) return false;
+  return (
+    /^(?:e\b|isso\b|isto\b|esse\b|essa\b|este\b|esta\b|ele\b|ela\b|depois\b|agora\b)/.test(normalized) ||
+    /\b(?:video|link|artigo|conteudo|passo anterior|passo seguinte)\b/.test(normalized) ||
+    /^(?:onde|como|qual|quais|quando|por que|porque|posso|pode|tem)\b/.test(normalized)
+  );
+}
+
+function previousCustomerTopic(conversationContext: string): string {
+  const customerMessages = conversationContext
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .reverse();
+
+  for (const line of customerMessages) {
+    const match = line.match(/^Cliente:\s*(.+)$/i);
+    if (!match?.[1]) continue;
+    const value = match[1].trim().slice(0, 320);
+    if (value.length < 3 || isConversationalFollowUp(value)) continue;
+    return value;
+  }
+  return "";
+}
+
+function knowledgeQuestion(question: string, conversationContext: string): string {
+  if (!conversationContext || !isConversationalFollowUp(question)) return question;
+  const topic = previousCustomerTopic(conversationContext);
+  return topic ? `${topic}\nContinuação do cliente: ${question}`.slice(0, 600) : question;
+}
+
+function proceduralSegments(answer: string): string[] {
+  const normalized = answer
+    .replace(/;\s+(?=(?:para|se|use|acesse|selecione|clique|marque|desmarque|informe|preencha)\b)/gi, ".\n")
+    .replace(/\s+/g, " ")
+    .replace(/\.\s+(?=[A-ZÁÉÍÓÚÂÊÔÃÕÇ])/g, ".\n");
+  return normalized
+    .split(/\n+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function formatSupportAnswer(answer: string): string {
+  const trimmed = answer.trim();
+  if (!trimmed || /\n\s*(?:[-•]|\d+[.)])\s+/.test(trimmed)) return trimmed;
+
+  const segments = proceduralSegments(trimmed);
+  const actionSegments = segments.filter((segment) =>
+    /^(?:acesse|selecione|clique|marque|desmarque|use|informe|preencha|abra|escolha|confirme|salve|para\b|se\b)/i.test(segment),
+  );
+  if (segments.length < 3 || actionSegments.length < 2) return trimmed;
+
+  return [
+    "**Passo a passo**",
+    "",
+    ...segments.map((segment, index) => `${index + 1}. ${segment}`),
+  ].join("\n");
+}
 
 async function saveRun(input: {
   actorUserId?: string | null;
@@ -95,7 +168,7 @@ function mapKnowledgeResult(
   if (result.resolution === "answered" || result.resolution === "navigate") {
     return {
       resolution: "answered",
-      answer: result.answer,
+      answer: formatSupportAnswer(result.answer),
       escalationReason: "",
     };
   }
@@ -123,7 +196,7 @@ export async function runSupportAi(
 
   try {
     const knowledge = await answerHelpQuestion({
-      question,
+      question: knowledgeQuestion(question, input.conversationContext ?? ""),
       scope: { type: "global" },
       source: "chat_ai",
       actorUserId: input.actorUserId ?? null,
@@ -187,6 +260,7 @@ export async function runSupportAi(
       resolution: mapped.resolution,
       answer: mapped.answer,
       escalationReason: mapped.escalationReason,
+      target: knowledge.target,
       sources: knowledge.sources,
       model,
       providerResponseId: knowledge.providerResponseId,
@@ -235,6 +309,7 @@ export async function runSupportAi(
       resolution: "failed",
       answer: TECHNICAL_FAILURE_MESSAGE,
       escalationReason,
+      target: null,
       sources: [],
       model,
       providerResponseId: null,
