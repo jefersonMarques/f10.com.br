@@ -1,7 +1,17 @@
 <script lang="ts">
-  import { CheckCircle2, CheckSquare2, ExternalLink, Headphones, Link2 } from "lucide-svelte";
+  import { CalendarDays, CheckCircle2, CheckSquare2, ExternalLink, Headphones, Link2 } from "lucide-svelte";
 
   export let anchor: string;
+  export let schedulingEvents: Array<{
+    id: string;
+    title: string;
+    organizerName: string;
+    startsAt: Date | string;
+    endsAt: Date | string;
+    timeZone: string;
+    status: "confirmed" | "cancelled";
+    googleMeetUrl: string | null;
+  }> = [];
   export let tasks: Array<{
     id: string;
     title: string;
@@ -33,7 +43,7 @@
 
   type ListItem = {
     key: string;
-    source: "task" | "ticket" | "google";
+    source: "f10" | "task" | "ticket" | "google";
     id: string;
     title: string;
     subtitle: string;
@@ -51,6 +61,30 @@
     resolved: "Resolvido",
     closed: "Fechado",
   };
+
+  function asDate(value: Date | string): Date {
+    return value instanceof Date ? value : new Date(value);
+  }
+
+  function schedulingDate(event: typeof schedulingEvents[number]): string {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: event.timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(asDate(event.startsAt));
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  }
+
+  function schedulingTime(event: typeof schedulingEvents[number]): string {
+    const formatter = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: event.timeZone,
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    return `${formatter.format(asDate(event.startsAt))}–${formatter.format(asDate(event.endsAt))}`;
+  }
 
   function googleDate(event: typeof googleEvents[number]): string | null {
     return event.startDate ?? event.startDateTime?.slice(0, 10) ?? null;
@@ -72,6 +106,22 @@
 
   $: monthPrefix = anchor.slice(0, 7);
   $: items = [
+    ...schedulingEvents.flatMap((event): ListItem[] => {
+      if (event.status !== "confirmed") return [];
+      const key = schedulingDate(event);
+      if (!key.startsWith(monthPrefix)) return [];
+      return [{
+        key,
+        source: "f10",
+        id: event.id,
+        title: event.title,
+        subtitle: `${schedulingTime(event)} · ${event.organizerName}${event.googleMeetUrl ? " · Google Meet" : ""}`,
+        status: "Agenda F10",
+        completed: false,
+        href: event.googleMeetUrl,
+        external: Boolean(event.googleMeetUrl),
+      }];
+    }),
     ...tasks.flatMap((task): ListItem[] => task.dueOn && task.dueOn.startsWith(monthPrefix) ? [{
       key: task.dueOn,
       source: "task",
@@ -132,7 +182,9 @@
           </div>
 
           <div>
-            {#if item.source === "task"}
+            {#if item.source === "f10"}
+              <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#EEF0FF] px-2 py-1 font-bold text-[#000A57]"><CalendarDays size={11}/>Agenda F10</span>
+            {:else if item.source === "task"}
               <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#EEF0FF] px-2 py-1 font-bold text-[#000A57]"><CheckSquare2 size={11}/>Tarefa</span>
             {:else if item.source === "ticket"}
               <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#FFF4E8] px-2 py-1 font-bold text-[#9B530F]"><Headphones size={11}/>Ticket</span>
