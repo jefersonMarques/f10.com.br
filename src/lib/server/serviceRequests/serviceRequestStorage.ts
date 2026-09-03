@@ -11,7 +11,7 @@ import {
   type ServiceRequestType,
 } from "$lib/server/serviceRequests/serviceRequestDefinitions";
 
-const MAX_TOTAL_ATTACHMENT_BYTES = 50 * 1024 * 1024;
+export const SERVICE_REQUEST_MAX_TOTAL_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 
 export type ServiceRequestAttachmentInput = {
   fieldKey: string;
@@ -149,7 +149,7 @@ function validateAttachmentSet(
     totalBytes += attachment.file.size;
   }
 
-  if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
+  if (totalBytes > SERVICE_REQUEST_MAX_TOTAL_ATTACHMENT_BYTES) {
     throw new Error("SERVICE_REQUEST_ATTACHMENTS_TOO_LARGE");
   }
 
@@ -227,7 +227,7 @@ export async function uploadServiceRequestAttachmentField(
   validateFilesForDefinition(definition, files);
 
   const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
-  if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
+  if (totalBytes > SERVICE_REQUEST_MAX_TOTAL_ATTACHMENT_BYTES) {
     throw new Error("SERVICE_REQUEST_ATTACHMENTS_TOO_LARGE");
   }
 
@@ -249,7 +249,17 @@ export async function deleteStoredServiceRequestAttachments(
 ): Promise<void> {
   if (attachments.length === 0) return;
   const bucket = privateBucket();
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     attachments.map((attachment) => deleteAssetObjectFromBucket(bucket, attachment.storageKey)),
   );
+
+  results.forEach((result, index) => {
+    if (result.status !== "rejected") return;
+    const cause = result.reason;
+    console.error("[service-request.storage.cleanup]", {
+      storageKey: attachments[index]?.storageKey,
+      errorCode: cause instanceof Error ? cause.message : "SERVICE_REQUEST_STORAGE_DELETE_FAILED",
+      causeType: cause instanceof Error ? cause.name : typeof cause,
+    });
+  });
 }
