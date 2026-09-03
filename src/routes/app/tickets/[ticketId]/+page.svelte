@@ -15,6 +15,7 @@
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
+  import ServiceRequestDetailsCard from "$lib/components/serviceRequests/ServiceRequestDetailsCard.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -45,6 +46,9 @@
     "ticket.due_date.changed": "alterou a conclusão planejada",
     "ticket.assignee.changed": "alterou o responsável",
     "ticket.task.linked": "vinculou uma tarefa",
+    "service_request.created": "criou a solicitação estruturada",
+    "service_request.updated": "alterou os dados da solicitação",
+    "service_request.secret.revealed": "revelou uma credencial protegida",
     "chat.claimed": "assumiu o atendimento",
     "chat.assigned": "atribuiu o atendimento",
     "chat.auto_assigned": "recebeu o atendimento pela distribuição automática",
@@ -85,6 +89,16 @@
 
   <div class="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
     <div class="space-y-6">
+      {#if data.serviceRequest}
+        <ServiceRequestDetailsCard
+          serviceRequest={data.serviceRequest}
+          ticketId={data.details.ticket.id}
+          mode="support"
+          canEdit={data.canReply && data.details.ticket.status !== "closed"}
+          updateAction="?/updateServiceRequest"
+        />
+      {/if}
+
       <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5 sm:p-7">
         <div class="flex items-start gap-3"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><MessageSquare size={19}/></span><div><h2 class="text-[16px] font-semibold text-[#11182C]">Conversa</h2><p class="mt-1 text-[11px] text-[#858A98]">Respostas públicas e notas internas ficam no mesmo histórico.</p></div></div>
         <div class="mt-6 space-y-4">{#each data.details.messages as message}<article class={`rounded-2xl border px-4 py-4 ${message.visibility === "internal" ? "border-[#F1D7BD] bg-[#FFF9F3]" : message.authorType === "customer" ? "border-[#E3E6ED] bg-[#FAFAFC]" : "border-[#D8DDF4] bg-[#F6F7FF]"}`}><div class="flex flex-wrap items-center justify-between gap-2"><div class="flex items-center gap-2"><strong class="text-[11px] font-semibold text-[#3B4150]">{message.authorUserName ?? message.customerName ?? (message.authorType === "system" ? "Sistema" : "Atendimento F10")}</strong>{#if message.visibility === "internal"}<span class="application-text-meta rounded-full bg-[#FFE5C9] px-2 py-1 font-bold uppercase tracking-[0.06em] text-[#91500F]">Nota interna</span>{/if}</div><span class="application-text-meta text-[#999EAA]">{formatDateTime(message.createdAt)}</span></div><p class="mt-2 whitespace-pre-wrap text-[12px] leading-6 text-[#5D6372]">{message.body}</p></article>{/each}</div>
