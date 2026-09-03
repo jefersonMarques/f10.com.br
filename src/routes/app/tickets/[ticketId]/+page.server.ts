@@ -7,6 +7,11 @@ import {
   resolveUserPermissions,
 } from "$lib/server/auth/permissions";
 import { markEntityNotificationsRead } from "$lib/server/notifications/notificationRepository";
+import { parseServiceRequestUpdateForm } from "$lib/server/serviceRequests/serviceRequestForm";
+import {
+  getSupportServiceRequestForTicket,
+  updateSupportServiceRequest,
+} from "$lib/server/serviceRequests/serviceRequestOperations";
 import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { markTicketChatHumanTakeover } from "$lib/server/support/supportAiHandoff";
 import { createTaskFromTicket, listTicketTasks } from "$lib/server/support/ticketTaskBridge";
@@ -107,13 +112,15 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   if (!hasPermission(permissions, "tickets.view")) {
     throw error(403, "Acesso não autorizado.");
   }
+  const viewScope = getPermissionScope(permissions, "tickets.view");
+  if (!viewScope) throw error(403, "Acesso não autorizado.");
 
   try {
     const canReply = hasPermission(permissions, "tickets.reply");
     const canAssign = hasPermission(permissions, "tickets.assign");
     const canViewTasks = hasPermission(permissions, "tasks.view");
     const canCreateTask = canReply && hasPermission(permissions, "tasks.create");
-    const [details, users, linkedTasks, taskProjects] = await Promise.all([
+    const [details, users, linkedTasks, taskProjects, serviceRequest] = await Promise.all([
       getSupportTicket(layout.user.id, permissions, params.ticketId),
       canReply || canAssign ? listSupportAgents() : Promise.resolve([]),
       canViewTasks
@@ -122,6 +129,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       canCreateTask
         ? listTaskProjects(layout.user.id, permissions).catch(() => [])
         : Promise.resolve([]),
+      getSupportServiceRequestForTicket(layout.user.id, viewScope, params.ticketId),
     ]);
     const [mentionUsers, customerContext] = await Promise.all([
       canReply
@@ -134,6 +142,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     return {
       details,
       customerContext,
+      serviceRequest,
       agents: canAssign ? users : [],
       mentionUsers,
       linkedTasks,
@@ -371,6 +380,81 @@ export const actions: Actions = {
         success: false,
         action: "assign",
         message: "Não foi possível atribuir este ticket.",
+      });
+    }
+  },
+
+  updateServiceRequest: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, {
+        success: false,
+        action: "updateServiceRequest",
+        message: "Solicitação não encontrada.",
+      });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      `/app/tickets/${params.ticketId}`,
+    );
+    const scope = getPermissionScope(permissions, "tickets.reply");
+    if (!scope) {
+      return fail(403, {
+        success: false,
+        action: "updateServiceRequest",
+        message: "Acesso não autorizado.",
+      });
+    }
+
+    try {
+      const input = parseServiceRequestUpdateForm(await request.formData());
+      await updateSupportServiceRequest(session.user.id, scope, params.ticketId, input);
+      return {
+        success: true,
+        action: "updateServiceRequest",
+        message: "Dados da solicitação atualizados e registrados no histórico.",
+      };
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : "SERVICE_REQUEST_UPDATE_FAILED";
+      if (code === "SERVICE_REQUEST_NO_CHANGES") {
+        return {
+          success: true,
+          action: "updateServiceRequest",
+          message: "Nenhuma alteração foi identificada.",
+        };
+      }
+      if (code === "SERVICE_REQUEST_VERSION_CONFLICT") {
+        return fail(409, {
+          success: false,
+          action: "updateServiceRequest",
+          message: "A solicitação mudou desde que você abriu a tela. Atualize a página e revise antes de salvar novamente.",
+        });
+      }
+      if (code === "SERVICE_REQUEST_TICKET_CLOSED") {
+        return fail(409, {
+          success: false,
+          action: "updateServiceRequest",
+          message: "Este ticket está fechado e não aceita alterações.",
+        });
+      }
+      if (code === "TICKET_NOT_ACCESSIBLE") {
+        return fail(403, {
+          success: false,
+          action: "updateServiceRequest",
+          message: "A solicitação está fora do seu escopo de acesso.",
+        });
+      }
+      if (code === "SERVICE_REQUEST_SECRET_KEY_NOT_CONFIGURED") {
+        return fail(503, {
+          success: false,
+          action: "updateServiceRequest",
+          message: "A alteração de credenciais está temporariamente indisponível.",
+        });
+      }
+      return fail(code.startsWith("SERVICE_REQUEST_") ? 400 : 500, {
+        success: false,
+        action: "updateServiceRequest",
+        message: "Revise os dados informados e tente novamente.",
       });
     }
   },
