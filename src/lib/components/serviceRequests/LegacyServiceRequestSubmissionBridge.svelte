@@ -4,11 +4,42 @@
 
   export let endpoint: string;
 
+  const MB = 1024 * 1024;
+
   function createIdempotencyKey(): string {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
       return crypto.randomUUID();
     }
     return `service-request-${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  function validateAttachments(body: BodyInit | null | undefined): string | null {
+    if (!(body instanceof FormData)) return null;
+    let totalBytes = 0;
+
+    for (const [fieldKey, value] of body.entries()) {
+      if (!(value instanceof File) || value.size <= 0) continue;
+      totalBytes += value.size;
+      const maxBytes = endpoint === "/api/nfse/nfse-homologacao/submit"
+        ? 5 * MB
+        : fieldKey === "doc_selfie"
+          ? 5 * MB
+          : 10 * MB;
+      if (value.size > maxBytes) {
+        const limit = Math.round(maxBytes / MB);
+        return `O arquivo ${value.name} excede o limite de ${limit} MB.`;
+      }
+    }
+
+    if (totalBytes > 50 * MB) return "O conjunto de documentos excede o limite total de 50 MB.";
+    return null;
+  }
+
+  function invalidAttachmentResponse(message: string): Response {
+    return new Response(JSON.stringify({ success: false, message, error: "PAYLOAD_TOO_LARGE" }), {
+      status: 413,
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    });
   }
 
   onMount(() => {
@@ -29,6 +60,9 @@
       }
 
       if (pathname !== endpoint) return originalFetch(input, init);
+
+      const attachmentError = validateAttachments(init?.body);
+      if (attachmentError) return invalidAttachmentResponse(attachmentError);
 
       const baseHeaders = input instanceof Request ? input.headers : init?.headers;
       const headers = new Headers(baseHeaders);
