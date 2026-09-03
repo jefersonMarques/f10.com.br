@@ -20,6 +20,14 @@ const requiredTables = [
   "customer_portal_login_tokens",
   "customer_portal_sessions",
   "operations_settings",
+  "ai_provider_credentials",
+  "teams",
+  "ticket_areas",
+  "service_request_routes",
+  "service_requests",
+  "service_request_attachments",
+  "service_request_change_sets",
+  "service_request_field_changes",
   "internal_notifications",
   "user_profiles",
 ];
@@ -37,42 +45,36 @@ check(
   rateLimitSecret.length >= 32 ? "configured" : "SUPPORT_RATE_LIMIT_SECRET must have at least 32 characters",
 );
 
-const supportAiEnabled = process.env.SUPPORT_AI_CHAT_ENABLED === "true";
-const openAiApiKey = process.env.OPENAI_API_KEY?.trim() ?? "";
-const openAiModel = process.env.OPENAI_MODEL?.trim() || "gpt-5-mini";
+const publicBucket = process.env.S3_BUCKET?.trim() ?? "";
+const privateBucket = process.env.SERVICE_REQUEST_S3_BUCKET?.trim() ?? "";
+const baseStorageConfigured =
+  process.env.ASSET_STORAGE?.trim() === "s3" &&
+  Boolean(process.env.S3_ENDPOINT?.trim()) &&
+  Boolean(publicBucket) &&
+  Boolean(process.env.S3_ACCESS_KEY?.trim()) &&
+  Boolean(process.env.S3_SECRET_KEY?.trim());
+
 check(
-  "support AI",
-  supportAiEnabled,
-  supportAiEnabled ? "enabled" : "set SUPPORT_AI_CHAT_ENABLED=true",
+  "Help storage",
+  baseStorageConfigured,
+  baseStorageConfigured ? `bucket=${publicBucket}` : "S3/MinIO base storage is incomplete",
 );
 check(
-  "OpenAI API key",
-  Boolean(openAiApiKey),
-  openAiApiKey ? "configured" : "OPENAI_API_KEY is required for support AI",
+  "Service Request storage isolation",
+  baseStorageConfigured && Boolean(privateBucket) && privateBucket !== publicBucket,
+  privateBucket && privateBucket !== publicBucket
+    ? `private bucket=${privateBucket}`
+    : "SERVICE_REQUEST_S3_BUCKET must be different from S3_BUCKET",
 );
 
-if (supportAiEnabled && openAiApiKey) {
-  try {
-    const response = await fetch(
-      `https://api.openai.com/v1/models/${encodeURIComponent(openAiModel)}`,
-      {
-        headers: { Authorization: `Bearer ${openAiApiKey}` },
-        signal: AbortSignal.timeout(10_000),
-      },
-    );
-    check(
-      "OpenAI model access",
-      response.ok,
-      response.ok ? openAiModel : `model=${openAiModel}, HTTP ${response.status}`,
-    );
-  } catch (cause) {
-    check(
-      "OpenAI model access",
-      false,
-      cause instanceof Error ? cause.name : "network error",
-    );
-  }
-}
+const serviceRequestSecret = process.env.SERVICE_REQUEST_SECRET_KEY?.trim() ?? "";
+check(
+  "Service Request encryption",
+  serviceRequestSecret.length >= 32,
+  serviceRequestSecret.length >= 32
+    ? "configured"
+    : "SERVICE_REQUEST_SECRET_KEY must have at least 32 characters",
+);
 
 const portalBase = process.env.CUSTOMER_PORTAL_BASE_URL?.trim() ?? "";
 if (portalBase) {
@@ -107,6 +109,37 @@ try {
     missingTables.length === 0 ? `${requiredTables.length} available` : `missing=${missingTables.join(",")}`,
   );
 
+  if (!missingTables.includes("ai_provider_credentials")) {
+    const credentialRows = await sql`
+      SELECT provider, last_test_status
+      FROM ai_provider_credentials
+    `;
+    const aiSecretsKeyConfigured = (process.env.AI_SECRETS_KEY?.trim().length ?? 0) >= 32;
+    const configuredProviders = new Set(
+      ["openai", "deepseek"].filter((provider) => {
+        const environmentConfigured = provider === "openai"
+          ? Boolean(process.env.OPENAI_API_KEY?.trim())
+          : Boolean(process.env.DEEPSEEK_API_KEY?.trim());
+        const databaseConfigured =
+          aiSecretsKeyConfigured &&
+          credentialRows.some((row) => row.provider === provider);
+        return environmentConfigured || databaseConfigured;
+      }),
+    );
+    check(
+      "AI provider availability",
+      configuredProviders.size > 0,
+      configuredProviders.size > 0
+        ? Array.from(configuredProviders).join(", ")
+        : "configure OpenAI or DeepSeek in Operations > Inteligência Artificial",
+    );
+    for (const row of credentialRows) {
+      if (row.last_test_status === "error") {
+        check(`AI provider ${row.provider} last test`, false, "connection test failed");
+      }
+    }
+  }
+
   let settingsSenderEmail = "";
   if (!missingTables.includes("operations_settings")) {
     const [general] = await sql`
@@ -133,11 +166,12 @@ try {
         : "configure the support sender email in Operations settings",
   );
 
-  if (!missingTables.includes("support_queues")) {
+  if (!missingTables.includes("support_queues") && !missingTables.includes("teams")) {
     const [queue] = await sql`
-      SELECT code, active, team_id
-      FROM support_queues
-      WHERE code = 'support'
+      SELECT q.code, q.active, q.team_id, t.active AS team_active
+      FROM support_queues q
+      LEFT JOIN teams t ON t.id = q.team_id
+      WHERE q.code = 'support'
       LIMIT 1
     `;
     check(
@@ -147,11 +181,51 @@ try {
     );
     check(
       "support queue team",
-      Boolean(queue?.team_id),
-      queue?.team_id
-        ? "configured"
-        : "select the responsible team in Operations > Configurações > Operação do suporte",
+      Boolean(queue?.team_id && queue?.team_active),
+      queue?.team_id && queue?.team_active
+        ? "active responsible team configured"
+        : "select an active responsible team in Operations > Configurações > Atendimento",
     );
+  }
+
+  if (
+    !missingTables.includes("service_request_routes") &&
+    !missingTables.includes("support_queues") &&
+    !missingTables.includes("ticket_areas") &&
+    !missingTables.includes("teams")
+  ) {
+    const routes = await sql`
+      SELECT
+        r.request_type,
+        r.active AS route_active,
+        q.active AS queue_active,
+        q.team_id AS queue_team_id,
+        a.active AS area_active,
+        a.team_id AS area_team_id,
+        t.active AS team_active
+      FROM service_request_routes r
+      INNER JOIN support_queues q ON q.id = r.queue_id
+      INNER JOIN ticket_areas a ON a.id = r.area_id
+      LEFT JOIN teams t ON t.id = a.team_id
+      WHERE r.request_type IN ('nfse', 'cell_coin')
+    `;
+    const routeByType = new Map(routes.map((row) => [row.request_type, row]));
+    for (const requestType of ["nfse", "cell_coin"]) {
+      const route = routeByType.get(requestType);
+      const ok = Boolean(
+        route?.route_active &&
+        route?.queue_active &&
+        route?.queue_team_id &&
+        route?.area_active &&
+        route?.area_team_id &&
+        route?.team_active
+      );
+      check(
+        `Service Request ${requestType}`,
+        ok,
+        ok ? "routing ready" : "route/queue/area/team is missing or inactive",
+      );
+    }
   }
 
   if (!missingTables.includes("help_publications")) {
