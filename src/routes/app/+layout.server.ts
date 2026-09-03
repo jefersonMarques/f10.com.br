@@ -1,5 +1,6 @@
 import { redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
+import { getUserAccount } from "$lib/server/account/userAccountRepository";
 import { hasPermission, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { getSessionUser, SESSION_COOKIE_NAME } from "$lib/server/auth/session";
 import { getNotificationSummary } from "$lib/server/notifications/notificationRepository";
@@ -26,15 +27,19 @@ export const load: LayoutServerLoad = async ({ cookies, url }) => {
   }
 
   const permissionMap = await resolveUserPermissions(session.user.id);
-  const [notifications, presence] = await Promise.all([
+  const [notifications, presence, account] = await Promise.all([
     getNotificationSummary(session.user.id),
     hasPermission(permissionMap, "chat.respond")
       ? getSupportAgentPresence(session.user.id).catch(() => OFFLINE_PRESENCE)
       : Promise.resolve(null),
+    getUserAccount(session.user.id),
   ]);
 
   return {
-    user: session.user,
+    user: {
+      ...session.user,
+      hasAvatar: Boolean(account.avatarKey),
+    },
     roles: session.roles,
     permissions: Array.from(permissionMap, ([code, scope]) => ({ code, scope })),
     notifications,
