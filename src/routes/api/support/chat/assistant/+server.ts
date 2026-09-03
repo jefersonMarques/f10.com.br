@@ -206,6 +206,10 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
   const contextSourceSlug = readString(body.contextSourceSlug, MAX_SOURCE_SLUG_CHARS);
   const unresolvedCount = readUnresolvedCount(body.unresolvedCount);
   const preferredArticleSlug = currentArticleSlug(pageContext);
+  const preferredArticleConversationContext =
+    preferredArticleSlug && contextSourceSlug === preferredArticleSlug
+      ? conversationContext
+      : "";
   if (!message) return json({ error: "INVALID_MESSAGE" }, { status: 400 });
 
   await getOptionalCustomerF10PortalSession(cookies).catch(() => null);
@@ -311,6 +315,10 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
       question: message,
       conversationContext: buildConversationContext(conversationContext, pageContext),
       preferredArticleSlug: preferredArticleSlug || null,
+      preferredArticleConversationContext: buildConversationContext(
+        preferredArticleConversationContext,
+        pageContext,
+      ),
       maxOutputTokens: 500,
     });
 
