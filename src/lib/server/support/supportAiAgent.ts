@@ -56,6 +56,7 @@ export type RunSupportAiInput = {
   ticketId?: string | null;
   conversationContext?: string;
   preferredArticleSlug?: string | null;
+  preferredArticleConversationContext?: string;
   maxOutputTokens?: number;
 };
 
@@ -253,13 +254,18 @@ async function answerArticle(
   const deterministic = await tryAnswerHelpArticleDeterministically({ question, slug });
   if (deterministic) return deterministic;
 
+  const preferredArticleSlug = input.preferredArticleSlug?.trim().slice(0, 160) ?? "";
+  const conversationContext = slug === preferredArticleSlug
+    ? input.preferredArticleConversationContext ?? ""
+    : input.conversationContext;
+
   return answerHelpQuestion({
     question,
     scope: { type: "article", slug },
     source: "chat_ai",
     actorUserId: input.actorUserId ?? null,
     customerContactId: input.customerContactId ?? null,
-    conversationContext: input.conversationContext,
+    conversationContext,
     maxOutputTokens: input.maxOutputTokens,
   });
 }
