@@ -1,32 +1,35 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { MessageCircleMore } from "lucide-svelte";
+  import HelpPublicAiAssistant from "$lib/components/help/HelpPublicAiAssistant.svelte";
   import SupportAssistantDialog from "$lib/components/onboarding/SupportAssistantDialog.svelte";
   import type { LayoutData } from "./$types";
 
   export let data: LayoutData;
 
-  const HELP_CHAT_CLOSED_KEY = "f10-help-assistant-closed-v1";
   let chatOpen = false;
   let mounted = false;
 
   function openChat(): void {
     chatOpen = true;
-    if (mounted) window.sessionStorage.removeItem(HELP_CHAT_CLOSED_KEY);
   }
 
   function closeChat(): void {
     chatOpen = false;
-    if (mounted) window.sessionStorage.setItem(HELP_CHAT_CLOSED_KEY, "1");
   }
 
   onMount(() => {
     mounted = true;
-    chatOpen = window.sessionStorage.getItem(HELP_CHAT_CLOSED_KEY) !== "1";
   });
 </script>
 
 <slot />
+
+<HelpPublicAiAssistant
+  enabled={data.helpPublicAi.enabled}
+  available={data.helpPublicAi.available}
+  requiresAuthentication={data.helpPublicAi.requiresAuthentication}
+/>
 
 {#if mounted && !chatOpen}
   <button
