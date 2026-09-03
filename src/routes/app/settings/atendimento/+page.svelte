@@ -27,22 +27,22 @@
     ["sunday", "Domingo"],
   ] as const;
 
-  let routingUserIds = data.routing.users
-    .filter((user) => user.included)
-    .map((user) => user.id);
+  let chatRoutingUserIds = data.routing.chatUsers.filter((user) => user.included).map((user) => user.id);
+  let ticketRoutingUserIds = data.routing.ticketUsers.filter((user) => user.included).map((user) => user.id);
 
-  function toggleRoutingUser(userId: string, checked: boolean): void {
-    routingUserIds = checked
-      ? Array.from(new Set([...routingUserIds, userId]))
-      : routingUserIds.filter((id) => id !== userId);
+  function toggleRoutingUser(kind: "chat" | "ticket", userId: string, checked: boolean): void {
+    const current = kind === "chat" ? chatRoutingUserIds : ticketRoutingUserIds;
+    const next = checked ? Array.from(new Set([...current, userId])) : current.filter((id) => id !== userId);
+    if (kind === "chat") chatRoutingUserIds = next;
+    else ticketRoutingUserIds = next;
   }
 
-  function addAllRoutingUsers(): void {
-    routingUserIds = data.routing.users.map((user) => user.id);
-  }
-
-  function clearRoutingUsers(): void {
-    routingUserIds = [];
+  function setAllRoutingUsers(kind: "chat" | "ticket", include: boolean): void {
+    if (kind === "chat") {
+      chatRoutingUserIds = include ? data.routing.chatUsers.map((user) => user.id) : [];
+      return;
+    }
+    ticketRoutingUserIds = include ? data.routing.ticketUsers.map((user) => user.id) : [];
   }
 
   function presenceLabel(status: string): string {
@@ -65,7 +65,7 @@
   <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
     <div class="flex items-start gap-3">
       <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F2F0FF] text-[#5C4BA2]"><Users size={18}/></span>
-      <div><h2 class="text-[14px] font-semibold text-[#252C3D]">Equipe responsável pelo suporte</h2><p class="application-text-meta mt-1 leading-4 text-[#858B99]">Equipe da fila principal. As demais filas podem usar equipes diferentes, configuradas na entrada do chat.</p></div>
+      <div><h2 class="text-[14px] font-semibold text-[#252C3D]">Equipe responsável pelo suporte</h2><p class="application-text-meta mt-1 leading-4 text-[#858B99]">Equipe da fila principal. As demais filas e áreas podem usar equipes diferentes.</p></div>
     </div>
 
     {#if data.queue.teams.length > 0}
@@ -156,33 +156,56 @@
   <form method="POST" action="?/saveRouting" class="mt-4 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
     <div class="flex items-start gap-3">
       <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF8F1] text-[#2F7045]"><RotateCw size={18}/></span>
-      <div><h2 class="text-[14px] font-semibold text-[#252C3D]">Distribuição dos chats</h2><p class="application-text-meta mt-1 leading-4 text-[#858B99]">No automático, o handoff respeita a equipe da fila e vai para o próximo participante realmente Online.</p></div>
+      <div><h2 class="text-[14px] font-semibold text-[#252C3D]">Distribuição automática</h2><p class="application-text-meta mt-1 leading-4 text-[#858B99]">Chat e tickets usam grupos de participantes independentes. Tickets ainda respeitam a equipe da fila ou da área atual.</p></div>
     </div>
 
     <div class="mt-5 grid gap-4 sm:grid-cols-2">
       <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6B]">Modo de atribuição</span><select name="assignmentMode" class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"><option value="manual" selected={data.routing.configuration.assignmentMode === "manual"}>Manual</option><option value="round_robin" selected={data.routing.configuration.assignmentMode === "round_robin"}>Automática rotacionada</option></select></label>
-      <div class="application-text-meta rounded-xl bg-[#F8F9FC] px-4 py-3 leading-4 text-[#777D8D]"><strong class="application-text-caption block text-[#414858]">Regra de presença</strong>Ocupado, Ausente e Offline não recebem novas conversas. Após 10 minutos sem interação real no painel, Online vira Ausente automaticamente.</div>
+      <div class="application-text-meta rounded-xl bg-[#F8F9FC] px-4 py-3 leading-4 text-[#777D8D]"><strong class="application-text-caption block text-[#414858]">Regra de presença</strong>Ocupado, Ausente e Offline não recebem novas atribuições. Após 10 minutos sem interação real no painel, Online vira Ausente automaticamente.</div>
     </div>
 
-    <div class="mt-5 overflow-hidden rounded-2xl border border-[#E2E5ED]">
-      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#EEF0F5] bg-[#FAFAFC] px-4 py-3">
-        <div><strong class="application-text-caption block text-[#3F4656]">Atendentes participantes</strong><span class="application-text-meta text-[#8A909E]">Somente usuários ativos com permissão para responder chat aparecem aqui.</span></div>
-        <div class="flex gap-2"><button type="button" on:click={addAllRoutingUsers} class="application-text-meta rounded-lg border border-[#DDE1EA] bg-white px-3 py-1.5 font-semibold text-[#000A57]">Adicionar todos</button><button type="button" on:click={clearRoutingUsers} class="application-text-meta rounded-lg px-3 py-1.5 font-semibold text-[#777D8D]">Limpar</button></div>
-      </div>
-      {#if data.routing.users.length > 0}
-        <div class="divide-y divide-[#EEF0F5]">
-          {#each data.routing.users as user}
-            <label class="flex items-center gap-3 px-4 py-3 transition hover:bg-[#FAFAFC]">
-              <input name="routingUserId" type="checkbox" value={user.id} checked={routingUserIds.includes(user.id)} on:change={(event) => toggleRoutingUser(user.id, event.currentTarget.checked)} class="h-4 w-4 rounded border-[#C9CEDA]"/>
-              <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF0FF] text-[#000A57]"><UserCheck size={15}/></span>
-              <span class="min-w-0 flex-1"><strong class="application-text-caption block truncate text-[#353C4C]">{user.name}</strong><span class="application-text-meta block truncate text-[#9297A4]">{user.email}</span></span>
-              <span class={`application-text-meta rounded-full px-2 py-1 font-bold ${user.presence.effectiveStatus === "online" ? "bg-[#EEF8F1] text-[#2F7045]" : user.presence.effectiveStatus === "busy" ? "bg-[#FFF4E9] text-[#A9510D]" : "bg-[#F1F2F5] text-[#777D8C]"}`}>{presenceLabel(user.presence.effectiveStatus)}</span>
-            </label>
-          {/each}
+    <div class="mt-5 grid gap-4 lg:grid-cols-2">
+      <div class="overflow-hidden rounded-2xl border border-[#E2E5ED]">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#EEF0F5] bg-[#FAFAFC] px-4 py-3">
+          <div><strong class="application-text-caption block text-[#3F4656]">Participantes do chat</strong><span class="application-text-meta text-[#8A909E]">Exige permissão chat.respond.</span></div>
+          <div class="flex gap-2"><button type="button" on:click={() => setAllRoutingUsers("chat", true)} class="application-text-meta rounded-lg border border-[#DDE1EA] bg-white px-3 py-1.5 font-semibold text-[#000A57]">Todos</button><button type="button" on:click={() => setAllRoutingUsers("chat", false)} class="application-text-meta rounded-lg px-3 py-1.5 font-semibold text-[#777D8D]">Limpar</button></div>
         </div>
-      {:else}
-        <p class="application-text-caption px-4 py-6 text-center text-[#858B99]">Nenhum usuário elegível para atendimento por chat.</p>
-      {/if}
+        {#if data.routing.chatUsers.length > 0}
+          <div class="divide-y divide-[#EEF0F5]">
+            {#each data.routing.chatUsers as user}
+              <label class="flex items-center gap-3 px-4 py-3 transition hover:bg-[#FAFAFC]">
+                <input name="chatRoutingUserId" type="checkbox" value={user.id} checked={chatRoutingUserIds.includes(user.id)} on:change={(event) => toggleRoutingUser("chat", user.id, event.currentTarget.checked)} class="h-4 w-4 rounded border-[#C9CEDA]"/>
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF0FF] text-[#000A57]"><UserCheck size={15}/></span>
+                <span class="min-w-0 flex-1"><strong class="application-text-caption block truncate text-[#353C4C]">{user.name}</strong><span class="application-text-meta block truncate text-[#9297A4]">{user.email}</span></span>
+                <span class={`application-text-meta rounded-full px-2 py-1 font-bold ${user.presence.effectiveStatus === "online" ? "bg-[#EEF8F1] text-[#2F7045]" : user.presence.effectiveStatus === "busy" ? "bg-[#FFF4E9] text-[#A9510D]" : "bg-[#F1F2F5] text-[#777D8C]"}`}>{presenceLabel(user.presence.effectiveStatus)}</span>
+              </label>
+            {/each}
+          </div>
+        {:else}
+          <p class="application-text-caption px-4 py-6 text-center text-[#858B99]">Nenhum usuário elegível para chat.</p>
+        {/if}
+      </div>
+
+      <div class="overflow-hidden rounded-2xl border border-[#E2E5ED]">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#EEF0F5] bg-[#FAFAFC] px-4 py-3">
+          <div><strong class="application-text-caption block text-[#3F4656]">Participantes de tickets</strong><span class="application-text-meta text-[#8A909E]">Exige tickets.reply e participação na equipe da fila/área.</span></div>
+          <div class="flex gap-2"><button type="button" on:click={() => setAllRoutingUsers("ticket", true)} class="application-text-meta rounded-lg border border-[#DDE1EA] bg-white px-3 py-1.5 font-semibold text-[#000A57]">Todos</button><button type="button" on:click={() => setAllRoutingUsers("ticket", false)} class="application-text-meta rounded-lg px-3 py-1.5 font-semibold text-[#777D8D]">Limpar</button></div>
+        </div>
+        {#if data.routing.ticketUsers.length > 0}
+          <div class="divide-y divide-[#EEF0F5]">
+            {#each data.routing.ticketUsers as user}
+              <label class="flex items-center gap-3 px-4 py-3 transition hover:bg-[#FAFAFC]">
+                <input name="ticketRoutingUserId" type="checkbox" value={user.id} checked={ticketRoutingUserIds.includes(user.id)} on:change={(event) => toggleRoutingUser("ticket", user.id, event.currentTarget.checked)} class="h-4 w-4 rounded border-[#C9CEDA]"/>
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFF2E8] text-[#C85C08]"><UserCheck size={15}/></span>
+                <span class="min-w-0 flex-1"><strong class="application-text-caption block truncate text-[#353C4C]">{user.name}</strong><span class="application-text-meta block truncate text-[#9297A4]">{user.email}</span></span>
+                <span class={`application-text-meta rounded-full px-2 py-1 font-bold ${user.presence.effectiveStatus === "online" ? "bg-[#EEF8F1] text-[#2F7045]" : user.presence.effectiveStatus === "busy" ? "bg-[#FFF4E9] text-[#A9510D]" : "bg-[#F1F2F5] text-[#777D8C]"}`}>{presenceLabel(user.presence.effectiveStatus)}</span>
+              </label>
+            {/each}
+          </div>
+        {:else}
+          <p class="application-text-caption px-4 py-6 text-center text-[#858B99]">Nenhum usuário elegível para tickets.</p>
+        {/if}
+      </div>
     </div>
 
     <div class="mt-6 flex items-start gap-3 border-t border-[#EEF0F5] pt-5">

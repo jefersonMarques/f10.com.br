@@ -60,6 +60,30 @@ export const supportChatRoutingMembers = pgTable(
   ],
 );
 
+export const supportTicketRoutingMembers = pgTable(
+  "support_ticket_routing_members",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(true),
+    lastAssignedAt: timestamp("last_assigned_at", { withTimezone: true }),
+    addedBy: uuid("added_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("support_ticket_routing_members_enabled_idx").on(
+      table.enabled,
+      table.lastAssignedAt,
+    ),
+  ],
+);
+
 export const ticketTaskLinks = pgTable(
   "ticket_task_links",
   {

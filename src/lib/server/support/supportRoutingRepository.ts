@@ -18,8 +18,10 @@ import { teamMembers, users } from "$lib/server/db/schema";
 import {
   supportAgentPresence,
   supportChatRoutingMembers,
+  supportTicketRoutingMembers,
 } from "$lib/server/db/supportRoutingSchema";
 import { supportQueues, ticketEvents, tickets } from "$lib/server/db/supportSchema";
+import { ticketAreas, ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
 import {
   listSupportAgentPresence,
   SUPPORT_AWAY_AFTER_MS,
@@ -90,7 +92,7 @@ export async function getSupportRoutingConfiguration(): Promise<SupportRoutingCo
   };
 }
 
-export async function listEligibleSupportResponders() {
+async function listEligibleResponders(permissionCode: "chat.respond" | "tickets.reply") {
   const db = getDatabase();
   const userRows = await db
     .select({ id: users.id, name: users.name, email: users.email })
@@ -106,8 +108,20 @@ export async function listEligibleSupportResponders() {
   );
 
   return eligibility
-    .filter((entry) => hasPermission(entry.permissions, "chat.respond"))
+    .filter((entry) => hasPermission(entry.permissions, permissionCode))
     .map((entry) => entry.user);
+}
+
+export async function listEligibleChatResponders() {
+  return listEligibleResponders("chat.respond");
+}
+
+export async function listEligibleTicketResponders() {
+  return listEligibleResponders("tickets.reply");
+}
+
+export async function listEligibleSupportResponders() {
+  return listEligibleChatResponders();
 }
 
 export async function countAvailableSupportRespondersForQueue(
@@ -116,7 +130,7 @@ export async function countAvailableSupportRespondersForQueue(
   const configuration = await getSupportRoutingConfiguration();
   if (configuration.assignmentMode !== "round_robin") return 0;
 
-  const responders = await listEligibleSupportResponders();
+  const responders = await listEligibleChatResponders();
   if (responders.length === 0) return 0;
 
   const db = getDatabase();
@@ -162,27 +176,52 @@ export async function countAvailableSupportRespondersForQueue(
 }
 
 export async function getSupportRoutingSettings() {
-  const [configuration, eligibleUsers] = await Promise.all([
+  const [configuration, chatUsers, ticketUsers] = await Promise.all([
     getSupportRoutingConfiguration(),
-    listEligibleSupportResponders(),
+    listEligibleChatResponders(),
+    listEligibleTicketResponders(),
   ]);
   const db = getDatabase();
-  const memberRows = await db
-    .select({
-      userId: supportChatRoutingMembers.userId,
-      enabled: supportChatRoutingMembers.enabled,
-      lastAssignedAt: supportChatRoutingMembers.lastAssignedAt,
-    })
-    .from(supportChatRoutingMembers);
-  const memberByUser = new Map(memberRows.map((row) => [row.userId, row]));
-  const presence = await listSupportAgentPresence(eligibleUsers.map((user) => user.id));
+  const [chatMemberRows, ticketMemberRows] = await Promise.all([
+    db
+      .select({
+        userId: supportChatRoutingMembers.userId,
+        enabled: supportChatRoutingMembers.enabled,
+        lastAssignedAt: supportChatRoutingMembers.lastAssignedAt,
+      })
+      .from(supportChatRoutingMembers),
+    db
+      .select({
+        userId: supportTicketRoutingMembers.userId,
+        enabled: supportTicketRoutingMembers.enabled,
+        lastAssignedAt: supportTicketRoutingMembers.lastAssignedAt,
+      })
+      .from(supportTicketRoutingMembers),
+  ]);
+  const chatMemberByUser = new Map(chatMemberRows.map((row) => [row.userId, row]));
+  const ticketMemberByUser = new Map(ticketMemberRows.map((row) => [row.userId, row]));
+  const allUserIds = Array.from(new Set([
+    ...chatUsers.map((user) => user.id),
+    ...ticketUsers.map((user) => user.id),
+  ]));
+  const presence = await listSupportAgentPresence(allUserIds);
 
   return {
     configuration,
-    users: eligibleUsers.map((user) => ({
+    chatUsers: chatUsers.map((user) => ({
       ...user,
-      included: memberByUser.get(user.id)?.enabled === true,
-      lastAssignedAt: memberByUser.get(user.id)?.lastAssignedAt ?? null,
+      included: chatMemberByUser.get(user.id)?.enabled === true,
+      lastAssignedAt: chatMemberByUser.get(user.id)?.lastAssignedAt ?? null,
+      presence: presence.get(user.id) ?? {
+        manualStatus: "offline" as const,
+        effectiveStatus: "offline" as const,
+        lastActivityAt: null,
+      },
+    })),
+    ticketUsers: ticketUsers.map((user) => ({
+      ...user,
+      included: ticketMemberByUser.get(user.id)?.enabled === true,
+      lastAssignedAt: ticketMemberByUser.get(user.id)?.lastAssignedAt ?? null,
       presence: presence.get(user.id) ?? {
         manualStatus: "offline" as const,
         effectiveStatus: "offline" as const,
@@ -195,11 +234,17 @@ export async function getSupportRoutingSettings() {
 export async function updateSupportRoutingSettings(
   actorUserId: string,
   configuration: SupportRoutingConfiguration,
-  requestedUserIds: string[],
+  requestedChatUserIds: string[],
+  requestedTicketUserIds: string[],
 ): Promise<void> {
-  const eligible = await listEligibleSupportResponders();
-  const eligibleIds = new Set(eligible.map((user) => user.id));
-  const userIds = Array.from(new Set(requestedUserIds)).filter((id) => eligibleIds.has(id));
+  const [eligibleChatUsers, eligibleTicketUsers] = await Promise.all([
+    listEligibleChatResponders(),
+    listEligibleTicketResponders(),
+  ]);
+  const eligibleChatIds = new Set(eligibleChatUsers.map((user) => user.id));
+  const eligibleTicketIds = new Set(eligibleTicketUsers.map((user) => user.id));
+  const chatUserIds = Array.from(new Set(requestedChatUserIds)).filter((id) => eligibleChatIds.has(id));
+  const ticketUserIds = Array.from(new Set(requestedTicketUserIds)).filter((id) => eligibleTicketIds.has(id));
   const normalized: SupportRoutingConfiguration = {
     assignmentMode: configuration.assignmentMode === "round_robin" ? "round_robin" : "manual",
     aiMaxRunsPerConversation: boundedInteger(configuration.aiMaxRunsPerConversation, 6, 1, 20),
@@ -223,24 +268,35 @@ export async function updateSupportRoutingSettings(
         set: { value: normalized, updatedBy: actorUserId, updatedAt: now },
       });
 
-    if (userIds.length === 0) {
+    if (chatUserIds.length === 0) {
       await tx.delete(supportChatRoutingMembers);
     } else {
       await tx
         .delete(supportChatRoutingMembers)
-        .where(notInArray(supportChatRoutingMembers.userId, userIds));
-
-      for (const userId of userIds) {
+        .where(notInArray(supportChatRoutingMembers.userId, chatUserIds));
+      for (const userId of chatUserIds) {
         await tx
           .insert(supportChatRoutingMembers)
-          .values({
-            userId,
-            enabled: true,
-            addedBy: actorUserId,
-            updatedAt: now,
-          })
+          .values({ userId, enabled: true, addedBy: actorUserId, updatedAt: now })
           .onConflictDoUpdate({
             target: supportChatRoutingMembers.userId,
+            set: { enabled: true, addedBy: actorUserId, updatedAt: now },
+          });
+      }
+    }
+
+    if (ticketUserIds.length === 0) {
+      await tx.delete(supportTicketRoutingMembers);
+    } else {
+      await tx
+        .delete(supportTicketRoutingMembers)
+        .where(notInArray(supportTicketRoutingMembers.userId, ticketUserIds));
+      for (const userId of ticketUserIds) {
+        await tx
+          .insert(supportTicketRoutingMembers)
+          .values({ userId, enabled: true, addedBy: actorUserId, updatedAt: now })
+          .onConflictDoUpdate({
+            target: supportTicketRoutingMembers.userId,
             set: { enabled: true, addedBy: actorUserId, updatedAt: now },
           });
       }
@@ -254,7 +310,8 @@ export async function updateSupportRoutingSettings(
     entityId: "support_routing",
     metadata: {
       assignmentMode: normalized.assignmentMode,
-      memberCount: userIds.length,
+      chatMemberCount: chatUserIds.length,
+      ticketMemberCount: ticketUserIds.length,
       aiMaxRunsPerConversation: normalized.aiMaxRunsPerConversation,
       aiDailyTokenBudget: normalized.aiDailyTokenBudget,
       aiMaxOutputTokens: normalized.aiMaxOutputTokens,
@@ -270,17 +327,11 @@ export async function setSupportRoutingMembership(
   const db = getDatabase();
   const now = new Date();
   if (!included) {
-    await db
-      .delete(supportChatRoutingMembers)
-      .where(eq(supportChatRoutingMembers.userId, userId));
+    await db.delete(supportChatRoutingMembers).where(eq(supportChatRoutingMembers.userId, userId));
     return;
   }
 
-  const [user] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
+  const [user] = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1);
   if (!user) throw new Error("SUPPORT_ROUTING_USER_NOT_FOUND");
 
   await db
@@ -288,6 +339,30 @@ export async function setSupportRoutingMembership(
     .values({ userId, enabled: true, addedBy: actorUserId, updatedAt: now })
     .onConflictDoUpdate({
       target: supportChatRoutingMembers.userId,
+      set: { enabled: true, addedBy: actorUserId, updatedAt: now },
+    });
+}
+
+export async function setSupportTicketRoutingMembership(
+  actorUserId: string,
+  userId: string,
+  included: boolean,
+): Promise<void> {
+  const db = getDatabase();
+  const now = new Date();
+  if (!included) {
+    await db.delete(supportTicketRoutingMembers).where(eq(supportTicketRoutingMembers.userId, userId));
+    return;
+  }
+
+  const [user] = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) throw new Error("SUPPORT_ROUTING_USER_NOT_FOUND");
+
+  await db
+    .insert(supportTicketRoutingMembers)
+    .values({ userId, enabled: true, addedBy: actorUserId, updatedAt: now })
+    .onConflictDoUpdate({
+      target: supportTicketRoutingMembers.userId,
       set: { enabled: true, addedBy: actorUserId, updatedAt: now },
     });
 }
@@ -305,23 +380,10 @@ export async function autoAssignTicketIfConfigured(
     .where(eq(webChatSessions.ticketId, ticketId))
     .limit(1);
   const isChat = Boolean(chatSession?.id);
-
-  const responders = await listEligibleSupportResponders();
-  let responderIds = responders.map((user) => user.id);
-  if (!isChat && responderIds.length > 0) {
-    const ticketResponderEligibility = await Promise.all(
-      responders.map(async (user) => ({
-        userId: user.id,
-        allowed: hasPermission(await resolveUserPermissions(user.id), "tickets.reply"),
-      })),
-    );
-    const ticketResponderIds = new Set(
-      ticketResponderEligibility
-        .filter((entry) => entry.allowed)
-        .map((entry) => entry.userId),
-    );
-    responderIds = responderIds.filter((userId) => ticketResponderIds.has(userId));
-  }
+  const responders = isChat
+    ? await listEligibleChatResponders()
+    : await listEligibleTicketResponders();
+  const responderIds = responders.map((user) => user.id);
   if (responderIds.length === 0) return null;
 
   const now = new Date();
@@ -335,46 +397,78 @@ export async function autoAssignTicketIfConfigured(
         assignedUserId: tickets.assignedUserId,
         ticketNumber: tickets.ticketNumber,
         queueTeamId: supportQueues.teamId,
+        areaTeamId: ticketAreas.teamId,
       })
       .from(tickets)
       .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
+      .leftJoin(ticketWorkflowStates, eq(ticketWorkflowStates.ticketId, tickets.id))
+      .leftJoin(ticketAreas, eq(ticketAreas.id, ticketWorkflowStates.areaId))
       .where(eq(tickets.id, ticketId))
       .limit(1);
     if (!ticket || ticket.assignedUserId) return ticket?.assignedUserId ?? null;
 
+    const effectiveTeamId = !isChat && ticket.areaTeamId
+      ? ticket.areaTeamId
+      : ticket.queueTeamId;
     let eligibleResponderIds = responderIds;
-    if (ticket.queueTeamId) {
+    if (effectiveTeamId) {
       const membershipRows = await tx
         .select({ userId: teamMembers.userId })
         .from(teamMembers)
-        .where(eq(teamMembers.teamId, ticket.queueTeamId));
+        .where(eq(teamMembers.teamId, effectiveTeamId));
       const teamUserIds = new Set(membershipRows.map((row) => row.userId));
       eligibleResponderIds = responderIds.filter((userId) => teamUserIds.has(userId));
       if (eligibleResponderIds.length === 0) return null;
     }
 
-    const [candidate] = await tx
-      .select({ userId: supportChatRoutingMembers.userId })
-      .from(supportChatRoutingMembers)
-      .innerJoin(users, eq(users.id, supportChatRoutingMembers.userId))
-      .innerJoin(
-        supportAgentPresence,
-        eq(supportAgentPresence.userId, supportChatRoutingMembers.userId),
-      )
-      .where(
-        and(
-          eq(supportChatRoutingMembers.enabled, true),
-          inArray(supportChatRoutingMembers.userId, eligibleResponderIds),
-          eq(users.status, "active"),
-          eq(supportAgentPresence.manualStatus, "online"),
-          gt(supportAgentPresence.lastActivityAt, activeAfter),
-        ),
-      )
-      .orderBy(
-        sql`${supportChatRoutingMembers.lastAssignedAt} asc nulls first`,
-        asc(supportChatRoutingMembers.createdAt),
-      )
-      .limit(1);
+    let candidate: { userId: string } | undefined;
+    if (isChat) {
+      [candidate] = await tx
+        .select({ userId: supportChatRoutingMembers.userId })
+        .from(supportChatRoutingMembers)
+        .innerJoin(users, eq(users.id, supportChatRoutingMembers.userId))
+        .innerJoin(
+          supportAgentPresence,
+          eq(supportAgentPresence.userId, supportChatRoutingMembers.userId),
+        )
+        .where(
+          and(
+            eq(supportChatRoutingMembers.enabled, true),
+            inArray(supportChatRoutingMembers.userId, eligibleResponderIds),
+            eq(users.status, "active"),
+            eq(supportAgentPresence.manualStatus, "online"),
+            gt(supportAgentPresence.lastActivityAt, activeAfter),
+          ),
+        )
+        .orderBy(
+          sql`${supportChatRoutingMembers.lastAssignedAt} asc nulls first`,
+          asc(supportChatRoutingMembers.createdAt),
+        )
+        .limit(1);
+    } else {
+      [candidate] = await tx
+        .select({ userId: supportTicketRoutingMembers.userId })
+        .from(supportTicketRoutingMembers)
+        .innerJoin(users, eq(users.id, supportTicketRoutingMembers.userId))
+        .innerJoin(
+          supportAgentPresence,
+          eq(supportAgentPresence.userId, supportTicketRoutingMembers.userId),
+        )
+        .where(
+          and(
+            eq(supportTicketRoutingMembers.enabled, true),
+            inArray(supportTicketRoutingMembers.userId, eligibleResponderIds),
+            eq(users.status, "active"),
+            eq(supportAgentPresence.manualStatus, "online"),
+            gt(supportAgentPresence.lastActivityAt, activeAfter),
+          ),
+        )
+        .orderBy(
+          sql`${supportTicketRoutingMembers.lastAssignedAt} asc nulls first`,
+          asc(supportTicketRoutingMembers.createdAt),
+        )
+        .limit(1);
+    }
 
     if (!candidate) return null;
 
@@ -385,10 +479,17 @@ export async function autoAssignTicketIfConfigured(
       .returning({ id: tickets.id });
     if (!assigned) return null;
 
-    await tx
-      .update(supportChatRoutingMembers)
-      .set({ lastAssignedAt: now, updatedAt: now })
-      .where(eq(supportChatRoutingMembers.userId, candidate.userId));
+    if (isChat) {
+      await tx
+        .update(supportChatRoutingMembers)
+        .set({ lastAssignedAt: now, updatedAt: now })
+        .where(eq(supportChatRoutingMembers.userId, candidate.userId));
+    } else {
+      await tx
+        .update(supportTicketRoutingMembers)
+        .set({ lastAssignedAt: now, updatedAt: now })
+        .where(eq(supportTicketRoutingMembers.userId, candidate.userId));
+    }
 
     await tx.insert(ticketEvents).values({
       ticketId,
@@ -397,7 +498,7 @@ export async function autoAssignTicketIfConfigured(
       metadata: {
         assignedUserId: candidate.userId,
         strategy: "round_robin",
-        queueTeamId: ticket.queueTeamId,
+        teamId: effectiveTeamId,
       },
     });
 

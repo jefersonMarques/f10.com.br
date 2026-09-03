@@ -55,10 +55,7 @@ function readSettings(formData: FormData): SupportHoursSettings {
     };
   }
 
-  return {
-    configured: formData.has("configured"),
-    days,
-  };
+  return { configured: formData.has("configured"), days };
 }
 
 function readEntryOption(formData: FormData) {
@@ -68,9 +65,7 @@ function readEntryOption(formData: FormData) {
   const initialHandling = readString(formData, "initialHandling") === "human" ? "human" as const : "ai" as const;
   const sortOrder = Math.min(Math.max(readInteger(formData, "sortOrder", 10), 0), 10_000);
 
-  if (label.length < 2 || label.length > 80 || description.length > 180 || !isUuid(queueId)) {
-    return null;
-  }
+  if (label.length < 2 || label.length > 80 || description.length > 180 || !isUuid(queueId)) return null;
   return {
     label,
     description,
@@ -94,73 +89,33 @@ export const load: PageServerLoad = async ({ cookies }) => {
 
 export const actions: Actions = {
   save: async ({ cookies, request }) => {
-    const { session } = await requireAppPermission(
-      cookies,
-      "system.settings.manage",
-      "/app/settings/atendimento",
-    );
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
     const settings = readSettings(await request.formData());
     if (!isValidSupportHours(settings)) {
-      return fail(400, {
-        success: false,
-        action: "save",
-        message: "Revise os horários. Cada dia ativo precisa terminar depois do horário de início.",
-      });
+      return fail(400, { success: false, action: "save", message: "Revise os horários. Cada dia ativo precisa terminar depois do horário de início." });
     }
-
     await updateSupportHoursSettings(session.user.id, settings);
-    return {
-      success: true,
-      action: "save",
-      message: "Horário de atendimento atualizado.",
-    };
+    return { success: true, action: "save", message: "Horário de atendimento atualizado." };
   },
 
   saveTeam: async ({ cookies, request }) => {
-    const { session } = await requireAppPermission(
-      cookies,
-      "system.settings.manage",
-      "/app/settings/atendimento",
-    );
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
     const teamId = readString(await request.formData(), "teamId");
-    if (!isUuid(teamId)) {
-      return fail(400, {
-        success: false,
-        action: "saveTeam",
-        message: "Selecione a equipe responsável pelo suporte.",
-      });
-    }
-
+    if (!isUuid(teamId)) return fail(400, { success: false, action: "saveTeam", message: "Selecione a equipe responsável pelo suporte." });
     try {
       await updateSupportQueueTeam(session.user.id, teamId);
-      return {
-        success: true,
-        action: "saveTeam",
-        message: "Equipe responsável pelo suporte atualizada.",
-      };
+      return { success: true, action: "saveTeam", message: "Equipe responsável pelo suporte atualizada." };
     } catch {
-      return fail(400, {
-        success: false,
-        action: "saveTeam",
-        message: "Não foi possível vincular esta equipe à fila de suporte.",
-      });
+      return fail(400, { success: false, action: "saveTeam", message: "Não foi possível vincular esta equipe à fila de suporte." });
     }
   },
 
   saveRouting: async ({ cookies, request }) => {
-    const { session } = await requireAppPermission(
-      cookies,
-      "system.settings.manage",
-      "/app/settings/atendimento",
-    );
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
     const formData = await request.formData();
-    const assignmentMode: SupportAssignmentMode =
-      readString(formData, "assignmentMode") === "round_robin"
-        ? "round_robin"
-        : "manual";
-    const routingUserIds = formData
-      .getAll("routingUserId")
-      .filter((value): value is string => typeof value === "string" && isUuid(value));
+    const assignmentMode: SupportAssignmentMode = readString(formData, "assignmentMode") === "round_robin" ? "round_robin" : "manual";
+    const chatRoutingUserIds = formData.getAll("chatRoutingUserId").filter((value): value is string => typeof value === "string" && isUuid(value));
+    const ticketRoutingUserIds = formData.getAll("ticketRoutingUserId").filter((value): value is string => typeof value === "string" && isUuid(value));
 
     await updateSupportRoutingSettings(
       session.user.id,
@@ -170,151 +125,79 @@ export const actions: Actions = {
         aiDailyTokenBudget: readInteger(formData, "aiDailyTokenBudget", 100_000),
         aiMaxOutputTokens: readInteger(formData, "aiMaxOutputTokens", 500),
       },
-      routingUserIds,
+      chatRoutingUserIds,
+      ticketRoutingUserIds,
     );
 
-    return {
-      success: true,
-      action: "saveRouting",
-      message: "Distribuição do chat e limites da IA atualizados.",
-    };
+    return { success: true, action: "saveRouting", message: "Distribuição de chats, tickets e limites da IA atualizados." };
   },
 
   createQueue: async ({ cookies, request }) => {
-    const { session } = await requireAppPermission(
-      cookies,
-      "system.settings.manage",
-      "/app/settings/atendimento",
-    );
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
     const formData = await request.formData();
     const name = readString(formData, "name");
     const teamId = readString(formData, "teamId");
     const defaultDueDays = readInteger(formData, "defaultDueDays", 3);
     if (name.length < 2 || name.length > 80 || !isUuid(teamId) || !isValidDefaultDueDays(defaultDueDays)) {
-      return fail(400, {
-        success: false,
-        action: "createQueue",
-        message: "Informe nome, equipe e um prazo padrão entre 1 e 365 dias.",
-      });
+      return fail(400, { success: false, action: "createQueue", message: "Informe nome, equipe e um prazo padrão entre 1 e 365 dias." });
     }
     try {
       await createSupportQueue(session.user.id, name, teamId, defaultDueDays);
       return { success: true, action: "createQueue", message: "Fila de atendimento criada." };
     } catch {
-      return fail(400, {
-        success: false,
-        action: "createQueue",
-        message: "Não foi possível criar a fila de atendimento.",
-      });
+      return fail(400, { success: false, action: "createQueue", message: "Não foi possível criar a fila de atendimento." });
     }
   },
 
   saveQueueDueDays: async ({ cookies, request }) => {
-    const { session } = await requireAppPermission(
-      cookies,
-      "system.settings.manage",
-      "/app/settings/atendimento",
-    );
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
     const formData = await request.formData();
     const queueId = readString(formData, "queueId");
     const defaultDueDays = readInteger(formData, "defaultDueDays", 0);
-    if (!isUuid(queueId) || !isValidDefaultDueDays(defaultDueDays)) {
-      return fail(400, {
-        success: false,
-        action: "saveQueueDueDays",
-        message: "Informe um prazo padrão entre 1 e 365 dias.",
-      });
-    }
-
+    if (!isUuid(queueId) || !isValidDefaultDueDays(defaultDueDays)) return fail(400, { success: false, action: "saveQueueDueDays", message: "Informe um prazo padrão entre 1 e 365 dias." });
     try {
       await updateSupportQueueDueDays(session.user.id, queueId, defaultDueDays);
-      return {
-        success: true,
-        action: "saveQueueDueDays",
-        message: "Prazo padrão da fila atualizado.",
-      };
+      return { success: true, action: "saveQueueDueDays", message: "Prazo padrão da fila atualizado." };
     } catch {
-      return fail(400, {
-        success: false,
-        action: "saveQueueDueDays",
-        message: "Não foi possível atualizar o prazo padrão da fila.",
-      });
+      return fail(400, { success: false, action: "saveQueueDueDays", message: "Não foi possível atualizar o prazo padrão da fila." });
     }
   },
 
   createEntryOption: async ({ cookies, request }) => {
-    const { session } = await requireAppPermission(
-      cookies,
-      "system.settings.manage",
-      "/app/settings/atendimento",
-    );
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
     const input = readEntryOption(await request.formData());
-    if (!input) {
-      return fail(400, {
-        success: false,
-        action: "createEntryOption",
-        message: "Revise nome, descrição e fila da opção.",
-      });
-    }
+    if (!input) return fail(400, { success: false, action: "createEntryOption", message: "Revise nome, descrição e fila da opção." });
     try {
       await createSupportChatEntryOption(session.user.id, input);
       return { success: true, action: "createEntryOption", message: "Opção de entrada criada." };
     } catch {
-      return fail(400, {
-        success: false,
-        action: "createEntryOption",
-        message: "Não foi possível criar esta opção de entrada.",
-      });
+      return fail(400, { success: false, action: "createEntryOption", message: "Não foi possível criar esta opção de entrada." });
     }
   },
 
   updateEntryOption: async ({ cookies, request }) => {
-    const { session } = await requireAppPermission(
-      cookies,
-      "system.settings.manage",
-      "/app/settings/atendimento",
-    );
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
     const formData = await request.formData();
     const optionId = readString(formData, "optionId");
     const input = readEntryOption(formData);
-    if (!isUuid(optionId) || !input) {
-      return fail(400, {
-        success: false,
-        action: "updateEntryOption",
-        message: "Revise os dados da opção de entrada.",
-      });
-    }
+    if (!isUuid(optionId) || !input) return fail(400, { success: false, action: "updateEntryOption", message: "Revise os dados da opção de entrada." });
     try {
       await updateSupportChatEntryOption(session.user.id, optionId, input);
       return { success: true, action: "updateEntryOption", message: "Opção de entrada atualizada." };
     } catch {
-      return fail(400, {
-        success: false,
-        action: "updateEntryOption",
-        message: "Não foi possível atualizar esta opção.",
-      });
+      return fail(400, { success: false, action: "updateEntryOption", message: "Não foi possível atualizar esta opção." });
     }
   },
 
   deleteEntryOption: async ({ cookies, request }) => {
-    const { session } = await requireAppPermission(
-      cookies,
-      "system.settings.manage",
-      "/app/settings/atendimento",
-    );
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
     const optionId = readString(await request.formData(), "optionId");
-    if (!isUuid(optionId)) {
-      return fail(400, { success: false, action: "deleteEntryOption", message: "Opção inválida." });
-    }
+    if (!isUuid(optionId)) return fail(400, { success: false, action: "deleteEntryOption", message: "Opção inválida." });
     try {
       await deleteSupportChatEntryOption(session.user.id, optionId);
       return { success: true, action: "deleteEntryOption", message: "Opção removida." };
     } catch {
-      return fail(400, {
-        success: false,
-        action: "deleteEntryOption",
-        message: "Não foi possível remover esta opção.",
-      });
+      return fail(400, { success: false, action: "deleteEntryOption", message: "Não foi possível remover esta opção." });
     }
   },
 };

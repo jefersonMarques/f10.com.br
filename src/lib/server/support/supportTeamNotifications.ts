@@ -3,6 +3,7 @@ import { getDatabase } from "$lib/server/db";
 import { webChatSessions } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { teamMembers, users } from "$lib/server/db/schema";
+import { ticketAreas, ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
 import { autoAssignChatIfConfigured } from "$lib/server/support/supportChatRoutingRepository";
 import { autoAssignTicketIfConfigured } from "$lib/server/support/supportRoutingRepository";
@@ -82,10 +83,13 @@ export async function notifySupportTicketNeedsAttention(
       subject: tickets.subject,
       channel: tickets.channel,
       assignedUserId: tickets.assignedUserId,
-      teamId: supportQueues.teamId,
+      queueTeamId: supportQueues.teamId,
+      areaTeamId: ticketAreas.teamId,
     })
     .from(tickets)
     .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
+    .leftJoin(ticketWorkflowStates, eq(ticketWorkflowStates.ticketId, tickets.id))
+    .leftJoin(ticketAreas, eq(ticketAreas.id, ticketWorkflowStates.areaId))
     .where(eq(tickets.id, ticketId))
     .limit(1);
 
@@ -96,15 +100,16 @@ export async function notifySupportTicketNeedsAttention(
     if (autoAssignedUserId) return;
   }
 
+  const teamId = ticket.areaTeamId ?? ticket.queueTeamId;
   let recipientIds: string[] = [];
   if (ticket.assignedUserId) {
     recipientIds = [ticket.assignedUserId];
-  } else if (ticket.teamId) {
+  } else if (teamId) {
     const members = await db
       .select({ userId: teamMembers.userId })
       .from(teamMembers)
       .innerJoin(users, eq(users.id, teamMembers.userId))
-      .where(and(eq(teamMembers.teamId, ticket.teamId), eq(users.status, "active")));
+      .where(and(eq(teamMembers.teamId, teamId), eq(users.status, "active")));
     recipientIds = Array.from(new Set(members.map((member) => member.userId)));
   }
 
