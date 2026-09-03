@@ -2,6 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { getOpenAiModel, isOpenAiConfigured } from "$lib/server/ai/openAiResponses";
 import { getDatabase } from "$lib/server/db";
 import { supportAiRuns } from "$lib/server/db/supportAiSchema";
+import { tryAnswerHelpArticleDeterministically } from "$lib/server/help/helpArticleDeterministicAnswer";
 import {
   answerHelpQuestion,
   type HelpKnowledgeResult,
@@ -249,6 +250,9 @@ async function answerArticle(
   question: string,
   slug: string,
 ): Promise<HelpKnowledgeResult> {
+  const deterministic = await tryAnswerHelpArticleDeterministically({ question, slug });
+  if (deterministic) return deterministic;
+
   return answerHelpQuestion({
     question,
     scope: { type: "article", slug },
