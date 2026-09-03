@@ -231,7 +231,7 @@ export async function runSupportAi(
   if (!question) throw new Error("SUPPORT_AI_QUESTION_REQUIRED");
 
   try {
-    const knowledge = await answerHelpQuestion({
+    let knowledge = await answerHelpQuestion({
       question: knowledgeQuestion(question, input.conversationContext ?? ""),
       scope: { type: "global" },
       source: "chat_ai",
@@ -243,6 +243,32 @@ export async function runSupportAi(
       ),
       maxOutputTokens: input.maxOutputTokens,
     });
+
+    if (knowledge.resolution === "navigate" && knowledge.target?.slug) {
+      const navigationKnowledge = knowledge;
+      const articleKnowledge = await answerHelpQuestion({
+        question,
+        scope: { type: "article", slug: knowledge.target.slug },
+        source: "chat_ai",
+        actorUserId: input.actorUserId ?? null,
+        customerContactId: input.customerContactId ?? null,
+        conversationContext: input.conversationContext,
+        maxOutputTokens: input.maxOutputTokens,
+      });
+
+      if (articleKnowledge.resolution === "answered") {
+        knowledge = {
+          ...articleKnowledge,
+          searchEventId: navigationKnowledge.searchEventId ?? articleKnowledge.searchEventId,
+          retrievalQuery: navigationKnowledge.retrievalQuery,
+          sources:
+            navigationKnowledge.sources.length > 0
+              ? navigationKnowledge.sources
+              : articleKnowledge.sources,
+        };
+      }
+    }
+
     const mapped = mapKnowledgeResult(knowledge);
     const model = knowledge.model ?? getOpenAiModel();
     const latencyMs = Date.now() - startedAt;
