@@ -19,6 +19,7 @@ function statusForError(code: string): number {
   if (code === "SERVICE_REQUEST_TICKET_CLOSED") return 409;
   if (code === "SERVICE_REQUEST_NOT_FOUND") return 404;
   if (code === "TICKET_NOT_ACCESSIBLE") return 403;
+  if (code === "PAYLOAD_TOO_LARGE" || code.includes("TOO_LARGE")) return 413;
   if (
     code === "SERVICE_REQUEST_STORAGE_NOT_CONFIGURED" ||
     code === "SERVICE_REQUEST_STORAGE_BUCKET_NOT_PRIVATE" ||

@@ -17,7 +17,7 @@ function messageForError(code: string): string {
   if (code === "AUTH_REQUIRED") return "Sua sessão expirou. Entre novamente na Área do Cliente.";
   if (code === "UNIT_REQUIRED") return "Selecione a unidade F10 antes de enviar esta solicitação.";
   if (code === "IDEMPOTENCY_KEY_REQUIRED") return "Atualize a página e tente enviar novamente.";
-  if (code.includes("ATTACHMENT_TOO_LARGE") || code === "PAYLOAD_TOO_LARGE") {
+  if (code === "PAYLOAD_TOO_LARGE" || code.includes("TOO_LARGE")) {
     return "Um ou mais documentos excedem o limite permitido.";
   }
   if (code.includes("ATTACHMENT_TYPE_INVALID")) return "Revise o formato dos documentos enviados.";
@@ -39,6 +39,7 @@ function statusForError(code: string): number {
   if (code === "UNIT_REQUIRED") return 409;
   if (code === "SERVICE_REQUEST_CONTEXT_NOT_AUTHORIZED") return 403;
   if (code === "SERVICE_REQUEST_IDEMPOTENCY_CONFLICT") return 409;
+  if (code === "PAYLOAD_TOO_LARGE" || code.includes("TOO_LARGE")) return 413;
   if (
     code === "SERVICE_REQUEST_TEAM_NOT_CONFIGURED" ||
     code === "SERVICE_REQUEST_GLOBAL_STAGE_NOT_CONFIGURED" ||
@@ -49,7 +50,6 @@ function statusForError(code: string): number {
     code === "ASSET_STORAGE_NOT_CONFIGURED" ||
     code.startsWith("ASSET_STORAGE_PUT_")
   ) return 503;
-  if (code === "PAYLOAD_TOO_LARGE") return 413;
   return code.startsWith("SERVICE_REQUEST_") || code === "IDEMPOTENCY_KEY_REQUIRED" ? 400 : 500;
 }
 

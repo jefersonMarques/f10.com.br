@@ -221,8 +221,8 @@
   // - Passo 3: múltiplos arquivos por tipo
   // - Passo 4: selfie única
   // ==============================
-  const maxSmallFileSizeBytes = 2 * 1024 * 1024; // 2MB
-  const maxLargeFileSizeBytes = 2 * 1024 * 1024 * 1024; // 2GB
+  const maxSmallFileSizeBytes = 5 * 1024 * 1024; // 5MB
+  const maxLargeFileSizeBytes = 10 * 1024 * 1024; // 10MB
   const maxFilesPerDocType = 6; // proteção contra exageros (ajuste se quiser)
 
   const step3DocTypes: Step3DocType[] = ["rg_cnh", "cnpj", "contrato"];
@@ -330,8 +330,8 @@
         ok: false,
         reason:
           docType === "selfie"
-            ? "Arquivo acima de 2MB."
-            : "Arquivo acima de 2GB.",
+            ? "Arquivo acima de 5MB."
+            : "Arquivo acima de 10MB.",
       };
     }
 
@@ -577,7 +577,7 @@
     closeCameraOverlay();
   }
 
-  // Captura com compressão adaptativa para caber em 2MB
+  // Captura com compressão adaptativa para caber em 5MB
   async function captureSelfie() {
     if (!videoEl || !canvasEl) return;
 
@@ -1579,18 +1579,18 @@
 
   function docHint(docType: DocType): string {
     if (docType === "rg_cnh") {
-      return "CNH: inclua a foto do QR Code. PDF ou imagem. Até 2GB.";
+      return "CNH: inclua a foto do QR Code. PDF ou imagem. Até 10MB.";
     }
 
     if (docType === "cnpj") {
-      return "Arquivo PDF ou imagem. Até 2GB.";
+      return "Arquivo PDF ou imagem. Até 10MB.";
     }
 
     if (docType === "contrato") {
-      return "Arquivo PDF ou imagem. Até 2GB.";
+      return "Arquivo PDF ou imagem. Até 10MB.";
     }
 
-    return "Foto nítida segurando o documento. Até 2MB.";
+    return "Foto nítida segurando o documento. Até 5MB.";
   }
 
   function docCardBorderClass(docType: DocType): string {
@@ -2470,7 +2470,7 @@
                     Envie os documentos obrigatórios (você pode anexar mais de
                     um arquivo por item).
                   </p>
-                  <p>Formatos aceitos: PDF, JPG, PNG (é 2MB por arquivo).</p>
+                  <p>Formatos aceitos: PDF, JPG, PNG (até 10 MB por arquivo).</p>
                 </div>
               </div>
             </div>
