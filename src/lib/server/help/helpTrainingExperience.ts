@@ -4,11 +4,13 @@ import { getHelpTrainingSession } from "$lib/server/help/helpTrainingRepository"
 export type HelpTrainingClientStep = {
   id: string;
   title: string;
+  question: string;
   instruction: string;
   expectedResult: string;
   successMessage: string;
   primaryActionLabel: string;
   interactionMode: HelpTrainingInteractionMode;
+  videoStartSeconds: number;
   images: Array<{ assetId: string; altText: string }>;
   videoUrl: string | null;
   captionAssetId: string | null;
@@ -22,11 +24,13 @@ export function normalizeTrainingClientStep(
   return {
     id: step.id,
     title: step.title,
+    question: step.question?.trim() || step.title,
     instruction: step.instruction,
     expectedResult: step.expectedResult,
     successMessage: step.successMessage,
-    primaryActionLabel: "Próximo passo",
+    primaryActionLabel: step.primaryActionLabel?.trim() || "Concluir e continuar",
     interactionMode,
+    videoStartSeconds: step.videoStartSeconds ?? 0,
     images: step.images.slice(0, 1),
     videoUrl: step.videoUrl,
     captionAssetId: step.captionAssetId ?? null,
@@ -51,6 +55,7 @@ export function toHelpTrainingClientState(
       audience: state.snapshot.audience,
       welcomeMessage: state.snapshot.welcomeMessage,
     },
+    sourceContent: state.snapshot.sourceContent,
     currentStep: normalizeTrainingClientStep(state.currentStep),
     progress: state.progress
       ? {

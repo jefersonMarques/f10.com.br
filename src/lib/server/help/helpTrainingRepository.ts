@@ -193,63 +193,10 @@ export async function listTrainingSupportQueues() {
 }
 
 export async function createHelpTrainingPath(
-  actorUserId: string,
-  input: { title: string; slug: string; audience: string; description: string },
+  _actorUserId: string,
+  _input: { title: string; slug: string; audience: string; description: string },
 ) {
-  const db = getDatabase();
-  const slug = normalizeTrainingSlug(input.slug || input.title);
-  if (!slug || input.title.trim().length < 4) throw new Error("INVALID_TRAINING_PATH");
-
-  const result = await db.transaction(async (tx) => {
-    const [path] = await tx
-      .insert(helpTrainingPaths)
-      .values({
-        slug,
-        title: input.title.trim(),
-        audience: input.audience.trim(),
-        description: input.description.trim(),
-        welcomeMessage: "Vamos aprender fazendo. Você verá uma ação curta por vez.",
-        createdBy: actorUserId,
-        updatedBy: actorUserId,
-      })
-      .returning({ id: helpTrainingPaths.id, slug: helpTrainingPaths.slug });
-    if (!path) throw new Error("TRAINING_PATH_NOT_CREATED");
-
-    const [step] = await tx
-      .insert(helpTrainingSteps)
-      .values({
-        pathId: path.id,
-        title: "Primeira ação",
-        instruction: "Descreva uma única ação simples que o usuário deve executar no F10.",
-        expectedResult: "Descreva o que ele deve ver quando terminar.",
-        successMessage: "Certo. Você concluiu esta ação.",
-        estimatedSeconds: 45,
-        sortOrder: 10,
-      })
-      .returning({ id: helpTrainingSteps.id });
-    if (!step) throw new Error("TRAINING_STEP_NOT_CREATED");
-
-    await tx.insert(helpTrainingFailureReasons).values(
-      DEFAULT_FAILURE_REASONS.map((reason, index) => ({
-        stepId: step.id,
-        reasonKey: reason.key,
-        label: reason.label,
-        recoveryMessage: reason.recoveryMessage,
-        sortOrder: (index + 1) * 10,
-      })),
-    );
-
-    return path;
-  });
-
-  await recordAuditEvent({
-    actorUserId,
-    action: "help.training.created",
-    entityType: "help_training_path",
-    entityId: result.id,
-    metadata: { slug: result.slug },
-  });
-  return result;
+  throw new Error("TRAINING_SOURCE_CONTENT_REQUIRED");
 }
 
 export async function updateHelpTrainingPath(
@@ -479,6 +426,8 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
       expectedResult: step.expectedResult,
       successMessage: step.successMessage,
       estimatedSeconds: step.estimatedSeconds,
+      sourceContentStepId: step.sourceContentStepId,
+      videoStartSeconds: step.videoStartSeconds,
       images,
       videoUrl: video?.sourceUrl ?? null,
       failureReasons: step.failureReasons.map((reason) => ({
@@ -497,6 +446,7 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
     description: path.description,
     welcomeMessage: path.welcomeMessage,
     version,
+    sourceContent: path.sourcePublicationSnapshot,
     steps,
   };
 }

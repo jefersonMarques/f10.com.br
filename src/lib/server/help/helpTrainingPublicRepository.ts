@@ -143,6 +143,7 @@ export function toPublicHelpTrainingClientState(
       audience: state.snapshot.audience,
       welcomeMessage: state.snapshot.welcomeMessage,
     },
+    sourceContent: state.snapshot.sourceContent,
     currentStep: normalizeTrainingClientStep(state.currentStep),
     progress: state.progress
       ? {
