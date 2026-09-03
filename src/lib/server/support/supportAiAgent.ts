@@ -30,6 +30,8 @@ export type SupportAiSource = {
   score: number;
 };
 
+export type SupportAiAnswerOrigin = "current_article" | "other_article" | "global";
+
 export type SupportAiResult = {
   runId: string;
   searchEventId: string | null;
@@ -38,6 +40,7 @@ export type SupportAiResult = {
   escalationReason: string;
   target: HelpKnowledgeTarget | null;
   sources: SupportAiSource[];
+  answerOrigin: SupportAiAnswerOrigin;
   model: string;
   providerResponseId: string | null;
   inputTokens: number | null;
@@ -51,6 +54,7 @@ export type RunSupportAiInput = {
   customerContactId?: string | null;
   ticketId?: string | null;
   conversationContext?: string;
+  preferredArticleSlug?: string | null;
   maxOutputTokens?: number;
 };
 
@@ -228,6 +232,113 @@ function mapKnowledgeResult(
   };
 }
 
+function mergeArticleKnowledge(
+  discovery: HelpKnowledgeResult,
+  answer: HelpKnowledgeResult,
+): HelpKnowledgeResult {
+  return {
+    ...answer,
+    searchEventId: discovery.searchEventId ?? answer.searchEventId,
+    retrievalQuery: discovery.retrievalQuery,
+    sources: discovery.sources.length > 0 ? discovery.sources : answer.sources,
+  };
+}
+
+async function answerArticle(
+  input: RunSupportAiInput,
+  question: string,
+  slug: string,
+): Promise<HelpKnowledgeResult> {
+  return answerHelpQuestion({
+    question,
+    scope: { type: "article", slug },
+    source: "chat_ai",
+    actorUserId: input.actorUserId ?? null,
+    customerContactId: input.customerContactId ?? null,
+    conversationContext: input.conversationContext,
+    maxOutputTokens: input.maxOutputTokens,
+  });
+}
+
+async function answerGlobal(
+  input: RunSupportAiInput,
+  question: string,
+): Promise<HelpKnowledgeResult> {
+  let knowledge = await answerHelpQuestion({
+    question: knowledgeQuestion(question, input.conversationContext ?? ""),
+    scope: { type: "global" },
+    source: "chat_ai",
+    actorUserId: input.actorUserId ?? null,
+    customerContactId: input.customerContactId ?? null,
+    conversationContext: knowledgeConversationContext(
+      question,
+      input.conversationContext ?? "",
+    ),
+    maxOutputTokens: input.maxOutputTokens,
+  });
+
+  if (knowledge.resolution === "navigate" && knowledge.target?.slug) {
+    const navigationKnowledge = knowledge;
+    const articleKnowledge = await answerArticle(
+      input,
+      question,
+      navigationKnowledge.target.slug,
+    );
+    if (articleKnowledge.resolution === "answered") {
+      knowledge = mergeArticleKnowledge(navigationKnowledge, articleKnowledge);
+    }
+  }
+
+  return knowledge;
+}
+
+async function resolveKnowledge(
+  input: RunSupportAiInput,
+  question: string,
+): Promise<{ knowledge: HelpKnowledgeResult; answerOrigin: SupportAiAnswerOrigin }> {
+  const preferredArticleSlug = input.preferredArticleSlug?.trim().slice(0, 160) ?? "";
+
+  if (preferredArticleSlug) {
+    try {
+      const currentArticle = await answerArticle(input, question, preferredArticleSlug);
+      if (currentArticle.resolution === "answered") {
+        return { knowledge: currentArticle, answerOrigin: "current_article" };
+      }
+
+      if (
+        currentArticle.resolution === "found_elsewhere" &&
+        currentArticle.target?.slug &&
+        currentArticle.target.slug !== preferredArticleSlug
+      ) {
+        const otherArticle = await answerArticle(
+          input,
+          question,
+          currentArticle.target.slug,
+        );
+        if (otherArticle.resolution === "answered") {
+          return {
+            knowledge: mergeArticleKnowledge(currentArticle, otherArticle),
+            answerOrigin: "other_article",
+          };
+        }
+      }
+    } catch (cause) {
+      if (!(cause instanceof Error) || cause.message !== "HELP_ARTICLE_NOT_FOUND") {
+        throw cause;
+      }
+    }
+  }
+
+  const global = await answerGlobal(input, question);
+  return {
+    knowledge: global,
+    answerOrigin:
+      preferredArticleSlug && global.target?.slug && global.target.slug !== preferredArticleSlug
+        ? "other_article"
+        : "global",
+  };
+}
+
 export function getSupportAiLabConfiguration() {
   return {
     configured: isOpenAiConfigured(),
@@ -243,44 +354,7 @@ export async function runSupportAi(
   if (!question) throw new Error("SUPPORT_AI_QUESTION_REQUIRED");
 
   try {
-    let knowledge = await answerHelpQuestion({
-      question: knowledgeQuestion(question, input.conversationContext ?? ""),
-      scope: { type: "global" },
-      source: "chat_ai",
-      actorUserId: input.actorUserId ?? null,
-      customerContactId: input.customerContactId ?? null,
-      conversationContext: knowledgeConversationContext(
-        question,
-        input.conversationContext ?? "",
-      ),
-      maxOutputTokens: input.maxOutputTokens,
-    });
-
-    if (knowledge.resolution === "navigate" && knowledge.target?.slug) {
-      const navigationKnowledge = knowledge;
-      const articleKnowledge = await answerHelpQuestion({
-        question,
-        scope: { type: "article", slug: knowledge.target.slug },
-        source: "chat_ai",
-        actorUserId: input.actorUserId ?? null,
-        customerContactId: input.customerContactId ?? null,
-        conversationContext: input.conversationContext,
-        maxOutputTokens: input.maxOutputTokens,
-      });
-
-      if (articleKnowledge.resolution === "answered") {
-        knowledge = {
-          ...articleKnowledge,
-          searchEventId: navigationKnowledge.searchEventId ?? articleKnowledge.searchEventId,
-          retrievalQuery: navigationKnowledge.retrievalQuery,
-          sources:
-            navigationKnowledge.sources.length > 0
-              ? navigationKnowledge.sources
-              : articleKnowledge.sources,
-        };
-      }
-    }
-
+    const { knowledge, answerOrigin } = await resolveKnowledge(input, question);
     const mapped = mapKnowledgeResult(knowledge);
     const model = knowledge.model ?? getOpenAiModel();
     const latencyMs = Date.now() - startedAt;
@@ -293,7 +367,7 @@ export async function runSupportAi(
 
     await recordHelpKnowledgeRun({
       source: "chat_ai",
-      scope: "global",
+      scope: answerOrigin === "current_article" ? "article" : "global",
       actorUserId: input.actorUserId,
       customerContactId: input.customerContactId,
       searchEventId: knowledge.searchEventId,
@@ -339,6 +413,7 @@ export async function runSupportAi(
       escalationReason: mapped.escalationReason,
       target: knowledge.target,
       sources: knowledge.sources,
+      answerOrigin,
       model,
       providerResponseId: knowledge.providerResponseId,
       inputTokens: knowledge.inputTokens,
@@ -357,7 +432,7 @@ export async function runSupportAi(
 
     await recordHelpKnowledgeRun({
       source: "chat_ai",
-      scope: "global",
+      scope: input.preferredArticleSlug ? "article" : "global",
       actorUserId: input.actorUserId,
       customerContactId: input.customerContactId,
       question,
@@ -388,6 +463,7 @@ export async function runSupportAi(
       escalationReason,
       target: null,
       sources: [],
+      answerOrigin: "global",
       model,
       providerResponseId: null,
       inputTokens: null,
