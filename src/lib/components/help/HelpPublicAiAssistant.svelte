@@ -73,6 +73,7 @@
   ];
 
   let minimized = true;
+  let showHint = true;
   let question = "";
   let loading = false;
   let messages: ChatMessage[] = [];
@@ -97,6 +98,12 @@
     question = "";
     loading = false;
     minimized = true;
+    showHint = true;
+  }
+
+  function openAssistant(): void {
+    minimized = false;
+    showHint = false;
   }
 
   function targetElement(helpTarget: HelpTarget): HTMLElement | null {
@@ -307,18 +314,32 @@
 
 {#if enabled && articleSlug}
   {#if minimized}
-    <button
-      type="button"
-      class="fixed bottom-4 left-1/2 z-40 inline-flex min-h-12 -translate-x-1/2 items-center gap-2 rounded-full border border-[#D9DDE8] bg-white px-5 text-[11px] font-semibold text-[#000A57] shadow-[0_18px_50px_rgba(1,13,40,0.18)] transition hover:-translate-y-0.5 sm:bottom-6"
-      on:click={() => (minimized = false)}
-      aria-label="Abrir assistente deste artigo"
-    >
-      <Sparkles size={16} class="text-[#EA6D0B]" />
-      Perguntar sobre este artigo
-    </button>
+    <div class="group fixed bottom-[92px] right-5 z-[10005] flex items-center gap-3 sm:bottom-[96px] sm:right-6">
+      <div
+        class={`relative hidden max-w-[210px] rounded-2xl border border-[#E3E6EF] bg-white px-3.5 py-2.5 text-[10px] font-semibold leading-4 text-[#000A57] shadow-[0_14px_36px_rgba(1,13,40,0.14)] transition sm:block ${showHint ? "opacity-100" : "pointer-events-none translate-x-1 opacity-0 group-hover:pointer-events-auto group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-x-0 group-focus-within:opacity-100"}`}
+      >
+        Estou aqui para tirar dúvidas
+        <span class="absolute right-[-5px] top-1/2 h-2.5 w-2.5 -translate-y-1/2 rotate-45 border-r border-t border-[#E3E6EF] bg-white" aria-hidden="true"></span>
+      </div>
+
+      <button
+        type="button"
+        class="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-4 focus-visible:ring-[#EA6D0B]/25"
+        on:click={openAssistant}
+        aria-label="Perguntar sobre este artigo"
+        aria-expanded="false"
+        title="Perguntar sobre este artigo"
+      >
+        <span class="article-assistant-radar" aria-hidden="true"></span>
+        <span class="article-assistant-radar article-assistant-radar-delayed" aria-hidden="true"></span>
+        <span class="relative z-10 flex h-12 w-12 items-center justify-center rounded-full bg-[#EA6D0B] text-white shadow-[0_10px_28px_rgba(234,109,11,0.35)] transition duration-200 group-hover:scale-105">
+          <Sparkles size={20} aria-hidden="true" />
+        </span>
+      </button>
+    </div>
   {:else}
-    <aside class="fixed bottom-3 left-1/2 z-40 w-[calc(100vw-20px)] max-w-[760px] -translate-x-1/2 overflow-hidden rounded-[26px] border border-[#D9DDE8] bg-white shadow-[0_24px_80px_rgba(1,13,40,0.20)] sm:bottom-6">
-      <header class="flex items-center justify-between gap-3 border-b border-[#E7EAF1] bg-[#010D28] px-4 py-3 text-white sm:px-5">
+    <aside class="fixed bottom-[92px] right-4 z-[10005] w-[calc(100vw-32px)] max-w-[420px] overflow-hidden rounded-[24px] border border-[#D9DDE8] bg-white shadow-[0_24px_80px_rgba(1,13,40,0.22)] sm:bottom-[96px] sm:right-6">
+      <header class="flex items-center justify-between gap-3 border-b border-[#E7EAF1] bg-[#010D28] px-4 py-3 text-white">
         <div class="flex min-w-0 items-center gap-3">
           <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[#FF9A4B]"><Sparkles size={17} /></span>
           <div class="min-w-0">
@@ -329,17 +350,17 @@
         <button type="button" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/65 transition hover:bg-white/10 hover:text-white" on:click={() => (minimized = true)} aria-label="Minimizar assistente"><X size={15}/></button>
       </header>
 
-      <div bind:this={viewport} class="max-h-[46vh] min-h-[150px] overflow-y-auto bg-[#F7F8FB] px-3 py-4 sm:px-5">
+      <div bind:this={viewport} class="max-h-[52vh] min-h-[180px] overflow-y-auto bg-[#F7F8FB] px-3 py-4">
         {#if !available}
-          <div class="mx-auto max-w-[620px] rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[11px] leading-5 text-[#7A3B08]">
+          <div class="rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[11px] leading-5 text-[#7A3B08]">
             Assistente temporariamente indisponível.
             {#if requiresAuthentication}<a href="/cliente" class="mt-2 block font-semibold text-[#000A57] hover:underline">Entrar na Área do Cliente</a>{/if}
           </div>
         {:else if messages.length === 0}
-          <div class="mx-auto max-w-[620px]">
+          <div>
             <div class="flex items-start gap-3">
               <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF0FF] text-[#000A57]"><MessageCircleQuestion size={15}/></span>
-              <div class="max-w-[540px] rounded-2xl rounded-tl-md bg-white px-4 py-3 shadow-[0_4px_18px_rgba(1,13,40,0.05)]">
+              <div class="rounded-2xl rounded-tl-md bg-white px-4 py-3 shadow-[0_4px_18px_rgba(1,13,40,0.05)]">
                 <p class="text-[12px] leading-6 text-[#424A5D]">Pergunte sobre esta página. Se a resposta estiver aqui, eu explico e mostro exatamente o ponto do artigo. Se estiver em outro conteúdo, eu trago a orientação correspondente.</p>
               </div>
             </div>
@@ -352,18 +373,18 @@
         {/if}
 
         {#if messages.length > 0}
-          <div class="mx-auto max-w-[660px] space-y-3">
+          <div class="space-y-3">
             {#each messages as message (message.id)}
               {#if message.role === "user"}
                 <div class="flex justify-end">
-                  <div class="max-w-[86%] rounded-2xl rounded-br-md bg-[#000A57] px-4 py-3 text-white">
+                  <div class="max-w-[88%] rounded-2xl rounded-br-md bg-[#000A57] px-4 py-3 text-white">
                     <p class="whitespace-pre-wrap text-[12px] leading-5">{message.text}</p>
                   </div>
                 </div>
               {:else}
                 <div class="flex items-start gap-2.5">
                   <span class={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${message.error ? "bg-[#FFF0E8] text-[#A9510D]" : "bg-[#EEF0FF] text-[#000A57]"}`}><Sparkles size={14}/></span>
-                  <div class={`max-w-[86%] rounded-2xl rounded-tl-md border px-4 py-3 ${message.error ? "border-[#F1D7BD] bg-[#FFF9F3]" : "border-[#E7EAF1] bg-white"}`}>
+                  <div class={`max-w-[88%] rounded-2xl rounded-tl-md border px-4 py-3 ${message.error ? "border-[#F1D7BD] bg-[#FFF9F3]" : "border-[#E7EAF1] bg-white"}`}>
                     {#if message.error}
                       <p class="whitespace-pre-wrap text-[12px] leading-6 text-[#7A3B08]">{message.text}</p>
                     {:else}
@@ -423,15 +444,15 @@
         {/if}
       </div>
 
-      <form class="border-t border-[#E7EAF1] bg-white p-3 sm:px-4 sm:py-3.5" on:submit|preventDefault={() => submitQuestion()}>
+      <form class="border-t border-[#E7EAF1] bg-white p-3" on:submit|preventDefault={() => submitQuestion()}>
         <label class="sr-only" for="help-public-ai-question">Pergunte sobre este artigo</label>
-        <div class="mx-auto flex max-w-[680px] items-end gap-2 rounded-2xl border border-[#DDE1EA] bg-[#FAFBFD] p-2 focus-within:border-[#000A57] focus-within:ring-4 focus-within:ring-[#000A57]/8">
+        <div class="flex items-end gap-2 rounded-2xl border border-[#DDE1EA] bg-[#FAFBFD] p-2 focus-within:border-[#000A57] focus-within:ring-4 focus-within:ring-[#000A57]/8">
           <textarea
             id="help-public-ai-question"
             bind:value={question}
             maxlength="600"
             rows="1"
-            placeholder="Pergunte sobre este artigo ou continue a conversa..."
+            placeholder="Pergunte sobre este artigo..."
             class="max-h-28 min-h-[42px] flex-1 resize-none bg-transparent px-2 py-2.5 text-[12px] leading-5 text-[#252C3D] outline-none placeholder:text-[#969CAA]"
             disabled={!available || loading}
             on:keydown={handleQuestionKeydown}
@@ -440,9 +461,9 @@
             {#if loading}<LoaderCircle size={17} class="animate-spin"/>{:else}<Send size={16}/>{/if}
           </button>
         </div>
-        <div class="mx-auto mt-2 flex max-w-[680px] items-center justify-between gap-3 px-1">
-          <span class="inline-flex items-center gap-1.5 text-[8px] font-medium text-[#8B91A0]"><ShieldCheck size={11}/>Prioriza este artigo e aponta o trecho exato da resposta</span>
-          <span class="text-[8px] text-[#A0A5B1]">Enter envia · Shift+Enter quebra linha</span>
+        <div class="mt-2 flex items-center justify-between gap-3 px-1">
+          <span class="inline-flex items-center gap-1.5 text-[8px] font-medium text-[#8B91A0]"><ShieldCheck size={11}/>Prioriza este artigo e aponta o trecho exato</span>
+          <span class="hidden text-[8px] text-[#A0A5B1] sm:block">Enter envia</span>
         </div>
       </form>
     </aside>
@@ -450,11 +471,35 @@
 {/if}
 
 <style>
+  .article-assistant-radar {
+    position: absolute;
+    inset: -5px;
+    border: 1px solid rgba(234, 109, 11, 0.42);
+    border-radius: 9999px;
+    pointer-events: none;
+    animation: article-assistant-radar 2.6s ease-out infinite;
+  }
+
+  .article-assistant-radar-delayed {
+    animation-delay: 1.3s;
+  }
+
   :global(.help-ai-target-highlight) {
     animation: help-ai-target-pulse 1.2s ease-out 2;
     outline: 3px solid rgba(234, 109, 11, 0.7);
     outline-offset: 4px;
     border-radius: 18px;
+  }
+
+  @keyframes article-assistant-radar {
+    0% {
+      opacity: 0.8;
+      transform: scale(0.78);
+    }
+    75%, 100% {
+      opacity: 0;
+      transform: scale(1.45);
+    }
   }
 
   @keyframes help-ai-target-pulse {
@@ -463,6 +508,9 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    :global(.help-ai-target-highlight) { animation: none; }
+    .article-assistant-radar,
+    :global(.help-ai-target-highlight) {
+      animation: none;
+    }
   }
 </style>
