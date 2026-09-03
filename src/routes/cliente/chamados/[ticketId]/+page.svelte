@@ -16,6 +16,7 @@
   } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
+  import ServiceRequestDetailsCard from "$lib/components/serviceRequests/ServiceRequestDetailsCard.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -167,6 +168,18 @@
       <span class={`inline-flex items-center gap-1.5 font-semibold ${dueLabel().startsWith("Prazo excedido") ? "text-[#A44E3B]" : "text-[#5F687B]"}`}><Activity size={13} />{dueLabel()}</span>
     </div>
   </section>
+
+  {#if data.serviceRequest}
+    <div class="mt-4">
+      <ServiceRequestDetailsCard
+        serviceRequest={data.serviceRequest}
+        ticketId={data.details.ticket.id}
+        mode="customer"
+        canEdit={data.details.ticket.status !== "closed"}
+        updateAction="?/updateServiceRequest"
+      />
+    </div>
+  {/if}
 
   <section class="mt-4 overflow-hidden rounded-[22px] border border-[#E1E4EC] bg-white shadow-[0_8px_28px_rgba(1,13,40,0.025)]">
     <header class="border-b border-[#ECEEF3] px-5 py-4 sm:px-6">
