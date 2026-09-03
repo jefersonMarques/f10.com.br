@@ -17,6 +17,7 @@
   export let selectedUnitId: number | null = null;
   export let invalid = false;
   export let hint = "";
+  export let surface: "card" | "plain" = "card";
 
   $: if (selectedGroupId === null && groups.length === 1) {
     selectedGroupId = groups[0]?.grupo_id ?? null;
@@ -33,6 +34,10 @@
     invalid = false;
   }
 
+  $: surfaceClass = surface === "card"
+    ? `rounded-2xl border bg-white px-4 py-4 shadow-[0_8px_24px_rgba(1,13,40,0.035)] sm:px-5 ${invalid ? "border-red-300 ring-2 ring-red-100" : "border-[#E1E4EC]"}`
+    : `${invalid ? "rounded-xl outline outline-2 outline-red-200 outline-offset-4" : ""}`;
+
   function handleGroupChange(event: Event) {
     const value = (event.currentTarget as HTMLSelectElement).value;
     selectedGroupId = value ? Number(value) : null;
@@ -45,15 +50,12 @@
   }
 </script>
 
-<section
-  data-service-request-context
-  class={`rounded-2xl border bg-white px-4 py-4 shadow-[0_8px_24px_rgba(1,13,40,0.035)] transition sm:px-5 ${invalid ? "border-red-300 ring-2 ring-red-100" : "border-[#E1E4EC]"}`}
->
+<section data-service-request-context class={`transition ${surfaceClass}`}>
   <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-    <div class="min-w-0">
+    <div class="min-w-0 lg:max-w-[360px]">
       <p class="application-text-caption font-bold uppercase tracking-[0.08em] text-[#EA6D0B]">Contexto da implementação</p>
-      <h2 class="mt-1 text-[16px] font-semibold text-[#202737]">Escolha o grupo e a unidade</h2>
-      <p class="mt-1 text-[11px] leading-5 text-[#747C8D]">A solicitação e o chamado serão vinculados à unidade escolhida abaixo.</p>
+      <h2 class="mt-1 text-[16px] font-semibold text-[#202737]">Grupo e unidade</h2>
+      <p class="application-text-meta mt-1 leading-5 text-[#747C8D]">Escolha onde esta implementação será vinculada.</p>
       {#if invalid}
         <p class="mt-2 text-[11px] font-semibold text-red-600">Selecione o grupo e a unidade antes de enviar a solicitação.</p>
       {/if}
@@ -61,9 +63,9 @@
 
     <div class="grid w-full gap-3 sm:grid-cols-2 lg:max-w-[650px]">
       <label class="block">
-        <span class="application-text-meta mb-1.5 flex items-center gap-1.5 font-semibold text-[#596173]"><Building2 size={14} /> Grupo</span>
+        <span class="application-text-caption mb-1.5 flex items-center gap-1.5 font-semibold text-[#555D6E]"><Building2 size={14} /> Grupo</span>
         <select
-          class="w-full rounded-xl border border-[#DDE1E9] bg-white px-3 py-2.5 text-[12px] text-[#202737] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"
+          class="application-text-control h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 text-[#202737] outline-none transition focus:border-[#000A57] focus:ring-4 focus:ring-[#000A57]/10"
           value={selectedGroupId ?? ""}
           on:change={handleGroupChange}
           aria-label="Grupo da implementação"
@@ -77,16 +79,16 @@
       </label>
 
       <label class="block">
-        <span class="application-text-meta mb-1.5 flex items-center gap-1.5 font-semibold text-[#596173]"><School size={14} /> Unidade</span>
+        <span class="application-text-caption mb-1.5 flex items-center gap-1.5 font-semibold text-[#555D6E]"><School size={14} /> Unidade</span>
         <select
-          class="w-full rounded-xl border border-[#DDE1E9] bg-white px-3 py-2.5 text-[12px] text-[#202737] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10 disabled:cursor-not-allowed disabled:bg-[#F5F6F8] disabled:text-[#9AA0AC]"
+          class="application-text-control h-11 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 text-[#202737] outline-none transition focus:border-[#000A57] focus:ring-4 focus:ring-[#000A57]/10 disabled:cursor-not-allowed disabled:bg-[#F5F6F8] disabled:text-[#A1A6B0]"
           value={selectedUnitId ?? ""}
           on:change={handleUnitChange}
           disabled={selectedGroupId === null}
           aria-label="Unidade da implementação"
           aria-invalid={invalid}
         >
-          <option value="">Selecione a unidade</option>
+          <option value="">{selectedGroupId === null ? "Selecione o grupo primeiro" : "Selecione a unidade"}</option>
           {#each units as unit (unit.unidade_id)}
             <option value={unit.unidade_id}>{unit.unidade}</option>
           {/each}
@@ -96,7 +98,7 @@
   </div>
 
   {#if hint}
-    <div class="application-text-meta mt-3 flex items-start gap-2 border-t border-[#EEF0F4] pt-3 leading-5 text-[#6A7280]">
+    <div class="application-text-meta mt-4 flex items-start gap-2 border-t border-[#E8EBF1] pt-3 leading-5 text-[#7A8190]">
       <ShieldCheck size={13} class="mt-0.5 shrink-0 text-[#4F6658]" />
       <span>{hint}</span>
     </div>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import LegacyServiceRequestSubmissionBridge from "$lib/components/serviceRequests/LegacyServiceRequestSubmissionBridge.svelte";
-  import ServiceRequestContextSelector from "$lib/components/serviceRequests/ServiceRequestContextSelector.svelte";
+  import ServiceRequestPortalFormShell from "$lib/components/serviceRequests/ServiceRequestPortalFormShell.svelte";
   import LegacyCellCoinForm from "../../../celcoin/cadastro-de-escolas/+page.svelte";
   import type { PageData } from "./$types";
 
@@ -23,22 +23,15 @@
   on:contextrequired={() => contextInvalid = true}
 />
 
-<div class="mx-auto mt-6 max-w-[1180px] px-4 sm:px-6">
-  <ServiceRequestContextSelector
-    groups={data.groups}
-    bind:selectedGroupId
-    bind:selectedUnitId
-    bind:invalid={contextInvalid}
-    hint="Documentos: até 10 MB por arquivo, selfie até 5 MB e 50 MB no total. Os arquivos são armazenados no bucket privado da solicitação."
-  />
-</div>
-
-<div class="service-request-embedded-form">
+<ServiceRequestPortalFormShell
+  requestType="cell-coin"
+  title="Implementação CELL COIN"
+  description="Informe os dados cadastrais, documentos e aceite necessários para ativar o serviço na unidade escolhida."
+  groups={data.groups}
+  bind:selectedGroupId
+  bind:selectedUnitId
+  bind:contextInvalid
+  hint="Documentos: até 10 MB por arquivo, selfie até 5 MB e 50 MB no total. Os arquivos são armazenados no bucket privado da solicitação."
+>
   <LegacyCellCoinForm />
-</div>
-
-<style>
-  .service-request-embedded-form :global(nav[itemtype="https://schema.org/BreadcrumbList"]) {
-    display: none;
-  }
-</style>
+</ServiceRequestPortalFormShell>
