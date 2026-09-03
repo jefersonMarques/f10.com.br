@@ -8,7 +8,7 @@
 </script>
 
 <nav class="border-b border-[#E6E8EF] bg-white/90 px-5 py-3 backdrop-blur sm:px-8" aria-label="Seções de configurações">
-  <div class="mx-auto flex max-w-[1260px] flex-wrap gap-2">
+  <div class="mx-auto flex max-w-[1440px] flex-wrap gap-2">
     <a href="/app/settings" class={baseClass + " " + ($page.url.pathname === "/app/settings" ? activeClass : inactiveClass)}><Settings size={13}/>Geral</a>
     <a href="/app/settings/atendimento" class={baseClass + " " + ($page.url.pathname.startsWith("/app/settings/atendimento") ? activeClass : inactiveClass)}><Clock3 size={13}/>Atendimento</a>
     <a href="/app/settings/ai" class={baseClass + " " + ($page.url.pathname.startsWith("/app/settings/ai") ? activeClass : inactiveClass)}><Bot size={13}/>Inteligência Artificial</a>
