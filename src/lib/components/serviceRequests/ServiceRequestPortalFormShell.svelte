@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Coins, FileText } from "lucide-svelte";
+  import { Coins, FileText, MapPin } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import ServiceRequestContextSelector from "$lib/components/serviceRequests/ServiceRequestContextSelector.svelte";
@@ -23,6 +23,37 @@
   export let selectedUnitId: number | null = null;
   export let contextInvalid = false;
   export let hint = "";
+
+  let contextConfirmed = false;
+
+  $: singleGroup = groups.length === 1 ? groups[0] ?? null : null;
+  $: singleUnit = singleGroup?.unidades.length === 1 ? singleGroup.unidades[0] ?? null : null;
+
+  $: if (singleGroup && singleUnit) {
+    selectedGroupId = singleGroup.grupo_id;
+    selectedUnitId = singleUnit.unidade_id;
+    contextConfirmed = true;
+    contextInvalid = false;
+  }
+
+  $: selectedGroup = groups.find((group) => group.grupo_id === selectedGroupId) ?? null;
+  $: selectedUnit = selectedGroup?.unidades.find((unit) => unit.unidade_id === selectedUnitId) ?? null;
+  $: contextReady = selectedGroup !== null && selectedUnit !== null;
+  $: canChangeContext = !(singleGroup && singleUnit);
+
+  function confirmContext(): void {
+    if (!contextReady) {
+      contextInvalid = true;
+      return;
+    }
+    contextInvalid = false;
+    contextConfirmed = true;
+  }
+
+  function changeContext(): void {
+    if (!canChangeContext) return;
+    contextConfirmed = false;
+  }
 </script>
 
 <ApplicationContent width="narrow" density="normal" className="pb-10">
@@ -46,22 +77,54 @@
       </div>
     </header>
 
-    <div class="border-t border-[#ECEEF3] bg-[#FAFBFC] p-5 sm:p-6">
-      <ServiceRequestContextSelector
-        surface="plain"
-        {groups}
-        bind:selectedGroupId
-        bind:selectedUnitId
-        bind:invalid={contextInvalid}
-        {hint}
-      />
-    </div>
+    {#if !contextConfirmed}
+      <div class="border-t border-[#ECEEF3] bg-[#FAFBFC] p-5 sm:p-6">
+        <ServiceRequestContextSelector
+          surface="plain"
+          {groups}
+          bind:selectedGroupId
+          bind:selectedUnitId
+          bind:invalid={contextInvalid}
+        />
 
-    <div class="border-t border-[#ECEEF3] p-5 sm:p-6">
-      <div class="legacy-form">
-        <slot />
+        <div class="mt-5 flex justify-end border-t border-[#E8EBF1] pt-4">
+          <button
+            type="button"
+            class="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white transition hover:bg-[#111B71] disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!contextReady}
+            on:click={confirmContext}
+          >
+            Continuar
+          </button>
+        </div>
       </div>
-    </div>
+    {:else}
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-[#ECEEF3] bg-[#FAFBFC] px-5 py-3 sm:px-6">
+        <div class="flex min-w-0 items-center gap-2 text-[#626A7A]">
+          <MapPin size={14} class="shrink-0 text-[#000A57]" />
+          <span class="application-text-caption truncate">
+            <strong class="font-semibold text-[#343C4C]">{selectedGroup?.grupo}</strong>
+            <span class="mx-1.5 text-[#B0B5BF]">·</span>
+            {selectedUnit?.unidade}
+          </span>
+        </div>
+        {#if canChangeContext}
+          <button
+            type="button"
+            class="application-text-caption rounded-lg px-2.5 py-1.5 font-semibold text-[#000A57] transition hover:bg-[#EEF0FF]"
+            on:click={changeContext}
+          >
+            Alterar
+          </button>
+        {/if}
+      </div>
+
+      <div class="border-t border-[#ECEEF3] p-5 sm:p-6">
+        <div class="legacy-form">
+          <slot />
+        </div>
+      </div>
+    {/if}
   </section>
 </ApplicationContent>
 
