@@ -1,8 +1,9 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
-  createOpenAiStructuredResponse,
-  OpenAiResponseError,
-} from "$lib/server/ai/openAiResponses";
+  AiGatewayError,
+  createAiStructuredResponse,
+} from "$lib/server/ai/aiGateway";
+import type { AiCapability, AiProviderCode, AiTaskCode } from "$lib/server/ai/aiTypes";
 import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
 import {
@@ -26,12 +27,12 @@ const NOT_FOUND_ANSWER =
   "Não encontrei uma orientação publicada que responda isso com segurança. Tente descrever a tela, botão ou procedimento que você está procurando.";
 
 const RETRIABLE_HELP_AI_CODES = new Set([
-  "OPENAI_TIMEOUT",
-  "OPENAI_REQUEST_FAILED",
-  "OPENAI_INVALID_RESPONSE",
-  "OPENAI_EMPTY_RESPONSE",
-  "OPENAI_INVALID_JSON",
-  "OPENAI_INVALID_HELP_KNOWLEDGE_OUTPUT",
+  "AI_TIMEOUT",
+  "AI_REQUEST_FAILED",
+  "AI_INVALID_RESPONSE",
+  "AI_EMPTY_RESPONSE",
+  "AI_INVALID_JSON",
+  "AI_INVALID_HELP_KNOWLEDGE_OUTPUT",
 ]);
 
 const NAVIGATION_STOP_WORDS = new Set([
@@ -160,6 +161,8 @@ export type HelpKnowledgeResult = {
     rank: number;
     score: number;
   }>;
+  provider?: AiProviderCode | null;
+  fallbackUsed?: boolean;
   model: string | null;
   providerResponseId: string | null;
   inputTokens: number | null;
@@ -493,8 +496,18 @@ function navigationMatch(
   return terms.every((term) => topText.includes(term));
 }
 
+function aiTaskFor(input: AnswerHelpQuestionInput): AiTaskCode {
+  return input.source === "public" ? "help_public_answer" : "support_answer";
+}
+
+function requiredCapabilitiesFor(input: AnswerHelpQuestionInput): AiCapability[] {
+  return input.source === "public"
+    ? ["knowledge.search", "knowledge.read", "public.reply"]
+    : ["knowledge.search", "knowledge.read", "customer.reply"];
+}
+
 function shouldRetryModel(cause: unknown): boolean {
-  if (!(cause instanceof OpenAiResponseError)) return false;
+  if (!(cause instanceof AiGatewayError)) return false;
   if (cause.status !== null && cause.status >= 500) return true;
   return RETRIABLE_HELP_AI_CODES.has(cause.code);
 }
@@ -504,13 +517,17 @@ async function runModelAttempt(
   fragments: KnowledgeFragment[],
 ): Promise<{
   answer: ModelAnswer;
+  provider: AiProviderCode;
+  fallbackUsed: boolean;
   model: string;
   responseId: string | null;
   inputTokens: number | null;
   outputTokens: number | null;
 }> {
   const conversation = trimText(input.conversationContext ?? "", MAX_CONVERSATION_CHARS);
-  const response = await createOpenAiStructuredResponse<ModelAnswer>({
+  const response = await createAiStructuredResponse<ModelAnswer>({
+    task: aiTaskFor(input),
+    requiredCapabilities: requiredCapabilitiesFor(input),
     instructions: input.scope.type === "article" ? ARTICLE_INSTRUCTIONS : GLOBAL_INSTRUCTIONS,
     userInput: [
       conversation ? `Histórico recente:\n${conversation}` : "",
@@ -526,11 +543,16 @@ async function runModelAttempt(
   });
 
   if (!isModelAnswer(response.data)) {
-    throw new OpenAiResponseError("OPENAI_INVALID_HELP_KNOWLEDGE_OUTPUT");
+    throw new AiGatewayError(
+      "AI_INVALID_HELP_KNOWLEDGE_OUTPUT",
+      response.provider,
+    );
   }
 
   return {
     answer: response.data,
+    provider: response.provider,
+    fallbackUsed: response.fallbackUsed,
     model: response.model,
     responseId: response.responseId,
     inputTokens: response.inputTokens,
@@ -547,8 +569,8 @@ async function runModel(
   } catch (cause) {
     if (!shouldRetryModel(cause)) throw cause;
     console.warn("[help.knowledge] retrying transient model failure", {
-      code: cause instanceof OpenAiResponseError ? cause.code : "UNKNOWN",
-      status: cause instanceof OpenAiResponseError ? cause.status : null,
+      code: cause instanceof AiGatewayError ? cause.code : "UNKNOWN",
+      status: cause instanceof AiGatewayError ? cause.status : null,
     });
     return runModelAttempt(input, fragments);
   }
@@ -611,6 +633,8 @@ async function answerArticleScope(
           score: selected.lexicalScore,
         },
       ],
+      provider: response.provider,
+      fallbackUsed: response.fallbackUsed,
       model: response.model,
       providerResponseId: response.responseId,
       inputTokens: response.inputTokens,
@@ -645,6 +669,8 @@ async function answerArticleScope(
         searchEventId: search.searchEventId,
         retrievalQuery,
         sources,
+        provider: response.provider,
+        fallbackUsed: response.fallbackUsed,
         model: response.model,
         providerResponseId: response.responseId,
         inputTokens: response.inputTokens,
@@ -664,6 +690,8 @@ async function answerArticleScope(
     searchEventId: search.searchEventId,
     retrievalQuery,
     sources,
+    provider: response.provider,
+    fallbackUsed: response.fallbackUsed,
     model: response.model,
     providerResponseId: response.responseId,
     inputTokens: response.inputTokens,
@@ -759,6 +787,8 @@ async function answerGlobalScope(
       searchEventId: search.searchEventId,
       retrievalQuery,
       sources,
+      provider: response.provider,
+      fallbackUsed: response.fallbackUsed,
       model: response.model,
       providerResponseId: response.responseId,
       inputTokens: response.inputTokens,
@@ -779,6 +809,8 @@ async function answerGlobalScope(
     searchEventId: search.searchEventId,
     retrievalQuery,
     sources,
+    provider: response.provider,
+    fallbackUsed: response.fallbackUsed,
     model: response.model,
     providerResponseId: response.responseId,
     inputTokens: response.inputTokens,

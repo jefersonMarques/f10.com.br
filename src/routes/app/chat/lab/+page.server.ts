@@ -36,7 +36,7 @@ export const load: PageServerLoad = async ({ parent }) => {
   const chatScope = getPermissionScope(permissions, "chat.view");
 
   return {
-    configuration: getSupportAiLabConfiguration(),
+    configuration: await getSupportAiLabConfiguration(),
     recentRuns: chatScope === "all" ? await listRecentSupportAiRuns(12) : [],
     canAsk: hasPermission(permissions, "chat.respond"),
   };

@@ -1,6 +1,5 @@
 <script lang="ts">
   import {
-    Bot,
     Clock3,
     MessagesSquare,
     Plus,
@@ -208,18 +207,7 @@
       </div>
     </div>
 
-    <div class="mt-6 flex items-start gap-3 border-t border-[#EEF0F5] pt-5">
-      <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F2F0FF] text-[#5C4BA2]"><Bot size={18}/></span>
-      <div><h3 class="text-[13px] font-semibold text-[#252C3D]">Limites do agente de IA</h3><p class="application-text-meta mt-1 leading-4 text-[#858B99]">A IA só usa conteúdo publicado na Base de Conhecimento. Os limites evitam conversas longas e gasto excessivo.</p></div>
-    </div>
-    <div class="mt-4 grid gap-4 sm:grid-cols-3">
-      <label class="block"><span class="application-text-meta mb-1.5 block font-semibold text-[#555B6B]">Respostas por conversa</span><input name="aiMaxRunsPerConversation" type="number" min="1" max="20" value={data.routing.configuration.aiMaxRunsPerConversation} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
-      <label class="block"><span class="application-text-meta mb-1.5 block font-semibold text-[#555B6B]">Orçamento diário de tokens</span><input name="aiDailyTokenBudget" type="number" min="5000" max="5000000" step="1000" value={data.routing.configuration.aiDailyTokenBudget} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
-      <label class="block"><span class="application-text-meta mb-1.5 block font-semibold text-[#555B6B]">Máximo por resposta</span><input name="aiMaxOutputTokens" type="number" min="200" max="700" step="50" value={data.routing.configuration.aiMaxOutputTokens} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
-    </div>
-
-    <button type="submit" class="application-text-caption mt-5 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 font-semibold text-white"><Save size={14}/>Salvar distribuição e IA</button>
-  </form>
+    <button type="submit" class="application-text-caption mt-5 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 font-semibold text-white"><Save size={14}/>Salvar distribuição</button>\n  </form>
 
   <form method="POST" action="?/save" class="mt-4 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
     <div class="flex items-start gap-3"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Clock3 size={18}/></span><div><h2 class="text-[14px] font-semibold text-[#252C3D]">Horário de funcionamento</h2><p class="application-text-meta mt-1 text-[#858B99]">Controla o estado aberto/fechado exibido no chat e a mensagem de handoff da IA.</p></div></div>

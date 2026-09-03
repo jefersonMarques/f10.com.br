@@ -1,4 +1,3 @@
-import { env } from "$env/dynamic/private";
 import {
   and,
   asc,
@@ -8,7 +7,10 @@ import {
   or,
   sql,
 } from "drizzle-orm";
-import { isOpenAiConfigured } from "$lib/server/ai/openAiResponses";
+import {
+  getAiRuntimePolicy,
+  isAiTaskConfigured,
+} from "$lib/server/ai/aiConfigurationRepository";
 import { getDatabase } from "$lib/server/db";
 import { webChatSessions } from "$lib/server/db/chatSchema";
 import { supportAiRuns } from "$lib/server/db/supportAiSchema";
@@ -22,10 +24,7 @@ import {
   type SupportAiResult,
 } from "$lib/server/support/supportAiAgent";
 import { getSupportAvailabilityStatus } from "$lib/server/support/publicSupportStatus";
-import {
-  autoAssignTicketIfConfigured,
-  getSupportRoutingConfiguration,
-} from "$lib/server/support/supportRoutingRepository";
+import { autoAssignTicketIfConfigured } from "$lib/server/support/supportRoutingRepository";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
 
 const PROCESSING_STALE_MS = 60_000;
@@ -44,8 +43,12 @@ export type SupportAiChatProcessResult = {
   result: SupportAiResult | null;
 };
 
-export function isSupportAiChatEnabled(): boolean {
-  return env.SUPPORT_AI_CHAT_ENABLED === "true" && isOpenAiConfigured();
+export async function isSupportAiChatEnabled(): Promise<boolean> {
+  return isAiTaskConfigured("support_answer", [
+    "knowledge.search",
+    "knowledge.read",
+    "customer.reply",
+  ]);
 }
 
 function normalizeConversationText(value: string): string {
@@ -489,7 +492,7 @@ export async function processSupportAiChatMessage(
     return { processed: false, state: "disabled", result: null };
   }
 
-  if (!isSupportAiChatEnabled()) {
+  if (!(await isSupportAiChatEnabled())) {
     await disableAiSession(sessionId);
     return { processed: false, state: "disabled", result: null };
   }
@@ -586,12 +589,12 @@ export async function processSupportAiChatMessage(
       return persistLocalResponse(sessionId, ticket.id, "clarification");
     }
 
-    const configuration = await getSupportRoutingConfiguration();
+    const configuration = await getAiRuntimePolicy();
     const [runCount, usedTokens] = await Promise.all([
       getAiRunCount(ticket.id),
       getAiTokensUsedToday(availability.timezone),
     ]);
-    if (runCount >= configuration.aiMaxRunsPerConversation) {
+    if (runCount >= configuration.maxRunsPerConversation) {
       return escalateWithoutModel(
         sessionId,
         ticket.id,
@@ -600,7 +603,7 @@ export async function processSupportAiChatMessage(
       );
     }
 
-    if (usedTokens >= configuration.aiDailyTokenBudget) {
+    if (usedTokens >= configuration.dailyTokenBudget) {
       return escalateWithoutModel(
         sessionId,
         ticket.id,
@@ -619,7 +622,7 @@ export async function processSupportAiChatMessage(
       customerContactId: ticket.customerContactId,
       ticketId: ticket.id,
       conversationContext,
-      maxOutputTokens: configuration.aiMaxOutputTokens,
+      maxOutputTokens: configuration.maxOutputTokens,
     });
 
     return persistAiResult(

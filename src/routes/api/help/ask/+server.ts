@@ -1,5 +1,6 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
-import { isOpenAiConfigured, OpenAiResponseError } from "$lib/server/ai/openAiResponses";
+import { AiGatewayError } from "$lib/server/ai/aiGateway";
+import { isAiTaskConfigured } from "$lib/server/ai/aiConfigurationRepository";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { tryAnswerHelpArticleDeterministically } from "$lib/server/help/helpArticleDeterministicAnswer";
 import {
@@ -61,7 +62,11 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
   if (isBodyTooLarge(request)) return errorResponse("PAYLOAD_TOO_LARGE", 413);
 
   const settings = await getHelpPublicAiSettings();
-  if (!settings.enabled || !isOpenAiConfigured() || !isHelpPublicAiSecretConfigured()) {
+  if (!settings.enabled || !(await isAiTaskConfigured("help_public_answer", [
+    "knowledge.search",
+    "knowledge.read",
+    "public.reply",
+  ])) || !isHelpPublicAiSecretConfigured()) {
     return errorResponse("AI_UNAVAILABLE", 503);
   }
 
@@ -195,7 +200,7 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
     );
   } catch (cause) {
     const code = cause instanceof Error ? cause.message : "HELP_PUBLIC_AI_FAILED";
-    const failureCode = cause instanceof OpenAiResponseError ? cause.code : code;
+    const failureCode = cause instanceof AiGatewayError ? cause.code : code;
 
     if (knowledgeStartedAt !== null) {
       await recordHelpKnowledgeRun({
@@ -238,7 +243,7 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
 
     console.error("[help.public-ai]", {
       causeType: cause instanceof Error ? cause.name : typeof cause,
-      code: cause instanceof OpenAiResponseError ? cause.code : "UNEXPECTED_FAILURE",
+      code: cause instanceof AiGatewayError ? cause.code : "UNEXPECTED_FAILURE",
     });
     return errorResponse("AI_UNAVAILABLE", 503);
   }

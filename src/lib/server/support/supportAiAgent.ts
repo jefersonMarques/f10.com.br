@@ -1,5 +1,9 @@
 import { desc, eq } from "drizzle-orm";
-import { getOpenAiModel, isOpenAiConfigured } from "$lib/server/ai/openAiResponses";
+import {
+  getAiTaskProfile,
+  isAiTaskConfigured,
+} from "$lib/server/ai/aiConfigurationRepository";
+import { AI_PROVIDER_DEFINITIONS } from "$lib/server/ai/aiTypes";
 import { getDatabase } from "$lib/server/db";
 import { supportAiRuns } from "$lib/server/db/supportAiSchema";
 import {
@@ -29,6 +33,7 @@ export type SupportAiResult = {
   answer: string;
   escalationReason: string;
   sources: SupportAiSource[];
+  provider: string;
   model: string;
   providerResponseId: string | null;
   inputTokens: number | null;
@@ -51,6 +56,7 @@ async function saveRun(input: {
   question: string;
   answer: string;
   resolution: "answered" | "escalate" | "failed";
+  provider: string;
   model: string;
   providerResponseId?: string | null;
   sources: SupportAiSource[];
@@ -69,6 +75,7 @@ async function saveRun(input: {
       question: input.question,
       answer: input.answer,
       resolution: input.resolution,
+      provider: input.provider,
       model: input.model,
       providerResponseId: input.providerResponseId ?? null,
       sourceSnapshot: input.sources,
@@ -107,10 +114,13 @@ function mapKnowledgeResult(
   };
 }
 
-export function getSupportAiLabConfiguration() {
+export async function getSupportAiLabConfiguration() {
+  const profile = await getAiTaskProfile("support_answer");
   return {
-    configured: isOpenAiConfigured(),
-    model: getOpenAiModel(),
+    configured: await isAiTaskConfigured("support_answer"),
+    provider: profile.provider,
+    providerLabel: AI_PROVIDER_DEFINITIONS[profile.provider].label,
+    model: profile.model,
   };
 }
 
@@ -120,6 +130,7 @@ export async function runSupportAi(
   const startedAt = Date.now();
   const question = input.question.trim().slice(0, 600);
   if (!question) throw new Error("SUPPORT_AI_QUESTION_REQUIRED");
+  const profile = await getAiTaskProfile("support_answer");
 
   try {
     const knowledge = await answerHelpQuestion({
@@ -132,7 +143,8 @@ export async function runSupportAi(
       maxOutputTokens: input.maxOutputTokens,
     });
     const mapped = mapKnowledgeResult(knowledge);
-    const model = knowledge.model ?? getOpenAiModel();
+    const model = knowledge.model ?? profile.model;
+    const provider = knowledge.provider ?? profile.provider;
     const latencyMs = Date.now() - startedAt;
 
     if (knowledge.searchEventId && input.ticketId) {
@@ -171,6 +183,7 @@ export async function runSupportAi(
       question,
       answer: mapped.answer,
       resolution: mapped.resolution,
+      provider,
       model,
       providerResponseId: knowledge.providerResponseId,
       sources: knowledge.sources,
@@ -188,6 +201,7 @@ export async function runSupportAi(
       answer: mapped.answer,
       escalationReason: mapped.escalationReason,
       sources: knowledge.sources,
+      provider,
       model,
       providerResponseId: knowledge.providerResponseId,
       inputTokens: knowledge.inputTokens,
@@ -196,12 +210,14 @@ export async function runSupportAi(
     };
   } catch (cause) {
     const latencyMs = Date.now() - startedAt;
-    const model = getOpenAiModel();
+    const model = profile.model;
+    const provider = profile.provider;
     const failureCode =
       cause instanceof Error ? cause.message.slice(0, 120) : "SUPPORT_AI_UNEXPECTED_FAILURE";
     const escalationReason =
-      failureCode === "OPENAI_NOT_CONFIGURED"
-        ? "A integração com a OpenAI não está configurada neste ambiente."
+      failureCode === "AI_PROVIDER_NOT_CONFIGURED" ||
+      failureCode === "AI_TASK_DISABLED"
+        ? "A função de IA do atendimento não possui um provedor disponível."
         : "Falha técnica durante a consulta ao motor de conhecimento.";
 
     await recordHelpKnowledgeRun({
@@ -221,6 +237,7 @@ export async function runSupportAi(
       question,
       answer: TECHNICAL_FAILURE_MESSAGE,
       resolution: "failed",
+      provider,
       model,
       sources: [],
       escalationReason,
@@ -236,6 +253,7 @@ export async function runSupportAi(
       answer: TECHNICAL_FAILURE_MESSAGE,
       escalationReason,
       sources: [],
+      provider,
       model,
       providerResponseId: null,
       inputTokens: null,
@@ -263,6 +281,7 @@ export async function listRecentSupportAiRuns(
       question: supportAiRuns.question,
       answer: supportAiRuns.answer,
       resolution: supportAiRuns.resolution,
+      provider: supportAiRuns.provider,
       model: supportAiRuns.model,
       sourceSnapshot: supportAiRuns.sourceSnapshot,
       escalationReason: supportAiRuns.escalationReason,

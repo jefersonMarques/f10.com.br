@@ -47,3 +47,7 @@ export function encryptServiceRequestSecrets(
   if (entries.length === 0) return {};
   return Object.fromEntries(entries.map(([key, value]) => [key, encryptServiceRequestSecret(value)]));
 }
+
+export function isServiceRequestSecretKeyConfigured(): boolean {
+  return (env.SERVICE_REQUEST_SECRET_KEY?.trim().length ?? 0) >= MIN_SECRET_LENGTH;
+}

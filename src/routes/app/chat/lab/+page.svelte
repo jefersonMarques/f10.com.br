@@ -41,7 +41,7 @@
       <span class="application-text-meta font-bold uppercase tracking-[0.08em] text-[#959AA8]">Modelo</span>
       <span class="ml-2 text-[11px] font-semibold text-[#202637]">{data.configuration.model}</span>
       <span class={`application-text-meta ml-2 inline-flex rounded-full px-2 py-1 font-bold ${data.configuration.configured ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF4E9] text-[#A9510D]"}`}>
-        {data.configuration.configured ? "OpenAI configurada" : "Configuração pendente"}
+        {data.configuration.configured ? data.configuration.providerLabel + " configurado" : "Configuração pendente"}
       </span>
     </div>
   </div>
@@ -95,7 +95,7 @@
           {/if}
           <div>
             <h2 class="text-[13px] font-semibold text-[#222839]">{resolutionLabel(form.result.resolution)}</h2>
-            <p class="application-text-meta mt-1 text-[#858B99]">Execução {form.result.runId.slice(0, 8)} · {form.result.model}</p>
+            <p class="application-text-meta mt-1 text-[#858B99]">Execução {form.result.runId.slice(0, 8)} · {form.result.provider} · {form.result.model}</p>
           </div>
         </div>
         <div class="application-text-meta flex flex-wrap gap-2 font-semibold text-[#727887]">
@@ -168,7 +168,7 @@
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
                   <span class={`application-text-meta rounded-full px-2 py-1 font-bold ${run.resolution === "answered" ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#FFF0F0] text-[#9B3C3C]"}`}>{resolutionLabel(run.resolution)}</span>
-                  <span class="application-text-meta text-[#A0A5B0]">{run.model}</span>
+                  <span class="application-text-meta text-[#A0A5B0]">{run.provider} · {run.model}</span>
                 </div>
                 <strong class="mt-2 block text-[11px] font-semibold text-[#303645]">{run.question}</strong>
                 {#if run.escalationReason}<p class="application-text-meta mt-1 leading-5 text-[#8B6666]">{run.escalationReason}</p>{/if}

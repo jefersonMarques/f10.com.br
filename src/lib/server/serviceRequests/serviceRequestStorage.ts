@@ -263,3 +263,34 @@ export async function deleteStoredServiceRequestAttachments(
     });
   });
 }
+
+export function getServiceRequestStorageStatus() {
+  const bucket = env.SERVICE_REQUEST_S3_BUCKET?.trim() ?? "";
+  const publicBucket = env.S3_BUCKET?.trim() ?? "";
+  const privateBucketConfigured = Boolean(bucket && bucket !== publicBucket);
+  const baseStorageConfigured =
+    env.ASSET_STORAGE?.trim() === "s3" &&
+    Boolean(env.S3_ENDPOINT?.trim()) &&
+    Boolean(env.S3_ACCESS_KEY?.trim()) &&
+    Boolean(env.S3_SECRET_KEY?.trim());
+
+  return {
+    bucket,
+    configured: privateBucketConfigured && baseStorageConfigured,
+    privateBucket: privateBucketConfigured,
+  };
+}
+
+export async function testServiceRequestStorageConnection(): Promise<boolean> {
+  const status = getServiceRequestStorageStatus();
+  if (!status.configured) return false;
+  const key = `.health/${Date.now()}-${randomUUID()}.txt`;
+  const bytes = new TextEncoder().encode("f10-service-request-storage-health");
+  try {
+    await putAssetObjectInBucket(status.bucket, key, bytes, "text/plain; charset=utf-8");
+    await deleteAssetObjectFromBucket(status.bucket, key);
+    return true;
+  } catch {
+    return false;
+  }
+}

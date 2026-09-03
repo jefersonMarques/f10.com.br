@@ -117,19 +117,18 @@ export const actions: Actions = {
     const chatRoutingUserIds = formData.getAll("chatRoutingUserId").filter((value): value is string => typeof value === "string" && isUuid(value));
     const ticketRoutingUserIds = formData.getAll("ticketRoutingUserId").filter((value): value is string => typeof value === "string" && isUuid(value));
 
+    const currentConfiguration = await getSupportRoutingConfiguration();
     await updateSupportRoutingSettings(
       session.user.id,
       {
+        ...currentConfiguration,
         assignmentMode,
-        aiMaxRunsPerConversation: readInteger(formData, "aiMaxRunsPerConversation", 6),
-        aiDailyTokenBudget: readInteger(formData, "aiDailyTokenBudget", 100_000),
-        aiMaxOutputTokens: readInteger(formData, "aiMaxOutputTokens", 500),
       },
       chatRoutingUserIds,
       ticketRoutingUserIds,
     );
 
-    return { success: true, action: "saveRouting", message: "Distribuição de chats, tickets e limites da IA atualizados." };
+    return { success: true, action: "saveRouting", message: "Distribuição de chats e tickets atualizada." };
   },
 
   createQueue: async ({ cookies, request }) => {
