@@ -1,8 +1,8 @@
 # F10 Website
 
-Site institucional/marketing do **F10**, construído com **SvelteKit + Vite + Tailwind CSS**.
+Plataforma **F10** construída com **SvelteKit + Vite + Tailwind CSS**, reunindo o site institucional, F10 Operations, Área do Cliente, suporte, Base de Conhecimento, Trilhas e integrações.
 
-Foco do projeto: **alta performance**, **SEO consistente** e **conversão** (leads via WhatsApp/contato).
+O site público continua priorizando performance e SEO; as áreas autenticadas e APIs executam em SSR com Node.js.
 
 ---
 
@@ -37,7 +37,7 @@ npm run dev
 # dev no WSL com polling (quando o watch falha)
 npm run dev:wsl
 
-# build de produção (gera dist/)
+# build de produção (adapter-node)
 npm run build
 
 # preview local do build
@@ -112,43 +112,25 @@ Em produção:
 
 ---
 
-## PM2 (processos no servidor)
+## Produção e PM2
 
-Geralmente existem dois processos:
+A aplicação completa usa `adapter-node`. Operations, Área do Cliente, APIs, PostgreSQL, IA e uploads dependem de SSR; portanto **não use `pm2 serve dist/` para a release atual**.
 
-### `f10-dev` (ambiente de desenvolvimento)
-
-- Executa `npm run dev` (Vite) no diretório do projeto.
-- Útil para validações rápidas.
-- Não é o modo recomendado para produção.
-
-### `f10` (produção estática)
-
-- Serve a pasta `dist/` via `pm2 serve`.
-
-Se você atualizou o código e não refletiu no site público, normalmente o domínio está apontando para o **processo/porta do `f10`**, não do `f10-dev`. Verifique o proxy/Nginx para confirmar.
-
----
-
-## Deploy recomendado
-
-### Opção A: Estático (recomendado para site institucional)
-
-1) Build:
+Fluxo base:
 
 ```bash
+npm ci
+npm run db:migrate
+npm run check
 npm run build
+HOST=127.0.0.1 PORT=5179 ORIGIN=https://f10.com.br node build
 ```
 
-2) Servir `dist/` via **Nginx** (recomendado) ou `pm2 serve`.
+Com PM2, execute `build/index.js` como processo Node e deixe Nginx/Nginx Proxy Manager responsável por HTTPS e proxy reverso.
 
-### Opção B: SSR (somente se necessário)
-
-Requer `adapter-node` e execução via `node build`.  
-Se não houver um motivo claro (personalização server-side, autenticação SSR, etc.), **provavelmente não precisa**.
+Antes da primeira liberação controlada, siga `docs/production-phase-1.md` e execute os doctors e o smoke.
 
 ---
-
 ## Performance e Core Web Vitals (CWV)
 
 CWV mede a experiência real do usuário:
@@ -182,8 +164,8 @@ curl -I -L --max-redirs 10 http://127.0.0.1:5179/inovacao-digital
 
 ### “Atualizei o repo e não mudou no site”
 
-- Verifique se o domínio aponta para o build antigo (`pm2 serve` do `dist/`) ou para outro serviço.
-- Confirme `proxy_pass`/porta no Nginx/Nginx Proxy Manager.
+- Verifique qual processo Node/porta está configurado no PM2.
+- Confirme `proxy_pass`/porta no Nginx/Nginx Proxy Manager e o SHA/build em execução.
 
 ---
 
