@@ -1,4 +1,5 @@
 import { error, type RequestHandler } from "@sveltejs/kit";
+import { getCustomerF10Ticket } from "$lib/server/customerPortal/customerF10TicketRepository";
 import { requireCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { getCustomerServiceRequestAttachment } from "$lib/server/serviceRequests/serviceRequestOperations";
 import { getServiceRequestObject } from "$lib/server/serviceRequests/serviceRequestStorage";
@@ -13,6 +14,9 @@ export const GET: RequestHandler = async ({ params, cookies, url, request }) => 
   if (!isUuid(ticketId) || !isUuid(attachmentId)) throw error(404, "Anexo não encontrado.");
 
   const session = await requireCustomerF10PortalSession(cookies, url.pathname, false);
+  const ticket = await getCustomerF10Ticket(session, ticketId);
+  if (!ticket) throw error(404, "Anexo não encontrado.");
+
   const attachment = await getCustomerServiceRequestAttachment(session, ticketId, attachmentId);
   if (!attachment) throw error(404, "Anexo não encontrado.");
 
