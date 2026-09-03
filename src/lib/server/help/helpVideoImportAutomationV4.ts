@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { env } from "$env/dynamic/private";
 import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
 import { createAiStructuredResponse, AiGatewayError } from "$lib/server/ai/aiGateway";
-import { isOpenAiConfigured } from "$lib/server/ai/openAiResponses";
+import { isAiProviderConfigured, readAiProviderCredential } from "$lib/server/ai/aiConfigurationRepository";
 import type { HelpImportPackageAsset } from "$lib/server/help/helpImportPackage";
 import type { HelpImportFile } from "$lib/server/help/structuredHelpImport";
 
@@ -255,12 +255,13 @@ function commandAvailable(command: string, args: string[]): Promise<boolean> {
 }
 
 export async function getHelpVideoAutomationRuntimeStatus(): Promise<HelpVideoAutomationRuntimeStatus> {
-  const [ffmpeg, youtube] = await Promise.all([
+  const [ffmpeg, youtube, openAi] = await Promise.all([
     commandAvailable(ffmpegPath(), ["-version"]),
     commandAvailable(ytDlpPath(), ["--version"]),
+    isAiProviderConfigured("openai"),
   ]);
   return {
-    openAi: isOpenAiConfigured(),
+    openAi,
     ffmpeg,
     youtube,
     ffmpegPath: ffmpegPath(),
@@ -364,8 +365,12 @@ async function transcribeAudio(
   audioPath: string,
   onAiUsage?: HelpVideoAutomationAiUsageHandler,
 ): Promise<TimestampedTranscript> {
-  const apiKey = env.OPENAI_API_KEY?.trim();
-  if (!apiKey) throw new Error("OPENAI_NOT_CONFIGURED");
+  let apiKey = "";
+  try {
+    apiKey = (await readAiProviderCredential("openai")).apiKey;
+  } catch {
+    throw new Error("OPENAI_NOT_CONFIGURED");
+  }
   const startedAt = Date.now();
   let durationSeconds: number | null = null;
 
