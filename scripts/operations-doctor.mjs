@@ -96,7 +96,11 @@ const criticalTables = [
   "task_projects", "tasks", "ticket_task_links", "support_queues", "tickets", "ticket_messages",
   "web_chat_sessions", "support_public_limits", "support_agent_presence",
   "support_chat_routing_members", "support_chat_entry_options", "ticket_message_attachments",
-  "operations_settings",
+  "operations_settings", "ai_provider_credentials",
+  "teams", "team_members", "ticket_areas",
+  "service_request_routes", "service_requests", "service_request_attachments",
+  "service_request_change_sets", "service_request_field_changes",
+  "help_public_ai_requests", "help_ai_usage_runs",
   "remote_devices", "remote_customer_groups", "remote_device_enrollments",
   "remote_support_sessions",
 ];
@@ -216,6 +220,178 @@ try {
           : "disabled; uploads and ZIP assets unavailable",
     );
     hasFailure ||= !storageOk;
+
+    const aiSecretsKeyConfigured = (process.env.AI_SECRETS_KEY?.trim().length ?? 0) >= 32;
+    const providerRows = await sql`
+      SELECT provider, last_test_status
+      FROM ai_provider_credentials
+    `;
+    const providerByCode = new Map(providerRows.map((row) => [row.provider, row]));
+    const providerConfigured = (provider) => {
+      const environmentConfigured = provider === "openai"
+        ? Boolean(process.env.OPENAI_API_KEY?.trim())
+        : provider === "deepseek"
+          ? Boolean(process.env.DEEPSEEK_API_KEY?.trim())
+          : false;
+      return environmentConfigured || (aiSecretsKeyConfigured && providerByCode.has(provider));
+    };
+
+    printResult(
+      "AI encrypted credentials",
+      providerRows.length === 0 || aiSecretsKeyConfigured,
+      providerRows.length === 0
+        ? "no encrypted credential stored"
+        : aiSecretsKeyConfigured
+          ? `${providerRows.length} credential(s) readable with AI_SECRETS_KEY`
+          : "AI_SECRETS_KEY must have at least 32 characters",
+    );
+    hasFailure ||= providerRows.length > 0 && !aiSecretsKeyConfigured;
+
+    for (const row of providerRows) {
+      const ok = providerConfigured(row.provider) && row.last_test_status !== "error";
+      printResult(
+        `AI provider ${row.provider}`,
+        ok,
+        ok
+          ? `configured${row.last_test_status ? `; last test=${row.last_test_status}` : "; connection test pending"}`
+          : "credential unavailable or last connection test failed",
+      );
+      hasFailure ||= !ok;
+    }
+
+    const [taskProfilesRow] = await sql`
+      SELECT value
+      FROM operations_settings
+      WHERE key = 'ai_task_profiles'
+      LIMIT 1
+    `;
+    const taskProfiles =
+      taskProfilesRow?.value && typeof taskProfilesRow.value === "object"
+        ? taskProfilesRow.value
+        : {};
+    const taskDefaults = {
+      help_public_answer: { enabled: true, provider: "openai", fallbackProvider: null },
+      content_edit: { enabled: true, provider: "openai", fallbackProvider: null },
+      training_generation: { enabled: true, provider: "openai", fallbackProvider: null },
+    };
+
+    for (const [task, fallback] of Object.entries(taskDefaults)) {
+      const stored =
+        taskProfiles[task] && typeof taskProfiles[task] === "object"
+          ? taskProfiles[task]
+          : {};
+      const enabled = typeof stored.enabled === "boolean" ? stored.enabled : fallback.enabled;
+      const provider = typeof stored.provider === "string" ? stored.provider : fallback.provider;
+      const fallbackProvider =
+        typeof stored.fallbackProvider === "string" && stored.fallbackProvider
+          ? stored.fallbackProvider
+          : fallback.fallbackProvider;
+      const primaryOk = providerConfigured(provider);
+      const fallbackOk = Boolean(fallbackProvider && providerConfigured(fallbackProvider));
+      const ok = enabled && (primaryOk || fallbackOk);
+      printResult(
+        `AI task ${task}`,
+        ok,
+        !enabled
+          ? "disabled in Operations > Configurações > Inteligência Artificial"
+          : primaryOk
+            ? `provider=${provider}`
+            : fallbackOk
+              ? `primary unavailable; fallback=${fallbackProvider}`
+              : `provider=${provider} is not configured`,
+      );
+      hasFailure ||= !ok;
+    }
+
+    const transcriptionOk = providerConfigured("openai");
+    printResult(
+      "OpenAI transcription",
+      transcriptionOk,
+      transcriptionOk
+        ? "available for MP4/YouTube imports"
+        : "configure OpenAI in the AI panel or OPENAI_API_KEY",
+    );
+    hasFailure ||= !transcriptionOk;
+
+    const privateBucket = process.env.SERVICE_REQUEST_S3_BUCKET?.trim() ?? "";
+    const publicBucket = process.env.S3_BUCKET?.trim() ?? "";
+    const privateStorageOk =
+      assetStorageConfigured &&
+      Boolean(privateBucket) &&
+      privateBucket !== publicBucket;
+    printResult(
+      "Service Request private storage",
+      privateStorageOk,
+      privateStorageOk
+        ? `bucket=${privateBucket}; separated from Help bucket`
+        : "SERVICE_REQUEST_S3_BUCKET must be configured and different from S3_BUCKET",
+    );
+    hasFailure ||= !privateStorageOk;
+
+    const serviceRequestSecret = process.env.SERVICE_REQUEST_SECRET_KEY?.trim() ?? "";
+    const serviceRequestSecretOk = serviceRequestSecret.length >= 32;
+    printResult(
+      "Service Request encryption",
+      serviceRequestSecretOk,
+      serviceRequestSecretOk
+        ? "configured"
+        : "SERVICE_REQUEST_SECRET_KEY must have at least 32 characters",
+    );
+    hasFailure ||= !serviceRequestSecretOk;
+
+    const serviceRoutes = await sql`
+      SELECT
+        r.request_type,
+        r.active AS route_active,
+        q.active AS queue_active,
+        q.team_id AS queue_team_id,
+        a.active AS area_active,
+        a.team_id AS area_team_id,
+        t.active AS team_active
+      FROM service_request_routes r
+      INNER JOIN support_queues q ON q.id = r.queue_id
+      INNER JOIN ticket_areas a ON a.id = r.area_id
+      LEFT JOIN teams t ON t.id = a.team_id
+      WHERE r.request_type IN ('nfse', 'cell_coin')
+    `;
+    const routeByType = new Map(serviceRoutes.map((row) => [row.request_type, row]));
+    for (const requestType of ["nfse", "cell_coin"]) {
+      const route = routeByType.get(requestType);
+      const ok = Boolean(
+        route?.route_active &&
+        route?.queue_active &&
+        route?.queue_team_id &&
+        route?.area_active &&
+        route?.area_team_id &&
+        route?.team_active
+      );
+      printResult(
+        `Service Request route ${requestType}`,
+        ok,
+        ok ? "active with responsible team" : "route/queue/area/team is missing or inactive",
+      );
+      hasFailure ||= !ok;
+    }
+
+    const [generalSettings] = await sql`
+      SELECT value
+      FROM operations_settings
+      WHERE key = 'general'
+      LIMIT 1
+    `;
+    const configuredSender =
+      typeof generalSettings?.value?.supportSenderEmail === "string"
+        ? generalSettings.value.supportSenderEmail.trim()
+        : "";
+    const emailOk =
+      Boolean(process.env.BREVO_API_KEY?.trim()) &&
+      Boolean(configuredSender || process.env.BREVO_SENDER_EMAIL?.trim());
+    printResult(
+      "transactional email",
+      emailOk,
+      emailOk ? "Brevo key and sender configured" : "BREVO_API_KEY and sender are required",
+    );
+    hasFailure ||= !emailOk;
 
     const remoteOk = remoteConfigured || (!remoteEnabled && !requireRemote);
     printResult(
