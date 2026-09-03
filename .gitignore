@@ -1,38 +1,27 @@
-# Node
-node_modules/
-npm-debug.log*
-pnpm-lock.yaml
-yarn.lock
-
-# Svelte/SvelteKit
-.svelte-kit/
-.build/
-dist/
-build/
-.vite/
-vite.config.ts.timestamp-*
-*.svelte-kit-tmp
-vite.config.ts
-
-# IDE / SO
+node_modules
 .DS_Store
-Thumbs.db
-*.swp
-*.swo
-.vscode/
-.idea/
-
-# Env & credenciais
+build
+.svelte-kit
+package
 .env
 .env.*
 !.env.example
-
-# Test / Coverage
-coverage/
-static/InstaladorF10.exe
-
-#data logs
-data/contact-modal-leads.json
-data/whatsapp-leads.json
-data/contact-jobs.json
-data/contact-leads.json
+.vercel
+.output
+.vite
+drizzle
+data/contact-modal-submissions.log
+data/registration-submissions.log
+data/registration-errors.log
+data/registration-files.json
+data/uploads/registration/
+data/whatsapp-leads.log
+data/nfse-submissions.log
+data/nfse-errors.log
+data/help-video-jobs/
+data/help-projects.json
+data/help-video-projects/
+data/help/generation-jobs.json
+data/help/uploads/
+data/help/drafts/
+data/help/publish-worktree/
