@@ -126,6 +126,18 @@ function knowledgeConversationContext(question: string, conversationContext: str
     : currentQuestion;
 }
 
+function emphasizeSupportMarkers(answer: string): string {
+  return answer
+    .replace(
+      /\b(Acesse|Use|Abra|Vá para|Navegue até|Entre em)\s+([^.;\n]+(?:\s*>\s*[^.;\n]+)+)(?=[.;]|$)/giu,
+      (_match, action: string, path: string) => `${action} **${path.trim()}**`,
+    )
+    .replace(
+      /\((ex\.:?\s*)([^)]+)\)/giu,
+      (_match, prefix: string, example: string) => `(${prefix}**${example.trim()}**)`,
+    );
+}
+
 function proceduralSegments(answer: string): string[] {
   const normalized = answer
     .replace(/;\s+(?=(?:para|se|use|acesse|selecione|clique|marque|desmarque|informe|preencha)\b)/gi, ".\n")
@@ -138,7 +150,7 @@ function proceduralSegments(answer: string): string[] {
 }
 
 function formatSupportAnswer(answer: string): string {
-  const trimmed = answer.trim();
+  const trimmed = emphasizeSupportMarkers(answer.trim());
   if (!trimmed || /\n\s*(?:[-•]|\d+[.)])\s+/.test(trimmed)) return trimmed;
 
   const segments = proceduralSegments(trimmed);
