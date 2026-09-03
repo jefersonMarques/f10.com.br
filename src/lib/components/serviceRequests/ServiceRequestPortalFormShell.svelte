@@ -215,6 +215,52 @@
     border-color: #DDE1E9 !important;
   }
 
+  .legacy-form :global(div:has(> h2 + div + div #contractAccepted) > h2),
+  .legacy-form :global(div:has(> h2 + div + div #contractAccepted) > div:first-of-type) {
+    display: none !important;
+  }
+
+  .legacy-form :global(div:has(> div > label > #contractAccepted)) {
+    display: flex !important;
+    flex-direction: column !important;
+    margin-top: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .legacy-form :global(div:has(> div > label > #contractAccepted) > div:first-child) {
+    order: 1;
+    margin-bottom: 0.75rem;
+  }
+
+  .legacy-form :global(div:has(> div > label > #contractAccepted) > div:first-child > button) {
+    display: none !important;
+  }
+
+  .legacy-form :global(div:has(> div > label > #contractAccepted) > div:nth-child(3)) {
+    order: 2;
+    max-height: none !important;
+    overflow: visible !important;
+    margin-top: 0 !important;
+    padding: 1rem !important;
+    border-color: #E1E4EC !important;
+    background: #FFFFFF !important;
+  }
+
+  .legacy-form :global(div:has(> div > label > #contractAccepted) > div:nth-child(2)) {
+    order: 3;
+    margin-top: 1rem !important;
+    padding: 0.9rem 1rem !important;
+    border-color: #DDE1E9 !important;
+    background: #F8F9FB !important;
+  }
+
+  .legacy-form :global(div:has(> div > label > #contractAccepted) > div:nth-child(2) > p[class*="text-black/50"]) {
+    display: none !important;
+  }
+
   @media (max-width: 639px) {
     .legacy-form :global(section.min-h-screen > .container > header) {
       margin-bottom: 1rem !important;
