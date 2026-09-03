@@ -153,6 +153,7 @@ export type HelpVideoAutomationResult = {
   assets: Map<string, HelpImportPackageAsset>;
   reviewCandidates: HelpVideoScreenshotReviewCandidate[];
   transcript: string;
+  transcriptTimeline: Array<{ start: number; end: number; text: string }>;
   transcriptChars: number;
   analyzedFrameCount: number;
   selectedScreenshotCount: number;
@@ -894,6 +895,7 @@ function categorySlugs(
 async function buildImportResult(input: {
   article: GeneratedArticle;
   transcript: string;
+  transcriptTimeline: TranscriptSegment[];
   screenshotResolution: ScreenshotResolution;
   categories: HelpVideoAutomationCategory[];
   externalId: string;
@@ -973,6 +975,11 @@ async function buildImportResult(input: {
     assets,
     reviewCandidates: input.screenshotResolution.reviewCandidates,
     transcript: input.transcript,
+    transcriptTimeline: input.transcriptTimeline.map((segment) => ({
+      start: segment.start,
+      end: segment.end,
+      text: segment.text,
+    })),
     transcriptChars: input.transcript.length,
     analyzedFrameCount: input.screenshotResolution.analyzedFrameCount,
     selectedScreenshotCount,
@@ -1109,6 +1116,7 @@ export async function generateHelpImportFromVideo(input: {
     const result = await buildImportResult({
       article,
       transcript: transcript.text,
+      transcriptTimeline: transcript.segments,
       screenshotResolution,
       categories: input.categories,
       externalId,

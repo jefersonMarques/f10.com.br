@@ -5,7 +5,7 @@ import { requireAppPermission } from "$lib/server/auth/authorization";
 import { recordHelpAiUsage } from "$lib/server/help/helpAiUsageRepository";
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import { stabilizeHelpImportIdentity } from "$lib/server/help/helpImportIdentity";
-import { attachImportedMp4AsFeaturedVideo } from "$lib/server/help/helpImportedFeaturedVideo";
+import { attachImportedMp4AsFeaturedVideo, saveHelpImportedVideoTimeline } from "$lib/server/help/helpImportedFeaturedVideo";
 import { replaceHelpScreenshotReviewCandidates } from "$lib/server/help/helpScreenshotReviewRepository";
 import {
   generateHelpImportFromVideo,
@@ -278,8 +278,15 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
             subtitles: generated.transcript,
             altText: content.summary || content.title,
             assistantSummary: content.quickGuide || content.summary || content.title,
+            transcriptTimeline: generated.transcriptTimeline,
           });
         }
+
+        await saveHelpImportedVideoTimeline(
+          session.user.id,
+          importedContent.id,
+          generated.transcriptTimeline,
+        );
 
         await replaceHelpScreenshotReviewCandidates(
           session.user.id,

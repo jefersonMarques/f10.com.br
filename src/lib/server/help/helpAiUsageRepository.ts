@@ -8,6 +8,7 @@ export type HelpAiUsageStatus = "success" | "failed";
 export type RecordHelpAiUsageInput = {
   actorUserId?: string | null;
   operation: string;
+  provider?: string;
   model: string;
   inputTokens?: number | null;
   outputTokens?: number | null;
@@ -69,7 +70,7 @@ export async function recordHelpAiUsage(input: RecordHelpAiUsageInput): Promise<
   await getDatabase().insert(helpAiUsageRuns).values({
     actorUserId: input.actorUserId ?? null,
     operation: input.operation.trim().slice(0, 120),
-    provider: "openai",
+    provider: input.provider?.trim().slice(0, 40) || "openai",
     model: input.model.trim().slice(0, 120),
     inputTokens: input.inputTokens ?? null,
     outputTokens: input.outputTokens ?? null,
