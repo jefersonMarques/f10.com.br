@@ -91,6 +91,37 @@ function localAssistantReply(message: string): string | null {
   return null;
 }
 
+function currentArticleSlug(pageContext: string): string {
+  const match = pageContext.match(/(?:^|\n)Caminho:\s*\/ajuda-f10\/([^/?#\s]+)/i);
+  if (!match?.[1]) return "";
+  try {
+    const slug = decodeURIComponent(match[1]).trim().slice(0, MAX_SOURCE_SLUG_CHARS);
+    return /^[a-z0-9][a-z0-9-]{0,159}$/i.test(slug) ? slug : "";
+  } catch {
+    return "";
+  }
+}
+
+function previousAssistantOfferedHuman(conversationContext: string): boolean {
+  const assistantMessages = conversationContext
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => /^Assistente F10:/i.test(line))
+    .slice(-2)
+    .join(" ");
+  const normalized = normalizeText(assistantMessages);
+  return (
+    /quer falar com (?:uma pessoa|a equipe|um atendente)/.test(normalized) ||
+    /posso encaminhar (?:voce|a conversa) para (?:uma pessoa|a equipe|um atendente)/.test(normalized)
+  );
+}
+
+function confirmsHumanOffer(message: string, conversationContext: string): boolean {
+  if (!previousAssistantOfferedHuman(conversationContext)) return false;
+  const normalized = normalizeText(message);
+  return /^(?:sim|sim por favor|quero|quero sim|pode|pode sim|claro|ok|okay|beleza|vamos|vamos sim)$/.test(normalized);
+}
+
 function buildConversationContext(conversationContext: string, pageContext: string): string {
   if (!pageContext) return conversationContext;
   const pageBlock = `Contexto da página atual:\n${pageContext}`;
@@ -129,6 +160,23 @@ function assistantPayload(input: {
   };
 }
 
+function humanOffer(input: {
+  aiAvailable: boolean;
+  unresolvedCount: number;
+  searchEventId?: string | null;
+  technical?: boolean;
+}) {
+  return assistantPayload({
+    answer: input.technical
+      ? "Não consegui consultar as orientações do F10 agora. Quer falar com uma pessoa da equipe F10?"
+      : "Não encontrei uma orientação segura na Central de Ajuda para responder isso. Quer falar com uma pessoa da equipe F10?",
+    action: "clarify",
+    aiAvailable: input.aiAvailable,
+    unresolvedCount: Math.min(input.unresolvedCount + 1, MAX_UNRESOLVED_COUNT),
+    searchEventId: input.searchEventId,
+  });
+}
+
 export const POST: RequestHandler = async ({ request, getClientAddress, cookies }) => {
   if (isBodyTooLarge(request)) {
     return json({ error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
@@ -146,9 +194,9 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
   const pageContext = readString(body.pageContext, MAX_PAGE_CONTEXT_CHARS);
   const contextSourceSlug = readString(body.contextSourceSlug, MAX_SOURCE_SLUG_CHARS);
   const unresolvedCount = readUnresolvedCount(body.unresolvedCount);
+  const preferredArticleSlug = currentArticleSlug(pageContext);
   if (!message) return json({ error: "INVALID_MESSAGE" }, { status: 400 });
 
-  // Mensagem enviada pelo cliente é atividade real; polling continua sem renovar a sessão.
   await getOptionalCustomerF10PortalSession(cookies).catch(() => null);
 
   let clientAddress = "unknown";
@@ -175,21 +223,23 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
-    if (requestsHumanSupport(message)) {
+    if (requestsHumanSupport(message) || confirmsHumanOffer(message, conversationContext)) {
       return json(assistantPayload({
-        answer: "Certo. Passei a conversa para um atendente da equipe F10, que continua com você por aqui.",
+        answer: "Certo. Vou encaminhar esta mesma conversa para uma pessoa da equipe F10.",
         action: "handoff",
-        handoffReason: "O cliente pediu explicitamente atendimento humano.",
+        handoffReason: requestsHumanSupport(message)
+          ? "O cliente pediu explicitamente atendimento humano."
+          : "O cliente confirmou a oferta de atendimento humano após a IA não encontrar uma orientação segura.",
         aiAvailable: isSupportAiChatEnabled(),
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
     if (showsFrustration(message) && conversationContext) {
       return json(assistantPayload({
-        answer: "Entendi. Como as tentativas anteriores não resolveram, passei a conversa para um atendente da equipe F10, que continua com você por aqui.",
-        action: "handoff",
-        handoffReason: "O cliente demonstrou frustração após tentativas de resolução.",
+        answer: "Entendi que as tentativas anteriores não resolveram. Quer falar com uma pessoa da equipe F10?",
+        action: "clarify",
         aiAvailable: isSupportAiChatEnabled(),
+        unresolvedCount: Math.min(unresolvedCount + 1, MAX_UNRESOLVED_COUNT),
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
@@ -220,7 +270,9 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
 
     if (isGenericSupportRequest(message)) {
       return json(assistantPayload({
-        answer: "Claro. Me conte o que você está tentando fazer no F10, em qual tela está e o que aconteceu.",
+        answer: preferredArticleSlug
+          ? "Claro. Pergunte sobre este conteúdo ou me diga o que você está tentando fazer no F10. Se a resposta não estiver aqui, eu procuro em toda a Central de Ajuda."
+          : "Claro. Me conte o que você está tentando fazer no F10, em qual tela está e o que aconteceu.",
         action: "clarify",
         unresolvedCount: 0,
         aiAvailable: isSupportAiChatEnabled(),
@@ -237,17 +289,17 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
     }
 
     if (!isSupportAiChatEnabled()) {
-      return json(assistantPayload({
-        answer: "Não consegui consultar as orientações do F10 agora. Passei a conversa para um atendente da equipe F10, que continua com você por aqui.",
-        action: "handoff",
-        handoffReason: "O Assistente F10 está temporariamente indisponível.",
+      return json(humanOffer({
         aiAvailable: false,
+        unresolvedCount,
+        technical: true,
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
     const result = await runSupportAi({
       question: message,
       conversationContext: buildConversationContext(conversationContext, pageContext),
+      preferredArticleSlug: preferredArticleSlug || null,
       maxOutputTokens: 500,
     });
 
@@ -263,8 +315,11 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
 
     if (result.resolution === "answered") {
       const presentation = await resultPresentation(result).catch(() => null);
+      const answer = result.answerOrigin === "other_article" && preferredArticleSlug
+        ? `Encontrei a resposta em outro conteúdo da Central de Ajuda.\n\n${result.answer}`
+        : result.answer;
       return json(assistantPayload({
-        answer: result.answer,
+        answer,
         action: "answer",
         aiAvailable: true,
         unresolvedCount: 0,
@@ -273,33 +328,20 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
-    if (result.resolution === "failed" || unresolvedCount >= 1) {
-      return json(assistantPayload({
-        answer: "Não consegui resolver isso com segurança por aqui. Passei a conversa para um atendente da equipe F10, que continua com você por aqui.",
-        action: "handoff",
-        handoffReason: result.escalationReason || "O Assistente F10 não conseguiu sustentar uma resposta segura após tentativa de esclarecimento.",
-        aiAvailable: result.resolution !== "failed",
-        unresolvedCount: Math.min(unresolvedCount + 1, MAX_UNRESOLVED_COUNT),
-        searchEventId: result.searchEventId,
-      }), { headers: { "Cache-Control": "no-store" } });
-    }
-
-    return json(assistantPayload({
-      answer: "Ainda não encontrei uma orientação segura. Para eu tentar mais uma vez, me diga o que você estava tentando fazer, em qual tela isso aconteceu e qual resultado apareceu para você.",
-      action: "clarify",
-      aiAvailable: true,
-      unresolvedCount: 1,
+    return json(humanOffer({
+      aiAvailable: result.resolution !== "failed",
+      unresolvedCount,
       searchEventId: result.searchEventId,
+      technical: result.resolution === "failed",
     }), { headers: { "Cache-Control": "no-store" } });
   } catch (cause) {
     console.error("[support.chat.assistant]", {
       causeType: cause instanceof Error ? cause.name : typeof cause,
     });
-    return json(assistantPayload({
-      answer: "Não consegui consultar as orientações do F10 agora. Passei a conversa para um atendente da equipe F10, que continua com você por aqui.",
-      action: "handoff",
-      handoffReason: "Falha técnica ao consultar o Assistente F10.",
+    return json(humanOffer({
       aiAvailable: false,
+      unresolvedCount,
+      technical: true,
     }), { status: 200, headers: { "Cache-Control": "no-store" } });
   }
 };
