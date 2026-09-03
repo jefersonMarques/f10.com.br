@@ -33,9 +33,9 @@ function encodePath(value: string): string {
     .join("/");
 }
 
-function readConfiguration() {
+function readConfiguration(bucketOverride?: string) {
   const endpointValue = env.S3_ENDPOINT?.trim() ?? "";
-  const bucket = env.S3_BUCKET?.trim() ?? "";
+  const bucket = bucketOverride?.trim() || env.S3_BUCKET?.trim() || "";
   const accessKey = env.S3_ACCESS_KEY?.trim() ?? "";
   const secretKey = env.S3_SECRET_KEY?.trim() ?? "";
   const region = env.S3_REGION?.trim() || "us-east-1";
@@ -65,8 +65,8 @@ function readConfiguration() {
   } as const;
 }
 
-function requireConfiguration() {
-  const config = readConfiguration();
+function requireConfiguration(bucketOverride?: string) {
+  const config = readConfiguration(bucketOverride);
   if (!config.configured || !config.endpoint) {
     throw new Error("ASSET_STORAGE_NOT_CONFIGURED");
   }
@@ -151,8 +151,9 @@ async function signedFetch(
   body?: Uint8Array,
   contentType?: string,
   range?: string,
+  bucketOverride?: string,
 ): Promise<Response> {
-  const config = requireConfiguration();
+  const config = requireConfiguration(bucketOverride);
   const url = buildObjectUrl(config.endpoint, config.bucket, key);
   const bodyHash = sha256(body ?? new Uint8Array());
   const headers = signHeaders({
@@ -191,7 +192,24 @@ export async function putAssetObject(
   bytes: Uint8Array,
   contentType: string,
 ): Promise<StoredAsset> {
-  const response = await signedFetch("PUT", key, bytes, contentType);
+  return putAssetObjectInBucket(requireConfiguration().bucket, key, bytes, contentType);
+}
+
+export async function getAssetObject(key: string, range?: string): Promise<Response> {
+  return getAssetObjectFromBucket(requireConfiguration().bucket, key, range);
+}
+
+export async function deleteAssetObject(key: string): Promise<void> {
+  await deleteAssetObjectFromBucket(requireConfiguration().bucket, key);
+}
+
+export async function putAssetObjectInBucket(
+  bucket: string,
+  key: string,
+  bytes: Uint8Array,
+  contentType: string,
+): Promise<StoredAsset> {
+  const response = await signedFetch("PUT", key, bytes, contentType, undefined, bucket);
   if (!response.ok) throw new Error(`ASSET_STORAGE_PUT_${response.status}`);
   return {
     key,
@@ -201,16 +219,20 @@ export async function putAssetObject(
   };
 }
 
-export async function getAssetObject(key: string, range?: string): Promise<Response> {
-  const response = await signedFetch("GET", key, undefined, undefined, range);
+export async function getAssetObjectFromBucket(
+  bucket: string,
+  key: string,
+  range?: string,
+): Promise<Response> {
+  const response = await signedFetch("GET", key, undefined, undefined, range, bucket);
   if (!response.ok && response.status !== 416) {
     throw new Error(`ASSET_STORAGE_GET_${response.status}`);
   }
   return response;
 }
 
-export async function deleteAssetObject(key: string): Promise<void> {
-  const response = await signedFetch("DELETE", key);
+export async function deleteAssetObjectFromBucket(bucket: string, key: string): Promise<void> {
+  const response = await signedFetch("DELETE", key, undefined, undefined, undefined, bucket);
   if (!response.ok && response.status !== 404) {
     throw new Error(`ASSET_STORAGE_DELETE_${response.status}`);
   }
