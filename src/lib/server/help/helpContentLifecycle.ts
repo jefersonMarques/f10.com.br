@@ -1,8 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { helpContentVersions } from "$lib/server/db/schema";
 import { helpPublications } from "$lib/server/db/helpPublications";
+import { helpTrainingPaths } from "$lib/server/db/helpTrainingSchema";
 import { helpSearchDocuments } from "$lib/server/db/helpSearchSchema";
 import { helpAssets, helpContents } from "$lib/server/db/structuredHelpSchema";
 
@@ -103,6 +104,18 @@ export async function archiveStructuredHelpContent(
 
   const published = content.publishedAt || (await hasPublication(contentId));
   if (!published) throw new Error("CONTENT_NEVER_PUBLISHED");
+
+  const [activeTraining] = await db
+    .select({ id: helpTrainingPaths.id })
+    .from(helpTrainingPaths)
+    .where(
+      and(
+        eq(helpTrainingPaths.sourceContentId, contentId),
+        ne(helpTrainingPaths.status, "archived"),
+      ),
+    )
+    .limit(1);
+  if (activeTraining) throw new Error("CONTENT_USED_BY_TRAINING");
 
   const archivedAt = new Date();
   await db.transaction(async (tx) => {

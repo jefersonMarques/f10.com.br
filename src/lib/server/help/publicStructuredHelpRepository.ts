@@ -248,6 +248,24 @@ export async function listPublishedStructuredHelpLinks() {
   });
 }
 
+export async function getPublishedStructuredHelpById(contentId: string) {
+  const [row] = await getDatabase()
+    .select({
+      entityId: helpPublications.entityId,
+      snapshot: helpPublications.snapshot,
+      publishedAt: helpPublications.publishedAt,
+    })
+    .from(helpPublications)
+    .where(
+      and(
+        eq(helpPublications.entityType, "content"),
+        eq(helpPublications.entityId, contentId),
+      ),
+    )
+    .limit(1);
+  return row ? parsePublication(row.entityId, row.publishedAt, row.snapshot) : null;
+}
+
 export async function getPublishedStructuredHelpBySlug(slug: string) {
   const [row] = await getDatabase()
     .select({ entityId: helpPublications.entityId, snapshot: helpPublications.snapshot, publishedAt: helpPublications.publishedAt })

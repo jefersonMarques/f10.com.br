@@ -10,12 +10,57 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { helpAssets, helpCategories } from "$lib/server/db/structuredHelpSchema";
+import { helpAssets, helpCategories, helpContents } from "$lib/server/db/structuredHelpSchema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
 import { helpContentStatus, users } from "$lib/server/db/schema";
 
 export type HelpTrainingAccessMode = "invite_only" | "public";
 export type HelpTrainingInteractionMode = "presentation" | "action";
+
+export type HelpTrainingSourceAsset = {
+  id: string;
+  assetType: "image" | "video" | "file";
+  sourceUrl: string | null;
+  storageKey: string | null;
+  altText: string;
+};
+
+export type HelpTrainingSourceBlock = {
+  id: string;
+  blockType: "text" | "image" | "notice" | "link" | "file";
+  textContent: string;
+  linkUrl: string | null;
+  linkLabel: string | null;
+  noticeVariant: string | null;
+  sortOrder: number;
+  annotations: unknown[];
+  asset: HelpTrainingSourceAsset | null;
+};
+
+export type HelpTrainingSourceContent = {
+  contentId: string;
+  slug: string;
+  title: string;
+  summary: string;
+  quickGuide: string;
+  categories: Array<{
+    id: string;
+    slug: string;
+    name: string;
+    description: string;
+    icon: string;
+    destinationUrl: string;
+  }>;
+  featuredVideo: HelpTrainingSourceAsset | null;
+  steps: Array<{
+    id: string;
+    title: string;
+    description: string;
+    sortOrder: number;
+    blocks: HelpTrainingSourceBlock[];
+  }>;
+  publishedAt: string;
+};
 
 export const helpTrainingPaths = pgTable(
   "help_training_paths",
@@ -32,6 +77,13 @@ export const helpTrainingPaths = pgTable(
     supportQueueId: uuid("support_queue_id").references(() => supportQueues.id, {
       onDelete: "set null",
     }),
+    sourceContentId: uuid("source_content_id")
+      .notNull()
+      .references(() => helpContents.id, { onDelete: "restrict" }),
+    sourcePublishedAt: timestamp("source_published_at", { withTimezone: true }).notNull(),
+    sourcePublicationSnapshot: jsonb("source_publication_snapshot")
+      .$type<HelpTrainingSourceContent>()
+      .notNull(),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -82,6 +134,8 @@ export const helpTrainingSteps = pgTable(
       .notNull()
       .default("action"),
     estimatedSeconds: integer("estimated_seconds").notNull().default(45),
+    sourceContentStepId: uuid("source_content_step_id"),
+    videoStartSeconds: integer("video_start_seconds").notNull().default(0),
     sortOrder: integer("sort_order").notNull().default(10),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -142,6 +196,7 @@ export type HelpTrainingSnapshot = {
   description: string;
   welcomeMessage: string;
   version: number;
+  sourceContent: HelpTrainingSourceContent;
   steps: Array<{
     id: string;
     title: string;
@@ -152,6 +207,8 @@ export type HelpTrainingSnapshot = {
     primaryActionLabel?: string;
     interactionMode?: HelpTrainingInteractionMode;
     estimatedSeconds: number;
+    sourceContentStepId?: string | null;
+    videoStartSeconds?: number;
     images: Array<{ assetId: string; altText: string }>;
     videoUrl: string | null;
     captionAssetId?: string | null;

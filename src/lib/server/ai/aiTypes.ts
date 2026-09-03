@@ -4,6 +4,7 @@ export type AiTaskCode =
   | "support_answer"
   | "help_public_answer"
   | "content_edit"
+  | "training_generation"
   | "ticket_summary"
   | "ticket_classification";
 
@@ -13,6 +14,7 @@ export type AiCapability =
   | "customer.reply"
   | "public.reply"
   | "content.draft"
+  | "training.draft"
   | "ticket.read"
   | "ticket.summarize"
   | "ticket.classify";
@@ -57,6 +59,7 @@ export const AI_CAPABILITY_LABELS: Record<AiCapability, string> = {
   "customer.reply": "Responder cliente no atendimento",
   "public.reply": "Responder visitante da Central",
   "content.draft": "Gerar ou editar rascunho de conteúdo",
+  "training.draft": "Gerar orientação de trilha a partir de conteúdo publicado",
   "ticket.read": "Ler dados do ticket",
   "ticket.summarize": "Resumir ticket",
   "ticket.classify": "Classificar ticket",
@@ -104,6 +107,16 @@ export const AI_TASK_DEFINITIONS: Record<
     defaultProvider: "openai",
     allowedCapabilities: ["knowledge.read", "content.draft"],
     defaultCapabilities: ["knowledge.read", "content.draft"],
+  },
+  training_generation: {
+    code: "training_generation",
+    label: "Geração de trilhas",
+    description: "Transforma conteúdo publicado em uma sequência prática, reutilizando vídeo, imagens e linha do tempo.",
+    wired: true,
+    defaultEnabled: true,
+    defaultProvider: "openai",
+    allowedCapabilities: ["knowledge.read", "training.draft"],
+    defaultCapabilities: ["knowledge.read", "training.draft"],
   },
   ticket_summary: {
     code: "ticket_summary",
