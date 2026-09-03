@@ -1,8 +1,9 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { teams } from "$lib/server/db/schema";
 import { supportQueues } from "$lib/server/db/supportSchema";
+import { ticketAreas } from "$lib/server/db/ticketWorkflowSchema";
 
 export async function getSupportQueueTeamSettings() {
   const db = getDatabase();
@@ -38,18 +39,54 @@ export async function updateSupportQueueTeam(
     .limit(1);
   if (!team) throw new Error("SUPPORT_TEAM_NOT_FOUND");
 
-  const [queue] = await db
-    .update(supportQueues)
-    .set({ teamId: team.id, updatedAt: new Date() })
-    .where(eq(supportQueues.code, "support"))
-    .returning({ id: supportQueues.id });
-  if (!queue) throw new Error("SUPPORT_QUEUE_NOT_FOUND");
+  const result = await db.transaction(async (tx) => {
+    const [queue] = await tx
+      .update(supportQueues)
+      .set({ teamId: team.id, updatedAt: new Date() })
+      .where(eq(supportQueues.code, "support"))
+      .returning({ id: supportQueues.id });
+    if (!queue) throw new Error("SUPPORT_QUEUE_NOT_FOUND");
+
+    const inheritedQueues = await tx
+      .update(supportQueues)
+      .set({ teamId: team.id, updatedAt: new Date() })
+      .where(
+        and(
+          inArray(supportQueues.code, ["service_nfse", "service_cell_coin"]),
+          eq(supportQueues.active, true),
+          isNull(supportQueues.teamId),
+        ),
+      )
+      .returning({ id: supportQueues.id });
+
+    const inheritedAreas = await tx
+      .update(ticketAreas)
+      .set({ teamId: team.id, updatedAt: new Date() })
+      .where(
+        and(
+          eq(ticketAreas.active, true),
+          isNull(ticketAreas.teamId),
+          sql`lower(btrim(${ticketAreas.name})) in ('nota fiscal', 'cell coin')`,
+        ),
+      )
+      .returning({ id: ticketAreas.id });
+
+    return {
+      queueId: queue.id,
+      inheritedQueueCount: inheritedQueues.length,
+      inheritedAreaCount: inheritedAreas.length,
+    };
+  });
 
   await recordAuditEvent({
     actorUserId,
     action: "operations.support_queue.team.updated",
     entityType: "support_queue",
-    entityId: queue.id,
-    metadata: { teamId: team.id },
+    entityId: result.queueId,
+    metadata: {
+      teamId: team.id,
+      inheritedServiceQueueCount: result.inheritedQueueCount,
+      inheritedServiceAreaCount: result.inheritedAreaCount,
+    },
   });
 }
