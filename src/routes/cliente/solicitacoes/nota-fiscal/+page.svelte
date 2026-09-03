@@ -31,7 +31,6 @@
   bind:selectedGroupId
   bind:selectedUnitId
   bind:contextInvalid
-  hint="Certificado digital e XML: até 5 MB por arquivo. Os arquivos são armazenados no bucket privado da solicitação."
 >
   <LegacyNfseForm />
 </ServiceRequestPortalFormShell>
