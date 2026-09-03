@@ -1,5 +1,6 @@
 import { dev } from "$app/environment";
 import { json, type RequestHandler } from "@sveltejs/kit";
+import { createOpenAiStructuredResponse } from "$lib/server/ai/openAiResponses";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import {
   getHelpPresentation,
@@ -19,7 +20,28 @@ const RATE_WINDOW_MS = 10 * 60 * 1000;
 const RATE_BLOCK_MS = 30 * 60 * 1000;
 const LAST_HELP_SEARCH_COOKIE = "f10_support_last_help_search";
 
+const HANDOFF_INTENT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    intent: {
+      type: "string",
+      enum: ["confirm_handoff", "decline_handoff", "other"],
+    },
+  },
+  required: ["intent"],
+} as const;
+
+const HANDOFF_INTENT_INSTRUCTIONS = `Classifique somente a resposta do cliente à oferta explícita de falar com uma pessoa da equipe F10.
+Retorne confirm_handoff quando o cliente aceitar ou pedir o atendimento humano.
+Retorne decline_handoff quando o cliente recusar ou disser que prefere continuar sem atendimento humano.
+Retorne other quando a mensagem não responder claramente à oferta, mudar de assunto ou for ambígua demais.
+Tolere abreviações, linguagem informal e pequenos erros de digitação.
+Não transforme dúvida, hesitação ou ausência de resposta em confirmação.`;
+
 type AssistantAction = "answer" | "clarify" | "handoff" | "ticket_offer";
+type HandoffIntent = "confirm_handoff" | "decline_handoff" | "other";
+type HandoffIntentResponse = { intent: HandoffIntent };
 
 function isBodyTooLarge(request: Request): boolean {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
@@ -102,24 +124,73 @@ function currentArticleSlug(pageContext: string): string {
   }
 }
 
-function previousAssistantOfferedHuman(conversationContext: string): boolean {
-  const assistantMessages = conversationContext
+function lastAssistantMessage(conversationContext: string): string {
+  return conversationContext
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => /^Assistente F10:/i.test(line))
-    .slice(-2)
-    .join(" ");
-  const normalized = normalizeText(assistantMessages);
+    .at(-1)
+    ?.replace(/^Assistente F10:\s*/i, "")
+    .trim() ?? "";
+}
+
+function previousAssistantOfferedHuman(conversationContext: string): boolean {
+  const normalized = normalizeText(lastAssistantMessage(conversationContext));
   return (
     /quer falar com (?:uma pessoa|a equipe|um atendente)/.test(normalized) ||
     /posso encaminhar (?:voce|a conversa) para (?:uma pessoa|a equipe|um atendente)/.test(normalized)
   );
 }
 
-function confirmsHumanOffer(message: string, conversationContext: string): boolean {
-  if (!previousAssistantOfferedHuman(conversationContext)) return false;
+function deterministicHandoffIntent(message: string): HandoffIntent | null {
   const normalized = normalizeText(message);
-  return /^(?:sim|sim por favor|quero|quero sim|pode|pode sim|claro|ok|okay|beleza|vamos|vamos sim)$/.test(normalized);
+  if (!normalized) return null;
+
+  if (
+    /^(?:nao|agora nao|prefiro nao|nao quero|melhor nao|deixa pra la|deixa para la)\b/.test(normalized)
+  ) {
+    return "decline_handoff";
+  }
+
+  if (
+    /^(?:sim|quero|pode|claro|ok|okay|beleza|vamos)\b/.test(normalized) &&
+    !/\bnao\b/.test(normalized)
+  ) {
+    return "confirm_handoff";
+  }
+
+  return null;
+}
+
+function isHandoffIntent(value: unknown): value is HandoffIntent {
+  return value === "confirm_handoff" || value === "decline_handoff" || value === "other";
+}
+
+async function classifyHandoffIntent(
+  message: string,
+  conversationContext: string,
+): Promise<HandoffIntent> {
+  if (!previousAssistantOfferedHuman(conversationContext)) return "other";
+
+  const deterministic = deterministicHandoffIntent(message);
+  if (deterministic) return deterministic;
+  if (!isSupportAiChatEnabled()) return "other";
+
+  try {
+    const response = await createOpenAiStructuredResponse<HandoffIntentResponse>({
+      instructions: HANDOFF_INTENT_INSTRUCTIONS,
+      userInput: [
+        `Oferta do Assistente F10: ${lastAssistantMessage(conversationContext)}`,
+        `Resposta do cliente: ${message}`,
+      ].join("\n"),
+      schemaName: "f10_support_handoff_intent",
+      schema: HANDOFF_INTENT_SCHEMA,
+      maxOutputTokens: 100,
+    });
+    return isHandoffIntent(response.data?.intent) ? response.data.intent : "other";
+  } catch {
+    return "other";
+  }
 }
 
 function buildConversationContext(conversationContext: string, pageContext: string): string {
@@ -238,14 +309,28 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
-    if (requestsHumanSupport(message) || confirmsHumanOffer(message, conversationContext)) {
+    const explicitHumanRequest = requestsHumanSupport(message);
+    const handoffIntent = explicitHumanRequest
+      ? "confirm_handoff"
+      : await classifyHandoffIntent(message, conversationContext);
+
+    if (handoffIntent === "confirm_handoff") {
       return json(assistantPayload({
         answer: "Certo. Vou encaminhar esta mesma conversa para uma pessoa da equipe F10.",
         action: "handoff",
-        handoffReason: requestsHumanSupport(message)
+        handoffReason: explicitHumanRequest
           ? "O cliente pediu explicitamente atendimento humano."
           : "O cliente confirmou a oferta de atendimento humano após a IA não encontrar uma orientação segura.",
         aiAvailable: isSupportAiChatEnabled(),
+      }), { headers: { "Cache-Control": "no-store" } });
+    }
+
+    if (handoffIntent === "decline_handoff") {
+      return json(assistantPayload({
+        answer: "Tudo bem. Vamos continuar por aqui. Me diga de outra forma o que você precisa ou o que estava tentando fazer no F10.",
+        action: "clarify",
+        aiAvailable: isSupportAiChatEnabled(),
+        unresolvedCount: 0,
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
