@@ -143,8 +143,14 @@
                       <label><span class="mb-1 block text-[8px] font-semibold text-[#616777]">Estimativa (s)</span><input name="estimatedSeconds" type="number" min="5" max="900" value={step.estimatedSeconds} class="h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[9px]"/></label>
                     </div>
                   </fieldset>
-                  {#if data.canEdit}<div class="flex justify-between gap-3"><form method="POST" action="?/deleteStep" use:enhance={enhanceEditor} on:submit={(event)=>{if(!confirm("Remover esta orientação?")) event.preventDefault();}}><input type="hidden" name="stepId" value={step.id}/><button type="submit" class="inline-flex min-h-8 items-center gap-1 text-[8px] font-semibold text-[#9B2C2C]"><Trash2 size={11}/>Remover</button></form><button type="submit" class="inline-flex min-h-8 items-center gap-1 rounded-lg border border-[#DDE1EA] px-3 text-[8px] font-semibold text-[#000A57]"><Save size={11}/>Salvar orientação</button></div>{/if}
+                  {#if data.canEdit}<div class="flex justify-end"><button type="submit" class="inline-flex min-h-8 items-center gap-1 rounded-lg border border-[#DDE1EA] px-3 text-[8px] font-semibold text-[#000A57]"><Save size={11}/>Salvar orientação</button></div>{/if}
                 </form>
+                {#if data.canEdit && data.path.steps.length > 1}
+                  <form method="POST" action="?/deleteStep" use:enhance={enhanceEditor} class="mt-3 border-t border-[#EEF0F5] pt-3" on:submit={(event)=>{if(!confirm("Remover esta orientação?")) event.preventDefault();}}>
+                    <input type="hidden" name="stepId" value={step.id}/>
+                    <button type="submit" class="inline-flex min-h-8 items-center gap-1 text-[8px] font-semibold text-[#9B2C2C]"><Trash2 size={11}/>Remover orientação</button>
+                  </form>
+                {/if}
               </div>
             </details>
           {/each}

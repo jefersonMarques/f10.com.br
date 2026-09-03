@@ -188,7 +188,9 @@ export const actions: Actions = {
         message:
           cause instanceof Error && cause.message === "CONTENT_NEVER_PUBLISHED"
             ? "Este conteúdo nunca foi publicado. Exclua o rascunho se não quiser mantê-lo."
-            : "Não foi possível arquivar este conteúdo.",
+            : cause instanceof Error && cause.message === "CONTENT_USED_BY_TRAINING"
+              ? "Este conteúdo está sendo usado por uma trilha ativa. Arquive ou exclua a trilha antes de arquivar o conteúdo."
+              : "Não foi possível arquivar este conteúdo.",
       });
     }
     throw redirect(303, "/app/help/content");
