@@ -194,7 +194,7 @@
 
         {#if canRespondToChat && presence}
           <div class="relative hidden sm:block">
-            <button type="button" on:click={() => (presenceOpen = !presenceOpen)} class="application-text-caption flex h-10 items-center gap-2 rounded-xl bg-[#F5F6FA] px-3 font-semibold text-[#555C6D] transition hover:bg-[#EEF0FF]" aria-expanded={presenceOpen}>
+            <button type="button" on:click={() => { presenceOpen = !presenceOpen; profileOpen = false; notificationOpen = false; }} class="application-text-caption flex h-10 items-center gap-2 rounded-xl bg-[#F5F6FA] px-3 font-semibold text-[#555C6D] transition hover:bg-[#EEF0FF]" aria-expanded={presenceOpen}>
               <span class={`h-2.5 w-2.5 rounded-full ${presenceDotClass(presence.effectiveStatus)}`}></span>
               {presenceLabel(presence.effectiveStatus)}
               <ChevronDown size={13}/>
@@ -216,7 +216,7 @@
             class="relative flex h-10 w-10 items-center justify-center rounded-xl bg-[#F5F6FA] text-[#555C6D] transition hover:bg-[#EEF0FF] hover:text-[#000A57]"
             aria-label="Notificações"
             aria-expanded={notificationOpen}
-            on:click={() => (notificationOpen = !notificationOpen)}
+            on:click={() => { notificationOpen = !notificationOpen; profileOpen = false; presenceOpen = false; }}
           >
             <Bell size={18} aria-hidden="true" />
             {#if notifications.unreadCount > 0}
@@ -261,50 +261,61 @@
         <div class="relative">
           <button
             type="button"
-            class="flex h-10 min-w-10 items-center gap-2 rounded-xl bg-[#F5F6FA] px-2.5 text-[#555C6D] transition hover:bg-[#EEF0FF] hover:text-[#000A57]"
+            class="flex h-10 items-center gap-1.5 rounded-xl bg-[#F5F6FA] px-1.5 text-[#555C6D] transition hover:bg-[#EEF0FF] hover:text-[#000A57]"
             aria-label="Menu do perfil"
             aria-expanded={profileOpen}
-            on:click={() => (profileOpen = !profileOpen)}
+            on:click={() => { profileOpen = !profileOpen; notificationOpen = false; presenceOpen = false; }}
           >
-            <UserCircle size={20} class="shrink-0 text-[#000A57]" />
-            <span class="hidden max-w-36 truncate text-[11px] font-semibold md:block">{data.user.name}</span>
-            <ChevronDown size={13} class="hidden shrink-0 sm:block" />
+            <span class="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white text-[#000A57] ring-1 ring-[#E1E4EC]">
+              {#if data.user.hasAvatar}
+                <img src="/app/minha-conta/avatar" alt="" class="h-full w-full object-cover" />
+              {:else}
+                <UserCircle size={19} aria-hidden="true" />
+              {/if}
+            </span>
+            <ChevronDown size={13} class="shrink-0" />
           </button>
 
           {#if profileOpen}
-            <div class="absolute right-0 top-12 z-50 w-[min(280px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[#E1E4EC] bg-white p-2 shadow-2xl shadow-slate-900/15">
-              <div class="rounded-xl bg-[#F7F8FB] px-3 py-3">
-                <div class="flex items-start gap-3">
-                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#000A57] shadow-sm"><UserCircle size={20}/></span>
-                  <span class="min-w-0 flex-1">
-                    <strong class="block truncate text-[12px] text-[#202637]">{data.user.name}</strong>
-                    <span class="application-text-meta mt-1 block truncate text-[#777D8D]">{data.user.email}</span>
-                  </span>
-                </div>
-                {#if data.roles.length > 0}
-                  <div class="mt-3 flex flex-wrap gap-1.5">
-                    {#each data.roles as role}
-                      <span class="application-text-meta rounded-full bg-white px-2 py-1 font-bold tracking-[0.04em] text-[#000A57] shadow-sm">{role}</span>
-                    {/each}
-                  </div>
-                {/if}
+            <div class="absolute right-0 top-12 z-50 w-[min(260px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[#E1E4EC] bg-white shadow-2xl shadow-slate-900/15">
+              <div class="flex items-center gap-3 px-4 py-4">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#F5F6FA] text-[#000A57] ring-1 ring-[#E1E4EC]">
+                  {#if data.user.hasAvatar}
+                    <img src="/app/minha-conta/avatar" alt="Avatar de {data.user.name}" class="h-full w-full object-cover" />
+                  {:else}
+                    <UserCircle size={22} aria-hidden="true" />
+                  {/if}
+                </span>
+                <span class="min-w-0 flex-1">
+                  <strong class="block truncate text-[12px] font-semibold text-[#202637]">{data.user.name}</strong>
+                  <span class="application-text-meta mt-0.5 block truncate text-[#858B99]">{data.user.email}</span>
+                </span>
               </div>
 
-              <a
-                href="/app/minha-conta"
-                on:click={() => (profileOpen = false)}
-                class="application-text-caption mt-1 flex min-h-10 items-center gap-2 rounded-xl px-3 font-semibold text-[#434A5A] transition hover:bg-[#F6F7FB]"
-              >
-                <UserCircle size={17} aria-hidden="true"/>
-                Minha conta
-              </a>
+              {#if data.roles.length > 0}
+                <div class="flex flex-wrap gap-1.5 border-t border-[#EEF0F5] px-4 py-2.5">
+                  {#each data.roles as role}
+                    <span class="application-text-meta rounded-full bg-[#F5F6FA] px-2 py-1 font-bold tracking-[0.04em] text-[#000A57]">{role}</span>
+                  {/each}
+                </div>
+              {/if}
 
-              <form method="POST" action="/app/logout" class="mt-1 border-t border-[#EEF0F5] pt-1">
-                <button type="submit" class="application-text-caption flex min-h-10 w-full items-center gap-2 rounded-xl px-3 text-left font-semibold text-[#6D7280] transition hover:bg-[#FFF0F0] hover:text-[#A52A2A]">
-                  <LogOut size={17} aria-hidden="true"/>
-                  Sair
-                </button>
-              </form>
+              <div class="border-t border-[#EEF0F5] p-1.5">
+                <a
+                  href="/app/minha-conta"
+                  on:click={() => (profileOpen = false)}
+                  class="application-text-caption flex min-h-10 items-center gap-2 rounded-xl px-3 font-semibold text-[#434A5A] transition hover:bg-[#F6F7FB]"
+                >
+                  <UserCircle size={17} aria-hidden="true"/>
+                  Minha conta
+                </a>
+                <form method="POST" action="/app/logout">
+                  <button type="submit" class="application-text-caption flex min-h-10 w-full items-center gap-2 rounded-xl px-3 text-left font-semibold text-[#6D7280] transition hover:bg-[#FFF0F0] hover:text-[#A52A2A]">
+                    <LogOut size={17} aria-hidden="true"/>
+                    Sair
+                  </button>
+                </form>
+              </div>
             </div>
           {/if}
         </div>
