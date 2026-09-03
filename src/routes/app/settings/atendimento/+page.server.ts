@@ -22,6 +22,7 @@ import {
   updateSupportQueueDueDays,
 } from "$lib/server/support/supportChatEntryRepository";
 import {
+  getSupportRoutingConfiguration,
   getSupportRoutingSettings,
   updateSupportRoutingSettings,
   type SupportAssignmentMode,

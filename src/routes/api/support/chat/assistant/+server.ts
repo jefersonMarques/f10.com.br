@@ -137,12 +137,14 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
     });
     if (!allowed) return json({ error: "RATE_LIMITED" }, { status: 429 });
 
+    const aiAvailable = await isSupportAiChatEnabled();
+
     if (requestsTicketCreation(message)) {
       return json(assistantPayload({
         answer: "Entendi. Posso levar você para a abertura de um chamado. Ele só será criado depois que você revisar e confirmar os dados.",
         action: "ticket_offer",
         ticketUrl: "/cliente/chamados/novo",
-        aiAvailable: isSupportAiChatEnabled(),
+        aiAvailable,
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
@@ -151,7 +153,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
         answer: "Certo. Passei a conversa para um atendente da equipe F10, que continua com você por aqui.",
         action: "handoff",
         handoffReason: "O cliente pediu explicitamente atendimento humano.",
-        aiAvailable: isSupportAiChatEnabled(),
+        aiAvailable,
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
@@ -160,7 +162,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
         answer: "Entendi. Como as tentativas anteriores não resolveram, passei a conversa para um atendente da equipe F10, que continua com você por aqui.",
         action: "handoff",
         handoffReason: "O cliente demonstrou frustração após tentativas de resolução.",
-        aiAvailable: isSupportAiChatEnabled(),
+        aiAvailable,
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
@@ -169,7 +171,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
         answer: "Claro. Me conte o que você está tentando fazer no F10, em qual tela está e o que aconteceu.",
         action: "clarify",
         unresolvedCount: 0,
-        aiAvailable: isSupportAiChatEnabled(),
+        aiAvailable,
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
@@ -178,11 +180,11 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
       return json(assistantPayload({
         answer: localReply,
         action: "answer",
-        aiAvailable: isSupportAiChatEnabled(),
+        aiAvailable,
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
-    if (!isSupportAiChatEnabled()) {
+    if (!aiAvailable) {
       return json(assistantPayload({
         answer: "Não consegui consultar as orientações do F10 agora. Passei a conversa para um atendente da equipe F10, que continua com você por aqui.",
         action: "handoff",

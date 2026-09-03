@@ -192,7 +192,7 @@ export async function updateAiTaskProfile(
 
 export async function getAiRuntimePolicy(): Promise<AiRuntimePolicy> {
   const db = getDatabase();
-  const [row, legacy] = await Promise.all([
+  const [runtimeRows, legacyRows] = await Promise.all([
     db
       .select({ value: operationsSettings.value })
       .from(operationsSettings)
@@ -204,8 +204,8 @@ export async function getAiRuntimePolicy(): Promise<AiRuntimePolicy> {
       .where(eq(operationsSettings.key, "support_routing"))
       .limit(1),
   ]);
-  const value = asRecord(row?.value);
-  const legacyValue = asRecord(legacy?.value);
+  const value = asRecord(runtimeRows[0]?.value);
+  const legacyValue = asRecord(legacyRows[0]?.value);
 
   return {
     maxRunsPerConversation: boundedInteger(
