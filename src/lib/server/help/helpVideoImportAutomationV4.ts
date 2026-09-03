@@ -5,12 +5,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { env } from "$env/dynamic/private";
 import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
-import { getOpenAiModel, isOpenAiConfigured } from "$lib/server/ai/openAiResponses";
+import { createAiStructuredResponse, AiGatewayError } from "$lib/server/ai/aiGateway";
+import { isOpenAiConfigured } from "$lib/server/ai/openAiResponses";
 import type { HelpImportPackageAsset } from "$lib/server/help/helpImportPackage";
 import type { HelpImportFile } from "$lib/server/help/structuredHelpImport";
 
 const OPENAI_TRANSCRIPTIONS_URL = "https://api.openai.com/v1/audio/transcriptions";
-const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const TRANSCRIPTION_MODEL = "whisper-1";
 const MAX_UPLOAD_VIDEO_BYTES = 90 * 1024 * 1024;
 const MAX_AUTOMATIC_SCREENSHOTS = 40;
@@ -19,7 +19,6 @@ const SCREENSHOT_CONCURRENCY = 3;
 const STABILITY_THRESHOLD = 0.975;
 const COMMAND_TIMEOUT_MS = 8 * 60 * 1_000;
 const OPENAI_TRANSCRIPTION_TIMEOUT_MS = 3 * 60 * 1_000;
-const OPENAI_ARTICLE_TIMEOUT_MS = 3 * 60 * 1_000;
 
 type ScreenshotCaptureMode = "before" | "after";
 
@@ -125,6 +124,7 @@ export type HelpVideoAutomationProgressHandler = (
 
 export type HelpVideoAutomationAiUsage = {
   operation: "video_transcription" | "video_article";
+  provider?: string;
   model: string;
   inputTokens?: number | null;
   outputTokens?: number | null;
@@ -412,6 +412,7 @@ async function transcribeAudio(
         ?? Math.max(...segments.map((segment) => segment.end));
       await reportAiUsage(onAiUsage, {
         operation: "video_transcription",
+        provider: "openai",
         model: TRANSCRIPTION_MODEL,
         audioSeconds: durationSeconds,
         latencyMs: Date.now() - startedAt,
@@ -428,6 +429,7 @@ async function transcribeAudio(
   } catch (cause) {
     await reportAiUsage(onAiUsage, {
       operation: "video_transcription",
+      provider: "openai",
       model: TRANSCRIPTION_MODEL,
       audioSeconds: durationSeconds,
       latencyMs: Date.now() - startedAt,
@@ -525,29 +527,6 @@ function articleSchema(): Record<string, unknown> {
   };
 }
 
-function extractOpenAiOutputText(payload: unknown): string {
-  if (!payload || typeof payload !== "object") return "";
-  const output = (payload as { output?: unknown }).output;
-  if (!Array.isArray(output)) return "";
-  const parts: string[] = [];
-  for (const item of output) {
-    if (!item || typeof item !== "object" || (item as { type?: unknown }).type !== "message") continue;
-    const content = (item as { content?: unknown }).content;
-    if (!Array.isArray(content)) continue;
-    for (const part of content) {
-      if (
-        part &&
-        typeof part === "object" &&
-        (part as { type?: unknown }).type === "output_text" &&
-        typeof (part as { text?: unknown }).text === "string"
-      ) {
-        parts.push(String((part as { text?: unknown }).text));
-      }
-    }
-  }
-  return parts.join("\n").trim();
-}
-
 function articlePrompt(
   categories: HelpVideoAutomationCategory[],
   transcript: TimestampedTranscript,
@@ -583,77 +562,56 @@ async function generateArticle(
   categories: HelpVideoAutomationCategory[],
   onAiUsage?: HelpVideoAutomationAiUsageHandler,
 ): Promise<GeneratedArticle> {
-  const apiKey = env.OPENAI_API_KEY?.trim();
-  if (!apiKey) throw new Error("OPENAI_NOT_CONFIGURED");
-  const model = getOpenAiModel();
   const startedAt = Date.now();
-  let usage: { input_tokens?: number; output_tokens?: number } | undefined;
+  let provider = "";
+  let model = "";
+  let inputTokens: number | null = null;
+  let outputTokens: number | null = null;
 
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), OPENAI_ARTICLE_TIMEOUT_MS);
-    try {
-      const response = await fetch(OPENAI_RESPONSES_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model,
-          store: false,
-          input: [{
-            role: "user",
-            content: [{ type: "input_text", text: articlePrompt(categories, transcript) }],
-          }],
-          max_output_tokens: 8_000,
-          text: {
-            format: {
-              type: "json_schema",
-              name: "f10_help_video_article_timeline_local_frames",
-              strict: true,
-              schema: articleSchema(),
-            },
-          },
-        }),
-      });
-      const payload = await response.json().catch(() => ({})) as {
-        id?: string;
-        model?: string;
-        usage?: { input_tokens?: number; output_tokens?: number };
-        error?: { message?: string };
-        output?: unknown;
-      };
-      usage = payload.usage;
-      if (!response.ok) {
-        throw new Error(`HELP_VIDEO_ARTICLE_GENERATION_FAILED:${payload.error?.message ?? response.status}`);
-      }
-      const output = extractOpenAiOutputText(payload);
-      if (!output) throw new Error("HELP_VIDEO_ARTICLE_GENERATION_EMPTY");
-      const article = JSON.parse(output) as GeneratedArticle;
-      await reportAiUsage(onAiUsage, {
-        operation: "video_article",
-        model: payload.model ?? model,
-        inputTokens: usage?.input_tokens ?? null,
-        outputTokens: usage?.output_tokens ?? null,
-        latencyMs: Date.now() - startedAt,
-        status: "success",
-      });
-      return article;
-    } finally {
-      clearTimeout(timer);
-    }
-  } catch (cause) {
+    const response = await createAiStructuredResponse<GeneratedArticle>({
+      task: "content_edit",
+      requiredCapabilities: ["content.draft"],
+      instructions: [
+        "Estruture um artigo operacional F10 usando exclusivamente a fonte recebida.",
+        "Responda exatamente no schema solicitado, sem texto fora do JSON.",
+        "Não invente telas, regras, campos, URLs, condições ou resultados.",
+      ].join("\n"),
+      userInput: articlePrompt(categories, transcript),
+      schemaName: "f10_help_video_article_timeline_local_frames",
+      schema: articleSchema(),
+      maxOutputTokens: 8_000,
+    });
+    provider = response.provider;
+    model = response.model;
+    inputTokens = response.inputTokens;
+    outputTokens = response.outputTokens;
+
     await reportAiUsage(onAiUsage, {
       operation: "video_article",
+      provider,
       model,
-      inputTokens: usage?.input_tokens ?? null,
-      outputTokens: usage?.output_tokens ?? null,
+      inputTokens,
+      outputTokens,
+      latencyMs: Date.now() - startedAt,
+      status: "success",
+    });
+    return response.data;
+  } catch (cause) {
+    const code = cause instanceof AiGatewayError ? cause.code : failureCode(cause);
+    await reportAiUsage(onAiUsage, {
+      operation: "video_article",
+      provider: provider || undefined,
+      model: model || "ai-gateway",
+      inputTokens,
+      outputTokens,
       latencyMs: Date.now() - startedAt,
       status: "failed",
-      failureCode: failureCode(cause),
+      failureCode: code,
     });
+    if (cause instanceof AiGatewayError) {
+      throw new Error(`HELP_VIDEO_ARTICLE_GENERATION_FAILED:${cause.code}`);
+    }
     throw cause;
   }
 }

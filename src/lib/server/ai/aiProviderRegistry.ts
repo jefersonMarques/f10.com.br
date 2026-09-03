@@ -119,7 +119,7 @@ export async function createProviderStructuredResponse<T>(input: {
         input: input.userInput,
         max_output_tokens: Math.min(
           Math.max(input.maxOutputTokens ?? 900, 100),
-          4_000,
+          10_000,
         ),
         text: { format },
       }),
