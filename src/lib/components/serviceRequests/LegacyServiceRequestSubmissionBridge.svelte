@@ -3,6 +3,8 @@
   import { onMount } from "svelte";
 
   export let endpoint: string;
+  export let selectedGroupId: number | null = null;
+  export let selectedUnitId: number | null = null;
 
   const MB = 1024 * 1024;
 
@@ -35,11 +37,33 @@
     return null;
   }
 
-  function invalidAttachmentResponse(message: string): Response {
-    return new Response(JSON.stringify({ success: false, message, error: "PAYLOAD_TOO_LARGE" }), {
-      status: 413,
+  function jsonErrorResponse(error: string, message: string, status: number): Response {
+    return new Response(JSON.stringify({ success: false, message, error }), {
+      status,
       headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
     });
+  }
+
+  function applyServiceRequestContext(body: BodyInit | null | undefined): Response | null {
+    if (!(body instanceof FormData)) return null;
+    if (
+      selectedGroupId === null ||
+      selectedUnitId === null ||
+      !Number.isSafeInteger(selectedGroupId) ||
+      !Number.isSafeInteger(selectedUnitId) ||
+      selectedGroupId <= 0 ||
+      selectedUnitId <= 0
+    ) {
+      return jsonErrorResponse(
+        "SERVICE_REQUEST_CONTEXT_REQUIRED",
+        "Selecione o grupo e a unidade desta implementação antes de enviar.",
+        400,
+      );
+    }
+
+    body.set("serviceRequestGroupId", String(selectedGroupId));
+    body.set("serviceRequestUnitId", String(selectedUnitId));
+    return null;
   }
 
   onMount(() => {
@@ -61,8 +85,13 @@
 
       if (pathname !== endpoint) return originalFetch(input, init);
 
+      const contextError = applyServiceRequestContext(init?.body);
+      if (contextError) return contextError;
+
       const attachmentError = validateAttachments(init?.body);
-      if (attachmentError) return invalidAttachmentResponse(attachmentError);
+      if (attachmentError) {
+        return jsonErrorResponse("PAYLOAD_TOO_LARGE", attachmentError, 413);
+      }
 
       const baseHeaders = input instanceof Request ? input.headers : init?.headers;
       const headers = new Headers(baseHeaders);

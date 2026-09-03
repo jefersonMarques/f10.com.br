@@ -15,7 +15,9 @@ function response(error: string, status: number) {
 
 function messageForError(code: string): string {
   if (code === "AUTH_REQUIRED") return "Sua sessão expirou. Entre novamente na Área do Cliente.";
-  if (code === "UNIT_REQUIRED") return "Selecione a unidade F10 antes de enviar esta solicitação.";
+  if (code === "UNIT_REQUIRED" || code === "SERVICE_REQUEST_CONTEXT_REQUIRED") {
+    return "Selecione o grupo e a unidade desta implementação antes de enviar.";
+  }
   if (code === "IDEMPOTENCY_KEY_REQUIRED") return "Atualize a página e tente enviar novamente.";
   if (code === "PAYLOAD_TOO_LARGE" || code.includes("TOO_LARGE")) {
     return "Um ou mais documentos excedem o limite permitido.";
@@ -37,6 +39,7 @@ function messageForError(code: string): string {
 function statusForError(code: string): number {
   if (code === "AUTH_REQUIRED") return 401;
   if (code === "UNIT_REQUIRED") return 409;
+  if (code === "SERVICE_REQUEST_CONTEXT_REQUIRED") return 400;
   if (code === "SERVICE_REQUEST_CONTEXT_NOT_AUTHORIZED") return 403;
   if (code === "SERVICE_REQUEST_IDEMPOTENCY_CONFLICT") return 409;
   if (code === "PAYLOAD_TOO_LARGE" || code.includes("TOO_LARGE")) return 413;
@@ -73,6 +76,13 @@ function parsePayload(formData: FormData, requestType: ServiceRequestType): Reco
   return fields;
 }
 
+function readPositiveInteger(formData: FormData, name: string): number | null {
+  const value = formData.get(name);
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 function collectAttachments(formData: FormData): ServiceRequestAttachmentInput[] {
   const attachments: ServiceRequestAttachmentInput[] = [];
   for (const [fieldKey, value] of formData.entries()) {
@@ -100,9 +110,6 @@ export async function handleLegacyServiceRequestSubmission(input: {
 
   const session = await getOptionalCustomerF10PortalSession(input.cookies);
   if (!session) return response("AUTH_REQUIRED", 401);
-  if (session.selectedGroupId === null || session.selectedUnitId === null) {
-    return response("UNIT_REQUIRED", 409);
-  }
 
   const idempotencyKey = input.request.headers.get("idempotency-key")?.trim() ?? "";
   if (!idempotencyKey) return response("IDEMPOTENCY_KEY_REQUIRED", 400);
@@ -114,13 +121,20 @@ export async function handleLegacyServiceRequestSubmission(input: {
     return response("SERVICE_REQUEST_PAYLOAD_INVALID", 400);
   }
 
+  const groupId = readPositiveInteger(formData, "serviceRequestGroupId");
+  const unitId = readPositiveInteger(formData, "serviceRequestUnitId");
+  if (groupId === null || unitId === null) {
+    return response("SERVICE_REQUEST_CONTEXT_REQUIRED", 400);
+  }
+
+  const attachments = collectAttachments(formData);
+
   try {
     const fields = parsePayload(formData, input.requestType);
-    const attachments = collectAttachments(formData);
     const result = await createCustomerServiceRequest(session, {
       requestType: input.requestType,
-      groupId: session.selectedGroupId,
-      unitId: session.selectedUnitId,
+      groupId,
+      unitId,
       idempotencyKey,
       fields,
       attachments,
@@ -140,10 +154,10 @@ export async function handleLegacyServiceRequestSubmission(input: {
     const code = cause instanceof Error ? cause.message : "SERVICE_REQUEST_CREATE_FAILED";
     console.error("[legacy.service-request.submit]", {
       requestType: input.requestType,
-      groupId: session.selectedGroupId,
-      unitId: session.selectedUnitId,
+      groupId,
+      unitId,
       errorCode: code,
-      attachmentCount: collectAttachments(formData).length,
+      attachmentCount: attachments.length,
       causeType: cause instanceof Error ? cause.name : typeof cause,
     });
     return response(code, statusForError(code));

@@ -41,13 +41,7 @@ function f10LoginDiagnostic(cause: unknown): string {
 export const load: PageServerLoad = async ({ cookies, url }) => {
   const returnTo = safeReturnTo(url.searchParams.get("returnTo") ?? "/cliente/chamados");
   const session = await getOptionalCustomerF10PortalSession(cookies);
-  if (session) {
-    if (session.groups.length > 1 && session.selectedGroupId === null) {
-      const params = new URLSearchParams({ returnTo });
-      throw redirect(303, `/cliente/grupo?${params.toString()}`);
-    }
-    throw redirect(303, returnTo);
-  }
+  if (session) throw redirect(303, returnTo);
   return { returnTo };
 };
 
@@ -74,11 +68,6 @@ export const actions: Actions = {
     try {
       const session = await createF10CustomerPortalSession(email, password);
       setCustomerPortalSessionCookie(cookies, session.token, session.expiresAt);
-
-      if (session.needsGroupSelection) {
-        const params = new URLSearchParams({ returnTo });
-        throw redirect(303, `/cliente/grupo?${params.toString()}`);
-      }
       throw redirect(303, returnTo);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && "location" in cause) throw cause;
