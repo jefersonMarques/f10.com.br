@@ -15,6 +15,7 @@ import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTe
 import { serviceRequestLabel, type ServiceRequestType } from "$lib/server/serviceRequests/serviceRequestDefinitions";
 import {
   deleteStoredServiceRequestAttachments,
+  SERVICE_REQUEST_MAX_TOTAL_ATTACHMENT_BYTES,
   uploadServiceRequestAttachmentField,
 } from "$lib/server/serviceRequests/serviceRequestStorage";
 
@@ -135,6 +136,20 @@ async function replaceRequestAttachment(params: {
           ),
         );
       previousStored = previous.map((attachment) => ({ storageKey: attachment.storageKey }));
+
+      const [attachmentTotal] = await tx
+        .select({
+          totalBytes: sql<number>`coalesce(sum(${serviceRequestAttachments.sizeBytes}), 0)`,
+        })
+        .from(serviceRequestAttachments)
+        .where(eq(serviceRequestAttachments.serviceRequestId, params.row.id));
+      const currentTotalBytes = Number(attachmentTotal?.totalBytes ?? 0);
+      const previousFieldBytes = previous.reduce((sum, attachment) => sum + attachment.sizeBytes, 0);
+      const nextFieldBytes = stored.reduce((sum, attachment) => sum + attachment.sizeBytes, 0);
+      const projectedTotalBytes = currentTotalBytes - previousFieldBytes + nextFieldBytes;
+      if (projectedTotalBytes > SERVICE_REQUEST_MAX_TOTAL_ATTACHMENT_BYTES) {
+        throw new Error("SERVICE_REQUEST_ATTACHMENTS_TOO_LARGE");
+      }
 
       await tx
         .delete(serviceRequestAttachments)
