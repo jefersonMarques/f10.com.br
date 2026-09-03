@@ -284,9 +284,7 @@ async function answerGlobal(
       question,
       navigationKnowledge.target.slug,
     );
-    if (articleKnowledge.resolution === "answered") {
-      knowledge = mergeArticleKnowledge(navigationKnowledge, articleKnowledge);
-    }
+    knowledge = mergeArticleKnowledge(navigationKnowledge, articleKnowledge);
   }
 
   return knowledge;
