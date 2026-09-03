@@ -1,6 +1,5 @@
 import { error, fail, redirect, type Actions, type Cookies } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
-import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import {
   getPublicHelpTrainingLanding,
   getPublicHelpTrainingSession,
@@ -11,7 +10,6 @@ import {
 import {
   completePublicTrainingStepGuided,
   goBackPublicTrainingStep,
-  reportPublicTrainingDifficulty,
 } from "$lib/server/help/helpTrainingGuidedExperienceRepository";
 import {
   clearHelpTrainingPublicSessionCookie,
@@ -26,46 +24,8 @@ const PUBLIC_TRAINING_START_RATE_LIMIT = {
   blockMs: 15 * 60 * 1000,
 } as const;
 
-const PUBLIC_TRAINING_FAILURE_RATE_LIMIT = {
-  maxRequests: 12,
-  windowMs: 15 * 60 * 1000,
-  blockMs: 30 * 60 * 1000,
-} as const;
-
-function read(formData: FormData, name: string): string {
-  const value = formData.get(name);
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function publicPath(slug: string): string {
   return `/treinamento/trilha/${encodeURIComponent(slug)}`;
-}
-
-function publicDifficultyAuth(customer: Awaited<ReturnType<typeof getOptionalCustomerF10PortalSession>>) {
-  if (!customer) {
-    return {
-      authenticated: false,
-      name: "",
-      email: "",
-      groupName: null,
-      unitName: null,
-      requiresUnitSelection: false,
-      groups: [],
-    };
-  }
-  return {
-    authenticated: customer.selectedUnitId !== null,
-    name: customer.name,
-    email: customer.email,
-    groupName: customer.selectedGroupName,
-    unitName: customer.selectedUnitName,
-    requiresUnitSelection: customer.selectedUnitId === null,
-    groups: customer.groups.map((group) => ({
-      id: group.grupo_id,
-      name: group.grupo,
-      units: group.unidades.map((unit) => ({ id: unit.unidade_id, name: unit.unidade })),
-    })),
-  };
 }
 
 async function requirePublicSession(cookies: Cookies, slug: string) {
@@ -85,10 +45,7 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
   if (!landing) throw error(404, "Trilha não encontrada.");
 
   const token = getHelpTrainingPublicSessionCookie(cookies);
-  let [state, customer] = await Promise.all([
-    token ? getPublicHelpTrainingSession(token) : Promise.resolve(null),
-    getOptionalCustomerF10PortalSession(cookies),
-  ]);
+  let state = token ? await getPublicHelpTrainingSession(token) : null;
   if (state && state.snapshot.slug !== slug) state = null;
   if (token && !state) clearHelpTrainingPublicSessionCookie(cookies);
   if (state?.currentStep) {
@@ -100,8 +57,6 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
     state: state ? toPublicHelpTrainingClientState(state) : null,
     canGoBack: Boolean(state && state.session.currentStepIndex > 0),
     successMessage: (url.searchParams.get("feito") ?? "").slice(0, 500),
-    failureReported: false,
-    difficultyAuth: publicDifficultyAuth(customer),
   };
 };
 
@@ -150,54 +105,6 @@ export const actions: Actions = {
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
       return fail(409, { success: false, message: "Não foi possível voltar para a orientação anterior." });
-    }
-  },
-
-  failure: async ({ params, cookies, request, getClientAddress }) => {
-    const slug = params.slug?.trim() ?? "";
-    const { token } = await requirePublicSession(cookies, slug);
-    const customer = await getOptionalCustomerF10PortalSession(cookies);
-    if (!customer || customer.selectedUnitId === null) {
-      return fail(401, {
-        success: false,
-        authRequired: true,
-        message: "Entre com sua conta F10 antes de registrar a dificuldade.",
-      });
-    }
-
-    const formData = await request.formData();
-    const detail = read(formData, "detail");
-    const intent = read(formData, "intent") === "ticket" ? "ticket" : "save";
-    if (detail.length < 3) {
-      return fail(400, { success: false, message: "Conte brevemente o que impediu você de continuar." });
-    }
-
-    try {
-      const allowed = await consumeSupportPublicRateLimit(
-        "help-training-public-failure",
-        getClientAddress(),
-        PUBLIC_TRAINING_FAILURE_RATE_LIMIT,
-      );
-      if (!allowed) {
-        return fail(429, { success: false, message: "Muitos relatos foram enviados. Aguarde alguns minutos antes de tentar novamente." });
-      }
-      await reportPublicTrainingDifficulty(token, detail, {
-        name: customer.name,
-        email: customer.email,
-        groupName: customer.selectedGroupName,
-        unitName: customer.selectedUnitName,
-      });
-      return {
-        success: true,
-        difficultySaved: true,
-        intent,
-        detail,
-        message: intent === "ticket"
-          ? "Dificuldade registrada. Abrindo o ticket..."
-          : "Dificuldade registrada. Você pode continuar quando estiver pronto.",
-      };
-    } catch {
-      return fail(409, { success: false, message: "Não foi possível registrar a dificuldade. Tente novamente." });
     }
   },
 

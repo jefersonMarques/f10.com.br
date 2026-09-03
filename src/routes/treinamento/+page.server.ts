@@ -1,6 +1,5 @@
 import { fail, redirect, type Actions, type Cookies } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
-import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { previewHelpTrainingInvite } from "$lib/server/help/helpTrainingInvitePreview";
 import {
   consumeHelpTrainingInvite,
@@ -10,7 +9,6 @@ import {
 import {
   completeInviteTrainingStepGuided,
   goBackInviteTrainingStep,
-  reportInviteTrainingDifficulty,
 } from "$lib/server/help/helpTrainingGuidedExperienceRepository";
 import { toHelpTrainingClientState } from "$lib/server/help/helpTrainingExperience";
 import {
@@ -21,38 +19,6 @@ import {
   setHelpTrainingSessionCookie,
 } from "$lib/server/help/helpTrainingSession";
 import { markHelpTrainingStepViewed } from "$lib/server/help/helpTrainingTelemetry";
-
-function read(formData: FormData, name: string): string {
-  const value = formData.get(name);
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function publicDifficultyAuth(customer: Awaited<ReturnType<typeof getOptionalCustomerF10PortalSession>>) {
-  if (!customer) {
-    return {
-      authenticated: false,
-      name: "",
-      email: "",
-      groupName: null,
-      unitName: null,
-      requiresUnitSelection: false,
-      groups: [],
-    };
-  }
-  return {
-    authenticated: customer.selectedUnitId !== null,
-    name: customer.name,
-    email: customer.email,
-    groupName: customer.selectedGroupName,
-    unitName: customer.selectedUnitName,
-    requiresUnitSelection: customer.selectedUnitId === null,
-    groups: customer.groups.map((group) => ({
-      id: group.grupo_id,
-      name: group.grupo,
-      units: group.unidades.map((unit) => ({ id: unit.unidade_id, name: unit.unidade })),
-    })),
-  };
-}
 
 async function requireTrainingToken(cookies: Cookies): Promise<string> {
   const token = getHelpTrainingSessionCookie(cookies);
@@ -67,10 +33,7 @@ async function requireTrainingToken(cookies: Cookies): Promise<string> {
 
 export const load: PageServerLoad = async ({ cookies, url }) => {
   const token = getHelpTrainingSessionCookie(cookies);
-  const [state, customer] = await Promise.all([
-    token ? getHelpTrainingSession(token) : Promise.resolve(null),
-    getOptionalCustomerF10PortalSession(cookies),
-  ]);
+  const state = token ? await getHelpTrainingSession(token) : null;
   if (token && !state) clearHelpTrainingSessionCookie(cookies);
 
   if (state?.session.startedAt && state.currentStep) {
@@ -89,8 +52,6 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
     invitePreview,
     inviteState: url.searchParams.get("convite"),
     successMessage: (url.searchParams.get("feito") ?? "").slice(0, 500),
-    failureReported: false,
-    difficultyAuth: publicDifficultyAuth(customer),
   };
 };
 
@@ -137,44 +98,6 @@ export const actions: Actions = {
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
       return fail(409, { success: false, message: "Não foi possível voltar para a orientação anterior." });
-    }
-  },
-
-  failure: async ({ cookies, request }) => {
-    const token = await requireTrainingToken(cookies);
-    const customer = await getOptionalCustomerF10PortalSession(cookies);
-    if (!customer || customer.selectedUnitId === null) {
-      return fail(401, {
-        success: false,
-        authRequired: true,
-        message: "Entre com sua conta F10 antes de registrar a dificuldade.",
-      });
-    }
-
-    const formData = await request.formData();
-    const detail = read(formData, "detail");
-    const intent = read(formData, "intent") === "ticket" ? "ticket" : "save";
-    if (detail.length < 3) {
-      return fail(400, { success: false, message: "Conte brevemente o que impediu você de continuar." });
-    }
-    try {
-      await reportInviteTrainingDifficulty(token, detail, {
-        name: customer.name,
-        email: customer.email,
-        groupName: customer.selectedGroupName,
-        unitName: customer.selectedUnitName,
-      });
-      return {
-        success: true,
-        difficultySaved: true,
-        intent,
-        detail,
-        message: intent === "ticket"
-          ? "Dificuldade registrada. Abrindo o ticket..."
-          : "Dificuldade registrada. Você pode continuar quando estiver pronto.",
-      };
-    } catch {
-      return fail(409, { success: false, message: "Não foi possível registrar a dificuldade. Tente novamente." });
     }
   },
 

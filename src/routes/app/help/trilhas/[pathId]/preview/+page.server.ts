@@ -21,6 +21,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       title: path.title,
       audience: path.audience,
       welcomeMessage: path.welcomeMessage,
+      sourceContent: path.sourcePublicationSnapshot,
       steps: path.steps.map((step) => {
         const interactionMode = step.interactionMode ?? "action";
         return {
@@ -30,14 +31,14 @@ export const load: PageServerLoad = async ({ params, parent }) => {
           instruction: step.instruction,
           expectedResult: step.expectedResult,
           successMessage: step.successMessage,
-          primaryActionLabel: step.primaryActionLabel?.trim()
-            || (interactionMode === "presentation" ? "Entendi, continuar" : "Sim, consegui"),
+          primaryActionLabel: step.primaryActionLabel?.trim() || "Concluir e continuar",
           interactionMode,
+          videoStartSeconds: step.videoStartSeconds,
           images: step.media
             .filter((media) => media.mediaType === "image" && media.assetId)
+            .slice(0, 1)
             .map((media) => ({ assetId: media.assetId as string, altText: media.altText })),
           videoUrl: step.media.find((media) => media.mediaType === "video")?.sourceUrl ?? null,
-          captionAssetId: step.media.find((media) => media.mediaType === "caption" && media.assetId)?.assetId ?? null,
         };
       }),
     },
