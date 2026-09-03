@@ -278,7 +278,11 @@
 
           {#if profileOpen}
             <div class="absolute right-0 top-12 z-50 w-[min(260px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[#E1E4EC] bg-white shadow-2xl shadow-slate-900/15">
-              <div class="flex items-center gap-3 px-4 py-4">
+              <a
+                href="/app/minha-conta"
+                on:click={() => (profileOpen = false)}
+                class="flex items-center gap-3 px-4 py-4 transition hover:bg-[#F7F8FB]"
+              >
                 <span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#F5F6FA] text-[#000A57] ring-1 ring-[#E1E4EC]">
                   {#if data.user.hasAvatar}
                     <img src="/app/minha-conta/avatar" alt="Avatar de {data.user.name}" class="h-full w-full object-cover" />
@@ -290,32 +294,14 @@
                   <strong class="block truncate text-[12px] font-semibold text-[#202637]">{data.user.name}</strong>
                   <span class="application-text-meta mt-0.5 block truncate text-[#858B99]">{data.user.email}</span>
                 </span>
-              </div>
+              </a>
 
-              {#if data.roles.length > 0}
-                <div class="flex flex-wrap gap-1.5 border-t border-[#EEF0F5] px-4 py-2.5">
-                  {#each data.roles as role}
-                    <span class="application-text-meta rounded-full bg-[#F5F6FA] px-2 py-1 font-bold tracking-[0.04em] text-[#000A57]">{role}</span>
-                  {/each}
-                </div>
-              {/if}
-
-              <div class="border-t border-[#EEF0F5] p-1.5">
-                <a
-                  href="/app/minha-conta"
-                  on:click={() => (profileOpen = false)}
-                  class="application-text-caption flex min-h-10 items-center gap-2 rounded-xl px-3 font-semibold text-[#434A5A] transition hover:bg-[#F6F7FB]"
-                >
-                  <UserCircle size={17} aria-hidden="true"/>
-                  Minha conta
-                </a>
-                <form method="POST" action="/app/logout">
-                  <button type="submit" class="application-text-caption flex min-h-10 w-full items-center gap-2 rounded-xl px-3 text-left font-semibold text-[#6D7280] transition hover:bg-[#FFF0F0] hover:text-[#A52A2A]">
-                    <LogOut size={17} aria-hidden="true"/>
-                    Sair
-                  </button>
-                </form>
-              </div>
+              <form method="POST" action="/app/logout" class="border-t border-[#EEF0F5] p-1.5">
+                <button type="submit" class="application-text-caption flex min-h-10 w-full items-center gap-2 rounded-xl px-3 text-left font-semibold text-[#6D7280] transition hover:bg-[#FFF0F0] hover:text-[#A52A2A]">
+                  <LogOut size={17} aria-hidden="true"/>
+                  Sair
+                </button>
+              </form>
             </div>
           {/if}
         </div>
