@@ -5,6 +5,7 @@
     KeyRound,
     ShieldCheck,
     UserRound,
+    UsersRound,
   } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
@@ -96,6 +97,32 @@
               <form method="POST" action="?/status"><input type="hidden" name="status" value="active" /><button type="submit" class="min-h-10 w-full rounded-xl bg-[#000A57] px-3 text-[11px] font-semibold text-white">Reativar usuário</button></form>
             {/if}
           </div>
+        {/if}
+      </section>
+
+      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
+        <div class="flex items-start gap-3">
+          <UsersRound size={18} class="mt-0.5 shrink-0 text-[#EA6D0B]" aria-hidden="true" />
+          <div><h2 class="text-[12px] font-semibold text-[#353B4A]">Áreas de atuação</h2><p class="application-text-caption mt-1 leading-5 text-[#777D8D]">A participação é definida pela equipe responsável pela área. Uma equipe pode atender mais de uma área.</p></div>
+        </div>
+        {#if data.supportTeams.length > 0}
+          <div class="mt-4 space-y-2">
+            {#each data.supportTeams as supportTeam}
+              <form method="POST" action="?/supportTeam" class="rounded-xl border border-[#E7E9EF] p-3">
+                <input type="hidden" name="teamId" value={supportTeam.teamId} />
+                <div class="flex items-start gap-3">
+                  <input name="included" type="checkbox" checked={supportTeam.included} disabled={!data.canManage} class="mt-0.5 h-4 w-4 rounded border-[#C9CEDA]" />
+                  <div class="min-w-0 flex-1">
+                    <strong class="application-text-caption block text-[#3E4555]">{supportTeam.teamName}</strong>
+                    <span class="application-text-meta mt-1 block leading-4 text-[#8A909E]">{supportTeam.areas.join(" · ")}</span>
+                  </div>
+                </div>
+                {#if data.canManage}<button type="submit" class="application-text-meta mt-3 h-8 w-full rounded-lg border border-[#DDE1EA] bg-white font-semibold text-[#000A57]">Salvar atuação</button>{/if}
+              </form>
+            {/each}
+          </div>
+        {:else}
+          <p class="application-text-caption mt-4 rounded-xl bg-[#F8F9FC] px-3 py-3 leading-5 text-[#858B99]">Nenhuma área com equipe responsável está configurada.</p>
         {/if}
       </section>
 

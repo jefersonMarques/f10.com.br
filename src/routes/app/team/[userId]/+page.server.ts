@@ -14,6 +14,10 @@ import {
   setManagedUserStatus,
   type UserPermissionEffect,
 } from "$lib/server/users/userManagementRepository";
+import {
+  listUserSupportTeams,
+  setManagedUserSupportTeamMembership,
+} from "$lib/server/users/userSupportTeamRepository";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f-]{36}$/i.test(value);
@@ -32,9 +36,7 @@ function isPermissionScope(value: string): value is PermissionScope {
   return value === "own" || value === "team" || value === "all";
 }
 
-function isPermissionEffect(
-  value: string,
-): value is UserPermissionEffect | "inherit" {
+function isPermissionEffect(value: string): value is UserPermissionEffect | "inherit" {
   return value === "inherit" || value === "allow" || value === "deny";
 }
 
@@ -47,18 +49,13 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   if (!hasPermission(permissionMap, "users.view")) {
     throw error(403, "Acesso não autorizado.");
   }
-
-  if (!isUuid(params.userId)) {
-    throw error(404, "Usuário não encontrado.");
-  }
+  if (!isUuid(params.userId)) throw error(404, "Usuário não encontrado.");
 
   try {
+    const details = await getManagedUserDetails(layout.user.id, layout.roles, params.userId);
     return {
-      details: await getManagedUserDetails(
-        layout.user.id,
-        layout.roles,
-        params.userId,
-      ),
+      details,
+      supportTeams: await listUserSupportTeams(params.userId),
       canManage:
         hasPermission(permissionMap, "users.manage") &&
         layout.user.id !== params.userId,
@@ -66,143 +63,93 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     };
   } catch (cause) {
     if (cause instanceof Error && cause.message === "USER_NOT_MANAGEABLE") {
-      throw error(
-        403,
-        "Este usuário não pode ser administrado pelo seu perfil.",
-      );
+      throw error(403, "Este usuário não pode ser administrado pelo seu perfil.");
     }
-
     throw error(404, "Usuário não encontrado.");
   }
 };
 
 export const actions: Actions = {
   permission: async ({ cookies, params, request }) => {
-    if (!isUuid(params.userId)) {
-      return fail(404, {
-        success: false,
-        message: "Usuário não encontrado.",
-      });
-    }
-
-    const { session } = await requireAppPermission(
-      cookies,
-      "users.manage",
-      `/app/team/${params.userId}`,
-    );
+    if (!isUuid(params.userId)) return fail(404, { success: false, message: "Usuário não encontrado." });
+    const { session } = await requireAppPermission(cookies, "users.manage", `/app/team/${params.userId}`);
     const formData = await request.formData();
     const permissionCode = readFormValue(formData, "permissionCode");
     const effect = readFormValue(formData, "effect");
     const scope = readFormValue(formData, "scope");
 
-    if (
-      !isPermissionCode(permissionCode) ||
-      !isPermissionEffect(effect) ||
-      !isPermissionScope(scope)
-    ) {
-      return fail(400, {
-        success: false,
-        message: "Configuração de permissão inválida.",
-      });
+    if (!isPermissionCode(permissionCode) || !isPermissionEffect(effect) || !isPermissionScope(scope)) {
+      return fail(400, { success: false, message: "Configuração de permissão inválida." });
     }
 
     try {
-      await setManagedUserPermission(
-        session.user.id,
-        session.roles,
-        params.userId,
-        permissionCode,
-        effect,
-        scope,
-      );
-
-      return {
-        success: true,
-        message: "Permissão atualizada.",
-      };
+      await setManagedUserPermission(session.user.id, session.roles, params.userId, permissionCode, effect, scope);
+      return { success: true, message: "Permissão atualizada." };
     } catch (cause) {
       const message =
         cause instanceof Error && cause.message === "SCOPE_NOT_DELEGABLE"
           ? "Você não pode conceder um escopo maior que o seu próprio acesso."
-          : cause instanceof Error &&
-              cause.message === "PERMISSION_NOT_DELEGABLE"
+          : cause instanceof Error && cause.message === "PERMISSION_NOT_DELEGABLE"
             ? "Você não pode delegar uma permissão que não possui."
             : "Não foi possível alterar esta permissão.";
-
       return fail(403, { success: false, message });
     }
   },
 
-  status: async ({ cookies, params, request }) => {
-    if (!isUuid(params.userId)) {
-      return fail(404, {
-        success: false,
-        message: "Usuário não encontrado.",
-      });
-    }
-
-    const { session } = await requireAppPermission(
-      cookies,
-      "users.manage",
-      `/app/team/${params.userId}`,
-    );
+  supportTeam: async ({ cookies, params, request }) => {
+    if (!isUuid(params.userId)) return fail(404, { success: false, message: "Usuário não encontrado." });
+    const { session } = await requireAppPermission(cookies, "users.manage", `/app/team/${params.userId}`);
     const formData = await request.formData();
-    const requestedStatus = readFormValue(formData, "status");
+    const teamId = readFormValue(formData, "teamId");
+    if (!isUuid(teamId)) return fail(400, { success: false, message: "Equipe inválida." });
 
+    try {
+      const included = formData.has("included");
+      await setManagedUserSupportTeamMembership(
+        session.user.id,
+        session.roles,
+        params.userId,
+        teamId,
+        included,
+      );
+      return {
+        success: true,
+        message: included ? "Área de atuação adicionada." : "Área de atuação removida.",
+      };
+    } catch {
+      return fail(403, { success: false, message: "Não foi possível alterar esta área de atuação." });
+    }
+  },
+
+  status: async ({ cookies, params, request }) => {
+    if (!isUuid(params.userId)) return fail(404, { success: false, message: "Usuário não encontrado." });
+    const { session } = await requireAppPermission(cookies, "users.manage", `/app/team/${params.userId}`);
+    const requestedStatus = readFormValue(await request.formData(), "status");
     if (requestedStatus !== "active" && requestedStatus !== "inactive") {
       return fail(400, { success: false, message: "Status inválido." });
     }
 
     try {
-      await setManagedUserStatus(
-        session.user.id,
-        session.roles,
-        params.userId,
-        requestedStatus,
-      );
-
+      await setManagedUserStatus(session.user.id, session.roles, params.userId, requestedStatus);
       return {
         success: true,
-        message:
-          requestedStatus === "active"
-            ? "Usuário reativado."
-            : "Usuário desativado e sessões revogadas.",
+        message: requestedStatus === "active" ? "Usuário reativado." : "Usuário desativado e sessões revogadas.",
       };
     } catch (cause) {
-      const message =
-        cause instanceof Error && cause.message === "USER_REQUIRES_ACTIVATION"
-          ? "Este usuário ainda precisa concluir a ativação da conta."
-          : "Não foi possível alterar o status deste usuário.";
-
+      const message = cause instanceof Error && cause.message === "USER_REQUIRES_ACTIVATION"
+        ? "Este usuário ainda precisa concluir a ativação da conta."
+        : "Não foi possível alterar o status deste usuário.";
       return fail(409, { success: false, message });
     }
   },
 
   regenerateInvite: async ({ cookies, params, url }) => {
-    if (!isUuid(params.userId)) {
-      return fail(404, {
-        success: false,
-        message: "Usuário não encontrado.",
-      });
-    }
-
-    const { session } = await requireAppPermission(
-      cookies,
-      "users.manage",
-      `/app/team/${params.userId}`,
-    );
+    if (!isUuid(params.userId)) return fail(404, { success: false, message: "Usuário não encontrado." });
+    const { session } = await requireAppPermission(cookies, "users.manage", `/app/team/${params.userId}`);
 
     try {
-      const invitation = await regenerateManagedUserInvite(
-        session.user.id,
-        session.roles,
-        params.userId,
-      );
-      const inviteUrl = new URL(
-        `/login/activate?token=${encodeURIComponent(invitation.token)}`,
-        url.origin,
-      ).toString();
-
+      const invitation = await regenerateManagedUserInvite(session.user.id, session.roles, params.userId);
+      const inviteUrl = new URL(`/login/activate?token=${encodeURIComponent(invitation.token)}`, url.origin).toString();
       return {
         success: true,
         message: "Novo link de ativação criado. O link anterior foi invalidado.",
@@ -210,11 +157,7 @@ export const actions: Actions = {
         expiresAt: invitation.expiresAt.toISOString(),
       };
     } catch {
-      return fail(409, {
-        success: false,
-        message:
-          "Não foi possível gerar um novo convite para este usuário.",
-      });
+      return fail(409, { success: false, message: "Não foi possível gerar um novo convite para este usuário." });
     }
   },
 };
