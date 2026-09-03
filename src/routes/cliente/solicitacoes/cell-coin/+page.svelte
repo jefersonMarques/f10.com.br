@@ -31,7 +31,6 @@
   bind:selectedGroupId
   bind:selectedUnitId
   bind:contextInvalid
-  hint="Documentos: até 10 MB por arquivo, selfie até 5 MB e 50 MB no total. Os arquivos são armazenados no bucket privado da solicitação."
 >
   <LegacyCellCoinForm />
 </ServiceRequestPortalFormShell>
