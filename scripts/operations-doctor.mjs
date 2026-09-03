@@ -5,12 +5,8 @@ import postgres from "postgres";
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 const requireSuperAdmin = process.env.OPERATIONS_DOCTOR_REQUIRE_SUPER_ADMIN !== "false";
-const requireOpenAi = process.env.OPERATIONS_DOCTOR_REQUIRE_OPENAI === "true";
 const requireAssetStorage = process.env.OPERATIONS_DOCTOR_REQUIRE_ASSET_STORAGE === "true";
 const requireRemote = process.env.OPERATIONS_DOCTOR_REQUIRE_REMOTE === "true";
-const openAiConfigured = Boolean(process.env.OPENAI_API_KEY?.trim());
-const openAiModel = process.env.OPENAI_MODEL?.trim() || "gpt-5-mini";
-const chatAiEnabled = process.env.SUPPORT_AI_CHAT_ENABLED === "true";
 const supportRateLimitSecret = process.env.SUPPORT_RATE_LIMIT_SECRET?.trim() ?? "";
 
 const assetStorageEnabled = process.env.ASSET_STORAGE === "s3";
@@ -184,30 +180,6 @@ try {
         : "SUPPORT_RATE_LIMIT_SECRET must have at least 32 characters",
     );
     hasFailure ||= !rateLimitSecretOk;
-
-    const openAiOk = openAiConfigured || !requireOpenAi;
-    printResult(
-      "OpenAI support agent",
-      openAiOk,
-      openAiConfigured
-        ? `configured; model=${openAiModel}`
-        : requireOpenAi
-          ? "OPENAI_API_KEY is required"
-          : "not configured; AI lab will fail closed to human escalation",
-    );
-    hasFailure ||= !openAiOk;
-
-    const chatAiOk = !chatAiEnabled || openAiConfigured;
-    printResult(
-      "native chat AI",
-      chatAiOk,
-      chatAiEnabled
-        ? chatAiOk
-          ? `enabled; model=${openAiModel}`
-          : "SUPPORT_AI_CHAT_ENABLED requires OPENAI_API_KEY"
-        : "disabled by feature flag",
-    );
-    hasFailure ||= !chatAiOk;
 
     const storageOk = assetStorageConfigured || (!assetStorageEnabled && !requireAssetStorage);
     printResult(
