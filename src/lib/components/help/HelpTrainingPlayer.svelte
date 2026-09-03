@@ -199,21 +199,28 @@
     tutorQuestion = question;
     tutorAnswer = "";
     try {
-      const response = await fetch("/api/help/ask", {
+      const response = await fetch(mode === "preview" ? "/api/help/ask" : "/api/training/tutor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question,
-          scope: "article",
-          articleSlug: sourceContentSlug,
-          conversationContext: tutorContext,
-        }),
+        body: JSON.stringify(
+          mode === "preview"
+            ? {
+                question,
+                scope: "article",
+                articleSlug: sourceContentSlug,
+                conversationContext: tutorContext,
+              }
+            : {
+                question,
+                conversationContext: tutorContext,
+              },
+        ),
       });
       const payload = await response.json() as { answer?: string; error?: string };
       tutorAnswer = response.ok && payload.answer
         ? payload.answer
-        : payload.error === "AUTH_REQUIRED"
-          ? "Entre na Área do Cliente para usar o tutor desta trilha."
+        : payload.error === "AUTH_REQUIRED" || payload.error === "TRAINING_SESSION_REQUIRED"
+          ? "A sessão da trilha expirou. Abra novamente a trilha para continuar."
           : "O tutor não está disponível agora. O conteúdo completo continua disponível abaixo.";
       if (response.ok && payload.answer) {
         tutorContext = `${tutorContext}\nCliente: ${question}\nTutor: ${payload.answer}`.trim().slice(-5000);
