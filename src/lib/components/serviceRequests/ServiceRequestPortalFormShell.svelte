@@ -22,7 +22,6 @@
   export let selectedGroupId: number | null = null;
   export let selectedUnitId: number | null = null;
   export let contextInvalid = false;
-  export let hint = "";
 
   let contextConfirmed = false;
 
