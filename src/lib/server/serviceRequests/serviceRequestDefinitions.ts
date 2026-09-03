@@ -1,16 +1,30 @@
 export const SERVICE_REQUEST_TYPES = ["nfse", "cell_coin"] as const;
 export type ServiceRequestType = (typeof SERVICE_REQUEST_TYPES)[number];
 
+export type ServiceRequestDataValue =
+  | string
+  | number
+  | boolean
+  | null
+  | ServiceRequestDataValue[]
+  | { [key: string]: ServiceRequestDataValue };
+
 export type ServiceRequestAttachmentDefinition = {
   fieldKey: string;
   label: string;
   required: boolean;
   maxFiles: number;
   maxBytes: number;
-  kinds: Array<"image" | "pdf" | "xml" | "pkcs12">;
+  kinds: Array<"image" | "pdf" | "xml" | "certificate">;
 };
 
 const MB = 1024 * 1024;
+const MAX_TOP_LEVEL_FIELDS = 120;
+const MAX_NESTED_DEPTH = 6;
+const MAX_NESTED_ITEMS = 100;
+const MAX_TOTAL_NODES = 1_500;
+const MAX_TEXT_LENGTH = 200_000;
+const MAX_SERIALIZED_DATA_BYTES = 512 * 1024;
 
 export const SERVICE_REQUEST_ATTACHMENT_DEFINITIONS: Record<
   ServiceRequestType,
@@ -23,7 +37,7 @@ export const SERVICE_REQUEST_ATTACHMENT_DEFINITIONS: Record<
       required: true,
       maxFiles: 1,
       maxBytes: 5 * MB,
-      kinds: ["pkcs12"],
+      kinds: ["certificate"],
     },
     {
       fieldKey: "invoice_xml_file",
@@ -84,15 +98,42 @@ export function isServiceRequestType(value: string): value is ServiceRequestType
   return (SERVICE_REQUEST_TYPES as readonly string[]).includes(value);
 }
 
-function normalizeFieldValue(value: unknown): string | number | boolean | null {
+function isSafeKey(value: string): boolean {
+  return /^[A-Za-z][A-Za-z0-9_.:-]{0,79}$/.test(value);
+}
+
+function normalizeDataValue(
+  value: unknown,
+  depth: number,
+  state: { nodes: number },
+): ServiceRequestDataValue {
+  state.nodes += 1;
+  if (state.nodes > MAX_TOTAL_NODES) throw new Error("SERVICE_REQUEST_DATA_TOO_COMPLEX");
+  if (depth > MAX_NESTED_DEPTH) throw new Error("SERVICE_REQUEST_DATA_TOO_DEEP");
+
   if (value === null) return null;
   if (typeof value === "boolean") return value;
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
     const normalized = value.trim();
-    if (normalized.length > 10_000) throw new Error("SERVICE_REQUEST_FIELD_TOO_LONG");
+    if (normalized.length > MAX_TEXT_LENGTH) throw new Error("SERVICE_REQUEST_FIELD_TOO_LONG");
     return normalized;
   }
+  if (Array.isArray(value)) {
+    if (value.length > MAX_NESTED_ITEMS) throw new Error("SERVICE_REQUEST_ARRAY_TOO_LONG");
+    return value.map((item) => normalizeDataValue(item, depth + 1, state));
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length > MAX_NESTED_ITEMS) throw new Error("SERVICE_REQUEST_OBJECT_TOO_LARGE");
+    const normalized: Record<string, ServiceRequestDataValue> = {};
+    for (const [key, nestedValue] of entries) {
+      if (!isSafeKey(key)) throw new Error("SERVICE_REQUEST_FIELD_KEY_INVALID");
+      normalized[key] = normalizeDataValue(nestedValue, depth + 1, state);
+    }
+    return normalized;
+  }
+
   throw new Error("SERVICE_REQUEST_FIELD_TYPE_INVALID");
 }
 
@@ -100,20 +141,19 @@ export function normalizeServiceRequestFields(
   requestType: ServiceRequestType,
   fields: Record<string, unknown>,
 ): {
-  data: Record<string, string | number | boolean | null>;
+  data: Record<string, ServiceRequestDataValue>;
   secrets: Record<string, string>;
 } {
   const entries = Object.entries(fields);
-  if (entries.length > 120) throw new Error("SERVICE_REQUEST_TOO_MANY_FIELDS");
+  if (entries.length > MAX_TOP_LEVEL_FIELDS) throw new Error("SERVICE_REQUEST_TOO_MANY_FIELDS");
 
-  const data: Record<string, string | number | boolean | null> = {};
+  const data: Record<string, ServiceRequestDataValue> = {};
   const secrets: Record<string, string> = {};
   const secretFields = SECRET_FIELDS[requestType];
+  const state = { nodes: 0 };
 
   for (const [fieldKey, rawValue] of entries) {
-    if (!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(fieldKey)) {
-      throw new Error("SERVICE_REQUEST_FIELD_KEY_INVALID");
-    }
+    if (!isSafeKey(fieldKey)) throw new Error("SERVICE_REQUEST_FIELD_KEY_INVALID");
     if (secretFields.has(fieldKey)) {
       if (typeof rawValue !== "string") throw new Error("SERVICE_REQUEST_SECRET_TYPE_INVALID");
       const secret = rawValue.trim();
@@ -121,8 +161,11 @@ export function normalizeServiceRequestFields(
       if (secret) secrets[fieldKey] = secret;
       continue;
     }
-    data[fieldKey] = normalizeFieldValue(rawValue);
+    data[fieldKey] = normalizeDataValue(rawValue, 0, state);
   }
+
+  const serializedSize = Buffer.byteLength(JSON.stringify(data), "utf8");
+  if (serializedSize > MAX_SERIALIZED_DATA_BYTES) throw new Error("SERVICE_REQUEST_DATA_TOO_LARGE");
 
   for (const fieldKey of REQUIRED_FIELDS[requestType]) {
     const value = data[fieldKey];
