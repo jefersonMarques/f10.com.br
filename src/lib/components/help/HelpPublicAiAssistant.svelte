@@ -4,13 +4,16 @@
   import { tick } from "svelte";
   import {
     ArrowUpRight,
+    ExternalLink,
     LoaderCircle,
     MessageCircleQuestion,
+    PlayCircle,
     Send,
     ShieldCheck,
     Sparkles,
     X,
   } from "lucide-svelte";
+  import HelpRichText from "$lib/components/help/HelpRichText.svelte";
 
   export let enabled = false;
   export let available = false;
@@ -28,12 +31,38 @@
 
   type HelpResolution = "answered" | "navigate" | "found_elsewhere" | "not_found";
 
+  type HelpPresentationSource = {
+    contentId: string;
+    slug: string;
+    title: string;
+    href: string;
+  };
+
+  type HelpPresentationMedia = {
+    kind: "youtube" | "video" | "link";
+    title: string;
+    url: string;
+  };
+
+  type HelpPresentation = {
+    source: HelpPresentationSource;
+    media: HelpPresentationMedia | null;
+  };
+
+  type HelpAskPayload = {
+    error?: string;
+    resolution?: HelpResolution;
+    answer?: string;
+    target?: HelpTarget | null;
+  };
+
   type ChatMessage = {
     id: number;
     role: "user" | "assistant";
     text: string;
     resolution?: HelpResolution | null;
     target?: HelpTarget | null;
+    presentation?: HelpPresentation | null;
     error?: boolean;
   };
 
@@ -43,7 +72,7 @@
     "Quais pontos exigem atenção?",
   ];
 
-  let minimized = false;
+  let minimized = true;
   let question = "";
   let loading = false;
   let messages: ChatMessage[] = [];
@@ -67,7 +96,7 @@
     messages = [];
     question = "";
     loading = false;
-    minimized = false;
+    minimized = true;
   }
 
   function targetElement(helpTarget: HelpTarget): HTMLElement | null {
@@ -99,6 +128,73 @@
       return;
     }
     await goto(`/ajuda-f10/${encodeURIComponent(helpTarget.slug)}`);
+  }
+
+  function isPresentation(value: unknown): value is HelpPresentation {
+    if (!value || typeof value !== "object") return false;
+    const presentation = value as Record<string, unknown>;
+    if (!presentation.source || typeof presentation.source !== "object") return false;
+    const source = presentation.source as Record<string, unknown>;
+    if (
+      typeof source.contentId !== "string" ||
+      typeof source.slug !== "string" ||
+      typeof source.title !== "string" ||
+      typeof source.href !== "string" ||
+      !source.href.startsWith(`/ajuda-f10/${encodeURIComponent(source.slug)}`)
+    ) return false;
+
+    if (presentation.media === null) return true;
+    if (!presentation.media || typeof presentation.media !== "object") return false;
+    const media = presentation.media as Record<string, unknown>;
+    if (
+      (media.kind !== "youtube" && media.kind !== "video" && media.kind !== "link") ||
+      typeof media.title !== "string" ||
+      typeof media.url !== "string"
+    ) return false;
+    if (media.kind === "youtube") {
+      return /^https:\/\/www\.youtube-nocookie\.com\/embed\/[A-Za-z0-9_-]{6,20}$/.test(media.url);
+    }
+    if (media.kind === "video") {
+      return /^\/api\/help\/content\/[^/]+\/assets\/[0-9a-f-]{36}$/i.test(media.url);
+    }
+    try {
+      const url = new URL(media.url);
+      return url.protocol === "https:" || url.protocol === "http:";
+    } catch {
+      return false;
+    }
+  }
+
+  async function fetchPresentation(slug: string): Promise<HelpPresentation | null> {
+    try {
+      const response = await fetch(`/api/help/content/${encodeURIComponent(slug)}/presentation`);
+      if (!response.ok) return null;
+      const payload = await response.json();
+      return isPresentation(payload) ? payload : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function askArticle(
+    value: string,
+    slug: string,
+    conversationContext: string,
+  ): Promise<{ response: Response; payload: HelpAskPayload }> {
+    const response = await fetch("/api/help/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: value,
+        scope: "article",
+        articleSlug: slug,
+        conversationContext,
+      }),
+    });
+    return {
+      response,
+      payload: (await response.json()) as HelpAskPayload,
+    };
   }
 
   function errorFor(code: string): string {
@@ -159,35 +255,40 @@
     loading = true;
 
     try {
-      const response = await fetch("/api/help/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: normalized,
-          scope: "article",
-          articleSlug,
-          conversationContext: context,
-        }),
-      });
-      const payload = (await response.json()) as {
-        error?: string;
-        resolution?: HelpResolution;
-        answer?: string;
-        target?: HelpTarget | null;
-      };
-
-      if (!response.ok) {
+      const first = await askArticle(normalized, articleSlug, context);
+      if (!first.response.ok) {
         question = normalized;
-        addMessage({ role: "assistant", text: errorFor(payload.error ?? ""), error: true });
+        addMessage({ role: "assistant", text: errorFor(first.payload.error ?? ""), error: true });
         return;
       }
 
-      const answer = typeof payload.answer === "string" && payload.answer.trim()
-        ? payload.answer.trim()
+      let answer = typeof first.payload.answer === "string" && first.payload.answer.trim()
+        ? first.payload.answer.trim()
         : "Não encontrei uma orientação publicada que responda isso com segurança.";
-      const resolution = payload.resolution ?? "not_found";
-      const target = payload.target ?? null;
-      addMessage({ role: "assistant", text: answer, resolution, target });
+      const resolution = first.payload.resolution ?? "not_found";
+      let target = first.payload.target ?? null;
+      let presentation: HelpPresentation | null = null;
+
+      if (resolution === "found_elsewhere" && target?.slug && target.slug !== articleSlug) {
+        const originalTarget = target;
+        const [elsewhere, foundPresentation] = await Promise.all([
+          askArticle(normalized, originalTarget.slug, context).catch(() => null),
+          fetchPresentation(originalTarget.slug),
+        ]);
+        presentation = foundPresentation;
+
+        if (
+          elsewhere?.response.ok &&
+          elsewhere.payload.resolution === "answered" &&
+          typeof elsewhere.payload.answer === "string" &&
+          elsewhere.payload.answer.trim()
+        ) {
+          answer = `Esse assunto está em outro conteúdo da Central de Ajuda.\n\n${elsewhere.payload.answer.trim()}`;
+          target = elsewhere.payload.target ?? originalTarget;
+        }
+      }
+
+      addMessage({ role: "assistant", text: answer, resolution, target, presentation });
     } catch {
       question = normalized;
       addMessage({ role: "assistant", text: errorFor(""), error: true });
@@ -213,7 +314,7 @@
       aria-label="Abrir assistente deste artigo"
     >
       <Sparkles size={16} class="text-[#EA6D0B]" />
-      Conversar sobre este artigo
+      Perguntar sobre este artigo
     </button>
   {:else}
     <aside class="fixed bottom-3 left-1/2 z-40 w-[calc(100vw-20px)] max-w-[760px] -translate-x-1/2 overflow-hidden rounded-[26px] border border-[#D9DDE8] bg-white shadow-[0_24px_80px_rgba(1,13,40,0.20)] sm:bottom-6">
@@ -221,8 +322,8 @@
         <div class="flex min-w-0 items-center gap-3">
           <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[#FF9A4B]"><Sparkles size={17} /></span>
           <div class="min-w-0">
-            <strong class="block truncate text-[12px] font-semibold">Assistente F10</strong>
-            <span class="mt-0.5 block text-[9px] text-white/55">Conversa contextual sobre este artigo</span>
+            <strong class="block truncate text-[12px] font-semibold">Assistente deste artigo</strong>
+            <span class="mt-0.5 block text-[9px] text-white/55">Localiza e explica exatamente o conteúdo desta página</span>
           </div>
         </div>
         <button type="button" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/65 transition hover:bg-white/10 hover:text-white" on:click={() => (minimized = true)} aria-label="Minimizar assistente"><X size={15}/></button>
@@ -239,7 +340,7 @@
             <div class="flex items-start gap-3">
               <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF0FF] text-[#000A57]"><MessageCircleQuestion size={15}/></span>
               <div class="max-w-[540px] rounded-2xl rounded-tl-md bg-white px-4 py-3 shadow-[0_4px_18px_rgba(1,13,40,0.05)]">
-                <p class="text-[12px] leading-6 text-[#424A5D]">Posso esclarecer este procedimento e continuar a conversa usando somente o conteúdo publicado deste artigo. Pergunte de forma natural, inclusive em sequência.</p>
+                <p class="text-[12px] leading-6 text-[#424A5D]">Pergunte sobre esta página. Se a resposta estiver aqui, eu explico e mostro exatamente o ponto do artigo. Se estiver em outro conteúdo, eu trago a orientação correspondente.</p>
               </div>
             </div>
             <div class="ml-11 mt-3 flex flex-wrap gap-2">
@@ -263,12 +364,49 @@
                 <div class="flex items-start gap-2.5">
                   <span class={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${message.error ? "bg-[#FFF0E8] text-[#A9510D]" : "bg-[#EEF0FF] text-[#000A57]"}`}><Sparkles size={14}/></span>
                   <div class={`max-w-[86%] rounded-2xl rounded-tl-md border px-4 py-3 ${message.error ? "border-[#F1D7BD] bg-[#FFF9F3]" : "border-[#E7EAF1] bg-white"}`}>
-                    <p class={`whitespace-pre-wrap text-[12px] leading-6 ${message.error ? "text-[#7A3B08]" : "text-[#424A5D]"}`}>{message.text}</p>
+                    {#if message.error}
+                      <p class="whitespace-pre-wrap text-[12px] leading-6 text-[#7A3B08]">{message.text}</p>
+                    {:else}
+                      <HelpRichText text={message.text} className="space-y-1.5 text-[12px] leading-6 text-[#424A5D]" />
+                    {/if}
+
                     {#if message.target && message.resolution === "answered"}
                       <button type="button" class="mt-3 inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#EEF0FF] px-3 text-[10px] font-semibold text-[#000A57]" on:click={() => message.target && openTarget(message.target)}>Ver ponto no artigo<ArrowUpRight size={13}/></button>
+                    {/if}
+
+                    {#if message.resolution === "found_elsewhere" && message.presentation}
+                      {#if message.presentation.media}
+                        <div class="mt-3 overflow-hidden rounded-xl border border-[#E2E5EC] bg-[#F7F8FB]">
+                          {#if message.presentation.media.kind === "youtube"}
+                            <div class="aspect-video bg-black">
+                              <iframe
+                                src={message.presentation.media.url}
+                                title={message.presentation.media.title}
+                                class="h-full w-full"
+                                loading="lazy"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowfullscreen
+                              ></iframe>
+                            </div>
+                          {:else if message.presentation.media.kind === "video"}
+                            <video controls preload="metadata" class="aspect-video h-auto w-full bg-black" src={message.presentation.media.url}>
+                              <track kind="captions" />
+                            </video>
+                          {:else}
+                            <a href={message.presentation.media.url} target="_blank" rel="noopener noreferrer" class="flex items-center justify-between gap-3 px-3.5 py-3 text-[#000A57] transition hover:bg-white">
+                              <span class="flex min-w-0 items-center gap-2.5"><PlayCircle size={18} class="shrink-0" /><span class="truncate text-[10px] font-semibold">Assistir ao vídeo</span></span><ExternalLink size={13} class="shrink-0" />
+                            </a>
+                          {/if}
+                        </div>
+                      {/if}
+
+                      <a href={message.presentation.source.href} class="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[#DDE2F0] bg-[#F7F8FF] px-3 py-2.5 text-[#000A57] transition hover:border-[#BFC7E4] hover:bg-[#F1F3FF]">
+                        <span class="min-w-0"><small class="block text-[8px] font-bold uppercase tracking-[0.08em] text-[#7B839B]">Central de Ajuda</small><strong class="mt-0.5 block truncate text-[10px] font-semibold">{message.presentation.source.title}</strong></span><ArrowUpRight size={13} class="shrink-0" />
+                      </a>
                     {:else if message.target && message.resolution === "found_elsewhere"}
                       <button type="button" class="mt-3 inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#EEF0FF] px-3 text-[10px] font-semibold text-[#000A57]" on:click={() => message.target && openTarget(message.target)}>Abrir {message.target.title}<ArrowUpRight size={13}/></button>
                     {/if}
+
                     {#if message.error && requiresAuthentication}<a href="/cliente" class="mt-2 block text-[10px] font-semibold text-[#000A57] hover:underline">Entrar na Área do Cliente</a>{/if}
                   </div>
                 </div>
@@ -303,7 +441,7 @@
           </button>
         </div>
         <div class="mx-auto mt-2 flex max-w-[680px] items-center justify-between gap-3 px-1">
-          <span class="inline-flex items-center gap-1.5 text-[8px] font-medium text-[#8B91A0]"><ShieldCheck size={11}/>Respostas limitadas ao artigo; histórico usado apenas para contexto</span>
+          <span class="inline-flex items-center gap-1.5 text-[8px] font-medium text-[#8B91A0]"><ShieldCheck size={11}/>Prioriza este artigo e aponta o trecho exato da resposta</span>
           <span class="text-[8px] text-[#A0A5B1]">Enter envia · Shift+Enter quebra linha</span>
         </div>
       </form>
