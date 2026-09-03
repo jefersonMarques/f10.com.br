@@ -3,32 +3,23 @@ import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import {
-  addHelpTrainingFailureReason,
   deleteHelpTrainingDraftPath,
-  deleteHelpTrainingFailureReason,
-  moveHelpTrainingFailureReason,
   moveHelpTrainingStep,
   publishHelpTrainingPathDraft,
+  updateHelpTrainingPathDraft,
   updateHelpTrainingStepDraft,
 } from "$lib/server/help/helpTrainingAuthoringRepository";
-import {
-  listHelpCategories,
-  listHelpTrainingPathCategories,
-  updateHelpTrainingPathWithCategories,
-} from "$lib/server/help/helpCategoryRepository";
 import { getCombinedHelpTrainingInsights } from "$lib/server/help/helpTrainingInsightsRepository";
+import { regenerateHelpTrainingFromPublishedContent } from "$lib/server/help/helpTrainingGeneration";
 import { getTrainingBaseUrl, sendHelpTrainingInvite } from "$lib/server/help/helpTrainingMailer";
 import {
-  addHelpTrainingStep,
   archiveHelpTrainingPath,
   createHelpTrainingInvite,
-  deleteHelpTrainingMedia,
   deleteHelpTrainingStep,
   getHelpTrainingPath,
   listHelpTrainingParticipants,
-  listTrainingSupportQueues,
-  updateHelpTrainingFailureReason,
 } from "$lib/server/help/helpTrainingRepository";
+import { getPublishedStructuredHelpById } from "$lib/server/help/publicStructuredHelpRepository";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -48,10 +39,10 @@ function direction(value: string): "up" | "down" | null {
 }
 
 function publishErrorMessage(cause: unknown): string {
-  const code = cause instanceof Error ? cause.message : "TRAINING_PUBLISH_FAILED";
-  if (code === "TRAINING_STEP_INCOMPLETE") return "Toda microação precisa ter título e conteúdo.";
-  if (code === "TRAINING_VIDEO_INVALID" || code === "INVALID_MEDIA_URL") return "Há um vídeo inválido em uma das microações.";
-  return "Não foi possível publicar. Revise as microações e tente novamente.";
+  const code = cause instanceof Error ? cause.message : "";
+  if (code === "TRAINING_STEP_INCOMPLETE") return "Toda orientação precisa ter título e instrução.";
+  if (code === "TRAINING_VIDEO_INVALID" || code === "INVALID_MEDIA_URL") return "A referência do vídeo publicado não é válida.";
+  return "Não foi possível publicar. Revise as orientações.";
 }
 
 export const load: PageServerLoad = async ({ params, parent }) => {
@@ -62,23 +53,24 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 
   const path = await getHelpTrainingPath(params.pathId);
   if (!path) throw error(404, "Trilha não encontrada.");
-  const [queues, participants, insights, categories, assignedCategories] = await Promise.all([
-    listTrainingSupportQueues(),
+
+  const [participants, insights, currentPublication] = await Promise.all([
     listHelpTrainingParticipants(params.pathId),
     getCombinedHelpTrainingInsights(params.pathId),
-    listHelpCategories(true),
-    listHelpTrainingPathCategories(params.pathId),
+    getPublishedStructuredHelpById(path.sourceContentId),
   ]);
   const canEditPermission = hasPermission(permissions, "help.edit");
   const canPublishPermission = hasPermission(permissions, "help.publish");
+  const sourceUpdateAvailable = Boolean(
+    currentPublication &&
+    currentPublication.publishedAt.getTime() > path.sourcePublishedAt.getTime(),
+  );
 
   return {
     path,
-    queues,
     participants,
     insights,
-    categories,
-    assignedCategoryIds: assignedCategories.map((category) => category.id),
+    sourceUpdateAvailable,
     canEdit: canEditPermission && path.status !== "archived",
     canPublish: canPublishPermission && path.status !== "archived",
     canDelete: canEditPermission && path.currentVersion === 0,
@@ -96,50 +88,25 @@ export const actions: Actions = {
     const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
     const formData = await request.formData();
     const title = read(formData, "title");
-    const slug = read(formData, "slug");
     const audience = read(formData, "audience");
     const description = read(formData, "description");
     const welcomeMessage = read(formData, "welcomeMessage");
-    const supportQueueId = read(formData, "supportQueueId");
-    const accessMode = read(formData, "accessMode") === "public" ? "public" : "invite_only";
-    const categoryValues = formData.getAll("categoryIds");
-    if (categoryValues.some((value) => typeof value !== "string" || !isUuid(value))) {
-      return fail(400, { success: false, message: "Uma das categorias selecionadas é inválida." });
-    }
-    const categoryIds = categoryValues as string[];
     if (title.length < 4 || title.length > 160 || audience.length > 160 || description.length > 1200 || welcomeMessage.length > 1200) {
       return fail(400, { success: false, message: "Revise os dados da trilha." });
     }
     try {
-      await updateHelpTrainingPathWithCategories(session.user.id, params.pathId, {
+      await updateHelpTrainingPathDraft(session.user.id, params.pathId, {
         title,
-        slug,
+        slug: read(formData, "slug"),
         audience,
         description,
         welcomeMessage,
-        supportQueueId: isUuid(supportQueueId) ? supportQueueId : null,
-        accessMode,
-        categoryIds,
+        supportQueueId: null,
+        accessMode: read(formData, "accessMode") === "public" ? "public" : "invite_only",
       });
-      return { success: true, message: "Configuração e categorias salvas." };
-    } catch (cause) {
-      return fail(409, {
-        success: false,
-        message: cause instanceof Error && cause.message === "HELP_CATEGORY_INVALID"
-          ? "Uma das categorias foi desativada ou não existe mais. Atualize a página e selecione novamente."
-          : "Não foi possível salvar a trilha. Verifique se o endereço já está em uso.",
-      });
-    }
-  },
-
-  addStep: async ({ cookies, params }) => {
-    if (!isUuid(params.pathId)) return fail(404, { success: false, message: "Trilha não encontrada." });
-    const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
-    try {
-      const stepId = await addHelpTrainingStep(session.user.id, params.pathId);
-      return { success: true, message: "Microação adicionada.", openStepId: stepId };
+      return { success: true, message: "Configuração salva." };
     } catch {
-      return fail(409, { success: false, message: "Não foi possível adicionar a microação." });
+      return fail(409, { success: false, message: "Não foi possível salvar a trilha." });
     }
   },
 
@@ -148,9 +115,7 @@ export const actions: Actions = {
     const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
     const formData = await request.formData();
     const stepId = read(formData, "stepId");
-    if (!isUuid(stepId)) return fail(400, { success: false, message: "Microação inválida." });
-    const interactionMode = read(formData, "interactionMode") === "presentation" ? "presentation" : "action";
-    const estimatedSeconds = Number.parseInt(read(formData, "estimatedSeconds") || "45", 10);
+    if (!isUuid(stepId)) return fail(400, { success: false, message: "Orientação inválida." });
     try {
       await updateHelpTrainingStepDraft(session.user.id, params.pathId, stepId, {
         title: read(formData, "title"),
@@ -159,12 +124,13 @@ export const actions: Actions = {
         expectedResult: read(formData, "expectedResult"),
         successMessage: read(formData, "successMessage"),
         primaryActionLabel: read(formData, "primaryActionLabel"),
-        estimatedSeconds,
-        interactionMode,
+        estimatedSeconds: Number.parseInt(read(formData, "estimatedSeconds") || "45", 10),
+        videoStartSeconds: Number.parseInt(read(formData, "videoStartSeconds") || "0", 10),
+        interactionMode: read(formData, "interactionMode") === "presentation" ? "presentation" : "action",
       });
-      return { success: true, message: "Microação salva.", openStepId: stepId };
+      return { success: true, message: "Orientação salva.", openStepId: stepId };
     } catch {
-      return fail(409, { success: false, message: "Não foi possível salvar esta microação.", openStepId: stepId });
+      return fail(409, { success: false, message: "Não foi possível salvar esta orientação.", openStepId: stepId });
     }
   },
 
@@ -175,108 +141,31 @@ export const actions: Actions = {
     const stepId = read(formData, "stepId");
     const moveDirection = direction(read(formData, "direction"));
     if (!isUuid(stepId) || !moveDirection) return fail(400, { success: false, message: "Movimentação inválida." });
-    try {
-      await moveHelpTrainingStep(session.user.id, params.pathId, stepId, moveDirection);
-      return { success: true, message: "Ordem atualizada.", openStepId: stepId };
-    } catch {
-      return fail(409, { success: false, message: "Não foi possível reordenar esta microação.", openStepId: stepId });
-    }
+    await moveHelpTrainingStep(session.user.id, params.pathId, stepId, moveDirection);
+    return { success: true, message: "Ordem atualizada.", openStepId: stepId };
   },
 
   deleteStep: async ({ cookies, params, request }) => {
     if (!isUuid(params.pathId)) return fail(404, { success: false, message: "Trilha não encontrada." });
     const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
-    const formData = await request.formData();
-    const stepId = read(formData, "stepId");
-    if (!isUuid(stepId)) return fail(400, { success: false, message: "Microação inválida." });
+    const stepId = read(await request.formData(), "stepId");
+    if (!isUuid(stepId)) return fail(400, { success: false, message: "Orientação inválida." });
     try {
       await deleteHelpTrainingStep(session.user.id, params.pathId, stepId);
-      return { success: true, message: "Microação removida." };
-    } catch (cause) {
-      return fail(409, {
-        success: false,
-        message: cause instanceof Error && cause.message === "LAST_TRAINING_STEP_REQUIRED"
-          ? "A trilha precisa manter pelo menos uma microação."
-          : "Não foi possível remover esta microação.",
-      });
+      return { success: true, message: "Orientação removida." };
+    } catch {
+      return fail(409, { success: false, message: "A trilha precisa manter pelo menos uma orientação." });
     }
   },
 
-  deleteMedia: async ({ cookies, params, request }) => {
+  regenerate: async ({ cookies, params }) => {
     if (!isUuid(params.pathId)) return fail(404, { success: false, message: "Trilha não encontrada." });
     const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
-    const formData = await request.formData();
-    const stepId = read(formData, "stepId");
-    const mediaId = read(formData, "mediaId");
-    if (!isUuid(stepId) || !isUuid(mediaId)) return fail(400, { success: false, message: "Mídia inválida." });
     try {
-      await deleteHelpTrainingMedia(session.user.id, params.pathId, stepId, mediaId);
-      return { success: true, message: "Mídia removida.", openStepId: stepId };
+      await regenerateHelpTrainingFromPublishedContent(session.user.id, params.pathId);
+      return { success: true, message: "Orientações regeneradas com a publicação mais recente." };
     } catch {
-      return fail(409, { success: false, message: "Não foi possível remover a mídia.", openStepId: stepId });
-    }
-  },
-
-  addReason: async ({ cookies, params, request }) => {
-    if (!isUuid(params.pathId)) return fail(404, { success: false, message: "Trilha não encontrada." });
-    const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
-    const formData = await request.formData();
-    const stepId = read(formData, "stepId");
-    if (!isUuid(stepId)) return fail(400, { success: false, message: "Microação inválida." });
-    try {
-      await addHelpTrainingFailureReason(session.user.id, params.pathId, stepId);
-      return { success: true, message: "Motivo adicionado.", openStepId: stepId };
-    } catch {
-      return fail(409, { success: false, message: "Não foi possível adicionar o motivo.", openStepId: stepId });
-    }
-  },
-
-  updateReason: async ({ cookies, params, request }) => {
-    if (!isUuid(params.pathId)) return fail(404, { success: false, message: "Trilha não encontrada." });
-    const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
-    const formData = await request.formData();
-    const stepId = read(formData, "stepId");
-    const reasonId = read(formData, "reasonId");
-    if (!isUuid(stepId) || !isUuid(reasonId)) return fail(400, { success: false, message: "Motivo inválido." });
-    try {
-      await updateHelpTrainingFailureReason(session.user.id, params.pathId, stepId, reasonId, {
-        label: read(formData, "label"),
-        recoveryMessage: read(formData, "recoveryMessage"),
-      });
-      return { success: true, message: "Motivo salvo.", openStepId: stepId };
-    } catch {
-      return fail(409, { success: false, message: "Não foi possível salvar o motivo.", openStepId: stepId });
-    }
-  },
-
-  moveReason: async ({ cookies, params, request }) => {
-    if (!isUuid(params.pathId)) return fail(404, { success: false, message: "Trilha não encontrada." });
-    const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
-    const formData = await request.formData();
-    const stepId = read(formData, "stepId");
-    const reasonId = read(formData, "reasonId");
-    const moveDirection = direction(read(formData, "direction"));
-    if (!isUuid(stepId) || !isUuid(reasonId) || !moveDirection) return fail(400, { success: false, message: "Movimentação inválida." });
-    try {
-      await moveHelpTrainingFailureReason(session.user.id, params.pathId, stepId, reasonId, moveDirection);
-      return { success: true, message: "Ordem dos motivos atualizada.", openStepId: stepId };
-    } catch {
-      return fail(409, { success: false, message: "Não foi possível reordenar o motivo.", openStepId: stepId });
-    }
-  },
-
-  deleteReason: async ({ cookies, params, request }) => {
-    if (!isUuid(params.pathId)) return fail(404, { success: false, message: "Trilha não encontrada." });
-    const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
-    const formData = await request.formData();
-    const stepId = read(formData, "stepId");
-    const reasonId = read(formData, "reasonId");
-    if (!isUuid(stepId) || !isUuid(reasonId)) return fail(400, { success: false, message: "Motivo inválido." });
-    try {
-      await deleteHelpTrainingFailureReason(session.user.id, params.pathId, stepId, reasonId);
-      return { success: true, message: "Motivo removido.", openStepId: stepId };
-    } catch {
-      return fail(409, { success: false, message: "Não foi possível remover o motivo.", openStepId: stepId });
+      return fail(409, { success: false, message: "Não foi possível regenerar a trilha. Verifique a configuração da IA e o conteúdo publicado." });
     }
   },
 
@@ -307,13 +196,8 @@ export const actions: Actions = {
     const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
     try {
       await deleteHelpTrainingDraftPath(session.user.id, params.pathId);
-    } catch (cause) {
-      return fail(409, {
-        success: false,
-        message: cause instanceof Error && cause.message === "TRAINING_DELETE_PUBLISHED_NOT_ALLOWED"
-          ? "Uma trilha que já teve versão publicada deve ser arquivada, não excluída."
-          : "Não foi possível excluir esta trilha.",
-      });
+    } catch {
+      return fail(409, { success: false, message: "Não foi possível excluir esta trilha." });
     }
     throw redirect(303, "/app/help/trilhas");
   },
@@ -326,26 +210,15 @@ export const actions: Actions = {
     const email = read(formData, "email").toLowerCase();
     const organizationName = read(formData, "organizationName");
     if (name.length < 2 || name.length > 160 || !/^\S+@\S+\.\S+$/.test(email)) {
-      return fail(400, { success: false, message: "Informe nome e e-mail válidos para o participante." });
+      return fail(400, { success: false, message: "Informe nome e e-mail válidos." });
     }
     try {
       const invite = await createHelpTrainingInvite(session.user.id, params.pathId, { name, email, organizationName });
       const magicUrl = `${getTrainingBaseUrl(url.origin)}/treinamento/${invite.token}`;
-      await sendHelpTrainingInvite({
-        email,
-        name,
-        trainingTitle: invite.title,
-        magicUrl,
-        expiresAt: invite.expiresAt,
-      });
+      await sendHelpTrainingInvite({ email, name, trainingTitle: invite.title, magicUrl, expiresAt: invite.expiresAt });
       return { success: true, message: `Convite enviado para ${email}.` };
-    } catch (cause) {
-      return fail(409, {
-        success: false,
-        message: cause instanceof Error && cause.message === "TRAINING_NOT_AVAILABLE_FOR_INVITE"
-          ? "Publique a trilha antes de enviar convites."
-          : "Não foi possível enviar o convite. Revise a configuração de e-mail e tente novamente.",
-      });
+    } catch {
+      return fail(409, { success: false, message: "Publique a trilha e confirme a configuração de e-mail antes de convidar." });
     }
   },
 };

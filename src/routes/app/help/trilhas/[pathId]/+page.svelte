@@ -1,234 +1,150 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
   import type { SubmitFunction } from "@sveltejs/kit";
-  import {
-    Archive,
-    ArrowDown,
-    ArrowUp,
-    BarChart3,
-    Captions,
-    CheckCircle2,
-    CircleAlert,
-    Clock3,
-    ExternalLink,
-    Eye,
-    Globe2,
-    GraduationCap,
-    Mail,
-    Plus,
-    Save,
-    Send,
-    Trash2,
-    Users,
-    Video,
-  } from "lucide-svelte";
+  import { ArrowDown, ArrowUp, BookOpen, Clock3, ExternalLink, Eye, LoaderCircle, Mail, RefreshCw, Save, Sparkles, Trash2 } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
-  import TrainingImageUploader from "$lib/components/operations/TrainingImageUploader.svelte";
-  import HelpTrainingVideoUploader from "$lib/components/operations/HelpTrainingVideoUploader.svelte";
-  import HelpTrainingDifficultyReports from "$lib/components/operations/HelpTrainingDifficultyReports.svelte";
   import type { ActionData, PageData } from "./$types";
-
-  type InteractionMode = "presentation" | "action";
 
   export let data: PageData;
   export let form: ActionData;
 
-  let openStepId = data.path.steps[0]?.id ?? "";
-  let interactionModeByStep: Record<string, InteractionMode> = {};
-
-  $: if (form && "openStepId" in form && typeof form.openStepId === "string") {
-    openStepId = form.openStepId;
-  }
+  let openStepId = form && "openStepId" in form && typeof form.openStepId === "string" ? form.openStepId : "";
+  let regenerating = false;
 
   const enhanceEditor: SubmitFunction = () => {
-    return async ({ update, result }) => {
-      if ((result.type === "success" || result.type === "failure") && result.data && "openStepId" in result.data && typeof result.data.openStepId === "string") {
-        openStepId = result.data.openStepId;
-      }
-      await update({ reset: false, invalidateAll: true });
+    return async ({ update }) => {
+      await update({ reset: false });
     };
   };
 
-  function statusLabel(status: string, currentVersion: number): string {
-    if (status === "published") return "Publicada";
-    if (status === "archived") return "Arquivada";
-    if (currentVersion > 0) return "Alterações não publicadas";
-    return "Rascunho";
-  }
-
-  function participantStatus(status: string): string {
-    if (status === "completed") return "Concluído";
-    if (status === "in_progress") return "Em andamento";
-    if (status === "opened") return "Abriu convite";
-    return "Convidado";
-  }
-
-  function formatDate(value: string | Date | null): string {
-    if (!value) return "—";
-    return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
-  }
-
-  function handleStepToggle(event: Event, stepId: string): void {
-    const details = event.currentTarget as HTMLDetailsElement;
-    if (details.open) openStepId = stepId;
-    else if (openStepId === stepId) openStepId = "";
-  }
-
-  function interactionModeFor(step: PageData["path"]["steps"][number]): InteractionMode {
-    return interactionModeByStep[step.id] ?? step.interactionMode ?? "action";
-  }
-
-  function handleInteractionModeChange(event: Event, stepId: string): void {
-    const value = (event.currentTarget as HTMLSelectElement).value;
-    interactionModeByStep = {
-      ...interactionModeByStep,
-      [stepId]: value === "presentation" ? "presentation" : "action",
+  const enhanceRegenerate: SubmitFunction = () => {
+    regenerating = true;
+    return async ({ update }) => {
+      try {
+        await update({ reset: false });
+      } finally {
+        regenerating = false;
+      }
     };
+  };
+
+  function sourceStepTitle(stepId: string | null): string {
+    return data.path.sourcePublicationSnapshot.steps.find((step) => step.id === stepId)?.title ?? "Passo do conteúdo";
   }
 
-  function captionAssetId(step: PageData["path"]["steps"][number]): string | null {
-    return step.media.find((media) => media.mediaType === "caption" && media.assetId)?.assetId ?? null;
-  }
-
-  function captionUrl(step: PageData["path"]["steps"][number]): string {
-    const assetId = captionAssetId(step);
-    return assetId ? `/api/app/help/assets/${assetId}` : "/help-training-empty.vtt";
+  function formatSeconds(value: number): string {
+    const seconds = Math.max(0, Math.round(value));
+    const minutes = Math.floor(seconds / 60);
+    return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
   }
 </script>
 
-<svelte:head><title>{data.path.title} | Trilhas F10</title></svelte:head>
+<svelte:head><title>{data.path.title} | Trilhas</title></svelte:head>
 
 <ApplicationContent width="wide">
-  <div class="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-    <ApplicationBackLink href="/app/help/trilhas" label="Trilhas" />
-    <div class="flex flex-wrap items-center gap-2">
-      <span class={`application-text-caption rounded-full px-3 py-1.5 font-bold uppercase tracking-[0.08em] ${data.path.status === "published" ? "bg-[#EEF8F1] text-[#2F7045]" : data.path.status === "archived" ? "bg-[#F1F1F3] text-[#676D7D]" : "bg-[#EEF0FF] text-[#000A57]"}`}>{statusLabel(data.path.status, data.path.currentVersion)}</span>
-      {#if data.path.currentVersion > 0}<span class="application-text-caption rounded-full bg-[#F3F4F7] px-3 py-1.5 font-semibold text-[#737989]">versão {data.path.currentVersion}</span>{/if}
-      <span class="application-text-caption rounded-full bg-[#FFF4E9] px-3 py-1.5 font-semibold text-[#B85408]">{data.path.steps.length} microações · somente interno</span>
+  <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <ApplicationBackLink href="/app/help/trilhas" label="Trilhas" />
+      <h1 class="mt-3 text-[20px] font-semibold text-[#11182C]">{data.path.title}</h1>
+      <p class="mt-1 text-[10px] text-[#858A98]">Fonte: {data.path.sourcePublicationSnapshot.title}</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href={data.previewUrl} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#DDE1EA] bg-white px-3 text-[9px] font-semibold text-[#000A57]"><Eye size={13}/>Prévia</a>
+      <a href={`/ajuda-f10/${data.path.sourcePublicationSnapshot.slug}`} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#DDE1EA] bg-white px-3 text-[9px] font-semibold text-[#5F6676]"><BookOpen size={13}/>Conteúdo completo<ExternalLink size={11}/></a>
+      {#if data.publicUrl}<a href={data.publicUrl} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#000A57] px-3 text-[9px] font-semibold text-white">Abrir trilha<ExternalLink size={11}/></a>{/if}
     </div>
   </div>
 
-  <section class="mb-4 rounded-[22px] border border-[#E2E5ED] bg-white px-5 py-4 sm:px-6">
-    <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
-      <div class="min-w-0">
-        <h2 class="truncate text-[18px] font-semibold text-[#11182C]">{data.path.title}</h2>
-        <p class="mt-1 truncate text-[11px] text-[#838897]">/{data.path.slug} · {data.path.audience || "público não informado"}</p>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        <a href={data.previewUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><Eye size={14}/>Pré-visualizar</a>
-        {#if data.publicUrl}<a href={data.publicUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#B9E6C9] bg-[#F1FBF4] px-3.5 font-semibold text-[#2F7045]"><Globe2 size={14}/>Abrir link público</a>{/if}
-        {#if data.canPublish && data.path.status !== "published"}
-          <form method="POST" action="?/publish" use:enhance={enhanceEditor}><button type="submit" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#EA6D0B] px-4 font-semibold text-white"><GraduationCap size={15}/>Publicar nova versão</button></form>
-        {/if}
-        {#if data.canArchive}
-          <form method="POST" action="?/archive" use:enhance={enhanceEditor} on:submit={(event) => { if (!confirm("Arquivar esta trilha? O link público e novos convites serão bloqueados; participantes já iniciados continuam na versão recebida.")) event.preventDefault(); }}><button type="submit" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#626979]"><Archive size={14}/>Arquivar</button></form>
-        {/if}
-        {#if data.canDelete}
-          <form method="POST" action="?/deletePath" use:enhance on:submit={(event) => { if (!confirm("Excluir definitivamente esta trilha em rascunho? Esta ação não pode ser desfeita.")) event.preventDefault(); }}><button type="submit" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#F0C8C8] bg-white px-3.5 font-semibold text-[#9B2C2C]"><Trash2 size={14}/>Excluir rascunho</button></form>
-        {/if}
-      </div>
-    </div>
-  </section>
-
   {#if form?.message}
-    <div class={`mb-4 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
-      {#if form.success}<CheckCircle2 size={18}/>{:else}<CircleAlert size={18}/>{/if}<span>{form.message}</span>
-    </div>
+    <div class="mb-4 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-4 py-3 text-[10px] font-medium text-[#000A57]">{form.message}</div>
   {/if}
 
-  <section class="grid gap-3 md:grid-cols-4">
-    <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><Mail size={18} class="text-[#000A57]"/><strong class="mt-3 block text-[24px] font-semibold">{data.insights.invited}</strong><span class="application-text-caption text-[#858A98]">convidados</span></div>
-    <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><Users size={18} class="text-[#000A57]"/><strong class="mt-3 block text-[24px] font-semibold">{data.insights.started}</strong><span class="application-text-caption text-[#858A98]">iniciaram</span></div>
-    <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><CheckCircle2 size={18} class="text-[#2F7045]"/><strong class="mt-3 block text-[24px] font-semibold">{data.insights.completed}</strong><span class="application-text-caption text-[#858A98]">concluíram</span></div>
-    <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5"><CircleAlert size={18} class="text-[#EA6D0B]"/><strong class="mt-3 block text-[24px] font-semibold">{data.insights.humanHelp}</strong><span class="application-text-caption text-[#858A98]">precisaram de ajuda humana</span></div>
-  </section>
-  {#if data.insights.publicStarted > 0}<p class="application-text-meta mt-2 text-right text-[#8B909D]">Dos acessos acima, {data.insights.publicStarted} começaram pelo link público e {data.insights.publicCompleted} concluíram.</p>{/if}
-
-  <HelpTrainingDifficultyReports reports={data.insights.difficultyReports} />
-
-  <div class="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+  <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
     <div class="space-y-5">
-      <form method="POST" action="?/updatePath" use:enhance={enhanceEditor} class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
-        <fieldset disabled={!data.canEdit} class="disabled:opacity-70">
-          <div class="flex items-start justify-between gap-3"><div><h2 class="text-[16px] font-semibold text-[#11182C]">Configuração da trilha</h2><p class="mt-1 text-[11px] text-[#858A98]">Quantidade total e estimativas nunca são enviadas para a experiência do participante.</p></div><Save size={17} class="text-[#000A57]"/></div>
-          <div class="mt-5 grid gap-4 lg:grid-cols-2">
-            <label class="block lg:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Nome</span><input name="title" required maxlength="160" value={data.path.title} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]"/></label>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Endereço</span><input name="slug" maxlength="100" value={data.path.slug} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]"/></label>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Público</span><input name="audience" maxlength="160" value={data.path.audience} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]"/></label>
-            <label class="block lg:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Descrição interna</span><textarea name="description" rows="3" maxlength="1200" class="w-full rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[11px]">{data.path.description}</textarea><span class="application-text-meta mt-1 block text-[#8B909D]">Somente Operations. Este conteúdo não é enviado ao participante.</span></label>
-            <label class="block lg:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Mensagem de entrada</span><textarea name="welcomeMessage" rows="3" maxlength="1200" class="w-full rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[11px]">{data.path.welcomeMessage}</textarea><span class="application-text-meta mt-1 block text-[#8B909D]">Evite informar quantidade de etapas ou duração.</span></label>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Acesso</span><select name="accessMode" value={data.path.accessMode} class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"><option value="invite_only">Somente por convite</option><option value="public">Público por link</option></select><span class="application-text-meta mt-1 block text-[#8B909D]">O link público usa sempre a última versão publicada.</span></label>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Fila quando precisar de ajuda humana</span><select name="supportQueueId" value={data.path.supportQueueId ?? ""} class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"><option value="">Fila padrão de suporte</option>{#each data.queues as queue}<option value={queue.id}>{queue.name} ({queue.code})</option>{/each}</select></label>
-            <div class="lg:col-span-2">
-              <div class="flex items-center justify-between gap-3"><span class="application-text-caption font-semibold text-[#555B6A]">Categorias</span><a href="/app/help/categories" class="application-text-meta font-semibold text-[#000A57]">Gerenciar categorias</a></div>
-              {#if data.categories.length === 0}
-                <div class="mt-2 rounded-xl border border-dashed border-[#D8DCE5] bg-[#FAFAFC] px-4 py-3 text-[10px] leading-5 text-[#777D8C]">Crie categorias como Comercial, Financeiro ou Pedagógico para organizar as trilhas.</div>
-              {:else}
-                <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {#each data.categories as category}
-                    <label class="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-[#E1E4EB] bg-[#FAFAFC] px-3 text-[10px] font-semibold text-[#4F5666]"><input name="categoryIds" type="checkbox" value={category.id} checked={data.assignedCategoryIds.includes(category.id)} class="h-4 w-4 rounded border-[#C9CED9]"/><span class="text-[15px]">{category.icon || "•"}</span><span>{category.name}</span></label>
-                  {/each}
-                </div>
-              {/if}
-              <span class="application-text-meta mt-1.5 block text-[#8B909D]">Uma trilha pode aparecer em várias áreas. Somente trilhas públicas e publicadas entram no catálogo de categorias.</span>
+      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div class="flex items-start gap-3">
+            <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Sparkles size={18}/></span>
+            <div>
+              <h2 class="text-[14px] font-semibold text-[#11182C]">Conteúdo de origem</h2>
+              <p class="mt-1 text-[10px] leading-5 text-[#777E8D]">{data.path.sourcePublicationSnapshot.title}</p>
+              <p class="mt-1 text-[9px] text-[#959AA6]">Publicação usada na geração: {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(data.path.sourcePublishedAt))}</p>
             </div>
           </div>
-          {#if data.canEdit}<div class="mt-5 flex justify-end"><button type="submit" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 font-semibold text-white"><Save size={14}/>Salvar configuração</button></div>{/if}
-        </fieldset>
-      </form>
+          {#if data.canEdit && data.sourceUpdateAvailable}
+            <form method="POST" action="?/regenerate" use:enhance={enhanceRegenerate}>
+              <button type="submit" disabled={regenerating} class="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#EA6D0B] px-3 text-[9px] font-semibold text-white disabled:opacity-60">{#if regenerating}<LoaderCircle size={12} class="animate-spin"/>{:else}<RefreshCw size={12}/>{/if}Usar publicação mais recente</button>
+            </form>
+          {:else if data.sourceUpdateAvailable}
+            <span class="rounded-full bg-[#FFF3E9] px-2.5 py-1 text-[8px] font-semibold text-[#A9510D]">Há atualização do conteúdo</span>
+          {:else}
+            <span class="rounded-full bg-[#EEF8F1] px-2.5 py-1 text-[8px] font-semibold text-[#2F7045]">Fonte sincronizada</span>
+          {/if}
+        </div>
+      </section>
 
       <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
-        <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h2 class="text-[16px] font-semibold text-[#11182C]">Microações</h2><p class="mt-1 text-[11px] text-[#858A98]">Use “Apresentação” quando basta observar algo e “Ação” quando a pessoa precisa executar algo no F10. Em ambos os casos ela apenas segue a orientação e avança.</p></div>{#if data.canEdit}<form method="POST" action="?/addStep" use:enhance={enhanceEditor}><button type="submit" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 font-semibold text-white"><Plus size={14}/>Adicionar microação</button></form>{/if}</div>
+        <h2 class="text-[14px] font-semibold text-[#11182C]">Configuração</h2>
+        <form method="POST" action="?/updatePath" use:enhance={enhanceEditor} class="mt-4">
+          <fieldset disabled={!data.canEdit} class="grid gap-3 lg:grid-cols-2 disabled:opacity-70">
+            <label><span class="mb-1 block text-[9px] font-semibold text-[#5B6170]">Nome</span><input name="title" maxlength="160" value={data.path.title} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[10px]"/></label>
+            <label><span class="mb-1 block text-[9px] font-semibold text-[#5B6170]">Endereço</span><input name="slug" maxlength="100" value={data.path.slug} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[10px]"/></label>
+            <label><span class="mb-1 block text-[9px] font-semibold text-[#5B6170]">Público</span><input name="audience" maxlength="160" value={data.path.audience} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[10px]"/></label>
+            <label><span class="mb-1 block text-[9px] font-semibold text-[#5B6170]">Acesso</span><select name="accessMode" value={data.path.accessMode} class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px]"><option value="invite_only">Somente por convite</option><option value="public">Público por link</option></select></label>
+            <label class="lg:col-span-2"><span class="mb-1 block text-[9px] font-semibold text-[#5B6170]">Descrição interna</span><textarea name="description" rows="2" maxlength="1200" class="w-full rounded-xl border border-[#DDE1EA] px-3 py-2 text-[10px]">{data.path.description}</textarea></label>
+            <label class="lg:col-span-2"><span class="mb-1 block text-[9px] font-semibold text-[#5B6170]">Mensagem de entrada</span><textarea name="welcomeMessage" rows="2" maxlength="1200" class="w-full rounded-xl border border-[#DDE1EA] px-3 py-2 text-[10px]">{data.path.welcomeMessage}</textarea></label>
+          </fieldset>
+          {#if data.canEdit}<div class="mt-4 flex justify-end"><button type="submit" class="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#000A57] px-3 text-[9px] font-semibold text-white"><Save size={12}/>Salvar</button></div>{/if}
+        </form>
+      </section>
 
-        <div class="mt-5 space-y-4">
-          {#each data.path.steps as step, stepIndex (step.id)}
-            <details class="overflow-hidden rounded-2xl border border-[#E3E6ED] bg-[#FAFAFC]" open={openStepId === step.id} on:toggle={(event) => handleStepToggle(event, step.id)}>
-              <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 sm:px-5">
-                <div class="flex min-w-0 items-center gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[11px] font-bold text-white">{stepIndex + 1}</span><div class="min-w-0"><strong class="block truncate text-[12px] font-semibold text-[#2B3141]">{step.title}</strong><span class="application-text-meta mt-1 block text-[#8B909D]">{interactionModeFor(step) === "presentation" ? "Apresentação" : "Ação guiada"} · estimativa interna {step.estimatedSeconds}s</span></div></div>
-                {#if data.canEdit}<div class="flex shrink-0 gap-1"><form method="POST" action="?/moveStep" use:enhance={enhanceEditor}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="up"/><button type="submit" on:click|stopPropagation disabled={stepIndex === 0} aria-label="Mover microação para cima" class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#E1E4EB] bg-white text-[#6B7280] disabled:opacity-30"><ArrowUp size={13}/></button></form><form method="POST" action="?/moveStep" use:enhance={enhanceEditor}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="down"/><button type="submit" on:click|stopPropagation disabled={stepIndex === data.path.steps.length - 1} aria-label="Mover microação para baixo" class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#E1E4EB] bg-white text-[#6B7280] disabled:opacity-30"><ArrowDown size={13}/></button></form></div>{/if}
-              </summary>
-              <div class="border-t border-[#E7E9EF] bg-white p-4 sm:p-5">
-                <form method="POST" action="?/updateStep" use:enhance={enhanceEditor} class="space-y-4">
-                  <input type="hidden" name="stepId" value={step.id}/>
-                  <fieldset disabled={!data.canEdit} class="space-y-4 disabled:opacity-70">
-                    <div class="grid gap-3 lg:grid-cols-[220px_1fr]"><label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">Tipo</span><select name="interactionMode" value={interactionModeFor(step)} on:change={(event) => handleInteractionModeChange(event, step.id)} class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"><option value="presentation">Apresentação — observar e avançar</option><option value="action">Ação — executar e avançar</option></select></label><label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">Título da ação</span><input name="title" required maxlength="180" value={step.title} placeholder="Ex.: Abra o menu Cadastros" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label></div>
-                    <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">O que a pessoa deve fazer agora</span><textarea name="instruction" required rows="4" maxlength="6000" class="w-full rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[11px] leading-5">{step.instruction}</textarea><span class="application-text-meta mt-1 block leading-4 text-[#8B909D]">Escreva uma instrução curta e direta. Marcação disponível: <strong>**negrito**</strong>, <code class="rounded bg-[#F1F2F5] px-1">`botão`</code>, listas iniciadas por <strong>-</strong> e quebras de linha.</span></label>
-                    <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">Dica de apoio (opcional)</span><textarea name="expectedResult" rows="2" maxlength="3000" placeholder="Ex.: A lista de usuários deve ficar aberta." class="w-full rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[11px]">{step.expectedResult}</textarea><span class="application-text-meta mt-1 block text-[#8B909D]">Use apenas quando ajudar a pessoa a reconhecer que está na tela certa.</span></label>
-                    <div class="grid gap-3 lg:grid-cols-[1fr_160px]"><label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">Mensagem após avançar</span><input name="successMessage" maxlength="500" value={step.successMessage} placeholder="Certo. Vamos para o próximo passo." class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label><label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#616777]">Segundos estimados</span><input name="estimatedSeconds" type="number" min="5" max="900" value={step.estimatedSeconds} class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label></div>
-                    {#if data.canEdit}<div class="flex justify-end"><button type="submit" class="application-text-caption inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]"><Save size={13}/>Salvar microação</button></div>{/if}
-                  </fieldset>
-                </form>
+      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+        <div>
+          <h2 class="text-[14px] font-semibold text-[#11182C]">Orientações geradas</h2>
+          <p class="mt-1 text-[10px] leading-5 text-[#858A98]">A trilha referencia o mesmo vídeo e as mesmas imagens do conteúdo. Ajuste texto, ordem ou o ponto de início sem criar novos arquivos.</p>
+        </div>
 
-                <div class="mt-5 border-t border-[#EEF0F5] pt-5">
-                  <h3 class="text-[11px] font-semibold text-[#303645]">Demonstração visual</h3>
-                  <p class="application-text-meta mt-1 text-[#8B909D]">Use uma única imagem principal por passo e, se necessário, um vídeo auxiliar de 30 a 60 segundos.</p>
-                  {#if step.media.length > 0}
-                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                      {#each step.media as media}
-                        <div class="rounded-xl border border-[#E2E5ED] bg-[#FAFAFC] p-3">
-                          {#if media.mediaType === "image" && media.assetId}
-                            <img src={`/api/app/help/assets/${media.assetId}`} alt={media.altText || media.assetName || "Imagem da microação"} class="max-h-48 w-full rounded-lg bg-white object-contain"/>
-                            <p class="application-text-meta mt-2 truncate font-semibold text-[#606777]">{media.assetName || "Imagem principal do passo"}</p>
-                          {:else if media.mediaType === "video" && media.assetId}
-                            <video src={`/api/app/help/assets/${media.assetId}`} controls preload="metadata" class="aspect-video w-full rounded-lg bg-black"><track kind="captions" srclang="pt-BR" label="Português" src={captionUrl(step)} default /></video>
-                            <p class="application-text-meta mt-2 truncate font-semibold text-[#606777]">{media.assetName || "Demonstração em vídeo"}</p>
-                          {:else if media.mediaType === "video" && media.sourceUrl}
-                            <div class="flex min-h-28 items-center justify-center rounded-lg bg-[#EEF0FF] text-[#000A57]"><Video size={26}/></div><a href={media.sourceUrl} target="_blank" rel="noopener noreferrer" class="application-text-meta mt-2 inline-flex items-center gap-1 font-semibold text-[#000A57]">Vídeo externo<ExternalLink size={11}/></a>
-                          {:else if media.mediaType === "caption" && media.assetId}
-                            <div class="flex min-h-28 items-center justify-center rounded-lg bg-[#F4F5F8] text-[#000A57]"><Captions size={26}/></div><p class="application-text-meta mt-2 truncate font-semibold text-[#606777]">{media.assetName || "Legenda WebVTT opcional (legado)"}</p>
-                          {/if}
-                          {#if data.canEdit}<form method="POST" action="?/deleteMedia" use:enhance={enhanceEditor} class="mt-2"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="mediaId" value={media.id}/><button type="submit" class="application-text-meta inline-flex items-center gap-1 font-semibold text-[#9B2C2C]"><Trash2 size={11}/>Remover</button></form>{/if}
-                        </div>
-                      {/each}
-                    </div>
-                  {/if}
-                  {#if data.canEdit}<div class="mt-3 grid gap-3 lg:grid-cols-2"><TrainingImageUploader pathId={data.path.id} stepId={step.id}/><HelpTrainingVideoUploader pathId={data.path.id} stepId={step.id}/></div>{/if}
+        <div class="mt-4 space-y-3">
+          {#each data.path.steps as step, index (step.id)}
+            <details open={openStepId === step.id} class="overflow-hidden rounded-2xl border border-[#E3E6ED] bg-[#FAFAFC]">
+              <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4">
+                <div class="flex min-w-0 items-center gap-3">
+                  <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#000A57] text-[10px] font-bold text-white">{index + 1}</span>
+                  <div class="min-w-0">
+                    <strong class="block truncate text-[11px] text-[#2B3141]">{step.title}</strong>
+                    <span class="mt-1 block truncate text-[8px] text-[#8B909D]">{sourceStepTitle(step.sourceContentStepId)}{#if step.media.some((media) => media.mediaType === "video")} · vídeo em {formatSeconds(step.videoStartSeconds)}{/if}</span>
+                  </div>
                 </div>
-
-                <div class="mt-5 rounded-xl bg-[#F7F8FB] px-3 py-3 text-[10px] leading-5 text-[#6F7585]">A opção <strong>Preciso de ajuda</strong> fica disponível em todos os passos. O participante se identifica, escreve livremente o que aconteceu e pode apenas registrar ou registrar e abrir um ticket.</div>
-
-                {#if data.canEdit && data.path.steps.length > 1}<form method="POST" action="?/deleteStep" use:enhance={enhanceEditor} class="mt-5 border-t border-[#EEF0F5] pt-4" on:submit={(event) => { if (!confirm("Remover esta microação do rascunho? Versões já publicadas permanecem imutáveis.")) event.preventDefault(); }}><input type="hidden" name="stepId" value={step.id}/><button type="submit" class="application-text-meta inline-flex items-center gap-2 font-semibold text-[#9B2C2C]"><Trash2 size={12}/>Remover microação</button></form>{/if}
+                {#if data.canEdit}
+                  <div class="flex gap-1">
+                    <form method="POST" action="?/moveStep" use:enhance={enhanceEditor}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="up"/><button type="submit" disabled={index===0} class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white disabled:opacity-30" aria-label="Mover para cima"><ArrowUp size={12}/></button></form>
+                    <form method="POST" action="?/moveStep" use:enhance={enhanceEditor}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="down"/><button type="submit" disabled={index===data.path.steps.length-1} class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white disabled:opacity-30" aria-label="Mover para baixo"><ArrowDown size={12}/></button></form>
+                  </div>
+                {/if}
+              </summary>
+              <div class="border-t border-[#E7E9EF] bg-white p-4">
+                <form method="POST" action="?/updateStep" use:enhance={enhanceEditor} class="space-y-3">
+                  <input type="hidden" name="stepId" value={step.id}/>
+                  <fieldset disabled={!data.canEdit} class="space-y-3 disabled:opacity-70">
+                    <div class="grid gap-3 sm:grid-cols-2">
+                      <label><span class="mb-1 block text-[8px] font-semibold text-[#616777]">Tipo</span><select name="interactionMode" value={step.interactionMode} class="h-9 w-full rounded-lg border border-[#DDE1EA] bg-white px-2 text-[9px]"><option value="action">Ação</option><option value="presentation">Apresentação</option></select></label>
+                      <label><span class="mb-1 block text-[8px] font-semibold text-[#616777]">Início do vídeo (segundos)</span><input name="videoStartSeconds" type="number" min="0" max="86400" value={step.videoStartSeconds} class="h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[9px]"/></label>
+                    </div>
+                    <label><span class="mb-1 block text-[8px] font-semibold text-[#616777]">Título</span><input name="title" maxlength="180" value={step.title} class="h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[9px]"/></label>
+                    <label><span class="mb-1 block text-[8px] font-semibold text-[#616777]">Instrução</span><textarea name="instruction" rows="3" maxlength="3000" class="w-full rounded-lg border border-[#DDE1EA] px-2 py-2 text-[9px] leading-5">{step.instruction}</textarea></label>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                      <label><span class="mb-1 block text-[8px] font-semibold text-[#616777]">Pergunta de confirmação</span><input name="question" maxlength="300" value={step.question} class="h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[9px]"/></label>
+                      <label><span class="mb-1 block text-[8px] font-semibold text-[#616777]">Botão principal</span><input name="primaryActionLabel" maxlength="80" value={step.primaryActionLabel} class="h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[9px]"/></label>
+                    </div>
+                    <label><span class="mb-1 block text-[8px] font-semibold text-[#616777]">Resultado esperado</span><textarea name="expectedResult" rows="2" maxlength="1500" class="w-full rounded-lg border border-[#DDE1EA] px-2 py-2 text-[9px]">{step.expectedResult}</textarea></label>
+                    <div class="grid gap-3 sm:grid-cols-[1fr_140px]">
+                      <label><span class="mb-1 block text-[8px] font-semibold text-[#616777]">Mensagem após concluir</span><input name="successMessage" maxlength="500" value={step.successMessage} class="h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[9px]"/></label>
+                      <label><span class="mb-1 block text-[8px] font-semibold text-[#616777]">Estimativa (s)</span><input name="estimatedSeconds" type="number" min="5" max="900" value={step.estimatedSeconds} class="h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[9px]"/></label>
+                    </div>
+                  </fieldset>
+                  {#if data.canEdit}<div class="flex justify-between gap-3"><form method="POST" action="?/deleteStep" use:enhance={enhanceEditor} on:submit={(event)=>{if(!confirm("Remover esta orientação?")) event.preventDefault();}}><input type="hidden" name="stepId" value={step.id}/><button type="submit" class="inline-flex min-h-8 items-center gap-1 text-[8px] font-semibold text-[#9B2C2C]"><Trash2 size={11}/>Remover</button></form><button type="submit" class="inline-flex min-h-8 items-center gap-1 rounded-lg border border-[#DDE1EA] px-3 text-[8px] font-semibold text-[#000A57]"><Save size={11}/>Salvar orientação</button></div>{/if}
+                </form>
               </div>
             </details>
           {/each}
@@ -236,28 +152,48 @@
       </section>
     </div>
 
-    <aside class="space-y-5">
+    <aside class="space-y-4">
       <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
-        <div class="flex items-start gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0E4] text-[#EA6D0B]"><Send size={18}/></span><div><h2 class="text-[14px] font-semibold text-[#11182C]">Convidar participante</h2><p class="application-text-caption mt-1 leading-5 text-[#858A98]">O link é individual. A pessoa nunca recebe a quantidade total de passos.</p></div></div>
-        {#if data.path.currentVersion < 1}<div class="application-text-meta mt-4 rounded-xl bg-[#FFF7ED] px-3 py-3 leading-4 text-[#9A4B08]">Publique a primeira versão antes de enviar convites.</div>{:else if data.canEdit}
-          <form method="POST" action="?/invite" use:enhance={enhanceEditor} class="mt-4 space-y-3"><input name="name" required maxlength="160" placeholder="Nome do novo usuário" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] px-3"/><input name="email" type="email" required placeholder="email@cliente.com.br" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] px-3"/><input name="organizationName" maxlength="180" placeholder="Empresa / instituição" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] px-3"/><button type="submit" class="application-text-caption inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#EA6D0B] px-3 font-semibold text-white"><Mail size={14}/>Enviar convite</button></form>
+        <h2 class="text-[13px] font-semibold text-[#11182C]">Publicação</h2>
+        <div class="mt-3 space-y-2 text-[9px] text-[#747B8A]">
+          <div class="flex justify-between gap-3"><span>Status</span><strong class="text-[#303645]">{data.path.status}</strong></div>
+          <div class="flex justify-between gap-3"><span>Versão</span><strong class="text-[#303645]">{data.path.currentVersion}</strong></div>
+          <div class="flex justify-between gap-3"><span>Orientações</span><strong class="text-[#303645]">{data.path.steps.length}</strong></div>
+        </div>
+        {#if data.canPublish}<form method="POST" action="?/publish" use:enhance={enhanceEditor} class="mt-4"><button type="submit" class="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 text-[9px] font-semibold text-white"><Sparkles size={12}/>Publicar nova versão</button></form>{/if}
+      </section>
+
+      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
+        <h2 class="text-[13px] font-semibold text-[#11182C]">Convidar participante</h2>
+        {#if data.path.currentVersion < 1}
+          <p class="mt-3 text-[9px] leading-4 text-[#8B909D]">Publique a primeira versão antes de enviar convites.</p>
+        {:else if data.canEdit}
+          <form method="POST" action="?/invite" use:enhance={enhanceEditor} class="mt-3 space-y-2">
+            <input name="name" required maxlength="160" placeholder="Nome" class="h-9 w-full rounded-lg border border-[#DDE1EA] px-3 text-[9px]"/>
+            <input name="email" type="email" required placeholder="email@cliente.com.br" class="h-9 w-full rounded-lg border border-[#DDE1EA] px-3 text-[9px]"/>
+            <input name="organizationName" maxlength="180" placeholder="Empresa" class="h-9 w-full rounded-lg border border-[#DDE1EA] px-3 text-[9px]"/>
+            <button type="submit" class="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#EA6D0B] text-[9px] font-semibold text-white"><Mail size={12}/>Enviar convite</button>
+          </form>
         {/if}
       </section>
 
-      {#if data.path.accessMode === "public"}
-        <section class="rounded-[22px] border border-[#CFE9D7] bg-[#F7FCF8] p-5"><div class="flex items-center gap-2"><Globe2 size={17} class="text-[#2F7045]"/><h2 class="text-[14px] font-semibold text-[#234F32]">Acesso público</h2></div>{#if data.publicUrl}<p class="application-text-caption mt-3 leading-5 text-[#52715D]">A última versão publicada está disponível sem convite. Alterações do rascunho só aparecem após uma nova publicação.</p><a href={data.publicUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption mt-3 inline-flex items-center gap-1 font-semibold text-[#2F7045]">Abrir experiência<ExternalLink size={11}/></a>{:else}<p class="application-text-caption mt-3 leading-5 text-[#52715D]">Publique a primeira versão para ativar o endereço público.</p>{/if}</section>
-      {/if}
-
       <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
-        <div class="flex items-center gap-2"><BarChart3 size={17} class="text-[#000A57]"/><h2 class="text-[14px] font-semibold text-[#11182C]">Onde estão travando</h2></div>
-        {#if data.insights.stepRanking.length === 0}<p class="application-text-caption mt-4 leading-5 text-[#8B909D]">Os dados aparecem conforme participantes usam a trilha.</p>{:else}<div class="mt-4 space-y-3">{#each data.insights.stepRanking.slice(0,5) as step}<div><div class="application-text-meta flex justify-between gap-3"><span class="font-semibold text-[#4E5565]">{step.title}</span><span class="text-[#8B909D]">{step.failures} falhas · {step.helpRequests} ajuda</span></div><div class="mt-1 h-1.5 rounded-full bg-[#EEF0F5]"><div class="h-1.5 rounded-full bg-[#EA6D0B]" style={`width:${Math.min(100, step.failures * 12 + step.helpRequests * 20)}%`}></div></div></div>{/each}</div>{/if}
-        {#if data.insights.reasonRanking.length > 0}<div class="mt-5 border-t border-[#EEF0F5] pt-4"><p class="application-text-meta font-bold uppercase tracking-[0.08em] text-[#8B909D]">Classificações históricas</p>{#each data.insights.reasonRanking.slice(0,4) as reason}<div class="application-text-meta mt-2 flex justify-between gap-3"><span class="text-[#5E6575]">{reason.label}</span><strong>{reason.occurrences}</strong></div>{/each}</div>{/if}
+        <h2 class="text-[13px] font-semibold text-[#11182C]">Uso</h2>
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <div class="rounded-xl bg-[#F7F8FB] p-3"><strong class="block text-[16px] text-[#11182C]">{data.participants.length}</strong><span class="text-[8px] text-[#8B909D]">convites</span></div>
+          <div class="rounded-xl bg-[#F7F8FB] p-3"><strong class="block text-[16px] text-[#2F7045]">{data.participants.filter((item)=>item.status==="completed").length}</strong><span class="text-[8px] text-[#8B909D]">concluídos</span></div>
+        </div>
+        {#if data.participants.length > 0}
+          <div class="mt-3 space-y-2">
+            {#each data.participants.slice(0,8) as participant}
+              <div class="rounded-xl border border-[#EEF0F5] px-3 py-2"><strong class="block truncate text-[9px] text-[#434A5A]">{participant.name}</strong><span class="mt-0.5 block text-[8px] text-[#8B909D]">{participant.status}</span></div>
+            {/each}
+          </div>
+        {/if}
       </section>
 
-      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
-        <div class="flex items-center gap-2"><Users size={17} class="text-[#000A57]"/><h2 class="text-[14px] font-semibold text-[#11182C]">Participantes por convite</h2></div>
-        {#if data.participants.length === 0}<p class="application-text-caption mt-4 text-[#8B909D]">Nenhum convite enviado.</p>{:else}<div class="mt-4 space-y-3">{#each data.participants.slice(0,12) as participant}<div class="rounded-xl border border-[#EEF0F5] bg-[#FAFAFC] p-3"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><strong class="application-text-caption block truncate text-[#343A49]">{participant.name}</strong><span class="application-text-meta mt-0.5 block truncate text-[#8B909D]">{participant.organizationName || participant.email}</span></div><span class={`application-text-meta shrink-0 rounded-full px-2 py-1 font-semibold ${participant.status === "completed" ? "bg-[#EEF8F1] text-[#2F7045]" : participant.status === "in_progress" ? "bg-[#EEF0FF] text-[#000A57]" : "bg-[#F1F2F5] text-[#6F7585]"}`}>{participantStatus(participant.status)}</span></div>{#if participant.startedAt}<div class="application-text-meta mt-2 flex items-center gap-1 text-[#8B909D]"><Clock3 size={10}/>{formatDate(participant.lastActivityAt)}</div>{/if}{#if participant.status === "in_progress" && participant.currentStepTitle}<p class="application-text-meta mt-2 leading-4 text-[#666D7C]">Atual: {participant.currentStepTitle}</p>{/if}{#if participant.supportTicketId}<p class="application-text-meta mt-2 font-semibold text-[#B85408]">Precisou de ajuda humana</p>{/if}</div>{/each}</div>{/if}
-      </section>
+      {#if data.canArchive}<form method="POST" action="?/archive" use:enhance={enhanceEditor} on:submit={(event)=>{if(!confirm("Arquivar esta trilha?")) event.preventDefault();}}><button type="submit" class="w-full text-[8px] font-semibold text-[#8A5A22]">Arquivar trilha</button></form>{/if}
+      {#if data.canDelete}<form method="POST" action="?/deletePath" on:submit={(event)=>{if(!confirm("Excluir este rascunho?")) event.preventDefault();}}><button type="submit" class="w-full text-[8px] font-semibold text-[#9B2C2C]">Excluir rascunho</button></form>{/if}
     </aside>
   </div>
 </ApplicationContent>

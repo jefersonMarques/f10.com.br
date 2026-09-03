@@ -33,7 +33,7 @@ function assertVideoReference(value: string, assetId: string | null): void {
 }
 
 function defaultPrimaryActionLabel(_interactionMode: HelpTrainingInteractionMode): string {
-  return "Próximo passo";
+  return "Concluir e continuar";
 }
 
 async function getTrainingPathRow(pathId: string) {
@@ -113,6 +113,7 @@ export async function updateHelpTrainingStepDraft(
     successMessage: string;
     primaryActionLabel: string;
     estimatedSeconds: number;
+    videoStartSeconds: number;
     interactionMode: HelpTrainingInteractionMode;
   },
 ): Promise<void> {
@@ -128,6 +129,7 @@ export async function updateHelpTrainingStepDraft(
     || step.primaryActionLabel.trim()
     || defaultPrimaryActionLabel(input.interactionMode);
   const estimatedSeconds = Math.min(Math.max(Math.round(input.estimatedSeconds || 45), 5), 900);
+  const videoStartSeconds = Math.min(Math.max(Math.round(input.videoStartSeconds || 0), 0), 86400);
   await getDatabase()
     .update(helpTrainingSteps)
     .set({
@@ -138,6 +140,7 @@ export async function updateHelpTrainingStepDraft(
       successMessage: input.successMessage.trim(),
       primaryActionLabel,
       estimatedSeconds,
+      videoStartSeconds,
       interactionMode: input.interactionMode,
       updatedAt: new Date(),
     })
@@ -275,6 +278,8 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
       primaryActionLabel: step.primaryActionLabel.trim() || defaultPrimaryActionLabel(interactionMode),
       interactionMode,
       estimatedSeconds: step.estimatedSeconds,
+      sourceContentStepId: step.sourceContentStepId,
+      videoStartSeconds: step.videoStartSeconds,
       images,
       videoUrl: video?.sourceUrl ?? null,
       captionAssetId: caption?.assetId ?? null,
@@ -296,6 +301,7 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
     description: path.description,
     welcomeMessage: path.welcomeMessage,
     version,
+    sourceContent: path.sourcePublicationSnapshot,
     steps,
   };
 }
