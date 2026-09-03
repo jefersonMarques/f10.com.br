@@ -1,11 +1,12 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { onMount } from "svelte";
+  import { createEventDispatcher, onMount } from "svelte";
 
   export let endpoint: string;
   export let selectedGroupId: number | null = null;
   export let selectedUnitId: number | null = null;
 
+  const dispatch = createEventDispatcher<{ contextrequired: void }>();
   const MB = 1024 * 1024;
 
   function createIdempotencyKey(): string {
@@ -44,6 +45,20 @@
     });
   }
 
+  function requestContextSelection(): Response {
+    dispatch("contextrequired");
+    window.setTimeout(() => {
+      const target = document.querySelector<HTMLElement>("[data-service-request-context]");
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      target?.querySelector<HTMLSelectElement>("select:not([disabled])")?.focus({ preventScroll: true });
+    }, 0);
+    return jsonErrorResponse(
+      "SERVICE_REQUEST_CONTEXT_REQUIRED",
+      "Selecione o grupo e a unidade desta implementação antes de enviar.",
+      400,
+    );
+  }
+
   function applyServiceRequestContext(body: BodyInit | null | undefined): Response | null {
     if (!(body instanceof FormData)) return null;
     if (
@@ -54,11 +69,7 @@
       selectedGroupId <= 0 ||
       selectedUnitId <= 0
     ) {
-      return jsonErrorResponse(
-        "SERVICE_REQUEST_CONTEXT_REQUIRED",
-        "Selecione o grupo e a unidade desta implementação antes de enviar.",
-        400,
-      );
+      return requestContextSelection();
     }
 
     body.set("serviceRequestGroupId", String(selectedGroupId));
