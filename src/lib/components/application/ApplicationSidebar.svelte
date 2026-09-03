@@ -13,7 +13,6 @@
     GraduationCap,
     Headphones,
     LayoutDashboard,
-    LogOut,
     MessageCircleMore,
     MonitorCog,
     PanelLeftClose,
@@ -21,7 +20,6 @@
     Search,
     Settings,
     ShieldCheck,
-    UserCircle,
     Users,
   } from "lucide-svelte";
 
@@ -32,8 +30,6 @@
     ticketUnreadCount: number;
     taskUnreadCount: number;
   };
-  export let user: { name: string; email: string };
-  export let roles: string[] = [];
 
   type NavigationChild = {
     label: string;
@@ -242,27 +238,5 @@
       {/each}
     </nav>
 
-    <div class={`hidden border-t border-[#EEF0F5] lg:block ${collapsed ? "p-2" : "p-3"}`}>
-      {#if collapsed}
-        <a href="/app/minha-conta" class="flex h-10 items-center justify-center rounded-xl text-[#000A57] transition hover:bg-[#EEF0FF]" aria-label="Minha conta" title={user.name}>
-          <UserCircle size={21}/>
-        </a>
-        <form method="POST" action="/app/logout" class="mt-1">
-          <button type="submit" class="flex h-10 w-full items-center justify-center rounded-xl text-[#6D7280] transition hover:bg-[#FFF0F0] hover:text-[#A52A2A]" aria-label="Sair" title="Sair"><LogOut size={18}/></button>
-        </form>
-      {:else}
-        <a href="/app/minha-conta" class="block rounded-2xl bg-[#F7F8FB] p-3 transition hover:bg-[#EEF0FF]">
-          <div class="flex items-start gap-3">
-            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#000A57] shadow-sm"><UserCircle size={20}/></span>
-            <span class="min-w-0 flex-1">
-              <span class="block truncate text-[13px] font-semibold text-[#202637]">{user.name}</span>
-              <span class="mt-1 block truncate text-[11px] text-[#777D8D]">{user.email}</span>
-            </span>
-          </div>
-          <div class="mt-3 flex flex-wrap gap-1.5">{#each roles as role}<span class="application-text-meta rounded-full bg-white px-2 py-1 font-bold tracking-[0.04em] text-[#000A57] shadow-sm">{role}</span>{/each}</div>
-        </a>
-        <form method="POST" action="/app/logout" class="mt-2"><button type="submit" class="flex h-10 w-full items-center gap-2 rounded-xl px-3 text-left text-[12px] font-semibold text-[#6D7280] transition hover:bg-[#FFF0F0] hover:text-[#A52A2A]"><LogOut size={17} aria-hidden="true"/>Sair</button></form>
-      {/if}
-    </div>
   </div>
 </aside>
