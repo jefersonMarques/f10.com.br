@@ -43,14 +43,110 @@
       </div>
     </section>
   {:else if form?.message}
-    <div class="mb-3 rounded-2xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[12px] font-medium text-[#9B2C2C]">{form.message}</div>
+    <div class={`mb-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{form.message}</div>
   {/if}
+
+  <section class="mb-5 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div class="flex items-start gap-3">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Users size={19} aria-hidden="true" /></span>
+        <div>
+          <h2 class="text-[16px] font-semibold text-[#11182C]">Equipes de atendimento</h2>
+          <p class="mt-1 max-w-[720px] text-[11px] leading-5 text-[#858A98]">Agrupe os integrantes responsáveis pelas filas e áreas de atendimento. Depois, defina a equipe principal em Configurações de atendimento.</p>
+        </div>
+      </div>
+      <a href="/app/settings/atendimento" class="application-text-caption inline-flex min-h-9 shrink-0 items-center justify-center rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57] hover:bg-[#F8F9FC]">Configurar atendimento</a>
+    </div>
+
+    {#if data.teamManagement.teams.length === 0}
+      <div class="mt-5 rounded-2xl border border-dashed border-[#D7DAE3] bg-[#FAFAFC] px-4 py-5">
+        <p class="text-[12px] font-semibold text-[#4B5160]">Nenhuma equipe cadastrada</p>
+        <p class="application-text-caption mt-1 leading-5 text-[#7C8291]">Crie a primeira equipe para poder vinculá-la ao Suporte F10, Nota Fiscal e CELL COIN.</p>
+      </div>
+    {:else}
+      <div class="mt-5 grid gap-3 lg:grid-cols-2">
+        {#each data.teamManagement.teams as team}
+          <div class="rounded-2xl border border-[#E5E7ED] bg-[#FAFAFC] p-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <strong class="text-[13px] font-semibold text-[#252C3D]">{team.name}</strong>
+                  <span class={`application-text-meta rounded-full px-2 py-1 font-bold ${team.active ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#F1F2F5] text-[#777D8C]"}`}>{team.active ? "Ativa" : "Inativa"}</span>
+                  {#if team.inUse}<span class="application-text-meta rounded-full bg-[#EEF0FF] px-2 py-1 font-bold text-[#000A57]">Em uso</span>{/if}
+                </div>
+                <p class="application-text-meta mt-1 text-[#8B909E]">{team.members.length} {team.members.length === 1 ? "integrante" : "integrantes"}</p>
+              </div>
+            </div>
+
+            {#if data.canManageTeams}
+              <details class="mt-4 rounded-xl border border-[#E1E4EC] bg-white p-3">
+                <summary class="application-text-caption cursor-pointer list-none font-semibold text-[#000A57]">Editar equipe</summary>
+                <form method="POST" action="?/updateTeam" class="mt-4 space-y-4">
+                  <input type="hidden" name="teamId" value={team.id} />
+                  <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Nome</span><input name="name" required minlength="2" maxlength="80" value={team.name} class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[12px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10" /></label>
+                  <label class="application-text-caption flex items-center gap-2 font-semibold text-[#555B6B]"><input name="active" type="checkbox" checked={team.active} class="h-4 w-4 rounded border-[#C9CEDA]" />Equipe ativa</label>
+                  {#if team.inUse}<p class="application-text-meta rounded-xl bg-[#F2F3F8] px-3 py-2 leading-4 text-[#727888]">Equipes vinculadas a filas ou áreas ativas não podem ser desativadas até que o vínculo seja alterado.</p>{/if}
+
+                  <fieldset>
+                    <legend class="mb-2 text-[11px] font-semibold text-[#4A5060]">Integrantes</legend>
+                    {#if data.teamManagement.users.length === 0}
+                      <p class="application-text-caption rounded-xl border border-dashed border-[#D7DAE3] px-3 py-3 text-[#7C8291]">Nenhum usuário ativo ou convidado disponível.</p>
+                    {:else}
+                      <div class="grid gap-2 sm:grid-cols-2">
+                        {#each data.teamManagement.users as user}
+                          <label class="flex items-start gap-2 rounded-xl border border-[#E5E7ED] bg-[#FAFAFC] px-3 py-2.5">
+                            <input name="memberUserId" value={user.id} type="checkbox" checked={team.members.some((member) => member.userId === user.id)} class="mt-0.5 h-4 w-4 rounded border-[#C9CEDA]" />
+                            <span class="min-w-0"><strong class="block truncate text-[11px] font-semibold text-[#414858]">{user.name}</strong><span class="application-text-meta block truncate text-[#8B909E]">{user.email}{user.status === "invited" ? " · convite pendente" : ""}</span></span>
+                          </label>
+                        {/each}
+                      </div>
+                    {/if}
+                  </fieldset>
+
+                  <button type="submit" class="application-text-caption inline-flex min-h-10 items-center justify-center rounded-xl bg-[#000A57] px-4 font-semibold text-white">Salvar equipe</button>
+                </form>
+              </details>
+            {:else if team.members.length > 0}
+              <div class="mt-3 flex flex-wrap gap-2">
+                {#each team.members as member}<span class="application-text-meta rounded-full bg-white px-2.5 py-1 font-semibold text-[#646A79]">{member.name}</span>{/each}
+              </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    {/if}
+
+    {#if data.canManageTeams}
+      <details class="mt-4 rounded-2xl border border-dashed border-[#D7DAE3] bg-[#FAFBFC] p-4" open={data.teamManagement.teams.length === 0}>
+        <summary class="application-text-caption cursor-pointer list-none font-semibold text-[#000A57]">+ Criar equipe de atendimento</summary>
+        <form method="POST" action="?/createTeam" class="mt-4 space-y-4">
+          <label class="block max-w-[520px]"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Nome da equipe</span><input name="name" required minlength="2" maxlength="80" placeholder="Ex.: Suporte F10" class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10" /></label>
+          <fieldset>
+            <legend class="mb-2 text-[11px] font-semibold text-[#4A5060]">Integrantes iniciais</legend>
+            {#if data.teamManagement.users.length === 0}
+              <p class="application-text-caption rounded-xl border border-dashed border-[#D7DAE3] bg-white px-3 py-3 text-[#7C8291]">Ainda não existem usuários ativos ou convidados para adicionar. A equipe pode ser criada sem integrantes e configurada depois.</p>
+            {:else}
+              <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {#each data.teamManagement.users as user}
+                  <label class="flex items-start gap-2 rounded-xl border border-[#E5E7ED] bg-white px-3 py-2.5">
+                    <input name="memberUserId" value={user.id} type="checkbox" class="mt-0.5 h-4 w-4 rounded border-[#C9CEDA]" />
+                    <span class="min-w-0"><strong class="block truncate text-[11px] font-semibold text-[#414858]">{user.name}</strong><span class="application-text-meta block truncate text-[#8B909E]">{user.email}{user.status === "invited" ? " · convite pendente" : ""}</span></span>
+                  </label>
+                {/each}
+              </div>
+            {/if}
+          </fieldset>
+          <button type="submit" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 font-semibold text-white"><Plus size={14} aria-hidden="true" />Criar equipe</button>
+        </form>
+      </details>
+    {/if}
+  </section>
 
   <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
     <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
       <header class="flex items-center justify-between gap-4 border-b border-[#EEF0F5] px-5 py-4 sm:px-6">
         <div class="flex items-center gap-3">
-          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Users size={19} aria-hidden="true" /></span>
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><UserRound size={19} aria-hidden="true" /></span>
           <div><h2 class="text-[16px] font-semibold text-[#11182C]">Usuários administráveis</h2><p class="mt-1 text-[11px] text-[#858A98]">{data.users.length} registros disponíveis para seu perfil</p></div>
         </div>
       </header>
