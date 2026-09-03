@@ -111,29 +111,41 @@ function detectFile(file: File, bytes: Uint8Array): DetectedFile | null {
   return null;
 }
 
+function validateFilesForDefinition(
+  definition: ServiceRequestAttachmentDefinition,
+  files: File[],
+): void {
+  if (files.length === 0) {
+    throw new Error(`SERVICE_REQUEST_ATTACHMENT_REQUIRED:${definition.fieldKey}`);
+  }
+  if (files.length > definition.maxFiles) {
+    throw new Error(`SERVICE_REQUEST_ATTACHMENT_TOO_MANY:${definition.fieldKey}`);
+  }
+  for (const file of files) {
+    if (!(file instanceof File) || file.size <= 0) {
+      throw new Error("SERVICE_REQUEST_ATTACHMENT_INVALID");
+    }
+    if (file.size > definition.maxBytes) {
+      throw new Error(`SERVICE_REQUEST_ATTACHMENT_TOO_LARGE:${definition.fieldKey}`);
+    }
+  }
+}
+
 function validateAttachmentSet(
   requestType: ServiceRequestType,
   attachments: ServiceRequestAttachmentInput[],
 ): Map<string, ServiceRequestAttachmentDefinition> {
   const definitions = SERVICE_REQUEST_ATTACHMENT_DEFINITIONS[requestType];
   const byKey = new Map(definitions.map((definition) => [definition.fieldKey, definition]));
-  const counts = new Map<string, number>();
+  const grouped = new Map<string, File[]>();
   let totalBytes = 0;
 
   for (const attachment of attachments) {
     const definition = byKey.get(attachment.fieldKey);
     if (!definition) throw new Error("SERVICE_REQUEST_ATTACHMENT_FIELD_INVALID");
-    if (!(attachment.file instanceof File) || attachment.file.size <= 0) {
-      throw new Error("SERVICE_REQUEST_ATTACHMENT_INVALID");
-    }
-    if (attachment.file.size > definition.maxBytes) {
-      throw new Error(`SERVICE_REQUEST_ATTACHMENT_TOO_LARGE:${attachment.fieldKey}`);
-    }
-    const count = (counts.get(attachment.fieldKey) ?? 0) + 1;
-    if (count > definition.maxFiles) {
-      throw new Error(`SERVICE_REQUEST_ATTACHMENT_TOO_MANY:${attachment.fieldKey}`);
-    }
-    counts.set(attachment.fieldKey, count);
+    const files = grouped.get(attachment.fieldKey) ?? [];
+    files.push(attachment.file);
+    grouped.set(attachment.fieldKey, files);
     totalBytes += attachment.file.size;
   }
 
@@ -142,20 +154,21 @@ function validateAttachmentSet(
   }
 
   for (const definition of definitions) {
-    if (definition.required && (counts.get(definition.fieldKey) ?? 0) === 0) {
+    const files = grouped.get(definition.fieldKey) ?? [];
+    if (definition.required && files.length === 0) {
       throw new Error(`SERVICE_REQUEST_ATTACHMENT_REQUIRED:${definition.fieldKey}`);
     }
+    if (files.length > 0) validateFilesForDefinition(definition, files);
   }
 
   return byKey;
 }
 
-export async function uploadServiceRequestAttachments(
+async function storeValidatedAttachments(
   serviceRequestId: string,
-  requestType: ServiceRequestType,
   attachments: ServiceRequestAttachmentInput[],
+  definitions: Map<string, ServiceRequestAttachmentDefinition>,
 ): Promise<StoredServiceRequestAttachment[]> {
-  const definitions = validateAttachmentSet(requestType, attachments);
   const bucket = privateBucket();
   const stored: StoredServiceRequestAttachment[] = [];
 
@@ -190,6 +203,40 @@ export async function uploadServiceRequestAttachments(
     await deleteStoredServiceRequestAttachments(stored);
     throw cause;
   }
+}
+
+export async function uploadServiceRequestAttachments(
+  serviceRequestId: string,
+  requestType: ServiceRequestType,
+  attachments: ServiceRequestAttachmentInput[],
+): Promise<StoredServiceRequestAttachment[]> {
+  const definitions = validateAttachmentSet(requestType, attachments);
+  return storeValidatedAttachments(serviceRequestId, attachments, definitions);
+}
+
+export async function uploadServiceRequestAttachmentField(
+  serviceRequestId: string,
+  requestType: ServiceRequestType,
+  fieldKey: string,
+  files: File[],
+): Promise<StoredServiceRequestAttachment[]> {
+  const definition = SERVICE_REQUEST_ATTACHMENT_DEFINITIONS[requestType].find(
+    (candidate) => candidate.fieldKey === fieldKey,
+  );
+  if (!definition) throw new Error("SERVICE_REQUEST_ATTACHMENT_FIELD_INVALID");
+  validateFilesForDefinition(definition, files);
+
+  const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+  if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
+    throw new Error("SERVICE_REQUEST_ATTACHMENTS_TOO_LARGE");
+  }
+
+  const attachments = files.map((file) => ({ fieldKey, file }));
+  return storeValidatedAttachments(
+    serviceRequestId,
+    attachments,
+    new Map([[fieldKey, definition]]),
+  );
 }
 
 export async function getServiceRequestObject(storageKey: string, range?: string): Promise<Response> {
