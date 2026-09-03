@@ -134,6 +134,17 @@ async function resultPresentation(result: SupportAiResult): Promise<HelpPresenta
   return getHelpPresentation(slug, result.target?.anchor ?? null);
 }
 
+function currentArticlePresentation(presentation: HelpPresentation | null): HelpPresentation | null {
+  if (!presentation) return null;
+  return {
+    source: {
+      ...presentation.source,
+      title: "Ver ponto no artigo",
+    },
+    media: null,
+  };
+}
+
 function assistantPayload(input: {
   answer: string;
   action: AssistantAction;
@@ -314,7 +325,10 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
     }
 
     if (result.resolution === "answered") {
-      const presentation = await resultPresentation(result).catch(() => null);
+      const rawPresentation = await resultPresentation(result).catch(() => null);
+      const presentation = result.answerOrigin === "current_article"
+        ? currentArticlePresentation(rawPresentation)
+        : rawPresentation;
       const answer = result.answerOrigin === "other_article" && preferredArticleSlug
         ? `Encontrei a resposta em outro conteúdo da Central de Ajuda.\n\n${result.answer}`
         : result.answer;
