@@ -23,7 +23,9 @@ function isUuid(value: string): boolean {
 function generationMessage(cause: unknown): string {
   const code = cause instanceof Error ? cause.message : "";
   if (code === "TRAINING_SOURCE_CONTENT_NOT_PUBLISHED") return "Selecione um conteúdo publicado.";
-  if (code === "TRAINING_GENERATION_EMPTY") return "A IA não encontrou etapas seguras para gerar a trilha. Revise o conteúdo publicado.";
+  if (code === "TRAINING_GENERATION_EMPTY") return "A IA não encontrou slides visuais seguros para gerar a trilha. Revise o conteúdo publicado.";
+  if (code === "TRAINING_SOURCE_CONTENT_VIDEO_REQUIRED") return "O conteúdo publicado precisa ter um vídeo para criar a trilha.";
+  if (code === "TRAINING_SOURCE_CONTENT_IMAGES_REQUIRED" || code === "TRAINING_GENERATION_IMAGE_REQUIRED") return "O conteúdo publicado precisa ter imagens associadas aos passos. Cada slide da trilha exige uma imagem.";
   if (cause instanceof AiGatewayError) {
     if (cause.code === "AI_TASK_DISABLED") return "Habilite a função “Geração de trilhas” em Configurações > Inteligência Artificial.";
     if (cause.code === "AI_PROVIDER_NOT_CONFIGURED" || cause.code === "AI_CREDENTIAL_UNAVAILABLE") {

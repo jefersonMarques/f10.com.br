@@ -85,15 +85,30 @@ async function sourceTimeline(content: PublishedStructuredHelp): Promise<Transcr
   return readTimeline(metadata.transcriptTimeline);
 }
 
+
+function visualStepIds(content: PublishedStructuredHelp): Set<string> {
+  return new Set(
+    content.steps
+      .filter((step) => Boolean(stepImageAsset(content, step.id)))
+      .map((step) => step.id),
+  );
+}
+
 function publicText(content: PublishedStructuredHelp): string {
   return content.steps.map((step, index) => {
+    const image = stepImageAsset(content, step.id);
     const blocks = step.blocks.map((block) => {
       if (block.blockType === "text" || block.blockType === "notice") return block.textContent;
       if (block.blockType === "image") return block.asset?.altText ? `[Imagem: ${block.asset.altText}]` : "[Imagem]";
       if (block.blockType === "link") return block.linkLabel ? `[Link: ${block.linkLabel}]` : "";
       return "";
     }).filter(Boolean).join("\n");
-    return `PASSO ${index + 1} | id=${step.id}\n${step.title}\n${step.description}\n${blocks}`;
+    return [
+      `PASSO ${index + 1} | id=${step.id} | imagem=${image ? "SIM" : "NÃO"}`,
+      step.title,
+      step.description,
+      blocks,
+    ].filter(Boolean).join("\n");
   }).join("\n\n");
 }
 
@@ -153,6 +168,10 @@ async function generatePlan(
   actorUserId: string,
   content: PublishedStructuredHelp,
 ): Promise<GeneratedTrainingPlan> {
+  if (!content.featuredVideo) throw new Error("TRAINING_SOURCE_CONTENT_VIDEO_REQUIRED");
+  const allowedVisualStepIds = visualStepIds(content);
+  if (allowedVisualStepIds.size === 0) throw new Error("TRAINING_SOURCE_CONTENT_IMAGES_REQUIRED");
+
   const timeline = await sourceTimeline(content);
   const startedAt = Date.now();
   let provider = "";
@@ -174,13 +193,19 @@ async function generatePlan(
       "Você cria Trilhas F10 somente a partir do conteúdo publicado fornecido.",
       "A trilha é uma sequência prática para a pessoa executar o procedimento no F10 enquanto consulta uma guia flutuante.",
       "Não invente menus, botões, regras, exceções ou resultados.",
-      "Cada etapa deve apontar para um sourceStepId existente exatamente como recebido.",
-      "Prefira uma ação essencial por etapa e evite fragmentação excessiva.",
+      "Cada etapa deve apontar para um sourceStepId existente exatamente como recebido e que esteja marcado com imagem=SIM.",
+      "Toda etapa da trilha é um slide visual: nunca gere introdução, conclusão ou ação sem uma imagem publicada associada.",
+      "Prefira uma ação essencial por slide e evite fragmentação excessiva.",
+      "A instruction será exibida em uma janela pequena ao lado da imagem. Escreva uma orientação curta, didática e visualmente organizada em Markdown.",
+      "Use **negrito** para a ação principal e nomes importantes; use `código` para menus, botões, abas, campos e valores que a pessoa deve localizar no F10.",
+      "Quando houver mais de uma interação, use lista com marcadores ou passos numerados. Evite parágrafo longo.",
+      "Emoji é permitido apenas quando realmente ajuda a leitura, no máximo um por slide, por exemplo 👉 para ação e ⚠️ para atenção.",
+      "Não repita o título inteiro dentro da instruction e não escreva texto genérico ou vazio.",
       "Se houver linha do tempo do vídeo, videoStartSeconds deve apontar para o início do trecho essencial daquela ação, de preferência alguns segundos antes da demonstração ficar visível.",
       "Não crie cortes de vídeo. O vídeo sempre será reproduzido integralmente a partir de videoStartSeconds.",
       "Se não houver linha do tempo útil, use videoStartSeconds=0.",
       "Use interactionMode=action quando a pessoa precisa executar algo no F10 e presentation somente quando basta observar ou compreender.",
-      "primaryActionLabel deve ser curto, por exemplo 'Concluir e continuar'.",
+      "primaryActionLabel deve ser curto: use 'Continuar' para os slides.",
     ].join("\n"),
     userInput: [
       `CONTEÚDO: ${content.title}`,
@@ -235,9 +260,12 @@ async function generatePlan(
     },
   }).catch(() => undefined);
 
-  const allowedStepIds = new Set(content.steps.map((step) => step.id));
+  const allowedStepIds = visualStepIds(content);
   const normalizedSteps = response.data.steps
-    .filter((step) => allowedStepIds.has(step.sourceStepId))
+    .filter((step) =>
+      allowedStepIds.has(step.sourceStepId)
+      && step.instruction.trim().length >= 12
+    )
     .map((step) => ({
       ...step,
       title: step.title.trim().slice(0, 180),
@@ -245,13 +273,16 @@ async function generatePlan(
       instruction: step.instruction.trim().slice(0, 3000),
       expectedResult: step.expectedResult.trim().slice(0, 1500),
       successMessage: step.successMessage.trim().slice(0, 500),
-      primaryActionLabel: step.primaryActionLabel.trim().slice(0, 80) || "Concluir e continuar",
+      primaryActionLabel: "Continuar",
       estimatedSeconds: Math.min(Math.max(Math.round(step.estimatedSeconds), 5), 900),
       videoStartSeconds: content.featuredVideo
         ? Math.min(Math.max(Math.round(step.videoStartSeconds), 0), 86400)
         : 0,
     }));
   if (normalizedSteps.length === 0) throw new Error("TRAINING_GENERATION_EMPTY");
+  if (normalizedSteps.some((step) => !stepImageAsset(content, step.sourceStepId))) {
+    throw new Error("TRAINING_GENERATION_IMAGE_REQUIRED");
+  }
 
   return {
     title: response.data.title.trim().slice(0, 160) || content.title,
@@ -295,16 +326,15 @@ async function insertGeneratedSteps(
     if (!created) throw new Error("TRAINING_STEP_NOT_CREATED");
 
     const image = stepImageAsset(content, step.sourceStepId);
-    if (image) {
-      await tx.insert(helpTrainingStepMedia).values({
-        stepId: created.id,
-        mediaType: "image",
-        assetId: image.id,
-        sourceUrl: null,
-        altText: image.altText,
-        sortOrder: 10,
-      });
-    }
+    if (!image) throw new Error("TRAINING_GENERATION_IMAGE_REQUIRED");
+    await tx.insert(helpTrainingStepMedia).values({
+      stepId: created.id,
+      mediaType: "image",
+      assetId: image.id,
+      sourceUrl: null,
+      altText: image.altText,
+      sortOrder: 10,
+    });
 
     const video = content.featuredVideo;
     if (video?.storageKey) {

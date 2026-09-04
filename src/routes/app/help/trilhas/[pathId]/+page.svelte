@@ -72,9 +72,9 @@
               <p class="mt-1 text-[9px] text-[#959AA6]">Publicação usada na geração: {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(data.path.sourcePublishedAt))}</p>
             </div>
           </div>
-          {#if data.canEdit && data.sourceUpdateAvailable}
+          {#if data.canEdit}
             <form method="POST" action="?/regenerate" use:enhance={enhanceRegenerate}>
-              <button type="submit" disabled={regenerating} class="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#EA6D0B] px-3 text-[9px] font-semibold text-white disabled:opacity-60">{#if regenerating}<LoaderCircle size={12} class="animate-spin"/>{:else}<RefreshCw size={12}/>{/if}Usar publicação mais recente</button>
+              <button type="submit" disabled={regenerating} class="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#EA6D0B] px-3 text-[9px] font-semibold text-white disabled:opacity-60">{#if regenerating}<LoaderCircle size={12} class="animate-spin"/>{:else}<RefreshCw size={12}/>{/if}{data.sourceUpdateAvailable ? "Usar publicação mais recente" : "Regenerar orientações com IA"}</button>
             </form>
           {:else if data.sourceUpdateAvailable}
             <span class="rounded-full bg-[#FFF3E9] px-2.5 py-1 text-[8px] font-semibold text-[#A9510D]">Há atualização do conteúdo</span>
