@@ -1,4 +1,5 @@
 import type { HelpTrainingInteractionMode } from "$lib/server/db/helpTrainingSchema";
+import type { HelpImageAnnotation } from "$lib/help/helpImageAnnotations";
 import { getHelpTrainingSession } from "$lib/server/help/helpTrainingRepository";
 
 export type HelpTrainingClientStep = {
@@ -11,7 +12,7 @@ export type HelpTrainingClientStep = {
   primaryActionLabel: string;
   interactionMode: HelpTrainingInteractionMode;
   videoStartSeconds: number;
-  images: Array<{ assetId: string; altText: string }>;
+  images: Array<{ assetId: string; altText: string; annotations: HelpImageAnnotation[] }>;
   videoUrl: string | null;
   captionAssetId: string | null;
 };
@@ -31,7 +32,11 @@ export function normalizeTrainingClientStep(
     primaryActionLabel: step.primaryActionLabel?.trim() || "Continuar",
     interactionMode,
     videoStartSeconds: step.videoStartSeconds ?? 0,
-    images: step.images.slice(0, 1),
+    images: step.images.slice(0, 1).map((image) => ({
+      assetId: image.assetId,
+      altText: image.altText,
+      annotations: image.annotations ?? [],
+    })),
     videoUrl: step.videoUrl,
     captionAssetId: step.captionAssetId ?? null,
   };

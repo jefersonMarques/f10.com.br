@@ -12,6 +12,7 @@ import {
   type HelpTrainingSnapshot,
 } from "$lib/server/db/helpTrainingSchema";
 import { getHelpTrainingPath, normalizeTrainingSlug } from "$lib/server/help/helpTrainingRepository";
+import { parseHelpImageAnnotations } from "$lib/help/helpImageAnnotations";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -260,10 +261,22 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
     const interactionMode = step.interactionMode ?? "action";
     if (!step.title.trim() || !step.instruction.trim()) throw new Error("TRAINING_STEP_INCOMPLETE");
 
+    const sourceStep = step.sourceContentStepId
+      ? path.sourcePublicationSnapshot.steps.find((source) => source.id === step.sourceContentStepId)
+      : null;
     const images = step.media
       .filter((media) => media.mediaType === "image" && media.assetId)
       .slice(0, 1)
-      .map((media) => ({ assetId: media.assetId as string, altText: media.altText }));
+      .map((media) => {
+        const sourceBlock = sourceStep?.blocks.find(
+          (block) => block.blockType === "image" && block.asset?.id === media.assetId,
+        );
+        return {
+          assetId: media.assetId as string,
+          altText: media.altText,
+          annotations: parseHelpImageAnnotations(sourceBlock?.annotations) ?? [],
+        };
+      });
     const video = step.media.find((media) => media.mediaType === "video" && media.sourceUrl);
     const caption = step.media.find((media) => media.mediaType === "caption" && media.assetId);
     if (!video?.sourceUrl) throw new Error("TRAINING_STEP_VIDEO_REQUIRED");

@@ -9,6 +9,8 @@
     Sparkles,
   } from "lucide-svelte";
   import HelpTrainingTutor from "$lib/components/help/HelpTrainingTutor.svelte";
+  import HelpAnnotatedImage from "$lib/components/help/HelpAnnotatedImage.svelte";
+  import type { HelpImageAnnotation } from "$lib/help/helpImageAnnotations";
   import { claimTrainingPipWindow } from "$lib/help/trainingPipBridge";
   import { trainingMarkupToHtml } from "$lib/help/trainingMarkup";
 
@@ -22,7 +24,7 @@
     primaryActionLabel: string;
     interactionMode: "presentation" | "action";
     videoStartSeconds: number;
-    images: Array<{ assetId: string; altText: string }>;
+    images: Array<{ assetId: string; altText: string; annotations: HelpImageAnnotation[] }>;
     videoUrl: string | null;
   };
 
@@ -448,11 +450,13 @@
     <div class="mx-auto grid min-h-full w-full max-w-[1520px] items-center gap-7 lg:grid-cols-[minmax(0,1fr)_430px] lg:gap-8">
       <section class="flex min-h-[360px] items-center justify-start lg:min-h-[calc(100dvh-8rem)]">
         {#if currentImage}
-          <div class="flex max-h-[82dvh] min-h-[330px] w-full items-center justify-center overflow-hidden rounded-[30px] bg-white shadow-[0_26px_76px_rgba(12,23,52,0.11)] ring-1 ring-[#E1E5ED] lg:min-h-[560px]">
-            <img
+          <div class="max-h-[82dvh] min-h-[330px] w-full overflow-auto rounded-[30px] bg-white shadow-[0_26px_76px_rgba(12,23,52,0.11)] ring-1 ring-[#E1E5ED] lg:min-h-[560px]">
+            <HelpAnnotatedImage
               src={`${assetBasePath}/${currentImage.assetId}`}
               alt={currentImage.altText || step.title}
-              class="max-h-[82dvh] w-full object-contain"
+              annotations={currentImage.annotations}
+              loading="eager"
+              className="bg-white"
             />
           </div>
         {:else}

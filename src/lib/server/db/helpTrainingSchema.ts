@@ -13,6 +13,7 @@ import {
 import { helpAssets, helpCategories, helpContents } from "$lib/server/db/structuredHelpSchema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
 import { helpContentStatus, users } from "$lib/server/db/schema";
+import type { HelpImageAnnotation } from "$lib/help/helpImageAnnotations";
 
 export type HelpTrainingAccessMode = "invite_only" | "public";
 export type HelpTrainingInteractionMode = "presentation" | "action";
@@ -33,7 +34,7 @@ export type HelpTrainingSourceBlock = {
   linkLabel: string | null;
   noticeVariant: string | null;
   sortOrder: number;
-  annotations: unknown[];
+  annotations: HelpImageAnnotation[];
   asset: HelpTrainingSourceAsset | null;
 };
 
@@ -209,7 +210,7 @@ export type HelpTrainingSnapshot = {
     estimatedSeconds: number;
     sourceContentStepId?: string | null;
     videoStartSeconds?: number;
-    images: Array<{ assetId: string; altText: string }>;
+    images: Array<{ assetId: string; altText: string; annotations?: HelpImageAnnotation[] }>;
     videoUrl: string | null;
     captionAssetId?: string | null;
     failureReasons: Array<{

@@ -2,6 +2,7 @@ import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { hasPermission } from "$lib/server/auth/permissions";
 import { getHelpTrainingPath } from "$lib/server/help/helpTrainingRepository";
+import { parseHelpImageAnnotations } from "$lib/help/helpImageAnnotations";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -37,7 +38,21 @@ export const load: PageServerLoad = async ({ params, parent }) => {
           images: step.media
             .filter((media) => media.mediaType === "image" && media.assetId)
             .slice(0, 1)
-            .map((media) => ({ assetId: media.assetId as string, altText: media.altText })),
+            .map((media) => {
+              const sourceStep = step.sourceContentStepId
+                ? path.sourcePublicationSnapshot.steps.find(
+                    (source) => source.id === step.sourceContentStepId,
+                  )
+                : null;
+              const sourceBlock = sourceStep?.blocks.find(
+                (block) => block.blockType === "image" && block.asset?.id === media.assetId,
+              );
+              return {
+                assetId: media.assetId as string,
+                altText: media.altText,
+                annotations: parseHelpImageAnnotations(sourceBlock?.annotations) ?? [],
+              };
+            }),
           videoUrl: step.media.find((media) => media.mediaType === "video")?.sourceUrl ?? null,
         };
       }),
