@@ -38,6 +38,16 @@ function check(label, ok, detail = "") {
   failed ||= !ok;
 }
 
+const siteSupportChatProvider =
+  process.env.PUBLIC_SITE_SUPPORT_CHAT_PROVIDER?.trim().toLowerCase() || "movidesk";
+check(
+  "public site support chat",
+  ["movidesk", "f10"].includes(siteSupportChatProvider),
+  ["movidesk", "f10"].includes(siteSupportChatProvider)
+    ? `provider=${siteSupportChatProvider}`
+    : "PUBLIC_SITE_SUPPORT_CHAT_PROVIDER must be movidesk or f10",
+);
+
 const rateLimitSecret = process.env.SUPPORT_RATE_LIMIT_SECRET?.trim() ?? "";
 check(
   "chat rate limit",
