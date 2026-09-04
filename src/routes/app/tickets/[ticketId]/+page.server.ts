@@ -152,7 +152,12 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       canViewTasks,
       canCreateTask,
     };
-  } catch {
+  } catch (cause) {
+    console.error("[operations.ticket.load]", {
+      ticketId: params.ticketId,
+      causeType: cause instanceof Error ? cause.name : typeof cause,
+      causeMessage: cause instanceof Error ? cause.message : "unknown",
+    });
     throw error(404, "Ticket não encontrado ou fora do seu escopo de acesso.");
   }
 };
