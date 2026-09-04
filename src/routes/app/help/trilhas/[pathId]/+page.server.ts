@@ -41,7 +41,6 @@ function direction(value: string): "up" | "down" | null {
 function publishErrorMessage(cause: unknown): string {
   const code = cause instanceof Error ? cause.message : "";
   if (code === "TRAINING_STEP_INCOMPLETE") return "Toda orientação precisa ter título e instrução.";
-  if (code === "TRAINING_STEP_IMAGE_REQUIRED") return "Cada slide da trilha precisa ter uma imagem publicada.";
   if (code === "TRAINING_STEP_VIDEO_REQUIRED") return "Cada slide da trilha precisa ter a ajuda em vídeo vinculada.";
   if (code === "TRAINING_VIDEO_INVALID" || code === "INVALID_MEDIA_URL") return "A referência do vídeo publicado não é válida.";
   return "Não foi possível publicar. Revise as orientações.";
@@ -171,8 +170,8 @@ export const actions: Actions = {
       const message =
         code === "TRAINING_SOURCE_CONTENT_VIDEO_REQUIRED"
           ? "O conteúdo publicado precisa ter um vídeo para gerar a trilha."
-          : code === "TRAINING_SOURCE_CONTENT_IMAGES_REQUIRED" || code === "TRAINING_GENERATION_IMAGE_REQUIRED"
-            ? "Cada slide precisa de uma imagem. Revise as imagens do conteúdo publicado antes de regenerar."
+          : code === "TRAINING_SOURCE_CONTENT_STEPS_REQUIRED"
+            ? "O conteúdo publicado precisa ter pelo menos uma etapa."
             : "Não foi possível regenerar a trilha. Verifique a configuração da IA e o conteúdo publicado.";
       return fail(409, { success: false, message });
     }

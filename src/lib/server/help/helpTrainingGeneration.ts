@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { createAiStructuredResponse, type AiStructuredResponse } from "$lib/server/ai/aiGateway";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
@@ -7,12 +7,9 @@ import {
   helpTrainingPaths,
   helpTrainingStepMedia,
   helpTrainingSteps,
-  type HelpTrainingInteractionMode,
   type HelpTrainingSourceContent,
 } from "$lib/server/db/helpTrainingSchema";
-import {
-  helpAssets,
-} from "$lib/server/db/structuredHelpSchema";
+import { helpAssets } from "$lib/server/db/structuredHelpSchema";
 import { recordHelpAiUsage } from "$lib/server/help/helpAiUsageRepository";
 import {
   getPublishedStructuredHelpById,
@@ -24,6 +21,13 @@ type TranscriptTimelineSegment = {
   start: number;
   end: number;
   text: string;
+};
+
+type GeneratedTimelinePlan = {
+  steps: Array<{
+    sourceStepId: string;
+    videoStartSeconds: number;
+  }>;
 };
 
 type GeneratedTrainingPlan = {
@@ -38,7 +42,7 @@ type GeneratedTrainingPlan = {
     expectedResult: string;
     successMessage: string;
     primaryActionLabel: string;
-    interactionMode: HelpTrainingInteractionMode;
+    interactionMode: "presentation";
     estimatedSeconds: number;
     videoStartSeconds: number;
   }>;
@@ -85,33 +89,6 @@ async function sourceTimeline(content: PublishedStructuredHelp): Promise<Transcr
   return readTimeline(metadata.transcriptTimeline);
 }
 
-
-function visualStepIds(content: PublishedStructuredHelp): Set<string> {
-  return new Set(
-    content.steps
-      .filter((step) => Boolean(stepImageAsset(content, step.id)))
-      .map((step) => step.id),
-  );
-}
-
-function publicText(content: PublishedStructuredHelp): string {
-  return content.steps.map((step, index) => {
-    const image = stepImageAsset(content, step.id);
-    const blocks = step.blocks.map((block) => {
-      if (block.blockType === "text" || block.blockType === "notice") return block.textContent;
-      if (block.blockType === "image") return block.asset?.altText ? `[Imagem: ${block.asset.altText}]` : "[Imagem]";
-      if (block.blockType === "link") return block.linkLabel ? `[Link: ${block.linkLabel}]` : "";
-      return "";
-    }).filter(Boolean).join("\n");
-    return [
-      `PASSO ${index + 1} | id=${step.id} | imagem=${image ? "SIM" : "NÃO"}`,
-      step.title,
-      step.description,
-      blocks,
-    ].filter(Boolean).join("\n");
-  }).join("\n\n");
-}
-
 function timelineText(timeline: TranscriptTimelineSegment[]): string {
   if (timeline.length === 0) return "Sem linha do tempo disponível.";
   return timeline
@@ -120,43 +97,77 @@ function timelineText(timeline: TranscriptTimelineSegment[]): string {
     .slice(0, 90_000);
 }
 
-const PLAN_SCHEMA = {
+function stepImageAsset(content: PublishedStructuredHelp, sourceStepId: string) {
+  return content.steps
+    .find((step) => step.id === sourceStepId)
+    ?.blocks.find((block) => block.blockType === "image" && block.asset?.assetType === "image")
+    ?.asset ?? null;
+}
+
+function blockToTrainingMarkdown(
+  block: PublishedStructuredHelp["steps"][number]["blocks"][number],
+): string {
+  if (block.blockType === "text") return block.textContent.trim();
+
+  if (block.blockType === "notice") {
+    const prefix = block.noticeVariant === "warning" || block.noticeVariant === "danger"
+      ? "⚠️ "
+      : "💡 ";
+    return block.textContent
+      .trim()
+      .split("\n")
+      .map((line, index) => `> ${index === 0 ? prefix : ""}${line}`)
+      .join("\n");
+  }
+
+  if (block.blockType === "link" && block.linkLabel) {
+    return block.linkUrl
+      ? `**${block.linkLabel}**\n\n${block.linkUrl}`
+      : `**${block.linkLabel}**`;
+  }
+
+  if (block.blockType === "file" && block.asset?.altText) {
+    return `**Material:** ${block.asset.altText}`;
+  }
+
+  return "";
+}
+
+function sourceInstruction(step: PublishedStructuredHelp["steps"][number]): string {
+  const sections = [
+    step.description.trim(),
+    ...step.blocks.map(blockToTrainingMarkdown),
+  ].filter(Boolean);
+
+  if (sections.length > 0) return sections.join("\n\n").slice(0, 5000);
+  return `Observe **${step.title.trim()}** e siga para a próxima etapa quando estiver pronto.`;
+}
+
+function stepsForAi(content: PublishedStructuredHelp): string {
+  return content.steps.map((step, index) => {
+    return [
+      `ETAPA ${index + 1} | sourceStepId=${step.id}`,
+      `TÍTULO: ${step.title}`,
+      `CONTEÚDO:\n${sourceInstruction(step)}`,
+    ].join("\n");
+  }).join("\n\n");
+}
+
+const TIMELINE_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["title", "audience", "welcomeMessage", "steps"],
+  required: ["steps"],
   properties: {
-    title: { type: "string", minLength: 4, maxLength: 160 },
-    audience: { type: "string", maxLength: 160 },
-    welcomeMessage: { type: "string", minLength: 4, maxLength: 800 },
     steps: {
       type: "array",
       minItems: 1,
-      maxItems: 30,
+      maxItems: 80,
       items: {
         type: "object",
         additionalProperties: false,
-        required: [
-          "sourceStepId",
-          "title",
-          "question",
-          "instruction",
-          "expectedResult",
-          "successMessage",
-          "primaryActionLabel",
-          "interactionMode",
-          "estimatedSeconds",
-          "videoStartSeconds",
-        ],
+        required: ["sourceStepId", "videoStartSeconds"],
         properties: {
           sourceStepId: { type: "string", minLength: 1, maxLength: 80 },
-          title: { type: "string", minLength: 3, maxLength: 180 },
-          question: { type: "string", minLength: 3, maxLength: 300 },
-          instruction: { type: "string", minLength: 3, maxLength: 3000 },
-          expectedResult: { type: "string", maxLength: 1500 },
-          successMessage: { type: "string", maxLength: 500 },
-          primaryActionLabel: { type: "string", minLength: 2, maxLength: 80 },
-          interactionMode: { type: "string", enum: ["presentation", "action"] },
-          estimatedSeconds: { type: "integer", minimum: 5, maximum: 900 },
           videoStartSeconds: { type: "integer", minimum: 0, maximum: 86400 },
         },
       },
@@ -169,8 +180,7 @@ async function generatePlan(
   content: PublishedStructuredHelp,
 ): Promise<GeneratedTrainingPlan> {
   if (!content.featuredVideo) throw new Error("TRAINING_SOURCE_CONTENT_VIDEO_REQUIRED");
-  const allowedVisualStepIds = visualStepIds(content);
-  if (allowedVisualStepIds.size === 0) throw new Error("TRAINING_SOURCE_CONTENT_IMAGES_REQUIRED");
+  if (content.steps.length === 0) throw new Error("TRAINING_SOURCE_CONTENT_STEPS_REQUIRED");
 
   const timeline = await sourceTimeline(content);
   const startedAt = Date.now();
@@ -180,42 +190,31 @@ async function generatePlan(
   let outputTokens: number | null = null;
   let fallbackUsed = false;
 
-  let response: AiStructuredResponse<GeneratedTrainingPlan>;
+  let response: AiStructuredResponse<GeneratedTimelinePlan>;
   try {
-    response = await createAiStructuredResponse<GeneratedTrainingPlan>({
+    response = await createAiStructuredResponse<GeneratedTimelinePlan>({
       task: "training_generation",
       requiredCapabilities: ["knowledge.read", "training.draft"],
-      schemaName: "f10_training_from_published_content",
-      schema: PLAN_SCHEMA,
-      maxOutputTokens: 3500,
+      schemaName: "f10_training_video_timeline",
+      schema: TIMELINE_SCHEMA,
+      maxOutputTokens: 1800,
       timeoutMs: 90_000,
-    instructions: [
-      "Você cria Trilhas F10 somente a partir do conteúdo publicado fornecido.",
-      "A trilha é uma sequência prática para a pessoa executar o procedimento no F10 enquanto consulta uma guia flutuante.",
-      "Não invente menus, botões, regras, exceções ou resultados.",
-      "Cada etapa deve apontar para um sourceStepId existente exatamente como recebido e que esteja marcado com imagem=SIM.",
-      "Toda etapa da trilha é um slide visual: nunca gere introdução, conclusão ou ação sem uma imagem publicada associada.",
-      "Prefira uma ação essencial por slide e evite fragmentação excessiva.",
-      "A instruction será exibida em uma janela pequena ao lado da imagem. Escreva uma orientação curta, didática e visualmente organizada em Markdown.",
-      "Use **negrito** para a ação principal e nomes importantes; use `código` para menus, botões, abas, campos e valores que a pessoa deve localizar no F10.",
-      "Quando houver mais de uma interação, use lista com marcadores ou passos numerados. Evite parágrafo longo.",
-      "Emoji é permitido apenas quando realmente ajuda a leitura, no máximo um por slide, por exemplo 👉 para ação e ⚠️ para atenção.",
-      "Não repita o título inteiro dentro da instruction e não escreva texto genérico ou vazio.",
-      "Se houver linha do tempo do vídeo, videoStartSeconds deve apontar para o início do trecho essencial daquela ação, de preferência alguns segundos antes da demonstração ficar visível.",
-      "Não crie cortes de vídeo. O vídeo sempre será reproduzido integralmente a partir de videoStartSeconds.",
-      "Se não houver linha do tempo útil, use videoStartSeconds=0.",
-      "Use interactionMode=action quando a pessoa precisa executar algo no F10 e presentation somente quando basta observar ou compreender.",
-      "primaryActionLabel deve ser curto: use 'Continuar' para os slides.",
-    ].join("\n"),
-    userInput: [
-      `CONTEÚDO: ${content.title}`,
-      content.summary,
-      content.quickGuide ? `RESUMO RÁPIDO:\n${content.quickGuide}` : "",
-      "PASSOS PUBLICADOS:",
-      publicText(content),
-      "LINHA DO TEMPO DO VÍDEO:",
-      timelineText(timeline),
-    ].filter(Boolean).join("\n\n"),
+      instructions: [
+        "Você recebe um conteúdo F10 já publicado e a transcrição temporal do vídeo que originou esse conteúdo.",
+        "A estrutura da trilha NÃO deve ser recriada: cada etapa publicada será exatamente um slide, na mesma ordem.",
+        "Sua única responsabilidade é localizar no vídeo o início mais útil para demonstrar cada etapa.",
+        "Retorne um item para cada sourceStepId recebido. Não remova, não una e não crie etapas.",
+        "videoStartSeconds deve apontar alguns segundos antes da demonstração visual relevante começar.",
+        "Quando não houver evidência suficiente na transcrição, use 0.",
+        "Não crie cortes; o player reproduz o vídeo original a partir do timestamp.",
+      ].join("\n"),
+      userInput: [
+        `CONTEÚDO PUBLICADO: ${content.title}`,
+        "ETAPAS PUBLICADAS:",
+        stepsForAi(content),
+        "LINHA DO TEMPO DO VÍDEO:",
+        timelineText(timeline),
+      ].join("\n\n"),
     });
 
     provider = response.provider;
@@ -237,11 +236,35 @@ async function generatePlan(
       metadata: {
         contentId: content.contentId,
         sourcePublishedAt: content.publishedAt.toISOString(),
+        sourceStepCount: content.steps.length,
         timelineSegments: timeline.length,
       },
     }).catch(() => undefined);
     throw cause;
   }
+
+  const allowedStepIds = new Set(content.steps.map((step) => step.id));
+  const timestampByStepId = new Map(
+    response.data.steps
+      .filter((step) => allowedStepIds.has(step.sourceStepId))
+      .map((step) => [
+        step.sourceStepId,
+        Math.min(Math.max(Math.round(step.videoStartSeconds), 0), 86400),
+      ]),
+  );
+
+  const steps = content.steps.map((step) => ({
+    sourceStepId: step.id,
+    title: step.title.trim().slice(0, 180),
+    question: step.title.trim().slice(0, 300),
+    instruction: sourceInstruction(step),
+    expectedResult: "",
+    successMessage: "",
+    primaryActionLabel: "Continuar",
+    interactionMode: "presentation" as const,
+    estimatedSeconds: 45,
+    videoStartSeconds: timestampByStepId.get(step.id) ?? 0,
+  }));
 
   await recordHelpAiUsage({
     actorUserId,
@@ -254,49 +277,19 @@ async function generatePlan(
     metadata: {
       contentId: content.contentId,
       sourcePublishedAt: content.publishedAt.toISOString(),
-      stepCount: response.data.steps.length,
+      sourceStepCount: content.steps.length,
+      generatedStepCount: steps.length,
       timelineSegments: timeline.length,
       fallbackUsed,
     },
   }).catch(() => undefined);
 
-  const allowedStepIds = visualStepIds(content);
-  const normalizedSteps = response.data.steps
-    .filter((step) =>
-      allowedStepIds.has(step.sourceStepId)
-      && step.instruction.trim().length >= 12
-    )
-    .map((step) => ({
-      ...step,
-      title: step.title.trim().slice(0, 180),
-      question: step.question.trim().slice(0, 300),
-      instruction: step.instruction.trim().slice(0, 3000),
-      expectedResult: step.expectedResult.trim().slice(0, 1500),
-      successMessage: step.successMessage.trim().slice(0, 500),
-      primaryActionLabel: "Continuar",
-      estimatedSeconds: Math.min(Math.max(Math.round(step.estimatedSeconds), 5), 900),
-      videoStartSeconds: content.featuredVideo
-        ? Math.min(Math.max(Math.round(step.videoStartSeconds), 0), 86400)
-        : 0,
-    }));
-  if (normalizedSteps.length === 0) throw new Error("TRAINING_GENERATION_EMPTY");
-  if (normalizedSteps.some((step) => !stepImageAsset(content, step.sourceStepId))) {
-    throw new Error("TRAINING_GENERATION_IMAGE_REQUIRED");
-  }
-
   return {
-    title: response.data.title.trim().slice(0, 160) || content.title,
-    audience: response.data.audience.trim().slice(0, 160),
-    welcomeMessage: response.data.welcomeMessage.trim().slice(0, 800),
-    steps: normalizedSteps,
+    title: content.title.trim().slice(0, 160),
+    audience: "",
+    welcomeMessage: (content.summary || content.quickGuide || "Siga cada etapa com o F10 aberto.").trim().slice(0, 800),
+    steps,
   };
-}
-
-function stepImageAsset(content: PublishedStructuredHelp, sourceStepId: string) {
-  return content.steps
-    .find((step) => step.id === sourceStepId)
-    ?.blocks.find((block) => block.blockType === "image" && block.asset?.assetType === "image")
-    ?.asset ?? null;
 }
 
 async function insertGeneratedSteps(
@@ -326,15 +319,16 @@ async function insertGeneratedSteps(
     if (!created) throw new Error("TRAINING_STEP_NOT_CREATED");
 
     const image = stepImageAsset(content, step.sourceStepId);
-    if (!image) throw new Error("TRAINING_GENERATION_IMAGE_REQUIRED");
-    await tx.insert(helpTrainingStepMedia).values({
-      stepId: created.id,
-      mediaType: "image",
-      assetId: image.id,
-      sourceUrl: null,
-      altText: image.altText,
-      sortOrder: 10,
-    });
+    if (image) {
+      await tx.insert(helpTrainingStepMedia).values({
+        stepId: created.id,
+        mediaType: "image",
+        assetId: image.id,
+        sourceUrl: null,
+        altText: image.altText,
+        sortOrder: 10,
+      });
+    }
 
     const video = content.featuredVideo;
     if (video?.storageKey) {
@@ -384,9 +378,9 @@ export async function generateHelpTrainingFromPublishedContent(
   const plan = await generatePlan(actorUserId, content);
   const slug = normalizeTrainingSlug(plan.title || content.title);
   if (!slug) throw new Error("INVALID_TRAINING_PATH");
+
   const db = getDatabase();
   const snapshot = sourceSnapshot(content);
-
   const [created] = await db.transaction(async (tx) => {
     const rows = await tx
       .insert(helpTrainingPaths)
@@ -403,6 +397,7 @@ export async function generateHelpTrainingFromPublishedContent(
         updatedBy: actorUserId,
       })
       .returning({ id: helpTrainingPaths.id, slug: helpTrainingPaths.slug });
+
     const path = rows[0];
     if (!path) throw new Error("TRAINING_PATH_NOT_CREATED");
     await replaceCategories(tx, path.id, content);
@@ -421,6 +416,7 @@ export async function generateHelpTrainingFromPublishedContent(
       stepCount: plan.steps.length,
     },
   });
+
   return created;
 }
 
@@ -438,11 +434,13 @@ export async function regenerateHelpTrainingFromPublishedContent(
     .from(helpTrainingPaths)
     .where(eq(helpTrainingPaths.id, pathId))
     .limit(1);
+
   if (!path) throw new Error("TRAINING_PATH_NOT_FOUND");
   if (path.status === "archived") throw new Error("TRAINING_PATH_ARCHIVED");
 
   const content = await getPublishedStructuredHelpById(path.sourceContentId);
   if (!content) throw new Error("TRAINING_SOURCE_CONTENT_NOT_PUBLISHED");
+
   const plan = await generatePlan(actorUserId, content);
   const snapshot = sourceSnapshot(content);
 
@@ -453,6 +451,8 @@ export async function regenerateHelpTrainingFromPublishedContent(
     await tx
       .update(helpTrainingPaths)
       .set({
+        title: plan.title,
+        welcomeMessage: plan.welcomeMessage,
         sourcePublishedAt: content.publishedAt,
         sourcePublicationSnapshot: snapshot,
         status: "draft",

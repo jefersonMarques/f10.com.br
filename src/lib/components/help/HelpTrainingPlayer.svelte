@@ -4,7 +4,6 @@
   import type { SubmitFunction } from "@sveltejs/kit";
   import {
     ArrowLeft,
-    ImageOff,
     LoaderCircle,
     Play,
     Sparkles,
@@ -53,11 +52,14 @@
   let successForm: HTMLFormElement | null = null;
   let backForm: HTMLFormElement | null = null;
   let isSubmitting = false;
+  let pipVideoElement: HTMLVideoElement | null = null;
+  let pipVideoFrame: HTMLIFrameElement | null = null;
 
   $: currentImage = step.images[0] ?? null;
 
   $: if (step.id !== trackedStepId) {
     trackedStepId = step.id;
+    stopPipMedia();
     pipMode = "guide";
     if (pipWindow && !pipWindow.closed) renderPip();
   }
@@ -85,6 +87,7 @@
     }
 
     return () => {
+      stopPipMedia();
       if (pipWindow && !pipWindow.closed) pipWindow.close();
     };
   });
@@ -125,11 +128,34 @@
     }).documentPictureInPicture ?? null;
   }
 
+  function stopPipMedia(): void {
+    if (pipVideoElement) {
+      try {
+        pipVideoElement.pause();
+        pipVideoElement.removeAttribute("src");
+        pipVideoElement.load();
+      } catch {
+        // A janela pode já ter sido encerrada pelo navegador.
+      }
+      pipVideoElement = null;
+    }
+
+    if (pipVideoFrame) {
+      try {
+        pipVideoFrame.src = "about:blank";
+      } catch {
+        // A janela pode já ter sido encerrada pelo navegador.
+      }
+      pipVideoFrame = null;
+    }
+  }
+
   function adoptPipWindow(windowRef: Window): void {
     pipWindow = windowRef;
     pipMode = "guide";
     fallbackOpen = false;
     pipWindow.addEventListener("pagehide", () => {
+      stopPipMedia();
       pipWindow = null;
       pipMode = "guide";
     }, { once: true });
@@ -160,10 +186,17 @@
     }
   }
 
+  function returnToGuide(): void {
+    stopPipMedia();
+    pipMode = "guide";
+    renderPip();
+  }
+
   function openVideoHelp(): void {
     if (!step.videoUrl) return;
 
     if (pipWindow && !pipWindow.closed) {
+      stopPipMedia();
       pipMode = "video";
       renderPip();
       return;
@@ -182,6 +215,7 @@
         pipMode = "video";
         fallbackOpen = false;
         pipWindow.addEventListener("pagehide", () => {
+          stopPipMedia();
           pipWindow = null;
           pipMode = "guide";
         }, { once: true });
@@ -289,7 +323,7 @@
 
     const content = doc.createElement("section");
     content.className = "content";
-    appendText(doc, content, "p", "eyebrow", "Faça isso agora");
+    appendText(doc, content, "p", "eyebrow", "Etapa da trilha");
     appendText(doc, content, "h1", "title", step.title);
     appendMarkup(doc, content, "rich", step.instruction);
 
@@ -332,10 +366,7 @@
     appendText(doc, meta, "span", "", `Ajuda em vídeo · ${formatSeconds(step.videoStartSeconds)}`);
     appendText(doc, meta, "strong", "", step.title);
     top.append(meta);
-    top.append(pipButton(doc, "← Voltar à orientação", "back-guide", () => {
-      pipMode = "guide";
-      renderPip();
-    }));
+    top.append(pipButton(doc, "← Voltar à orientação", "back-guide", returnToGuide));
     root.append(top);
 
     const content = doc.createElement("section");
@@ -345,6 +376,7 @@
 
     if (assetId) {
       const video = doc.createElement("video");
+      pipVideoElement = video;
       video.src = `${assetBasePath}/${assetId}`;
       video.controls = true;
       video.autoplay = true;
@@ -354,12 +386,13 @@
           video.currentTime = Math.max(0, step.videoStartSeconds || 0);
           void video.play().catch(() => undefined);
         } catch {
-          // O navegador mantém a reprodução normal quando não consegue posicionar o vídeo.
+          // Mantém a reprodução normal quando o seek não estiver disponível.
         }
       }, { once: true });
       content.append(video);
     } else if (youtubeUrl) {
       const iframe = doc.createElement("iframe");
+      pipVideoFrame = iframe;
       iframe.src = youtubeUrl;
       iframe.title = `Ajuda em vídeo: ${step.title}`;
       iframe.allow = "autoplay; encrypted-media; picture-in-picture";
@@ -382,6 +415,9 @@
   function renderPip(): void {
     if (!pipWindow || pipWindow.closed) return;
     const doc = pipWindow.document;
+
+    if (pipMode === "guide") stopPipMedia();
+
     doc.title = pipMode === "video" ? `Vídeo | ${step.title}` : `${step.title} | Trilha F10`;
     doc.head.replaceChildren();
     doc.body.replaceChildren();
@@ -397,7 +433,7 @@
 {/if}
 
 <div class="fixed inset-0 z-[80] h-[100dvh] overflow-hidden bg-[#F5F6FA] text-[#061333]">
-  <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_7%_16%,rgba(234,109,11,0.11),transparent_24%),radial-gradient(circle_at_90%_75%,rgba(0,10,87,0.06),transparent_26%)]"></div>
+  <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_7%_16%,rgba(234,109,11,0.10),transparent_24%),radial-gradient(circle_at_90%_75%,rgba(0,10,87,0.05),transparent_26%)]"></div>
 
   <header class="relative z-20 flex min-h-16 items-center justify-between gap-3 border-b border-[#E4E7EE] bg-white/94 px-4 py-2 backdrop-blur sm:px-8 lg:px-[max(2rem,calc((100vw-1520px)/2))]">
     <div class="flex min-w-0 items-center gap-3">
@@ -420,11 +456,13 @@
             />
           </div>
         {:else}
-          <div class="flex min-h-[520px] w-full items-center justify-center rounded-[30px] border border-[#F0C9C5] bg-[#FFF8F7] px-8 text-center">
-            <div class="max-w-[440px]">
-              <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-[#B42318] shadow-sm"><ImageOff size={25}/></span>
-              <strong class="mt-5 block text-[16px] text-[#7A2E28]">Este slide precisa de uma imagem</strong>
-              <p class="mt-2 text-[11px] leading-5 text-[#9B5A54]">Regere as orientações da trilha. Novas publicações não podem mais ser publicadas sem imagem em todos os slides.</p>
+          <div class="visual-fallback w-full max-w-[980px] overflow-hidden rounded-[30px] border border-[#E1E5ED] bg-white shadow-[0_26px_76px_rgba(12,23,52,0.10)]">
+            <div class="border-b border-[#E9ECF2] bg-[#FAFBFD] px-7 py-5 sm:px-10">
+              <p class="text-[9px] font-bold uppercase tracking-[0.16em] text-[#EA6D0B]">Visão da etapa</p>
+              <h2 class="mt-2 text-[26px] font-semibold tracking-[-0.04em] text-[#07132D] sm:text-[34px]">{step.title}</h2>
+            </div>
+            <div class="visual-markup px-7 py-7 sm:px-10 sm:py-9">
+              {@html trainingMarkupToHtml(step.instruction)}
             </div>
           </div>
         {/if}
@@ -458,7 +496,7 @@
 {#if fallbackOpen}
   <div class="fixed inset-0 z-[140] flex items-end justify-center bg-[#07132D]/60 p-3 backdrop-blur-[3px] sm:items-center">
     <section class="max-h-[88dvh] w-full max-w-[520px] overflow-y-auto rounded-[26px] bg-white p-5 shadow-2xl sm:p-6">
-      <p class="text-[8px] font-bold uppercase tracking-[0.13em] text-[#EA6D0B]">Faça isso agora</p>
+      <p class="text-[8px] font-bold uppercase tracking-[0.13em] text-[#EA6D0B]">Etapa da trilha</p>
       <h2 class="mt-2 text-[26px] font-semibold tracking-[-0.04em] text-[#061333]">{step.title}</h2>
       <div class="training-rich mt-4 text-[13px] leading-6 text-[#5E687E]">{@html trainingMarkupToHtml(step.instruction)}</div>
       {#if step.videoUrl}
@@ -481,9 +519,14 @@
     transition: transform 180ms ease, box-shadow 180ms ease;
   }
 
-  :global(.training-rich p) { margin: 0.32rem 0; }
-  :global(.training-rich strong) { font-weight: 800; color: #061333; }
-  :global(.training-rich code) {
+  :global(.training-rich p),
+  :global(.visual-markup p) { margin: 0.32rem 0; }
+
+  :global(.training-rich strong),
+  :global(.visual-markup strong) { font-weight: 800; color: #061333; }
+
+  :global(.training-rich code),
+  :global(.visual-markup code) {
     display: inline-block;
     border-radius: 0.4rem;
     background: #edf0f5;
@@ -493,8 +536,42 @@
     font-size: 0.92em;
     font-weight: 800;
   }
-  :global(.training-rich ul), :global(.training-rich ol) { margin: 0.55rem 0; padding-left: 1.35rem; }
-  :global(.training-rich li) { margin: 0.28rem 0; }
+
+  :global(.training-rich ul),
+  :global(.training-rich ol),
+  :global(.visual-markup ul),
+  :global(.visual-markup ol) {
+    margin: 0.65rem 0;
+    padding-left: 1.4rem;
+  }
+
+  :global(.training-rich li),
+  :global(.visual-markup li) { margin: 0.32rem 0; }
+
+  :global(.visual-markup) {
+    color: #4A556B;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  :global(.visual-markup h2),
+  :global(.visual-markup h3) {
+    margin: 1rem 0 0.5rem;
+    color: #07132D;
+    line-height: 1.25;
+  }
+
+  :global(.visual-markup h2) { font-size: 20px; }
+  :global(.visual-markup h3) { font-size: 16px; }
+
+  :global(.visual-markup blockquote) {
+    margin: 1rem 0;
+    border-left: 3px solid #EA6D0B;
+    border-radius: 0 12px 12px 0;
+    background: #FFF7F0;
+    padding: 0.8rem 1rem;
+    color: #6F4E35;
+  }
 
   @keyframes training-resume-float {
     0%, 100% { transform: translateY(0); box-shadow: 0 18px 40px rgba(243,107,0,0.22); }
