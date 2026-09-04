@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { createAiStructuredResponse } from "$lib/server/ai/aiGateway";
+import { createAiStructuredResponse, type AiStructuredResponse } from "$lib/server/ai/aiGateway";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -161,7 +161,7 @@ async function generatePlan(
   let outputTokens: number | null = null;
   let fallbackUsed = false;
 
-  let response;
+  let response: AiStructuredResponse<GeneratedTrainingPlan>;
   try {
     response = await createAiStructuredResponse<GeneratedTrainingPlan>({
       task: "training_generation",
