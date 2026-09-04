@@ -5,14 +5,23 @@
   import whatsappIconUrl from "$lib/assets/brand/whatsapp-white-icon.svg?url&no-inline";
   import { salesContact } from "$lib/config/contactConfig";
   import { openSupportEventName } from "$lib/support/supportEvents";
+  import {
+    siteSupportChatProvider,
+    supportChatClientId,
+  } from "$lib/support/supportConfig";
   import SupportChatDialog from "$lib/components/onboarding/SupportChatDialog.svelte";
 
-  // Props antigas mantidas por compatibilidade com chamadas existentes.
-  // O fluxo de suporte agora abre o chat nativo F10, sem carregar Movidesk.
-  export let movideskChatClient = "";
+  export let movideskChatClient: string = supportChatClientId;
   export let supportOpenMode: "widget" | "iframe" = "widget";
   export let supportStartOpen = false;
   export let variant: "contact" | "support" = "contact";
+
+  type MovideskWindow = Window & {
+    mdChatClient?: string;
+    movideskChatWidgetChangeWindowState?: (
+      state: "maximized" | "minimized",
+    ) => void;
+  };
 
   type FbqFunction = (
     command: "track" | "trackCustom" | "init",
@@ -60,8 +69,148 @@
   let isBusinessHours = false;
   let showOnlineHint = false;
 
-  void movideskChatClient;
-  void supportOpenMode;
+  const movideskWidgetSrc =
+    "https://chat.movidesk.com/Scripts/chat-widget.min.js";
+  const movideskContainerSelector = ".md-chat-widget-container";
+  let movideskWidgetPromise: Promise<boolean> | null = null;
+  let isSupportWidgetOpen = false;
+
+  function getMovideskWindow(): MovideskWindow | null {
+    if (typeof window === "undefined") return null;
+    return window as MovideskWindow;
+  }
+
+  function isMovideskApiReady(value: MovideskWindow | null): boolean {
+    return Boolean(
+      value &&
+      typeof value.movideskChatWidgetChangeWindowState === "function",
+    );
+  }
+
+  function waitForMovideskApi(timeoutMs = 6000): Promise<boolean> {
+    const currentWindow = getMovideskWindow();
+    if (!currentWindow) return Promise.resolve(false);
+
+    currentWindow.mdChatClient = movideskChatClient;
+    if (isMovideskApiReady(currentWindow)) return Promise.resolve(true);
+
+    return new Promise((resolve) => {
+      const startedAt = Date.now();
+      const timer = window.setInterval(() => {
+        const nextWindow = getMovideskWindow();
+        if (isMovideskApiReady(nextWindow)) {
+          window.clearInterval(timer);
+          resolve(true);
+          return;
+        }
+        if (Date.now() - startedAt > timeoutMs) {
+          window.clearInterval(timer);
+          resolve(false);
+        }
+      }, 100);
+    });
+  }
+
+  function ensureMovideskWidgetLoaded(): Promise<boolean> {
+    const currentWindow = getMovideskWindow();
+    if (!currentWindow) return Promise.resolve(false);
+    if (isMovideskApiReady(currentWindow)) return Promise.resolve(true);
+    if (movideskWidgetPromise) return movideskWidgetPromise;
+
+    movideskWidgetPromise = new Promise<boolean>((resolve) => {
+      try {
+        currentWindow.mdChatClient = movideskChatClient;
+        const alreadyLoaded = Array.from(document.scripts).some((script) =>
+          (script.src || "").includes(movideskWidgetSrc),
+        );
+
+        if (!alreadyLoaded) {
+          const script = document.createElement("script");
+          script.src = movideskWidgetSrc;
+          script.async = true;
+          script.onload = async () => resolve(await waitForMovideskApi());
+          script.onerror = () => {
+            movideskWidgetPromise = null;
+            resolve(false);
+          };
+          document.head.appendChild(script);
+          return;
+        }
+
+        void waitForMovideskApi().then(resolve);
+      } catch {
+        movideskWidgetPromise = null;
+        resolve(false);
+      }
+    });
+
+    return movideskWidgetPromise;
+  }
+
+  function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
+  async function waitForMovideskContainer(timeoutMs = 4000): Promise<boolean> {
+    if (typeof document === "undefined") return false;
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      if (document.querySelector(movideskContainerSelector)) return true;
+      await sleep(50);
+    }
+    return false;
+  }
+
+  async function maximizeMovideskWithRetry(): Promise<boolean> {
+    const currentWindow = getMovideskWindow();
+    if (!currentWindow) return false;
+
+    currentWindow.mdChatClient = movideskChatClient;
+    const ready = await ensureMovideskWidgetLoaded();
+    if (!ready || !isMovideskApiReady(currentWindow)) return false;
+
+    await waitForMovideskContainer(5000);
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      currentWindow.movideskChatWidgetChangeWindowState?.("maximized");
+      await sleep(150);
+    }
+    return true;
+  }
+
+  async function openMovideskSupport(): Promise<void> {
+    chatOpen = false;
+    isOpen = false;
+    selectedDepartment = null;
+    showOnlineHint = false;
+
+    if (supportOpenMode === "iframe") {
+      window.open(
+        `https://chat.movidesk.com/ChatWidget/index/${movideskChatClient}`,
+        "_blank",
+      );
+      isSupportWidgetOpen = false;
+      return;
+    }
+
+    if (await maximizeMovideskWithRetry()) {
+      isSupportWidgetOpen = true;
+      return;
+    }
+
+    window.open(
+      `https://chat.movidesk.com/ChatWidget/index/${movideskChatClient}`,
+      "_blank",
+    );
+    isSupportWidgetOpen = false;
+  }
+
+  function closeMovideskSupport(): void {
+    const currentWindow = getMovideskWindow();
+    if (isMovideskApiReady(currentWindow)) {
+      currentWindow?.movideskChatWidgetChangeWindowState?.("minimized");
+    }
+    isSupportWidgetOpen = false;
+  }
 
   function trackLead(payload: LeadPayload) {
     if (typeof window === "undefined") return;
@@ -81,15 +230,24 @@
   }
 
   function openNativeSupport(): void {
+    if (isSupportWidgetOpen) closeMovideskSupport();
     isOpen = false;
     selectedDepartment = null;
     showOnlineHint = false;
     chatOpen = true;
   }
 
+  async function openConfiguredSupport(): Promise<void> {
+    if (siteSupportChatProvider === "f10") {
+      openNativeSupport();
+      return;
+    }
+    await openMovideskSupport();
+  }
+
   function handleOpenSupportRequest(): void {
     if (variant !== "support") return;
-    openNativeSupport();
+    void openConfiguredSupport();
   }
 
   function toWaMeNumber(raw: string): string {
@@ -126,11 +284,16 @@
     errorMessage = "";
   }
 
-  function toggleOpen() {
+  async function toggleOpen() {
     errorMessage = "";
 
+    if (siteSupportChatProvider === "movidesk" && isSupportWidgetOpen) {
+      closeMovideskSupport();
+      return;
+    }
+
     if (variant === "support") {
-      openNativeSupport();
+      await openConfiguredSupport();
       return;
     }
 
@@ -144,16 +307,17 @@
     selectedDepartment = null;
   }
 
-  function handleSelectDepartment(dep: Department) {
+  async function handleSelectDepartment(dep: Department) {
     errorMessage = "";
 
     if (dep === "sales") {
+      if (isSupportWidgetOpen) closeMovideskSupport();
       selectedDepartment = "sales";
       return;
     }
 
     if (dep === "support") {
-      openNativeSupport();
+      await openConfiguredSupport();
       return;
     }
 
@@ -291,7 +455,7 @@
       }, 5000);
     }
 
-    if (supportStartOpen) openNativeSupport();
+    if (supportStartOpen) void openConfiguredSupport();
     window.addEventListener(openSupportEventName, handleOpenSupportRequest);
 
     return () => {
@@ -393,7 +557,7 @@
             </div>
 
             <p class="mt-3 text-[10px] text-slate-400 text-center">
-              Vendas abre formulário. Suporte abre o chat F10. Financeiro abre WhatsApp.
+              Vendas abre formulário. Suporte abre {siteSupportChatProvider === "f10" ? "o chat F10" : "Movidesk"}. Financeiro abre WhatsApp.
             </p>
           </div>
         {:else if selectedDepartment === "sales"}
@@ -517,7 +681,7 @@
         class={`relative flex h-16 w-16 items-center justify-center rounded-full text-white shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white transition ${variant === "support" ? "bg-[#000A57] shadow-[#000A57]/30 hover:bg-[#111B71] focus-visible:ring-[#000A57]/60" : "bg-[#25D366] shadow-emerald-500/35 hover:bg-[#20bd59] focus-visible:ring-[#25D366]/70"}`}
         on:click={toggleOpen}
         aria-label={variant === "support" ? "Abrir suporte F10" : "Falar com a F10"}
-        aria-expanded={isOpen || chatOpen}
+        aria-expanded={isOpen || chatOpen || isSupportWidgetOpen}
       >
         {#if variant === "support"}
           <LifeBuoy size={30} strokeWidth={2.2} aria-hidden="true" />
@@ -526,7 +690,7 @@
         {/if}
       </button>
 
-      {#if showOnlineHint && !isOpen && !chatOpen}
+      {#if showOnlineHint && !isOpen && !chatOpen && !isSupportWidgetOpen}
         <div class="absolute right-20 bottom-3 max-w-[200px] rounded-2xl bg-white shadow-lg shadow-slate-900/20 border border-emerald-100 px-3 py-2 text-[11px] text-slate-800">
           <div class="flex items-center gap-2 whitespace-nowrap">
             <span class="h-2.5 min-w-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -538,4 +702,25 @@
   </div>
 </div>
 
-<SupportChatDialog isOpen={chatOpen} onClose={() => (chatOpen = false)} />
+{#if siteSupportChatProvider === "f10"}
+  <SupportChatDialog isOpen={chatOpen} onClose={() => (chatOpen = false)} />
+{/if}
+
+<style>
+  :global(.md-chat-widget-btn-wrapper) {
+    display: none !important;
+  }
+
+  :global(.md-chat-widget-container) {
+    z-index: 10000 !important;
+    border-radius: 24px !important;
+  }
+
+  :global(.container-fluid) {
+    width: 100% !important;
+  }
+
+  :global(.widget-frame.md-fade-when-visible) {
+    border-radius: 24px !important;
+  }
+</style>
