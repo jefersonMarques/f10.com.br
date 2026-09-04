@@ -2,6 +2,7 @@
   import { enhance } from "$app/forms";
   import type { SubmitFunction } from "@sveltejs/kit";
   import { Check, ChevronRight, RotateCcw } from "lucide-svelte";
+  import HelpTrainingCompletionFeedback from "$lib/components/help/HelpTrainingCompletionFeedback.svelte";
   import HelpTrainingPlayer from "$lib/components/help/HelpTrainingPlayer.svelte";
   import { requestTrainingPipWindow } from "$lib/help/trainingPipBridge";
   import type { ActionData, PageData } from "./$types";
@@ -46,6 +47,7 @@
       <p class="mt-6 text-[9px] font-bold uppercase tracking-[0.14em] text-[#2F7045]">Concluído</p>
       <h1 class="mt-3 text-[30px] font-semibold tracking-[-0.035em] text-[#11182C] sm:text-[40px]">Você concluiu esta trilha.</h1>
       <p class="mt-4 text-[12px] leading-6 text-[#747A8A]">Quando precisar relembrar, você pode acessar novamente pelo mesmo endereço.</p>
+      <HelpTrainingCompletionFeedback mode="public" sourceContentSlug={data.state.sourceContent.slug} />
       <form method="POST" action="?/restart" class="mt-7"><button type="submit" class="training-start inline-flex min-h-11 items-center gap-2 rounded-full border border-[#DDE1EA] bg-white px-5 text-[10px] font-semibold text-[#000A57]"><RotateCcw size={14}/>Recomeçar</button></form>
     </section>
   </main>

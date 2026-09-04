@@ -2,6 +2,7 @@
   import { enhance } from "$app/forms";
   import type { SubmitFunction } from "@sveltejs/kit";
   import { Check, ChevronRight, GraduationCap } from "lucide-svelte";
+  import HelpTrainingCompletionFeedback from "$lib/components/help/HelpTrainingCompletionFeedback.svelte";
   import HelpTrainingPlayer from "$lib/components/help/HelpTrainingPlayer.svelte";
   import { requestTrainingPipWindow } from "$lib/help/trainingPipBridge";
   import type { ActionData, PageData } from "./$types";
@@ -52,6 +53,7 @@
       <p class="mt-6 text-[9px] font-bold uppercase tracking-[0.14em] text-[#2F7045]">Concluído</p>
       <h1 class="mt-3 text-[30px] font-semibold tracking-[-0.035em] text-[#11182C] sm:text-[40px]">Você concluiu esta trilha.</h1>
       <p class="mt-4 text-[12px] leading-6 text-[#747A8A]">Se precisar rever alguma ação depois, use novamente o conteúdo recebido.</p>
+      <HelpTrainingCompletionFeedback mode="invite" sourceContentSlug={data.state.sourceContent.slug} />
     </section>
   </main>
 {:else if !data.state.session.startedAt}

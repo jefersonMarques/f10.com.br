@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Check, ChevronRight, RotateCcw } from "lucide-svelte";
+  import HelpTrainingCompletionFeedback from "$lib/components/help/HelpTrainingCompletionFeedback.svelte";
   import HelpTrainingPlayer from "$lib/components/help/HelpTrainingPlayer.svelte";
   import { requestTrainingPipWindow } from "$lib/help/trainingPipBridge";
   import type { PageData } from "./$types";
@@ -63,6 +64,7 @@
       <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EEF8F1] text-[#2F7045]"><Check size={27}/></span>
       <p class="mt-6 text-[9px] font-bold uppercase tracking-[0.14em] text-[#2F7045]">Fim da pré-visualização</p>
       <h1 class="mt-3 text-[30px] font-semibold tracking-[-0.035em] text-[#11182C] sm:text-[40px]">Experiência concluída.</h1>
+      <HelpTrainingCompletionFeedback mode="preview" sourceContentSlug={data.preview.sourceContent.slug} />
       <button type="button" on:click={restart} class="training-start mt-7 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-5 text-[10px] font-semibold text-[#000A57]"><RotateCcw size={14}/>Recomeçar</button>
     </section>
   </main>
