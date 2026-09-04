@@ -66,7 +66,7 @@
     if (pipWindow && !pipWindow.closed) renderPip();
   }
 
-  $: if (pipWindow && !pipWindow.closed) {
+  $: if (pipWindow && !pipWindow.closed && pipMode === "guide") {
     step.id;
     step.title;
     step.instruction;
@@ -75,7 +75,6 @@
     isSubmitting;
     successMessage;
     formMessage;
-    pipMode;
     renderPip();
   }
 
@@ -390,6 +389,7 @@
   }
 
   function renderVideo(doc: Document): void {
+    stopPipMedia();
     const root = doc.createElement("main");
     root.className = "video-shell";
 
