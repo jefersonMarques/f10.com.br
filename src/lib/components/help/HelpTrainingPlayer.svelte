@@ -10,7 +10,7 @@
     Sparkles,
   } from "lucide-svelte";
   import HelpTrainingTutor from "$lib/components/help/HelpTrainingTutor.svelte";
-  import { claimTrainingPipWindow, trainingPipSupported } from "$lib/help/trainingPipBridge";
+  import { claimTrainingPipWindow } from "$lib/help/trainingPipBridge";
   import { trainingMarkupToHtml } from "$lib/help/trainingMarkup";
 
   type TrainingPlayerStep = {
@@ -46,7 +46,6 @@
   export let onBack: (() => void) | null = null;
 
   let trackedStepId = step.id;
-  let pipSupported = false;
   let pipOpening = false;
   let pipWindow: Window | null = null;
   let pipMode: PipMode = "guide";
@@ -77,7 +76,6 @@
   }
 
   onMount(() => {
-    pipSupported = trainingPipSupported();
     const pending = claimTrainingPipWindow();
     if (pending) {
       void pending.then((claimed) => {
