@@ -53,6 +53,7 @@ async function attempt<T>(input: {
   schemaName: string;
   schema: JsonSchema;
   maxOutputTokens?: number;
+  timeoutMs?: number;
 }) {
   return createProviderStructuredResponse<T>(input);
 }
@@ -64,6 +65,7 @@ export async function createAiStructuredResponse<T>(input: {
   schemaName: string;
   schema: JsonSchema;
   maxOutputTokens?: number;
+  timeoutMs?: number;
   requiredCapabilities?: AiCapability[];
 }): Promise<AiStructuredResponse<T>> {
   const profile = await getAiTaskProfile(input.task);
@@ -87,6 +89,7 @@ export async function createAiStructuredResponse<T>(input: {
       schemaName: input.schemaName,
       schema: input.schema,
       maxOutputTokens: input.maxOutputTokens,
+      timeoutMs: input.timeoutMs,
     });
     return { ...response, fallbackUsed: false };
   } catch (cause) {
@@ -111,6 +114,7 @@ export async function createAiStructuredResponse<T>(input: {
         schemaName: input.schemaName,
         schema: input.schema,
         maxOutputTokens: input.maxOutputTokens,
+        timeoutMs: input.timeoutMs,
       });
       return { ...response, fallbackUsed: true };
     } catch (fallbackCause) {

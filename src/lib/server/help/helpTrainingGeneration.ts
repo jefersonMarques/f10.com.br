@@ -155,12 +155,21 @@ async function generatePlan(
 ): Promise<GeneratedTrainingPlan> {
   const timeline = await sourceTimeline(content);
   const startedAt = Date.now();
-  const response = await createAiStructuredResponse<GeneratedTrainingPlan>({
-    task: "training_generation",
-    requiredCapabilities: ["knowledge.read", "training.draft"],
-    schemaName: "f10_training_from_published_content",
-    schema: PLAN_SCHEMA,
-    maxOutputTokens: 3500,
+  let provider = "";
+  let model = "";
+  let inputTokens: number | null = null;
+  let outputTokens: number | null = null;
+  let fallbackUsed = false;
+
+  let response;
+  try {
+    response = await createAiStructuredResponse<GeneratedTrainingPlan>({
+      task: "training_generation",
+      requiredCapabilities: ["knowledge.read", "training.draft"],
+      schemaName: "f10_training_from_published_content",
+      schema: PLAN_SCHEMA,
+      maxOutputTokens: 3500,
+      timeoutMs: 90_000,
     instructions: [
       "Você cria Trilhas F10 somente a partir do conteúdo publicado fornecido.",
       "A trilha é uma sequência prática para a pessoa executar o procedimento no F10 enquanto consulta uma guia flutuante.",
@@ -182,22 +191,47 @@ async function generatePlan(
       "LINHA DO TEMPO DO VÍDEO:",
       timelineText(timeline),
     ].filter(Boolean).join("\n\n"),
-  });
+    });
+
+    provider = response.provider;
+    model = response.model;
+    inputTokens = response.inputTokens;
+    outputTokens = response.outputTokens;
+    fallbackUsed = response.fallbackUsed;
+  } catch (cause) {
+    await recordHelpAiUsage({
+      actorUserId,
+      operation: "training_generation",
+      provider: provider || undefined,
+      model: model || "ai-gateway",
+      inputTokens,
+      outputTokens,
+      latencyMs: Date.now() - startedAt,
+      status: "failed",
+      failureCode: cause instanceof Error ? cause.message : "TRAINING_GENERATION_FAILED",
+      metadata: {
+        contentId: content.contentId,
+        sourcePublishedAt: content.publishedAt.toISOString(),
+        timelineSegments: timeline.length,
+      },
+    }).catch(() => undefined);
+    throw cause;
+  }
 
   await recordHelpAiUsage({
     actorUserId,
     operation: "training_generation",
-    provider: response.provider,
-    model: response.model,
-    inputTokens: response.inputTokens,
-    outputTokens: response.outputTokens,
+    provider,
+    model,
+    inputTokens,
+    outputTokens,
     latencyMs: Date.now() - startedAt,
     metadata: {
       contentId: content.contentId,
       sourcePublishedAt: content.publishedAt.toISOString(),
       stepCount: response.data.steps.length,
       timelineSegments: timeline.length,
-      fallbackUsed: response.fallbackUsed,
+      fallbackUsed,
     },
   }).catch(() => undefined);
 

@@ -51,7 +51,10 @@ export class AiProviderError extends Error {
   }
 }
 
-function parseTimeoutMs(provider: AiProviderCode): number {
+function parseTimeoutMs(provider: AiProviderCode, overrideMs?: number): number {
+  if (Number.isFinite(overrideMs)) {
+    return Math.min(Math.max(Math.round(overrideMs ?? 0), 5_000), 180_000);
+  }
   const providerValue =
     provider === "openai" ? env.OPENAI_TIMEOUT_MS : env.DEEPSEEK_TIMEOUT_MS;
   const parsed = Number.parseInt(
@@ -81,6 +84,7 @@ export async function createProviderStructuredResponse<T>(input: {
   schemaName: string;
   schema: JsonSchema;
   maxOutputTokens?: number;
+  timeoutMs?: number;
 }): Promise<AiProviderStructuredResponse<T>> {
   const { apiKey } = await readAiProviderCredential(input.provider).catch((cause) => {
     if (cause instanceof Error && cause.message === "AI_PROVIDER_NOT_CONFIGURED") {
@@ -90,7 +94,10 @@ export async function createProviderStructuredResponse<T>(input: {
   });
   const definition = AI_PROVIDER_DEFINITIONS[input.provider];
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), parseTimeoutMs(input.provider));
+  const timeout = setTimeout(
+    () => controller.abort(),
+    parseTimeoutMs(input.provider, input.timeoutMs),
+  );
   const format = input.provider === "openai"
     ? {
         type: "json_schema",
