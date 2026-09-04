@@ -237,6 +237,38 @@
     return /^[0-9a-f-]{36}$/i.test(id) ? id : null;
   }
 
+  function trainingVideoAssetUrl(assetId: string): string {
+    const startSeconds = Math.max(0, Math.round(step.videoStartSeconds || 0));
+    return `${assetBasePath}/${assetId}?preview=1#t=${startSeconds}`;
+  }
+
+  function seekTrainingVideo(video: HTMLVideoElement): void {
+    const target = Math.max(0, Number(step.videoStartSeconds) || 0);
+    if (target <= 0) {
+      void video.play().catch(() => undefined);
+      return;
+    }
+
+    const seek = () => {
+      if (!Number.isFinite(video.duration) && video.seekable.length === 0) return;
+      try {
+        if (Math.abs(video.currentTime - target) > 0.5) {
+          video.currentTime = target;
+        }
+        void video.play().catch(() => undefined);
+      } catch {
+        // O próximo evento de mídia tenta posicionar novamente.
+      }
+    };
+
+    seek();
+    video.addEventListener("loadeddata", seek, { once: true });
+    video.addEventListener("canplay", seek, { once: true });
+    video.addEventListener("progress", seek, { once: true });
+    window.setTimeout(seek, 180);
+    window.setTimeout(seek, 650);
+  }
+
   function youtubeEmbedUrl(value: string | null): string | null {
     if (!value || value.startsWith("asset:")) return null;
     try {
@@ -379,18 +411,12 @@
     if (assetId) {
       const video = doc.createElement("video");
       pipVideoElement = video;
-      video.src = `${assetBasePath}/${assetId}`;
+      video.src = trainingVideoAssetUrl(assetId);
       video.controls = true;
       video.autoplay = true;
       video.playsInline = true;
-      video.addEventListener("loadedmetadata", () => {
-        try {
-          video.currentTime = Math.max(0, step.videoStartSeconds || 0);
-          void video.play().catch(() => undefined);
-        } catch {
-          // Mantém a reprodução normal quando o seek não estiver disponível.
-        }
-      }, { once: true });
+      video.preload = "auto";
+      video.addEventListener("loadedmetadata", () => seekTrainingVideo(video), { once: true });
       content.append(video);
     } else if (youtubeUrl) {
       const iframe = doc.createElement("iframe");
