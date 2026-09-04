@@ -28,7 +28,7 @@ export function normalizeTrainingClientStep(
     instruction: step.instruction,
     expectedResult: step.expectedResult,
     successMessage: step.successMessage,
-    primaryActionLabel: step.primaryActionLabel?.trim() || "Concluir e continuar",
+    primaryActionLabel: step.primaryActionLabel?.trim() || "Continuar",
     interactionMode,
     videoStartSeconds: step.videoStartSeconds ?? 0,
     images: step.images.slice(0, 1),
