@@ -46,7 +46,19 @@ function extractSessionCookie(response) {
   return sessionCookie ? sessionCookie.split(";", 1)[0] : "";
 }
 function decodeHtml(value) {
-  return value.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  let decoded = value;
+  for (let index = 0; index < 3; index += 1) {
+    const next = decoded
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+    if (next === decoded) break;
+    decoded = next;
+  }
+  return decoded;
 }
 function extractLoginMessage(html) {
   const match = html.match(/role=["']alert["'][^>]*>([\s\S]*?)<\/div>/i);
@@ -56,7 +68,7 @@ function extractOperationsLinks(html) {
   const routes = new Set();
   const hrefPattern = /\bhref\s*=\s*["']([^"']+)["']/gi;
   for (const match of html.matchAll(hrefPattern)) {
-    const href = match[1]?.trim();
+    const href = decodeHtml(match[1]?.trim() ?? "");
     if (!href || href.startsWith("#")) continue;
     let url;
     try { url = new URL(href, baseUrl); } catch { continue; }
@@ -66,7 +78,27 @@ function extractOperationsLinks(html) {
   return routes;
 }
 async function fetchAuthenticatedPage(route, sessionCookie) {
-  const response = await fetch(absoluteUrl(route), { redirect: "manual", headers: { Accept: "text/html", Cookie: sessionCookie, "User-Agent": "F10-Operations-Smoke/1.0" } });
+  let response;
+  let lastError = null;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      response = await fetch(absoluteUrl(route), {
+        redirect: "manual",
+        headers: {
+          Accept: "text/html",
+          Cookie: sessionCookie,
+          "User-Agent": "F10-Operations-Smoke/1.0",
+        },
+      });
+      break;
+    } catch (cause) {
+      lastError = cause;
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
+  if (!response) {
+    throw new Error(`${route} fetch failed after retry: ${describeError(lastError)}`);
+  }
   assertStatus(response, [200], route);
   const contentType = response.headers.get("content-type") ?? "";
   const html = contentType.includes("text/html") ? await response.text() : "";
