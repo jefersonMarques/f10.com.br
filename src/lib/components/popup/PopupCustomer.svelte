@@ -107,10 +107,10 @@
                                border border-[#CBD5F0] shadow-sm
                                hover:bg-[#F4F6FF] active:translate-y-[1px]
                                transition-all focus:outline-none focus:ring-2 focus:ring-[#EA6D0B]/25"
-                        aria-label="Acessar a central de ajuda"
+                        aria-label="Central de ajuda"
                     >
                         <span class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-                            Acessar a central de ajuda
+                            Central de ajuda
                         </span>
 
                         <span class="absolute right-5 top-1/2 -translate-y-1/2 text-[#EA6D0B]">
