@@ -115,6 +115,7 @@ export async function updateHelpTrainingStepDraft(
     primaryActionLabel: string;
     estimatedSeconds: number;
     videoStartSeconds: number;
+    videoEndSeconds: number;
     interactionMode: HelpTrainingInteractionMode;
   },
 ): Promise<void> {
@@ -131,6 +132,8 @@ export async function updateHelpTrainingStepDraft(
     || defaultPrimaryActionLabel(input.interactionMode);
   const estimatedSeconds = Math.min(Math.max(Math.round(input.estimatedSeconds || 45), 5), 900);
   const videoStartSeconds = Math.min(Math.max(Math.round(input.videoStartSeconds || 0), 0), 86400);
+  const requestedVideoEndSeconds = Math.min(Math.max(Math.round(input.videoEndSeconds || 0), 0), 86400);
+  const videoEndSeconds = requestedVideoEndSeconds > videoStartSeconds ? requestedVideoEndSeconds : 0;
   await getDatabase()
     .update(helpTrainingSteps)
     .set({
@@ -142,6 +145,7 @@ export async function updateHelpTrainingStepDraft(
       primaryActionLabel,
       estimatedSeconds,
       videoStartSeconds,
+      videoEndSeconds,
       interactionMode: input.interactionMode,
       updatedAt: new Date(),
     })
@@ -294,6 +298,7 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
       estimatedSeconds: step.estimatedSeconds,
       sourceContentStepId: step.sourceContentStepId,
       videoStartSeconds: step.videoStartSeconds,
+      videoEndSeconds: step.videoEndSeconds,
       images,
       videoUrl: video?.sourceUrl ?? null,
       captionAssetId: caption?.assetId ?? null,

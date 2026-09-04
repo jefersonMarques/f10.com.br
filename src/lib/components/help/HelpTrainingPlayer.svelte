@@ -24,6 +24,7 @@
     primaryActionLabel: string;
     interactionMode: "presentation" | "action";
     videoStartSeconds: number;
+    videoEndSeconds: number;
     images: Array<{ assetId: string; altText: string; annotations: HelpImageAnnotation[] }>;
     videoUrl: string | null;
   };
@@ -71,6 +72,7 @@
     step.title;
     step.instruction;
     step.videoStartSeconds;
+    step.videoEndSeconds;
     canGoBack;
     isSubmitting;
     successMessage;
@@ -238,21 +240,23 @@
 
   function trainingVideoAssetUrl(assetId: string): string {
     const startSeconds = Math.max(0, Math.round(step.videoStartSeconds || 0));
-    return `${assetBasePath}/${assetId}?preview=1#t=${startSeconds}`;
+    const endSeconds = Math.max(0, Math.round(step.videoEndSeconds || 0));
+    const fragment = endSeconds > startSeconds
+      ? `#t=${startSeconds},${endSeconds}`
+      : `#t=${startSeconds}`;
+    return `${assetBasePath}/${assetId}?preview=1${fragment}`;
   }
 
   function seekTrainingVideo(video: HTMLVideoElement): void {
-    const target = Math.max(0, Number(step.videoStartSeconds) || 0);
-    if (target <= 0) {
-      void video.play().catch(() => undefined);
-      return;
-    }
+    const start = Math.max(0, Number(step.videoStartSeconds) || 0);
+    const end = Math.max(0, Number(step.videoEndSeconds) || 0);
+    const hasEnd = end > start;
 
     const seek = () => {
       if (!Number.isFinite(video.duration) && video.seekable.length === 0) return;
       try {
-        if (Math.abs(video.currentTime - target) > 0.5) {
-          video.currentTime = target;
+        if (Math.abs(video.currentTime - start) > 0.5) {
+          video.currentTime = start;
         }
         void video.play().catch(() => undefined);
       } catch {
@@ -260,6 +264,27 @@
       }
     };
 
+    const stopAtEnd = () => {
+      if (!hasEnd || video.currentTime < end) return;
+      video.pause();
+      try {
+        video.currentTime = Math.min(end, Number.isFinite(video.duration) ? video.duration : end);
+      } catch {
+        // Mantém o último frame disponível.
+      }
+    };
+
+    const replayRange = () => {
+      if (!hasEnd || video.currentTime < end - 0.25) return;
+      try {
+        video.currentTime = start;
+      } catch {
+        // O navegador mantém a posição atual se o seek ainda não estiver disponível.
+      }
+    };
+
+    video.addEventListener("timeupdate", stopAtEnd);
+    video.addEventListener("play", replayRange);
     seek();
     video.addEventListener("loadeddata", seek, { once: true });
     video.addEventListener("canplay", seek, { once: true });
@@ -280,8 +305,11 @@
           id = url.pathname.split("/")[2] ?? "";
         }
       }
+      const start = Math.max(0, Math.round(step.videoStartSeconds || 0));
+      const end = Math.max(0, Math.round(step.videoEndSeconds || 0));
+      const endParameter = end > start ? `&end=${end}` : "";
       return id
-        ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&start=${Math.max(0, Math.round(step.videoStartSeconds || 0))}`
+        ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&start=${start}${endParameter}`
         : null;
     } catch {
       return null;
@@ -363,7 +391,7 @@
     if (step.videoUrl) {
       content.append(pipButton(
         doc,
-        `▶ Ajuda em vídeo · trecho ${formatSeconds(step.videoStartSeconds)}`,
+        `▶ Ajuda em vídeo · ${formatSeconds(step.videoStartSeconds)} → ${step.videoEndSeconds > step.videoStartSeconds ? formatSeconds(step.videoEndSeconds) : "fim"}`,
         "video-help",
         openVideoHelp,
       ));
@@ -397,7 +425,7 @@
     top.className = "video-top";
     const meta = doc.createElement("div");
     meta.className = "video-meta";
-    appendText(doc, meta, "span", "", `Ajuda em vídeo · ${formatSeconds(step.videoStartSeconds)}`);
+    appendText(doc, meta, "span", "", `Ajuda em vídeo · ${formatSeconds(step.videoStartSeconds)} → ${step.videoEndSeconds > step.videoStartSeconds ? formatSeconds(step.videoEndSeconds) : "fim"}`);
     appendText(doc, meta, "strong", "", step.title);
     top.append(meta);
     top.append(pipButton(doc, "← Voltar à orientação", "back-guide", returnToGuide));
@@ -530,7 +558,7 @@
       <h2 class="mt-2 text-[26px] font-semibold tracking-[-0.04em] text-[#061333]">{step.title}</h2>
       <div class="training-rich mt-4 text-[13px] leading-6 text-[#5E687E]">{@html trainingMarkupToHtml(step.instruction)}</div>
       {#if step.videoUrl}
-        <button type="button" on:click={openVideoHelp} class="mt-5 min-h-11 w-full rounded-xl border border-[#FFD1B0] bg-[#FFF7F0] text-[10px] font-bold text-[#B94E00]"><Play size={13} class="mr-1 inline"/>Ajuda em vídeo · {formatSeconds(step.videoStartSeconds)}</button>
+        <button type="button" on:click={openVideoHelp} class="mt-5 min-h-11 w-full rounded-xl border border-[#FFD1B0] bg-[#FFF7F0] text-[10px] font-bold text-[#B94E00]"><Play size={13} class="mr-1 inline"/>Ajuda em vídeo · {formatSeconds(step.videoStartSeconds)} → {step.videoEndSeconds > step.videoStartSeconds ? formatSeconds(step.videoEndSeconds) : "fim"}</button>
       {/if}
       <div class="mt-5 grid grid-cols-[1fr_1.45fr] gap-2">
         <button type="button" on:click={triggerBack} disabled={!canGoBack || isSubmitting} class="min-h-12 rounded-xl border border-[#D8DDE7] bg-white text-[10px] font-semibold text-[#596174] disabled:opacity-40"><ArrowLeft size={14} class="mr-1 inline"/>Voltar</button>

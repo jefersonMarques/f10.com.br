@@ -35,6 +35,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
           primaryActionLabel: step.primaryActionLabel?.trim() || "Continuar",
           interactionMode,
           videoStartSeconds: step.videoStartSeconds,
+          videoEndSeconds: step.videoEndSeconds,
           images: step.media
             .filter((media) => media.mediaType === "image" && media.assetId)
             .slice(0, 1)

@@ -428,6 +428,7 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
       estimatedSeconds: step.estimatedSeconds,
       sourceContentStepId: step.sourceContentStepId,
       videoStartSeconds: step.videoStartSeconds,
+      videoEndSeconds: step.videoEndSeconds,
       images,
       videoUrl: video?.sourceUrl ?? null,
       failureReasons: step.failureReasons.map((reason) => ({

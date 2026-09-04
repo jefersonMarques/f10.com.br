@@ -127,6 +127,7 @@ export const actions: Actions = {
         primaryActionLabel: read(formData, "primaryActionLabel"),
         estimatedSeconds: Number.parseInt(read(formData, "estimatedSeconds") || "45", 10),
         videoStartSeconds: Number.parseInt(read(formData, "videoStartSeconds") || "0", 10),
+        videoEndSeconds: Number.parseInt(read(formData, "videoEndSeconds") || "0", 10),
         interactionMode: read(formData, "interactionMode") === "presentation" ? "presentation" : "action",
       });
       return { success: true, message: "Orientação salva.", openStepId: stepId };

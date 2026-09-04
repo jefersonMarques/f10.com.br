@@ -137,6 +137,7 @@ export const helpTrainingSteps = pgTable(
     estimatedSeconds: integer("estimated_seconds").notNull().default(45),
     sourceContentStepId: uuid("source_content_step_id"),
     videoStartSeconds: integer("video_start_seconds").notNull().default(0),
+    videoEndSeconds: integer("video_end_seconds").notNull().default(0),
     sortOrder: integer("sort_order").notNull().default(10),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -210,6 +211,7 @@ export type HelpTrainingSnapshot = {
     estimatedSeconds: number;
     sourceContentStepId?: string | null;
     videoStartSeconds?: number;
+    videoEndSeconds?: number;
     images: Array<{ assetId: string; altText: string; annotations?: HelpImageAnnotation[] }>;
     videoUrl: string | null;
     captionAssetId?: string | null;

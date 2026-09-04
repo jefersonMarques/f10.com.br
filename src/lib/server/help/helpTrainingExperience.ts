@@ -12,6 +12,7 @@ export type HelpTrainingClientStep = {
   primaryActionLabel: string;
   interactionMode: HelpTrainingInteractionMode;
   videoStartSeconds: number;
+  videoEndSeconds: number;
   images: Array<{ assetId: string; altText: string; annotations: HelpImageAnnotation[] }>;
   videoUrl: string | null;
   captionAssetId: string | null;
@@ -32,6 +33,7 @@ export function normalizeTrainingClientStep(
     primaryActionLabel: step.primaryActionLabel?.trim() || "Continuar",
     interactionMode,
     videoStartSeconds: step.videoStartSeconds ?? 0,
+    videoEndSeconds: step.videoEndSeconds ?? 0,
     images: step.images.slice(0, 1).map((image) => ({
       assetId: image.assetId,
       altText: image.altText,

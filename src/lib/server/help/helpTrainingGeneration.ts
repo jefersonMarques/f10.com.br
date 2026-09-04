@@ -27,6 +27,7 @@ type GeneratedTimelinePlan = {
   steps: Array<{
     sourceStepId: string;
     videoStartSeconds: number;
+    videoEndSeconds: number;
   }>;
 };
 
@@ -45,6 +46,7 @@ type GeneratedTrainingPlan = {
     interactionMode: "presentation";
     estimatedSeconds: number;
     videoStartSeconds: number;
+    videoEndSeconds: number;
   }>;
 };
 
@@ -165,10 +167,11 @@ const TIMELINE_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["sourceStepId", "videoStartSeconds"],
+        required: ["sourceStepId", "videoStartSeconds", "videoEndSeconds"],
         properties: {
           sourceStepId: { type: "string", minLength: 1, maxLength: 80 },
           videoStartSeconds: { type: "integer", minimum: 0, maximum: 86400 },
+          videoEndSeconds: { type: "integer", minimum: 0, maximum: 86400 },
         },
       },
     },
@@ -202,11 +205,14 @@ async function generatePlan(
       instructions: [
         "Você recebe um conteúdo F10 já publicado e a transcrição temporal do vídeo que originou esse conteúdo.",
         "A estrutura da trilha NÃO deve ser recriada: cada etapa publicada será exatamente um slide, na mesma ordem.",
-        "Sua única responsabilidade é localizar no vídeo o início mais útil para demonstrar cada etapa.",
+        "Sua única responsabilidade é localizar no vídeo o intervalo exato que corresponde a cada etapa publicada.",
         "Retorne um item para cada sourceStepId recebido. Não remova, não una e não crie etapas.",
-        "videoStartSeconds deve apontar alguns segundos antes da demonstração visual relevante começar.",
-        "Quando não houver evidência suficiente na transcrição, use 0.",
-        "Não crie cortes; o player reproduz o vídeo original a partir do timestamp.",
+        "videoStartSeconds deve marcar o segundo em que começa a explicação ou demonstração específica daquela etapa.",
+        "videoEndSeconds deve marcar o segundo em que termina a explicação ou demonstração daquela etapa, antes de o vídeo entrar no assunto do próximo slide.",
+        "Não adicione folga grande antes ou depois. O objetivo é reproduzir somente o trecho útil daquela etapa.",
+        "videoEndSeconds deve ser maior que videoStartSeconds quando houver evidência suficiente.",
+        "Quando não houver evidência suficiente para uma etapa, use 0 para início e fim.",
+        "Não crie cortes nem novos arquivos; o player usa o vídeo original e apenas inicia e pausa nesses pontos.",
       ].join("\n"),
       userInput: [
         `CONTEÚDO PUBLICADO: ${content.title}`,
@@ -244,13 +250,15 @@ async function generatePlan(
   }
 
   const allowedStepIds = new Set(content.steps.map((step) => step.id));
-  const timestampByStepId = new Map(
+  const rangeByStepId = new Map(
     response.data.steps
       .filter((step) => allowedStepIds.has(step.sourceStepId))
-      .map((step) => [
-        step.sourceStepId,
-        Math.min(Math.max(Math.round(step.videoStartSeconds), 0), 86400),
-      ]),
+      .map((step) => {
+        const start = Math.min(Math.max(Math.round(step.videoStartSeconds), 0), 86400);
+        const rawEnd = Math.min(Math.max(Math.round(step.videoEndSeconds), 0), 86400);
+        const end = rawEnd > start ? rawEnd : 0;
+        return [step.sourceStepId, { start, end }] as const;
+      }),
   );
 
   const steps = content.steps.map((step) => ({
@@ -263,7 +271,8 @@ async function generatePlan(
     primaryActionLabel: "Continuar",
     interactionMode: "presentation" as const,
     estimatedSeconds: 45,
-    videoStartSeconds: timestampByStepId.get(step.id) ?? 0,
+    videoStartSeconds: rangeByStepId.get(step.id)?.start ?? 0,
+    videoEndSeconds: rangeByStepId.get(step.id)?.end ?? 0,
   }));
 
   await recordHelpAiUsage({
@@ -313,6 +322,7 @@ async function insertGeneratedSteps(
         interactionMode: step.interactionMode,
         estimatedSeconds: step.estimatedSeconds,
         videoStartSeconds: step.videoStartSeconds,
+        videoEndSeconds: step.videoEndSeconds,
         sortOrder: (index + 1) * 10,
       })
       .returning({ id: helpTrainingSteps.id });

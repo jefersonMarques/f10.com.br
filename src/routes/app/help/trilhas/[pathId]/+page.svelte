@@ -102,7 +102,7 @@
       <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
         <div>
           <h2 class="text-[14px] font-semibold text-[#11182C]">Orientações geradas</h2>
-          <p class="mt-1 text-[10px] leading-5 text-[#858A98]">A trilha referencia o mesmo vídeo e as mesmas imagens do conteúdo. Ajuste texto, ordem ou o ponto de início sem criar novos arquivos.</p>
+          <p class="mt-1 text-[10px] leading-5 text-[#858A98]">A trilha referencia o mesmo vídeo, imagens e marcações do conteúdo. Ajuste texto, ordem ou a faixa de reprodução sem criar novos arquivos.</p>
         </div>
 
         <div class="mt-4 space-y-3">
@@ -113,7 +113,7 @@
                   <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#000A57] text-[10px] font-bold text-white">{index + 1}</span>
                   <div class="min-w-0">
                     <strong class="block truncate text-[11px] text-[#2B3141]">{step.title}</strong>
-                    <span class="mt-1 block truncate text-[8px] text-[#8B909D]">{sourceStepTitle(step.sourceContentStepId)}{#if step.media.some((media) => media.mediaType === "video")} · vídeo em {formatSeconds(step.videoStartSeconds)}{/if}</span>
+                    <span class="mt-1 block truncate text-[8px] text-[#8B909D]">{sourceStepTitle(step.sourceContentStepId)}{#if step.media.some((media) => media.mediaType === "video")} · vídeo {formatSeconds(step.videoStartSeconds)} → {step.videoEndSeconds > step.videoStartSeconds ? formatSeconds(step.videoEndSeconds) : "fim livre"}{/if}</span>
                   </div>
                 </div>
                 {#if data.canEdit}
@@ -127,9 +127,10 @@
                 <form method="POST" action="?/updateStep" use:enhance={enhanceEditor} class="space-y-3">
                   <input type="hidden" name="stepId" value={step.id}/>
                   <fieldset disabled={!data.canEdit} class="space-y-3 disabled:opacity-70">
-                    <div class="grid gap-3 sm:grid-cols-2">
+                    <div class="grid gap-3 sm:grid-cols-3">
                       <label><span class="mb-1 block text-[8px] font-semibold text-[#616777]">Tipo</span><select name="interactionMode" value={step.interactionMode} class="h-9 w-full rounded-lg border border-[#DDE1EA] bg-white px-2 text-[9px]"><option value="action">Ação</option><option value="presentation">Apresentação</option></select></label>
-                      <label><span class="mb-1 block text-[8px] font-semibold text-[#616777]">Início do vídeo (segundos)</span><input name="videoStartSeconds" type="number" min="0" max="86400" value={step.videoStartSeconds} class="h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[9px]"/></label>
+                      <label><span class="mb-1 block text-[8px] font-semibold text-[#616777]">Início do trecho (s)</span><input name="videoStartSeconds" type="number" min="0" max="86400" value={step.videoStartSeconds} class="h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[9px]"/></label>
+                      <label><span class="mb-1 block text-[8px] font-semibold text-[#616777]">Fim do trecho (s)</span><input name="videoEndSeconds" type="number" min="0" max="86400" value={step.videoEndSeconds} class="h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[9px]"/></label>
                     </div>
                     <label><span class="mb-1 block text-[8px] font-semibold text-[#616777]">Título</span><input name="title" maxlength="180" value={step.title} class="h-9 w-full rounded-lg border border-[#DDE1EA] px-2 text-[9px]"/></label>
                     <label><span class="mb-1 block text-[8px] font-semibold text-[#616777]">Instrução</span><textarea name="instruction" rows="3" maxlength="3000" class="w-full rounded-lg border border-[#DDE1EA] px-2 py-2 text-[9px] leading-5">{step.instruction}</textarea></label>
