@@ -91,6 +91,16 @@ export const actions: Actions = {
       throw redirect(303, `/app/help/trilhas/${path.id}`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
+      const technicalCode = cause instanceof AiGatewayError
+        ? cause.code
+        : cause instanceof Error
+          ? cause.message
+          : "TRAINING_GENERATION_FAILED";
+      console.error("[help-training] create failed", {
+        moduleCount: contentIds.length,
+        technicalCode,
+        cause,
+      });
       return fail(409, { success: false, action: "create", message: generationMessage(cause) });
     }
   },
