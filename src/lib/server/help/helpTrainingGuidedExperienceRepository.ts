@@ -63,6 +63,11 @@ export async function completeInviteTrainingStepGuided(rawSessionToken: string) 
   const now = new Date();
   const nextIndex = state.session.currentStepIndex + 1;
   const completed = nextIndex >= state.snapshot.steps.length;
+  const nextStep = state.snapshot.steps[nextIndex] ?? null;
+  const moduleCompleted = Boolean(
+    state.currentStep.pathItemId &&
+    (!nextStep || nextStep.pathItemId !== state.currentStep.pathItemId),
+  );
   const db = getDatabase();
 
   await db.transaction(async (tx) => {
@@ -82,7 +87,7 @@ export async function completeInviteTrainingStepGuided(rawSessionToken: string) 
     });
   });
 
-  return { completed, successMessage: state.currentStep.successMessage };
+  return { completed, moduleCompleted, successMessage: state.currentStep.successMessage };
 }
 
 export async function completePublicTrainingStepGuided(rawSessionToken: string) {
@@ -93,6 +98,11 @@ export async function completePublicTrainingStepGuided(rawSessionToken: string) 
   const now = new Date();
   const nextIndex = state.session.currentStepIndex + 1;
   const completed = nextIndex >= state.snapshot.steps.length;
+  const nextStep = state.snapshot.steps[nextIndex] ?? null;
+  const moduleCompleted = Boolean(
+    state.currentStep.pathItemId &&
+    (!nextStep || nextStep.pathItemId !== state.currentStep.pathItemId),
+  );
   const db = getDatabase();
 
   await db.transaction(async (tx) => {
@@ -112,7 +122,7 @@ export async function completePublicTrainingStepGuided(rawSessionToken: string) 
     });
   });
 
-  return { completed, successMessage: state.currentStep.successMessage };
+  return { completed, moduleCompleted, successMessage: state.currentStep.successMessage };
 }
 
 export async function reportInviteTrainingDifficulty(

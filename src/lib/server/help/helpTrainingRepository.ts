@@ -6,6 +6,7 @@ import {
   helpTrainingEvents,
   helpTrainingFailureReasons,
   helpTrainingInvites,
+  helpTrainingPathItems,
   helpTrainingPaths,
   helpTrainingSessions,
   helpTrainingStepMedia,
@@ -117,10 +118,21 @@ export async function listHelpTrainingPaths() {
 
   return Promise.all(
     paths.map(async (path) => {
-      const [{ stepCount }] = await db
-        .select({ stepCount: count() })
-        .from(helpTrainingSteps)
-        .where(eq(helpTrainingSteps.pathId, path.id));
+      const [[{ stepCount }], modules] = await Promise.all([
+        db
+          .select({ stepCount: count() })
+          .from(helpTrainingSteps)
+          .where(eq(helpTrainingSteps.pathId, path.id)),
+        db
+          .select({
+            id: helpTrainingPathItems.id,
+            sortOrder: helpTrainingPathItems.sortOrder,
+            sourcePublicationSnapshot: helpTrainingPathItems.sourcePublicationSnapshot,
+          })
+          .from(helpTrainingPathItems)
+          .where(eq(helpTrainingPathItems.pathId, path.id))
+          .orderBy(asc(helpTrainingPathItems.sortOrder)),
+      ]);
       const invites = await db
         .select({
           id: helpTrainingInvites.id,
@@ -134,6 +146,12 @@ export async function listHelpTrainingPaths() {
       return {
         ...path,
         stepCount: Number(stepCount ?? 0),
+        moduleCount: modules.length || 1,
+        modules: modules.map((module) => ({
+          id: module.id,
+          title: module.sourcePublicationSnapshot.title,
+          sortOrder: module.sortOrder,
+        })),
         participantCount: invites.length,
         startedCount: invites.filter((invite) => invite.sessionStartedAt).length,
         completedCount: invites.filter((invite) => invite.sessionCompletedAt).length,
@@ -147,11 +165,18 @@ export async function getHelpTrainingPath(pathId: string) {
   const path = await getTrainingPathRow(pathId);
   if (!path) return null;
 
-  const steps = await db
-    .select()
-    .from(helpTrainingSteps)
-    .where(eq(helpTrainingSteps.pathId, pathId))
-    .orderBy(asc(helpTrainingSteps.sortOrder));
+  const [items, steps] = await Promise.all([
+    db
+      .select()
+      .from(helpTrainingPathItems)
+      .where(eq(helpTrainingPathItems.pathId, pathId))
+      .orderBy(asc(helpTrainingPathItems.sortOrder)),
+    db
+      .select()
+      .from(helpTrainingSteps)
+      .where(eq(helpTrainingSteps.pathId, pathId))
+      .orderBy(asc(helpTrainingSteps.sortOrder)),
+  ]);
 
   const enrichedSteps = await Promise.all(
     steps.map(async (step) => {
@@ -181,7 +206,7 @@ export async function getHelpTrainingPath(pathId: string) {
     }),
   );
 
-  return { ...path, steps: enrichedSteps };
+  return { ...path, items, steps: enrichedSteps };
 }
 
 export async function listTrainingSupportQueues() {
@@ -238,6 +263,13 @@ export async function addHelpTrainingStep(actorUserId: string, pathId: string): 
   if (!path) throw new Error("TRAINING_PATH_NOT_FOUND");
   if (path.status === "archived") throw new Error("TRAINING_PATH_ARCHIVED");
   const db = getDatabase();
+  const [firstItem] = await db
+    .select({ id: helpTrainingPathItems.id })
+    .from(helpTrainingPathItems)
+    .where(eq(helpTrainingPathItems.pathId, pathId))
+    .orderBy(asc(helpTrainingPathItems.sortOrder))
+    .limit(1);
+  if (!firstItem) throw new Error("TRAINING_PATH_ITEM_REQUIRED");
   const [{ value: currentMax }] = await db
     .select({ value: max(helpTrainingSteps.sortOrder) })
     .from(helpTrainingSteps)
@@ -247,6 +279,7 @@ export async function addHelpTrainingStep(actorUserId: string, pathId: string): 
     .insert(helpTrainingSteps)
     .values({
       pathId,
+      pathItemId: firstItem.id,
       title: "Nova ação",
       instruction: "Explique somente a próxima ação.",
       expectedResult: "O que o usuário deve ver ao concluir?",
@@ -661,6 +694,11 @@ export async function completeHelpTrainingStep(rawSessionToken: string) {
   const now = new Date();
   const nextIndex = state.session.currentStepIndex + 1;
   const completed = nextIndex >= state.snapshot.steps.length;
+  const nextStep = state.snapshot.steps[nextIndex] ?? null;
+  const moduleCompleted = Boolean(
+    state.currentStep.pathItemId &&
+    (!nextStep || nextStep.pathItemId !== state.currentStep.pathItemId),
+  );
 
   await db.transaction(async (tx) => {
     await tx
@@ -698,7 +736,7 @@ export async function completeHelpTrainingStep(rawSessionToken: string) {
     });
   });
 
-  return { completed, successMessage: state.currentStep.successMessage };
+  return { completed, moduleCompleted, successMessage: state.currentStep.successMessage };
 }
 
 export async function reportHelpTrainingFailure(

@@ -29,8 +29,10 @@
     };
   };
 
-  function sourceStepTitle(stepId: string | null): string {
-    return data.path.sourcePublicationSnapshot.steps.find((step) => step.id === stepId)?.title ?? "Passo do conteúdo";
+  function sourceStepTitle(stepId: string | null, pathItemId: string): string {
+    const source = data.path.items.find((item) => item.id === pathItemId)?.sourcePublicationSnapshot
+      ?? data.path.sourcePublicationSnapshot;
+    return source.steps.find((step) => step.id === stepId)?.title ?? "Passo do conteúdo";
   }
 
   function formatSeconds(value: number): string {
@@ -47,11 +49,11 @@
     <div>
       <ApplicationBackLink href="/app/help/trilhas" label="Trilhas" />
       <h1 class="mt-3 text-[20px] font-semibold text-[#11182C]">{data.path.title}</h1>
-      <p class="mt-1 text-[12px] text-[#858A98]">Fonte: {data.path.sourcePublicationSnapshot.title}</p>
+      <p class="mt-1 text-[12px] text-[#858A98]">{data.path.items.length > 1 ? `${data.path.items.length} módulos na jornada` : `Fonte: ${data.path.items[0]?.sourcePublicationSnapshot.title ?? data.path.sourcePublicationSnapshot.title}`}</p>
     </div>
     <div class="flex flex-wrap gap-2">
       <a href={data.previewUrl} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#DDE1EA] bg-white px-3 text-[14px] font-semibold text-[#000A57]"><Eye size={13}/>Prévia</a>
-      <a href={`/ajuda-f10/${data.path.sourcePublicationSnapshot.slug}`} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#DDE1EA] bg-white px-3 text-[14px] font-semibold text-[#5F6676]"><BookOpen size={13}/>Conteúdo completo<ExternalLink size={11}/></a>
+      {#if data.path.items.length === 1}<a href={`/ajuda-f10/${data.path.items[0]?.sourcePublicationSnapshot.slug ?? data.path.sourcePublicationSnapshot.slug}`} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#DDE1EA] bg-white px-3 text-[14px] font-semibold text-[#5F6676]"><BookOpen size={13}/>Conteúdo completo<ExternalLink size={11}/></a>{/if}
       {#if data.publicUrl}<a href={data.publicUrl} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#000A57] px-3 text-[14px] font-semibold text-white">Abrir trilha<ExternalLink size={11}/></a>{/if}
     </div>
   </div>
@@ -67,9 +69,19 @@
           <div class="flex items-start gap-3">
             <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Sparkles size={18}/></span>
             <div>
-              <h2 class="text-[14px] font-semibold text-[#11182C]">Conteúdo de origem</h2>
-              <p class="mt-1 text-[12px] leading-5 text-[#777E8D]">{data.path.sourcePublicationSnapshot.title}</p>
-              <p class="mt-1 text-[14px] text-[#959AA6]">Publicação usada na geração: {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(data.path.sourcePublishedAt))}</p>
+              <h2 class="text-[14px] font-semibold text-[#11182C]">Estrutura da trilha</h2>
+              <p class="mt-1 text-[12px] leading-5 text-[#777E8D]">{data.path.items.length} {data.path.items.length === 1 ? "módulo" : "módulos"} em ordem de execução</p>
+              <div class="mt-3 space-y-2">
+                {#each data.path.items as item, index (item.id)}
+                  <div class="flex items-center gap-3 rounded-xl border border-[#E7E9EF] bg-[#FAFAFC] px-3 py-2.5">
+                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#000A57] text-[10px] font-bold text-white">{index + 1}</span>
+                    <div class="min-w-0 flex-1">
+                      <strong class="block truncate text-[11px] font-semibold text-[#303748]">{item.sourcePublicationSnapshot.title}</strong>
+                      <span class={`mt-0.5 block text-[9px] font-medium ${data.sourceUpdates[index]?.updateAvailable ? "text-[#A9510D]" : "text-[#2F7045]"}`}>{data.sourceUpdates[index]?.updateAvailable ? "Nova publicação disponível" : "Fonte sincronizada"}</span>
+                    </div>
+                  </div>
+                {/each}
+              </div>
             </div>
           </div>
           {#if data.canEdit}
@@ -113,7 +125,7 @@
                   <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#000A57] text-[12px] font-bold text-white">{index + 1}</span>
                   <div class="min-w-0">
                     <strong class="block truncate text-[14px] text-[#2B3141]">{step.title}</strong>
-                    <span class="mt-1 block truncate text-[12px] text-[#8B909D]">{sourceStepTitle(step.sourceContentStepId)}{#if step.media.some((media) => media.mediaType === "video")} · vídeo {formatSeconds(step.videoStartSeconds)} → {step.videoEndSeconds > step.videoStartSeconds ? formatSeconds(step.videoEndSeconds) : "fim livre"}{/if}</span>
+                    <span class="mt-1 block truncate text-[12px] text-[#8B909D]">{sourceStepTitle(step.sourceContentStepId, step.pathItemId)}{#if step.media.some((media) => media.mediaType === "video")} · vídeo {formatSeconds(step.videoStartSeconds)} → {step.videoEndSeconds > step.videoStartSeconds ? formatSeconds(step.videoEndSeconds) : "fim livre"}{/if}</span>
                   </div>
                 </div>
                 {#if data.canEdit}

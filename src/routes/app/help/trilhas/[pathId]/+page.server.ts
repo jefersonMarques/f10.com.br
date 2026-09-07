@@ -55,22 +55,33 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   const path = await getHelpTrainingPath(params.pathId);
   if (!path) throw error(404, "Trilha não encontrada.");
 
-  const [participants, insights, currentPublication] = await Promise.all([
+  const [participants, insights, currentPublications] = await Promise.all([
     listHelpTrainingParticipants(params.pathId),
     getCombinedHelpTrainingInsights(params.pathId),
-    getPublishedStructuredHelpById(path.sourceContentId),
+    Promise.all(
+      path.items.map((item) => getPublishedStructuredHelpById(item.sourceContentId)),
+    ),
   ]);
   const canEditPermission = hasPermission(permissions, "help.edit");
   const canPublishPermission = hasPermission(permissions, "help.publish");
-  const sourceUpdateAvailable = Boolean(
-    currentPublication &&
-    currentPublication.publishedAt.getTime() > path.sourcePublishedAt.getTime(),
-  );
+  const sourceUpdates = path.items.map((item, index) => {
+    const currentPublication = currentPublications[index] ?? null;
+    return {
+      itemId: item.id,
+      title: item.sourcePublicationSnapshot.title,
+      updateAvailable: Boolean(
+        currentPublication &&
+        currentPublication.publishedAt.getTime() > item.sourcePublishedAt.getTime(),
+      ),
+    };
+  });
+  const sourceUpdateAvailable = sourceUpdates.some((item) => item.updateAvailable);
 
   return {
     path,
     participants,
     insights,
+    sourceUpdates,
     sourceUpdateAvailable,
     canEdit: canEditPermission && path.status !== "archived",
     canPublish: canPublishPermission && path.status !== "archived",

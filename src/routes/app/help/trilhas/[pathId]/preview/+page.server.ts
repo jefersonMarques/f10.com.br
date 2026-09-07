@@ -22,11 +22,23 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       title: path.title,
       audience: path.audience,
       welcomeMessage: path.welcomeMessage,
-      sourceContent: path.sourcePublicationSnapshot,
+      sourceContent: path.items[0]?.sourcePublicationSnapshot ?? path.sourcePublicationSnapshot,
+      modules: path.items.map((item) => ({
+        id: item.id,
+        title: item.sourcePublicationSnapshot.title,
+        summary: item.sourcePublicationSnapshot.summary || item.sourcePublicationSnapshot.quickGuide || "",
+        slug: item.sourcePublicationSnapshot.slug,
+        sortOrder: item.sortOrder,
+        stepIds: path.steps.filter((step) => step.pathItemId === item.id).map((step) => step.id),
+      })),
       steps: path.steps.map((step) => {
         const interactionMode = step.interactionMode ?? "action";
+        const sourceContent = path.items.find((item) => item.id === step.pathItemId)?.sourcePublicationSnapshot
+          ?? path.sourcePublicationSnapshot;
         return {
           id: step.id,
+          pathItemId: step.pathItemId,
+          sourceContentSlug: sourceContent.slug,
           title: step.title,
           question: step.question?.trim() || step.title,
           instruction: step.instruction,
@@ -34,6 +46,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
           successMessage: step.successMessage,
           primaryActionLabel: step.primaryActionLabel?.trim() || "Continuar",
           interactionMode,
+          estimatedSeconds: step.estimatedSeconds,
           videoStartSeconds: step.videoStartSeconds,
           videoEndSeconds: step.videoEndSeconds,
           images: step.media
@@ -41,7 +54,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
             .slice(0, 1)
             .map((media) => {
               const sourceStep = step.sourceContentStepId
-                ? path.sourcePublicationSnapshot.steps.find(
+                ? sourceContent.steps.find(
                     (source) => source.id === step.sourceContentStepId,
                   )
                 : null;

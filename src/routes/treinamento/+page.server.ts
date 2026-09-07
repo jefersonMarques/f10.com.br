@@ -10,7 +10,10 @@ import {
   completeInviteTrainingStepGuided,
   goBackInviteTrainingStep,
 } from "$lib/server/help/helpTrainingGuidedExperienceRepository";
-import { toHelpTrainingClientState } from "$lib/server/help/helpTrainingExperience";
+import {
+  canGoBackWithinTrainingModule,
+  toHelpTrainingClientState,
+} from "$lib/server/help/helpTrainingExperience";
 import {
   clearHelpTrainingInviteCookie,
   clearHelpTrainingSessionCookie,
@@ -46,9 +49,19 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
     : null;
   if (stagedInviteToken && !invitePreview) clearHelpTrainingInviteCookie(cookies);
 
+  const clientState = state ? toHelpTrainingClientState(state) : null;
+
   return {
-    state: state ? toHelpTrainingClientState(state) : null,
-    canGoBack: Boolean(state && state.session.currentStepIndex > 0),
+    state: clientState,
+    showJourney: Boolean(
+      clientState?.session.startedAt &&
+      clientState.journey.isMultiModule &&
+      !clientState.completed &&
+      url.searchParams.get("modulo") !== "abrir",
+    ),
+    canGoBack: Boolean(
+      state && canGoBackWithinTrainingModule(state.snapshot, state.session.currentStepIndex),
+    ),
     invitePreview,
     inviteState: url.searchParams.get("convite"),
     successMessage: (url.searchParams.get("feito") ?? "").slice(0, 500),
@@ -78,12 +91,20 @@ export const actions: Actions = {
     throw redirect(303, "/treinamento");
   },
 
+  openModule: async ({ cookies }) => {
+    await requireTrainingToken(cookies);
+    throw redirect(303, "/treinamento?modulo=abrir");
+  },
+
   success: async ({ cookies }) => {
     const token = await requireTrainingToken(cookies);
     try {
       const result = await completeInviteTrainingStepGuided(token);
+      if (result.completed || result.moduleCompleted) {
+        throw redirect(303, "/treinamento");
+      }
       const message = encodeURIComponent(result.successMessage || "Certo. Vamos continuar.");
-      throw redirect(303, `/treinamento?feito=${message}`);
+      throw redirect(303, `/treinamento?modulo=abrir&feito=${message}`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
       return fail(409, { success: false, message: "Não foi possível avançar. Tente novamente." });
@@ -94,7 +115,7 @@ export const actions: Actions = {
     const token = await requireTrainingToken(cookies);
     try {
       await goBackInviteTrainingStep(token);
-      throw redirect(303, "/treinamento");
+      throw redirect(303, "/treinamento?modulo=abrir");
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
       return fail(409, { success: false, message: "Não foi possível voltar para a orientação anterior." });
