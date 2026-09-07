@@ -265,8 +265,10 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
     const interactionMode = step.interactionMode ?? "action";
     if (!step.title.trim() || !step.instruction.trim()) throw new Error("TRAINING_STEP_INCOMPLETE");
 
+    const sourceContent = path.items.find((item) => item.id === step.pathItemId)?.sourcePublicationSnapshot
+      ?? path.sourcePublicationSnapshot;
     const sourceStep = step.sourceContentStepId
-      ? path.sourcePublicationSnapshot.steps.find((source) => source.id === step.sourceContentStepId)
+      ? sourceContent.steps.find((source) => source.id === step.sourceContentStepId)
       : null;
     const images = step.media
       .filter((media) => media.mediaType === "image" && media.assetId)
@@ -288,6 +290,7 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
 
     return {
       id: step.id,
+      pathItemId: step.pathItemId,
       title: step.title,
       question: step.question.trim() || step.title.trim(),
       instruction: step.instruction,
@@ -320,7 +323,16 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
     description: path.description,
     welcomeMessage: path.welcomeMessage,
     version,
-    sourceContent: path.sourcePublicationSnapshot,
+    sourceContent: path.items[0]?.sourcePublicationSnapshot ?? path.sourcePublicationSnapshot,
+    modules: path.items.map((item) => ({
+      id: item.id,
+      title: item.sourcePublicationSnapshot.title,
+      sortOrder: item.sortOrder,
+      sourceContent: item.sourcePublicationSnapshot,
+      stepIds: path.steps
+        .filter((step) => step.pathItemId === item.id)
+        .map((step) => step.id),
+    })),
     steps,
   };
 }
