@@ -11,6 +11,7 @@ import {
   completePublicTrainingStepGuided,
   goBackPublicTrainingStep,
 } from "$lib/server/help/helpTrainingGuidedExperienceRepository";
+import { canGoBackWithinTrainingModule } from "$lib/server/help/helpTrainingExperience";
 import {
   clearHelpTrainingPublicSessionCookie,
   getHelpTrainingPublicSessionCookie,
@@ -52,10 +53,19 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
     await markPublicHelpTrainingStepViewed(state.session.id, state.currentStep.id);
   }
 
+  const clientState = state ? toPublicHelpTrainingClientState(state) : null;
+
   return {
     landing,
-    state: state ? toPublicHelpTrainingClientState(state) : null,
-    canGoBack: Boolean(state && state.session.currentStepIndex > 0),
+    state: clientState,
+    showJourney: Boolean(
+      clientState?.journey.isMultiModule &&
+      !clientState.completed &&
+      url.searchParams.get("modulo") !== "abrir",
+    ),
+    canGoBack: Boolean(
+      state && canGoBackWithinTrainingModule(state.snapshot, state.session.currentStepIndex),
+    ),
     successMessage: (url.searchParams.get("feito") ?? "").slice(0, 500),
   };
 };
@@ -83,13 +93,22 @@ export const actions: Actions = {
     throw redirect(303, publicPath(slug));
   },
 
+  openModule: async ({ params, cookies }) => {
+    const slug = params.slug?.trim() ?? "";
+    await requirePublicSession(cookies, slug);
+    throw redirect(303, `${publicPath(slug)}?modulo=abrir`);
+  },
+
   success: async ({ params, cookies }) => {
     const slug = params.slug?.trim() ?? "";
     const { token } = await requirePublicSession(cookies, slug);
     try {
       const result = await completePublicTrainingStepGuided(token);
+      if (result.completed || result.moduleCompleted) {
+        throw redirect(303, publicPath(slug));
+      }
       const message = encodeURIComponent(result.successMessage || "Certo. Vamos continuar.");
-      throw redirect(303, `${publicPath(slug)}?feito=${message}`);
+      throw redirect(303, `${publicPath(slug)}?modulo=abrir&feito=${message}`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
       return fail(409, { success: false, message: "Não foi possível avançar. Tente novamente." });
@@ -101,7 +120,7 @@ export const actions: Actions = {
     const { token } = await requirePublicSession(cookies, slug);
     try {
       await goBackPublicTrainingStep(token);
-      throw redirect(303, publicPath(slug));
+      throw redirect(303, `${publicPath(slug)}?modulo=abrir`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
       return fail(409, { success: false, message: "Não foi possível voltar para a orientação anterior." });
