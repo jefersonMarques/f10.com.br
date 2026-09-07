@@ -7,7 +7,10 @@ import {
   getHelpTrainingLifecycleState,
   restoreHelpTrainingPath,
 } from "$lib/server/help/helpTrainingLifecycleRepository";
-import { generateHelpTrainingFromPublishedContent } from "$lib/server/help/helpTrainingGeneration";
+import {
+  generateHelpTrainingFromPublishedContent,
+  generateHelpTrainingFromPublishedContents,
+} from "$lib/server/help/helpTrainingGeneration";
 import { listHelpTrainingPaths } from "$lib/server/help/helpTrainingRepository";
 import { listPublishedStructuredHelpCatalog } from "$lib/server/help/publicStructuredHelpRepository";
 
@@ -58,13 +61,33 @@ export const actions: Actions = {
   create: async ({ cookies, request }) => {
     const { session } = await requireAppPermission(cookies, "help.edit", "/app/help/trilhas");
     const formData = await request.formData();
-    const contentId = read(formData, "contentId");
-    if (!isUuid(contentId)) {
-      return fail(400, { success: false, action: "create", message: "Selecione um conteúdo publicado." });
+    const contentIds = Array.from(
+      new Set(
+        formData
+          .getAll("contentIds")
+          .filter((value): value is string => typeof value === "string")
+          .map((value) => value.trim())
+          .filter(isUuid),
+      ),
+    );
+    const legacyContentId = read(formData, "contentId");
+    if (contentIds.length === 0 && isUuid(legacyContentId)) contentIds.push(legacyContentId);
+    if (contentIds.length === 0) {
+      return fail(400, { success: false, action: "create", message: "Selecione pelo menos um conteúdo publicado." });
+    }
+    if (contentIds.length > 20) {
+      return fail(400, { success: false, action: "create", message: "Uma trilha pode ter até 20 conteúdos." });
+    }
+
+    const title = read(formData, "title");
+    if (contentIds.length > 1 && (title.length < 4 || title.length > 160)) {
+      return fail(400, { success: false, action: "create", message: "Informe o nome da trilha." });
     }
 
     try {
-      const path = await generateHelpTrainingFromPublishedContent(session.user.id, contentId);
+      const path = contentIds.length === 1
+        ? await generateHelpTrainingFromPublishedContent(session.user.id, contentIds[0]!)
+        : await generateHelpTrainingFromPublishedContents(session.user.id, contentIds, title);
       throw redirect(303, `/app/help/trilhas/${path.id}`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
