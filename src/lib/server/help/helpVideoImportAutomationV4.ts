@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { env } from "$env/dynamic/private";
@@ -19,6 +19,7 @@ const SCREENSHOT_CONCURRENCY = 3;
 const STABILITY_THRESHOLD = 0.975;
 const COMMAND_TIMEOUT_MS = 8 * 60 * 1_000;
 const OPENAI_TRANSCRIPTION_TIMEOUT_MS = 3 * 60 * 1_000;
+const DEFAULT_YTDLP_COOKIES_PATH = "/opt/f10-secrets/youtube-cookies.txt";
 
 type ScreenshotCaptureMode = "before" | "after";
 
@@ -183,6 +184,18 @@ function ytDlpPath(): string {
   return env.HELP_VIDEO_YTDLP_PATH?.trim() || "yt-dlp";
 }
 
+async function ytDlpCookiesPath(): Promise<string | null> {
+  const configuredPath = env.HELP_VIDEO_YTDLP_COOKIES_PATH?.trim();
+  const candidate = configuredPath || DEFAULT_YTDLP_COOKIES_PATH;
+  try {
+    await access(candidate);
+    return candidate;
+  } catch {
+    if (configuredPath) throw new Error("HELP_VIDEO_YOUTUBE_COOKIES_NOT_FOUND");
+    return null;
+  }
+}
+
 function normalizeSlug(value: string): string {
   return value
     .normalize("NFD")
@@ -306,9 +319,21 @@ async function runCommand(
   });
 }
 
+function classifyYoutubeDownloadError(cause: unknown): Error {
+  const message = cause instanceof Error ? cause.message : "";
+  if (
+    /provided YouTube account cookies are no longer valid/i.test(message)
+    || /sign in to confirm you(?:'|’)re not a bot/i.test(message)
+  ) {
+    return new Error("HELP_VIDEO_YOUTUBE_COOKIES_INVALID");
+  }
+  return cause instanceof Error ? cause : new Error("HELP_VIDEO_COMMAND_FAILED");
+}
+
 async function downloadYoutubeVideo(url: string, directory: string): Promise<string> {
   if (!youtubeVideoId(url)) throw new Error("HELP_VIDEO_YOUTUBE_URL_INVALID");
-  await runCommand(ytDlpPath(), [
+
+  const args = [
     "--no-playlist",
     "--no-progress",
     "--restrict-filenames",
@@ -322,8 +347,17 @@ async function downloadYoutubeVideo(url: string, directory: string): Promise<str
     "bv*+ba/b",
     "-o",
     join(directory, "source.%(ext)s"),
-    url,
-  ]);
+  ];
+  const cookiesPath = await ytDlpCookiesPath();
+  if (cookiesPath) args.unshift("--cookies", cookiesPath);
+  args.push(url);
+
+  try {
+    await runCommand(ytDlpPath(), args);
+  } catch (cause) {
+    throw classifyYoutubeDownloadError(cause);
+  }
+
   const files = await readdir(directory);
   const downloaded = files.find((file) => /^source\.(mp4|webm|mkv|mov)$/i.test(file));
   if (!downloaded) throw new Error("HELP_VIDEO_YOUTUBE_DOWNLOAD_NOT_FOUND");

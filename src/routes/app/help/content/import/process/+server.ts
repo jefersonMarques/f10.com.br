@@ -29,6 +29,12 @@ function automationErrorMessage(code: string): string {
   if (code === "OPENAI_NOT_CONFIGURED") return "Configure a chave da OpenAI antes de usar a automação.";
   if (code === "HELP_VIDEO_FFMPEG_NOT_AVAILABLE") return "FFmpeg não foi encontrado no servidor. Configure-o antes de processar vídeos.";
   if (code === "HELP_VIDEO_YTDLP_NOT_AVAILABLE") return "yt-dlp não foi encontrado no servidor. O modo MP4 continua disponível.";
+  if (code === "HELP_VIDEO_YOUTUBE_COOKIES_NOT_FOUND") {
+    return "O arquivo de cookies do YouTube configurado no servidor não foi encontrado.";
+  }
+  if (code === "HELP_VIDEO_YOUTUBE_COOKIES_INVALID") {
+    return "Os cookies do YouTube expiraram ou foram rotacionados. Renove o arquivo de cookies do servidor e tente novamente.";
+  }
   if (code === "HELP_VIDEO_YOUTUBE_URL_INVALID") return "Informe um link válido do YouTube.";
   if (code === "HELP_VIDEO_UPLOAD_SIZE_INVALID") {
     return `O vídeo deve ter no máximo ${Math.round(HELP_VIDEO_AUTOMATION_MAX_UPLOAD_BYTES / 1024 / 1024)} MB.`;
