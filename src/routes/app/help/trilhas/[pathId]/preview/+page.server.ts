@@ -46,6 +46,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
           successMessage: step.successMessage,
           primaryActionLabel: step.primaryActionLabel?.trim() || "Continuar",
           interactionMode,
+          estimatedSeconds: step.estimatedSeconds,
           videoStartSeconds: step.videoStartSeconds,
           videoEndSeconds: step.videoEndSeconds,
           images: step.media
