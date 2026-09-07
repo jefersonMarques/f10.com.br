@@ -13,10 +13,18 @@ import {
   or,
   sql,
 } from "drizzle-orm";
+import {
+  lockSchedulingUsers,
+  schedulingIntervalsConflict,
+  SCHEDULING_BOOKING_CLAIM_TIMEOUT_MS,
+  SCHEDULING_MAX_BUFFER_MINUTES,
+} from "$lib/server/calendar/schedulingConcurrency";
 import { getDatabase } from "$lib/server/db";
 import { googleCalendarConnections } from "$lib/server/db/googleCalendarSchema";
 import {
   schedulingAvailabilityProfiles,
+  schedulingEventParticipants,
+  schedulingEvents,
   schedulingInvitations,
   schedulingRateLimits,
   type SchedulingWeekday,
@@ -56,8 +64,6 @@ export const DEFAULT_SCHEDULING_AVAILABILITY: Omit<
 };
 
 export type SchedulingInvitationRow = typeof schedulingInvitations.$inferSelect;
-
-const BOOKING_CLAIM_TIMEOUT_MS = 5 * 60 * 1000;
 
 export async function listSchedulingTeamUserIds(actorUserId: string): Promise<string[]> {
   const db = getDatabase();
@@ -358,11 +364,17 @@ export async function listSchedulingReservations(
   const base = and(
     eq(schedulingInvitations.hostUserId, hostUserId),
     or(
-      eq(schedulingInvitations.status, "booked"),
+      and(
+        eq(schedulingInvitations.status, "booked"),
+        isNull(schedulingInvitations.eventId),
+      ),
       and(
         eq(schedulingInvitations.status, "booking"),
         isNotNull(schedulingInvitations.bookingStartedAt),
-        gt(schedulingInvitations.bookingStartedAt, new Date(Date.now() - BOOKING_CLAIM_TIMEOUT_MS)),
+        gt(
+          schedulingInvitations.bookingStartedAt,
+          new Date(Date.now() - SCHEDULING_BOOKING_CLAIM_TIMEOUT_MS),
+        ),
       ),
     ),
     isNotNull(schedulingInvitations.selectedStartAt),
@@ -386,30 +398,10 @@ export async function listSchedulingReservations(
     .where(condition);
 }
 
-function intervalsConflict(
-  candidateStart: Date,
-  candidateEnd: Date,
-  candidateBufferBefore: number,
-  candidateBufferAfter: number,
-  reservation: {
-    startAt: Date | null;
-    endAt: Date | null;
-    bufferBeforeMinutes: number;
-    bufferAfterMinutes: number;
-  },
-): boolean {
-  if (!reservation.startAt || !reservation.endAt) return false;
-  const candidateBusyStart = candidateStart.getTime() - candidateBufferBefore * 60_000;
-  const candidateBusyEnd = candidateEnd.getTime() + candidateBufferAfter * 60_000;
-  const reservationBusyStart = reservation.startAt.getTime() - reservation.bufferBeforeMinutes * 60_000;
-  const reservationBusyEnd = reservation.endAt.getTime() + reservation.bufferAfterMinutes * 60_000;
-  return candidateBusyStart < reservationBusyEnd && candidateBusyEnd > reservationBusyStart;
-}
-
 export async function recoverStaleSchedulingReservation(id: string): Promise<boolean> {
   const db = getDatabase();
   const now = new Date();
-  const staleBefore = new Date(now.getTime() - BOOKING_CLAIM_TIMEOUT_MS);
+  const staleBefore = new Date(now.getTime() - SCHEDULING_BOOKING_CLAIM_TIMEOUT_MS);
   const [recovered] = await db
     .update(schedulingInvitations)
     .set({
@@ -440,10 +432,10 @@ export async function claimSchedulingReservation(
 ): Promise<"claimed" | "unavailable" | "invalid_state"> {
   const db = getDatabase();
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${invitation.hostUserId}))`);
+    await lockSchedulingUsers((query) => tx.execute(query), [invitation.hostUserId]);
 
     const now = new Date();
-    const staleBefore = new Date(now.getTime() - BOOKING_CLAIM_TIMEOUT_MS);
+    const staleBefore = new Date(now.getTime() - SCHEDULING_BOOKING_CLAIM_TIMEOUT_MS);
     await tx
       .update(schedulingInvitations)
       .set({
@@ -475,8 +467,42 @@ export async function claimSchedulingReservation(
       return "invalid_state";
     }
 
-    const nearbyStart = new Date(startAt.getTime() - (invitation.bufferBeforeMinutes + 240) * 60_000);
-    const nearbyEnd = new Date(endAt.getTime() + (invitation.bufferAfterMinutes + 240) * 60_000);
+    const candidateBusyStart = new Date(
+      startAt.getTime() - invitation.bufferBeforeMinutes * 60_000,
+    );
+    const candidateBusyEnd = new Date(
+      endAt.getTime() + invitation.bufferAfterMinutes * 60_000,
+    );
+    const [eventConflict] = await tx
+      .select({ id: schedulingEvents.id })
+      .from(schedulingEvents)
+      .leftJoin(
+        schedulingEventParticipants,
+        eq(schedulingEventParticipants.eventId, schedulingEvents.id),
+      )
+      .where(
+        and(
+          eq(schedulingEvents.status, "confirmed"),
+          lt(schedulingEvents.startsAt, candidateBusyEnd),
+          gt(schedulingEvents.endsAt, candidateBusyStart),
+          or(
+            eq(schedulingEvents.organizerUserId, invitation.hostUserId),
+            eq(schedulingEventParticipants.userId, invitation.hostUserId),
+          ),
+        ),
+      )
+      .limit(1);
+
+    if (eventConflict) return "unavailable";
+
+    const nearbyStart = new Date(
+      startAt.getTime()
+        - (invitation.bufferBeforeMinutes + SCHEDULING_MAX_BUFFER_MINUTES) * 60_000,
+    );
+    const nearbyEnd = new Date(
+      endAt.getTime()
+        + (invitation.bufferAfterMinutes + SCHEDULING_MAX_BUFFER_MINUTES) * 60_000,
+    );
     const reservations = await tx
       .select({
         startAt: schedulingInvitations.selectedStartAt,
@@ -488,7 +514,13 @@ export async function claimSchedulingReservation(
       .where(
         and(
           eq(schedulingInvitations.hostUserId, invitation.hostUserId),
-          inArray(schedulingInvitations.status, ["booking", "booked"]),
+          or(
+            and(
+              eq(schedulingInvitations.status, "booked"),
+              isNull(schedulingInvitations.eventId),
+            ),
+            eq(schedulingInvitations.status, "booking"),
+          ),
           isNotNull(schedulingInvitations.selectedStartAt),
           isNotNull(schedulingInvitations.selectedEndAt),
           lt(schedulingInvitations.selectedStartAt, nearbyEnd),
@@ -499,7 +531,7 @@ export async function claimSchedulingReservation(
 
     if (
       reservations.some((reservation) =>
-        intervalsConflict(
+        schedulingIntervalsConflict(
           startAt,
           endAt,
           invitation.bufferBeforeMinutes,

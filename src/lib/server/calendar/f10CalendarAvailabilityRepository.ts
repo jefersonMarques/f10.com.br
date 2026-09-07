@@ -1,4 +1,5 @@
 import { and, eq, gte, lte } from "drizzle-orm";
+import { listSchedulingEventBusyIntervals } from "$lib/server/calendar/schedulingEventRepository";
 import {
   getGoogleCalendarConnection,
   listGoogleCalendarEvents,
@@ -133,6 +134,17 @@ async function listF10ConflictsForWindow(
   startDate: string,
   endDate: string,
 ): Promise<CalendarAvailabilityConflict[]> {
+  const eventIntervals = await listSchedulingEventBusyIntervals(userId, requestedStart, requestedEnd);
+  const conflictsByEvent = new Map<string, CalendarAvailabilityConflict>();
+  for (const interval of eventIntervals) {
+    conflictsByEvent.set(`scheduling:${interval.eventId}`, {
+      start: interval.startAt.toISOString(),
+      end: interval.endAt.toISOString(),
+      allDay: false,
+      source: "f10",
+    });
+  }
+
   const db = getDatabase();
   const rows = await db
     .select({
@@ -153,7 +165,6 @@ async function listF10ConflictsForWindow(
     .leftJoin(taskAssignees, eq(taskAssignees.taskId, tasks.id))
     .where(and(gte(tasks.dueOn, startDate), lte(tasks.dueOn, endDate)));
 
-  const conflictsByEvent = new Map<string, CalendarAvailabilityConflict>();
   for (const row of rows) {
     if (!row.dueOn || row.googleEventId === input.excludeGoogleEventId) continue;
     if (input.excludeGoogleIcalUid && row.googleIcalUid === input.excludeGoogleIcalUid) continue;
@@ -177,7 +188,7 @@ async function listF10ConflictsForWindow(
     if (!busyStart || !busyEnd) continue;
     if (!overlaps(requestedStart, requestedEnd, busyStart, busyEnd)) continue;
 
-    conflictsByEvent.set(row.googleEventId, {
+    conflictsByEvent.set(`task:${row.googleEventId}`, {
       start: busyStart.toISOString(),
       end: busyEnd.toISOString(),
       allDay: row.allDay,
@@ -232,6 +243,7 @@ async function checkUser(
   requestedStart: Date,
   requestedEnd: Date,
 ): Promise<CalendarAvailabilityResult> {
+  const f10Conflicts = await listF10Conflicts(user.id, input, requestedStart, requestedEnd);
   const connection = await getGoogleCalendarConnection(user.id);
 
   if (connection.connected) {
@@ -244,10 +256,10 @@ async function checkUser(
         name: user.name,
         email: user.email,
         coverage: "google",
-        conflicts: googleConflicts(events, input, requestedStart, requestedEnd),
+        conflicts: [...f10Conflicts, ...googleConflicts(events, input, requestedStart, requestedEnd)],
       };
     } catch {
-      // Se o Google estiver indisponível, ainda usamos compromissos temporizados conhecidos pelo F10.
+      // Se o Google estiver indisponível, os compromissos canônicos do F10 continuam válidos.
     }
   }
 
@@ -256,7 +268,7 @@ async function checkUser(
     name: user.name,
     email: user.email,
     coverage: "f10-only",
-    conflicts: await listF10Conflicts(user.id, input, requestedStart, requestedEnd),
+    conflicts: f10Conflicts,
   };
 }
 
@@ -283,6 +295,14 @@ export async function listF10CalendarBusyIntervals(
     throw new Error("CALENDAR_AVAILABILITY_INVALID_RANGE");
   }
 
+  const f10Conflicts = await listF10ConflictsForWindow(
+    input.user.id,
+    input,
+    requestedStart,
+    requestedEnd,
+    input.startDate,
+    input.endDate,
+  );
   const connection = await getGoogleCalendarConnection(input.user.id);
   if (connection.connected) {
     try {
@@ -294,10 +314,10 @@ export async function listF10CalendarBusyIntervals(
         name: input.user.name,
         email: input.user.email,
         coverage: "google",
-        conflicts: googleConflicts(events, input, requestedStart, requestedEnd),
+        conflicts: [...f10Conflicts, ...googleConflicts(events, input, requestedStart, requestedEnd)],
       };
     } catch {
-      // O fallback F10 mantém a página utilizável sem expor detalhes privados do Google.
+      // O fallback F10 mantém a agenda utilizável sem depender do provider externo.
     }
   }
 
@@ -306,13 +326,6 @@ export async function listF10CalendarBusyIntervals(
     name: input.user.name,
     email: input.user.email,
     coverage: "f10-only",
-    conflicts: await listF10ConflictsForWindow(
-      input.user.id,
-      input,
-      requestedStart,
-      requestedEnd,
-      input.startDate,
-      input.endDate,
-    ),
+    conflicts: f10Conflicts,
   };
 }

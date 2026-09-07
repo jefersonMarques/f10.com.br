@@ -33,7 +33,7 @@ export const DEFAULT_GOOGLE_CALENDAR_PREFERENCES: GoogleCalendarSyncPreferences 
   targetCalendarId: "primary",
   syncTasksToGoogle: false,
   syncTicketsToGoogle: false,
-  syncSchedulingToGoogle: true,
+  syncSchedulingToGoogle: false,
   syncGoogleChangesToF10: false,
 };
 

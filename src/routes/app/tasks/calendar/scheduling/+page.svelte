@@ -41,6 +41,7 @@
   let durationMinutes = 30;
   let dateRangeStart = "";
   let dateRangeEnd = "";
+  let addGoogleMeet = false;
   let copied = false;
 
   $: actionResult = form as (ActionData & { bookingPath?: string }) | undefined;
@@ -84,7 +85,9 @@
   function handleInvitationHostChange(event: Event): void {
     invitationHostId = (event.currentTarget as HTMLSelectElement).value;
     const host = data.hosts.find((item) => item.id === invitationHostId);
-    if (host) durationMinutes = host.profile.defaultDurationMinutes;
+    if (!host) return;
+    durationMinutes = host.profile.defaultDurationMinutes;
+    if (!host.googleConnected) addGoogleMeet = false;
   }
 
   async function copyGeneratedLink(): Promise<void> {
@@ -97,11 +100,12 @@
 
   function formatDateTime(value: string | Date | null, timeZone: string): string {
     if (!value) return "—";
+    const instant = value instanceof Date ? value : new Date(value);
     return new Intl.DateTimeFormat("pt-BR", {
       timeZone,
       dateStyle: "short",
       timeStyle: "short",
-    }).format(new Date(value));
+    }).format(instant);
   }
 
   function statusLabel(status: string): string {
@@ -174,13 +178,13 @@
           <form method="POST" action="?/createInvitation" class="mt-5 grid gap-4 sm:grid-cols-2">
             <label class="block sm:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Cliente</span><select name="customerContactId" required class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] outline-none focus:border-[#000A57]"><option value="">Selecione...</option>{#each data.customers as customer}<option value={customer.id}>{customer.name}{customer.organizationName ? ` · ${customer.organizationName}` : ""} · {customer.email}</option>{/each}</select></label>
             <label class="block sm:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Título</span><input name="title" required minlength="3" maxlength="180" placeholder="Ex.: Reunião de implantação" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#000A57]"/></label>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Responsável</span><select name="hostUserId" bind:value={invitationHostId} on:change={handleInvitationHostChange} required class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] outline-none focus:border-[#000A57]">{#each data.hosts as host}<option value={host.id} disabled={!host.googleConnected}>{host.name}{host.googleConnected ? "" : " · Google desconectado"}</option>{/each}</select></label>
+            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Responsável</span><select name="hostUserId" bind:value={invitationHostId} on:change={handleInvitationHostChange} required class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] outline-none focus:border-[#000A57]">{#each data.hosts as host}<option value={host.id}>{host.name}{host.googleConnected ? "" : " · sem Google"}</option>{/each}</select></label>
             <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Duração</span><select name="durationMinutes" bind:value={durationMinutes} class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"><option value={15}>15 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>60 min</option><option value={90}>90 min</option><option value={120}>120 min</option></select></label>
             <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Primeiro dia</span><input name="dateRangeStart" type="date" bind:value={dateRangeStart} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
             <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Último dia</span><input name="dateRangeEnd" type="date" bind:value={dateRangeEnd} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
-            <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-[#DDE3F1] bg-[#F8FAFF] px-3 py-3 sm:col-span-2"><input type="checkbox" name="addGoogleMeet" value="true" class="mt-0.5"/><span><strong class="application-text-caption inline-flex items-center gap-1.5 font-semibold text-[#214A9A]"><Video size={14}/>Gerar Google Meet</strong><span class="application-text-meta mt-0.5 block leading-4 text-[#7D8797]">O cliente será incluído como participante externo e receberá o convite pelo Google ao confirmar.</span></span></label>
-            {#if selectedInvitationHost && !selectedInvitationHost.googleConnected}<div class="application-text-meta rounded-xl border border-[#F0D6BD] bg-[#FFF9F3] px-3 py-2 text-[#935018] sm:col-span-2">Este responsável precisa conectar o Google Calendar antes de receber agendamentos.</div>{/if}
-            <div class="flex items-center justify-end sm:col-span-2"><button type="submit" disabled={!selectedInvitationHost?.googleConnected} class="inline-flex h-11 items-center gap-2 rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Link2 size={15}/>Gerar link</button></div>
+            <label class={`flex items-start gap-3 rounded-xl border px-3 py-3 sm:col-span-2 ${selectedInvitationHost?.googleConnected ? "cursor-pointer border-[#DDE3F1] bg-[#F8FAFF]" : "border-[#E4E6EB] bg-[#FAFAFC]"}`}><input type="checkbox" name="addGoogleMeet" value="true" bind:checked={addGoogleMeet} disabled={!selectedInvitationHost?.googleConnected} class="mt-0.5"/><span><strong class={`application-text-caption inline-flex items-center gap-1.5 font-semibold ${selectedInvitationHost?.googleConnected ? "text-[#214A9A]" : "text-[#8B909D]"}`}><Video size={14}/>Gerar Google Meet</strong><span class="application-text-meta mt-0.5 block leading-4 text-[#7D8797]">Opcional. Exige Google conectado; o agendamento F10 funciona sem ele.</span></span></label>
+            {#if selectedInvitationHost && !selectedInvitationHost.googleConnected}<div class="application-text-meta rounded-xl border border-[#D9EADD] bg-[#F7FBF8] px-3 py-2 text-[#31583E] sm:col-span-2">Google desconectado: o link e a reserva continuam funcionando pela Agenda F10; apenas o Google Meet ficará indisponível.</div>{/if}
+            <div class="flex items-center justify-end sm:col-span-2"><button type="submit" class="inline-flex h-11 items-center gap-2 rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white"><Link2 size={15}/>Gerar link</button></div>
           </form>
         </section>
       {:else}
@@ -191,7 +195,7 @@
         <section class="rounded-[22px] border border-[#E1E4EB] bg-white p-5 shadow-[0_8px_30px_rgba(1,13,40,0.04)] sm:p-6">
           <span class="application-text-caption inline-flex items-center gap-2 font-bold uppercase tracking-[0.08em] text-[#214A9A]"><Settings2 size={15}/>Disponibilidade de trabalho</span>
           <h2 class="mt-2 text-[18px] font-semibold text-[#202637]">Quando o cliente pode agendar</h2>
-          <p class="application-text-caption mt-1 leading-5 text-[#7A808E]">Horário de trabalho é aplicado antes dos conflitos do Google. Perfil padrão: segunda a sexta, 08:00–18:00, 2h de antecedência e slots de 30 min.</p>
+          <p class="application-text-caption mt-1 leading-5 text-[#7A808E]">Horário de trabalho é aplicado antes dos conflitos da Agenda F10 e, quando disponível, também considera o Google Calendar. Perfil padrão: segunda a sexta, 08:00–18:00, 2h de antecedência e slots de 30 min.</p>
 
           <form method="POST" action="?/saveAvailability" class="mt-5 grid gap-4 sm:grid-cols-2">
             <label class="block sm:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Responsável</span><select name="hostUserId" bind:value={availabilityHostId} on:change={handleAvailabilityHostChange} required class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]">{#each data.hosts as host}<option value={host.id}>{host.name} · {host.profile.source === "user" ? "perfil próprio" : "padrão F10"}</option>{/each}</select></label>

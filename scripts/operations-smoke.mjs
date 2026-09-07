@@ -22,6 +22,8 @@ const protectedRoutes = [
   "/app/help/flows",
   "/app/team",
   "/app/tasks",
+  "/app/tasks/calendar",
+  "/app/tasks/calendar/scheduling",
   "/app/tickets",
   "/app/chat",
   "/app/chat/lab",

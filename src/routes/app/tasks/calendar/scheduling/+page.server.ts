@@ -42,7 +42,7 @@ function schedulingMessage(errorValue: unknown): string {
   const messages: Record<string, string> = {
     SCHEDULING_HOST_NOT_ALLOWED: "Você não pode criar ou configurar agendamentos para este responsável.",
     SCHEDULING_HOST_NOT_FOUND: "Responsável inválido ou inativo.",
-    SCHEDULING_HOST_GOOGLE_REQUIRED: "O responsável precisa conectar o Google Calendar antes de receber agendamentos.",
+    SCHEDULING_GOOGLE_MEET_CONNECTION_REQUIRED: "Conecte o Google Calendar do responsável somente se quiser gerar um Google Meet.",
     SCHEDULING_CUSTOMER_EMAIL_REQUIRED: "Selecione um cliente ativo com e-mail cadastrado.",
     SCHEDULING_INVALID_TITLE: "Informe um título entre 3 e 180 caracteres.",
     SCHEDULING_INVALID_DURATION: "A duração deve ficar entre 15 e 240 minutos.",

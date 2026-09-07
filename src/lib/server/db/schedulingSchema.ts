@@ -1,11 +1,14 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   date,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -24,6 +27,16 @@ export const schedulingInvitationStatus = pgEnum("scheduling_invitation_status",
   "expired",
   "revoked",
   "cancelled",
+]);
+
+export const schedulingEventStatus = pgEnum("scheduling_event_status", [
+  "confirmed",
+  "cancelled",
+]);
+
+export const schedulingEventParticipantKind = pgEnum("scheduling_event_participant_kind", [
+  "internal",
+  "external",
 ]);
 
 export type SchedulingWeekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -46,6 +59,99 @@ export const schedulingAvailabilityProfiles = pgTable("scheduling_availability_p
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const schedulingEvents = pgTable(
+  "scheduling_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizerUserId: uuid("organizer_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    timeZone: text("time_zone").notNull().default("America/Sao_Paulo"),
+    status: schedulingEventStatus("status").notNull().default("confirmed"),
+    ticketId: uuid("ticket_id").references(() => tickets.id, { onDelete: "set null" }),
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+    groupId: integer("group_id"),
+    groupName: text("group_name"),
+    unitId: integer("unit_id"),
+    unitName: text("unit_name"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("scheduling_events_valid_interval", sql`${table.endsAt} > ${table.startsAt}`),
+    index("scheduling_events_organizer_start_idx").on(table.organizerUserId, table.startsAt),
+    index("scheduling_events_interval_idx").on(table.startsAt, table.endsAt),
+    index("scheduling_events_status_idx").on(table.status),
+    index("scheduling_events_ticket_idx").on(table.ticketId).where(sql`${table.ticketId} is not null`),
+    index("scheduling_events_task_idx").on(table.taskId).where(sql`${table.taskId} is not null`),
+  ],
+);
+
+export const schedulingEventParticipants = pgTable(
+  "scheduling_event_participants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => schedulingEvents.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    customerContactId: uuid("customer_contact_id").references(() => customerContacts.id, { onDelete: "set null" }),
+    name: text("name").notNull().default(""),
+    email: text("email").notNull().default(""),
+    kind: schedulingEventParticipantKind("kind").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "scheduling_event_participants_identity_check",
+      sql`(${table.kind} = 'internal' and ${table.userId} is not null) or (${table.kind} = 'external' and (${table.customerContactId} is not null or length(trim(${table.email})) > 0))`,
+    ),
+    index("scheduling_event_participants_event_idx").on(table.eventId),
+    index("scheduling_event_participants_user_idx")
+      .on(table.userId, table.eventId)
+      .where(sql`${table.userId} is not null`),
+    uniqueIndex("scheduling_event_participants_internal_unique")
+      .on(table.eventId, table.userId)
+      .where(sql`${table.kind} = 'internal' and ${table.userId} is not null`),
+    uniqueIndex("scheduling_event_participants_external_email_unique")
+      .on(table.eventId, sql`lower(${table.email})`)
+      .where(sql`${table.kind} = 'external' and length(trim(${table.email})) > 0`),
+  ],
+);
+
+export const schedulingEventGoogleCalendarLinks = pgTable(
+  "scheduling_event_google_calendar_links",
+  {
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => schedulingEvents.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    googleCalendarId: text("google_calendar_id").notNull().default("primary"),
+    googleEventId: text("google_event_id"),
+    googleIcalUid: text("google_ical_uid"),
+    googleHtmlLink: text("google_html_link"),
+    googleMeetUrl: text("google_meet_url"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    lastSyncError: text("last_sync_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.eventId, table.userId] }),
+    index("scheduling_event_google_links_user_idx").on(table.userId),
+    index("scheduling_event_google_links_event_idx")
+      .on(table.userId, table.googleCalendarId, table.googleEventId)
+      .where(sql`${table.googleEventId} is not null`),
+  ],
+);
 
 export const schedulingInvitations = pgTable(
   "scheduling_invitations",
@@ -84,6 +190,7 @@ export const schedulingInvitations = pgTable(
     googleEventId: text("google_event_id"),
     googleIcalUid: text("google_ical_uid"),
     googleMeetUrl: text("google_meet_url"),
+    eventId: uuid("event_id").references(() => schedulingEvents.id, { onDelete: "set null" }),
     ticketId: uuid("ticket_id").references(() => tickets.id, { onDelete: "set null" }),
     taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
     groupId: integer("group_id"),
@@ -95,6 +202,9 @@ export const schedulingInvitations = pgTable(
   },
   (table) => [
     uniqueIndex("scheduling_invitations_token_unique").on(table.tokenHash),
+    uniqueIndex("scheduling_invitations_event_unique")
+      .on(table.eventId)
+      .where(sql`${table.eventId} is not null`),
     index("scheduling_invitations_creator_idx").on(table.createdByUserId, table.createdAt),
     index("scheduling_invitations_host_idx").on(table.hostUserId, table.status, table.dateRangeStart, table.dateRangeEnd),
     index("scheduling_invitations_customer_idx").on(table.customerContactId, table.createdAt),

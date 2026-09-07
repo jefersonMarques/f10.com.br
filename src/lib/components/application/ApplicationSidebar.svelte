@@ -63,7 +63,7 @@
       label: "Operação",
       items: [
         { label: "Visão geral", icon: LayoutDashboard, href: "/app" },
-        { label: "Agenda", icon: CalendarDays, href: "/app/tasks/calendar", permissionsAny: ["tasks.view", "tickets.view"] },
+        { label: "Agenda", icon: CalendarDays, href: "/app/tasks/calendar", permissionsAny: ["tasks.view", "tickets.view", "scheduling.view"] },
         { label: "Tarefas", icon: CheckSquare2, href: "/app/tasks", permission: "tasks.view" },
       ],
     },

@@ -1,5 +1,7 @@
 import { error, fail, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
+import { getSchedulingEventGoogleLink } from "$lib/server/calendar/schedulingEventLifecycleRepository";
+import { getSchedulingEvent } from "$lib/server/calendar/schedulingEventRepository";
 import { enforceSchedulingRateLimit } from "$lib/server/calendar/schedulingRepository";
 import {
   bookSchedulingSlot,
@@ -44,6 +46,33 @@ function publicSchedulingMessage(errorValue: unknown): { status: number; message
   return { status: 404, message: "Este link de agendamento não está mais disponível." };
 }
 
+async function projectCurrentBookedInvitation(
+  resolved: NonNullable<Awaited<ReturnType<typeof getPublicSchedulingInvitation>>>,
+) {
+  if (resolved.invitation.status !== "booked" || !resolved.row.eventId) {
+    return resolved.invitation;
+  }
+
+  const event = await getSchedulingEvent(resolved.row.eventId);
+  if (!event || event.status !== "confirmed") return resolved.invitation;
+
+  const googleLink = await getSchedulingEventGoogleLink(event.id, event.organizerUserId);
+  const durationMinutes = Math.max(
+    1,
+    Math.round((event.endsAt.getTime() - event.startsAt.getTime()) / 60_000),
+  );
+
+  return {
+    ...resolved.invitation,
+    title: event.title,
+    durationMinutes,
+    timeZone: event.timeZone,
+    selectedStartAt: event.startsAt.toISOString(),
+    selectedEndAt: event.endsAt.toISOString(),
+    googleMeetUrl: googleLink?.googleMeetUrl ?? resolved.invitation.googleMeetUrl,
+  };
+}
+
 export const prerender = false;
 
 export const load: PageServerLoad = async ({ params, getClientAddress, setHeaders }) => {
@@ -58,10 +87,11 @@ export const load: PageServerLoad = async ({ params, getClientAddress, setHeader
 
   const resolved = await getPublicSchedulingInvitation(params.token);
   if (!resolved) throw error(404, "Este link de agendamento não está mais disponível.");
+  const invitation = await projectCurrentBookedInvitation(resolved);
 
-  if (resolved.invitation.status === "booked" || resolved.invitation.status === "booking") {
+  if (invitation.status === "booked" || invitation.status === "booking") {
     return {
-      invitation: resolved.invitation,
+      invitation,
       slots: [],
       availabilityUnavailable: false,
     };
@@ -70,14 +100,14 @@ export const load: PageServerLoad = async ({ params, getClientAddress, setHeader
   try {
     const slots = await listSchedulingSlots(resolved.row);
     return {
-      invitation: resolved.invitation,
+      invitation,
       slots,
       availabilityUnavailable: false,
     };
   } catch (errorValue) {
     if (errorValue instanceof Error && errorValue.message === "SCHEDULING_GOOGLE_AVAILABILITY_UNAVAILABLE") {
       return {
-        invitation: resolved.invitation,
+        invitation,
         slots: [],
         availabilityUnavailable: true,
       };

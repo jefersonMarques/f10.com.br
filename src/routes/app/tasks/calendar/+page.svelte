@@ -35,7 +35,7 @@
   export let form: ActionData;
 
   type CalendarView = "month" | "week" | "list";
-  type CreationKind = "task" | "ticket" | "scheduling" | "google";
+  type CreationKind = "f10" | "task" | "ticket" | "scheduling" | "google";
 
   const weekdayLabels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
   const priorityClasses: Record<string, string> = {
@@ -71,6 +71,7 @@
 
   let calendarView: CalendarView = "month";
   let cursorDate = parseDateKey(data.calendarAnchor);
+  let showScheduling = data.canViewScheduling;
   let showTasks = data.canViewTasks;
   let showTickets = data.canViewTickets;
   let showGoogle = data.googleCalendar.connected;
@@ -98,7 +99,7 @@
   let schedulingDurationMinutes = data.schedulingHosts.find((host) => host.id === schedulingHostId)?.defaultDurationMinutes ?? 30;
   let schedulingDateStart = data.calendarAnchor;
   let schedulingDateEnd = data.calendarAnchor;
-  let schedulingAddMeet = true;
+  let schedulingAddMeet = false;
   let schedulingBookingPath = "";
   let schedulingCopied = false;
 
@@ -155,6 +156,34 @@
 
   function ticketsForDay(key: string, items: PageData["tickets"]) {
     return items.filter((ticket) => ticket.dueOn === key);
+  }
+
+  function schedulingEventInstant(value: Date | string): Date {
+    return value instanceof Date ? value : new Date(value);
+  }
+
+  function schedulingEventDateKey(event: PageData["schedulingEvents"][number]): string {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: event.timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(schedulingEventInstant(event.startsAt));
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  }
+
+  function schedulingEventsForDay(key: string, items: PageData["schedulingEvents"]) {
+    return items.filter((event) => event.status === "confirmed" && schedulingEventDateKey(event) === key);
+  }
+
+  function schedulingEventTime(event: PageData["schedulingEvents"][number]): string {
+    const formatter = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: event.timeZone,
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    return `${formatter.format(schedulingEventInstant(event.startsAt))}–${formatter.format(schedulingEventInstant(event.endsAt))}`;
   }
 
   function googleEventsForDay(key: string, items: PageData["googleEvents"]) {
@@ -226,6 +255,9 @@
 
   function chooseCreation(kind: CreationKind): void {
     creationMenuOpen = false;
+    if (kind === "f10") {
+      window.dispatchEvent(new CustomEvent("f10-agenda:create-event", { detail: { date: creationDate } }));
+    }
     if (kind === "task") openTaskCreate(parseDateKey(creationDate));
     if (kind === "ticket") openTicketCreate(parseDateKey(creationDate));
     if (kind === "scheduling") openScheduling(parseDateKey(creationDate));
@@ -257,7 +289,7 @@
     schedulingDateEnd = dateKey(addDays(date, 14));
     schedulingHostId = data.schedulingHosts.find((host) => host.id === data.organizerUserId)?.id ?? data.schedulingHosts[0]?.id ?? "";
     schedulingDurationMinutes = data.schedulingHosts.find((host) => host.id === schedulingHostId)?.defaultDurationMinutes ?? 30;
-    schedulingAddMeet = true;
+    schedulingAddMeet = false;
     schedulingBookingPath = "";
     schedulingCopied = false;
     schedulingOpen = true;
@@ -266,7 +298,9 @@
   function handleSchedulingHostChange(event: Event): void {
     schedulingHostId = (event.currentTarget as HTMLSelectElement).value;
     const host = data.schedulingHosts.find((item) => item.id === schedulingHostId);
-    if (host) schedulingDurationMinutes = host.defaultDurationMinutes;
+    if (!host) return;
+    schedulingDurationMinutes = host.defaultDurationMinutes;
+    if (!host.googleConnected) schedulingAddMeet = false;
   }
 
   async function copySchedulingLink(): Promise<void> {
@@ -375,6 +409,9 @@
   $: monthDays = Array.from({ length: 42 }, (_, index) => addDays(startOfMonthGrid(cursorDate), index));
   $: weekDays = Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(cursorDate), index));
   $: visibleDays = calendarView === "week" ? weekDays : monthDays;
+  $: visibleSchedulingEvents = showScheduling
+    ? data.schedulingEvents.filter((event) => event.status === "confirmed")
+    : [];
   $: visibleTasks = showTasks
     ? data.tasks.filter((task) => showCompleted || !task.statusClosed)
     : [];
@@ -385,7 +422,7 @@
   $: selectedMembers = data.membersByProject[createProjectId] ?? [];
   $: googleEventMembers = data.membersByProject[googleEventProjectId] ?? [];
   $: selectedSchedulingHost = data.schedulingHosts.find((host) => host.id === schedulingHostId) ?? null;
-  $: canCreateAnything = data.canCreate || data.canCreateTicket || data.canCreateScheduling || data.googleCalendar.connected;
+  $: canCreateAnything = data.canCreateSchedulingEvent || data.canCreate || data.canCreateTicket || data.canCreateScheduling || data.googleCalendar.connected;
   $: unscheduledCount = visibleTasks.filter((task) => !task.dueOn).length;
   $: periodLabel = calendarView === "week"
     ? `${new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(weekDays[0])} – ${new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(weekDays[6])}`
@@ -416,6 +453,7 @@
         {/if}
 
         <div class="flex rounded-lg bg-[#EDEFF4] p-1" aria-label="Fontes da agenda">
+          {#if data.canViewScheduling}<button type="button" aria-pressed={showScheduling} on:click={() => (showScheduling = !showScheduling)} class={`application-text-meta h-7 rounded-md px-2.5 font-semibold transition ${showScheduling ? "bg-white text-[#000A57] shadow-sm" : "text-[#9A9FAC]"}`}>Agenda F10</button>{/if}
           {#if data.canViewTasks}<button type="button" aria-pressed={showTasks} on:click={() => (showTasks = !showTasks)} class={`application-text-meta h-7 rounded-md px-2.5 font-semibold transition ${showTasks ? "bg-white text-[#000A57] shadow-sm" : "text-[#9A9FAC]"}`}>Tarefas</button>{/if}
           {#if data.canViewTickets}<button type="button" aria-pressed={showTickets} on:click={() => (showTickets = !showTickets)} class={`application-text-meta h-7 rounded-md px-2.5 font-semibold transition ${showTickets ? "bg-white text-[#8B4D12] shadow-sm" : "text-[#9A9FAC]"}`}>Tickets</button>{/if}
           {#if data.googleCalendar.connected}<button type="button" aria-pressed={showGoogle} on:click={() => (showGoogle = !showGoogle)} class={`application-text-meta h-7 rounded-md px-2.5 font-semibold transition ${showGoogle ? "bg-white text-[#2F7045] shadow-sm" : "text-[#9A9FAC]"}`}>Google</button>{/if}
@@ -465,6 +503,7 @@
     {/if}
 
     <div class="application-text-caption flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[#E8EAF0] bg-[#FAFAFC] px-4 py-2 text-[#808695]">
+      {#if data.canViewScheduling && showScheduling}<span class="inline-flex items-center gap-2"><CalendarDays size={13}/>{visibleSchedulingEvents.length} compromisso(s) F10</span>{/if}
       {#if data.canViewTasks && showTasks}<span class="inline-flex items-center gap-2"><Clock3 size={14}/>{unscheduledCount} tarefa(s) sem prazo</span>{/if}
       {#if data.canViewTickets && showTickets}<span class="inline-flex items-center gap-2"><Headphones size={13}/>{visibleTickets.length} ticket(s) no período</span>{/if}
       {#if data.googleCalendar.connected && showGoogle}<span class="inline-flex items-center gap-2"><Link2 size={13}/>{visibleGoogleEvents.length} evento(s) Google</span>{/if}
@@ -479,10 +518,11 @@
         <div class="grid min-w-[880px] grid-cols-7">
           {#each visibleDays as day}
             {@const key = dateKey(day)}
+            {@const daySchedulingEvents = schedulingEventsForDay(key, visibleSchedulingEvents)}
             {@const dayTasks = tasksForDay(key, visibleTasks)}
             {@const dayTickets = ticketsForDay(key, visibleTickets)}
             {@const dayGoogleEvents = googleEventsForDay(key, visibleGoogleEvents)}
-            {@const totalItems = dayTasks.length + dayTickets.length + dayGoogleEvents.length}
+            {@const totalItems = daySchedulingEvents.length + dayTasks.length + dayTickets.length + dayGoogleEvents.length}
             {@const outsideMonth = day.getMonth() !== cursorDate.getMonth()}
             {@const isToday = key === dateKey(new Date())}
             <div role="group" aria-label={`Agenda de ${formatModalDate(key)}`} on:dragover={allowTicketDrop} on:drop={(event) => void dropTicketDueOn(event, key)} class={`group min-h-[150px] border-b border-r border-[#ECEEF3] p-2 transition ${outsideMonth ? "bg-[#FAFAFC]" : "bg-white hover:bg-[#FCFCFE]"} ${draggingTicketId ? "hover:bg-[#FFF8F1]" : ""}`}>
@@ -495,6 +535,9 @@
                 <div class="flex w-full items-center justify-between rounded-lg px-1 py-0.5"><span class={`application-text-caption flex h-7 min-w-7 items-center justify-center rounded-full px-1 font-semibold ${isToday ? "bg-[#000A57] text-white" : outsideMonth ? "text-[#B1B5BF]" : "text-[#5D6372]"}`}>{formatDayNumber(day)}</span></div>
               {/if}
               <div class="mt-1 space-y-1">
+                {#each daySchedulingEvents.slice(0, 2) as event}
+                  <span class="application-text-meta block truncate rounded-md border border-[#D8DBFF] bg-[#F3F4FF] px-2 py-1.5 font-semibold text-[#000A57]" title={`${schedulingEventTime(event)} · ${event.title}`}>F10 · {schedulingEventTime(event)} · {event.title}</span>
+                {/each}
                 {#each dayGoogleEvents.slice(0, 1) as event}
                   {#if event.htmlLink}<a href={event.htmlLink} target="_blank" rel="noopener noreferrer" class="application-text-meta block truncate rounded-md border border-[#CFE0D5] bg-[#F1F8F3] px-2 py-1.5 font-semibold text-[#2F7045]" title={`${googleEventTime(event)} · ${event.summary}`}><span class="application-text-meta mr-1 font-bold">G</span>{#if event.meetUrl}<Video size={10} class="mr-1 inline"/>{/if}{googleEventTime(event)} · {event.summary}</a>{:else}<span class="application-text-meta block truncate rounded-md border border-[#CFE0D5] bg-[#F1F8F3] px-2 py-1.5 font-semibold text-[#2F7045]">G · {event.summary}</span>{/if}
                 {/each}
@@ -504,7 +547,7 @@
                 {#each dayTasks.slice(0, 2) as task}
                   <a href={taskHref(task.id)} class={`application-text-meta block truncate rounded-md border px-2 py-1.5 font-semibold transition hover:brightness-[0.98] ${priorityClasses[task.priority]} ${task.statusClosed ? "opacity-55 line-through" : ""}`}>{#if taskLinkedToGoogle(task.id)}<span class="mr-1 font-bold text-[#2F7045]">G</span>{/if}{#if taskHasMeet(task.id)}<Video size={10} class="mr-1 inline text-[#214A9A]"/>{/if}{task.title}</a>
                 {/each}
-                {#if totalItems > 5}<span class="application-text-meta block px-1 font-semibold text-[#7C8291]">+ {totalItems - 5} item(ns)</span>{/if}
+                {#if totalItems > 7}<span class="application-text-meta block px-1 font-semibold text-[#7C8291]">+ {totalItems - 7} item(ns)</span>{/if}
               </div>
             </div>
           {/each}
@@ -515,6 +558,7 @@
         <div class="grid min-w-[880px] grid-cols-7">
           {#each visibleDays as day, index}
             {@const key = dateKey(day)}
+            {@const daySchedulingEvents = schedulingEventsForDay(key, visibleSchedulingEvents)}
             {@const dayTasks = tasksForDay(key, visibleTasks)}
             {@const dayTickets = ticketsForDay(key, visibleTickets)}
             {@const dayGoogleEvents = googleEventsForDay(key, visibleGoogleEvents)}
@@ -530,6 +574,9 @@
                 <div class="flex w-full flex-col items-center border-b border-[#E8EAF0] px-2 py-3"><span class="application-text-meta font-bold uppercase tracking-[0.08em] text-[#858B99]">{weekdayLabels[index]}</span><span class={`mt-1 flex h-9 min-w-9 items-center justify-center rounded-full px-1 text-[13px] font-semibold ${isToday ? "bg-[#000A57] text-white" : "text-[#303646]"}`}>{day.getDate()}</span></div>
               {/if}
               <div class="space-y-2 p-2.5">
+                {#each daySchedulingEvents as event}
+                  <article class="rounded-xl border border-[#D8DBFF] bg-[#F3F4FF] p-3 text-[#000A57] transition hover:shadow-sm"><span class="application-text-meta font-bold uppercase tracking-[0.08em]">Agenda F10 · {schedulingEventTime(event)}</span><strong class="application-text-caption mt-1 block font-semibold leading-4">{event.title}</strong><span class="application-text-meta mt-2 block truncate opacity-75">{event.organizerName}</span>{#if event.googleMeetUrl}<a href={event.googleMeetUrl} target="_blank" rel="noopener noreferrer" class="application-text-meta mt-2 inline-flex items-center gap-1 rounded-md bg-[#214A9A] px-2 py-1 font-semibold text-white"><Video size={10}/>Entrar no Meet</a>{/if}</article>
+                {/each}
                 {#each dayGoogleEvents as event}
                   <article class="rounded-xl border border-[#CFE0D5] bg-[#F1F8F3] p-3 text-[#2F7045] transition hover:shadow-sm"><span class="application-text-meta font-bold uppercase tracking-[0.08em]">Google · {googleEventTime(event)}</span><strong class="application-text-caption mt-1 block font-semibold leading-4">{event.summary}</strong>{#if event.location}<span class="application-text-meta mt-1 block truncate opacity-75">{event.location}</span>{/if}<div class="mt-2 flex flex-wrap items-center gap-2">{#if event.htmlLink}<a href={event.htmlLink} target="_blank" rel="noopener noreferrer" class="application-text-meta inline-flex items-center gap-1 font-semibold text-[#2F7045]">Evento <ExternalLink size={10}/></a>{/if}{#if event.meetUrl}<a href={event.meetUrl} target="_blank" rel="noopener noreferrer" class="application-text-meta inline-flex items-center gap-1 rounded-md bg-[#214A9A] px-2 py-1 font-semibold text-white"><Video size={10}/>Entrar no Meet</a>{/if}</div></article>
                 {/each}
@@ -539,7 +586,7 @@
                 {#each dayTasks as task}
                   <a href={taskHref(task.id)} class={`block rounded-xl border p-3 transition hover:shadow-sm ${priorityClasses[task.priority]} ${task.statusClosed ? "opacity-55" : ""}`}><span class="application-text-meta inline-flex items-center gap-1 font-bold uppercase tracking-[0.06em] opacity-70">Tarefa F10{taskLinkedToGoogle(task.id) ? " · Google" : ""}{#if taskHasMeet(task.id)}<Video size={10}/>{/if}</span><strong class={`application-text-caption mt-1 block font-semibold leading-4 ${task.statusClosed ? "line-through" : ""}`}>{task.title}</strong><span class="application-text-meta mt-2 block truncate opacity-75">{task.projectName}</span></a>
                 {/each}
-                {#if dayGoogleEvents.length === 0 && dayTickets.length === 0 && dayTasks.length === 0}
+                {#if daySchedulingEvents.length === 0 && dayGoogleEvents.length === 0 && dayTickets.length === 0 && dayTasks.length === 0}
                   {#if canCreateAnything}<button type="button" on:click={() => openCreationChooser(day)} class="application-text-meta flex min-h-20 w-full items-center justify-center rounded-xl border border-dashed border-[#E1E4EA] text-[#A0A5B0] hover:border-[#C8CDD7] hover:bg-[#FAFAFC]">+ Novo evento</button>{:else}<div class="application-text-meta flex min-h-20 w-full items-center justify-center rounded-xl border border-dashed border-[#E1E4EA] text-[#A0A5B0]">Sem compromissos</div>{/if}
                 {/if}
               </div>
@@ -548,7 +595,7 @@
         </div>
       </div>
     {:else}
-      <AgendaListView anchor={dateKey(cursorDate)} tasks={visibleTasks} tickets={visibleTickets} googleEvents={visibleGoogleEvents}/>
+      <AgendaListView anchor={dateKey(cursorDate)} schedulingEvents={visibleSchedulingEvents} tasks={visibleTasks} tickets={visibleTickets} googleEvents={visibleGoogleEvents}/>
     {/if}
   </section>
 </ApplicationContent>
@@ -559,10 +606,11 @@
     <div class="relative z-10 w-full max-w-[620px] rounded-[22px] border border-[#E0E3EA] bg-white shadow-[0_28px_90px_rgba(1,13,40,0.26)]" role="dialog" aria-modal="true" aria-label="Escolher tipo de evento">
       <header class="flex items-start justify-between gap-4 border-b border-[#EEF0F4] px-5 py-4"><div><span class="application-text-caption font-bold uppercase tracking-[0.08em] text-[#EA6D0B]">Novo evento</span><h2 class="mt-1 text-[17px] font-semibold text-[#202637]">O que deseja criar?</h2><p class="application-text-caption mt-1 text-[#858B99]">{formatModalDate(creationDate)}</p></div><button type="button" on:click={() => (creationMenuOpen = false)} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#8B909D] hover:bg-[#F3F4F7]" aria-label="Fechar"><X size={16}/></button></header>
       <div class="grid gap-3 p-5 sm:grid-cols-2">
+        {#if data.canCreateSchedulingEvent}<button type="button" on:click={() => chooseCreation("f10")} class="rounded-2xl border border-[#D8DBFF] bg-[#F3F4FF] p-4 text-left transition hover:border-[#BEC4FF] hover:bg-[#EEF0FF]"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#000A57] shadow-sm"><CalendarDays size={17}/></span><strong class="application-text-body mt-3 block font-semibold text-[#303747]">Compromisso F10</strong><span class="application-text-caption mt-1 block leading-5 text-[#7B8291]">Evento canônico da Agenda F10, independente do Google.</span></button>{/if}
         {#if data.canCreate && data.projects.length > 0}<button type="button" on:click={() => chooseCreation("task")} class="rounded-2xl border border-[#D9DDF0] bg-[#F8F9FF] p-4 text-left transition hover:border-[#BFC7ED] hover:bg-[#F3F5FF]"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#000A57] shadow-sm"><CheckSquare2 size={17}/></span><strong class="application-text-body mt-3 block font-semibold text-[#303747]">Tarefa</strong><span class="application-text-caption mt-1 block leading-5 text-[#7B8291]">Ação interna com projeto, responsável e prazo.</span></button>{/if}
         {#if data.canCreateTicket && data.ticketQueues.length > 0}<button type="button" on:click={() => chooseCreation("ticket")} class="rounded-2xl border border-[#F0D8BE] bg-[#FFF9F3] p-4 text-left transition hover:border-[#E8C9A8] hover:bg-[#FFF5EA]"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#9B530F] shadow-sm"><Headphones size={17}/></span><strong class="application-text-body mt-3 block font-semibold text-[#303747]">Ticket</strong><span class="application-text-caption mt-1 block leading-5 text-[#7B8291]">Novo atendimento com conclusão planejada nesta Agenda.</span></button>{/if}
         {#if data.canCreateScheduling}<button type="button" on:click={() => chooseCreation("scheduling")} class="rounded-2xl border border-[#D7E4EA] bg-[#F5FAFC] p-4 text-left transition hover:border-[#BFD6DF] hover:bg-[#F0F8FB]"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#27637B] shadow-sm"><CalendarClock size={17}/></span><strong class="application-text-body mt-3 block font-semibold text-[#303747]">Agendamento de call</strong><span class="application-text-caption mt-1 block leading-5 text-[#7B8291]">Gera um link para o cliente escolher um horário disponível.</span></button>{/if}
-        {#if data.googleCalendar.connected}<button type="button" on:click={() => chooseCreation("google")} class="rounded-2xl border border-[#CFE0D5] bg-[#F3F9F5] p-4 text-left transition hover:border-[#B9D5C3] hover:bg-[#EEF7F1]"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#2F7045] shadow-sm"><CalendarDays size={17}/></span><strong class="application-text-body mt-3 block font-semibold text-[#303747]">Evento Google</strong><span class="application-text-caption mt-1 block leading-5 text-[#7B8291]">Compromisso de calendário, com Meet e participantes opcionais.</span></button>{/if}
+        {#if data.googleCalendar.connected}<button type="button" on:click={() => chooseCreation("google")} class="rounded-2xl border border-[#CFE0D5] bg-[#F3F9F5] p-4 text-left transition hover:border-[#B9D5C3] hover:bg-[#EEF7F1]"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#2F7045] shadow-sm"><CalendarDays size={17}/></span><strong class="application-text-body mt-3 block font-semibold text-[#303747]">Evento Google</strong><span class="application-text-caption mt-1 block leading-5 text-[#7B8291]">Projeção externa direta, com Meet e participantes opcionais.</span></button>{/if}
       </div>
     </div>
   </div>
@@ -618,13 +666,13 @@
           <form method="POST" action="?/createSchedulingInvitation" use:enhance={() => { return async ({ result, update }) => { await update(); if (result.type === "success") { const payload = result.data as { bookingPath?: string } | null; schedulingBookingPath = payload?.bookingPath ?? ""; schedulingOpen = true; } }; }} class="grid gap-3 sm:grid-cols-2">
             <label class="block sm:col-span-2"><span class="application-text-meta mb-1 block font-semibold text-[#777D8D]">Cliente</span><select name="customerContactId" required class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3"><option value="">Selecione...</option>{#each data.schedulingCustomers as customer}<option value={customer.id}>{customer.name}{customer.organizationName ? ` · ${customer.organizationName}` : ""} · {customer.email}</option>{/each}</select></label>
             <label class="block sm:col-span-2"><span class="application-text-meta mb-1 block font-semibold text-[#777D8D]">Título</span><input name="title" required minlength="3" maxlength="180" placeholder="Ex.: Reunião de implantação" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] px-3"/></label>
-            <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#777D8D]">Responsável</span><select name="hostUserId" bind:value={schedulingHostId} on:change={handleSchedulingHostChange} required class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3">{#each data.schedulingHosts as host}<option value={host.id} disabled={!host.googleConnected}>{host.name}{host.googleConnected ? "" : " · Google desconectado"}</option>{/each}</select></label>
+            <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#777D8D]">Responsável</span><select name="hostUserId" bind:value={schedulingHostId} on:change={handleSchedulingHostChange} required class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3">{#each data.schedulingHosts as host}<option value={host.id}>{host.name}{host.googleConnected ? "" : " · sem Google"}</option>{/each}</select></label>
             <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#777D8D]">Duração</span><select name="durationMinutes" bind:value={schedulingDurationMinutes} class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3"><option value={15}>15 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>60 min</option><option value={90}>90 min</option><option value={120}>120 min</option></select></label>
             <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#777D8D]">Primeiro dia</span><input name="dateRangeStart" type="date" bind:value={schedulingDateStart} required class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] px-3"/></label>
             <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#777D8D]">Último dia</span><input name="dateRangeEnd" type="date" bind:value={schedulingDateEnd} required class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] px-3"/></label>
-            <label class="application-text-caption flex cursor-pointer items-start gap-2 rounded-xl border border-[#DDE3F1] bg-[#F8FAFF] px-3 py-3 font-semibold text-[#526077] sm:col-span-2"><input type="checkbox" name="addGoogleMeet" value="true" bind:checked={schedulingAddMeet} class="mt-0.5"/><span><strong class="block text-[#214A9A]">Gerar Google Meet</strong><span class="application-text-meta mt-0.5 block font-normal leading-4 text-[#7D8797]">O cliente recebe o convite ao confirmar o horário.</span></span></label>
-            {#if selectedSchedulingHost && !selectedSchedulingHost.googleConnected}<div class="application-text-meta rounded-xl border border-[#F0D6BD] bg-[#FFF9F3] px-3 py-2 text-[#935018] sm:col-span-2">Este responsável precisa conectar o Google Calendar.</div>{/if}
-            <div class="flex items-center justify-between gap-3 sm:col-span-2">{#if data.canConfigureScheduling}<a href="/app/tasks/calendar/scheduling" class="application-text-meta inline-flex items-center gap-1.5 font-semibold text-[#687083] hover:text-[#000A57]"><Settings2 size={12}/>Configurar disponibilidade</a>{:else}<span></span>{/if}<button type="submit" disabled={!selectedSchedulingHost?.googleConnected} class="application-text-caption h-10 rounded-xl bg-[#000A57] px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Gerar link</button></div>
+            <label class={`application-text-caption flex items-start gap-2 rounded-xl border px-3 py-3 font-semibold sm:col-span-2 ${selectedSchedulingHost?.googleConnected ? "cursor-pointer border-[#DDE3F1] bg-[#F8FAFF] text-[#526077]" : "border-[#E4E6EB] bg-[#FAFAFC] text-[#8B909D]"}`}><input type="checkbox" name="addGoogleMeet" value="true" bind:checked={schedulingAddMeet} disabled={!selectedSchedulingHost?.googleConnected} class="mt-0.5"/><span><strong class="block">Gerar Google Meet</strong><span class="application-text-meta mt-0.5 block font-normal leading-4 text-[#7D8797]">Opcional; exige Google conectado. O link de agendamento funciona sem Google.</span></span></label>
+            {#if selectedSchedulingHost && !selectedSchedulingHost.googleConnected}<div class="application-text-meta rounded-xl border border-[#D9EADD] bg-[#F7FBF8] px-3 py-2 text-[#31583E] sm:col-span-2">Google desconectado: a Agenda F10 continuará oferecendo e reservando horários; apenas o Meet fica indisponível.</div>{/if}
+            <div class="flex items-center justify-between gap-3 sm:col-span-2">{#if data.canConfigureScheduling}<a href="/app/tasks/calendar/scheduling" class="application-text-meta inline-flex items-center gap-1.5 font-semibold text-[#687083] hover:text-[#000A57]"><Settings2 size={12}/>Configurar disponibilidade</a>{:else}<span></span>{/if}<button type="submit" class="application-text-caption h-10 rounded-xl bg-[#000A57] px-4 font-semibold text-white">Gerar link</button></div>
           </form>
         {/if}
 
@@ -651,7 +699,7 @@
         <GoogleEventDetailsEditor users={data.calendarUsers} organizerUserId={data.organizerUserId} organizerEmail={data.googleCalendar.googleEmail} date={googleEventDate} startTime={googleEventStartTime} endTime={googleEventEndTime} timeZone={googleTimeZone} allDay={googleEventAllDay}/>
         <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Descrição <span class="font-normal text-[#9A9FAC]">(opcional)</span></span><textarea name="description" maxlength="5000" rows="4" class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-3 text-[11px] leading-5"></textarea></label>
         {#if data.canCreate && data.projects.length > 0}<div class="rounded-xl border border-[#E2E5ED] bg-[#FAFAFC] p-3"><label class="flex cursor-pointer items-start gap-2"><input type="checkbox" name="createAsTask" value="true" bind:checked={googleEventCreateAsTask} class="mt-0.5"/><span><strong class="application-text-caption block font-semibold text-[#303747]">Criar também como tarefa F10</strong><span class="application-text-meta mt-0.5 block leading-4 text-[#828896]">O evento e a tarefa ficam vinculados.</span></span></label>{#if googleEventCreateAsTask}<div class="mt-3 grid gap-3 border-t border-[#E6E8EE] pt-3 sm:grid-cols-2"><label class="block sm:col-span-2"><span class="application-text-meta mb-1 block font-semibold text-[#6E7483]">Projeto</span><select name="projectId" bind:value={googleEventProjectId} required class="application-text-caption h-10 w-full rounded-lg border border-[#DDE1EA] bg-white px-2">{#each data.projects as project}<option value={project.id}>{project.name}</option>{/each}</select></label><label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#6E7483]">Prioridade</span><select name="priority" class="application-text-caption h-10 w-full rounded-lg border border-[#DDE1EA] bg-white px-2"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select></label>{#if data.canAssign}<label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#6E7483]">Responsável</span><select name="assigneeId" class="application-text-caption h-10 w-full rounded-lg border border-[#DDE1EA] bg-white px-2"><option value="">Atribuir a mim</option>{#each googleEventMembers as member}<option value={member.id}>{member.name}</option>{/each}</select></label>{/if}</div>{/if}</div>{/if}
-        <div class="flex items-center justify-between gap-3"><span class="application-text-meta text-[#969BA7]">Agenda principal de {data.googleCalendar.googleEmail}.</span><button type="submit" class="inline-flex h-11 items-center gap-2 rounded-xl bg-[#2F7045] px-5 text-[11px] font-semibold text-white"><Plus size={15}/>{googleEventCreateAsTask ? "Criar evento + tarefa" : "Criar no Google"}</button></div>
+        <div class="flex items-center justify-between gap-3"><span class="application-text-meta text-[#969BA7]">Agenda externa de {data.googleCalendar.googleEmail}.</span><button type="submit" class="inline-flex h-11 items-center gap-2 rounded-xl bg-[#2F7045] px-5 text-[11px] font-semibold text-white"><Plus size={15}/>{googleEventCreateAsTask ? "Criar evento + tarefa" : "Criar no Google"}</button></div>
       </form>
     </div>
   </div>
