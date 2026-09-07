@@ -12,7 +12,7 @@
 
   export let data: PageData;
 
-  let savingAll = false;
+  let savingMode: "draft" | "confirm" | null = null;
   let saveMessage = "";
   let saveSuccess = false;
   let hasUnsavedReview = false;
@@ -75,9 +75,12 @@
     });
   }
 
-  async function persistAll(confirmUntouched: boolean): Promise<void> {
+  async function persistAll(
+    mode: "draft" | "confirm",
+    confirmUntouched: boolean,
+  ): Promise<void> {
     const items = collectReviewItems();
-    savingAll = true;
+    savingMode = mode;
     saveMessage = "";
     saveSuccess = false;
     try {
@@ -85,6 +88,7 @@
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          mode,
           confirmUntouched,
           items: items.map((item) => ({
             blockId: item.blockId,
@@ -96,7 +100,13 @@
       });
       const payload = await response.json().catch(() => ({})) as { success?: boolean; message?: string };
       saveSuccess = response.ok && Boolean(payload.success);
-      saveMessage = payload.message || (saveSuccess ? "Revisão humana salva." : "Não foi possível salvar a revisão humana.");
+      saveMessage = payload.message || (
+        saveSuccess
+          ? mode === "draft"
+            ? "Rascunho salvo."
+            : "Revisão concluída."
+          : "Não foi possível salvar a revisão humana."
+      );
       if (!saveSuccess) return;
       hasUnsavedReview = false;
       showUntouchedModal = false;
@@ -104,19 +114,24 @@
     } catch {
       saveMessage = "A conexão foi interrompida ao salvar a revisão humana.";
     } finally {
-      savingAll = false;
+      savingMode = null;
     }
   }
 
-  async function saveAll(): Promise<void> {
-    if (savingAll || !data.canEdit || data.humanReview.total === 0) return;
+  async function saveDraft(): Promise<void> {
+    if (savingMode || !data.canEdit || data.humanReview.total === 0) return;
+    await persistAll("draft", false);
+  }
+
+  async function concludeReview(): Promise<void> {
+    if (savingMode || !data.canEdit || data.humanReview.total === 0) return;
     const items = collectReviewItems();
     untouchedCount = items.filter((item) => !item.reviewed && !item.touched).length;
     if (untouchedCount > 0) {
       showUntouchedModal = true;
       return;
     }
-    await persistAll(false);
+    await persistAll("confirm", false);
   }
 
   function markInteraction(): void {
@@ -141,14 +156,15 @@
       <span class="application-text-meta inline-flex items-center gap-2 rounded-full bg-[#EEF0FF] px-3 py-1.5 font-bold text-[#000A57]"><PenTool size={13}/>REVISÃO HUMANA</span>
       <a href={`/app/help/content/${data.content.id}/preview`} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><Eye size={14}/>Preview</a>
       {#if data.canEdit && data.humanReview.total > 0}
-        <button type="button" disabled={savingAll} on:click={saveAll} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 font-semibold text-white disabled:cursor-wait disabled:opacity-60">{#if savingAll}<LoaderCircle size={14} class="animate-spin"/>{:else}<Save size={14}/>{/if}{savingAll ? "Salvando..." : "Salvar tudo"}</button>
+        <button type="button" disabled={Boolean(savingMode)} on:click={saveDraft} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#D8DDF4] bg-white px-4 font-semibold text-[#000A57] disabled:cursor-wait disabled:opacity-60">{#if savingMode === "draft"}<LoaderCircle size={14} class="animate-spin"/>{:else}<Save size={14}/>{/if}{savingMode === "draft" ? "Salvando..." : "Salvar rascunho"}</button>
+        <button type="button" disabled={Boolean(savingMode)} on:click={concludeReview} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 font-semibold text-white disabled:cursor-wait disabled:opacity-60">{#if savingMode === "confirm"}<LoaderCircle size={14} class="animate-spin"/>{:else}<CheckCircle2 size={14}/>{/if}{savingMode === "confirm" ? "Concluindo..." : "Concluir revisão"}</button>
       {/if}
     </div>
   </div>
 
   <section class="mb-4 rounded-[18px] border border-[#D8DDF4] bg-[#F8F9FF] px-4 py-3">
     <div class="flex flex-wrap items-start justify-between gap-3">
-      <div><strong class="text-[11px] font-semibold text-[#000A57]">Revisão obrigatória antes da publicação</strong><p class="mt-1 max-w-[760px] text-[10px] leading-5 text-[#5F6678]">Confira cada screenshot, escolha o melhor frame quando houver carrossel e faça as marcações necessárias. “Salvar tudo” confirma a revisão das imagens de uma vez. Se alguma imagem ainda não tiver recebido nenhuma interação, o F10 pede uma confirmação explícita para evitar esquecimentos.</p></div>
+      <div><strong class="text-[11px] font-semibold text-[#000A57]">Revisão obrigatória antes da publicação</strong><p class="mt-1 max-w-[760px] text-[10px] leading-5 text-[#5F6678]">Confira cada screenshot, escolha o melhor frame quando houver carrossel e faça as marcações necessárias. “Salvar rascunho” preserva escolhas, marcações e alternativas sem aprovar a revisão. “Concluir revisão” confirma todas as imagens de uma vez. Se alguma imagem ainda não tiver recebido nenhuma interação, o F10 pede uma confirmação explícita para evitar esquecimentos.</p></div>
       {#if data.humanReview.total > 0}<span class={`rounded-full px-3 py-1.5 text-[9px] font-bold ${data.humanReview.pending === 0 ? "bg-[#EAF7EE] text-[#2F7045]" : "bg-[#FFF0E4] text-[#A9510D]"}`}>{data.humanReview.reviewed}/{data.humanReview.total} revisadas</span>{/if}
     </div>
   </section>
@@ -191,11 +207,12 @@
                   contentId={data.content.id}
                   blockId={block.id}
                   candidates={review?.candidates ?? [{ assetId: block.asset.id, candidateIndex: 1, timeSeconds: null, recommended: false }]}
-                  initialAnnotations={readHelpImageAnnotationsFromMetadata(block.metadata)}
+                  initialSelectedAssetId={review?.draftSelectedAssetId ?? null}
+                  initialAnnotations={review?.draftAnnotations ?? readHelpImageAnnotationsFromMetadata(block.metadata)}
+                  initialInteractions={review?.draftInteractions ?? []}
                   reviewed={humanStatus?.reviewed ?? false}
                   disabled={!data.canEdit}
                   on:interaction={markInteraction}
-                  on:replaced={() => { hasUnsavedReview = false; saveMessage = "Imagem substituída. Faça a revisão desta imagem e use “Salvar tudo”."; saveSuccess = false; }}
                 />
               {:else if block.blockType === "file" && block.asset}
                 {@const fileUrl = block.asset.storageKey ? assetUrl(block.asset.id) : block.asset.sourceUrl}
@@ -209,7 +226,7 @@
   </main>
 
   {#if data.canEdit && data.humanReview.total > 0}
-    <div class="sticky bottom-4 z-20 mt-5 flex items-center justify-between gap-3 rounded-2xl border border-[#D8DDF4] bg-white/95 px-4 py-3 shadow-lg backdrop-blur"><span class="text-[9px] text-[#707788]">{data.humanReview.pending === 0 && !hasUnsavedReview ? "Todas as imagens já possuem revisão humana salva." : "Revise as imagens e salve todas as alterações antes de publicar."}</span><button type="button" disabled={savingAll} on:click={saveAll} class="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-60">{#if savingAll}<LoaderCircle size={14} class="animate-spin"/>{:else}<Save size={14}/>{/if}{savingAll ? "Salvando..." : "Salvar tudo"}</button></div>
+    <div class="sticky bottom-4 z-20 mt-5 flex flex-col gap-3 rounded-2xl border border-[#D8DDF4] bg-white/95 px-4 py-3 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between"><span class="text-[9px] text-[#707788]">{data.humanReview.pending === 0 && !hasUnsavedReview ? "Todas as imagens possuem revisão humana concluída." : "Você pode salvar o trabalho como rascunho e concluir a revisão somente quando estiver pronto."}</span><div class="flex shrink-0 flex-wrap gap-2"><button type="button" disabled={Boolean(savingMode)} on:click={saveDraft} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#D8DDF4] bg-white px-4 text-[10px] font-semibold text-[#000A57] disabled:opacity-60">{#if savingMode === "draft"}<LoaderCircle size={14} class="animate-spin"/>{:else}<Save size={14}/>{/if}{savingMode === "draft" ? "Salvando..." : "Salvar rascunho"}</button><button type="button" disabled={Boolean(savingMode)} on:click={concludeReview} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-60">{#if savingMode === "confirm"}<LoaderCircle size={14} class="animate-spin"/>{:else}<CheckCircle2 size={14}/>{/if}{savingMode === "confirm" ? "Concluindo..." : "Concluir revisão"}</button></div></div>
   {/if}
 </ApplicationContent>
 
@@ -218,7 +235,7 @@
     <section role="dialog" aria-modal="true" aria-labelledby="human-review-warning-title" class="w-full max-w-[520px] rounded-[24px] bg-white p-5 shadow-2xl sm:p-6">
       <div class="flex items-start justify-between gap-4"><div><h2 id="human-review-warning-title" class="text-[16px] font-semibold text-[#11182C]">Existem imagens sem interação</h2><p class="mt-1 text-[10px] leading-5 text-[#777D8D]">{untouchedCount} {untouchedCount === 1 ? "imagem ainda não teve" : "imagens ainda não tiveram"} troca de frame nem marcação nesta revisão.</p></div><button type="button" on:click={() => showUntouchedModal = false} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482]" aria-label="Fechar"><X size={16}/></button></div>
       <div class="mt-4 rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[10px] leading-5 text-[#7A3B08]">Isso pode significar que alguma imagem foi esquecida. Se você já conferiu visualmente essas imagens e elas estão corretas como estão, confirme abaixo. Essa confirmação passa a valer como a interação humana obrigatória.</div>
-      <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" disabled={savingAll} on:click={() => showUntouchedModal = false} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[10px] font-semibold text-[#626979]">Voltar e revisar</button><button type="button" disabled={savingAll} on:click={() => persistAll(true)} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-60">{#if savingAll}<LoaderCircle size={14} class="animate-spin"/>{:else}<CheckCircle2 size={14}/>{/if}Confirmar revisão e salvar tudo</button></div>
+      <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" disabled={Boolean(savingMode)} on:click={() => showUntouchedModal = false} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[10px] font-semibold text-[#626979]">Voltar e revisar</button><button type="button" disabled={Boolean(savingMode)} on:click={() => persistAll("confirm", true)} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-60">{#if savingMode === "confirm"}<LoaderCircle size={14} class="animate-spin"/>{:else}<CheckCircle2 size={14}/>{/if}Confirmar e concluir revisão</button></div>
     </section>
   </div>
 {/if}
