@@ -6,6 +6,7 @@ import {
   type PermissionScope,
 } from "$lib/server/auth/permissions";
 import { requireTicketAccess } from "$lib/server/support/supportAccess";
+import { markTicketFirstAgentView } from "$lib/server/support/ticketCustomerProgressRepository";
 import {
   getTicketWorkflowBoard,
   getTicketWorkflowContext,
@@ -29,6 +30,13 @@ export const load: LayoutServerLoad = async ({ parent, params }) => {
   const scope = getPermissionScope(permissions, "tickets.view");
   if (!scope) throw error(403, "Acesso não autorizado.");
   await requireTicketAccess(layout.user.id, scope, params.ticketId);
+
+  await markTicketFirstAgentView(layout.user.id, params.ticketId).catch((cause) => {
+    console.error("[ticket.customer_progress.first_view]", {
+      ticketId: params.ticketId,
+      causeType: cause instanceof Error ? cause.name : typeof cause,
+    });
+  });
 
   const [workflowContext, workflowBoard] = await Promise.all([
     getTicketWorkflowContext(layout.user.id, permissions, params.ticketId),

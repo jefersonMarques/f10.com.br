@@ -1,8 +1,10 @@
 import { error, type RequestHandler } from "@sveltejs/kit";
+import { isAuthorizedF10Context } from "$lib/server/customerPortal/customerF10AuthRepository";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
-import { authorizePublicChatSession } from "$lib/server/support/publicChatRepository";
+import { authorizePublicChatSessionForRead } from "$lib/server/support/publicChatRepository";
 import { getTicketCustomerContext } from "$lib/server/support/ticketCustomerContextRepository";
 import {
+  getSupportChatMessageAttachment,
   getSupportMessageAttachment,
   readSupportMessageAttachment,
 } from "$lib/server/support/supportMessageAttachmentRepository";
@@ -37,22 +39,34 @@ export const GET: RequestHandler = async ({ params, request, url, cookies }) => 
   }
 
   try {
-    const session = await authorizePublicChatSession(sessionId, token);
-    const customer = await getOptionalCustomerF10PortalSession(cookies);
-    if (!customer || customer.selectedUnitId === null) {
-      throw error(401, "Anexo não autorizado.");
-    }
+    const session = await authorizePublicChatSessionForRead(sessionId, token);
+    const customer = await getOptionalCustomerF10PortalSession(cookies, { touchActivity: false });
+    if (!customer) throw error(401, "Anexo não autorizado.");
 
-    const context = await getTicketCustomerContext(session.ticketId);
+    let authorized = false;
     if (
-      !context ||
-      context.legacyUserId !== customer.legacyUserId ||
-      context.unitId !== customer.selectedUnitId
+      session.legacyUserId &&
+      session.groupId !== null &&
+      session.unitId !== null
     ) {
-      throw error(401, "Anexo não autorizado.");
+      authorized = session.legacyUserId === customer.legacyUserId &&
+        isAuthorizedF10Context(customer, session.groupId, session.unitId);
+    } else if (session.ticketId) {
+      const context = await getTicketCustomerContext(session.ticketId);
+      authorized = Boolean(
+        context &&
+        context.scope === "unit" &&
+        context.legacyUserId === customer.legacyUserId &&
+        context.groupId !== null &&
+        context.unitId !== null &&
+        isAuthorizedF10Context(customer, context.groupId, context.unitId),
+      );
     }
+    if (!authorized) throw error(401, "Anexo não autorizado.");
 
-    const attachment = await getSupportMessageAttachment(attachmentId, session.ticketId);
+    const attachment = session.ticketId
+      ? await getSupportMessageAttachment(attachmentId, session.ticketId)
+      : await getSupportChatMessageAttachment(attachmentId, sessionId);
     if (!attachment) throw error(404, "Anexo não encontrado.");
 
     const object = await readSupportMessageAttachment(attachment.storageKey);

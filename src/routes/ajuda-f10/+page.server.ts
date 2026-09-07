@@ -41,21 +41,31 @@ export const load: PageServerLoad = async ({ url, cookies }) => {
       left.name.localeCompare(right.name, "pt-BR"),
     ),
     openChat: url.searchParams.get("chat") === "1",
-    customerSupport:
-      customer && customer.selectedUnitId !== null
-        ? {
-            authenticated: true,
-            name: customer.name,
-            email: customer.email,
-            groupName: customer.selectedGroupName,
-            unitName: customer.selectedUnitName,
-          }
-        : {
-            authenticated: false,
-            name: "",
-            email: "",
-            groupName: null,
-            unitName: null,
-          },
+    customerSupport: customer
+      ? {
+          authenticated: true,
+          name: customer.name,
+          email: customer.email,
+          groupName: customer.selectedGroupName,
+          unitName: customer.selectedUnitName,
+          requiresUnitSelection: customer.selectedUnitId === null,
+          groups: customer.groups.map((group) => ({
+            id: group.grupo_id,
+            name: group.grupo,
+            units: group.unidades.map((unit) => ({
+              id: unit.unidade_id,
+              name: unit.unidade,
+            })),
+          })),
+        }
+      : {
+          authenticated: false,
+          name: "",
+          email: "",
+          groupName: null,
+          unitName: null,
+          requiresUnitSelection: false,
+          groups: [],
+        },
   };
 };

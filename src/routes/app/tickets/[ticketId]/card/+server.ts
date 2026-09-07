@@ -2,6 +2,7 @@ import { error, json, type RequestHandler } from "@sveltejs/kit";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import { getTicketCard } from "$lib/server/support/ticketCardRepository";
+import { markTicketFirstAgentView } from "$lib/server/support/ticketCustomerProgressRepository";
 import { listTicketTasks } from "$lib/server/support/ticketTaskBridge";
 import { listTaskProjects } from "$lib/server/tasks/taskRepository";
 
@@ -19,6 +20,12 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
 
   try {
     const card = await getTicketCard(session.user.id, permissions, params.ticketId);
+    await markTicketFirstAgentView(session.user.id, params.ticketId).catch((cause) => {
+      console.error("[ticket.customer_progress.card_view]", {
+        ticketId: params.ticketId,
+        causeType: cause instanceof Error ? cause.name : typeof cause,
+      });
+    });
     const canViewTasks = hasPermission(permissions, "tasks.view");
     const canCreateTask =
       hasPermission(permissions, "tickets.reply") &&

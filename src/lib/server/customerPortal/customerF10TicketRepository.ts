@@ -1,17 +1,24 @@
+import { randomUUID } from "node:crypto";
 import {
   and,
   desc,
   eq,
   gte,
   ilike,
+  inArray,
   isNull,
   or,
   sql,
   type SQL,
 } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
-import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
-import { ticketMessages, tickets } from "$lib/server/db/supportSchema";
+import {
+  customerActivityEvents,
+  ticketCustomerContexts,
+} from "$lib/server/db/customerPortalSchema";
+import { ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
+import { ticketMessageAttachments } from "$lib/server/db/supportChatEntrySchema";
+import { ticketEvents, ticketMessages, tickets } from "$lib/server/db/supportSchema";
 import {
   getCustomerPortalTicket,
   replyCustomerPortalTicket,
@@ -22,6 +29,15 @@ import {
   type CustomerF10AuthorizedContext,
   type CustomerF10PortalSession,
 } from "$lib/server/customerPortal/customerF10AuthRepository";
+import { resolveCustomerPortalTicketIntake } from "$lib/server/customerPortal/customerPortalTicketIntake";
+import {
+  CUSTOMER_TEAM_ACTIVITY_EVENT_TYPES,
+} from "$lib/server/support/ticketCustomerProgressRepository";
+import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
+import {
+  deleteStoredSupportImages,
+  uploadSupportMessageAttachments,
+} from "$lib/server/support/supportMessageAttachmentRepository";
 
 export const CUSTOMER_TICKET_STATUSES = [
   "new",
@@ -32,18 +48,13 @@ export const CUSTOMER_TICKET_STATUSES = [
   "closed",
 ] as const;
 
-export const CUSTOMER_TICKET_PRIORITIES = [
-  "low",
-  "normal",
-  "high",
-  "urgent",
-] as const;
-
+export const CUSTOMER_TICKET_PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 export const CUSTOMER_TICKET_PERIODS = ["all", "7d", "30d", "90d"] as const;
 
 export type CustomerTicketStatus = (typeof CUSTOMER_TICKET_STATUSES)[number];
 export type CustomerTicketPriority = (typeof CUSTOMER_TICKET_PRIORITIES)[number];
 export type CustomerTicketPeriod = (typeof CUSTOMER_TICKET_PERIODS)[number];
+export type CustomerTicketContextScope = "unit" | "global";
 
 export type CustomerTicketListFilters = {
   groupId: number | null;
@@ -55,6 +66,28 @@ export type CustomerTicketListFilters = {
   page: number;
   pageSize: number;
 };
+
+export type CustomerTicketDisplayContext = {
+  scope: CustomerTicketContextScope;
+  groupId: number | null;
+  groupName: string;
+  unitId: number | null;
+  unitName: string;
+  unitSchema: string | null;
+};
+
+export type CreateCustomerF10TicketInput = {
+  scope: CustomerTicketContextScope;
+  groupId: number | null;
+  unitId: number | null;
+  subject: string;
+  message: string;
+  files?: File[];
+};
+
+export function canUseGlobalCustomerContext(session: CustomerF10PortalSession): boolean {
+  return session.groups.length > 1 || listAuthorizedF10Contexts(session).length > 1;
+}
 
 function hasSelectedUnitContext(session: CustomerF10PortalSession): boolean {
   return session.selectedGroupId !== null &&
@@ -85,22 +118,52 @@ function contextAuthorizationCondition(
   session: CustomerF10PortalSession,
   contexts: CustomerF10AuthorizedContext[],
 ): SQL | null {
-  if (contexts.length === 0) return null;
-  const condition = or(
-    ...contexts.map((context) =>
-      and(
-        eq(ticketCustomerContexts.legacyUserId, session.legacyUserId),
-        eq(ticketCustomerContexts.groupId, context.groupId),
-        eq(ticketCustomerContexts.unitId, context.unitId),
-      ),
-    ),
+  const conditions: SQL[] = [];
+  const globalCondition = and(
+    eq(ticketCustomerContexts.legacyUserId, session.legacyUserId),
+    eq(ticketCustomerContexts.contextScope, "global"),
   );
-  return condition ?? null;
+  if (globalCondition) conditions.push(globalCondition);
+
+  for (const context of contexts) {
+    const unitCondition = and(
+      eq(ticketCustomerContexts.legacyUserId, session.legacyUserId),
+      eq(ticketCustomerContexts.contextScope, "unit"),
+      eq(ticketCustomerContexts.groupId, context.groupId),
+      eq(ticketCustomerContexts.unitId, context.unitId),
+    );
+    if (unitCondition) conditions.push(unitCondition);
+  }
+
+  return conditions.length > 0 ? or(...conditions) ?? null : null;
+}
+
+function globalDisplayContext(): CustomerTicketDisplayContext {
+  return {
+    scope: "global",
+    groupId: null,
+    groupName: "Todos os grupos",
+    unitId: null,
+    unitName: "Global",
+    unitSchema: null,
+  };
+}
+
+function unitDisplayContext(context: CustomerF10AuthorizedContext): CustomerTicketDisplayContext {
+  return {
+    scope: "unit",
+    groupId: context.groupId,
+    groupName: context.groupName,
+    unitId: context.unitId,
+    unitName: context.unitName,
+    unitSchema: context.unitSchema,
+  };
 }
 
 function ticketContextFromRow(
   row: {
     contextTicketId: string | null;
+    contextScope: string | null;
     groupId: number | null;
     groupName: string | null;
     unitId: number | null;
@@ -108,7 +171,8 @@ function ticketContextFromRow(
     unitSchema: string | null;
   },
   fallback: CustomerF10AuthorizedContext | null,
-): CustomerF10AuthorizedContext | null {
+): CustomerTicketDisplayContext | null {
+  if (row.contextTicketId && row.contextScope === "global") return globalDisplayContext();
   if (
     row.contextTicketId &&
     row.groupId !== null &&
@@ -118,6 +182,7 @@ function ticketContextFromRow(
     row.unitSchema
   ) {
     return {
+      scope: "unit",
       groupId: row.groupId,
       groupName: row.groupName,
       unitId: row.unitId,
@@ -125,7 +190,7 @@ function ticketContextFromRow(
       unitSchema: row.unitSchema,
     };
   }
-  return fallback;
+  return fallback ? unitDisplayContext(fallback) : null;
 }
 
 export async function listCustomerF10Tickets(
@@ -133,14 +198,24 @@ export async function listCustomerF10Tickets(
   filters: CustomerTicketListFilters,
 ) {
   const authorizedContexts = listAuthorizedF10Contexts(session);
+  if (authorizedContexts.length === 0) {
+    return { tickets: [], total: 0, page: 1, pageSize: filters.pageSize, totalPages: 0 };
+  }
+
   const scopedContexts = filterAuthorizedContexts(authorizedContexts, filters);
-  const contextCondition = contextAuthorizationCondition(session, scopedContexts);
+  const hasContextFilter = filters.groupId !== null || filters.unitId !== null;
+  if (hasContextFilter && scopedContexts.length === 0) {
+    return { tickets: [], total: 0, page: 1, pageSize: filters.pageSize, totalPages: 0 };
+  }
+
+  const contextsForAuthorization = hasContextFilter ? scopedContexts : authorizedContexts;
+  const contextCondition = contextAuthorizationCondition(session, contextsForAuthorization);
   if (!contextCondition) {
     return { tickets: [], total: 0, page: 1, pageSize: filters.pageSize, totalPages: 0 };
   }
 
   const conditions: SQL[] = [eq(tickets.customerContactId, session.contactId)];
-  const allowLegacyWithoutContext = authorizedContexts.length === 1 && scopedContexts.length === 1;
+  const allowLegacyWithoutContext = authorizedContexts.length === 1 && contextsForAuthorization.length === 1;
   const authorizedTicketCondition = allowLegacyWithoutContext
     ? or(contextCondition, isNull(ticketCustomerContexts.ticketId))
     : contextCondition;
@@ -188,6 +263,7 @@ export async function listCustomerF10Tickets(
       createdAt: tickets.createdAt,
       updatedAt: tickets.updatedAt,
       contextTicketId: ticketCustomerContexts.ticketId,
+      contextScope: ticketCustomerContexts.contextScope,
       groupId: ticketCustomerContexts.groupId,
       groupName: ticketCustomerContexts.groupName,
       unitId: ticketCustomerContexts.unitId,
@@ -201,23 +277,74 @@ export async function listCustomerF10Tickets(
     .limit(filters.pageSize)
     .offset((page - 1) * filters.pageSize);
 
+  const ticketIds = rows.map((row) => row.id);
+  const detailPaths = ticketIds.map((ticketId) => `/cliente/chamados/${ticketId}`);
+  const [teamActivityRows, viewedRows] = ticketIds.length > 0
+    ? await Promise.all([
+        db
+          .select({
+            ticketId: ticketEvents.ticketId,
+            lastTeamActivityAt: sql<Date | null>`max(${ticketEvents.createdAt})`,
+          })
+          .from(ticketEvents)
+          .where(
+            and(
+              inArray(ticketEvents.ticketId, ticketIds),
+              inArray(ticketEvents.eventType, [...CUSTOMER_TEAM_ACTIVITY_EVENT_TYPES]),
+            ),
+          )
+          .groupBy(ticketEvents.ticketId),
+        db
+          .select({
+            path: customerActivityEvents.path,
+            lastViewedAt: sql<Date | null>`max(${customerActivityEvents.createdAt})`,
+          })
+          .from(customerActivityEvents)
+          .where(
+            and(
+              eq(customerActivityEvents.customerContactId, session.contactId),
+              eq(customerActivityEvents.eventType, "ticket.detail.view"),
+              inArray(customerActivityEvents.path, detailPaths),
+            ),
+          )
+          .groupBy(customerActivityEvents.path),
+      ])
+    : [[], []];
+
+  const teamActivityByTicket = new Map(
+    teamActivityRows.map((row) => [row.ticketId, row.lastTeamActivityAt]),
+  );
+  const lastViewedByPath = new Map(
+    viewedRows.map((row) => [row.path, row.lastViewedAt]),
+  );
   const fallbackContext = authorizedContexts.length === 1 ? authorizedContexts[0] ?? null : null;
+
   return {
-    tickets: rows.map((row) => ({
-      id: row.id,
-      ticketNumber: row.ticketNumber,
-      subject: row.subject,
-      status: row.status,
-      priority: row.priority,
-      channel: row.channel,
-      firstResponseDueAt: row.firstResponseDueAt,
-      resolutionDueAt: row.resolutionDueAt,
-      firstResponseAt: row.firstResponseAt,
-      resolvedAt: row.resolvedAt,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      context: ticketContextFromRow(row, fallbackContext),
-    })),
+    tickets: rows.map((row) => {
+      const lastTeamActivityAt = teamActivityByTicket.get(row.id) ?? null;
+      const lastViewedAt = lastViewedByPath.get(`/cliente/chamados/${row.id}`) ?? null;
+      const hasUnreadUpdate = Boolean(
+        lastTeamActivityAt &&
+        (!lastViewedAt || new Date(lastTeamActivityAt).getTime() > new Date(lastViewedAt).getTime()),
+      );
+      return {
+        id: row.id,
+        ticketNumber: row.ticketNumber,
+        subject: row.subject,
+        status: row.status,
+        priority: row.priority,
+        channel: row.channel,
+        firstResponseDueAt: row.firstResponseDueAt,
+        resolutionDueAt: row.resolutionDueAt,
+        firstResponseAt: row.firstResponseAt,
+        resolvedAt: row.resolvedAt,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        lastTeamActivityAt,
+        hasUnreadUpdate,
+        context: ticketContextFromRow(row, fallbackContext),
+      };
+    }),
     total,
     page,
     pageSize: filters.pageSize,
@@ -233,12 +360,10 @@ export async function getCustomerF10Ticket(
   if (!details) return null;
 
   const authorizedContexts = listAuthorizedF10Contexts(session);
-  if (authorizedContexts.length === 0) return null;
-
-  const db = getDatabase();
-  const [context] = await db
+  const [context] = await getDatabase()
     .select({
       legacyUserId: ticketCustomerContexts.legacyUserId,
+      contextScope: ticketCustomerContexts.contextScope,
       groupId: ticketCustomerContexts.groupId,
       groupName: ticketCustomerContexts.groupName,
       unitId: ticketCustomerContexts.unitId,
@@ -251,11 +376,20 @@ export async function getCustomerF10Ticket(
 
   if (!context) {
     if (authorizedContexts.length !== 1) return null;
-    return { ...details, context: authorizedContexts[0] };
+    return { ...details, context: unitDisplayContext(authorizedContexts[0]) };
+  }
+
+  if (context.legacyUserId !== session.legacyUserId) return null;
+  if (context.contextScope === "global") {
+    return { ...details, context: globalDisplayContext() };
   }
 
   if (
-    context.legacyUserId !== session.legacyUserId ||
+    context.groupId === null ||
+    !context.groupName ||
+    context.unitId === null ||
+    !context.unitName ||
+    !context.unitSchema ||
     !isAuthorizedF10Context(session, context.groupId, context.unitId)
   ) {
     return null;
@@ -264,6 +398,7 @@ export async function getCustomerF10Ticket(
   return {
     ...details,
     context: {
+      scope: "unit" as const,
       groupId: context.groupId,
       groupName: context.groupName,
       unitId: context.unitId,
@@ -273,14 +408,143 @@ export async function getCustomerF10Ticket(
   };
 }
 
+export async function createCustomerF10Ticket(
+  session: CustomerF10PortalSession,
+  input: CreateCustomerF10TicketInput,
+) {
+  const authorizedContexts = listAuthorizedF10Contexts(session);
+  const unitContext = input.scope === "unit"
+    ? authorizedContexts.find(
+        (item) => item.groupId === input.groupId && item.unitId === input.unitId,
+      ) ?? null
+    : null;
+
+  if (input.scope === "unit" && !unitContext) {
+    throw new Error("CUSTOMER_TICKET_CONTEXT_NOT_AUTHORIZED");
+  }
+  if (input.scope === "global" && !canUseGlobalCustomerContext(session)) {
+    throw new Error("CUSTOMER_TICKET_GLOBAL_CONTEXT_NOT_ALLOWED");
+  }
+
+  const subject = input.subject.trim();
+  const message = input.message.trim();
+  if (subject.length < 3 || subject.length > 180) throw new Error("CUSTOMER_TICKET_SUBJECT_INVALID");
+  if (message.length < 1 || message.length > 10_000) throw new Error("CUSTOMER_TICKET_MESSAGE_INVALID");
+
+  const intake = await resolveCustomerPortalTicketIntake();
+  const ticketId = randomUUID();
+  const messageId = randomUUID();
+  const storedAttachments = await uploadSupportMessageAttachments(
+    ticketId,
+    messageId,
+    input.files ?? [],
+  );
+  const db = getDatabase();
+  const now = new Date();
+
+  let ticket: { id: string; ticketNumber: number };
+  try {
+    ticket = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(tickets)
+        .values({
+          id: ticketId,
+          customerContactId: session.contactId,
+          queueId: intake.queueId,
+          subject,
+          status: intake.lifecycleStatus,
+          priority: "normal",
+          channel: "portal",
+          dueOn: sql`CURRENT_DATE + ${intake.defaultDueDays}::integer`,
+        })
+        .returning({ id: tickets.id, ticketNumber: tickets.ticketNumber });
+      if (!created) throw new Error("CUSTOMER_TICKET_NOT_CREATED");
+
+      await tx.insert(ticketMessages).values({
+        id: messageId,
+        ticketId,
+        authorType: "customer",
+        customerContactId: session.contactId,
+        visibility: "public",
+        channel: "portal",
+        body: message,
+      });
+
+      if (storedAttachments.length > 0) {
+        await tx.insert(ticketMessageAttachments).values(
+          storedAttachments.map((attachment) => ({
+            messageId,
+            ticketId,
+            storageKey: attachment.storageKey,
+            originalName: attachment.originalName,
+            mimeType: attachment.mimeType,
+            sizeBytes: attachment.sizeBytes,
+            checksumSha256: attachment.checksumSha256,
+          })),
+        );
+      }
+
+      await tx.insert(ticketCustomerContexts).values({
+        ticketId,
+        customerContactId: session.contactId,
+        legacyUserId: session.legacyUserId,
+        contextScope: input.scope,
+        groupId: unitContext?.groupId ?? null,
+        groupName: unitContext?.groupName ?? null,
+        unitId: unitContext?.unitId ?? null,
+        unitName: unitContext?.unitName ?? null,
+        unitSchema: unitContext?.unitSchema ?? null,
+        updatedAt: now,
+      });
+
+      await tx.insert(ticketWorkflowStates).values({
+        ticketId,
+        globalWorkflowId: intake.workflowId,
+        globalStageId: intake.stageId,
+        enteredAt: now,
+        updatedAt: now,
+      });
+
+      await tx.insert(ticketEvents).values({
+        ticketId,
+        eventType: "portal.ticket.created",
+        metadata: {
+          contextScope: input.scope,
+          groupId: unitContext?.groupId ?? null,
+          unitId: unitContext?.unitId ?? null,
+          attachmentCount: storedAttachments.length,
+        },
+      });
+
+      return created;
+    });
+  } catch (cause) {
+    await deleteStoredSupportImages(storedAttachments);
+    throw cause;
+  }
+
+  await notifySupportTicketNeedsAttention(
+    ticket.id,
+    "Novo chamado aberto pelo Portal do Cliente.",
+  ).catch((cause) => {
+    console.error("[customer.portal.ticket.notification]", {
+      ticketId: ticket.id,
+      causeType: cause instanceof Error ? cause.name : typeof cause,
+    });
+  });
+
+  return ticket;
+}
+
 export async function replyCustomerF10Ticket(
   session: CustomerF10PortalSession,
   ticketId: string,
   body: string,
+  files: File[] = [],
 ): Promise<void> {
   const ticket = await getCustomerF10Ticket(session, ticketId);
   if (!ticket) throw new Error("CUSTOMER_TICKET_NOT_FOUND");
-  await replyCustomerPortalTicket(session.contactId, ticketId, body);
+  await replyCustomerPortalTicket(session.contactId, ticketId, body, files);
 }
 
 export async function bindTicketF10Context(
@@ -298,10 +562,7 @@ export async function bindTicketF10Context(
   await db.transaction(async (tx) => {
     await tx
       .update(tickets)
-      .set({
-        customerContactId: session.contactId,
-        updatedAt: now,
-      })
+      .set({ customerContactId: session.contactId, updatedAt: now })
       .where(eq(tickets.id, ticketId));
 
     await tx
@@ -320,6 +581,7 @@ export async function bindTicketF10Context(
         ticketId,
         customerContactId: session.contactId,
         legacyUserId: session.legacyUserId,
+        contextScope: "unit",
         groupId: session.selectedGroupId as number,
         groupName: session.selectedGroupName ?? "",
         unitId: session.selectedUnitId as number,
@@ -332,6 +594,7 @@ export async function bindTicketF10Context(
         set: {
           customerContactId: session.contactId,
           legacyUserId: session.legacyUserId,
+          contextScope: "unit",
           groupId: session.selectedGroupId as number,
           groupName: session.selectedGroupName ?? "",
           unitId: session.selectedUnitId as number,

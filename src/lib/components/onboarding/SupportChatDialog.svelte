@@ -16,14 +16,6 @@
     X,
   } from "lucide-svelte";
 
-  type CustomerSupportContext = {
-    authenticated: boolean;
-    name: string;
-    email: string;
-    groupName: string | null;
-    unitName: string | null;
-  };
-
   type CustomerUnit = {
     id: number;
     name: string;
@@ -35,7 +27,22 @@
     units: CustomerUnit[];
   };
 
-  type AuthState = CustomerSupportContext & {
+  type CustomerSupportContext = {
+    authenticated: boolean;
+    name: string;
+    email: string;
+    groupName: string | null;
+    unitName: string | null;
+    requiresUnitSelection?: boolean;
+    groups?: CustomerGroup[];
+  };
+
+  type AuthState = {
+    authenticated: boolean;
+    name: string;
+    email: string;
+    groupName: string | null;
+    unitName: string | null;
     requiresUnitSelection: boolean;
     groups: CustomerGroup[];
   };
@@ -109,6 +116,8 @@
     email: "",
     groupName: null,
     unitName: null,
+    requiresUnitSelection: false,
+    groups: [],
   };
 
   const STORAGE_KEY = "f10-support-chat-session-v1";
@@ -177,12 +186,24 @@
 
   function initializeAuthState(): void {
     authState = {
-      ...customerSupport,
-      requiresUnitSelection: false,
-      groups: [],
+      authenticated: customerSupport.authenticated,
+      name: customerSupport.name,
+      email: customerSupport.email,
+      groupName: customerSupport.groupName,
+      unitName: customerSupport.unitName,
+      requiresUnitSelection: customerSupport.requiresUnitSelection ?? false,
+      groups: customerSupport.groups ?? [],
     };
     loginEmail = customerSupport.email;
+    prepareUnitSelection();
     authInitialized = true;
+  }
+
+  function prepareUnitSelection(): void {
+    const currentGroup = authState.groups.find((group) => group.name === authState.groupName);
+    const group = currentGroup ?? authState.groups[0] ?? null;
+    selectedGroupId = group?.id ?? 0;
+    selectedUnitId = group?.units.length === 1 ? group.units[0]?.id ?? 0 : 0;
   }
 
   function nowIso(): string {
@@ -384,10 +405,12 @@
     guestMessages = [...guestMessages, createGuestMessage("customer", option.label)];
 
     if (option.initialHandling === "human") {
-      guestMessages = [
-        ...guestMessages,
-        createGuestMessage("assistant", "Certo. Para falar com a equipe, preciso identificar sua conta F10. O login acontece aqui mesmo e sua senha não fica armazenada."),
-      ];
+      const message = authState.authenticated
+        ? authState.requiresUnitSelection
+          ? "Certo. Sua conta já está identificada. Selecione o grupo e a unidade para eu encaminhar este atendimento."
+          : "Certo. Sua conta já está identificada. Vou encaminhar este atendimento para a equipe F10."
+        : "Certo. Para falar com a equipe, preciso identificar sua conta F10. O login acontece aqui mesmo e sua senha não fica armazenada.";
+      guestMessages = [...guestMessages, createGuestMessage("assistant", message)];
       await requestHumanSupport();
       return;
     }
@@ -464,11 +487,17 @@
     errorMessage = "";
 
     if (authState.authenticated) {
+      if (authState.requiresUnitSelection) {
+        authStep = "unit";
+        prepareUnitSelection();
+        await scrollToLatest();
+        return;
+      }
       await startHumanChat();
       return;
     }
 
-    authStep = authState.requiresUnitSelection ? "unit" : "login";
+    authStep = "login";
     await scrollToLatest();
   }
 
@@ -493,9 +522,7 @@
       loginPassword = "";
       if (authState.requiresUnitSelection) {
         authStep = "unit";
-        const firstGroup = authState.groups[0];
-        selectedGroupId = firstGroup?.id ?? 0;
-        selectedUnitId = firstGroup?.units[0]?.id ?? 0;
+        prepareUnitSelection();
         return;
       }
 
@@ -511,8 +538,8 @@
   function handleGroupChange(event: Event): void {
     const target = event.currentTarget as HTMLSelectElement;
     selectedGroupId = Number(target.value);
-    const firstUnit = authState.groups.find((group) => group.id === selectedGroupId)?.units[0];
-    selectedUnitId = firstUnit?.id ?? 0;
+    const units = authState.groups.find((group) => group.id === selectedGroupId)?.units ?? [];
+    selectedUnitId = units.length === 1 ? units[0]?.id ?? 0 : 0;
   }
 
   async function submitUnitSelection(): Promise<void> {
@@ -578,7 +605,7 @@
 
       if (!response.ok) {
         if (response.status === 401) {
-          authState = { ...authState, authenticated: false };
+          authState = { ...authState, authenticated: false, requiresUnitSelection: false, groups: [] };
           authStep = "login";
           handoffRequested = true;
         }
@@ -638,7 +665,7 @@
       if (response.status === 401) {
         if (payload.error === "CUSTOMER_AUTH_REQUIRED") {
           authRequiredForSession = true;
-          authState = { ...authState, authenticated: false };
+          authState = { ...authState, authenticated: false, requiresUnitSelection: false, groups: [] };
           handoffRequested = true;
           authStep = "login";
           errorMessage = "Sua sessão F10 expirou. Entre novamente aqui para continuar o mesmo atendimento.";
@@ -794,7 +821,7 @@
         errorMessage = apiErrorMessage(error);
         if (response.status === 401 && error === "CUSTOMER_AUTH_REQUIRED") {
           authRequiredForSession = true;
-          authState = { ...authState, authenticated: false };
+          authState = { ...authState, authenticated: false, requiresUnitSelection: false, groups: [] };
           handoffRequested = true;
           authStep = "login";
         }
@@ -1033,7 +1060,7 @@
               {:else if authStep === "unit"}
                 <div class="flex items-start gap-2.5">
                   <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><CheckCircle2 size={16}/></span>
-                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">Selecione a unidade</h3><p class="mt-1 text-[9px] leading-4 text-[#7B8292]">Isso vincula o atendimento ao contexto correto da sua conta F10.</p></div>
+                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">Selecione a unidade</h3><p class="mt-1 text-[9px] leading-4 text-[#7B8292]">Sua conta já está autenticada. Escolha o grupo e a unidade para vincular o atendimento corretamente.</p></div>
                 </div>
                 <form class="mt-4 space-y-3" on:submit|preventDefault={submitUnitSelection}>
                   <label class="block text-[9px] font-semibold text-[#596171]">Grupo<select value={selectedGroupId || ""} on:change={handleGroupChange} required class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 text-[11px] font-normal outline-none"><option value="" disabled>Selecione</option>{#each authState.groups as group}<option value={group.id}>{group.name}</option>{/each}</select></label>

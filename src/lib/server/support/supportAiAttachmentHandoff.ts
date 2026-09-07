@@ -15,7 +15,7 @@ export async function handoffSupportChatForAttachment(sessionId: string) {
     .where(eq(webChatSessions.id, sessionId))
     .limit(1);
 
-  if (!session || session.aiState !== "active") {
+  if (!session || !session.ticketId || session.aiState !== "active") {
     return {
       processed: false,
       state: session?.aiState ?? ("disabled" as const),

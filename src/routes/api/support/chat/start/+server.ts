@@ -1,35 +1,31 @@
 import { dev } from "$app/environment";
 import { json, type RequestHandler } from "@sveltejs/kit";
+import { eq } from "drizzle-orm";
 import { recordCustomerActivity } from "$lib/server/customerPortal/customerActivityRepository";
-import { bindTicketF10Context } from "$lib/server/customerPortal/customerF10TicketRepository";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
+import { getDatabase } from "$lib/server/db";
+import { webChatSessions } from "$lib/server/db/chatSchema";
 import { markHelpSearchOutcome } from "$lib/server/help/helpSearchRepository";
+import { listPublicSupportChatEntryOptions } from "$lib/server/support/supportChatEntryRepository";
+import { resumeActiveCustomerChatSession } from "$lib/server/support/customerChatSessionRepository";
 import {
-  isSupportAiChatEnabled,
-  processSupportAiChatMessage,
-} from "$lib/server/support/supportAiChat";
-import { persistSupportChatHandoffContext } from "$lib/server/support/supportChatHandoffContext";
-import {
-  listPublicSupportChatEntryOptions,
-} from "$lib/server/support/supportChatEntryRepository";
-import { handlePureSupportGreeting } from "$lib/server/support/supportChatLocalIntent";
-import {
+  addPublicChatMessage,
   addPublicChatSystemMessage,
   startPublicChat,
 } from "$lib/server/support/publicChatRepository";
 import { getSupportAvailabilityStatus } from "$lib/server/support/publicSupportStatus";
-import { autoAssignTicketIfConfigured } from "$lib/server/support/supportRoutingRepository";
-import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
+import { notifySupportChatNeedsAttention } from "$lib/server/support/supportTeamNotifications";
 
 const MAX_BODY_BYTES = 32 * 1024;
 const MAX_HANDOFF_TRANSCRIPT_CHARS = 8_000;
+const MAX_HANDOFF_REASON_CHARS = 500;
 const LAST_HELP_SEARCH_COOKIE = "f10_support_last_help_search";
 
 type ChatStartDiagnosticCode =
   | "RATE_LIMIT_NOT_CONFIGURED"
   | "SUPPORT_QUEUE_UNAVAILABLE"
   | "DATABASE_UNAVAILABLE"
-  | "CUSTOMER_CONTEXT_BIND_FAILED"
+  | "CUSTOMER_CONTEXT_REQUIRED"
   | "CHAT_START_FAILED";
 
 function isBodyTooLarge(request: Request): boolean {
@@ -47,23 +43,16 @@ function isUuid(value: string): boolean {
 
 function sanitizeContextUrl(value: string): string {
   if (!value || value.length > 1000) return "";
-
   try {
     const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:"
-      ? url.toString()
-      : "";
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : "";
   } catch {
     return "";
   }
 }
 
-async function resolveEffectiveEntryOptionId(
-  entryOptionId: string | null,
-  forceHuman: boolean,
-): Promise<string | null> {
-  if (entryOptionId || !forceHuman) return entryOptionId;
-
+async function resolveEffectiveEntryOptionId(entryOptionId: string | null): Promise<string | null> {
+  if (entryOptionId) return entryOptionId;
   const options = await listPublicSupportChatEntryOptions();
   const preferred = options.find((option) => option.initialHandling === "human") ?? options[0];
   return preferred?.id ?? null;
@@ -73,20 +62,14 @@ function buildOutOfHoursMessage(nextOpenLabel: string | null): string {
   const nextOpen = nextOpenLabel
     ? ` Nossa equipe retorna ${nextOpenLabel.toLowerCase()}.`
     : " Nossa equipe responderá no próximo período de atendimento.";
-  return `Recebemos seu atendimento e ele ficou registrado na fila.${nextOpen}`;
+  return `Recebemos sua conversa e ela ficou aguardando a equipe F10.${nextOpen}`;
 }
 
 function diagnoseChatStartFailure(cause: unknown): ChatStartDiagnosticCode {
   if (!(cause instanceof Error)) return "CHAT_START_FAILED";
-  if (cause.message.includes("SUPPORT_RATE_LIMIT_SECRET")) {
-    return "RATE_LIMIT_NOT_CONFIGURED";
-  }
-  if (cause.message === "CHAT_QUEUE_NOT_FOUND") {
-    return "SUPPORT_QUEUE_UNAVAILABLE";
-  }
-  if (cause.message === "F10_CUSTOMER_UNIT_REQUIRED") {
-    return "CUSTOMER_CONTEXT_BIND_FAILED";
-  }
+  if (cause.message.includes("SUPPORT_RATE_LIMIT_SECRET")) return "RATE_LIMIT_NOT_CONFIGURED";
+  if (cause.message === "CHAT_QUEUE_NOT_FOUND") return "SUPPORT_QUEUE_UNAVAILABLE";
+  if (cause.message === "F10_CUSTOMER_UNIT_REQUIRED") return "CUSTOMER_CONTEXT_REQUIRED";
   if (
     cause.message.includes("DATABASE_URL") ||
     cause.name === "PostgresError" ||
@@ -102,7 +85,14 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
   if (origin && origin !== url.origin) return json({ error: "INVALID_ORIGIN" }, { status: 403 });
 
   const customer = await getOptionalCustomerF10PortalSession(cookies);
-  if (!customer || customer.selectedGroupId === null || customer.selectedUnitId === null) {
+  if (
+    !customer ||
+    customer.selectedGroupId === null ||
+    customer.selectedUnitId === null ||
+    !customer.selectedGroupName ||
+    !customer.selectedUnitName ||
+    !customer.selectedUnitSchema
+  ) {
     return json(
       {
         error: "CUSTOMER_AUTH_REQUIRED",
@@ -112,16 +102,21 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
     );
   }
 
-  if (isBodyTooLarge(request)) {
-    return json({ error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
-  }
+  if (isBodyTooLarge(request)) return json({ error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
 
   let body: Record<string, unknown>;
-
   try {
     body = (await request.json()) as Record<string, unknown>;
   } catch {
     return json({ error: "INVALID_JSON" }, { status: 400 });
+  }
+
+  const forceHuman = body.forceHuman === true;
+  if (!forceHuman) {
+    return json(
+      { error: "HUMAN_HANDOFF_REQUIRED" },
+      { status: 400, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   const name = customer.name.trim() || customer.email;
@@ -132,23 +127,17 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
   const contextUrl = sanitizeContextUrl(readString(body.contextUrl));
   const pageTitle = readString(body.pageTitle).slice(0, 200);
   const helpContext = readString(body.helpContext).slice(0, 200);
-  const forceHuman = body.forceHuman === true;
   const handoffTranscript = readString(body.handoffTranscript).slice(0, MAX_HANDOFF_TRANSCRIPT_CHARS);
+  const handoffReason = readString(body.handoffReason).slice(0, MAX_HANDOFF_REASON_CHARS);
   const storedSearchEventId = cookies.get(LAST_HELP_SEARCH_COOKIE) ?? "";
   const correlatedSearchEventId = isUuid(storedSearchEventId) ? storedSearchEventId : null;
 
-  if (name.length < 1 || name.length > 120 || email.length > 254) {
+  if (name.length < 1 || name.length > 120 || email.length > 254 || phone.length > 40) {
     return json({ error: "INVALID_CONTACT" }, { status: 400 });
   }
-
-  if (phone.length > 40) {
-    return json({ error: "INVALID_CONTACT" }, { status: 400 });
-  }
-
   if (message.length < 1 || message.length > 4000) {
     return json({ error: "INVALID_MESSAGE" }, { status: 400 });
   }
-
   if (entryOptionId && !isUuid(entryOptionId)) {
     return json({ error: "INVALID_ENTRY_OPTION" }, { status: 400 });
   }
@@ -160,119 +149,131 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
     clientAddress = "unknown";
   }
 
+  const customerContext = {
+    legacyUserId: customer.legacyUserId,
+    groupId: customer.selectedGroupId,
+    groupName: customer.selectedGroupName,
+    unitId: customer.selectedUnitId,
+    unitName: customer.selectedUnitName,
+    unitSchema: customer.selectedUnitSchema,
+  };
+  const handoffContextData = {
+    pageTitle: pageTitle || null,
+    helpContext: helpContext || null,
+    authenticatedCustomer: true,
+    assistantHandoff: true,
+    handoffReason: handoffReason || null,
+    handoffTranscript: handoffTranscript || null,
+  };
+
   try {
     const [effectiveEntryOptionId, availability] = await Promise.all([
-      resolveEffectiveEntryOptionId(entryOptionId, forceHuman),
+      resolveEffectiveEntryOptionId(entryOptionId),
       getSupportAvailabilityStatus(),
     ]);
-    const session = await startPublicChat(clientAddress, {
-      name,
-      email,
-      phone,
-      message,
-      entryOptionId: effectiveEntryOptionId,
+
+    const resumedSession = await resumeActiveCustomerChatSession({
+      customerContext,
       contextUrl,
-      contextData: {
-        pageTitle: pageTitle || null,
-        helpContext: helpContext || null,
-        authenticatedCustomer: true,
-        legacyUserId: customer.legacyUserId,
-        groupId: customer.selectedGroupId,
-        groupName: customer.selectedGroupName,
-        unitId: customer.selectedUnitId,
-        unitName: customer.selectedUnitName,
-        assistantHandoff: forceHuman,
-        handoffTranscript: handoffTranscript || null,
-      },
-      enableAi: !forceHuman && isSupportAiChatEnabled(),
+      contextData: handoffContextData,
+      handoffReason,
     });
+    let session;
+    let reused = false;
 
-    await bindTicketF10Context(session.ticketId, customer);
+    if (resumedSession) {
+      reused = true;
+      await addPublicChatMessage(
+        clientAddress,
+        resumedSession.sessionId,
+        resumedSession.token,
+        message,
+      );
+      session = {
+        sessionId: resumedSession.sessionId,
+        token: resumedSession.token,
+        expiresAt: resumedSession.expiresAt,
+        aiState: resumedSession.aiState,
+        entryOptionLabel: resumedSession.entryOptionLabel,
+      };
+    } else {
+      session = await startPublicChat(clientAddress, {
+        name,
+        email,
+        phone,
+        message,
+        entryOptionId: effectiveEntryOptionId,
+        contextUrl,
+        contextData: handoffContextData,
+        enableAi: false,
+        customerContext,
+      });
+    }
 
-    if (forceHuman && correlatedSearchEventId) {
-      await markHelpSearchOutcome(correlatedSearchEventId, {
-        escalated: true,
-        ticketId: session.ticketId,
-      }).catch((cause) => {
+    const [chatIdentity] = await getDatabase()
+      .select({ chatNumber: webChatSessions.chatNumber })
+      .from(webChatSessions)
+      .where(eq(webChatSessions.id, session.sessionId))
+      .limit(1);
+    if (!chatIdentity) throw new Error("CHAT_SESSION_NOT_CREATED");
+
+    if (correlatedSearchEventId) {
+      await markHelpSearchOutcome(correlatedSearchEventId, { escalated: true }).catch((cause) => {
         console.error("[support.chat.help_handoff]", {
-          ticketId: session.ticketId,
+          sessionId: session.sessionId,
           causeType: cause instanceof Error ? cause.name : typeof cause,
         });
       });
       cookies.delete(LAST_HELP_SEARCH_COOKIE, { path: "/" });
     }
 
-    if (handoffTranscript) {
-      await persistSupportChatHandoffContext(session.ticketId, handoffTranscript).catch((cause) => {
-        console.error("[support.chat.handoff_context]", {
-          ticketId: session.ticketId,
-          causeType: cause instanceof Error ? cause.name : typeof cause,
-        });
-      });
-    }
-
     await recordCustomerActivity(customer, {
-      eventType: "support.chat.started",
+      eventType: reused ? "support.chat.resumed" : "support.chat.started",
       source: "help_center",
       path: contextUrl || "/ajuda-f10",
       metadata: {
-        ticketId: session.ticketId,
-        ticketNumber: session.ticketNumber,
+        sessionId: session.sessionId,
+        chatNumber: chatIdentity.chatNumber,
         entryOptionId: effectiveEntryOptionId,
         entryOptionLabel: session.entryOptionLabel,
-        assistantHandoff: forceHuman,
-        helpSearchEventId: forceHuman ? correlatedSearchEventId : null,
+        assistantHandoff: true,
+        handoffReason: handoffReason || null,
+        helpSearchEventId: correlatedSearchEventId,
         outsideSupportHours: availability.isOpen === false,
+        reused,
       },
     }).catch(() => undefined);
 
-    let ai: { state: "active" | "escalated" | "human" | "disabled"; processed: boolean } | null = null;
-    if (session.aiState === "active") {
-      const handledLocally = await handlePureSupportGreeting(session.sessionId, message);
-      ai = handledLocally
-        ? { state: "active", processed: true }
-        : await processSupportAiChatMessage(session.sessionId, message);
+    if (!reused && availability.isOpen === false) {
+      await addPublicChatSystemMessage(
+        session.sessionId,
+        buildOutOfHoursMessage(availability.nextOpenLabel),
+      ).catch(() => undefined);
     }
 
-    const effectiveAiState = ai?.state ?? session.aiState;
-    if (effectiveAiState !== "active") {
-      if (availability.isOpen === false) {
-        await addPublicChatSystemMessage(
-          session.ticketId,
-          buildOutOfHoursMessage(availability.nextOpenLabel),
-        ).catch((cause) => {
-          console.error("[support.chat.out_of_hours_message]", {
-            ticketId: session.ticketId,
-            causeType: cause instanceof Error ? cause.name : typeof cause,
-          });
-        });
-      } else {
-        const assignedUserId = await autoAssignTicketIfConfigured(session.ticketId).catch(() => null);
-        if (!assignedUserId) {
-          await notifySupportTicketNeedsAttention(
-            session.ticketId,
-            "Novo atendimento direcionado para atendimento humano.",
-          ).catch(() => undefined);
-        }
-      }
-    }
+    await notifySupportChatNeedsAttention(
+      session.sessionId,
+      reused
+        ? "Cliente retomou uma conversa de atendimento."
+        : "Novo atendimento solicitado pelo cliente.",
+    ).catch(() => undefined);
 
     return json(
       {
         sessionId: session.sessionId,
         token: session.token,
-        ticketNumber: session.ticketNumber,
+        chatNumber: chatIdentity.chatNumber,
+        ticketId: null,
+        // Mantido temporariamente para compatibilidade com o componente existente do chat.
+        ticketNumber: chatIdentity.chatNumber,
         entryOptionLabel: session.entryOptionLabel,
         expiresAt: session.expiresAt.toISOString(),
-        aiState: effectiveAiState,
-        aiProcessed: ai?.processed ?? false,
+        aiState: session.aiState,
         outsideSupportHours: availability.isOpen === false,
         nextOpenLabel: availability.nextOpenLabel,
+        reused,
       },
-      {
-        status: 201,
-        headers: { "Cache-Control": "no-store" },
-      },
+      { status: reused ? 200 : 201, headers: { "Cache-Control": "no-store" } },
     );
   } catch (cause) {
     if (cause instanceof Error && cause.message === "CHAT_RATE_LIMITED") {

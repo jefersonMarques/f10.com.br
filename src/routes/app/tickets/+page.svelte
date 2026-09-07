@@ -150,7 +150,7 @@
     pink: "border-[#E8C9D8] bg-[#FFF1F8]",
   };
 
-  let scope: Scope = "mine";
+  let scope: Scope = "all";
   let view: View = "board";
   let search = "";
   let workflowId = "global";

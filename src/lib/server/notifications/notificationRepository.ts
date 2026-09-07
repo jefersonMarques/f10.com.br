@@ -2,7 +2,7 @@ import { and, count, desc, eq, inArray, isNull, like, ne, notLike, or } from "dr
 import { getDatabase } from "$lib/server/db";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 
-export type NotificationEntityType = "ticket" | "task" | "system";
+export type NotificationEntityType = "ticket" | "task" | "chat" | "system";
 
 export type CreateNotificationInput = {
   userId: string;

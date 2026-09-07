@@ -298,15 +298,37 @@ export async function autoAssignTicketIfConfigured(
   const configuration = await getSupportRoutingConfiguration();
   if (configuration.assignmentMode !== "round_robin") return null;
 
-  const responders = await listEligibleSupportResponders();
-  if (responders.length === 0) return null;
-  const responderIds = responders.map((user) => user.id);
   const db = getDatabase();
+  const [chatSession] = await db
+    .select({ id: webChatSessions.id })
+    .from(webChatSessions)
+    .where(eq(webChatSessions.ticketId, ticketId))
+    .limit(1);
+  const isChat = Boolean(chatSession?.id);
+
+  const responders = await listEligibleSupportResponders();
+  let responderIds = responders.map((user) => user.id);
+  if (!isChat && responderIds.length > 0) {
+    const ticketResponderEligibility = await Promise.all(
+      responders.map(async (user) => ({
+        userId: user.id,
+        allowed: hasPermission(await resolveUserPermissions(user.id), "tickets.reply"),
+      })),
+    );
+    const ticketResponderIds = new Set(
+      ticketResponderEligibility
+        .filter((entry) => entry.allowed)
+        .map((entry) => entry.userId),
+    );
+    responderIds = responderIds.filter((userId) => ticketResponderIds.has(userId));
+  }
+  if (responderIds.length === 0) return null;
+
   const now = new Date();
   const activeAfter = new Date(now.getTime() - SUPPORT_AWAY_AFTER_MS);
 
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('f10-support-chat-routing'))`);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('f10-support-ticket-routing'))`);
 
     const [ticket] = await tx
       .select({
@@ -371,7 +393,7 @@ export async function autoAssignTicketIfConfigured(
     await tx.insert(ticketEvents).values({
       ticketId,
       actorUserId: null,
-      eventType: "chat.auto_assigned",
+      eventType: isChat ? "chat.auto_assigned" : "ticket.auto_assigned",
       metadata: {
         assignedUserId: candidate.userId,
         strategy: "round_robin",
@@ -379,18 +401,18 @@ export async function autoAssignTicketIfConfigured(
       },
     });
 
-    const [chatSession] = await tx
-      .select({ id: webChatSessions.id })
-      .from(webChatSessions)
-      .where(eq(webChatSessions.ticketId, ticketId))
-      .limit(1);
-
     await tx.insert(internalNotifications).values({
       userId: candidate.userId,
-      kind: "chat.assigned",
-      title: `Novo atendimento atribuído${ticket.ticketNumber ? ` · #${ticket.ticketNumber}` : ""}`,
-      body: "Um atendimento do chat foi atribuído automaticamente a você.",
-      href: chatSession?.id ? `/app/chat/${chatSession.id}` : `/app/tickets/${ticketId}`,
+      kind: isChat ? "chat.assigned" : "ticket.assigned",
+      title: isChat
+        ? `Novo atendimento atribuído${ticket.ticketNumber ? ` · #${ticket.ticketNumber}` : ""}`
+        : `Ticket #${ticket.ticketNumber} atribuído automaticamente`,
+      body: isChat
+        ? "Um atendimento do chat foi atribuído automaticamente a você."
+        : "Um novo ticket foi atribuído automaticamente a você.",
+      href: isChat && chatSession?.id
+        ? `/app/chat/${chatSession.id}`
+        : `/app/tickets/${ticketId}`,
       entityType: "ticket",
       entityId: ticketId,
     });

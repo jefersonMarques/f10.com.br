@@ -34,7 +34,7 @@ export async function handlePureSupportGreeting(
       .from(webChatSessions)
       .where(eq(webChatSessions.id, sessionId))
       .limit(1);
-    if (!session || session.aiState !== "active") return false;
+    if (!session || !session.ticketId || session.aiState !== "active") return false;
 
     const [ticket] = await tx
       .select({ firstResponseAt: tickets.firstResponseAt, assignedUserId: tickets.assignedUserId })

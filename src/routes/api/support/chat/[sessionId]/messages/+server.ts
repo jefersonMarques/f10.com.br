@@ -1,4 +1,5 @@
 import { json, type Cookies, type RequestHandler } from "@sveltejs/kit";
+import { isAuthorizedF10Context } from "$lib/server/customerPortal/customerF10AuthRepository";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { getTicketCustomerContext } from "$lib/server/support/ticketCustomerContextRepository";
 import { handoffSupportChatForAttachment } from "$lib/server/support/supportAiAttachmentHandoff";
@@ -7,11 +8,14 @@ import { handlePureSupportGreeting } from "$lib/server/support/supportChatLocalI
 import {
   addPublicChatMessage,
   authorizePublicChatSession,
+  authorizePublicChatSessionForRead,
   listPublicChatMessages,
 } from "$lib/server/support/publicChatRepository";
 import { SUPPORT_IMAGE_MAX_FILES } from "$lib/server/support/supportMessageAttachmentRepository";
 
 const MAX_BODY_BYTES = 36 * 1024 * 1024;
+
+type AuthorizedChatSession = Awaited<ReturnType<typeof authorizePublicChatSessionForRead>>;
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -22,7 +26,6 @@ function isUuid(value: string): boolean {
 function getBearerToken(request: Request): string {
   const authorization = request.headers.get("authorization") ?? "";
   if (!authorization.startsWith("Bearer ")) return "";
-
   const token = authorization.slice(7).trim();
   return /^[A-Za-z0-9_-]{40,120}$/.test(token) ? token : "";
 }
@@ -53,35 +56,52 @@ async function readMessagePayload(request: Request): Promise<{ body: string; fil
   };
 }
 
-async function authorizeF10CustomerForTicket(
+async function authorizeF10CustomerForChat(
   cookies: Cookies,
-  ticketId: string,
+  session: AuthorizedChatSession,
+  touchActivity: boolean,
 ): Promise<boolean> {
-  const customer = await getOptionalCustomerF10PortalSession(cookies);
-  if (!customer || customer.selectedUnitId === null) return false;
+  const customer = await getOptionalCustomerF10PortalSession(cookies, { touchActivity });
+  if (!customer) return false;
 
-  const context = await getTicketCustomerContext(ticketId);
-  if (!context) return false;
-  return context.legacyUserId === customer.legacyUserId &&
-    context.unitId === customer.selectedUnitId;
+  if (
+    session.legacyUserId &&
+    session.groupId !== null &&
+    session.unitId !== null
+  ) {
+    return session.legacyUserId === customer.legacyUserId &&
+      isAuthorizedF10Context(customer, session.groupId, session.unitId);
+  }
+
+  if (!session.ticketId) return false;
+  const context = await getTicketCustomerContext(session.ticketId);
+  if (
+    !context ||
+    context.scope !== "unit" ||
+    context.legacyUserId !== customer.legacyUserId ||
+    context.groupId === null ||
+    context.unitId === null
+  ) {
+    return false;
+  }
+  return isAuthorizedF10Context(customer, context.groupId, context.unitId);
 }
 
 export const GET: RequestHandler = async ({ params, request, cookies }) => {
   const sessionId = params.sessionId ?? "";
   const token = getBearerToken(request);
-
   if (!isUuid(sessionId) || !token) {
     return json({ error: "INVALID_SESSION" }, { status: 401 });
   }
 
-  let session: Awaited<ReturnType<typeof authorizePublicChatSession>>;
+  let session: AuthorizedChatSession;
   try {
-    session = await authorizePublicChatSession(sessionId, token);
+    session = await authorizePublicChatSessionForRead(sessionId, token);
   } catch {
     return json({ error: "INVALID_SESSION" }, { status: 401 });
   }
 
-  if (!await authorizeF10CustomerForTicket(cookies, session.ticketId)) {
+  if (!await authorizeF10CustomerForChat(cookies, session, false)) {
     return json(
       {
         error: "CUSTOMER_AUTH_REQUIRED",
@@ -94,7 +114,7 @@ export const GET: RequestHandler = async ({ params, request, cookies }) => {
   try {
     const messages = await listPublicChatMessages(sessionId, token);
     return json(
-      { messages, aiState: session.aiState },
+      { messages, aiState: session.aiState, ticketId: session.ticketId },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (cause) {
@@ -114,7 +134,6 @@ export const POST: RequestHandler = async ({
 }) => {
   const sessionId = params.sessionId ?? "";
   const token = getBearerToken(request);
-
   if (!isUuid(sessionId) || !token) {
     return json({ error: "INVALID_SESSION" }, { status: 401 });
   }
@@ -126,7 +145,7 @@ export const POST: RequestHandler = async ({
     return json({ error: "INVALID_SESSION" }, { status: 401 });
   }
 
-  if (!await authorizeF10CustomerForTicket(cookies, chatSession.ticketId)) {
+  if (!await authorizeF10CustomerForChat(cookies, chatSession, true)) {
     return json(
       {
         error: "CUSTOMER_AUTH_REQUIRED",
@@ -172,7 +191,7 @@ export const POST: RequestHandler = async ({
     );
 
     let ai: { state: "active" | "escalated" | "human" | "disabled"; processed: boolean } | null = null;
-    if (messageResult.aiState === "active") {
+    if (messageResult.aiState === "active" && messageResult.ticketId) {
       if (files.length > 0) {
         ai = await handoffSupportChatForAttachment(sessionId);
       } else {
@@ -189,6 +208,7 @@ export const POST: RequestHandler = async ({
         messageId: messageResult.messageId,
         aiState: ai?.state ?? messageResult.aiState,
         aiProcessed: ai?.processed ?? false,
+        ticketId: messageResult.ticketId,
       },
       { headers: { "Cache-Control": "no-store" } },
     );
@@ -205,7 +225,6 @@ export const POST: RequestHandler = async ({
     if (cause instanceof Error && cause.message.startsWith("ASSET_STORAGE_")) {
       return json({ error: "ATTACHMENT_STORAGE_UNAVAILABLE" }, { status: 503 });
     }
-
     return json({ error: "INVALID_SESSION" }, { status: 401 });
   }
 };
