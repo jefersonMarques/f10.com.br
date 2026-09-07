@@ -32,6 +32,8 @@ type GeneratedTimelinePlan = {
   }>;
 };
 
+const TRAINING_GENERATION_CONCURRENCY = 2;
+
 type GeneratedTrainingPlan = {
   title: string;
   audience: string;
@@ -302,6 +304,33 @@ async function generatePlan(
   };
 }
 
+async function generatePlans(
+  actorUserId: string,
+  contents: PublishedStructuredHelp[],
+): Promise<GeneratedTrainingPlan[]> {
+  if (contents.length === 0) return [];
+
+  const plans: GeneratedTrainingPlan[] = new Array(contents.length);
+  let nextIndex = 0;
+  const workers = Array.from(
+    { length: Math.min(TRAINING_GENERATION_CONCURRENCY, contents.length) },
+    async () => {
+      while (true) {
+        const index = nextIndex;
+        nextIndex += 1;
+        if (index >= contents.length) return;
+
+        const content = contents[index];
+        if (!content) throw new Error("TRAINING_SOURCE_CONTENT_NOT_PUBLISHED");
+        plans[index] = await generatePlan(actorUserId, content);
+      }
+    },
+  );
+
+  await Promise.all(workers);
+  return plans;
+}
+
 async function insertGeneratedSteps(
   tx: Parameters<Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]>[0],
   pathId: string,
@@ -426,10 +455,7 @@ export async function generateHelpTrainingFromPublishedContents(
     contents.push(content);
   }
 
-  const plans: GeneratedTrainingPlan[] = [];
-  for (const content of contents) {
-    plans.push(await generatePlan(actorUserId, content));
-  }
+  const plans = await generatePlans(actorUserId, contents);
 
   const multiContent = contents.length > 1;
   const title = multiContent
@@ -545,13 +571,12 @@ export async function regenerateHelpTrainingFromPublishedContent(
   if (items.length === 0) throw new Error("TRAINING_PATH_ITEM_REQUIRED");
 
   const contents: PublishedStructuredHelp[] = [];
-  const plans: GeneratedTrainingPlan[] = [];
   for (const item of items) {
     const content = await getPublishedStructuredHelpById(item.sourceContentId);
     if (!content) throw new Error("TRAINING_SOURCE_CONTENT_NOT_PUBLISHED");
     contents.push(content);
-    plans.push(await generatePlan(actorUserId, content));
   }
+  const plans = await generatePlans(actorUserId, contents);
 
   const primaryContent = contents[0];
   const primaryPlan = plans[0];

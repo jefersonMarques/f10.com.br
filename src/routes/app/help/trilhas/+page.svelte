@@ -108,6 +108,13 @@
           <p class="mt-2 max-w-[680px] text-[13px] leading-6 text-[#747B8A]">Cada conteúdo será um módulo independente. O participante conclui um módulo, volta ao mapa da jornada e então segue para o próximo.</p>
         </div>
 
+        {#if form?.message}
+          <div class="mx-6 mt-6 flex items-start gap-3 rounded-2xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[12px] font-medium text-[#9B2C2C] sm:mx-8">
+            <CircleAlert size={17} class="mt-0.5 shrink-0"/>
+            <span>{form.message}</span>
+          </div>
+        {/if}
+
         <form method="POST" action="?/create" use:enhance={enhanceCreate} class="grid gap-0 lg:grid-cols-[minmax(0,1fr)_310px]">
           <section class="px-6 py-7 sm:px-8">
             <label class="block">
