@@ -308,8 +308,12 @@
       const start = Math.max(0, Math.round(step.videoStartSeconds || 0));
       const end = Math.max(0, Math.round(step.videoEndSeconds || 0));
       const endParameter = end > start ? `&end=${end}` : "";
+      const pageOrigin = typeof window !== "undefined" ? window.location.origin : "";
+      const originParameters = pageOrigin
+        ? `&origin=${encodeURIComponent(pageOrigin)}&widget_referrer=${encodeURIComponent(pageOrigin)}`
+        : "";
       return id
-        ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&start=${start}${endParameter}`
+        ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&start=${start}${endParameter}${originParameters}`
         : null;
     } catch {
       return null;
@@ -452,6 +456,7 @@
       iframe.src = youtubeUrl;
       iframe.title = `Ajuda em vídeo: ${step.title}`;
       iframe.allow = "autoplay; encrypted-media; picture-in-picture";
+      iframe.referrerPolicy = "strict-origin-when-cross-origin";
       iframe.allowFullscreen = true;
       content.append(iframe);
     } else if (step.videoUrl) {
