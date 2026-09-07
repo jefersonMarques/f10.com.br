@@ -207,6 +207,7 @@
                   contentId={data.content.id}
                   blockId={block.id}
                   candidates={review?.candidates ?? [{ assetId: block.asset.id, candidateIndex: 1, timeSeconds: null, recommended: false }]}
+                  activeAssetId={block.asset.id}
                   initialSelectedAssetId={review?.draftSelectedAssetId ?? null}
                   initialAnnotations={review?.draftAnnotations ?? readHelpImageAnnotationsFromMetadata(block.metadata)}
                   initialInteractions={review?.draftInteractions ?? []}
