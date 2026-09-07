@@ -14,6 +14,10 @@ type JsonSchema = Record<string, unknown>;
 type ResponsesPayload = {
   id?: string;
   model?: string;
+  status?: string;
+  incomplete_details?: {
+    reason?: string;
+  } | null;
   output?: Array<{
     type?: string;
     content?: Array<{
@@ -151,6 +155,20 @@ export async function createProviderStructuredResponse<T>(input: {
 
     const outputText = extractOutputText(payload);
     if (!outputText) {
+      const incompleteReason = payload.incomplete_details?.reason?.trim() || null;
+      console.error("[ai-provider] structured response without output text", {
+        provider: input.provider,
+        model: payload.model ?? input.model,
+        responseId: payload.id ?? null,
+        responseStatus: payload.status ?? null,
+        incompleteReason,
+        outputTypes: (payload.output ?? []).map((item) => item.type ?? "unknown"),
+        inputTokens: payload.usage?.input_tokens ?? null,
+        outputTokens: payload.usage?.output_tokens ?? null,
+      });
+      if (payload.status === "incomplete" || incompleteReason) {
+        throw new AiProviderError("AI_OUTPUT_INCOMPLETE", input.provider, response.status);
+      }
       throw new AiProviderError("AI_EMPTY_RESPONSE", input.provider, response.status);
     }
 
