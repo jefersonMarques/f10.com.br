@@ -8,7 +8,11 @@ import {
   helpTrainingPublicStepProgress,
   helpTrainingVersions,
 } from "$lib/server/db/helpTrainingSchema";
-import { normalizeTrainingClientStep } from "$lib/server/help/helpTrainingExperience";
+import {
+  buildTrainingJourney,
+  getTrainingCurrentSourceContent,
+  normalizeTrainingClientStep,
+} from "$lib/server/help/helpTrainingExperience";
 
 const PUBLIC_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -131,6 +135,12 @@ export async function getPublicHelpTrainingSession(rawSessionToken: string) {
 export function toPublicHelpTrainingClientState(
   state: NonNullable<Awaited<ReturnType<typeof getPublicHelpTrainingSession>>>,
 ) {
+  const journey = buildTrainingJourney(
+    state.snapshot,
+    state.session.currentStepIndex,
+    state.completed,
+  );
+
   return {
     session: {
       id: state.session.id,
@@ -144,7 +154,9 @@ export function toPublicHelpTrainingClientState(
       welcomeMessage: state.snapshot.welcomeMessage,
     },
     sourceContent: state.snapshot.sourceContent,
+    currentSourceContent: getTrainingCurrentSourceContent(state.snapshot, state.currentStep),
     currentStep: normalizeTrainingClientStep(state.currentStep),
+    journey,
     progress: state.progress
       ? {
           status: state.progress.status,
@@ -175,6 +187,11 @@ export async function completePublicHelpTrainingStep(rawSessionToken: string) {
   const now = new Date();
   const nextIndex = state.session.currentStepIndex + 1;
   const completed = nextIndex >= state.snapshot.steps.length;
+  const nextStep = state.snapshot.steps[nextIndex] ?? null;
+  const moduleCompleted = Boolean(
+    state.currentStep.pathItemId &&
+    (!nextStep || nextStep.pathItemId !== state.currentStep.pathItemId),
+  );
   const interactionMode = state.currentStep.interactionMode ?? "action";
   const progressStatus = interactionMode === "presentation" ? "continued" : "succeeded";
 
@@ -218,7 +235,7 @@ export async function completePublicHelpTrainingStep(rawSessionToken: string) {
     });
   });
 
-  return { completed, successMessage: state.currentStep.successMessage };
+  return { completed, moduleCompleted, successMessage: state.currentStep.successMessage };
 }
 
 export async function reportPublicHelpTrainingFailure(
