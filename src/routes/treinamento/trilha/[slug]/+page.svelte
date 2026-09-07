@@ -3,6 +3,7 @@
   import type { SubmitFunction } from "@sveltejs/kit";
   import { Check, ChevronRight, RotateCcw } from "lucide-svelte";
   import HelpTrainingCompletionFeedback from "$lib/components/help/HelpTrainingCompletionFeedback.svelte";
+  import HelpTrainingJourney from "$lib/components/help/HelpTrainingJourney.svelte";
   import HelpTrainingPlayer from "$lib/components/help/HelpTrainingPlayer.svelte";
   import { requestTrainingPipWindow } from "$lib/help/trainingPipBridge";
   import type { ActionData, PageData } from "./$types";
@@ -51,11 +52,21 @@
       <form method="POST" action="?/restart" class="mt-7"><button type="submit" class="training-start inline-flex min-h-11 items-center gap-2 rounded-full border border-[#DDE1EA] bg-white px-5 text-[10px] font-semibold text-[#000A57]"><RotateCcw size={14}/>Recomeçar</button></form>
     </section>
   </main>
+{:else if data.showJourney}
+  <HelpTrainingJourney
+    trainingTitle={data.state.training.title}
+    welcomeMessage={data.state.training.welcomeMessage}
+    modules={data.state.journey.modules}
+    completedModules={data.state.journey.completedModules}
+    totalModules={data.state.journey.totalModules}
+    percent={data.state.journey.percent}
+    openAction="?/openModule"
+  />
 {:else if currentStep}
   <HelpTrainingPlayer
     mode="public"
     trainingTitle={data.landing.title}
-    sourceContentSlug={data.state.sourceContent.slug}
+    sourceContentSlug={data.state.currentSourceContent.slug}
     step={currentStep}
     assetBasePath="/treinamento/assets"
     canGoBack={data.canGoBack}
