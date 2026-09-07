@@ -14,6 +14,7 @@
     recommended: boolean;
   }> = [];
   export let initialAnnotations: HelpImageAnnotation[] = [];
+  export let activeAssetId: string | null = null;
   export let initialSelectedAssetId: string | null = null;
   export let initialInteractions: HelpHumanReviewInteraction[] = [];
   export let reviewed = false;
@@ -38,6 +39,9 @@
     if (initialSelectedAssetId && options.some((candidate) => candidate.assetId === initialSelectedAssetId)) {
       return initialSelectedAssetId;
     }
+    if (activeAssetId && options.some((candidate) => candidate.assetId === activeAssetId)) {
+      return activeAssetId;
+    }
     return options.find((candidate) => candidate.recommended)?.assetId
       ?? options[0]?.assetId
       ?? "";
@@ -52,6 +56,7 @@
         candidate.recommended,
       ]),
       annotations: initialAnnotations,
+      activeAssetId,
       initialSelectedAssetId,
       initialInteractions,
       reviewed,
@@ -193,7 +198,7 @@
     data-block-id={blockId}
     data-asset-id={selectedAssetId}
     data-reviewed={reviewed ? "true" : "false"}
-    data-touched={interacted ? "true" : "false"}
+    data-touched={interacted || interactions.length > 0 ? "true" : "false"}
   >
     <input type="hidden" data-review-annotations value={JSON.stringify(annotations)} />
     <input type="hidden" data-review-interactions value={JSON.stringify(interactions)} />
