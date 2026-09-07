@@ -4,6 +4,7 @@ import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import {
   helpTrainingPathCategories,
+  helpTrainingPathItems,
   helpTrainingPaths,
   helpTrainingStepMedia,
   helpTrainingSteps,
@@ -304,14 +305,17 @@ async function generatePlan(
 async function insertGeneratedSteps(
   tx: Parameters<Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]>[0],
   pathId: string,
+  pathItemId: string,
   content: PublishedStructuredHelp,
   plan: GeneratedTrainingPlan,
-): Promise<void> {
+  sortOffset: number,
+): Promise<number> {
   for (const [index, step] of plan.steps.entries()) {
     const [created] = await tx
       .insert(helpTrainingSteps)
       .values({
         pathId,
+        pathItemId,
         sourceContentStepId: step.sourceStepId,
         title: step.title,
         question: step.question,
@@ -323,7 +327,7 @@ async function insertGeneratedSteps(
         estimatedSeconds: step.estimatedSeconds,
         videoStartSeconds: step.videoStartSeconds,
         videoEndSeconds: step.videoEndSeconds,
-        sortOrder: (index + 1) * 10,
+        sortOrder: sortOffset + (index + 1) * 10,
       })
       .returning({ id: helpTrainingSteps.id });
     if (!created) throw new Error("TRAINING_STEP_NOT_CREATED");
@@ -361,17 +365,26 @@ async function insertGeneratedSteps(
       });
     }
   }
+
+  return plan.steps.length;
 }
 
 async function replaceCategories(
   tx: Parameters<Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]>[0],
   pathId: string,
-  content: PublishedStructuredHelp,
+  contents: PublishedStructuredHelp[],
 ): Promise<void> {
   await tx.delete(helpTrainingPathCategories).where(eq(helpTrainingPathCategories.pathId, pathId));
-  if (content.categories.length === 0) return;
+  const categories = Array.from(
+    new Map(
+      contents
+        .flatMap((content) => content.categories)
+        .map((category) => [category.id, category] as const),
+    ).values(),
+  );
+  if (categories.length === 0) return;
   await tx.insert(helpTrainingPathCategories).values(
-    content.categories.map((category, index) => ({
+    categories.map((category, index) => ({
       pathId,
       categoryId: category.id,
       sortOrder: (index + 1) * 10,
@@ -379,30 +392,73 @@ async function replaceCategories(
   );
 }
 
-export async function generateHelpTrainingFromPublishedContent(
-  actorUserId: string,
-  contentId: string,
-) {
-  const content = await getPublishedStructuredHelpById(contentId);
-  if (!content) throw new Error("TRAINING_SOURCE_CONTENT_NOT_PUBLISHED");
-  const plan = await generatePlan(actorUserId, content);
-  const slug = normalizeTrainingSlug(plan.title || content.title);
-  if (!slug) throw new Error("INVALID_TRAINING_PATH");
+async function resolveTrainingSlug(title: string): Promise<string> {
+  const baseSlug = normalizeTrainingSlug(title);
+  if (!baseSlug) throw new Error("INVALID_TRAINING_PATH");
 
   const db = getDatabase();
-  const snapshot = sourceSnapshot(content);
+  for (let suffix = 1; suffix <= 99; suffix += 1) {
+    const candidate = suffix === 1 ? baseSlug : `${baseSlug}-${suffix}`;
+    const [existing] = await db
+      .select({ id: helpTrainingPaths.id })
+      .from(helpTrainingPaths)
+      .where(eq(helpTrainingPaths.slug, candidate))
+      .limit(1);
+    if (!existing) return candidate;
+  }
+
+  throw new Error("TRAINING_SLUG_UNAVAILABLE");
+}
+
+export async function generateHelpTrainingFromPublishedContents(
+  actorUserId: string,
+  contentIds: string[],
+  requestedTitle = "",
+) {
+  const uniqueContentIds = Array.from(new Set(contentIds.map((value) => value.trim()).filter(Boolean)));
+  if (uniqueContentIds.length === 0) throw new Error("TRAINING_SOURCE_CONTENT_NOT_PUBLISHED");
+  if (uniqueContentIds.length > 20) throw new Error("TRAINING_SOURCE_CONTENT_LIMIT");
+
+  const contents: PublishedStructuredHelp[] = [];
+  for (const contentId of uniqueContentIds) {
+    const content = await getPublishedStructuredHelpById(contentId);
+    if (!content) throw new Error("TRAINING_SOURCE_CONTENT_NOT_PUBLISHED");
+    contents.push(content);
+  }
+
+  const plans: GeneratedTrainingPlan[] = [];
+  for (const content of contents) {
+    plans.push(await generatePlan(actorUserId, content));
+  }
+
+  const multiContent = contents.length > 1;
+  const title = multiContent
+    ? requestedTitle.trim().slice(0, 160)
+    : plans[0]?.title.trim().slice(0, 160) || contents[0]?.title.trim().slice(0, 160) || "";
+  if (title.length < 4) throw new Error("INVALID_TRAINING_PATH");
+
+  const slug = await resolveTrainingSlug(title);
+  const primaryContent = contents[0];
+  const primaryPlan = plans[0];
+  if (!primaryContent || !primaryPlan) throw new Error("TRAINING_SOURCE_CONTENT_NOT_PUBLISHED");
+
+  const db = getDatabase();
   const [created] = await db.transaction(async (tx) => {
     const rows = await tx
       .insert(helpTrainingPaths)
       .values({
         slug,
-        title: plan.title,
-        audience: plan.audience,
-        description: `Gerada a partir do conteúdo publicado “${content.title}”.`,
-        welcomeMessage: plan.welcomeMessage,
-        sourceContentId: content.contentId,
-        sourcePublishedAt: content.publishedAt,
-        sourcePublicationSnapshot: snapshot,
+        title,
+        audience: multiContent ? "" : primaryPlan.audience,
+        description: multiContent
+          ? `Trilha com ${contents.length} conteúdos publicados.`
+          : `Gerada a partir do conteúdo publicado “${primaryContent.title}”.`,
+        welcomeMessage: multiContent
+          ? `Percorra os ${contents.length} módulos desta trilha na ordem indicada.`
+          : primaryPlan.welcomeMessage,
+        sourceContentId: primaryContent.contentId,
+        sourcePublishedAt: primaryContent.publishedAt,
+        sourcePublicationSnapshot: sourceSnapshot(primaryContent),
         createdBy: actorUserId,
         updatedBy: actorUserId,
       })
@@ -410,8 +466,35 @@ export async function generateHelpTrainingFromPublishedContent(
 
     const path = rows[0];
     if (!path) throw new Error("TRAINING_PATH_NOT_CREATED");
-    await replaceCategories(tx, path.id, content);
-    await insertGeneratedSteps(tx, path.id, content, plan);
+
+    let globalStepOffset = 0;
+    for (const [index, content] of contents.entries()) {
+      const plan = plans[index];
+      if (!plan) throw new Error("TRAINING_GENERATION_EMPTY");
+      const [pathItem] = await tx
+        .insert(helpTrainingPathItems)
+        .values({
+          pathId: path.id,
+          sourceContentId: content.contentId,
+          sourcePublishedAt: content.publishedAt,
+          sourcePublicationSnapshot: sourceSnapshot(content),
+          sortOrder: (index + 1) * 10,
+        })
+        .returning({ id: helpTrainingPathItems.id });
+      if (!pathItem) throw new Error("TRAINING_PATH_ITEM_NOT_CREATED");
+
+      const insertedCount = await insertGeneratedSteps(
+        tx,
+        path.id,
+        pathItem.id,
+        content,
+        plan,
+        globalStepOffset,
+      );
+      globalStepOffset += insertedCount * 10;
+    }
+
+    await replaceCategories(tx, path.id, contents);
     return rows;
   });
 
@@ -421,13 +504,20 @@ export async function generateHelpTrainingFromPublishedContent(
     entityType: "help_training_path",
     entityId: created.id,
     metadata: {
-      sourceContentId: content.contentId,
-      sourcePublishedAt: content.publishedAt.toISOString(),
-      stepCount: plan.steps.length,
+      sourceContentIds: contents.map((content) => content.contentId),
+      moduleCount: contents.length,
+      stepCount: plans.reduce((sum, plan) => sum + plan.steps.length, 0),
     },
   });
 
   return created;
+}
+
+export async function generateHelpTrainingFromPublishedContent(
+  actorUserId: string,
+  contentId: string,
+) {
+  return generateHelpTrainingFromPublishedContents(actorUserId, [contentId]);
 }
 
 export async function regenerateHelpTrainingFromPublishedContent(
@@ -438,7 +528,6 @@ export async function regenerateHelpTrainingFromPublishedContent(
   const [path] = await db
     .select({
       id: helpTrainingPaths.id,
-      sourceContentId: helpTrainingPaths.sourceContentId,
       status: helpTrainingPaths.status,
     })
     .from(helpTrainingPaths)
@@ -448,23 +537,65 @@ export async function regenerateHelpTrainingFromPublishedContent(
   if (!path) throw new Error("TRAINING_PATH_NOT_FOUND");
   if (path.status === "archived") throw new Error("TRAINING_PATH_ARCHIVED");
 
-  const content = await getPublishedStructuredHelpById(path.sourceContentId);
-  if (!content) throw new Error("TRAINING_SOURCE_CONTENT_NOT_PUBLISHED");
+  const items = await db
+    .select()
+    .from(helpTrainingPathItems)
+    .where(eq(helpTrainingPathItems.pathId, pathId))
+    .orderBy(helpTrainingPathItems.sortOrder);
+  if (items.length === 0) throw new Error("TRAINING_PATH_ITEM_REQUIRED");
 
-  const plan = await generatePlan(actorUserId, content);
-  const snapshot = sourceSnapshot(content);
+  const contents: PublishedStructuredHelp[] = [];
+  const plans: GeneratedTrainingPlan[] = [];
+  for (const item of items) {
+    const content = await getPublishedStructuredHelpById(item.sourceContentId);
+    if (!content) throw new Error("TRAINING_SOURCE_CONTENT_NOT_PUBLISHED");
+    contents.push(content);
+    plans.push(await generatePlan(actorUserId, content));
+  }
+
+  const primaryContent = contents[0];
+  const primaryPlan = plans[0];
+  if (!primaryContent || !primaryPlan) throw new Error("TRAINING_SOURCE_CONTENT_NOT_PUBLISHED");
 
   await db.transaction(async (tx) => {
     await tx.delete(helpTrainingSteps).where(eq(helpTrainingSteps.pathId, pathId));
-    await replaceCategories(tx, pathId, content);
-    await insertGeneratedSteps(tx, pathId, content, plan);
+    await replaceCategories(tx, pathId, contents);
+
+    let globalStepOffset = 0;
+    for (const [index, item] of items.entries()) {
+      const content = contents[index];
+      const plan = plans[index];
+      if (!content || !plan) throw new Error("TRAINING_GENERATION_EMPTY");
+
+      await tx
+        .update(helpTrainingPathItems)
+        .set({
+          sourcePublishedAt: content.publishedAt,
+          sourcePublicationSnapshot: sourceSnapshot(content),
+          updatedAt: new Date(),
+        })
+        .where(eq(helpTrainingPathItems.id, item.id));
+
+      const insertedCount = await insertGeneratedSteps(
+        tx,
+        pathId,
+        item.id,
+        content,
+        plan,
+        globalStepOffset,
+      );
+      globalStepOffset += insertedCount * 10;
+    }
+
     await tx
       .update(helpTrainingPaths)
       .set({
-        title: plan.title,
-        welcomeMessage: plan.welcomeMessage,
-        sourcePublishedAt: content.publishedAt,
-        sourcePublicationSnapshot: snapshot,
+        ...(items.length === 1
+          ? { title: primaryPlan.title, welcomeMessage: primaryPlan.welcomeMessage }
+          : {}),
+        sourceContentId: primaryContent.contentId,
+        sourcePublishedAt: primaryContent.publishedAt,
+        sourcePublicationSnapshot: sourceSnapshot(primaryContent),
         status: "draft",
         updatedBy: actorUserId,
         updatedAt: new Date(),
@@ -478,9 +609,9 @@ export async function regenerateHelpTrainingFromPublishedContent(
     entityType: "help_training_path",
     entityId: pathId,
     metadata: {
-      sourceContentId: content.contentId,
-      sourcePublishedAt: content.publishedAt.toISOString(),
-      stepCount: plan.steps.length,
+      sourceContentIds: contents.map((content) => content.contentId),
+      moduleCount: contents.length,
+      stepCount: plans.reduce((sum, plan) => sum + plan.steps.length, 0),
     },
   });
 }
