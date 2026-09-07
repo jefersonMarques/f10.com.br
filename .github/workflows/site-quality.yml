@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - development
-      - agent/help-review-draft-preserve-assets
   pull_request:
     branches:
       - main
@@ -18,22 +17,6 @@ jobs:
     name: Check and build
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      DEBUG: "0"
-      EXACT_TOKEN: "ci-placeholder"
-      EXACT_FUNNEL_ID: "ci-placeholder"
-      F10_FONTE: "ci"
-      F10_UID: "ci-placeholder"
-      F10_MIDIA: "ci"
-      F10_TOKEN: "ci-placeholder"
-      F10_URL: "https://example.invalid"
-      BREVO_API_KEY: "ci-placeholder"
-      BREVO_SALES_MAIL_TO: "ci@example.invalid"
-      BREVO_FROM_EMAIL: "ci@example.invalid"
-      BREVO_FROM_NAME: "CI"
-      JOBS_MAIL_TO: "ci@example.invalid"
-      JOBS_RESUME_MAX_MB: "5"
-      SITE_URL: "https://example.invalid"
 
     steps:
       - name: Checkout repository
