@@ -20,7 +20,7 @@ import {
   helpContents,
   helpStepBlocks,
 } from "$lib/server/db/structuredHelpSchema";
-import { createManagedHelpAsset } from "$lib/server/help/helpAssetRepository";
+import { createManagedHelpAsset, deleteManagedHelpAsset } from "$lib/server/help/helpAssetRepository";
 import { deleteAssetObject, putAssetObject } from "$lib/server/storage/assetStorage";
 
 const REVIEW_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -36,6 +36,80 @@ type ScreenshotReviewMetadata = {
   };
 };
 
+const HELP_IMAGE_REVIEW_DRAFT_METADATA_KEY = "imageReviewDraft";
+
+type HelpImageReviewDraftMetadata = {
+  selectedAssetId: string;
+  annotations: HelpImageAnnotation[];
+  interactions: HelpHumanReviewInteraction[];
+  updatedAt: string;
+  updatedBy: string;
+};
+
+function normalizeInteractions(value: unknown): HelpHumanReviewInteraction[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(value.filter(
+    (item): item is HelpHumanReviewInteraction =>
+      item === "confirmed" ||
+      item === "image_selected" ||
+      item === "annotated" ||
+      item === "image_replaced",
+  )));
+}
+
+function readImageReviewDraft(
+  metadata: Record<string, unknown> | null | undefined,
+): HelpImageReviewDraftMetadata | null {
+  const value = metadata?.[HELP_IMAGE_REVIEW_DRAFT_METADATA_KEY];
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const draft = value as Record<string, unknown>;
+  if (
+    typeof draft.selectedAssetId !== "string" ||
+    !Array.isArray(draft.annotations) ||
+    typeof draft.updatedAt !== "string" ||
+    typeof draft.updatedBy !== "string"
+  ) {
+    return null;
+  }
+  return {
+    selectedAssetId: draft.selectedAssetId,
+    annotations: draft.annotations as HelpImageAnnotation[],
+    interactions: normalizeInteractions(draft.interactions),
+    updatedAt: draft.updatedAt,
+    updatedBy: draft.updatedBy,
+  };
+}
+
+function withImageReviewDraft(
+  metadata: Record<string, unknown> | null | undefined,
+  input: {
+    actorUserId: string;
+    selectedAssetId: string;
+    annotations: HelpImageAnnotation[];
+    interactions: HelpHumanReviewInteraction[];
+    updatedAt?: Date;
+  },
+): Record<string, unknown> {
+  return {
+    ...withoutHelpHumanReview(metadata),
+    [HELP_IMAGE_REVIEW_DRAFT_METADATA_KEY]: {
+      selectedAssetId: input.selectedAssetId,
+      annotations: input.annotations,
+      interactions: Array.from(new Set(input.interactions)),
+      updatedAt: (input.updatedAt ?? new Date()).toISOString(),
+      updatedBy: input.actorUserId,
+    } satisfies HelpImageReviewDraftMetadata,
+  };
+}
+
+function withoutImageReviewDraft(
+  metadata: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  const next = { ...(metadata ?? {}) };
+  delete next[HELP_IMAGE_REVIEW_DRAFT_METADATA_KEY];
+  return next;
+}
+
 export type HelpScreenshotReviewCandidateInput = {
   stepIndex: number;
   candidateIndex: number;
@@ -50,6 +124,9 @@ export type HelpScreenshotReviewGroup = {
   stepId: string;
   blockId: string;
   recommendedAssetId: string;
+  draftSelectedAssetId: string | null;
+  draftAnnotations: HelpImageAnnotation[] | null;
+  draftInteractions: HelpHumanReviewInteraction[];
   candidates: Array<{
     assetId: string;
     candidateIndex: number;
@@ -142,12 +219,15 @@ async function contentStepRows(contentId: string) {
 }
 
 async function imageBlocksByStep(stepIds: string[]) {
-  if (stepIds.length === 0) return new Map<string, { blockId: string; assetId: string }>();
+  if (stepIds.length === 0) {
+    return new Map<string, { blockId: string; assetId: string; metadata: Record<string, unknown> }>();
+  }
   const rows = await getDatabase()
     .select({
       stepId: helpStepBlocks.stepId,
       blockId: helpStepBlocks.id,
       assetId: helpStepBlocks.assetId,
+      metadata: helpStepBlocks.metadata,
     })
     .from(helpStepBlocks)
     .where(
@@ -158,10 +238,14 @@ async function imageBlocksByStep(stepIds: string[]) {
     )
     .orderBy(helpStepBlocks.sortOrder);
 
-  const result = new Map<string, { blockId: string; assetId: string }>();
+  const result = new Map<string, { blockId: string; assetId: string; metadata: Record<string, unknown> }>();
   for (const row of rows) {
     if (row.assetId && !result.has(row.stepId)) {
-      result.set(row.stepId, { blockId: row.blockId, assetId: row.assetId });
+      result.set(row.stepId, {
+        blockId: row.blockId,
+        assetId: row.assetId,
+        metadata: row.metadata ?? {},
+      });
     }
   }
   return result;
@@ -325,7 +409,6 @@ export async function replaceHelpScreenshotReviewCandidates(
 export async function listHelpScreenshotReviewGroups(
   contentId: string,
 ): Promise<HelpScreenshotReviewGroup[]> {
-  await cleanupExpiredCandidates(contentId);
   const db = getDatabase();
   const steps = await contentStepRows(contentId);
   const blockByStep = await imageBlocksByStep(steps.map((step) => step.id));
@@ -333,40 +416,55 @@ export async function listHelpScreenshotReviewGroups(
     .select({ id: helpAssets.id, metadata: helpAssets.metadata })
     .from(helpAssets)
     .where(and(eq(helpAssets.contentId, contentId), eq(helpAssets.assetType, "image")));
-  const assetMetadata = new Map(assets.map((asset) => [asset.id, asset.metadata]));
   const result: HelpScreenshotReviewGroup[] = [];
 
   for (const step of steps) {
     const block = blockByStep.get(step.id);
     if (!block) continue;
-    const recommendedReview = reviewMetadata(assetMetadata.get(block.assetId));
-    const extras = assets.flatMap((asset) => {
+
+    const related = assets.flatMap((asset) => {
       const review = reviewMetadata(asset.metadata);
-      if (!review || review.role !== "candidate" || review.stepId !== step.id) return [];
+      if (!review || review.stepId !== step.id) return [];
       return [{
         assetId: asset.id,
         candidateIndex: Number(review.candidateIndex ?? 0),
         timeSeconds: Number.isFinite(Number(review.timeSeconds)) ? Number(review.timeSeconds) : null,
-        recommended: false,
+        recommended: review.role === "recommended",
       }];
     });
-    if (extras.length === 0) continue;
+    if (!related.some((candidate) => candidate.assetId === block.assetId)) {
+      related.unshift({
+        assetId: block.assetId,
+        candidateIndex: 0,
+        timeSeconds: null,
+        recommended: related.length === 0,
+      });
+    }
+
+    const byAssetId = new Map(
+      related.map((candidate) => [candidate.assetId, candidate]),
+    );
+    const candidates = Array.from(byAssetId.values()).sort((left, right) => {
+      if (left.candidateIndex !== right.candidateIndex) {
+        return left.candidateIndex - right.candidateIndex;
+      }
+      return left.assetId.localeCompare(right.assetId);
+    });
+    const draft = readImageReviewDraft(block.metadata);
+    const draftSelectedAssetId =
+      draft && byAssetId.has(draft.selectedAssetId)
+        ? draft.selectedAssetId
+        : null;
 
     result.push({
       stepId: step.id,
       blockId: block.blockId,
-      recommendedAssetId: block.assetId,
-      candidates: [
-        {
-          assetId: block.assetId,
-          candidateIndex: Number(recommendedReview?.candidateIndex ?? 0),
-          timeSeconds: Number.isFinite(Number(recommendedReview?.timeSeconds))
-            ? Number(recommendedReview?.timeSeconds)
-            : null,
-          recommended: true,
-        },
-        ...extras,
-      ].sort((left, right) => left.candidateIndex - right.candidateIndex),
+      recommendedAssetId:
+        candidates.find((candidate) => candidate.recommended)?.assetId ?? block.assetId,
+      draftSelectedAssetId,
+      draftAnnotations: draftSelectedAssetId ? draft?.annotations ?? [] : null,
+      draftInteractions: draftSelectedAssetId ? draft?.interactions ?? [] : [],
+      candidates,
     });
   }
 
@@ -407,39 +505,26 @@ export async function confirmHelpScreenshotReviewSelection(input: {
   }
   if (row.contentStatus === "archived") throw new Error("CONTENT_ARCHIVED");
 
-  const [[current], reviewAssets] = await Promise.all([
-    db
-      .select({
-        id: helpAssets.id,
-        storageKey: helpAssets.storageKey,
-        metadata: helpAssets.metadata,
-      })
-      .from(helpAssets)
-      .where(eq(helpAssets.id, row.currentAssetId))
-      .limit(1),
-    db
-      .select({
-        id: helpAssets.id,
-        storageKey: helpAssets.storageKey,
-        metadata: helpAssets.metadata,
-      })
-      .from(helpAssets)
-      .where(and(eq(helpAssets.contentId, input.contentId), eq(helpAssets.assetType, "image"))),
-  ]);
-  const candidates = reviewAssets.filter((asset) => {
-    const review = reviewMetadata(asset.metadata);
-    return review?.role === "candidate" && review.stepId === row.stepId;
-  });
-  const selected = input.assetId === row.currentAssetId
-    ? current
-    : candidates.find((asset) => asset.id === input.assetId);
-  if (!selected) throw new Error("SCREENSHOT_REVIEW_ASSET_INVALID");
-
-  const removable = candidates.filter((asset) => asset.id !== selected.id);
-  if (selected.id !== row.currentAssetId && current) {
-    const review = reviewMetadata(current.metadata);
-    if (review?.role === "recommended" && review.stepId === row.stepId) removable.push(current);
-  }
+  const [selected] = await db
+    .select({
+      id: helpAssets.id,
+      contentId: helpAssets.contentId,
+      metadata: helpAssets.metadata,
+    })
+    .from(helpAssets)
+    .where(eq(helpAssets.id, input.assetId))
+    .limit(1);
+  const selectedReview = reviewMetadata(selected?.metadata);
+  const selectedAllowed =
+    Boolean(selected) &&
+    (
+      selected?.id === row.currentAssetId ||
+      (
+        selected?.contentId === input.contentId &&
+        selectedReview?.stepId === row.stepId
+      )
+    );
+  if (!selectedAllowed || !selected) throw new Error("SCREENSHOT_REVIEW_ASSET_INVALID");
 
   const previousAnnotations = readHelpImageAnnotationsFromMetadata(row.blockMetadata);
   const annotationsChanged = JSON.stringify(previousAnnotations) !== JSON.stringify(input.annotations);
@@ -453,7 +538,7 @@ export async function confirmHelpScreenshotReviewSelection(input: {
   ]));
   const blockMetadata = withHelpHumanReview(
     {
-      ...(row.blockMetadata ?? {}),
+      ...withoutImageReviewDraft(row.blockMetadata),
       [HELP_IMAGE_ANNOTATIONS_METADATA_KEY]: input.annotations,
     },
     {
@@ -471,15 +556,6 @@ export async function confirmHelpScreenshotReviewSelection(input: {
       .where(eq(helpStepBlocks.id, row.blockId));
 
     await tx
-      .update(helpAssets)
-      .set({ metadata: clearReviewMetadata(selected.metadata), updatedAt })
-      .where(eq(helpAssets.id, selected.id));
-
-    if (removable.length > 0) {
-      await tx.delete(helpAssets).where(inArray(helpAssets.id, removable.map((asset) => asset.id)));
-    }
-
-    await tx
       .update(helpContents)
       .set({
         ...(publicChanged || row.contentStatus !== "published" ? { status: "draft" as const } : {}),
@@ -489,7 +565,6 @@ export async function confirmHelpScreenshotReviewSelection(input: {
       .where(eq(helpContents.id, input.contentId));
   });
 
-  await deleteStoredAssets(removable);
   await recordAuditEvent({
     actorUserId: input.actorUserId,
     action: "help.image.review.confirmed",
@@ -501,9 +576,123 @@ export async function confirmHelpScreenshotReviewSelection(input: {
       changed: imageChanged,
       annotationCount: input.annotations.length,
       interactions,
-      discardedCandidates: removable.length,
+      preservedCandidates: true,
     },
   });
+}
+
+export async function saveHelpHumanReviewDraftBatch(input: {
+  actorUserId: string;
+  contentId: string;
+  items: Array<{
+    blockId: string;
+    assetId: string;
+    annotations: HelpImageAnnotation[];
+    interactions: HelpHumanReviewInteraction[];
+  }>;
+}): Promise<HelpHumanReviewStatus> {
+  const db = getDatabase();
+  const updatedAt = new Date();
+
+  await db.transaction(async (tx) => {
+    const [content] = await tx
+      .select({ status: helpContents.status })
+      .from(helpContents)
+      .where(eq(helpContents.id, input.contentId))
+      .limit(1);
+    if (!content) throw new Error("CONTENT_NOT_FOUND");
+    if (content.status === "archived") throw new Error("CONTENT_ARCHIVED");
+
+    const rows = await tx
+      .select({
+        blockId: helpStepBlocks.id,
+        stepId: helpStepBlocks.stepId,
+        assetId: helpStepBlocks.assetId,
+        metadata: helpStepBlocks.metadata,
+      })
+      .from(helpStepBlocks)
+      .innerJoin(helpContentSteps, eq(helpStepBlocks.stepId, helpContentSteps.id))
+      .where(
+        and(
+          eq(helpContentSteps.contentId, input.contentId),
+          eq(helpStepBlocks.blockType, "image"),
+        ),
+      );
+
+    const expected = new Map(rows.map((row) => [row.blockId, row]));
+    const supplied = new Map(input.items.map((item) => [item.blockId, item]));
+    if (
+      expected.size !== supplied.size ||
+      Array.from(expected.keys()).some((blockId) => !supplied.has(blockId))
+    ) {
+      throw new Error("HUMAN_REVIEW_INCOMPLETE");
+    }
+
+    const assetIds = Array.from(new Set(input.items.map((item) => item.assetId)));
+    const assets = assetIds.length > 0
+      ? await tx
+          .select({
+            id: helpAssets.id,
+            contentId: helpAssets.contentId,
+            metadata: helpAssets.metadata,
+          })
+          .from(helpAssets)
+          .where(inArray(helpAssets.id, assetIds))
+      : [];
+    const assetById = new Map(assets.map((asset) => [asset.id, asset]));
+
+    for (const item of input.items) {
+      const row = expected.get(item.blockId);
+      const selected = assetById.get(item.assetId);
+      const selectedReview = reviewMetadata(selected?.metadata);
+      if (
+        !row ||
+        !selected ||
+        (
+          selected.id !== row.assetId &&
+          !(
+            selected.contentId === input.contentId &&
+            selectedReview?.stepId === row.stepId
+          )
+        )
+      ) {
+        throw new Error("SCREENSHOT_REVIEW_ASSET_INVALID");
+      }
+
+      await tx
+        .update(helpStepBlocks)
+        .set({
+          metadata: withImageReviewDraft(row.metadata, {
+            actorUserId: input.actorUserId,
+            selectedAssetId: selected.id,
+            annotations: item.annotations,
+            interactions: item.interactions,
+            updatedAt,
+          }),
+          updatedAt,
+        })
+        .where(eq(helpStepBlocks.id, row.blockId));
+    }
+
+    await tx
+      .update(helpContents)
+      .set({
+        status: "draft",
+        updatedBy: input.actorUserId,
+        updatedAt,
+      })
+      .where(eq(helpContents.id, input.contentId));
+  });
+
+  await recordAuditEvent({
+    actorUserId: input.actorUserId,
+    action: "help.image.review.draft_saved",
+    entityType: "help_content",
+    entityId: input.contentId,
+    metadata: { imageCount: input.items.length },
+  });
+
+  return getHelpHumanReviewStatus(input.contentId);
 }
 
 export async function saveHelpHumanReviewBatch(input: {
@@ -517,39 +706,271 @@ export async function saveHelpHumanReviewBatch(input: {
     interactions: HelpHumanReviewInteraction[];
   }>;
 }): Promise<HelpHumanReviewStatus> {
-  const status = await getHelpHumanReviewStatus(input.contentId);
-  const expected = new Map(status.items.map((item) => [item.blockId, item]));
-  const supplied = new Map(input.items.map((item) => [item.blockId, item]));
-  if (expected.size !== supplied.size || Array.from(expected.keys()).some((blockId) => !supplied.has(blockId))) {
-    throw new Error("HUMAN_REVIEW_INCOMPLETE");
-  }
+  const db = getDatabase();
+  const updatedAt = new Date();
+  const auditItems: Array<{
+    blockId: string;
+    selectedAssetId: string;
+    imageChanged: boolean;
+    annotationCount: number;
+    interactions: HelpHumanReviewInteraction[];
+  }> = [];
 
-  const untouchedPending = status.items.filter((item) => {
-    if (item.reviewed) return false;
-    return (supplied.get(item.blockId)?.interactions.length ?? 0) === 0;
+  await db.transaction(async (tx) => {
+    const [content] = await tx
+      .select({ status: helpContents.status })
+      .from(helpContents)
+      .where(eq(helpContents.id, input.contentId))
+      .limit(1);
+    if (!content) throw new Error("CONTENT_NOT_FOUND");
+    if (content.status === "archived") throw new Error("CONTENT_ARCHIVED");
+
+    const rows = await tx
+      .select({
+        blockId: helpStepBlocks.id,
+        stepId: helpStepBlocks.stepId,
+        assetId: helpStepBlocks.assetId,
+        metadata: helpStepBlocks.metadata,
+      })
+      .from(helpStepBlocks)
+      .innerJoin(helpContentSteps, eq(helpStepBlocks.stepId, helpContentSteps.id))
+      .where(
+        and(
+          eq(helpContentSteps.contentId, input.contentId),
+          eq(helpStepBlocks.blockType, "image"),
+        ),
+      );
+
+    const expected = new Map(rows.map((row) => [row.blockId, row]));
+    const supplied = new Map(input.items.map((item) => [item.blockId, item]));
+    if (
+      expected.size !== supplied.size ||
+      Array.from(expected.keys()).some((blockId) => !supplied.has(blockId))
+    ) {
+      throw new Error("HUMAN_REVIEW_INCOMPLETE");
+    }
+
+    const untouchedPending = rows.filter((row) => {
+      if (isHelpHumanReviewComplete(row.metadata, row.assetId)) return false;
+      return (supplied.get(row.blockId)?.interactions.length ?? 0) === 0;
+    });
+    if (untouchedPending.length > 0 && !input.confirmUntouched) {
+      throw new Error("HUMAN_REVIEW_CONFIRMATION_REQUIRED");
+    }
+
+    const assetIds = Array.from(new Set(input.items.map((item) => item.assetId)));
+    const assets = assetIds.length > 0
+      ? await tx
+          .select({
+            id: helpAssets.id,
+            contentId: helpAssets.contentId,
+            metadata: helpAssets.metadata,
+          })
+          .from(helpAssets)
+          .where(inArray(helpAssets.id, assetIds))
+      : [];
+    const assetById = new Map(assets.map((asset) => [asset.id, asset]));
+    let publicChanged = false;
+
+    for (const item of input.items) {
+      const row = expected.get(item.blockId);
+      const selected = assetById.get(item.assetId);
+      const selectedReview = reviewMetadata(selected?.metadata);
+      if (
+        !row ||
+        !selected ||
+        (
+          selected.id !== row.assetId &&
+          !(
+            selected.contentId === input.contentId &&
+            selectedReview?.stepId === row.stepId
+          )
+        )
+      ) {
+        throw new Error("SCREENSHOT_REVIEW_ASSET_INVALID");
+      }
+
+      const previousAnnotations = readHelpImageAnnotationsFromMetadata(row.metadata);
+      const annotationsChanged =
+        JSON.stringify(previousAnnotations) !== JSON.stringify(item.annotations);
+      const imageChanged = selected.id !== row.assetId;
+      publicChanged ||= annotationsChanged || imageChanged;
+      const interactions = Array.from(new Set([
+        ...item.interactions,
+        ...(imageChanged ? ["image_selected" as const] : []),
+        ...(annotationsChanged ? ["annotated" as const] : []),
+      ]));
+      const metadata = withHelpHumanReview(
+        {
+          ...withoutImageReviewDraft(row.metadata),
+          [HELP_IMAGE_ANNOTATIONS_METADATA_KEY]: item.annotations,
+        },
+        {
+          actorUserId: input.actorUserId,
+          assetId: selected.id,
+          interactions: interactions.length > 0 ? interactions : ["confirmed"],
+          reviewedAt: updatedAt,
+        },
+      );
+
+      await tx
+        .update(helpStepBlocks)
+        .set({
+          assetId: selected.id,
+          metadata,
+          updatedAt,
+        })
+        .where(eq(helpStepBlocks.id, row.blockId));
+
+      auditItems.push({
+        blockId: row.blockId,
+        selectedAssetId: selected.id,
+        imageChanged,
+        annotationCount: item.annotations.length,
+        interactions: interactions.length > 0 ? interactions : ["confirmed"],
+      });
+    }
+
+    await tx
+      .update(helpContents)
+      .set({
+        ...(publicChanged || content.status !== "published"
+          ? { status: "draft" as const }
+          : {}),
+        updatedBy: input.actorUserId,
+        updatedAt,
+      })
+      .where(eq(helpContents.id, input.contentId));
   });
-  if (untouchedPending.length > 0 && !input.confirmUntouched) {
-    throw new Error("HUMAN_REVIEW_CONFIRMATION_REQUIRED");
-  }
 
-  for (const item of input.items) {
-    const previous = expected.get(item.blockId);
-    await confirmHelpScreenshotReviewSelection({
+  for (const item of auditItems) {
+    await recordAuditEvent({
       actorUserId: input.actorUserId,
-      contentId: input.contentId,
-      blockId: item.blockId,
-      assetId: item.assetId,
-      annotations: item.annotations,
-      interactions:
-        item.interactions.length > 0
-          ? item.interactions
-          : previous?.reviewed
-            ? []
-            : ["confirmed"],
+      action: "help.image.review.confirmed",
+      entityType: "help_step_block",
+      entityId: item.blockId,
+      metadata: {
+        contentId: input.contentId,
+        selectedAssetId: item.selectedAssetId,
+        changed: item.imageChanged,
+        annotationCount: item.annotationCount,
+        interactions: item.interactions,
+        preservedCandidates: true,
+      },
     });
   }
 
   return getHelpHumanReviewStatus(input.contentId);
+}
+
+export async function addHelpHumanReviewCandidate(input: {
+  actorUserId: string;
+  contentId: string;
+  blockId: string;
+  fileName: string;
+  mimeType: string;
+  bytes: Uint8Array;
+}): Promise<{
+  assetId: string;
+  candidateIndex: number;
+  timeSeconds: null;
+  recommended: false;
+}> {
+  const db = getDatabase();
+  const [row] = await db
+    .select({
+      stepId: helpStepBlocks.stepId,
+      blockType: helpStepBlocks.blockType,
+      contentStatus: helpContents.status,
+    })
+    .from(helpStepBlocks)
+    .innerJoin(helpContentSteps, eq(helpStepBlocks.stepId, helpContentSteps.id))
+    .innerJoin(helpContents, eq(helpContentSteps.contentId, helpContents.id))
+    .where(
+      and(
+        eq(helpStepBlocks.id, input.blockId),
+        eq(helpContentSteps.contentId, input.contentId),
+      ),
+    )
+    .limit(1);
+  if (!row || row.blockType !== "image") throw new Error("IMAGE_BLOCK_NOT_FOUND");
+  if (row.contentStatus === "archived") throw new Error("CONTENT_ARCHIVED");
+
+  const existingAssets = await db
+    .select({ metadata: helpAssets.metadata })
+    .from(helpAssets)
+    .where(and(eq(helpAssets.contentId, input.contentId), eq(helpAssets.assetType, "image")));
+  const candidateIndex =
+    Math.max(
+      0,
+      ...existingAssets.flatMap((asset) => {
+        const review = reviewMetadata(asset.metadata);
+        return review?.stepId === row.stepId
+          ? [Number(review.candidateIndex ?? 0)]
+          : [];
+      }),
+    ) + 1;
+
+  const created = await createManagedHelpAsset(input.actorUserId, {
+    fileName: input.fileName,
+    mimeType: input.mimeType,
+    bytes: input.bytes,
+    contentId: input.contentId,
+    deduplicate: false,
+  });
+
+  try {
+    const updatedAt = new Date();
+    await db.transaction(async (tx) => {
+      await tx
+        .update(helpAssets)
+        .set({
+          metadata: {
+            ...(created.asset.metadata ?? {}),
+            screenshotReview: {
+              pending: true,
+              role: "candidate",
+              stepId: row.stepId,
+              candidateIndex,
+              timeSeconds: null,
+            },
+          },
+          updatedAt,
+        })
+        .where(eq(helpAssets.id, created.asset.id));
+
+      await tx
+        .update(helpContents)
+        .set({
+          status: "draft",
+          updatedBy: input.actorUserId,
+          updatedAt,
+        })
+        .where(eq(helpContents.id, input.contentId));
+    });
+  } catch (cause) {
+    await deleteManagedHelpAsset(input.actorUserId, created.asset.id).catch(() => undefined);
+    throw cause;
+  }
+
+  await recordAuditEvent({
+    actorUserId: input.actorUserId,
+    action: "help.image.review.candidate_added",
+    entityType: "help_step_block",
+    entityId: input.blockId,
+    metadata: {
+      contentId: input.contentId,
+      assetId: created.asset.id,
+      candidateIndex,
+    },
+  });
+
+  return {
+    assetId: created.asset.id,
+    candidateIndex,
+    timeSeconds: null,
+    recommended: false,
+  };
 }
 
 export async function replaceHelpHumanReviewImage(input: {
