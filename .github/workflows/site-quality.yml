@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - development
+      - agent/help-review-draft-preserve-assets
   pull_request:
     branches:
       - main
