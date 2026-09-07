@@ -3,7 +3,10 @@ import type { RequestHandler } from "./$types";
 import { parseHelpImageAnnotationsJson } from "$lib/help/helpImageAnnotations";
 import type { HelpHumanReviewInteraction } from "$lib/help/helpHumanReview";
 import { requireAppPermission } from "$lib/server/auth/authorization";
-import { saveHelpHumanReviewBatch } from "$lib/server/help/helpScreenshotReviewRepository";
+import {
+  saveHelpHumanReviewBatch,
+  saveHelpHumanReviewDraftBatch,
+} from "$lib/server/help/helpScreenshotReviewRepository";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -31,6 +34,7 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
   );
 
   let payload: {
+    mode?: unknown;
     confirmUntouched?: unknown;
     items?: Array<{
       blockId?: unknown;
@@ -63,15 +67,25 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
   }
 
   try {
-    const status = await saveHelpHumanReviewBatch({
-      actorUserId: session.user.id,
-      contentId: params.contentId,
-      confirmUntouched: payload.confirmUntouched === true,
-      items,
-    });
+    const mode = payload.mode === "draft" ? "draft" : "confirm";
+    const status = mode === "draft"
+      ? await saveHelpHumanReviewDraftBatch({
+          actorUserId: session.user.id,
+          contentId: params.contentId,
+          items,
+        })
+      : await saveHelpHumanReviewBatch({
+          actorUserId: session.user.id,
+          contentId: params.contentId,
+          confirmUntouched: payload.confirmUntouched === true,
+          items,
+        });
     return json({
       success: true,
-      message: "Revisão humana salva para todas as imagens.",
+      message:
+        mode === "draft"
+          ? "Rascunho da revisão salvo. As alternativas foram preservadas."
+          : "Revisão humana concluída. As alternativas continuam disponíveis para futuras edições.",
       status,
     });
   } catch (cause) {
@@ -85,7 +99,7 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
             ? "Conteúdos arquivados não podem ser alterados."
             : code === "SCREENSHOT_REVIEW_ASSET_INVALID"
               ? "Uma das imagens selecionadas não pertence mais a esta revisão."
-              : "Não foi possível salvar toda a revisão humana.";
+              : "Não foi possível salvar a revisão humana.";
     return json({ success: false, message }, { status: 409 });
   }
 };
