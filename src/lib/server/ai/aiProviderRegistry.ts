@@ -28,6 +28,9 @@ type ResponsesPayload = {
   usage?: {
     input_tokens?: number;
     output_tokens?: number;
+    output_tokens_details?: {
+      reasoning_tokens?: number;
+    };
   };
   error?: {
     code?: string;
@@ -77,7 +80,24 @@ function extractOutputText(payload: ResponsesPayload): string {
       if (content.type === "output_text" && content.text) parts.push(content.text);
     }
   }
-  return parts.join("\n").trim();
+  return parts.join("").trim();
+}
+
+function structuredResponseDiagnostics(payload: ResponsesPayload, input: {
+  provider: AiProviderCode;
+  model: string;
+}) {
+  return {
+    provider: input.provider,
+    model: payload.model ?? input.model,
+    responseId: payload.id ?? null,
+    responseStatus: payload.status ?? null,
+    incompleteReason: payload.incomplete_details?.reason?.trim() || null,
+    outputTypes: (payload.output ?? []).map((item) => item.type ?? "unknown"),
+    inputTokens: payload.usage?.input_tokens ?? null,
+    outputTokens: payload.usage?.output_tokens ?? null,
+    reasoningTokens: payload.usage?.output_tokens_details?.reasoning_tokens ?? null,
+  };
 }
 
 export async function createProviderStructuredResponse<T>(input: {
@@ -153,22 +173,15 @@ export async function createProviderStructuredResponse<T>(input: {
       );
     }
 
+    const diagnostics = structuredResponseDiagnostics(payload, input);
+    if (payload.status === "incomplete" || diagnostics.incompleteReason) {
+      console.error("[ai-provider] structured response incomplete", diagnostics);
+      throw new AiProviderError("AI_OUTPUT_INCOMPLETE", input.provider, response.status);
+    }
+
     const outputText = extractOutputText(payload);
     if (!outputText) {
-      const incompleteReason = payload.incomplete_details?.reason?.trim() || null;
-      console.error("[ai-provider] structured response without output text", {
-        provider: input.provider,
-        model: payload.model ?? input.model,
-        responseId: payload.id ?? null,
-        responseStatus: payload.status ?? null,
-        incompleteReason,
-        outputTypes: (payload.output ?? []).map((item) => item.type ?? "unknown"),
-        inputTokens: payload.usage?.input_tokens ?? null,
-        outputTokens: payload.usage?.output_tokens ?? null,
-      });
-      if (payload.status === "incomplete" || incompleteReason) {
-        throw new AiProviderError("AI_OUTPUT_INCOMPLETE", input.provider, response.status);
-      }
+      console.error("[ai-provider] structured response without output text", diagnostics);
       throw new AiProviderError("AI_EMPTY_RESPONSE", input.provider, response.status);
     }
 
@@ -176,6 +189,10 @@ export async function createProviderStructuredResponse<T>(input: {
     try {
       data = JSON.parse(outputText) as T;
     } catch {
+      console.error("[ai-provider] structured response invalid JSON", {
+        ...diagnostics,
+        outputChars: outputText.length,
+      });
       throw new AiProviderError("AI_INVALID_JSON", input.provider, response.status);
     }
 

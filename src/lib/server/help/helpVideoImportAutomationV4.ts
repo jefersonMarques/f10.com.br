@@ -607,21 +607,43 @@ async function generateArticle(
   let inputTokens: number | null = null;
   let outputTokens: number | null = null;
 
+  const requestArticle = () => createAiStructuredResponse<GeneratedArticle>({
+    task: "content_edit",
+    requiredCapabilities: ["content.draft"],
+    instructions: [
+      "Estruture um artigo operacional F10 usando exclusivamente a fonte recebida.",
+      "Responda exatamente no schema solicitado, sem texto fora do JSON.",
+      "Não invente telas, regras, campos, URLs, condições ou resultados.",
+    ].join("\n"),
+    userInput: articlePrompt(categories, transcript),
+    schemaName: "f10_help_video_article_timeline_local_frames",
+    schema: articleSchema(),
+    maxOutputTokens: 10_000,
+    timeoutMs: 180_000,
+  });
+
   try {
-    const response = await createAiStructuredResponse<GeneratedArticle>({
-      task: "content_edit",
-      requiredCapabilities: ["content.draft"],
-      instructions: [
-        "Estruture um artigo operacional F10 usando exclusivamente a fonte recebida.",
-        "Responda exatamente no schema solicitado, sem texto fora do JSON.",
-        "Não invente telas, regras, campos, URLs, condições ou resultados.",
-      ].join("\n"),
-      userInput: articlePrompt(categories, transcript),
-      schemaName: "f10_help_video_article_timeline_local_frames",
-      schema: articleSchema(),
-      maxOutputTokens: 8_000,
-      timeoutMs: 180_000,
-    });
+    let response;
+    try {
+      response = await requestArticle();
+    } catch (cause) {
+      const retryable =
+        cause instanceof AiGatewayError
+        && (
+          cause.code === "AI_OUTPUT_INCOMPLETE"
+          || cause.code === "AI_EMPTY_RESPONSE"
+          || cause.code === "AI_INVALID_JSON"
+        );
+      if (!retryable) throw cause;
+
+      console.warn("[help-video-import] retrying article generation from transcript", {
+        failureCode: cause.code,
+        transcriptChars: transcript.text.length,
+        transcriptSegments: transcript.segments.length,
+      });
+      response = await requestArticle();
+    }
+
     provider = response.provider;
     model = response.model;
     inputTokens = response.inputTokens;
@@ -652,6 +674,9 @@ async function generateArticle(
     if (cause instanceof AiGatewayError) {
       if (cause.code === "AI_TIMEOUT") {
         throw new Error("HELP_VIDEO_ARTICLE_GENERATION_TIMEOUT");
+      }
+      if (cause.code === "AI_INVALID_JSON") {
+        throw new Error("HELP_VIDEO_ARTICLE_GENERATION_INVALID_JSON");
       }
       if (cause.code === "AI_EMPTY_RESPONSE" || cause.code === "AI_OUTPUT_INCOMPLETE") {
         throw new Error("HELP_VIDEO_ARTICLE_GENERATION_EMPTY");
