@@ -98,6 +98,32 @@ export const helpTrainingPaths = pgTable(
   ],
 );
 
+export const helpTrainingPathItems = pgTable(
+  "help_training_path_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    pathId: uuid("path_id")
+      .notNull()
+      .references(() => helpTrainingPaths.id, { onDelete: "cascade" }),
+    sourceContentId: uuid("source_content_id")
+      .notNull()
+      .references(() => helpContents.id, { onDelete: "restrict" }),
+    sourcePublishedAt: timestamp("source_published_at", { withTimezone: true }).notNull(),
+    sourcePublicationSnapshot: jsonb("source_publication_snapshot")
+      .$type<HelpTrainingSourceContent>()
+      .notNull(),
+    sortOrder: integer("sort_order").notNull().default(10),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("help_training_path_items_content_unique").on(table.pathId, table.sourceContentId),
+    uniqueIndex("help_training_path_items_order_unique").on(table.pathId, table.sortOrder),
+    index("help_training_path_items_path_idx").on(table.pathId, table.sortOrder),
+    index("help_training_path_items_source_idx").on(table.sourceContentId),
+  ],
+);
+
 export const helpTrainingPathCategories = pgTable(
   "help_training_path_categories",
   {
@@ -124,6 +150,9 @@ export const helpTrainingSteps = pgTable(
     pathId: uuid("path_id")
       .notNull()
       .references(() => helpTrainingPaths.id, { onDelete: "cascade" }),
+    pathItemId: uuid("path_item_id")
+      .notNull()
+      .references(() => helpTrainingPathItems.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     question: text("question").notNull().default(""),
     instruction: text("instruction").notNull().default(""),
@@ -199,8 +228,16 @@ export type HelpTrainingSnapshot = {
   welcomeMessage: string;
   version: number;
   sourceContent: HelpTrainingSourceContent;
+  modules?: Array<{
+    id: string;
+    title: string;
+    sortOrder: number;
+    sourceContent: HelpTrainingSourceContent;
+    stepIds: string[];
+  }>;
   steps: Array<{
     id: string;
+    pathItemId?: string | null;
     title: string;
     question?: string;
     instruction: string;
