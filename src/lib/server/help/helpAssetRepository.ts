@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { and, count, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
@@ -131,6 +131,7 @@ export type CreateManagedHelpAssetInput = {
   assistantSummary?: string;
   extractedText?: string;
   contentId?: string | null;
+  deduplicate?: boolean;
 };
 
 export async function createManagedHelpAsset(
@@ -150,25 +151,31 @@ export async function createManagedHelpAsset(
     input.extractedText?.trim() || extractPlainText(mimeType, input.bytes)
   ).slice(0, MAX_EXTRACTED_TEXT_CHARS);
   const db = getDatabase();
-  const [existing] = await db
-    .select()
-    .from(helpAssets)
-    .where(and(eq(helpAssets.checksumSha256, digest), isNotNull(helpAssets.storageKey)))
-    .limit(1);
+  const deduplicate = input.deduplicate !== false;
 
-  if (existing) {
-    if (!existing.extractedText && extractedText) {
-      const [updated] = await db
-        .update(helpAssets)
-        .set({ extractedText, updatedAt: new Date() })
-        .where(eq(helpAssets.id, existing.id))
-        .returning();
-      return { asset: updated ?? existing, reused: true };
+  if (deduplicate) {
+    const [existing] = await db
+      .select()
+      .from(helpAssets)
+      .where(and(eq(helpAssets.checksumSha256, digest), isNotNull(helpAssets.storageKey)))
+      .limit(1);
+
+    if (existing) {
+      if (!existing.extractedText && extractedText) {
+        const [updated] = await db
+          .update(helpAssets)
+          .set({ extractedText, updatedAt: new Date() })
+          .where(eq(helpAssets.id, existing.id))
+          .returning();
+        return { asset: updated ?? existing, reused: true };
+      }
+      return { asset: existing, reused: true };
     }
-    return { asset: existing, reused: true };
   }
 
-  const storageKey = `help-assets/${digest.slice(0, 2)}/${digest.slice(2, 4)}/${digest}.${rule.extension}`;
+  const storageKey = deduplicate
+    ? `help-assets/${digest.slice(0, 2)}/${digest.slice(2, 4)}/${digest}.${rule.extension}`
+    : `help-assets/review/${input.contentId ?? "unassigned"}/${randomUUID()}.${rule.extension}`;
   await putAssetObject(storageKey, input.bytes, mimeType);
 
   try {
