@@ -174,6 +174,7 @@ export const helpTrainingSteps = pgTable(
   (table) => [
     uniqueIndex("help_training_steps_order_unique").on(table.pathId, table.sortOrder),
     index("help_training_steps_path_idx").on(table.pathId, table.sortOrder),
+    index("help_training_steps_path_item_idx").on(table.pathItemId, table.sortOrder),
   ],
 );
 
