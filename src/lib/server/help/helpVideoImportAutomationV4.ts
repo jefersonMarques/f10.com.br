@@ -620,6 +620,7 @@ async function generateArticle(
       schemaName: "f10_help_video_article_timeline_local_frames",
       schema: articleSchema(),
       maxOutputTokens: 8_000,
+      timeoutMs: 180_000,
     });
     provider = response.provider;
     model = response.model;
@@ -649,6 +650,12 @@ async function generateArticle(
       failureCode: code,
     });
     if (cause instanceof AiGatewayError) {
+      if (cause.code === "AI_TIMEOUT") {
+        throw new Error("HELP_VIDEO_ARTICLE_GENERATION_TIMEOUT");
+      }
+      if (cause.code === "AI_EMPTY_RESPONSE" || cause.code === "AI_OUTPUT_INCOMPLETE") {
+        throw new Error("HELP_VIDEO_ARTICLE_GENERATION_EMPTY");
+      }
       throw new Error(`HELP_VIDEO_ARTICLE_GENERATION_FAILED:${cause.code}`);
     }
     throw cause;

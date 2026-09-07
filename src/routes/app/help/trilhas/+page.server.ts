@@ -35,6 +35,9 @@ function generationMessage(cause: unknown): string {
       return "Configure a credencial do provedor usado em “Geração de trilhas”.";
     }
     if (cause.code === "AI_TIMEOUT") return "A geração demorou além do limite. Tente novamente.";
+    if (cause.code === "AI_EMPTY_RESPONSE" || cause.code === "AI_OUTPUT_INCOMPLETE") {
+      return "A IA não retornou dados suficientes para montar um dos módulos. Tente novamente.";
+    }
   }
   return "Não foi possível gerar a trilha a partir deste conteúdo.";
 }

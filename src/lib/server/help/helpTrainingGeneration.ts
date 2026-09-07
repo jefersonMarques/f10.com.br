@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { createAiStructuredResponse, type AiStructuredResponse } from "$lib/server/ai/aiGateway";
+import { AiGatewayError, createAiStructuredResponse, type AiStructuredResponse } from "$lib/server/ai/aiGateway";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -197,13 +197,13 @@ async function generatePlan(
   let fallbackUsed = false;
 
   let response: AiStructuredResponse<GeneratedTimelinePlan>;
-  try {
-    response = await createAiStructuredResponse<GeneratedTimelinePlan>({
+  let retryUsed = false;
+  const requestPlan = () => createAiStructuredResponse<GeneratedTimelinePlan>({
       task: "training_generation",
       requiredCapabilities: ["knowledge.read", "training.draft"],
       schemaName: "f10_training_video_timeline",
       schema: TIMELINE_SCHEMA,
-      maxOutputTokens: 1800,
+      maxOutputTokens: 4_000,
       timeoutMs: 90_000,
       instructions: [
         "Você recebe um conteúdo F10 já publicado e a transcrição temporal do vídeo que originou esse conteúdo.",
@@ -225,6 +225,21 @@ async function generatePlan(
         timelineText(timeline),
       ].join("\n\n"),
     });
+
+  try {
+    try {
+      response = await requestPlan();
+    } catch (cause) {
+      if (
+        cause instanceof AiGatewayError
+        && (cause.code === "AI_EMPTY_RESPONSE" || cause.code === "AI_OUTPUT_INCOMPLETE")
+      ) {
+        retryUsed = true;
+        response = await requestPlan();
+      } else {
+        throw cause;
+      }
+    }
 
     provider = response.provider;
     model = response.model;
@@ -293,6 +308,7 @@ async function generatePlan(
       generatedStepCount: steps.length,
       timelineSegments: timeline.length,
       fallbackUsed,
+      retryUsed,
     },
   }).catch(() => undefined);
 
