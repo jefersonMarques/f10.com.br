@@ -518,6 +518,78 @@ export async function upsertStructuredHelpFeaturedVideo(
   });
 }
 
+export async function setStructuredHelpFeaturedVideoAsset(
+  actorUserId: string,
+  contentId: string,
+  assetId: string,
+  input: {
+    altText: string;
+    subtitles: string;
+    assistantSummary: string;
+  },
+): Promise<void> {
+  const db = getDatabase();
+  const content = await getContentRow(contentId);
+  if (!content) throw new Error("CONTENT_NOT_FOUND");
+  if (content.status === "archived") throw new Error("CONTENT_ARCHIVED");
+
+  const [asset] = await db
+    .select({
+      id: helpAssets.id,
+      contentId: helpAssets.contentId,
+      assetType: helpAssets.assetType,
+      mimeType: helpAssets.mimeType,
+      storageKey: helpAssets.storageKey,
+    })
+    .from(helpAssets)
+    .where(eq(helpAssets.id, assetId))
+    .limit(1);
+
+  if (
+    !asset ||
+    asset.assetType !== "video" ||
+    asset.mimeType !== "video/mp4" ||
+    !asset.storageKey
+  ) {
+    throw new Error("FEATURED_VIDEO_MP4_REQUIRED");
+  }
+  if (asset.contentId && asset.contentId !== contentId) {
+    throw new Error("FEATURED_VIDEO_ASSET_OWNERSHIP");
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(helpAssets)
+      .set({
+        contentId,
+        sourceUrl: null,
+        altText: input.altText.trim().slice(0, 500),
+        subtitles: input.subtitles.trim().slice(0, 200_000),
+        assistantSummary: input.assistantSummary.trim().slice(0, 20_000),
+        updatedAt: new Date(),
+      })
+      .where(eq(helpAssets.id, assetId));
+
+    await tx
+      .insert(helpContentFeaturedVideos)
+      .values({ contentId, assetId })
+      .onConflictDoUpdate({
+        target: helpContentFeaturedVideos.contentId,
+        set: { assetId, updatedAt: new Date() },
+      });
+  });
+
+  await markContentDraft(contentId, actorUserId);
+  await saveStructuredContentVersion(contentId, actorUserId);
+  await recordAuditEvent({
+    actorUserId,
+    action: "help.content.featured_video.asset_set",
+    entityType: "help_content",
+    entityId: contentId,
+    metadata: { assetId, mimeType: "video/mp4" },
+  });
+}
+
 export async function deleteStructuredHelpFeaturedVideo(
   actorUserId: string,
   contentId: string,
