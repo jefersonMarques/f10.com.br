@@ -12,6 +12,7 @@ import {
 import { getCombinedHelpTrainingInsights } from "$lib/server/help/helpTrainingInsightsRepository";
 import {
   addHelpTrainingModuleFromPublishedContent,
+  localizeHelpTrainingPathVideos,
   moveHelpTrainingModule,
   regenerateHelpTrainingFromPublishedContent,
   removeHelpTrainingModule,
@@ -61,6 +62,40 @@ function moduleErrorMessage(cause: unknown): string {
   return "Não foi possível atualizar os módulos da trilha.";
 }
 
+function isYoutubeUrl(value: string | null): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    return hostname === "youtu.be"
+      || hostname === "youtube.com"
+      || hostname === "www.youtube.com"
+      || hostname === "m.youtube.com";
+  } catch {
+    return false;
+  }
+}
+
+function localVideoErrorMessage(cause: unknown): string {
+  const code = cause instanceof Error ? cause.message : "";
+  if (code === "HELP_VIDEO_YOUTUBE_COOKIES_NOT_FOUND") {
+    return "O arquivo de cookies do YouTube configurado no servidor não foi encontrado.";
+  }
+  if (code === "HELP_VIDEO_YOUTUBE_COOKIES_INVALID") {
+    return "Os cookies do YouTube expiraram. Renove o arquivo do servidor antes de preparar o MP4 local.";
+  }
+  if (code === "HELP_VIDEO_LOCAL_COPY_TOO_LARGE") {
+    return "O vídeo não coube no limite da cópia local mesmo na qualidade reduzida.";
+  }
+  if (code === "HELP_VIDEO_YOUTUBE_DOWNLOAD_NOT_FOUND") {
+    return "O YouTube não disponibilizou uma versão MP4 adequada para a trilha.";
+  }
+  if (code === "HELP_VIDEO_COMMAND_TIMEOUT") {
+    return "O download do vídeo demorou além do limite permitido.";
+  }
+  return "Não foi possível preparar a cópia local do vídeo.";
+}
+
 function publishErrorMessage(cause: unknown): string {
   const code = cause instanceof Error ? cause.message : "";
   if (code === "TRAINING_STEP_INCOMPLETE") return "Toda orientação precisa ter título e instrução.";
@@ -104,6 +139,14 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   const availableContents = publishedCatalog.filter(
     (content) => !currentSourceIds.has(content.contentId),
   );
+  const hasRemoteYoutubeVideos = path.steps.some((step) =>
+    step.media.some(
+      (media) => media.mediaType === "video"
+        && Boolean(media.sourceUrl)
+        && !media.sourceUrl?.startsWith("asset:")
+        && isYoutubeUrl(media.sourceUrl),
+    ),
+  );
 
   return {
     path,
@@ -112,6 +155,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     sourceUpdates,
     sourceUpdateAvailable,
     availableContents,
+    hasRemoteYoutubeVideos,
     canEdit: canEditPermission && path.status !== "archived",
     canPublish: canPublishPermission && path.status !== "archived",
     canDelete: canEditPermission && path.currentVersion === 0,
@@ -254,6 +298,29 @@ export const actions: Actions = {
       return { success: true, message: "Módulo removido do rascunho da trilha." };
     } catch (cause) {
       return fail(409, { success: false, message: moduleErrorMessage(cause) });
+    }
+  },
+
+  localizeVideos: async ({ cookies, params }) => {
+    if (!isUuid(params.pathId)) return fail(404, { success: false, message: "Trilha não encontrada." });
+    const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
+
+    try {
+      const updatedSteps = await localizeHelpTrainingPathVideos(session.user.id, params.pathId);
+      if (updatedSteps === 0) {
+        return { success: true, message: "Os vídeos desta trilha já estão preparados para reprodução local." };
+      }
+      return {
+        success: true,
+        message: "MP4 local preparado sem regenerar as orientações. Publique uma nova versão da trilha para disponibilizar a correção.",
+      };
+    } catch (cause) {
+      console.error("[help-training] local video preparation failed", {
+        pathId: params.pathId,
+        technicalCode: cause instanceof Error ? cause.message : "TRAINING_LOCAL_VIDEO_FAILED",
+        cause,
+      });
+      return fail(409, { success: false, message: localVideoErrorMessage(cause) });
     }
   },
 
