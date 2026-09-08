@@ -59,6 +59,7 @@ function moduleErrorMessage(cause: unknown): string {
   if (code === "AI_EMPTY_RESPONSE" || code === "AI_OUTPUT_INCOMPLETE") {
     return "A IA não retornou dados suficientes para montar o novo módulo. Tente novamente.";
   }
+  if (code.startsWith("HELP_VIDEO_")) return localVideoErrorMessage(cause);
   return "Não foi possível atualizar os módulos da trilha.";
 }
 
