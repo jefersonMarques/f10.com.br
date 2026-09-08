@@ -177,23 +177,53 @@
   <section class="mt-5 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
     <div class="flex items-start gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Video size={20}/></span><div><h2 class="text-[16px] font-semibold text-[#11182C]">Vídeo principal</h2><p class="mt-1 max-w-[760px] text-[11px] leading-5 text-[#858A98]">Quando existir, subtitles são obrigatórios e formam a fonte textual do vídeo para pesquisa e respostas.</p></div></div>
 
-    {#if data.content.featuredVideo?.storageKey && !data.content.featuredVideo.sourceUrl}
-      <div class="mt-5 rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4">
-        <strong class="text-[11px] text-[#000A57]">MP4 importado e armazenado</strong>
-        <p class="mt-1 text-[10px] leading-5 text-[#777D8D]">Este vídeo foi preservado pela importação automática e aparecerá no topo do Preview e do artigo público.</p>
-        <a href={`/api/app/help/assets/${data.content.featuredVideo.id}`} target="_blank" rel="noopener noreferrer" class="application-text-caption mt-3 inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#D8DDF4] bg-white px-3 font-semibold text-[#000A57]">Abrir vídeo<ExternalLink size={12}/></a>
+    {#if data.content.featuredVideo?.storageKey}
+      <div class="mt-5 rounded-2xl border border-[#CFE3D6] bg-[#F4FBF6] p-4">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <strong class="text-[11px] text-[#2F7045]">MP4 local ativo</strong>
+            <p class="mt-1 text-[10px] leading-5 text-[#6F7D73]">O artigo público e novas versões da trilha usam este arquivo local, sem dependência do YouTube.</p>
+          </div>
+          <a href={`/api/app/help/assets/${data.content.featuredVideo.id}`} target="_blank" rel="noopener noreferrer" class="application-text-caption inline-flex min-h-9 shrink-0 items-center gap-2 rounded-lg border border-[#CFE3D6] bg-white px-3 font-semibold text-[#2F7045]">Abrir MP4<ExternalLink size={12}/></a>
+        </div>
       </div>
-    {:else}
-      <form method="POST" action="?/updateFeaturedVideo" class="mt-5">
-        <fieldset disabled={!data.canEdit} class="grid gap-4 disabled:opacity-70 lg:grid-cols-2">
-          <label class="block lg:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">URL do vídeo</span><input name="sourceUrl" required value={data.content.featuredVideo?.sourceUrl ?? ""} placeholder="https://www.youtube.com/watch?v=..." class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]" /></label>
-          <label class="block lg:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Descrição pública</span><input name="altText" maxlength="500" value={data.content.featuredVideo?.altText ?? ""} placeholder="Ex.: Demonstração completa do cadastro" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]" /></label>
-          <label class="block rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4 lg:col-span-2"><span class="application-text-caption font-semibold text-[#000A57]">Subtitles *</span><span class="mt-1 block text-[10px] leading-5 text-[#777D8D]">Cole o conteúdo de SRT, VTT ou texto equivalente. É a fonte factual do vídeo.</span><textarea name="subtitles" required maxlength="200000" rows="10" class="mt-3 w-full resize-y rounded-xl border border-[#D8DDF4] bg-white px-3 py-2.5 text-[11px] leading-5">{data.content.featuredVideo?.subtitles ?? ""}</textarea></label>
-          <label class="block rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4 lg:col-span-2"><span class="application-text-caption font-semibold text-[#000A57]">Resumo operacional opcional</span><span class="mt-1 block text-[10px] leading-5 text-[#777D8D]">Resumo curto do que o vídeo demonstra; serve como apoio ao retrieval.</span><textarea name="assistantSummary" maxlength="20000" rows="5" class="mt-3 w-full resize-y rounded-xl border border-[#D8DDF4] bg-white px-3 py-2.5 text-[11px] leading-5">{data.content.featuredVideo?.assistantSummary ?? ""}</textarea></label>
-          {#if data.canEdit}<div class="flex justify-end lg:col-span-2"><button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white"><Save size={15}/>{data.content.featuredVideo ? "Salvar vídeo" : "Adicionar vídeo"}</button></div>{/if}
-        </fieldset>
-      </form>
+    {:else if data.content.featuredVideo?.sourceUrl}
+      <div class="mt-5 rounded-2xl border border-[#F0D6B8] bg-[#FFF9F2] p-4">
+        <strong class="text-[11px] text-[#A9510D]">Vídeo externo legado</strong>
+        <p class="mt-1 text-[10px] leading-5 text-[#826B56]">Este conteúdo ainda usa uma URL externa. Selecione um MP4 abaixo para substituir a referência sem alterar os textos do conteúdo.</p>
+        <a href={data.content.featuredVideo.sourceUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption mt-3 inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#F0D6B8] bg-white px-3 font-semibold text-[#A9510D]">Abrir URL atual<ExternalLink size={12}/></a>
+      </div>
     {/if}
+
+    <form method="POST" action="?/updateFeaturedVideo" enctype="multipart/form-data" class="mt-5">
+      <fieldset disabled={!data.canEdit} class="grid gap-4 disabled:opacity-70 lg:grid-cols-2">
+        {#if !data.content.featuredVideo?.storageKey}
+          <label class="block lg:col-span-2">
+            <span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">URL externa atual</span>
+            <input name="sourceUrl" value={data.content.featuredVideo?.sourceUrl ?? ""} placeholder="https://www.youtube.com/watch?v=..." class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]" />
+            <span class="mt-1.5 block text-[9px] leading-4 text-[#8A909D]">Mantida apenas para conteúdos legados. Para a trilha, prefira substituir por MP4 local.</span>
+          </label>
+        {:else}
+          <input type="hidden" name="sourceUrl" value="" />
+        {/if}
+
+        <label class="block rounded-2xl border border-dashed border-[#C8CFDC] bg-[#FAFBFD] p-4 lg:col-span-2">
+          <span class="flex items-center gap-2 text-[11px] font-semibold text-[#000A57]"><CloudUpload size={15}/>MP4 local</span>
+          <span class="mt-1 block text-[10px] leading-5 text-[#777D8D]">{data.content.featuredVideo?.storageKey ? "Selecione outro MP4 somente quando quiser substituir o vídeo atual." : "Selecione um MP4 para substituir o link do YouTube e tornar o vídeo compatível com a trilha."}</span>
+          <input name="videoFile" type="file" accept="video/mp4,.mp4" class="mt-3 block w-full rounded-xl border border-[#DDE1EA] bg-white px-3 py-2 text-[11px] text-[#555B6A] file:mr-3 file:rounded-lg file:border-0 file:bg-[#000A57] file:px-3 file:py-2 file:text-[10px] file:font-semibold file:text-white" />
+          <span class="mt-1.5 block text-[9px] text-[#9297A5]">Formato MP4 · até 25 MB.</span>
+        </label>
+
+        <label class="block lg:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Descrição pública</span><input name="altText" maxlength="500" value={data.content.featuredVideo?.altText ?? ""} placeholder="Ex.: Demonstração completa do cadastro" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]" /></label>
+        <label class="block rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4 lg:col-span-2"><span class="application-text-caption font-semibold text-[#000A57]">Subtitles *</span><span class="mt-1 block text-[10px] leading-5 text-[#777D8D]">Cole o conteúdo de SRT, VTT ou texto equivalente. É a fonte factual do vídeo.</span><textarea name="subtitles" required maxlength="200000" rows="10" class="mt-3 w-full resize-y rounded-xl border border-[#D8DDF4] bg-white px-3 py-2.5 text-[11px] leading-5">{data.content.featuredVideo?.subtitles ?? ""}</textarea></label>
+        <label class="block rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4 lg:col-span-2"><span class="application-text-caption font-semibold text-[#000A57]">Resumo operacional opcional</span><span class="mt-1 block text-[10px] leading-5 text-[#777D8D]">Resumo curto do que o vídeo demonstra; serve como apoio ao retrieval.</span><textarea name="assistantSummary" maxlength="20000" rows="5" class="mt-3 w-full resize-y rounded-xl border border-[#D8DDF4] bg-white px-3 py-2.5 text-[11px] leading-5">{data.content.featuredVideo?.assistantSummary ?? ""}</textarea></label>
+        {#if data.canEdit}
+          <div class="flex justify-end lg:col-span-2">
+            <button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white"><Save size={15}/>{data.content.featuredVideo ? "Salvar vídeo" : "Adicionar vídeo"}</button>
+          </div>
+        {/if}
+      </fieldset>
+    </form>
     {#if data.canEdit && data.content.featuredVideo}<form method="POST" action="?/deleteFeaturedVideo" class="mt-3 flex justify-end" on:submit={(event) => { if (!confirm("Remover o vídeo principal?")) event.preventDefault(); }}><button type="submit" class="application-text-caption inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#F0C8C8] bg-white px-3 font-semibold text-[#9B2C2C]"><Trash2 size={14}/>Remover vídeo</button></form>{/if}
   </section>
 
