@@ -18,21 +18,6 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-function assertVideoReference(value: string, assetId: string | null): void {
-  if (value.startsWith("asset:")) {
-    const referenceId = value.slice("asset:".length);
-    if (!isUuid(referenceId) || (assetId && referenceId !== assetId)) {
-      throw new Error("TRAINING_VIDEO_INVALID");
-    }
-    return;
-  }
-
-  const url = new URL(value);
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("INVALID_MEDIA_URL");
-  }
-}
-
 function defaultPrimaryActionLabel(_interactionMode: HelpTrainingInteractionMode): string {
   return "Continuar";
 }
@@ -287,10 +272,16 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
           annotations: parseHelpImageAnnotations(sourceBlock?.annotations) ?? [],
         };
       });
-    const video = step.media.find((media) => media.mediaType === "video" && media.sourceUrl);
+    const video = step.media.find((media) => media.mediaType === "video") ?? null;
     const caption = step.media.find((media) => media.mediaType === "caption" && media.assetId);
-    if (!video?.sourceUrl) throw new Error("TRAINING_STEP_VIDEO_REQUIRED");
-    assertVideoReference(video.sourceUrl, video.assetId);
+    if (!video) throw new Error("TRAINING_STEP_VIDEO_REQUIRED");
+    if (
+      !video.assetId ||
+      video.sourceUrl !== `asset:${video.assetId}` ||
+      video.assetMimeType !== "video/mp4"
+    ) {
+      throw new Error("TRAINING_LOCAL_VIDEO_REQUIRED");
+    }
 
     return {
       id: step.id,
@@ -307,7 +298,7 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
       videoStartSeconds: step.videoStartSeconds,
       videoEndSeconds: step.videoEndSeconds,
       images,
-      videoUrl: video?.sourceUrl ?? null,
+      videoUrl: `asset:${video.assetId}`,
       captionAssetId: caption?.assetId ?? null,
       failureReasons: interactionMode === "presentation"
         ? []
