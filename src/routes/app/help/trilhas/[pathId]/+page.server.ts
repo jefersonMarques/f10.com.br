@@ -10,6 +10,7 @@ import {
   updateHelpTrainingStepDraft,
 } from "$lib/server/help/helpTrainingAuthoringRepository";
 import { getCombinedHelpTrainingInsights } from "$lib/server/help/helpTrainingInsightsRepository";
+import { HELP_YOUTUBE_EXTRACTION_ENABLED } from "$lib/server/help/helpVideoImportAutomation";
 import {
   addHelpTrainingModuleFromPublishedContent,
   localizeHelpTrainingPathVideos,
@@ -146,7 +147,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   const availableContents = publishedCatalog.filter(
     (content) => !currentSourceIds.has(content.contentId),
   );
-  const hasRemoteYoutubeVideos = path.steps.some((step) =>
+  const hasRemoteYoutubeVideos = HELP_YOUTUBE_EXTRACTION_ENABLED && path.steps.some((step) =>
     step.media.some(
       (media) => media.mediaType === "video"
         && Boolean(media.sourceUrl)
@@ -310,6 +311,12 @@ export const actions: Actions = {
 
   localizeVideos: async ({ cookies, params }) => {
     if (!isUuid(params.pathId)) return fail(404, { success: false, message: "Trilha não encontrada." });
+    if (!HELP_YOUTUBE_EXTRACTION_ENABLED) {
+      return fail(403, {
+        success: false,
+        message: "A preparação de MP4 a partir do YouTube está temporariamente desabilitada.",
+      });
+    }
     const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
 
     try {
