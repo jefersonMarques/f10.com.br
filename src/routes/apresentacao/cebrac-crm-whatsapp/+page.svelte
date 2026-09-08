@@ -44,6 +44,11 @@
     owner: string;
   };
 
+  type Recording = {
+    title: string;
+    src: string;
+  };
+
   const journeySteps = [
     "Lead recebido",
     "Distribuição",
@@ -227,6 +232,21 @@
       owner: "Rede + F10 + unidade",
     },
   ];
+
+  const recordings: Recording[] = [
+    {
+      title: "Gravação CRM - SDR's 28/08",
+      src: "/apresentacao/cebrac-crm-whatsapp/videos/crm-sdrs",
+    },
+    {
+      title: "Gravação CRM - Gestão 28/08",
+      src: "/apresentacao/cebrac-crm-whatsapp/videos/crm-gestao",
+    },
+    {
+      title: "WhatsApp no F10",
+      src: "/apresentacao/cebrac-crm-whatsapp/videos/whatsapp-f10",
+    },
+  ];
 </script>
 
 <svelte:head>
@@ -320,6 +340,7 @@
         <a href="#motivo" class="nav-link">Por que muda</a>
         <a href="#modelo" class="nav-link">Como funciona</a>
         <a href="#beneficios" class="nav-link">Benefícios</a>
+        <a href="#gravacoes" class="nav-link">Gravações</a>
         <a href="#investimento" class="nav-link">Investimento</a>
         <a href="#implantacao" class="nav-link">Implantação</a>
       </div>
@@ -541,6 +562,43 @@
     </div>
   </div>
 </section>
+
+  <section id="gravacoes" class="scroll-mt-16 bg-white px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
+    <div class="mx-auto max-w-[1480px]">
+      <div class="grid gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-end lg:gap-20">
+        <div>
+          <p class="section-label">Gravações da apresentação</p>
+          <h2 class="section-title mt-4">CRM e WhatsApp apresentados na prática.</h2>
+        </div>
+        <p class="max-w-[780px] text-lg leading-8 text-[#2B4091]/70 lg:pb-1">
+          Acesse as gravações para revisar a operação comercial, a visão de gestão e o uso do WhatsApp integrado ao F10.
+        </p>
+      </div>
+
+      <div class="mt-12 grid gap-7 lg:grid-cols-2">
+        {#each recordings as recording, index}
+          <article class={`overflow-hidden border border-[#2B4091]/12 bg-[#f6f8fc] shadow-[0_20px_52px_rgba(43,64,145,0.10)] ${index === recordings.length - 1 ? "lg:col-span-2" : ""}`}>
+            <div class="border-b border-[#2B4091]/10 bg-white px-5 py-4 sm:px-6">
+              <span class="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#f36b21]">Vídeo {String(index + 1).padStart(2, "0")}</span>
+              <h3 class="mt-1 text-lg font-bold text-[#2B4091] sm:text-xl">{recording.title}</h3>
+            </div>
+            <div class={`bg-black ${index === recordings.length - 1 ? "mx-auto max-w-[980px]" : ""}`}>
+              <video
+                class="aspect-video w-full bg-black"
+                controls
+                playsinline
+                preload="metadata"
+                src={recording.src}
+                aria-label={recording.title}
+              >
+                Seu navegador não suporta reprodução de vídeo HTML5.
+              </video>
+            </div>
+          </article>
+        {/each}
+      </div>
+    </div>
+  </section>
 
   <section id="investimento" class="scroll-mt-16 bg-[#f3f5fa] px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
     <div class="mx-auto max-w-[1480px]">
