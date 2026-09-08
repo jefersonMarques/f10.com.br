@@ -6,12 +6,17 @@ import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import { moveHelpBlock, moveHelpStep, type HelpMoveDirection } from "$lib/server/help/helpContentOrdering";
 import { publishHelpKnowledgeContent } from "$lib/server/help/helpKnowledgePublisher";
 import {
+  createManagedHelpAsset,
+  deleteManagedHelpAsset,
+} from "$lib/server/help/helpAssetRepository";
+import {
   addStructuredHelpBlock,
   addStructuredHelpStep,
   deleteStructuredHelpBlock,
   deleteStructuredHelpFeaturedVideo,
   deleteStructuredHelpStep,
   getStructuredHelpContent,
+  setStructuredHelpFeaturedVideoAsset,
   updateStructuredHelpBlock,
   updateStructuredHelpContent,
   updateStructuredHelpStep,
@@ -121,10 +126,7 @@ function validateBlockInput(input: StructuredHelpBlockInput): string | null {
   return null;
 }
 
-function validateFeaturedVideoInput(input: StructuredHelpFeaturedVideoInput): string | null {
-  if (!isHttpUrl(input.sourceUrl)) {
-    return "Informe uma URL HTTP ou HTTPS válida para o vídeo principal.";
-  }
+function validateFeaturedVideoMetadata(input: StructuredHelpFeaturedVideoInput): string | null {
   if (input.altText.length > 500) {
     return "A descrição do vídeo deve ter no máximo 500 caracteres.";
   }
@@ -138,6 +140,24 @@ function validateFeaturedVideoInput(input: StructuredHelpFeaturedVideoInput): st
     return "O resumo operacional deve ter no máximo 20.000 caracteres.";
   }
   return null;
+}
+
+function validateFeaturedVideoUrl(input: StructuredHelpFeaturedVideoInput): string | null {
+  return isHttpUrl(input.sourceUrl)
+    ? null
+    : "Informe uma URL HTTP ou HTTPS válida para o vídeo principal ou selecione um MP4.";
+}
+
+function featuredVideoUploadErrorMessage(cause: unknown): string {
+  const code = cause instanceof Error ? cause.message : "";
+  if (code === "ASSET_SIZE_NOT_ALLOWED") return "O vídeo MP4 deve ter no máximo 25 MB.";
+  if (code === "ASSET_MIME_NOT_ALLOWED" || code === "FEATURED_VIDEO_MP4_REQUIRED") {
+    return "Use um arquivo MP4 válido.";
+  }
+  if (code === "ASSET_CONTENT_MISMATCH") {
+    return "O arquivo selecionado não possui uma estrutura MP4 válida.";
+  }
+  return "Não foi possível salvar o vídeo principal.";
 }
 
 function getPublishErrorMessage(cause: unknown): string {
@@ -248,15 +268,78 @@ export const actions: Actions = {
   updateFeaturedVideo: async ({ cookies, params, request }) => {
     if (!isUuid(params.contentId)) return fail(404, { success: false, message: "Conteúdo não encontrado." });
     const { session } = await requireAppPermission(cookies, "help.edit", contentEditorPath(params.contentId));
-    const input = parseFeaturedVideoInput(await request.formData());
-    const validationMessage = validateFeaturedVideoInput(input);
-    if (validationMessage) return fail(400, { success: false, message: validationMessage });
+    const formData = await request.formData();
+    const input = parseFeaturedVideoInput(formData);
+    const metadataValidationMessage = validateFeaturedVideoMetadata(input);
+    if (metadataValidationMessage) {
+      return fail(400, { success: false, message: metadataValidationMessage });
+    }
+
+    const fileValue = formData.get("videoFile");
+    const videoFile = fileValue instanceof File && fileValue.size > 0 ? fileValue : null;
+
+    if (videoFile) {
+      if (videoFile.type.toLowerCase() !== "video/mp4") {
+        return fail(400, { success: false, message: "Use um arquivo MP4 válido." });
+      }
+
+      let uploadedAssetId: string | null = null;
+      try {
+        const uploaded = await createManagedHelpAsset(session.user.id, {
+          fileName: videoFile.name || "video.mp4",
+          mimeType: videoFile.type,
+          bytes: new Uint8Array(await videoFile.arrayBuffer()),
+          altText: input.altText,
+          assistantSummary: input.assistantSummary,
+          contentId: params.contentId,
+          deduplicate: false,
+        });
+        uploadedAssetId = uploaded.asset.id;
+
+        await setStructuredHelpFeaturedVideoAsset(
+          session.user.id,
+          params.contentId,
+          uploaded.asset.id,
+          {
+            altText: input.altText,
+            subtitles: input.subtitles,
+            assistantSummary: input.assistantSummary,
+          },
+        );
+      } catch (cause) {
+        if (uploadedAssetId) {
+          await deleteManagedHelpAsset(session.user.id, uploadedAssetId).catch(() => undefined);
+        }
+        return fail(409, { success: false, message: featuredVideoUploadErrorMessage(cause) });
+      }
+
+      redirectToContentEditor(params.contentId);
+    }
 
     try {
-      await upsertStructuredHelpFeaturedVideo(session.user.id, params.contentId, input);
-    } catch {
-      return fail(409, { success: false, message: "Não foi possível salvar o vídeo principal." });
+      const currentContent = await getStructuredHelpContent(params.contentId);
+      if (currentContent?.featuredVideo?.storageKey) {
+        await setStructuredHelpFeaturedVideoAsset(
+          session.user.id,
+          params.contentId,
+          currentContent.featuredVideo.id,
+          {
+            altText: input.altText,
+            subtitles: input.subtitles,
+            assistantSummary: input.assistantSummary,
+          },
+        );
+      } else {
+        const urlValidationMessage = validateFeaturedVideoUrl(input);
+        if (urlValidationMessage) {
+          return fail(400, { success: false, message: urlValidationMessage });
+        }
+        await upsertStructuredHelpFeaturedVideo(session.user.id, params.contentId, input);
+      }
+    } catch (cause) {
+      return fail(409, { success: false, message: featuredVideoUploadErrorMessage(cause) });
     }
+
     redirectToContentEditor(params.contentId);
   },
 
