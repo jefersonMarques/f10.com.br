@@ -42,9 +42,9 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
   const returnTo = safeReturnTo(url.searchParams.get("returnTo") ?? "/cliente/chamados");
   const session = await getOptionalCustomerF10PortalSession(cookies);
   if (session) {
-    if (session.selectedUnitId === null) {
+    if (session.groups.length > 1 && session.selectedGroupId === null) {
       const params = new URLSearchParams({ returnTo });
-      throw redirect(303, `/cliente/unidade?${params.toString()}`);
+      throw redirect(303, `/cliente/grupo?${params.toString()}`);
     }
     throw redirect(303, returnTo);
   }
@@ -75,9 +75,9 @@ export const actions: Actions = {
       const session = await createF10CustomerPortalSession(email, password);
       setCustomerPortalSessionCookie(cookies, session.token, session.expiresAt);
 
-      if (session.needsUnitSelection) {
+      if (session.needsGroupSelection) {
         const params = new URLSearchParams({ returnTo });
-        throw redirect(303, `/cliente/unidade?${params.toString()}`);
+        throw redirect(303, `/cliente/grupo?${params.toString()}`);
       }
       throw redirect(303, returnTo);
     } catch (cause) {

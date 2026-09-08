@@ -13,7 +13,11 @@ function isUuid(value: string): boolean {
 
 export const load: PageServerLoad = async ({ params, cookies, url }) => {
   if (!isUuid(params.ticketId)) throw error(404, "Chamado não encontrado.");
-  const session = await requireCustomerF10PortalSession(cookies, `${url.pathname}${url.search}`);
+  const session = await requireCustomerF10PortalSession(
+    cookies,
+    `${url.pathname}${url.search}`,
+    false,
+  );
   const details = await getCustomerF10Ticket(session, params.ticketId);
   if (!details) throw error(404, "Chamado não encontrado.");
   await recordCustomerActivity(session, {
@@ -31,7 +35,11 @@ export const actions: Actions = {
       return fail(404, { success: false, message: "Chamado não encontrado." });
     }
 
-    const session = await requireCustomerF10PortalSession(cookies, `/cliente/chamados/${params.ticketId}`);
+    const session = await requireCustomerF10PortalSession(
+      cookies,
+      `/cliente/chamados/${params.ticketId}`,
+      false,
+    );
     const formData = await request.formData();
     const value = formData.get("body");
     const body = typeof value === "string" ? value.trim() : "";
