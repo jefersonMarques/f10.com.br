@@ -44,9 +44,12 @@
     owner: string;
   };
 
-  type Recording = {
+  type CrmPracticalSession = {
+    audience: string;
     title: string;
+    description: string;
     src: string;
+    topics: string[];
   };
 
   const journeySteps = [
@@ -233,18 +236,32 @@
     },
   ];
 
-  const recordings: Recording[] = [
+  const crmPracticalSessions: CrmPracticalSession[] = [
     {
-      title: "Gravação CRM - SDR's 28/08",
+      audience: "Para o time comercial",
+      title: "Como trabalhar cada lead da entrada até a próxima ação",
+      description:
+        "Veja a rotina de SDRs e atendimento no CRM: organização do funil, definição de responsáveis, tarefas, agenda, follow-ups e histórico para que cada oportunidade avance com contexto e prazo.",
       src: "/apresentacao/cebrac-crm-whatsapp/videos/crm-sdrs",
+      topics: [
+        "Funil de matrículas com cada lead na etapa correta",
+        "Próxima ação, responsável e prazo visíveis",
+        "Tarefas, agenda e follow-ups organizados no mesmo fluxo",
+        "Histórico preservado para dar continuidade ao atendimento",
+      ],
     },
     {
-      title: "Gravação CRM - Gestão 28/08",
+      audience: "Para gestão e liderança",
+      title: "Como acompanhar o funil, as prioridades e a execução da equipe",
+      description:
+        "Veja como a gestão utiliza o CRM para enxergar oportunidades paradas, atrasos, responsáveis, produtividade e conversão, identificando onde a operação precisa agir antes que o lead esfrie.",
       src: "/apresentacao/cebrac-crm-whatsapp/videos/crm-gestao",
-    },
-    {
-      title: "WhatsApp no F10",
-      src: "/apresentacao/cebrac-crm-whatsapp/videos/whatsapp-f10",
+      topics: [
+        "Visão do funil e das oportunidades em andamento",
+        "Leads sem próxima ação e atividades atrasadas",
+        "Acompanhamento de responsáveis e prioridades",
+        "Indicadores de produtividade, avanço e conversão",
+      ],
     },
   ];
 </script>
@@ -340,7 +357,7 @@
         <a href="#motivo" class="nav-link">Por que muda</a>
         <a href="#modelo" class="nav-link">Como funciona</a>
         <a href="#beneficios" class="nav-link">Benefícios</a>
-        <a href="#gravacoes" class="nav-link">Gravações</a>
+        <a href="#crm-pratica" class="nav-link">CRM na prática</a>
         <a href="#investimento" class="nav-link">Investimento</a>
         <a href="#implantacao" class="nav-link">Implantação</a>
       </div>
@@ -560,42 +577,114 @@
         <strong>CRM de Leads ou F10</strong>
       </div>
     </div>
+
+    <div class="mt-14 grid overflow-hidden border border-[#2B4091]/12 bg-white shadow-[0_22px_60px_rgba(43,64,145,0.10)] lg:grid-cols-[0.72fr_1.28fr] lg:items-stretch">
+      <div class="flex flex-col justify-center px-6 py-8 sm:px-8 lg:px-10 lg:py-10">
+        <p class="section-label">WhatsApp no F10</p>
+        <h3 class="mt-4 text-[30px] font-semibold leading-[1.12] tracking-[-0.035em] text-[#2B4091] sm:text-[38px]">
+          Atendimento organizado no sistema e a conversa acompanhada também pelo celular.
+        </h3>
+        <p class="mt-5 text-base leading-7 text-[#2B4091]/68">
+          A equipe mantém o atendimento dentro da operação do F10, com histórico e contexto centralizados, enquanto acompanha as conversas pelos canais usados no dia a dia. Assim, a unidade reduz dependência de aparelhos individuais sem perder mobilidade no relacionamento.
+        </p>
+        <div class="mt-6 grid gap-3 text-sm font-semibold text-[#2B4091]/78 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+          <span class="flex items-start gap-2"><CheckCircle2 size={17} class="mt-0.5 shrink-0 text-[#61CE70]"/>Histórico preservado na unidade</span>
+          <span class="flex items-start gap-2"><CheckCircle2 size={17} class="mt-0.5 shrink-0 text-[#61CE70]"/>Continuidade entre atendentes</span>
+          <span class="flex items-start gap-2"><CheckCircle2 size={17} class="mt-0.5 shrink-0 text-[#61CE70]"/>Operação centralizada no F10</span>
+          <span class="flex items-start gap-2"><CheckCircle2 size={17} class="mt-0.5 shrink-0 text-[#61CE70]"/>Acompanhamento também pelo celular</span>
+        </div>
+      </div>
+      <div class="flex items-center bg-black">
+        <video
+          class="aspect-video w-full bg-black"
+          controls
+          playsinline
+          preload="metadata"
+          src="/apresentacao/cebrac-crm-whatsapp/videos/whatsapp-f10"
+          aria-label="WhatsApp no F10"
+        >
+          Seu navegador não suporta reprodução de vídeo HTML5.
+        </video>
+      </div>
+    </div>
   </div>
 </section>
 
-  <section id="gravacoes" class="scroll-mt-16 bg-white px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
+  <section id="crm-pratica" class="scroll-mt-16 bg-[#f3f5fa] px-5 py-20 sm:px-8 lg:px-12 lg:py-24">
     <div class="mx-auto max-w-[1480px]">
-      <div class="grid gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-end lg:gap-20">
+      <div class="grid gap-8 lg:grid-cols-[0.7fr_1.3fr] lg:items-end lg:gap-20">
         <div>
-          <p class="section-label">Gravações da apresentação</p>
-          <h2 class="section-title mt-4">CRM e WhatsApp apresentados na prática.</h2>
+          <p class="section-label">CRM na prática</p>
+          <h2 class="section-title mt-4">Uma operação para quem atende e uma visão clara para quem gerencia.</h2>
         </div>
-        <p class="max-w-[780px] text-lg leading-8 text-[#2B4091]/70 lg:pb-1">
-          Acesse as gravações para revisar a operação comercial, a visão de gestão e o uso do WhatsApp integrado ao F10.
-        </p>
+        <div class="max-w-[800px] lg:pb-1">
+          <p class="text-lg leading-8 text-[#2B4091]/70">
+            O CRM Escolar centraliza leads, histórico, tarefas, notificações e próximas ações. Na rotina, o time sabe o que fazer e quando agir; na gestão, fica mais simples identificar atrasos, gargalos e oportunidades que precisam de atenção.
+          </p>
+          <p class="mt-4 text-sm font-semibold leading-6 text-[#2B4091]/55">
+            Abaixo estão duas apresentações complementares: uma focada na execução comercial e outra no acompanhamento gerencial da operação.
+          </p>
+        </div>
       </div>
 
-      <div class="mt-12 grid gap-7 lg:grid-cols-2">
-        {#each recordings as recording, index}
-          <article class={`overflow-hidden border border-[#2B4091]/12 bg-[#f6f8fc] shadow-[0_20px_52px_rgba(43,64,145,0.10)] ${index === recordings.length - 1 ? "lg:col-span-2" : ""}`}>
-            <div class="border-b border-[#2B4091]/10 bg-white px-5 py-4 sm:px-6">
-              <span class="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#f36b21]">Vídeo {String(index + 1).padStart(2, "0")}</span>
-              <h3 class="mt-1 text-lg font-bold text-[#2B4091] sm:text-xl">{recording.title}</h3>
-            </div>
-            <div class={`bg-black ${index === recordings.length - 1 ? "mx-auto max-w-[980px]" : ""}`}>
-              <video
-                class="aspect-video w-full bg-black"
-                controls
-                playsinline
-                preload="metadata"
-                src={recording.src}
-                aria-label={recording.title}
-              >
-                Seu navegador não suporta reprodução de vídeo HTML5.
-              </video>
+      <div class="mt-14 space-y-10">
+        {#each crmPracticalSessions as session, index}
+          <article class="overflow-hidden border border-[#2B4091]/12 bg-white shadow-[0_22px_60px_rgba(43,64,145,0.09)]">
+            <div class={`grid lg:grid-cols-2 ${index % 2 === 1 ? "lg:[&>*:first-child]:order-2" : ""}`}>
+              <div class="flex flex-col justify-center px-6 py-8 sm:px-8 lg:px-10 lg:py-10">
+                <span class="text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#f36b21]">{session.audience}</span>
+                <h3 class="mt-3 text-[28px] font-semibold leading-[1.14] tracking-[-0.035em] text-[#2B4091] sm:text-[34px]">
+                  {session.title}
+                </h3>
+                <p class="mt-5 text-base leading-7 text-[#2B4091]/68">{session.description}</p>
+
+                <div class="mt-7 border-t border-[#2B4091]/10 pt-5">
+                  <span class="text-[11px] font-extrabold uppercase tracking-[0.13em] text-[#2B4091]/48">O que você vai ver</span>
+                  <div class="mt-3 grid gap-2.5">
+                    {#each session.topics as topic}
+                      <span class="flex items-start gap-2 text-sm font-semibold leading-6 text-[#2B4091]/78">
+                        <CheckCircle2 size={17} class="mt-1 shrink-0 text-[#61CE70]"/>
+                        {topic}
+                      </span>
+                    {/each}
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center bg-[#111827]">
+                <video
+                  class="aspect-video w-full bg-black"
+                  controls
+                  playsinline
+                  preload="metadata"
+                  src={session.src}
+                  aria-label={session.title}
+                >
+                  Seu navegador não suporta reprodução de vídeo HTML5.
+                </video>
+              </div>
             </div>
           </article>
         {/each}
+      </div>
+
+      <div class="mt-10 grid gap-4 border-t border-[#2B4091]/12 pt-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="border-l-2 border-[#f36b21] pl-4">
+          <strong class="block text-sm text-[#2B4091]">Funil por etapas</strong>
+          <span class="mt-1 block text-xs leading-5 text-[#2B4091]/58">Cada lead com posição, responsável e contexto.</span>
+        </div>
+        <div class="border-l-2 border-[#ffcd40] pl-4">
+          <strong class="block text-sm text-[#2B4091]">Próxima ação</strong>
+          <span class="mt-1 block text-xs leading-5 text-[#2B4091]/58">Tarefas, agenda, retornos e follow-ups visíveis.</span>
+        </div>
+        <div class="border-l-2 border-[#61CE70] pl-4">
+          <strong class="block text-sm text-[#2B4091]">Histórico completo</strong>
+          <span class="mt-1 block text-xs leading-5 text-[#2B4091]/58">Continuidade mesmo quando muda o atendente.</span>
+        </div>
+        <div class="border-l-2 border-[#2B4091] pl-4">
+          <strong class="block text-sm text-[#2B4091]">Gestão em tempo real</strong>
+          <span class="mt-1 block text-xs leading-5 text-[#2B4091]/58">Prioridades, atrasos, produtividade e conversão.</span>
+        </div>
       </div>
     </div>
   </section>
