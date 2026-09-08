@@ -236,7 +236,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
         });
 
         normalizeSingleScreenshotPerStep(generated.file);
-        if (source.type === "upload") {
+        if (source.type === "upload" || generated.localVideo) {
           for (const content of generated.file.contents) content.featuredVideo = undefined;
         }
         const selectedScreenshotCount = countScreenshots(generated.file);
@@ -290,6 +290,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
             contentId: importedContent.id,
             bytes: localVideo.bytes,
             fileName: localVideo.fileName,
+            sourceUrl: source.type === "youtube" ? source.url : undefined,
             subtitles: generated.transcript,
             altText: content.summary || content.title,
             assistantSummary: content.quickGuide || content.summary || content.title,
@@ -319,9 +320,14 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
         const overwriteMessage = result.overwrittenCount > 0
           ? " O conteúdo anterior foi substituído mantendo o mesmo ID."
           : "";
+        const localVideoMessage = source.type === "youtube" && generated.localVideoFailureCode
+          ? " O artigo foi preservado, mas a cópia MP4 local não pôde ser criada nesta execução."
+          : source.type === "youtube" && generated.localVideo
+            ? " O MP4 local foi armazenado e será reutilizado pelas trilhas."
+            : "";
         write({
           type: "success",
-          message: `Vídeo processado e ${result.contentCount} conteúdo(s) criado(s) como rascunho.${overwriteMessage} Revise os screenshots, faça as marcações e publique quando estiver correto.`,
+          message: `Vídeo processado e ${result.contentCount} conteúdo(s) criado(s) como rascunho.${overwriteMessage}${localVideoMessage} Revise os screenshots, faça as marcações e publique quando estiver correto.`,
           summary: {
             source: result.source,
             contentCount: result.contentCount,
