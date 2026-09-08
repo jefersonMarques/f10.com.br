@@ -100,6 +100,15 @@
     return true;
   }
 
+  function submissionKey(): string {
+    if (submissionIdempotencyKey) return submissionIdempotencyKey;
+    submissionIdempotencyKey =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `cell-coin-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return submissionIdempotencyKey;
+  }
+
   function isStep3DocType(docType: DocType): docType is Step3DocType {
     return docType !== "selfie";
   }
@@ -194,6 +203,7 @@
 
   let errors: FormErrors = {};
   let isSubmitting = false;
+  let submissionIdempotencyKey = "";
 
   // Loading silencioso (sem texto)
   let isCnpjLoading = false;
@@ -1530,6 +1540,7 @@
       // 2) Envia para o endpoint que dispara o e-mail via Brevo
       const res = await fetch("/api/registration/submit", {
         method: "POST",
+        headers: { "Idempotency-Key": submissionKey() },
         body: fd,
       });
 
