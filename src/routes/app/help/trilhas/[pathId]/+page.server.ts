@@ -83,7 +83,13 @@ function localVideoErrorMessage(cause: unknown): string {
     return "O arquivo de cookies do YouTube configurado no servidor não foi encontrado.";
   }
   if (code === "HELP_VIDEO_YOUTUBE_COOKIES_INVALID") {
-    return "Os cookies do YouTube expiraram. Renove o arquivo do servidor antes de preparar o MP4 local.";
+    return "Este vídeo exige autenticação no YouTube e os cookies de fallback estão inválidos.";
+  }
+  if (code === "HELP_VIDEO_YOUTUBE_AUTH_REQUIRED") {
+    return "Este vídeo exige autenticação no YouTube. Vídeos públicos usam o fluxo automático sem cookies.";
+  }
+  if (code === "HELP_VIDEO_YTDLP_POT_PROVIDER_URL_INVALID") {
+    return "A URL configurada para o provedor automático do YouTube é inválida.";
   }
   if (code === "HELP_VIDEO_LOCAL_COPY_TOO_LARGE") {
     return "O vídeo não coube no limite da cópia local mesmo na qualidade reduzida.";
