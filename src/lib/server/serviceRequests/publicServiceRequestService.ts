@@ -117,8 +117,29 @@ export async function createPublicServiceRequest(
         sql`select pg_advisory_xact_lock(hashtext(${`public:${input.requestType}:${idempotencyKey}`}))`,
       );
 
-      const duplicate = await findExistingPublicRequest(input.requestType, idempotencyKey);
-      if (duplicate) return duplicate;
+      const [duplicate] = await tx
+        .select({
+          serviceRequestId: serviceRequests.id,
+          ticketId: serviceRequests.ticketId,
+          ticketNumber: tickets.ticketNumber,
+        })
+        .from(serviceRequests)
+        .innerJoin(tickets, eq(tickets.id, serviceRequests.ticketId))
+        .where(
+          and(
+            isNull(serviceRequests.customerContactId),
+            eq(serviceRequests.requestType, input.requestType),
+            eq(serviceRequests.idempotencyKey, idempotencyKey),
+          ),
+        )
+        .limit(1);
+      if (duplicate) {
+        return {
+          ...duplicate,
+          requestType: input.requestType,
+          deduplicated: true,
+        };
+      }
 
       const [ticket] = await tx
         .insert(tickets)
