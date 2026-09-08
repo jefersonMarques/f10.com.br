@@ -20,6 +20,7 @@ const STABILITY_THRESHOLD = 0.975;
 const COMMAND_TIMEOUT_MS = 8 * 60 * 1_000;
 const OPENAI_TRANSCRIPTION_TIMEOUT_MS = 3 * 60 * 1_000;
 const DEFAULT_YTDLP_COOKIES_PATH = "/opt/f10-secrets/youtube-cookies.txt";
+const DEFAULT_YTDLP_POT_PROVIDER_URL = "http://127.0.0.1:4416";
 
 type ScreenshotCaptureMode = "before" | "after";
 
@@ -152,6 +153,11 @@ export type HelpVideoScreenshotReviewCandidate = {
 export type HelpVideoAutomationResult = {
   file: HelpImportFile;
   assets: Map<string, HelpImportPackageAsset>;
+  localVideo?: {
+    bytes: Uint8Array;
+    fileName: string;
+  };
+  localVideoFailureCode?: string;
   reviewCandidates: HelpVideoScreenshotReviewCandidate[];
   transcript: string;
   transcriptTimeline: Array<{ start: number; end: number; text: string }>;
@@ -194,6 +200,35 @@ async function ytDlpCookiesPath(): Promise<string | null> {
     if (configuredPath) throw new Error("HELP_VIDEO_YOUTUBE_COOKIES_NOT_FOUND");
     return null;
   }
+}
+
+function ytDlpPotProviderUrl(): string {
+  const configured = env.HELP_VIDEO_YTDLP_POT_PROVIDER_URL?.trim();
+  const candidate = configured || DEFAULT_YTDLP_POT_PROVIDER_URL;
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("HELP_VIDEO_YTDLP_POT_PROVIDER_URL_INVALID");
+    }
+    return url.toString().replace(/\/$/, "");
+  } catch (cause) {
+    if (
+      cause instanceof Error &&
+      cause.message === "HELP_VIDEO_YTDLP_POT_PROVIDER_URL_INVALID"
+    ) {
+      throw cause;
+    }
+    throw new Error("HELP_VIDEO_YTDLP_POT_PROVIDER_URL_INVALID");
+  }
+}
+
+function youtubeRuntimeArgs(): string[] {
+  return [
+    "--js-runtimes",
+    `node:${process.execPath}`,
+    "--extractor-args",
+    `youtubepot-bgutilhttp:base_url=${ytDlpPotProviderUrl()}`,
+  ];
 }
 
 function normalizeSlug(value: string): string {
@@ -319,10 +354,16 @@ async function runCommand(
   });
 }
 
-function classifyYoutubeDownloadError(cause: unknown): Error {
+function youtubeDownloadRequiresAuthentication(cause: unknown): boolean {
+  const message = cause instanceof Error ? cause.message : "";
+  return /sign in|login required|private video|members[- ]only|age[- ]restricted|confirm you(?:'|’)re not a bot|cookies/i.test(message);
+}
+
+function classifyYoutubeCookieError(cause: unknown): Error {
   const message = cause instanceof Error ? cause.message : "";
   if (
     /provided YouTube account cookies are no longer valid/i.test(message)
+    || /cookies.*(?:expired|invalid)/i.test(message)
     || /sign in to confirm you(?:'|’)re not a bot/i.test(message)
   ) {
     return new Error("HELP_VIDEO_YOUTUBE_COOKIES_INVALID");
@@ -330,13 +371,17 @@ function classifyYoutubeDownloadError(cause: unknown): Error {
   return cause instanceof Error ? cause : new Error("HELP_VIDEO_COMMAND_FAILED");
 }
 
-async function downloadYoutubeVideo(url: string, directory: string): Promise<string> {
-  if (!youtubeVideoId(url)) throw new Error("HELP_VIDEO_YOUTUBE_URL_INVALID");
-
+function youtubeDownloadArgs(
+  url: string,
+  directory: string,
+  outputPrefix: string,
+  cookiesPath: string | null,
+): string[] {
   const args = [
     "--no-playlist",
     "--no-progress",
     "--restrict-filenames",
+    ...youtubeRuntimeArgs(),
     "--match-filter",
     "duration <= 1800",
     "--max-filesize",
@@ -346,22 +391,138 @@ async function downloadYoutubeVideo(url: string, directory: string): Promise<str
     "-f",
     "bv*+ba/b",
     "-o",
-    join(directory, "source.%(ext)s"),
+    join(directory, `${outputPrefix}.%(ext)s`),
   ];
-  const cookiesPath = await ytDlpCookiesPath();
   if (cookiesPath) args.unshift("--cookies", cookiesPath);
   args.push(url);
+  return args;
+}
 
+async function findYoutubeDownload(
+  directory: string,
+  outputPrefix: string,
+): Promise<string | null> {
+  const files = await readdir(directory);
+  const downloaded = files.find((file) => {
+    if (!file.startsWith(`${outputPrefix}.`)) return false;
+    return /\.(mp4|webm|mkv|mov)$/i.test(file);
+  });
+  return downloaded ? join(directory, downloaded) : null;
+}
+
+async function clearYoutubeDownload(
+  directory: string,
+  outputPrefix: string,
+): Promise<void> {
+  const files = await readdir(directory).catch(() => []);
+  await Promise.all(
+    files
+      .filter((file) => file.startsWith(`${outputPrefix}.`))
+      .map((file) => rm(join(directory, file), { force: true }).catch(() => undefined)),
+  );
+}
+
+async function runYoutubeDownload(
+  url: string,
+  directory: string,
+  outputPrefix: string,
+  cookiesPath: string | null,
+): Promise<string> {
+  await clearYoutubeDownload(directory, outputPrefix);
   try {
-    await runCommand(ytDlpPath(), args);
+    await runCommand(
+      ytDlpPath(),
+      youtubeDownloadArgs(url, directory, outputPrefix, cookiesPath),
+    );
   } catch (cause) {
-    throw classifyYoutubeDownloadError(cause);
+    if (cookiesPath) throw classifyYoutubeCookieError(cause);
+    throw cause;
   }
 
-  const files = await readdir(directory);
-  const downloaded = files.find((file) => /^source\.(mp4|webm|mkv|mov)$/i.test(file));
+  const downloaded = await findYoutubeDownload(directory, outputPrefix);
   if (!downloaded) throw new Error("HELP_VIDEO_YOUTUBE_DOWNLOAD_NOT_FOUND");
-  return join(directory, downloaded);
+  return downloaded;
+}
+
+async function downloadYoutubeVideo(url: string, directory: string): Promise<string> {
+  if (!youtubeVideoId(url)) throw new Error("HELP_VIDEO_YOUTUBE_URL_INVALID");
+
+  try {
+    return await runYoutubeDownload(url, directory, "source-public", null);
+  } catch (publicCause) {
+    if (!youtubeDownloadRequiresAuthentication(publicCause)) throw publicCause;
+
+    const cookiesPath = await ytDlpCookiesPath();
+    if (!cookiesPath) throw new Error("HELP_VIDEO_YOUTUBE_AUTH_REQUIRED");
+    return runYoutubeDownload(url, directory, "source-authenticated", cookiesPath);
+  }
+}
+
+function isMp4Bytes(bytes: Uint8Array): boolean {
+  return bytes.byteLength >= 12
+    && new TextDecoder().decode(bytes.slice(4, 8)) === "ftyp";
+}
+
+async function buildStoredYoutubeMp4(
+  videoPath: string,
+  directory: string,
+  videoId: string,
+): Promise<{ bytes: Uint8Array; fileName: string }> {
+  const originalBytes = new Uint8Array(await readFile(videoPath));
+  if (
+    originalBytes.byteLength <= MAX_UPLOAD_VIDEO_BYTES &&
+    isMp4Bytes(originalBytes)
+  ) {
+    return { bytes: originalBytes, fileName: `youtube-${videoId}.mp4` };
+  }
+
+  const profiles = [
+    { width: 1280, crf: 28, audioBitrate: "96k" },
+    { width: 854, crf: 30, audioBitrate: "80k" },
+    { width: 640, crf: 32, audioBitrate: "64k" },
+  ];
+
+  for (const [index, profile] of profiles.entries()) {
+    const outputPath = join(directory, `stored-${index + 1}.mp4`);
+    await rm(outputPath, { force: true }).catch(() => undefined);
+    try {
+      await runCommand(ffmpegPath(), [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        videoPath,
+        "-vf",
+        `scale=min(${profile.width}\\,iw):-2`,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        String(profile.crf),
+        "-c:a",
+        "aac",
+        "-b:a",
+        profile.audioBitrate,
+        "-movflags",
+        "+faststart",
+        outputPath,
+      ]);
+    } catch {
+      continue;
+    }
+
+    const bytes = new Uint8Array(await readFile(outputPath));
+    if (
+      bytes.byteLength <= MAX_UPLOAD_VIDEO_BYTES &&
+      isMp4Bytes(bytes)
+    ) {
+      return { bytes, fileName: `youtube-${videoId}.mp4` };
+    }
+  }
+
+  throw new Error("HELP_VIDEO_LOCAL_COPY_TOO_LARGE");
 }
 
 export async function downloadHelpYoutubeMp4ForStorage(
@@ -372,58 +533,8 @@ export async function downloadHelpYoutubeMp4ForStorage(
 
   const directory = await mkdtemp(join(tmpdir(), "f10-training-youtube-"));
   try {
-    const cookiesPath = await ytDlpCookiesPath();
-    let lastCause: Error | null = null;
-
-    for (const height of [720, 480]) {
-      const prefix = `training-${height}`;
-      const args = [
-        "--no-playlist",
-        "--no-progress",
-        "--restrict-filenames",
-        "--match-filter",
-        "duration <= 1800",
-        "--max-filesize",
-        `${Math.floor(MAX_UPLOAD_VIDEO_BYTES / 1024 / 1024)}M`,
-        "--merge-output-format",
-        "mp4",
-        "--remux-video",
-        "mp4",
-        "-f",
-        `b[ext=mp4][height<=${height}]/bv*[ext=mp4][height<=${height}]+ba[ext=m4a]/b[height<=${height}]/bv*[height<=${height}]+ba`,
-        "-o",
-        join(directory, `${prefix}.%(ext)s`),
-      ];
-      if (cookiesPath) args.unshift("--cookies", cookiesPath);
-      args.push(url);
-
-      try {
-        await runCommand(ytDlpPath(), args);
-      } catch (cause) {
-        const classified = classifyYoutubeDownloadError(cause);
-        if (classified.message === "HELP_VIDEO_YOUTUBE_COOKIES_INVALID") throw classified;
-        lastCause = classified;
-        continue;
-      }
-
-      const files = await readdir(directory);
-      const downloaded = files.find((file) => file === `${prefix}.mp4`);
-      if (!downloaded) {
-        lastCause = new Error("HELP_VIDEO_YOUTUBE_DOWNLOAD_NOT_FOUND");
-        continue;
-      }
-
-      const bytes = new Uint8Array(await readFile(join(directory, downloaded)));
-      const isMp4 = bytes.byteLength >= 12
-        && new TextDecoder().decode(bytes.slice(4, 8)) === "ftyp";
-      if (isMp4 && bytes.byteLength <= MAX_UPLOAD_VIDEO_BYTES) {
-        return { bytes, fileName: `youtube-${videoId}.mp4` };
-      }
-
-      lastCause = new Error("HELP_VIDEO_LOCAL_COPY_TOO_LARGE");
-    }
-
-    throw lastCause ?? new Error("HELP_VIDEO_YOUTUBE_DOWNLOAD_NOT_FOUND");
+    const videoPath = await downloadYoutubeVideo(url, directory);
+    return await buildStoredYoutubeMp4(videoPath, directory, videoId);
   } finally {
     await rm(directory, { recursive: true, force: true }).catch(() => undefined);
   }
@@ -1110,6 +1221,7 @@ export async function generateHelpImportFromVideo(input: {
     let videoPath: string;
     let derivedExternalId: string;
     let featuredVideoUrl: string | undefined;
+    let youtubeId: string | null = null;
 
     await reportProgress(input.onProgress, {
       stage: "source",
@@ -1120,6 +1232,7 @@ export async function generateHelpImportFromVideo(input: {
     if (input.source.type === "youtube") {
       const id = youtubeVideoId(input.source.url);
       if (!id) throw new Error("HELP_VIDEO_YOUTUBE_URL_INVALID");
+      youtubeId = id;
       videoPath = await downloadYoutubeVideo(input.source.url, directory);
       derivedExternalId = `youtube:${id.toLowerCase()}`;
       featuredVideoUrl = input.source.url;
@@ -1217,6 +1330,18 @@ export async function generateHelpImportFromVideo(input: {
       featuredVideoUrl,
       sourceType: input.source.type,
     });
+    if (youtubeId) {
+      try {
+        result.localVideo = await buildStoredYoutubeMp4(videoPath, directory, youtubeId);
+      } catch (cause) {
+        result.localVideoFailureCode = cause instanceof Error
+          ? cause.message.split(":", 1)[0]?.slice(0, 120) || "HELP_VIDEO_LOCAL_COPY_FAILED"
+          : "HELP_VIDEO_LOCAL_COPY_FAILED";
+        console.error("[help-video-import] local MP4 cache skipped", {
+          technicalCode: result.localVideoFailureCode,
+        });
+      }
+    }
     await reportProgress(input.onProgress, {
       stage: "package",
       status: "done",

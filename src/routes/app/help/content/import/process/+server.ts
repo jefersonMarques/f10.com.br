@@ -33,7 +33,13 @@ function automationErrorMessage(code: string): string {
     return "O arquivo de cookies do YouTube configurado no servidor não foi encontrado.";
   }
   if (code === "HELP_VIDEO_YOUTUBE_COOKIES_INVALID") {
-    return "Os cookies do YouTube expiraram ou foram rotacionados. Renove o arquivo de cookies do servidor e tente novamente.";
+    return "Este vídeo exige autenticação no YouTube e os cookies de fallback estão inválidos.";
+  }
+  if (code === "HELP_VIDEO_YOUTUBE_AUTH_REQUIRED") {
+    return "Este vídeo exige autenticação no YouTube. Vídeos públicos usam o fluxo automático sem cookies.";
+  }
+  if (code === "HELP_VIDEO_YTDLP_POT_PROVIDER_URL_INVALID") {
+    return "A URL configurada para o provedor automático do YouTube é inválida.";
   }
   if (code === "HELP_VIDEO_YOUTUBE_URL_INVALID") return "Informe um link válido do YouTube.";
   if (code === "HELP_VIDEO_UPLOAD_SIZE_INVALID") {
@@ -230,7 +236,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
         });
 
         normalizeSingleScreenshotPerStep(generated.file);
-        if (source.type === "upload") {
+        if (source.type === "upload" || generated.localVideo) {
           for (const content of generated.file.contents) content.featuredVideo = undefined;
         }
         const selectedScreenshotCount = countScreenshots(generated.file);
@@ -275,12 +281,16 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
         const content = stabilizedFile.contents[0];
         if (!importedContent || !content) throw new Error("IMPORT_CONTENT_NOT_CREATED");
 
-        if (source.type === "upload") {
+        const localVideo = source.type === "upload"
+          ? { bytes: source.bytes, fileName: source.fileName }
+          : generated.localVideo;
+        if (localVideo) {
           await attachImportedMp4AsFeaturedVideo({
             actorUserId: session.user.id,
             contentId: importedContent.id,
-            bytes: source.bytes,
-            fileName: source.fileName,
+            bytes: localVideo.bytes,
+            fileName: localVideo.fileName,
+            sourceUrl: source.type === "youtube" ? source.url : undefined,
             subtitles: generated.transcript,
             altText: content.summary || content.title,
             assistantSummary: content.quickGuide || content.summary || content.title,
@@ -310,9 +320,14 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
         const overwriteMessage = result.overwrittenCount > 0
           ? " O conteúdo anterior foi substituído mantendo o mesmo ID."
           : "";
+        const localVideoMessage = source.type === "youtube" && generated.localVideoFailureCode
+          ? " O artigo foi preservado, mas a cópia MP4 local não pôde ser criada nesta execução."
+          : source.type === "youtube" && generated.localVideo
+            ? " O MP4 local foi armazenado e será reutilizado pelas trilhas."
+            : "";
         write({
           type: "success",
-          message: `Vídeo processado e ${result.contentCount} conteúdo(s) criado(s) como rascunho.${overwriteMessage} Revise os screenshots, faça as marcações e publique quando estiver correto.`,
+          message: `Vídeo processado e ${result.contentCount} conteúdo(s) criado(s) como rascunho.${overwriteMessage}${localVideoMessage} Revise os screenshots, faça as marcações e publique quando estiver correto.`,
           summary: {
             source: result.source,
             contentCount: result.contentCount,
