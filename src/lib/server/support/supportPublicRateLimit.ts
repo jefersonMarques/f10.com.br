@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { env } from "$env/dynamic/private";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { supportPublicLimits } from "$lib/server/db/chatSchema";
 
@@ -83,4 +83,20 @@ export async function consumeSupportPublicRateLimit(
     .where(eq(supportPublicLimits.key, key));
 
   return true;
+}
+
+
+export async function releaseSupportPublicRateLimit(
+  scope: string,
+  clientAddress: string,
+): Promise<void> {
+  const key = createSupportPublicLimitKey(scope, clientAddress);
+  await getDatabase()
+    .update(supportPublicLimits)
+    .set({
+      requestCount: sql<number>`greatest(${supportPublicLimits.requestCount} - 1, 0)`,
+      blockedUntil: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(supportPublicLimits.key, key));
 }
