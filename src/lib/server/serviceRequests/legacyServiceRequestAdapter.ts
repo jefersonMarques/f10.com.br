@@ -2,7 +2,10 @@ import { json, type Cookies } from "@sveltejs/kit";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { createPublicServiceRequest } from "$lib/server/serviceRequests/publicServiceRequestService";
 import { createCustomerServiceRequest } from "$lib/server/serviceRequests/serviceRequestService";
-import { consumeSupportPublicRateLimit } from "$lib/server/support/supportPublicRateLimit";
+import {
+  consumeSupportPublicRateLimit,
+  releaseSupportPublicRateLimit,
+} from "$lib/server/support/supportPublicRateLimit";
 import type { ServiceRequestType } from "$lib/server/serviceRequests/serviceRequestDefinitions";
 import type { ServiceRequestAttachmentInput } from "$lib/server/serviceRequests/serviceRequestStorage";
 
@@ -131,11 +134,15 @@ export async function handleLegacyServiceRequestSubmission(input: {
   const authenticatedPortalSubmission = Boolean(session && groupId !== null && unitId !== null);
   const attachments = collectAttachments(formData);
 
+  const publicRateLimitScope = `service-request:${input.requestType}`;
+  const publicRateLimitAddress = input.clientAddress?.trim() || "unknown";
+  let publicRateLimitConsumed = false;
+
   if (!authenticatedPortalSubmission) {
     try {
       const allowed = await consumeSupportPublicRateLimit(
-        `service-request:${input.requestType}`,
-        input.clientAddress?.trim() || "unknown",
+        publicRateLimitScope,
+        publicRateLimitAddress,
         {
           maxRequests: 8,
           windowMs: 60 * 60 * 1000,
@@ -143,6 +150,7 @@ export async function handleLegacyServiceRequestSubmission(input: {
         },
       );
       if (!allowed) return response("RATE_LIMITED", 429);
+      publicRateLimitConsumed = true;
     } catch (cause) {
       console.error("[legacy.service-request.rate-limit]", {
         requestType: input.requestType,
@@ -185,6 +193,13 @@ export async function handleLegacyServiceRequestSubmission(input: {
     );
   } catch (cause) {
     const code = cause instanceof Error ? cause.message : "SERVICE_REQUEST_CREATE_FAILED";
+    const status = statusForError(code);
+    if (publicRateLimitConsumed && status >= 500) {
+      await releaseSupportPublicRateLimit(
+        publicRateLimitScope,
+        publicRateLimitAddress,
+      ).catch(() => undefined);
+    }
     console.error("[legacy.service-request.submit]", {
       requestType: input.requestType,
       authenticatedPortalSubmission,
@@ -194,6 +209,6 @@ export async function handleLegacyServiceRequestSubmission(input: {
       attachmentCount: attachments.length,
       causeType: cause instanceof Error ? cause.name : typeof cause,
     });
-    return response(code, statusForError(code));
+    return response(code, status);
   }
 }
