@@ -378,6 +378,7 @@ function youtubeDownloadArgs(
   cookiesPath: string | null,
 ): string[] {
   const args = [
+    "--ignore-config",
     "--no-playlist",
     "--no-progress",
     "--restrict-filenames",
