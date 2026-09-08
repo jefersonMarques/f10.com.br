@@ -139,6 +139,7 @@ export const actions: Actions = {
     const message = readFormValue(formData, "message");
     const priority = readFormValue(formData, "priority");
     const dueOn = readFormValue(formData, "dueOn");
+    const queueId = readFormValue(formData, "queueId");
     let customer;
     try {
       customer = parseTicketCustomerLinkForm(formData);
