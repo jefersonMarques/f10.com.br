@@ -28,17 +28,24 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
 
   return json(
     {
-      customers: result.rows.map((customer) => ({
-        id: customer.id,
-        name: customer.name,
-        email: customer.email,
-        phone: customer.phone,
-        whatsapp: customer.whatsapp,
-        organizationName: customer.organizationName,
-        latestUnitName: customer.latestUnitName,
-        latestGroupName: customer.latestGroupName,
-        openTicketCount: customer.openTicketCount,
-      })),
+      customers: result.rows
+        .filter((customer) => Boolean(customer.latestContextTicketId))
+        .map((customer) => ({
+          id: customer.id,
+          name: customer.name,
+          email: customer.email,
+          phone: customer.phone,
+          whatsapp: customer.whatsapp,
+          organizationName: customer.organizationName,
+          latestContextTicketId: customer.latestContextTicketId,
+          latestGroupId: customer.latestGroupId,
+          latestGroupName: customer.latestGroupName,
+          latestSubgroup: customer.latestSubgroup,
+          latestUnitId: customer.latestUnitId,
+          latestUnitName: customer.latestUnitName,
+          latestUnitSchema: customer.latestUnitSchema,
+          openTicketCount: customer.openTicketCount,
+        })),
     },
     { headers: { "Cache-Control": "no-store" } },
   );
