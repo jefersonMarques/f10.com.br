@@ -157,6 +157,7 @@ export type HelpVideoAutomationResult = {
     bytes: Uint8Array;
     fileName: string;
   };
+  localVideoFailureCode?: string;
   reviewCandidates: HelpVideoScreenshotReviewCandidate[];
   transcript: string;
   transcriptTimeline: Array<{ start: number; end: number; text: string }>;
@@ -1330,7 +1331,16 @@ export async function generateHelpImportFromVideo(input: {
       sourceType: input.source.type,
     });
     if (youtubeId) {
-      result.localVideo = await buildStoredYoutubeMp4(videoPath, directory, youtubeId);
+      try {
+        result.localVideo = await buildStoredYoutubeMp4(videoPath, directory, youtubeId);
+      } catch (cause) {
+        result.localVideoFailureCode = cause instanceof Error
+          ? cause.message.split(":", 1)[0]?.slice(0, 120) || "HELP_VIDEO_LOCAL_COPY_FAILED"
+          : "HELP_VIDEO_LOCAL_COPY_FAILED";
+        console.error("[help-video-import] local MP4 cache skipped", {
+          technicalCode: result.localVideoFailureCode,
+        });
+      }
     }
     await reportProgress(input.onProgress, {
       stage: "package",
