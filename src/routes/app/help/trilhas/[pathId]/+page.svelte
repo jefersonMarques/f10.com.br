@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
   import type { SubmitFunction } from "@sveltejs/kit";
-  import { ArrowDown, ArrowUp, BookOpen, Clock3, ExternalLink, Eye, LoaderCircle, Mail, RefreshCw, Save, Sparkles, Trash2 } from "lucide-svelte";
+  import { ArrowDown, ArrowUp, BookOpen, Clock3, ExternalLink, Eye, LoaderCircle, Mail, Plus, RefreshCw, Save, Sparkles, Trash2 } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
@@ -11,6 +11,7 @@
 
   let openStepId = form && "openStepId" in form && typeof form.openStepId === "string" ? form.openStepId : "";
   let regenerating = false;
+  let addingModule = false;
 
   const enhanceEditor: SubmitFunction = () => {
     return async ({ update }) => {
@@ -25,6 +26,17 @@
         await update({ reset: false });
       } finally {
         regenerating = false;
+      }
+    };
+  };
+
+  const enhanceAddModule: SubmitFunction = () => {
+    addingModule = true;
+    return async ({ update }) => {
+      try {
+        await update({ reset: false });
+      } finally {
+        addingModule = false;
       }
     };
   };
@@ -79,9 +91,47 @@
                       <strong class="block truncate text-[11px] font-semibold text-[#303748]">{item.sourcePublicationSnapshot.title}</strong>
                       <span class={`mt-0.5 block text-[9px] font-medium ${data.sourceUpdates[index]?.updateAvailable ? "text-[#A9510D]" : "text-[#2F7045]"}`}>{data.sourceUpdates[index]?.updateAvailable ? "Nova publicação disponível" : "Fonte sincronizada"}</span>
                     </div>
+                    {#if data.canEdit}
+                      <div class="flex shrink-0 items-center gap-1">
+                        <form method="POST" action="?/moveModule" use:enhance={enhanceEditor}>
+                          <input type="hidden" name="pathItemId" value={item.id}/>
+                          <input type="hidden" name="direction" value="up"/>
+                          <button type="submit" disabled={index === 0} class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#50586A] disabled:opacity-25" aria-label="Mover módulo para cima"><ArrowUp size={12}/></button>
+                        </form>
+                        <form method="POST" action="?/moveModule" use:enhance={enhanceEditor}>
+                          <input type="hidden" name="pathItemId" value={item.id}/>
+                          <input type="hidden" name="direction" value="down"/>
+                          <button type="submit" disabled={index === data.path.items.length - 1} class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#50586A] disabled:opacity-25" aria-label="Mover módulo para baixo"><ArrowDown size={12}/></button>
+                        </form>
+                        <form method="POST" action="?/removeModule" use:enhance={enhanceEditor} on:submit={(event)=>{if(!confirm(`Remover o módulo “${item.sourcePublicationSnapshot.title}” da trilha?`)) event.preventDefault();}}>
+                          <input type="hidden" name="pathItemId" value={item.id}/>
+                          <button type="submit" disabled={data.path.items.length <= 1} class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#F0D6D6] bg-white text-[#9B2C2C] disabled:opacity-25" aria-label="Remover módulo"><Trash2 size={12}/></button>
+                        </form>
+                      </div>
+                    {/if}
                   </div>
                 {/each}
               </div>
+
+              {#if data.canEdit}
+                <form method="POST" action="?/addModule" use:enhance={enhanceAddModule} class="mt-4 rounded-xl border border-dashed border-[#CDD3E0] bg-white p-3">
+                  <label class="block">
+                    <span class="mb-1.5 block text-[10px] font-semibold text-[#606778]">Adicionar conteúdo publicado</span>
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                      <select name="contentId" required disabled={addingModule || data.availableContents.length === 0} class="h-9 min-w-0 flex-1 rounded-lg border border-[#DDE1EA] bg-white px-2 text-[11px] text-[#303748] disabled:bg-[#F3F4F7]">
+                        <option value="">{data.availableContents.length > 0 ? "Selecione um conteúdo" : "Todos os conteúdos publicados já estão na trilha"}</option>
+                        {#each data.availableContents as content}
+                          <option value={content.contentId}>{content.title} · {content.stepCount} etapas</option>
+                        {/each}
+                      </select>
+                      <button type="submit" disabled={addingModule || data.availableContents.length === 0} class="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#000A57] px-3 text-[11px] font-semibold text-white disabled:opacity-50">
+                        {#if addingModule}<LoaderCircle size={12} class="animate-spin"/>Gerando módulo...{:else}<Plus size={12}/>Adicionar módulo{/if}
+                      </button>
+                    </div>
+                  </label>
+                  <p class="mt-2 text-[9px] leading-4 text-[#8A909D]">Somente o novo módulo é gerado pela IA. Os módulos e ajustes atuais são preservados.</p>
+                </form>
+              {/if}
             </div>
           </div>
           {#if data.canEdit}
@@ -130,8 +180,8 @@
                 </div>
                 {#if data.canEdit}
                   <div class="flex gap-1">
-                    <form method="POST" action="?/moveStep" use:enhance={enhanceEditor}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="up"/><button type="submit" disabled={index===0} class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white disabled:opacity-30" aria-label="Mover para cima"><ArrowUp size={12}/></button></form>
-                    <form method="POST" action="?/moveStep" use:enhance={enhanceEditor}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="down"/><button type="submit" disabled={index===data.path.steps.length-1} class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white disabled:opacity-30" aria-label="Mover para baixo"><ArrowDown size={12}/></button></form>
+                    <form method="POST" action="?/moveStep" use:enhance={enhanceEditor}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="up"/><button type="submit" disabled={index===0 || data.path.steps[index - 1]?.pathItemId !== step.pathItemId} class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white disabled:opacity-30" aria-label="Mover para cima"><ArrowUp size={12}/></button></form>
+                    <form method="POST" action="?/moveStep" use:enhance={enhanceEditor}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="down"/><button type="submit" disabled={index===data.path.steps.length-1 || data.path.steps[index + 1]?.pathItemId !== step.pathItemId} class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white disabled:opacity-30" aria-label="Mover para baixo"><ArrowDown size={12}/></button></form>
                   </div>
                 {/if}
               </summary>
