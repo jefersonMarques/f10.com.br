@@ -10,7 +10,12 @@ import {
   updateHelpTrainingStepDraft,
 } from "$lib/server/help/helpTrainingAuthoringRepository";
 import { getCombinedHelpTrainingInsights } from "$lib/server/help/helpTrainingInsightsRepository";
-import { regenerateHelpTrainingFromPublishedContent } from "$lib/server/help/helpTrainingGeneration";
+import {
+  addHelpTrainingModuleFromPublishedContent,
+  moveHelpTrainingModule,
+  regenerateHelpTrainingFromPublishedContent,
+  removeHelpTrainingModule,
+} from "$lib/server/help/helpTrainingGeneration";
 import { getTrainingBaseUrl, sendHelpTrainingInvite } from "$lib/server/help/helpTrainingMailer";
 import {
   archiveHelpTrainingPath,
@@ -19,7 +24,10 @@ import {
   getHelpTrainingPath,
   listHelpTrainingParticipants,
 } from "$lib/server/help/helpTrainingRepository";
-import { getPublishedStructuredHelpById } from "$lib/server/help/publicStructuredHelpRepository";
+import {
+  getPublishedStructuredHelpById,
+  listPublishedStructuredHelpCatalog,
+} from "$lib/server/help/publicStructuredHelpRepository";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -36,6 +44,21 @@ function editorPath(pathId: string): string {
 
 function direction(value: string): "up" | "down" | null {
   return value === "up" || value === "down" ? value : null;
+}
+
+function moduleErrorMessage(cause: unknown): string {
+  const code = cause instanceof Error ? cause.message : "";
+  if (code === "TRAINING_PATH_ITEM_DUPLICATE") return "Este conteúdo já faz parte da trilha.";
+  if (code === "TRAINING_SOURCE_CONTENT_LIMIT") return "Uma trilha pode ter até 20 módulos.";
+  if (code === "LAST_TRAINING_MODULE_REQUIRED") return "A trilha precisa manter pelo menos um módulo.";
+  if (code === "TRAINING_SOURCE_CONTENT_NOT_PUBLISHED") return "Selecione um conteúdo publicado válido.";
+  if (code === "TRAINING_SOURCE_CONTENT_VIDEO_REQUIRED") return "O conteúdo publicado precisa ter um vídeo para gerar o módulo.";
+  if (code === "TRAINING_SOURCE_CONTENT_STEPS_REQUIRED") return "O conteúdo publicado precisa ter pelo menos uma etapa.";
+  if (code === "AI_TIMEOUT") return "A geração do novo módulo demorou além do limite. Tente novamente.";
+  if (code === "AI_EMPTY_RESPONSE" || code === "AI_OUTPUT_INCOMPLETE") {
+    return "A IA não retornou dados suficientes para montar o novo módulo. Tente novamente.";
+  }
+  return "Não foi possível atualizar os módulos da trilha.";
 }
 
 function publishErrorMessage(cause: unknown): string {
@@ -55,12 +78,13 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   const path = await getHelpTrainingPath(params.pathId);
   if (!path) throw error(404, "Trilha não encontrada.");
 
-  const [participants, insights, currentPublications] = await Promise.all([
+  const [participants, insights, currentPublications, publishedCatalog] = await Promise.all([
     listHelpTrainingParticipants(params.pathId),
     getCombinedHelpTrainingInsights(params.pathId),
     Promise.all(
       path.items.map((item) => getPublishedStructuredHelpById(item.sourceContentId)),
     ),
+    listPublishedStructuredHelpCatalog(),
   ]);
   const canEditPermission = hasPermission(permissions, "help.edit");
   const canPublishPermission = hasPermission(permissions, "help.publish");
@@ -76,6 +100,10 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     };
   });
   const sourceUpdateAvailable = sourceUpdates.some((item) => item.updateAvailable);
+  const currentSourceIds = new Set(path.items.map((item) => item.sourceContentId));
+  const availableContents = publishedCatalog.filter(
+    (content) => !currentSourceIds.has(content.contentId),
+  );
 
   return {
     path,
@@ -83,6 +111,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     insights,
     sourceUpdates,
     sourceUpdateAvailable,
+    availableContents,
     canEdit: canEditPermission && path.status !== "archived",
     canPublish: canPublishPermission && path.status !== "archived",
     canDelete: canEditPermission && path.currentVersion === 0,
@@ -168,6 +197,57 @@ export const actions: Actions = {
       return { success: true, message: "Orientação removida." };
     } catch {
       return fail(409, { success: false, message: "A trilha precisa manter pelo menos uma orientação." });
+    }
+  },
+
+  addModule: async ({ cookies, params, request }) => {
+    if (!isUuid(params.pathId)) return fail(404, { success: false, message: "Trilha não encontrada." });
+    const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
+    const contentId = read(await request.formData(), "contentId");
+    if (!isUuid(contentId)) return fail(400, { success: false, message: "Selecione um conteúdo publicado." });
+
+    try {
+      await addHelpTrainingModuleFromPublishedContent(session.user.id, params.pathId, contentId);
+      return { success: true, message: "Módulo adicionado ao rascunho da trilha." };
+    } catch (cause) {
+      console.error("[help-training] add module failed", {
+        pathId: params.pathId,
+        technicalCode: cause instanceof Error ? cause.message : "TRAINING_MODULE_ADD_FAILED",
+        cause,
+      });
+      return fail(409, { success: false, message: moduleErrorMessage(cause) });
+    }
+  },
+
+  moveModule: async ({ cookies, params, request }) => {
+    if (!isUuid(params.pathId)) return fail(404, { success: false, message: "Trilha não encontrada." });
+    const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
+    const formData = await request.formData();
+    const pathItemId = read(formData, "pathItemId");
+    const moveDirection = direction(read(formData, "direction"));
+    if (!isUuid(pathItemId) || !moveDirection) {
+      return fail(400, { success: false, message: "Movimentação de módulo inválida." });
+    }
+
+    try {
+      await moveHelpTrainingModule(session.user.id, params.pathId, pathItemId, moveDirection);
+      return { success: true, message: "Ordem dos módulos atualizada." };
+    } catch (cause) {
+      return fail(409, { success: false, message: moduleErrorMessage(cause) });
+    }
+  },
+
+  removeModule: async ({ cookies, params, request }) => {
+    if (!isUuid(params.pathId)) return fail(404, { success: false, message: "Trilha não encontrada." });
+    const { session } = await requireAppPermission(cookies, "help.edit", editorPath(params.pathId));
+    const pathItemId = read(await request.formData(), "pathItemId");
+    if (!isUuid(pathItemId)) return fail(400, { success: false, message: "Módulo inválido." });
+
+    try {
+      await removeHelpTrainingModule(session.user.id, params.pathId, pathItemId);
+      return { success: true, message: "Módulo removido do rascunho da trilha." };
+    } catch (cause) {
+      return fail(409, { success: false, message: moduleErrorMessage(cause) });
     }
   },
 
