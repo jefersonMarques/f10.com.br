@@ -195,8 +195,14 @@ export const actions: Actions = {
     try {
       await deleteHelpTrainingStep(session.user.id, params.pathId, stepId);
       return { success: true, message: "Orientação removida." };
-    } catch {
-      return fail(409, { success: false, message: "A trilha precisa manter pelo menos uma orientação." });
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : "";
+      return fail(409, {
+        success: false,
+        message: code === "LAST_TRAINING_MODULE_STEP_REQUIRED"
+          ? "O módulo precisa manter pelo menos uma orientação. Para removê-lo, exclua o módulo inteiro."
+          : "A trilha precisa manter pelo menos uma orientação.",
+      });
     }
   },
 
