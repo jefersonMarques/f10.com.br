@@ -964,12 +964,26 @@ export async function localizeHelpTrainingPathVideos(
     .orderBy(asc(helpTrainingPathItems.sortOrder));
   if (items.length === 0) throw new Error("TRAINING_PATH_ITEM_REQUIRED");
 
-  const localAssetIds = await Promise.all(
-    items.map((item) => ensureTrainingLocalVideoAsset(actorUserId, {
-      contentId: item.sourceContentId,
-      video: item.sourcePublicationSnapshot.featuredVideo,
-    })),
+  const localAssetIds: Array<string | null> = new Array(items.length).fill(null);
+  let nextItemIndex = 0;
+  const workers = Array.from(
+    { length: Math.min(TRAINING_GENERATION_CONCURRENCY, items.length) },
+    async () => {
+      while (true) {
+        const index = nextItemIndex;
+        nextItemIndex += 1;
+        if (index >= items.length) return;
+
+        const item = items[index];
+        if (!item) return;
+        localAssetIds[index] = await ensureTrainingLocalVideoAsset(actorUserId, {
+          contentId: item.sourceContentId,
+          video: item.sourcePublicationSnapshot.featuredVideo,
+        });
+      }
+    },
   );
+  await Promise.all(workers);
 
   let updatedSteps = 0;
   await db.transaction(async (tx) => {
@@ -989,7 +1003,7 @@ export async function localizeHelpTrainingPathVideos(
       const stepIds = stepRows.map((step) => step.id);
       if (stepIds.length === 0) continue;
 
-      await tx
+      const updatedMedia = await tx
         .update(helpTrainingStepMedia)
         .set({
           assetId: localAssetId,
@@ -1000,8 +1014,9 @@ export async function localizeHelpTrainingPathVideos(
             inArray(helpTrainingStepMedia.stepId, stepIds),
             eq(helpTrainingStepMedia.mediaType, "video"),
           ),
-        );
-      updatedSteps += stepIds.length;
+        )
+        .returning({ id: helpTrainingStepMedia.id });
+      updatedSteps += updatedMedia.length;
     }
 
     if (updatedSteps > 0) {
