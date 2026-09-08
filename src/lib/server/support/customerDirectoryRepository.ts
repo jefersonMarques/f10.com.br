@@ -185,6 +185,58 @@ export async function listCustomerDirectory(
         order by customer_context.updated_at desc
         limit 1
       )`,
+      latestContextTicketId: sql<string | null>`(
+        select customer_context.ticket_id::text
+        from ticket_customer_contexts customer_context
+        where customer_context.customer_contact_id = ${customerContacts.id}
+          and customer_context.group_id is not null
+          and customer_context.group_name is not null
+          and customer_context.unit_id is not null
+          and customer_context.unit_name is not null
+          and customer_context.unit_schema is not null
+        order by customer_context.updated_at desc
+        limit 1
+      )`,
+      latestGroupId: sql<number | null>`(
+        select customer_context.group_id
+        from ticket_customer_contexts customer_context
+        where customer_context.customer_contact_id = ${customerContacts.id}
+          and customer_context.group_id is not null
+          and customer_context.unit_id is not null
+          and customer_context.unit_schema is not null
+        order by customer_context.updated_at desc
+        limit 1
+      )`,
+      latestSubgroup: sql<boolean | null>`(
+        select customer_context.subgroup
+        from ticket_customer_contexts customer_context
+        where customer_context.customer_contact_id = ${customerContacts.id}
+          and customer_context.group_id is not null
+          and customer_context.unit_id is not null
+          and customer_context.unit_schema is not null
+        order by customer_context.updated_at desc
+        limit 1
+      )`,
+      latestUnitId: sql<number | null>`(
+        select customer_context.unit_id
+        from ticket_customer_contexts customer_context
+        where customer_context.customer_contact_id = ${customerContacts.id}
+          and customer_context.group_id is not null
+          and customer_context.unit_id is not null
+          and customer_context.unit_schema is not null
+        order by customer_context.updated_at desc
+        limit 1
+      )`,
+      latestUnitSchema: sql<string | null>`(
+        select customer_context.unit_schema
+        from ticket_customer_contexts customer_context
+        where customer_context.customer_contact_id = ${customerContacts.id}
+          and customer_context.group_id is not null
+          and customer_context.unit_id is not null
+          and customer_context.unit_schema is not null
+        order by customer_context.updated_at desc
+        limit 1
+      )`,
       lastInteractionAt: sql<Date | null>`(
         select max(customer_ticket.updated_at)
         from tickets customer_ticket
