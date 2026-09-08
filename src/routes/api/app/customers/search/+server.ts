@@ -24,13 +24,12 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
     query,
     page: 1,
     pageSize: 20,
+    requireF10Context: true,
   });
 
   return json(
     {
-      customers: result.rows
-        .filter((customer) => Boolean(customer.latestContextTicketId))
-        .map((customer) => ({
+      customers: result.rows.map((customer) => ({
           id: customer.id,
           name: customer.name,
           email: customer.email,
