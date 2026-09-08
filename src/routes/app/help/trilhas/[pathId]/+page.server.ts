@@ -108,6 +108,9 @@ function publishErrorMessage(cause: unknown): string {
   const code = cause instanceof Error ? cause.message : "";
   if (code === "TRAINING_STEP_INCOMPLETE") return "Toda orientação precisa ter título e instrução.";
   if (code === "TRAINING_STEP_VIDEO_REQUIRED") return "Cada slide da trilha precisa ter a ajuda em vídeo vinculada.";
+  if (code === "TRAINING_LOCAL_VIDEO_REQUIRED") {
+    return "A trilha só pode ser publicada com vídeo MP4 local. Substitua o vídeo externo no conteúdo e atualize a trilha.";
+  }
   if (code === "TRAINING_VIDEO_INVALID" || code === "INVALID_MEDIA_URL") return "A referência do vídeo publicado não é válida.";
   return "Não foi possível publicar. Revise as orientações.";
 }
