@@ -208,7 +208,7 @@
                   </fieldset>
                   {#if data.canEdit}<div class="flex justify-end"><button type="submit" class="inline-flex min-h-8 items-center gap-1 rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold text-[#000A57]"><Save size={11}/>Salvar orientação</button></div>{/if}
                 </form>
-                {#if data.canEdit && data.path.steps.length > 1}
+                {#if data.canEdit && data.path.steps.filter((candidate) => candidate.pathItemId === step.pathItemId).length > 1}
                   <form method="POST" action="?/deleteStep" use:enhance={enhanceEditor} class="mt-3 border-t border-[#EEF0F5] pt-3" on:submit={(event)=>{if(!confirm("Remover esta orientação?")) event.preventDefault();}}>
                     <input type="hidden" name="stepId" value={step.id}/>
                     <button type="submit" class="inline-flex min-h-8 items-center gap-1 text-[12px] font-semibold text-[#9B2C2C]"><Trash2 size={11}/>Remover orientação</button>
