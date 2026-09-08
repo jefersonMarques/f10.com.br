@@ -4,10 +4,11 @@ import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
 
 export type TicketCustomerContext = {
   ticketId: string;
-  legacyUserId: string;
+  legacyUserId: string | null;
   scope: "unit" | "global";
   groupId: number | null;
   groupName: string | null;
+  subgroup: boolean | null;
   unitId: number | null;
   unitName: string | null;
   unitSchema: string | null;
@@ -15,10 +16,11 @@ export type TicketCustomerContext = {
 
 type TicketCustomerContextRow = {
   ticketId: string;
-  legacyUserId: string;
+  legacyUserId: string | null;
   contextScope: string;
   groupId: number | null;
   groupName: string | null;
+  subgroup: boolean | null;
   unitId: number | null;
   unitName: string | null;
   unitSchema: string | null;
@@ -31,6 +33,7 @@ function mapTicketCustomerContext(row: TicketCustomerContextRow): TicketCustomer
     scope: row.contextScope === "global" ? "global" : "unit",
     groupId: row.groupId,
     groupName: row.groupName,
+    subgroup: row.subgroup,
     unitId: row.unitId,
     unitName: row.unitName,
     unitSchema: row.unitSchema,
@@ -50,6 +53,7 @@ export async function listTicketCustomerContexts(
       contextScope: ticketCustomerContexts.contextScope,
       groupId: ticketCustomerContexts.groupId,
       groupName: ticketCustomerContexts.groupName,
+      subgroup: ticketCustomerContexts.subgroup,
       unitId: ticketCustomerContexts.unitId,
       unitName: ticketCustomerContexts.unitName,
       unitSchema: ticketCustomerContexts.unitSchema,
@@ -71,6 +75,7 @@ export async function getTicketCustomerContext(
       contextScope: ticketCustomerContexts.contextScope,
       groupId: ticketCustomerContexts.groupId,
       groupName: ticketCustomerContexts.groupName,
+      subgroup: ticketCustomerContexts.subgroup,
       unitId: ticketCustomerContexts.unitId,
       unitName: ticketCustomerContexts.unitName,
       unitSchema: ticketCustomerContexts.unitSchema,
