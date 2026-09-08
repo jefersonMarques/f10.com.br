@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
   import type { SubmitFunction } from "@sveltejs/kit";
-  import { ArrowDown, ArrowUp, BookOpen, Clock3, ExternalLink, Eye, LoaderCircle, Mail, Plus, RefreshCw, Save, Sparkles, Trash2 } from "lucide-svelte";
+  import { ArrowDown, ArrowUp, BookOpen, Clock3, Download, ExternalLink, Eye, LoaderCircle, Mail, Plus, RefreshCw, Save, Sparkles, Trash2 } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
@@ -12,6 +12,7 @@
   let openStepId = form && "openStepId" in form && typeof form.openStepId === "string" ? form.openStepId : "";
   let regenerating = false;
   let addingModule = false;
+  let localizingVideos = false;
 
   const enhanceEditor: SubmitFunction = () => {
     return async ({ update }) => {
@@ -37,6 +38,17 @@
         await update({ reset: false });
       } finally {
         addingModule = false;
+      }
+    };
+  };
+
+  const enhanceLocalizeVideos: SubmitFunction = () => {
+    localizingVideos = true;
+    return async ({ update }) => {
+      try {
+        await update({ reset: false, invalidateAll: true });
+      } finally {
+        localizingVideos = false;
       }
     };
   };
@@ -135,9 +147,20 @@
             </div>
           </div>
           {#if data.canEdit}
-            <form method="POST" action="?/regenerate" use:enhance={enhanceRegenerate}>
-              <button type="submit" disabled={regenerating} class="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#EA6D0B] px-3 text-[14px] font-semibold text-white disabled:opacity-60">{#if regenerating}<LoaderCircle size={12} class="animate-spin"/>{:else}<RefreshCw size={12}/>{/if}{data.sourceUpdateAvailable ? "Usar publicação mais recente" : "Regenerar orientações com IA"}</button>
-            </form>
+            <div class="flex flex-col items-stretch gap-2 sm:items-end">
+              {#if data.hasRemoteYoutubeVideos}
+                <form method="POST" action="?/localizeVideos" use:enhance={enhanceLocalizeVideos}>
+                  <button type="submit" disabled={localizingVideos} class="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#000A57] px-3 text-[12px] font-semibold text-white disabled:opacity-60 sm:w-auto">
+                    {#if localizingVideos}<LoaderCircle size={12} class="animate-spin"/>{:else}<Download size={12}/>{/if}
+                    {localizingVideos ? "Preparando MP4..." : "Usar MP4 local"}
+                  </button>
+                </form>
+                <span class="max-w-[240px] text-right text-[9px] leading-4 text-[#858A98]">Corrige a reprodução do YouTube sem regenerar textos ou orientações.</span>
+              {/if}
+              <form method="POST" action="?/regenerate" use:enhance={enhanceRegenerate}>
+                <button type="submit" disabled={regenerating} class="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#EA6D0B] px-3 text-[14px] font-semibold text-white disabled:opacity-60">{#if regenerating}<LoaderCircle size={12} class="animate-spin"/>{:else}<RefreshCw size={12}/>{/if}{data.sourceUpdateAvailable ? "Usar publicação mais recente" : "Regenerar orientações com IA"}</button>
+              </form>
+            </div>
           {:else if data.sourceUpdateAvailable}
             <span class="rounded-full bg-[#FFF3E9] px-2.5 py-1 text-[12px] font-semibold text-[#A9510D]">Há atualização do conteúdo</span>
           {:else}
