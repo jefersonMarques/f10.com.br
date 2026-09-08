@@ -31,6 +31,7 @@ export async function attachImportedMp4AsFeaturedVideo(input: {
   contentId: string;
   bytes: Uint8Array;
   fileName: string;
+  sourceUrl?: string;
   subtitles: string;
   altText: string;
   assistantSummary: string;
@@ -60,6 +61,7 @@ export async function attachImportedMp4AsFeaturedVideo(input: {
         .values({
           contentId: input.contentId,
           assetType: "video",
+          sourceUrl: input.sourceUrl?.trim() || null,
           storageKey: stored.key,
           originalName: safeFileName(input.fileName),
           mimeType: "video/mp4",
@@ -71,6 +73,7 @@ export async function attachImportedMp4AsFeaturedVideo(input: {
           metadata: {
             managed: true,
             importedVideo: true,
+            originalSourceUrl: input.sourceUrl?.trim() || null,
             transcriptTimeline: (input.transcriptTimeline ?? []).slice(0, 2000),
           },
           createdBy: input.actorUserId,
