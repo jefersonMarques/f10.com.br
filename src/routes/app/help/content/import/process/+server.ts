@@ -169,7 +169,9 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
     && !HELP_YOUTUBE_EXTRACTION_ENABLED
   ) {
     return json(
-      { message: "A importação por YouTube está temporariamente desabilitada. Use um arquivo MP4." },
+      {
+        message: "A importação por YouTube está temporariamente desabilitada. Use um serviço externo de download ou uma extensão/plugin do navegador para obter o MP4 e envie o arquivo ao F10.",
+      },
       { status: 403 },
     );
   }
