@@ -67,7 +67,15 @@ export const load: PageServerLoad = async ({ params, parent }) => {
                 annotations: parseHelpImageAnnotations(sourceBlock?.annotations) ?? [],
               };
             }),
-          videoUrl: step.media.find((media) => media.mediaType === "video")?.sourceUrl ?? null,
+          videoUrl: (() => {
+            const video = step.media.find(
+              (media) =>
+                media.mediaType === "video" &&
+                media.assetId &&
+                media.assetMimeType === "video/mp4",
+            );
+            return video?.assetId ? `asset:${video.assetId}` : null;
+          })(),
         };
       }),
     },
