@@ -14,10 +14,6 @@ import {
 import { getHelpTrainingPath, normalizeTrainingSlug } from "$lib/server/help/helpTrainingRepository";
 import { parseHelpImageAnnotations } from "$lib/help/helpImageAnnotations";
 
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
 function defaultPrimaryActionLabel(_interactionMode: HelpTrainingInteractionMode): string {
   return "Continuar";
 }
