@@ -103,7 +103,7 @@ function combineConditions(...conditions: Array<SQL | undefined>): SQL | undefin
 export async function listCustomerDirectory(
   actorUserId: string,
   permissions: CustomerDirectoryPermissionMap,
-  options: { query?: string; page?: number; pageSize?: number } = {},
+  options: { query?: string; page?: number; pageSize?: number; requireF10Context?: boolean } = {},
 ) {
   const scope = requireCustomerScope(permissions, "customers.view");
   const accessCondition = await buildCustomerAccessCondition(actorUserId, scope);
@@ -121,7 +121,24 @@ export async function listCustomerDirectory(
         ilike(customerOrganizations.name, pattern),
       )
     : undefined;
-  const whereCondition = combineConditions(accessCondition, searchCondition);
+  const f10ContextCondition = options.requireF10Context
+    ? exists(
+        getDatabase()
+          .select({ ticketId: ticketCustomerContexts.ticketId })
+          .from(ticketCustomerContexts)
+          .where(
+            and(
+              eq(ticketCustomerContexts.customerContactId, customerContacts.id),
+              sql`${ticketCustomerContexts.groupId} is not null`,
+              sql`${ticketCustomerContexts.groupName} is not null`,
+              sql`${ticketCustomerContexts.unitId} is not null`,
+              sql`${ticketCustomerContexts.unitName} is not null`,
+              sql`${ticketCustomerContexts.unitSchema} is not null`,
+            ),
+          ),
+      )
+    : undefined;
+  const whereCondition = combineConditions(accessCondition, searchCondition, f10ContextCondition);
   const db = getDatabase();
 
   const rowQuery = db
@@ -182,6 +199,58 @@ export async function listCustomerDirectory(
         select customer_context.group_name
         from ticket_customer_contexts customer_context
         where customer_context.customer_contact_id = ${customerContacts.id}
+        order by customer_context.updated_at desc
+        limit 1
+      )`,
+      latestContextTicketId: sql<string | null>`(
+        select customer_context.ticket_id::text
+        from ticket_customer_contexts customer_context
+        where customer_context.customer_contact_id = ${customerContacts.id}
+          and customer_context.group_id is not null
+          and customer_context.group_name is not null
+          and customer_context.unit_id is not null
+          and customer_context.unit_name is not null
+          and customer_context.unit_schema is not null
+        order by customer_context.updated_at desc
+        limit 1
+      )`,
+      latestGroupId: sql<number | null>`(
+        select customer_context.group_id
+        from ticket_customer_contexts customer_context
+        where customer_context.customer_contact_id = ${customerContacts.id}
+          and customer_context.group_id is not null
+          and customer_context.unit_id is not null
+          and customer_context.unit_schema is not null
+        order by customer_context.updated_at desc
+        limit 1
+      )`,
+      latestSubgroup: sql<boolean | null>`(
+        select customer_context.subgroup
+        from ticket_customer_contexts customer_context
+        where customer_context.customer_contact_id = ${customerContacts.id}
+          and customer_context.group_id is not null
+          and customer_context.unit_id is not null
+          and customer_context.unit_schema is not null
+        order by customer_context.updated_at desc
+        limit 1
+      )`,
+      latestUnitId: sql<number | null>`(
+        select customer_context.unit_id
+        from ticket_customer_contexts customer_context
+        where customer_context.customer_contact_id = ${customerContacts.id}
+          and customer_context.group_id is not null
+          and customer_context.unit_id is not null
+          and customer_context.unit_schema is not null
+        order by customer_context.updated_at desc
+        limit 1
+      )`,
+      latestUnitSchema: sql<string | null>`(
+        select customer_context.unit_schema
+        from ticket_customer_contexts customer_context
+        where customer_context.customer_contact_id = ${customerContacts.id}
+          and customer_context.group_id is not null
+          and customer_context.unit_id is not null
+          and customer_context.unit_schema is not null
         order by customer_context.updated_at desc
         limit 1
       )`,

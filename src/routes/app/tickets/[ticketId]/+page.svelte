@@ -15,6 +15,7 @@
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
+  import TicketCustomerPicker from "$lib/components/operations/TicketCustomerPicker.svelte";
   import ServiceRequestDetailsCard from "$lib/components/serviceRequests/ServiceRequestDetailsCard.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -45,6 +46,7 @@
     "ticket.priority.changed": "alterou a prioridade",
     "ticket.due_date.changed": "alterou a conclusão planejada",
     "ticket.assignee.changed": "alterou o responsável",
+    "ticket.customer.linked": "vinculou o cliente F10",
     "ticket.task.linked": "vinculou uma tarefa",
     "service_request.created": "criou a solicitação estruturada",
     "service_request.updated": "alterou os dados da solicitação",
@@ -154,15 +156,32 @@
 
       <section class="rounded-[24px] border border-[#D8DEF2] bg-[#F8F9FF] p-5"><div class="flex items-center gap-3"><MonitorCog size={18} class="text-[#000A57]"/><h2 class="text-[14px] font-semibold">Suporte remoto</h2></div><p class="application-text-caption mt-3 leading-5 text-[#697187]">Use um computador já reconhecido ou envie o instalador de suporte ao cliente na primeira vez.</p><a href={`/app/tickets/${data.details.ticket.id}/remote`} class="application-text-caption mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-[#000A57] font-semibold text-white">Abrir acesso remoto</a></section>
 
-      <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5"><div class="flex items-center gap-3"><UserRound size={18} class="text-[#EA6D0B]"/><h2 class="text-[14px] font-semibold text-[#11182C]">Cliente</h2></div><dl class="application-text-caption mt-4 space-y-3"><div><dt class="text-[#8D929F]">Nome</dt><dd class="mt-1 font-medium text-[#4E5463]">{data.details.ticket.customerName ?? "Não informado"}</dd></div><div><dt class="text-[#8D929F]">E-mail</dt><dd class="mt-1 break-all font-medium text-[#4E5463]">{data.details.ticket.customerEmail ?? "Não informado"}</dd></div><div><dt class="text-[#8D929F]">Telefone</dt><dd class="mt-1 font-medium text-[#4E5463]">{data.details.ticket.customerPhone ?? "Não informado"}</dd></div></dl></section>
+      <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5">
+        <div class="flex items-center gap-3"><UserRound size={18} class="text-[#EA6D0B]"/><h2 class="text-[14px] font-semibold text-[#11182C]">Cliente F10</h2></div>
+        {#if data.details.ticket.customerContactId}
+          <dl class="application-text-caption mt-4 space-y-3">
+            <div><dt class="text-[#8D929F]">Nome</dt><dd class="mt-1 font-medium text-[#4E5463]">{data.details.ticket.customerName ?? "Não informado"}</dd></div>
+            <div><dt class="text-[#8D929F]">E-mail</dt><dd class="mt-1 break-all font-medium text-[#4E5463]">{data.details.ticket.customerEmail ?? "Não informado"}</dd></div>
+            <div><dt class="text-[#8D929F]">Telefone</dt><dd class="mt-1 font-medium text-[#4E5463]">{data.details.ticket.customerPhone ?? "Não informado"}</dd></div>
+          </dl>
+        {:else}
+          <p class="application-text-caption mt-3 leading-5 text-[#858B99]">Este ticket chegou sem cliente vinculado.</p>
+          {#if data.canLinkCustomer}
+            <form method="POST" action="?/linkCustomer" class="mt-4 grid gap-3 sm:grid-cols-2">
+              <TicketCustomerPicker enabled={true}/>
+              <button type="submit" class="application-text-caption min-h-10 rounded-xl bg-[#000A57] px-3 font-semibold text-white sm:col-span-2">Vincular cliente ao ticket</button>
+            </form>
+          {/if}
+        {/if}
+      </section>
 
       {#if data.customerContext}
         <section class="rounded-[24px] border border-[#D8DEF2] bg-[#F8F9FF] p-5">
-          <div class="flex items-center gap-3"><Building2 size={18} class="text-[#000A57]"/><div><h2 class="text-[14px] font-semibold text-[#11182C]">Contexto F10 autenticado</h2><p class="application-text-meta mt-0.5 text-[#808695]">Escola e unidade vinculadas no início do atendimento.</p></div></div>
+          <div class="flex items-center gap-3"><Building2 size={18} class="text-[#000A57]"/><div><h2 class="text-[14px] font-semibold text-[#11182C]">Contexto F10</h2><p class="application-text-meta mt-0.5 text-[#808695]">Grupo e unidade associados a este ticket.</p></div></div>
           <dl class="application-text-caption mt-4 space-y-3">
             <div><dt class="text-[#8D929F]">Escola / unidade</dt><dd class="mt-1 font-semibold text-[#3F4656]">{data.customerContext.unitName}</dd></div>
             <div><dt class="text-[#8D929F]">Grupo</dt><dd class="mt-1 font-medium text-[#4E5463]">{data.customerContext.groupName}</dd></div>
-            <div><dt class="text-[#8D929F]">Usuário F10</dt><dd class="application-text-meta mt-1 font-mono font-medium text-[#5D6372]">{data.customerContext.legacyUserId}</dd></div>
+            <div><dt class="text-[#8D929F]">Usuário F10</dt><dd class="application-text-meta mt-1 font-mono font-medium text-[#5D6372]">{data.customerContext.legacyUserId ?? "Ainda não autenticado"}</dd></div>
           </dl>
         </section>
       {:else if data.details.ticket.organizationName}

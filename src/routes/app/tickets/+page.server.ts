@@ -12,7 +12,6 @@ import {
   type PermissionScope,
 } from "$lib/server/auth/permissions";
 import type { SupportPermissionMap } from "$lib/server/support/supportAccess";
-import { getCustomerDirectoryDetails } from "$lib/server/support/customerDirectoryRepository";
 import {
   addTicketLabel,
   createTicketLabel,
@@ -21,6 +20,7 @@ import {
   removeTicketLabel,
   uploadTicketAttachment,
 } from "$lib/server/support/ticketCardRepository";
+import { parseTicketCustomerLinkForm } from "$lib/server/support/ticketCustomerForm";
 import { isTicketDueDate } from "$lib/server/support/ticketDueDate";
 import {
   createManualTicket,
@@ -82,10 +82,11 @@ export const load: PageServerLoad = async ({ parent }) => {
   const viewScope = getPermissionScope(permissionMap, "tickets.view");
   if (!viewScope) throw error(403, "Acesso não autorizado.");
 
-  const canCreate = hasPermission(permissionMap, "tickets.create");
+  const canCreate = hasPermission(permissionMap, "tickets.create")
+    && hasPermission(permissionMap, "customers.view");
   const canReply = hasPermission(permissionMap, "tickets.reply");
   const canManageWorkflow = hasPermission(permissionMap, "tickets.manage", "all");
-  const canSearchCustomers = canCreate && hasPermission(permissionMap, "customers.view");
+  const canSearchCustomers = canCreate;
   const [ticketRows, queues] = await Promise.all([
     listSupportTickets(layout.user.id, permissionMap),
     canCreate ? listSupportQueues() : Promise.resolve([]),
@@ -138,48 +139,22 @@ export const actions: Actions = {
     const message = readFormValue(formData, "message");
     const priority = readFormValue(formData, "priority");
     const dueOn = readFormValue(formData, "dueOn");
-    const customerContactId = readFormValue(formData, "customerContactId");
-    let customerName = readFormValue(formData, "customerName");
-    let customerEmail = readFormValue(formData, "customerEmail").toLowerCase();
-    let customerPhone = readFormValue(formData, "customerPhone");
-    let customerWhatsapp = readFormValue(formData, "customerWhatsapp");
-    let organizationName = readFormValue(formData, "organizationName");
     const queueId = readFormValue(formData, "queueId");
-
-    if (customerContactId) {
-      if (!isUuid(customerContactId) || !hasPermission(permissions, "customers.view")) {
-        return fail(403, { success: false, action: "create", message: "Cliente selecionado não está disponível para este usuário." });
-      }
-      try {
-        const selected = await getCustomerDirectoryDetails(
-          session.user.id,
-          permissions,
-          customerContactId,
-        );
-        customerName = selected.customer.name;
-        customerEmail = selected.customer.email ?? "";
-        customerPhone = selected.customer.phone ?? "";
-        customerWhatsapp = selected.customer.whatsapp ?? "";
-        organizationName = selected.customer.organizationName ?? "";
-      } catch {
-        return fail(403, { success: false, action: "create", message: "Cliente selecionado não está disponível para este usuário." });
-      }
+    let customer;
+    try {
+      customer = parseTicketCustomerLinkForm(formData);
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : "";
+      const message = code === "CUSTOMER_F10_CONTEXT_REQUIRED"
+        ? "Selecione um cliente existente com grupo/unidade F10 ou use + para cadastrar todos os identificadores obrigatórios."
+        : "Revise os dados do cliente antes de criar o ticket.";
+      return fail(400, { success: false, action: "create", message });
     }
-
     if (subject.length < 3 || subject.length > 180) {
       return fail(400, { success: false, action: "create", message: "Informe um assunto entre 3 e 180 caracteres." });
     }
     if (message.length < 1 || message.length > 10000) {
       return fail(400, { success: false, action: "create", message: "A descrição deve ter entre 1 e 10.000 caracteres." });
-    }
-    if (customerName.length < 2 || customerName.length > 120) {
-      return fail(400, { success: false, action: "create", message: "Informe o nome do cliente entre 2 e 120 caracteres." });
-    }
-    if (organizationName.length > 160) {
-      return fail(400, { success: false, action: "create", message: "O nome da escola ou empresa deve ter no máximo 160 caracteres." });
-    }
-    if (customerEmail.length > 254 || customerPhone.length > 40 || customerWhatsapp.length > 40) {
-      return fail(400, { success: false, action: "create", message: "E-mail, telefone ou WhatsApp do cliente excede o tamanho permitido." });
     }
     if (!queueId || !isTicketPriority(priority)) {
       return fail(400, { success: false, action: "create", message: "Revise fila e prioridade." });
@@ -194,12 +169,7 @@ export const actions: Actions = {
         message,
         priority,
         dueOn,
-        customerContactId: customerContactId || null,
-        customerName,
-        customerEmail,
-        customerPhone,
-        customerWhatsapp,
-        organizationName,
+        ...customer,
         queueId,
       });
       throw redirect(303, `/app/tickets/${ticket.id}`);

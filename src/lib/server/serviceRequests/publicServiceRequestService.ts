@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
-import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
 import {
   serviceRequestAttachments,
   serviceRequestChangeSets,
@@ -10,16 +9,12 @@ import {
 } from "$lib/server/db/serviceRequestSchema";
 import { ticketEvents, ticketMessages, tickets } from "$lib/server/db/supportSchema";
 import { ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
-import {
-  listAuthorizedF10Contexts,
-  type CustomerF10PortalSession,
-} from "$lib/server/customerPortal/customerF10AuthRepository";
-import { autoAssignTicketIfConfigured } from "$lib/server/support/supportRoutingRepository";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
 import { encryptServiceRequestSecrets } from "$lib/server/serviceRequests/serviceRequestCrypto";
 import {
   normalizeServiceRequestFields,
   serviceRequestLabel,
+  type ServiceRequestDataValue,
   type ServiceRequestType,
 } from "$lib/server/serviceRequests/serviceRequestDefinitions";
 import { resolveServiceRequestIntake } from "$lib/server/serviceRequests/serviceRequestIntake";
@@ -29,29 +24,19 @@ import {
   type ServiceRequestAttachmentInput,
 } from "$lib/server/serviceRequests/serviceRequestStorage";
 
-export type CreateCustomerServiceRequestInput = {
+export type CreatePublicServiceRequestInput = {
   requestType: ServiceRequestType;
-  groupId: number;
-  unitId: number;
   idempotencyKey: string;
   fields: Record<string, unknown>;
   attachments: ServiceRequestAttachmentInput[];
 };
 
-export type CreatedCustomerServiceRequest = {
+export type CreatedPublicServiceRequest = {
   serviceRequestId: string;
   ticketId: string;
   ticketNumber: number;
   requestType: ServiceRequestType;
   deduplicated: boolean;
-};
-
-type ExistingRequest = {
-  serviceRequestId: string;
-  ticketId: string;
-  ticketNumber: number;
-  groupId: number | null;
-  unitId: number | null;
 };
 
 function normalizeIdempotencyKey(value: string): string {
@@ -62,70 +47,60 @@ function normalizeIdempotencyKey(value: string): string {
   return key;
 }
 
-async function findExistingRequest(
-  customerContactId: string,
+function subjectDetail(data: Record<string, ServiceRequestDataValue>): string {
+  const candidates = [
+    data.unitFantasyName,
+    data.fantasyName,
+    data.unitLegalName,
+    data.legalName,
+    data.cnpj,
+  ];
+  const value = candidates.find((candidate) => typeof candidate === "string" && candidate.trim());
+  return typeof value === "string" ? value.trim().slice(0, 120) : "Solicitação pública";
+}
+
+async function findExistingPublicRequest(
   requestType: ServiceRequestType,
   idempotencyKey: string,
-): Promise<ExistingRequest | null> {
-  const db = getDatabase();
-  const [row] = await db
+): Promise<CreatedPublicServiceRequest | null> {
+  const [row] = await getDatabase()
     .select({
       serviceRequestId: serviceRequests.id,
       ticketId: serviceRequests.ticketId,
       ticketNumber: tickets.ticketNumber,
-      groupId: serviceRequests.groupId,
-      unitId: serviceRequests.unitId,
     })
     .from(serviceRequests)
     .innerJoin(tickets, eq(tickets.id, serviceRequests.ticketId))
     .where(
       and(
-        eq(serviceRequests.customerContactId, customerContactId),
+        isNull(serviceRequests.customerContactId),
         eq(serviceRequests.requestType, requestType),
         eq(serviceRequests.idempotencyKey, idempotencyKey),
       ),
     )
     .limit(1);
-  return row ?? null;
+
+  return row
+    ? {
+        ...row,
+        requestType,
+        deduplicated: true,
+      }
+    : null;
 }
 
-function deduplicatedResult(
-  requestType: ServiceRequestType,
-  existing: ExistingRequest,
-  groupId: number,
-  unitId: number,
-): CreatedCustomerServiceRequest {
-  if (existing.groupId !== groupId || existing.unitId !== unitId) {
-    throw new Error("SERVICE_REQUEST_IDEMPOTENCY_CONFLICT");
-  }
-  return {
-    serviceRequestId: existing.serviceRequestId,
-    ticketId: existing.ticketId,
-    ticketNumber: existing.ticketNumber,
-    requestType,
-    deduplicated: true,
-  };
-}
-
-export async function createCustomerServiceRequest(
-  session: CustomerF10PortalSession,
-  input: CreateCustomerServiceRequestInput,
-): Promise<CreatedCustomerServiceRequest> {
+export async function createPublicServiceRequest(
+  input: CreatePublicServiceRequestInput,
+): Promise<CreatedPublicServiceRequest> {
   const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey);
-  const context = listAuthorizedF10Contexts(session).find(
-    (candidate) => candidate.groupId === input.groupId && candidate.unitId === input.unitId,
-  );
-  if (!context) throw new Error("SERVICE_REQUEST_CONTEXT_NOT_AUTHORIZED");
-
-  const existing = await findExistingRequest(session.contactId, input.requestType, idempotencyKey);
-  if (existing) return deduplicatedResult(input.requestType, existing, context.groupId, context.unitId);
+  const existing = await findExistingPublicRequest(input.requestType, idempotencyKey);
+  if (existing) return existing;
 
   const normalized = normalizeServiceRequestFields(input.requestType, input.fields);
   const encryptedSecrets = encryptServiceRequestSecrets(normalized.secrets);
   const intake = await resolveServiceRequestIntake(input.requestType);
   const serviceRequestId = randomUUID();
   const ticketId = randomUUID();
-  const messageId = randomUUID();
   const storedAttachments = await uploadServiceRequestAttachments(
     serviceRequestId,
     input.requestType,
@@ -137,70 +112,57 @@ export async function createCustomerServiceRequest(
   let createdNew = false;
 
   try {
-    const result = await db.transaction(async (tx): Promise<CreatedCustomerServiceRequest> => {
-      const lockKey = `${session.contactId}:${input.requestType}:${idempotencyKey}`;
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}))`);
+    const result = await db.transaction(async (tx): Promise<CreatedPublicServiceRequest> => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`public:${input.requestType}:${idempotencyKey}`}))`,
+      );
 
       const [duplicate] = await tx
         .select({
           serviceRequestId: serviceRequests.id,
           ticketId: serviceRequests.ticketId,
           ticketNumber: tickets.ticketNumber,
-          groupId: serviceRequests.groupId,
-          unitId: serviceRequests.unitId,
         })
         .from(serviceRequests)
         .innerJoin(tickets, eq(tickets.id, serviceRequests.ticketId))
         .where(
           and(
-            eq(serviceRequests.customerContactId, session.contactId),
+            isNull(serviceRequests.customerContactId),
             eq(serviceRequests.requestType, input.requestType),
             eq(serviceRequests.idempotencyKey, idempotencyKey),
           ),
         )
         .limit(1);
-
       if (duplicate) {
-        return deduplicatedResult(input.requestType, duplicate, context.groupId, context.unitId);
+        return {
+          ...duplicate,
+          requestType: input.requestType,
+          deduplicated: true,
+        };
       }
 
       const [ticket] = await tx
         .insert(tickets)
         .values({
           id: ticketId,
-          customerContactId: session.contactId,
+          customerContactId: null,
           queueId: intake.queueId,
-          subject: `${label} · ${context.unitName}`,
+          assignedUserId: null,
+          subject: `${label} · ${subjectDetail(normalized.data)}`,
           status: intake.lifecycleStatus,
           priority: "normal",
-          channel: "portal",
+          channel: "manual",
           dueOn: sql`CURRENT_DATE + ${intake.defaultDueDays}::integer`,
         })
         .returning({ id: tickets.id, ticketNumber: tickets.ticketNumber });
       if (!ticket) throw new Error("SERVICE_REQUEST_TICKET_NOT_CREATED");
 
       await tx.insert(ticketMessages).values({
-        id: messageId,
         ticketId,
-        authorType: "customer",
-        customerContactId: session.contactId,
+        authorType: "system",
         visibility: "public",
-        channel: "portal",
-        body: `Solicitação de ${label} enviada pelo Portal do Cliente. Os dados estruturados estão disponíveis nos detalhes desta solicitação.`,
-      });
-
-      await tx.insert(ticketCustomerContexts).values({
-        ticketId,
-        customerContactId: session.contactId,
-        legacyUserId: session.legacyUserId,
-        contextScope: "unit",
-        groupId: context.groupId,
-        groupName: context.groupName,
-        subgroup: context.subgroup,
-        unitId: context.unitId,
-        unitName: context.unitName,
-        unitSchema: context.unitSchema,
-        updatedAt: now,
+        channel: "manual",
+        body: `Solicitação pública de ${label} recebida. O solicitante externo não foi cadastrado automaticamente como cliente F10; os dados enviados estão disponíveis na solicitação estruturada.`,
       });
 
       await tx.insert(ticketWorkflowStates).values({
@@ -219,13 +181,13 @@ export async function createCustomerServiceRequest(
         id: serviceRequestId,
         ticketId,
         requestType: input.requestType,
-        customerContactId: session.contactId,
-        legacyUserId: session.legacyUserId,
-        groupId: context.groupId,
-        groupName: context.groupName,
-        unitId: context.unitId,
-        unitName: context.unitName,
-        unitSchema: context.unitSchema,
+        customerContactId: null,
+        legacyUserId: null,
+        groupId: null,
+        groupName: null,
+        unitId: null,
+        unitName: null,
+        unitSchema: null,
         idempotencyKey,
         version: 1,
         data: normalized.data,
@@ -252,8 +214,7 @@ export async function createCustomerServiceRequest(
         .values({
           serviceRequestId,
           version: 1,
-          source: "customer",
-          actorCustomerContactId: session.contactId,
+          source: "system",
         })
         .returning({ id: serviceRequestChangeSets.id });
       if (!changeSet) throw new Error("SERVICE_REQUEST_CHANGE_SET_NOT_CREATED");
@@ -284,8 +245,7 @@ export async function createCustomerServiceRequest(
         metadata: {
           serviceRequestId,
           requestType: input.requestType,
-          groupId: context.groupId,
-          unitId: context.unitId,
+          publicSubmission: true,
           attachmentCount: storedAttachments.length,
           version: 1,
         },
@@ -306,18 +266,11 @@ export async function createCustomerServiceRequest(
       return result;
     }
 
-    await autoAssignTicketIfConfigured(result.ticketId).catch((cause) => {
-      console.error("[service-request.assignment]", {
-        ticketId: result.ticketId,
-        requestType: input.requestType,
-        causeType: cause instanceof Error ? cause.name : typeof cause,
-      });
-    });
     await notifySupportTicketNeedsAttention(
       result.ticketId,
-      `Nova solicitação de ${label} enviada pelo Portal do Cliente.`,
+      `Nova solicitação pública de ${label} aguardando atendimento.`,
     ).catch((cause) => {
-      console.error("[service-request.notification]", {
+      console.error("[service-request.public.notification]", {
         ticketId: result.ticketId,
         requestType: input.requestType,
         causeType: cause instanceof Error ? cause.name : typeof cause,

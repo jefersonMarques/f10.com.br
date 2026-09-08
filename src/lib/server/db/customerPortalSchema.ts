@@ -1,5 +1,6 @@
 import {
   index,
+  boolean,
   integer,
   jsonb,
   pgTable,
@@ -106,10 +107,11 @@ export const ticketCustomerContexts = pgTable(
     customerContactId: uuid("customer_contact_id").references(() => customerContacts.id, {
       onDelete: "set null",
     }),
-    legacyUserId: text("legacy_user_id").notNull(),
+    legacyUserId: text("legacy_user_id"),
     contextScope: text("context_scope").notNull().default("unit"),
     groupId: integer("group_id"),
     groupName: text("group_name"),
+    subgroup: boolean("subgroup"),
     unitId: integer("unit_id"),
     unitName: text("unit_name"),
     unitSchema: text("unit_schema"),

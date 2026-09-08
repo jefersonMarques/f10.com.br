@@ -4,11 +4,15 @@ import {
   desc,
   eq,
   inArray,
+  isNotNull,
   or,
+  sql,
 } from "drizzle-orm";
 import { getPermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
+import { serviceRequests } from "$lib/server/db/serviceRequestSchema";
 import { users } from "$lib/server/db/schema";
 import {
   customerContacts,
@@ -23,7 +27,6 @@ import {
   requireTicketAccess,
   type SupportPermissionMap,
 } from "$lib/server/support/supportAccess";
-import { resolveCustomerContact } from "$lib/server/support/customerResolutionRepository";
 
 export type TicketStatus =
   | "new"
@@ -35,18 +38,43 @@ export type TicketStatus =
 
 export type TicketPriority = "low" | "normal" | "high" | "urgent";
 
-export type CreateManualTicketInput = {
-  subject: string;
-  message: string;
-  priority: TicketPriority;
-  dueOn: string;
+export type TicketCustomerLinkInput = {
+  customerMode: "existing" | "new";
   customerContactId: string | null;
+  customerContextTicketId: string | null;
   customerName: string;
   customerEmail: string;
   customerPhone: string;
   customerWhatsapp: string;
   organizationName: string;
+  groupId: number | null;
+  groupName: string;
+  subgroup: boolean | null;
+  unitId: number | null;
+  unitName: string;
+  unitSchema: string;
+};
+
+export type CreateManualTicketInput = TicketCustomerLinkInput & {
+  subject: string;
+  message: string;
+  priority: TicketPriority;
+  dueOn: string;
   queueId: string;
+};
+
+type SupportDatabase = ReturnType<typeof getDatabase>;
+type SupportTransaction = Parameters<Parameters<SupportDatabase["transaction"]>[0]>[0];
+
+type ResolvedTicketCustomer = {
+  contactId: string;
+  legacyUserId: string | null;
+  groupId: number;
+  groupName: string;
+  subgroup: boolean | null;
+  unitId: number;
+  unitName: string;
+  unitSchema: string;
 };
 
 function requireSupportScope(
@@ -137,6 +165,224 @@ export async function listSupportTickets(
   return condition ? query.where(condition) : query;
 }
 
+function normalizedPhone(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+function requireManualContext(input: TicketCustomerLinkInput): {
+  groupId: number;
+  groupName: string;
+  subgroup: boolean;
+  unitId: number;
+  unitName: string;
+  unitSchema: string;
+} {
+  if (
+    input.groupId === null ||
+    !Number.isSafeInteger(input.groupId) ||
+    input.groupId <= 0 ||
+    input.unitId === null ||
+    !Number.isSafeInteger(input.unitId) ||
+    input.unitId <= 0 ||
+    !input.groupName.trim() ||
+    input.subgroup === null ||
+    !input.unitName.trim() ||
+    !input.unitSchema.trim()
+  ) {
+    throw new Error("CUSTOMER_F10_CONTEXT_REQUIRED");
+  }
+  return {
+    groupId: input.groupId,
+    groupName: input.groupName.trim(),
+    subgroup: input.subgroup,
+    unitId: input.unitId,
+    unitName: input.unitName.trim(),
+    unitSchema: input.unitSchema.trim(),
+  };
+}
+
+async function resolveTicketCustomer(
+  tx: SupportTransaction,
+  input: TicketCustomerLinkInput,
+): Promise<ResolvedTicketCustomer> {
+  if (input.customerMode === "existing") {
+    if (!input.customerContactId || !input.customerContextTicketId) {
+      throw new Error("CUSTOMER_F10_CONTEXT_REQUIRED");
+    }
+
+    const [selected] = await tx
+      .select({
+        contactId: customerContacts.id,
+        legacyUserId: ticketCustomerContexts.legacyUserId,
+        groupId: ticketCustomerContexts.groupId,
+        groupName: ticketCustomerContexts.groupName,
+        subgroup: ticketCustomerContexts.subgroup,
+        unitId: ticketCustomerContexts.unitId,
+        unitName: ticketCustomerContexts.unitName,
+        unitSchema: ticketCustomerContexts.unitSchema,
+      })
+      .from(customerContacts)
+      .innerJoin(
+        ticketCustomerContexts,
+        and(
+          eq(ticketCustomerContexts.customerContactId, customerContacts.id),
+          eq(ticketCustomerContexts.ticketId, input.customerContextTicketId),
+        ),
+      )
+      .where(
+        and(
+          eq(customerContacts.id, input.customerContactId),
+          eq(customerContacts.active, true),
+          isNotNull(ticketCustomerContexts.groupId),
+          isNotNull(ticketCustomerContexts.groupName),
+          isNotNull(ticketCustomerContexts.unitId),
+          isNotNull(ticketCustomerContexts.unitName),
+          isNotNull(ticketCustomerContexts.unitSchema),
+        ),
+      )
+      .limit(1);
+
+    if (
+      !selected ||
+      selected.groupId === null ||
+      selected.groupName === null ||
+      selected.unitId === null ||
+      selected.unitName === null ||
+      selected.unitSchema === null
+    ) {
+      throw new Error("CUSTOMER_F10_CONTEXT_REQUIRED");
+    }
+
+    return {
+      contactId: selected.contactId,
+      legacyUserId: selected.legacyUserId,
+      groupId: selected.groupId,
+      groupName: selected.groupName,
+      subgroup: selected.subgroup,
+      unitId: selected.unitId,
+      unitName: selected.unitName,
+      unitSchema: selected.unitSchema,
+    };
+  }
+
+  const context = requireManualContext(input);
+  const name = input.customerName.trim();
+  const organizationName = input.organizationName.trim();
+  const email = input.customerEmail.trim().toLowerCase();
+  const phone = input.customerPhone.trim();
+  const whatsapp = input.customerWhatsapp.trim();
+  if (name.length < 2 || organizationName.length < 2) {
+    throw new Error("CUSTOMER_REQUIRED");
+  }
+
+  let existingContact: { id: string; organizationId: string | null } | undefined;
+  if (email) {
+    [existingContact] = await tx
+      .select({ id: customerContacts.id, organizationId: customerContacts.organizationId })
+      .from(customerContacts)
+      .where(and(eq(customerContacts.active, true), sql`lower(${customerContacts.email}) = ${email}`))
+      .limit(1);
+  }
+
+  const phoneDigits = normalizedPhone(phone || whatsapp);
+  if (!existingContact && phoneDigits.length >= 8) {
+    [existingContact] = await tx
+      .select({ id: customerContacts.id, organizationId: customerContacts.organizationId })
+      .from(customerContacts)
+      .where(
+        and(
+          eq(customerContacts.active, true),
+          or(
+            sql`regexp_replace(coalesce(${customerContacts.phone}, ''), '\\D', '', 'g') = ${phoneDigits}`,
+            sql`regexp_replace(coalesce(${customerContacts.whatsapp}, ''), '\\D', '', 'g') = ${phoneDigits}`,
+          ),
+        ),
+      )
+      .limit(1);
+  }
+
+  let contactId = existingContact?.id ?? null;
+  if (!contactId) {
+    let organizationId: string | null = null;
+    const [existingOrganization] = await tx
+      .select({ id: customerOrganizations.id })
+      .from(customerOrganizations)
+      .where(
+        and(
+          eq(customerOrganizations.active, true),
+          sql`lower(${customerOrganizations.name}) = ${organizationName.toLowerCase()}`,
+        ),
+      )
+      .limit(1);
+
+    if (existingOrganization) {
+      organizationId = existingOrganization.id;
+    } else {
+      const [organization] = await tx
+        .insert(customerOrganizations)
+        .values({ name: organizationName })
+        .returning({ id: customerOrganizations.id });
+      organizationId = organization?.id ?? null;
+    }
+
+    const [contact] = await tx
+      .insert(customerContacts)
+      .values({
+        organizationId,
+        name,
+        email: email || null,
+        phone: phone || null,
+        whatsapp: whatsapp || null,
+      })
+      .returning({ id: customerContacts.id });
+    if (!contact) throw new Error("CUSTOMER_NOT_CREATED");
+    contactId = contact.id;
+  }
+
+  return {
+    contactId,
+    legacyUserId: null,
+    ...context,
+  };
+}
+
+async function saveTicketCustomerContext(
+  tx: SupportTransaction,
+  ticketId: string,
+  customer: ResolvedTicketCustomer,
+): Promise<void> {
+  await tx
+    .insert(ticketCustomerContexts)
+    .values({
+      ticketId,
+      customerContactId: customer.contactId,
+      legacyUserId: customer.legacyUserId,
+      contextScope: "unit",
+      groupId: customer.groupId,
+      groupName: customer.groupName,
+      subgroup: customer.subgroup,
+      unitId: customer.unitId,
+      unitName: customer.unitName,
+      unitSchema: customer.unitSchema,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: ticketCustomerContexts.ticketId,
+      set: {
+        customerContactId: customer.contactId,
+        legacyUserId: customer.legacyUserId,
+        contextScope: "unit",
+        groupId: customer.groupId,
+        groupName: customer.groupName,
+        subgroup: customer.subgroup,
+        unitId: customer.unitId,
+        unitName: customer.unitName,
+        unitSchema: customer.unitSchema,
+        updatedAt: new Date(),
+      },
+    });
+}
+
 export async function createManualTicket(
   actorUserId: string,
   permissions: SupportPermissionMap,
@@ -150,23 +396,14 @@ export async function createManualTicket(
     .from(supportQueues)
     .where(and(eq(supportQueues.id, input.queueId), eq(supportQueues.active, true)))
     .limit(1);
-
   if (!queue) throw new Error("QUEUE_NOT_FOUND");
 
-  const customerContactId = await resolveCustomerContact({
-    contactId: input.customerContactId,
-    name: input.customerName,
-    email: input.customerEmail,
-    phone: input.customerPhone,
-    whatsapp: input.customerWhatsapp,
-    organizationName: input.organizationName,
-  });
-
   return db.transaction(async (tx) => {
+    const customer = await resolveTicketCustomer(tx, input);
     const [ticket] = await tx
       .insert(tickets)
       .values({
-        customerContactId,
+        customerContactId: customer.contactId,
         queueId: queue.id,
         assignedUserId: actorUserId,
         subject: input.subject.trim(),
@@ -179,11 +416,12 @@ export async function createManualTicket(
 
     if (!ticket) throw new Error("TICKET_NOT_CREATED");
 
+    await saveTicketCustomerContext(tx, ticket.id, customer);
     await tx.insert(ticketMessages).values({
       ticketId: ticket.id,
       authorType: "user",
       authorUserId: actorUserId,
-      customerContactId,
+      customerContactId: customer.contactId,
       visibility: "public",
       channel: "manual",
       body: input.message.trim(),
@@ -193,10 +431,75 @@ export async function createManualTicket(
       ticketId: ticket.id,
       actorUserId,
       eventType: "ticket.created",
-      metadata: { channel: "manual", dueOn: input.dueOn },
+      metadata: {
+        channel: "manual",
+        dueOn: input.dueOn,
+        customerContactId: customer.contactId,
+        groupId: customer.groupId,
+        unitId: customer.unitId,
+      },
     });
 
     return ticket;
+  });
+}
+
+export async function linkTicketCustomer(
+  actorUserId: string,
+  permissions: SupportPermissionMap,
+  ticketId: string,
+  input: TicketCustomerLinkInput,
+): Promise<void> {
+  const scope = requireSupportScope(permissions, "tickets.reply");
+  await requireTicketAccess(actorUserId, scope, ticketId);
+
+  const db = getDatabase();
+  await db.transaction(async (tx) => {
+    const [ticket] = await tx
+      .select({ customerContactId: tickets.customerContactId })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId))
+      .limit(1);
+    if (!ticket) throw new Error("TICKET_NOT_FOUND");
+    if (ticket.customerContactId) throw new Error("TICKET_CUSTOMER_ALREADY_LINKED");
+
+    const customer = await resolveTicketCustomer(tx, input);
+    const now = new Date();
+
+    await tx
+      .update(tickets)
+      .set({
+        customerContactId: customer.contactId,
+        updatedAt: now,
+      })
+      .where(eq(tickets.id, ticketId));
+
+    await saveTicketCustomerContext(tx, ticketId, customer);
+
+    await tx
+      .update(serviceRequests)
+      .set({
+        customerContactId: customer.contactId,
+        legacyUserId: customer.legacyUserId,
+        groupId: customer.groupId,
+        groupName: customer.groupName,
+        unitId: customer.unitId,
+        unitName: customer.unitName,
+        unitSchema: customer.unitSchema,
+        updatedAt: now,
+      })
+      .where(eq(serviceRequests.ticketId, ticketId));
+
+    await tx.insert(ticketEvents).values({
+      ticketId,
+      actorUserId,
+      eventType: "ticket.customer.linked",
+      metadata: {
+        customerContactId: customer.contactId,
+        groupId: customer.groupId,
+        unitId: customer.unitId,
+      },
+    });
   });
 }
 

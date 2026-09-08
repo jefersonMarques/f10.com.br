@@ -40,6 +40,7 @@ export function countF10Units(groups: CustomerF10GroupSnapshot[]): number {
 export type CustomerF10AuthorizedContext = {
   groupId: number;
   groupName: string;
+  subgroup: boolean;
   unitId: number;
   unitName: string;
   unitSchema: string;
@@ -71,6 +72,7 @@ export function listAuthorizedF10Contexts(
     group.unidades.map((unit) => ({
       groupId: group.grupo_id,
       groupName: group.grupo,
+      subgroup: group.subgrupo,
       unitId: unit.unidade_id,
       unitName: unit.unidade,
       unitSchema: unit.schema,

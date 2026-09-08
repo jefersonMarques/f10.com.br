@@ -135,7 +135,7 @@ type ServiceRequestRow = {
   id: string;
   ticketId: string;
   requestType: ServiceRequestType;
-  customerContactId: string;
+  customerContactId: string | null;
   version: number;
   data: Record<string, unknown>;
   secretsEncrypted: Record<string, string>;
