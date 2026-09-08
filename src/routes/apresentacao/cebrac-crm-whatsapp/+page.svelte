@@ -577,12 +577,12 @@
 
       <div class="mt-12 grid gap-7 lg:grid-cols-2">
         {#each recordings as recording, index}
-          <article class:lg:col-span-2={index === recordings.length - 1} class="overflow-hidden border border-[#2B4091]/12 bg-[#f6f8fc] shadow-[0_20px_52px_rgba(43,64,145,0.10)]">
+          <article class={`overflow-hidden border border-[#2B4091]/12 bg-[#f6f8fc] shadow-[0_20px_52px_rgba(43,64,145,0.10)] ${index === recordings.length - 1 ? "lg:col-span-2" : ""}`}>
             <div class="border-b border-[#2B4091]/10 bg-white px-5 py-4 sm:px-6">
               <span class="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#f36b21]">Vídeo {String(index + 1).padStart(2, "0")}</span>
               <h3 class="mt-1 text-lg font-bold text-[#2B4091] sm:text-xl">{recording.title}</h3>
             </div>
-            <div class:mx-auto={index === recordings.length - 1} class:max-w-[980px]={index === recordings.length - 1} class="bg-black">
+            <div class={`bg-black ${index === recordings.length - 1 ? "mx-auto max-w-[980px]" : ""}`}>
               <video
                 class="aspect-video w-full bg-black"
                 controls
