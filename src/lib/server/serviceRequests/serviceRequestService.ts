@@ -50,8 +50,8 @@ type ExistingRequest = {
   serviceRequestId: string;
   ticketId: string;
   ticketNumber: number;
-  groupId: number;
-  unitId: number;
+  groupId: number | null;
+  unitId: number | null;
 };
 
 function normalizeIdempotencyKey(value: string): string {
@@ -196,6 +196,7 @@ export async function createCustomerServiceRequest(
         contextScope: "unit",
         groupId: context.groupId,
         groupName: context.groupName,
+        subgroup: context.subgroup,
         unitId: context.unitId,
         unitName: context.unitName,
         unitSchema: context.unitSchema,
