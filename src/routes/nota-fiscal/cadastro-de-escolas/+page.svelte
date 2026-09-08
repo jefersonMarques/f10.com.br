@@ -52,10 +52,20 @@
   let isSubmitting = false;
   let isSuccess = false;
   let submitMessage = "";
+  let submissionIdempotencyKey = "";
 
   let certificateFile: File | null = null;
   let invoiceXmlFile: File | null = null;
   let cityCheckResult: CityCheckResult | null = null;
+
+  function submissionKey(): string {
+    if (submissionIdempotencyKey) return submissionIdempotencyKey;
+    submissionIdempotencyKey =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `nfse-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return submissionIdempotencyKey;
+  }
 
   function onlyDigits(value: string): string {
     return value.replace(/\D+/g, "");
@@ -809,6 +819,7 @@
 
       const res = await fetch("/api/nfse/nfse-homologacao/submit", {
         method: "POST",
+        headers: { "Idempotency-Key": submissionKey() },
         body: fd,
       });
 
