@@ -12,10 +12,12 @@ module.exports = {
       // (env_file deveria resolver, mas isso aqui mata qualquer dúvida e override)
       env: {
         NODE_ENV: "production",
+        ORIGIN: "https://f10.com.br",
         BODY_SIZE_LIMIT: "100M",
       },
       env_production: {
         NODE_ENV: "production",
+        ORIGIN: "https://f10.com.br",
         BODY_SIZE_LIMIT: "100M",
       },
     },
