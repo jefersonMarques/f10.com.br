@@ -161,7 +161,11 @@ export async function moveHelpTrainingStep(
 ): Promise<void> {
   const db = getDatabase();
   const steps = await db
-    .select({ id: helpTrainingSteps.id, sortOrder: helpTrainingSteps.sortOrder })
+    .select({
+      id: helpTrainingSteps.id,
+      pathItemId: helpTrainingSteps.pathItemId,
+      sortOrder: helpTrainingSteps.sortOrder,
+    })
     .from(helpTrainingSteps)
     .where(eq(helpTrainingSteps.pathId, pathId))
     .orderBy(asc(helpTrainingSteps.sortOrder));
@@ -170,7 +174,7 @@ export async function moveHelpTrainingStep(
   const targetIndex = direction === "up" ? index - 1 : index + 1;
   const target = steps[targetIndex];
   const current = steps[index];
-  if (!current || !target) return;
+  if (!current || !target || current.pathItemId !== target.pathItemId) return;
   const temporarySortOrder = Math.min(...steps.map((step) => step.sortOrder)) - 1000;
 
   await db.transaction(async (tx) => {

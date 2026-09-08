@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { AiGatewayError, createAiStructuredResponse, type AiStructuredResponse } from "$lib/server/ai/aiGateway";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
@@ -414,16 +414,20 @@ async function insertGeneratedSteps(
   return plan.steps.length;
 }
 
-async function replaceCategories(
-  tx: Parameters<Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]>[0],
+type TrainingTransaction = Parameters<
+  Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]
+>[0];
+
+async function replaceCategoriesFromSnapshots(
+  tx: TrainingTransaction,
   pathId: string,
-  contents: PublishedStructuredHelp[],
+  snapshots: HelpTrainingSourceContent[],
 ): Promise<void> {
   await tx.delete(helpTrainingPathCategories).where(eq(helpTrainingPathCategories.pathId, pathId));
   const categories = Array.from(
     new Map(
-      contents
-        .flatMap((content) => content.categories)
+      snapshots
+        .flatMap((snapshot) => snapshot.categories)
         .map((category) => [category.id, category] as const),
     ).values(),
   );
@@ -435,6 +439,102 @@ async function replaceCategories(
       sortOrder: (index + 1) * 10,
     })),
   );
+}
+
+async function replaceCategories(
+  tx: TrainingTransaction,
+  pathId: string,
+  contents: PublishedStructuredHelp[],
+): Promise<void> {
+  await replaceCategoriesFromSnapshots(
+    tx,
+    pathId,
+    contents.map(sourceSnapshot),
+  );
+}
+
+async function reindexTrainingStructure(
+  tx: TrainingTransaction,
+  pathId: string,
+  orderedItems: Array<{
+    id: string;
+    sourceContentId: string;
+    sourcePublishedAt: Date;
+    sourcePublicationSnapshot: HelpTrainingSourceContent;
+  }>,
+): Promise<void> {
+  const currentItems = await tx
+    .select({ id: helpTrainingPathItems.id })
+    .from(helpTrainingPathItems)
+    .where(eq(helpTrainingPathItems.pathId, pathId))
+    .orderBy(asc(helpTrainingPathItems.sortOrder));
+
+  for (const [index, item] of currentItems.entries()) {
+    await tx
+      .update(helpTrainingPathItems)
+      .set({ sortOrder: -100_000 - index, updatedAt: new Date() })
+      .where(eq(helpTrainingPathItems.id, item.id));
+  }
+  for (const [index, item] of orderedItems.entries()) {
+    await tx
+      .update(helpTrainingPathItems)
+      .set({ sortOrder: (index + 1) * 10, updatedAt: new Date() })
+      .where(eq(helpTrainingPathItems.id, item.id));
+  }
+
+  const currentSteps = await tx
+    .select({
+      id: helpTrainingSteps.id,
+      pathItemId: helpTrainingSteps.pathItemId,
+      sortOrder: helpTrainingSteps.sortOrder,
+    })
+    .from(helpTrainingSteps)
+    .where(eq(helpTrainingSteps.pathId, pathId))
+    .orderBy(asc(helpTrainingSteps.sortOrder));
+
+  for (const [index, step] of currentSteps.entries()) {
+    await tx
+      .update(helpTrainingSteps)
+      .set({ sortOrder: -200_000 - index })
+      .where(eq(helpTrainingSteps.id, step.id));
+  }
+
+  const itemPosition = new Map(orderedItems.map((item, index) => [item.id, index]));
+  const orderedSteps = [...currentSteps].sort((left, right) => {
+    const moduleDifference =
+      (itemPosition.get(left.pathItemId) ?? Number.MAX_SAFE_INTEGER)
+      - (itemPosition.get(right.pathItemId) ?? Number.MAX_SAFE_INTEGER);
+    return moduleDifference || left.sortOrder - right.sortOrder;
+  });
+  for (const [index, step] of orderedSteps.entries()) {
+    await tx
+      .update(helpTrainingSteps)
+      .set({ sortOrder: (index + 1) * 10 })
+      .where(eq(helpTrainingSteps.id, step.id));
+  }
+}
+
+async function syncTrainingPrimarySource(
+  tx: TrainingTransaction,
+  actorUserId: string,
+  pathId: string,
+  firstItem: {
+    sourceContentId: string;
+    sourcePublishedAt: Date;
+    sourcePublicationSnapshot: HelpTrainingSourceContent;
+  },
+): Promise<void> {
+  await tx
+    .update(helpTrainingPaths)
+    .set({
+      sourceContentId: firstItem.sourceContentId,
+      sourcePublishedAt: firstItem.sourcePublishedAt,
+      sourcePublicationSnapshot: firstItem.sourcePublicationSnapshot,
+      status: "draft",
+      updatedBy: actorUserId,
+      updatedAt: new Date(),
+    })
+    .where(eq(helpTrainingPaths.id, pathId));
 }
 
 async function resolveTrainingSlug(title: string): Promise<string> {
@@ -453,6 +553,244 @@ async function resolveTrainingSlug(title: string): Promise<string> {
   }
 
   throw new Error("TRAINING_SLUG_UNAVAILABLE");
+}
+
+export async function addHelpTrainingModuleFromPublishedContent(
+  actorUserId: string,
+  pathId: string,
+  contentId: string,
+): Promise<string> {
+  const db = getDatabase();
+  const [path] = await db
+    .select({ id: helpTrainingPaths.id, status: helpTrainingPaths.status })
+    .from(helpTrainingPaths)
+    .where(eq(helpTrainingPaths.id, pathId))
+    .limit(1);
+  if (!path) throw new Error("TRAINING_PATH_NOT_FOUND");
+  if (path.status === "archived") throw new Error("TRAINING_PATH_ARCHIVED");
+
+  const existingItems = await db
+    .select({
+      id: helpTrainingPathItems.id,
+      sourceContentId: helpTrainingPathItems.sourceContentId,
+    })
+    .from(helpTrainingPathItems)
+    .where(eq(helpTrainingPathItems.pathId, pathId));
+  if (existingItems.length >= 20) throw new Error("TRAINING_SOURCE_CONTENT_LIMIT");
+  if (existingItems.some((item) => item.sourceContentId === contentId)) {
+    throw new Error("TRAINING_PATH_ITEM_DUPLICATE");
+  }
+
+  const content = await getPublishedStructuredHelpById(contentId);
+  if (!content) throw new Error("TRAINING_SOURCE_CONTENT_NOT_PUBLISHED");
+  const plan = await generatePlan(actorUserId, content);
+  const snapshot = sourceSnapshot(content);
+
+  const createdItemId = await db.transaction(async (tx) => {
+    const [currentPath] = await tx
+      .select({ status: helpTrainingPaths.status })
+      .from(helpTrainingPaths)
+      .where(eq(helpTrainingPaths.id, pathId))
+      .limit(1);
+    if (!currentPath) throw new Error("TRAINING_PATH_NOT_FOUND");
+    if (currentPath.status === "archived") throw new Error("TRAINING_PATH_ARCHIVED");
+
+    const items = await tx
+      .select({
+        id: helpTrainingPathItems.id,
+        sourceContentId: helpTrainingPathItems.sourceContentId,
+        sourcePublishedAt: helpTrainingPathItems.sourcePublishedAt,
+        sourcePublicationSnapshot: helpTrainingPathItems.sourcePublicationSnapshot,
+        sortOrder: helpTrainingPathItems.sortOrder,
+      })
+      .from(helpTrainingPathItems)
+      .where(eq(helpTrainingPathItems.pathId, pathId))
+      .orderBy(asc(helpTrainingPathItems.sortOrder));
+    if (items.length >= 20) throw new Error("TRAINING_SOURCE_CONTENT_LIMIT");
+    if (items.some((item) => item.sourceContentId === contentId)) {
+      throw new Error("TRAINING_PATH_ITEM_DUPLICATE");
+    }
+
+    const steps = await tx
+      .select({ sortOrder: helpTrainingSteps.sortOrder })
+      .from(helpTrainingSteps)
+      .where(eq(helpTrainingSteps.pathId, pathId))
+      .orderBy(asc(helpTrainingSteps.sortOrder));
+    const itemSortOrder = (items.at(-1)?.sortOrder ?? 0) + 10;
+    const stepSortOffset = steps.at(-1)?.sortOrder ?? 0;
+
+    const [createdItem] = await tx
+      .insert(helpTrainingPathItems)
+      .values({
+        pathId,
+        sourceContentId: content.contentId,
+        sourcePublishedAt: content.publishedAt,
+        sourcePublicationSnapshot: snapshot,
+        sortOrder: itemSortOrder,
+      })
+      .returning({ id: helpTrainingPathItems.id });
+    if (!createdItem) throw new Error("TRAINING_PATH_ITEM_NOT_CREATED");
+
+    await insertGeneratedSteps(
+      tx,
+      pathId,
+      createdItem.id,
+      content,
+      plan,
+      stepSortOffset,
+    );
+    await replaceCategoriesFromSnapshots(
+      tx,
+      pathId,
+      [...items.map((item) => item.sourcePublicationSnapshot), snapshot],
+    );
+    await tx
+      .update(helpTrainingPaths)
+      .set({ status: "draft", updatedBy: actorUserId, updatedAt: new Date() })
+      .where(eq(helpTrainingPaths.id, pathId));
+
+    return createdItem.id;
+  });
+
+  await recordAuditEvent({
+    actorUserId,
+    action: "help.training.module.added",
+    entityType: "help_training_path",
+    entityId: pathId,
+    metadata: {
+      pathItemId: createdItemId,
+      sourceContentId: content.contentId,
+      sourceTitle: content.title,
+      stepCount: plan.steps.length,
+    },
+  });
+
+  return createdItemId;
+}
+
+export async function removeHelpTrainingModule(
+  actorUserId: string,
+  pathId: string,
+  pathItemId: string,
+): Promise<void> {
+  const db = getDatabase();
+  let removedContentId = "";
+  let removedTitle = "";
+
+  await db.transaction(async (tx) => {
+    const [path] = await tx
+      .select({ status: helpTrainingPaths.status })
+      .from(helpTrainingPaths)
+      .where(eq(helpTrainingPaths.id, pathId))
+      .limit(1);
+    if (!path) throw new Error("TRAINING_PATH_NOT_FOUND");
+    if (path.status === "archived") throw new Error("TRAINING_PATH_ARCHIVED");
+
+    const items = await tx
+      .select({
+        id: helpTrainingPathItems.id,
+        sourceContentId: helpTrainingPathItems.sourceContentId,
+        sourcePublishedAt: helpTrainingPathItems.sourcePublishedAt,
+        sourcePublicationSnapshot: helpTrainingPathItems.sourcePublicationSnapshot,
+      })
+      .from(helpTrainingPathItems)
+      .where(eq(helpTrainingPathItems.pathId, pathId))
+      .orderBy(asc(helpTrainingPathItems.sortOrder));
+    if (items.length <= 1) throw new Error("LAST_TRAINING_MODULE_REQUIRED");
+
+    const target = items.find((item) => item.id === pathItemId);
+    if (!target) throw new Error("TRAINING_PATH_ITEM_NOT_FOUND");
+    removedContentId = target.sourceContentId;
+    removedTitle = target.sourcePublicationSnapshot.title;
+
+    const remainingItems = items.filter((item) => item.id !== pathItemId);
+    const firstItem = remainingItems[0];
+    if (!firstItem) throw new Error("LAST_TRAINING_MODULE_REQUIRED");
+
+    await tx
+      .delete(helpTrainingPathItems)
+      .where(and(
+        eq(helpTrainingPathItems.id, pathItemId),
+        eq(helpTrainingPathItems.pathId, pathId),
+      ));
+    await reindexTrainingStructure(tx, pathId, remainingItems);
+    await replaceCategoriesFromSnapshots(
+      tx,
+      pathId,
+      remainingItems.map((item) => item.sourcePublicationSnapshot),
+    );
+    await syncTrainingPrimarySource(tx, actorUserId, pathId, firstItem);
+  });
+
+  await recordAuditEvent({
+    actorUserId,
+    action: "help.training.module.removed",
+    entityType: "help_training_path",
+    entityId: pathId,
+    metadata: { pathItemId, sourceContentId: removedContentId, sourceTitle: removedTitle },
+  });
+}
+
+export async function moveHelpTrainingModule(
+  actorUserId: string,
+  pathId: string,
+  pathItemId: string,
+  direction: "up" | "down",
+): Promise<void> {
+  const db = getDatabase();
+  let moved = false;
+
+  await db.transaction(async (tx) => {
+    const [path] = await tx
+      .select({ status: helpTrainingPaths.status })
+      .from(helpTrainingPaths)
+      .where(eq(helpTrainingPaths.id, pathId))
+      .limit(1);
+    if (!path) throw new Error("TRAINING_PATH_NOT_FOUND");
+    if (path.status === "archived") throw new Error("TRAINING_PATH_ARCHIVED");
+
+    const items = await tx
+      .select({
+        id: helpTrainingPathItems.id,
+        sourceContentId: helpTrainingPathItems.sourceContentId,
+        sourcePublishedAt: helpTrainingPathItems.sourcePublishedAt,
+        sourcePublicationSnapshot: helpTrainingPathItems.sourcePublicationSnapshot,
+      })
+      .from(helpTrainingPathItems)
+      .where(eq(helpTrainingPathItems.pathId, pathId))
+      .orderBy(asc(helpTrainingPathItems.sortOrder));
+    const index = items.findIndex((item) => item.id === pathItemId);
+    if (index < 0) throw new Error("TRAINING_PATH_ITEM_NOT_FOUND");
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= items.length) return;
+
+    const orderedItems = [...items];
+    const current = orderedItems[index];
+    const target = orderedItems[targetIndex];
+    if (!current || !target) return;
+    orderedItems[index] = target;
+    orderedItems[targetIndex] = current;
+    const firstItem = orderedItems[0];
+    if (!firstItem) throw new Error("TRAINING_PATH_ITEM_REQUIRED");
+
+    await reindexTrainingStructure(tx, pathId, orderedItems);
+    await replaceCategoriesFromSnapshots(
+      tx,
+      pathId,
+      orderedItems.map((item) => item.sourcePublicationSnapshot),
+    );
+    await syncTrainingPrimarySource(tx, actorUserId, pathId, firstItem);
+    moved = true;
+  });
+
+  if (!moved) return;
+  await recordAuditEvent({
+    actorUserId,
+    action: "help.training.module.moved",
+    entityType: "help_training_path",
+    entityId: pathId,
+    metadata: { pathItemId, direction },
+  });
 }
 
 export async function generateHelpTrainingFromPublishedContents(

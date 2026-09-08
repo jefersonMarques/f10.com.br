@@ -330,11 +330,18 @@ export async function deleteHelpTrainingStep(
 ): Promise<void> {
   const db = getDatabase();
   const steps = await db
-    .select({ id: helpTrainingSteps.id })
+    .select({
+      id: helpTrainingSteps.id,
+      pathItemId: helpTrainingSteps.pathItemId,
+    })
     .from(helpTrainingSteps)
     .where(eq(helpTrainingSteps.pathId, pathId));
   if (steps.length <= 1) throw new Error("LAST_TRAINING_STEP_REQUIRED");
-  if (!steps.some((step) => step.id === stepId)) throw new Error("TRAINING_STEP_NOT_FOUND");
+  const target = steps.find((step) => step.id === stepId);
+  if (!target) throw new Error("TRAINING_STEP_NOT_FOUND");
+  if (steps.filter((step) => step.pathItemId === target.pathItemId).length <= 1) {
+    throw new Error("LAST_TRAINING_MODULE_STEP_REQUIRED");
+  }
   await db.delete(helpTrainingSteps).where(eq(helpTrainingSteps.id, stepId));
   await touchTrainingDraft(pathId, actorUserId);
 }
