@@ -1,6 +1,8 @@
 import { json, type Cookies } from "@sveltejs/kit";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
+import { createPublicServiceRequest } from "$lib/server/serviceRequests/publicServiceRequestService";
 import { createCustomerServiceRequest } from "$lib/server/serviceRequests/serviceRequestService";
+import { consumeSupportPublicRateLimit } from "$lib/server/support/supportPublicRateLimit";
 import type { ServiceRequestType } from "$lib/server/serviceRequests/serviceRequestDefinitions";
 import type { ServiceRequestAttachmentInput } from "$lib/server/serviceRequests/serviceRequestStorage";
 
@@ -15,6 +17,8 @@ function response(error: string, status: number) {
 
 function messageForError(code: string): string {
   if (code === "AUTH_REQUIRED") return "Sua sessão expirou. Entre novamente na Área do Cliente.";
+  if (code === "RATE_LIMITED") return "Muitas solicitações foram enviadas deste acesso. Aguarde antes de tentar novamente.";
+  if (code === "SERVICE_REQUEST_RATE_LIMIT_UNAVAILABLE") return "O formulário público está temporariamente indisponível.";
   if (code === "UNIT_REQUIRED" || code === "SERVICE_REQUEST_CONTEXT_REQUIRED") {
     return "Selecione o grupo e a unidade desta implementação antes de enviar.";
   }
@@ -38,6 +42,8 @@ function messageForError(code: string): string {
 
 function statusForError(code: string): number {
   if (code === "AUTH_REQUIRED") return 401;
+  if (code === "RATE_LIMITED") return 429;
+  if (code === "SERVICE_REQUEST_RATE_LIMIT_UNAVAILABLE") return 503;
   if (code === "UNIT_REQUIRED") return 409;
   if (code === "SERVICE_REQUEST_CONTEXT_REQUIRED") return 400;
   if (code === "SERVICE_REQUEST_CONTEXT_NOT_AUTHORIZED") return 403;
@@ -96,6 +102,7 @@ export async function handleLegacyServiceRequestSubmission(input: {
   cookies: Cookies;
   url: URL;
   requestType: ServiceRequestType;
+  clientAddress?: string;
 }): Promise<Response> {
   const origin = input.request.headers.get("origin");
   if (origin && origin !== input.url.origin) return response("INVALID_ORIGIN", 403);
@@ -108,9 +115,6 @@ export async function handleLegacyServiceRequestSubmission(input: {
     return response("UNSUPPORTED_MEDIA_TYPE", 415);
   }
 
-  const session = await getOptionalCustomerF10PortalSession(input.cookies);
-  if (!session) return response("AUTH_REQUIRED", 401);
-
   const idempotencyKey = input.request.headers.get("idempotency-key")?.trim() ?? "";
   if (!idempotencyKey) return response("IDEMPOTENCY_KEY_REQUIRED", 400);
 
@@ -121,29 +125,58 @@ export async function handleLegacyServiceRequestSubmission(input: {
     return response("SERVICE_REQUEST_PAYLOAD_INVALID", 400);
   }
 
+  const session = await getOptionalCustomerF10PortalSession(input.cookies);
   const groupId = readPositiveInteger(formData, "serviceRequestGroupId");
   const unitId = readPositiveInteger(formData, "serviceRequestUnitId");
-  if (groupId === null || unitId === null) {
-    return response("SERVICE_REQUEST_CONTEXT_REQUIRED", 400);
-  }
-
+  const authenticatedPortalSubmission = Boolean(session && groupId !== null && unitId !== null);
   const attachments = collectAttachments(formData);
+
+  if (!authenticatedPortalSubmission) {
+    try {
+      const allowed = await consumeSupportPublicRateLimit(
+        `service-request:${input.requestType}`,
+        input.clientAddress?.trim() || "unknown",
+        {
+          maxRequests: 8,
+          windowMs: 60 * 60 * 1000,
+          blockMs: 2 * 60 * 60 * 1000,
+        },
+      );
+      if (!allowed) return response("RATE_LIMITED", 429);
+    } catch (cause) {
+      console.error("[legacy.service-request.rate-limit]", {
+        requestType: input.requestType,
+        causeType: cause instanceof Error ? cause.name : typeof cause,
+      });
+      return response("SERVICE_REQUEST_RATE_LIMIT_UNAVAILABLE", 503);
+    }
+  }
 
   try {
     const fields = parsePayload(formData, input.requestType);
-    const result = await createCustomerServiceRequest(session, {
-      requestType: input.requestType,
-      groupId,
-      unitId,
-      idempotencyKey,
-      fields,
-      attachments,
-    });
+    const result = authenticatedPortalSubmission && session && groupId !== null && unitId !== null
+      ? await createCustomerServiceRequest(session, {
+          requestType: input.requestType,
+          groupId,
+          unitId,
+          idempotencyKey,
+          fields,
+          attachments,
+        })
+      : await createPublicServiceRequest({
+          requestType: input.requestType,
+          idempotencyKey,
+          fields,
+          attachments,
+        });
+
     return json(
       {
         success: true,
         ...result,
-        ticketHref: `/cliente/chamados/${result.ticketId}`,
+        ...(authenticatedPortalSubmission
+          ? { ticketHref: `/cliente/chamados/${result.ticketId}` }
+          : {}),
       },
       {
         status: result.deduplicated ? 200 : 201,
@@ -154,6 +187,7 @@ export async function handleLegacyServiceRequestSubmission(input: {
     const code = cause instanceof Error ? cause.message : "SERVICE_REQUEST_CREATE_FAILED";
     console.error("[legacy.service-request.submit]", {
       requestType: input.requestType,
+      authenticatedPortalSubmission,
       groupId,
       unitId,
       errorCode: code,
