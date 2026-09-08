@@ -142,9 +142,7 @@
   </main>
   <FloatingWhatsappButton variant="support" />
 {:else if isHelpPage}
-  <main class="h-[100dvh] overflow-hidden">
-    <slot />
-  </main>
+  <slot />
 {:else}
   <Header />
   <main>
