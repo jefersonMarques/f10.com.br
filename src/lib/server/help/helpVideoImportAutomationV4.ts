@@ -364,6 +364,71 @@ async function downloadYoutubeVideo(url: string, directory: string): Promise<str
   return join(directory, downloaded);
 }
 
+export async function downloadHelpYoutubeMp4ForStorage(
+  url: string,
+): Promise<{ bytes: Uint8Array; fileName: string }> {
+  const videoId = youtubeVideoId(url);
+  if (!videoId) throw new Error("HELP_VIDEO_YOUTUBE_URL_INVALID");
+
+  const directory = await mkdtemp(join(tmpdir(), "f10-training-youtube-"));
+  try {
+    const cookiesPath = await ytDlpCookiesPath();
+    let lastCause: Error | null = null;
+
+    for (const height of [720, 480]) {
+      const prefix = `training-${height}`;
+      const args = [
+        "--no-playlist",
+        "--no-progress",
+        "--restrict-filenames",
+        "--match-filter",
+        "duration <= 1800",
+        "--max-filesize",
+        `${Math.floor(MAX_UPLOAD_VIDEO_BYTES / 1024 / 1024)}M`,
+        "--merge-output-format",
+        "mp4",
+        "--remux-video",
+        "mp4",
+        "-f",
+        `b[ext=mp4][height<=${height}]/bv*[ext=mp4][height<=${height}]+ba[ext=m4a]/b[height<=${height}]/bv*[height<=${height}]+ba`,
+        "-o",
+        join(directory, `${prefix}.%(ext)s`),
+      ];
+      if (cookiesPath) args.unshift("--cookies", cookiesPath);
+      args.push(url);
+
+      try {
+        await runCommand(ytDlpPath(), args);
+      } catch (cause) {
+        const classified = classifyYoutubeDownloadError(cause);
+        if (classified.message === "HELP_VIDEO_YOUTUBE_COOKIES_INVALID") throw classified;
+        lastCause = classified;
+        continue;
+      }
+
+      const files = await readdir(directory);
+      const downloaded = files.find((file) => file === `${prefix}.mp4`);
+      if (!downloaded) {
+        lastCause = new Error("HELP_VIDEO_YOUTUBE_DOWNLOAD_NOT_FOUND");
+        continue;
+      }
+
+      const bytes = new Uint8Array(await readFile(join(directory, downloaded)));
+      const isMp4 = bytes.byteLength >= 12
+        && new TextDecoder().decode(bytes.slice(4, 8)) === "ftyp";
+      if (isMp4 && bytes.byteLength <= MAX_UPLOAD_VIDEO_BYTES) {
+        return { bytes, fileName: `youtube-${videoId}.mp4` };
+      }
+
+      lastCause = new Error("HELP_VIDEO_LOCAL_COPY_TOO_LARGE");
+    }
+
+    throw lastCause ?? new Error("HELP_VIDEO_YOUTUBE_DOWNLOAD_NOT_FOUND");
+  } finally {
+    await rm(directory, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
 async function extractAudio(videoPath: string, directory: string): Promise<string> {
   const audioPath = join(directory, "audio.mp3");
   await runCommand(ffmpegPath(), [

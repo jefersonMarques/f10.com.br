@@ -29,6 +29,11 @@ function generationMessage(cause: unknown): string {
   if (code === "TRAINING_GENERATION_EMPTY") return "A IA não conseguiu associar a linha do tempo do vídeo às etapas publicadas.";
   if (code === "TRAINING_SOURCE_CONTENT_VIDEO_REQUIRED") return "O conteúdo publicado precisa ter um vídeo para criar a trilha.";
   if (code === "TRAINING_SOURCE_CONTENT_STEPS_REQUIRED") return "O conteúdo publicado precisa ter pelo menos uma etapa.";
+  if (code === "HELP_VIDEO_YOUTUBE_COOKIES_NOT_FOUND") return "O arquivo de cookies do YouTube configurado no servidor não foi encontrado.";
+  if (code === "HELP_VIDEO_YOUTUBE_COOKIES_INVALID") return "Os cookies do YouTube expiraram. Renove o arquivo do servidor e tente novamente.";
+  if (code === "HELP_VIDEO_LOCAL_COPY_TOO_LARGE") return "O vídeo do YouTube não coube no limite da cópia local da trilha.";
+  if (code === "HELP_VIDEO_YOUTUBE_DOWNLOAD_NOT_FOUND") return "O YouTube não disponibilizou uma versão MP4 adequada para a trilha.";
+  if (code === "HELP_VIDEO_COMMAND_TIMEOUT") return "O download do vídeo demorou além do limite permitido.";
   if (cause instanceof AiGatewayError) {
     if (cause.code === "AI_TASK_DISABLED") return "Habilite a função “Geração de trilhas” em Configurações > Inteligência Artificial.";
     if (cause.code === "AI_PROVIDER_NOT_CONFIGURED" || cause.code === "AI_CREDENTIAL_UNAVAILABLE") {

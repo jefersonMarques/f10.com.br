@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { AiGatewayError, createAiStructuredResponse, type AiStructuredResponse } from "$lib/server/ai/aiGateway";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
@@ -17,6 +17,7 @@ import {
   type PublishedStructuredHelp,
 } from "$lib/server/help/publicStructuredHelpRepository";
 import { normalizeTrainingSlug } from "$lib/server/help/helpTrainingRepository";
+import { ensureTrainingLocalVideoAsset } from "$lib/server/help/helpTrainingVideoMirror";
 
 type TranscriptTimelineSegment = {
   start: number;
@@ -347,6 +348,36 @@ async function generatePlans(
   return plans;
 }
 
+async function resolveTrainingLocalVideoAssetIds(
+  actorUserId: string,
+  contents: PublishedStructuredHelp[],
+): Promise<Array<string | null>> {
+  if (contents.length === 0) return [];
+
+  const assetIds: Array<string | null> = new Array(contents.length).fill(null);
+  let nextIndex = 0;
+  const workers = Array.from(
+    { length: Math.min(TRAINING_GENERATION_CONCURRENCY, contents.length) },
+    async () => {
+      while (true) {
+        const index = nextIndex;
+        nextIndex += 1;
+        if (index >= contents.length) return;
+
+        const content = contents[index];
+        if (!content) throw new Error("TRAINING_SOURCE_CONTENT_NOT_PUBLISHED");
+        assetIds[index] = await ensureTrainingLocalVideoAsset(actorUserId, {
+          contentId: content.contentId,
+          video: content.featuredVideo,
+        });
+      }
+    },
+  );
+
+  await Promise.all(workers);
+  return assetIds;
+}
+
 async function insertGeneratedSteps(
   tx: Parameters<Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]>[0],
   pathId: string,
@@ -354,6 +385,7 @@ async function insertGeneratedSteps(
   content: PublishedStructuredHelp,
   plan: GeneratedTrainingPlan,
   sortOffset: number,
+  localVideoAssetId: string | null = null,
 ): Promise<number> {
   for (const [index, step] of plan.steps.entries()) {
     const [created] = await tx
@@ -390,13 +422,14 @@ async function insertGeneratedSteps(
     }
 
     const video = content.featuredVideo;
-    if (video?.storageKey) {
+    const videoAssetId = localVideoAssetId ?? (video?.storageKey ? video.id : null);
+    if (videoAssetId) {
       await tx.insert(helpTrainingStepMedia).values({
         stepId: created.id,
         mediaType: "video",
-        assetId: video.id,
-        sourceUrl: `asset:${video.id}`,
-        altText: video.altText,
+        assetId: videoAssetId,
+        sourceUrl: `asset:${videoAssetId}`,
+        altText: video?.altText ?? "",
         sortOrder: 20,
       });
     } else if (video?.sourceUrl) {
@@ -584,6 +617,10 @@ export async function addHelpTrainingModuleFromPublishedContent(
   const content = await getPublishedStructuredHelpById(contentId);
   if (!content) throw new Error("TRAINING_SOURCE_CONTENT_NOT_PUBLISHED");
   const plan = await generatePlan(actorUserId, content);
+  const localVideoAssetId = await ensureTrainingLocalVideoAsset(actorUserId, {
+    contentId: content.contentId,
+    video: content.featuredVideo,
+  });
   const snapshot = sourceSnapshot(content);
 
   const createdItemId = await db.transaction(async (tx) => {
@@ -638,6 +675,7 @@ export async function addHelpTrainingModuleFromPublishedContent(
       content,
       plan,
       stepSortOffset,
+      localVideoAssetId,
     );
     await replaceCategoriesFromSnapshots(
       tx,
@@ -810,6 +848,7 @@ export async function generateHelpTrainingFromPublishedContents(
   }
 
   const plans = await generatePlans(actorUserId, contents);
+  const localVideoAssetIds = await resolveTrainingLocalVideoAssetIds(actorUserId, contents);
 
   const multiContent = contents.length > 1;
   const title = multiContent
@@ -870,6 +909,7 @@ export async function generateHelpTrainingFromPublishedContents(
         content,
         plan,
         globalStepOffset,
+        localVideoAssetIds[index] ?? null,
       );
       globalStepOffset += insertedCount * 10;
     }
@@ -898,6 +938,106 @@ export async function generateHelpTrainingFromPublishedContent(
   contentId: string,
 ) {
   return generateHelpTrainingFromPublishedContents(actorUserId, [contentId]);
+}
+
+export async function localizeHelpTrainingPathVideos(
+  actorUserId: string,
+  pathId: string,
+): Promise<number> {
+  const db = getDatabase();
+  const [path] = await db
+    .select({ id: helpTrainingPaths.id, status: helpTrainingPaths.status })
+    .from(helpTrainingPaths)
+    .where(eq(helpTrainingPaths.id, pathId))
+    .limit(1);
+  if (!path) throw new Error("TRAINING_PATH_NOT_FOUND");
+  if (path.status === "archived") throw new Error("TRAINING_PATH_ARCHIVED");
+
+  const items = await db
+    .select({
+      id: helpTrainingPathItems.id,
+      sourceContentId: helpTrainingPathItems.sourceContentId,
+      sourcePublicationSnapshot: helpTrainingPathItems.sourcePublicationSnapshot,
+    })
+    .from(helpTrainingPathItems)
+    .where(eq(helpTrainingPathItems.pathId, pathId))
+    .orderBy(asc(helpTrainingPathItems.sortOrder));
+  if (items.length === 0) throw new Error("TRAINING_PATH_ITEM_REQUIRED");
+
+  const localAssetIds: Array<string | null> = new Array(items.length).fill(null);
+  let nextItemIndex = 0;
+  const workers = Array.from(
+    { length: Math.min(TRAINING_GENERATION_CONCURRENCY, items.length) },
+    async () => {
+      while (true) {
+        const index = nextItemIndex;
+        nextItemIndex += 1;
+        if (index >= items.length) return;
+
+        const item = items[index];
+        if (!item) return;
+        localAssetIds[index] = await ensureTrainingLocalVideoAsset(actorUserId, {
+          contentId: item.sourceContentId,
+          video: item.sourcePublicationSnapshot.featuredVideo,
+        });
+      }
+    },
+  );
+  await Promise.all(workers);
+
+  let updatedSteps = 0;
+  await db.transaction(async (tx) => {
+    for (const [index, item] of items.entries()) {
+      const localAssetId = localAssetIds[index] ?? null;
+      if (!localAssetId) continue;
+
+      const stepRows = await tx
+        .select({ id: helpTrainingSteps.id })
+        .from(helpTrainingSteps)
+        .where(
+          and(
+            eq(helpTrainingSteps.pathId, pathId),
+            eq(helpTrainingSteps.pathItemId, item.id),
+          ),
+        );
+      const stepIds = stepRows.map((step) => step.id);
+      if (stepIds.length === 0) continue;
+
+      const updatedMedia = await tx
+        .update(helpTrainingStepMedia)
+        .set({
+          assetId: localAssetId,
+          sourceUrl: `asset:${localAssetId}`,
+        })
+        .where(
+          and(
+            inArray(helpTrainingStepMedia.stepId, stepIds),
+            eq(helpTrainingStepMedia.mediaType, "video"),
+          ),
+        )
+        .returning({ id: helpTrainingStepMedia.id });
+      updatedSteps += updatedMedia.length;
+    }
+
+    if (updatedSteps > 0) {
+      await tx
+        .update(helpTrainingPaths)
+        .set({ status: "draft", updatedBy: actorUserId, updatedAt: new Date() })
+        .where(eq(helpTrainingPaths.id, pathId));
+    }
+  });
+
+  if (updatedSteps > 0) {
+    await recordAuditEvent({
+      actorUserId,
+      action: "help.training.video.localized",
+      entityType: "help_training_path",
+      entityId: pathId,
+      metadata: { moduleCount: items.length, stepCount: updatedSteps },
+    });
+  }
+
+  return updatedSteps;
 }
 
 export async function regenerateHelpTrainingFromPublishedContent(
@@ -931,6 +1071,7 @@ export async function regenerateHelpTrainingFromPublishedContent(
     contents.push(content);
   }
   const plans = await generatePlans(actorUserId, contents);
+  const localVideoAssetIds = await resolveTrainingLocalVideoAssetIds(actorUserId, contents);
 
   const primaryContent = contents[0];
   const primaryPlan = plans[0];
@@ -962,6 +1103,7 @@ export async function regenerateHelpTrainingFromPublishedContent(
         content,
         plan,
         globalStepOffset,
+        localVideoAssetIds[index] ?? null,
       );
       globalStepOffset += insertedCount * 10;
     }
