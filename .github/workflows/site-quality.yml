@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - development
-      - agent/training-local-youtube-video
   pull_request:
     branches:
       - main
@@ -18,22 +17,6 @@ jobs:
     name: Check and build
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      DEBUG: "false"
-      EXACT_TOKEN: "ci-placeholder"
-      EXACT_FUNNEL_ID: "ci"
-      F10_FONTE: "ci"
-      F10_UID: "ci"
-      F10_MIDIA: "ci"
-      F10_TOKEN: "ci-placeholder"
-      F10_URL: "https://example.com"
-      BREVO_API_KEY: "ci-placeholder"
-      BREVO_SALES_MAIL_TO: "ci@example.com"
-      BREVO_FROM_EMAIL: "ci@example.com"
-      BREVO_FROM_NAME: "CI"
-      JOBS_MAIL_TO: "ci@example.com"
-      JOBS_RESUME_MAX_MB: "10"
-      SITE_URL: "https://example.com"
 
     steps:
       - name: Checkout repository
