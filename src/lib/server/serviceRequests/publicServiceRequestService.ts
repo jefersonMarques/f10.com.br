@@ -165,17 +165,32 @@ export async function createPublicServiceRequest(
         body: `Solicitação pública de ${label} recebida. O solicitante externo não foi cadastrado automaticamente como cliente F10; os dados enviados estão disponíveis na solicitação estruturada.`,
       });
 
-      await tx.insert(ticketWorkflowStates).values({
-        ticketId,
-        globalWorkflowId: intake.globalWorkflowId,
-        globalStageId: intake.globalStageId,
-        areaId: intake.areaId,
-        areaWorkflowId: intake.areaWorkflowId,
-        areaStageId: intake.areaStageId,
-        enteredAt: now,
-        areaEnteredAt: now,
-        updatedAt: now,
-      });
+      await tx
+        .insert(ticketWorkflowStates)
+        .values({
+          ticketId,
+          globalWorkflowId: intake.globalWorkflowId,
+          globalStageId: intake.globalStageId,
+          areaId: intake.areaId,
+          areaWorkflowId: intake.areaWorkflowId,
+          areaStageId: intake.areaStageId,
+          enteredAt: now,
+          areaEnteredAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: ticketWorkflowStates.ticketId,
+          set: {
+            globalWorkflowId: intake.globalWorkflowId,
+            globalStageId: intake.globalStageId,
+            areaId: intake.areaId,
+            areaWorkflowId: intake.areaWorkflowId,
+            areaStageId: intake.areaStageId,
+            enteredAt: now,
+            areaEnteredAt: now,
+            updatedAt: now,
+          },
+        });
 
       await tx.insert(serviceRequests).values({
         id: serviceRequestId,
