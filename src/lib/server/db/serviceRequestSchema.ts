@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { users } from "$lib/server/db/schema";
 import { customerContacts, supportQueues, tickets } from "$lib/server/db/supportSchema";
 import { ticketAreas } from "$lib/server/db/ticketWorkflowSchema";
@@ -44,14 +45,13 @@ export const serviceRequests = pgTable(
       .references(() => tickets.id, { onDelete: "cascade" }),
     requestType: serviceRequestType("request_type").notNull(),
     customerContactId: uuid("customer_contact_id")
-      .notNull()
       .references(() => customerContacts.id, { onDelete: "restrict" }),
-    legacyUserId: text("legacy_user_id").notNull(),
-    groupId: integer("group_id").notNull(),
-    groupName: text("group_name").notNull(),
-    unitId: integer("unit_id").notNull(),
-    unitName: text("unit_name").notNull(),
-    unitSchema: text("unit_schema").notNull(),
+    legacyUserId: text("legacy_user_id"),
+    groupId: integer("group_id"),
+    groupName: text("group_name"),
+    unitId: integer("unit_id"),
+    unitName: text("unit_name"),
+    unitSchema: text("unit_schema"),
     idempotencyKey: text("idempotency_key").notNull(),
     version: integer("version").notNull().default(1),
     data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
@@ -69,6 +69,9 @@ export const serviceRequests = pgTable(
       table.requestType,
       table.idempotencyKey,
     ),
+    uniqueIndex("service_requests_public_type_idempotency_unique")
+      .on(table.requestType, table.idempotencyKey)
+      .where(sql`${table.customerContactId} is null`),
     index("service_requests_unit_type_idx").on(
       table.groupId,
       table.unitId,
