@@ -16,11 +16,13 @@ import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { markTicketChatHumanTakeover } from "$lib/server/support/supportAiHandoff";
 import { createTaskFromTicket, listTicketTasks } from "$lib/server/support/ticketTaskBridge";
 import { getTicketCustomerContext } from "$lib/server/support/ticketCustomerContextRepository";
+import { parseTicketCustomerLinkForm } from "$lib/server/support/ticketCustomerForm";
 import { isTicketDueDate } from "$lib/server/support/ticketDueDate";
 import {
   addTicketMessage,
   assignTicket,
   getSupportTicket,
+  linkTicketCustomer,
   listSupportAgents,
   updateTicketDueOn,
   updateTicketPriority,
@@ -120,6 +122,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     const canAssign = hasPermission(permissions, "tickets.assign");
     const canViewTasks = hasPermission(permissions, "tasks.view");
     const canCreateTask = canReply && hasPermission(permissions, "tasks.create");
+    const canLinkCustomer = canReply && hasPermission(permissions, "customers.view");
     const [details, users, linkedTasks, taskProjects, serviceRequest] = await Promise.all([
       getSupportTicket(layout.user.id, permissions, params.ticketId),
       canReply || canAssign ? listSupportAgents() : Promise.resolve([]),
@@ -149,6 +152,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       taskProjects,
       canReply,
       canAssign,
+      canLinkCustomer,
       canViewTasks,
       canCreateTask,
     };
@@ -385,6 +389,60 @@ export const actions: Actions = {
         success: false,
         action: "assign",
         message: "Não foi possível atribuir este ticket.",
+      });
+    }
+  },
+
+  linkCustomer: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, { success: false, action: "linkCustomer", message: "Ticket não encontrado." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      `/app/tickets/${params.ticketId}`,
+    );
+    if (!hasPermission(permissions, "customers.view")) {
+      return fail(403, {
+        success: false,
+        action: "linkCustomer",
+        message: "Você não possui acesso aos clientes F10.",
+      });
+    }
+
+    try {
+      const customer = parseTicketCustomerLinkForm(await request.formData());
+      await linkTicketCustomer(
+        session.user.id,
+        permissions,
+        params.ticketId,
+        customer,
+      );
+      return {
+        success: true,
+        action: "linkCustomer",
+        message: "Cliente e contexto F10 vinculados ao ticket.",
+      };
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : "";
+      if (code === "TICKET_CUSTOMER_ALREADY_LINKED") {
+        return fail(409, {
+          success: false,
+          action: "linkCustomer",
+          message: "Este ticket já possui um cliente vinculado.",
+        });
+      }
+      if (code === "CUSTOMER_F10_CONTEXT_REQUIRED") {
+        return fail(400, {
+          success: false,
+          action: "linkCustomer",
+          message: "Informe grupo, subgrupo, unidade e schema F10 antes de vincular o cliente.",
+        });
+      }
+      return fail(409, {
+        success: false,
+        action: "linkCustomer",
+        message: "Não foi possível vincular o cliente ao ticket.",
       });
     }
   },
