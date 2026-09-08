@@ -4,6 +4,10 @@ import {
   listGoogleCalendarEvents,
   type GoogleCalendarEvent,
 } from "$lib/server/calendar/googleCalendarRepository";
+import {
+  getGoogleCalendarSyncPreferences,
+  listGoogleCalendarSources,
+} from "$lib/server/calendar/googleCalendarPreferenceRepository";
 import { getDatabase } from "$lib/server/db";
 import { taskGoogleCalendarLinks } from "$lib/server/db/googleCalendarSchema";
 import { taskAssignees, tasks } from "$lib/server/db/taskSchema";
@@ -203,6 +207,45 @@ async function listF10Conflicts(
   );
 }
 
+async function listRelevantGoogleCalendarIds(userId: string): Promise<string[]> {
+  const [preferences, sources] = await Promise.all([
+    getGoogleCalendarSyncPreferences(userId),
+    listGoogleCalendarSources(userId),
+  ]);
+  const primaryCalendarId = sources.find((source) => source.isPrimary)?.calendarId ?? "primary";
+  const targetCalendarId = preferences.targetCalendarId === "primary"
+    ? primaryCalendarId
+    : preferences.targetCalendarId;
+  const calendarIds = new Set<string>([primaryCalendarId]);
+
+  if (targetCalendarId) calendarIds.add(targetCalendarId);
+  for (const source of sources) {
+    if (source.visibleInF10) calendarIds.add(source.calendarId);
+  }
+
+  return Array.from(calendarIds);
+}
+
+async function listGoogleConflictsForWindow(
+  userId: string,
+  input: Pick<CalendarAvailabilityInput, "timeZone" | "excludeGoogleEventId" | "excludeGoogleIcalUid">,
+  requestedStart: Date,
+  requestedEnd: Date,
+): Promise<CalendarAvailabilityConflict[]> {
+  const rangeStart = new Date(requestedStart.getTime() - 24 * 60 * 60 * 1000);
+  const rangeEnd = new Date(requestedEnd.getTime() + 24 * 60 * 60 * 1000);
+  const calendarIds = await listRelevantGoogleCalendarIds(userId);
+  const eventGroups = await Promise.all(
+    calendarIds.map((calendarId) =>
+      listGoogleCalendarEvents(userId, rangeStart, rangeEnd, calendarId),
+    ),
+  );
+
+  return eventGroups.flatMap((events) =>
+    googleConflicts(events, input, requestedStart, requestedEnd),
+  );
+}
+
 function googleConflicts(
   events: GoogleCalendarEvent[],
   input: Pick<CalendarAvailabilityInput, "timeZone" | "excludeGoogleEventId" | "excludeGoogleIcalUid">,
@@ -236,15 +279,17 @@ async function checkUser(
 
   if (connection.connected) {
     try {
-      const rangeStart = new Date(requestedStart.getTime() - 24 * 60 * 60 * 1000);
-      const rangeEnd = new Date(requestedEnd.getTime() + 24 * 60 * 60 * 1000);
-      const events = await listGoogleCalendarEvents(user.id, rangeStart, rangeEnd);
       return {
         userId: user.id,
         name: user.name,
         email: user.email,
         coverage: "google",
-        conflicts: googleConflicts(events, input, requestedStart, requestedEnd),
+        conflicts: await listGoogleConflictsForWindow(
+          user.id,
+          input,
+          requestedStart,
+          requestedEnd,
+        ),
       };
     } catch {
       // Se o Google estiver indisponível, ainda usamos compromissos temporizados conhecidos pelo F10.
@@ -286,15 +331,17 @@ export async function listF10CalendarBusyIntervals(
   const connection = await getGoogleCalendarConnection(input.user.id);
   if (connection.connected) {
     try {
-      const rangeStart = new Date(requestedStart.getTime() - 24 * 60 * 60 * 1000);
-      const rangeEnd = new Date(requestedEnd.getTime() + 24 * 60 * 60 * 1000);
-      const events = await listGoogleCalendarEvents(input.user.id, rangeStart, rangeEnd);
       return {
         userId: input.user.id,
         name: input.user.name,
         email: input.user.email,
         coverage: "google",
-        conflicts: googleConflicts(events, input, requestedStart, requestedEnd),
+        conflicts: await listGoogleConflictsForWindow(
+          input.user.id,
+          input,
+          requestedStart,
+          requestedEnd,
+        ),
       };
     } catch {
       // O fallback F10 mantém a página utilizável sem expor detalhes privados do Google.
