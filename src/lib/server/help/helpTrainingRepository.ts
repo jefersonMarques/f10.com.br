@@ -65,13 +65,6 @@ export function normalizeTrainingSlug(value: string): string {
     .slice(0, 100);
 }
 
-function assertHttpUrl(value: string): void {
-  const url = new URL(value);
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("INVALID_MEDIA_URL");
-  }
-}
-
 async function getTrainingPathRow(pathId: string) {
   const [path] = await getDatabase()
     .select()
@@ -457,8 +450,11 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
     const images = step.media
       .filter((media) => media.mediaType === "image" && media.assetId)
       .map((media) => ({ assetId: media.assetId as string, altText: media.altText }));
-    const video = step.media.find((media) => media.mediaType === "video" && media.sourceUrl);
-    if (video?.sourceUrl) assertHttpUrl(video.sourceUrl);
+    const video = step.media.find((media) => media.mediaType === "video") ?? null;
+    const videoAssetId = video?.assetId ?? null;
+    if (video && (!videoAssetId || video.assetMimeType !== "video/mp4")) {
+      throw new Error("TRAINING_LOCAL_VIDEO_REQUIRED");
+    }
     return {
       id: step.id,
       title: step.title,
@@ -470,7 +466,7 @@ async function buildTrainingSnapshot(pathId: string, version: number): Promise<H
       videoStartSeconds: step.videoStartSeconds,
       videoEndSeconds: step.videoEndSeconds,
       images,
-      videoUrl: video?.sourceUrl ?? null,
+      videoUrl: videoAssetId ? `asset:${videoAssetId}` : null,
       failureReasons: step.failureReasons.map((reason) => ({
         key: reason.reasonKey,
         label: reason.label,
