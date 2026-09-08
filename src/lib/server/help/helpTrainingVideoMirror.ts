@@ -5,7 +5,10 @@ import { getDatabase } from "$lib/server/db";
 import type { HelpTrainingSourceAsset } from "$lib/server/db/helpTrainingSchema";
 import { helpAssets } from "$lib/server/db/structuredHelpSchema";
 import { deleteAssetObject, putAssetObject } from "$lib/server/storage/assetStorage";
-import { downloadHelpYoutubeMp4ForStorage } from "$lib/server/help/helpVideoImportAutomation";
+import {
+  downloadHelpYoutubeMp4ForStorage,
+  HELP_YOUTUBE_EXTRACTION_ENABLED,
+} from "$lib/server/help/helpVideoImportAutomation";
 
 type TrainingVideoSource = {
   contentId: string;
@@ -139,7 +142,8 @@ async function createMirror(
 }
 
 export function trainingVideoNeedsLocalMirror(video: HelpTrainingSourceAsset | null): boolean {
-  return Boolean(video?.sourceUrl && !video.storageKey && youtubeVideoId(video.sourceUrl));
+  return HELP_YOUTUBE_EXTRACTION_ENABLED
+    && Boolean(video?.sourceUrl && !video.storageKey && youtubeVideoId(video.sourceUrl));
 }
 
 export async function ensureTrainingLocalVideoAsset(

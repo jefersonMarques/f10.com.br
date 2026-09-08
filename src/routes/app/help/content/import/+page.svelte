@@ -75,7 +75,7 @@
     data.videoAutomation.enabled &&
     data.videoRuntime.openAi &&
     data.videoRuntime.ffmpeg;
-  $: youtubeAvailable = mp4Available && data.videoRuntime.youtube;
+  $: youtubeAvailable = false;
 
   function formatMegabytes(bytes: number): string {
     return `${Math.round((bytes / 1024 / 1024) * 10) / 10} MB`;
@@ -239,7 +239,7 @@
           on:click={() => selectMode("youtube")}
           class={`rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${importMode === "youtube" ? "border-[#000A57] bg-[#F6F7FF] ring-1 ring-[#000A57]" : "border-[#E2E5ED] bg-[#FAFBFD] hover:border-[#C7CCDA]"}`}
         >
-          <span class="flex items-start gap-3"><Link2 size={19} class="mt-0.5 shrink-0 text-[#000A57]"/><span><strong class="block text-[12px] text-[#2F3544]">Link do YouTube</strong><small class="mt-1 block text-[9px] leading-4 text-[#858B99]">Cole o link; o F10 processa o vídeo e preserva uma cópia MP4 local para reutilização.</small><span class={`mt-3 inline-flex rounded-full px-2 py-1 text-[8px] font-bold ${youtubeAvailable ? "bg-[#EAF7EE] text-[#2D7143]" : "bg-[#FFF0E9] text-[#A9510D]"}`}>{youtubeAvailable ? "AUTOMAÇÃO DISPONÍVEL" : !data.videoAutomation.enabled ? "DESABILITADO PELO ADMIN" : !data.videoRuntime.youtube ? "YT-DLP PENDENTE" : "OPENAI / FFMPEG PENDENTE"}</span></span></span>
+          <span class="flex items-start gap-3"><Link2 size={19} class="mt-0.5 shrink-0 text-[#000A57]"/><span><strong class="block text-[12px] text-[#2F3544]">Link do YouTube</strong><small class="mt-1 block text-[9px] leading-4 text-[#858B99]">Extração temporariamente desabilitada. Baixe o vídeo e envie o arquivo MP4.</small><span class="mt-3 inline-flex rounded-full bg-[#FFF0E9] px-2 py-1 text-[8px] font-bold text-[#A9510D]">TEMPORARIAMENTE DESABILITADO</span></span></span>
         </button>
       </div>
       {#if !data.canImport}<p class="mt-3 text-[10px] text-[#A9510D]">Seu usuário possui acesso de leitura, mas não possui permissão para importar conteúdo.</p>{/if}

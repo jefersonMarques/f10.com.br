@@ -10,6 +10,7 @@ import { replaceHelpScreenshotReviewCandidates } from "$lib/server/help/helpScre
 import {
   generateHelpImportFromVideo,
   HELP_VIDEO_AUTOMATION_MAX_UPLOAD_BYTES,
+  HELP_YOUTUBE_EXTRACTION_ENABLED,
   type HelpVideoAutomationProgress,
   type HelpVideoAutomationSource,
 } from "$lib/server/help/helpVideoImportAutomation";
@@ -161,6 +162,16 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
     formData = await request.formData();
   } catch {
     return json({ message: "Não foi possível receber os dados do vídeo." }, { status: 400 });
+  }
+
+  if (
+    readString(formData, "sourceType") === "youtube"
+    && !HELP_YOUTUBE_EXTRACTION_ENABLED
+  ) {
+    return json(
+      { message: "A importação por YouTube está temporariamente desabilitada. Use um arquivo MP4." },
+      { status: 403 },
+    );
   }
 
   let source: HelpVideoAutomationSource;

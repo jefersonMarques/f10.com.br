@@ -22,6 +22,8 @@ const OPENAI_TRANSCRIPTION_TIMEOUT_MS = 3 * 60 * 1_000;
 const DEFAULT_YTDLP_COOKIES_PATH = "/opt/f10-secrets/youtube-cookies.txt";
 const DEFAULT_YTDLP_POT_PROVIDER_URL = "http://127.0.0.1:4416";
 
+export const HELP_YOUTUBE_EXTRACTION_ENABLED = false;
+
 type ScreenshotCaptureMode = "before" | "after";
 
 type TranscriptSegment = {
