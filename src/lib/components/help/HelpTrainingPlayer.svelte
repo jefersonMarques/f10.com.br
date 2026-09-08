@@ -56,7 +56,6 @@
   let backForm: HTMLFormElement | null = null;
   let isSubmitting = false;
   let pipVideoElement: HTMLVideoElement | null = null;
-  let pipVideoFrame: HTMLIFrameElement | null = null;
 
   $: currentImage = step.images[0] ?? null;
 
@@ -143,14 +142,6 @@
       pipVideoElement = null;
     }
 
-    if (pipVideoFrame) {
-      try {
-        pipVideoFrame.src = "about:blank";
-      } catch {
-        // A janela pode já ter sido encerrada pelo navegador.
-      }
-      pipVideoFrame = null;
-    }
   }
 
   function adoptPipWindow(windowRef: Window): void {
@@ -293,33 +284,6 @@
     window.setTimeout(seek, 650);
   }
 
-  function youtubeEmbedUrl(value: string | null): string | null {
-    if (!value || value.startsWith("asset:")) return null;
-    try {
-      const url = new URL(value);
-      let id = "";
-      if (url.hostname === "youtu.be") id = url.pathname.slice(1).split("/")[0] ?? "";
-      if (url.hostname.endsWith("youtube.com")) {
-        if (url.pathname === "/watch") id = url.searchParams.get("v") ?? "";
-        else if (url.pathname.startsWith("/shorts/") || url.pathname.startsWith("/embed/")) {
-          id = url.pathname.split("/")[2] ?? "";
-        }
-      }
-      const start = Math.max(0, Math.round(step.videoStartSeconds || 0));
-      const end = Math.max(0, Math.round(step.videoEndSeconds || 0));
-      const endParameter = end > start ? `&end=${end}` : "";
-      const pageOrigin = typeof window !== "undefined" ? window.location.origin : "";
-      const originParameters = pageOrigin
-        ? `&origin=${encodeURIComponent(pageOrigin)}&widget_referrer=${encodeURIComponent(pageOrigin)}`
-        : "";
-      return id
-        ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&start=${start}${endParameter}${originParameters}`
-        : null;
-    } catch {
-      return null;
-    }
-  }
-
   function appendText(
     doc: Document,
     parent: HTMLElement,
@@ -368,7 +332,7 @@
       .rich{margin-top:18px;color:#4a556b;font-size:15px;line-height:1.68}.rich p{margin:0 0 12px}.rich strong{color:#07132d;font-weight:850}.rich em{color:#596579}.rich code{display:inline-block;border-radius:7px;background:#eef0f5;padding:2px 7px;color:#000a57;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em;font-weight:850}.rich ul,.rich ol{margin:10px 0 14px;padding-left:22px}.rich li{margin:7px 0}.rich h2,.rich h3{margin:18px 0 8px;color:#07132d;line-height:1.25}.rich h2{font-size:16px}.rich h3{font-size:14px}.rich blockquote{margin:14px 0;border-left:3px solid #ea6d0b;border-radius:0 10px 10px 0;background:#fff7f0;padding:10px 12px;color:#6f4e35}.rich hr{margin:18px 0;border:0;border-top:1px solid #e5e8ef}
       .video-help{width:100%;margin-top:20px;border:1px solid #ffc99e;border-radius:14px;background:#fff7f0;color:#b94e00;min-height:48px;font-size:11px;font-weight:850;cursor:pointer}.success{margin-top:14px;border-radius:12px;background:#eef8f1;padding:10px 12px;color:#2f7045;font-size:10px;font-weight:700}.error{margin-top:14px;border-radius:12px;background:#fff2f2;padding:10px 12px;color:#9b2c2c;font-size:10px}
       .footer{display:grid;grid-template-columns:1fr 1.45fr;gap:9px;border-top:1px solid #e5e8ef;background:#fff;padding:12px 14px}.neutral,.positive{min-height:50px;border-radius:14px;font-size:12px;font-weight:850;cursor:pointer}.neutral{border:1px solid #d9dee8;background:#fff;color:#596174}.neutral:disabled{opacity:.38}.positive{border:1px solid #2f7d4c;background:#2f7d4c;color:#fff;box-shadow:0 10px 24px rgba(47,125,76,.20)}.positive:disabled{opacity:.55}
-      .video-shell{height:100vh;display:grid;grid-template-rows:auto minmax(0,1fr);background:#000}.video-top{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#010d28;padding:11px 13px;color:#fff}.video-meta{min-width:0}.video-meta span{display:block;font-size:8px;font-weight:850;letter-spacing:.12em;text-transform:uppercase;color:#ff9a4b}.video-meta strong{display:block;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px;font-size:11px}.back-guide{min-height:34px;border:1px solid rgba(255,255,255,.16);border-radius:10px;background:rgba(255,255,255,.08);padding:0 11px;color:#fff;font-size:9px;font-weight:750;cursor:pointer}.video-content{min-height:0;display:flex;align-items:center;justify-content:center;background:#000}.video-content video,.video-content iframe{width:100%;height:100%;border:0;background:#000;object-fit:contain}.video-link{display:inline-flex;min-height:44px;align-items:center;border-radius:999px;background:#fff;padding:0 18px;color:#000a57;font-size:10px;font-weight:800;text-decoration:none}
+      .video-shell{height:100vh;display:grid;grid-template-rows:auto minmax(0,1fr);background:#000}.video-top{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#010d28;padding:11px 13px;color:#fff}.video-meta{min-width:0}.video-meta span{display:block;font-size:8px;font-weight:850;letter-spacing:.12em;text-transform:uppercase;color:#ff9a4b}.video-meta strong{display:block;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px;font-size:11px}.back-guide{min-height:34px;border:1px solid rgba(255,255,255,.16);border-radius:10px;background:rgba(255,255,255,.08);padding:0 11px;color:#fff;font-size:9px;font-weight:750;cursor:pointer}.video-content{min-height:0;display:flex;align-items:center;justify-content:center;background:#000}.video-content video{width:100%;height:100%;border:0;background:#000;object-fit:contain}.video-link{display:inline-flex;min-height:44px;align-items:center;border-radius:999px;background:#fff;padding:0 18px;color:#000a57;font-size:10px;font-weight:800;text-decoration:none}
     `;
     doc.head.append(style);
   }
@@ -438,7 +402,6 @@
     const content = doc.createElement("section");
     content.className = "video-content";
     const assetId = trainingVideoAssetId(step.videoUrl);
-    const youtubeUrl = youtubeEmbedUrl(step.videoUrl);
 
     if (assetId) {
       const video = doc.createElement("video");
@@ -450,22 +413,13 @@
       video.preload = "auto";
       video.addEventListener("loadedmetadata", () => seekTrainingVideo(video), { once: true });
       content.append(video);
-    } else if (youtubeUrl) {
-      const iframe = doc.createElement("iframe");
-      pipVideoFrame = iframe;
-      iframe.src = youtubeUrl;
-      iframe.title = `Ajuda em vídeo: ${step.title}`;
-      iframe.allow = "autoplay; encrypted-media; picture-in-picture";
-      iframe.referrerPolicy = "strict-origin-when-cross-origin";
-      iframe.allowFullscreen = true;
-      content.append(iframe);
     } else if (step.videoUrl) {
       const link = doc.createElement("a");
       link.className = "video-link";
       link.href = step.videoUrl;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
-      link.textContent = "Abrir vídeo";
+      link.textContent = "Abrir vídeo em nova aba";
       content.append(link);
     }
 
