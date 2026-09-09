@@ -766,7 +766,7 @@ function metadataHasEditorialIssue(metadata: GeneratedMetadata): boolean {
     metadata.summary,
     metadata.quickGuide,
     metadata.assistantKnowledge,
-  ].some(sourceLeak);
+  ].some((value) => editorialInvalid(value));
 }
 
 async function generateMetadata(
