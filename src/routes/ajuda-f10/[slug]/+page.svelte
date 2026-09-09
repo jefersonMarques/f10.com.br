@@ -5,6 +5,7 @@
     CheckCircle2,
     Download,
     ExternalLink,
+    History,
     Info,
     PlayCircle,
     Sparkles,
@@ -18,7 +19,10 @@
   export let data: PageData;
 
   function managedAssetUrl(assetId: string): string {
-    return `/api/help/content/${encodeURIComponent(data.content.slug)}/assets/${assetId}`;
+    const base = `/api/help/content/${encodeURIComponent(data.content.slug)}/assets/${assetId}`;
+    return data.isHistorical && data.releaseNumber
+      ? `${base}?versao=${data.releaseNumber}`
+      : base;
   }
 
   function youtubeEmbedUrl(value: string | null): string | null {
@@ -76,6 +80,13 @@
       <ArrowLeft size={17} />Central de Ajuda
     </a>
 
+    {#if data.isHistorical}
+      <section class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[#7A3B08]">
+        <div class="flex items-center gap-2"><History size={16}/><strong class="text-[10px]">Versão anterior · v{data.releaseNumber}</strong></div>
+        <a href={`/ajuda-f10/${data.content.slug}`} class="rounded-xl bg-white px-3 py-2 text-[9px] font-semibold text-[#000A57]">Ver versão atual</a>
+      </section>
+    {/if}
+
     <header class="mt-6 rounded-[28px] border border-[#E3E6EE] bg-white px-6 py-7 shadow-[0_14px_44px_rgba(1,13,40,0.05)] sm:px-9 sm:py-9">
       {#if data.content.categories.length > 0}
         <div class="flex flex-wrap gap-2">
@@ -97,9 +108,25 @@
       {/if}
       <h1 class="mt-3 max-w-[860px] text-[30px] font-semibold tracking-[-0.04em] text-[#010D28] sm:text-[44px]">{data.content.title}</h1>
       {#if data.content.summary}<HelpRichText text={data.content.summary} className="mt-4 max-w-[820px] space-y-1 text-[14px] leading-7 text-[#6C7383] sm:text-[15px]"/>{/if}
-      <div class="mt-6 flex flex-wrap gap-2 text-[9px] font-semibold text-[#777E8E]">
+      <div class="mt-6 flex flex-wrap items-center gap-2 text-[9px] font-semibold text-[#777E8E]">
         <span class="rounded-full bg-[#F4F5F8] px-3 py-1.5">{data.content.steps.length} {data.content.steps.length === 1 ? "passo" : "passos"}</span>
         <span class="rounded-full bg-[#F4F5F8] px-3 py-1.5">Atualizado {new Intl.DateTimeFormat("pt-BR").format(new Date(data.content.publishedAt))}</span>
+        {#if data.releaseNumber}
+          <details class="relative">
+            <summary class="flex cursor-pointer list-none items-center gap-1.5 rounded-full bg-[#EEF0FF] px-3 py-1.5 text-[#000A57]"><History size={11}/>Versão {data.releaseNumber}</summary>
+            <div class="absolute left-0 top-8 z-20 min-w-[190px] overflow-hidden rounded-xl border border-[#DDE1EA] bg-white py-1 shadow-xl">
+              {#each data.releases as release}
+                <a
+                  href={release.releaseNumber === data.currentReleaseNumber ? `/ajuda-f10/${data.content.slug}` : `/ajuda-f10/${data.content.slug}?versao=${release.releaseNumber}`}
+                  class={`flex items-center justify-between gap-3 px-3 py-2.5 text-[9px] hover:bg-[#F7F8FB] ${release.releaseNumber === data.releaseNumber ? "font-bold text-[#000A57]" : "text-[#666D7D]"}`}
+                >
+                  <span>Versão {release.releaseNumber}</span>
+                  <span>{new Intl.DateTimeFormat("pt-BR").format(new Date(release.publishedAt))}</span>
+                </a>
+              {/each}
+            </div>
+          </details>
+        {/if}
       </div>
     </header>
 
