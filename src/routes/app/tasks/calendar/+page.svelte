@@ -76,6 +76,7 @@
   let showTasks = data.canViewTasks;
   let showTickets = data.canViewTickets;
   let showGoogle = data.googleCalendar.connected;
+  let showScheduling = data.canViewScheduling;
   let showCompleted = true;
   let draggingTicketId: string | null = null;
   let movingTicket = false;
@@ -451,6 +452,7 @@
         <div class="flex rounded-lg bg-[#EDEFF4] p-1" aria-label="Fontes da agenda">
           {#if data.canViewTasks}<button type="button" aria-pressed={showTasks} on:click={() => (showTasks = !showTasks)} class={`application-text-meta h-7 rounded-md px-2.5 font-semibold transition ${showTasks ? "bg-white text-[#000A57] shadow-sm" : "text-[#9A9FAC]"}`}>Tarefas</button>{/if}
           {#if data.canViewTickets}<button type="button" aria-pressed={showTickets} on:click={() => (showTickets = !showTickets)} class={`application-text-meta h-7 rounded-md px-2.5 font-semibold transition ${showTickets ? "bg-white text-[#8B4D12] shadow-sm" : "text-[#9A9FAC]"}`}>Tickets</button>{/if}
+          {#if data.canViewScheduling}<button type="button" aria-pressed={showScheduling} on:click={() => (showScheduling = !showScheduling)} class={`application-text-meta h-7 rounded-md px-2.5 font-semibold transition ${showScheduling ? "bg-white text-[#5C4BA2] shadow-sm" : "text-[#9A9FAC]"}`}>Agendamentos</button>{/if}
           {#if data.googleCalendar.connected}<button type="button" aria-pressed={showGoogle} on:click={() => (showGoogle = !showGoogle)} class={`application-text-meta h-7 rounded-md px-2.5 font-semibold transition ${showGoogle ? "bg-white text-[#2F7045] shadow-sm" : "text-[#9A9FAC]"}`}>Google</button>{/if}
         </div>
 
@@ -510,6 +512,7 @@
     <div class="application-text-caption flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[#E8EAF0] bg-[#FAFAFC] px-4 py-2 text-[#808695]">
       {#if data.canViewTasks && showTasks}<span class="inline-flex items-center gap-2"><Clock3 size={14}/>{unscheduledCount} tarefa(s) sem prazo</span>{/if}
       {#if data.canViewTickets && showTickets}<span class="inline-flex items-center gap-2"><Headphones size={13}/>{visibleTickets.length} ticket(s) no período</span>{/if}
+      {#if data.canViewScheduling && showScheduling}<span class="inline-flex items-center gap-2"><CalendarClock size={13}/>{data.schedulingBookings.length} agendamento(s)</span>{/if}
       {#if data.googleCalendar.connected && showGoogle}<span class="inline-flex items-center gap-2"><Link2 size={13}/>{visibleGoogleEvents.length} evento(s) Google</span>{/if}
       {#if data.canChangeTicketDueOn && showTickets && calendarView !== "list"}<span class="application-text-meta text-[#9A744F]">Arraste um Ticket para outro dia para alterar a conclusão planejada.</span>{/if}
     </div>
@@ -597,7 +600,7 @@
         tasks={visibleTasks}
         tickets={visibleTickets}
         googleEvents={visibleGoogleEvents}
-        bookings={data.schedulingBookings}
+        bookings={showScheduling ? data.schedulingBookings : []}
       />
     {/if}
   </section>
