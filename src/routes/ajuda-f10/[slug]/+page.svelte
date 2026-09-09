@@ -68,6 +68,7 @@
 <svelte:head>
   <title>{data.content.title} | Ajuda F10</title>
   <meta name="description" content={data.content.summary || `Passo a passo: ${data.content.title}`} />
+  {#if data.isHistorical}<meta name="robots" content="noindex,follow" />{/if}
 </svelte:head>
 
 <main
