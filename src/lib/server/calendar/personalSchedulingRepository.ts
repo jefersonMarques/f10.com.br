@@ -600,3 +600,30 @@ export async function cancelPersonalSchedulingClaim(bookingId: string): Promise<
     .set({ status: "cancelled", cancelledAt: now, updatedAt: now })
     .where(and(eq(schedulingBookings.id, bookingId), eq(schedulingBookings.status, "booking")));
 }
+
+export async function listPersonalSchedulingBookings(
+  hostUserId: string,
+  rangeStart: Date,
+  rangeEnd: Date,
+) {
+  return getDatabase()
+    .select({
+      id: schedulingBookings.id,
+      customerName: schedulingBookings.customerName,
+      notes: schedulingBookings.notes,
+      startAt: schedulingBookings.startAt,
+      endAt: schedulingBookings.endAt,
+      status: schedulingBookings.status,
+      googleMeetUrl: schedulingBookings.googleMeetUrl,
+    })
+    .from(schedulingBookings)
+    .where(
+      and(
+        eq(schedulingBookings.hostUserId, hostUserId),
+        eq(schedulingBookings.status, "booked"),
+        lt(schedulingBookings.startAt, rangeEnd),
+        gt(schedulingBookings.endAt, rangeStart),
+      ),
+    )
+    .orderBy(asc(schedulingBookings.startAt));
+}
