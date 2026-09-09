@@ -10,6 +10,7 @@ import {
   getGoogleCalendarConnection,
 } from "$lib/server/calendar/googleCalendarRepository";
 import { getGoogleCalendarSyncPreferences } from "$lib/server/calendar/googleCalendarPreferenceRepository";
+import { sendPersonalSchedulingConfirmation } from "$lib/server/calendar/personalSchedulingConfirmation";
 import {
   addPersonalSchedulingException,
   cancelPersonalSchedulingClaim,
@@ -603,6 +604,24 @@ export async function bookPersonalSchedulingSlot(
           googleEventId: googleEvent.id,
         },
       }),
+      sendPersonalSchedulingConfirmation({
+        id: completed.id,
+        title: schedule.publicTitle,
+        hostName: schedule.hostName,
+        customerName: customer.name,
+        customerEmail: customer.email,
+        startAt: completed.startAt,
+        endAt: completed.endAt,
+        timeZone: schedule.timeZone,
+        googleIcalUid: completed.googleIcalUid,
+        googleMeetUrl: completed.googleMeetUrl,
+      }).catch((cause) => {
+        console.error("[scheduling.confirmation.email]", {
+          bookingId: completed.id,
+          causeType: cause instanceof Error ? cause.message : typeof cause,
+        });
+        throw cause;
+      }),
     ]);
 
     return {
@@ -613,6 +632,7 @@ export async function bookPersonalSchedulingSlot(
       startAt: completed.startAt.toISOString(),
       endAt: completed.endAt.toISOString(),
       googleMeetUrl: completed.googleMeetUrl,
+      calendarFilePath: `/agendar/${schedule.publicSlug}/booking/${completed.id}/calendar`,
     };
   } catch (error) {
     if (googleEvent) {
