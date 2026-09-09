@@ -201,6 +201,40 @@ export async function listHelpContentReleases(contentId: string) {
     );
 }
 
+export async function listPublicHelpContentReleases(contentId: string) {
+  return getDatabase()
+    .select({
+      releaseNumber: helpContentReleases.releaseNumber,
+      publishedAt: helpContentReleases.publishedAt,
+    })
+    .from(helpContentReleases)
+    .where(eq(helpContentReleases.contentId, contentId))
+    .orderBy(desc(helpContentReleases.releaseNumber));
+}
+
+export async function isAssetInPublicHelpRelease(
+  slug: string,
+  releaseNumber: number,
+  assetId: string,
+): Promise<boolean> {
+  const [row] = await getDatabase()
+    .select({ releaseId: helpContentReleases.id })
+    .from(helpContentReleases)
+    .innerJoin(
+      helpContentReleaseAssets,
+      eq(helpContentReleaseAssets.releaseId, helpContentReleases.id),
+    )
+    .where(
+      and(
+        eq(helpContentReleases.releaseNumber, releaseNumber),
+        eq(helpContentReleaseAssets.assetId, assetId),
+        sql`${helpContentReleases.publicSnapshot}->'public'->>'slug' = ${slug}`,
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
 export async function getHelpContentRelease(
   contentId: string,
   releaseNumber: number,
