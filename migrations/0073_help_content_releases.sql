@@ -53,3 +53,38 @@ WHERE hp.entity_type = 'content'
     FROM help_content_releases hcr
     WHERE hcr.content_id = hc.id
   );
+
+INSERT INTO help_content_release_assets (release_id, asset_id, role)
+SELECT
+  hcr.id,
+  ha.id,
+  'featured_video'
+FROM help_content_releases hcr
+JOIN help_publications hp
+  ON hp.entity_type = 'content'
+ AND hp.entity_id = hcr.content_id::text
+JOIN help_assets ha
+  ON ha.id::text = hp.snapshot->'public'->'featuredVideo'->>'id'
+WHERE hcr.release_number = 1
+ON CONFLICT DO NOTHING;
+
+INSERT INTO help_content_release_assets (release_id, asset_id, role)
+SELECT DISTINCT
+  hcr.id,
+  ha.id,
+  'content'
+FROM help_content_releases hcr
+JOIN help_publications hp
+  ON hp.entity_type = 'content'
+ AND hp.entity_id = hcr.content_id::text
+CROSS JOIN LATERAL jsonb_array_elements(
+  COALESCE(hp.snapshot->'public'->'steps', '[]'::jsonb)
+) AS step_value
+CROSS JOIN LATERAL jsonb_array_elements(
+  COALESCE(step_value->'blocks', '[]'::jsonb)
+) AS block_value
+JOIN help_assets ha
+  ON ha.id::text = block_value->'asset'->>'id'
+WHERE hcr.release_number = 1
+  AND block_value->'asset'->>'id' IS NOT NULL
+ON CONFLICT DO NOTHING;
