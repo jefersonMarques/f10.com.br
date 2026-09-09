@@ -9,6 +9,35 @@ CREATE UNIQUE INDEX IF NOT EXISTS scheduling_availability_public_slug_unique
   ON scheduling_availability_profiles(public_slug)
   WHERE public_slug IS NOT NULL;
 
+INSERT INTO scheduling_availability_profiles (
+  user_id,
+  public_slug,
+  updated_by
+)
+SELECT
+  users.id,
+  concat(
+    coalesce(
+      nullif(
+        trim(both '-' from regexp_replace(lower(users.name), '[^a-z0-9]+', '-', 'g')),
+        ''
+      ),
+      'agenda'
+    ),
+    '-',
+    left(replace(users.id::text, '-', ''), 10)
+  ),
+  users.id
+FROM users
+WHERE users.status = 'active'
+ON CONFLICT (user_id) DO UPDATE
+SET
+  public_slug = coalesce(
+    scheduling_availability_profiles.public_slug,
+    excluded.public_slug
+  ),
+  updated_at = now();
+
 CREATE TABLE IF NOT EXISTS scheduling_availability_windows (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
