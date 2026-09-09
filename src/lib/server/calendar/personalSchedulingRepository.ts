@@ -260,12 +260,36 @@ export async function addPersonalSchedulingException(
     endTime: string | null;
   },
 ): Promise<void> {
-  await getDatabase().insert(schedulingAvailabilityExceptions).values({
-    userId,
-    exceptionDate: input.exceptionDate,
-    available: input.available,
-    startTime: input.startTime,
-    endTime: input.endTime,
+  const db = getDatabase();
+  await db.transaction(async (tx) => {
+    if (!input.available) {
+      await tx
+        .delete(schedulingAvailabilityExceptions)
+        .where(
+          and(
+            eq(schedulingAvailabilityExceptions.userId, userId),
+            eq(schedulingAvailabilityExceptions.exceptionDate, input.exceptionDate),
+          ),
+        );
+    } else {
+      await tx
+        .delete(schedulingAvailabilityExceptions)
+        .where(
+          and(
+            eq(schedulingAvailabilityExceptions.userId, userId),
+            eq(schedulingAvailabilityExceptions.exceptionDate, input.exceptionDate),
+            eq(schedulingAvailabilityExceptions.available, false),
+          ),
+        );
+    }
+
+    await tx.insert(schedulingAvailabilityExceptions).values({
+      userId,
+      exceptionDate: input.exceptionDate,
+      available: input.available,
+      startTime: input.startTime,
+      endTime: input.endTime,
+    });
   });
 }
 
