@@ -754,6 +754,21 @@
     </div>
   {/if}
 
+  {#if data.generationCoverage}
+    <section class={`mb-4 flex flex-wrap items-center gap-2 rounded-2xl border px-4 py-3 ${data.generationCoverage.uncoveredRelevantSegments === 0 ? "border-[#CFE8D7] bg-[#F6FBF7]" : "border-[#F0C8C8] bg-[#FFF5F5]"}`}>
+      {#if data.generationCoverage.uncoveredRelevantSegments === 0}
+        <CheckCircle2 size={15} class="text-[#2D7143]"/>
+      {:else}
+        <TriangleAlert size={15} class="text-[#9B2C2C]"/>
+      {/if}
+      <strong class="text-[10px] font-semibold text-[#303645]">Cobertura do vídeo</strong>
+      <span class="rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold text-[#5E6575]">100% analisado</span>
+      <span class="rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold text-[#5E6575]">{data.generationCoverage.coveredRelevantSegments}/{data.generationCoverage.relevantSegments} relevantes incorporados</span>
+      <span class="rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold text-[#5E6575]">{data.generationCoverage.processingParts} partes</span>
+      <span class={`rounded-full px-2.5 py-1 text-[9px] font-semibold ${data.generationCoverage.uncoveredRelevantSegments === 0 ? "bg-[#EAF7EE] text-[#2D7143]" : "bg-[#FFF0F0] text-[#9B2C2C]"}`}>{data.generationCoverage.uncoveredRelevantSegments} pendentes</span>
+    </section>
+  {/if}
+
   <main data-help-content-id={data.content.id}>
     <header class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
       <div class="flex flex-wrap items-center gap-2">
