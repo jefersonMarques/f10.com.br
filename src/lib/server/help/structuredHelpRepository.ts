@@ -901,6 +901,76 @@ async function createAssetForBlock(
   return asset.id;
 }
 
+export async function attachStructuredHelpImageAsset(
+  actorUserId: string,
+  contentId: string,
+  stepId: string,
+  assetId: string,
+): Promise<string> {
+  const db = getDatabase();
+  const content = await getContentRow(contentId);
+  if (!content) throw new Error("CONTENT_NOT_FOUND");
+  if (content.status === "archived") throw new Error("CONTENT_ARCHIVED");
+
+  const step = await getStepRow(stepId);
+  if (!step || step.contentId !== contentId) throw new Error("STEP_NOT_FOUND");
+
+  const [existingImage] = await db
+    .select({ id: helpStepBlocks.id })
+    .from(helpStepBlocks)
+    .where(and(eq(helpStepBlocks.stepId, stepId), eq(helpStepBlocks.blockType, "image")))
+    .limit(1);
+  if (existingImage) throw new Error("STEP_IMAGE_LIMIT_EXCEEDED");
+
+  const [asset] = await db
+    .select({
+      id: helpAssets.id,
+      contentId: helpAssets.contentId,
+      assetType: helpAssets.assetType,
+      storageKey: helpAssets.storageKey,
+      sourceUrl: helpAssets.sourceUrl,
+    })
+    .from(helpAssets)
+    .where(eq(helpAssets.id, assetId))
+    .limit(1);
+  if (
+    !asset ||
+    asset.assetType !== "image" ||
+    asset.contentId !== contentId ||
+    (!asset.storageKey && !asset.sourceUrl)
+  ) {
+    throw new Error("IMAGE_ASSET_INVALID");
+  }
+
+  const [{ value: currentMax }] = await db
+    .select({ value: max(helpStepBlocks.sortOrder) })
+    .from(helpStepBlocks)
+    .where(eq(helpStepBlocks.stepId, stepId));
+
+  const [block] = await db
+    .insert(helpStepBlocks)
+    .values({
+      stepId,
+      blockType: "image",
+      assetId,
+      textContent: "",
+      sortOrder: Number(currentMax ?? 0) + 10,
+    })
+    .returning({ id: helpStepBlocks.id });
+  if (!block) throw new Error("BLOCK_NOT_CREATED");
+
+  await markContentDraft(contentId, actorUserId);
+  await saveStructuredContentVersion(contentId, actorUserId);
+  await recordAuditEvent({
+    actorUserId,
+    action: "help.content.step_image_added",
+    entityType: "help_content_step",
+    entityId: stepId,
+    metadata: { contentId, blockId: block.id, assetId },
+  });
+  return block.id;
+}
+
 export async function addStructuredHelpBlock(
   actorUserId: string,
   contentId: string,
