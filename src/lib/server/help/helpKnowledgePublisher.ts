@@ -1,11 +1,15 @@
-import { eq } from "drizzle-orm";
+import { eq, max } from "drizzle-orm";
 import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
 import { readHelpImageAnnotationsFromMetadata } from "$lib/help/helpImageAnnotations";
 import { isHelpHumanReviewComplete } from "$lib/help/helpHumanReview";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
-import { helpContents } from "$lib/server/db/structuredHelpSchema";
+import {
+  helpContentReleaseAssets,
+  helpContentReleases,
+  helpContents,
+} from "$lib/server/db/structuredHelpSchema";
 import { cleanupObsoleteImportedHelpAssets } from "$lib/server/help/helpImportedAssetCleanup";
 import {
   compileHelpKnowledgeDocument,
@@ -110,9 +114,32 @@ export async function publishHelpKnowledgeContent(
   }
 
   const snapshot = { public: publicSnapshot, knowledge };
+  const compiledVersionSnapshot = compileHelpVersionSnapshot(content, publishedAt);
+  const editorSnapshot = {
+    ...compiledVersionSnapshot,
+    quickGuide: content.quickGuide,
+    steps: compiledVersionSnapshot.steps.map((step) => ({
+      ...step,
+      blocks: step.blocks.map((block) => ({
+        ...block,
+        annotations: annotationsByBlockId.get(block.id) ?? [],
+      })),
+    })),
+  };
+  const releaseAssetIds = Array.from(new Set([
+    ...(content.featuredVideo ? [content.featuredVideo.id] : []),
+    ...content.steps.flatMap((step) =>
+      step.blocks.flatMap((block) => block.asset ? [block.asset.id] : []),
+    ),
+  ]));
   const db = getDatabase();
 
   await db.transaction(async (tx) => {
+    const [releaseRow] = await tx
+      .select({ value: max(helpContentReleases.releaseNumber) })
+      .from(helpContentReleases)
+      .where(eq(helpContentReleases.contentId, contentId));
+    const releaseNumber = Number(releaseRow?.value ?? 0) + 1;
     await tx
       .update(helpContents)
       .set({
@@ -140,23 +167,37 @@ export async function publishHelpKnowledgeContent(
           publishedAt,
         },
       });
+
+    const [release] = await tx
+      .insert(helpContentReleases)
+      .values({
+        contentId,
+        releaseNumber,
+        publicSnapshot: snapshot,
+        editorSnapshot,
+        sourceVideoAssetId: content.featuredVideo?.id ?? null,
+        changeSummary: "",
+        publishedBy: actorUserId,
+        publishedAt,
+      })
+      .returning({ id: helpContentReleases.id });
+    if (!release) throw new Error("HELP_RELEASE_NOT_CREATED");
+
+    if (releaseAssetIds.length > 0) {
+      await tx.insert(helpContentReleaseAssets).values(
+        releaseAssetIds.map((assetId) => ({
+          releaseId: release.id,
+          assetId,
+          role: assetId === content.featuredVideo?.id ? "featured_video" : "content",
+        })),
+      );
+    }
   });
 
-  const compiledVersionSnapshot = compileHelpVersionSnapshot(content, publishedAt);
   await saveHelpContentVersion(
     "content",
     contentId,
-    {
-      ...compiledVersionSnapshot,
-      quickGuide: content.quickGuide,
-      steps: compiledVersionSnapshot.steps.map((step) => ({
-        ...step,
-        blocks: step.blocks.map((block) => ({
-          ...block,
-          annotations: annotationsByBlockId.get(block.id) ?? [],
-        })),
-      })),
-    },
+    editorSnapshot,
     actorUserId,
   );
 
