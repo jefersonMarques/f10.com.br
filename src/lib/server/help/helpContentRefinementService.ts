@@ -119,9 +119,9 @@ function splitSchema(): Record<string, unknown> {
           additionalProperties: false,
           required: ["title", "description", "instruction"],
           properties: {
-            title: { type: "string", minLength: 2, maxLength: 180 },
-            description: { type: "string", maxLength: 2_000 },
-            instruction: { type: "string", minLength: 1, maxLength: 50_000 },
+            title: { type: "string" },
+            description: { type: "string" },
+            instruction: { type: "string" },
           },
         },
       },
