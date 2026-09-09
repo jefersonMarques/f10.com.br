@@ -8,6 +8,7 @@
     ExternalLink,
     Eye,
     FileText,
+    History,
     ImagePlus,
     Info,
     Link2,
@@ -15,10 +16,14 @@
     PenTool,
     PlayCircle,
     Plus,
+    RefreshCw,
     Save,
     Settings2,
     Sparkles,
+    Trash2,
     TriangleAlert,
+    UploadCloud,
+    Video,
     X,
   } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
@@ -78,6 +83,12 @@
   let splitSuggestion: SplitSuggestion | null = null;
   let splitLoadingStepId = "";
   let splitApplying = false;
+  let deleteStepTarget: ReviewStep | null = null;
+  let deletingStep = false;
+  let showVideoUpdateModal = false;
+  let regenerationFile: File | null = null;
+  let regenerating = false;
+  let regenerationProgress: Array<{ stage: string; label: string; detail?: string; status: string }> = [];
 
   type ReviewItemPayload = {
     blockId: string;
@@ -540,6 +551,151 @@
     }
   }
 
+  function openDeleteStep(step: ReviewStep): void {
+    if (hasUnsavedReview || openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = hasUnsavedReview
+        ? "Salve as alterações das imagens antes de excluir uma etapa."
+        : "Salve ou cancele o texto que está em edição.";
+      return;
+    }
+    deleteStepTarget = step;
+  }
+
+  async function confirmDeleteStep(): Promise<void> {
+    if (!deleteStepTarget || deletingStep) return;
+    deletingStep = true;
+    try {
+      const response = await fetch(
+        `/api/app/help/content/${data.content.id}/steps/${deleteStepTarget.id}`,
+        { method: "DELETE" },
+      );
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+      };
+      if (!response.ok || !payload.success) {
+        saveSuccess = false;
+        saveMessage = payload.message || "Não foi possível excluir a etapa.";
+        return;
+      }
+      saveSuccess = true;
+      saveMessage = payload.message || "Etapa excluída.";
+      deleteStepTarget = null;
+      await invalidateAll();
+    } finally {
+      deletingStep = false;
+    }
+  }
+
+  function chooseRegenerationFile(event: Event): void {
+    const input = event.currentTarget as HTMLInputElement;
+    regenerationFile = input.files?.[0] ?? null;
+  }
+
+  function openVideoUpdate(): void {
+    if (hasUnsavedReview || openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = hasUnsavedReview
+        ? "Salve as alterações das imagens antes de reprocessar."
+        : "Salve ou cancele o texto que está em edição.";
+      return;
+    }
+    regenerationFile = null;
+    regenerationProgress = [];
+    showVideoUpdateModal = true;
+  }
+
+  async function runRegeneration(mode: "current" | "upload"): Promise<void> {
+    if (regenerating || (mode === "upload" && !regenerationFile)) return;
+    regenerating = true;
+    regenerationProgress = [];
+    saveMessage = "";
+    try {
+      let response: Response;
+      if (mode === "upload") {
+        const formData = new FormData();
+        formData.set("videoFile", regenerationFile!);
+        response = await fetch(
+          `/api/app/help/content/${data.content.id}/regenerate`,
+          { method: "POST", body: formData },
+        );
+      } else {
+        response = await fetch(
+          `/api/app/help/content/${data.content.id}/regenerate`,
+          { method: "POST" },
+        );
+      }
+
+      if (!response.ok || !response.body) {
+        const payload = await response.json().catch(() => ({})) as { message?: string };
+        saveSuccess = false;
+        saveMessage = payload.message || "Não foi possível iniciar a atualização.";
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let success = false;
+      let resultMessage = "";
+
+      const handleLine = (line: string) => {
+        if (!line.trim()) return;
+        const payload = JSON.parse(line) as {
+          type?: string;
+          stage?: string;
+          status?: string;
+          label?: string;
+          detail?: string;
+          message?: string;
+          success?: boolean;
+        };
+        if (payload.type === "progress" && payload.stage && payload.label) {
+          const next = regenerationProgress.filter((item) => item.stage !== payload.stage);
+          regenerationProgress = [
+            ...next,
+            {
+              stage: payload.stage,
+              label: payload.label,
+              detail: payload.detail,
+              status: payload.status || "active",
+            },
+          ];
+        } else if (payload.type === "result" && payload.success) {
+          success = true;
+          resultMessage = payload.message || "Novo rascunho gerado.";
+        } else if (payload.type === "error") {
+          resultMessage = payload.message || "Não foi possível atualizar o conteúdo.";
+        }
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) handleLine(line);
+      }
+      buffer += decoder.decode();
+      if (buffer.trim()) handleLine(buffer);
+
+      saveSuccess = success;
+      saveMessage = resultMessage || (success ? "Novo rascunho gerado." : "Não foi possível atualizar o conteúdo.");
+      if (success) {
+        showVideoUpdateModal = false;
+        regenerationFile = null;
+        await invalidateAll();
+      }
+    } catch {
+      saveSuccess = false;
+      saveMessage = "A conexão foi interrompida durante a atualização.";
+    } finally {
+      regenerating = false;
+    }
+  }
+
   async function publish(): Promise<void> {
     if (!publicationReady || publishing) return;
     publishing = true;
@@ -574,6 +730,10 @@
   <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
     <ApplicationBackLink href="/app/help/content" label="Conteúdos" />
     <div class="flex flex-wrap items-center gap-2">
+      <a href={`/app/help/content/${data.content.id}/history`} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><History size={14}/>Histórico</a>
+      {#if data.canEdit}
+        <button type="button" on:click={openVideoUpdate} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-3.5 font-semibold text-[#A9510D]"><RefreshCw size={14}/>Atualizar IA</button>
+      {/if}
       <a href={`/app/help/content/${data.content.id}/preview`} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><Eye size={14}/>Preview</a>
       <a href={`/app/help/content/${data.content.id}`} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><Settings2 size={14}/>Modo avançado</a>
       {#if data.canPublish}
@@ -694,6 +854,7 @@
               <button type="button" on:click={() => openSplitDialog(step)} disabled={splitApplying} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#F1D7BD] bg-[#FFF9F3] text-[#A9510D] transition hover:bg-[#FFF4E9] disabled:opacity-50" aria-label="Quebrar etapa com IA" title="Quebrar etapa">
                 <Sparkles size={14}/>
               </button>
+              <button type="button" on:click={() => openDeleteStep(step)} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#F0C8C8] bg-[#FFF7F7] text-[#9B2C2C] transition hover:bg-[#FFF0F0]" aria-label="Excluir etapa" title="Excluir etapa"><Trash2 size={14}/></button>
             {/if}
             <a href={`/app/help/content/${data.content.id}?step=${encodeURIComponent(step.id)}`} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#6E7584] transition hover:text-[#000A57]" aria-label="Abrir etapa no modo avançado" title="Modo avançado desta etapa"><Settings2 size={14}/></a>
           </header>
@@ -813,6 +974,60 @@
     </div>
   {/if}
 </ApplicationContent>
+
+{#if showVideoUpdateModal}
+  <div class="fixed inset-0 z-[150] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
+    <section role="dialog" aria-modal="true" class="max-h-[88vh] w-full max-w-[620px] overflow-y-auto rounded-[24px] bg-white p-5 shadow-2xl sm:p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Sparkles size={17}/></span>
+          <div><h2 class="text-[16px] font-semibold text-[#11182C]">Atualizar com IA</h2><p class="mt-1 text-[10px] text-[#858A98]">A publicação atual permanece ativa.</p></div>
+        </div>
+        <button type="button" on:click={() => !regenerating && (showVideoUpdateModal = false)} disabled={regenerating} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482] disabled:opacity-50" aria-label="Fechar"><X size={16}/></button>
+      </div>
+
+      <div class="mt-5 grid gap-3 sm:grid-cols-2">
+        <button type="button" on:click={() => runRegeneration("current")} disabled={regenerating || !data.content.featuredVideo?.storageKey} class="rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4 text-left disabled:opacity-40">
+          <Video size={19} class="text-[#000A57]"/>
+          <strong class="mt-3 block text-[11px] text-[#303645]">Reprocessar vídeo atual</strong>
+          <span class="mt-1 block text-[9px] text-[#858A98]">Refaz texto, etapas e prints.</span>
+        </button>
+
+        <div class="rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] p-4">
+          <UploadCloud size={19} class="text-[#EA6D0B]"/>
+          <strong class="mt-3 block text-[11px] text-[#303645]">Novo vídeo</strong>
+          <input type="file" accept="video/mp4,.mp4" on:change={chooseRegenerationFile} disabled={regenerating} class="mt-3 block w-full text-[9px]"/>
+          <button type="button" on:click={() => runRegeneration("upload")} disabled={regenerating || !regenerationFile} class="mt-3 inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#EA6D0B] px-3 text-[9px] font-semibold text-white disabled:opacity-40"><RefreshCw size={12}/>Atualizar</button>
+        </div>
+      </div>
+
+      {#if regenerating || regenerationProgress.length > 0}
+        <div class="mt-4 space-y-2 rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-3">
+          {#each regenerationProgress as item}
+            <div class="flex items-start gap-2 rounded-xl bg-white px-3 py-2.5">
+              {#if item.status === "done"}<CheckCircle2 size={13} class="mt-0.5 shrink-0 text-[#2D7143]"/>{:else}<LoaderCircle size={13} class="mt-0.5 shrink-0 animate-spin text-[#000A57]"/>{/if}
+              <div><strong class="block text-[9px] text-[#454C5D]">{item.label}</strong>{#if item.detail}<span class="mt-0.5 block text-[8px] text-[#9297A5]">{item.detail}</span>{/if}</div>
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      <div class="mt-4 rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[9px] font-medium text-[#7A3B08]">O rascunho atual será substituído. A versão publicada e o histórico não mudam até você publicar novamente.</div>
+    </section>
+  </div>
+{/if}
+
+{#if deleteStepTarget}
+  <div class="fixed inset-0 z-[148] flex items-center justify-center bg-[#050A1A]/60 px-4" role="presentation">
+    <section role="dialog" aria-modal="true" class="w-full max-w-[420px] rounded-[22px] bg-white p-5 shadow-2xl">
+      <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0F0] text-[#9B2C2C]"><Trash2 size={17}/></span><div><h2 class="text-[14px] font-semibold text-[#11182C]">Excluir etapa?</h2><p class="mt-1 text-[9px] text-[#858A98]">{deleteStepTarget.title}</p></div></div>
+      <div class="mt-5 flex justify-end gap-2">
+        <button type="button" on:click={() => (deleteStepTarget = null)} disabled={deletingStep} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[10px] font-semibold text-[#626979]">Cancelar</button>
+        <button type="button" on:click={confirmDeleteStep} disabled={deletingStep} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#9B2C2C] px-4 text-[10px] font-semibold text-white disabled:opacity-50">{#if deletingStep}<LoaderCircle size={13} class="animate-spin"/>{:else}<Trash2 size={13}/>{/if}Excluir</button>
+      </div>
+    </section>
+  </div>
+{/if}
 
 {#if splitTargetStep}
   <div class="fixed inset-0 z-[145] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
