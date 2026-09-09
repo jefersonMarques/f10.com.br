@@ -189,6 +189,7 @@ export async function listHelpContentReleases(contentId: string) {
       canRestore: helpContentReleases.editorSnapshot,
       publishedBy: helpContentReleases.publishedBy,
       publishedAt: helpContentReleases.publishedAt,
+      slug: sql<string>`${helpContentReleases.publicSnapshot}->'public'->>'slug'`,
     })
     .from(helpContentReleases)
     .where(eq(helpContentReleases.contentId, contentId))
