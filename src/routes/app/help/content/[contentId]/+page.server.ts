@@ -5,6 +5,7 @@ import { hasPermission } from "$lib/server/auth/permissions";
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import { moveHelpBlock, moveHelpStep, type HelpMoveDirection } from "$lib/server/help/helpContentOrdering";
 import { publishHelpKnowledgeContent } from "$lib/server/help/helpKnowledgePublisher";
+import { findImportedHelpVideoByChecksum } from "$lib/server/help/helpImportedFeaturedVideo";
 import {
   createManagedHelpAsset,
   deleteManagedHelpAsset,
@@ -156,6 +157,9 @@ function featuredVideoUploadErrorMessage(cause: unknown): string {
   }
   if (code === "ASSET_CONTENT_MISMATCH") {
     return "O arquivo selecionado não possui uma estrutura MP4 válida.";
+  }
+  if (code === "HELP_VIDEO_ALREADY_USED") {
+    return "Este vídeo já pertence a outro conteúdo.";
   }
   return "Não foi possível salvar o vídeo principal.";
 }
@@ -336,17 +340,43 @@ export const actions: Actions = {
       }
 
       let uploadedAssetId: string | null = null;
+      let createdNewAsset = false;
       try {
-        const uploaded = await createManagedHelpAsset(session.user.id, {
-          fileName: videoFile.name || "video.mp4",
-          mimeType: videoFile.type,
-          bytes: new Uint8Array(await videoFile.arrayBuffer()),
-          altText: input.altText,
-          assistantSummary: input.assistantSummary,
-          contentId: params.contentId,
-          deduplicate: false,
-        });
+        const bytes = new Uint8Array(await videoFile.arrayBuffer());
+        const duplicate = await findImportedHelpVideoByChecksum(bytes);
+        if (duplicate?.contentId && duplicate.contentId !== params.contentId) {
+          throw new Error("HELP_VIDEO_ALREADY_USED");
+        }
+
+        const uploaded = duplicate?.contentId === params.contentId
+          ? { asset: await (async () => {
+              const currentContent = await getStructuredHelpContent(params.contentId);
+              const existing = currentContent?.featuredVideo?.id === duplicate.assetId
+                ? currentContent.featuredVideo
+                : null;
+              if (existing) return existing;
+              const managed = await createManagedHelpAsset(session.user.id, {
+                fileName: videoFile.name || "video.mp4",
+                mimeType: videoFile.type,
+                bytes,
+                altText: input.altText,
+                assistantSummary: input.assistantSummary,
+                contentId: params.contentId,
+                deduplicate: true,
+              });
+              return managed.asset;
+            })(), reused: true }
+          : await createManagedHelpAsset(session.user.id, {
+              fileName: videoFile.name || "video.mp4",
+              mimeType: videoFile.type,
+              bytes,
+              altText: input.altText,
+              assistantSummary: input.assistantSummary,
+              contentId: params.contentId,
+              deduplicate: false,
+            });
         uploadedAssetId = uploaded.asset.id;
+        createdNewAsset = !uploaded.reused;
 
         await setStructuredHelpFeaturedVideoAsset(
           session.user.id,
@@ -359,7 +389,7 @@ export const actions: Actions = {
           },
         );
       } catch (cause) {
-        if (uploadedAssetId) {
+        if (uploadedAssetId && createdNewAsset) {
           await deleteManagedHelpAsset(session.user.id, uploadedAssetId).catch(() => undefined);
         }
         return fail(409, { success: false, message: featuredVideoUploadErrorMessage(cause) });
