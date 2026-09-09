@@ -248,6 +248,7 @@ export async function refreshGoogleCalendarSources(userId: string): Promise<void
             ...(!canReadEvents
               ? {
                   visibleInF10: false,
+                  blocksScheduling: false,
                   importMode: "hidden" as const,
                   importProjectId: null,
                   importAssigneeId: null,
