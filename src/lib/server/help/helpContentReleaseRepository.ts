@@ -16,6 +16,7 @@ import {
   helpContents,
   helpStepBlocks,
 } from "$lib/server/db/structuredHelpSchema";
+import { deleteManagedHelpAsset } from "$lib/server/help/helpAssetRepository";
 import { saveHelpContentVersion } from "$lib/server/help/helpVersionRepository";
 import {
   parsePublishedStructuredHelpSnapshot,
@@ -298,6 +299,28 @@ export async function restoreHelpContentReleaseAsDraft(input: {
   }
 
   const db = getDatabase();
+  const currentSteps = await db
+    .select({ id: helpContentSteps.id })
+    .from(helpContentSteps)
+    .where(eq(helpContentSteps.contentId, input.contentId));
+  const currentStepIds = currentSteps.map((step) => step.id);
+  const [currentFeatured, currentBlockAssets] = await Promise.all([
+    db
+      .select({ assetId: helpContentFeaturedVideos.assetId })
+      .from(helpContentFeaturedVideos)
+      .where(eq(helpContentFeaturedVideos.contentId, input.contentId)),
+    currentStepIds.length
+      ? db
+          .select({ assetId: helpStepBlocks.assetId })
+          .from(helpStepBlocks)
+          .where(inArray(helpStepBlocks.stepId, currentStepIds))
+      : Promise.resolve([]),
+  ]);
+  const previousDraftAssetIds = Array.from(new Set([
+    ...currentFeatured.map((item) => item.assetId),
+    ...currentBlockAssets.flatMap((item) => item.assetId ? [item.assetId] : []),
+  ]));
+
   const assetIds = Array.from(new Set([
     ...(snapshot.featuredVideo ? [snapshot.featuredVideo.id] : []),
     ...snapshot.steps.flatMap((step) =>
@@ -396,6 +419,12 @@ export async function restoreHelpContentReleaseAsDraft(input: {
     input.contentId,
     release.editorSnapshot,
     input.actorUserId,
+  );
+  const restoredAssetIds = new Set(assetIds);
+  await Promise.allSettled(
+    previousDraftAssetIds
+      .filter((assetId) => !restoredAssetIds.has(assetId))
+      .map((assetId) => deleteManagedHelpAsset(input.actorUserId, assetId)),
   );
   await recordAuditEvent({
     actorUserId: input.actorUserId,
