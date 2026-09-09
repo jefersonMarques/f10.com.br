@@ -716,6 +716,7 @@ async function transcribeAudio(
       durationSeconds: completedSeconds,
     };
   } catch (cause) {
+    const code = failureCode(cause);
     await reportAiUsage(onAiUsage, {
       operation: "video_transcription",
       provider: "openai",
@@ -723,9 +724,9 @@ async function transcribeAudio(
       audioSeconds: completedSeconds || null,
       latencyMs: Date.now() - startedAt,
       status: "failed",
-      failureCode: failureCode(cause),
+      failureCode: code,
     });
-    throw cause;
+    throw new Error(code);
   }
 }
 
