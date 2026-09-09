@@ -345,7 +345,7 @@ async function classifyTranscript(
       label: "Mapeando todo o conteúdo do vídeo",
       detail: `Parte ${index + 1} de ${batches.length} · ${batch[0]?.id}-${batch.at(-1)?.id}`,
     });
-    result.push(await classifyBatch(batch, index, batches.length, onAiUsage));
+    result.push(...await classifyBatch(batch, index, batches.length, onAiUsage));
   }
   return result;
 }
@@ -882,7 +882,7 @@ export async function generateHelpVideoArticle(input: {
       label: "Gerando conteúdo sem perder etapas",
       detail: `Parte ${index + 1} de ${parts.length} · ${part[0]?.id}-${part.at(-1)?.id}`,
     });
-    generated.push(await generatePart(part, index, parts.length, input.onAiUsage));
+    generated.push(...await generatePart(part, index, parts.length, input.onAiUsage));
   }
 
   const requiredIds = relevant.map((segment) => segment.id);
