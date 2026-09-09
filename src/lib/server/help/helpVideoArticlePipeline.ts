@@ -713,15 +713,6 @@ async function generateCoverageRecovery(
       throw new Error("HELP_VIDEO_COVERAGE_RECOVERY_INCOMPLETE");
     }
 
-    const semanticMissing = await auditPartCoverage(
-      missingSegments,
-      recoverySteps,
-      onAiUsage,
-    );
-    if (semanticMissing.length > 0) {
-      throw new Error("HELP_VIDEO_COVERAGE_RECOVERY_INCOMPLETE");
-    }
-
     await reportAiUsage(onAiUsage, {
       operation: "video_article_part",
       ...responseMeta,
