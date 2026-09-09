@@ -7,6 +7,7 @@ import {
   resolveUserPermissions,
 } from "$lib/server/auth/permissions";
 import { markEntityNotificationsRead } from "$lib/server/notifications/notificationRepository";
+import { getPersonalSchedulingSettings } from "$lib/server/calendar/personalSchedulingService";
 import {
   createKnownDeviceRemoteSession,
   createRemoteDeviceEnrollment,
@@ -169,6 +170,10 @@ export const load: PageServerLoad = async ({ params, parent }) => {
         ? listTaskProjects(layout.user.id, permissions).catch(() => [])
         : Promise.resolve([]),
     ]);
+    const personalScheduling = hasPermission(permissions, "scheduling.view")
+      ? await getPersonalSchedulingSettings(layout.user.id).catch(() => null)
+      : null;
+
     const mentionUsers = !canInternalNote
       ? []
       : ticketId
@@ -210,6 +215,10 @@ export const load: PageServerLoad = async ({ params, parent }) => {
         ? await listKnownRemoteDevicesForTicket(ticketId)
         : [],
       remoteReady: hasTicket && provider.configured && control.configured,
+      schedulingPath:
+        personalScheduling?.profile.publicEnabled && personalScheduling.profile.publicSlug
+          ? `/agendar/${personalScheduling.profile.publicSlug}`
+          : "",
     };
   } catch {
     throw error(404, "Conversa não encontrada ou fora do seu escopo.");
