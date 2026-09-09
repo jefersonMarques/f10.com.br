@@ -369,41 +369,6 @@ export async function addHelpTrainingImage(
   await touchTrainingDraft(pathId, actorUserId);
 }
 
-export async function addHelpTrainingVideo(
-  actorUserId: string,
-  pathId: string,
-  stepId: string,
-  sourceUrl: string,
-): Promise<void> {
-  const step = await getTrainingStepRow(stepId);
-  if (!step || step.pathId !== pathId) throw new Error("TRAINING_STEP_NOT_FOUND");
-  assertHttpUrl(sourceUrl);
-  const db = getDatabase();
-  const existing = await db
-    .select({ id: helpTrainingStepMedia.id })
-    .from(helpTrainingStepMedia)
-    .where(and(eq(helpTrainingStepMedia.stepId, stepId), eq(helpTrainingStepMedia.mediaType, "video")))
-    .limit(1);
-  if (existing[0]) {
-    await db
-      .update(helpTrainingStepMedia)
-      .set({ sourceUrl: sourceUrl.trim() })
-      .where(eq(helpTrainingStepMedia.id, existing[0].id));
-  } else {
-    const [{ value: currentMax }] = await db
-      .select({ value: max(helpTrainingStepMedia.sortOrder) })
-      .from(helpTrainingStepMedia)
-      .where(eq(helpTrainingStepMedia.stepId, stepId));
-    await db.insert(helpTrainingStepMedia).values({
-      stepId,
-      mediaType: "video",
-      sourceUrl: sourceUrl.trim(),
-      sortOrder: Number(currentMax ?? 0) + 10,
-    });
-  }
-  await touchTrainingDraft(pathId, actorUserId);
-}
-
 export async function deleteHelpTrainingMedia(
   actorUserId: string,
   pathId: string,
