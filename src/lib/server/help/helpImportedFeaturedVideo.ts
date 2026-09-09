@@ -67,6 +67,7 @@ export async function attachImportedMp4AsFeaturedVideo(input: {
   altText: string;
   assistantSummary: string;
   transcriptTimeline?: Array<{ start: number; end: number; text: string }>;
+  generationCoverage?: Record<string, unknown>;
 }): Promise<void> {
   if (input.bytes.byteLength < 1 || input.bytes.byteLength > MAX_VIDEO_BYTES || !isMp4(input.bytes)) {
     throw new Error("HELP_VIDEO_UPLOAD_FORMAT_INVALID");
@@ -109,7 +110,10 @@ export async function attachImportedMp4AsFeaturedVideo(input: {
             managed: true,
             importedVideo: true,
             originalSourceUrl: input.sourceUrl?.trim() || null,
-            transcriptTimeline: (input.transcriptTimeline ?? []).slice(0, 2000),
+            transcriptTimeline: (input.transcriptTimeline ?? []).slice(0, 4000),
+            ...(input.generationCoverage
+              ? { generationCoverage: input.generationCoverage }
+              : {}),
           },
           updatedAt: new Date(),
         })
@@ -159,7 +163,10 @@ export async function attachImportedMp4AsFeaturedVideo(input: {
             managed: true,
             importedVideo: true,
             originalSourceUrl: input.sourceUrl?.trim() || null,
-            transcriptTimeline: (input.transcriptTimeline ?? []).slice(0, 2000),
+            transcriptTimeline: (input.transcriptTimeline ?? []).slice(0, 4000),
+            ...(input.generationCoverage
+              ? { generationCoverage: input.generationCoverage }
+              : {}),
           },
           createdBy: input.actorUserId,
         })
