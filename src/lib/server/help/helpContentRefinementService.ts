@@ -175,7 +175,7 @@ export async function suggestHelpStepSplit(
     outputTokens: response.outputTokens,
     latencyMs: Date.now() - startedAt,
     metadata: { contentId, stepId, suggestedParts: response.data.parts.length },
-  });
+  }).catch(() => undefined);
 
   const parts = response.data.parts
     .map((part) => ({
@@ -334,7 +334,7 @@ async function automaticScreenshotWindow(input: {
     outputTokens: response.outputTokens,
     latencyMs: Date.now() - startedAt,
     metadata: { contentId: input.contentId, stepId: input.stepId },
-  });
+  }).catch(() => undefined);
 
   return response.data;
 }
