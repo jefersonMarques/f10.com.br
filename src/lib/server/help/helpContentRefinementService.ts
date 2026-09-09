@@ -344,6 +344,7 @@ export async function generateAdditionalHelpScreenshotCandidates(input: {
   contentId: string;
   blockId: string;
   mode: HelpScreenshotGenerationMode;
+  baseTimeSeconds?: number | null;
 }) {
   const content = await getStructuredHelpContent(input.contentId);
   if (!content) throw new Error("CONTENT_NOT_FOUND");
@@ -362,7 +363,11 @@ export async function generateAdditionalHelpScreenshotCandidates(input: {
     ?? group?.candidates.find((candidate) => candidate.recommended)
     ?? group?.candidates.find((candidate) => candidate.timeSeconds !== null)
     ?? null;
-  const baseTime = selectedCandidate?.timeSeconds ?? null;
+  const suppliedBaseTime = Number(input.baseTimeSeconds);
+  const baseTime =
+    Number.isFinite(suppliedBaseTime) && suppliedBaseTime >= 0
+      ? suppliedBaseTime
+      : selectedCandidate?.timeSeconds ?? null;
   const durationSeconds = Math.max(...timeline.map((segment) => segment.end));
   const sourceText = [step.title, step.description, blockSource(step)].filter(Boolean).join("\n");
 
