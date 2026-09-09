@@ -24,6 +24,7 @@ import {
   type SchedulingWeekday,
 } from "$lib/server/db/schedulingSchema";
 import { users } from "$lib/server/db/schema";
+import { addDateKeyDays, instantToZonedParts } from "$lib/server/calendar/schedulingTime";
 
 const BOOKING_CLAIM_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -340,16 +341,8 @@ export async function getPublicPersonalSchedule(publicSlug: string) {
     .limit(1);
   if (!row) return null;
 
-  const today = new Date();
-  const startDate = new Intl.DateTimeFormat("en-CA", {
-    timeZone: row.timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(today);
-  const endDateValue = new Date(today);
-  endDateValue.setUTCDate(endDateValue.getUTCDate() + row.maxHorizonDays + 2);
-  const broadEnd = endDateValue.toISOString().slice(0, 10);
+  const startDate = instantToZonedParts(new Date(), row.timeZone).date;
+  const broadEnd = addDateKeyDays(startDate, row.maxHorizonDays + 2);
 
   const [windows, exceptions] = await Promise.all([
     db
