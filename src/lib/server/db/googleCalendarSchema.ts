@@ -54,6 +54,7 @@ export const googleCalendarSources = pgTable(
     accessRole: text("access_role").notNull().default("reader"),
     isPrimary: boolean("is_primary").notNull().default(false),
     visibleInF10: boolean("visible_in_f10").notNull().default(false),
+    blocksScheduling: boolean("blocks_scheduling").notNull().default(false),
     importMode: text("import_mode").$type<GoogleCalendarImportMode>().notNull().default("view_only"),
     importProjectId: uuid("import_project_id").references(() => taskProjects.id, { onDelete: "set null" }),
     importAssigneeId: uuid("import_assignee_id").references(() => users.id, { onDelete: "set null" }),
