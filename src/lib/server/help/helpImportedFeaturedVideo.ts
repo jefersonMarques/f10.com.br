@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -26,6 +26,28 @@ function safeFileName(value: string): string {
   return normalized.endsWith(".mp4") ? normalized : `${normalized || "video"}.mp4`;
 }
 
+
+export async function findImportedHelpVideoByChecksum(bytes: Uint8Array) {
+  const checksumSha256 = createHash("sha256").update(bytes).digest("hex");
+  const [row] = await getDatabase()
+    .select({
+      assetId: helpAssets.id,
+      contentId: helpAssets.contentId,
+      checksumSha256: helpAssets.checksumSha256,
+      storageKey: helpAssets.storageKey,
+    })
+    .from(helpAssets)
+    .where(
+      and(
+        eq(helpAssets.assetType, "video"),
+        eq(helpAssets.checksumSha256, checksumSha256),
+        isNotNull(helpAssets.storageKey),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
 export async function attachImportedMp4AsFeaturedVideo(input: {
   actorUserId: string;
   contentId: string;
@@ -50,9 +72,63 @@ export async function attachImportedMp4AsFeaturedVideo(input: {
   if (!content) throw new Error("CONTENT_NOT_FOUND");
   if (content.status === "archived") throw new Error("CONTENT_ARCHIVED");
 
+  const checksumSha256 = createHash("sha256").update(input.bytes).digest("hex");
+  const [existing] = await db
+    .select()
+    .from(helpAssets)
+    .where(
+      and(
+        eq(helpAssets.contentId, input.contentId),
+        eq(helpAssets.assetType, "video"),
+        eq(helpAssets.checksumSha256, checksumSha256),
+        isNotNull(helpAssets.storageKey),
+      ),
+    )
+    .limit(1);
+
+  if (existing) {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(helpAssets)
+        .set({
+          sourceUrl: input.sourceUrl?.trim() || existing.sourceUrl,
+          altText: input.altText.trim().slice(0, 500),
+          subtitles: input.subtitles.trim().slice(0, 200_000),
+          assistantSummary: input.assistantSummary.trim().slice(0, 20_000),
+          metadata: {
+            ...(existing.metadata ?? {}),
+            managed: true,
+            importedVideo: true,
+            originalSourceUrl: input.sourceUrl?.trim() || null,
+            transcriptTimeline: (input.transcriptTimeline ?? []).slice(0, 2000),
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(helpAssets.id, existing.id));
+      await tx
+        .insert(helpContentFeaturedVideos)
+        .values({ contentId: input.contentId, assetId: existing.id })
+        .onConflictDoUpdate({
+          target: helpContentFeaturedVideos.contentId,
+          set: { assetId: existing.id, updatedAt: new Date() },
+        });
+      await tx
+        .update(helpContents)
+        .set({ status: "draft", updatedBy: input.actorUserId, updatedAt: new Date() })
+        .where(eq(helpContents.id, input.contentId));
+    });
+    await recordAuditEvent({
+      actorUserId: input.actorUserId,
+      action: "help.content.featured_video.reused",
+      entityType: "help_content",
+      entityId: input.contentId,
+      metadata: { assetId: existing.id, checksumSha256 },
+    });
+    return;
+  }
+
   const storageKey = `help/import/${input.contentId}/${randomUUID()}-${safeFileName(input.fileName)}`;
   const stored = await putAssetObject(storageKey, input.bytes, "video/mp4");
-  const checksumSha256 = createHash("sha256").update(input.bytes).digest("hex");
 
   try {
     const [asset] = await db.transaction(async (tx) => {
