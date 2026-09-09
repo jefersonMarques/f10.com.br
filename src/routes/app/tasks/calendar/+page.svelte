@@ -253,8 +253,15 @@
     calendarView = view;
     const url = new URL($page.url);
     url.searchParams.set("view", view);
-    if (view === "list") url.searchParams.set("period", listPeriod);
-    else url.searchParams.delete("period");
+    if (view === "list") {
+      url.searchParams.set("period", listPeriod);
+      if (listPeriod !== "month") {
+        cursorDate = new Date();
+        url.searchParams.set("date", dateKey(cursorDate));
+      }
+    } else {
+      url.searchParams.delete("period");
+    }
     void goto(`${url.pathname}${url.search}`, { replaceState: true, noScroll: true });
   }
 
@@ -263,6 +270,10 @@
     const url = new URL($page.url);
     url.searchParams.set("view", "list");
     url.searchParams.set("period", period);
+    if (period !== "month") {
+      cursorDate = new Date();
+      url.searchParams.set("date", dateKey(cursorDate));
+    }
     void goto(`${url.pathname}${url.search}`, { replaceState: true, noScroll: true });
   }
 
