@@ -50,6 +50,26 @@ export const helpCategories = pgTable(
   ],
 );
 
+export const helpCollections = pgTable(
+  "help_collections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    sortOrder: integer("sort_order").notNull().default(10),
+    active: boolean("active").notNull().default(true),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("help_collections_slug_unique").on(table.slug),
+    index("help_collections_active_order_idx").on(table.active, table.sortOrder),
+  ],
+);
+
 export const helpContents = pgTable(
   "help_contents",
   {
@@ -76,6 +96,25 @@ export const helpContents = pgTable(
     index("help_contents_status_idx").on(table.status),
     index("help_contents_updated_idx").on(table.updatedAt),
     index("help_contents_import_source_idx").on(table.importSource),
+  ],
+);
+
+export const helpCollectionItems = pgTable(
+  "help_collection_items",
+  {
+    collectionId: uuid("collection_id")
+      .notNull()
+      .references(() => helpCollections.id, { onDelete: "cascade" }),
+    contentId: uuid("content_id")
+      .notNull()
+      .references(() => helpContents.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull().default(10),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.collectionId, table.contentId] }),
+    index("help_collection_items_collection_order_idx").on(table.collectionId, table.sortOrder),
+    index("help_collection_items_content_idx").on(table.contentId),
   ],
 );
 
