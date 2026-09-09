@@ -78,6 +78,33 @@
       bookingSubmitting = false;
     }
   }
+
+  async function confirmLegacyBooking(startAt: string): Promise<void> {
+    if (bookingSubmitting) return;
+    bookingSubmitting = true;
+    bookingError = "";
+    try {
+      const response = await fetch(`${window.location.pathname}/book`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startAt }),
+      });
+      const payload = await response.json() as {
+        success: boolean;
+        message?: string;
+        booking?: BookingResult;
+      };
+      if (!response.ok || !payload.success || !payload.booking) {
+        bookingError = payload.message || "Não foi possível confirmar o agendamento.";
+        return;
+      }
+      bookingResult = payload.booking;
+    } catch {
+      bookingError = "Não foi possível confirmar o agendamento.";
+    } finally {
+      bookingSubmitting = false;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -116,7 +143,8 @@
           {:else if dates.length === 0}
             <div class="mt-5 rounded-xl border border-[#E4E6EC] bg-[#FAFAFC] px-4 py-8 text-center text-[10px] text-[#858B99]">Nenhum horário disponível.</div>
           {:else}
-            <div class="mt-5 space-y-5">
+            {#if bookingError}<p class="mt-4 text-[10px] font-medium text-[#9B2C2C]">{bookingError}</p>{/if}
+          <div class="mt-5 space-y-5">
               {#each dates as date}
                 <section>
                   <h3 class="capitalize text-[11px] font-semibold text-[#404756]">{formatDate(date)}</h3>
@@ -157,12 +185,12 @@
         <div class={`mt-4 rounded-xl border px-4 py-3 text-[11px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{form.message}</div>
       {/if}
 
-      {#if data.invitation.status === "booked"}
+      {#if bookingResult || data.invitation.status === "booked"}
         <section class="mt-5 rounded-[26px] border border-[#B9E6C9] bg-white p-7 text-center">
           <CalendarCheck2 size={28} class="mx-auto text-[#176B35]"/>
           <h2 class="mt-4 text-[20px] font-semibold text-[#202637]">Agendamento confirmado</h2>
-          <p class="mt-2 capitalize text-[13px] text-[#5F6776]">{formatDateTime(data.invitation.selectedStartAt)}</p>
-          {#if data.invitation.googleMeetUrl}<a href={data.invitation.googleMeetUrl} target="_blank" rel="noopener noreferrer" class="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-[#214A9A] px-5 text-[11px] font-semibold text-white"><Video size={15}/>Abrir Google Meet</a>{/if}
+          <p class="mt-2 capitalize text-[13px] text-[#5F6776]">{formatDateTime(bookingResult?.startAt ?? data.invitation.selectedStartAt, bookingResult?.timeZone ?? data.invitation.timeZone)}</p>
+          {#if bookingResult?.googleMeetUrl ?? data.invitation.googleMeetUrl}<a href={bookingResult?.googleMeetUrl ?? data.invitation.googleMeetUrl ?? "#"} target="_blank" rel="noopener noreferrer" class="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-[#214A9A] px-5 text-[11px] font-semibold text-white"><Video size={15}/>Abrir Google Meet</a>{/if}
         </section>
       {:else}
         <section class="mt-5 rounded-[26px] border border-[#E0E3EA] bg-white p-5 sm:p-7">
@@ -173,10 +201,7 @@
                 <h3 class="capitalize text-[11px] font-semibold text-[#404756]">{formatDate(date)}</h3>
                 <div class="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
                   {#each slotsForDate(date) as slot}
-                    <form method="POST" action="?/book">
-                      <input type="hidden" name="startAt" value={slot.startAt}/>
-                      <button type="submit" class="h-10 w-full rounded-xl border border-[#D8DCE6] bg-white text-[11px] font-semibold text-[#000A57] hover:border-[#000A57]">{slot.time}</button>
-                    </form>
+                    <button type="button" disabled={bookingSubmitting} on:click={() => confirmLegacyBooking(slot.startAt)} class="h-10 w-full rounded-xl border border-[#D8DCE6] bg-white text-[11px] font-semibold text-[#000A57] hover:border-[#000A57] disabled:opacity-50">{slot.time}</button>
                   {/each}
                 </div>
               </section>
