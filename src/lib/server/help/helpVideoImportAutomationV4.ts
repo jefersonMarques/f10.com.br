@@ -111,6 +111,7 @@ export type HelpVideoAutomationAiUsage = {
   operation:
     | "video_transcription"
     | "video_coverage"
+    | "video_coverage_audit"
     | "video_article_part"
     | "video_article_metadata";
   provider?: string;
