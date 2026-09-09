@@ -222,6 +222,9 @@ export async function createHelpVideoProcessingJob(input: {
     if (sourceStorageKey) {
       await deleteAssetObject(sourceStorageKey).catch(() => undefined);
     }
+    const active = await getActiveHelpVideoProcessingJob(input.contentId)
+      .catch(() => null);
+    if (active) return toView(active, await completedPartCount(active.id));
     throw cause;
   }
 }
