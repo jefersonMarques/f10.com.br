@@ -39,6 +39,10 @@ CREATE INDEX IF NOT EXISTS "help_video_processing_jobs_status_idx"
 CREATE INDEX IF NOT EXISTS "help_video_processing_jobs_lease_idx"
   ON "help_video_processing_jobs" ("status", "lease_expires_at");
 
+CREATE UNIQUE INDEX IF NOT EXISTS "help_video_processing_jobs_content_active_unique"
+  ON "help_video_processing_jobs" ("content_id")
+  WHERE "status" IN ('queued', 'running', 'retry_waiting');
+
 CREATE TABLE IF NOT EXISTS "help_video_processing_parts" (
   "job_id" uuid NOT NULL REFERENCES "help_video_processing_jobs"("id") ON DELETE CASCADE,
   "part_index" integer NOT NULL,
