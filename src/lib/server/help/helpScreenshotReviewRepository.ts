@@ -973,6 +973,133 @@ export async function addHelpHumanReviewCandidate(input: {
   };
 }
 
+export async function addHelpGeneratedReviewCandidates(input: {
+  actorUserId: string;
+  contentId: string;
+  blockId: string;
+  altText: string;
+  assistantDescription: string;
+  candidates: Array<{
+    timeSeconds: number;
+    bytes: Uint8Array;
+  }>;
+}): Promise<Array<{
+  assetId: string;
+  candidateIndex: number;
+  timeSeconds: number;
+  recommended: false;
+}>> {
+  const db = getDatabase();
+  const [row] = await db
+    .select({
+      stepId: helpStepBlocks.stepId,
+      blockType: helpStepBlocks.blockType,
+      contentStatus: helpContents.status,
+    })
+    .from(helpStepBlocks)
+    .innerJoin(helpContentSteps, eq(helpStepBlocks.stepId, helpContentSteps.id))
+    .innerJoin(helpContents, eq(helpContentSteps.contentId, helpContents.id))
+    .where(
+      and(
+        eq(helpStepBlocks.id, input.blockId),
+        eq(helpContentSteps.contentId, input.contentId),
+      ),
+    )
+    .limit(1);
+  if (!row || row.blockType !== "image") throw new Error("IMAGE_BLOCK_NOT_FOUND");
+  if (row.contentStatus === "archived") throw new Error("CONTENT_ARCHIVED");
+
+  const existingAssets = await db
+    .select({ metadata: helpAssets.metadata })
+    .from(helpAssets)
+    .where(and(eq(helpAssets.contentId, input.contentId), eq(helpAssets.assetType, "image")));
+  const related = existingAssets.flatMap((asset) => {
+    const review = reviewMetadata(asset.metadata);
+    return review?.stepId === row.stepId ? [review] : [];
+  });
+  if (related.length + input.candidates.length > 24) {
+    throw new Error("SCREENSHOT_CANDIDATE_LIMIT");
+  }
+  let candidateIndex = Math.max(
+    0,
+    ...related.map((review) => Number(review.candidateIndex ?? 0)),
+  );
+  const expiresAt = new Date(Date.now() + REVIEW_TTL_MS).toISOString();
+  const created: Array<{
+    assetId: string;
+    candidateIndex: number;
+    timeSeconds: number;
+    recommended: false;
+  }> = [];
+
+  try {
+    for (const [index, candidate] of input.candidates.entries()) {
+      const asset = await createManagedHelpAsset(input.actorUserId, {
+        fileName: `generated-${index + 1}.jpg`,
+        mimeType: "image/jpeg",
+        bytes: candidate.bytes,
+        altText: input.altText,
+        assistantDescription: input.assistantDescription,
+        contentId: input.contentId,
+        deduplicate: false,
+      });
+      candidateIndex += 1;
+      const timeSeconds = Math.max(0, Number(candidate.timeSeconds) || 0);
+      await db
+        .update(helpAssets)
+        .set({
+          metadata: {
+            ...(asset.asset.metadata ?? {}),
+            screenshotReview: {
+              pending: true,
+              role: "candidate",
+              stepId: row.stepId,
+              candidateIndex,
+              timeSeconds,
+              expiresAt,
+            },
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(helpAssets.id, asset.asset.id));
+      created.push({
+        assetId: asset.asset.id,
+        candidateIndex,
+        timeSeconds,
+        recommended: false,
+      });
+    }
+
+    await db
+      .update(helpContents)
+      .set({
+        status: "draft",
+        updatedBy: input.actorUserId,
+        updatedAt: new Date(),
+      })
+      .where(eq(helpContents.id, input.contentId));
+  } catch (cause) {
+    await Promise.allSettled(
+      created.map((item) => deleteManagedHelpAsset(input.actorUserId, item.assetId)),
+    );
+    throw cause;
+  }
+
+  await recordAuditEvent({
+    actorUserId: input.actorUserId,
+    action: "help.image.review.candidates_generated",
+    entityType: "help_step_block",
+    entityId: input.blockId,
+    metadata: {
+      contentId: input.contentId,
+      candidateCount: created.length,
+      timeSeconds: created.map((item) => item.timeSeconds),
+    },
+  });
+
+  return created;
+}
+
 export async function replaceHelpHumanReviewImage(input: {
   actorUserId: string;
   contentId: string;
