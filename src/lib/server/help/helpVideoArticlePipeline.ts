@@ -98,7 +98,11 @@ export type HelpVideoCoverage = {
 };
 
 export type HelpVideoArticlePipelineAiUsage = {
-  operation: "video_coverage" | "video_article_part" | "video_article_metadata";
+  operation:
+    | "video_coverage"
+    | "video_coverage_audit"
+    | "video_article_part"
+    | "video_article_metadata";
   provider?: string;
   model: string;
   inputTokens?: number | null;
@@ -511,6 +515,115 @@ function missingCoverage(
   return requiredIds.filter((id) => !covered.has(id));
 }
 
+type CoverageAuditResponse = {
+  segments: Array<{
+    segmentId: string;
+    covered: boolean;
+  }>;
+};
+
+function coverageAuditSchema(): Record<string, unknown> {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["segments"],
+    properties: {
+      segments: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["segmentId", "covered"],
+          properties: {
+            segmentId: { type: "string" },
+            covered: { type: "boolean" },
+          },
+        },
+      },
+    },
+  };
+}
+
+async function auditPartCoverage(
+  part: ClassifiedSegment[],
+  steps: GeneratedPartStep[],
+  onAiUsage?: PipelineAiUsageHandler,
+): Promise<string[]> {
+  const startedAt = Date.now();
+  let responseMeta: {
+    provider?: string;
+    model: string;
+    inputTokens?: number | null;
+    outputTokens?: number | null;
+  } = { model: "ai-gateway" };
+
+  try {
+    const response = await createAiStructuredResponse<CoverageAuditResponse>({
+      task: "content_edit",
+      requiredCapabilities: ["content.draft"],
+      instructions: [
+        "Audite se cada segmento da fonte está REALMENTE representado no texto público gerado.",
+        "Retorne exatamente um item para cada segmentId recebido.",
+        "Marque covered=true somente quando a ação, regra, condição, resultado ou explicação daquele segmento estiver expressa no título, descrição ou instrução.",
+        "Ignore sourceSegmentIds declarados pelas etapas; eles não são prova de cobertura.",
+        "Não exija repetição literal. Considere paráfrases fiéis equivalentes.",
+        "Se qualquer detalhe operacional relevante do segmento estiver ausente, marque covered=false.",
+      ].join("\n"),
+      userInput: [
+        "FONTE:",
+        partInput(part),
+        "CONTEÚDO GERADO:",
+        steps.map((step, index) => [
+          `ETAPA ${index + 1}: ${step.title}`,
+          step.description,
+          step.instruction,
+        ].filter(Boolean).join("\n")).join("\n\n"),
+      ].join("\n\n"),
+      schemaName: "f10_help_video_coverage_audit",
+      schema: coverageAuditSchema(),
+      maxOutputTokens: 6_000,
+      timeoutMs: 120_000,
+    });
+    responseMeta = {
+      provider: response.provider,
+      model: response.model,
+      inputTokens: response.inputTokens,
+      outputTokens: response.outputTokens,
+    };
+
+    const expected = new Set(part.map((segment) => segment.id));
+    const seen = new Set<string>();
+    const uncovered: string[] = [];
+    for (const item of response.data.segments) {
+      if (!expected.has(item.segmentId) || seen.has(item.segmentId)) {
+        throw new Error("HELP_VIDEO_COVERAGE_AUDIT_INVALID");
+      }
+      seen.add(item.segmentId);
+      if (!item.covered) uncovered.push(item.segmentId);
+    }
+    if (seen.size !== expected.size) {
+      throw new Error("HELP_VIDEO_COVERAGE_AUDIT_INVALID");
+    }
+
+    await reportAiUsage(onAiUsage, {
+      operation: "video_coverage_audit",
+      ...responseMeta,
+      latencyMs: Date.now() - startedAt,
+      status: "success",
+    });
+    return uncovered;
+  } catch (cause) {
+    await reportAiUsage(onAiUsage, {
+      operation: "video_coverage_audit",
+      ...responseMeta,
+      latencyMs: Date.now() - startedAt,
+      status: "failed",
+      failureCode: aiFailureCode(cause),
+    });
+    throw new Error(`HELP_VIDEO_COVERAGE_AUDIT_FAILED:${aiFailureCode(cause)}`);
+  }
+}
+
 function partInput(part: ClassifiedSegment[]): string {
   return part
     .map(
@@ -554,7 +667,7 @@ async function generatePart(
           "Para etapa de interface, planeje no máximo um screenshot usando os tempos dos próprios segmentos da etapa.",
           "Não invente telas, campos, regras, URLs ou resultados.",
           attempt === 2
-            ? `CORREÇÃO OBRIGATÓRIA: a tentativa anterior deixou estes segmentos sem cobertura ou vazou linguagem da fonte: ${lastMissing.join(", ") || "linguagem editorial inadequada"}.`
+            ? `CORREÇÃO OBRIGATÓRIA: a auditoria detectou estes segmentos sem representação suficiente ou linguagem inadequada: ${lastMissing.join(", ") || "linguagem editorial inadequada"}. Inclua os fatos desses segmentos de forma explícita e natural.`
             : "",
         ].filter(Boolean).join("\n"),
         userInput: [
@@ -580,13 +693,16 @@ async function generatePart(
       lastMissing = missingCoverage(requiredIds, steps);
       const editorialLeak = steps.some(stepLeaksSource);
       if (steps.length > 0 && lastMissing.length === 0 && !editorialLeak) {
-        await reportAiUsage(onAiUsage, {
-          operation: "video_article_part",
-          ...lastResponseMeta,
-          latencyMs: Date.now() - startedAt,
-          status: "success",
-        });
-        return steps;
+        lastMissing = await auditPartCoverage(part, steps, onAiUsage);
+        if (lastMissing.length === 0) {
+          await reportAiUsage(onAiUsage, {
+            operation: "video_article_part",
+            ...lastResponseMeta,
+            latencyMs: Date.now() - startedAt,
+            status: "success",
+          });
+          return steps;
+        }
       }
       if (editorialLeak && lastMissing.length === 0) lastMissing = ["linguagem_da_fonte"];
     }
