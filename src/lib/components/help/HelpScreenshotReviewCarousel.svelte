@@ -19,6 +19,7 @@
   export let initialInteractions: HelpHumanReviewInteraction[] = [];
   export let reviewed = false;
   export let disabled = false;
+  export let canGenerateFrames = false;
 
   const dispatch = createEventDispatcher<{ interaction: void; replaced: void }>();
   let candidateOptions = [...candidates];
@@ -34,6 +35,7 @@
   let candidateFile: File | null = null;
   let addingCandidate = false;
   let candidateMessage = "";
+  let generatingMode: "auto" | "before" | "after" | null = null;
 
   function preferredAssetId(options = candidateOptions): string {
     if (initialSelectedAssetId && options.some((candidate) => candidate.assetId === initialSelectedAssetId)) {
@@ -149,6 +151,51 @@
     candidateMessage = "";
   }
 
+  async function generateCandidates(mode: "auto" | "before" | "after"): Promise<void> {
+    if (generatingMode || disabled || !canGenerateFrames) return;
+    generatingMode = mode;
+    candidateMessage = "";
+    try {
+      const response = await fetch(
+        `/api/app/help/content/${contentId}/images/${blockId}/review/generate`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ mode }),
+        },
+      );
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+        candidates?: Array<{
+          assetId: string;
+          candidateIndex: number;
+          timeSeconds: number;
+          recommended: false;
+        }>;
+      };
+      if (!response.ok || !payload.success || !payload.candidates?.length) {
+        candidateMessage = payload.message || "Não foi possível gerar novas imagens.";
+        return;
+      }
+      candidateOptions = [...candidateOptions, ...payload.candidates].sort(
+        (left, right) => left.candidateIndex - right.candidateIndex,
+      );
+      candidateMessage = payload.message || "Novas imagens adicionadas.";
+      queueMicrotask(() => {
+        stripElement?.children.item(candidateOptions.length - payload.candidates!.length)?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "center",
+        });
+      });
+    } catch {
+      candidateMessage = "A conexão foi interrompida ao gerar novas imagens.";
+    } finally {
+      generatingMode = null;
+    }
+  }
+
   async function addCandidate(): Promise<void> {
     if (!candidateFile || addingCandidate || disabled) return;
     addingCandidate = true;
@@ -259,7 +306,22 @@
       {/if}
 
       {#if !disabled}
-        <div class="mt-4 rounded-2xl border border-[#E2E5ED] bg-white p-3">
+        {#if canGenerateFrames}
+          <div class="mt-4 rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-3">
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" disabled={Boolean(generatingMode)} on:click={() => generateCandidates("auto")} class="inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#000A57] px-3 text-[9px] font-semibold text-white disabled:opacity-50">
+                {#if generatingMode === "auto"}<LoaderCircle size={13} class="animate-spin"/>{:else}<Sparkles size={13}/>{/if}
+                Mais imagens
+              </button>
+              {#if candidateOptions.some((candidate) => candidate.timeSeconds !== null)}
+                <button type="button" disabled={Boolean(generatingMode)} on:click={() => generateCandidates("before")} class="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#D8DDF4] bg-white px-3 text-[9px] font-semibold text-[#000A57] disabled:opacity-50"><ChevronLeft size={13}/>Antes</button>
+                <button type="button" disabled={Boolean(generatingMode)} on:click={() => generateCandidates("after")} class="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#D8DDF4] bg-white px-3 text-[9px] font-semibold text-[#000A57] disabled:opacity-50">Depois<ChevronRight size={13}/></button>
+              {/if}
+            </div>
+          </div>
+        {/if}
+
+        <div class="mt-3 rounded-2xl border border-[#E2E5ED] bg-white p-3">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <label class="min-w-0 flex-1">
               <span class="text-[9px] font-semibold text-[#596071]">Adicionar outra imagem</span>
