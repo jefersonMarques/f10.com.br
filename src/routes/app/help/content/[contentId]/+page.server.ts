@@ -9,6 +9,7 @@ import { findImportedHelpVideoByChecksum } from "$lib/server/help/helpImportedFe
 import {
   createManagedHelpAsset,
   deleteManagedHelpAsset,
+  getHelpAsset,
 } from "$lib/server/help/helpAssetRepository";
 import {
   addStructuredHelpBlock,
@@ -350,21 +351,9 @@ export const actions: Actions = {
 
         const uploaded = duplicate?.contentId === params.contentId
           ? { asset: await (async () => {
-              const currentContent = await getStructuredHelpContent(params.contentId);
-              const existing = currentContent?.featuredVideo?.id === duplicate.assetId
-                ? currentContent.featuredVideo
-                : null;
-              if (existing) return existing;
-              const managed = await createManagedHelpAsset(session.user.id, {
-                fileName: videoFile.name || "video.mp4",
-                mimeType: videoFile.type,
-                bytes,
-                altText: input.altText,
-                assistantSummary: input.assistantSummary,
-                contentId: params.contentId,
-                deduplicate: true,
-              });
-              return managed.asset;
+              const existing = await getHelpAsset(duplicate.assetId);
+              if (!existing) throw new Error("FEATURED_VIDEO_MP4_REQUIRED");
+              return existing;
             })(), reused: true }
           : await createManagedHelpAsset(session.user.id, {
               fileName: videoFile.name || "video.mp4",
