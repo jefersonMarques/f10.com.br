@@ -96,16 +96,17 @@
   }
 
   function periodRange(): { start: string; end: string } {
-    if (period === "today") return { start: anchor, end: anchor };
+    const today = dateKey(new Date());
+    if (period === "today") return { start: today, end: today };
     if (period === "tomorrow") {
-      const tomorrow = addDays(anchor, 1);
+      const tomorrow = addDays(today, 1);
       return { start: tomorrow, end: tomorrow };
     }
     if (period === "week") {
-      const start = startOfWeek(anchor);
+      const start = startOfWeek(today);
       return { start, end: addDays(start, 6) };
     }
-    if (period === "next7") return { start: anchor, end: addDays(anchor, 6) };
+    if (period === "next7") return { start: today, end: addDays(today, 6) };
     const date = parseDateKey(anchor);
     const start = dateKey(new Date(date.getFullYear(), date.getMonth(), 1));
     const end = dateKey(new Date(date.getFullYear(), date.getMonth() + 1, 0));
