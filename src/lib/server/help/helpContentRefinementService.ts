@@ -561,6 +561,7 @@ export async function generateAdditionalHelpScreenshotCandidates(input: {
   blockId: string;
   mode: HelpScreenshotGenerationMode;
   baseTimeSeconds?: number | null;
+  selectedAssetId?: string | null;
 }) {
   const content = await getStructuredHelpContent(input.contentId);
   if (!content) throw new Error("CONTENT_NOT_FOUND");
@@ -641,5 +642,6 @@ export async function generateAdditionalHelpScreenshotCandidates(input: {
       timeSeconds: candidate.timeSeconds,
       bytes: candidate.bytes,
     })),
+    preserveAssetIds: input.selectedAssetId ? [input.selectedAssetId] : [],
   });
 }
