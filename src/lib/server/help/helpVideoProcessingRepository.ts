@@ -6,6 +6,7 @@ import {
   desc,
   eq,
   inArray,
+  isNotNull,
   isNull,
   lte,
   or,
@@ -37,7 +38,7 @@ const ACTIVE_STATUSES: HelpVideoProcessingJobStatus[] = [
   "running",
   "retry_waiting",
 ];
-const LEASE_MS = 5 * 60 * 1_000;
+const LEASE_MS = 90 * 1_000;
 
 export type HelpVideoProcessingSource =
   | { type: "current" }
@@ -241,6 +242,7 @@ export async function recoverStaleHelpVideoProcessingJobs(): Promise<void> {
     .where(
       and(
         eq(helpVideoProcessingJobs.status, "running"),
+        isNotNull(helpVideoProcessingJobs.leaseExpiresAt),
         lte(helpVideoProcessingJobs.leaseExpiresAt, now),
       ),
     );
@@ -347,10 +349,7 @@ function checkpointWithoutParts(
   return {
     transcript: checkpoint.transcript,
     article: checkpoint.article
-      ? {
-          classifiedSegments: checkpoint.article.classifiedSegments,
-          metadata: checkpoint.article.metadata,
-        }
+      ? { metadata: checkpoint.article.metadata }
       : undefined,
   };
 }
@@ -490,9 +489,10 @@ export async function failHelpVideoProcessingJob(
   job: HelpVideoProcessingJob,
   code: string,
   message: string,
+  retryable = true,
 ): Promise<void> {
   const now = new Date();
-  const retry = job.attemptCount < job.maxAttempts;
+  const retry = retryable && job.attemptCount < job.maxAttempts;
   await getDatabase()
     .update(helpVideoProcessingJobs)
     .set({
