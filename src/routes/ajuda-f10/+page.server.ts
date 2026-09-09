@@ -4,11 +4,11 @@ import { listPublishedStructuredHelpCatalog } from "$lib/server/help/publicStruc
 import { listPublicHelpCollections } from "$lib/server/help/helpCollectionRepository";
 
 export const load: PageServerLoad = async ({ url, cookies }) => {
-  const [articles, collections, customer] = await Promise.all([
+  const [articles, customer] = await Promise.all([
     listPublishedStructuredHelpCatalog(),
-    listPublicHelpCollections(),
     getOptionalCustomerF10PortalSession(cookies),
   ]);
+  const collections = await listPublicHelpCollections(articles);
 
   const categoryMap = new Map<
     string,
