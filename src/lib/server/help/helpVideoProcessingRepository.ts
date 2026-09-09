@@ -49,6 +49,9 @@ export type HelpVideoProcessingSource =
     };
 
 export type HelpVideoProcessingJob = typeof helpVideoProcessingJobs.$inferSelect;
+type CompletedArticlePart = NonNullable<
+  NonNullable<HelpVideoAutomationCheckpoint["article"]>["completedParts"]
+>[number];
 
 export type HelpVideoProcessingJobView = {
   id: string;
@@ -406,51 +409,24 @@ export async function loadHelpVideoProcessingCheckpoint(
     .where(eq(helpVideoProcessingParts.jobId, job.id))
     .orderBy(asc(helpVideoProcessingParts.partIndex));
 
+  const completedParts: CompletedArticlePart[] = parts.flatMap((part) => {
+    const steps = (part.payload as { steps?: CompletedArticlePart["steps"] }).steps;
+    return Array.isArray(steps)
+      ? [{
+          partIndex: part.partIndex,
+          segmentIds: part.segmentIds,
+          steps,
+        }]
+      : [];
+  });
+
   return {
     transcript: base.transcript,
-    article: base.article
-      ? {
-          ...base.article,
-          completedParts: parts.flatMap((part) => {
-            const payload = part.payload as {
-              steps?: HelpVideoAutomationCheckpoint["article"] extends infer T
-                ? unknown
-                : never;
-            };
-            const steps = (
-              part.payload as {
-                steps?: NonNullable<
-                  NonNullable<HelpVideoAutomationCheckpoint["article"]>["completedParts"]
-                >[number]["steps"];
-              }
-            ).steps;
-            return Array.isArray(steps)
-              ? [{
-                  partIndex: part.partIndex,
-                  segmentIds: part.segmentIds,
-                  steps,
-                }]
-              : [];
-          }),
-        }
-      : parts.length > 0
+    article:
+      base.article || completedParts.length > 0
         ? {
-            completedParts: parts.flatMap((part) => {
-              const steps = (
-                part.payload as {
-                  steps?: NonNullable<
-                    NonNullable<HelpVideoAutomationCheckpoint["article"]>["completedParts"]
-                  >[number]["steps"];
-                }
-              ).steps;
-              return Array.isArray(steps)
-                ? [{
-                    partIndex: part.partIndex,
-                    segmentIds: part.segmentIds,
-                    steps,
-                  }]
-                : [];
-            }),
+            ...(base.article ?? {}),
+            completedParts,
           }
         : undefined,
   };
