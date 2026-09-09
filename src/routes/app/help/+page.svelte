@@ -1,196 +1,157 @@
 <script lang="ts">
   import {
-    BookOpen,
-    CheckCircle2,
+    ArrowUpRight,
+    BarChart3,
+    BrainCircuit,
     CircleAlert,
-    FilePlus2,
-    GitBranch,
-    Library,
+    FileText,
+    GraduationCap,
     Layers3,
-    PlaySquare,
+    Search,
+    SearchX,
+    Users,
   } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
-  import type { ActionData, PageData } from "./$types";
+  import type { PageData } from "./$types";
 
   export let data: PageData;
-  export let form: ActionData;
 
-  const statusLabels: Record<string, string> = {
-    draft: "Rascunho",
-    review: "Em revisão",
-    published: "Publicado",
-    archived: "Arquivado",
-  };
-
-  $: createValues =
-    form && form.action === "createArticle" && "values" in form
-      ? form.values
-      : null;
+  function formatDate(value: string | Date): string {
+    return new Intl.DateTimeFormat("pt-BR", {
+      dateStyle: "short",
+    }).format(new Date(value));
+  }
 </script>
 
-<svelte:head>
-  <title>Central de Ajuda | F10 Operations</title>
-</svelte:head>
+<svelte:head><title>Base de Conhecimento | F10 Operations</title></svelte:head>
 
-<ApplicationContent width="standard">
-  <div class="mb-3 flex flex-wrap justify-end gap-2">
-    <a href="/app/help/collections" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57] shadow-sm transition hover:bg-[#F8F9FC]"><Layers3 size={15}/>Coleções</a>
-    {#if data.canEdit}
-      <form method="POST" action="?/importLegacy">
-        <button
-          type="submit"
-          class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57] shadow-sm transition hover:bg-[#F8F9FC]"
-        >
-          <GitBranch size={15} aria-hidden="true" />
-          Importar conteúdo atual
-        </button>
-      </form>
-    {/if}
+<ApplicationContent width="wide">
+  <div class="mb-4 flex flex-wrap items-center justify-end gap-2">
+    <a href="/app/help/content" class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 text-[10px] font-semibold text-[#000A57]"><FileText size={14}/>Conteúdos</a>
+    <a href="/app/help/collections" class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 text-[10px] font-semibold text-[#000A57]"><Layers3 size={14}/>Coleções</a>
+    <a href="/app/help/trilhas" class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 text-[10px] font-semibold text-[#000A57]"><GraduationCap size={14}/>Trilhas</a>
+    <a href="/app/help/insights" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-3.5 text-[10px] font-semibold text-white"><BarChart3 size={14}/>Detalhes</a>
   </div>
-
-  {#if form?.message}
-    <div
-      class={`mb-3 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${
-        form.success
-          ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]"
-          : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"
-      }`}
-    >
-      {#if form.success}
-        <CheckCircle2 size={18} class="mt-0.5 shrink-0" aria-hidden="true" />
-      {:else}
-        <CircleAlert size={18} class="mt-0.5 shrink-0" aria-hidden="true" />
-      {/if}
-      <span>{form.message}</span>
-    </div>
-  {/if}
 
   <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5">
-      <Library size={20} class="text-[#000A57]" aria-hidden="true" />
-      <strong class="mt-4 block text-[26px] font-semibold">{data.summary.articles}</strong>
-      <span class="text-[11px] text-[#858A98]">conteúdos editoriais</span>
+      <Search size={19} class="text-[#000A57]"/>
+      <strong class="mt-4 block text-[26px] font-semibold">{data.summary.searches}</strong>
+      <span class="text-[10px] text-[#858A98]">pesquisas</span>
+    </div>
+    <div class="rounded-2xl border border-[#F0D7C4] bg-[#FFF9F4] p-5">
+      <SearchX size={19} class="text-[#A9510D]"/>
+      <strong class="mt-4 block text-[26px] font-semibold text-[#7A3B08]">{data.summary.withoutResults}</strong>
+      <span class="text-[10px] text-[#91603A]">sem resultado</span>
+    </div>
+    <div class="rounded-2xl border border-[#F0D7C4] bg-[#FFF9F4] p-5">
+      <BrainCircuit size={19} class="text-[#EA6D0B]"/>
+      <strong class="mt-4 block text-[26px] font-semibold text-[#7A3B08]">{data.knowledge.summary.notFound}</strong>
+      <span class="text-[10px] text-[#91603A]">IA sem resposta</span>
     </div>
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5">
-      <BookOpen size={20} class="text-[#000A57]" aria-hidden="true" />
-      <strong class="mt-4 block text-[26px] font-semibold">{data.summary.destinations}</strong>
-      <span class="text-[11px] text-[#858A98]">destinos de ajuda</span>
-    </div>
-    <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5">
-      <GitBranch size={20} class="text-[#000A57]" aria-hidden="true" />
-      <strong class="mt-4 block text-[26px] font-semibold">{data.summary.questions}</strong>
-      <span class="text-[11px] text-[#858A98]">perguntas interativas</span>
-    </div>
-    <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5">
-      <PlaySquare size={20} class="text-[#000A57]" aria-hidden="true" />
-      <strong class="mt-4 block text-[26px] font-semibold">{data.summary.trainings}</strong>
-      <span class="text-[11px] text-[#858A98]">treinamentos</span>
+      <Users size={19} class="text-[#000A57]"/>
+      <strong class="mt-4 block text-[26px] font-semibold">{data.summary.escalations}</strong>
+      <span class="text-[10px] text-[#858A98]">viraram atendimento</span>
     </div>
   </section>
 
-  <div class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
-    <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
-      <header class="flex items-center justify-between gap-4 border-b border-[#EEF0F5] px-5 py-4 sm:px-6">
-        <div>
-          <h2 class="text-[16px] font-semibold text-[#11182C]">Conteúdos</h2>
-          <p class="mt-1 text-[11px] text-[#858A98]">Rascunhos e conteúdos publicados pela equipe.</p>
-        </div>
+  <div class="mt-5 grid gap-5 xl:grid-cols-2">
+    <section class="overflow-hidden rounded-[22px] border border-[#F0D7C4] bg-white">
+      <header class="flex items-center gap-3 border-b border-[#F4E4D7] bg-[#FFF9F4] px-5 py-4 sm:px-6">
+        <BrainCircuit size={17} class="text-[#EA6D0B]"/>
+        <h2 class="text-[13px] font-semibold text-[#303645]">IA não conseguiu responder</h2>
       </header>
-
-      {#if data.articles.length === 0}
-        <div class="px-6 py-14 text-center">
-          <BookOpen size={30} class="mx-auto text-[#B5BAC7]" aria-hidden="true" />
-          <p class="mt-4 text-[13px] font-semibold text-[#4B5160]">Nenhum conteúdo editorial criado</p>
-          <p class="mt-1 text-[11px] text-[#9297A5]">Os fluxos atuais podem ser importados sem afetar a Central pública.</p>
-        </div>
+      {#if data.knowledge.gaps.length === 0}
+        <div class="px-6 py-12 text-center text-[10px] text-[#9297A5]">Nenhuma lacuna registrada.</div>
       {:else}
         <div class="divide-y divide-[#EEF0F5]">
-          {#each data.articles as article}
-            <article class="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          {#each data.knowledge.gaps.slice(0, 10) as item}
+            <div class="flex items-start justify-between gap-4 px-5 py-4 sm:px-6">
               <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-2">
-                  <a
-                    href={`/app/help/${article.id}`}
-                    class="truncate text-[13px] font-semibold text-[#202637] transition hover:text-[#000A57] hover:underline"
-                  >
-                    {article.title}
-                  </a>
-                  <span class="application-text-meta rounded-full bg-[#F2F3F7] px-2 py-1 font-bold uppercase tracking-[0.06em] text-[#707687]">
-                    {statusLabels[article.status] ?? article.status}
-                  </span>
-                </div>
-                <p class="mt-1 truncate text-[11px] text-[#8B909E]">/{article.slug}</p>
-                {#if article.summary}
-                  <p class="mt-2 line-clamp-2 text-[12px] leading-5 text-[#666C7D]">{article.summary}</p>
-                {/if}
+                <strong class="block text-[11px] leading-5 text-[#303645]">{item.sampleQuestion}</strong>
+                <span class="mt-1 block text-[8px] text-[#A0A5B0]">{formatDate(item.lastAskedAt)}</span>
               </div>
-
-              {#if data.canPublish && article.status !== "published"}
-                <form method="POST" action="?/publishArticle" class="shrink-0">
-                  <input type="hidden" name="articleId" value={article.id} />
-                  <button
-                    type="submit"
-                    class="min-h-9 rounded-lg bg-[#000A57] px-3 text-[11px] font-semibold text-white transition hover:bg-[#111B71]"
-                  >
-                    Publicar
-                  </button>
-                </form>
-              {/if}
-            </article>
+              <span class="shrink-0 rounded-full bg-[#FFF0E4] px-2.5 py-1 text-[9px] font-bold text-[#A9510D]">{item.attempts}x</span>
+            </div>
           {/each}
         </div>
       {/if}
     </section>
 
-    {#if data.canEdit}
-      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
-        <div class="flex items-start gap-3">
-          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFF0E4] text-[#EA6D0B]">
-            <FilePlus2 size={19} aria-hidden="true" />
-          </span>
-          <div>
-            <h2 class="text-[16px] font-semibold text-[#11182C]">Novo conteúdo</h2>
-            <p class="mt-1 text-[11px] leading-5 text-[#858A98]">Cria um rascunho simples para evolução no editor.</p>
-          </div>
+    <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
+      <header class="flex items-center gap-3 border-b border-[#EEF0F5] px-5 py-4 sm:px-6">
+        <SearchX size={17} class="text-[#A9510D]"/>
+        <h2 class="text-[13px] font-semibold text-[#303645]">Buscas sem conteúdo</h2>
+      </header>
+      {#if data.noResultQueries.length === 0}
+        <div class="px-6 py-12 text-center text-[10px] text-[#9297A5]">Nenhuma busca sem resultado.</div>
+      {:else}
+        <div class="divide-y divide-[#EEF0F5]">
+          {#each data.noResultQueries.slice(0, 10) as item}
+            <div class="flex items-start justify-between gap-4 px-5 py-4 sm:px-6">
+              <div class="min-w-0">
+                <strong class="block text-[11px] leading-5 text-[#303645]">{item.sampleQuery}</strong>
+                <span class="mt-1 block text-[8px] text-[#A0A5B0]">{formatDate(item.lastSearchedAt)}</span>
+              </div>
+              <span class="shrink-0 rounded-full bg-[#F3F4F7] px-2.5 py-1 text-[9px] font-bold text-[#5E6575]">{item.searches}x</span>
+            </div>
+          {/each}
         </div>
-
-        <form method="POST" action="?/createArticle" class="mt-6 space-y-4">
-          <label class="block">
-            <span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Título</span>
-            <input name="title" required maxlength="160" value={createValues?.title ?? ""} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10" />
-          </label>
-
-          <label class="block">
-            <span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Endereço</span>
-            <input name="slug" maxlength="120" value={createValues?.slug ?? ""} placeholder="gerado a partir do título" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10" />
-          </label>
-
-          <label class="block">
-            <span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Resumo</span>
-            <textarea name="summary" maxlength="320" rows="3" value={createValues?.summary ?? ""} class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"></textarea>
-          </label>
-
-          <label class="block">
-            <span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Conteúdo</span>
-            <textarea name="bodyText" required maxlength="50000" rows="9" value={createValues?.bodyText ?? ""} placeholder="Separe os parágrafos com uma linha em branco." class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[13px] leading-6 outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10"></textarea>
-          </label>
-
-          <button type="submit" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white transition hover:bg-[#111B71]">
-            <FilePlus2 size={17} aria-hidden="true" />
-            Criar rascunho
-          </button>
-        </form>
-      </section>
-    {/if}
+      {/if}
+    </section>
   </div>
 
-  <section class="mt-5 rounded-[22px] border border-dashed border-[#CFD3DD] bg-[#FAFAFC] px-5 py-5 sm:px-6">
-    <div class="flex items-start gap-3">
-      <GitBranch size={20} class="mt-0.5 shrink-0 text-[#EA6D0B]" aria-hidden="true" />
-      <div>
-        <h2 class="text-[13px] font-semibold text-[#323848]">Transição sem impacto no site público</h2>
-        <p class="mt-1 max-w-[900px] text-[11px] leading-5 text-[#777D8D]">Nesta fase, os dados são administrados no PostgreSQL, mas a rota pública /ajuda-f10 continua usando a estrutura atual em TypeScript. A troca para leitura dinâmica será feita somente depois de validar a importação e o mecanismo de publicação.</p>
-      </div>
-    </div>
-  </section>
+  <div class="mt-5 grid gap-5 xl:grid-cols-2">
+    <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
+      <header class="flex items-center gap-3 border-b border-[#EEF0F5] px-5 py-4 sm:px-6">
+        <ArrowUpRight size={17} class="text-[#76510A]"/>
+        <h2 class="text-[13px] font-semibold text-[#303645]">Resposta estava em outro artigo</h2>
+      </header>
+      {#if data.knowledge.foundElsewhere.length === 0}
+        <div class="px-6 py-12 text-center text-[10px] text-[#9297A5]">Nenhum caso registrado.</div>
+      {:else}
+        <div class="divide-y divide-[#EEF0F5]">
+          {#each data.knowledge.foundElsewhere.slice(0, 10) as item}
+            <div class="px-5 py-4 sm:px-6">
+              <div class="flex items-start justify-between gap-3">
+                <strong class="text-[11px] leading-5 text-[#303645]">{item.sampleQuestion}</strong>
+                <span class="shrink-0 text-[9px] font-bold text-[#76510A]">{item.attempts}x</span>
+              </div>
+              <div class="mt-2 flex items-center justify-between gap-3">
+                <span class="truncate text-[8px] text-[#9297A5]">/{item.contextSlug || "global"} → /{item.targetSlug}</span>
+                {#if item.targetContentId}
+                  <a href={`/app/help/content/${item.targetContentId}/images`} class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#000A57]" aria-label="Abrir conteúdo" title="Abrir conteúdo"><ArrowUpRight size={12}/></a>
+                {/if}
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </section>
+
+    <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
+      <header class="flex items-center gap-3 border-b border-[#EEF0F5] px-5 py-4 sm:px-6">
+        <Search size={17} class="text-[#000A57]"/>
+        <h2 class="text-[13px] font-semibold text-[#303645]">Mais pesquisados</h2>
+      </header>
+      {#if data.topQueries.length === 0}
+        <div class="px-6 py-12 text-center text-[10px] text-[#9297A5]">Sem pesquisas registradas.</div>
+      {:else}
+        <div class="divide-y divide-[#EEF0F5]">
+          {#each data.topQueries.slice(0, 10) as item}
+            <div class="px-5 py-4 sm:px-6">
+              <div class="flex items-center justify-between gap-4">
+                <strong class="truncate text-[11px] text-[#303645]">{item.sampleQuery}</strong>
+                <span class="shrink-0 text-[9px] font-bold text-[#000A57]">{item.searches}x</span>
+              </div>
+              {#if item.withoutResults > 0}
+                <div class="mt-2 flex items-center gap-1.5 text-[8px] font-medium text-[#A9510D]"><CircleAlert size={11}/>{item.withoutResults} sem resultado</div>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </section>
+  </div>
 </ApplicationContent>
