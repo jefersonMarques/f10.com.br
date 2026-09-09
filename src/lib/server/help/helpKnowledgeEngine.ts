@@ -81,7 +81,7 @@ const RESPONSE_SCHEMA = {
   properties: {
     resolved: { type: "boolean" },
     answer: { type: "string" },
-    targetIndex: { type: "integer", minimum: 0 },
+    targetIndex: { type: "integer" },
   },
   required: ["resolved", "answer", "targetIndex"],
 } as const;
