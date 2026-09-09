@@ -14,6 +14,7 @@ import {
 import { getStructuredHelpContent } from "$lib/server/help/structuredHelpRepository";
 import {
   generateHelpImportFromVideo,
+  type HelpVideoAutomationCheckpoint,
   type HelpVideoAutomationProgress,
 } from "$lib/server/help/helpVideoImportAutomation";
 
@@ -54,6 +55,10 @@ export async function regenerateHelpContentFromVideo(input: {
   actorUserId: string;
   contentId: string;
   source: HelpContentRegenerationSource;
+  checkpoint?: HelpVideoAutomationCheckpoint;
+  onCheckpoint?: (
+    checkpoint: HelpVideoAutomationCheckpoint,
+  ) => void | Promise<void>;
   onProgress?: (progress: HelpVideoAutomationProgress) => void | Promise<void>;
 }) {
   const current = await getStructuredHelpContent(input.contentId);
@@ -99,6 +104,8 @@ export async function regenerateHelpContentFromVideo(input: {
     },
     categories,
     externalIdHint: current.importExternalId || `content:${current.id}`,
+    checkpoint: input.checkpoint,
+    onCheckpoint: input.onCheckpoint,
     onProgress: input.onProgress,
     onAiUsage: (usage) =>
       recordHelpAiUsage({
