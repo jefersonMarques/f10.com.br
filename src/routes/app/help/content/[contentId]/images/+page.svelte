@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
+  import { onDestroy } from "svelte";
   import {
     AlertTriangle,
     Check,
@@ -88,9 +89,29 @@
   let deletingStep = false;
   let showVideoUpdateModal = false;
   let regenerationFile: File | null = null;
+  type RegenerationJob = {
+    id: string;
+    contentId: string;
+    status: "queued" | "running" | "retry_waiting" | "completed" | "failed" | "cancelled";
+    stage: string;
+    progressLabel: string;
+    progressDetail: string;
+    attemptCount: number;
+    maxAttempts: number;
+    completedParts: number;
+    lastErrorCode: string | null;
+    lastErrorMessage: string | null;
+    createdAt: string;
+    updatedAt: string;
+    completedAt: string | null;
+  };
+
   let regenerating = false;
   let regenerationError = "";
   let regenerationProgress: Array<{ stage: string; label: string; detail?: string; status: string }> = [];
+  let regenerationJob: RegenerationJob | null = null;
+  let regenerationPollTimer: ReturnType<typeof setTimeout> | null = null;
+  let completedRegenerationJobId = "";
 
   type ReviewItemPayload = {
     blockId: string;
@@ -595,6 +616,81 @@
     regenerationFile = input.files?.[0] ?? null;
   }
 
+  function clearRegenerationPolling(): void {
+    if (regenerationPollTimer) clearTimeout(regenerationPollTimer);
+    regenerationPollTimer = null;
+  }
+
+  async function applyRegenerationJob(job: RegenerationJob | null): Promise<void> {
+    regenerationJob = job;
+    regenerating = Boolean(
+      job && ["queued", "running", "retry_waiting"].includes(job.status),
+    );
+    regenerationProgress = job
+      ? [{
+          stage: job.stage,
+          label: job.progressLabel,
+          detail: [
+            job.progressDetail,
+            job.completedParts > 0 ? `${job.completedParts} parte(s) preservada(s)` : "",
+          ].filter(Boolean).join(" · "),
+          status: job.status === "completed" ? "done" : "active",
+        }]
+      : [];
+
+    if (job?.status === "failed") {
+      regenerationError =
+        "O processamento foi pausado após várias tentativas. Você pode retomar do último checkpoint.";
+    } else if (job?.status !== "cancelled") {
+      regenerationError = "";
+    }
+
+    if (
+      job?.status === "completed"
+      && completedRegenerationJobId !== job.id
+    ) {
+      completedRegenerationJobId = job.id;
+      saveSuccess = true;
+      saveMessage = "Novo rascunho gerado. Revise o conteúdo antes de publicar.";
+      regenerationFile = null;
+      await invalidateAll();
+    }
+  }
+
+  function scheduleRegenerationPoll(jobId: string): void {
+    clearRegenerationPolling();
+    regenerationPollTimer = setTimeout(() => {
+      void loadRegenerationJob(jobId);
+    }, 4_000);
+  }
+
+  async function loadRegenerationJob(jobId = ""): Promise<void> {
+    try {
+      const query = jobId ? `?jobId=${encodeURIComponent(jobId)}` : "";
+      const response = await fetch(
+        `/api/app/help/content/${data.content.id}/regenerate${query}`,
+        { headers: { Accept: "application/json" } },
+      );
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        job?: RegenerationJob | null;
+      };
+      if (!response.ok || !payload.success) return;
+      await applyRegenerationJob(payload.job ?? null);
+      if (
+        showVideoUpdateModal
+        && payload.job
+        && ["queued", "running", "retry_waiting"].includes(payload.job.status)
+      ) {
+        scheduleRegenerationPoll(payload.job.id);
+      }
+    } catch {
+      if (showVideoUpdateModal && regenerationJob?.id) {
+        scheduleRegenerationPoll(regenerationJob.id);
+      }
+    }
+  }
+
   function openVideoUpdate(): void {
     if (hasUnsavedReview || openEditors.size > 0) {
       saveSuccess = false;
@@ -607,14 +703,19 @@
     regenerationError = "";
     regenerationProgress = [];
     showVideoUpdateModal = true;
+    void loadRegenerationJob();
+  }
+
+  function closeVideoUpdate(): void {
+    showVideoUpdateModal = false;
+    clearRegenerationPolling();
   }
 
   async function runRegeneration(mode: "current" | "upload"): Promise<void> {
     if (regenerating || (mode === "upload" && !regenerationFile)) return;
-    regenerating = true;
     regenerationError = "";
-    regenerationProgress = [];
     saveMessage = "";
+
     try {
       let response: Response;
       if (mode === "upload") {
@@ -631,76 +732,55 @@
         );
       }
 
-      if (!response.ok || !response.body) {
-        const payload = await response.json().catch(() => ({})) as { message?: string };
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+        job?: RegenerationJob;
+      };
+      if (!response.ok || !payload.success || !payload.job) {
         regenerationError = payload.message || "Não foi possível iniciar a atualização.";
         return;
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let success = false;
-      let resultMessage = "";
-
-      const handleLine = (line: string) => {
-        if (!line.trim()) return;
-        const payload = JSON.parse(line) as {
-          type?: string;
-          stage?: string;
-          status?: string;
-          label?: string;
-          detail?: string;
-          message?: string;
-          success?: boolean;
-        };
-        if (payload.type === "progress" && payload.stage && payload.label) {
-          const next = regenerationProgress.filter((item) => item.stage !== payload.stage);
-          regenerationProgress = [
-            ...next,
-            {
-              stage: payload.stage,
-              label: payload.label,
-              detail: payload.detail,
-              status: payload.status || "active",
-            },
-          ];
-        } else if (payload.type === "result" && payload.success) {
-          success = true;
-          resultMessage = payload.message || "Novo rascunho gerado.";
-        } else if (payload.type === "error") {
-          resultMessage = payload.message || "Não foi possível atualizar o conteúdo.";
-          regenerationError = resultMessage;
-        }
-      };
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) handleLine(line);
-      }
-      buffer += decoder.decode();
-      if (buffer.trim()) handleLine(buffer);
-
-      if (success) {
-        saveSuccess = true;
-        saveMessage = resultMessage || "Novo rascunho gerado.";
-        regenerationError = "";
-        showVideoUpdateModal = false;
-        regenerationFile = null;
-        await invalidateAll();
-      } else if (!regenerationError) {
-        regenerationError = resultMessage || "Não foi possível atualizar o conteúdo.";
-      }
+      await applyRegenerationJob(payload.job);
+      scheduleRegenerationPoll(payload.job.id);
     } catch {
-      regenerationError = "A conexão foi interrompida durante a atualização.";
-    } finally {
-      regenerating = false;
+      regenerationError = "Não foi possível iniciar o processamento no servidor.";
     }
   }
+
+  async function retryRegeneration(): Promise<void> {
+    if (!regenerationJob || regenerating) return;
+    regenerationError = "";
+    try {
+      const response = await fetch(
+        `/api/app/help/content/${data.content.id}/regenerate`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jobId: regenerationJob.id,
+            action: "retry",
+          }),
+        },
+      );
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+        job?: RegenerationJob | null;
+      };
+      if (!response.ok || !payload.success || !payload.job) {
+        regenerationError = payload.message || "Não foi possível retomar.";
+        return;
+      }
+      await applyRegenerationJob(payload.job);
+      scheduleRegenerationPoll(payload.job.id);
+    } catch {
+      regenerationError = "Não foi possível solicitar a retomada.";
+    }
+  }
+
+  onDestroy(clearRegenerationPolling);
 
   async function publish(): Promise<void> {
     if (!publicationReady || publishing) return;
@@ -1004,7 +1084,7 @@
           <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Sparkles size={17}/></span>
           <div><h2 class="text-[16px] font-semibold text-[#11182C]">Atualizar com IA</h2><p class="mt-1 text-[10px] text-[#858A98]">A publicação atual permanece ativa.</p></div>
         </div>
-        <button type="button" on:click={() => !regenerating && (showVideoUpdateModal = false)} disabled={regenerating} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482] disabled:opacity-50" aria-label="Fechar"><X size={16}/></button>
+        <button type="button" on:click={closeVideoUpdate} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482]" aria-label="Fechar"><X size={16}/></button>
       </div>
 
       <div class="mt-5 grid gap-3 sm:grid-cols-2">
@@ -1040,7 +1120,21 @@
         </div>
       {/if}
 
-      <div class="mt-4 rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[9px] font-medium text-[#7A3B08]">O rascunho atual será substituído. A versão publicada e o histórico não mudam até você publicar novamente.</div>
+      {#if regenerationJob?.status === "failed"}
+        <div class="mt-3 flex justify-end">
+          <button type="button" on:click={retryRegeneration} class="inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#000A57] px-3 text-[9px] font-semibold text-white">
+            <RefreshCw size={12}/>Tentar novamente
+          </button>
+        </div>
+      {/if}
+
+      {#if regenerating}
+        <div class="mt-4 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-4 py-3 text-[9px] font-medium text-[#000A57]">
+          O processamento continua no servidor. Você pode fechar esta tela e voltar depois.
+        </div>
+      {/if}
+
+      <div class="mt-4 rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[9px] font-medium text-[#7A3B08]">O rascunho atual será substituído somente quando todo o processamento terminar. A versão publicada permanece ativa.</div>
     </section>
   </div>
 {/if}
