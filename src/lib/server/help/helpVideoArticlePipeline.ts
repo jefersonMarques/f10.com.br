@@ -39,7 +39,7 @@ export type HelpVideoGeneratedArticle = {
   steps: HelpVideoGeneratedStep[];
 };
 
-type SegmentClassification =
+export type HelpVideoHelpVideoSegmentClassification =
   | "action"
   | "rule"
   | "condition"
@@ -54,27 +54,48 @@ type IdentifiedSegment = HelpVideoSourceSegment & {
 };
 
 type ClassifiedSegment = IdentifiedSegment & {
-  classification: SegmentClassification;
+  classification: HelpVideoSegmentClassification;
   topicKey: string;
 };
 
 type ClassificationResponse = {
   segments: Array<{
     segmentId: string;
-    classification: SegmentClassification;
+    classification: HelpVideoSegmentClassification;
     topicKey: string;
   }>;
 };
 
-type GeneratedPartStep = HelpVideoGeneratedStep & {
+export type HelpVideoGeneratedPartStep = HelpVideoGeneratedStep & {
   sourceSegmentIds: string[];
 };
+
+type GeneratedPartStep = HelpVideoGeneratedPartStep;
 
 type GeneratedPartResponse = {
   steps: GeneratedPartStep[];
 };
 
-type GeneratedMetadata = Omit<HelpVideoGeneratedArticle, "steps">;
+export type HelpVideoGeneratedMetadata = Omit<HelpVideoGeneratedArticle, "steps">;
+type GeneratedMetadata = HelpVideoGeneratedMetadata;
+
+export type HelpVideoArticleCheckpoint = {
+  classifiedSegments?: Array<{
+    id: string;
+    sourceIndex: number;
+    start: number;
+    end: number;
+    text: string;
+    classification: HelpVideoSegmentClassification;
+    topicKey: string;
+  }>;
+  completedParts?: Array<{
+    partIndex: number;
+    segmentIds: string[];
+    steps: HelpVideoGeneratedPartStep[];
+  }>;
+  metadata?: HelpVideoGeneratedMetadata;
+};
 
 export type HelpVideoCoverage = {
   generatedAt: string;
@@ -91,7 +112,7 @@ export type HelpVideoCoverage = {
     id: string;
     start: number;
     end: number;
-    classification: SegmentClassification;
+    classification: HelpVideoSegmentClassification;
     topicKey: string;
     stepIndexes: number[];
   }>;
@@ -1034,20 +1055,55 @@ async function generateMetadata(
 export async function generateHelpVideoArticle(input: {
   segments: HelpVideoSourceSegment[];
   categories: HelpVideoArticleCategory[];
+  checkpoint?: HelpVideoArticleCheckpoint;
+  onCheckpoint?: (
+    checkpoint: HelpVideoArticleCheckpoint,
+  ) => void | Promise<void>;
   onProgress?: PipelineProgressHandler;
   onAiUsage?: PipelineAiUsageHandler;
 }): Promise<{
   article: HelpVideoGeneratedArticle;
   coverage: HelpVideoCoverage;
+  checkpoint: HelpVideoArticleCheckpoint;
 }> {
   const identified = identifiedSegments(input.segments);
   if (identified.length === 0) throw new Error("HELP_VIDEO_TRANSCRIPTION_EMPTY");
 
-  const classified = await classifyTranscript(
-    identified,
-    input.onProgress,
-    input.onAiUsage,
-  );
+  const checkpoint: HelpVideoArticleCheckpoint = {
+    classifiedSegments: input.checkpoint?.classifiedSegments,
+    completedParts: [...(input.checkpoint?.completedParts ?? [])],
+    metadata: input.checkpoint?.metadata,
+  };
+
+  const checkpointClassified = checkpoint.classifiedSegments;
+  const classifiedCheckpointValid =
+    checkpointClassified?.length === identified.length
+    && checkpointClassified.every((segment, index) => {
+      const source = identified[index];
+      return Boolean(
+        source
+        && segment.id === source.id
+        && segment.sourceIndex === source.sourceIndex
+        && segment.start === source.start
+        && segment.end === source.end
+        && segment.text === source.text,
+      );
+    });
+
+  const classified: ClassifiedSegment[] = classifiedCheckpointValid
+    ? checkpointClassified as ClassifiedSegment[]
+    : await classifyTranscript(
+        identified,
+        input.onProgress,
+        input.onAiUsage,
+      );
+
+  if (!classifiedCheckpointValid) {
+    checkpoint.classifiedSegments = classified.map((segment) => ({ ...segment }));
+    checkpoint.completedParts = [];
+    checkpoint.metadata = undefined;
+    await input.onCheckpoint?.(checkpoint);
+  }
   const relevant = classified.filter(isRelevant);
   const ignored = classified.filter((segment) => !isRelevant(segment));
   if (relevant.length === 0) throw new Error("HELP_VIDEO_COVERAGE_NO_RELEVANT_CONTENT");
@@ -1056,11 +1112,48 @@ export async function generateHelpVideoArticle(input: {
   const generated: GeneratedPartStep[] = [];
 
   for (const [index, part] of parts.entries()) {
+    const segmentIds = part.map((segment) => segment.id);
+    const saved = checkpoint.completedParts?.find(
+      (candidate) =>
+        candidate.partIndex === index
+        && candidate.segmentIds.length === segmentIds.length
+        && candidate.segmentIds.every((id, idIndex) => id === segmentIds[idIndex]),
+    );
+    const savedValid = Boolean(
+      saved
+      && saved.steps.length > 0
+      && missingCoverage(segmentIds, saved.steps).length === 0
+      && !saved.steps.some(stepHasEditorialIssue),
+    );
+
+    if (saved && savedValid) {
+      generated.push(...saved.steps);
+      await input.onProgress?.({
+        label: "Retomando conteúdo já processado",
+        detail: `Parte ${index + 1} de ${parts.length} recuperada do checkpoint`,
+      });
+      continue;
+    }
+
     await input.onProgress?.({
       label: "Gerando conteúdo sem perder etapas",
       detail: `Parte ${index + 1} de ${parts.length} · ${part[0]?.id}-${part.at(-1)?.id}`,
     });
-    generated.push(...await generatePart(part, index, parts.length, input.onAiUsage));
+    const steps = await generatePart(part, index, parts.length, input.onAiUsage);
+    generated.push(...steps);
+
+    checkpoint.completedParts = [
+      ...(checkpoint.completedParts ?? []).filter(
+        (candidate) => candidate.partIndex !== index,
+      ),
+      {
+        partIndex: index,
+        segmentIds,
+        steps,
+      },
+    ].sort((left, right) => left.partIndex - right.partIndex);
+    checkpoint.metadata = undefined;
+    await input.onCheckpoint?.(checkpoint);
   }
 
   const requiredIds = relevant.map((segment) => segment.id);
@@ -1076,12 +1169,18 @@ export async function generateHelpVideoArticle(input: {
     label: "Finalizando título e resumo",
     detail: `${generated.length} etapa(s) · cobertura integral validada`,
   });
-  const metadata = await generateMetadata(
-    generated,
-    classified,
-    input.categories,
-    input.onAiUsage,
-  );
+  const metadata = checkpoint.metadata && !metadataHasEditorialIssue(checkpoint.metadata)
+    ? checkpoint.metadata
+    : await generateMetadata(
+        generated,
+        classified,
+        input.categories,
+        input.onAiUsage,
+      );
+  if (!checkpoint.metadata) {
+    checkpoint.metadata = metadata;
+    await input.onCheckpoint?.(checkpoint);
+  }
 
   const article: HelpVideoGeneratedArticle = {
     ...metadata,
@@ -1118,5 +1217,5 @@ export async function generateHelpVideoArticle(input: {
     })),
   };
 
-  return { article, coverage };
+  return { article, coverage, checkpoint };
 }
