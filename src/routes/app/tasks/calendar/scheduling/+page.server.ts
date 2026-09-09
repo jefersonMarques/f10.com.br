@@ -41,9 +41,12 @@ function readWindows(formData: FormData) {
   }> = [];
 
   for (let index = 0; index < Math.min(weekdays.length, starts.length, ends.length); index += 1) {
-    const weekday = Number(weekdays[index]);
-    const startTime = typeof starts[index] === "string" ? starts[index].trim() : "";
-    const endTime = typeof ends[index] === "string" ? ends[index].trim() : "";
+    const weekdayEntry = weekdays[index];
+    const startEntry = starts[index];
+    const endEntry = ends[index];
+    const weekday = Number(weekdayEntry);
+    const startTime = typeof startEntry === "string" ? startEntry.trim() : "";
+    const endTime = typeof endEntry === "string" ? endEntry.trim() : "";
     if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6 || !startTime || !endTime) continue;
     windows.push({
       weekday: weekday as SchedulingWeekday,
