@@ -194,20 +194,14 @@ export async function listHelpContentReleases(contentId: string) {
       releaseNumber: helpContentReleases.releaseNumber,
       changeSummary: helpContentReleases.changeSummary,
       sourceVideoAssetId: helpContentReleases.sourceVideoAssetId,
-      canRestore: helpContentReleases.editorSnapshot,
+      canRestore: sql<boolean>`${helpContentReleases.editorSnapshot} IS NOT NULL`,
       publishedBy: helpContentReleases.publishedBy,
       publishedAt: helpContentReleases.publishedAt,
       slug: sql<string>`${helpContentReleases.publicSnapshot}->'public'->>'slug'`,
     })
     .from(helpContentReleases)
     .where(eq(helpContentReleases.contentId, contentId))
-    .orderBy(desc(helpContentReleases.releaseNumber))
-    .then((rows) =>
-      rows.map((row) => ({
-        ...row,
-        canRestore: Boolean(row.canRestore),
-      })),
-    );
+    .orderBy(desc(helpContentReleases.releaseNumber));
 }
 
 export async function listPublicHelpContentReleases(contentId: string) {
