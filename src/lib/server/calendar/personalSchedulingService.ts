@@ -20,6 +20,7 @@ import {
   getPublicPersonalSchedule,
   listPersonalSchedulingReservations,
   savePersonalSchedulingSettings,
+  setPersonalSchedulingPublicEnabled,
   setSchedulingBlockingCalendars,
   type PersonalAvailabilityWindow,
   type PersonalSchedulingSettingsInput,
@@ -208,6 +209,32 @@ export async function removeSchedulingException(
   if (!(await deletePersonalSchedulingException(userId, exceptionId))) {
     throw new Error("SCHEDULING_EXCEPTION_NOT_FOUND");
   }
+}
+
+export async function togglePersonalScheduling(
+  actorUserId: string,
+  permissions: PersonalSchedulingPermissionMap,
+  userId: string,
+  publicEnabled: boolean,
+): Promise<void> {
+  if (!(await canOperateHost(actorUserId, userId, permissions))) {
+    throw new Error("SCHEDULING_HOST_NOT_ALLOWED");
+  }
+
+  const settings = await getPersonalSchedulingSettings(userId);
+  if (publicEnabled && !settings.googleConnected) {
+    throw new Error("SCHEDULING_HOST_GOOGLE_REQUIRED");
+  }
+
+  await setPersonalSchedulingPublicEnabled(userId, publicEnabled);
+  await recordAuditEvent({
+    actorUserId,
+    action: publicEnabled
+      ? "scheduling.public_profile.enabled"
+      : "scheduling.public_profile.disabled",
+    entityType: "user",
+    entityId: userId,
+  });
 }
 
 export async function configureBlockingCalendars(
