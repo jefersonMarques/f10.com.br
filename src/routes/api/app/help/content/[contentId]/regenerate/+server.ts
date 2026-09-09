@@ -18,6 +18,10 @@ function errorMessage(code: string): string {
   if (code === "HELP_VIDEO_UPLOAD_FORMAT_INVALID") return "Use um arquivo MP4 válido.";
   if (code === "HELP_VIDEO_FFMPEG_NOT_AVAILABLE") return "A geração por vídeo não está disponível no servidor.";
   if (code === "OPENAI_NOT_CONFIGURED") return "A IA de geração não está configurada.";
+  if (code === "OPENAI_TIMEOUT") return "A transcrição demorou mais que o esperado. Tente novamente; o processamento foi interrompido com segurança.";
+  if (code.startsWith("HELP_VIDEO_TRANSCRIPTION_FAILED:")) return "A OpenAI não conseguiu transcrever o áudio deste vídeo.";
+  if (code === "HELP_VIDEO_TRANSCRIPTION_EMPTY" || code === "HELP_VIDEO_TRANSCRIPTION_TIMESTAMPS_EMPTY") return "O áudio foi processado, mas não foi possível obter uma transcrição utilizável.";
+  if (code === "HELP_VIDEO_TRANSCRIPTION_CHUNKS_EMPTY") return "Não foi possível preparar o áudio em partes para transcrição.";
   if (code === "CONTENT_ARCHIVED") return "Conteúdo arquivado não pode ser atualizado.";
   if (code === "CONTENT_NOT_FOUND") return "Conteúdo não encontrado.";
   return "Não foi possível atualizar o conteúdo a partir do vídeo.";
@@ -67,6 +71,19 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
 
   const encoder = new TextEncoder();
   let closed = false;
+  let lastProgress: {
+    stage: string;
+    status: string;
+    label: string;
+    detail?: string;
+  } | null = null;
+  let stageStartedAt = Date.now();
+
+  const elapsedLabel = (startedAt: number) => {
+    const totalSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+    if (totalSeconds < 60) return `${totalSeconds}s`;
+    return `${Math.floor(totalSeconds / 60)}m ${totalSeconds % 60}s`;
+  };
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -81,19 +98,36 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
 
       const heartbeat = setInterval(() => {
         if (closed) return;
+        if (lastProgress?.status === "active") {
+          write({
+            type: "progress",
+            ...lastProgress,
+            detail: [
+              lastProgress.detail,
+              `em processamento há ${elapsedLabel(stageStartedAt)}`,
+            ].filter(Boolean).join(" · "),
+          });
+          return;
+        }
         try {
           controller.enqueue(encoder.encode("\n"));
         } catch {
           closed = true;
         }
-      }, 15_000);
+      }, 12_000);
 
       try {
         const result = await regenerateHelpContentFromVideo({
           actorUserId: session.user.id,
           contentId: params.contentId,
           source,
-          onProgress: (progress) => write({ type: "progress", ...progress }),
+          onProgress: (progress) => {
+            if (!lastProgress || lastProgress.stage !== progress.stage) {
+              stageStartedAt = Date.now();
+            }
+            lastProgress = progress;
+            write({ type: "progress", ...progress });
+          },
         });
         write({
           type: "result",
