@@ -11,6 +11,7 @@ import {
   helpContents,
   helpStepBlocks,
 } from "$lib/server/db/structuredHelpSchema";
+import { deleteManagedHelpAsset } from "$lib/server/help/helpAssetRepository";
 import { normalizeHelpSlug } from "$lib/server/help/helpArticleRepository";
 import { saveHelpContentVersion } from "$lib/server/help/helpVersionRepository";
 
@@ -612,15 +613,13 @@ export async function deleteStructuredHelpFeaturedVideo(
     .limit(1);
   if (!featured) return;
 
-  await db.transaction(async (tx) => {
-    await tx
-      .delete(helpContentFeaturedVideos)
-      .where(eq(helpContentFeaturedVideos.contentId, contentId));
-    await tx.delete(helpAssets).where(eq(helpAssets.id, featured.assetId));
-  });
+  await db
+    .delete(helpContentFeaturedVideos)
+    .where(eq(helpContentFeaturedVideos.contentId, contentId));
 
   await markContentDraft(contentId, actorUserId);
   await saveStructuredContentVersion(contentId, actorUserId);
+  await deleteManagedHelpAsset(actorUserId, featured.assetId).catch(() => undefined);
   await recordAuditEvent({
     actorUserId,
     action: "help.content.featured_video.deleted",
@@ -853,9 +852,18 @@ export async function deleteStructuredHelpStep(
   if (steps.length <= 1) throw new Error("LAST_STEP_REQUIRED");
   if (!steps.some((step) => step.id === stepId)) throw new Error("STEP_NOT_FOUND");
 
+  const stepAssets = await db
+    .select({ assetId: helpStepBlocks.assetId })
+    .from(helpStepBlocks)
+    .where(eq(helpStepBlocks.stepId, stepId));
+  const assetIds = stepAssets.flatMap((item) => item.assetId ? [item.assetId] : []);
+
   await db.delete(helpContentSteps).where(eq(helpContentSteps.id, stepId));
   await markContentDraft(contentId, actorUserId);
   await saveStructuredContentVersion(contentId, actorUserId);
+  await Promise.allSettled(
+    assetIds.map((assetId) => deleteManagedHelpAsset(actorUserId, assetId)),
+  );
 }
 
 function validateBlockInput(input: StructuredHelpBlockInput): void {
@@ -1075,13 +1083,13 @@ export async function deleteStructuredHelpBlock(
   const step = await getStepRow(block.stepId);
   if (!step || step.contentId !== contentId) throw new Error("BLOCK_NOT_FOUND");
 
-  await db.transaction(async (tx) => {
-    await tx.delete(helpStepBlocks).where(eq(helpStepBlocks.id, blockId));
-    if (block.assetId) await tx.delete(helpAssets).where(eq(helpAssets.id, block.assetId));
-  });
+  await db.delete(helpStepBlocks).where(eq(helpStepBlocks.id, blockId));
 
   await markContentDraft(contentId, actorUserId);
   await saveStructuredContentVersion(contentId, actorUserId);
+  if (block.assetId) {
+    await deleteManagedHelpAsset(actorUserId, block.assetId).catch(() => undefined);
+  }
 }
 
 function buildPublicationSnapshot(
