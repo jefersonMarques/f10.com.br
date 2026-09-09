@@ -8,6 +8,7 @@ import {
   helpCategories,
   helpContentCategories,
   helpContentFeaturedVideos,
+  helpContentReleases,
   helpContents,
   helpContentSteps,
   helpStepBlocks,
@@ -651,6 +652,13 @@ export async function importStructuredHelpFile(
         )
     : [];
   const publishedContentIds = new Set(publishedRows.map((row) => row.contentId));
+  const releaseRows = existingRows.length
+    ? await db
+        .select({ contentId: helpContentReleases.contentId })
+        .from(helpContentReleases)
+        .where(inArray(helpContentReleases.contentId, existingRows.map((row) => row.id)))
+    : [];
+  const releasedContentIds = new Set(releaseRows.map((row) => row.contentId));
 
   const normalizedContents = file.contents.map((content) => {
     const existing = existingByExternalId.get(content.externalId) ?? null;
@@ -682,7 +690,7 @@ export async function importStructuredHelpFile(
   }
 
   const replaceableContentIds = existingRows
-    .filter((row) => !publishedContentIds.has(row.id))
+    .filter((row) => !publishedContentIds.has(row.id) && !releasedContentIds.has(row.id))
     .map((row) => row.id);
   const oldManagedAssets = replaceableContentIds.length
     ? await db
@@ -713,7 +721,10 @@ export async function importStructuredHelpFile(
             .delete(helpContentCategories)
             .where(eq(helpContentCategories.contentId, content.contentId));
           await tx.delete(helpContentSteps).where(eq(helpContentSteps.contentId, content.contentId));
-          if (!publishedContentIds.has(content.contentId)) {
+          if (
+            !publishedContentIds.has(content.contentId)
+            && !releasedContentIds.has(content.contentId)
+          ) {
             await tx.delete(helpAssets).where(eq(helpAssets.contentId, content.contentId));
           }
           await tx
