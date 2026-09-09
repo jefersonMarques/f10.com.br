@@ -1025,6 +1025,7 @@ export async function addHelpGeneratedReviewCandidates(input: {
     ...related.map((review) => Number(review.candidateIndex ?? 0)),
   );
   const expiresAt = new Date(Date.now() + REVIEW_TTL_MS).toISOString();
+  const createdAssetIds: string[] = [];
   const created: Array<{
     assetId: string;
     candidateIndex: number;
@@ -1043,6 +1044,7 @@ export async function addHelpGeneratedReviewCandidates(input: {
         contentId: input.contentId,
         deduplicate: false,
       });
+      createdAssetIds.push(asset.asset.id);
       candidateIndex += 1;
       const timeSeconds = Math.max(0, Number(candidate.timeSeconds) || 0);
       await db
@@ -1080,7 +1082,7 @@ export async function addHelpGeneratedReviewCandidates(input: {
       .where(eq(helpContents.id, input.contentId));
   } catch (cause) {
     await Promise.allSettled(
-      created.map((item) => deleteManagedHelpAsset(input.actorUserId, item.assetId)),
+      createdAssetIds.map((assetId) => deleteManagedHelpAsset(input.actorUserId, assetId)),
     );
     throw cause;
   }
