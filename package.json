@@ -15,7 +15,8 @@
     "operations:doctor": "node --env-file-if-exists=.env scripts/operations-doctor.mjs",
     "operations:smoke": "node --env-file-if-exists=.env scripts/operations-smoke.mjs",
     "support:doctor": "node --env-file-if-exists=.env scripts/support-doctor.mjs",
-    "production:doctor": "npm run operations:doctor && npm run support:doctor"
+    "production:doctor": "npm run operations:doctor && npm run support:doctor",
+    "prod": "node scripts/production.mjs"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^3.3.1",
