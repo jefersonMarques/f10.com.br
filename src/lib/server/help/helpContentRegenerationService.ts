@@ -75,7 +75,7 @@ export async function regenerateHelpContentFromVideo(input: {
     videoBytes = input.source.bytes;
     fileName = input.source.fileName || "video-atualizado.mp4";
     mimeType = input.source.mimeType || "video/mp4";
-    const duplicate = await findImportedHelpVideoByChecksum(videoBytes);
+    const duplicate = await findImportedHelpVideoByChecksum(videoBytes, input.contentId);
     if (duplicate?.contentId && duplicate.contentId !== input.contentId) {
       throw new Error(`HELP_VIDEO_ALREADY_USED:${duplicate.contentId}`);
     }
