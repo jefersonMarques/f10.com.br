@@ -164,6 +164,7 @@
           body: JSON.stringify({
             mode,
             baseTimeSeconds: selected?.timeSeconds ?? null,
+            selectedAssetId: selected?.assetId ?? null,
           }),
         },
       );
