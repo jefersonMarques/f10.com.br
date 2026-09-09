@@ -418,6 +418,46 @@ export async function getPublicPersonalSchedule(publicSlug: string) {
   return { ...row, windows, exceptions };
 }
 
+export async function getPersonalSchedulingBookingForCustomer(
+  publicSlug: string,
+  bookingId: string,
+  customerContactId: string,
+) {
+  const [booking] = await getDatabase()
+    .select({
+      id: schedulingBookings.id,
+      customerContactId: schedulingBookings.customerContactId,
+      customerName: schedulingBookings.customerName,
+      customerEmail: schedulingBookings.customerEmail,
+      startAt: schedulingBookings.startAt,
+      endAt: schedulingBookings.endAt,
+      status: schedulingBookings.status,
+      googleIcalUid: schedulingBookings.googleIcalUid,
+      googleMeetUrl: schedulingBookings.googleMeetUrl,
+      title: schedulingAvailabilityProfiles.publicTitle,
+      timeZone: schedulingAvailabilityProfiles.timeZone,
+      publicSlug: schedulingAvailabilityProfiles.publicSlug,
+      hostName: users.name,
+    })
+    .from(schedulingBookings)
+    .innerJoin(
+      schedulingAvailabilityProfiles,
+      eq(schedulingAvailabilityProfiles.userId, schedulingBookings.hostUserId),
+    )
+    .innerJoin(users, eq(users.id, schedulingBookings.hostUserId))
+    .where(
+      and(
+        eq(schedulingBookings.id, bookingId),
+        eq(schedulingBookings.customerContactId, customerContactId),
+        eq(schedulingBookings.status, "booked"),
+        eq(schedulingAvailabilityProfiles.publicSlug, publicSlug),
+      ),
+    )
+    .limit(1);
+
+  return booking ?? null;
+}
+
 export async function listPersonalSchedulingReservations(
   hostUserId: string,
   rangeStart: Date,
