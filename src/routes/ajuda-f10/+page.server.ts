@@ -1,10 +1,12 @@
 import type { PageServerLoad } from "./$types";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { listPublishedStructuredHelpCatalog } from "$lib/server/help/publicStructuredHelpRepository";
+import { listPublicHelpCollections } from "$lib/server/help/helpCollectionRepository";
 
 export const load: PageServerLoad = async ({ url, cookies }) => {
-  const [articles, customer] = await Promise.all([
+  const [articles, collections, customer] = await Promise.all([
     listPublishedStructuredHelpCatalog(),
+    listPublicHelpCollections(),
     getOptionalCustomerF10PortalSession(cookies),
   ]);
 
@@ -37,6 +39,7 @@ export const load: PageServerLoad = async ({ url, cookies }) => {
 
   return {
     articleCount: articles.length,
+    collections,
     categories: Array.from(categoryMap.values()).sort((left, right) =>
       left.name.localeCompare(right.name, "pt-BR"),
     ),
