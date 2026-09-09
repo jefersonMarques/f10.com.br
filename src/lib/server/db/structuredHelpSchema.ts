@@ -186,6 +186,42 @@ export const helpAssets = pgTable(
   ],
 );
 
+export const helpContentReleases = pgTable(
+  "help_content_releases",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    contentId: uuid("content_id").notNull().references(() => helpContents.id, { onDelete: "cascade" }),
+    releaseNumber: integer("release_number").notNull(),
+    publicSnapshot: jsonb("public_snapshot").$type<Record<string, unknown>>().notNull(),
+    editorSnapshot: jsonb("editor_snapshot").$type<Record<string, unknown> | null>(),
+    sourceVideoAssetId: uuid("source_video_asset_id").references(() => helpAssets.id, { onDelete: "restrict" }),
+    changeSummary: text("change_summary").notNull().default(""),
+    publishedBy: uuid("published_by").references(() => users.id, { onDelete: "set null" }),
+    publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("help_content_releases_content_number_unique").on(table.contentId, table.releaseNumber),
+    index("help_content_releases_content_published_idx").on(table.contentId, table.publishedAt),
+  ],
+);
+
+export const helpContentReleaseAssets = pgTable(
+  "help_content_release_assets",
+  {
+    releaseId: uuid("release_id")
+      .notNull()
+      .references(() => helpContentReleases.id, { onDelete: "cascade" }),
+    assetId: uuid("asset_id")
+      .notNull()
+      .references(() => helpAssets.id, { onDelete: "restrict" }),
+    role: text("role").notNull().default("content"),
+  },
+  (table) => [
+    primaryKey({ columns: [table.releaseId, table.assetId] }),
+    index("help_content_release_assets_asset_idx").on(table.assetId),
+  ],
+);
+
 export const helpContentFeaturedVideos = pgTable(
   "help_content_featured_videos",
   {
