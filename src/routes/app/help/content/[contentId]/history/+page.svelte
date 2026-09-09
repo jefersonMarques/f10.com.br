@@ -55,7 +55,7 @@
 
               <div class="flex flex-wrap gap-2">
                 <a
-                  href={release.releaseNumber === data.currentReleaseNumber ? `/ajuda-f10/${release.slug}` : `/ajuda-f10/${release.slug}?versao=${release.releaseNumber}`}
+                  href={release.releaseNumber === data.currentReleaseNumber ? `/ajuda-f10/${data.content.slug}` : `/ajuda-f10/${data.content.slug}?versao=${release.releaseNumber}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[9px] font-semibold text-[#000A57]"
