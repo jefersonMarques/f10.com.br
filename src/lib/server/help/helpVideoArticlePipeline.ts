@@ -39,7 +39,7 @@ export type HelpVideoGeneratedArticle = {
   steps: HelpVideoGeneratedStep[];
 };
 
-export type HelpVideoHelpVideoSegmentClassification =
+export type HelpVideoSegmentClassification =
   | "action"
   | "rule"
   | "condition"
