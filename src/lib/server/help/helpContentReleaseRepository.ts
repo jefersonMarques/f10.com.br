@@ -197,7 +197,6 @@ export async function listHelpContentReleases(contentId: string) {
       canRestore: sql<boolean>`${helpContentReleases.editorSnapshot} IS NOT NULL`,
       publishedBy: helpContentReleases.publishedBy,
       publishedAt: helpContentReleases.publishedAt,
-      slug: sql<string>`${helpContentReleases.publicSnapshot}->'public'->>'slug'`,
     })
     .from(helpContentReleases)
     .where(eq(helpContentReleases.contentId, contentId))
@@ -209,7 +208,6 @@ export async function listPublicHelpContentReleases(contentId: string) {
     .select({
       releaseNumber: helpContentReleases.releaseNumber,
       publishedAt: helpContentReleases.publishedAt,
-      slug: sql<string>`${helpContentReleases.publicSnapshot}->'public'->>'slug'`,
     })
     .from(helpContentReleases)
     .where(eq(helpContentReleases.contentId, contentId))
