@@ -216,8 +216,8 @@ export async function listPublicHelpContentReleases(contentId: string) {
     .orderBy(desc(helpContentReleases.releaseNumber));
 }
 
-export async function isAssetInPublicHelpRelease(
-  slug: string,
+export async function isAssetInHelpContentRelease(
+  contentId: string,
   releaseNumber: number,
   assetId: string,
 ): Promise<boolean> {
@@ -230,9 +230,9 @@ export async function isAssetInPublicHelpRelease(
     )
     .where(
       and(
+        eq(helpContentReleases.contentId, contentId),
         eq(helpContentReleases.releaseNumber, releaseNumber),
         eq(helpContentReleaseAssets.assetId, assetId),
-        sql`${helpContentReleases.publicSnapshot}->'public'->>'slug' = ${slug}`,
       ),
     )
     .limit(1);
@@ -256,8 +256,8 @@ export async function getHelpContentRelease(
   return row ?? null;
 }
 
-export async function getPublicHelpContentReleaseBySlug(
-  slug: string,
+export async function getPublicHelpContentRelease(
+  contentId: string,
   releaseNumber: number,
 ): Promise<PublishedStructuredHelp | null> {
   const [row] = await getDatabase()
@@ -269,8 +269,8 @@ export async function getPublicHelpContentReleaseBySlug(
     .from(helpContentReleases)
     .where(
       and(
+        eq(helpContentReleases.contentId, contentId),
         eq(helpContentReleases.releaseNumber, releaseNumber),
-        sql`${helpContentReleases.publicSnapshot}->'public'->>'slug' = ${slug}`,
       ),
     )
     .limit(1);
