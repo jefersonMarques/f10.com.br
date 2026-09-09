@@ -65,6 +65,7 @@ async function canOperateHost(
   hostUserId: string,
   permissions: PersonalSchedulingPermissionMap,
 ): Promise<boolean> {
+  if (actorUserId === hostUserId && hasPermission(permissions, "scheduling.view")) return true;
   if (hasPermission(permissions, "scheduling.manage")) return true;
   const scope = getPermissionScope(permissions, "scheduling.create");
   if (scope === "all") return true;
