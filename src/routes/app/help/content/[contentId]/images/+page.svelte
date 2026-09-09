@@ -1048,7 +1048,7 @@
         <strong class="text-[11px] font-semibold text-[#303645]">Quantas partes?</strong>
         <div class="mt-2 flex flex-wrap gap-2">
           {#each [2, 3, 4, 5, 6] as count}
-            <button type="button" on:click={() => { splitDesiredParts = count; splitSuggestion = null; }} class={`flex h-10 w-10 items-center justify-center rounded-xl border text-[11px] font-bold ${splitDesiredParts === count ? "border-[#000A57] bg-[#000A57] text-white" : "border-[#DDE1EA] bg-white text-[#5F6676]"}`}>{count}</button>
+            <button type="button" on:click={() => { splitDesiredParts = count; splitSuggestion = null; splitError = ""; }} class={`flex h-10 w-10 items-center justify-center rounded-xl border text-[11px] font-bold ${splitDesiredParts === count ? "border-[#000A57] bg-[#000A57] text-white" : "border-[#DDE1EA] bg-white text-[#5F6676]"}`}>{count}</button>
           {/each}
           <button type="button" on:click={analyzeSplitTarget} disabled={Boolean(splitLoadingStepId) || splitApplying} class="ml-auto inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[10px] font-semibold text-white disabled:opacity-50">
             {#if splitLoadingStepId}<LoaderCircle size={14} class="animate-spin"/>{:else}<Sparkles size={14}/>{/if}
