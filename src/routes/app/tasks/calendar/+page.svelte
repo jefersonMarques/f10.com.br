@@ -35,6 +35,7 @@
   export let form: ActionData;
 
   type CalendarView = "month" | "week" | "list";
+  type ListPeriod = "today" | "tomorrow" | "week" | "next7" | "month";
   type CreationKind = "task" | "ticket" | "scheduling" | "google";
 
   const weekdayLabels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -70,6 +71,7 @@
   };
 
   let calendarView: CalendarView = "month";
+  let listPeriod: ListPeriod = "today";
   let cursorDate = parseDateKey(data.calendarAnchor);
   let showTasks = data.canViewTasks;
   let showTickets = data.canViewTickets;
@@ -114,6 +116,20 @@
 
   onMount(() => {
     googleTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || googleTimeZone;
+    const requestedView = $page.url.searchParams.get("view");
+    if (requestedView === "month" || requestedView === "week" || requestedView === "list") {
+      calendarView = requestedView;
+    }
+    const requestedPeriod = $page.url.searchParams.get("period");
+    if (
+      requestedPeriod === "today" ||
+      requestedPeriod === "tomorrow" ||
+      requestedPeriod === "week" ||
+      requestedPeriod === "next7" ||
+      requestedPeriod === "month"
+    ) {
+      listPeriod = requestedPeriod;
+    }
   });
 
   function parseDateKey(value: string): Date {
@@ -228,8 +244,25 @@
     creationMenuOpen = false;
     if (kind === "task") openTaskCreate(parseDateKey(creationDate));
     if (kind === "ticket") openTicketCreate(parseDateKey(creationDate));
-    if (kind === "scheduling") openScheduling(parseDateKey(creationDate));
+    if (kind === "scheduling") void goto("/app/tasks/calendar/scheduling");
     if (kind === "google") openGoogleEvent(parseDateKey(creationDate));
+  }
+
+  function setCalendarView(view: CalendarView): void {
+    calendarView = view;
+    const url = new URL($page.url);
+    url.searchParams.set("view", view);
+    if (view === "list") url.searchParams.set("period", listPeriod);
+    else url.searchParams.delete("period");
+    void goto(`${url.pathname}${url.search}`, { replaceState: true, noScroll: true });
+  }
+
+  function setListPeriod(period: ListPeriod): void {
+    listPeriod = period;
+    const url = new URL($page.url);
+    url.searchParams.set("view", "list");
+    url.searchParams.set("period", period);
+    void goto(`${url.pathname}${url.search}`, { replaceState: true, noScroll: true });
   }
 
   function openTaskCreate(date: Date): void {
@@ -426,9 +459,9 @@
         {/if}
 
         <div class="flex rounded-lg bg-[#EDEFF4] p-1">
-          <button type="button" on:click={() => (calendarView = "month")} class={`application-text-caption h-7 rounded-md px-3 font-semibold ${calendarView === "month" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Mês</button>
-          <button type="button" on:click={() => (calendarView = "week")} class={`application-text-caption h-7 rounded-md px-3 font-semibold ${calendarView === "week" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Semana</button>
-          <button type="button" on:click={() => (calendarView = "list")} class={`application-text-caption inline-flex h-7 items-center gap-1.5 rounded-md px-3 font-semibold ${calendarView === "list" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><ListIcon size={12}/>Lista</button>
+          <button type="button" on:click={() => setCalendarView("month")} class={`application-text-caption h-7 rounded-md px-3 font-semibold ${calendarView === "month" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Mês</button>
+          <button type="button" on:click={() => setCalendarView("week")} class={`application-text-caption h-7 rounded-md px-3 font-semibold ${calendarView === "week" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Semana</button>
+          <button type="button" on:click={() => setCalendarView("list")} class={`application-text-caption inline-flex h-7 items-center gap-1.5 rounded-md px-3 font-semibold ${calendarView === "list" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><ListIcon size={12}/>Lista</button>
         </div>
 
         {#if canCreateAnything}
@@ -461,6 +494,16 @@
             {#if !form.success || form.syncWarning}<CircleAlert size={16}/>{/if}{form.message}
           </div>
         {/if}
+      </div>
+    {/if}
+
+    {#if calendarView === "list"}
+      <div class="flex flex-wrap items-center gap-1.5 border-b border-[#E8EAF0] bg-white px-4 py-2.5">
+        <button type="button" on:click={() => setListPeriod("today")} class={`application-text-meta h-8 rounded-lg px-3 font-semibold ${listPeriod === "today" ? "bg-[#000A57] text-white" : "bg-[#F2F3F6] text-[#666D7C]"}`}>Hoje</button>
+        <button type="button" on:click={() => setListPeriod("tomorrow")} class={`application-text-meta h-8 rounded-lg px-3 font-semibold ${listPeriod === "tomorrow" ? "bg-[#000A57] text-white" : "bg-[#F2F3F6] text-[#666D7C]"}`}>Amanhã</button>
+        <button type="button" on:click={() => setListPeriod("week")} class={`application-text-meta h-8 rounded-lg px-3 font-semibold ${listPeriod === "week" ? "bg-[#000A57] text-white" : "bg-[#F2F3F6] text-[#666D7C]"}`}>Esta semana</button>
+        <button type="button" on:click={() => setListPeriod("next7")} class={`application-text-meta h-8 rounded-lg px-3 font-semibold ${listPeriod === "next7" ? "bg-[#000A57] text-white" : "bg-[#F2F3F6] text-[#666D7C]"}`}>7 dias</button>
+        <button type="button" on:click={() => setListPeriod("month")} class={`application-text-meta h-8 rounded-lg px-3 font-semibold ${listPeriod === "month" ? "bg-[#000A57] text-white" : "bg-[#F2F3F6] text-[#666D7C]"}`}>Mês</button>
       </div>
     {/if}
 
@@ -548,7 +591,14 @@
         </div>
       </div>
     {:else}
-      <AgendaListView anchor={dateKey(cursorDate)} tasks={visibleTasks} tickets={visibleTickets} googleEvents={visibleGoogleEvents}/>
+      <AgendaListView
+        anchor={dateKey(cursorDate)}
+        period={listPeriod}
+        tasks={visibleTasks}
+        tickets={visibleTickets}
+        googleEvents={visibleGoogleEvents}
+        bookings={data.schedulingBookings}
+      />
     {/if}
   </section>
 </ApplicationContent>
@@ -561,7 +611,7 @@
       <div class="grid gap-3 p-5 sm:grid-cols-2">
         {#if data.canCreate && data.projects.length > 0}<button type="button" on:click={() => chooseCreation("task")} class="rounded-2xl border border-[#D9DDF0] bg-[#F8F9FF] p-4 text-left transition hover:border-[#BFC7ED] hover:bg-[#F3F5FF]"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#000A57] shadow-sm"><CheckSquare2 size={17}/></span><strong class="application-text-body mt-3 block font-semibold text-[#303747]">Tarefa</strong><span class="application-text-caption mt-1 block leading-5 text-[#7B8291]">Ação interna com projeto, responsável e prazo.</span></button>{/if}
         {#if data.canCreateTicket && data.ticketQueues.length > 0}<button type="button" on:click={() => chooseCreation("ticket")} class="rounded-2xl border border-[#F0D8BE] bg-[#FFF9F3] p-4 text-left transition hover:border-[#E8C9A8] hover:bg-[#FFF5EA]"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#9B530F] shadow-sm"><Headphones size={17}/></span><strong class="application-text-body mt-3 block font-semibold text-[#303747]">Ticket</strong><span class="application-text-caption mt-1 block leading-5 text-[#7B8291]">Novo atendimento com conclusão planejada nesta Agenda.</span></button>{/if}
-        {#if data.canCreateScheduling}<button type="button" on:click={() => chooseCreation("scheduling")} class="rounded-2xl border border-[#D7E4EA] bg-[#F5FAFC] p-4 text-left transition hover:border-[#BFD6DF] hover:bg-[#F0F8FB]"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#27637B] shadow-sm"><CalendarClock size={17}/></span><strong class="application-text-body mt-3 block font-semibold text-[#303747]">Agendamento de call</strong><span class="application-text-caption mt-1 block leading-5 text-[#7B8291]">Gera um link para o cliente escolher um horário disponível.</span></button>{/if}
+        {#if data.canCreateScheduling}<button type="button" on:click={() => chooseCreation("scheduling")} class="rounded-2xl border border-[#D7E4EA] bg-[#F5FAFC] p-4 text-left transition hover:border-[#BFD6DF] hover:bg-[#F0F8FB]"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#27637B] shadow-sm"><CalendarClock size={17}/></span><strong class="application-text-body mt-3 block font-semibold text-[#303747]">Minha agenda</strong><span class="application-text-caption mt-1 block leading-5 text-[#7B8291]">Link público e disponibilidade.</span></button>{/if}
         {#if data.googleCalendar.connected}<button type="button" on:click={() => chooseCreation("google")} class="rounded-2xl border border-[#CFE0D5] bg-[#F3F9F5] p-4 text-left transition hover:border-[#B9D5C3] hover:bg-[#EEF7F1]"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#2F7045] shadow-sm"><CalendarDays size={17}/></span><strong class="application-text-body mt-3 block font-semibold text-[#303747]">Evento Google</strong><span class="application-text-caption mt-1 block leading-5 text-[#7B8291]">Compromisso de calendário, com Meet e participantes opcionais.</span></button>{/if}
       </div>
     </div>
