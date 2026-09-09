@@ -117,7 +117,7 @@
             <div class="absolute left-0 top-8 z-20 min-w-[190px] overflow-hidden rounded-xl border border-[#DDE1EA] bg-white py-1 shadow-xl">
               {#each data.releases as release}
                 <a
-                  href={release.releaseNumber === data.currentReleaseNumber ? `/ajuda-f10/${data.content.slug}` : `/ajuda-f10/${data.content.slug}?versao=${release.releaseNumber}`}
+                  href={release.releaseNumber === data.currentReleaseNumber ? `/ajuda-f10/${release.slug}` : `/ajuda-f10/${release.slug}?versao=${release.releaseNumber}`}
                   class={`flex items-center justify-between gap-3 px-3 py-2.5 text-[9px] hover:bg-[#F7F8FB] ${release.releaseNumber === data.releaseNumber ? "font-bold text-[#000A57]" : "text-[#666D7D]"}`}
                 >
                   <span>Versão {release.releaseNumber}</span>
