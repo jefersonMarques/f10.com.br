@@ -9,6 +9,7 @@ import { isAiProviderConfigured, readAiProviderCredential } from "$lib/server/ai
 import type { HelpImportPackageAsset } from "$lib/server/help/helpImportPackage";
 import {
   generateHelpVideoArticle,
+  type HelpVideoArticleCheckpoint,
   type HelpVideoCoverage,
   type HelpVideoGeneratedArticle,
   type HelpVideoPlannedScreenshot,
@@ -37,10 +38,17 @@ type TranscriptSegment = {
   text: string;
 };
 
-type TimestampedTranscript = {
+export type HelpVideoAutomationTranscriptCheckpoint = {
   text: string;
   segments: TranscriptSegment[];
   durationSeconds: number;
+};
+
+type TimestampedTranscript = HelpVideoAutomationTranscriptCheckpoint;
+
+export type HelpVideoAutomationCheckpoint = {
+  transcript?: HelpVideoAutomationTranscriptCheckpoint;
+  article?: HelpVideoArticleCheckpoint;
 };
 
 type PlannedScreenshot = HelpVideoPlannedScreenshot;
@@ -1108,6 +1116,10 @@ export async function generateHelpImportFromVideo(input: {
   source: HelpVideoAutomationSource;
   categories: HelpVideoAutomationCategory[];
   externalIdHint?: string;
+  checkpoint?: HelpVideoAutomationCheckpoint;
+  onCheckpoint?: (
+    checkpoint: HelpVideoAutomationCheckpoint,
+  ) => void | Promise<void>;
   onProgress?: HelpVideoAutomationProgressHandler;
   onAiUsage?: HelpVideoAutomationAiUsageHandler;
 }): Promise<HelpVideoAutomationResult> {
@@ -1174,35 +1186,55 @@ export async function generateHelpImportFromVideo(input: {
 
     const externalId = normalizeExternalId(input.externalIdHint ?? "") || derivedExternalId;
 
-    await reportProgress(input.onProgress, {
-      stage: "extract",
-      status: "active",
-      label: "Extraindo o áudio do vídeo",
-    });
-    const audioPath = await extractAudio(videoPath, directory);
-    await reportProgress(input.onProgress, {
-      stage: "extract",
-      status: "done",
-      label: "Áudio preparado para transcrição",
-    });
+    let transcript: TimestampedTranscript;
+    if (
+      input.checkpoint?.transcript
+      && input.checkpoint.transcript.text.trim()
+      && input.checkpoint.transcript.segments.length > 0
+      && input.checkpoint.transcript.durationSeconds > 0
+    ) {
+      transcript = input.checkpoint.transcript;
+      await reportProgress(input.onProgress, {
+        stage: "transcribe",
+        status: "done",
+        label: "Transcrição recuperada do checkpoint",
+        detail: `${transcript.segments.length} segmento(s) já processado(s)`,
+      });
+    } else {
+      await reportProgress(input.onProgress, {
+        stage: "extract",
+        status: "active",
+        label: "Extraindo o áudio do vídeo",
+      });
+      const audioPath = await extractAudio(videoPath, directory);
+      await reportProgress(input.onProgress, {
+        stage: "extract",
+        status: "done",
+        label: "Áudio preparado para transcrição",
+      });
 
-    await reportProgress(input.onProgress, {
-      stage: "transcribe",
-      status: "active",
-      label: "Transcrevendo áudio e identificando os tempos",
-    });
-    const transcript = await transcribeAudio(
-      audioPath,
-      directory,
-      input.onAiUsage,
-      input.onProgress,
-    );
-    await reportProgress(input.onProgress, {
-      stage: "transcribe",
-      status: "done",
-      label: "Transcrição temporal concluída",
-      detail: `${transcript.segments.length} segmento(s) · ${transcript.text.length} caracteres`,
-    });
+      await reportProgress(input.onProgress, {
+        stage: "transcribe",
+        status: "active",
+        label: "Transcrevendo áudio e identificando os tempos",
+      });
+      transcript = await transcribeAudio(
+        audioPath,
+        directory,
+        input.onAiUsage,
+        input.onProgress,
+      );
+      await input.onCheckpoint?.({
+        transcript,
+        article: input.checkpoint?.article,
+      });
+      await reportProgress(input.onProgress, {
+        stage: "transcribe",
+        status: "done",
+        label: "Transcrição temporal concluída",
+        detail: `${transcript.segments.length} segmento(s) · ${transcript.text.length} caracteres`,
+      });
+    }
 
     await reportProgress(input.onProgress, {
       stage: "analyze",
@@ -1212,6 +1244,12 @@ export async function generateHelpImportFromVideo(input: {
     const generatedArticle = await generateHelpVideoArticle({
       segments: transcript.segments,
       categories: input.categories,
+      checkpoint: input.checkpoint?.article,
+      onCheckpoint: (article) =>
+        input.onCheckpoint?.({
+          transcript,
+          article,
+        }),
       onProgress: (progress) =>
         reportProgress(input.onProgress, {
           stage: "analyze",
