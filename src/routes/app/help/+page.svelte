@@ -6,6 +6,7 @@
     FilePlus2,
     GitBranch,
     Library,
+    Layers3,
     PlaySquare,
   } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
@@ -32,8 +33,9 @@
 </svelte:head>
 
 <ApplicationContent width="standard">
-  {#if data.canEdit}
-    <div class="mb-3 flex justify-end">
+  <div class="mb-3 flex flex-wrap justify-end gap-2">
+    <a href="/app/help/collections" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57] shadow-sm transition hover:bg-[#F8F9FC]"><Layers3 size={15}/>Coleções</a>
+    {#if data.canEdit}
       <form method="POST" action="?/importLegacy">
         <button
           type="submit"
@@ -43,8 +45,8 @@
           Importar conteúdo atual
         </button>
       </form>
-    </div>
-  {/if}
+    {/if}
+  </div>
 
   {#if form?.message}
     <div
