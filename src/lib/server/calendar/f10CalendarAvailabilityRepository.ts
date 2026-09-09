@@ -9,7 +9,10 @@ import {
   listGoogleCalendarSources,
 } from "$lib/server/calendar/googleCalendarPreferenceRepository";
 import { getDatabase } from "$lib/server/db";
-import { taskGoogleCalendarLinks } from "$lib/server/db/googleCalendarSchema";
+import {
+  taskGoogleCalendarLinks,
+  ticketGoogleCalendarLinks,
+} from "$lib/server/db/googleCalendarSchema";
 import { taskAssignees, tasks } from "$lib/server/db/taskSchema";
 
 export type CalendarAvailabilityUser = {
@@ -159,7 +162,7 @@ async function listF10ConflictsForWindow(
 
   const conflictsByEvent = new Map<string, CalendarAvailabilityConflict>();
   for (const row of rows) {
-    if (!row.dueOn || row.googleEventId === input.excludeGoogleEventId) continue;
+    if (!row.dueOn || row.allDay || row.googleEventId === input.excludeGoogleEventId) continue;
     if (input.excludeGoogleIcalUid && row.googleIcalUid === input.excludeGoogleIcalUid) continue;
     const participates =
       row.linkUserId === userId ||
@@ -216,14 +219,46 @@ async function listRelevantGoogleCalendarIds(userId: string): Promise<string[]> 
   const targetCalendarId = preferences.targetCalendarId === "primary"
     ? primaryCalendarId
     : preferences.targetCalendarId;
-  const calendarIds = new Set<string>([primaryCalendarId]);
+  const configured = sources
+    .filter((source) => source.blocksScheduling)
+    .map((source) => source.calendarId);
 
-  if (targetCalendarId) calendarIds.add(targetCalendarId);
-  for (const source of sources) {
-    if (source.visibleInF10) calendarIds.add(source.calendarId);
+  if (configured.length > 0) return Array.from(new Set(configured));
+  return [targetCalendarId || primaryCalendarId];
+}
+
+async function listIgnoredAllDayGoogleEvents(userId: string) {
+  const db = getDatabase();
+  const [tasks, tickets] = await Promise.all([
+    db
+      .select({
+        calendarId: taskGoogleCalendarLinks.googleCalendarId,
+        eventId: taskGoogleCalendarLinks.googleEventId,
+      })
+      .from(taskGoogleCalendarLinks)
+      .where(
+        and(
+          eq(taskGoogleCalendarLinks.userId, userId),
+          eq(taskGoogleCalendarLinks.allDay, true),
+        ),
+      ),
+    db
+      .select({
+        calendarId: ticketGoogleCalendarLinks.googleCalendarId,
+        eventId: ticketGoogleCalendarLinks.googleEventId,
+      })
+      .from(ticketGoogleCalendarLinks)
+      .where(eq(ticketGoogleCalendarLinks.userId, userId)),
+  ]);
+
+  const ignored = new Map<string, Set<string>>();
+  for (const row of [...tasks, ...tickets]) {
+    if (row.eventId.startsWith("pending:")) continue;
+    const ids = ignored.get(row.calendarId) ?? new Set<string>();
+    ids.add(row.eventId);
+    ignored.set(row.calendarId, ids);
   }
-
-  return Array.from(calendarIds);
+  return ignored;
 }
 
 async function listGoogleConflictsForWindow(
@@ -234,15 +269,25 @@ async function listGoogleConflictsForWindow(
 ): Promise<CalendarAvailabilityConflict[]> {
   const rangeStart = new Date(requestedStart.getTime() - 24 * 60 * 60 * 1000);
   const rangeEnd = new Date(requestedEnd.getTime() + 24 * 60 * 60 * 1000);
-  const calendarIds = await listRelevantGoogleCalendarIds(userId);
+  const [calendarIds, ignoredByCalendar] = await Promise.all([
+    listRelevantGoogleCalendarIds(userId),
+    listIgnoredAllDayGoogleEvents(userId),
+  ]);
   const eventGroups = await Promise.all(
-    calendarIds.map((calendarId) =>
-      listGoogleCalendarEvents(userId, rangeStart, rangeEnd, calendarId),
-    ),
+    calendarIds.map(async (calendarId) => ({
+      calendarId,
+      events: await listGoogleCalendarEvents(userId, rangeStart, rangeEnd, calendarId),
+    })),
   );
 
-  return eventGroups.flatMap((events) =>
-    googleConflicts(events, input, requestedStart, requestedEnd),
+  return eventGroups.flatMap(({ calendarId, events }) =>
+    googleConflicts(
+      events,
+      input,
+      requestedStart,
+      requestedEnd,
+      ignoredByCalendar.get(calendarId) ?? new Set<string>(),
+    ),
   );
 }
 
@@ -251,9 +296,11 @@ function googleConflicts(
   input: Pick<CalendarAvailabilityInput, "timeZone" | "excludeGoogleEventId" | "excludeGoogleIcalUid">,
   requestedStart: Date,
   requestedEnd: Date,
+  ignoredEventIds: Set<string> = new Set(),
 ): CalendarAvailabilityConflict[] {
   const conflicts: CalendarAvailabilityConflict[] = [];
   for (const event of events) {
+    if (ignoredEventIds.has(event.id)) continue;
     if (event.id === input.excludeGoogleEventId) continue;
     if (input.excludeGoogleIcalUid && event.iCalUID === input.excludeGoogleIcalUid) continue;
     if (event.transparency === "transparent" || selfDeclined(event)) continue;
