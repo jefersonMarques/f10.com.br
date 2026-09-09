@@ -24,6 +24,7 @@ import { createManagedHelpAsset, deleteManagedHelpAsset } from "$lib/server/help
 import { deleteAssetObject, putAssetObject } from "$lib/server/storage/assetStorage";
 
 const REVIEW_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
+const MAX_GENERATED_REVIEW_ALTERNATIVES = 18;
 
 type ScreenshotReviewMetadata = {
   screenshotReview?: {
@@ -988,6 +989,7 @@ export async function addHelpGeneratedReviewCandidates(input: {
     timeSeconds: number;
     bytes: Uint8Array;
   }>;
+  preserveAssetIds?: string[];
 }): Promise<Array<{
   assetId: string;
   candidateIndex: number;
@@ -999,6 +1001,8 @@ export async function addHelpGeneratedReviewCandidates(input: {
     .select({
       stepId: helpStepBlocks.stepId,
       blockType: helpStepBlocks.blockType,
+      activeAssetId: helpStepBlocks.assetId,
+      blockMetadata: helpStepBlocks.metadata,
       contentStatus: helpContents.status,
     })
     .from(helpStepBlocks)
@@ -1014,17 +1018,62 @@ export async function addHelpGeneratedReviewCandidates(input: {
   if (!row || row.blockType !== "image") throw new Error("IMAGE_BLOCK_NOT_FOUND");
   if (row.contentStatus === "archived") throw new Error("CONTENT_ARCHIVED");
 
-  const existingAssets = await db
-    .select({ metadata: helpAssets.metadata })
+  let existingAssets = await db
+    .select({
+      id: helpAssets.id,
+      metadata: helpAssets.metadata,
+    })
     .from(helpAssets)
     .where(and(eq(helpAssets.contentId, input.contentId), eq(helpAssets.assetType, "image")));
+
+  const draftSelectedAssetId = readImageReviewDraft(row.blockMetadata)?.selectedAssetId ?? null;
+  const protectedAssetIds = new Set([
+    ...(row.activeAssetId ? [row.activeAssetId] : []),
+    ...(draftSelectedAssetId ? [draftSelectedAssetId] : []),
+    ...(input.preserveAssetIds ?? []).filter(Boolean),
+  ]);
+  const generatedAlternatives = existingAssets
+    .flatMap((asset) => {
+      const review = reviewMetadata(asset.metadata);
+      return review?.stepId === row.stepId
+        && review.role === "candidate"
+        && typeof review.timeSeconds === "number"
+        ? [{ asset, review }]
+        : [];
+    })
+    .sort(
+      (left, right) =>
+        Number(left.review.candidateIndex ?? 0) - Number(right.review.candidateIndex ?? 0),
+    );
+
+  const excess =
+    generatedAlternatives.length +
+    input.candidates.length -
+    MAX_GENERATED_REVIEW_ALTERNATIVES;
+  if (excess > 0) {
+    const removable = generatedAlternatives
+      .filter(({ asset }) => !protectedAssetIds.has(asset.id))
+      .slice(0, excess);
+
+    await Promise.allSettled(
+      removable.map(({ asset }) =>
+        deleteManagedHelpAsset(input.actorUserId, asset.id)
+      ),
+    );
+
+    existingAssets = await db
+      .select({
+        id: helpAssets.id,
+        metadata: helpAssets.metadata,
+      })
+      .from(helpAssets)
+      .where(and(eq(helpAssets.contentId, input.contentId), eq(helpAssets.assetType, "image")));
+  }
+
   const related = existingAssets.flatMap((asset) => {
     const review = reviewMetadata(asset.metadata);
     return review?.stepId === row.stepId ? [review] : [];
   });
-  if (related.length + input.candidates.length > 24) {
-    throw new Error("SCREENSHOT_CANDIDATE_LIMIT");
-  }
   let candidateIndex = Math.max(
     0,
     ...related.map((review) => Number(review.candidateIndex ?? 0)),
