@@ -4,6 +4,7 @@
     BookOpen,
     ChevronDown,
     LifeBuoy,
+    Layers3,
     LoaderCircle,
     Search,
     Send,
@@ -117,6 +118,26 @@
         {:else}
           <div class="flex items-start gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Sparkles size={16}/></span><div class="min-w-0 flex-1"><p class="whitespace-pre-line text-[13px] leading-6 text-[#343C4E]">{answer}</p>{#if target}<div class="mt-5 border-t border-[#EEF0F5] pt-4"><p class="text-[9px] font-bold uppercase tracking-[0.12em] text-[#949AA8]">Conteúdo relacionado</p><a href={targetHref(target)} class="mt-2 inline-flex items-center gap-2 text-[12px] font-semibold text-[#000A57] hover:underline">{target.title}<ArrowRight size={14}/></a>{#if resolution === "answered"}<p class="mt-1 text-[10px] text-[#858B99]">Ver passo a passo completo</p>{/if}</div>{/if}</div></div>
         {/if}
+      </section>
+    {/if}
+
+    {#if data.collections.length > 0}
+      <section class="mt-10">
+        <div><p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Seleções F10</p><h2 class="mt-1 text-[24px] font-semibold tracking-[-0.035em] text-[#010D28]">Coleções</h2></div>
+        <div class="mt-6 grid gap-3 sm:grid-cols-2">
+          {#each data.collections as collection}
+            <a href={`/ajuda-f10/colecoes/${encodeURIComponent(collection.slug)}`} class="group rounded-[22px] border border-[#E2E5EC] bg-white p-5 shadow-[0_8px_24px_rgba(1,13,40,0.025)] transition hover:border-[#C8CEDA] hover:shadow-[0_12px_32px_rgba(1,13,40,0.05)]">
+              <div class="flex items-start gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Layers3 size={18}/></span>
+                <div class="min-w-0 flex-1">
+                  <h3 class="text-[13px] font-semibold text-[#303746] group-hover:text-[#000A57]">{collection.title}</h3>
+                  {#if collection.description}<p class="mt-1 line-clamp-2 text-[10px] leading-5 text-[#7D8493]">{collection.description}</p>{/if}
+                  <div class="mt-3 flex items-center justify-between gap-3"><span class="text-[9px] font-semibold text-[#959BA8]">{collection.items.length} {collection.items.length === 1 ? "conteúdo" : "conteúdos"}</span><ArrowRight size={14} class="text-[#9AA0AE] transition group-hover:translate-x-0.5 group-hover:text-[#000A57]"/></div>
+                </div>
+              </div>
+            </a>
+          {/each}
+        </div>
       </section>
     {/if}
 
