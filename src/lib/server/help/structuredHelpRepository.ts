@@ -721,9 +721,7 @@ export async function replaceStructuredHelpStepWithParts(
     .from(helpStepBlocks)
     .where(eq(helpStepBlocks.stepId, stepId))
     .orderBy(asc(helpStepBlocks.sortOrder));
-  const editableBlocks = targetBlocks.filter(
-    (block) => block.blockType === "text" || block.blockType === "notice",
-  );
+  const editableBlocks = targetBlocks.filter((block) => block.blockType === "text");
   const primaryEditable = editableBlocks[0] ?? null;
   const removableIds = editableBlocks.slice(1).map((block) => block.id);
   const updatedAt = new Date();
