@@ -640,6 +640,108 @@ function partInput(part: ClassifiedSegment[]): string {
     .join("\n");
 }
 
+async function generateCoverageRecovery(
+  missingSegments: ClassifiedSegment[],
+  existingSteps: GeneratedPartStep[],
+  partIndex: number,
+  partCount: number,
+  onAiUsage?: PipelineAiUsageHandler,
+): Promise<GeneratedPartStep[]> {
+  if (missingSegments.length === 0) return [];
+
+  const startedAt = Date.now();
+  const requiredIds = missingSegments.map((segment) => segment.id);
+  const allowedIds = new Set(requiredIds);
+  let responseMeta: {
+    provider?: string;
+    model: string;
+    inputTokens?: number | null;
+    outputTokens?: number | null;
+  } = { model: "ai-gateway" };
+
+  try {
+    const response = await createAiStructuredResponse<GeneratedPartResponse>({
+      task: "content_edit",
+      requiredCapabilities: ["content.draft"],
+      instructions: [
+        "Complete um artigo F10 já existente usando SOMENTE os segmentos pendentes fornecidos.",
+        "Crie apenas as etapas adicionais necessárias para representar integralmente esses segmentos.",
+        "Não reescreva, resuma nem repita etapas que já estão cobertas.",
+        "Cada segmentId recebido DEVE aparecer em sourceSegmentIds e seu fato operacional deve estar realmente presente no texto público.",
+        "A fonte é evidência interna. NUNCA mencione transcrição, vídeo, gravação, narrador, áudio, processo de geração, ausência de ações ou ausência de screenshot.",
+        "Não produza placeholders ou artefatos como **svg**, <svg>, **html>, JSON isolado ou nomes de formatos sem função editorial.",
+        "Escreva diretamente a orientação ao usuário final.",
+        "Preserve ações, campos, valores, regras, condições, exceções e resultados.",
+        "Toda ação executável deve ficar em linha numerada usando **1.**, **2.**, **3.**.",
+        "Para etapa de interface, planeje no máximo um screenshot usando os tempos dos segmentos pendentes.",
+        "Não invente fatos, telas, campos, URLs ou resultados.",
+      ].join("\n"),
+      userInput: [
+        `PARTE ORIGINAL ${partIndex + 1} DE ${partCount}`,
+        `SEGMENTOS PENDENTES: ${requiredIds.join(", ")}`,
+        "TRECHOS PENDENTES:",
+        partInput(missingSegments),
+        "ETAPAS JÁ GERADAS — USE APENAS PARA EVITAR DUPLICAÇÃO:",
+        existingSteps
+          .map((step, index) => [
+            `ETAPA EXISTENTE ${index + 1}: ${step.title}`,
+            step.description,
+            step.instruction,
+          ].filter(Boolean).join("\n"))
+          .join("\n\n"),
+      ].join("\n\n"),
+      schemaName: "f10_help_video_article_coverage_recovery",
+      schema: partSchema(),
+      maxOutputTokens: 8_000,
+      timeoutMs: 180_000,
+    });
+
+    responseMeta = {
+      provider: response.provider,
+      model: response.model,
+      inputTokens: response.inputTokens,
+      outputTokens: response.outputTokens,
+    };
+
+    const recoverySteps = normalizePartSteps(response.data, allowedIds);
+    if (recoverySteps.length === 0 || recoverySteps.some(stepHasEditorialIssue)) {
+      throw new Error("HELP_VIDEO_COVERAGE_RECOVERY_INVALID");
+    }
+
+    const referencedMissing = missingCoverage(requiredIds, recoverySteps);
+    if (referencedMissing.length > 0) {
+      throw new Error("HELP_VIDEO_COVERAGE_RECOVERY_INCOMPLETE");
+    }
+
+    const semanticMissing = await auditPartCoverage(
+      missingSegments,
+      recoverySteps,
+      onAiUsage,
+    );
+    if (semanticMissing.length > 0) {
+      throw new Error("HELP_VIDEO_COVERAGE_RECOVERY_INCOMPLETE");
+    }
+
+    await reportAiUsage(onAiUsage, {
+      operation: "video_article_part",
+      ...responseMeta,
+      latencyMs: Date.now() - startedAt,
+      status: "success",
+    });
+
+    return recoverySteps;
+  } catch (cause) {
+    await reportAiUsage(onAiUsage, {
+      operation: "video_article_part",
+      ...responseMeta,
+      latencyMs: Date.now() - startedAt,
+      status: "failed",
+      failureCode: aiFailureCode(cause),
+    });
+    throw new Error(`HELP_VIDEO_COVERAGE_RECOVERY_FAILED:${aiFailureCode(cause)}`);
+  }
+}
+
 async function generatePart(
   part: ClassifiedSegment[],
   partIndex: number,
@@ -656,6 +758,8 @@ async function generatePart(
     outputTokens?: number | null;
   } = { model: "ai-gateway" };
   let lastMissing = requiredIds;
+  let latestSteps: GeneratedPartStep[] = [];
+  let latestEditorialIssue = false;
 
   try {
     for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -700,8 +804,10 @@ async function generatePart(
       };
 
       const steps = normalizePartSteps(response.data, allowedIds);
+      latestSteps = steps;
       lastMissing = missingCoverage(requiredIds, steps);
       const editorialLeak = steps.some(stepHasEditorialIssue);
+      latestEditorialIssue = editorialLeak;
       if (steps.length > 0 && lastMissing.length === 0 && !editorialLeak) {
         lastMissing = await auditPartCoverage(part, steps, onAiUsage);
         if (lastMissing.length === 0) {
@@ -716,6 +822,41 @@ async function generatePart(
       }
       if (editorialLeak && lastMissing.length === 0) {
         lastMissing = ["linguagem_de_bastidor_ou_artefato"];
+      }
+    }
+
+    const recoverableIds = lastMissing.filter((id) => allowedIds.has(id));
+    if (
+      latestSteps.length > 0
+      && !latestEditorialIssue
+      && recoverableIds.length > 0
+      && recoverableIds.length === lastMissing.length
+    ) {
+      const missingIdSet = new Set(recoverableIds);
+      const missingSegments = part.filter((segment) => missingIdSet.has(segment.id));
+      const recoverySteps = await generateCoverageRecovery(
+        missingSegments,
+        latestSteps,
+        partIndex,
+        partCount,
+        onAiUsage,
+      );
+      const combined = [...latestSteps, ...recoverySteps];
+      const combinedMissing = missingCoverage(requiredIds, combined);
+      if (
+        combinedMissing.length === 0
+        && !combined.some(stepHasEditorialIssue)
+      ) {
+        const semanticMissing = await auditPartCoverage(part, combined, onAiUsage);
+        if (semanticMissing.length === 0) {
+          await reportAiUsage(onAiUsage, {
+            operation: "video_article_part",
+            ...lastResponseMeta,
+            latencyMs: Date.now() - startedAt,
+            status: "success",
+          });
+          return combined;
+        }
       }
     }
 
