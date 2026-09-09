@@ -34,10 +34,15 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
   );
 
   let mode: HelpScreenshotGenerationMode = "auto";
+  let baseTimeSeconds: number | null = null;
   try {
-    const payload = await request.json() as { mode?: string };
+    const payload = await request.json() as { mode?: string; baseTimeSeconds?: unknown };
     if (payload.mode === "before" || payload.mode === "after" || payload.mode === "auto") {
       mode = payload.mode;
+    }
+    const suppliedBaseTime = Number(payload.baseTimeSeconds);
+    if (Number.isFinite(suppliedBaseTime) && suppliedBaseTime >= 0) {
+      baseTimeSeconds = suppliedBaseTime;
     }
   } catch {
     // Usa o modo automático quando o corpo vier vazio.
@@ -49,6 +54,7 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
       contentId: params.contentId,
       blockId: params.blockId,
       mode,
+      baseTimeSeconds,
     });
     return json({
       success: true,
