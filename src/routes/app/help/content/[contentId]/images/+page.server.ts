@@ -12,6 +12,27 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function generationCoverageSummary(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const coverage = value as Record<string, unknown>;
+  const summaryValue = coverage.summary;
+  if (!summaryValue || typeof summaryValue !== "object" || Array.isArray(summaryValue)) return null;
+  const summary = summaryValue as Record<string, unknown>;
+  const readNumber = (key: string) => {
+    const number = Number(summary[key]);
+    return Number.isFinite(number) && number >= 0 ? number : 0;
+  };
+  return {
+    totalSegments: readNumber("totalSegments"),
+    relevantSegments: readNumber("relevantSegments"),
+    coveredRelevantSegments: readNumber("coveredRelevantSegments"),
+    ignoredSegments: readNumber("ignoredSegments"),
+    uncoveredRelevantSegments: readNumber("uncoveredRelevantSegments"),
+    processingParts: readNumber("processingParts"),
+    generatedSteps: readNumber("generatedSteps"),
+  };
+}
+
 export const load: PageServerLoad = async ({ params, parent }) => {
   if (!isUuid(params.contentId)) throw error(404, "Conteúdo não encontrado.");
 
@@ -29,12 +50,16 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   ]);
   if (!content) throw error(404, "Conteúdo não encontrado.");
   const transcriptTimeline = content.featuredVideo?.metadata?.transcriptTimeline;
+  const generationCoverage = generationCoverageSummary(
+    content.featuredVideo?.metadata?.generationCoverage,
+  );
 
   return {
     content,
     screenshotReview,
     humanReview,
     categories,
+    generationCoverage,
     canGenerateVideoFrames: Boolean(
       content.featuredVideo?.storageKey
       && Array.isArray(transcriptTimeline)
