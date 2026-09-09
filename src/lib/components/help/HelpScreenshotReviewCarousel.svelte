@@ -161,7 +161,10 @@
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ mode }),
+          body: JSON.stringify({
+            mode,
+            baseTimeSeconds: selected?.timeSeconds ?? null,
+          }),
         },
       );
       const payload = await response.json().catch(() => ({})) as {
