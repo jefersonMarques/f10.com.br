@@ -735,6 +735,7 @@
 
   async function runRegeneration(mode: "current" | "upload"): Promise<void> {
     if (regenerating || (mode === "upload" && !regenerationFile)) return;
+    regenerating = true;
     regenerationError = "";
     saveMessage = "";
 
@@ -761,12 +762,14 @@
       };
       if (!response.ok || !payload.success || !payload.job) {
         regenerationError = payload.message || "Não foi possível iniciar a atualização.";
+        regenerating = false;
         return;
       }
 
       await applyRegenerationJob(payload.job);
       scheduleRegenerationPoll(payload.job.id);
     } catch {
+      regenerating = false;
       regenerationError = "Não foi possível iniciar o processamento no servidor.";
     }
   }
