@@ -72,15 +72,6 @@ export type HelpVideoGeneratedMetadata = Omit<HelpVideoGeneratedArticle, "steps"
 type GeneratedMetadata = HelpVideoGeneratedMetadata;
 
 export type HelpVideoArticleCheckpoint = {
-  classifiedSegments?: Array<{
-    id: string;
-    sourceIndex: number;
-    start: number;
-    end: number;
-    text: string;
-    classification: HelpVideoSegmentClassification;
-    topicKey: string;
-  }>;
   completedParts?: Array<{
     partIndex: number;
     segmentIds: string[];
@@ -136,6 +127,7 @@ type PipelineAiUsageHandler = (
 
 const GENERATION_PART_SEGMENTS = 36;
 const GENERATION_PART_SECONDS = 6 * 60;
+const GENERATION_CONCURRENCY = 2;
 
 const EDITORIAL_INVALID_PATTERNS = [
   /\bna transcri(?:ção|cao)\b/i,
@@ -879,42 +871,20 @@ export async function generateHelpVideoArticle(input: {
   if (identified.length === 0) throw new Error("HELP_VIDEO_TRANSCRIPTION_EMPTY");
 
   const checkpoint: HelpVideoArticleCheckpoint = {
-    classifiedSegments: input.checkpoint?.classifiedSegments,
     completedParts: [...(input.checkpoint?.completedParts ?? [])],
     metadata: input.checkpoint?.metadata,
   };
-
-  const checkpointClassified = checkpoint.classifiedSegments;
-  const classifiedCheckpointValid =
-    checkpointClassified?.length === identified.length
-    && checkpointClassified.every((segment, index) => {
-      const source = identified[index];
-      return Boolean(
-        source
-        && segment.id === source.id
-        && segment.sourceIndex === source.sourceIndex
-        && segment.start === source.start
-        && segment.end === source.end
-        && segment.text === source.text,
-      );
-    });
-
-  const classified: ClassifiedSegment[] = classifiedCheckpointValid
-    ? checkpointClassified as ClassifiedSegment[]
-    : classifyTranscript(identified);
-
-  if (!classifiedCheckpointValid) {
-    checkpoint.classifiedSegments = classified.map((segment) => ({ ...segment }));
-    checkpoint.completedParts = [];
-    checkpoint.metadata = undefined;
-    await input.onCheckpoint?.(checkpoint);
-  }
+  const classified = classifyTranscript(identified);
   const relevant = classified.filter(isRelevant);
   const ignored = classified.filter((segment) => !isRelevant(segment));
   if (relevant.length === 0) throw new Error("HELP_VIDEO_COVERAGE_NO_RELEVANT_CONTENT");
 
   const parts = buildGenerationParts(classified);
-  const generated: GeneratedPartStep[] = [];
+  const completedByPart = new Map<number, {
+    partIndex: number;
+    segmentIds: string[];
+    steps: GeneratedPartStep[];
+  }>();
 
   for (const [index, part] of parts.entries()) {
     const segmentIds = part.map((segment) => segment.id);
@@ -924,42 +894,85 @@ export async function generateHelpVideoArticle(input: {
         && candidate.segmentIds.length === segmentIds.length
         && candidate.segmentIds.every((id, idIndex) => id === segmentIds[idIndex]),
     );
-    const savedValid = Boolean(
+    if (
       saved
       && saved.steps.length > 0
       && missingCoverage(segmentIds, saved.steps).length === 0
-      && !saved.steps.some(stepHasEditorialIssue),
-    );
-
-    if (saved && savedValid) {
-      generated.push(...saved.steps);
-      await input.onProgress?.({
-        label: "Retomando conteúdo já processado",
-        detail: `Parte ${index + 1} de ${parts.length} recuperada do checkpoint`,
-      });
-      continue;
+      && !saved.steps.some(stepHasEditorialIssue)
+    ) {
+      completedByPart.set(index, saved);
     }
+  }
 
+  const pendingIndexes = parts
+    .map((_, index) => index)
+    .filter((index) => !completedByPart.has(index));
+
+  if (completedByPart.size > 0) {
+    await input.onProgress?.({
+      label: "Retomando conteúdo já processado",
+      detail: `${completedByPart.size} de ${parts.length} parte(s) recuperada(s) do checkpoint`,
+    });
+  }
+
+  for (
+    let offset = 0;
+    offset < pendingIndexes.length;
+    offset += GENERATION_CONCURRENCY
+  ) {
+    const batchIndexes = pendingIndexes.slice(
+      offset,
+      offset + GENERATION_CONCURRENCY,
+    );
     await input.onProgress?.({
       label: "Gerando conteúdo sem perder etapas",
-      detail: `Parte ${index + 1} de ${parts.length} · ${part[0]?.id}-${part.at(-1)?.id}`,
+      detail: `Partes ${batchIndexes.map((index) => index + 1).join(" e ")} de ${parts.length}`,
     });
-    const steps = await generatePart(part, index, parts.length, input.onAiUsage);
-    generated.push(...steps);
 
-    checkpoint.completedParts = [
-      ...(checkpoint.completedParts ?? []).filter(
-        (candidate) => candidate.partIndex !== index,
-      ),
-      {
-        partIndex: index,
-        segmentIds,
-        steps,
-      },
-    ].sort((left, right) => left.partIndex - right.partIndex);
-    checkpoint.metadata = undefined;
-    await input.onCheckpoint?.(checkpoint);
+    const settled = await Promise.allSettled(
+      batchIndexes.map(async (index) => {
+        const part = parts[index]!;
+        const segmentIds = part.map((segment) => segment.id);
+        const steps = await generatePart(
+          part,
+          index,
+          parts.length,
+          input.onAiUsage,
+        );
+        return { partIndex: index, segmentIds, steps };
+      }),
+    );
+
+    let firstFailure: unknown = null;
+    for (const [resultIndex, result] of settled.entries()) {
+      if (result.status === "fulfilled") {
+        completedByPart.set(result.value.partIndex, result.value);
+      } else if (firstFailure === null) {
+        firstFailure = result.reason;
+      }
+
+      if (result.status === "fulfilled") {
+        checkpoint.completedParts = Array.from(completedByPart.values())
+          .sort((left, right) => left.partIndex - right.partIndex);
+        checkpoint.metadata = undefined;
+        await input.onCheckpoint?.(checkpoint);
+      } else {
+        const failedPartIndex = batchIndexes[resultIndex];
+        await input.onProgress?.({
+          label: "Parte aguardando nova tentativa",
+          detail: failedPartIndex === undefined
+            ? "O progresso concluído foi preservado."
+            : `Parte ${failedPartIndex + 1} de ${parts.length}; as demais concluídas foram preservadas.`,
+        });
+      }
+    }
+
+    if (firstFailure !== null) throw firstFailure;
   }
+
+  const generated: GeneratedPartStep[] = parts.flatMap((_, index) =>
+    completedByPart.get(index)?.steps ?? [],
+  );
 
   const requiredIds = relevant.map((segment) => segment.id);
   const uncovered = missingCoverage(requiredIds, generated);
