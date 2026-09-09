@@ -7,6 +7,7 @@ import {
   listHelpScreenshotReviewGroups,
 } from "$lib/server/help/helpScreenshotReviewRepository";
 import { getStructuredHelpContent } from "$lib/server/help/structuredHelpRepository";
+import { getLatestHelpVideoProcessingJobView } from "$lib/server/help/helpVideoProcessingRepository";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -42,11 +43,12 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   );
   if (!hasPermission(permissions, "help.view")) throw error(403, "Acesso não autorizado.");
 
-  const [content, screenshotReview, humanReview, categories] = await Promise.all([
+  const [content, screenshotReview, humanReview, categories, videoProcessingJob] = await Promise.all([
     getStructuredHelpContent(params.contentId),
     listHelpScreenshotReviewGroups(params.contentId),
     getHelpHumanReviewStatus(params.contentId),
     listHelpCategories(true),
+    getLatestHelpVideoProcessingJobView(params.contentId),
   ]);
   if (!content) throw error(404, "Conteúdo não encontrado.");
   const transcriptTimeline = content.featuredVideo?.metadata?.transcriptTimeline;
@@ -60,6 +62,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     humanReview,
     categories,
     generationCoverage,
+    videoProcessingJob,
     canGenerateVideoFrames: Boolean(
       content.featuredVideo?.storageKey
       && Array.isArray(transcriptTimeline)
