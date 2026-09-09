@@ -81,6 +81,7 @@
           icon: BookOpen,
           permission: "help.view",
           children: [
+            { label: "Visão geral", icon: BarChart3, href: "/app/help" },
             { label: "Conteúdos", icon: FileText, href: "/app/help/content" },
             { label: "Coleções", icon: Layers3, href: "/app/help/collections" },
             { label: "Trilhas", icon: GraduationCap, href: "/app/help/trilhas" },
