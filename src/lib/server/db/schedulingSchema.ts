@@ -26,6 +26,12 @@ export const schedulingInvitationStatus = pgEnum("scheduling_invitation_status",
   "cancelled",
 ]);
 
+export const schedulingBookingStatus = pgEnum("scheduling_booking_status", [
+  "booking",
+  "booked",
+  "cancelled",
+]);
+
 export type SchedulingWeekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export const schedulingAvailabilityProfiles = pgTable("scheduling_availability_profiles", {
@@ -42,10 +48,106 @@ export const schedulingAvailabilityProfiles = pgTable("scheduling_availability_p
   bufferAfterMinutes: integer("buffer_after_minutes").notNull().default(0),
   maxHorizonDays: integer("max_horizon_days").notNull().default(30),
   defaultDurationMinutes: integer("default_duration_minutes").notNull().default(30),
+  publicSlug: text("public_slug"),
+  publicEnabled: boolean("public_enabled").notNull().default(false),
+  publicTitle: text("public_title").notNull().default("Agendar uma conversa"),
+  publicDescription: text("public_description").notNull().default(""),
+  addGoogleMeet: boolean("add_google_meet").notNull().default(true),
   updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const schedulingAvailabilityWindows = pgTable(
+  "scheduling_availability_windows",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    weekday: integer("weekday").$type<SchedulingWeekday>().notNull(),
+    startTime: text("start_time").notNull(),
+    endTime: text("end_time").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("scheduling_availability_windows_user_idx").on(
+      table.userId,
+      table.weekday,
+      table.sortOrder,
+    ),
+  ],
+);
+
+export const schedulingAvailabilityExceptions = pgTable(
+  "scheduling_availability_exceptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    exceptionDate: date("exception_date").notNull(),
+    available: boolean("available").notNull().default(false),
+    startTime: text("start_time"),
+    endTime: text("end_time"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("scheduling_availability_exceptions_user_idx").on(
+      table.userId,
+      table.exceptionDate,
+    ),
+  ],
+);
+
+export const schedulingBookings = pgTable(
+  "scheduling_bookings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    hostUserId: uuid("host_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    customerContactId: uuid("customer_contact_id")
+      .notNull()
+      .references(() => customerContacts.id, { onDelete: "restrict" }),
+    customerName: text("customer_name").notNull(),
+    customerEmail: text("customer_email").notNull(),
+    groupId: integer("group_id"),
+    groupName: text("group_name"),
+    unitId: integer("unit_id"),
+    unitName: text("unit_name"),
+    notes: text("notes").notNull().default(""),
+    startAt: timestamp("start_at", { withTimezone: true }).notNull(),
+    endAt: timestamp("end_at", { withTimezone: true }).notNull(),
+    bufferBeforeMinutes: integer("buffer_before_minutes").notNull().default(0),
+    bufferAfterMinutes: integer("buffer_after_minutes").notNull().default(0),
+    status: schedulingBookingStatus("status").notNull().default("booking"),
+    bookingStartedAt: timestamp("booking_started_at", { withTimezone: true }).notNull().defaultNow(),
+    bookedAt: timestamp("booked_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    googleCalendarId: text("google_calendar_id").notNull().default("primary"),
+    googleEventId: text("google_event_id"),
+    googleIcalUid: text("google_ical_uid"),
+    googleMeetUrl: text("google_meet_url"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("scheduling_bookings_host_idx").on(
+      table.hostUserId,
+      table.status,
+      table.startAt,
+      table.endAt,
+    ),
+    index("scheduling_bookings_customer_idx").on(
+      table.customerContactId,
+      table.createdAt,
+    ),
+  ],
+);
 
 export const schedulingInvitations = pgTable(
   "scheduling_invitations",
