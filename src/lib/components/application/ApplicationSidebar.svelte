@@ -13,6 +13,7 @@
     GraduationCap,
     Headphones,
     LayoutDashboard,
+    Layers3,
     MessageCircleMore,
     MonitorCog,
     PanelLeftClose,
@@ -81,6 +82,7 @@
           permission: "help.view",
           children: [
             { label: "Conteúdos", icon: FileText, href: "/app/help/content" },
+            { label: "Coleções", icon: Layers3, href: "/app/help/collections" },
             { label: "Trilhas", icon: GraduationCap, href: "/app/help/trilhas" },
           ],
         },
