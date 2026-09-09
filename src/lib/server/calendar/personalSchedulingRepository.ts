@@ -615,6 +615,7 @@ export async function listPersonalSchedulingBookings(
       endAt: schedulingBookings.endAt,
       status: schedulingBookings.status,
       googleMeetUrl: schedulingBookings.googleMeetUrl,
+      googleEventId: schedulingBookings.googleEventId,
     })
     .from(schedulingBookings)
     .where(
