@@ -479,6 +479,7 @@
                 />
               </div>
             </div>
+            <a href={`/app/help/content/${data.content.id}?step=${encodeURIComponent(step.id)}`} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#6E7584] transition hover:text-[#000A57]" aria-label="Abrir etapa no modo avançado" title="Modo avançado desta etapa"><Settings2 size={14}/></a>
           </header>
 
           <div class="space-y-5 px-5 py-6 sm:px-6">
