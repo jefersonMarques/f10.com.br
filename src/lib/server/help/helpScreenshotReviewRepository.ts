@@ -178,8 +178,13 @@ async function cleanupExpiredCandidates(contentId: string): Promise<void> {
     })
     .from(helpAssets)
     .where(and(eq(helpAssets.contentId, contentId), eq(helpAssets.assetType, "image")));
+  const activeRows = await imageReviewRows(contentId);
+  const activeAssetIds = new Set(
+    activeRows.flatMap((row) => row.assetId ? [row.assetId] : []),
+  );
   const now = Date.now();
   const expired = rows.filter((row) => {
+    if (activeAssetIds.has(row.id)) return false;
     const review = reviewMetadata(row.metadata);
     if (!review || review.role !== "candidate" || !review.expiresAt) return false;
     const expiresAt = Date.parse(review.expiresAt);
