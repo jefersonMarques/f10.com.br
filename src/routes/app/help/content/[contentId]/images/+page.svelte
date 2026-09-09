@@ -8,6 +8,7 @@
     ExternalLink,
     Eye,
     FileText,
+    ImagePlus,
     Info,
     Link2,
     LoaderCircle,
@@ -35,7 +36,7 @@
 
   type ReviewStep = PageData["content"]["steps"][number];
   type ReviewContent = PageData["content"];
-  type AddBlockType = "text" | "notice" | "link";
+  type AddBlockType = "text" | "notice" | "link" | "image";
   type SplitSuggestion = {
     stepId: string;
     sourceSignature: string;
@@ -61,7 +62,9 @@
   let addLinkLabel = "";
   let addLinkUrl = "";
   let addNoticeVariant = "info";
+  let addImageFile: File | null = null;
   let addSaving = false;
+  let imageAddingMode: "generate" | "upload" | null = null;
   let openEditors = new Set<string>();
   let appliedContentUpdatedAt = "";
   let reviewSummary = "";
@@ -70,6 +73,8 @@
   let reviewCategories = data.content.categories;
   let selectedCategoryIds: string[] = [];
   let reviewPending = data.humanReview.pending;
+  let splitTargetStep: ReviewStep | null = null;
+  let splitDesiredParts = 2;
   let splitSuggestion: SplitSuggestion | null = null;
   let splitLoadingStepId = "";
   let splitApplying = false;
@@ -327,10 +332,70 @@
     addLinkLabel = "";
     addLinkUrl = "";
     addNoticeVariant = "info";
+    addImageFile = null;
+  }
+
+  function chooseStepImageFile(event: Event): void {
+    const input = event.currentTarget as HTMLInputElement;
+    addImageFile = input.files?.[0] ?? null;
+  }
+
+  async function addStepImage(action: "generate" | "upload"): Promise<void> {
+    if (!addPanel || addPanel.type !== "image" || imageAddingMode) return;
+    if (hasUnsavedReview || openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = hasUnsavedReview
+        ? "Salve as alterações das imagens antes de adicionar outra."
+        : "Salve ou cancele o texto que está em edição.";
+      return;
+    }
+    if (action === "upload" && !addImageFile) return;
+
+    imageAddingMode = action;
+    saveMessage = "";
+    try {
+      let response: Response;
+      if (action === "generate") {
+        response = await fetch(
+          `/api/app/help/content/${data.content.id}/steps/${addPanel.stepId}/image`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "generate" }),
+          },
+        );
+      } else {
+        const formData = new FormData();
+        formData.set("file", addImageFile!);
+        response = await fetch(
+          `/api/app/help/content/${data.content.id}/steps/${addPanel.stepId}/image`,
+          { method: "POST", body: formData },
+        );
+      }
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+      };
+      if (!response.ok || !payload.success) {
+        saveSuccess = false;
+        saveMessage = payload.message || "Não foi possível adicionar a imagem.";
+        return;
+      }
+      saveSuccess = true;
+      saveMessage = payload.message || "Imagem adicionada.";
+      addPanel = null;
+      addImageFile = null;
+      await invalidateAll();
+    } catch {
+      saveSuccess = false;
+      saveMessage = "A conexão foi interrompida ao adicionar a imagem.";
+    } finally {
+      imageAddingMode = null;
+    }
   }
 
   async function addBlock(): Promise<void> {
-    if (!addPanel || addSaving) return;
+    if (!addPanel || addPanel.type === "image" || addSaving) return;
     addSaving = true;
     try {
       const response = await fetch(`/api/app/help/content/${data.content.id}/review`, {
@@ -363,6 +428,27 @@
     }
   }
 
+  function openSplitDialog(step: ReviewStep): void {
+    if (hasUnsavedReview || openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = hasUnsavedReview
+        ? "Salve as alterações das imagens antes de reorganizar a etapa."
+        : "Salve ou cancele o texto que está em edição.";
+      return;
+    }
+    splitTargetStep = step;
+    splitDesiredParts = 2;
+    splitSuggestion = null;
+    saveMessage = "";
+  }
+
+  function closeSplitDialog(): void {
+    if (splitApplying) return;
+    splitTargetStep = null;
+    splitSuggestion = null;
+    splitLoadingStepId = "";
+  }
+
   async function previewStepSplit(step: ReviewStep): Promise<void> {
     if (splitLoadingStepId || splitApplying) return;
     if (hasUnsavedReview || openEditors.size > 0) {
@@ -380,7 +466,10 @@
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ action: "preview" }),
+          body: JSON.stringify({
+            action: "preview",
+            desiredParts: splitDesiredParts,
+          }),
         },
       );
       const payload = await response.json().catch(() => ({})) as {
@@ -394,10 +483,6 @@
         return;
       }
       splitSuggestion = { stepId: step.id, ...payload.suggestion };
-      if (!splitSuggestion.shouldSplit) {
-        saveSuccess = true;
-        saveMessage = "A etapa já está objetiva. Nenhuma quebra foi sugerida.";
-      }
     } catch {
       saveSuccess = false;
       saveMessage = "A conexão foi interrompida ao analisar a etapa.";
@@ -439,6 +524,7 @@
       }
       applyUpdatedContent(payload.content);
       splitSuggestion = null;
+      splitTargetStep = null;
       saveSuccess = true;
       saveMessage = payload.message || "Etapa reorganizada.";
     } catch {
@@ -600,8 +686,8 @@
               </div>
             </div>
             {#if data.canEdit}
-              <button type="button" on:click={() => previewStepSplit(step)} disabled={Boolean(splitLoadingStepId) || splitApplying} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#F1D7BD] bg-[#FFF9F3] text-[#A9510D] transition hover:bg-[#FFF4E9] disabled:opacity-50" aria-label="Quebrar etapa com IA" title="Quebrar etapa">
-                {#if splitLoadingStepId === step.id}<LoaderCircle size={14} class="animate-spin"/>{:else}<Sparkles size={14}/>{/if}
+              <button type="button" on:click={() => openSplitDialog(step)} disabled={splitApplying} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#F1D7BD] bg-[#FFF9F3] text-[#A9510D] transition hover:bg-[#FFF4E9] disabled:opacity-50" aria-label="Quebrar etapa com IA" title="Quebrar etapa">
+                <Sparkles size={14}/>
               </button>
             {/if}
             <a href={`/app/help/content/${data.content.id}?step=${encodeURIComponent(step.id)}`} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#6E7584] transition hover:text-[#000A57]" aria-label="Abrir etapa no modo avançado" title="Modo avançado desta etapa"><Settings2 size={14}/></a>
@@ -657,11 +743,31 @@
                   <button type="button" on:click={() => openAddPanel(step.id, "text")} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><FileText size={13}/>Texto</button>
                   <button type="button" on:click={() => openAddPanel(step.id, "notice")} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-3 text-[10px] font-semibold text-[#A9510D]"><Info size={13}/>Aviso</button>
                   <button type="button" on:click={() => openAddPanel(step.id, "link")} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-3 text-[10px] font-semibold text-[#000A57]"><Link2 size={13}/>Link</button>
+                  {#if !step.blocks.some((block) => block.blockType === "image")}
+                    <button type="button" on:click={() => openAddPanel(step.id, "image")} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#D8DDF4] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><ImagePlus size={13}/>Imagem</button>
+                  {/if}
                 </div>
 
                 {#if addPanel?.stepId === step.id}
                   <div class="mt-3 rounded-2xl border border-[#DDE1EA] bg-[#FAFAFC] p-3">
-                    {#if addPanel.type === "link"}
+                    {#if addPanel.type === "image"}
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        {#if data.canGenerateVideoFrames}
+                          <button type="button" on:click={() => addStepImage("generate")} disabled={Boolean(imageAddingMode)} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">
+                            {#if imageAddingMode === "generate"}<LoaderCircle size={14} class="animate-spin"/>{:else}<Sparkles size={14}/>{/if}
+                            Gerar do vídeo
+                          </button>
+                        {/if}
+                        <label class="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 py-2">
+                          <ImagePlus size={14} class="shrink-0 text-[#000A57]"/>
+                          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" on:change={chooseStepImageFile} class="min-w-0 flex-1 text-[9px]"/>
+                        </label>
+                        <button type="button" on:click={() => addStepImage("upload")} disabled={!addImageFile || Boolean(imageAddingMode)} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-4 text-[10px] font-semibold text-[#000A57] disabled:opacity-40">
+                          {#if imageAddingMode === "upload"}<LoaderCircle size={14} class="animate-spin"/>{:else}<Check size={14}/>{/if}
+                          Enviar
+                        </button>
+                      </div>
+                    {:else if addPanel.type === "link"}
                       <div class="grid gap-2 sm:grid-cols-2">
                         <input bind:value={addLinkLabel} maxlength="240" placeholder="Texto do link" class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"/>
                         <input bind:value={addLinkUrl} placeholder="https://..." class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"/>
@@ -678,7 +784,9 @@
                     {/if}
                     <div class="mt-3 flex justify-end gap-2">
                       <button type="button" on:click={() => (addPanel = null)} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] text-[#6C7383]" aria-label="Cancelar"><X size={14}/></button>
-                      <button type="button" on:click={addBlock} disabled={addSaving} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#000A57] text-white disabled:opacity-50" aria-label="Adicionar">{#if addSaving}<LoaderCircle size={13} class="animate-spin"/>{:else}<Check size={14}/>{/if}</button>
+                      {#if addPanel.type !== "image"}
+                        <button type="button" on:click={addBlock} disabled={addSaving} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#000A57] text-white disabled:opacity-50" aria-label="Adicionar">{#if addSaving}<LoaderCircle size={13} class="animate-spin"/>{:else}<Check size={14}/>{/if}</button>
+                      {/if}
                     </div>
                   </div>
                 {/if}
@@ -701,7 +809,7 @@
   {/if}
 </ApplicationContent>
 
-{#if splitSuggestion}
+{#if splitTargetStep}
   <div class="fixed inset-0 z-[145] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
     <section role="dialog" aria-modal="true" class="max-h-[88vh] w-full max-w-[680px] overflow-y-auto rounded-[24px] bg-white p-5 shadow-2xl sm:p-6">
       <div class="flex items-start justify-between gap-4">
@@ -709,30 +817,45 @@
           <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Sparkles size={17}/></span>
           <div>
             <h2 class="text-[16px] font-semibold text-[#11182C]">Quebrar etapa</h2>
-            <p class="mt-1 text-[10px] text-[#858A98]">{splitSuggestion.parts.length} {splitSuggestion.parts.length === 1 ? "parte sugerida" : "partes sugeridas"}</p>
+            <p class="mt-1 text-[10px] text-[#858A98]">{splitTargetStep.title}</p>
           </div>
         </div>
-        <button type="button" on:click={() => (splitSuggestion = null)} disabled={splitApplying} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482]" aria-label="Fechar"><X size={16}/></button>
+        <button type="button" on:click={closeSplitDialog} disabled={splitApplying} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482]" aria-label="Fechar"><X size={16}/></button>
       </div>
 
-      <div class="mt-5 space-y-3">
-        {#each splitSuggestion.parts as part, index}
-          <article class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4">
-            <div class="flex items-start gap-3">
-              <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#000A57] text-[10px] font-bold text-white">{index + 1}</span>
-              <div class="min-w-0 flex-1">
-                <strong class="text-[12px] font-semibold text-[#303645]">{part.title}</strong>
-                {#if part.description}<p class="mt-1 text-[9px] leading-4 text-[#858B99]">{part.description}</p>{/if}
-                <div class="mt-2"><HelpRichText text={part.instruction} className="space-y-1 text-[10px] leading-5 text-[#555D6C]"/></div>
-              </div>
-            </div>
-          </article>
-        {/each}
+      <div class="mt-5">
+        <strong class="text-[11px] font-semibold text-[#303645]">Quantas partes?</strong>
+        <div class="mt-2 flex flex-wrap gap-2">
+          {#each [2, 3, 4, 5, 6] as count}
+            <button type="button" on:click={() => { splitDesiredParts = count; splitSuggestion = null; }} class={`flex h-10 w-10 items-center justify-center rounded-xl border text-[11px] font-bold ${splitDesiredParts === count ? "border-[#000A57] bg-[#000A57] text-white" : "border-[#DDE1EA] bg-white text-[#5F6676]"}`}>{count}</button>
+          {/each}
+          <button type="button" on:click={() => previewStepSplit(splitTargetStep)} disabled={Boolean(splitLoadingStepId) || splitApplying} class="ml-auto inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[10px] font-semibold text-white disabled:opacity-50">
+            {#if splitLoadingStepId}<LoaderCircle size={14} class="animate-spin"/>{:else}<Sparkles size={14}/>{/if}
+            Analisar
+          </button>
+        </div>
       </div>
+
+      {#if splitSuggestion}
+        <div class="mt-5 space-y-3">
+          {#each splitSuggestion.parts as part, index}
+            <article class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4">
+              <div class="flex items-start gap-3">
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#000A57] text-[10px] font-bold text-white">{index + 1}</span>
+                <div class="min-w-0 flex-1">
+                  <strong class="text-[12px] font-semibold text-[#303645]">{part.title}</strong>
+                  {#if part.description}<p class="mt-1 text-[9px] leading-4 text-[#858B99]">{part.description}</p>{/if}
+                  <div class="mt-2"><HelpRichText text={part.instruction} className="space-y-1 text-[10px] leading-5 text-[#555D6C]"/></div>
+                </div>
+              </div>
+            </article>
+          {/each}
+        </div>
+      {/if}
 
       <div class="mt-5 flex justify-end gap-2">
-        <button type="button" on:click={() => (splitSuggestion = null)} disabled={splitApplying} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[10px] font-semibold text-[#626979]">Cancelar</button>
-        {#if splitSuggestion.shouldSplit}
+        <button type="button" on:click={closeSplitDialog} disabled={splitApplying} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[10px] font-semibold text-[#626979]">Cancelar</button>
+        {#if splitSuggestion?.shouldSplit}
           <button type="button" on:click={applyStepSplit} disabled={splitApplying} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">
             {#if splitApplying}<LoaderCircle size={14} class="animate-spin"/>{:else}<Check size={14}/>{/if}
             Aplicar
