@@ -28,6 +28,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     listHelpCategories(true),
   ]);
   if (!content) throw error(404, "Conteúdo não encontrado.");
+  const transcriptTimeline = content.featuredVideo?.metadata?.transcriptTimeline;
 
   return {
     content,
@@ -36,8 +37,8 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     categories,
     canGenerateVideoFrames: Boolean(
       content.featuredVideo?.storageKey
-      && Array.isArray(content.featuredVideo.metadata?.transcriptTimeline)
-      && content.featuredVideo.metadata.transcriptTimeline.length > 0,
+      && Array.isArray(transcriptTimeline)
+      && transcriptTimeline.length > 0,
     ),
     canEdit: content.status !== "archived" && hasPermission(permissions, "help.edit"),
     canPublish: content.status !== "archived" && hasPermission(permissions, "help.publish"),
