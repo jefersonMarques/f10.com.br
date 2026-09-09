@@ -182,16 +182,22 @@
         candidateMessage = payload.message || "Não foi possível gerar novas imagens.";
         return;
       }
-      candidateOptions = [...candidateOptions, ...payload.candidates].sort(
+      const previousIds = new Set(candidateOptions.map((candidate) => candidate.assetId));
+      candidateOptions = [...payload.candidates].sort(
         (left, right) => left.candidateIndex - right.candidateIndex,
       );
       candidateMessage = payload.message || "Novas imagens adicionadas.";
       queueMicrotask(() => {
-        stripElement?.children.item(candidateOptions.length - payload.candidates!.length)?.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
-          inline: "center",
-        });
+        const firstNewIndex = candidateOptions.findIndex(
+          (candidate) => !previousIds.has(candidate.assetId),
+        );
+        if (firstNewIndex >= 0) {
+          stripElement?.children.item(firstNewIndex)?.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+            inline: "center",
+          });
+        }
       });
     } catch {
       candidateMessage = "A conexão foi interrompida ao gerar novas imagens.";
