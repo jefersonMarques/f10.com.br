@@ -8,12 +8,17 @@ import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstant
 import { createAiStructuredResponse, AiGatewayError } from "$lib/server/ai/aiGateway";
 import { isAiProviderConfigured, readAiProviderCredential } from "$lib/server/ai/aiConfigurationRepository";
 import type { HelpImportPackageAsset } from "$lib/server/help/helpImportPackage";
+import {
+  generateHelpVideoArticle,
+  type HelpVideoCoverage,
+  type HelpVideoGeneratedArticle,
+  type HelpVideoPlannedScreenshot,
+} from "$lib/server/help/helpVideoArticlePipeline";
 import type { HelpImportFile } from "$lib/server/help/structuredHelpImport";
 
 const OPENAI_TRANSCRIPTIONS_URL = "https://api.openai.com/v1/audio/transcriptions";
 const TRANSCRIPTION_MODEL = "whisper-1";
 const MAX_UPLOAD_VIDEO_BYTES = 90 * 1024 * 1024;
-const MAX_AUTOMATIC_SCREENSHOTS = 40;
 const CANDIDATES_PER_SCREENSHOT = 6;
 const SCREENSHOT_CONCURRENCY = 3;
 const STABILITY_THRESHOLD = 0.975;
@@ -39,32 +44,8 @@ type TimestampedTranscript = {
   durationSeconds: number;
 };
 
-type PlannedScreenshot = {
-  startSeconds: number;
-  endSeconds: number;
-  capture: ScreenshotCaptureMode;
-  target: string;
-  altText: string;
-  assistantDescription: string;
-};
-
-type GeneratedStep = {
-  title: string;
-  description: string;
-  instruction: string;
-  screenshots: PlannedScreenshot[];
-};
-
-type GeneratedArticle = {
-  title: string;
-  slug: string;
-  summary: string;
-  quickGuide: string;
-  categories: string[];
-  searchAliases: string[];
-  assistantKnowledge: string;
-  steps: GeneratedStep[];
-};
+type PlannedScreenshot = HelpVideoPlannedScreenshot;
+type GeneratedArticle = HelpVideoGeneratedArticle;
 
 type ScreenshotCandidate = {
   path: string;
@@ -128,7 +109,11 @@ export type HelpVideoAutomationProgressHandler = (
 ) => void | Promise<void>;
 
 export type HelpVideoAutomationAiUsage = {
-  operation: "video_transcription" | "video_article";
+  operation:
+    | "video_transcription"
+    | "video_coverage"
+    | "video_article_part"
+    | "video_article_metadata";
   provider?: string;
   model: string;
   inputTokens?: number | null;
@@ -168,6 +153,7 @@ export type HelpVideoAutomationResult = {
   analyzedFrameCount: number;
   selectedScreenshotCount: number;
   sourceType: HelpVideoAutomationSource["type"];
+  coverage: HelpVideoCoverage;
 };
 
 async function reportProgress(
@@ -730,408 +716,6 @@ async function transcribeAudio(
   }
 }
 
-function formatTimecode(seconds: number): string {
-  const safe = Math.max(0, seconds);
-  const hours = Math.floor(safe / 3600);
-  const minutes = Math.floor((safe % 3600) / 60);
-  const secs = safe % 60;
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${secs.toFixed(2).padStart(5, "0")}`;
-}
-
-function formatTimestampedTranscript(transcript: TimestampedTranscript): string {
-  return transcript.segments
-    .map((segment) => `[${formatTimecode(segment.start)} - ${formatTimecode(segment.end)}] ${segment.text}`)
-    .join("\n");
-}
-
-function articleSchema(): Record<string, unknown> {
-  return {
-    type: "object",
-    additionalProperties: false,
-    required: [
-      "title",
-      "slug",
-      "summary",
-      "quickGuide",
-      "categories",
-      "searchAliases",
-      "assistantKnowledge",
-      "steps",
-    ],
-    properties: {
-      title: { type: "string", minLength: 4, maxLength: 160 },
-      slug: { type: "string", minLength: 1, maxLength: 120 },
-      summary: { type: "string", maxLength: 320 },
-      quickGuide: { type: "string", minLength: 1, maxLength: 12000 },
-      categories: {
-        type: "array",
-        maxItems: 12,
-        items: { type: "string", maxLength: 120 },
-      },
-      searchAliases: {
-        type: "array",
-        maxItems: 40,
-        items: { type: "string", maxLength: 160 },
-      },
-      assistantKnowledge: { type: "string", maxLength: 20000 },
-      steps: {
-        type: "array",
-        minItems: 1,
-        maxItems: 40,
-        items: {
-          type: "object",
-          additionalProperties: false,
-          required: ["title", "description", "instruction", "screenshots"],
-          properties: {
-            title: { type: "string", minLength: 1, maxLength: 180 },
-            description: { type: "string", maxLength: 2000 },
-            instruction: { type: "string", minLength: 1, maxLength: 50000 },
-            screenshots: {
-              type: "array",
-              maxItems: 1,
-              items: {
-                type: "object",
-                additionalProperties: false,
-                required: [
-                  "startSeconds",
-                  "endSeconds",
-                  "capture",
-                  "target",
-                  "altText",
-                  "assistantDescription",
-                ],
-                properties: {
-                  startSeconds: { type: "number", minimum: 0 },
-                  endSeconds: { type: "number", minimum: 0 },
-                  capture: { type: "string", enum: ["before", "after"] },
-                  target: { type: "string", minLength: 1, maxLength: 1000 },
-                  altText: { type: "string", maxLength: 500 },
-                  assistantDescription: { type: "string", maxLength: 20000 },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  };
-}
-
-function articlePrompt(
-  categories: HelpVideoAutomationCategory[],
-  transcript: TimestampedTranscript,
-): string {
-  return [
-    "Crie um único artigo operacional da Base de Conhecimento F10 usando SOMENTE a transcrição temporal abaixo.",
-    "Você não recebeu imagens. Use os timecodes para definir os cortes dos screenshots; o F10 fará a captura localmente sem enviar frames para a OpenAI.",
-    "Não invente telas, ações, regras, URLs ou fatos.",
-    "Preserve como fatos prioritários todas as obrigatoriedades, condições, exceções e dependências explicitamente ditas na transcrição, especialmente expressões como 'é obrigatório', 'precisa', 'deve', 'somente', 'se', 'caso', 'exceto' e 'não pode'.",
-    "Nunca generalize uma regra condicional. Se a fonte disser que `E-mail` é obrigatório quando o funcionário também é `Usuário`, não transforme isso em obrigação para todo funcionário.",
-    "Quando uma condição ou obrigatoriedade ajuda o cliente a executar corretamente o procedimento, declare-a no texto público do step correspondente.",
-    "Use assistantKnowledge para preservar regras seguras para o cliente, condições e exceções importantes que estejam explícitas na transcrição mas não precisem aparecer integralmente no artigo.",
-    "Use Markdown seguro nos textos: **negrito**, *itálico*, `código`, listas e emojis.",
-    "Para nomes literais da interface, caminhos, menus, botões, campos, status, códigos e valores, prefira inline code.",
-    "Em cada step.instruction, toda ação executável deve ficar em sua própria linha numerada usando **1.**, **2.**, **3.** e assim por diante.",
-    "Não junte duas ou mais ações executáveis em um parágrafo corrido. Informações complementares ficam depois da lista, em parágrafo separado e sem número.",
-    "quickGuide deve ser curto, sequencial e numerado.",
-    "REGRA DE SCREENSHOT: todo step que ensina uma ação de interface deve retornar exatamente um item em screenshots. Use screenshots: [] somente para um step puramente explicativo, sem clique, navegação, preenchimento, seleção, configuração, confirmação ou resultado visual.",
-    "A janela de screenshot deve se basear nos timecodes da fala da própria ação. Use normalmente 4 a 10 segundos e nunca mais de 12 segundos. Pode começar até 2 segundos antes e terminar até 3 segundos depois da fala para abranger o estado da interface.",
-    "Use capture='before' quando o valor do screenshot é mostrar onde está o botão, menu, campo ou controle ANTES do clique/ação.",
-    "Use capture='after' quando o valor do screenshot é mostrar o resultado da ação: tela aberta, aba selecionada, campo preenchido, opção marcada, configuração concluída ou confirmação exibida.",
-    "Para passos de preenchimento, seleção, configuração e salvamento, prefira capture='after'. Para localizar um botão/menu que será clicado, use capture='before' quando isso for mais didático.",
-    "target, altText e assistantDescription devem descrever apenas o estado esperado a partir do que a transcrição afirma, sem alegar detalhes que não foram mencionados.",
-    `Categorias permitidas: ${categories.map((category) => `${category.slug} (${category.name})`).join(", ") || UNCATEGORIZED_HELP_CATEGORY_SLUG}.`,
-    `Se nenhuma categoria real for segura, use somente ${UNCATEGORIZED_HELP_CATEGORY_SLUG}.`,
-    "TRANSCRIÇÃO COM TIMECODES:",
-    formatTimestampedTranscript(transcript),
-  ].join("\n\n");
-}
-
-async function generateArticle(
-  transcript: TimestampedTranscript,
-  categories: HelpVideoAutomationCategory[],
-  onAiUsage?: HelpVideoAutomationAiUsageHandler,
-): Promise<GeneratedArticle> {
-  const startedAt = Date.now();
-  let provider = "";
-  let model = "";
-  let inputTokens: number | null = null;
-  let outputTokens: number | null = null;
-
-  const requestArticle = () => createAiStructuredResponse<GeneratedArticle>({
-    task: "content_edit",
-    requiredCapabilities: ["content.draft"],
-    instructions: [
-      "Estruture um artigo operacional F10 usando exclusivamente a fonte recebida.",
-      "Responda exatamente no schema solicitado, sem texto fora do JSON.",
-      "Não invente telas, regras, campos, URLs, condições ou resultados.",
-    ].join("\n"),
-    userInput: articlePrompt(categories, transcript),
-    schemaName: "f10_help_video_article_timeline_local_frames",
-    schema: articleSchema(),
-    maxOutputTokens: 10_000,
-    timeoutMs: 180_000,
-  });
-
-  try {
-    let response;
-    try {
-      response = await requestArticle();
-    } catch (cause) {
-      const retryable =
-        cause instanceof AiGatewayError
-        && (
-          cause.code === "AI_OUTPUT_INCOMPLETE"
-          || cause.code === "AI_EMPTY_RESPONSE"
-          || cause.code === "AI_INVALID_JSON"
-        );
-      if (!retryable) throw cause;
-
-      console.warn("[help-video-import] retrying article generation from transcript", {
-        failureCode: cause.code,
-        transcriptChars: transcript.text.length,
-        transcriptSegments: transcript.segments.length,
-      });
-      response = await requestArticle();
-    }
-
-    provider = response.provider;
-    model = response.model;
-    inputTokens = response.inputTokens;
-    outputTokens = response.outputTokens;
-
-    await reportAiUsage(onAiUsage, {
-      operation: "video_article",
-      provider,
-      model,
-      inputTokens,
-      outputTokens,
-      latencyMs: Date.now() - startedAt,
-      status: "success",
-    });
-    return response.data;
-  } catch (cause) {
-    const code = cause instanceof AiGatewayError ? cause.code : failureCode(cause);
-    await reportAiUsage(onAiUsage, {
-      operation: "video_article",
-      provider: provider || undefined,
-      model: model || "ai-gateway",
-      inputTokens,
-      outputTokens,
-      latencyMs: Date.now() - startedAt,
-      status: "failed",
-      failureCode: code,
-    });
-    if (cause instanceof AiGatewayError) {
-      if (cause.code === "AI_TIMEOUT") {
-        throw new Error("HELP_VIDEO_ARTICLE_GENERATION_TIMEOUT");
-      }
-      if (cause.code === "AI_INVALID_JSON") {
-        throw new Error("HELP_VIDEO_ARTICLE_GENERATION_INVALID_JSON");
-      }
-      if (cause.code === "AI_EMPTY_RESPONSE" || cause.code === "AI_OUTPUT_INCOMPLETE") {
-        throw new Error("HELP_VIDEO_ARTICLE_GENERATION_EMPTY");
-      }
-      throw new Error(`HELP_VIDEO_ARTICLE_GENERATION_FAILED:${cause.code}`);
-    }
-    throw cause;
-  }
-}
-
-function normalizeScreenshotWindow(
-  screenshot: PlannedScreenshot,
-  durationSeconds: number,
-): { start: number; end: number } | null {
-  const rawStart = toFiniteNumber(screenshot.startSeconds);
-  const rawEnd = toFiniteNumber(screenshot.endSeconds);
-  if (rawStart === null || rawEnd === null || durationSeconds <= 0) return null;
-
-  let start = Math.max(0, Math.min(rawStart, durationSeconds));
-  let end = Math.max(start, Math.min(rawEnd, durationSeconds));
-  if (end - start > 12) end = start + 12;
-  if (end - start < 2) {
-    start = Math.max(0, start - 1);
-    end = Math.min(durationSeconds, Math.max(end + 1, start + 2));
-  }
-  return end > start ? { start, end } : null;
-}
-
-function candidateTimes(start: number, end: number): number[] {
-  const span = end - start;
-  return [0.06, 0.24, 0.42, 0.6, 0.78, 0.96].map((fraction) =>
-    Math.round(Math.max(start, Math.min(end - 0.03, start + span * fraction)) * 1000) / 1000,
-  );
-}
-
-async function extractScreenshotCandidates(input: {
-  videoPath: string;
-  directory: string;
-  stepIndex: number;
-  screenshot: PlannedScreenshot;
-  durationSeconds: number;
-}): Promise<ScreenshotCandidate[]> {
-  const window = normalizeScreenshotWindow(input.screenshot, input.durationSeconds);
-  if (!window) return [];
-
-  const candidates: ScreenshotCandidate[] = [];
-  for (const [candidateIndex, timeSeconds] of candidateTimes(window.start, window.end).entries()) {
-    const outputPath = join(
-      input.directory,
-      `candidate-${String(input.stepIndex + 1).padStart(2, "0")}-${candidateIndex + 1}.jpg`,
-    );
-    try {
-      await runCommand(ffmpegPath(), [
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-y",
-        "-ss",
-        timeSeconds.toFixed(3),
-        "-i",
-        input.videoPath,
-        "-frames:v",
-        "1",
-        "-vf",
-        "scale=min(1280\\,iw):-2",
-        "-q:v",
-        "3",
-        outputPath,
-      ]);
-      await readFile(outputPath);
-      candidates.push({ path: outputPath, timeSeconds });
-    } catch {
-      // Um frame perto do fim pode falhar sem invalidar a etapa inteira.
-    }
-  }
-  return candidates;
-}
-
-export type HelpVideoGeneratedFrameCandidate = {
-  candidateIndex: number;
-  timeSeconds: number;
-  recommended: boolean;
-  bytes: Uint8Array;
-};
-
-export async function generateHelpVideoFrameCandidates(input: {
-  videoBytes: Uint8Array;
-  startSeconds: number;
-  endSeconds: number;
-  capture: ScreenshotCaptureMode;
-  durationSeconds: number;
-}): Promise<HelpVideoGeneratedFrameCandidate[]> {
-  if (!isMp4Bytes(input.videoBytes)) throw new Error("HELP_VIDEO_UPLOAD_FORMAT_INVALID");
-  const directory = await mkdtemp(join(tmpdir(), "f10-help-frames-"));
-  const videoPath = join(directory, "source.mp4");
-  try {
-    await writeFile(videoPath, input.videoBytes);
-    const screenshot: PlannedScreenshot = {
-      startSeconds: input.startSeconds,
-      endSeconds: input.endSeconds,
-      capture: input.capture,
-      target: "Screenshot adicional",
-      altText: "",
-      assistantDescription: "",
-    };
-    const candidates = await extractScreenshotCandidates({
-      videoPath,
-      directory,
-      stepIndex: 0,
-      screenshot,
-      durationSeconds: input.durationSeconds,
-    });
-    const selected = await chooseStableCandidate(candidates, input.capture);
-    return Promise.all(
-      candidates.map(async (candidate, index) => ({
-        candidateIndex: index + 1,
-        timeSeconds: candidate.timeSeconds,
-        recommended: candidate.path === selected?.path,
-        bytes: new Uint8Array(await readFile(candidate.path)),
-      })),
-    );
-  } finally {
-    await rm(directory, { recursive: true, force: true }).catch(() => undefined);
-  }
-}
-
-async function frameSsim(leftPath: string, rightPath: string): Promise<number | null> {
-  try {
-    const stderr = await runCommand(ffmpegPath(), [
-      "-hide_banner",
-      "-i",
-      leftPath,
-      "-i",
-      rightPath,
-      "-lavfi",
-      "[0:v][1:v]ssim",
-      "-f",
-      "null",
-      "-",
-    ]);
-    const matches = Array.from(stderr.matchAll(/All:([0-9.]+)/g));
-    const raw = matches.at(-1)?.[1];
-    const score = raw ? Number(raw) : NaN;
-    return Number.isFinite(score) ? score : null;
-  } catch {
-    return null;
-  }
-}
-
-async function chooseStableCandidate(
-  candidates: ScreenshotCandidate[],
-  capture: ScreenshotCaptureMode,
-): Promise<ScreenshotCandidate | null> {
-  if (candidates.length === 0) return null;
-  if (candidates.length === 1) return candidates[0] ?? null;
-
-  const pairs: Array<{ index: number; score: number }> = [];
-  for (let index = 0; index < candidates.length - 1; index += 1) {
-    const left = candidates[index];
-    const right = candidates[index + 1];
-    if (!left || !right) continue;
-    const score = await frameSsim(left.path, right.path);
-    if (score !== null) pairs.push({ index, score });
-  }
-
-  if (pairs.length === 0) {
-    return capture === "after" ? candidates.at(-1) ?? null : candidates[0] ?? null;
-  }
-
-  const stablePairs = pairs.filter((pair) => pair.score >= STABILITY_THRESHOLD);
-  if (capture === "after") {
-    const pair = stablePairs.at(-1)
-      ?? [...pairs].sort((a, b) => b.score - a.score || b.index - a.index)[0];
-    return pair ? candidates[pair.index + 1] ?? candidates.at(-1) ?? null : candidates.at(-1) ?? null;
-  }
-
-  const pair = stablePairs[0]
-    ?? [...pairs].sort((a, b) => b.score - a.score || a.index - b.index)[0];
-  return pair ? candidates[pair.index] ?? candidates[0] ?? null : candidates[0] ?? null;
-}
-
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  mapper: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  if (items.length === 0) return [];
-  const results: R[] = new Array(items.length);
-  let nextIndex = 0;
-  const workers = Array.from(
-    { length: Math.min(Math.max(concurrency, 1), items.length) },
-    async () => {
-      while (true) {
-        const index = nextIndex;
-        nextIndex += 1;
-        if (index >= items.length) return;
-        results[index] = await mapper(items[index]!, index);
-      }
-    },
-  );
-  await Promise.all(workers);
-  return results;
-}
-
 async function resolveArticleScreenshots(input: {
   videoPath: string;
   directory: string;
@@ -1229,6 +813,7 @@ async function buildImportResult(input: {
   externalId: string;
   featuredVideoUrl?: string;
   sourceType: HelpVideoAutomationSource["type"];
+  coverage: HelpVideoCoverage;
 }): Promise<HelpVideoAutomationResult> {
   const slug = normalizeSlug(input.article.slug || input.article.title) || `conteudo-${Date.now()}`;
   const assets = new Map<string, HelpImportPackageAsset>();
@@ -1312,6 +897,7 @@ async function buildImportResult(input: {
     analyzedFrameCount: input.screenshotResolution.analyzedFrameCount,
     selectedScreenshotCount,
     sourceType: input.sourceType,
+    coverage: input.coverage,
   };
 }
 
@@ -1418,9 +1004,21 @@ export async function generateHelpImportFromVideo(input: {
     await reportProgress(input.onProgress, {
       stage: "analyze",
       status: "active",
-      label: "Estruturando o artigo e definindo os cortes",
+      label: "Mapeando cobertura e estruturando o artigo",
     });
-    const article = await generateArticle(transcript, input.categories, input.onAiUsage);
+    const generatedArticle = await generateHelpVideoArticle({
+      segments: transcript.segments,
+      categories: input.categories,
+      onProgress: (progress) =>
+        reportProgress(input.onProgress, {
+          stage: "analyze",
+          status: "active",
+          label: progress.label,
+          detail: progress.detail,
+        }),
+      onAiUsage: input.onAiUsage,
+    });
+    const article = generatedArticle.article;
     const plannedScreenshotCount = article.steps.filter((step) => step.screenshots.length > 0).length;
     if (plannedScreenshotCount === 0) throw new Error("HELP_VIDEO_SCREENSHOTS_NOT_PLANNED");
 
@@ -1457,6 +1055,7 @@ export async function generateHelpImportFromVideo(input: {
       externalId,
       featuredVideoUrl,
       sourceType: input.source.type,
+      coverage: generatedArticle.coverage,
     });
     if (youtubeId) {
       try {
