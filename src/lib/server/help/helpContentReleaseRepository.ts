@@ -1,4 +1,9 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import {
+  HELP_IMAGE_ANNOTATIONS_METADATA_KEY,
+  parseHelpImageAnnotations,
+  type HelpImageAnnotation,
+} from "$lib/help/helpImageAnnotations";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -44,6 +49,7 @@ type EditorSnapshotBlock = {
   noticeVariant: string | null;
   sortOrder: number;
   asset: EditorSnapshotAsset | null;
+  annotations: HelpImageAnnotation[];
 };
 
 type EditorSnapshotStep = {
@@ -144,6 +150,7 @@ function parseEditorSnapshot(value: unknown): EditorSnapshot | null {
                     ? block.sortOrder
                     : (blockIndex + 1) * 10,
                 asset: parseEditorAsset(block.asset),
+                annotations: parseHelpImageAnnotations(block.annotations) ?? [],
               }];
             })
           : [];
@@ -373,6 +380,10 @@ export async function restoreHelpContentReleaseAsDraft(input: {
             linkUrl: block.linkUrl,
             linkLabel: block.linkLabel,
             noticeVariant: block.noticeVariant,
+            metadata:
+              block.blockType === "image" && block.annotations.length > 0
+                ? { [HELP_IMAGE_ANNOTATIONS_METADATA_KEY]: block.annotations }
+                : {},
             sortOrder: (blockIndex + 1) * 10,
           })),
         );
