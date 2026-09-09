@@ -89,6 +89,7 @@
   let showVideoUpdateModal = false;
   let regenerationFile: File | null = null;
   let regenerating = false;
+  let regenerationError = "";
   let regenerationProgress: Array<{ stage: string; label: string; detail?: string; status: string }> = [];
 
   type ReviewItemPayload = {
@@ -603,6 +604,7 @@
       return;
     }
     regenerationFile = null;
+    regenerationError = "";
     regenerationProgress = [];
     showVideoUpdateModal = true;
   }
@@ -610,6 +612,7 @@
   async function runRegeneration(mode: "current" | "upload"): Promise<void> {
     if (regenerating || (mode === "upload" && !regenerationFile)) return;
     regenerating = true;
+    regenerationError = "";
     regenerationProgress = [];
     saveMessage = "";
     try {
@@ -630,8 +633,7 @@
 
       if (!response.ok || !response.body) {
         const payload = await response.json().catch(() => ({})) as { message?: string };
-        saveSuccess = false;
-        saveMessage = payload.message || "Não foi possível iniciar a atualização.";
+        regenerationError = payload.message || "Não foi possível iniciar a atualização.";
         return;
       }
 
@@ -668,6 +670,7 @@
           resultMessage = payload.message || "Novo rascunho gerado.";
         } else if (payload.type === "error") {
           resultMessage = payload.message || "Não foi possível atualizar o conteúdo.";
+          regenerationError = resultMessage;
         }
       };
 
@@ -682,16 +685,18 @@
       buffer += decoder.decode();
       if (buffer.trim()) handleLine(buffer);
 
-      saveSuccess = success;
-      saveMessage = resultMessage || (success ? "Novo rascunho gerado." : "Não foi possível atualizar o conteúdo.");
       if (success) {
+        saveSuccess = true;
+        saveMessage = resultMessage || "Novo rascunho gerado.";
+        regenerationError = "";
         showVideoUpdateModal = false;
         regenerationFile = null;
         await invalidateAll();
+      } else if (!regenerationError) {
+        regenerationError = resultMessage || "Não foi possível atualizar o conteúdo.";
       }
     } catch {
-      saveSuccess = false;
-      saveMessage = "A conexão foi interrompida durante a atualização.";
+      regenerationError = "A conexão foi interrompida durante a atualização.";
     } finally {
       regenerating = false;
     }
@@ -1010,6 +1015,13 @@
               <div><strong class="block text-[9px] text-[#454C5D]">{item.label}</strong>{#if item.detail}<span class="mt-0.5 block text-[8px] text-[#9297A5]">{item.detail}</span>{/if}</div>
             </div>
           {/each}
+        </div>
+      {/if}
+
+      {#if regenerationError}
+        <div class="mt-4 flex items-start gap-2 rounded-xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[9px] font-medium text-[#9B2C2C]">
+          <TriangleAlert size={13} class="mt-0.5 shrink-0"/>
+          <span>{regenerationError}</span>
         </div>
       {/if}
 
