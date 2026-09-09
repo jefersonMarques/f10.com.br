@@ -4,7 +4,7 @@ import {
   requireAppAnyPermission,
   requireAppPermission,
 } from "$lib/server/auth/authorization";
-import { getPermissionScope, hasPermission } from "$lib/server/auth/permissions";
+import { hasPermission } from "$lib/server/auth/permissions";
 import { readGoogleEventDetailsFromForm } from "$lib/server/calendar/googleEventFormInput";
 import {
   createGoogleCalendarEvent,
@@ -18,14 +18,6 @@ import {
   type GoogleAgendaEvent,
 } from "$lib/server/calendar/googleCalendarSyncService";
 import { syncAllTicketGoogleCalendarLinks } from "$lib/server/calendar/ticketGoogleCalendarLifecycle";
-import {
-  DEFAULT_SCHEDULING_AVAILABILITY,
-  listSchedulingCustomers,
-  listSchedulingHosts,
-  listSchedulingInvitations,
-  listSchedulingTeamUserIds,
-} from "$lib/server/calendar/schedulingRepository";
-import { generateSchedulingInvitation } from "$lib/server/calendar/schedulingService";
 import { listPersonalSchedulingBookings } from "$lib/server/calendar/personalSchedulingRepository";
 import { listTicketAgendaItems } from "$lib/server/support/ticketAgendaRepository";
 import { isTicketDueDate } from "$lib/server/support/ticketDueDate";
@@ -113,22 +105,6 @@ function agendaRange(anchor: string): { timeMin: Date; timeMax: Date; startOn: s
   };
 }
 
-function schedulingMessage(errorValue: unknown): string {
-  const code = errorValue instanceof Error ? errorValue.message : "";
-  const messages: Record<string, string> = {
-    SCHEDULING_HOST_NOT_ALLOWED: "Você não pode criar agendamentos para este responsável.",
-    SCHEDULING_HOST_NOT_FOUND: "Responsável inválido ou inativo.",
-    SCHEDULING_HOST_GOOGLE_REQUIRED: "O responsável precisa conectar o Google Calendar antes de receber agendamentos.",
-    SCHEDULING_CUSTOMER_EMAIL_REQUIRED: "Selecione um cliente ativo com e-mail cadastrado.",
-    SCHEDULING_INVALID_TITLE: "Informe um título entre 3 e 180 caracteres.",
-    SCHEDULING_INVALID_DURATION: "A duração deve ficar entre 15 e 240 minutos.",
-    SCHEDULING_INVALID_DATE_RANGE: "Revise a janela de datas do agendamento.",
-    SCHEDULING_DATE_RANGE_IN_PAST: "A janela de agendamento não pode começar no passado.",
-    SCHEDULING_DATE_RANGE_TOO_LONG: "A janela escolhida ultrapassa o horizonte configurado para o responsável.",
-  };
-  return messages[code] ?? "Não foi possível criar o link de agendamento.";
-}
-
 async function googleWriteConfiguration(userId: string) {
   const preferences = await getGoogleCalendarSyncPreferences(userId);
   return {
@@ -142,9 +118,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const permissions = createPermissionMap(layout.permissions);
   const canViewTasks = hasPermission(permissions, "tasks.view");
   const canViewTickets = hasPermission(permissions, "tickets.view");
-  const schedulingViewScope = getPermissionScope(permissions, "scheduling.view");
-  const schedulingCreateScope = getPermissionScope(permissions, "scheduling.create");
-  const canViewScheduling = Boolean(schedulingViewScope);
+  const canViewScheduling = hasPermission(permissions, "scheduling.view");
 
   if (!canViewTasks && !canViewTickets && !canViewScheduling) {
     throw error(403, "Acesso não autorizado.");
@@ -200,17 +174,6 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const canCreateTicket = hasPermission(permissions, "tickets.create");
   const canSearchCustomers = canCreateTicket && hasPermission(permissions, "customers.view");
   const canChangeTicketDueOn = canViewTickets && hasPermission(permissions, "tickets.reply");
-  const canManageScheduling = hasPermission(permissions, "scheduling.manage");
-  const canCreateScheduling = Boolean(schedulingCreateScope) && hasPermission(permissions, "customers.view");
-  const canConfigureScheduling = Boolean(schedulingCreateScope) || canManageScheduling;
-  const needsSchedulingTeamUsers = schedulingCreateScope === "team" || schedulingViewScope === "team";
-  const schedulingTeamUserIds = canViewScheduling && needsSchedulingTeamUsers
-    ? await listSchedulingTeamUserIds(layout.user.id)
-    : [layout.user.id];
-  const schedulingVisibility: "own" | "team" | "all" = canManageScheduling || schedulingViewScope === "all"
-    ? "all"
-    : schedulingViewScope ?? "own";
-
   let sourceTasks: Awaited<ReturnType<typeof listMyTasks>> = [];
   if (canViewTasks && selectedProject) {
     const board = await getTaskBoard(layout.user.id, permissions, selectedProject.id);
@@ -235,9 +198,6 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     calendarUsers,
     ticketRows,
     ticketQueues,
-    rawSchedulingHosts,
-    schedulingCustomers,
-    schedulingInvitations,
   ] = await Promise.all([
     canAssign
       ? Promise.all(
@@ -256,36 +216,11 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     canCreateTicket
       ? listSupportQueues()
       : Promise.resolve([]),
-    canCreateScheduling
-      ? listSchedulingHosts()
-      : Promise.resolve([]),
-    canCreateScheduling
-      ? listSchedulingCustomers()
-      : Promise.resolve([]),
-    canViewScheduling
-      ? listSchedulingInvitations(layout.user.id, schedulingVisibility, schedulingTeamUserIds)
-      : Promise.resolve([]),
   ]);
 
   const personalSchedulingBookings = canViewScheduling
     ? await listPersonalSchedulingBookings(layout.user.id, range.timeMin, range.timeMax)
     : [];
-
-  const schedulingHosts = rawSchedulingHosts
-    .filter((host) =>
-      canManageScheduling ||
-      schedulingCreateScope === "all" ||
-      (schedulingCreateScope === "team" && schedulingTeamUserIds.includes(host.id)) ||
-      host.id === layout.user.id
-    )
-    .map((host) => ({
-      id: host.id,
-      name: host.name,
-      email: host.email,
-      googleConnected: Boolean(host.googleConnectedUserId),
-      defaultDurationMinutes: host.profileDefaultDurationMinutes ?? DEFAULT_SCHEDULING_AVAILABILITY.defaultDurationMinutes,
-      maxHorizonDays: host.profileMaxHorizonDays ?? DEFAULT_SCHEDULING_AVAILABILITY.maxHorizonDays,
-    }));
 
   const googleLinkedTaskIds = taskGoogleLinks.map((link) => link.taskId);
   const googleMeetTaskIds = taskGoogleLinks.filter((link) => link.googleMeetUrl).map((link) => link.taskId);
@@ -307,11 +242,6 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     canSearchCustomers,
     canChangeTicketDueOn,
     canViewScheduling,
-    canCreateScheduling,
-    canConfigureScheduling,
-    schedulingHosts,
-    schedulingCustomers,
-    schedulingInvitations: schedulingInvitations.slice(0, 20),
     schedulingBookings: personalSchedulingBookings,
     calendarAnchor,
     googleCalendar,
@@ -356,46 +286,6 @@ export const actions: Actions = {
         success: false,
         action: "updateTicketDueOn",
         message: "Não foi possível alterar a conclusão planejada deste ticket.",
-      });
-    }
-  },
-
-  createSchedulingInvitation: async ({ cookies, request }) => {
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      "scheduling.create",
-      "/app/tasks/calendar",
-    );
-    if (!hasPermission(permissions, "customers.view")) {
-      return fail(403, {
-        success: false,
-        action: "createSchedulingInvitation",
-        message: "Acesso a clientes não autorizado.",
-      });
-    }
-
-    const formData = await request.formData();
-    try {
-      const created = await generateSchedulingInvitation(session.user.id, permissions, {
-        customerContactId: readFormValue(formData, "customerContactId"),
-        title: readFormValue(formData, "title"),
-        hostUserId: readFormValue(formData, "hostUserId"),
-        durationMinutes: readInteger(formData, "durationMinutes"),
-        dateRangeStart: readFormValue(formData, "dateRangeStart"),
-        dateRangeEnd: readFormValue(formData, "dateRangeEnd"),
-        addGoogleMeet: readFormValue(formData, "addGoogleMeet") === "true",
-      });
-      return {
-        success: true,
-        action: "createSchedulingInvitation",
-        message: "Link de agendamento criado.",
-        bookingPath: `/agendar/${created.token}`,
-      };
-    } catch (errorValue) {
-      return fail(400, {
-        success: false,
-        action: "createSchedulingInvitation",
-        message: schedulingMessage(errorValue),
       });
     }
   },
