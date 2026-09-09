@@ -187,12 +187,15 @@ function getPublishErrorMessage(cause: unknown): string {
   }
 }
 
-function contentEditorPath(contentId: string): string {
-  return `/app/help/content/${contentId}`;
+function contentEditorPath(contentId: string, stepId?: string): string {
+  const base = `/app/help/content/${contentId}`;
+  return stepId && isUuid(stepId)
+    ? `${base}?step=${encodeURIComponent(stepId)}`
+    : base;
 }
 
-function redirectToContentEditor(contentId: string): never {
-  throw redirect(303, contentEditorPath(contentId));
+function redirectToContentEditor(contentId: string, stepId?: string): never {
+  throw redirect(303, contentEditorPath(contentId, stepId));
 }
 
 export const load: PageServerLoad = async ({ params, parent }) => {
@@ -407,11 +410,12 @@ export const actions: Actions = {
     if (!isUuid(params.contentId)) return fail(404, { success: false, message: "Conteúdo não encontrado." });
     const { session } = await requireAppPermission(cookies, "help.edit", contentEditorPath(params.contentId));
     try {
-      await addStructuredHelpStep(session.user.id, params.contentId);
-    } catch {
+      const stepId = await addStructuredHelpStep(session.user.id, params.contentId);
+      redirectToContentEditor(params.contentId, stepId);
+    } catch (cause) {
+      if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
       return fail(409, { success: false, message: "Não foi possível adicionar o passo." });
     }
-    redirectToContentEditor(params.contentId);
   },
 
   moveStep: async ({ cookies, params, request }) => {
@@ -426,7 +430,7 @@ export const actions: Actions = {
     } catch {
       return fail(409, { success: false, message: "Não foi possível reordenar este passo." });
     }
-    redirectToContentEditor(params.contentId);
+    redirectToContentEditor(params.contentId, stepId);
   },
 
   updateStep: async ({ cookies, params, request }) => {
@@ -450,7 +454,7 @@ export const actions: Actions = {
     } catch {
       return fail(404, { success: false, message: "Passo não encontrado." });
     }
-    redirectToContentEditor(params.contentId);
+    redirectToContentEditor(params.contentId, stepId);
   },
 
   deleteStep: async ({ cookies, params, request }) => {
@@ -485,13 +489,14 @@ export const actions: Actions = {
     } catch {
       return fail(409, { success: false, message: "Não foi possível adicionar este bloco." });
     }
-    redirectToContentEditor(params.contentId);
+    redirectToContentEditor(params.contentId, stepId);
   },
 
   moveBlock: async ({ cookies, params, request }) => {
     if (!isUuid(params.contentId)) return fail(404, { success: false, message: "Conteúdo não encontrado." });
     const { session } = await requireAppPermission(cookies, "help.edit", contentEditorPath(params.contentId));
     const formData = await request.formData();
+    const stepId = readFormValue(formData, "stepId");
     const blockId = readFormValue(formData, "blockId");
     const direction = readMoveDirection(formData);
     if (!isUuid(blockId) || !direction) return fail(400, { success: false, message: "Movimentação inválida." });
@@ -500,13 +505,14 @@ export const actions: Actions = {
     } catch {
       return fail(409, { success: false, message: "Não foi possível reordenar este bloco." });
     }
-    redirectToContentEditor(params.contentId);
+    redirectToContentEditor(params.contentId, stepId);
   },
 
   updateBlock: async ({ cookies, params, request }) => {
     if (!isUuid(params.contentId)) return fail(404, { success: false, message: "Conteúdo não encontrado." });
     const { session } = await requireAppPermission(cookies, "help.edit", contentEditorPath(params.contentId));
     const formData = await request.formData();
+    const stepId = readFormValue(formData, "stepId");
     const blockId = readFormValue(formData, "blockId");
     const input = parseBlockInput(formData);
     if (!isUuid(blockId) || !input) return fail(400, { success: false, message: "Bloco inválido." });
@@ -517,20 +523,22 @@ export const actions: Actions = {
     } catch {
       return fail(409, { success: false, message: "Não foi possível atualizar este bloco." });
     }
-    redirectToContentEditor(params.contentId);
+    redirectToContentEditor(params.contentId, stepId);
   },
 
   deleteBlock: async ({ cookies, params, request }) => {
     if (!isUuid(params.contentId)) return fail(404, { success: false, message: "Conteúdo não encontrado." });
     const { session } = await requireAppPermission(cookies, "help.edit", contentEditorPath(params.contentId));
-    const blockId = readFormValue(await request.formData(), "blockId");
+    const formData = await request.formData();
+    const stepId = readFormValue(formData, "stepId");
+    const blockId = readFormValue(formData, "blockId");
     if (!isUuid(blockId)) return fail(400, { success: false, message: "Bloco inválido." });
     try {
       await deleteStructuredHelpBlock(session.user.id, params.contentId, blockId);
     } catch {
       return fail(409, { success: false, message: "Não foi possível remover este bloco." });
     }
-    redirectToContentEditor(params.contentId);
+    redirectToContentEditor(params.contentId, stepId);
   },
 
   publish: async ({ cookies, params }) => {
