@@ -2,16 +2,34 @@ import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { recordCustomerActivity } from "$lib/server/customerPortal/customerActivityRepository";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
+import {
+  getPublicHelpContentReleaseBySlug,
+  listPublicHelpContentReleases,
+} from "$lib/server/help/helpContentReleaseRepository";
 import { getPublishedStructuredHelpBySlug } from "$lib/server/help/publicStructuredHelpRepository";
 
 export const prerender = false;
 
 export const load: PageServerLoad = async ({ params, cookies, url }) => {
-  const [content, customer] = await Promise.all([
-    getPublishedStructuredHelpBySlug(params.slug),
+  const requestedVersion = Number(url.searchParams.get("versao"));
+  const currentContent = await getPublishedStructuredHelpBySlug(params.slug);
+  if (!currentContent) throw error(404, "Conteúdo de ajuda não encontrado.");
+  const historical =
+    Number.isInteger(requestedVersion) && requestedVersion > 0
+      ? await getPublicHelpContentReleaseBySlug(params.slug, requestedVersion)
+      : null;
+  if (url.searchParams.has("versao") && !historical) {
+    throw error(404, "Versão de ajuda não encontrada.");
+  }
+  const content = historical ?? currentContent;
+  const [customer, releases] = await Promise.all([
     getOptionalCustomerF10PortalSession(cookies),
+    listPublicHelpContentReleases(currentContent.contentId),
   ]);
-  if (!content) throw error(404, "Conteúdo de ajuda não encontrado.");
+  const currentReleaseNumber = releases[0]?.releaseNumber ?? null;
+  const releaseNumber = historical
+    ? requestedVersion
+    : currentReleaseNumber;
 
   if (customer?.selectedUnitId !== null && customer?.selectedUnitId !== undefined) {
     await recordCustomerActivity(customer, {
@@ -31,5 +49,11 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
     }).catch(() => undefined);
   }
 
-  return { content };
+  return {
+    content,
+    releases,
+    releaseNumber,
+    currentReleaseNumber,
+    isHistorical: Boolean(historical && releaseNumber !== currentReleaseNumber),
+  };
 };
