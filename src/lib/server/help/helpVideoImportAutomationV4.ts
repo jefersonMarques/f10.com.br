@@ -723,8 +723,7 @@ async function resolveArticleScreenshots(input: {
 }): Promise<ScreenshotResolution> {
   const planned = input.article.steps
     .map((step, stepIndex) => ({ stepIndex, screenshot: step.screenshots?.[0] }))
-    .filter((item): item is { stepIndex: number; screenshot: PlannedScreenshot } => Boolean(item.screenshot))
-    .slice(0, MAX_AUTOMATIC_SCREENSHOTS);
+    .filter((item): item is { stepIndex: number; screenshot: PlannedScreenshot } => Boolean(item.screenshot));
   if (planned.length === 0) throw new Error("HELP_VIDEO_SCREENSHOTS_NOT_PLANNED");
 
   const results = await mapWithConcurrency(
