@@ -934,6 +934,54 @@ async function extractScreenshotCandidates(input: {
   return candidates;
 }
 
+export type HelpVideoGeneratedFrameCandidate = {
+  candidateIndex: number;
+  timeSeconds: number;
+  recommended: boolean;
+  bytes: Uint8Array;
+};
+
+export async function generateHelpVideoFrameCandidates(input: {
+  videoBytes: Uint8Array;
+  startSeconds: number;
+  endSeconds: number;
+  capture: ScreenshotCaptureMode;
+  durationSeconds: number;
+}): Promise<HelpVideoGeneratedFrameCandidate[]> {
+  if (!isMp4Bytes(input.videoBytes)) throw new Error("HELP_VIDEO_UPLOAD_FORMAT_INVALID");
+  const directory = await mkdtemp(join(tmpdir(), "f10-help-frames-"));
+  const videoPath = join(directory, "source.mp4");
+  try {
+    await writeFile(videoPath, input.videoBytes);
+    const screenshot: PlannedScreenshot = {
+      startSeconds: input.startSeconds,
+      endSeconds: input.endSeconds,
+      capture: input.capture,
+      target: "Screenshot adicional",
+      altText: "",
+      assistantDescription: "",
+    };
+    const candidates = await extractScreenshotCandidates({
+      videoPath,
+      directory,
+      stepIndex: 0,
+      screenshot,
+      durationSeconds: input.durationSeconds,
+    });
+    const selected = await chooseStableCandidate(candidates, input.capture);
+    return Promise.all(
+      candidates.map(async (candidate, index) => ({
+        candidateIndex: index + 1,
+        timeSeconds: candidate.timeSeconds,
+        recommended: candidate.path === selected?.path,
+        bytes: new Uint8Array(await readFile(candidate.path)),
+      })),
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
 async function frameSsim(leftPath: string, rightPath: string): Promise<number | null> {
   try {
     const stderr = await runCommand(ffmpegPath(), [
