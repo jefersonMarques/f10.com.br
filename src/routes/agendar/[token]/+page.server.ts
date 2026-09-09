@@ -1,8 +1,7 @@
-import { error, fail, type Actions } from "@sveltejs/kit";
+import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import {
-  bookSchedulingSlot,
   getPublicSchedulingInvitation,
   listSchedulingSlots,
 } from "$lib/server/calendar/schedulingService";
@@ -13,7 +12,6 @@ import {
 import { enforceSchedulingRateLimit } from "$lib/server/calendar/schedulingRepository";
 
 const VIEW_WINDOW_MS = 5 * 60 * 1000;
-const BOOK_WINDOW_MS = 10 * 60 * 1000;
 
 function clientAddress(getClientAddress: () => string): string {
   try {
@@ -156,35 +154,4 @@ export const load: PageServerLoad = async ({
     }
     throw error(404, "Este link de agendamento não está mais disponível.");
   }
-};
-
-export const actions: Actions = {
-  book: async ({ params, request, getClientAddress, setHeaders }) => {
-    noStore(setHeaders);
-    if (await getPublicPersonalSchedule(params.token)) {
-      return fail(400, { success: false, message: "Use a confirmação da agenda atual." });
-    }
-
-    const address = clientAddress(getClientAddress);
-    try {
-      await enforceSchedulingRateLimit(`book:${params.token}:${address}`, 12, BOOK_WINDOW_MS);
-    } catch (errorValue) {
-      const result = publicSchedulingMessage(errorValue);
-      return fail(result.status, { success: false, message: result.message });
-    }
-
-    const formData = await request.formData();
-    const selectedStartAt = formData.get("startAt");
-    if (typeof selectedStartAt !== "string" || selectedStartAt.length > 64) {
-      return fail(400, { success: false, message: "Horário inválido." });
-    }
-
-    try {
-      await bookSchedulingSlot(params.token, selectedStartAt);
-      return { success: true, message: "Agendamento confirmado." };
-    } catch (errorValue) {
-      const result = publicSchedulingMessage(errorValue);
-      return fail(result.status, { success: false, message: result.message });
-    }
-  },
 };
