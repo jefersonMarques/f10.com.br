@@ -11,6 +11,23 @@ import {
 
 export const CUSTOMER_PORTAL_SESSION_COOKIE = "f10_customer_session";
 
+export function normalizeCustomerPortalReturnTo(
+  value: string,
+  fallback = "/cliente/chamados",
+): string {
+  if (!value.startsWith("/") || value.startsWith("//")) return fallback;
+  if (
+    value === "/cliente" ||
+    value.startsWith("/cliente/") ||
+    value === "/ajuda-f10" ||
+    value.startsWith("/ajuda-f10/") ||
+    value.startsWith("/agendar/")
+  ) {
+    return value;
+  }
+  return fallback;
+}
+
 const COOKIE_OPTIONS = {
   path: "/",
   httpOnly: true,
@@ -63,9 +80,7 @@ export async function requireCustomerPortalSession(cookies: Cookies) {
 
 function loginUrl(returnTo: string): string {
   const params = new URLSearchParams();
-  if (returnTo.startsWith("/") && !returnTo.startsWith("//")) {
-    params.set("returnTo", returnTo);
-  }
+  params.set("returnTo", normalizeCustomerPortalReturnTo(returnTo));
   const query = params.toString();
   return query ? `/cliente?${query}` : "/cliente";
 }
