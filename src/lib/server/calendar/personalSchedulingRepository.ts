@@ -389,7 +389,16 @@ export async function listPersonalSchedulingReservations(
   const db = getDatabase();
   const bookingCondition = and(
     eq(schedulingBookings.hostUserId, hostUserId),
-    inArray(schedulingBookings.status, ["booking", "booked"]),
+    or(
+      eq(schedulingBookings.status, "booked"),
+      and(
+        eq(schedulingBookings.status, "booking"),
+        gt(
+          schedulingBookings.bookingStartedAt,
+          new Date(Date.now() - BOOKING_CLAIM_TIMEOUT_MS),
+        ),
+      ),
+    ),
     lt(schedulingBookings.startAt, rangeEnd),
     gt(schedulingBookings.endAt, rangeStart),
   );
