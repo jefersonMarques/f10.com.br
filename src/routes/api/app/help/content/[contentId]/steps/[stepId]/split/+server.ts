@@ -29,6 +29,7 @@ function readParts(value: unknown): StructuredHelpStepSplitPart[] {
 function messageFor(code: string): string {
   if (code === "STEP_SPLIT_SOURCE_CHANGED") return "A etapa mudou. Gere uma nova sugestão antes de aplicar.";
   if (code === "STEP_LIMIT_EXCEEDED") return "O conteúdo já atingiu o limite de etapas.";
+  if (code === "STEP_SPLIT_PART_COUNT_INVALID") return "A IA não conseguiu montar a quantidade escolhida. Tente novamente.";
   if (code === "CONTENT_ARCHIVED") return "Conteúdo arquivado não pode ser alterado.";
   if (code === "STEP_NOT_FOUND") return "Etapa não encontrada.";
   if (code === "AI_TASK_DISABLED" || code === "AI_PROVIDER_NOT_CONFIGURED" || code === "AI_CREDENTIAL_UNAVAILABLE") {
@@ -57,10 +58,15 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
   const action = payload.action;
   try {
     if (action === "preview") {
+      const desiredParts = Number(payload.desiredParts);
+      if (!Number.isInteger(desiredParts) || desiredParts < 2 || desiredParts > 6) {
+        return json({ success: false, message: "Escolha entre 2 e 6 partes." }, { status: 400 });
+      }
       const suggestion = await suggestHelpStepSplit(
         session.user.id,
         params.contentId,
         params.stepId,
+        desiredParts,
       );
       return json({ success: true, suggestion });
     }
