@@ -2,18 +2,14 @@ import { error, fail, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { getPermissionScope, hasPermission } from "$lib/server/auth/permissions";
+import { listSchedulingHosts, listSchedulingTeamUserIds } from "$lib/server/calendar/schedulingRepository";
 import {
-  DEFAULT_SCHEDULING_AVAILABILITY,
-  listSchedulingCustomers,
-  listSchedulingHosts,
-  listSchedulingInvitations,
-  listSchedulingTeamUserIds,
-} from "$lib/server/calendar/schedulingRepository";
-import {
-  configureSchedulingAvailability,
-  generateSchedulingInvitation,
-  revokeSchedulingLink,
-} from "$lib/server/calendar/schedulingService";
+  addSchedulingException,
+  configureBlockingCalendars,
+  configurePersonalScheduling,
+  getPersonalSchedulingSettings,
+  removeSchedulingException,
+} from "$lib/server/calendar/personalSchedulingService";
 import type { SchedulingWeekday } from "$lib/server/db/schedulingSchema";
 
 function permissionMap(permissions: Array<{ code: string; scope: "own" | "team" | "all" }>) {
@@ -29,189 +25,238 @@ function readInteger(formData: FormData, name: string): number {
   return Number.parseInt(readValue(formData, name), 10);
 }
 
-function readWeekdays(formData: FormData): SchedulingWeekday[] {
-  const values = formData
-    .getAll("weekday")
-    .map((value) => Number(value))
-    .filter((value): value is SchedulingWeekday => Number.isInteger(value) && value >= 0 && value <= 6);
-  return Array.from(new Set(values)).sort((left, right) => left - right);
+function readBoolean(formData: FormData, name: string): boolean {
+  return readValue(formData, name) === "true";
+}
+
+function readWindows(formData: FormData) {
+  const weekdays = formData.getAll("windowWeekday");
+  const starts = formData.getAll("windowStart");
+  const ends = formData.getAll("windowEnd");
+  const windows: Array<{
+    weekday: SchedulingWeekday;
+    startTime: string;
+    endTime: string;
+  }> = [];
+
+  for (let index = 0; index < Math.min(weekdays.length, starts.length, ends.length); index += 1) {
+    const weekday = Number(weekdays[index]);
+    const startTime = typeof starts[index] === "string" ? starts[index].trim() : "";
+    const endTime = typeof ends[index] === "string" ? ends[index].trim() : "";
+    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6 || !startTime || !endTime) continue;
+    windows.push({
+      weekday: weekday as SchedulingWeekday,
+      startTime,
+      endTime,
+    });
+  }
+  return windows;
 }
 
 function schedulingMessage(errorValue: unknown): string {
   const code = errorValue instanceof Error ? errorValue.message : "";
   const messages: Record<string, string> = {
-    SCHEDULING_HOST_NOT_ALLOWED: "Você não pode criar ou configurar agendamentos para este responsável.",
-    SCHEDULING_HOST_NOT_FOUND: "Responsável inválido ou inativo.",
-    SCHEDULING_HOST_GOOGLE_REQUIRED: "O responsável precisa conectar o Google Calendar antes de receber agendamentos.",
-    SCHEDULING_CUSTOMER_EMAIL_REQUIRED: "Selecione um cliente ativo com e-mail cadastrado.",
-    SCHEDULING_INVALID_TITLE: "Informe um título entre 3 e 180 caracteres.",
-    SCHEDULING_INVALID_DURATION: "A duração deve ficar entre 15 e 240 minutos.",
-    SCHEDULING_INVALID_DATE_RANGE: "Revise a janela de datas do agendamento.",
-    SCHEDULING_DATE_RANGE_IN_PAST: "A janela de agendamento não pode começar no passado.",
-    SCHEDULING_DATE_RANGE_TOO_LONG: "A janela escolhida ultrapassa o horizonte configurado para o responsável.",
+    SCHEDULING_HOST_NOT_ALLOWED: "Acesso não autorizado.",
+    SCHEDULING_HOST_NOT_FOUND: "Usuário inválido ou inativo.",
     SCHEDULING_INVALID_TIME_ZONE: "Fuso horário inválido.",
-    SCHEDULING_INVALID_WEEKDAYS: "Selecione ao menos um dia de atendimento.",
-    SCHEDULING_INVALID_WORKING_HOURS: "Informe um horário de atendimento válido.",
+    SCHEDULING_INVALID_WINDOWS: "Revise os horários de disponibilidade.",
     SCHEDULING_INVALID_SLOT_STEP: "Intervalo entre horários inválido.",
     SCHEDULING_INVALID_MINIMUM_NOTICE: "Antecedência mínima inválida.",
-    SCHEDULING_INVALID_BUFFER: "Buffer de agenda inválido.",
-    SCHEDULING_INVALID_HORIZON: "Horizonte de datas inválido.",
-    SCHEDULING_INVITATION_NOT_REVOCABLE: "Este convite não pode mais ser revogado.",
+    SCHEDULING_INVALID_BUFFER: "Intervalo de proteção inválido.",
+    SCHEDULING_INVALID_HORIZON: "Horizonte de agenda inválido.",
+    SCHEDULING_INVALID_DURATION: "Duração padrão inválida.",
+    SCHEDULING_INVALID_TITLE: "Título da agenda inválido.",
+    SCHEDULING_INVALID_DESCRIPTION: "Descrição muito longa.",
+    SCHEDULING_INVALID_EXCEPTION_DATE: "Data da exceção inválida.",
+    SCHEDULING_INVALID_EXCEPTION_TIME: "Horário da exceção inválido.",
+    SCHEDULING_EXCEPTION_NOT_FOUND: "Exceção não encontrada.",
   };
-  return messages[code] ?? "Não foi possível concluir a operação de agendamento.";
+  return messages[code] ?? "Não foi possível salvar a agenda.";
 }
 
-export const load: PageServerLoad = async ({ parent }) => {
+export const load: PageServerLoad = async ({ parent, url }) => {
   const layout = await parent();
   const permissions = permissionMap(layout.permissions);
   if (!hasPermission(permissions, "scheduling.view")) throw error(403, "Acesso não autorizado.");
 
   const createScope = getPermissionScope(permissions, "scheduling.create");
-  const viewScope = getPermissionScope(permissions, "scheduling.view") ?? "own";
   const canManage = hasPermission(permissions, "scheduling.manage");
-  const canCreate = Boolean(createScope) && hasPermission(permissions, "customers.view");
-  const needsTeamUsers = createScope === "team" || viewScope === "team";
-  const teamUserIds = needsTeamUsers ? await listSchedulingTeamUserIds(layout.user.id) : [layout.user.id];
-  const invitationVisibility = canManage || viewScope === "all" ? "all" : viewScope;
-  const [rawHosts, customers, invitations] = await Promise.all([
-    listSchedulingHosts(),
-    canCreate ? listSchedulingCustomers() : Promise.resolve([]),
-    listSchedulingInvitations(layout.user.id, invitationVisibility, teamUserIds),
-  ]);
+  const teamUserIds = createScope === "team"
+    ? await listSchedulingTeamUserIds(layout.user.id)
+    : [layout.user.id];
+  const rawHosts = await listSchedulingHosts();
 
-  const allowedHosts = rawHosts
+  const hosts = rawHosts
     .filter((host) =>
+      host.id === layout.user.id ||
       canManage ||
       createScope === "all" ||
-      (createScope === "team" && teamUserIds.includes(host.id)) ||
-      host.id === layout.user.id
+      (createScope === "team" && teamUserIds.includes(host.id))
     )
     .map((host) => ({
       id: host.id,
       name: host.name,
       email: host.email,
       googleConnected: Boolean(host.googleConnectedUserId),
-      profile: {
-        userId: host.id,
-        timeZone: host.profileTimeZone ?? DEFAULT_SCHEDULING_AVAILABILITY.timeZone,
-        weekdays: host.profileWeekdays ?? DEFAULT_SCHEDULING_AVAILABILITY.weekdays,
-        startTime: host.profileStartTime ?? DEFAULT_SCHEDULING_AVAILABILITY.startTime,
-        endTime: host.profileEndTime ?? DEFAULT_SCHEDULING_AVAILABILITY.endTime,
-        slotStepMinutes: host.profileSlotStepMinutes ?? DEFAULT_SCHEDULING_AVAILABILITY.slotStepMinutes,
-        minimumNoticeMinutes: host.profileMinimumNoticeMinutes ?? DEFAULT_SCHEDULING_AVAILABILITY.minimumNoticeMinutes,
-        bufferBeforeMinutes: host.profileBufferBeforeMinutes ?? DEFAULT_SCHEDULING_AVAILABILITY.bufferBeforeMinutes,
-        bufferAfterMinutes: host.profileBufferAfterMinutes ?? DEFAULT_SCHEDULING_AVAILABILITY.bufferAfterMinutes,
-        maxHorizonDays: host.profileMaxHorizonDays ?? DEFAULT_SCHEDULING_AVAILABILITY.maxHorizonDays,
-        defaultDurationMinutes: host.profileDefaultDurationMinutes ?? DEFAULT_SCHEDULING_AVAILABILITY.defaultDurationMinutes,
-        source: host.profileUserId ? "user" as const : "default" as const,
-      },
     }));
 
+  const requestedUserId = url.searchParams.get("user") ?? "";
+  const selectedHost = hosts.find((host) => host.id === requestedUserId)
+    ?? hosts.find((host) => host.id === layout.user.id)
+    ?? hosts[0];
+  if (!selectedHost) throw error(404, "Nenhum usuário disponível.");
+
+  const settings = await getPersonalSchedulingSettings(selectedHost.id);
+
   return {
-    canCreate,
-    canManage,
-    canConfigure: Boolean(createScope) || canManage,
-    canChangeInvitations: Boolean(createScope) || canManage,
     currentUserId: layout.user.id,
-    hosts: allowedHosts,
-    customers,
-    invitations,
+    selectedUserId: selectedHost.id,
+    canChooseHost: hosts.length > 1,
+    hosts,
+    googleConnected: settings.googleConnected,
+    publicPath: settings.profile.publicSlug ? `/agendar/${settings.profile.publicSlug}` : "",
+    profile: {
+      timeZone: settings.profile.timeZone,
+      slotStepMinutes: settings.profile.slotStepMinutes,
+      minimumNoticeMinutes: settings.profile.minimumNoticeMinutes,
+      bufferBeforeMinutes: settings.profile.bufferBeforeMinutes,
+      bufferAfterMinutes: settings.profile.bufferAfterMinutes,
+      maxHorizonDays: settings.profile.maxHorizonDays,
+      defaultDurationMinutes: settings.profile.defaultDurationMinutes,
+      publicEnabled: settings.profile.publicEnabled,
+      publicTitle: settings.profile.publicTitle,
+      publicDescription: settings.profile.publicDescription,
+      addGoogleMeet: settings.profile.addGoogleMeet,
+    },
+    windows: settings.windows.map((window) => ({
+      id: window.id,
+      weekday: window.weekday,
+      startTime: window.startTime,
+      endTime: window.endTime,
+    })),
+    exceptions: settings.exceptions.map((exception) => ({
+      id: exception.id,
+      exceptionDate: exception.exceptionDate,
+      available: exception.available,
+      startTime: exception.startTime,
+      endTime: exception.endTime,
+    })),
+    sources: settings.sources,
+    bookings: settings.bookings.map((booking) => ({
+      id: booking.id,
+      customerName: booking.customerName,
+      notes: booking.notes,
+      startAt: booking.startAt,
+      endAt: booking.endAt,
+      status: booking.status,
+      googleMeetUrl: booking.googleMeetUrl,
+    })),
   };
 };
 
 export const actions: Actions = {
-  createInvitation: async ({ cookies, request }) => {
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      "scheduling.create",
-      "/app/tasks/calendar/scheduling",
-    );
-    if (!hasPermission(permissions, "customers.view")) {
-      return fail(403, { success: false, action: "createInvitation", message: "Acesso a clientes não autorizado." });
-    }
-
-    const formData = await request.formData();
-    try {
-      const created = await generateSchedulingInvitation(session.user.id, permissions, {
-        customerContactId: readValue(formData, "customerContactId"),
-        title: readValue(formData, "title"),
-        hostUserId: readValue(formData, "hostUserId"),
-        durationMinutes: readInteger(formData, "durationMinutes"),
-        dateRangeStart: readValue(formData, "dateRangeStart"),
-        dateRangeEnd: readValue(formData, "dateRangeEnd"),
-        addGoogleMeet: readValue(formData, "addGoogleMeet") === "true",
-      });
-      return {
-        success: true,
-        action: "createInvitation",
-        message: "Link de agendamento criado.",
-        bookingPath: `/agendar/${created.token}`,
-      };
-    } catch (errorValue) {
-      return fail(400, {
-        success: false,
-        action: "createInvitation",
-        message: schedulingMessage(errorValue),
-      });
-    }
-  },
-
-  saveAvailability: async ({ cookies, request }) => {
+  saveProfile: async ({ cookies, request }) => {
     const { session, permissions } = await requireAppPermission(
       cookies,
       "scheduling.view",
       "/app/tasks/calendar/scheduling",
     );
-    if (!hasPermission(permissions, "scheduling.create") && !hasPermission(permissions, "scheduling.manage")) {
-      return fail(403, { success: false, action: "saveAvailability", message: "Acesso não autorizado." });
-    }
     const formData = await request.formData();
+    const userId = readValue(formData, "userId");
 
     try {
-      await configureSchedulingAvailability(session.user.id, permissions, {
-        userId: readValue(formData, "hostUserId"),
+      await configurePersonalScheduling(session.user.id, permissions, userId, {
         timeZone: readValue(formData, "timeZone"),
-        weekdays: readWeekdays(formData),
-        startTime: readValue(formData, "startTime"),
-        endTime: readValue(formData, "endTime"),
         slotStepMinutes: readInteger(formData, "slotStepMinutes"),
         minimumNoticeMinutes: readInteger(formData, "minimumNoticeMinutes"),
         bufferBeforeMinutes: readInteger(formData, "bufferBeforeMinutes"),
         bufferAfterMinutes: readInteger(formData, "bufferAfterMinutes"),
         maxHorizonDays: readInteger(formData, "maxHorizonDays"),
         defaultDurationMinutes: readInteger(formData, "defaultDurationMinutes"),
+        publicEnabled: readBoolean(formData, "publicEnabled"),
+        publicTitle: readValue(formData, "publicTitle"),
+        publicDescription: readValue(formData, "publicDescription"),
+        addGoogleMeet: readBoolean(formData, "addGoogleMeet"),
+        windows: readWindows(formData),
       });
-      return { success: true, action: "saveAvailability", message: "Disponibilidade atualizada." };
+      return { success: true, action: "saveProfile", message: "Agenda salva." };
     } catch (errorValue) {
       return fail(400, {
         success: false,
-        action: "saveAvailability",
+        action: "saveProfile",
         message: schedulingMessage(errorValue),
       });
     }
   },
 
-  revokeInvitation: async ({ cookies, request }) => {
+  addException: async ({ cookies, request }) => {
     const { session, permissions } = await requireAppPermission(
       cookies,
       "scheduling.view",
       "/app/tasks/calendar/scheduling",
     );
-    if (!hasPermission(permissions, "scheduling.create") && !hasPermission(permissions, "scheduling.manage")) {
-      return fail(403, { success: false, action: "revokeInvitation", message: "Acesso não autorizado." });
+    const formData = await request.formData();
+    const userId = readValue(formData, "userId");
+    try {
+      await addSchedulingException(session.user.id, permissions, userId, {
+        exceptionDate: readValue(formData, "exceptionDate"),
+        available: readBoolean(formData, "available"),
+        startTime: readValue(formData, "startTime"),
+        endTime: readValue(formData, "endTime"),
+      });
+      return { success: true, action: "addException", message: "Exceção adicionada." };
+    } catch (errorValue) {
+      return fail(400, {
+        success: false,
+        action: "addException",
+        message: schedulingMessage(errorValue),
+      });
     }
+  },
+
+  deleteException: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "scheduling.view",
+      "/app/tasks/calendar/scheduling",
+    );
     const formData = await request.formData();
     try {
-      await revokeSchedulingLink(
+      await removeSchedulingException(
         session.user.id,
         permissions,
-        readValue(formData, "invitationId"),
+        readValue(formData, "userId"),
+        readValue(formData, "exceptionId"),
       );
-      return { success: true, action: "revokeInvitation", message: "Link de agendamento revogado." };
+      return { success: true, action: "deleteException", message: "Exceção removida." };
     } catch (errorValue) {
-      return fail(409, {
+      return fail(404, {
         success: false,
-        action: "revokeInvitation",
+        action: "deleteException",
+        message: schedulingMessage(errorValue),
+      });
+    }
+  },
+
+  saveBlockingCalendars: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "scheduling.view",
+      "/app/tasks/calendar/scheduling",
+    );
+    const formData = await request.formData();
+    try {
+      await configureBlockingCalendars(
+        session.user.id,
+        permissions,
+        readValue(formData, "userId"),
+        formData.getAll("calendarId").filter((value): value is string => typeof value === "string"),
+      );
+      return { success: true, action: "saveBlockingCalendars", message: "Calendários atualizados." };
+    } catch (errorValue) {
+      return fail(400, {
+        success: false,
+        action: "saveBlockingCalendars",
         message: schedulingMessage(errorValue),
       });
     }
