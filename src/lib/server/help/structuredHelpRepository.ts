@@ -43,6 +43,12 @@ export type StructuredHelpStepInput = {
   assistantKnowledge: string;
 };
 
+export type StructuredHelpStepSplitPart = {
+  title: string;
+  description: string;
+  instruction: string;
+};
+
 export type StructuredHelpBlockInput = {
   blockType: StructuredHelpBlockType;
   textContent: string;
@@ -678,6 +684,162 @@ export async function updateStructuredHelpStep(
 
   await markContentDraft(contentId, actorUserId);
   await saveStructuredContentVersion(contentId, actorUserId);
+}
+
+export async function replaceStructuredHelpStepWithParts(
+  actorUserId: string,
+  contentId: string,
+  stepId: string,
+  parts: StructuredHelpStepSplitPart[],
+): Promise<void> {
+  const normalized = parts
+    .map((part) => ({
+      title: part.title.trim().slice(0, 180),
+      description: part.description.trim().slice(0, 2_000),
+      instruction: part.instruction.trim().slice(0, 50_000),
+    }))
+    .filter((part) => part.title.length >= 2 && part.instruction.length > 0)
+    .slice(0, 8);
+  if (normalized.length < 2) throw new Error("STEP_SPLIT_PARTS_REQUIRED");
+
+  const db = getDatabase();
+  const contentRow = await getContentRow(contentId);
+  if (!contentRow) throw new Error("CONTENT_NOT_FOUND");
+  if (contentRow.status === "archived") throw new Error("CONTENT_ARCHIVED");
+
+  const steps = await db
+    .select()
+    .from(helpContentSteps)
+    .where(eq(helpContentSteps.contentId, contentId))
+    .orderBy(asc(helpContentSteps.sortOrder));
+  const targetIndex = steps.findIndex((step) => step.id === stepId);
+  if (targetIndex < 0) throw new Error("STEP_NOT_FOUND");
+  if (steps.length + normalized.length - 1 > 80) throw new Error("STEP_LIMIT_EXCEEDED");
+
+  const targetBlocks = await db
+    .select()
+    .from(helpStepBlocks)
+    .where(eq(helpStepBlocks.stepId, stepId))
+    .orderBy(asc(helpStepBlocks.sortOrder));
+  const editableBlocks = targetBlocks.filter(
+    (block) => block.blockType === "text" || block.blockType === "notice",
+  );
+  const primaryEditable = editableBlocks[0] ?? null;
+  const removableIds = editableBlocks.slice(1).map((block) => block.id);
+  const updatedAt = new Date();
+
+  await db.transaction(async (tx) => {
+    for (const [index, step] of steps.entries()) {
+      await tx
+        .update(helpContentSteps)
+        .set({ sortOrder: -(100_000 + index * 10), updatedAt })
+        .where(eq(helpContentSteps.id, step.id));
+    }
+
+    for (let index = 0; index < targetIndex; index += 1) {
+      const step = steps[index];
+      if (!step) continue;
+      await tx
+        .update(helpContentSteps)
+        .set({ sortOrder: (index + 1) * 10, updatedAt })
+        .where(eq(helpContentSteps.id, step.id));
+    }
+
+    await tx
+      .update(helpContentSteps)
+      .set({
+        title: normalized[0]!.title,
+        description: normalized[0]!.description,
+        sortOrder: (targetIndex + 1) * 10,
+        updatedAt,
+      })
+      .where(eq(helpContentSteps.id, stepId));
+
+    if (primaryEditable) {
+      await tx
+        .update(helpStepBlocks)
+        .set({
+          blockType: "text",
+          textContent: normalized[0]!.instruction,
+          assetId: null,
+          linkUrl: null,
+          linkLabel: null,
+          noticeVariant: null,
+          updatedAt,
+        })
+        .where(eq(helpStepBlocks.id, primaryEditable.id));
+    } else {
+      const [{ value: currentMax }] = await tx
+        .select({ value: max(helpStepBlocks.sortOrder) })
+        .from(helpStepBlocks)
+        .where(eq(helpStepBlocks.stepId, stepId));
+      await tx.insert(helpStepBlocks).values({
+        stepId,
+        blockType: "text",
+        textContent: normalized[0]!.instruction,
+        sortOrder: Number(currentMax ?? 0) + 10,
+      });
+    }
+
+    if (removableIds.length > 0) {
+      await tx.delete(helpStepBlocks).where(inArray(helpStepBlocks.id, removableIds));
+    }
+
+    for (let partIndex = 1; partIndex < normalized.length; partIndex += 1) {
+      const part = normalized[partIndex]!;
+      const [createdStep] = await tx
+        .insert(helpContentSteps)
+        .values({
+          contentId,
+          title: part.title,
+          description: part.description,
+          assistantKnowledge: "",
+          sortOrder: (targetIndex + partIndex + 1) * 10,
+        })
+        .returning({ id: helpContentSteps.id });
+      if (!createdStep) throw new Error("STEP_NOT_CREATED");
+      await tx.insert(helpStepBlocks).values({
+        stepId: createdStep.id,
+        blockType: "text",
+        textContent: part.instruction,
+        sortOrder: 10,
+      });
+    }
+
+    for (let index = targetIndex + 1; index < steps.length; index += 1) {
+      const step = steps[index];
+      if (!step) continue;
+      await tx
+        .update(helpContentSteps)
+        .set({
+          sortOrder: (index + normalized.length) * 10,
+          updatedAt,
+        })
+        .where(eq(helpContentSteps.id, step.id));
+    }
+
+    await tx
+      .update(helpContents)
+      .set({
+        status: "draft",
+        updatedBy: actorUserId,
+        updatedAt,
+      })
+      .where(eq(helpContents.id, contentId));
+  });
+
+  await saveStructuredContentVersion(contentId, actorUserId);
+  await recordAuditEvent({
+    actorUserId,
+    action: "help.content.step_split",
+    entityType: "help_content_step",
+    entityId: stepId,
+    metadata: {
+      contentId,
+      partCount: normalized.length,
+      preservedNonTextBlocks: targetBlocks.length - editableBlocks.length,
+    },
+  });
 }
 
 export async function deleteStructuredHelpStep(
