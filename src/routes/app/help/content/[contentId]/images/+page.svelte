@@ -106,12 +106,24 @@
     completedAt: string | null;
   };
 
-  let regenerating = false;
+  let regenerationJob: RegenerationJob | null = data.videoProcessingJob;
+  let regenerating = Boolean(
+    regenerationJob
+    && ["queued", "running", "retry_waiting"].includes(regenerationJob.status),
+  );
   let regenerationError = "";
-  let regenerationProgress: Array<{ stage: string; label: string; detail?: string; status: string }> = [];
-  let regenerationJob: RegenerationJob | null = null;
+  let regenerationProgress: Array<{ stage: string; label: string; detail?: string; status: string }> =
+    regenerationJob
+      ? [{
+          stage: regenerationJob.stage,
+          label: regenerationJob.progressLabel,
+          detail: regenerationJob.progressDetail,
+          status: regenerationJob.status === "completed" ? "done" : "active",
+        }]
+      : [];
   let regenerationPollTimer: ReturnType<typeof setTimeout> | null = null;
-  let completedRegenerationJobId = "";
+  let completedRegenerationJobId =
+    regenerationJob?.status === "completed" ? regenerationJob.id : "";
 
   type ReviewItemPayload = {
     blockId: string;
@@ -818,7 +830,7 @@
     <div class="flex flex-wrap items-center gap-2">
       <a href={`/app/help/content/${data.content.id}/history`} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><History size={14}/>Histórico</a>
       {#if data.canEdit}
-        <button type="button" on:click={openVideoUpdate} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-3.5 font-semibold text-[#A9510D]"><RefreshCw size={14}/>Atualizar IA</button>
+        <button type="button" on:click={openVideoUpdate} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-3.5 font-semibold text-[#A9510D]">{#if regenerating}<LoaderCircle size={14} class="animate-spin"/>{:else}<RefreshCw size={14}/>{/if}{regenerating ? "Processando" : "Atualizar IA"}</button>
       {/if}
       <a href={`/app/help/content/${data.content.id}/preview`} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><Eye size={14}/>Preview</a>
       <a href={`/app/help/content/${data.content.id}`} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><Settings2 size={14}/>Modo avançado</a>
