@@ -9,6 +9,7 @@ import {
   configurePersonalScheduling,
   getPersonalSchedulingSettings,
   removeSchedulingException,
+  togglePersonalScheduling,
 } from "$lib/server/calendar/personalSchedulingService";
 import type { SchedulingWeekday } from "$lib/server/db/schedulingSchema";
 
@@ -70,6 +71,7 @@ function schedulingMessage(errorValue: unknown): string {
     SCHEDULING_INVALID_EXCEPTION_DATE: "Data da exceção inválida.",
     SCHEDULING_INVALID_EXCEPTION_TIME: "Horário da exceção inválido.",
     SCHEDULING_EXCEPTION_NOT_FOUND: "Exceção não encontrada.",
+    SCHEDULING_HOST_GOOGLE_REQUIRED: "Conecte o Google Calendar antes de ativar a agenda.",
   };
   return messages[code] ?? "Não foi possível salvar a agenda.";
 }
@@ -155,6 +157,37 @@ export const load: PageServerLoad = async ({ parent, url }) => {
 };
 
 export const actions: Actions = {
+  togglePublic: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "scheduling.view",
+      "/app/tasks/calendar/scheduling",
+    );
+    const formData = await request.formData();
+    const userId = readValue(formData, "userId");
+    const publicEnabled = readBoolean(formData, "publicEnabled");
+
+    try {
+      await togglePersonalScheduling(
+        session.user.id,
+        permissions,
+        userId,
+        publicEnabled,
+      );
+      return {
+        success: true,
+        action: "togglePublic",
+        message: publicEnabled ? "Agenda ativada." : "Agenda desativada.",
+      };
+    } catch (errorValue) {
+      return fail(400, {
+        success: false,
+        action: "togglePublic",
+        message: schedulingMessage(errorValue),
+      });
+    }
+  },
+
   saveProfile: async ({ cookies, request }) => {
     const { session, permissions } = await requireAppPermission(
       cookies,
