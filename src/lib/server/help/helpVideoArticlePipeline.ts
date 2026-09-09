@@ -669,7 +669,7 @@ async function generateCoverageRecovery(
         "Não reescreva, resuma nem repita etapas que já estão cobertas.",
         "Cada segmentId recebido DEVE aparecer em sourceSegmentIds e seu fato operacional deve estar realmente presente no texto público.",
         "A fonte é evidência interna. NUNCA mencione transcrição, vídeo, gravação, narrador, áudio, processo de geração, ausência de ações ou ausência de screenshot.",
-        "Não produza placeholders ou artefatos como **svg**, <svg>, **html>, JSON isolado ou nomes de formatos sem função editorial.",
+        "Não produza placeholders ou artefatos como **svg**, <svg>, **html**, JSON isolado ou nomes de formatos sem função editorial.",
         "Escreva diretamente a orientação ao usuário final.",
         "Preserve ações, campos, valores, regras, condições, exceções e resultados.",
         "Toda ação executável deve ficar em linha numerada usando **1.**, **2.**, **3.**.",
@@ -832,32 +832,44 @@ async function generatePart(
       && recoverableIds.length > 0
       && recoverableIds.length === lastMissing.length
     ) {
-      const missingIdSet = new Set(recoverableIds);
-      const missingSegments = part.filter((segment) => missingIdSet.has(segment.id));
-      const recoverySteps = await generateCoverageRecovery(
-        missingSegments,
-        latestSteps,
-        partIndex,
-        partCount,
-        onAiUsage,
-      );
-      const combined = [...latestSteps, ...recoverySteps];
-      const combinedMissing = missingCoverage(requiredIds, combined);
-      if (
-        combinedMissing.length === 0
-        && !combined.some(stepHasEditorialIssue)
-      ) {
-        const semanticMissing = await auditPartCoverage(part, combined, onAiUsage);
-        if (semanticMissing.length === 0) {
-          await reportAiUsage(onAiUsage, {
-            operation: "video_article_part",
-            ...lastResponseMeta,
-            latencyMs: Date.now() - startedAt,
-            status: "success",
-          });
-          return combined;
+      let combined = [...latestSteps];
+      let pendingIds = [...recoverableIds];
+
+      for (let recoveryRound = 1; recoveryRound <= 3 && pendingIds.length > 0; recoveryRound += 1) {
+        const pendingIdSet = new Set(pendingIds);
+        const missingSegments = part.filter((segment) => pendingIdSet.has(segment.id));
+        const recoverySteps = await generateCoverageRecovery(
+          missingSegments,
+          combined,
+          partIndex,
+          partCount,
+          onAiUsage,
+        );
+        combined = [...combined, ...recoverySteps];
+
+        const referencedMissing = missingCoverage(requiredIds, combined);
+        if (referencedMissing.length > 0) {
+          pendingIds = referencedMissing;
+          continue;
         }
+        if (combined.some(stepHasEditorialIssue)) {
+          throw new Error("HELP_VIDEO_ARTICLE_EDITORIAL_INVALID");
+        }
+
+        pendingIds = await auditPartCoverage(part, combined, onAiUsage);
       }
+
+      if (pendingIds.length === 0) {
+        await reportAiUsage(onAiUsage, {
+          operation: "video_article_part",
+          ...lastResponseMeta,
+          latencyMs: Date.now() - startedAt,
+          status: "success",
+        });
+        return combined;
+      }
+
+      lastMissing = pendingIds;
     }
 
     throw new Error("HELP_VIDEO_ARTICLE_PART_COVERAGE_INCOMPLETE");
