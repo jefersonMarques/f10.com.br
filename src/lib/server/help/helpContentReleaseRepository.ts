@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -222,26 +222,23 @@ export async function getPublicHelpContentReleaseBySlug(
   slug: string,
   releaseNumber: number,
 ): Promise<PublishedStructuredHelp | null> {
-  const rows = await getDatabase()
+  const [row] = await getDatabase()
     .select({
       contentId: helpContentReleases.contentId,
-      releaseNumber: helpContentReleases.releaseNumber,
       publicSnapshot: helpContentReleases.publicSnapshot,
       publishedAt: helpContentReleases.publishedAt,
     })
     .from(helpContentReleases)
-    .orderBy(desc(helpContentReleases.releaseNumber));
-
-  for (const row of rows) {
-    if (row.releaseNumber !== releaseNumber) continue;
-    const parsed = parsePublishedStructuredHelpSnapshot(
-      row.contentId,
-      row.publishedAt,
-      row.publicSnapshot,
-    );
-    if (parsed?.slug === slug) return parsed;
-  }
-  return null;
+    .where(
+      and(
+        eq(helpContentReleases.releaseNumber, releaseNumber),
+        sql`${helpContentReleases.publicSnapshot}->'public'->>'slug' = ${slug}`,
+      ),
+    )
+    .limit(1);
+  return row
+    ? parsePublishedStructuredHelpSnapshot(row.contentId, row.publishedAt, row.publicSnapshot)
+    : null;
 }
 
 export async function restoreHelpContentReleaseAsDraft(input: {
@@ -265,29 +262,13 @@ export async function restoreHelpContentReleaseAsDraft(input: {
     ),
   ]));
   const availableAssets = assetIds.length
-    ? await db.select({ id: helpAssets.id }).from(helpAssets)
-        .where(
-          // IDs são protegidos por help_content_release_assets.
-          // O filtro individual evita restaurar uma release corrompida.
-          assetIds.length === 1
-            ? eq(helpAssets.id, assetIds[0]!)
-            : undefined as never,
-        )
+    ? await db
+        .select({ id: helpAssets.id })
+        .from(helpAssets)
+        .where(inArray(helpAssets.id, assetIds))
     : [];
-  if (assetIds.length === 1 && availableAssets.length !== 1) {
+  if (availableAssets.length !== assetIds.length) {
     throw new Error("HELP_RELEASE_ASSET_MISSING");
-  }
-  if (assetIds.length > 1) {
-    const allAssets = await Promise.all(
-      assetIds.map(async (assetId) => {
-        const [row] = await db.select({ id: helpAssets.id })
-          .from(helpAssets)
-          .where(eq(helpAssets.id, assetId))
-          .limit(1);
-        return row?.id ?? null;
-      }),
-    );
-    if (allAssets.some((assetId) => !assetId)) throw new Error("HELP_RELEASE_ASSET_MISSING");
   }
 
   await db.transaction(async (tx) => {
