@@ -273,8 +273,8 @@ async function classifyBatch(
           "Classifique TODOS os segmentos recebidos para garantir cobertura integral de um procedimento F10.",
           "Retorne exatamente um item para cada segmentId, sem criar, omitir ou repetir IDs.",
           "action: ação executável; rule: regra; condition: condição/exceção; result: resultado/estado; explanation: explicação útil.",
-          "Use repetition somente quando o trecho apenas repete informação já presente neste lote.",
-          "Use irrelevant somente para conversa sem valor operacional, saudação, ruído ou assunto claramente fora do procedimento.",
+          "Use repetition somente quando o trecho apenas repete informação já presente neste lote. Mesmo assim ele continuará sendo rastreado na cobertura.",
+          "Use irrelevant SOMENTE para saudação, ruído, conversa sem valor operacional ou assunto claramente fora do procedimento. Na dúvida, não use irrelevant.",
           "topicKey deve ser curto e estável. Segmentos do mesmo assunto devem reutilizar exatamente o mesmo topicKey.",
           attempt === 2
             ? "A resposta anterior falhou na cobertura. Confira cada ID antes de responder."
@@ -344,7 +344,7 @@ async function classifyTranscript(
 }
 
 function isRelevant(segment: ClassifiedSegment): boolean {
-  return segment.classification !== "repetition" && segment.classification !== "irrelevant";
+  return segment.classification !== "irrelevant";
 }
 
 function buildGenerationParts(segments: ClassifiedSegment[]): ClassifiedSegment[][] {
