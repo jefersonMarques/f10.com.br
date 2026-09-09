@@ -5,6 +5,7 @@
     ArrowLeft,
     Bot,
     BookOpen,
+    CalendarClock,
     CheckCircle2,
     ChevronDown,
     CircleAlert,
@@ -192,6 +193,16 @@
   function persistDraft(): void {
     if (messageBody) window.sessionStorage.setItem(draftKey, messageBody);
     else window.sessionStorage.removeItem(draftKey);
+  }
+
+  function insertSchedulingLink(): void {
+    if (!data.schedulingPath) return;
+    const absoluteUrl = new URL(data.schedulingPath, window.location.origin).toString();
+    const prefix = "Você pode escolher o melhor horário na minha agenda:";
+    messageBody = messageBody.trim()
+      ? `${messageBody.trim()}\n\n${absoluteUrl}`
+      : `${prefix}\n${absoluteUrl}`;
+    persistDraft();
   }
 
   function messageCursor(message: ChatMessage): string {
@@ -513,6 +524,7 @@
             <div class="flex items-center gap-2 border-b border-[#ECEEF2] px-3 py-2.5">
               {#if canWrite}<button type="button" on:click={() => composerMode = "reply"} class={`rounded-full px-3 py-1.5 text-[10px] font-semibold transition ${composerMode === "reply" ? "bg-[#000A57] text-white" : "bg-[#F3F4F7] text-[#6D7382] hover:bg-[#ECEEF2]"}`}>Resposta</button>{/if}
               {#if data.canInternalNote}<button type="button" on:click={() => composerMode = "note"} class={`rounded-full px-3 py-1.5 text-[10px] font-semibold transition ${composerMode === "note" ? "bg-[#9A5513] text-white" : "bg-[#FFF3E7] text-[#8B4D12] hover:bg-[#FBE9D7]"}`}>Nota interna</button>{/if}
+              {#if data.schedulingPath && canWrite && composerMode === "reply"}<button type="button" on:click={insertSchedulingLink} class="inline-flex items-center gap-1.5 rounded-full bg-[#EEF0FF] px-3 py-1.5 text-[10px] font-semibold text-[#000A57]"><CalendarClock size={12}/>Minha agenda</button>{/if}
               <span class="ml-auto text-[9px] text-[#999FAA]">{composerMode === "note" ? "Somente equipe F10" : "Visível ao cliente"}</span>
             </div>
 
