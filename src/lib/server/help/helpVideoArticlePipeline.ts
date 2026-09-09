@@ -121,7 +121,7 @@ type PipelineAiUsageHandler = (
   usage: HelpVideoArticlePipelineAiUsage,
 ) => void | Promise<void>;
 
-const CLASSIFICATION_BATCH_SEGMENTS = 60;
+const CLASSIFICATION_BATCH_SEGMENTS = 24;
 const GENERATION_PART_SEGMENTS = 55;
 const GENERATION_PART_SECONDS = 9 * 60;
 
@@ -236,18 +236,18 @@ function normalizeTopicKey(value: string): string {
     .slice(0, 80) || "geral";
 }
 
-function validateClassification(
+function normalizeClassification(
   source: IdentifiedSegment[],
   response: ClassificationResponse,
-): ClassifiedSegment[] | null {
+): ClassifiedSegment[] {
   const sourceById = new Map(source.map((segment) => [segment.id, segment]));
   const seen = new Set<string>();
   const normalized: ClassifiedSegment[] = [];
 
   for (const item of response.segments) {
-    if (seen.has(item.segmentId)) return null;
+    if (seen.has(item.segmentId)) continue;
     const segment = sourceById.get(item.segmentId);
-    if (!segment) return null;
+    if (!segment) continue;
     seen.add(item.segmentId);
     normalized.push({
       ...segment,
@@ -256,9 +256,18 @@ function validateClassification(
     });
   }
 
-  if (seen.size !== source.length) return null;
-  if (source.some((segment) => !seen.has(segment.id))) return null;
   return normalized.sort((left, right) => left.sourceIndex - right.sourceIndex);
+}
+
+function fallbackClassification(
+  segments: IdentifiedSegment[],
+  batchIndex: number,
+): ClassifiedSegment[] {
+  return segments.map((segment) => ({
+    ...segment,
+    classification: "explanation",
+    topicKey: `parte_${String(batchIndex + 1).padStart(3, "0")}`,
+  }));
 }
 
 async function classifyBatch(
@@ -267,73 +276,84 @@ async function classifyBatch(
   batchCount: number,
   onAiUsage?: PipelineAiUsageHandler,
 ): Promise<ClassifiedSegment[]> {
-  const startedAt = Date.now();
-  let lastResponseMeta: {
-    provider?: string;
-    model: string;
-    inputTokens?: number | null;
-    outputTokens?: number | null;
-  } = { model: "ai-gateway" };
+  const classifiedById = new Map<string, ClassifiedSegment>();
+  let pending = [...segments];
 
-  try {
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
+  for (let attempt = 1; attempt <= 2 && pending.length > 0; attempt += 1) {
+    const startedAt = Date.now();
+    let responseMeta: {
+      provider?: string;
+      model: string;
+      inputTokens?: number | null;
+      outputTokens?: number | null;
+    } = { model: "ai-gateway" };
+
+    try {
       const response = await createAiStructuredResponse<ClassificationResponse>({
         task: "content_edit",
         requiredCapabilities: ["content.draft"],
         instructions: [
-          "Classifique TODOS os segmentos recebidos para garantir cobertura integral de um procedimento F10.",
-          "Retorne exatamente um item para cada segmentId, sem criar, omitir ou repetir IDs.",
+          "Classifique cada segmento recebido para ajudar a organizar um procedimento F10.",
+          "Retorne um item para cada segmentId recebido. Não crie IDs novos.",
           "action: ação executável; rule: regra; condition: condição/exceção; result: resultado/estado; explanation: explicação útil.",
-          "Use repetition somente quando o trecho apenas repete informação já presente neste lote. Mesmo assim ele continuará sendo rastreado na cobertura.",
-          "Use irrelevant SOMENTE para saudação, ruído, conversa sem valor operacional ou assunto claramente fora do procedimento. Na dúvida, não use irrelevant.",
-          "topicKey deve ser curto e estável. Segmentos do mesmo assunto devem reutilizar exatamente o mesmo topicKey.",
+          "Use repetition somente para repetição clara. Ela continuará sendo preservada na cobertura.",
+          "Use irrelevant SOMENTE para saudação, ruído ou conversa claramente sem valor operacional. Na dúvida, use explanation.",
+          "topicKey deve ser curto e estável para segmentos do mesmo assunto.",
           attempt === 2
-            ? "A resposta anterior falhou na cobertura. Confira cada ID antes de responder."
+            ? "Esta chamada contém apenas segmentos que ficaram pendentes. Classifique todos os IDs recebidos."
             : "",
         ].filter(Boolean).join("\n"),
         userInput: [
           `LOTE ${batchIndex + 1} DE ${batchCount}`,
-          classificationInput(segments),
+          classificationInput(pending),
         ].join("\n\n"),
         schemaName: attempt === 1
           ? "f10_help_video_segment_coverage"
           : "f10_help_video_segment_coverage_retry",
         schema: classificationSchema(),
-        maxOutputTokens: 8_000,
+        maxOutputTokens: 6_000,
         timeoutMs: 120_000,
       });
-      lastResponseMeta = {
+
+      responseMeta = {
         provider: response.provider,
         model: response.model,
         inputTokens: response.inputTokens,
         outputTokens: response.outputTokens,
       };
-      const classified = validateClassification(segments, response.data);
-      if (classified) {
-        await reportAiUsage(onAiUsage, {
-          operation: "video_coverage",
-          ...lastResponseMeta,
-          latencyMs: Date.now() - startedAt,
-          status: "success",
-        });
-        return classified;
-      }
-    }
 
-    throw new Error("HELP_VIDEO_COVERAGE_CLASSIFICATION_INCOMPLETE");
-  } catch (cause) {
-    await reportAiUsage(onAiUsage, {
-      operation: "video_coverage",
-      ...lastResponseMeta,
-      latencyMs: Date.now() - startedAt,
-      status: "failed",
-      failureCode: aiFailureCode(cause),
-    });
-    if (cause instanceof Error && cause.message === "HELP_VIDEO_COVERAGE_CLASSIFICATION_INCOMPLETE") {
-      throw cause;
+      const normalized = normalizeClassification(pending, response.data);
+      for (const segment of normalized) classifiedById.set(segment.id, segment);
+      pending = pending.filter((segment) => !classifiedById.has(segment.id));
+
+      await reportAiUsage(onAiUsage, {
+        operation: "video_coverage",
+        ...responseMeta,
+        latencyMs: Date.now() - startedAt,
+        status: "success",
+      });
+    } catch (cause) {
+      await reportAiUsage(onAiUsage, {
+        operation: "video_coverage",
+        ...responseMeta,
+        latencyMs: Date.now() - startedAt,
+        status: "failed",
+        failureCode: aiFailureCode(cause),
+      });
     }
-    throw new Error(`HELP_VIDEO_COVERAGE_FAILED:${aiFailureCode(cause)}`);
   }
+
+  if (pending.length > 0) {
+    for (const segment of fallbackClassification(pending, batchIndex)) {
+      classifiedById.set(segment.id, segment);
+    }
+  }
+
+  return segments.map(
+    (segment) =>
+      classifiedById.get(segment.id)
+      ?? fallbackClassification([segment], batchIndex)[0]!,
+  );
 }
 
 async function classifyTranscript(
