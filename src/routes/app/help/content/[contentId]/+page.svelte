@@ -4,6 +4,7 @@
     ArrowUp,
     BrainCircuit,
     CheckCircle2,
+    ChevronDown,
     CircleAlert,
     CloudUpload,
     ExternalLink,
@@ -31,6 +32,8 @@
 
   export let data: PageData;
   export let form: ActionData;
+
+  let expandedStepId = data.content.steps[0]?.id ?? "";
 
   const blockLabels: Record<string, string> = {
     text: "Texto",
@@ -120,7 +123,7 @@
       <div class="min-w-0"><h1 class="truncate text-[18px] font-semibold text-[#11182C]">{data.content.title}</h1><p class="mt-1 truncate text-[11px] text-[#838897]">/{data.content.slug}</p></div>
       <div class="flex flex-wrap gap-2">
         <a href={`/app/help/content/${data.content.id}/preview`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]">Preview<ExternalLink size={12}/></a>
-        <a href={`/app/help/content/${data.content.id}/images`} class={`application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border px-3.5 font-semibold ${humanReviewReady ? "border-[#CFE4D6] bg-[#F7FCF8] text-[#2F7045]" : "border-[#F1D7BD] bg-[#FFF9F3] text-[#A9510D]"}`}><PenTool size={13}/>Revisão humana{#if imageBlocks.length > 0}<span class="rounded-full bg-white px-1.5 py-0.5 text-[8px]">{reviewedImageCount}/{imageBlocks.length}</span>{/if}</a>
+        <a href={`/app/help/content/${data.content.id}/images`} class={`application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border px-3.5 font-semibold ${humanReviewReady ? "border-[#CFE4D6] bg-[#F7FCF8] text-[#2F7045]" : "border-[#F1D7BD] bg-[#FFF9F3] text-[#A9510D]"}`}><PenTool size={13}/>Revisar conteúdo{#if imageBlocks.length > 0}<span class="rounded-full bg-white px-1.5 py-0.5 text-[8px]">{reviewedImageCount}/{imageBlocks.length}</span>{/if}</a>
         <a href="/app/help/categories" class="application-text-caption inline-flex min-h-10 items-center justify-center rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]">Categorias</a>
         <a href="/app/help/assets" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><HardDrive size={14}/>Biblioteca</a>
         {#if data.canPublish && data.content.status !== "published"}
@@ -144,7 +147,7 @@
 
   <form method="POST" action="?/updateContent" class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
     <fieldset disabled={!data.canEdit} class="disabled:opacity-70">
-      <div class="flex items-start justify-between gap-4"><div><h2 class="text-[16px] font-semibold text-[#11182C]">Informações gerais</h2><p class="mt-1 text-[11px] text-[#858A98]">O conteúdo público é a principal fonte do assistente. Preencha conhecimento adicional somente quando necessário.</p></div><Save size={18} class="text-[#000A57]"/></div>
+      <div class="flex items-start justify-between gap-4"><div><h2 class="text-[16px] font-semibold text-[#11182C]">Informações gerais</h2><p class="mt-1 text-[11px] text-[#858A98]">Título, endereço e classificação do conteúdo.</p></div><Save size={18} class="text-[#000A57]"/></div>
 
       <div class="mt-6 grid gap-5 lg:grid-cols-2">
         <label class="block lg:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Título</span><input name="title" required maxlength="160" value={data.content.title} class="h-12 w-full rounded-xl border border-[#DDE1EA] px-4 text-[14px] font-medium" /></label>
@@ -164,11 +167,9 @@
           </div>
         </section>
 
-        <label class="block rounded-2xl border border-[#DDE1EA] bg-white p-4 lg:col-span-2"><span class="flex items-center gap-2 text-[11px] font-semibold text-[#303645]"><Search size={15}/>Termos relacionados / sinônimos</span><span class="mt-1 block text-[10px] leading-5 text-[#858A98]">Usados somente para localizar o artigo. Um termo por linha, vírgula ou ponto e vírgula.</span><textarea name="searchAliases" maxlength="8000" rows="4" class="mt-3 w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[11px] leading-5">{data.content.searchAliases.join("\n")}</textarea></label>
-
-        <label class="block rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4 lg:col-span-2"><span class="flex items-center gap-2 text-[11px] font-semibold text-[#000A57]"><BrainCircuit size={16}/>Conhecimento adicional do assistente</span><span class="mt-1 block text-[10px] leading-5 text-[#777D8D]">Somente informações seguras para serem respondidas ao cliente e que não precisam aparecer no artigo.</span><textarea name="assistantKnowledge" maxlength="40000" rows="5" class="mt-3 w-full resize-y rounded-xl border border-[#D8DDF4] bg-white px-3 py-2.5 text-[11px] leading-5">{data.content.assistantKnowledge}</textarea></label>
-
-        <label class="block rounded-2xl border border-[#F0D7C4] bg-[#FFF9F4] p-4 lg:col-span-2"><span class="flex items-center gap-2 text-[11px] font-semibold text-[#7A3B08]"><LockKeyhole size={15}/>Notas internas do suporte</span><span class="mt-1 block text-[10px] leading-5 text-[#91603A]">Uso interno. Este conteúdo não é incluído na publicação nem no contexto da IA pública.</span><textarea name="internalSupportNotes" maxlength="40000" rows="4" class="mt-3 w-full resize-y rounded-xl border border-[#F0D7C4] bg-white px-3 py-2.5 text-[11px] leading-5">{data.content.internalSupportNotes}</textarea></label>
+        <input type="hidden" name="searchAliases" value={data.content.searchAliases.join("\n")}/>
+        <input type="hidden" name="assistantKnowledge" value={data.content.assistantKnowledge}/>
+        <input type="hidden" name="internalSupportNotes" value={data.content.internalSupportNotes}/>
       </div>
       {#if data.canEdit}<div class="mt-5 flex justify-end"><button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white"><Save size={15}/>Salvar informações gerais</button></div>{/if}
     </fieldset>
@@ -232,8 +233,12 @@
   <div class="mt-5 space-y-5">
     {#each data.content.steps as step, stepIndex}
       <article class="overflow-hidden rounded-[22px] border border-[#DDE1EA] bg-white">
-        <header class="flex flex-col gap-4 border-b border-[#EEF0F5] bg-[#FAFAFC] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div class="flex items-center gap-4"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#000A57] text-[13px] font-bold text-white">{stepIndex + 1}</span><div><p class="application-text-meta font-bold uppercase tracking-[0.12em] text-[#EA6D0B]">Passo {stepIndex + 1}</p><h2 class="mt-1 text-[16px] font-semibold text-[#222839]">{step.title}</h2></div></div>
+        <header class="flex flex-col gap-4 border-b border-[#EEF0F5] bg-[#FAFAFC] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <button type="button" on:click={() => (expandedStepId = expandedStepId === step.id ? "" : step.id)} class="flex min-w-0 flex-1 items-center gap-4 text-left">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#000A57] text-[13px] font-bold text-white">{stepIndex + 1}</span>
+            <div class="min-w-0 flex-1"><p class="application-text-meta font-bold uppercase tracking-[0.12em] text-[#EA6D0B]">Etapa {stepIndex + 1}</p><h2 class="mt-1 truncate text-[16px] font-semibold text-[#222839]">{step.title}</h2></div>
+            <ChevronDown size={16} class={`shrink-0 text-[#737989] transition ${expandedStepId === step.id ? "rotate-180" : ""}`}/>
+          </button>
           {#if data.canEdit}
             <div class="flex items-center gap-1">
               <form method="POST" action="?/moveStep"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="up"/><button type="submit" disabled={stepIndex === 0} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#666D7D] disabled:opacity-30" aria-label="Mover passo para cima"><ArrowUp size={14}/></button></form>
@@ -243,6 +248,7 @@
           {/if}
         </header>
 
+        {#if expandedStepId === step.id}
         <div class="p-5 sm:p-6">
           <form method="POST" action="?/updateStep" class="grid gap-4 lg:grid-cols-2">
             <input type="hidden" name="stepId" value={step.id}/>
@@ -303,6 +309,7 @@
             {/if}
           </section>
         </div>
+        {/if}
       </article>
     {/each}
   </div>
@@ -333,5 +340,21 @@
         {/if}
       </div>
     </div>
+  </section>
+
+  <section class="mt-5 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+    <div class="flex items-center gap-3">
+      <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F3F4F7] text-[#000A57]"><BrainCircuit size={17}/></span>
+      <div><h2 class="text-[14px] font-semibold text-[#11182C]">Configurações avançadas</h2><p class="mt-1 text-[10px] text-[#858A98]">Pesquisa, IA e informações internas.</p></div>
+    </div>
+
+    <form method="POST" action="?/updateAdvanced" class="mt-5 grid gap-4">
+      <fieldset disabled={!data.canEdit} class="contents disabled:opacity-70">
+        <label class="block rounded-2xl border border-[#DDE1EA] bg-[#FAFAFC] p-4"><span class="flex items-center gap-2 text-[11px] font-semibold text-[#303645]"><Search size={15}/>Termos de pesquisa</span><textarea name="searchAliases" maxlength="8000" rows="4" class="mt-3 w-full resize-y rounded-xl border border-[#DDE1EA] bg-white px-3 py-2.5 text-[11px] leading-5">{data.content.searchAliases.join("\n")}</textarea></label>
+        <label class="block rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4"><span class="flex items-center gap-2 text-[11px] font-semibold text-[#000A57]"><BrainCircuit size={15}/>Conhecimento da IA</span><textarea name="assistantKnowledge" maxlength="40000" rows="5" class="mt-3 w-full resize-y rounded-xl border border-[#D8DDF4] bg-white px-3 py-2.5 text-[11px] leading-5">{data.content.assistantKnowledge}</textarea></label>
+        <label class="block rounded-2xl border border-[#F0D7C4] bg-[#FFF9F4] p-4"><span class="flex items-center gap-2 text-[11px] font-semibold text-[#7A3B08]"><LockKeyhole size={15}/>Notas internas</span><textarea name="internalSupportNotes" maxlength="40000" rows="4" class="mt-3 w-full resize-y rounded-xl border border-[#F0D7C4] bg-white px-3 py-2.5 text-[11px] leading-5">{data.content.internalSupportNotes}</textarea></label>
+        {#if data.canEdit}<div class="flex justify-end"><button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white"><Save size={14}/>Salvar configurações</button></div>{/if}
+      </fieldset>
+    </form>
   </section>
 </ApplicationContent>
