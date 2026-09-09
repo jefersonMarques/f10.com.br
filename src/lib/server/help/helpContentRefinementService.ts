@@ -351,6 +351,23 @@ async function automaticScreenshotWindow(input: {
   return response.data;
 }
 
+function safeVideoWindow(
+  startValue: number,
+  endValue: number,
+  durationSeconds: number,
+): { startSeconds: number; endSeconds: number } {
+  const duration = Math.max(2, Number(durationSeconds) || 2);
+  const startSeconds = Math.max(
+    0,
+    Math.min(Number(startValue) || 0, Math.max(0, duration - 2)),
+  );
+  const endSeconds = Math.min(
+    duration,
+    Math.max(startSeconds + 2, Number(endValue) || startSeconds + 8),
+  );
+  return { startSeconds, endSeconds };
+}
+
 async function generateStepFrameSet(input: {
   actorUserId: string;
   contentId: string;
@@ -377,10 +394,10 @@ async function generateStepFrameSet(input: {
     baseTime: null,
   });
 
-  const startSeconds = Math.max(0, Math.min(Number(window.startSeconds) || 0, durationSeconds));
-  const endSeconds = Math.max(
-    startSeconds + 2,
-    Math.min(Number(window.endSeconds) || startSeconds + 8, durationSeconds),
+  const { startSeconds, endSeconds } = safeVideoWindow(
+    window.startSeconds,
+    window.endSeconds,
+    durationSeconds,
   );
   const response = await getAssetObject(storageKey);
   const videoBytes = new Uint8Array(await response.arrayBuffer());
@@ -571,10 +588,10 @@ export async function generateAdditionalHelpScreenshotCandidates(input: {
     });
   }
 
-  const startSeconds = Math.max(0, Math.min(Number(window.startSeconds) || 0, durationSeconds));
-  const endSeconds = Math.max(
-    startSeconds + 2,
-    Math.min(Number(window.endSeconds) || startSeconds + 8, durationSeconds),
+  const { startSeconds, endSeconds } = safeVideoWindow(
+    window.startSeconds,
+    window.endSeconds,
+    durationSeconds,
   );
   const response = await getAssetObject(storageKey);
   const videoBytes = new Uint8Array(await response.arrayBuffer());
