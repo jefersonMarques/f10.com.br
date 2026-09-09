@@ -5,7 +5,11 @@ import { requireAppPermission } from "$lib/server/auth/authorization";
 import { recordHelpAiUsage } from "$lib/server/help/helpAiUsageRepository";
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import { stabilizeHelpImportIdentity } from "$lib/server/help/helpImportIdentity";
-import { attachImportedMp4AsFeaturedVideo, saveHelpImportedVideoTimeline } from "$lib/server/help/helpImportedFeaturedVideo";
+import {
+  attachImportedMp4AsFeaturedVideo,
+  findImportedHelpVideoByChecksum,
+  saveHelpImportedVideoTimeline,
+} from "$lib/server/help/helpImportedFeaturedVideo";
 import { replaceHelpScreenshotReviewCandidates } from "$lib/server/help/helpScreenshotReviewRepository";
 import {
   generateHelpImportFromVideo,
@@ -194,6 +198,19 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
       },
       { status: 400 },
     );
+  }
+
+  if (source.type === "upload") {
+    const duplicate = await findImportedHelpVideoByChecksum(source.bytes);
+    if (duplicate?.contentId) {
+      return json(
+        {
+          message: "Este vídeo já está vinculado a um conteúdo. Abra o artigo existente e use Atualizar ou Reprocessar.",
+          existingContentId: duplicate.contentId,
+        },
+        { status: 409 },
+      );
+    }
   }
 
   const externalIdHint = readString(formData, "externalId");
