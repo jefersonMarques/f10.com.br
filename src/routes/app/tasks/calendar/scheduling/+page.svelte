@@ -27,7 +27,6 @@
   ];
 
   let windows = data.windows.map((window) => ({ ...window }));
-  let publicEnabled = data.profile.publicEnabled;
   let publicTitle = data.profile.publicTitle;
   let publicDescription = data.profile.publicDescription;
   let addGoogleMeet = data.profile.addGoogleMeet;
@@ -114,7 +113,13 @@
       <section class="rounded-[22px] border border-[#E1E4EB] bg-white p-5 shadow-[0_8px_30px_rgba(1,13,40,0.04)] sm:p-6">
         <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-2"><Link2 size={16} class="text-[#000A57]"/><h2 class="text-[15px] font-semibold text-[#202637]">Link da agenda</h2></div>
-          <span class={`rounded-full px-2.5 py-1 text-[9px] font-semibold ${data.profile.publicEnabled ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#F2F3F6] text-[#777E8D]"}`}>{data.profile.publicEnabled ? "Ativa" : "Inativa"}</span>
+          <form method="POST" action="?/togglePublic">
+            <input type="hidden" name="userId" value={data.selectedUserId}/>
+            <input type="hidden" name="publicEnabled" value={data.profile.publicEnabled ? "false" : "true"}/>
+            <button type="submit" disabled={!data.googleConnected && !data.profile.publicEnabled} class={`h-8 rounded-full px-3 text-[9px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${data.profile.publicEnabled ? "bg-[#EEF8F1] text-[#2F7045] hover:bg-[#E3F3E8]" : "bg-[#F2F3F6] text-[#666D7C] hover:bg-[#E8EAF0]"}`}>
+              {data.profile.publicEnabled ? "Ativa" : "Inativa"}
+            </button>
+          </form>
         </div>
         <div class="mt-4 flex flex-col gap-3 sm:flex-row">
           <div class="min-w-0 flex-1 truncate rounded-xl border border-[#E1E4EA] bg-[#FAFAFC] px-3 py-3 text-[11px] font-medium text-[#555D6C]">{data.publicPath || "—"}</div>
@@ -128,7 +133,7 @@
 
         <form method="POST" action="?/saveProfile" class="mt-5 space-y-5">
           <input type="hidden" name="userId" value={data.selectedUserId}/>
-          <input type="hidden" name="publicEnabled" value={publicEnabled ? "true" : "false"}/>
+          <input type="hidden" name="publicEnabled" value={data.profile.publicEnabled ? "true" : "false"}/>
           <input type="hidden" name="addGoogleMeet" value={addGoogleMeet ? "true" : "false"}/>
 
           <div class="grid gap-3 sm:grid-cols-2">
@@ -158,7 +163,6 @@
           </div>
 
           <div class="flex flex-wrap gap-3">
-            <label class="inline-flex items-center gap-2 text-[10px] font-semibold text-[#565D6D]"><input type="checkbox" bind:checked={publicEnabled}/>Agenda ativa</label>
             <label class="inline-flex items-center gap-2 text-[10px] font-semibold text-[#565D6D]"><input type="checkbox" bind:checked={addGoogleMeet}/>Google Meet</label>
           </div>
 
