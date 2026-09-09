@@ -318,7 +318,10 @@ async function classifyBatch(
       status: "failed",
       failureCode: aiFailureCode(cause),
     });
-    throw cause;
+    if (cause instanceof Error && cause.message === "HELP_VIDEO_COVERAGE_CLASSIFICATION_INCOMPLETE") {
+      throw cause;
+    }
+    throw new Error(`HELP_VIDEO_COVERAGE_FAILED:${aiFailureCode(cause)}`);
   }
 }
 
@@ -597,7 +600,10 @@ async function generatePart(
       status: "failed",
       failureCode: aiFailureCode(cause),
     });
-    throw cause;
+    if (cause instanceof Error && cause.message === "HELP_VIDEO_ARTICLE_PART_COVERAGE_INCOMPLETE") {
+      throw cause;
+    }
+    throw new Error(`HELP_VIDEO_ARTICLE_PART_FAILED:${aiFailureCode(cause)}`);
   }
 }
 
@@ -724,7 +730,10 @@ async function generateMetadata(
       status: "failed",
       failureCode: aiFailureCode(cause),
     });
-    throw cause;
+    if (cause instanceof Error && cause.message === "HELP_VIDEO_ARTICLE_EDITORIAL_INVALID") {
+      throw cause;
+    }
+    throw new Error(`HELP_VIDEO_ARTICLE_METADATA_FAILED:${aiFailureCode(cause)}`);
   }
 }
 
