@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
   import {
     CalendarClock,
     Check,
-    Clock3,
     Copy,
+    ExternalLink,
     Link2,
+    Plus,
     Settings2,
-    ShieldCheck,
-    Video,
+    Trash2,
   } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
@@ -17,220 +17,214 @@
   export let form: ActionData;
 
   const weekdayOptions = [
-    { value: 1, label: "Seg" },
-    { value: 2, label: "Ter" },
-    { value: 3, label: "Qua" },
-    { value: 4, label: "Qui" },
-    { value: 5, label: "Sex" },
-    { value: 6, label: "Sáb" },
-    { value: 0, label: "Dom" },
+    { value: 1, label: "Segunda" },
+    { value: 2, label: "Terça" },
+    { value: 3, label: "Quarta" },
+    { value: 4, label: "Quinta" },
+    { value: 5, label: "Sexta" },
+    { value: 6, label: "Sábado" },
+    { value: 0, label: "Domingo" },
   ];
 
-  let invitationHostId = data.hosts.find((host) => host.id === data.currentUserId)?.id ?? data.hosts[0]?.id ?? "";
-  let availabilityHostId = invitationHostId;
-  let availabilityTimeZone = "America/Sao_Paulo";
-  let availabilityWeekdays: number[] = [1, 2, 3, 4, 5];
-  let availabilityStartTime = "08:00";
-  let availabilityEndTime = "18:00";
-  let slotStepMinutes = 30;
-  let minimumNoticeMinutes = 120;
-  let bufferBeforeMinutes = 0;
-  let bufferAfterMinutes = 0;
-  let maxHorizonDays = 30;
-  let defaultDurationMinutes = 30;
-  let durationMinutes = 30;
-  let dateRangeStart = "";
-  let dateRangeEnd = "";
+  let windows = data.windows.map((window) => ({ ...window }));
+  let publicEnabled = data.profile.publicEnabled;
+  let publicTitle = data.profile.publicTitle;
+  let publicDescription = data.profile.publicDescription;
+  let addGoogleMeet = data.profile.addGoogleMeet;
+  let exceptionMode: "blocked" | "custom" = "blocked";
   let copied = false;
 
-  $: actionResult = form as (ActionData & { bookingPath?: string }) | undefined;
-  $: bookingPath = actionResult?.bookingPath ?? "";
-  $: selectedInvitationHost = data.hosts.find((host) => host.id === invitationHostId) ?? null;
+  $: publicUrl = data.publicPath && typeof window !== "undefined"
+    ? new URL(data.publicPath, window.location.origin).toString()
+    : data.publicPath;
+  $: upcomingBookings = data.bookings
+    .filter((booking) => booking.status === "booked" && new Date(booking.startAt).getTime() >= Date.now())
+    .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
 
-  function localDateKey(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+  function addWindow(): void {
+    windows = [
+      ...windows,
+      {
+        id: crypto.randomUUID(),
+        weekday: 1,
+        startTime: "09:00",
+        endTime: "12:00",
+      },
+    ];
   }
 
-  function addDays(date: Date, days: number): Date {
-    const next = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    next.setDate(next.getDate() + days);
-    return next;
+  function removeWindow(id: string): void {
+    windows = windows.filter((window) => window.id !== id);
   }
 
-  function applyAvailabilityProfile(hostId: string): void {
-    const host = data.hosts.find((item) => item.id === hostId);
-    if (!host) return;
-    availabilityTimeZone = host.profile.timeZone;
-    availabilityWeekdays = [...host.profile.weekdays];
-    availabilityStartTime = host.profile.startTime;
-    availabilityEndTime = host.profile.endTime;
-    slotStepMinutes = host.profile.slotStepMinutes;
-    minimumNoticeMinutes = host.profile.minimumNoticeMinutes;
-    bufferBeforeMinutes = host.profile.bufferBeforeMinutes;
-    bufferAfterMinutes = host.profile.bufferAfterMinutes;
-    maxHorizonDays = host.profile.maxHorizonDays;
-    defaultDurationMinutes = host.profile.defaultDurationMinutes;
-    if (!durationMinutes) durationMinutes = host.profile.defaultDurationMinutes;
+  function changeHost(event: Event): void {
+    const userId = (event.currentTarget as HTMLSelectElement).value;
+    void goto(`/app/tasks/calendar/scheduling?user=${encodeURIComponent(userId)}`);
   }
 
-  function handleAvailabilityHostChange(event: Event): void {
-    availabilityHostId = (event.currentTarget as HTMLSelectElement).value;
-    applyAvailabilityProfile(availabilityHostId);
-  }
-
-  function handleInvitationHostChange(event: Event): void {
-    invitationHostId = (event.currentTarget as HTMLSelectElement).value;
-    const host = data.hosts.find((item) => item.id === invitationHostId);
-    if (host) durationMinutes = host.profile.defaultDurationMinutes;
-  }
-
-  async function copyGeneratedLink(): Promise<void> {
-    if (!bookingPath) return;
-    const absoluteUrl = new URL(bookingPath, window.location.origin).toString();
-    await navigator.clipboard.writeText(absoluteUrl);
+  async function copyLink(): Promise<void> {
+    if (!publicUrl) return;
+    await navigator.clipboard.writeText(publicUrl);
     copied = true;
-    window.setTimeout(() => (copied = false), 1800);
+    window.setTimeout(() => (copied = false), 1600);
   }
 
-  function formatDateTime(value: string | Date | null, timeZone: string): string {
-    if (!value) return "—";
+  function formatBooking(value: string | Date): string {
     return new Intl.DateTimeFormat("pt-BR", {
-      timeZone,
-      dateStyle: "short",
-      timeStyle: "short",
+      timeZone: data.profile.timeZone,
+      weekday: "short",
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
     }).format(new Date(value));
   }
 
-  function statusLabel(status: string): string {
-    const labels: Record<string, string> = {
-      draft: "Rascunho",
-      sent: "Gerado",
-      opened: "Aberto pelo cliente",
-      booking: "Confirmando",
-      booked: "Agendado",
-      expired: "Expirado",
-      revoked: "Revogado",
-      cancelled: "Cancelado",
-    };
-    return labels[status] ?? status;
+  function formatExceptionDate(value: string): string {
+    const [year, month, day] = value.split("-").map(Number);
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(new Date(year, month - 1, day));
   }
-
-  function statusClass(status: string): string {
-    if (status === "booked") return "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]";
-    if (status === "opened" || status === "sent") return "border-[#D7DCF2] bg-[#F5F6FF] text-[#000A57]";
-    if (status === "booking") return "border-[#F0D6BD] bg-[#FFF9F3] text-[#935018]";
-    return "border-[#E1E4EA] bg-[#F7F8FA] text-[#737988]";
-  }
-
-  onMount(() => {
-    const today = new Date();
-    if (!dateRangeStart) dateRangeStart = localDateKey(today);
-    if (!dateRangeEnd) dateRangeEnd = localDateKey(addDays(today, 14));
-    applyAvailabilityProfile(availabilityHostId);
-    if (selectedInvitationHost) durationMinutes = selectedInvitationHost.profile.defaultDurationMinutes;
-  });
 </script>
 
-<svelte:head><title>Links de agendamento | F10 Operations</title></svelte:head>
+<svelte:head><title>Minha agenda | F10 Operations</title></svelte:head>
 
 <ApplicationContent width="wide">
-  <div class="mb-3 flex justify-end">
-    <div class="application-text-caption inline-flex items-center gap-2 rounded-xl border border-[#DDE3F1] bg-[#F8FAFF] px-3 py-2 font-medium text-[#526077]">
-      <ShieldCheck size={15} class="text-[#214A9A]"/>
-      Token bruto só aparece no link gerado; a base guarda apenas o hash.
+  <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <span class="application-text-caption font-bold uppercase tracking-[0.08em] text-[#EA6D0B]">Agendamento</span>
+      <h1 class="mt-1 text-[22px] font-semibold tracking-[-0.025em] text-[#202637]">Minha agenda</h1>
     </div>
-  </div>
+    {#if data.canChooseHost}
+      <select value={data.selectedUserId} on:change={changeHost} class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] font-semibold text-[#555C6D]">
+        {#each data.hosts as host}<option value={host.id}>{host.name}</option>{/each}
+      </select>
+    {/if}
+  </header>
 
   {#if form?.message}
-    <div class={`mb-3 rounded-xl border px-4 py-3 text-[11px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{form.message}</div>
+    <div class={`mb-4 rounded-xl border px-4 py-3 text-[11px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{form.message}</div>
   {/if}
 
-  {#if bookingPath}
-    <section class="mb-4 rounded-[20px] border border-[#B9E6C9] bg-[#F5FCF7] p-5">
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div class="min-w-0">
-          <span class="application-text-caption inline-flex items-center gap-2 font-bold uppercase tracking-[0.08em] text-[#176B35]"><Link2 size={14}/>Link pronto</span>
-          <p class="mt-2 break-all text-[11px] font-medium text-[#31583E]">{bookingPath}</p>
-          <p class="application-text-meta mt-1 text-[#6D8374]">Este é o único momento em que o token bruto é retornado pelo servidor.</p>
-        </div>
-        <button type="button" on:click={copyGeneratedLink} class="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#176B35] px-4 text-[11px] font-semibold text-white">
-          {#if copied}<Check size={15}/>Copiado{:else}<Copy size={15}/>Copiar link{/if}
-        </button>
-      </div>
-    </section>
-  {/if}
-
-  <div class="grid gap-4 2xl:grid-cols-[1.08fr_0.92fr]">
+  <div class="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
     <div class="space-y-4">
-      {#if data.canCreate}
-        <section class="rounded-[22px] border border-[#E1E4EB] bg-white p-5 shadow-[0_8px_30px_rgba(1,13,40,0.04)] sm:p-6">
-          <div class="flex items-start justify-between gap-4">
-            <div><span class="application-text-caption inline-flex items-center gap-2 font-bold uppercase tracking-[0.08em] text-[#EA6D0B]"><CalendarClock size={15}/>Novo convite</span><h2 class="mt-2 text-[18px] font-semibold text-[#202637]">Criar link de agendamento</h2></div>
+      <section class="rounded-[22px] border border-[#E1E4EB] bg-white p-5 shadow-[0_8px_30px_rgba(1,13,40,0.04)] sm:p-6">
+        <div class="flex items-center gap-2"><Link2 size={16} class="text-[#000A57]"/><h2 class="text-[15px] font-semibold text-[#202637]">Link da agenda</h2></div>
+        <div class="mt-4 flex flex-col gap-3 sm:flex-row">
+          <div class="min-w-0 flex-1 truncate rounded-xl border border-[#E1E4EA] bg-[#FAFAFC] px-3 py-3 text-[11px] font-medium text-[#555D6C]">{data.publicPath || "—"}</div>
+          <button type="button" on:click={copyLink} disabled={!data.publicPath} class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:opacity-40">{#if copied}<Check size={14}/>Copiado{:else}<Copy size={14}/>Copiar{/if}</button>
+          {#if data.publicPath}<a href={data.publicPath} target="_blank" rel="noopener noreferrer" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] px-4 text-[11px] font-semibold text-[#000A57]"><ExternalLink size={14}/>Abrir</a>{/if}
+        </div>
+      </section>
+
+      <section class="rounded-[22px] border border-[#E1E4EB] bg-white p-5 shadow-[0_8px_30px_rgba(1,13,40,0.04)] sm:p-6">
+        <div class="flex items-center gap-2"><Settings2 size={16} class="text-[#214A9A]"/><h2 class="text-[15px] font-semibold text-[#202637]">Disponibilidade</h2></div>
+
+        <form method="POST" action="?/saveProfile" class="mt-5 space-y-5">
+          <input type="hidden" name="userId" value={data.selectedUserId}/>
+          <input type="hidden" name="publicEnabled" value={publicEnabled ? "true" : "false"}/>
+          <input type="hidden" name="addGoogleMeet" value={addGoogleMeet ? "true" : "false"}/>
+
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label class="sm:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Título</span><input name="publicTitle" bind:value={publicTitle} required maxlength="180" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]"/></label>
+            <label class="sm:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Descrição</span><input name="publicDescription" bind:value={publicDescription} maxlength="1000" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]"/></label>
+            <label><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Duração</span><input name="defaultDurationMinutes" type="number" min="15" max="240" step="5" value={data.profile.defaultDurationMinutes} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
+            <label><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Intervalo dos horários</span><input name="slotStepMinutes" type="number" min="5" max="120" step="5" value={data.profile.slotStepMinutes} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
+            <label><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Antecedência mínima</span><input name="minimumNoticeMinutes" type="number" min="0" max="43200" step="5" value={data.profile.minimumNoticeMinutes} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
+            <label><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Horizonte em dias</span><input name="maxHorizonDays" type="number" min="1" max="90" value={data.profile.maxHorizonDays} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
+            <label><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Buffer antes</span><input name="bufferBeforeMinutes" type="number" min="0" max="240" step="5" value={data.profile.bufferBeforeMinutes} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
+            <label><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Buffer depois</span><input name="bufferAfterMinutes" type="number" min="0" max="240" step="5" value={data.profile.bufferAfterMinutes} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
+            <label class="sm:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Fuso horário</span><input name="timeZone" value={data.profile.timeZone} required maxlength="100" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
           </div>
 
-          <form method="POST" action="?/createInvitation" class="mt-5 grid gap-4 sm:grid-cols-2">
-            <label class="block sm:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Cliente</span><select name="customerContactId" required class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] outline-none focus:border-[#000A57]"><option value="">Selecione...</option>{#each data.customers as customer}<option value={customer.id}>{customer.name}{customer.organizationName ? ` · ${customer.organizationName}` : ""} · {customer.email}</option>{/each}</select></label>
-            <label class="block sm:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Título</span><input name="title" required minlength="3" maxlength="180" placeholder="Ex.: Reunião de implantação" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#000A57]"/></label>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Responsável</span><select name="hostUserId" bind:value={invitationHostId} on:change={handleInvitationHostChange} required class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px] outline-none focus:border-[#000A57]">{#each data.hosts as host}<option value={host.id} disabled={!host.googleConnected}>{host.name}{host.googleConnected ? "" : " · Google desconectado"}</option>{/each}</select></label>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Duração</span><select name="durationMinutes" bind:value={durationMinutes} class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"><option value={15}>15 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>60 min</option><option value={90}>90 min</option><option value={120}>120 min</option></select></label>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Primeiro dia</span><input name="dateRangeStart" type="date" bind:value={dateRangeStart} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Último dia</span><input name="dateRangeEnd" type="date" bind:value={dateRangeEnd} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
-            <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-[#DDE3F1] bg-[#F8FAFF] px-3 py-3 sm:col-span-2"><input type="checkbox" name="addGoogleMeet" value="true" class="mt-0.5"/><span><strong class="application-text-caption inline-flex items-center gap-1.5 font-semibold text-[#214A9A]"><Video size={14}/>Gerar Google Meet</strong><span class="application-text-meta mt-0.5 block leading-4 text-[#7D8797]">O cliente será incluído como participante externo e receberá o convite pelo Google ao confirmar.</span></span></label>
-            {#if selectedInvitationHost && !selectedInvitationHost.googleConnected}<div class="application-text-meta rounded-xl border border-[#F0D6BD] bg-[#FFF9F3] px-3 py-2 text-[#935018] sm:col-span-2">Este responsável precisa conectar o Google Calendar antes de receber agendamentos.</div>{/if}
-            <div class="flex items-center justify-end sm:col-span-2"><button type="submit" disabled={!selectedInvitationHost?.googleConnected} class="inline-flex h-11 items-center gap-2 rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Link2 size={15}/>Gerar link</button></div>
-          </form>
-        </section>
-      {:else}
-        <section class="rounded-[20px] border border-[#E1E4EA] bg-[#FAFAFC] p-5 text-[11px] text-[#666D7C]">Sua permissão permite visualizar agendamentos, mas não criar novos links ou acessar clientes.</section>
-      {/if}
+          <div>
+            <div class="mb-2 flex items-center justify-between"><h3 class="text-[12px] font-semibold text-[#343B4B]">Horários semanais</h3><button type="button" on:click={addWindow} class="inline-flex h-8 items-center gap-1 rounded-lg border border-[#DDE1EA] px-2.5 text-[9px] font-semibold text-[#000A57]"><Plus size={12}/>Adicionar</button></div>
+            <div class="space-y-2">
+              {#each windows as window (window.id)}
+                <div class="grid grid-cols-[1fr_105px_105px_34px] gap-2">
+                  <select name="windowWeekday" bind:value={window.weekday} class="h-10 min-w-0 rounded-lg border border-[#DDE1EA] bg-white px-2 text-[10px]">{#each weekdayOptions as weekday}<option value={weekday.value}>{weekday.label}</option>{/each}</select>
+                  <input name="windowStart" type="time" bind:value={window.startTime} required class="h-10 rounded-lg border border-[#DDE1EA] px-2 text-[10px]"/>
+                  <input name="windowEnd" type="time" bind:value={window.endTime} required class="h-10 rounded-lg border border-[#DDE1EA] px-2 text-[10px]"/>
+                  <button type="button" on:click={() => removeWindow(window.id)} class="flex h-10 items-center justify-center rounded-lg border border-[#E3E5EA] text-[#8A5961]" aria-label="Remover horário"><Trash2 size={13}/></button>
+                </div>
+              {/each}
+            </div>
+          </div>
 
-      {#if data.canConfigure}
-        <section class="rounded-[22px] border border-[#E1E4EB] bg-white p-5 shadow-[0_8px_30px_rgba(1,13,40,0.04)] sm:p-6">
-          <span class="application-text-caption inline-flex items-center gap-2 font-bold uppercase tracking-[0.08em] text-[#214A9A]"><Settings2 size={15}/>Disponibilidade de trabalho</span>
-          <h2 class="mt-2 text-[18px] font-semibold text-[#202637]">Quando o cliente pode agendar</h2>
-          <p class="application-text-caption mt-1 leading-5 text-[#7A808E]">Horário de trabalho é aplicado antes dos conflitos do Google. Perfil padrão: segunda a sexta, 08:00–18:00, 2h de antecedência e slots de 30 min.</p>
+          <div class="flex flex-wrap gap-3">
+            <label class="inline-flex items-center gap-2 text-[10px] font-semibold text-[#565D6D]"><input type="checkbox" bind:checked={publicEnabled}/>Agenda ativa</label>
+            <label class="inline-flex items-center gap-2 text-[10px] font-semibold text-[#565D6D]"><input type="checkbox" bind:checked={addGoogleMeet}/>Google Meet</label>
+          </div>
 
-          <form method="POST" action="?/saveAvailability" class="mt-5 grid gap-4 sm:grid-cols-2">
-            <label class="block sm:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Responsável</span><select name="hostUserId" bind:value={availabilityHostId} on:change={handleAvailabilityHostChange} required class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]">{#each data.hosts as host}<option value={host.id}>{host.name} · {host.profile.source === "user" ? "perfil próprio" : "padrão F10"}</option>{/each}</select></label>
-            <label class="block sm:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Fuso horário IANA</span><input name="timeZone" bind:value={availabilityTimeZone} required maxlength="100" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
-            <fieldset class="sm:col-span-2"><legend class="application-text-caption mb-2 font-semibold text-[#565D6D]">Dias de atendimento</legend><div class="flex flex-wrap gap-2">{#each weekdayOptions as weekday}<label class="application-text-meta inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-[#E0E3EA] px-3 font-semibold text-[#626979]"><input type="checkbox" name="weekday" value={weekday.value} bind:group={availabilityWeekdays}/>{weekday.label}</label>{/each}</div></fieldset>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Início</span><input name="startTime" type="time" bind:value={availabilityStartTime} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Fim</span><input name="endTime" type="time" bind:value={availabilityEndTime} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Passo dos slots (min)</span><input name="slotStepMinutes" type="number" min="5" max="120" step="5" bind:value={slotStepMinutes} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Antecedência mínima (min)</span><input name="minimumNoticeMinutes" type="number" min="0" max="43200" step="5" bind:value={minimumNoticeMinutes} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Buffer antes (min)</span><input name="bufferBeforeMinutes" type="number" min="0" max="240" step="5" bind:value={bufferBeforeMinutes} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Buffer depois (min)</span><input name="bufferAfterMinutes" type="number" min="0" max="240" step="5" bind:value={bufferAfterMinutes} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Horizonte máximo (dias)</span><input name="maxHorizonDays" type="number" min="1" max="90" bind:value={maxHorizonDays} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
-            <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#565D6D]">Duração padrão (min)</span><input name="defaultDurationMinutes" type="number" min="15" max="240" step="5" bind:value={defaultDurationMinutes} required class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/></label>
-            <div class="flex items-center justify-end sm:col-span-2"><button type="submit" class="inline-flex h-11 items-center gap-2 rounded-xl border border-[#C9D0E0] bg-white px-5 text-[11px] font-semibold text-[#000A57]"><Settings2 size={15}/>Salvar disponibilidade</button></div>
-          </form>
-        </section>
-      {/if}
+          {#if !data.googleConnected}<div class="rounded-xl border border-[#F0D6BD] bg-[#FFF9F3] px-3 py-2 text-[10px] font-medium text-[#935018]">Google Calendar desconectado.</div>{/if}
+
+          <div class="flex justify-end"><button type="submit" class="h-11 rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white">Salvar agenda</button></div>
+        </form>
+      </section>
+
+      <section class="rounded-[22px] border border-[#E1E4EB] bg-white p-5 sm:p-6">
+        <h2 class="text-[15px] font-semibold text-[#202637]">Exceções</h2>
+        <form method="POST" action="?/addException" class="mt-4 grid gap-2 sm:grid-cols-[150px_160px_1fr_1fr_auto]">
+          <input type="hidden" name="userId" value={data.selectedUserId}/>
+          <input type="date" name="exceptionDate" required class="h-10 rounded-lg border border-[#DDE1EA] px-2 text-[10px]"/>
+          <select bind:value={exceptionMode} class="h-10 rounded-lg border border-[#DDE1EA] bg-white px-2 text-[10px]">
+            <option value="blocked">Indisponível</option>
+            <option value="custom">Horário especial</option>
+          </select>
+          <input type="hidden" name="available" value={exceptionMode === "custom" ? "true" : "false"}/>
+          <input name="startTime" type="time" disabled={exceptionMode !== "custom"} required={exceptionMode === "custom"} class="h-10 rounded-lg border border-[#DDE1EA] px-2 text-[10px] disabled:bg-[#F5F6F8]"/>
+          <input name="endTime" type="time" disabled={exceptionMode !== "custom"} required={exceptionMode === "custom"} class="h-10 rounded-lg border border-[#DDE1EA] px-2 text-[10px] disabled:bg-[#F5F6F8]"/>
+          <button type="submit" class="h-10 rounded-lg border border-[#C9D0E0] px-3 text-[10px] font-semibold text-[#000A57]">Adicionar</button>
+        </form>
+
+        {#if data.exceptions.length > 0}
+          <div class="mt-4 divide-y divide-[#EEF0F4]">
+            {#each data.exceptions as exception}
+              <div class="flex items-center justify-between gap-3 py-2.5 text-[10px]">
+                <span class="font-semibold text-[#4D5565]">{formatExceptionDate(exception.exceptionDate)} · {exception.available ? `${exception.startTime}–${exception.endTime}` : "Indisponível"}</span>
+                <form method="POST" action="?/deleteException"><input type="hidden" name="userId" value={data.selectedUserId}/><input type="hidden" name="exceptionId" value={exception.id}/><button type="submit" class="text-[#9B4752]"><Trash2 size={13}/></button></form>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </section>
     </div>
 
-    <section class="h-fit rounded-[22px] border border-[#E1E4EB] bg-white shadow-[0_8px_30px_rgba(1,13,40,0.04)]">
-      <header class="border-b border-[#E8EAF0] px-5 py-4"><span class="application-text-caption inline-flex items-center gap-2 font-bold uppercase tracking-[0.08em] text-[#5C6475]"><Clock3 size={14}/>Convites recentes</span><p class="application-text-meta mt-1 text-[#8A909E]">O token não é recuperável daqui; somente o estado e o agendamento confirmado ficam persistidos.</p></header>
-      {#if data.invitations.length === 0}
-        <div class="application-text-caption px-5 py-12 text-center text-[#969BA7]">Nenhum convite de agendamento no seu escopo.</div>
-      {:else}
-        <div class="divide-y divide-[#EEF0F4]">
-          {#each data.invitations as invitation}
-            <article class="p-5">
-              <div class="flex items-start justify-between gap-3"><div class="min-w-0"><h3 class="truncate text-[13px] font-semibold text-[#202637]">{invitation.title}</h3><p class="application-text-meta mt-1 truncate text-[#7A808E]">{invitation.customerName} · {invitation.hostName}</p></div><span class={`application-text-meta shrink-0 rounded-full border px-2.5 py-1 font-bold ${statusClass(invitation.status)}`}>{statusLabel(invitation.status)}</span></div>
-              <div class="application-text-meta mt-3 grid grid-cols-2 gap-2 text-[#6C7382]"><span>{invitation.durationMinutes} min · {invitation.timeZone}</span><span class="text-right">{invitation.dateRangeStart.split("-").reverse().join("/")} – {invitation.dateRangeEnd.split("-").reverse().join("/")}</span></div>
-              {#if invitation.status === "booked"}
-                <div class="application-text-meta mt-3 rounded-lg border border-[#D9EADD] bg-[#F7FBF8] px-3 py-2 text-[#31583E]"><strong>Confirmado:</strong> {formatDateTime(invitation.selectedStartAt, invitation.timeZone)}{#if invitation.googleMeetUrl} · <a href={invitation.googleMeetUrl} target="_blank" rel="noopener noreferrer" class="font-semibold underline">Google Meet</a>{/if}</div>
-              {/if}
-              {#if data.canChangeInvitations && ["draft", "sent", "opened"].includes(invitation.status)}
-                <form method="POST" action="?/revokeInvitation" class="mt-3 flex justify-end"><input type="hidden" name="invitationId" value={invitation.id}/><button type="submit" class="application-text-meta h-8 rounded-lg border border-[#E1E4EA] px-3 font-semibold text-[#7B4650]">Revogar link</button></form>
-              {/if}
-            </article>
-          {/each}
-        </div>
-      {/if}
-    </section>
+    <div class="space-y-4">
+      <section class="rounded-[22px] border border-[#E1E4EB] bg-white p-5 sm:p-6">
+        <h2 class="text-[15px] font-semibold text-[#202637]">Calendários que bloqueiam</h2>
+        <form method="POST" action="?/saveBlockingCalendars" class="mt-4">
+          <input type="hidden" name="userId" value={data.selectedUserId}/>
+          <div class="space-y-2">
+            {#each data.sources as source}
+              <label class="flex items-center justify-between gap-3 rounded-xl border border-[#E7E9EF] px-3 py-3 text-[10px] font-semibold text-[#555D6C]">
+                <span class="truncate">{source.calendarName || source.calendarId}{source.isPrimary ? " · principal" : ""}</span>
+                <input type="checkbox" name="calendarId" value={source.calendarId} checked={source.blocksScheduling}/>
+              </label>
+            {/each}
+          </div>
+          <div class="mt-4 flex justify-end"><button type="submit" class="h-10 rounded-xl border border-[#C9D0E0] px-4 text-[10px] font-semibold text-[#000A57]">Salvar</button></div>
+        </form>
+      </section>
+
+      <section class="rounded-[22px] border border-[#E1E4EB] bg-white">
+        <header class="border-b border-[#E8EAF0] px-5 py-4"><div class="flex items-center gap-2"><CalendarClock size={15} class="text-[#EA6D0B]"/><h2 class="text-[14px] font-semibold text-[#202637]">Próximos agendamentos</h2></div></header>
+        {#if upcomingBookings.length === 0}
+          <div class="px-5 py-10 text-center text-[10px] text-[#9298A5]">Nenhum agendamento.</div>
+        {:else}
+          <div class="divide-y divide-[#EEF0F4]">
+            {#each upcomingBookings as booking}
+              <article class="px-5 py-4">
+                <div class="flex items-start justify-between gap-3"><div class="min-w-0"><h3 class="truncate text-[12px] font-semibold text-[#303747]">{booking.customerName}</h3><p class="mt-1 text-[10px] font-medium text-[#707787]">{formatBooking(booking.startAt)}</p></div>{#if booking.googleMeetUrl}<a href={booking.googleMeetUrl} target="_blank" rel="noopener noreferrer" class="text-[9px] font-semibold text-[#214A9A]">Meet</a>{/if}</div>
+                {#if booking.notes}<p class="mt-2 line-clamp-2 text-[10px] leading-5 text-[#7A808E]">{booking.notes}</p>{/if}
+              </article>
+            {/each}
+          </div>
+        {/if}
+      </section>
+    </div>
   </div>
 </ApplicationContent>
