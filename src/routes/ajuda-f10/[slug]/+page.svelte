@@ -19,7 +19,7 @@
   export let data: PageData;
 
   function managedAssetUrl(assetId: string): string {
-    const base = `/api/help/content/${encodeURIComponent(data.content.slug)}/assets/${assetId}`;
+    const base = `/api/help/content/${encodeURIComponent(data.routeSlug)}/assets/${assetId}`;
     return data.isHistorical && data.releaseNumber
       ? `${base}?versao=${data.releaseNumber}`
       : base;
@@ -83,7 +83,7 @@
     {#if data.isHistorical}
       <section class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[#7A3B08]">
         <div class="flex items-center gap-2"><History size={16}/><strong class="text-[10px]">Versão anterior · v{data.releaseNumber}</strong></div>
-        <a href={`/ajuda-f10/${data.content.slug}`} class="rounded-xl bg-white px-3 py-2 text-[9px] font-semibold text-[#000A57]">Ver versão atual</a>
+        <a href={`/ajuda-f10/${data.routeSlug}`} class="rounded-xl bg-white px-3 py-2 text-[9px] font-semibold text-[#000A57]">Ver versão atual</a>
       </section>
     {/if}
 
@@ -117,7 +117,7 @@
             <div class="absolute left-0 top-8 z-20 min-w-[190px] overflow-hidden rounded-xl border border-[#DDE1EA] bg-white py-1 shadow-xl">
               {#each data.releases as release}
                 <a
-                  href={release.releaseNumber === data.currentReleaseNumber ? `/ajuda-f10/${release.slug}` : `/ajuda-f10/${release.slug}?versao=${release.releaseNumber}`}
+                  href={release.releaseNumber === data.currentReleaseNumber ? `/ajuda-f10/${data.routeSlug}` : `/ajuda-f10/${data.routeSlug}?versao=${release.releaseNumber}`}
                   class={`flex items-center justify-between gap-3 px-3 py-2.5 text-[9px] hover:bg-[#F7F8FB] ${release.releaseNumber === data.releaseNumber ? "font-bold text-[#000A57]" : "text-[#666D7D]"}`}
                 >
                   <span>Versão {release.releaseNumber}</span>
