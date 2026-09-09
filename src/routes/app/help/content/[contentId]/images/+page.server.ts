@@ -1,6 +1,7 @@
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { hasPermission } from "$lib/server/auth/permissions";
+import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import {
   getHelpHumanReviewStatus,
   listHelpScreenshotReviewGroups,
@@ -20,10 +21,11 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   );
   if (!hasPermission(permissions, "help.view")) throw error(403, "Acesso não autorizado.");
 
-  const [content, screenshotReview, humanReview] = await Promise.all([
+  const [content, screenshotReview, humanReview, categories] = await Promise.all([
     getStructuredHelpContent(params.contentId),
     listHelpScreenshotReviewGroups(params.contentId),
     getHelpHumanReviewStatus(params.contentId),
+    listHelpCategories(true),
   ]);
   if (!content) throw error(404, "Conteúdo não encontrado.");
 
@@ -31,6 +33,8 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     content,
     screenshotReview,
     humanReview,
+    categories,
     canEdit: content.status !== "archived" && hasPermission(permissions, "help.edit"),
+    canPublish: content.status !== "archived" && hasPermission(permissions, "help.publish"),
   };
 };
