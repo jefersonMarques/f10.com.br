@@ -7,7 +7,10 @@ import {
   helpCollections,
   helpContents,
 } from "$lib/server/db/structuredHelpSchema";
-import { listPublishedStructuredHelpCatalog } from "$lib/server/help/publicStructuredHelpRepository";
+import {
+  listPublishedStructuredHelpCatalog,
+  type PublishedStructuredHelpSummary,
+} from "$lib/server/help/publicStructuredHelpRepository";
 
 const MAX_COLLECTION_ITEMS = 100;
 
@@ -182,13 +185,15 @@ export async function saveHelpCollection(
       id = created.id;
     }
 
+    if (!id) throw new Error("HELP_COLLECTION_NOT_CREATED");
+
     await tx
       .delete(helpCollectionItems)
       .where(eq(helpCollectionItems.collectionId, id));
 
     await tx.insert(helpCollectionItems).values(
       contentIds.map((contentId, index) => ({
-        collectionId: id!,
+        collectionId: id,
         contentId,
         sortOrder: (index + 1) * 10,
       })),
@@ -224,10 +229,14 @@ export type PublicHelpCollection = {
   }>;
 };
 
-export async function listPublicHelpCollections(): Promise<PublicHelpCollection[]> {
+export async function listPublicHelpCollections(
+  publishedCatalog?: PublishedStructuredHelpSummary[],
+): Promise<PublicHelpCollection[]> {
   const [collections, catalog] = await Promise.all([
     listHelpCollections(),
-    listPublishedStructuredHelpCatalog(),
+    publishedCatalog
+      ? Promise.resolve(publishedCatalog)
+      : listPublishedStructuredHelpCatalog(),
   ]);
   const publishedById = new Map(catalog.map((content) => [content.contentId, content]));
 
