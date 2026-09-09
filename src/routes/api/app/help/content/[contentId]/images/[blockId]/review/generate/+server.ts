@@ -13,7 +13,6 @@ function isUuid(value: string): boolean {
 function messageFor(code: string): string {
   if (code === "HELP_VIDEO_LOCAL_COPY_REQUIRED") return "Este conteúdo não possui vídeo local para gerar novos prints.";
   if (code === "HELP_VIDEO_TIMELINE_REQUIRED") return "A timeline do vídeo não está disponível.";
-  if (code === "SCREENSHOT_CANDIDATE_LIMIT") return "Esta etapa já possui muitas alternativas. Escolha uma imagem ou envie outra manualmente.";
   if (code === "HELP_VIDEO_FFMPEG_NOT_AVAILABLE") return "A geração de frames não está disponível no servidor.";
   if (code === "CONTENT_ARCHIVED") return "Conteúdo arquivado não pode ser alterado.";
   if (code === "IMAGE_BLOCK_NOT_FOUND") return "Imagem não encontrada.";
@@ -35,14 +34,22 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
 
   let mode: HelpScreenshotGenerationMode = "auto";
   let baseTimeSeconds: number | null = null;
+  let selectedAssetId: string | null = null;
   try {
-    const payload = await request.json() as { mode?: string; baseTimeSeconds?: unknown };
+    const payload = await request.json() as {
+      mode?: string;
+      baseTimeSeconds?: unknown;
+      selectedAssetId?: unknown;
+    };
     if (payload.mode === "before" || payload.mode === "after" || payload.mode === "auto") {
       mode = payload.mode;
     }
     const suppliedBaseTime = Number(payload.baseTimeSeconds);
     if (Number.isFinite(suppliedBaseTime) && suppliedBaseTime >= 0) {
       baseTimeSeconds = suppliedBaseTime;
+    }
+    if (typeof payload.selectedAssetId === "string" && isUuid(payload.selectedAssetId)) {
+      selectedAssetId = payload.selectedAssetId;
     }
   } catch {
     // Usa o modo automático quando o corpo vier vazio.
@@ -55,6 +62,7 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
       blockId: params.blockId,
       mode,
       baseTimeSeconds,
+      selectedAssetId,
     });
     return json({
       success: true,
