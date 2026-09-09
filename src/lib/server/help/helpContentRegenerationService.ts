@@ -154,6 +154,7 @@ export async function regenerateHelpContentFromVideo(input: {
     assistantSummary:
       generatedContent.quickGuide || generatedContent.summary || current.summary || current.title,
     transcriptTimeline: generated.transcriptTimeline,
+    generationCoverage: generated.coverage,
   });
 
   await saveHelpImportedVideoTimeline(
@@ -183,6 +184,7 @@ export async function regenerateHelpContentFromVideo(input: {
       screenshotCount: generated.selectedScreenshotCount,
       transcriptChars: generated.transcriptChars,
       videoReused: reusedExistingVideo,
+      coverage: generated.coverage.summary,
     },
   };
 }
