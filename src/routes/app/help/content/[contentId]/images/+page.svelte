@@ -2,7 +2,6 @@
   import { invalidateAll } from "$app/navigation";
   import {
     AlertTriangle,
-    BookOpen,
     Check,
     CheckCircle2,
     Download,
@@ -10,7 +9,6 @@
     Eye,
     FileText,
     Info,
-    Layers3,
     Link2,
     LoaderCircle,
     PenTool,
@@ -83,7 +81,9 @@
         blocks: [...step.blocks],
       }));
       reviewCategories = data.content.categories;
-      selectedCategoryIds = data.content.categories.map((category) => category.id);
+      selectedCategoryIds = data.content.categories
+        .filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG)
+        .map((category) => category.id);
       reviewPending = data.humanReview.pending;
     }
   }
@@ -109,10 +109,21 @@
   $: singleImagePerStep = reviewSteps.every(
     (step) => step.blocks.filter((block) => block.blockType === "image").length <= 1,
   );
+  $: imageOnlyStepsReady = reviewSteps.every((step) => {
+    const images = step.blocks.filter((block) => block.blockType === "image");
+    if (images.length === 0 || images.length !== step.blocks.length) return true;
+    return images.every(
+      (block) => Boolean(block.asset?.altText.trim() || block.asset?.assistantDescription.trim()),
+    );
+  });
+  $: videoReady =
+    !data.content.featuredVideo || Boolean(data.content.featuredVideo.subtitles.trim());
   $: publicationReady =
     realCategoriesReady &&
     stepsReady &&
     singleImagePerStep &&
+    imageOnlyStepsReady &&
+    videoReady &&
     reviewPending === 0 &&
     openEditors.size === 0 &&
     !hasUnsavedReview;
@@ -171,7 +182,9 @@
     reviewQuickGuide = updated.quickGuide;
     reviewSteps = updated.steps.map((step) => ({ ...step, blocks: [...step.blocks] }));
     reviewCategories = updated.categories;
-    selectedCategoryIds = updated.categories.map((category) => category.id);
+    selectedCategoryIds = updated.categories
+      .filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG)
+      .map((category) => category.id);
     appliedContentUpdatedAt = String(updated.updatedAt);
     saveSuccess = true;
     saveMessage = "Alteração salva.";
@@ -399,7 +412,7 @@
       {#if categoryPickerOpen}
         <div class="mt-3 rounded-2xl border border-[#DDE1EA] bg-[#FAFAFC] p-3">
           <div class="grid gap-2 sm:grid-cols-2">
-            {#each data.categories as category}
+            {#each data.categories.filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG) as category}
               <button type="button" on:click={() => toggleCategory(category.id)} class={`flex min-h-10 items-center justify-between rounded-xl border px-3 text-left text-[10px] font-semibold ${selectedCategoryIds.includes(category.id) ? "border-[#BFC7F4] bg-[#EEF0FF] text-[#000A57]" : "border-[#E1E4EB] bg-white text-[#606777]"}`}>
                 <span class="flex items-center gap-2"><HelpCategoryIcon name={category.icon} size={13}/>{category.name}</span>
                 {#if selectedCategoryIds.includes(category.id)}<Check size={13}/>{/if}
