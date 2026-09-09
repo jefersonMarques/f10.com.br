@@ -72,7 +72,8 @@
       pathname === "/app" ||
       pathname.startsWith("/app/") ||
       pathname === "/cliente" ||
-      pathname.startsWith("/cliente/")
+      pathname.startsWith("/cliente/") ||
+      pathname.startsWith("/agendar/")
     );
   }
 
