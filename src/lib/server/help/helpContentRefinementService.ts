@@ -105,7 +105,7 @@ function blockSource(
     .join("\n");
 }
 
-function splitSchema(partCount: number): Record<string, unknown> {
+function splitSchema(): Record<string, unknown> {
   return {
     type: "object",
     additionalProperties: false,
@@ -114,8 +114,6 @@ function splitSchema(partCount: number): Record<string, unknown> {
       shouldSplit: { type: "boolean" },
       parts: {
         type: "array",
-        minItems: partCount,
-        maxItems: partCount,
         items: {
           type: "object",
           additionalProperties: false,
@@ -146,35 +144,67 @@ export async function suggestHelpStepSplit(
   if (!step) throw new Error("STEP_NOT_FOUND");
 
   const startedAt = Date.now();
-  const response = await createAiStructuredResponse<SplitAiResponse>({
+  const baseInstructions = [
+    "Você refina etapas de artigos operacionais da Base de Conhecimento F10.",
+    "Use somente o conteúdo fornecido. Não invente telas, campos, regras ou ações.",
+    `Divida a etapa em EXATAMENTE ${partCount} partes.`,
+    "Agrupe ações relacionadas de forma inteligente. NÃO transforme cada item numerado em uma etapa.",
+    "Se houver 8 ações e forem pedidas 2 partes, prefira dois grupos coerentes de aproximadamente 4 ações, ajustando o ponto de corte pelo sentido do procedimento.",
+    "Cada parte pode conter várias ações numeradas quando elas pertencem ao mesmo objetivo ou estado visual.",
+    "Cada parte deve ser executável e compreensível isoladamente.",
+    "Preserve obrigatoriedades, condições, exceções, avisos e sequência.",
+    "Use Markdown seguro apenas em instruction: **negrito**, *itálico*, `código`, listas.",
+    "Não duplique informação entre as partes.",
+    `Retorne exatamente ${partCount} itens em parts e shouldSplit=true.`,
+  ];
+  const userInput = [
+    `ARTIGO: ${content.title}`,
+    `ETAPA ANTERIOR: ${content.steps[index - 1]?.title || "nenhuma"}`,
+    `ETAPA ATUAL: ${step.title}`,
+    step.description ? `DESCRIÇÃO: ${step.description}` : "",
+    blockSource(step),
+    `ETAPA SEGUINTE: ${content.steps[index + 1]?.title || "nenhuma"}`,
+  ].filter(Boolean).join("\n\n");
+
+  let retried = false;
+  let response = await createAiStructuredResponse<SplitAiResponse>({
     task: "content_edit",
     requiredCapabilities: ["content.draft"],
-    instructions: [
-      "Você refina etapas de artigos operacionais da Base de Conhecimento F10.",
-      "Use somente o conteúdo fornecido. Não invente telas, campos, regras ou ações.",
-      `Divida a etapa em EXATAMENTE ${partCount} partes.`,
-      "Agrupe ações relacionadas de forma inteligente. NÃO transforme cada item numerado em uma etapa.",
-      "Se houver 8 ações e forem pedidas 2 partes, prefira dois grupos coerentes de aproximadamente 4 ações, ajustando o ponto de corte pelo sentido do procedimento.",
-      "Cada parte pode conter várias ações numeradas quando elas pertencem ao mesmo objetivo ou estado visual.",
-      "Cada parte deve ser executável e compreensível isoladamente.",
-      "Preserve obrigatoriedades, condições, exceções, avisos e sequência.",
-      "Use Markdown seguro apenas em instruction: **negrito**, *itálico*, `código`, listas.",
-      "Não duplique informação entre as partes.",
-      `Retorne exatamente ${partCount} itens em parts e shouldSplit=true.`,
-    ].join("\n"),
-    userInput: [
-      `ARTIGO: ${content.title}`,
-      `ETAPA ANTERIOR: ${content.steps[index - 1]?.title || "nenhuma"}`,
-      `ETAPA ATUAL: ${step.title}`,
-      step.description ? `DESCRIÇÃO: ${step.description}` : "",
-      blockSource(step),
-      `ETAPA SEGUINTE: ${content.steps[index + 1]?.title || "nenhuma"}`,
-    ].filter(Boolean).join("\n\n"),
+    instructions: baseInstructions.join("\n"),
+    userInput,
     schemaName: "f10_help_step_split",
-    schema: splitSchema(partCount),
+    schema: splitSchema(),
     maxOutputTokens: 6_000,
     timeoutMs: 120_000,
   });
+
+  const normalizeParts = (value: SplitAiResponse) =>
+    value.parts
+      .map((part) => ({
+        title: part.title.trim().slice(0, 180),
+        description: part.description.trim().slice(0, 2_000),
+        instruction: part.instruction.trim().slice(0, 50_000),
+      }))
+      .filter((part) => part.title.length >= 2 && part.instruction.length > 0);
+
+  let parts = normalizeParts(response.data);
+  if (parts.length !== partCount) {
+    retried = true;
+    response = await createAiStructuredResponse<SplitAiResponse>({
+      task: "content_edit",
+      requiredCapabilities: ["content.draft"],
+      instructions: [
+        ...baseInstructions,
+        `A resposta anterior não respeitou a quantidade. Confira a contagem: parts deve conter EXATAMENTE ${partCount} objetos.`,
+      ].join("\n"),
+      userInput,
+      schemaName: "f10_help_step_split_retry",
+      schema: splitSchema(),
+      maxOutputTokens: 6_000,
+      timeoutMs: 120_000,
+    });
+    parts = normalizeParts(response.data);
+  }
 
   await recordHelpAiUsage({
     actorUserId,
@@ -184,17 +214,14 @@ export async function suggestHelpStepSplit(
     inputTokens: response.inputTokens,
     outputTokens: response.outputTokens,
     latencyMs: Date.now() - startedAt,
-    metadata: { contentId, stepId, desiredParts: partCount, suggestedParts: response.data.parts.length },
+    metadata: {
+      contentId,
+      stepId,
+      desiredParts: partCount,
+      suggestedParts: parts.length,
+      retried,
+    },
   }).catch(() => undefined);
-
-  const parts = response.data.parts
-    .map((part) => ({
-      title: part.title.trim().slice(0, 180),
-      description: part.description.trim().slice(0, 2_000),
-      instruction: part.instruction.trim().slice(0, 50_000),
-    }))
-    .filter((part) => part.title.length >= 2 && part.instruction.length > 0)
-    .slice(0, partCount);
 
   if (parts.length !== partCount) throw new Error("STEP_SPLIT_PART_COUNT_INVALID");
 
