@@ -22,6 +22,11 @@ function errorMessage(code: string): string {
   if (code.startsWith("HELP_VIDEO_TRANSCRIPTION_FAILED:")) return "A OpenAI não conseguiu transcrever o áudio deste vídeo.";
   if (code === "HELP_VIDEO_TRANSCRIPTION_EMPTY" || code === "HELP_VIDEO_TRANSCRIPTION_TIMESTAMPS_EMPTY") return "O áudio foi processado, mas não foi possível obter uma transcrição utilizável.";
   if (code === "HELP_VIDEO_TRANSCRIPTION_CHUNKS_EMPTY") return "Não foi possível preparar o áudio em partes para transcrição.";
+  if (code === "HELP_VIDEO_COVERAGE_CLASSIFICATION_INCOMPLETE") return "Não foi possível classificar todos os trechos do vídeo. O rascunho atual foi preservado.";
+  if (code === "HELP_VIDEO_COVERAGE_NO_RELEVANT_CONTENT") return "Não foi identificado conteúdo operacional suficiente neste vídeo.";
+  if (code === "HELP_VIDEO_ARTICLE_PART_COVERAGE_INCOMPLETE" || code.startsWith("HELP_VIDEO_COVERAGE_INCOMPLETE:")) return "Uma parte relevante do vídeo ficou sem cobertura. A atualização foi interrompida para não omitir conteúdo.";
+  if (code === "HELP_VIDEO_ARTICLE_EDITORIAL_INVALID") return "A IA ainda usou linguagem de bastidor no texto. A atualização foi interrompida para manter o conteúdo adequado ao usuário final.";
+  if (code.startsWith("HELP_VIDEO_COVERAGE_FAILED:") || code.startsWith("HELP_VIDEO_ARTICLE_PART_FAILED:") || code.startsWith("HELP_VIDEO_ARTICLE_METADATA_FAILED:")) return "A IA não conseguiu concluir uma das partes da análise. O rascunho atual foi preservado.";
   if (code === "CONTENT_ARCHIVED") return "Conteúdo arquivado não pode ser atualizado.";
   if (code === "CONTENT_NOT_FOUND") return "Conteúdo não encontrado.";
   return "Não foi possível atualizar o conteúdo a partir do vídeo.";
