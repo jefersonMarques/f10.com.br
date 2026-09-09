@@ -6,7 +6,6 @@
   import {
     CalendarClock,
     CalendarDays,
-    Check,
     CheckCircle2,
     CheckSquare2,
     ChevronDown,
@@ -14,13 +13,11 @@
     ChevronRight,
     CircleAlert,
     Clock3,
-    Copy,
     ExternalLink,
     Headphones,
     Link2,
     List as ListIcon,
     Plus,
-    Settings2,
     Unplug,
     Video,
     X,
@@ -59,16 +56,6 @@
     resolved: "Resolvido",
     closed: "Fechado",
   };
-  const schedulingStatusLabels: Record<string, string> = {
-    draft: "Rascunho",
-    sent: "Gerado",
-    opened: "Aberto pelo cliente",
-    booking: "Confirmando",
-    booked: "Agendado",
-    expired: "Expirado",
-    revoked: "Revogado",
-    cancelled: "Cancelado",
-  };
 
   let calendarView: CalendarView = "month";
   let listPeriod: ListPeriod = "today";
@@ -95,15 +82,6 @@
 
   let ticketCreateOpen = false;
   let ticketDueOn = data.calendarAnchor;
-
-  let schedulingOpen = false;
-  let schedulingHostId = data.schedulingHosts.find((host) => host.id === data.organizerUserId)?.id ?? data.schedulingHosts[0]?.id ?? "";
-  let schedulingDurationMinutes = data.schedulingHosts.find((host) => host.id === schedulingHostId)?.defaultDurationMinutes ?? 30;
-  let schedulingDateStart = data.calendarAnchor;
-  let schedulingDateEnd = data.calendarAnchor;
-  let schedulingAddMeet = true;
-  let schedulingBookingPath = "";
-  let schedulingCopied = false;
 
   let googleEventOpen = false;
   let googleEventDate = data.calendarAnchor;
@@ -295,32 +273,6 @@
     ticketCreateOpen = true;
   }
 
-  function openScheduling(date = cursorDate): void {
-    if (!data.canViewScheduling) return;
-    const start = dateKey(date);
-    schedulingDateStart = start;
-    schedulingDateEnd = dateKey(addDays(date, 14));
-    schedulingHostId = data.schedulingHosts.find((host) => host.id === data.organizerUserId)?.id ?? data.schedulingHosts[0]?.id ?? "";
-    schedulingDurationMinutes = data.schedulingHosts.find((host) => host.id === schedulingHostId)?.defaultDurationMinutes ?? 30;
-    schedulingAddMeet = true;
-    schedulingBookingPath = "";
-    schedulingCopied = false;
-    schedulingOpen = true;
-  }
-
-  function handleSchedulingHostChange(event: Event): void {
-    schedulingHostId = (event.currentTarget as HTMLSelectElement).value;
-    const host = data.schedulingHosts.find((item) => item.id === schedulingHostId);
-    if (host) schedulingDurationMinutes = host.defaultDurationMinutes;
-  }
-
-  async function copySchedulingLink(): Promise<void> {
-    if (!schedulingBookingPath) return;
-    await navigator.clipboard.writeText(new URL(schedulingBookingPath, window.location.origin).toString());
-    schedulingCopied = true;
-    window.setTimeout(() => (schedulingCopied = false), 1800);
-  }
-
   function openGoogleEvent(date = cursorDate): void {
     if (!data.googleCalendar.connected) return;
     googleEventDate = dateKey(date);
@@ -429,7 +381,6 @@
   $: visibleGoogleEvents = showGoogle ? data.googleEvents : [];
   $: selectedMembers = data.membersByProject[createProjectId] ?? [];
   $: googleEventMembers = data.membersByProject[googleEventProjectId] ?? [];
-  $: selectedSchedulingHost = data.schedulingHosts.find((host) => host.id === schedulingHostId) ?? null;
   $: canCreateAnything = data.canCreate || data.canCreateTicket || data.canViewScheduling || data.googleCalendar.connected;
   $: unscheduledCount = visibleTasks.filter((task) => !task.dueOn).length;
   $: periodLabel = calendarView === "week"
@@ -500,13 +451,13 @@
       </div>
     </header>
 
-    {#if oauthMessage || data.googleCalendarError || (form?.message && form?.action !== "createSchedulingInvitation")}
+    {#if oauthMessage || data.googleCalendarError || form?.message}
       <div class="space-y-2 border-b border-[#E8EAF0] bg-[#FAFAFC] px-4 py-3">
         {#if oauthMessage}
           <div class={`rounded-xl border px-4 py-3 text-[11px] font-medium ${data.googleStatus === "connected" ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0D6BD] bg-[#FFF9F3] text-[#935018]"}`}>{oauthMessage}</div>
         {/if}
         {#if data.googleCalendarError}<div class="flex items-center gap-2 rounded-xl border border-[#F0D6BD] bg-[#FFF9F3] px-4 py-3 text-[11px] font-medium text-[#935018]"><CircleAlert size={16}/>{data.googleCalendarError}</div>{/if}
-        {#if form?.message && form?.action !== "createSchedulingInvitation"}
+        {#if form?.message}
           <div class={`flex items-center gap-2 rounded-xl border px-4 py-3 text-[11px] font-medium ${form.syncWarning ? "border-[#F0D2A9] bg-[#FFF9EF] text-[#8A4B0F]" : form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
             {#if !form.success || form.syncWarning}<CircleAlert size={16}/>{/if}{form.message}
           </div>
@@ -667,39 +618,6 @@
         <textarea name="message" required maxlength="10000" rows="5" placeholder="Descrição do atendimento" class="application-text-caption rounded-xl border border-[#DDE1EA] p-3 sm:col-span-2"></textarea>
         <div class="flex justify-end sm:col-span-2"><button type="submit" class="application-text-caption h-10 rounded-xl bg-[#000A57] px-4 font-semibold text-white">Criar ticket</button></div>
       </form>
-    </div>
-  </div>
-{/if}
-
-{#if schedulingOpen}
-  <div class="fixed inset-0 z-[110] flex items-center justify-center p-4">
-    <button type="button" class="absolute inset-0 bg-[#010D28]/30 backdrop-blur-[2px]" aria-label="Fechar agendamentos" on:click={() => (schedulingOpen = false)}></button>
-    <div class="relative z-10 max-h-[92vh] w-full max-w-[680px] overflow-y-auto rounded-[22px] border border-[#E0E3EA] bg-white shadow-[0_28px_90px_rgba(1,13,40,0.26)]" role="dialog" aria-modal="true" aria-label="Agendamentos de call">
-      <header class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[#EEF0F4] bg-white px-5 py-4"><div><span class="application-text-caption inline-flex items-center gap-2 font-bold uppercase tracking-[0.08em] text-[#27637B]"><CalendarClock size={14}/>Agendamentos</span><h2 class="mt-1 text-[16px] font-semibold text-[#202637]">Calls com escolha de horário pelo cliente</h2></div><button type="button" on:click={() => (schedulingOpen = false)} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#8B909D] hover:bg-[#F3F4F7]" aria-label="Fechar"><X size={16}/></button></header>
-      <div class="space-y-5 p-5">
-        {#if schedulingBookingPath}
-          <div class="rounded-xl border border-[#B9E6C9] bg-[#F1FBF4] p-4"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><strong class="application-text-caption inline-flex items-center gap-2 font-semibold text-[#176B35]"><Check size={14}/>Link pronto</strong><p class="application-text-meta mt-2 break-all text-[#4F745C]">{schedulingBookingPath}</p><p class="application-text-meta mt-1 text-[#789181]">Copie agora; o token bruto não fica armazenado.</p></div><button type="button" on:click={() => void copySchedulingLink()} class="application-text-meta inline-flex h-9 shrink-0 items-center gap-2 rounded-lg bg-[#176B35] px-3 font-semibold text-white">{#if schedulingCopied}<Check size={13}/>Copiado{:else}<Copy size={13}/>Copiar{/if}</button></div></div>
-        {/if}
-        {#if form?.action === "createSchedulingInvitation" && form?.message && !form.success}<div class="rounded-xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[11px] font-medium text-[#9B2C2C]">{form.message}</div>{/if}
-
-        {#if data.canCreateScheduling}
-          <form method="POST" action="?/createSchedulingInvitation" use:enhance={() => { return async ({ result, update }) => { await update(); if (result.type === "success") { const payload = result.data as { bookingPath?: string } | null; schedulingBookingPath = payload?.bookingPath ?? ""; schedulingOpen = true; } }; }} class="grid gap-3 sm:grid-cols-2">
-            <label class="block sm:col-span-2"><span class="application-text-meta mb-1 block font-semibold text-[#777D8D]">Cliente</span><select name="customerContactId" required class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3"><option value="">Selecione...</option>{#each data.schedulingCustomers as customer}<option value={customer.id}>{customer.name}{customer.organizationName ? ` · ${customer.organizationName}` : ""} · {customer.email}</option>{/each}</select></label>
-            <label class="block sm:col-span-2"><span class="application-text-meta mb-1 block font-semibold text-[#777D8D]">Título</span><input name="title" required minlength="3" maxlength="180" placeholder="Ex.: Reunião de implantação" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] px-3"/></label>
-            <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#777D8D]">Responsável</span><select name="hostUserId" bind:value={schedulingHostId} on:change={handleSchedulingHostChange} required class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3">{#each data.schedulingHosts as host}<option value={host.id} disabled={!host.googleConnected}>{host.name}{host.googleConnected ? "" : " · Google desconectado"}</option>{/each}</select></label>
-            <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#777D8D]">Duração</span><select name="durationMinutes" bind:value={schedulingDurationMinutes} class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3"><option value={15}>15 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>60 min</option><option value={90}>90 min</option><option value={120}>120 min</option></select></label>
-            <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#777D8D]">Primeiro dia</span><input name="dateRangeStart" type="date" bind:value={schedulingDateStart} required class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] px-3"/></label>
-            <label class="block"><span class="application-text-meta mb-1 block font-semibold text-[#777D8D]">Último dia</span><input name="dateRangeEnd" type="date" bind:value={schedulingDateEnd} required class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] px-3"/></label>
-            <label class="application-text-caption flex cursor-pointer items-start gap-2 rounded-xl border border-[#DDE3F1] bg-[#F8FAFF] px-3 py-3 font-semibold text-[#526077] sm:col-span-2"><input type="checkbox" name="addGoogleMeet" value="true" bind:checked={schedulingAddMeet} class="mt-0.5"/><span><strong class="block text-[#214A9A]">Gerar Google Meet</strong><span class="application-text-meta mt-0.5 block font-normal leading-4 text-[#7D8797]">O cliente recebe o convite ao confirmar o horário.</span></span></label>
-            {#if selectedSchedulingHost && !selectedSchedulingHost.googleConnected}<div class="application-text-meta rounded-xl border border-[#F0D6BD] bg-[#FFF9F3] px-3 py-2 text-[#935018] sm:col-span-2">Este responsável precisa conectar o Google Calendar.</div>{/if}
-            <div class="flex items-center justify-between gap-3 sm:col-span-2">{#if data.canConfigureScheduling}<a href="/app/tasks/calendar/scheduling" class="application-text-meta inline-flex items-center gap-1.5 font-semibold text-[#687083] hover:text-[#000A57]"><Settings2 size={12}/>Configurar disponibilidade</a>{:else}<span></span>{/if}<button type="submit" disabled={!selectedSchedulingHost?.googleConnected} class="application-text-caption h-10 rounded-xl bg-[#000A57] px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Gerar link</button></div>
-          </form>
-        {/if}
-
-        {#if data.schedulingInvitations.length > 0}
-          <div class="border-t border-[#EEF0F5] pt-4"><div class="flex items-center justify-between gap-3"><strong class="application-text-caption font-semibold text-[#3F4656]">Agendamentos recentes</strong><span class="application-text-meta text-[#9297A4]">{data.schedulingInvitations.length} carregado(s)</span></div><div class="mt-3 space-y-2">{#each data.schedulingInvitations.slice(0, 6) as invitation}<div class="rounded-xl border border-[#E7E9EF] bg-[#FAFAFC] px-3 py-3"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><strong class="application-text-caption block truncate text-[#414858]">{invitation.title}</strong><span class="application-text-meta mt-1 block truncate text-[#858B99]">{invitation.customerName} · {invitation.hostName}</span></div><span class="application-text-meta shrink-0 rounded-full bg-white px-2 py-1 font-semibold text-[#687083]">{schedulingStatusLabels[invitation.status] ?? invitation.status}</span></div><span class="application-text-meta mt-2 block text-[#969BA7]">{formatShortDate(invitation.dateRangeStart)} a {formatShortDate(invitation.dateRangeEnd)} · {invitation.durationMinutes} min</span></div>{/each}</div></div>
-        {/if}
-      </div>
     </div>
   </div>
 {/if}
