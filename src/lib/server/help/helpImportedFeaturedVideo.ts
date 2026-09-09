@@ -27,9 +27,12 @@ function safeFileName(value: string): string {
 }
 
 
-export async function findImportedHelpVideoByChecksum(bytes: Uint8Array) {
+export async function findImportedHelpVideoByChecksum(
+  bytes: Uint8Array,
+  preferredContentId?: string,
+) {
   const checksumSha256 = createHash("sha256").update(bytes).digest("hex");
-  const [row] = await getDatabase()
+  const rows = await getDatabase()
     .select({
       assetId: helpAssets.id,
       contentId: helpAssets.contentId,
@@ -44,8 +47,14 @@ export async function findImportedHelpVideoByChecksum(bytes: Uint8Array) {
         isNotNull(helpAssets.storageKey),
       ),
     )
-    .limit(1);
-  return row ?? null;
+    .limit(50);
+  return (
+    (preferredContentId
+      ? rows.find((row) => row.contentId === preferredContentId)
+      : null)
+    ?? rows[0]
+    ?? null
+  );
 }
 
 export async function attachImportedMp4AsFeaturedVideo(input: {
