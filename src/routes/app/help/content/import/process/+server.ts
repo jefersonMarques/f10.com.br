@@ -325,6 +325,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
             altText: content.summary || content.title,
             assistantSummary: content.quickGuide || content.summary || content.title,
             transcriptTimeline: generated.transcriptTimeline,
+            generationCoverage: generated.coverage,
           });
         }
 
