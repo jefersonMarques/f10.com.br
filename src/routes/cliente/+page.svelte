@@ -11,6 +11,7 @@
   $: returnTo = form && "action" in form && form.action === "f10Login" && "returnTo" in form
     ? form.returnTo ?? data.returnTo
     : data.returnTo;
+  $: schedulingLogin = returnTo.startsWith("/agendar/");
 </script>
 
 <svelte:head>
@@ -63,6 +64,7 @@
           <p class="application-text-meta leading-4 text-[#7F8695]">A senha é usada somente durante a validação com a F10 e não é armazenada. O acesso ao suporte usa uma sessão própria e segura.</p>
         </div>
 
+        {#if !schedulingLogin}
         <details class="mt-6 border-t border-[#ECEEF3] pt-5">
           <summary class="application-text-caption cursor-pointer font-semibold text-[#656C7C]">Acesso alternativo por e-mail</summary>
           <p class="application-text-meta mt-2 leading-4 text-[#9298A5]">Mantemos o link de uso único para acessos convidados e cenários específicos. Para chat e chamados de clientes F10, o login da conta F10 é o acesso principal.</p>
@@ -81,6 +83,7 @@
             <button type="submit" class="application-text-caption shrink-0 rounded-xl border border-[#D8DCE5] bg-white px-4 font-semibold text-[#000A57]">Enviar link</button>
           </form>
         </details>
+        {/if}
       </div>
     </section>
   </div>
