@@ -315,7 +315,7 @@
             </button>
           {/each}
         </div>
-        <p class="mt-3 text-[9px] leading-4 text-[#8A909E]">As alternativas são preservadas no conteúdo mesmo depois de salvar ou concluir a revisão. Somente a imagem confirmada entra na próxima publicação.</p>
+        <p class="mt-3 text-[9px] leading-4 text-[#8A909E]">A imagem escolhida, uploads manuais e imagens anotadas são preservados. Alternativas automáticas antigas podem ser renovadas ao gerar mais imagens.</p>
       {/if}
 
       {#if !disabled}
