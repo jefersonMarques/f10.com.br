@@ -100,7 +100,7 @@ function blockSource(
     .join("\n");
 }
 
-function splitSchema(): Record<string, unknown> {
+function splitSchema(partCount: number): Record<string, unknown> {
   return {
     type: "object",
     additionalProperties: false,
@@ -109,8 +109,8 @@ function splitSchema(): Record<string, unknown> {
       shouldSplit: { type: "boolean" },
       parts: {
         type: "array",
-        minItems: 1,
-        maxItems: 8,
+        minItems: partCount,
+        maxItems: partCount,
         items: {
           type: "object",
           additionalProperties: false,
@@ -130,7 +130,9 @@ export async function suggestHelpStepSplit(
   actorUserId: string,
   contentId: string,
   stepId: string,
+  desiredParts: number,
 ): Promise<HelpStepSplitSuggestion> {
+  const partCount = Math.max(2, Math.min(6, Math.round(desiredParts)));
   const content = await getStructuredHelpContent(contentId);
   if (!content) throw new Error("CONTENT_NOT_FOUND");
   if (content.status === "archived") throw new Error("CONTENT_ARCHIVED");
@@ -145,12 +147,15 @@ export async function suggestHelpStepSplit(
     instructions: [
       "Você refina etapas de artigos operacionais da Base de Conhecimento F10.",
       "Use somente o conteúdo fornecido. Não invente telas, campos, regras ou ações.",
-      "Quebre a etapa somente quando existirem duas ou mais ações ou estados visuais que ficariam mais claros como etapas independentes.",
-      "Cada parte deve ser curta, executável e compreensível isoladamente.",
+      `Divida a etapa em EXATAMENTE ${partCount} partes.`,
+      "Agrupe ações relacionadas de forma inteligente. NÃO transforme cada item numerado em uma etapa.",
+      "Se houver 8 ações e forem pedidas 2 partes, prefira dois grupos coerentes de aproximadamente 4 ações, ajustando o ponto de corte pelo sentido do procedimento.",
+      "Cada parte pode conter várias ações numeradas quando elas pertencem ao mesmo objetivo ou estado visual.",
+      "Cada parte deve ser executável e compreensível isoladamente.",
       "Preserve obrigatoriedades, condições, exceções, avisos e sequência.",
       "Use Markdown seguro apenas em instruction: **negrito**, *itálico*, `código`, listas.",
       "Não duplique informação entre as partes.",
-      "Se a etapa já estiver objetiva, retorne shouldSplit=false e uma única parte equivalente.",
+      `Retorne exatamente ${partCount} itens em parts e shouldSplit=true.`,
     ].join("\n"),
     userInput: [
       `ARTIGO: ${content.title}`,
@@ -161,7 +166,7 @@ export async function suggestHelpStepSplit(
       `ETAPA SEGUINTE: ${content.steps[index + 1]?.title || "nenhuma"}`,
     ].filter(Boolean).join("\n\n"),
     schemaName: "f10_help_step_split",
-    schema: splitSchema(),
+    schema: splitSchema(partCount),
     maxOutputTokens: 6_000,
     timeoutMs: 120_000,
   });
@@ -174,7 +179,7 @@ export async function suggestHelpStepSplit(
     inputTokens: response.inputTokens,
     outputTokens: response.outputTokens,
     latencyMs: Date.now() - startedAt,
-    metadata: { contentId, stepId, suggestedParts: response.data.parts.length },
+    metadata: { contentId, stepId, desiredParts: partCount, suggestedParts: response.data.parts.length },
   }).catch(() => undefined);
 
   const parts = response.data.parts
@@ -184,10 +189,12 @@ export async function suggestHelpStepSplit(
       instruction: part.instruction.trim().slice(0, 50_000),
     }))
     .filter((part) => part.title.length >= 2 && part.instruction.length > 0)
-    .slice(0, 8);
+    .slice(0, partCount);
+
+  if (parts.length !== partCount) throw new Error("STEP_SPLIT_PART_COUNT_INVALID");
 
   return {
-    shouldSplit: Boolean(response.data.shouldSplit && parts.length >= 2),
+    shouldSplit: true,
     parts,
     sourceSignature: stepSignature(step),
   };
