@@ -58,14 +58,6 @@ type ClassifiedSegment = IdentifiedSegment & {
   topicKey: string;
 };
 
-type ClassificationResponse = {
-  segments: Array<{
-    segmentId: string;
-    classification: HelpVideoSegmentClassification;
-    topicKey: string;
-  }>;
-};
-
 export type HelpVideoGeneratedPartStep = HelpVideoGeneratedStep & {
   sourceSegmentIds: string[];
 };
@@ -142,9 +134,8 @@ type PipelineAiUsageHandler = (
   usage: HelpVideoArticlePipelineAiUsage,
 ) => void | Promise<void>;
 
-const CLASSIFICATION_BATCH_SEGMENTS = 24;
-const GENERATION_PART_SEGMENTS = 55;
-const GENERATION_PART_SECONDS = 9 * 60;
+const GENERATION_PART_SEGMENTS = 36;
+const GENERATION_PART_SECONDS = 6 * 60;
 
 const EDITORIAL_INVALID_PATTERNS = [
   /\bna transcri(?:ção|cao)\b/i,
@@ -204,198 +195,16 @@ function identifiedSegments(
   }));
 }
 
-function classificationSchema(): Record<string, unknown> {
-  return {
-    type: "object",
-    additionalProperties: false,
-    required: ["segments"],
-    properties: {
-      segments: {
-        type: "array",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          required: ["segmentId", "classification", "topicKey"],
-          properties: {
-            segmentId: { type: "string" },
-            classification: {
-              type: "string",
-              enum: [
-                "action",
-                "rule",
-                "condition",
-                "result",
-                "explanation",
-                "repetition",
-                "irrelevant",
-              ],
-            },
-            topicKey: { type: "string" },
-          },
-        },
-      },
-    },
-  };
-}
-
-function classificationInput(segments: IdentifiedSegment[]): string {
-  return segments
-    .map(
-      (segment) =>
-        `[${segment.id}] [${formatTime(segment.start)}-${formatTime(segment.end)}] ${segment.text}`,
-    )
-    .join("\n");
-}
-
-function normalizeTopicKey(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 80) || "geral";
-}
-
-function normalizeClassification(
-  source: IdentifiedSegment[],
-  response: ClassificationResponse,
-): ClassifiedSegment[] {
-  const sourceById = new Map(source.map((segment) => [segment.id, segment]));
-  const seen = new Set<string>();
-  const normalized: ClassifiedSegment[] = [];
-
-  for (const item of response.segments) {
-    if (seen.has(item.segmentId)) continue;
-    const segment = sourceById.get(item.segmentId);
-    if (!segment) continue;
-    seen.add(item.segmentId);
-    normalized.push({
-      ...segment,
-      classification: item.classification,
-      topicKey: normalizeTopicKey(item.topicKey),
-    });
-  }
-
-  return normalized.sort((left, right) => left.sourceIndex - right.sourceIndex);
-}
-
-function fallbackClassification(
+function classifyTranscript(
   segments: IdentifiedSegment[],
-  batchIndex: number,
 ): ClassifiedSegment[] {
   return segments.map((segment) => ({
     ...segment,
     classification: "explanation",
-    topicKey: `parte_${String(batchIndex + 1).padStart(3, "0")}`,
+    topicKey: `janela_${String(
+      Math.floor(segment.start / GENERATION_PART_SECONDS) + 1,
+    ).padStart(3, "0")}`,
   }));
-}
-
-async function classifyBatch(
-  segments: IdentifiedSegment[],
-  batchIndex: number,
-  batchCount: number,
-  onAiUsage?: PipelineAiUsageHandler,
-): Promise<ClassifiedSegment[]> {
-  const classifiedById = new Map<string, ClassifiedSegment>();
-  let pending = [...segments];
-
-  for (let attempt = 1; attempt <= 2 && pending.length > 0; attempt += 1) {
-    const startedAt = Date.now();
-    let responseMeta: {
-      provider?: string;
-      model: string;
-      inputTokens?: number | null;
-      outputTokens?: number | null;
-    } = { model: "ai-gateway" };
-
-    try {
-      const response = await createAiStructuredResponse<ClassificationResponse>({
-        task: "content_edit",
-        requiredCapabilities: ["content.draft"],
-        instructions: [
-          "Classifique cada segmento recebido para ajudar a organizar um procedimento F10.",
-          "Retorne um item para cada segmentId recebido. Não crie IDs novos.",
-          "action: ação executável; rule: regra; condition: condição/exceção; result: resultado/estado; explanation: explicação útil.",
-          "Use repetition somente para repetição clara. Ela continuará sendo preservada na cobertura.",
-          "Use irrelevant SOMENTE para saudação, ruído ou conversa claramente sem valor operacional. Na dúvida, use explanation.",
-          "topicKey deve ser curto e estável para segmentos do mesmo assunto.",
-          attempt === 2
-            ? "Esta chamada contém apenas segmentos que ficaram pendentes. Classifique todos os IDs recebidos."
-            : "",
-        ].filter(Boolean).join("\n"),
-        userInput: [
-          `LOTE ${batchIndex + 1} DE ${batchCount}`,
-          classificationInput(pending),
-        ].join("\n\n"),
-        schemaName: attempt === 1
-          ? "f10_help_video_segment_coverage"
-          : "f10_help_video_segment_coverage_retry",
-        schema: classificationSchema(),
-        maxOutputTokens: 6_000,
-        timeoutMs: 120_000,
-      });
-
-      responseMeta = {
-        provider: response.provider,
-        model: response.model,
-        inputTokens: response.inputTokens,
-        outputTokens: response.outputTokens,
-      };
-
-      const normalized = normalizeClassification(pending, response.data);
-      for (const segment of normalized) classifiedById.set(segment.id, segment);
-      pending = pending.filter((segment) => !classifiedById.has(segment.id));
-
-      await reportAiUsage(onAiUsage, {
-        operation: "video_coverage",
-        ...responseMeta,
-        latencyMs: Date.now() - startedAt,
-        status: "success",
-      });
-    } catch (cause) {
-      await reportAiUsage(onAiUsage, {
-        operation: "video_coverage",
-        ...responseMeta,
-        latencyMs: Date.now() - startedAt,
-        status: "failed",
-        failureCode: aiFailureCode(cause),
-      });
-    }
-  }
-
-  if (pending.length > 0) {
-    for (const segment of fallbackClassification(pending, batchIndex)) {
-      classifiedById.set(segment.id, segment);
-    }
-  }
-
-  return segments.map(
-    (segment) =>
-      classifiedById.get(segment.id)
-      ?? fallbackClassification([segment], batchIndex)[0]!,
-  );
-}
-
-async function classifyTranscript(
-  segments: IdentifiedSegment[],
-  onProgress?: PipelineProgressHandler,
-  onAiUsage?: PipelineAiUsageHandler,
-): Promise<ClassifiedSegment[]> {
-  const batches: IdentifiedSegment[][] = [];
-  for (let index = 0; index < segments.length; index += CLASSIFICATION_BATCH_SEGMENTS) {
-    batches.push(segments.slice(index, index + CLASSIFICATION_BATCH_SEGMENTS));
-  }
-
-  const result: ClassifiedSegment[] = [];
-  for (const [index, batch] of batches.entries()) {
-    await onProgress?.({
-      label: "Mapeando todo o conteúdo do vídeo",
-      detail: `Parte ${index + 1} de ${batches.length} · ${batch[0]?.id}-${batch.at(-1)?.id}`,
-    });
-    result.push(...await classifyBatch(batch, index, batches.length, onAiUsage));
-  }
-  return result;
 }
 
 function isRelevant(segment: ClassifiedSegment): boolean {
@@ -1092,11 +901,7 @@ export async function generateHelpVideoArticle(input: {
 
   const classified: ClassifiedSegment[] = classifiedCheckpointValid
     ? checkpointClassified as ClassifiedSegment[]
-    : await classifyTranscript(
-        identified,
-        input.onProgress,
-        input.onAiUsage,
-      );
+    : classifyTranscript(identified);
 
   if (!classifiedCheckpointValid) {
     checkpoint.classifiedSegments = classified.map((segment) => ({ ...segment }));
