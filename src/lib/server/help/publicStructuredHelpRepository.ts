@@ -155,7 +155,7 @@ function parseStep(value: unknown): PublishedHelpStep | null {
   };
 }
 
-function parsePublication(
+export function parsePublishedStructuredHelpSnapshot(
   entityId: string,
   publishedAt: Date,
   snapshot: Record<string, unknown>,
@@ -211,7 +211,7 @@ export async function listPublishedStructuredHelpCatalog(query = ""): Promise<Pu
   const terms = normalizeSearchText(query).split(" ").filter(Boolean);
 
   return rows
-    .map((row) => parsePublication(row.entityId, row.publishedAt, row.snapshot))
+    .map((row) => parsePublishedStructuredHelpSnapshot(row.entityId, row.publishedAt, row.snapshot))
     .filter((content): content is PublishedStructuredHelp => Boolean(content))
     .filter((content) => {
       if (terms.length === 0) return true;
@@ -263,7 +263,7 @@ export async function getPublishedStructuredHelpById(contentId: string) {
       ),
     )
     .limit(1);
-  return row ? parsePublication(row.entityId, row.publishedAt, row.snapshot) : null;
+  return row ? parsePublishedStructuredHelpSnapshot(row.entityId, row.publishedAt, row.snapshot) : null;
 }
 
 export async function getPublishedStructuredHelpBySlug(slug: string) {
@@ -277,7 +277,7 @@ export async function getPublishedStructuredHelpBySlug(slug: string) {
       ),
     )
     .limit(1);
-  return row ? parsePublication(row.entityId, row.publishedAt, row.snapshot) : null;
+  return row ? parsePublishedStructuredHelpSnapshot(row.entityId, row.publishedAt, row.snapshot) : null;
 }
 
 export async function isAssetPublishedForSlug(slug: string, assetId: string): Promise<boolean> {
