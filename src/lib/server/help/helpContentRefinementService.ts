@@ -12,6 +12,7 @@ import {
   listHelpScreenshotReviewGroups,
 } from "$lib/server/help/helpScreenshotReviewRepository";
 import {
+  attachStructuredHelpImageAsset,
   getStructuredHelpContent,
   replaceStructuredHelpStepWithParts,
   type StructuredHelpStepSplitPart,
@@ -20,6 +21,10 @@ import {
   generateHelpVideoFrameCandidates,
   type ScreenshotCaptureMode,
 } from "$lib/server/help/helpVideoImportAutomationV4";
+import {
+  createManagedHelpAsset,
+  deleteManagedHelpAsset,
+} from "$lib/server/help/helpAssetRepository";
 import { getAssetObject } from "$lib/server/storage/assetStorage";
 
 type TranscriptSegment = {
@@ -344,6 +349,166 @@ async function automaticScreenshotWindow(input: {
   }).catch(() => undefined);
 
   return response.data;
+}
+
+async function generateStepFrameSet(input: {
+  actorUserId: string;
+  contentId: string;
+  stepId: string;
+}) {
+  const content = await getStructuredHelpContent(input.contentId);
+  if (!content) throw new Error("CONTENT_NOT_FOUND");
+  if (content.status === "archived") throw new Error("CONTENT_ARCHIVED");
+  const step = content.steps.find((item) => item.id === input.stepId);
+  if (!step) throw new Error("STEP_NOT_FOUND");
+  if (step.blocks.some((block) => block.blockType === "image")) {
+    throw new Error("STEP_IMAGE_LIMIT_EXCEEDED");
+  }
+
+  const { storageKey, timeline } = await featuredVideoSource(input.contentId);
+  const durationSeconds = Math.max(...timeline.map((segment) => segment.end));
+  const sourceText = [step.title, step.description, blockSource(step)].filter(Boolean).join("\n");
+  const window = await automaticScreenshotWindow({
+    actorUserId: input.actorUserId,
+    contentId: input.contentId,
+    stepId: step.id,
+    sourceText,
+    timeline,
+    baseTime: null,
+  });
+
+  const startSeconds = Math.max(0, Math.min(Number(window.startSeconds) || 0, durationSeconds));
+  const endSeconds = Math.max(
+    startSeconds + 2,
+    Math.min(Number(window.endSeconds) || startSeconds + 8, durationSeconds),
+  );
+  const response = await getAssetObject(storageKey);
+  const videoBytes = new Uint8Array(await response.arrayBuffer());
+  const generated = await generateHelpVideoFrameCandidates({
+    videoBytes,
+    startSeconds,
+    endSeconds,
+    capture: window.capture,
+    durationSeconds,
+  });
+  if (generated.length === 0) throw new Error("HELP_VIDEO_NO_SCREENSHOTS_SELECTED");
+  return { step, generated };
+}
+
+export async function generateHelpStepScreenshot(input: {
+  actorUserId: string;
+  contentId: string;
+  stepId: string;
+}) {
+  const { step, generated } = await generateStepFrameSet(input);
+  const recommended =
+    generated.find((candidate) => candidate.recommended)
+    ?? generated[0];
+  if (!recommended) throw new Error("HELP_VIDEO_NO_SCREENSHOTS_SELECTED");
+
+  const created = await createManagedHelpAsset(input.actorUserId, {
+    fileName: "screenshot-gerado.jpg",
+    mimeType: "image/jpeg",
+    bytes: recommended.bytes,
+    altText: step.title,
+    assistantDescription: step.description || step.title,
+    contentId: input.contentId,
+    deduplicate: false,
+  });
+
+  let blockId = "";
+  try {
+    blockId = await attachStructuredHelpImageAsset(
+      input.actorUserId,
+      input.contentId,
+      input.stepId,
+      created.asset.id,
+    );
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1_000).toISOString();
+    await getDatabase()
+      .update(helpAssets)
+      .set({
+        metadata: {
+          ...(created.asset.metadata ?? {}),
+          screenshotReview: {
+            pending: true,
+            role: "recommended",
+            stepId: input.stepId,
+            candidateIndex: 1,
+            timeSeconds: recommended.timeSeconds,
+            expiresAt,
+          },
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(helpAssets.id, created.asset.id));
+
+    const alternatives = generated.filter((candidate) => candidate !== recommended);
+    const added = alternatives.length > 0
+      ? await addHelpGeneratedReviewCandidates({
+          actorUserId: input.actorUserId,
+          contentId: input.contentId,
+          blockId,
+          altText: step.title,
+          assistantDescription: step.description || step.title,
+          candidates: alternatives.map((candidate) => ({
+            timeSeconds: candidate.timeSeconds,
+            bytes: candidate.bytes,
+          })),
+        }).catch(() => [])
+      : [];
+
+    return {
+      blockId,
+      assetId: created.asset.id,
+      candidateCount: 1 + added.length,
+    };
+  } catch (cause) {
+    if (!blockId) {
+      await deleteManagedHelpAsset(input.actorUserId, created.asset.id).catch(() => undefined);
+    }
+    throw cause;
+  }
+}
+
+export async function uploadHelpStepScreenshot(input: {
+  actorUserId: string;
+  contentId: string;
+  stepId: string;
+  fileName: string;
+  mimeType: string;
+  bytes: Uint8Array;
+}) {
+  const content = await getStructuredHelpContent(input.contentId);
+  if (!content) throw new Error("CONTENT_NOT_FOUND");
+  if (content.status === "archived") throw new Error("CONTENT_ARCHIVED");
+  const step = content.steps.find((item) => item.id === input.stepId);
+  if (!step) throw new Error("STEP_NOT_FOUND");
+  if (step.blocks.some((block) => block.blockType === "image")) {
+    throw new Error("STEP_IMAGE_LIMIT_EXCEEDED");
+  }
+
+  const created = await createManagedHelpAsset(input.actorUserId, {
+    fileName: input.fileName,
+    mimeType: input.mimeType,
+    bytes: input.bytes,
+    altText: step.title,
+    assistantDescription: step.description || step.title,
+    contentId: input.contentId,
+    deduplicate: false,
+  });
+  try {
+    const blockId = await attachStructuredHelpImageAsset(
+      input.actorUserId,
+      input.contentId,
+      input.stepId,
+      created.asset.id,
+    );
+    return { blockId, assetId: created.asset.id };
+  } catch (cause) {
+    await deleteManagedHelpAsset(input.actorUserId, created.asset.id).catch(() => undefined);
+    throw cause;
+  }
 }
 
 export async function generateAdditionalHelpScreenshotCandidates(input: {
