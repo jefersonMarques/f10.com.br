@@ -34,6 +34,11 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     screenshotReview,
     humanReview,
     categories,
+    canGenerateVideoFrames: Boolean(
+      content.featuredVideo?.storageKey
+      && Array.isArray(content.featuredVideo.metadata?.transcriptTimeline)
+      && content.featuredVideo.metadata.transcriptTimeline.length > 0,
+    ),
     canEdit: content.status !== "archived" && hasPermission(permissions, "help.edit"),
     canPublish: content.status !== "archived" && hasPermission(permissions, "help.publish"),
   };
