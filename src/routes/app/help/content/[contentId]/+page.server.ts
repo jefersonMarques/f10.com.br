@@ -265,6 +265,55 @@ export const actions: Actions = {
     redirectToContentEditor(params.contentId);
   },
 
+  updateAdvanced: async ({ cookies, params, request }) => {
+    if (!isUuid(params.contentId)) {
+      return fail(404, { success: false, message: "Conteúdo não encontrado." });
+    }
+    const { session } = await requireAppPermission(
+      cookies,
+      "help.edit",
+      contentEditorPath(params.contentId),
+    );
+    const formData = await request.formData();
+    const content = await getStructuredHelpContent(params.contentId);
+    if (!content) {
+      return fail(404, { success: false, message: "Conteúdo não encontrado." });
+    }
+
+    const searchAliases = readAliases(readFormValue(formData, "searchAliases"));
+    const assistantKnowledge = readFormValue(formData, "assistantKnowledge");
+    const internalSupportNotes = readFormValue(formData, "internalSupportNotes");
+    if (
+      searchAliases.length > 80 ||
+      assistantKnowledge.length > 40_000 ||
+      internalSupportNotes.length > 40_000
+    ) {
+      return fail(400, { success: false, message: "Revise as configurações avançadas." });
+    }
+
+    try {
+      await updateStructuredHelpContent(session.user.id, params.contentId, {
+        title: content.title,
+        slug: content.slug,
+        summary: content.summary,
+        searchAliases,
+        assistantKnowledge,
+        internalSupportNotes,
+        categories: content.categories.map((category, index) => ({
+          categoryId: category.id,
+          destinationUrl: category.destinationUrl,
+          sortOrder: category.sortOrder || (index + 1) * 10,
+        })),
+      });
+    } catch {
+      return fail(409, {
+        success: false,
+        message: "Não foi possível salvar as configurações avançadas.",
+      });
+    }
+    redirectToContentEditor(params.contentId);
+  },
+
   updateFeaturedVideo: async ({ cookies, params, request }) => {
     if (!isUuid(params.contentId)) return fail(404, { success: false, message: "Conteúdo não encontrado." });
     const { session } = await requireAppPermission(cookies, "help.edit", contentEditorPath(params.contentId));
