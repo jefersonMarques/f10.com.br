@@ -105,6 +105,8 @@
   const SESSION_KEY = "f10-support-chat-session-v1";
   const GUEST_KEY = "f10-support-assistant-conversation-v2";
   const UNRESOLVED_KEY = "f10-support-assistant-unresolved-v1";
+  const HANDOFF_KEY = "f10-support-assistant-handoff-v1";
+  const HANDOFF_TTL_MS = 60 * 60 * 1000;
   const MAX_IMAGES = 4;
   const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
   const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
@@ -217,18 +219,22 @@
     ensureGreeting();
 
     const rawSession = window.sessionStorage.getItem(SESSION_KEY);
-    if (!rawSession) return;
-    try {
-      const stored = JSON.parse(rawSession) as ChatSession;
-      if (!stored.sessionId || !stored.token || new Date(stored.expiresAt).getTime() <= Date.now()) {
+    if (rawSession) {
+      try {
+        const stored = JSON.parse(rawSession) as ChatSession;
+        if (!stored.sessionId || !stored.token || new Date(stored.expiresAt).getTime() <= Date.now()) {
+          clearSession();
+        } else {
+          session = stored;
+          clearPendingHandoff();
+          void refreshMessages(true);
+          return;
+        }
+      } catch {
         clearSession();
-        return;
       }
-      session = stored;
-      void refreshMessages(true);
-    } catch {
-      clearSession();
     }
+    restorePendingHandoff();
   }
 
   function persistGuestState(): void {
@@ -240,6 +246,51 @@
   function persistSession(value: ChatSession): void {
     if (!browser) return;
     window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(value));
+  }
+
+  function persistPendingHandoff(reason: string): void {
+    if (!browser) return;
+    window.sessionStorage.setItem(HANDOFF_KEY, JSON.stringify({
+      reason,
+      requestedAt: new Date().toISOString(),
+    }));
+  }
+
+  function clearPendingHandoff(): void {
+    if (browser) window.sessionStorage.removeItem(HANDOFF_KEY);
+    pendingHandoffReason = "";
+  }
+
+  function restorePendingHandoff(): void {
+    if (!browser || session) return;
+    const raw = window.sessionStorage.getItem(HANDOFF_KEY);
+    if (!raw) return;
+    try {
+      const stored = JSON.parse(raw) as { reason?: unknown; requestedAt?: unknown };
+      const reason = typeof stored.reason === "string" ? stored.reason.trim() : "";
+      const requestedAt = typeof stored.requestedAt === "string"
+        ? Date.parse(stored.requestedAt)
+        : Number.NaN;
+      if (!reason || !Number.isFinite(requestedAt) || Date.now() - requestedAt > HANDOFF_TTL_MS) {
+        clearPendingHandoff();
+        return;
+      }
+      pendingHandoffReason = reason;
+      if (!authState.authenticated) {
+        authRequired = true;
+        authStep = "login";
+        return;
+      }
+      if (authState.requiresUnitSelection) {
+        authRequired = true;
+        authStep = "unit";
+        prepareUnitSelection();
+        return;
+      }
+      void startHumanChat();
+    } catch {
+      clearPendingHandoff();
+    }
   }
 
   function clearSession(): void {
@@ -296,7 +347,7 @@
 
   async function sendGuestMessage(): Promise<void> {
     const body = guestReply.trim();
-    if (!body || assistantSending || starting) return;
+    if (!body || assistantSending || starting || authRequired || pendingHandoffReason) return;
 
     errorMessage = "";
     guestReply = "";
@@ -347,6 +398,7 @@
   async function requestHumanSupport(reason: string): Promise<void> {
     if (starting || session) return;
     pendingHandoffReason = reason;
+    persistPendingHandoff(reason);
 
     if (!authState.authenticated) {
       authRequired = true;
@@ -493,7 +545,7 @@
       authRequired = false;
       unresolvedCount = 0;
       persistGuestState();
-      pendingHandoffReason = "";
+      clearPendingHandoff();
       await refreshMessages(true);
     } catch (cause) {
       errorMessage = apiErrorMessage(cause instanceof Error ? cause.message : "CHAT_UNAVAILABLE");
