@@ -29,6 +29,7 @@
 
   const dispatch = createEventDispatcher<{
     saved: { content: unknown; text: string };
+    editing: { active: boolean };
   }>();
 
   let editing = false;
@@ -48,6 +49,7 @@
     draft = text;
     message = "";
     editing = true;
+    dispatch("editing", { active: true });
     queueMicrotask(() => textarea?.focus());
   }
 
@@ -55,6 +57,7 @@
     draft = text;
     message = "";
     editing = false;
+    dispatch("editing", { active: false });
   }
 
   function wrapSelection(prefix: string, suffix = prefix): void {
@@ -113,6 +116,7 @@
       appliedText = draft.trim();
       text = appliedText;
       editing = false;
+      dispatch("editing", { active: false });
       dispatch("saved", { content: payload.content, text: appliedText });
     } catch {
       message = "Não foi possível salvar.";
