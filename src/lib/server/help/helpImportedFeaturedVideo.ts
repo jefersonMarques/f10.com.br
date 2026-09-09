@@ -7,6 +7,7 @@ import {
   helpContentFeaturedVideos,
   helpContents,
 } from "$lib/server/db/structuredHelpSchema";
+import type { HelpVideoCoverage } from "$lib/server/help/helpVideoArticlePipeline";
 import { deleteAssetObject, putAssetObject } from "$lib/server/storage/assetStorage";
 
 const MAX_VIDEO_BYTES = 90 * 1024 * 1024;
@@ -67,7 +68,7 @@ export async function attachImportedMp4AsFeaturedVideo(input: {
   altText: string;
   assistantSummary: string;
   transcriptTimeline?: Array<{ start: number; end: number; text: string }>;
-  generationCoverage?: Record<string, unknown>;
+  generationCoverage?: HelpVideoCoverage;
 }): Promise<void> {
   if (input.bytes.byteLength < 1 || input.bytes.byteLength > MAX_VIDEO_BYTES || !isMp4(input.bytes)) {
     throw new Error("HELP_VIDEO_UPLOAD_FORMAT_INVALID");
