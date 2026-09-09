@@ -63,7 +63,7 @@
   }
 
   async function copyLink(): Promise<void> {
-    if (!publicUrl) return;
+    if (!publicUrl || !data.profile.publicEnabled) return;
     await navigator.clipboard.writeText(publicUrl);
     copied = true;
     window.setTimeout(() => (copied = false), 1600);
@@ -112,11 +112,14 @@
   <div class="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
     <div class="space-y-4">
       <section class="rounded-[22px] border border-[#E1E4EB] bg-white p-5 shadow-[0_8px_30px_rgba(1,13,40,0.04)] sm:p-6">
-        <div class="flex items-center gap-2"><Link2 size={16} class="text-[#000A57]"/><h2 class="text-[15px] font-semibold text-[#202637]">Link da agenda</h2></div>
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2"><Link2 size={16} class="text-[#000A57]"/><h2 class="text-[15px] font-semibold text-[#202637]">Link da agenda</h2></div>
+          <span class={`rounded-full px-2.5 py-1 text-[9px] font-semibold ${data.profile.publicEnabled ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#F2F3F6] text-[#777E8D]"}`}>{data.profile.publicEnabled ? "Ativa" : "Inativa"}</span>
+        </div>
         <div class="mt-4 flex flex-col gap-3 sm:flex-row">
           <div class="min-w-0 flex-1 truncate rounded-xl border border-[#E1E4EA] bg-[#FAFAFC] px-3 py-3 text-[11px] font-medium text-[#555D6C]">{data.publicPath || "—"}</div>
-          <button type="button" on:click={copyLink} disabled={!data.publicPath} class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:opacity-40">{#if copied}<Check size={14}/>Copiado{:else}<Copy size={14}/>Copiar{/if}</button>
-          {#if data.publicPath}<a href={data.publicPath} target="_blank" rel="noopener noreferrer" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] px-4 text-[11px] font-semibold text-[#000A57]"><ExternalLink size={14}/>Abrir</a>{/if}
+          <button type="button" on:click={copyLink} disabled={!data.publicPath || !data.profile.publicEnabled} class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-35">{#if copied}<Check size={14}/>Copiado{:else}<Copy size={14}/>Copiar{/if}</button>
+          {#if data.publicPath && data.profile.publicEnabled}<a href={data.publicPath} target="_blank" rel="noopener noreferrer" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] px-4 text-[11px] font-semibold text-[#000A57]"><ExternalLink size={14}/>Abrir</a>{/if}
         </div>
       </section>
 
