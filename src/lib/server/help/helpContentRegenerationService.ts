@@ -1,5 +1,5 @@
 import { recordHelpAiUsage } from "$lib/server/help/helpAiUsageRepository";
-import { getHelpAsset, readManagedHelpAsset } from "$lib/server/help/helpAssetRepository";
+import { readManagedHelpAsset } from "$lib/server/help/helpAssetRepository";
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import {
   findImportedHelpVideoByChecksum,
@@ -63,6 +63,7 @@ export async function regenerateHelpContentFromVideo(input: {
   let videoBytes: Uint8Array;
   let fileName: string;
   let mimeType = "video/mp4";
+  let reusedExistingVideo = input.source.type === "current";
 
   if (input.source.type === "current") {
     if (!current.featuredVideo?.storageKey) throw new Error("HELP_VIDEO_LOCAL_COPY_REQUIRED");
@@ -78,6 +79,7 @@ export async function regenerateHelpContentFromVideo(input: {
     if (duplicate?.contentId && duplicate.contentId !== input.contentId) {
       throw new Error(`HELP_VIDEO_ALREADY_USED:${duplicate.contentId}`);
     }
+    reusedExistingVideo = duplicate?.contentId === input.contentId;
   }
 
   const categories = (await listHelpCategories(true))
@@ -180,11 +182,7 @@ export async function regenerateHelpContentFromVideo(input: {
       removedSteps: Math.max(0, previousStepCount - nextStepCount),
       screenshotCount: generated.selectedScreenshotCount,
       transcriptChars: generated.transcriptChars,
-      videoReused: Boolean(
-        input.source.type === "current" ||
-        (await getHelpAsset(updated.featuredVideo?.id ?? ""))?.checksumSha256 ===
-          (await findImportedHelpVideoByChecksum(videoBytes))?.checksumSha256
-      ),
+      videoReused: reusedExistingVideo,
     },
   };
 }
