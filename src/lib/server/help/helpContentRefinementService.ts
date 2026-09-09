@@ -562,6 +562,7 @@ export async function generateAdditionalHelpScreenshotCandidates(input: {
   mode: HelpScreenshotGenerationMode;
   baseTimeSeconds?: number | null;
   selectedAssetId?: string | null;
+  preserveAssetIds?: string[];
 }) {
   const content = await getStructuredHelpContent(input.contentId);
   if (!content) throw new Error("CONTENT_NOT_FOUND");
@@ -642,7 +643,10 @@ export async function generateAdditionalHelpScreenshotCandidates(input: {
       timeSeconds: candidate.timeSeconds,
       bytes: candidate.bytes,
     })),
-    preserveAssetIds: input.selectedAssetId ? [input.selectedAssetId] : [],
+    preserveAssetIds: Array.from(new Set([
+      ...(input.selectedAssetId ? [input.selectedAssetId] : []),
+      ...(input.preserveAssetIds ?? []),
+    ])),
   });
   const refreshedGroups = await listHelpScreenshotReviewGroups(input.contentId);
   const refreshed = refreshedGroups.find((item) => item.blockId === input.blockId);
