@@ -56,7 +56,7 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
   }
 
   try {
-    const candidates = await generateAdditionalHelpScreenshotCandidates({
+    const result = await generateAdditionalHelpScreenshotCandidates({
       actorUserId: session.user.id,
       contentId: params.contentId,
       blockId: params.blockId,
@@ -66,8 +66,8 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
     });
     return json({
       success: true,
-      message: `${candidates.length} novas imagens adicionadas.`,
-      candidates,
+      message: `${result.addedCount} novas imagens adicionadas.`,
+      candidates: result.candidates,
     });
   } catch (cause) {
     const code = cause instanceof Error ? cause.message : "";
