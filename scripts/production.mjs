@@ -38,8 +38,25 @@ if (currentRoot !== productionRoot) {
 
 const dirtyFiles = output("git", ["status", "--porcelain"]);
 if (dirtyFiles) {
-  process.stderr.write(`\n${dirtyFiles}\n`);
-  fail("Existem alterações locais. O deploy foi cancelado.");
+  const entries = dirtyFiles.split("\n").filter(Boolean);
+  const untracked = entries.filter((entry) => entry.startsWith("?? "));
+  const tracked = entries.filter((entry) => !entry.startsWith("?? "));
+
+  if (tracked.length > 0) {
+    process.stderr.write("\nAlterações versionadas locais:\n");
+    process.stderr.write(`${tracked.join("\n")}\n`);
+  }
+
+  if (untracked.length > 0) {
+    process.stderr.write("\nArquivos não versionados:\n");
+    process.stderr.write(`${untracked.join("\n")}\n`);
+    process.stderr.write(
+      "\nRevise com: git clean -nd\n" +
+      "Se forem resíduos, remova somente os caminhos confirmados com: git clean -fd -- <caminhos>\n",
+    );
+  }
+
+  fail("O diretório de produção precisa estar limpo antes do deploy.");
 }
 
 run("Atualizando referências", "git", ["fetch", "origin", productionBranch]);
