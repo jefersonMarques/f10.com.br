@@ -571,6 +571,7 @@ export async function importStructuredHelpFile(
   actorUserId: string,
   file: HelpImportFile,
   packageAssets: ReadonlyMap<string, HelpImportPackageAsset> = new Map(),
+  options: { targetContentId?: string } = {},
 ) {
   const db = getDatabase();
   const requestedCategorySlugs = Array.from(
@@ -594,22 +595,48 @@ export async function importStructuredHelpFile(
   }
 
   const externalIds = file.contents.map((content) => content.externalId);
-  const existingRowsRaw = await db
-    .select({
-      id: helpContents.id,
-      externalId: helpContents.importExternalId,
-      slug: helpContents.slug,
-    })
-    .from(helpContents)
-    .where(
-      and(
-        eq(helpContents.importSource, file.source),
-        inArray(helpContents.importExternalId, externalIds),
-      ),
-    );
-  const existingRows: ExistingImportedContent[] = existingRowsRaw.flatMap((row) =>
-    row.externalId ? [{ id: row.id, externalId: row.externalId, slug: row.slug }] : [],
-  );
+  if (options.targetContentId && file.contents.length !== 1) {
+    throw new Error("IMPORT_TARGET_SINGLE_CONTENT_REQUIRED");
+  }
+
+  const existingRows: ExistingImportedContent[] = options.targetContentId
+    ? await db
+        .select({
+          id: helpContents.id,
+          slug: helpContents.slug,
+        })
+        .from(helpContents)
+        .where(eq(helpContents.id, options.targetContentId))
+        .limit(1)
+        .then((rows) => rows.flatMap((row) =>
+          file.contents[0]
+            ? [{
+                id: row.id,
+                externalId: file.contents[0].externalId,
+                slug: row.slug,
+              }]
+            : [],
+        ))
+    : await db
+        .select({
+          id: helpContents.id,
+          externalId: helpContents.importExternalId,
+          slug: helpContents.slug,
+        })
+        .from(helpContents)
+        .where(
+          and(
+            eq(helpContents.importSource, file.source),
+            inArray(helpContents.importExternalId, externalIds),
+          ),
+        )
+        .then((rows) => rows.flatMap((row) =>
+          row.externalId ? [{ id: row.id, externalId: row.externalId, slug: row.slug }] : [],
+        ));
+
+  if (options.targetContentId && existingRows.length !== 1) {
+    throw new Error("CONTENT_NOT_FOUND");
+  }
   const existingByExternalId = new Map(existingRows.map((row) => [row.externalId, row]));
 
   const publishedRows = existingRows.length
