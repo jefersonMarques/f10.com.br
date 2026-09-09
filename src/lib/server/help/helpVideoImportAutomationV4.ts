@@ -5,7 +5,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { env } from "$env/dynamic/private";
 import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
-import { createAiStructuredResponse, AiGatewayError } from "$lib/server/ai/aiGateway";
 import { isAiProviderConfigured, readAiProviderCredential } from "$lib/server/ai/aiConfigurationRepository";
 import type { HelpImportPackageAsset } from "$lib/server/help/helpImportPackage";
 import {
