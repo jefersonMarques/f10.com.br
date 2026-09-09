@@ -44,6 +44,10 @@
     );
   }
 
+  function isCurrentlyPublished(contentId: string): boolean {
+    return data.publishedContents.some((content) => content.contentId === contentId);
+  }
+
   function addContent(): void {
     if (!contentToAdd || selectedIds.includes(contentToAdd)) return;
     selectedIds = [...selectedIds, contentToAdd];
@@ -153,7 +157,7 @@
                   <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-[10px] font-bold text-[#000A57]">{index + 1}</span>
                   <div class="min-w-0 flex-1">
                     <strong class="block truncate text-[11px] font-semibold text-[#303746]">{content?.title ?? "Conteúdo indisponível"}</strong>
-                    {#if content && "published" in content && !content.published}<span class="mt-0.5 block text-[8px] font-semibold text-[#A55B18]">Não está mais publicado</span>{/if}
+                    {#if !isCurrentlyPublished(contentId)}<span class="mt-0.5 block text-[8px] font-semibold text-[#A55B18]">Não está mais publicado</span>{/if}
                   </div>
                   {#if data.canEdit}
                     <button type="button" on:click={() => moveContent(index, -1)} disabled={index === 0} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#697080] hover:bg-white disabled:opacity-25" aria-label="Subir"><ArrowUp size={13}/></button>
