@@ -3,7 +3,7 @@ import type { PageServerLoad } from "./$types";
 import { recordCustomerActivity } from "$lib/server/customerPortal/customerActivityRepository";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import {
-  getPublicHelpContentReleaseBySlug,
+  getPublicHelpContentRelease,
   listPublicHelpContentReleases,
 } from "$lib/server/help/helpContentReleaseRepository";
 import { getPublishedStructuredHelpBySlug } from "$lib/server/help/publicStructuredHelpRepository";
@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
   if (!currentContent) throw error(404, "Conteúdo de ajuda não encontrado.");
   const historical =
     Number.isInteger(requestedVersion) && requestedVersion > 0
-      ? await getPublicHelpContentReleaseBySlug(params.slug, requestedVersion)
+      ? await getPublicHelpContentRelease(currentContent.contentId, requestedVersion)
       : null;
   if (url.searchParams.has("versao") && !historical) {
     throw error(404, "Versão de ajuda não encontrada.");
@@ -55,5 +55,6 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
     releaseNumber,
     currentReleaseNumber,
     isHistorical: Boolean(historical && releaseNumber !== currentReleaseNumber),
+    routeSlug: currentContent.slug,
   };
 };
