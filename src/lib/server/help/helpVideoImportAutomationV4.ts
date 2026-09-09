@@ -19,6 +19,7 @@ const SCREENSHOT_CONCURRENCY = 3;
 const STABILITY_THRESHOLD = 0.975;
 const COMMAND_TIMEOUT_MS = 8 * 60 * 1_000;
 const OPENAI_TRANSCRIPTION_TIMEOUT_MS = 3 * 60 * 1_000;
+const TRANSCRIPTION_CHUNK_SECONDS = 8 * 60;
 const DEFAULT_YTDLP_COOKIES_PATH = "/opt/f10-secrets/youtube-cookies.txt";
 const DEFAULT_YTDLP_POT_PROVIDER_URL = "http://127.0.0.1:4416";
 
@@ -574,9 +575,91 @@ function failureCode(cause: unknown): string {
   return "OPENAI_REQUEST_FAILED";
 }
 
+async function splitAudioForTranscription(
+  audioPath: string,
+  directory: string,
+): Promise<string[]> {
+  const outputPattern = join(directory, "audio-transcription-%03d.mp3");
+  await runCommand(ffmpegPath(), [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-y",
+    "-i",
+    audioPath,
+    "-f",
+    "segment",
+    "-segment_time",
+    String(TRANSCRIPTION_CHUNK_SECONDS),
+    "-reset_timestamps",
+    "1",
+    "-c",
+    "copy",
+    outputPattern,
+  ]);
+
+  const names = (await readdir(directory))
+    .filter((name) => /^audio-transcription-\d{3}\.mp3$/.test(name))
+    .sort();
+  if (names.length === 0) throw new Error("HELP_VIDEO_TRANSCRIPTION_CHUNKS_EMPTY");
+  return names.map((name) => join(directory, name));
+}
+
+async function transcribeAudioChunk(
+  audioPath: string,
+  apiKey: string,
+): Promise<TimestampedTranscript> {
+  const bytes = await readFile(audioPath);
+  const form = new FormData();
+  form.set("model", TRANSCRIPTION_MODEL);
+  form.set("language", "pt");
+  form.set("response_format", "verbose_json");
+  form.append("timestamp_granularities[]", "segment");
+  form.set("file", new Blob([new Uint8Array(bytes)], { type: "audio/mpeg" }), "audio.mp3");
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OPENAI_TRANSCRIPTION_TIMEOUT_MS);
+  try {
+    const response = await fetch(OPENAI_TRANSCRIPTIONS_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+      signal: controller.signal,
+    });
+    const payload = await response.json().catch(() => ({})) as {
+      text?: string;
+      duration?: number;
+      segments?: Array<{ start?: number; end?: number; text?: string }>;
+      error?: { message?: string };
+    };
+    if (!response.ok) {
+      throw new Error(`HELP_VIDEO_TRANSCRIPTION_FAILED:${payload.error?.message ?? response.status}`);
+    }
+
+    const text = payload.text?.trim() ?? "";
+    if (!text) throw new Error("HELP_VIDEO_TRANSCRIPTION_EMPTY");
+    const segments = (payload.segments ?? []).flatMap((segment) => {
+      const start = toFiniteNumber(segment.start);
+      const end = toFiniteNumber(segment.end);
+      const segmentText = segment.text?.trim() ?? "";
+      if (start === null || end === null || end <= start || !segmentText) return [];
+      return [{ start: Math.max(0, start), end, text: segmentText }];
+    });
+    if (segments.length === 0) throw new Error("HELP_VIDEO_TRANSCRIPTION_TIMESTAMPS_EMPTY");
+
+    const durationSeconds = toFiniteNumber(payload.duration)
+      ?? Math.max(...segments.map((segment) => segment.end));
+    return { text, segments, durationSeconds };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function transcribeAudio(
   audioPath: string,
+  directory: string,
   onAiUsage?: HelpVideoAutomationAiUsageHandler,
+  onProgress?: HelpVideoAutomationProgressHandler,
 ): Promise<TimestampedTranscript> {
   let apiKey = "";
   try {
@@ -584,72 +667,60 @@ async function transcribeAudio(
   } catch {
     throw new Error("OPENAI_NOT_CONFIGURED");
   }
+
   const startedAt = Date.now();
-  let durationSeconds: number | null = null;
+  let completedSeconds = 0;
 
   try {
-    const bytes = await readFile(audioPath);
-    const form = new FormData();
-    form.set("model", TRANSCRIPTION_MODEL);
-    form.set("language", "pt");
-    form.set("response_format", "verbose_json");
-    form.append("timestamp_granularities[]", "segment");
-    form.set("file", new Blob([new Uint8Array(bytes)], { type: "audio/mpeg" }), "audio.mp3");
+    const chunks = await splitAudioForTranscription(audioPath, directory);
+    const texts: string[] = [];
+    const segments: TranscriptSegment[] = [];
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), OPENAI_TRANSCRIPTION_TIMEOUT_MS);
-    try {
-      const response = await fetch(OPENAI_TRANSCRIPTIONS_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}` },
-        body: form,
-        signal: controller.signal,
+    for (const [index, chunkPath] of chunks.entries()) {
+      await reportProgress(onProgress, {
+        stage: "transcribe",
+        status: "active",
+        label: "Transcrevendo áudio e identificando os tempos",
+        detail: chunks.length > 1
+          ? `Parte ${index + 1} de ${chunks.length}`
+          : "Processando áudio",
       });
-      const payload = await response.json().catch(() => ({})) as {
-        text?: string;
-        duration?: number;
-        segments?: Array<{ start?: number; end?: number; text?: string }>;
-        error?: { message?: string };
-      };
-      if (!response.ok) {
-        throw new Error(`HELP_VIDEO_TRANSCRIPTION_FAILED:${payload.error?.message ?? response.status}`);
-      }
-      const text = payload.text?.trim() ?? "";
-      if (!text) throw new Error("HELP_VIDEO_TRANSCRIPTION_EMPTY");
 
-      const segments = (payload.segments ?? []).flatMap((segment) => {
-        const start = toFiniteNumber(segment.start);
-        const end = toFiniteNumber(segment.end);
-        const segmentText = segment.text?.trim() ?? "";
-        if (start === null || end === null || end <= start || !segmentText) return [];
-        return [{ start: Math.max(0, start), end, text: segmentText }];
-      });
-      if (segments.length === 0) throw new Error("HELP_VIDEO_TRANSCRIPTION_TIMESTAMPS_EMPTY");
-
-      durationSeconds = toFiniteNumber(payload.duration)
-        ?? Math.max(...segments.map((segment) => segment.end));
-      await reportAiUsage(onAiUsage, {
-        operation: "video_transcription",
-        provider: "openai",
-        model: TRANSCRIPTION_MODEL,
-        audioSeconds: durationSeconds,
-        latencyMs: Date.now() - startedAt,
-        status: "success",
-      });
-      return {
-        text: text.slice(0, 180_000),
-        segments,
-        durationSeconds,
-      };
-    } finally {
-      clearTimeout(timer);
+      const chunk = await transcribeAudioChunk(chunkPath, apiKey);
+      texts.push(chunk.text);
+      segments.push(
+        ...chunk.segments.map((segment) => ({
+          start: segment.start + completedSeconds,
+          end: segment.end + completedSeconds,
+          text: segment.text,
+        })),
+      );
+      completedSeconds += chunk.durationSeconds;
     }
+
+    const text = texts.join("\n").trim();
+    if (!text || segments.length === 0) throw new Error("HELP_VIDEO_TRANSCRIPTION_EMPTY");
+
+    await reportAiUsage(onAiUsage, {
+      operation: "video_transcription",
+      provider: "openai",
+      model: TRANSCRIPTION_MODEL,
+      audioSeconds: completedSeconds,
+      latencyMs: Date.now() - startedAt,
+      status: "success",
+    });
+
+    return {
+      text: text.slice(0, 180_000),
+      segments,
+      durationSeconds: completedSeconds,
+    };
   } catch (cause) {
     await reportAiUsage(onAiUsage, {
       operation: "video_transcription",
       provider: "openai",
       model: TRANSCRIPTION_MODEL,
-      audioSeconds: durationSeconds,
+      audioSeconds: completedSeconds || null,
       latencyMs: Date.now() - startedAt,
       status: "failed",
       failureCode: failureCode(cause),
@@ -1330,7 +1401,12 @@ export async function generateHelpImportFromVideo(input: {
       status: "active",
       label: "Transcrevendo áudio e identificando os tempos",
     });
-    const transcript = await transcribeAudio(audioPath, input.onAiUsage);
+    const transcript = await transcribeAudio(
+      audioPath,
+      directory,
+      input.onAiUsage,
+      input.onProgress,
+    );
     await reportProgress(input.onProgress, {
       stage: "transcribe",
       status: "done",
