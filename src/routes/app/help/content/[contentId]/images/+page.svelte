@@ -118,7 +118,12 @@
           stage: regenerationJob.stage,
           label: regenerationJob.progressLabel,
           detail: regenerationJob.progressDetail,
-          status: regenerationJob.status === "completed" ? "done" : "active",
+          status:
+            regenerationJob.status === "completed"
+              ? "done"
+              : regenerationJob.status === "failed" || regenerationJob.status === "cancelled"
+                ? "error"
+                : "active",
         }]
       : [];
   let regenerationPollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -646,7 +651,12 @@
             job.progressDetail,
             job.completedParts > 0 ? `${job.completedParts} parte(s) preservada(s)` : "",
           ].filter(Boolean).join(" · "),
-          status: job.status === "completed" ? "done" : "active",
+          status:
+            job.status === "completed"
+              ? "done"
+              : job.status === "failed" || job.status === "cancelled"
+                ? "error"
+                : "active",
         }]
       : [];
 
@@ -1118,7 +1128,13 @@
         <div class="mt-4 space-y-2 rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-3">
           {#each regenerationProgress as item}
             <div class="flex items-start gap-2 rounded-xl bg-white px-3 py-2.5">
-              {#if item.status === "done"}<CheckCircle2 size={13} class="mt-0.5 shrink-0 text-[#2D7143]"/>{:else}<LoaderCircle size={13} class="mt-0.5 shrink-0 animate-spin text-[#000A57]"/>{/if}
+              {#if item.status === "done"}
+                <CheckCircle2 size={13} class="mt-0.5 shrink-0 text-[#2D7143]"/>
+              {:else if item.status === "error"}
+                <TriangleAlert size={13} class="mt-0.5 shrink-0 text-[#9B2C2C]"/>
+              {:else}
+                <LoaderCircle size={13} class="mt-0.5 shrink-0 animate-spin text-[#000A57]"/>
+              {/if}
               <div><strong class="block text-[9px] text-[#454C5D]">{item.label}</strong>{#if item.detail}<span class="mt-0.5 block text-[8px] text-[#9297A5]">{item.detail}</span>{/if}</div>
             </div>
           {/each}
