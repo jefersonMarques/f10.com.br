@@ -42,6 +42,9 @@ export type HelpVideoAutomationTranscriptCheckpoint = {
   text: string;
   segments: TranscriptSegment[];
   durationSeconds: number;
+  completedChunks?: number;
+  totalChunks?: number;
+  complete?: boolean;
 };
 
 type TimestampedTranscript = HelpVideoAutomationTranscriptCheckpoint;
@@ -654,6 +657,10 @@ async function transcribeAudio(
   directory: string,
   onAiUsage?: HelpVideoAutomationAiUsageHandler,
   onProgress?: HelpVideoAutomationProgressHandler,
+  resume?: HelpVideoAutomationTranscriptCheckpoint,
+  onCheckpoint?: (
+    checkpoint: HelpVideoAutomationTranscriptCheckpoint,
+  ) => void | Promise<void>,
 ): Promise<TimestampedTranscript> {
   let apiKey = "";
   try {
@@ -663,14 +670,26 @@ async function transcribeAudio(
   }
 
   const startedAt = Date.now();
-  let completedSeconds = 0;
 
   try {
     const chunks = await splitAudioForTranscription(audioPath, directory);
-    const texts: string[] = [];
-    const segments: TranscriptSegment[] = [];
+    const canResume = Boolean(
+      resume
+      && !resume.complete
+      && Number.isInteger(resume.completedChunks)
+      && (resume.completedChunks ?? 0) > 0
+      && resume.totalChunks === chunks.length
+      && resume.segments.length > 0,
+    );
+    const texts: string[] = canResume && resume?.text ? [resume.text] : [];
+    const segments: TranscriptSegment[] = canResume
+      ? resume!.segments.map((segment) => ({ ...segment }))
+      : [];
+    let completedSeconds = canResume ? resume!.durationSeconds : 0;
+    const startChunkIndex = canResume ? resume!.completedChunks ?? 0 : 0;
 
     for (const [index, chunkPath] of chunks.entries()) {
+      if (index < startChunkIndex) continue;
       await reportProgress(onProgress, {
         stage: "transcribe",
         status: "active",
@@ -690,6 +709,14 @@ async function transcribeAudio(
         })),
       );
       completedSeconds += chunk.durationSeconds;
+      await onCheckpoint?.({
+        text: texts.join("\n").trim().slice(0, 180_000),
+        segments: segments.map((segment) => ({ ...segment })),
+        durationSeconds: completedSeconds,
+        completedChunks: index + 1,
+        totalChunks: chunks.length,
+        complete: index + 1 === chunks.length,
+      });
     }
 
     const text = texts.join("\n").trim();
@@ -708,6 +735,9 @@ async function transcribeAudio(
       text: text.slice(0, 180_000),
       segments,
       durationSeconds: completedSeconds,
+      completedChunks: chunks.length,
+      totalChunks: chunks.length,
+      complete: true,
     };
   } catch (cause) {
     const code = failureCode(cause);
@@ -715,7 +745,7 @@ async function transcribeAudio(
       operation: "video_transcription",
       provider: "openai",
       model: TRANSCRIPTION_MODEL,
-      audioSeconds: completedSeconds || null,
+      audioSeconds: resume?.durationSeconds ?? null,
       latencyMs: Date.now() - startedAt,
       status: "failed",
       failureCode: code,
@@ -1189,6 +1219,7 @@ export async function generateHelpImportFromVideo(input: {
     let transcript: TimestampedTranscript;
     if (
       input.checkpoint?.transcript
+      && input.checkpoint.transcript.complete !== false
       && input.checkpoint.transcript.text.trim()
       && input.checkpoint.transcript.segments.length > 0
       && input.checkpoint.transcript.durationSeconds > 0
@@ -1223,6 +1254,12 @@ export async function generateHelpImportFromVideo(input: {
         directory,
         input.onAiUsage,
         input.onProgress,
+        input.checkpoint?.transcript,
+        (transcriptCheckpoint) =>
+          input.onCheckpoint?.({
+            transcript: transcriptCheckpoint,
+            article: input.checkpoint?.article,
+          }),
       );
       await input.onCheckpoint?.({
         transcript,
