@@ -9,17 +9,12 @@ import { createCustomerPortalLoginToken } from "$lib/server/customerPortal/custo
 import { createF10CustomerPortalSession } from "$lib/server/customerPortal/customerF10AuthRepository";
 import {
   getOptionalCustomerF10PortalSession,
+  normalizeCustomerPortalReturnTo,
   setCustomerPortalSessionCookie,
 } from "$lib/server/customerPortal/customerPortalSession";
 
 function isValidEmail(value: string): boolean {
   return value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function safeReturnTo(value: string): string {
-  if (!value.startsWith("/") || value.startsWith("//")) return "/cliente/chamados";
-  if (value.startsWith("/ajuda-f10") || value.startsWith("/cliente")) return value;
-  return "/cliente/chamados";
 }
 
 function diagnosticCode(cause: unknown): string {
@@ -39,7 +34,7 @@ function f10LoginDiagnostic(cause: unknown): string {
 }
 
 export const load: PageServerLoad = async ({ cookies, url }) => {
-  const returnTo = safeReturnTo(url.searchParams.get("returnTo") ?? "/cliente/chamados");
+  const returnTo = normalizeCustomerPortalReturnTo(url.searchParams.get("returnTo") ?? "/cliente/chamados");
   const session = await getOptionalCustomerF10PortalSession(cookies);
   if (session) throw redirect(303, returnTo);
   return { returnTo };
@@ -53,7 +48,7 @@ export const actions: Actions = {
     const returnToValue = formData.get("returnTo");
     const email = typeof emailValue === "string" ? emailValue.trim().toLowerCase() : "";
     const password = typeof passwordValue === "string" ? passwordValue : "";
-    const returnTo = safeReturnTo(typeof returnToValue === "string" ? returnToValue : "/cliente/chamados");
+    const returnTo = normalizeCustomerPortalReturnTo(typeof returnToValue === "string" ? returnToValue : "/cliente/chamados");
 
     if (!isValidEmail(email) || password.length < 1 || password.length > 512) {
       return fail(400, {
