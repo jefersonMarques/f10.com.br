@@ -24,7 +24,7 @@ const DEFAULT_YTDLP_POT_PROVIDER_URL = "http://127.0.0.1:4416";
 
 export const HELP_YOUTUBE_EXTRACTION_ENABLED = false;
 
-type ScreenshotCaptureMode = "before" | "after";
+export type ScreenshotCaptureMode = "before" | "after";
 
 type TranscriptSegment = {
   start: number;
