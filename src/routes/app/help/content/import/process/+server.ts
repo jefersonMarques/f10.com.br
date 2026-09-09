@@ -64,6 +64,21 @@ function automationErrorMessage(code: string): string {
   if (code === "HELP_VIDEO_ARTICLE_GENERATION_TIMEOUT") {
     return "A análise textual do vídeo pela OpenAI demorou mais que o limite permitido. Tente novamente.";
   }
+  if (code === "HELP_VIDEO_COVERAGE_CLASSIFICATION_INCOMPLETE") {
+    return "O F10 não conseguiu classificar todos os trechos do vídeo. Nada foi salvo para evitar conteúdo incompleto.";
+  }
+  if (code === "HELP_VIDEO_COVERAGE_NO_RELEVANT_CONTENT") {
+    return "O vídeo foi transcrito, mas não foi identificado conteúdo operacional suficiente para criar o artigo.";
+  }
+  if (code === "HELP_VIDEO_ARTICLE_PART_COVERAGE_INCOMPLETE" || code.startsWith("HELP_VIDEO_COVERAGE_INCOMPLETE:")) {
+    return "Uma parte do vídeo ficou sem cobertura no artigo. O F10 interrompeu a geração para não omitir conteúdo.";
+  }
+  if (code === "HELP_VIDEO_ARTICLE_EDITORIAL_INVALID") {
+    return "O conteúdo gerado ainda continha referências internas ao vídeo ou à transcrição. A geração foi interrompida para não publicar linguagem de bastidor.";
+  }
+  if (code.startsWith("HELP_VIDEO_COVERAGE_FAILED:") || code.startsWith("HELP_VIDEO_ARTICLE_PART_FAILED:") || code.startsWith("HELP_VIDEO_ARTICLE_METADATA_FAILED:")) {
+    return "A IA não conseguiu concluir uma das partes da análise do vídeo. Nenhum conteúdo parcial foi aceito.";
+  }
   if (code === "HELP_VIDEO_SCREENSHOTS_NOT_PLANNED") {
     return "A IA estruturou o artigo, mas não definiu cortes para os passos visuais. O F10 não criou um artigo somente com texto.";
   }
