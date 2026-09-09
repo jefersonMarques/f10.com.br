@@ -581,7 +581,7 @@ export async function bookPersonalSchedulingSlot(
       meetUrl: googleEvent.meetUrl,
     });
 
-    await Promise.allSettled([
+    const sideEffects = await Promise.allSettled([
       createInternalNotification({
         userId: schedule.userId,
         kind: "scheduling.booked",
@@ -633,6 +633,7 @@ export async function bookPersonalSchedulingSlot(
       endAt: completed.endAt.toISOString(),
       googleMeetUrl: completed.googleMeetUrl,
       calendarFilePath: `/agendar/${schedule.publicSlug}/booking/${completed.id}/calendar`,
+      confirmationEmailSent: sideEffects[2]?.status === "fulfilled",
     };
   } catch (error) {
     if (googleEvent) {
