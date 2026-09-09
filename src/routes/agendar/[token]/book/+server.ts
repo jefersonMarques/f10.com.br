@@ -5,6 +5,7 @@ import {
   bookPersonalSchedulingSlot,
   getPublicPersonalSchedule,
 } from "$lib/server/calendar/personalSchedulingService";
+import { bookSchedulingSlot } from "$lib/server/calendar/schedulingService";
 import { enforceSchedulingRateLimit } from "$lib/server/calendar/schedulingRepository";
 
 const BOOK_WINDOW_MS = 10 * 60 * 1000;
@@ -26,21 +27,18 @@ function messageFor(errorValue: unknown): { status: number; message: string } {
   return { status: 404, message: "Esta agenda não está disponível." };
 }
 
-export const POST: RequestHandler = async ({ params, request, cookies, url, setHeaders }) => {
+export const POST: RequestHandler = async ({
+  params,
+  request,
+  cookies,
+  url,
+  getClientAddress,
+  setHeaders,
+}) => {
   setHeaders({
     "Cache-Control": "private, no-store, max-age=0",
     Pragma: "no-cache",
   });
-
-  const schedule = await getPublicPersonalSchedule(params.token);
-  if (!schedule) return json({ success: false, message: "Esta agenda não está disponível." }, { status: 404 });
-
-  const session = await requireCustomerF10PortalSession(cookies, url.pathname.replace(/\/book$/, ""), false);
-  await enforceSchedulingRateLimit(
-    `personal-book:${params.token}:${session.contactId}`,
-    12,
-    BOOK_WINDOW_MS,
-  );
 
   let body: unknown;
   try {
@@ -68,22 +66,65 @@ export const POST: RequestHandler = async ({ params, request, cookies, url, setH
     return json({ success: false, message: "Horário inválido." }, { status: 400 });
   }
 
-  try {
-    const booking = await bookPersonalSchedulingSlot(
-      params.token,
-      {
-        contactId: session.contactId,
-        name: session.name,
-        email: session.email,
-        selectedGroupId: session.selectedGroupId,
-        selectedGroupName: session.selectedGroupName,
-        selectedUnitId: session.selectedUnitId,
-        selectedUnitName: session.selectedUnitName,
-      },
-      selectedStartAt,
-      notes,
+  const schedule = await getPublicPersonalSchedule(params.token);
+  if (schedule) {
+    const session = await requireCustomerF10PortalSession(
+      cookies,
+      url.pathname.replace(/\/book$/, ""),
+      false,
     );
-    return json({ success: true, booking });
+    try {
+      await enforceSchedulingRateLimit(
+        `personal-book:${params.token}:${session.contactId}`,
+        12,
+        BOOK_WINDOW_MS,
+      );
+      const booking = await bookPersonalSchedulingSlot(
+        params.token,
+        {
+          contactId: session.contactId,
+          name: session.name,
+          email: session.email,
+          selectedGroupId: session.selectedGroupId,
+          selectedGroupName: session.selectedGroupName,
+          selectedUnitId: session.selectedUnitId,
+          selectedUnitName: session.selectedUnitName,
+        },
+        selectedStartAt,
+        notes,
+      );
+      return json({ success: true, booking });
+    } catch (errorValue) {
+      const result = messageFor(errorValue);
+      return json({ success: false, message: result.message }, { status: result.status });
+    }
+  }
+
+  let address = "unknown";
+  try {
+    address = getClientAddress() || "unknown";
+  } catch {
+    address = "unknown";
+  }
+
+  try {
+    await enforceSchedulingRateLimit(
+      `legacy-book:${params.token}:${address}`,
+      12,
+      BOOK_WINDOW_MS,
+    );
+    const invitation = await bookSchedulingSlot(params.token, selectedStartAt);
+    return json({
+      success: true,
+      booking: {
+        hostName: invitation.hostName,
+        title: invitation.title,
+        timeZone: invitation.timeZone,
+        startAt: invitation.selectedStartAt,
+        endAt: invitation.selectedEndAt,
+        googleMeetUrl: invitation.googleMeetUrl,
+      },
+    });
   } catch (errorValue) {
     const result = messageFor(errorValue);
     return json({ success: false, message: result.message }, { status: result.status });
