@@ -430,7 +430,17 @@ export async function listPersonalSchedulingReservations(
     .where(
       and(
         eq(schedulingInvitations.hostUserId, hostUserId),
-        inArray(schedulingInvitations.status, ["booking", "booked"]),
+        or(
+          eq(schedulingInvitations.status, "booked"),
+          and(
+            eq(schedulingInvitations.status, "booking"),
+            isNotNull(schedulingInvitations.bookingStartedAt),
+            gt(
+              schedulingInvitations.bookingStartedAt,
+              new Date(Date.now() - BOOKING_CLAIM_TIMEOUT_MS),
+            ),
+          ),
+        ),
         isNotNull(schedulingInvitations.selectedStartAt),
         isNotNull(schedulingInvitations.selectedEndAt),
         lt(schedulingInvitations.selectedStartAt, rangeEnd),
@@ -523,7 +533,17 @@ export async function claimPersonalSchedulingBooking(input: {
       .where(
         and(
           eq(schedulingInvitations.hostUserId, input.hostUserId),
-          inArray(schedulingInvitations.status, ["booking", "booked"]),
+          or(
+            eq(schedulingInvitations.status, "booked"),
+            and(
+              eq(schedulingInvitations.status, "booking"),
+              isNotNull(schedulingInvitations.bookingStartedAt),
+              gt(
+                schedulingInvitations.bookingStartedAt,
+                new Date(Date.now() - BOOKING_CLAIM_TIMEOUT_MS),
+              ),
+            ),
+          ),
           isNotNull(schedulingInvitations.selectedStartAt),
           isNotNull(schedulingInvitations.selectedEndAt),
           lt(schedulingInvitations.selectedStartAt, nearbyEnd),
