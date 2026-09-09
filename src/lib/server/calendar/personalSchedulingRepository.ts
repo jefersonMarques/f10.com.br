@@ -309,6 +309,20 @@ export async function deletePersonalSchedulingException(
   return Boolean(deleted);
 }
 
+export async function setPersonalSchedulingPublicEnabled(
+  userId: string,
+  publicEnabled: boolean,
+): Promise<void> {
+  await ensurePersonalSchedulingProfile(userId);
+  await getDatabase()
+    .update(schedulingAvailabilityProfiles)
+    .set({
+      publicEnabled,
+      updatedAt: new Date(),
+    })
+    .where(eq(schedulingAvailabilityProfiles.userId, userId));
+}
+
 export async function setSchedulingBlockingCalendars(
   userId: string,
   calendarIds: string[],
