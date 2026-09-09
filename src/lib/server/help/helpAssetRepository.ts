@@ -4,7 +4,12 @@ import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
 import { helpTrainingStepMedia, helpTrainingVersions } from "$lib/server/db/helpTrainingSchema";
-import { helpAssets, helpStepBlocks } from "$lib/server/db/structuredHelpSchema";
+import {
+  helpAssets,
+  helpContentFeaturedVideos,
+  helpContentReleaseAssets,
+  helpStepBlocks,
+} from "$lib/server/db/structuredHelpSchema";
 import {
   deleteAssetObject,
   getAssetObject,
@@ -86,7 +91,18 @@ function extractPlainText(mimeType: string, bytes: Uint8Array): string {
 function snapshotReferencesAsset(snapshot: Record<string, unknown>, assetId: string): boolean {
   const publicSnapshot = snapshot.public;
   if (!publicSnapshot || typeof publicSnapshot !== "object" || Array.isArray(publicSnapshot)) return false;
-  const steps = (publicSnapshot as Record<string, unknown>).steps;
+  const publicRecord = publicSnapshot as Record<string, unknown>;
+  const featuredVideo = publicRecord.featuredVideo;
+  if (
+    featuredVideo &&
+    typeof featuredVideo === "object" &&
+    !Array.isArray(featuredVideo) &&
+    (featuredVideo as Record<string, unknown>).id === assetId
+  ) {
+    return true;
+  }
+
+  const steps = publicRecord.steps;
   if (!Array.isArray(steps)) return false;
 
   for (const stepValue of steps) {
@@ -245,14 +261,27 @@ export async function getHelpAsset(assetId: string) {
 
 export async function getHelpAssetUsageCount(assetId: string): Promise<number> {
   const db = getDatabase();
-  const [contentRows, trainingRows] = await Promise.all([
+  const [contentRows, featuredRows, releaseRows, trainingRows] = await Promise.all([
     db.select({ value: count() }).from(helpStepBlocks).where(eq(helpStepBlocks.assetId, assetId)),
+    db
+      .select({ value: count() })
+      .from(helpContentFeaturedVideos)
+      .where(eq(helpContentFeaturedVideos.assetId, assetId)),
+    db
+      .select({ value: count() })
+      .from(helpContentReleaseAssets)
+      .where(eq(helpContentReleaseAssets.assetId, assetId)),
     db
       .select({ value: count() })
       .from(helpTrainingStepMedia)
       .where(eq(helpTrainingStepMedia.assetId, assetId)),
   ]);
-  return Number(contentRows[0]?.value ?? 0) + Number(trainingRows[0]?.value ?? 0);
+  return (
+    Number(contentRows[0]?.value ?? 0) +
+    Number(featuredRows[0]?.value ?? 0) +
+    Number(releaseRows[0]?.value ?? 0) +
+    Number(trainingRows[0]?.value ?? 0)
+  );
 }
 
 export async function isHelpAssetPublished(assetId: string): Promise<boolean> {
