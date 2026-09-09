@@ -83,6 +83,7 @@ async function runWorkerLoop(): Promise<void> {
   await recoverStaleHelpVideoProcessingJobs();
 
   while (!stopping) {
+    await recoverStaleHelpVideoProcessingJobs();
     const job = await claimNextHelpVideoProcessingJob();
     if (!job) {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
