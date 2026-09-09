@@ -2,6 +2,9 @@
 // Redirecionamentos de URLs antigas para preservar autoridade, tráfego e indexação.
 
 import { redirect, type Handle } from "@sveltejs/kit";
+import { startHelpVideoProcessingWorker } from "$lib/server/help/helpVideoProcessingWorker";
+
+startHelpVideoProcessingWorker();
 
 type RedirectRule = {
   from: string;
