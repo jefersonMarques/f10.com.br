@@ -165,6 +165,9 @@
             mode,
             baseTimeSeconds: selected?.timeSeconds ?? null,
             selectedAssetId: selected?.assetId ?? null,
+            preserveAssetIds: Array.from(annotationDrafts.entries())
+              .filter(([, value]) => value.length > 0)
+              .map(([assetId]) => assetId),
           }),
         },
       );
@@ -174,8 +177,8 @@
         candidates?: Array<{
           assetId: string;
           candidateIndex: number;
-          timeSeconds: number;
-          recommended: false;
+          timeSeconds: number | null;
+          recommended: boolean;
         }>;
       };
       if (!response.ok || !payload.success || !payload.candidates?.length) {
