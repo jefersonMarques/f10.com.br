@@ -34,6 +34,19 @@ function failureMessage(cause: unknown): string {
     : "Falha inesperada no processamento do vídeo.";
 }
 
+function retryableFailure(code: string): boolean {
+  return !new Set([
+    "CONTENT_ARCHIVED",
+    "CONTENT_NOT_FOUND",
+    "HELP_VIDEO_PROCESSING_ACTOR_MISSING",
+    "HELP_VIDEO_PROCESSING_SOURCE_MISSING",
+    "HELP_VIDEO_LOCAL_COPY_REQUIRED",
+    "HELP_VIDEO_UPLOAD_FORMAT_INVALID",
+    "HELP_VIDEO_UPLOAD_SIZE_INVALID",
+    "OPENAI_NOT_CONFIGURED",
+  ]).has(code);
+}
+
 async function processJob(job: HelpVideoProcessingJob): Promise<void> {
   if (!job.actorUserId) {
     throw new Error("HELP_VIDEO_PROCESSING_ACTOR_MISSING");
@@ -100,10 +113,12 @@ async function runWorkerLoop(): Promise<void> {
         code: failureCode(cause),
         cause,
       });
+      const code = failureCode(cause);
       await failHelpVideoProcessingJob(
         job,
-        failureCode(cause),
+        code,
         failureMessage(cause),
+        retryableFailure(code),
       ).catch((failureCause) => {
         console.error("[help-video-worker] failed to persist job failure", {
           jobId: job.id,
