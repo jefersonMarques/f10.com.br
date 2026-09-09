@@ -3,6 +3,8 @@ import { getDatabase } from "$lib/server/db";
 import {
   helpAssets,
   helpContentFeaturedVideos,
+  helpContentReleaseAssets,
+  helpContentReleases,
   helpContentSteps,
   helpStepBlocks,
 } from "$lib/server/db/structuredHelpSchema";
@@ -16,7 +18,7 @@ export async function cleanupObsoleteImportedHelpAssets(contentId: string): Prom
     .where(eq(helpContentSteps.contentId, contentId));
   const stepIds = steps.map((step) => step.id);
 
-  const [featured, blockAssets, assets] = await Promise.all([
+  const [featured, blockAssets, releaseAssets, assets] = await Promise.all([
     db
       .select({ assetId: helpContentFeaturedVideos.assetId })
       .from(helpContentFeaturedVideos)
@@ -28,6 +30,14 @@ export async function cleanupObsoleteImportedHelpAssets(contentId: string): Prom
           .where(inArray(helpStepBlocks.stepId, stepIds))
       : Promise.resolve([]),
     db
+      .select({ assetId: helpContentReleaseAssets.assetId })
+      .from(helpContentReleaseAssets)
+      .innerJoin(
+        helpContentReleases,
+        eq(helpContentReleases.id, helpContentReleaseAssets.releaseId),
+      )
+      .where(eq(helpContentReleases.contentId, contentId)),
+    db
       .select({ id: helpAssets.id, storageKey: helpAssets.storageKey })
       .from(helpAssets)
       .where(eq(helpAssets.contentId, contentId)),
@@ -36,6 +46,7 @@ export async function cleanupObsoleteImportedHelpAssets(contentId: string): Prom
   const referencedAssetIds = new Set<string>([
     ...featured.map((item) => item.assetId),
     ...blockAssets.flatMap((item) => (item.assetId ? [item.assetId] : [])),
+    ...releaseAssets.map((item) => item.assetId),
   ]);
   const importPrefix = `help/import/${contentId}/`;
   const obsolete = assets.filter(
