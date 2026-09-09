@@ -3,14 +3,9 @@ import type { PageServerLoad } from "./$types";
 import { selectF10CustomerGroup } from "$lib/server/customerPortal/customerF10AuthRepository";
 import {
   getCustomerPortalSessionToken,
+  normalizeCustomerPortalReturnTo,
   requireCustomerF10PortalSession,
 } from "$lib/server/customerPortal/customerPortalSession";
-
-function safeReturnTo(value: string): string {
-  if (!value.startsWith("/") || value.startsWith("//")) return "/cliente/chamados";
-  if (value.startsWith("/ajuda-f10") || value.startsWith("/cliente")) return value;
-  return "/cliente/chamados";
-}
 
 function parseId(value: FormDataEntryValue | null): number | null {
   if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
@@ -19,7 +14,7 @@ function parseId(value: FormDataEntryValue | null): number | null {
 }
 
 export const load: PageServerLoad = async ({ cookies, url }) => {
-  const returnTo = safeReturnTo(url.searchParams.get("returnTo") ?? "/cliente/chamados");
+  const returnTo = normalizeCustomerPortalReturnTo(url.searchParams.get("returnTo") ?? "/cliente/chamados");
   const session = await requireCustomerF10PortalSession(cookies, returnTo, false);
 
   if (session.groups.length <= 1 || session.selectedGroupId !== null) {
@@ -41,7 +36,7 @@ export const actions: Actions = {
     const formData = await request.formData();
     const groupId = parseId(formData.get("groupId"));
     const returnToValue = formData.get("returnTo");
-    const returnTo = safeReturnTo(
+    const returnTo = normalizeCustomerPortalReturnTo(
       typeof returnToValue === "string" ? returnToValue : "/cliente/chamados",
     );
 
