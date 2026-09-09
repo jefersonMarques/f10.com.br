@@ -35,11 +35,13 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
   let mode: HelpScreenshotGenerationMode = "auto";
   let baseTimeSeconds: number | null = null;
   let selectedAssetId: string | null = null;
+  let preserveAssetIds: string[] = [];
   try {
     const payload = await request.json() as {
       mode?: string;
       baseTimeSeconds?: unknown;
       selectedAssetId?: unknown;
+      preserveAssetIds?: unknown;
     };
     if (payload.mode === "before" || payload.mode === "after" || payload.mode === "auto") {
       mode = payload.mode;
@@ -50,6 +52,13 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
     }
     if (typeof payload.selectedAssetId === "string" && isUuid(payload.selectedAssetId)) {
       selectedAssetId = payload.selectedAssetId;
+    }
+    if (Array.isArray(payload.preserveAssetIds)) {
+      preserveAssetIds = Array.from(new Set(
+        payload.preserveAssetIds.filter(
+          (assetId): assetId is string => typeof assetId === "string" && isUuid(assetId),
+        ),
+      )).slice(0, 24);
     }
   } catch {
     // Usa o modo automático quando o corpo vier vazio.
@@ -63,6 +72,7 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
       mode,
       baseTimeSeconds,
       selectedAssetId,
+      preserveAssetIds,
     });
     return json({
       success: true,
