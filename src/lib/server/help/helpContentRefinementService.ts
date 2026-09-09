@@ -632,7 +632,7 @@ export async function generateAdditionalHelpScreenshotCandidates(input: {
   });
   if (generated.length === 0) throw new Error("HELP_VIDEO_NO_SCREENSHOTS_SELECTED");
 
-  return addHelpGeneratedReviewCandidates({
+  const added = await addHelpGeneratedReviewCandidates({
     actorUserId: input.actorUserId,
     contentId: input.contentId,
     blockId: input.blockId,
@@ -644,4 +644,11 @@ export async function generateAdditionalHelpScreenshotCandidates(input: {
     })),
     preserveAssetIds: input.selectedAssetId ? [input.selectedAssetId] : [],
   });
+  const refreshedGroups = await listHelpScreenshotReviewGroups(input.contentId);
+  const refreshed = refreshedGroups.find((item) => item.blockId === input.blockId);
+
+  return {
+    addedCount: added.length,
+    candidates: refreshed?.candidates ?? added,
+  };
 }
