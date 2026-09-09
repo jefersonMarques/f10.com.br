@@ -1,9 +1,8 @@
 <script lang="ts">
   import { CalendarCheck2, Clock3, Video } from "lucide-svelte";
-  import type { ActionData, PageData } from "./$types";
+  import type { PageData } from "./$types";
 
   export let data: PageData;
-  export let form: ActionData;
 
   type Slot = PageData["slots"][number];
   type BookingResult = {
@@ -180,10 +179,6 @@
         <h1 class="mt-4 text-[28px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[36px]">{data.invitation.title}</h1>
         <p class="mt-2 text-[13px] leading-6 text-[#6F7585]">Com <strong class="font-semibold text-[#343B4A]">{data.invitation.hostName}</strong></p>
       </header>
-
-      {#if form?.message}
-        <div class={`mt-4 rounded-xl border px-4 py-3 text-[11px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>{form.message}</div>
-      {/if}
 
       {#if bookingResult || data.invitation.status === "booked"}
         <section class="mt-5 rounded-[26px] border border-[#B9E6C9] bg-white p-7 text-center">
