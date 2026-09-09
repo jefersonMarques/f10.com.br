@@ -78,7 +78,6 @@
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const before = draft.slice(0, start);
-    const selected = draft.slice(start, end) || draft.slice(start);
     const lineStart = before.lastIndexOf("\n") + 1;
     const selectedEnd = end > start ? end : draft.length;
     const segment = draft.slice(lineStart, selectedEnd);
@@ -128,19 +127,21 @@
 
 {#if editing}
   <div class="rounded-xl border border-[#C9CFF0] bg-white p-3 shadow-sm">
-    <div class="mb-2 flex flex-wrap items-center gap-1">
-      <button type="button" on:click={() => wrapSelection("**")} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#4E5668] hover:bg-[#F2F4FA]" aria-label="Negrito" title="Negrito"><Bold size={14}/></button>
-      <button type="button" on:click={() => wrapSelection("*")} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#4E5668] hover:bg-[#F2F4FA]" aria-label="Itálico" title="Itálico"><Italic size={14}/></button>
-      <button type="button" on:click={() => wrapSelection("`")} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#4E5668] hover:bg-[#F2F4FA]" aria-label="Código" title="Código"><Code2 size={14}/></button>
-      <span class="mx-1 h-5 w-px bg-[#E2E5ED]"></span>
-      <button type="button" on:click={() => prefixLines("- ")} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#4E5668] hover:bg-[#F2F4FA]" aria-label="Lista" title="Lista"><List size={14}/></button>
-      <button type="button" on:click={() => prefixLines("1. ")} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#4E5668] hover:bg-[#F2F4FA]" aria-label="Lista numerada" title="Lista numerada"><ListOrdered size={14}/></button>
-    </div>
+    {#if mode === "rich"}
+      <div class="mb-2 flex flex-wrap items-center gap-1">
+        <button type="button" on:click={() => wrapSelection("**")} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#4E5668] hover:bg-[#F2F4FA]" aria-label="Negrito" title="Negrito"><Bold size={14}/></button>
+        <button type="button" on:click={() => wrapSelection("*")} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#4E5668] hover:bg-[#F2F4FA]" aria-label="Itálico" title="Itálico"><Italic size={14}/></button>
+        <button type="button" on:click={() => wrapSelection("`")} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#4E5668] hover:bg-[#F2F4FA]" aria-label="Código" title="Código"><Code2 size={14}/></button>
+        <span class="mx-1 h-5 w-px bg-[#E2E5ED]"></span>
+        <button type="button" on:click={() => prefixLines("- ")} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#4E5668] hover:bg-[#F2F4FA]" aria-label="Lista" title="Lista"><List size={14}/></button>
+        <button type="button" on:click={() => prefixLines("1. ")} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#4E5668] hover:bg-[#F2F4FA]" aria-label="Lista numerada" title="Lista numerada"><ListOrdered size={14}/></button>
+      </div>
+    {/if}
     <textarea bind:this={textarea} bind:value={draft} {rows} {placeholder} maxlength={operation === "summary" ? 320 : operation === "quick_guide" ? 12000 : operation === "step_description" ? 2000 : operation === "step_title" ? 180 : 50000} class="w-full resize-y rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] px-3 py-2.5 text-[12px] leading-6 outline-none focus:border-[#000A57]"></textarea>
     {#if message}<p class="mt-2 text-[9px] font-medium text-[#9B2C2C]">{message}</p>{/if}
     <div class="mt-2 flex justify-end gap-1.5">
       <button type="button" on:click={cancelEdit} disabled={saving} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] text-[#6D7483]" aria-label="Cancelar" title="Cancelar"><X size={14}/></button>
-      <button type="button" on:click={save} disabled={saving || !draft.trim()} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#000A57] text-white disabled:opacity-40" aria-label="Salvar" title="Salvar"><Check size={15}/></button>
+      <button type="button" on:click={save} disabled={saving || ((operation === "step_title" || operation === "block_text") && !draft.trim())} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#000A57] text-white disabled:opacity-40" aria-label="Salvar" title="Salvar"><Check size={15}/></button>
     </div>
   </div>
 {:else}
