@@ -716,6 +716,210 @@ async function transcribeAudio(
   }
 }
 
+function normalizeScreenshotWindow(
+  screenshot: PlannedScreenshot,
+  durationSeconds: number,
+): { start: number; end: number } | null {
+  const rawStart = toFiniteNumber(screenshot.startSeconds);
+  const rawEnd = toFiniteNumber(screenshot.endSeconds);
+  if (rawStart === null || rawEnd === null || durationSeconds <= 0) return null;
+
+  let start = Math.max(0, Math.min(rawStart, durationSeconds));
+  let end = Math.max(start, Math.min(rawEnd, durationSeconds));
+  if (end - start > 12) end = start + 12;
+  if (end - start < 2) {
+    start = Math.max(0, start - 1);
+    end = Math.min(durationSeconds, Math.max(end + 1, start + 2));
+  }
+  return end > start ? { start, end } : null;
+}
+
+function candidateTimes(start: number, end: number): number[] {
+  const span = end - start;
+  const fractions = Array.from(
+    { length: CANDIDATES_PER_SCREENSHOT },
+    (_, index) => (index + 0.5) / CANDIDATES_PER_SCREENSHOT,
+  );
+  return fractions.map((fraction) =>
+    Math.round(
+      Math.max(start, Math.min(end - 0.03, start + span * fraction)) * 1000,
+    ) / 1000,
+  );
+}
+
+async function extractScreenshotCandidates(input: {
+  videoPath: string;
+  directory: string;
+  stepIndex: number;
+  screenshot: PlannedScreenshot;
+  durationSeconds: number;
+}): Promise<ScreenshotCandidate[]> {
+  const window = normalizeScreenshotWindow(input.screenshot, input.durationSeconds);
+  if (!window) return [];
+
+  const candidates: ScreenshotCandidate[] = [];
+  for (const [candidateIndex, timeSeconds] of candidateTimes(window.start, window.end).entries()) {
+    const outputPath = join(
+      input.directory,
+      `candidate-${String(input.stepIndex + 1).padStart(2, "0")}-${candidateIndex + 1}.jpg`,
+    );
+    try {
+      await runCommand(ffmpegPath(), [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-ss",
+        timeSeconds.toFixed(3),
+        "-i",
+        input.videoPath,
+        "-frames:v",
+        "1",
+        "-vf",
+        "scale=min(1280\\,iw):-2",
+        "-q:v",
+        "3",
+        outputPath,
+      ]);
+      await readFile(outputPath);
+      candidates.push({ path: outputPath, timeSeconds });
+    } catch {
+      // Um frame perto do fim pode falhar sem invalidar a etapa inteira.
+    }
+  }
+  return candidates;
+}
+
+export type HelpVideoGeneratedFrameCandidate = {
+  candidateIndex: number;
+  timeSeconds: number;
+  recommended: boolean;
+  bytes: Uint8Array;
+};
+
+export async function generateHelpVideoFrameCandidates(input: {
+  videoBytes: Uint8Array;
+  startSeconds: number;
+  endSeconds: number;
+  capture: ScreenshotCaptureMode;
+  durationSeconds: number;
+}): Promise<HelpVideoGeneratedFrameCandidate[]> {
+  if (!isMp4Bytes(input.videoBytes)) throw new Error("HELP_VIDEO_UPLOAD_FORMAT_INVALID");
+  const directory = await mkdtemp(join(tmpdir(), "f10-help-frames-"));
+  const videoPath = join(directory, "source.mp4");
+  try {
+    await writeFile(videoPath, input.videoBytes);
+    const screenshot: PlannedScreenshot = {
+      startSeconds: input.startSeconds,
+      endSeconds: input.endSeconds,
+      capture: input.capture,
+      target: "Screenshot adicional",
+      altText: "",
+      assistantDescription: "",
+    };
+    const candidates = await extractScreenshotCandidates({
+      videoPath,
+      directory,
+      stepIndex: 0,
+      screenshot,
+      durationSeconds: input.durationSeconds,
+    });
+    const selected = await chooseStableCandidate(candidates, input.capture);
+    return Promise.all(
+      candidates.map(async (candidate, index) => ({
+        candidateIndex: index + 1,
+        timeSeconds: candidate.timeSeconds,
+        recommended: candidate.path === selected?.path,
+        bytes: new Uint8Array(await readFile(candidate.path)),
+      })),
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+async function frameSsim(leftPath: string, rightPath: string): Promise<number | null> {
+  try {
+    const stderr = await runCommand(ffmpegPath(), [
+      "-hide_banner",
+      "-i",
+      leftPath,
+      "-i",
+      rightPath,
+      "-lavfi",
+      "[0:v][1:v]ssim",
+      "-f",
+      "null",
+      "-",
+    ]);
+    const matches = Array.from(stderr.matchAll(/All:([0-9.]+)/g));
+    const raw = matches.at(-1)?.[1];
+    const score = raw ? Number(raw) : NaN;
+    return Number.isFinite(score) ? score : null;
+  } catch {
+    return null;
+  }
+}
+
+async function chooseStableCandidate(
+  candidates: ScreenshotCandidate[],
+  capture: ScreenshotCaptureMode,
+): Promise<ScreenshotCandidate | null> {
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0] ?? null;
+
+  const pairs: Array<{ index: number; score: number }> = [];
+  for (let index = 0; index < candidates.length - 1; index += 1) {
+    const left = candidates[index];
+    const right = candidates[index + 1];
+    if (!left || !right) continue;
+    const score = await frameSsim(left.path, right.path);
+    if (score !== null) pairs.push({ index, score });
+  }
+
+  if (pairs.length === 0) {
+    return capture === "after" ? candidates.at(-1) ?? null : candidates[0] ?? null;
+  }
+
+  const stablePairs = pairs.filter((pair) => pair.score >= STABILITY_THRESHOLD);
+  if (capture === "after") {
+    const pair = stablePairs.at(-1)
+      ?? [...pairs].sort((a, b) => b.score - a.score || b.index - a.index)[0];
+    return pair
+      ? candidates[pair.index + 1] ?? candidates.at(-1) ?? null
+      : candidates.at(-1) ?? null;
+  }
+
+  const pair = stablePairs[0]
+    ?? [...pairs].sort((a, b) => b.score - a.score || a.index - b.index)[0];
+  return pair
+    ? candidates[pair.index] ?? candidates[0] ?? null
+    : candidates[0] ?? null;
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+  const workers = Array.from(
+    { length: Math.min(Math.max(concurrency, 1), items.length) },
+    async () => {
+      while (true) {
+        const index = nextIndex;
+        nextIndex += 1;
+        if (index >= items.length) return;
+        results[index] = await mapper(items[index]!, index);
+      }
+    },
+  );
+  await Promise.all(workers);
+  return results;
+}
+
 async function resolveArticleScreenshots(input: {
   videoPath: string;
   directory: string;
