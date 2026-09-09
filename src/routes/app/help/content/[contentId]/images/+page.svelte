@@ -83,6 +83,7 @@
   let splitSuggestion: SplitSuggestion | null = null;
   let splitLoadingStepId = "";
   let splitApplying = false;
+  let splitError = "";
   let deleteStepTarget: ReviewStep | null = null;
   let deletingStep = false;
   let showVideoUpdateModal = false;
@@ -450,6 +451,7 @@
     splitTargetStep = step;
     splitDesiredParts = 2;
     splitSuggestion = null;
+    splitError = "";
     saveMessage = "";
   }
 
@@ -457,6 +459,7 @@
     if (splitApplying) return;
     splitTargetStep = null;
     splitSuggestion = null;
+    splitError = "";
     splitLoadingStepId = "";
   }
 
@@ -475,6 +478,7 @@
       return;
     }
     splitLoadingStepId = step.id;
+    splitError = "";
     saveMessage = "";
     try {
       const response = await fetch(
@@ -494,14 +498,12 @@
         suggestion?: Omit<SplitSuggestion, "stepId">;
       };
       if (!response.ok || !payload.success || !payload.suggestion) {
-        saveSuccess = false;
-        saveMessage = payload.message || "Não foi possível analisar a etapa.";
+        splitError = payload.message || "Não foi possível analisar a etapa.";
         return;
       }
       splitSuggestion = { stepId: step.id, ...payload.suggestion };
     } catch {
-      saveSuccess = false;
-      saveMessage = "A conexão foi interrompida ao analisar a etapa.";
+      splitError = "A conexão foi interrompida ao analisar a etapa.";
     } finally {
       splitLoadingStepId = "";
     }
@@ -515,6 +517,7 @@
       return;
     }
     splitApplying = true;
+    splitError = "";
     try {
       const response = await fetch(
         `/api/app/help/content/${data.content.id}/steps/${splitSuggestion.stepId}/split`,
@@ -534,8 +537,7 @@
         content?: unknown;
       };
       if (!response.ok || !payload.success) {
-        saveSuccess = false;
-        saveMessage = payload.message || "Não foi possível reorganizar a etapa.";
+        splitError = payload.message || "Não foi possível reorganizar a etapa.";
         return;
       }
       applyUpdatedContent(payload.content);
@@ -544,8 +546,7 @@
       saveSuccess = true;
       saveMessage = payload.message || "Etapa reorganizada.";
     } catch {
-      saveSuccess = false;
-      saveMessage = "A conexão foi interrompida ao reorganizar a etapa.";
+      splitError = "A conexão foi interrompida ao reorganizar a etapa.";
     } finally {
       splitApplying = false;
     }
@@ -1055,6 +1056,13 @@
           </button>
         </div>
       </div>
+
+      {#if splitError}
+        <div class="mt-4 flex items-start gap-2 rounded-xl border border-[#F0C8C8] bg-[#FFF5F5] px-3 py-2.5 text-[9px] font-medium text-[#9B2C2C]">
+          <TriangleAlert size={13} class="mt-0.5 shrink-0"/>
+          <span>{splitError}</span>
+        </div>
+      {/if}
 
       {#if splitSuggestion}
         <div class="mt-5 space-y-3">
