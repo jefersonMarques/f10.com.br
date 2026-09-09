@@ -36,6 +36,16 @@
   type ReviewStep = PageData["content"]["steps"][number];
   type ReviewContent = PageData["content"];
   type AddBlockType = "text" | "notice" | "link";
+  type SplitSuggestion = {
+    stepId: string;
+    sourceSignature: string;
+    shouldSplit: boolean;
+    parts: Array<{
+      title: string;
+      description: string;
+      instruction: string;
+    }>;
+  };
 
   let savingMode: "draft" | "confirm" | null = null;
   let saveMessage = "";
@@ -60,6 +70,9 @@
   let reviewCategories = data.content.categories;
   let selectedCategoryIds: string[] = [];
   let reviewPending = data.humanReview.pending;
+  let splitSuggestion: SplitSuggestion | null = null;
+  let splitLoadingStepId = "";
+  let splitApplying = false;
 
   type ReviewItemPayload = {
     blockId: string;
@@ -350,6 +363,92 @@
     }
   }
 
+  async function previewStepSplit(step: ReviewStep): Promise<void> {
+    if (splitLoadingStepId || splitApplying) return;
+    if (hasUnsavedReview || openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = hasUnsavedReview
+        ? "Salve as alterações das imagens antes de reorganizar a etapa."
+        : "Salve ou cancele o texto que está em edição.";
+      return;
+    }
+    splitLoadingStepId = step.id;
+    saveMessage = "";
+    try {
+      const response = await fetch(
+        `/api/app/help/content/${data.content.id}/steps/${step.id}/split`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "preview" }),
+        },
+      );
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+        suggestion?: Omit<SplitSuggestion, "stepId">;
+      };
+      if (!response.ok || !payload.success || !payload.suggestion) {
+        saveSuccess = false;
+        saveMessage = payload.message || "Não foi possível analisar a etapa.";
+        return;
+      }
+      splitSuggestion = { stepId: step.id, ...payload.suggestion };
+      if (!splitSuggestion.shouldSplit) {
+        saveSuccess = true;
+        saveMessage = "A etapa já está objetiva. Nenhuma quebra foi sugerida.";
+      }
+    } catch {
+      saveSuccess = false;
+      saveMessage = "A conexão foi interrompida ao analisar a etapa.";
+    } finally {
+      splitLoadingStepId = "";
+    }
+  }
+
+  async function applyStepSplit(): Promise<void> {
+    if (!splitSuggestion?.shouldSplit || splitApplying) return;
+    if (hasUnsavedReview || openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = "Salve as alterações pendentes antes de aplicar.";
+      return;
+    }
+    splitApplying = true;
+    try {
+      const response = await fetch(
+        `/api/app/help/content/${data.content.id}/steps/${splitSuggestion.stepId}/split`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            action: "apply",
+            sourceSignature: splitSuggestion.sourceSignature,
+            parts: splitSuggestion.parts,
+          }),
+        },
+      );
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+        content?: unknown;
+      };
+      if (!response.ok || !payload.success) {
+        saveSuccess = false;
+        saveMessage = payload.message || "Não foi possível reorganizar a etapa.";
+        return;
+      }
+      applyUpdatedContent(payload.content);
+      splitSuggestion = null;
+      saveSuccess = true;
+      saveMessage = payload.message || "Etapa reorganizada.";
+    } catch {
+      saveSuccess = false;
+      saveMessage = "A conexão foi interrompida ao reorganizar a etapa.";
+    } finally {
+      splitApplying = false;
+    }
+  }
+
   async function publish(): Promise<void> {
     if (!publicationReady || publishing) return;
     publishing = true;
@@ -500,6 +599,11 @@
                 />
               </div>
             </div>
+            {#if data.canEdit}
+              <button type="button" on:click={() => previewStepSplit(step)} disabled={Boolean(splitLoadingStepId) || splitApplying} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#F1D7BD] bg-[#FFF9F3] text-[#A9510D] transition hover:bg-[#FFF4E9] disabled:opacity-50" aria-label="Quebrar etapa com IA" title="Quebrar etapa">
+                {#if splitLoadingStepId === step.id}<LoaderCircle size={14} class="animate-spin"/>{:else}<Sparkles size={14}/>{/if}
+              </button>
+            {/if}
             <a href={`/app/help/content/${data.content.id}?step=${encodeURIComponent(step.id)}`} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#6E7584] transition hover:text-[#000A57]" aria-label="Abrir etapa no modo avançado" title="Modo avançado desta etapa"><Settings2 size={14}/></a>
           </header>
 
@@ -535,6 +639,7 @@
                   initialAnnotations={review?.draftAnnotations ?? readHelpImageAnnotationsFromMetadata(block.metadata)}
                   initialInteractions={review?.draftInteractions ?? []}
                   reviewed={humanStatus?.reviewed ?? false}
+                  canGenerateFrames={data.canGenerateVideoFrames}
                   disabled={!data.canEdit}
                   on:interaction={markInteraction}
                 />
@@ -595,6 +700,48 @@
     </div>
   {/if}
 </ApplicationContent>
+
+{#if splitSuggestion}
+  <div class="fixed inset-0 z-[145] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
+    <section role="dialog" aria-modal="true" class="max-h-[88vh] w-full max-w-[680px] overflow-y-auto rounded-[24px] bg-white p-5 shadow-2xl sm:p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Sparkles size={17}/></span>
+          <div>
+            <h2 class="text-[16px] font-semibold text-[#11182C]">Quebrar etapa</h2>
+            <p class="mt-1 text-[10px] text-[#858A98]">{splitSuggestion.parts.length} {splitSuggestion.parts.length === 1 ? "parte sugerida" : "partes sugeridas"}</p>
+          </div>
+        </div>
+        <button type="button" on:click={() => (splitSuggestion = null)} disabled={splitApplying} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482]" aria-label="Fechar"><X size={16}/></button>
+      </div>
+
+      <div class="mt-5 space-y-3">
+        {#each splitSuggestion.parts as part, index}
+          <article class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4">
+            <div class="flex items-start gap-3">
+              <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#000A57] text-[10px] font-bold text-white">{index + 1}</span>
+              <div class="min-w-0 flex-1">
+                <strong class="text-[12px] font-semibold text-[#303645]">{part.title}</strong>
+                {#if part.description}<p class="mt-1 text-[9px] leading-4 text-[#858B99]">{part.description}</p>{/if}
+                <div class="mt-2"><HelpRichText text={part.instruction} className="space-y-1 text-[10px] leading-5 text-[#555D6C]"/></div>
+              </div>
+            </div>
+          </article>
+        {/each}
+      </div>
+
+      <div class="mt-5 flex justify-end gap-2">
+        <button type="button" on:click={() => (splitSuggestion = null)} disabled={splitApplying} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[10px] font-semibold text-[#626979]">Cancelar</button>
+        {#if splitSuggestion.shouldSplit}
+          <button type="button" on:click={applyStepSplit} disabled={splitApplying} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">
+            {#if splitApplying}<LoaderCircle size={14} class="animate-spin"/>{:else}<Check size={14}/>{/if}
+            Aplicar
+          </button>
+        {/if}
+      </div>
+    </section>
+  </div>
+{/if}
 
 {#if showUntouchedModal}
   <div class="fixed inset-0 z-[140] flex items-center justify-center bg-[#050A1A]/60 px-4" role="presentation">
