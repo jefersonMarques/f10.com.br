@@ -32,15 +32,17 @@ export const HELP_YOUTUBE_EXTRACTION_ENABLED = false;
 
 export type ScreenshotCaptureMode = "before" | "after";
 
-type TranscriptSegment = {
+export type HelpVideoTranscriptSegment = {
   start: number;
   end: number;
   text: string;
 };
 
+type TranscriptSegment = HelpVideoTranscriptSegment;
+
 export type HelpVideoAutomationTranscriptCheckpoint = {
   text: string;
-  segments: TranscriptSegment[];
+  segments: HelpVideoTranscriptSegment[];
   durationSeconds: number;
   completedChunks?: number;
   totalChunks?: number;
