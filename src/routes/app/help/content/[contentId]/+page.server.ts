@@ -343,7 +343,7 @@ export const actions: Actions = {
       let createdNewAsset = false;
       try {
         const bytes = new Uint8Array(await videoFile.arrayBuffer());
-        const duplicate = await findImportedHelpVideoByChecksum(bytes);
+        const duplicate = await findImportedHelpVideoByChecksum(bytes, params.contentId);
         if (duplicate?.contentId && duplicate.contentId !== params.contentId) {
           throw new Error("HELP_VIDEO_ALREADY_USED");
         }
