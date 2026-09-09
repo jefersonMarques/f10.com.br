@@ -26,6 +26,7 @@ import {
   listSchedulingTeamUserIds,
 } from "$lib/server/calendar/schedulingRepository";
 import { generateSchedulingInvitation } from "$lib/server/calendar/schedulingService";
+import { listPersonalSchedulingBookings } from "$lib/server/calendar/personalSchedulingRepository";
 import { listTicketAgendaItems } from "$lib/server/support/ticketAgendaRepository";
 import { isTicketDueDate } from "$lib/server/support/ticketDueDate";
 import {
@@ -266,6 +267,10 @@ export const load: PageServerLoad = async ({ parent, url }) => {
       : Promise.resolve([]),
   ]);
 
+  const personalSchedulingBookings = canViewScheduling
+    ? await listPersonalSchedulingBookings(layout.user.id, range.timeMin, range.timeMax)
+    : [];
+
   const schedulingHosts = rawSchedulingHosts
     .filter((host) =>
       canManageScheduling ||
@@ -307,6 +312,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     schedulingHosts,
     schedulingCustomers,
     schedulingInvitations: schedulingInvitations.slice(0, 20),
+    schedulingBookings: personalSchedulingBookings,
     calendarAnchor,
     googleCalendar,
     googleEvents,
