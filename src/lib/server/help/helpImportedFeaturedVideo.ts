@@ -218,7 +218,7 @@ export async function saveHelpImportedVideoTimeline(
         ? [{ start: Math.max(0, start), end, text }]
         : [];
     })
-    .slice(0, 2000);
+    .slice(0, 4000);
 
   const db = getDatabase();
   const [row] = await db
