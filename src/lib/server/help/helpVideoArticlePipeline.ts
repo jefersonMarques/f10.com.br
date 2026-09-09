@@ -125,17 +125,24 @@ const CLASSIFICATION_BATCH_SEGMENTS = 60;
 const GENERATION_PART_SEGMENTS = 55;
 const GENERATION_PART_SECONDS = 9 * 60;
 
-const SOURCE_LEAK_PATTERNS = [
+const EDITORIAL_INVALID_PATTERNS = [
   /\bna transcri(?:ção|cao)\b/i,
-  /\bconforme (?:a )?transcri(?:ção|cao)\b/i,
-  /\bde acordo com (?:a )?transcri(?:ção|cao)\b/i,
-  /\ba transcri(?:ção|cao) (?:diz|informa|menciona|mostra|indica)\b/i,
+  /\b(?:conforme|segundo|de acordo com).{0,80}\btranscri(?:ção|cao)\b/i,
+  /\b(?:explica(?:ção|cao)|conteúdo|informação).{0,50}\b(?:da|na) transcri(?:ção|cao)\b/i,
+  /\ba transcri(?:ção|cao) (?:diz|informa|menciona|mostra|indica|explica)\b/i,
   /\bno vídeo (?:é |foi )?(?:dito|mencionado|mostrado|explicado|informado)\b/i,
   /\bo vídeo (?:diz|mostra|explica|informa|menciona)\b/i,
   /\bconforme (?:o )?vídeo\b/i,
   /\bna grava(?:ção|cao)\b/i,
   /\bo narrador\b/i,
   /\bfoi (?:dito|mencionado) (?:no|na) (?:vídeo|áudio|grava(?:ção|cao))\b/i,
+  /\bnesta etapa não há ações? de interface\b/i,
+  /\b(?:esta|essa) etapa (?:é|e) (?:apenas|somente) (?:explicativa|conceitual)\b/i,
+  /\bsem ações? de interface\b/i,
+  /\bapenas compreensão (?:da|do|de)\b/i,
+  /\b(?:não|nao) (?:há|ha) (?:necessidade de )?(?:screenshot|captura de tela)\b/i,
+  /(?:^|\n)\s*(?:\*\*|__)?\s*(?:svg|html|xml|css|json)\s*(?:\*\*|__)?\s*(?=\n|$)/i,
+  /<\/?svg\b/i,
 ];
 
 function aiFailureCode(cause: unknown): string {
@@ -448,11 +455,11 @@ function partSchema(): Record<string, unknown> {
   };
 }
 
-function sourceLeak(value: string): boolean {
-  return SOURCE_LEAK_PATTERNS.some((pattern) => pattern.test(value));
+function editorialInvalid(value: string): boolean {
+  return EDITORIAL_INVALID_PATTERNS.some((pattern) => pattern.test(value));
 }
 
-function stepLeaksSource(step: GeneratedPartStep): boolean {
+function stepHasEditorialIssue(step: GeneratedPartStep): boolean {
   return [
     step.title,
     step.description,
@@ -462,7 +469,7 @@ function stepLeaksSource(step: GeneratedPartStep): boolean {
       item.altText,
       item.assistantDescription,
     ]),
-  ].some((value) => sourceLeak(value));
+  ].some((value) => editorialInvalid(value));
 }
 
 function normalizePartSteps(
@@ -658,6 +665,9 @@ async function generatePart(
         instructions: [
           "Escreva documentação oficial F10 para o usuário final usando somente os segmentos fornecidos.",
           "A fonte recebida é evidência interna. NUNCA mencione transcrição, gravação, narrador, áudio usado na geração, nem diga 'no vídeo é mostrado', 'foi dito' ou frases equivalentes.",
+          "NUNCA explique o processo de geração. Não escreva frases como 'nesta etapa não há ações de interface', 'etapa explicativa', 'sem necessidade de screenshot' ou justificativas sobre por que uma imagem não foi criada.",
+          "Se o trecho for conceitual, escreva diretamente o conceito útil ao usuário, sem comentar que ele é conceitual ou que não possui ações.",
+          "Não produza marcadores soltos, placeholders ou lixo de formatação como **svg**, <svg>, **html**, JSON isolado ou nomes de formatos sem função no texto.",
           "Escreva diretamente a orientação: transforme cada fato em instrução, regra, condição, resultado ou explicação útil.",
           "Não resuma a ponto de perder ações, campos, valores, regras, condições, exceções ou resultados.",
           "Toda ação executável deve ficar em linha numerada usando **1.**, **2.**, **3.**.",
@@ -667,7 +677,7 @@ async function generatePart(
           "Para etapa de interface, planeje no máximo um screenshot usando os tempos dos próprios segmentos da etapa.",
           "Não invente telas, campos, regras, URLs ou resultados.",
           attempt === 2
-            ? `CORREÇÃO OBRIGATÓRIA: a auditoria detectou estes segmentos sem representação suficiente ou linguagem inadequada: ${lastMissing.join(", ") || "linguagem editorial inadequada"}. Inclua os fatos desses segmentos de forma explícita e natural.`
+            ? `CORREÇÃO OBRIGATÓRIA: a auditoria detectou estes segmentos sem representação suficiente ou texto editorial inválido: ${lastMissing.join(", ") || "linguagem_de_bastidor_ou_artefato"}. Reescreva somente como documentação final para o usuário, sem comentar fonte, transcrição, vídeo, ausência de ações/screenshot ou processo de geração; remova qualquer token solto como **svg**.`
             : "",
         ].filter(Boolean).join("\n"),
         userInput: [
@@ -691,7 +701,7 @@ async function generatePart(
 
       const steps = normalizePartSteps(response.data, allowedIds);
       lastMissing = missingCoverage(requiredIds, steps);
-      const editorialLeak = steps.some(stepLeaksSource);
+      const editorialLeak = steps.some(stepHasEditorialIssue);
       if (steps.length > 0 && lastMissing.length === 0 && !editorialLeak) {
         lastMissing = await auditPartCoverage(part, steps, onAiUsage);
         if (lastMissing.length === 0) {
@@ -704,7 +714,9 @@ async function generatePart(
           return steps;
         }
       }
-      if (editorialLeak && lastMissing.length === 0) lastMissing = ["linguagem_da_fonte"];
+      if (editorialLeak && lastMissing.length === 0) {
+        lastMissing = ["linguagem_de_bastidor_ou_artefato"];
+      }
     }
 
     throw new Error("HELP_VIDEO_ARTICLE_PART_COVERAGE_INCOMPLETE");
@@ -748,7 +760,7 @@ function metadataSchema(): Record<string, unknown> {
   };
 }
 
-function metadataLeaksSource(metadata: GeneratedMetadata): boolean {
+function metadataHasEditorialIssue(metadata: GeneratedMetadata): boolean {
   return [
     metadata.title,
     metadata.summary,
@@ -792,6 +804,8 @@ async function generateMetadata(
           "O artigo já foi gerado em etapas com cobertura validada. Não reescreva nem resuma as etapas.",
           "quickGuide deve ser curto e sequencial; não precisa repetir todos os detalhes do artigo.",
           "A fonte é interna. NUNCA mencione transcrição, gravação, narrador, áudio de geração, 'no vídeo', 'foi dito' ou processo de criação.",
+          "Não explique que uma etapa é conceitual, que não possui ações de interface ou que não precisa de screenshot. Escreva somente a informação útil ao usuário.",
+          "Não produza placeholders ou artefatos como **svg**, <svg>, **html**, JSON isolado ou nomes de formatos sem função editorial.",
           "Não invente fatos.",
           attempt === 2 ? "A tentativa anterior usou linguagem de bastidor. Reescreva como documentação direta ao usuário." : "",
         ].filter(Boolean).join("\n"),
@@ -826,7 +840,7 @@ async function generateMetadata(
         assistantKnowledge: response.data.assistantKnowledge.trim().slice(0, 40_000),
       };
 
-      if (metadata.title && !metadataLeaksSource(metadata)) {
+      if (metadata.title && !metadataHasEditorialIssue(metadata)) {
         await reportAiUsage(onAiUsage, {
           operation: "video_article_metadata",
           ...lastResponseMeta,
@@ -890,7 +904,7 @@ export async function generateHelpVideoArticle(input: {
   if (uncovered.length > 0) {
     throw new Error(`HELP_VIDEO_COVERAGE_INCOMPLETE:${uncovered.slice(0, 20).join(",")}`);
   }
-  if (generated.some(stepLeaksSource)) {
+  if (generated.some(stepHasEditorialIssue)) {
     throw new Error("HELP_VIDEO_ARTICLE_EDITORIAL_INVALID");
   }
 
