@@ -477,6 +477,10 @@
           <button type="button" on:click={() => setCalendarView("list")} class={`application-text-caption inline-flex h-7 items-center gap-1.5 rounded-md px-3 font-semibold ${calendarView === "list" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><ListIcon size={12}/>Lista</button>
         </div>
 
+        {#if data.canViewScheduling}
+          <a href="/app/tasks/calendar/scheduling" class="application-text-caption inline-flex h-9 items-center gap-2 rounded-lg border border-[#D8DDF4] bg-[#F8F9FF] px-3 font-semibold text-[#000A57]"><CalendarClock size={14}/>Minha agenda</a>
+        {/if}
+
         {#if canCreateAnything}
           <button type="button" on:click={() => openCreationChooser(cursorDate)} class="application-text-caption inline-flex h-9 items-center gap-2 rounded-lg bg-[#000A57] px-3 font-semibold text-white"><Plus size={14}/>Novo evento</button>
         {/if}
