@@ -232,31 +232,54 @@ export type PublicHelpCollection = {
 export async function listPublicHelpCollections(
   publishedCatalog?: PublishedStructuredHelpSummary[],
 ): Promise<PublicHelpCollection[]> {
-  const [collections, catalog] = await Promise.all([
-    listHelpCollections(),
+  const db = getDatabase();
+  const [collections, items, catalog] = await Promise.all([
+    db
+      .select({
+        id: helpCollections.id,
+        slug: helpCollections.slug,
+        title: helpCollections.title,
+        description: helpCollections.description,
+      })
+      .from(helpCollections)
+      .where(eq(helpCollections.active, true))
+      .orderBy(asc(helpCollections.sortOrder), asc(helpCollections.title)),
+    db
+      .select({
+        collectionId: helpCollectionItems.collectionId,
+        contentId: helpCollectionItems.contentId,
+        sortOrder: helpCollectionItems.sortOrder,
+      })
+      .from(helpCollectionItems)
+      .innerJoin(helpCollections, eq(helpCollections.id, helpCollectionItems.collectionId))
+      .where(eq(helpCollections.active, true))
+      .orderBy(
+        asc(helpCollectionItems.collectionId),
+        asc(helpCollectionItems.sortOrder),
+      ),
     publishedCatalog
       ? Promise.resolve(publishedCatalog)
       : listPublishedStructuredHelpCatalog(),
   ]);
-  const publishedById = new Map(catalog.map((content) => [content.contentId, content]));
+
+  const publishedById = new Map(catalog.map((item) => [item.contentId, item]));
+  const itemsByCollection = new Map<string, PublicHelpCollection["items"]>();
+  for (const item of items) {
+    const published = publishedById.get(item.contentId);
+    if (!published) continue;
+    const current = itemsByCollection.get(item.collectionId) ?? [];
+    current.push({
+      contentId: published.contentId,
+      slug: published.slug,
+      title: published.title,
+    });
+    itemsByCollection.set(item.collectionId, current);
+  }
 
   return collections
-    .filter((collection) => collection.active)
     .map((collection) => ({
-      id: collection.id,
-      slug: collection.slug,
-      title: collection.title,
-      description: collection.description,
-      items: collection.items.flatMap((item) => {
-        const published = publishedById.get(item.contentId);
-        return published
-          ? [{
-              contentId: published.contentId,
-              slug: published.slug,
-              title: published.title,
-            }]
-          : [];
-      }),
+      ...collection,
+      items: itemsByCollection.get(collection.id) ?? [],
     }))
     .filter((collection) => collection.items.length > 0);
 }
