@@ -28,6 +28,7 @@
   import HelpInlineTextEditor from "$lib/components/help/HelpInlineTextEditor.svelte";
   import HelpRichText from "$lib/components/help/HelpRichText.svelte";
   import HelpScreenshotReviewCarousel from "$lib/components/help/HelpScreenshotReviewCarousel.svelte";
+  import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
   import { readHelpImageAnnotationsFromMetadata } from "$lib/help/helpImageAnnotations";
   import type { HelpHumanReviewInteraction } from "$lib/help/helpHumanReview";
   import type { PageData } from "./$types";
@@ -89,7 +90,14 @@
 
   $: realCategoriesReady =
     selectedCategoryIds.length > 0 &&
-    selectedCategoryIds.every((id) => data.categories.some((category) => category.id === id && category.active));
+    selectedCategoryIds.every((id) =>
+      data.categories.some(
+        (category) =>
+          category.id === id &&
+          category.active &&
+          category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG,
+      ),
+    );
   $: stepsReady =
     reviewSteps.length > 0 &&
     reviewSteps.every((step) => step.blocks.some((block) =>
