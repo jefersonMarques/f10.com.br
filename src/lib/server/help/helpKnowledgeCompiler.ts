@@ -173,7 +173,9 @@ export function validateHelpKnowledgePublication(content: HelpKnowledgeCompilerI
   if (content.featuredVideo && !content.featuredVideo.subtitles.trim()) {
     throw new Error("FEATURED_VIDEO_SUBTITLES_REQUIRED");
   }
-  if (content.steps.length === 0) throw new Error("CONTENT_STEP_REQUIRED");
+  if (!content.featuredVideo && content.steps.length === 0) {
+    throw new Error("CONTENT_PUBLIC_CONTENT_REQUIRED");
+  }
 
   for (const step of content.steps) {
     if (!step.title.trim()) throw new Error("STEP_TITLE_REQUIRED");
