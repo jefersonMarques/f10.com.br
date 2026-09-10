@@ -1,4 +1,7 @@
-import { createAiStructuredResponse } from "$lib/server/ai/aiGateway";
+import {
+  AiGatewayError,
+  createAiStructuredResponse,
+} from "$lib/server/ai/aiGateway";
 import {
   getPublishedHelpContext,
   markHelpSearchOutcome,
@@ -10,6 +13,13 @@ const MAX_SEARCH_QUERY_CHARS = 220;
 const MAX_CANDIDATES = 10;
 const MAX_ARTICLE_CHARS = 36_000;
 const MAX_CANDIDATE_SUMMARY_CHARS = 900;
+const RETRYABLE_AI_CODES = new Set([
+  "AI_TIMEOUT",
+  "AI_REQUEST_FAILED",
+  "AI_INVALID_RESPONSE",
+  "AI_EMPTY_RESPONSE",
+  "AI_INVALID_JSON",
+]);
 
 const PLAN_SCHEMA = {
   type: "object",
@@ -142,6 +152,21 @@ function trim(value: string, limit: number): string {
   return `${normalized.slice(0, Math.max(0, limit - 1))}…`;
 }
 
+function shouldRetry(cause: unknown): boolean {
+  if (!(cause instanceof AiGatewayError)) return false;
+  if (cause.status !== null && cause.status >= 500) return true;
+  return RETRYABLE_AI_CODES.has(cause.code);
+}
+
+async function withRetry<T>(request: () => Promise<T>): Promise<T> {
+  try {
+    return await request();
+  } catch (cause) {
+    if (!shouldRetry(cause)) throw cause;
+    return request();
+  }
+}
+
 async function plan(question: string): Promise<PlanResponse> {
   const request = () => createAiStructuredResponse<PlanResponse>({
     task: "support_answer",
@@ -153,14 +178,14 @@ async function plan(question: string): Promise<PlanResponse> {
     maxOutputTokens: 180,
   });
 
-  const first = await request();
+  const first = await withRetry(request);
   let result = first.data;
   const query = result.searchQuery.trim().slice(0, MAX_SEARCH_QUERY_CHARS);
   if (result.action !== "search" || query) {
     return { ...result, searchQuery: query };
   }
 
-  const second = await createAiStructuredResponse<PlanResponse>({
+  const second = await withRetry(() => createAiStructuredResponse<PlanResponse>({
     task: "support_answer",
     requiredCapabilities: ["knowledge.search", "customer.reply"],
     instructions: PLAN_INSTRUCTIONS,
@@ -168,7 +193,7 @@ async function plan(question: string): Promise<PlanResponse> {
     schemaName: "f10_general_help_plan_retry",
     schema: PLAN_SCHEMA,
     maxOutputTokens: 180,
-  });
+  }));
   result = second.data;
   const retryQuery = result.searchQuery.trim().slice(0, MAX_SEARCH_QUERY_CHARS);
   if (result.action === "search" && !retryQuery) {
@@ -199,7 +224,7 @@ async function selectArticle(
 ): Promise<number> {
   if (candidates.length === 0) return 0;
 
-  const request = async (correction = "") => createAiStructuredResponse<SelectResponse>({
+  const request = async (correction = "") => withRetry(() => createAiStructuredResponse<SelectResponse>({
     task: "support_answer",
     requiredCapabilities: ["knowledge.read", "customer.reply"],
     instructions: SELECT_INSTRUCTIONS,
@@ -210,7 +235,7 @@ async function selectArticle(
     schemaName: "f10_general_help_article_selection",
     schema: SELECT_SCHEMA,
     maxOutputTokens: 140,
-  });
+  }));
 
   const first = await request();
   if (first.data.articleIndex >= 0 && first.data.articleIndex <= candidates.length) {
@@ -251,7 +276,7 @@ async function answerFromArticle(question: string, article: Article): Promise<An
     `Conteúdo do artigo:\n${article.text}`,
   ].join("\n\n");
 
-  const request = async (correction = "") => createAiStructuredResponse<AnswerResponse>({
+  const request = async (correction = "") => withRetry(() => createAiStructuredResponse<AnswerResponse>({
     task: "support_answer",
     requiredCapabilities: ["knowledge.read", "customer.reply"],
     instructions: ANSWER_INSTRUCTIONS,
@@ -259,7 +284,7 @@ async function answerFromArticle(question: string, article: Article): Promise<An
     schemaName: "f10_general_help_article_answer",
     schema: ANSWER_SCHEMA,
     maxOutputTokens: 900,
-  });
+  }));
 
   const first = await request();
   const answer = first.data.answer.trim();
@@ -281,7 +306,7 @@ async function generateText(question: string, mode: "clarify" | "handoff" | "tic
   const instructions = mode === "clarify"
     ? CLARIFY_INSTRUCTIONS
     : `${DIRECT_INSTRUCTIONS}\nAção identificada: ${mode}.`;
-  const response = await createAiStructuredResponse<TextResponse>({
+  const response = await withRetry(() => createAiStructuredResponse<TextResponse>({
     task: "support_answer",
     requiredCapabilities: ["customer.reply"],
     instructions,
@@ -289,7 +314,7 @@ async function generateText(question: string, mode: "clarify" | "handoff" | "tic
     schemaName: `f10_general_help_${mode}`,
     schema: TEXT_SCHEMA,
     maxOutputTokens: 260,
-  });
+  }));
   const answer = response.data.answer.trim();
   if (!answer) throw new Error("AI_EMPTY_GENERAL_HELP_RESPONSE");
   return answer;
