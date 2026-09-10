@@ -103,7 +103,6 @@ export type HelpVideoCoverage = {
 
 export type HelpVideoArticlePipelineAiUsage = {
   operation:
-    | "video_coverage"
     | "video_coverage_audit"
     | "video_article_part"
     | "video_article_metadata";
