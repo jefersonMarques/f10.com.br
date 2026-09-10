@@ -104,8 +104,6 @@
   };
 
   const SESSION_KEY = "f10-support-chat-session-v1";
-  const GUEST_KEY = "f10-support-assistant-conversation-v2";
-  const UNRESOLVED_KEY = "f10-support-assistant-unresolved-v1";
   const HANDOFF_KEY = "f10-support-assistant-handoff-v1";
   const HANDOFF_TTL_MS = 60 * 60 * 1000;
   const MAX_IMAGES = 4;
@@ -203,20 +201,8 @@
 
   function restoreState(): void {
     restored = true;
-    try {
-      const rawGuest = window.sessionStorage.getItem(GUEST_KEY);
-      if (rawGuest) {
-        const stored = JSON.parse(rawGuest) as GuestMessage[];
-        if (Array.isArray(stored)) {
-          guestMessages = stored
-            .filter((message) => message && (message.role === "assistant" || message.role === "customer") && typeof message.body === "string")
-            .slice(-30);
-        }
-      }
-    } catch {
-      window.sessionStorage.removeItem(GUEST_KEY);
-    }
-    unresolvedCount = Number(window.sessionStorage.getItem(UNRESOLVED_KEY) ?? "0") || 0;
+    guestMessages = [];
+    unresolvedCount = 0;
     ensureGreeting();
 
     const rawSession = window.sessionStorage.getItem(SESSION_KEY);
@@ -236,12 +222,6 @@
       }
     }
     restorePendingHandoff();
-  }
-
-  function persistGuestState(): void {
-    if (!browser) return;
-    window.sessionStorage.setItem(GUEST_KEY, JSON.stringify(guestMessages.slice(-30)));
-    window.sessionStorage.setItem(UNRESOLVED_KEY, String(unresolvedCount));
   }
 
   function persistSession(value: ChatSession): void {
@@ -352,9 +332,7 @@
 
     errorMessage = "";
     guestReply = "";
-    const conversationContext = buildTranscript();
     guestMessages = [...guestMessages, createGuestMessage("customer", body)];
-    persistGuestState();
     assistantSending = true;
     await scrollToLatest();
 
@@ -364,7 +342,6 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: body,
-          conversationContext,
           unresolvedCount,
           pageContext: pageContext(),
         }),
@@ -381,7 +358,6 @@
         ...guestMessages,
         createGuestMessage("assistant", payload.answer || "Como posso ajudar?", ticketAction),
       ];
-      persistGuestState();
       await scrollToLatest();
 
       if (action === "handoff" || payload.requiresHuman) {
@@ -408,7 +384,6 @@
         ...guestMessages,
         createGuestMessage("assistant", "Para chamar um atendente, entre com sua conta F10."),
       ];
-      persistGuestState();
       await scrollToLatest();
       return;
     }
@@ -423,7 +398,6 @@
         ...guestMessages,
         createGuestMessage("assistant", "Selecione o grupo e a escola relacionados a esta conversa para eu encaminhar corretamente."),
       ];
-      persistGuestState();
       await scrollToLatest();
       return;
     }
@@ -548,7 +522,6 @@
       persistSession(session);
       authRequired = false;
       unresolvedCount = 0;
-      persistGuestState();
       clearPendingHandoff();
       await refreshMessages(true);
     } catch (cause) {
