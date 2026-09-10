@@ -18,6 +18,7 @@ import {
   helpVideoProcessingJobs,
   helpVideoProcessingParts,
   type HelpVideoProcessingJobStatus,
+  type HelpVideoProcessingOperation,
 } from "$lib/server/db/helpVideoProcessingSchema";
 import { helpContents } from "$lib/server/db/structuredHelpSchema";
 import { readManagedHelpAsset } from "$lib/server/help/helpAssetRepository";
@@ -65,6 +66,7 @@ type CompletedArticlePart = NonNullable<
 export type HelpVideoProcessingJobView = {
   id: string;
   contentId: string;
+  operation: HelpVideoProcessingOperation;
   status: HelpVideoProcessingJobStatus;
   stage: string;
   progressLabel: string;
@@ -106,6 +108,7 @@ function toView(
   return {
     id: job.id,
     contentId: job.contentId,
+    operation: job.operation,
     status: job.status,
     stage: job.stage,
     progressLabel: job.progressLabel,
@@ -213,6 +216,34 @@ export async function listHelpVideoProcessingJobSummaries(
   }));
 }
 
+export async function listActiveHelpVideoProcessingJobViews(): Promise<
+  HelpVideoProcessingJobView[]
+> {
+  const db = getDatabase();
+  const jobs = await db
+    .select()
+    .from(helpVideoProcessingJobs)
+    .where(inArray(helpVideoProcessingJobs.status, ACTIVE_STATUSES))
+    .orderBy(desc(helpVideoProcessingJobs.updatedAt));
+
+  if (jobs.length === 0) return [];
+
+  const jobIds = jobs.map((job) => job.id);
+  const partRows = await db
+    .select({
+      jobId: helpVideoProcessingParts.jobId,
+      value: count(),
+    })
+    .from(helpVideoProcessingParts)
+    .where(inArray(helpVideoProcessingParts.jobId, jobIds))
+    .groupBy(helpVideoProcessingParts.jobId);
+  const partCounts = new Map(
+    partRows.map((row) => [row.jobId, Number(row.value)]),
+  );
+
+  return jobs.map((job) => toView(job, partCounts.get(job.id) ?? 0));
+}
+
 export async function getActiveHelpVideoProcessingJob(
   contentId: string,
 ): Promise<HelpVideoProcessingJob | null> {
@@ -234,6 +265,8 @@ export async function createHelpVideoProcessingJob(input: {
   actorUserId: string;
   contentId: string;
   source: HelpVideoProcessingSource;
+  operation?: HelpVideoProcessingOperation;
+  importExternalId?: string;
 }): Promise<HelpVideoProcessingJobView> {
   const existing = await getActiveHelpVideoProcessingJob(input.contentId);
   if (existing) return toView(existing, await completedPartCount(existing.id));
@@ -288,6 +321,8 @@ export async function createHelpVideoProcessingJob(input: {
         contentId: input.contentId,
         actorUserId: input.actorUserId,
         sourceKind: input.source.type,
+        operation: input.operation ?? "regenerate",
+        importExternalId: input.importExternalId?.trim().slice(0, 240) || null,
         sourceAssetId,
         sourceStorageKey,
         sourceFileName,

@@ -1,28 +1,8 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
-import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
 import { requireAppPermission } from "$lib/server/auth/authorization";
-import { recordHelpAiUsage } from "$lib/server/help/helpAiUsageRepository";
-import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
-import { stabilizeHelpImportIdentity } from "$lib/server/help/helpImportIdentity";
-import {
-  attachImportedMp4AsFeaturedVideo,
-  findImportedHelpVideoByChecksum,
-  saveHelpImportedVideoTimeline,
-} from "$lib/server/help/helpImportedFeaturedVideo";
-import { replaceHelpScreenshotReviewCandidates } from "$lib/server/help/helpScreenshotReviewRepository";
-import {
-  generateHelpImportFromVideo,
-  HELP_VIDEO_AUTOMATION_MAX_UPLOAD_BYTES,
-  HELP_YOUTUBE_EXTRACTION_ENABLED,
-  type HelpVideoAutomationProgress,
-  type HelpVideoAutomationSource,
-} from "$lib/server/help/helpVideoImportAutomation";
-import {
-  importStructuredHelpFile,
-  validateHelpImportJson,
-  type HelpImportFile,
-} from "$lib/server/help/structuredHelpImport";
+import { createHelpVideoImportProcessingJob } from "$lib/server/help/helpVideoImportQueueService";
+import { HELP_VIDEO_AUTOMATION_MAX_UPLOAD_BYTES } from "$lib/server/help/helpVideoImportAutomation";
 import { getHelpVideoAutomationSettings } from "$lib/server/settings/operationsSettingsRepository";
 
 function readString(formData: FormData, key: string): string {
@@ -30,136 +10,26 @@ function readString(formData: FormData, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function automationErrorMessage(code: string): string {
-  if (code === "OPENAI_NOT_CONFIGURED") return "Configure a chave da OpenAI antes de usar a automação.";
-  if (code === "HELP_VIDEO_FFMPEG_NOT_AVAILABLE") return "FFmpeg não foi encontrado no servidor. Configure-o antes de processar vídeos.";
-  if (code === "HELP_VIDEO_YTDLP_NOT_AVAILABLE") return "yt-dlp não foi encontrado no servidor. O modo MP4 continua disponível.";
-  if (code === "HELP_VIDEO_YOUTUBE_COOKIES_NOT_FOUND") {
-    return "O arquivo de cookies do YouTube configurado no servidor não foi encontrado.";
+function errorMessage(code: string): string {
+  if (code.startsWith("HELP_VIDEO_ALREADY_USED:")) {
+    return "Este vídeo já pertence a outro conteúdo.";
   }
-  if (code === "HELP_VIDEO_YOUTUBE_COOKIES_INVALID") {
-    return "Este vídeo exige autenticação no YouTube e os cookies de fallback estão inválidos.";
-  }
-  if (code === "HELP_VIDEO_YOUTUBE_AUTH_REQUIRED") {
-    return "Este vídeo exige autenticação no YouTube. Vídeos públicos usam o fluxo automático sem cookies.";
-  }
-  if (code === "HELP_VIDEO_YTDLP_POT_PROVIDER_URL_INVALID") {
-    return "A URL configurada para o provedor automático do YouTube é inválida.";
-  }
-  if (code === "HELP_VIDEO_YOUTUBE_URL_INVALID") return "Informe um link válido do YouTube.";
   if (code === "HELP_VIDEO_UPLOAD_SIZE_INVALID") {
     return `O vídeo deve ter no máximo ${Math.round(HELP_VIDEO_AUTOMATION_MAX_UPLOAD_BYTES / 1024 / 1024)} MB.`;
   }
-  if (code === "HELP_VIDEO_UPLOAD_FORMAT_INVALID") return "Use um arquivo .mp4 válido.";
-  if (code === "HELP_VIDEO_TRANSCRIPTION_EMPTY") return "A transcrição retornou vazia. Revise o áudio do vídeo.";
-  if (code === "HELP_VIDEO_TRANSCRIPTION_TIMESTAMPS_EMPTY") return "A transcrição não retornou os tempos necessários para gerar os screenshots.";
-  if (code === "HELP_VIDEO_TRANSCRIPTION_TIMEOUT") return "A transcrição demorou mais que o limite permitido. Tente novamente.";
-  if (code === "HELP_VIDEO_FRAMES_NOT_FOUND") return "O F10 não encontrou telas válidas para analisar no vídeo.";
-  if (code === "HELP_VIDEO_ARTICLE_GENERATION_EMPTY") {
-    return "A OpenAI não retornou o artigo estruturado. Tente processar o vídeo novamente.";
+  if (code === "HELP_VIDEO_UPLOAD_FORMAT_INVALID") {
+    return "Use um arquivo .mp4 válido.";
   }
-  if (code === "HELP_VIDEO_ARTICLE_GENERATION_INVALID_JSON") {
-    return "A OpenAI retornou um artigo estruturado inválido. Tente processar o vídeo novamente.";
+  if (code === "CONTENT_ARCHIVED") {
+    return "O conteúdo vinculado a este ID externo está arquivado.";
   }
-  if (code === "HELP_VIDEO_ARTICLE_GENERATION_TIMEOUT") {
-    return "A análise textual do vídeo pela OpenAI demorou mais que o limite permitido. Tente novamente.";
+  if (code === "HELP_CATEGORY_UNCATEGORIZED_NOT_FOUND") {
+    return "A categoria interna necessária para iniciar a importação não está disponível.";
   }
-  if (code === "HELP_VIDEO_COVERAGE_CLASSIFICATION_INCOMPLETE") {
-    return "O F10 não conseguiu classificar todos os trechos do vídeo. Nada foi salvo para evitar conteúdo incompleto.";
+  if (code.startsWith("ASSET_STORAGE_")) {
+    return "Não foi possível armazenar o vídeo para processamento.";
   }
-  if (code === "HELP_VIDEO_COVERAGE_NO_RELEVANT_CONTENT") {
-    return "O vídeo foi transcrito, mas não foi identificado conteúdo operacional suficiente para criar o artigo.";
-  }
-  if (code === "HELP_VIDEO_ARTICLE_PART_COVERAGE_INCOMPLETE" || code.startsWith("HELP_VIDEO_COVERAGE_INCOMPLETE:")) {
-    return "Uma parte do vídeo ficou sem cobertura no artigo. O F10 interrompeu a geração para não omitir conteúdo.";
-  }
-  if (code === "HELP_VIDEO_ARTICLE_EDITORIAL_INVALID") {
-    return "O conteúdo gerado ainda continha referências internas ao vídeo ou à transcrição. A geração foi interrompida para não publicar linguagem de bastidor.";
-  }
-  if (code.startsWith("HELP_VIDEO_COVERAGE_FAILED:") || code.startsWith("HELP_VIDEO_ARTICLE_PART_FAILED:") || code.startsWith("HELP_VIDEO_ARTICLE_METADATA_FAILED:")) {
-    return "A IA não conseguiu concluir uma das partes da análise do vídeo. Nenhum conteúdo parcial foi aceito.";
-  }
-  if (code === "HELP_VIDEO_SCREENSHOTS_NOT_PLANNED") {
-    return "A IA estruturou o artigo, mas não definiu cortes para os passos visuais. O F10 não criou um artigo somente com texto.";
-  }
-  if (code === "HELP_VIDEO_NO_SCREENSHOTS_SELECTED") {
-    return "Os cortes foram planejados, mas o F10 não conseguiu extrair nenhum screenshot válido nas janelas indicadas.";
-  }
-  if (code === "IMPORT_CONTENT_NOT_CREATED") return "O conteúdo foi analisado, mas o F10 não conseguiu criar o rascunho.";
-  if (code === "IMPORT_VIDEO_NOT_CREATED") return "O conteúdo foi criado, mas o F10 não conseguiu salvar o vídeo principal.";
-  if (code === "IMPORT_STEP_NOT_CREATED") return "O F10 não conseguiu salvar uma das etapas do conteúdo gerado.";
-  if (code === "CONTENT_NOT_FOUND") return "O conteúdo importado não foi encontrado ao salvar o vídeo principal.";
-  if (code === "CONTENT_ARCHIVED") return "O conteúdo está arquivado e não pode receber o vídeo principal.";
-  if (code.startsWith("HELP_VIDEO_TRANSCRIPTION_FAILED:")) return "A OpenAI não conseguiu transcrever o áudio do vídeo.";
-  if (code.startsWith("HELP_VIDEO_ARTICLE_GENERATION_FAILED:")) return "A OpenAI não conseguiu estruturar o artigo a partir do vídeo.";
-  if (code.startsWith("HELP_VIDEO_COMMAND_FAILED:")) return "O servidor não conseguiu processar o vídeo com as ferramentas locais.";
-  if (code.startsWith("IMPORT_CATEGORY_INVALID:")) return "O conteúdo gerado usou uma categoria que não está mais disponível.";
-  if (code.startsWith("IMPORT_SLUG_CONFLICT:")) return "O endereço gerado para o artigo já pertence a outro conteúdo.";
-  if (code.startsWith("IMPORT_PACKAGE_ASSET_MISSING:")) return "Um screenshot selecionado não foi encontrado no pacote temporário.";
-  if (code === "IMPORT_INVALID_SLUG") return "O F10 não conseguiu gerar um endereço válido para o conteúdo.";
-  if (code === "HELP_VIDEO_COMMAND_TIMEOUT") return "O processamento local do vídeo excedeu o tempo permitido.";
-  return "Não foi possível gerar o conteúdo automaticamente a partir do vídeo.";
-}
-
-function classifyAutomationError(cause: unknown, stage: string): string {
-  if (cause instanceof SyntaxError && stage === "analyze") {
-    return "HELP_VIDEO_ARTICLE_GENERATION_INVALID_JSON";
-  }
-  if (cause instanceof Error && cause.name === "AbortError") {
-    if (stage === "transcribe") return "HELP_VIDEO_TRANSCRIPTION_TIMEOUT";
-    if (stage === "analyze") return "HELP_VIDEO_ARTICLE_GENERATION_TIMEOUT";
-  }
-  return cause instanceof Error ? cause.message : "HELP_VIDEO_AUTOMATION_FAILED";
-}
-
-function technicalErrorCode(code: string): string {
-  const prefix = code.split(":", 1)[0]?.trim() ?? "";
-  return /^[A-Z][A-Z0-9_]*$/.test(prefix) ? prefix : "HELP_VIDEO_AUTOMATION_FAILED";
-}
-
-function buildSource(formData: FormData): HelpVideoAutomationSource {
-  const sourceType = readString(formData, "sourceType");
-  if (sourceType === "youtube") {
-    return { type: "youtube", url: readString(formData, "youtubeUrl") };
-  }
-  if (sourceType !== "upload") throw new Error("HELP_VIDEO_SOURCE_INVALID");
-
-  const file = formData.get("videoFile");
-  if (!(file instanceof File) || file.size === 0) throw new Error("HELP_VIDEO_UPLOAD_FORMAT_INVALID");
-  if (file.size > HELP_VIDEO_AUTOMATION_MAX_UPLOAD_BYTES) {
-    throw new Error("HELP_VIDEO_UPLOAD_SIZE_INVALID");
-  }
-  return {
-    type: "upload",
-    fileName: file.name,
-    mimeType: file.type,
-    bytes: new Uint8Array(),
-    publishedVideoUrl: readString(formData, "publishedVideoUrl"),
-  };
-}
-
-function normalizeSingleScreenshotPerStep(file: HelpImportFile): void {
-  for (const content of file.contents) {
-    for (const step of content.steps) {
-      let imageFound = false;
-      step.blocks = step.blocks.filter((block) => {
-        if (block.type !== "image") return true;
-        if (imageFound) return false;
-        imageFound = true;
-        return true;
-      });
-    }
-  }
-}
-
-function countScreenshots(file: HelpImportFile): number {
-  return file.contents.reduce(
-    (contentTotal, content) => contentTotal + content.steps.reduce(
-      (stepTotal, step) => stepTotal + step.blocks.filter((block) => block.type === "image").length,
-      0,
-    ),
-    0,
-  );
+  return "Não foi possível iniciar o processamento do vídeo.";
 }
 
 export const POST: RequestHandler = async ({ cookies, request }) => {
@@ -171,7 +41,7 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
   const settings = await getHelpVideoAutomationSettings();
   if (!settings.enabled) {
     return json(
-      { message: "A geração automática por vídeo está desabilitada pelo administrador." },
+      { success: false, message: "A geração automática por vídeo está desabilitada." },
       { status: 403 },
     );
   }
@@ -180,246 +50,71 @@ export const POST: RequestHandler = async ({ cookies, request }) => {
   try {
     formData = await request.formData();
   } catch {
-    return json({ message: "Não foi possível receber os dados do vídeo." }, { status: 400 });
-  }
-
-  if (
-    readString(formData, "sourceType") === "youtube"
-    && !HELP_YOUTUBE_EXTRACTION_ENABLED
-  ) {
     return json(
-      {
-        message: "A importação por YouTube está temporariamente desabilitada. Use um serviço externo de download ou uma extensão/plugin do navegador para obter o MP4 e envie o arquivo ao F10.",
-      },
-      { status: 403 },
-    );
-  }
-
-  let source: HelpVideoAutomationSource;
-  try {
-    source = buildSource(formData);
-    if (source.type === "upload") {
-      const file = formData.get("videoFile");
-      if (!(file instanceof File)) throw new Error("HELP_VIDEO_UPLOAD_FORMAT_INVALID");
-      source.bytes = new Uint8Array(await file.arrayBuffer());
-    }
-  } catch (cause) {
-    const code = cause instanceof Error ? cause.message : "HELP_VIDEO_SOURCE_INVALID";
-    return json(
-      {
-        message: code === "HELP_VIDEO_SOURCE_INVALID"
-          ? "Selecione MP4 ou YouTube antes de iniciar o processamento."
-          : automationErrorMessage(code),
-      },
+      { success: false, message: "Não foi possível receber o vídeo." },
       { status: 400 },
     );
   }
 
-  if (source.type === "upload") {
-    const duplicate = await findImportedHelpVideoByChecksum(source.bytes);
-    if (duplicate?.contentId) {
-      return json(
-        {
-          message: "Este vídeo já está vinculado a um conteúdo. Abra o artigo existente e use Atualizar ou Reprocessar.",
-          existingContentId: duplicate.contentId,
-        },
-        { status: 409 },
-      );
-    }
+  if (readString(formData, "sourceType") !== "upload") {
+    return json(
+      { success: false, message: "Use um arquivo MP4 para iniciar o processamento." },
+      { status: 400 },
+    );
   }
 
-  const externalIdHint = readString(formData, "externalId");
-  const categories = (await listHelpCategories(true))
-    .filter((category) => category.active && category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG)
-    .map((category) => ({
-      slug: category.slug,
-      name: category.name,
-      description: category.description,
-    }));
+  const file = formData.get("videoFile");
+  if (!(file instanceof File) || file.size < 1) {
+    return json(
+      { success: false, message: "Selecione um arquivo MP4." },
+      { status: 400 },
+    );
+  }
+  if (file.size > HELP_VIDEO_AUTOMATION_MAX_UPLOAD_BYTES) {
+    return json(
+      { success: false, message: errorMessage("HELP_VIDEO_UPLOAD_SIZE_INVALID") },
+      { status: 413 },
+    );
+  }
+  if (
+    file.type.toLowerCase() !== "video/mp4"
+    && !file.name.toLowerCase().endsWith(".mp4")
+  ) {
+    return json(
+      { success: false, message: errorMessage("HELP_VIDEO_UPLOAD_FORMAT_INVALID") },
+      { status: 400 },
+    );
+  }
 
-  const encoder = new TextEncoder();
-  let streamClosed = false;
+  try {
+    const job = await createHelpVideoImportProcessingJob({
+      actorUserId: session.user.id,
+      fileName: file.name || "video.mp4",
+      mimeType: file.type || "video/mp4",
+      bytes: new Uint8Array(await file.arrayBuffer()),
+      externalId: readString(formData, "externalId"),
+    });
 
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      let lastProgressStage = "runtime";
-
-      const write = (payload: Record<string, unknown>) => {
-        if (streamClosed) return;
-        try {
-          controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
-        } catch {
-          streamClosed = true;
-        }
-      };
-
-      const heartbeat = setInterval(() => {
-        if (streamClosed) return;
-        try {
-          controller.enqueue(encoder.encode("\n"));
-        } catch {
-          streamClosed = true;
-        }
-      }, 15_000);
-
-      const progress = (item: HelpVideoAutomationProgress) => {
-        lastProgressStage = item.stage;
-        write({ type: "progress", ...item });
-      };
-
-      try {
-        const generated = await generateHelpImportFromVideo({
-          source,
-          categories,
-          externalIdHint,
-          onProgress: progress,
-          onAiUsage: (usage) => recordHelpAiUsage({
-            actorUserId: session.user.id,
-            ...usage,
-            metadata: { sourceType: source.type },
-          }),
-        });
-
-        normalizeSingleScreenshotPerStep(generated.file);
-        if (source.type === "upload" || generated.localVideo) {
-          for (const content of generated.file.contents) content.featuredVideo = undefined;
-        }
-        const selectedScreenshotCount = countScreenshots(generated.file);
-
-        lastProgressStage = "validate";
-        write({
-          type: "progress",
-          stage: "validate",
-          status: "active",
-          label: "Validando o conteúdo gerado",
-        });
-        const validation = validateHelpImportJson(JSON.stringify(generated.file));
-        if (!validation.valid || !validation.parsed) {
-          write({
-            type: "error",
-            message: "O conteúdo gerado pela IA não passou na validação final do F10.",
-            issues: validation.issues,
-          });
-          return;
-        }
-        const stabilizedFile = await stabilizeHelpImportIdentity(validation.parsed);
-        write({
-          type: "progress",
-          stage: "validate",
-          status: "done",
-          label: "Conteúdo validado e identidade conferida pelo F10",
-        });
-
-        lastProgressStage = "import";
-        write({
-          type: "progress",
-          stage: "import",
-          status: "active",
-          label: "Salvando rascunho, vídeo e opções de screenshots",
-        });
-        const result = await importStructuredHelpFile(
-          session.user.id,
-          stabilizedFile,
-          generated.assets,
-        );
-        const importedContent = result.imported[0];
-        const content = stabilizedFile.contents[0];
-        if (!importedContent || !content) throw new Error("IMPORT_CONTENT_NOT_CREATED");
-
-        const localVideo = source.type === "upload"
-          ? { bytes: source.bytes, fileName: source.fileName }
-          : generated.localVideo;
-        if (localVideo) {
-          await attachImportedMp4AsFeaturedVideo({
-            actorUserId: session.user.id,
-            contentId: importedContent.id,
-            bytes: localVideo.bytes,
-            fileName: localVideo.fileName,
-            sourceUrl: source.type === "youtube" ? source.url : undefined,
-            subtitles: generated.transcript,
-            altText: content.summary || content.title,
-            assistantSummary: content.quickGuide || content.summary || content.title,
-            transcriptTimeline: generated.transcriptTimeline,
-            generationCoverage: generated.coverage,
-          });
-        }
-
-        await saveHelpImportedVideoTimeline(
-          session.user.id,
-          importedContent.id,
-          generated.transcriptTimeline,
-        );
-
-        await replaceHelpScreenshotReviewCandidates(
-          session.user.id,
-          importedContent.id,
-          generated.reviewCandidates,
-        );
-
-        write({
-          type: "progress",
-          stage: "import",
-          status: "done",
-          label: "Rascunho, vídeo e opções de screenshots salvos",
-        });
-
-        const overwriteMessage = result.overwrittenCount > 0
-          ? " O conteúdo anterior foi substituído mantendo o mesmo ID."
-          : "";
-        const localVideoMessage = source.type === "youtube" && generated.localVideoFailureCode
-          ? " O artigo foi preservado, mas a cópia MP4 local não pôde ser criada nesta execução."
-          : source.type === "youtube" && generated.localVideo
-            ? " O MP4 local foi armazenado e será reutilizado pelas trilhas."
-            : "";
-        write({
-          type: "success",
-          message: `Vídeo processado e ${result.contentCount} conteúdo(s) criado(s) como rascunho.${overwriteMessage}${localVideoMessage} Revise os screenshots, faça as marcações e publique quando estiver correto.`,
-          summary: {
-            source: result.source,
-            contentCount: result.contentCount,
-            stepCount: result.stepCount,
-            blockCount: result.blockCount,
-            assetCount: selectedScreenshotCount,
-          },
-          automation: {
-            sourceType: generated.sourceType,
-            transcriptChars: generated.transcriptChars,
-            analyzedFrameCount: generated.analyzedFrameCount,
-            selectedScreenshotCount,
-          },
-          imported: result.imported,
-        });
-      } catch (cause) {
-        const code = classifyAutomationError(cause, lastProgressStage);
-        const technicalCode = technicalErrorCode(code);
-        console.error("[help-video-import] processing failed", {
-          stage: lastProgressStage,
-          technicalCode,
-          cause,
-        });
-        write({
-          type: "error",
-          message: automationErrorMessage(code),
-          issues: [
-            `Etapa: ${lastProgressStage}`,
-            `Código técnico: ${technicalCode}`,
-          ],
-        });
-      } finally {
-        clearInterval(heartbeat);
-        if (!streamClosed) {
-          streamClosed = true;
-          controller.close();
-        }
-      }
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "content-type": "application/x-ndjson; charset=utf-8",
-      "cache-control": "no-store, no-transform",
-      "x-accel-buffering": "no",
-    },
-  });
+    return json(
+      {
+        success: true,
+        message: "Vídeo recebido. O processamento continuará no servidor.",
+        job,
+      },
+      { status: 202 },
+    );
+  } catch (cause) {
+    const code = cause instanceof Error ? cause.message : "";
+    const existingContentId = code.startsWith("HELP_VIDEO_ALREADY_USED:")
+      ? code.slice("HELP_VIDEO_ALREADY_USED:".length)
+      : null;
+    return json(
+      {
+        success: false,
+        message: errorMessage(code),
+        existingContentId,
+      },
+      { status: 409 },
+    );
+  }
 };

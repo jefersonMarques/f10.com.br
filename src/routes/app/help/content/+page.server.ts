@@ -13,6 +13,10 @@ import {
   createStructuredHelpContent,
   listStructuredHelpContents,
 } from "$lib/server/help/structuredHelpRepository";
+import {
+  getActiveHelpVideoProcessingJob,
+  listActiveHelpVideoProcessingJobViews,
+} from "$lib/server/help/helpVideoProcessingRepository";
 import { listPublishedStructuredHelpLinks } from "$lib/server/help/publicStructuredHelpRepository";
 
 const DELETE_CONFIRMATION = "quero excluir";
@@ -51,19 +55,24 @@ export const load: PageServerLoad = async ({ parent }) => {
     throw error(403, "Acesso não autorizado.");
   }
 
-  const [contents, publishedLinks, categories] = await Promise.all([
+  const [contents, publishedLinks, categories, processingJobs] = await Promise.all([
     listStructuredHelpContents(),
     listPublishedStructuredHelpLinks(),
     listHelpCategories(true),
+    listActiveHelpVideoProcessingJobViews(),
   ]);
   const publishedById = new Map(
     publishedLinks.map((publication) => [publication.entityId, publication]),
+  );
+  const processingByContentId = new Map(
+    processingJobs.map((job) => [job.contentId, job]),
   );
 
   return {
     contents: contents.map((content) => ({
       ...content,
       publishedSlug: publishedById.get(content.id)?.slug ?? null,
+      processingJob: processingByContentId.get(content.id) ?? null,
     })),
     categories: categories.filter(
       (category) => category.active && category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG,
@@ -160,6 +169,12 @@ export const actions: Actions = {
     }
 
     try {
+      if (await getActiveHelpVideoProcessingJob(contentId)) {
+        return fail(409, {
+          success: false,
+          message: "Aguarde o processamento do vídeo terminar antes de excluir este conteúdo.",
+        });
+      }
       await discardStructuredHelpContent(session.user.id, contentId);
     } catch (cause) {
       return fail(409, {

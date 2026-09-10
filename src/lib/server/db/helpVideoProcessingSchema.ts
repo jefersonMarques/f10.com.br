@@ -23,6 +23,8 @@ export type HelpVideoProcessingJobStatus =
 
 export type HelpVideoProcessingSourceKind = "current" | "upload";
 
+export type HelpVideoProcessingOperation = "regenerate" | "import";
+
 export const helpVideoProcessingJobs = pgTable(
   "help_video_processing_jobs",
   {
@@ -36,6 +38,11 @@ export const helpVideoProcessingJobs = pgTable(
     sourceKind: text("source_kind")
       .$type<HelpVideoProcessingSourceKind>()
       .notNull(),
+    operation: text("operation")
+      .$type<HelpVideoProcessingOperation>()
+      .notNull()
+      .default("regenerate"),
+    importExternalId: text("import_external_id"),
     sourceAssetId: uuid("source_asset_id").references(() => helpAssets.id, {
       onDelete: "set null",
     }),

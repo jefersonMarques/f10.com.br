@@ -572,7 +572,10 @@ export async function importStructuredHelpFile(
   actorUserId: string,
   file: HelpImportFile,
   packageAssets: ReadonlyMap<string, HelpImportPackageAsset> = new Map(),
-  options: { targetContentId?: string } = {},
+  options: {
+    targetContentId?: string;
+    replaceImportIdentity?: boolean;
+  } = {},
 ) {
   const db = getDatabase();
   const requestedCategorySlugs = Array.from(
@@ -739,6 +742,12 @@ export async function importStructuredHelpFile(
               ),
               assistantKnowledge: content.assistantKnowledge?.trim() ?? "",
               internalSupportNotes: content.internalSupportNotes?.trim() ?? "",
+              ...(options.replaceImportIdentity
+                ? {
+                    importSource: file.source,
+                    importExternalId: content.externalId,
+                  }
+                : {}),
               status: "draft",
               updatedBy: actorUserId,
               updatedAt: new Date(),

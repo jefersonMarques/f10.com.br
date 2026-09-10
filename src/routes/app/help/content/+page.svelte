@@ -10,6 +10,7 @@
     FilePlus2,
     HardDrive,
     Layers3,
+    LoaderCircle,
     RotateCcw,
     Trash2,
     UploadCloud,
@@ -82,20 +83,40 @@
             <div class={`px-5 py-4 transition sm:px-6 ${content.status === "archived" ? "bg-[#FAFAFC] opacity-80" : "hover:bg-[#FAFAFC]"}`}>
               <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
                 <a href={`/app/help/content/${content.id}/images`} class="group min-w-0 flex-1">
-                  <div class="flex flex-wrap items-center gap-2"><strong class="truncate text-[13px] font-semibold text-[#252B3B]">{content.title}</strong><span class={`application-text-meta rounded-full px-2 py-1 font-bold uppercase tracking-[0.05em] ${content.status === "published" ? "bg-[#EEF8F1] text-[#2F7045]" : content.status === "archived" ? "bg-[#F1F1F3] text-[#676D7D]" : "bg-[#F2F3F7] text-[#707687]"}`}>{statusLabels[content.status] ?? content.status}</span></div>
-                  <p class="application-text-caption mt-1 truncate text-[#858B99]">{content.categories.length ? content.categories.map((category) => category.name).join(" · ") : "Sem categoria"} · {content.stepCount} {content.stepCount === 1 ? "passo" : "passos"} · /{content.slug}</p>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <strong class="truncate text-[13px] font-semibold text-[#252B3B]">{content.title}</strong>
+                    {#if content.processingJob}
+                      <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#FFF3E9] px-2 py-1 font-bold uppercase tracking-[0.05em] text-[#A9510D]"><LoaderCircle size={11} class="animate-spin"/>Processando</span>
+                    {:else}
+                      <span class={`application-text-meta rounded-full px-2 py-1 font-bold uppercase tracking-[0.05em] ${content.status === "published" ? "bg-[#EEF8F1] text-[#2F7045]" : content.status === "archived" ? "bg-[#F1F1F3] text-[#676D7D]" : "bg-[#F2F3F7] text-[#707687]"}`}>{statusLabels[content.status] ?? content.status}</span>
+                    {/if}
+                  </div>
+                  {#if content.processingJob}
+                    <p class="application-text-caption mt-1 truncate font-medium text-[#A9510D]">
+                      {content.processingJob.progressLabel}
+                      {#if content.processingJob.totalParts}
+                        · {Math.min(content.processingJob.completedParts, content.processingJob.totalParts)}/{content.processingJob.totalParts} partes
+                      {/if}
+                    </p>
+                  {:else}
+                    <p class="application-text-caption mt-1 truncate text-[#858B99]">{content.categories.length ? content.categories.map((category) => category.name).join(" · ") : "Sem categoria"} · {content.stepCount} {content.stepCount === 1 ? "passo" : "passos"} · /{content.slug}</p>
+                  {/if}
                   {#if content.summary}<p class="mt-2 line-clamp-2 max-w-[780px] text-[11px] leading-5 text-[#737989]">{content.summary}</p>{/if}
                 </a>
                 <div class="flex shrink-0 flex-wrap items-center gap-2">
-                  <a href={`/app/help/content/${content.id}/preview`} class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#626979]"><Eye size={13}/>Preview</a>
-                  {#if content.publishedSlug}<a href={`/ajuda-f10/${content.publishedSlug}`} target="_blank" rel="noopener noreferrer" class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 font-semibold text-white">Ver artigo<ExternalLink size={12}/></a>{:else if content.status !== "archived"}<a href={`/app/help/content/${content.id}/images`} class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#777D8D]" aria-label="Editar"><ArrowRight size={14}/></a>{/if}
+                  {#if content.processingJob}
+                    <span class="application-text-meta inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#F1D7BD] bg-[#FFF9F3] px-3 font-semibold text-[#A9510D]"><LoaderCircle size={13} class="animate-spin"/>Em andamento</span>
+                  {:else}
+                    <a href={`/app/help/content/${content.id}/preview`} class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#626979]"><Eye size={13}/>Preview</a>
+                    {#if content.publishedSlug}<a href={`/ajuda-f10/${content.publishedSlug}`} target="_blank" rel="noopener noreferrer" class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 font-semibold text-white">Ver artigo<ExternalLink size={12}/></a>{:else if content.status !== "archived"}<a href={`/app/help/content/${content.id}/images`} class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#777D8D]" aria-label="Editar"><ArrowRight size={14}/></a>{/if}
 
-                  {#if data.canEdit && content.status === "draft"}
-                    <button type="button" on:click={() => openDeleteModal(content)} class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#F0C8C8] bg-white px-3 font-semibold text-[#9B2C2C]"><Trash2 size={12}/>Excluir</button>
-                  {:else if data.canEdit && content.status === "archived"}
-                    <form method="POST" action="?/restore"><input type="hidden" name="contentId" value={content.id}/><button type="submit" class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#D8DDF4] bg-white px-3 font-semibold text-[#000A57]"><RotateCcw size={12}/>Restaurar</button></form>
-                  {:else if data.canArchive && content.status === "published"}
-                    <form method="POST" action="?/archive" on:submit={(event) => { if (!confirm("Arquivar este conteúdo? Ele sairá da Central e da IA pública.")) event.preventDefault(); }}><input type="hidden" name="contentId" value={content.id}/><button type="submit" class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#626979]"><Archive size={12}/>Arquivar</button></form>
+                    {#if data.canEdit && content.status === "draft"}
+                      <button type="button" on:click={() => openDeleteModal(content)} class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#F0C8C8] bg-white px-3 font-semibold text-[#9B2C2C]"><Trash2 size={12}/>Excluir</button>
+                    {:else if data.canEdit && content.status === "archived"}
+                      <form method="POST" action="?/restore"><input type="hidden" name="contentId" value={content.id}/><button type="submit" class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#D8DDF4] bg-white px-3 font-semibold text-[#000A57]"><RotateCcw size={12}/>Restaurar</button></form>
+                    {:else if data.canArchive && content.status === "published"}
+                      <form method="POST" action="?/archive" on:submit={(event) => { if (!confirm("Arquivar este conteúdo? Ele sairá da Central e da IA pública.")) event.preventDefault(); }}><input type="hidden" name="contentId" value={content.id}/><button type="submit" class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#626979]"><Archive size={12}/>Arquivar</button></form>
+                    {/if}
                   {/if}
                 </div>
               </div>

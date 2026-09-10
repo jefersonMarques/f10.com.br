@@ -55,6 +55,8 @@ export async function regenerateHelpContentFromVideo(input: {
   actorUserId: string;
   contentId: string;
   source: HelpContentRegenerationSource;
+  operation?: "regenerate" | "import";
+  importExternalId?: string;
   checkpoint?: HelpVideoAutomationCheckpoint;
   onCheckpoint?: (
     checkpoint: HelpVideoAutomationCheckpoint,
@@ -64,6 +66,9 @@ export async function regenerateHelpContentFromVideo(input: {
   const current = await getStructuredHelpContent(input.contentId);
   if (!current) throw new Error("CONTENT_NOT_FOUND");
   if (current.status === "archived") throw new Error("CONTENT_ARCHIVED");
+
+  const importing = input.operation === "import";
+  const importExternalId = input.importExternalId?.trim() || current.importExternalId || `content:${current.id}`;
 
   let videoBytes: Uint8Array;
   let fileName: string;
@@ -103,7 +108,9 @@ export async function regenerateHelpContentFromVideo(input: {
       bytes: videoBytes,
     },
     categories,
-    externalIdHint: current.importExternalId || `content:${current.id}`,
+    externalIdHint: importing
+      ? importExternalId
+      : current.importExternalId || `content:${current.id}`,
     checkpoint: input.checkpoint,
     onCheckpoint: input.onCheckpoint,
     onProgress: input.onProgress,
@@ -113,6 +120,7 @@ export async function regenerateHelpContentFromVideo(input: {
         ...usage,
         metadata: {
           sourceType: input.source.type === "current" ? "existing_video" : "updated_video",
+          operation: importing ? "import" : "regenerate",
           contentId: input.contentId,
         },
       }).catch(() => undefined),
@@ -124,20 +132,30 @@ export async function regenerateHelpContentFromVideo(input: {
 
   generated.file = {
     ...generated.file,
-    source: current.importSource || "content-regeneration",
+    source: importing
+      ? "f10-auto-video"
+      : current.importSource || "content-regeneration",
     contents: [{
       ...generatedContent,
-      externalId: current.importExternalId || `content:${current.id}`,
-      title: current.title,
-      slug: current.slug,
-      categories: current.categories.map((category) => ({
-        slug: category.slug,
-        destinationUrl: category.destinationUrl,
-      })),
-      searchAliases: mergeAliases(current.searchAliases, generatedContent.searchAliases),
-      assistantKnowledge:
-        current.assistantKnowledge.trim() || generatedContent.assistantKnowledge || "",
-      internalSupportNotes: current.internalSupportNotes,
+      externalId: importing
+        ? importExternalId
+        : current.importExternalId || `content:${current.id}`,
+      ...(importing
+        ? {
+            internalSupportNotes: current.internalSupportNotes,
+          }
+        : {
+            title: current.title,
+            slug: current.slug,
+            categories: current.categories.map((category) => ({
+              slug: category.slug,
+              destinationUrl: category.destinationUrl,
+            })),
+            searchAliases: mergeAliases(current.searchAliases, generatedContent.searchAliases),
+            assistantKnowledge:
+              current.assistantKnowledge.trim() || generatedContent.assistantKnowledge || "",
+            internalSupportNotes: current.internalSupportNotes,
+          }),
       featuredVideo: undefined,
     }],
   };
@@ -146,7 +164,10 @@ export async function regenerateHelpContentFromVideo(input: {
     input.actorUserId,
     generated.file,
     generated.assets,
-    { targetContentId: input.contentId },
+    {
+      targetContentId: input.contentId,
+      replaceImportIdentity: importing,
+    },
   );
   const importedContent = result.imported[0];
   if (!importedContent) throw new Error("IMPORT_CONTENT_NOT_CREATED");

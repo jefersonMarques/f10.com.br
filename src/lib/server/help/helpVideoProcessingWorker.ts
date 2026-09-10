@@ -27,6 +27,10 @@ const PERMANENT_FAILURE_CODES = new Set([
   "HELP_VIDEO_FFMPEG_NOT_AVAILABLE",
   "HELP_VIDEO_SCREENSHOTS_NOT_PLANNED",
   "HELP_VIDEO_NO_SCREENSHOTS_SELECTED",
+  "HELP_VIDEO_ALREADY_USED",
+  "IMPORT_CATEGORY_INVALID",
+  "IMPORT_INVALID_SLUG",
+  "IMPORT_SLUG_CONFLICT",
   "OPENAI_NOT_CONFIGURED",
 ]);
 
@@ -75,6 +79,8 @@ async function processJob(job: HelpVideoProcessingJob): Promise<void> {
         mimeType: source.mimeType,
         bytes: source.bytes,
       },
+      operation: job.operation,
+      importExternalId: job.importExternalId ?? undefined,
       checkpoint,
       onCheckpoint: (nextCheckpoint) =>
         saveHelpVideoProcessingCheckpoint(job.id, nextCheckpoint),

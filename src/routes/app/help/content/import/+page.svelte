@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
   import {
     Bot,
     CheckCircle2,
@@ -20,52 +21,12 @@
 
   type ImportMode = "zip" | "mp4" | "youtube";
 
-  type ProgressItem = {
-    stage: string;
-    status: "active" | "done";
-    label: string;
-    detail?: string;
-  };
-
-  type ImportedItem = {
-    id: string;
-    title: string;
-    externalId: string;
-    overwritten: boolean;
-  };
-
-  type AutomaticResult = {
-    message: string;
-    summary: {
-      source: string;
-      contentCount: number;
-      stepCount: number;
-      blockCount: number;
-      assetCount: number;
-    };
-    automation: {
-      sourceType: "youtube" | "upload";
-      transcriptChars: number;
-      analyzedFrameCount: number;
-      selectedScreenshotCount: number;
-    };
-    imported: ImportedItem[];
-  };
-
-  type StreamPayload =
-    | ({ type: "progress" } & ProgressItem)
-    | ({ type: "success" } & AutomaticResult)
-    | { type: "error"; message: string; issues?: string[] };
-
   export let data: PageData;
   export let form: ActionData;
 
   let importMode: ImportMode | null = form?.action === "import" ? "zip" : null;
   let isProcessing = false;
-  let processingSteps: ProgressItem[] = [];
-  let automaticResult: AutomaticResult | null = null;
   let automaticError = "";
-  let automaticIssues: string[] = [];
 
   $: realCategories = data.categories.filter(
     (category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG,
@@ -86,110 +47,41 @@
     if (mode === "mp4" && !mp4Available) return;
     if (mode === "youtube" && !youtubeAvailable) return;
     importMode = mode;
-    automaticResult = null;
     automaticError = "";
-    automaticIssues = [];
-  }
-
-  function markClientUploadDone(): void {
-    processingSteps = processingSteps.map((item) =>
-      item.stage === "upload" ? { ...item, status: "done" as const } : item,
-    );
-  }
-
-  function updateProgress(item: ProgressItem): void {
-    const index = processingSteps.findIndex((current) => current.stage === item.stage);
-    if (index < 0) {
-      processingSteps = [...processingSteps, item];
-      return;
-    }
-    processingSteps = processingSteps.map((current, currentIndex) =>
-      currentIndex === index ? item : current,
-    );
-  }
-
-  function handleStreamPayload(payload: StreamPayload): void {
-    if (payload.type === "progress") {
-      updateProgress(payload);
-      return;
-    }
-    if (payload.type === "success") {
-      automaticResult = {
-        message: payload.message,
-        summary: payload.summary,
-        automation: payload.automation,
-        imported: payload.imported,
-      };
-      automaticError = "";
-      automaticIssues = [];
-      processingSteps = processingSteps.map((item) => ({ ...item, status: "done" as const }));
-      return;
-    }
-    automaticError = payload.message;
-    automaticIssues = payload.issues ?? [];
   }
 
   async function processAutomaticImport(event: SubmitEvent): Promise<void> {
     event.preventDefault();
-    if (isProcessing || (importMode !== "mp4" && importMode !== "youtube")) return;
+    if (isProcessing || importMode !== "mp4") return;
 
     const currentTarget = event.currentTarget;
     if (!(currentTarget instanceof HTMLFormElement)) return;
 
-    automaticResult = null;
-    automaticError = "";
-    automaticIssues = [];
     isProcessing = true;
-    processingSteps = [{
-      stage: "upload",
-      status: "active",
-      label: importMode === "mp4" ? "Enviando o MP4 ao servidor" : "Enviando o link do YouTube ao servidor",
-    }];
-
-    const formData = new FormData(currentTarget);
-    formData.set("sourceType", importMode === "youtube" ? "youtube" : "upload");
+    automaticError = "";
 
     try {
+      const formData = new FormData(currentTarget);
+      formData.set("sourceType", "upload");
+
       const response = await fetch("/app/help/content/import/process", {
         method: "POST",
         body: formData,
       });
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+        existingContentId?: string | null;
+      };
 
-      markClientUploadDone();
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({})) as { message?: string };
+      if (!response.ok || !payload.success) {
         automaticError = payload.message || "Não foi possível iniciar o processamento do vídeo.";
         return;
       }
-      if (!response.body) {
-        automaticError = "O servidor não iniciou o stream de processamento.";
-        return;
-      }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          handleStreamPayload(JSON.parse(line) as StreamPayload);
-        }
-      }
-
-      buffer += decoder.decode();
-      if (buffer.trim()) handleStreamPayload(JSON.parse(buffer) as StreamPayload);
-      if (!automaticResult && !automaticError) {
-        automaticError = "O processamento terminou sem retornar o resultado final.";
-      }
+      await goto("/app/help/content");
     } catch {
-      automaticError = "A conexão com o servidor foi interrompida durante o processamento. Verifique o rascunho antes de tentar novamente.";
+      automaticError = "A conexão foi interrompida durante o envio do MP4.";
     } finally {
       isProcessing = false;
     }
@@ -287,19 +179,8 @@
         <div class={`rounded-xl border px-3 py-2.5 ${importMode === "mp4" || data.videoRuntime.youtube ? "border-[#CFE4D6] bg-[#F5FBF7]" : "border-[#F1D7BD] bg-[#FFF9F3]"}`}><span class="application-text-meta text-[#777D8D]">{importMode === "youtube" ? "yt-dlp" : "Fonte"}</span><strong class="ml-2 text-[10px]">{importMode === "youtube" ? (data.videoRuntime.youtube ? "OK" : "Pendente") : "MP4 local"}</strong></div>
       </div>
 
-      {#if automaticError}
-        <div class="mt-4 flex items-start gap-3 rounded-2xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[11px] font-medium text-[#9B2C2C]"><CircleAlert size={18}/><div><span>{automaticError}</span>{#if automaticIssues.length > 0}<ul class="mt-2 list-disc pl-4 text-[10px] font-normal">{#each automaticIssues as issue}<li>{issue}</li>{/each}</ul>{/if}</div></div>
-      {/if}
-
-      {#if automaticResult}
-        <div class="mt-4 rounded-2xl border border-[#B9E6C9] bg-[#F1FBF4] px-4 py-3 text-[11px] font-medium text-[#176B35]"><div class="flex items-start gap-3"><CheckCircle2 size={18}/><span>{automaticResult.message}</span></div></div>
-        <div class="mt-3 grid gap-3 sm:grid-cols-4">
-          <div class="rounded-xl border border-[#E3E6EE] bg-[#FAFBFD] p-3"><span class="text-[8px] font-bold uppercase text-[#959AA8]">Transcrição</span><strong class="mt-1 block text-[14px]">{automaticResult.automation.transcriptChars}</strong><small class="text-[8px] text-[#9297A5]">caracteres</small></div>
-          <div class="rounded-xl border border-[#E3E6EE] bg-[#FAFBFD] p-3"><span class="text-[8px] font-bold uppercase text-[#959AA8]">Entradas visuais</span><strong class="mt-1 block text-[18px]">{automaticResult.automation.analyzedFrameCount}</strong></div>
-          <div class="rounded-xl border border-[#E3E6EE] bg-[#FAFBFD] p-3"><span class="text-[8px] font-bold uppercase text-[#959AA8]">Screenshots</span><strong class="mt-1 block text-[18px]">{automaticResult.automation.selectedScreenshotCount}</strong></div>
-          <div class="rounded-xl border border-[#E3E6EE] bg-[#FAFBFD] p-3"><span class="text-[8px] font-bold uppercase text-[#959AA8]">Etapas</span><strong class="mt-1 block text-[18px]">{automaticResult.summary.stepCount}</strong></div>
-        </div>
-        {#if automaticResult.imported.length > 0}<div class="mt-3 divide-y overflow-hidden rounded-2xl border border-[#DCEDE2]">{#each automaticResult.imported as item}<a href={`/app/help/content/${item.id}`} class="flex items-center justify-between bg-white px-4 py-3 text-[11px] hover:bg-[#FAFAFC]"><span><strong>{item.title}</strong>{#if item.overwritten}<small class="ml-2 rounded-full bg-[#FFF0E4] px-2 py-0.5 text-[8px] font-bold text-[#A9510D]">ATUALIZADO</small>{/if}<small class="mt-1 block text-[#9297A5]">ID externo: {item.externalId}</small></span><span class="font-semibold text-[#000A57]">Revisar</span></a>{/each}</div>{/if}
+            {#if automaticError}
+        <div class="mt-4 flex items-start gap-3 rounded-2xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[11px] font-medium text-[#9B2C2C]"><CircleAlert size={18}/><span>{automaticError}</span></div>
       {/if}
 
       <form enctype="multipart/form-data" class="mt-5 space-y-4" on:submit={processAutomaticImport}>
@@ -314,7 +195,7 @@
 
         <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6B]">ID externo estável <span class="font-normal text-[#9297A5]">(opcional)</span></span><input name="externalId" maxlength="200" placeholder="Ex.: cadastro-funcionario-video-01" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/><span class="application-text-meta mt-1 block leading-4 text-[#9297A5]">Repita este valor para sobrescrever o mesmo conteúdo em uma nova geração. YouTube usa o ID do vídeo automaticamente quando este campo fica vazio.</span></label>
 
-        <div class="rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[10px] leading-5 text-[#7A3B08]"><strong>O processamento pode levar alguns minutos.</strong> Depois de iniciar, mantenha esta aba aberta. O F10 mostrará a transcrição temporal, o planejamento das capturas e a validação dos screenshots até o rascunho ser salvo.</div>
+        <div class="rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-4 py-3 text-[10px] leading-5 text-[#5E6575]"><strong>Depois que o envio terminar, pode fechar a aba.</strong> O processamento continua no servidor e aparece na lista de conteúdos.</div>
         <button type="submit" disabled={isProcessing} class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-5 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#B8BCC8]"><Sparkles size={17}/>Processar e criar rascunho</button>
       </form>
     </section>
@@ -339,22 +220,21 @@
 
 {#if isProcessing}
   <div class="fixed inset-0 z-[120] flex items-center justify-center bg-[#0B1020]/60 p-4 backdrop-blur-sm">
-    <section class="w-full max-w-[560px] rounded-[24px] border border-white/20 bg-white p-5 shadow-2xl sm:p-6" role="status" aria-live="polite">
+    <section class="w-full max-w-[520px] rounded-[24px] border border-white/20 bg-white p-5 shadow-2xl sm:p-6" role="status" aria-live="polite">
       <div class="flex items-start gap-4">
         <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EEF0FF] text-[#000A57]"><LoaderCircle size={24} class="animate-spin"/></span>
-        <div><h2 class="text-[16px] font-semibold text-[#11182C]">Processando o vídeo</h2><p class="mt-1 text-[10px] leading-5 text-[#777D8D]"><strong>Mantenha esta aba aberta.</strong> O tempo varia conforme a duração do vídeo, o download e a resposta da OpenAI.</p></div>
+        <div>
+          <h2 class="text-[16px] font-semibold text-[#11182C]">Enviando o vídeo</h2>
+          <p class="mt-1 text-[10px] leading-5 text-[#777D8D]">Mantenha esta aba aberta somente até o MP4 chegar ao servidor.</p>
+        </div>
       </div>
 
-      <div class="mt-5 space-y-2">
-        {#each processingSteps as item}
-          <div class={`flex items-start gap-3 rounded-xl border px-3 py-2.5 ${item.status === "done" ? "border-[#D7ECDD] bg-[#F6FBF7]" : "border-[#D8DDF4] bg-[#F8F9FF]"}`}>
-            <span class={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${item.status === "done" ? "bg-[#DDF2E3] text-[#24703E]" : "bg-[#E9EBFF] text-[#000A57]"}`}>{#if item.status === "done"}<CheckCircle2 size={13}/>{:else}<LoaderCircle size={13} class="animate-spin"/>{/if}</span>
-            <div><strong class="block text-[10px] text-[#3B4252]">{item.label}</strong>{#if item.detail}<small class="mt-0.5 block text-[9px] text-[#8A909E]">{item.detail}</small>{/if}</div>
-          </div>
-        {/each}
+      <div class="mt-5 flex items-center gap-3 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-4 py-3">
+        <LoaderCircle size={15} class="shrink-0 animate-spin text-[#000A57]"/>
+        <strong class="text-[10px] text-[#3B4252]">Enviando MP4 ao servidor</strong>
       </div>
 
-      <div class="mt-5 rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[9px] leading-5 text-[#7A3B08]">Não atualize, feche ou navegue para outra página enquanto o processamento estiver em andamento. O rascunho só é confirmado quando a etapa <strong>Rascunho e screenshots salvos</strong> for concluída.</div>
+      <div class="mt-4 rounded-xl border border-[#CFE8D7] bg-[#F6FBF7] px-4 py-3 text-[9px] leading-5 text-[#2D7143]">Assim que o envio terminar, o processamento fica salvo e continuará mesmo com F5, fechamento da aba ou navegação para outra página.</div>
     </section>
   </div>
 {/if}
