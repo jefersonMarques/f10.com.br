@@ -8,7 +8,6 @@
 
   export let data: LayoutData;
 
-  const HELP_CHAT_CLOSED_KEY = "f10-help-assistant-closed-v1";
   let chatOpen = false;
   let mounted = false;
 
@@ -16,24 +15,18 @@
 
   function openChat(): void {
     chatOpen = true;
-    if (mounted) window.sessionStorage.removeItem(HELP_CHAT_CLOSED_KEY);
   }
 
   function closeChat(): void {
     chatOpen = false;
-    if (mounted) window.sessionStorage.setItem(HELP_CHAT_CLOSED_KEY, "1");
   }
 
   onMount(() => {
     mounted = true;
-    chatOpen = isArticlePage
-      ? false
-      : window.sessionStorage.getItem(HELP_CHAT_CLOSED_KEY) !== "1";
+    const handleOpenHelpAssistant = (): void => openChat();
+    window.addEventListener("f10:open-help-assistant", handleOpenHelpAssistant);
 
-    const handleOpenSupport = () => openChat();
-    window.addEventListener("f10:open-support-chat", handleOpenSupport);
-
-    return () => window.removeEventListener("f10:open-support-chat", handleOpenSupport);
+    return () => window.removeEventListener("f10:open-help-assistant", handleOpenHelpAssistant);
   });
 </script>
 
