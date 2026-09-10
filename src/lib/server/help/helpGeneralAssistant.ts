@@ -10,11 +10,14 @@ export type GeneralHelpAssistantResult = {
   selectedContentId: string | null;
 };
 
+const HELP_ORIGIN = "https://f10.com.br";
+
 function contextualizeQuestion(question: string, reinforced = false): string {
   return [
     "Contexto obrigatório: você é o Assistente F10. Toda pergunta deve ser interpretada exclusivamente dentro do produto F10 e respondida usando a Base de Conhecimento do F10.",
     "Termos que também existem fora do F10 devem ser entendidos somente como recursos, integrações ou conceitos relacionados ao uso do F10.",
     "Nunca ofereça comparação, alternativa, explicação ou esclarecimento sobre serviços, produtos ou conceitos fora do F10.",
+    "Quando usar um artigo como fonte, inclua na resposta a URL pública completa do artigo ou trecho, sempre iniciando por https://f10.com.br/ajuda-f10/. Nunca devolva apenas um caminho relativo como /ajuda-f10/.",
     reinforced
       ? "Pesquise a Base de Conhecimento, escolha o artigo F10 mais relacionado e leia o conteúdo antes de concluir que precisa de esclarecimento."
       : "",
@@ -38,6 +41,13 @@ function leavesF10Context(answer: string): boolean {
   return externalMeaning.test(normalized) || externalFork.test(normalized);
 }
 
+function withAbsoluteHelpUrls(answer: string): string {
+  return answer.replace(
+    /(^|[\s(])(\/ajuda-f10(?:\/[^\s)\],;!?]*)?(?:#[^\s)\],;!?]*)?)/g,
+    (_match, prefix: string, path: string) => `${prefix}${HELP_ORIGIN}${path}`,
+  );
+}
+
 export async function runGeneralHelpAssistant(input: {
   question: string;
   conversationContext?: string;
@@ -56,7 +66,7 @@ export async function runGeneralHelpAssistant(input: {
   }
 
   return {
-    answer: result.answer,
+    answer: withAbsoluteHelpUrls(result.answer),
     action: result.action,
     searchEventId: result.searchEventId,
     selectedContentId: result.target?.contentId ?? null,
