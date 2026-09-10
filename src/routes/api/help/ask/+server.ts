@@ -3,11 +3,11 @@ import { AiGatewayError } from "$lib/server/ai/aiGateway";
 import { isAiTaskConfigured } from "$lib/server/ai/aiConfigurationRepository";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { tryAnswerHelpArticleDeterministically } from "$lib/server/help/helpArticleDeterministicAnswer";
+import type { HelpKnowledgeScope } from "$lib/server/help/helpKnowledgeEngine";
 import {
-  answerHelpQuestion,
-  type HelpKnowledgeScope,
-} from "$lib/server/help/helpKnowledgeEngine";
-import { answerHelpArticleWithGlobalFallback } from "$lib/server/help/helpKnowledgeOrchestrator";
+  answerHelpArticleWithGlobalFallback,
+  answerHelpGlobalWithArticleResolution,
+} from "$lib/server/help/helpKnowledgeOrchestrator";
 import { recordHelpKnowledgeRun } from "$lib/server/help/helpKnowledgeTelemetryRepository";
 import {
   claimHelpPublicAiRequest,
@@ -156,11 +156,12 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
           conversationContext,
           maxOutputTokens: ARTICLE_MAX_OUTPUT_TOKENS,
         })
-      : await answerHelpQuestion({
+      : await answerHelpGlobalWithArticleResolution({
           question,
           scope,
           source: "public",
           conversationContext,
+          maxOutputTokens: ARTICLE_MAX_OUTPUT_TOKENS,
         });
     const latencyMs = Date.now() - knowledgeStartedAt;
 
