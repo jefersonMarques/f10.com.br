@@ -31,7 +31,6 @@ const PERMANENT_FAILURE_CODES = new Set([
 ]);
 
 let started = false;
-let stopping = false;
 
 function failureCode(cause: unknown): string {
   if (!(cause instanceof Error)) return "HELP_VIDEO_PROCESSING_FAILED";
@@ -100,7 +99,7 @@ async function processJob(job: HelpVideoProcessingJob): Promise<void> {
 async function runWorkerLoop(): Promise<void> {
   await recoverStaleHelpVideoProcessingJobs();
 
-  while (!stopping) {
+  while (true) {
     await recoverStaleHelpVideoProcessingJobs();
     const job = await claimNextHelpVideoProcessingJob();
     if (!job) {
@@ -137,14 +136,9 @@ async function runWorkerLoop(): Promise<void> {
 export function startHelpVideoProcessingWorker(): void {
   if (started || env.F10_HELP_VIDEO_WORKER !== "1") return;
   started = true;
-  stopping = false;
   void runWorkerLoop().catch((cause) => {
     started = false;
     console.error("[help-video-worker] loop stopped", { cause });
     setTimeout(() => startHelpVideoProcessingWorker(), POLL_INTERVAL_MS);
   });
-}
-
-export function stopHelpVideoProcessingWorker(): void {
-  stopping = true;
 }
