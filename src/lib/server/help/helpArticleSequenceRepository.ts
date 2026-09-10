@@ -61,19 +61,21 @@ export async function moveHelpArticle(
   if (index < 0) throw new Error("CONTENT_NOT_FOUND");
 
   const targetIndex = direction === "up" ? index - 1 : index + 1;
-  if (targetIndex < 0 || targetIndex >= rows.length) return;
-
-  const reordered = [...rows];
-  [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
+  const current = rows[index];
+  const target = rows[targetIndex];
+  if (!current || !target) return;
 
   await db.transaction(async (tx) => {
-    for (const [position, item] of reordered.entries()) {
-      await tx.execute(sql`
-        UPDATE "help_contents"
-        SET "sort_order" = ${(position + 1) * 10}
-        WHERE "id" = ${item.id}
-      `);
-    }
+    await tx.execute(sql`
+      UPDATE "help_contents"
+      SET "sort_order" = ${target.sortOrder}
+      WHERE "id" = ${current.id}
+    `);
+    await tx.execute(sql`
+      UPDATE "help_contents"
+      SET "sort_order" = ${current.sortOrder}
+      WHERE "id" = ${target.id}
+    `);
   });
 
   await recordAuditEvent({
