@@ -16,6 +16,20 @@ import {
 const POLL_INTERVAL_MS = 4_000;
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
+const PERMANENT_FAILURE_CODES = new Set([
+  "CONTENT_ARCHIVED",
+  "CONTENT_NOT_FOUND",
+  "HELP_VIDEO_PROCESSING_ACTOR_MISSING",
+  "HELP_VIDEO_PROCESSING_SOURCE_MISSING",
+  "HELP_VIDEO_LOCAL_COPY_REQUIRED",
+  "HELP_VIDEO_UPLOAD_FORMAT_INVALID",
+  "HELP_VIDEO_UPLOAD_SIZE_INVALID",
+  "HELP_VIDEO_FFMPEG_NOT_AVAILABLE",
+  "HELP_VIDEO_SCREENSHOTS_NOT_PLANNED",
+  "HELP_VIDEO_NO_SCREENSHOTS_SELECTED",
+  "OPENAI_NOT_CONFIGURED",
+]);
+
 let started = false;
 let stopping = false;
 
@@ -35,16 +49,7 @@ function failureMessage(cause: unknown): string {
 }
 
 function retryableFailure(code: string): boolean {
-  return !new Set([
-    "CONTENT_ARCHIVED",
-    "CONTENT_NOT_FOUND",
-    "HELP_VIDEO_PROCESSING_ACTOR_MISSING",
-    "HELP_VIDEO_PROCESSING_SOURCE_MISSING",
-    "HELP_VIDEO_LOCAL_COPY_REQUIRED",
-    "HELP_VIDEO_UPLOAD_FORMAT_INVALID",
-    "HELP_VIDEO_UPLOAD_SIZE_INVALID",
-    "OPENAI_NOT_CONFIGURED",
-  ]).has(code);
+  return !PERMANENT_FAILURE_CODES.has(code);
 }
 
 async function processJob(job: HelpVideoProcessingJob): Promise<void> {
@@ -106,14 +111,14 @@ async function runWorkerLoop(): Promise<void> {
     try {
       await processJob(job);
     } catch (cause) {
+      const code = failureCode(cause);
       console.error("[help-video-worker] processing failed", {
         jobId: job.id,
         contentId: job.contentId,
         attempt: job.attemptCount,
-        code: failureCode(cause),
+        code,
         cause,
       });
-      const code = failureCode(cause);
       await failHelpVideoProcessingJob(
         job,
         code,
