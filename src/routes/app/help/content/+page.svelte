@@ -3,7 +3,9 @@
   import { onDestroy, onMount } from "svelte";
   import {
     Archive,
+    ArrowDown,
     ArrowRight,
+    ArrowUp,
     BarChart3,
     BookOpenCheck,
     CheckCircle2,
@@ -221,12 +223,12 @@
 
   <div class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_410px]">
     <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
-      <header class="border-b border-[#EEF0F5] px-5 py-4 sm:px-6"><h2 class="text-[16px] font-semibold text-[#11182C]">Conteúdos</h2><p class="mt-1 text-[11px] text-[#858A98]">Cada conteúdo deve participar de pelo menos uma categoria ativa.</p></header>
+      <header class="border-b border-[#EEF0F5] px-5 py-4 sm:px-6"><h2 class="text-[16px] font-semibold text-[#11182C]">Conteúdos</h2><p class="mt-1 text-[11px] text-[#858A98]">Use as setas para definir a sequência pública dos artigos.</p></header>
       {#if data.contents.length === 0}
         <div class="px-6 py-16 text-center"><BookOpenCheck size={34} class="mx-auto text-[#B6BBC7]"/><p class="mt-4 text-[13px] font-semibold text-[#4B5160]">Nenhum conteúdo estruturado</p></div>
       {:else}
         <div class="divide-y divide-[#EEF0F5]">
-          {#each data.contents as content}
+          {#each data.contents as content, index}
             <div class={`px-5 py-4 transition sm:px-6 ${content.status === "archived" ? "bg-[#FAFAFC] opacity-80" : "hover:bg-[#FAFAFC]"}`}>
               <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
                 <div class="min-w-0 flex-1">
@@ -276,6 +278,20 @@
                 </div>
 
                 <div class="flex shrink-0 flex-wrap items-center gap-2">
+                  <span class="flex h-9 min-w-9 items-center justify-center rounded-lg bg-[#F3F5FF] px-2 text-[10px] font-bold text-[#000A57]">{index + 1}</span>
+                  {#if data.canEdit}
+                    <form method="POST" action="?/move">
+                      <input type="hidden" name="contentId" value={content.id}/>
+                      <input type="hidden" name="direction" value="up"/>
+                      <button type="submit" disabled={index === 0} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#697080] transition hover:bg-[#F7F8FB] disabled:cursor-not-allowed disabled:opacity-25" aria-label="Subir na sequência" title="Subir"><ArrowUp size={13}/></button>
+                    </form>
+                    <form method="POST" action="?/move">
+                      <input type="hidden" name="contentId" value={content.id}/>
+                      <input type="hidden" name="direction" value="down"/>
+                      <button type="submit" disabled={index === data.contents.length - 1} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#697080] transition hover:bg-[#F7F8FB] disabled:cursor-not-allowed disabled:opacity-25" aria-label="Descer na sequência" title="Descer"><ArrowDown size={13}/></button>
+                    </form>
+                  {/if}
+
                   {#if content.processingJob}
                     <button
                       type="button"
