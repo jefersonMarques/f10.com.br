@@ -331,3 +331,21 @@
     </aside>
   {/if}
 {/if}
+
+<style>
+  :global(.help-ai-target-highlight) {
+    animation: help-ai-target-pulse 1.2s ease-out 2;
+    outline: 3px solid rgba(234, 109, 11, 0.7);
+    outline-offset: 4px;
+    border-radius: 18px;
+  }
+
+  @keyframes help-ai-target-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(234, 109, 11, 0); }
+    45% { box-shadow: 0 0 0 10px rgba(234, 109, 11, 0.16); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(.help-ai-target-highlight) { animation: none; }
+  }
+</style>
