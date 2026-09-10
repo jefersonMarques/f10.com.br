@@ -27,6 +27,10 @@
     blockId: string | null;
     anchor: string | null;
   };
+  type ConversationTurn = {
+    question: string;
+    answer: string;
+  };
 
   let chatOpen = data.openChat;
   let question = "";
@@ -35,6 +39,7 @@
   let target: HelpTarget | null = null;
   let loading = false;
   let errorMessage = "";
+  let conversation: ConversationTurn[] = [];
 
   function errorFor(code: string): string {
     if (code === "AUTH_REQUIRED") return "Para usar a pesquisa inteligente, entre na Área do Cliente e selecione sua unidade.";
@@ -48,9 +53,18 @@
     return `/ajuda-f10/${encodeURIComponent(helpTarget.slug)}${anchor}`;
   }
 
+  function conversationContext(): string {
+    const context = conversation
+      .slice(-4)
+      .map((turn) => `Cliente: ${turn.question}\nAssistente: ${turn.answer}`)
+      .join("\n");
+    return context.length <= 5_500 ? context : context.slice(context.length - 5_500);
+  }
+
   async function askHelp(): Promise<void> {
     const normalized = question.trim();
     if (!data.helpPublicAi.available || loading || normalized.length < 3) return;
+    const context = conversationContext();
     loading = true;
     answer = "";
     target = null;
@@ -60,7 +74,11 @@
       const response = await fetch("/api/help/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: normalized, scope: "global" }),
+        body: JSON.stringify({
+          question: normalized,
+          scope: "global",
+          conversationContext: context,
+        }),
       });
       const payload = (await response.json()) as {
         error?: string;
@@ -72,9 +90,13 @@
         errorMessage = errorFor(payload.error ?? "");
         return;
       }
-      answer = typeof payload.answer === "string" ? payload.answer : "";
+      answer = typeof payload.answer === "string" ? payload.answer.trim() : "";
       resolution = payload.resolution ?? "not_found";
       target = payload.target ?? null;
+      if (answer) {
+        conversation = [...conversation, { question: normalized, answer }].slice(-4);
+        question = "";
+      }
     } catch {
       errorMessage = errorFor("");
     } finally {
@@ -100,7 +122,7 @@
       <div class="mx-auto max-w-[820px] text-center">
         <div class="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-white/70"><Sparkles size={14}/>Central de Ajuda F10</div>
         <h1 class="mt-5 text-[34px] font-semibold tracking-[-0.045em] sm:text-[50px]">O que você precisa fazer no F10?</h1>
-        <p class="mx-auto mt-4 max-w-[680px] text-[14px] leading-7 text-white/68 sm:text-[15px]">Descreva sua dúvida como você falaria com o suporte. A Central procura o conteúdo publicado e resume o procedimento para você.</p>
+        <p class="mx-auto mt-4 max-w-[680px] text-[14px] leading-7 text-white/68 sm:text-[15px]">Descreva sua dúvida como você falaria com o suporte. A Central procura o conteúdo publicado e responde usando a orientação mais adequada.</p>
       </div>
 
       <form class="mx-auto mt-8 max-w-[820px]" on:submit|preventDefault={askHelp}>
