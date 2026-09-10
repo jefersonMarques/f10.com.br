@@ -6,6 +6,7 @@
     ArrowRight,
     BarChart3,
     BookOpenCheck,
+    CheckCircle2,
     CircleAlert,
     ExternalLink,
     Eye,
@@ -13,8 +14,10 @@
     HardDrive,
     Layers3,
     LoaderCircle,
+    RefreshCw,
     RotateCcw,
     Trash2,
+    TriangleAlert,
     UploadCloud,
     X,
   } from "lucide-svelte";
@@ -30,12 +33,32 @@
     published: "Publicado",
     archived: "Arquivado",
   };
+  const ACTIVE_PROCESSING_STATUSES = new Set([
+    "queued",
+    "running",
+    "retry_waiting",
+  ]);
+
+  type ContentItem = PageData["contents"][number];
+  type ProcessingJob = NonNullable<ContentItem["processingJob"]>;
 
   let deleteTarget: { id: string; title: string; hasPublicVersion: boolean } | null = null;
   let deleteConfirmation = "";
+  let processingTargetId: string | null = null;
+  let processingTarget: ContentItem | null = null;
+  let processingTargetJob: ProcessingJob | null = null;
+  let retryingJobId = "";
   let processingRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
-  $: hasProcessingJobs = data.contents.some((content) => Boolean(content.processingJob));
+  $: processingTarget = processingTargetId
+    ? data.contents.find((content) => content.id === processingTargetId) ?? null
+    : null;
+  $: processingTargetJob = processingTarget?.processingJob ?? null;
+  $: hasProcessingJobs = data.contents.some(
+    (content) =>
+      content.processingJob
+      && ACTIVE_PROCESSING_STATUSES.has(content.processingJob.status),
+  );
   $: values = form && "values" in form ? form.values : null;
   $: deleteConfirmationReady = deleteConfirmation.trim().toLocaleLowerCase("pt-BR").replace(/\s+/g, " ") === "quero excluir";
 
@@ -53,6 +76,67 @@
     deleteConfirmation = "";
   }
 
+  function isProcessingActive(status: string | undefined): boolean {
+    return Boolean(status && ACTIVE_PROCESSING_STATUSES.has(status));
+  }
+
+  function openProcessingDetails(contentId: string): void {
+    processingTargetId = contentId;
+  }
+
+  function closeProcessingDetails(): void {
+    processingTargetId = null;
+  }
+
+  function processingStatusLabel(job: ProcessingJob): string {
+    if (job.status === "completed") return "Concluído";
+    if (job.status === "failed") return "Falhou";
+    if (job.status === "retry_waiting") return "Nova tentativa";
+    if (job.status === "queued") return "Na fila";
+    return "Processando";
+  }
+
+  function processingTime(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  }
+
+  async function retryProcessing(job: ProcessingJob): Promise<void> {
+    if (retryingJobId || !data.canEdit) return;
+    retryingJobId = job.id;
+    try {
+      const response = await fetch(
+        `/api/app/help/content/${job.contentId}/regenerate`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            jobId: job.id,
+            action: "retry",
+          }),
+        },
+      );
+      if (response.ok) await invalidateAll();
+    } finally {
+      retryingJobId = "";
+    }
+  }
+
+  function handleEscape(event: KeyboardEvent): void {
+    if (event.key !== "Escape") return;
+    if (processingTargetId) {
+      closeProcessingDetails();
+      return;
+    }
+    if (deleteTarget) closeDeleteModal();
+  }
+
   onMount(() => {
     processingRefreshTimer = setInterval(() => {
       if (hasProcessingJobs && !document.hidden) {
@@ -68,7 +152,7 @@
 
 <svelte:head><title>Base de Conhecimento | F10 Operations</title></svelte:head>
 
-<svelte:window on:keydown={(event) => event.key === "Escape" && deleteTarget && closeDeleteModal()} />
+<svelte:window on:keydown={handleEscape} />
 
 <ApplicationContent width="wide">
   <div class="mb-3 flex flex-wrap justify-end gap-2">
@@ -98,31 +182,63 @@
           {#each data.contents as content}
             <div class={`px-5 py-4 transition sm:px-6 ${content.status === "archived" ? "bg-[#FAFAFC] opacity-80" : "hover:bg-[#FAFAFC]"}`}>
               <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                <a href={`/app/help/content/${content.id}/images`} class={`group min-w-0 flex-1 ${content.processingJob ? "pointer-events-none cursor-default" : ""}`} aria-disabled={content.processingJob ? "true" : undefined}>
+                <div class="min-w-0 flex-1">
                   <div class="flex flex-wrap items-center gap-2">
-                    <strong class="truncate text-[13px] font-semibold text-[#252B3B]">{content.title}</strong>
-                    {#if content.processingJob}
-                      <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#FFF3E9] px-2 py-1 font-bold uppercase tracking-[0.05em] text-[#A9510D]"><LoaderCircle size={11} class="animate-spin"/>Processando</span>
+                    {#if isProcessingActive(content.processingJob?.status)}
+                      <strong class="truncate text-[13px] font-semibold text-[#252B3B]">{content.title}</strong>
                     {:else}
-                      <span class={`application-text-meta rounded-full px-2 py-1 font-bold uppercase tracking-[0.05em] ${content.status === "published" ? "bg-[#EEF8F1] text-[#2F7045]" : content.status === "archived" ? "bg-[#F1F1F3] text-[#676D7D]" : "bg-[#F2F3F7] text-[#707687]"}`}>{statusLabels[content.status] ?? content.status}</span>
+                      <a href={`/app/help/content/${content.id}/images`} class="truncate text-[13px] font-semibold text-[#252B3B] hover:text-[#000A57]">{content.title}</a>
+                    {/if}
+
+                    <span class={`application-text-meta rounded-full px-2 py-1 font-bold uppercase tracking-[0.05em] ${content.status === "published" ? "bg-[#EEF8F1] text-[#2F7045]" : content.status === "archived" ? "bg-[#F1F1F3] text-[#676D7D]" : "bg-[#F2F3F7] text-[#707687]"}`}>
+                      {statusLabels[content.status] ?? content.status}
+                    </span>
+
+                    {#if content.processingJob?.status === "completed"}
+                      <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#EEF8F1] px-2 py-1 font-bold uppercase tracking-[0.05em] text-[#2F7045]"><CheckCircle2 size={11}/>Processado</span>
+                    {:else if content.processingJob?.status === "failed"}
+                      <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#FFF0F0] px-2 py-1 font-bold uppercase tracking-[0.05em] text-[#9B2C2C]"><TriangleAlert size={11}/>Falhou</span>
+                    {:else if content.processingJob}
+                      <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#FFF3E9] px-2 py-1 font-bold uppercase tracking-[0.05em] text-[#A9510D]"><LoaderCircle size={11} class="animate-spin"/>Processando</span>
                     {/if}
                   </div>
-                  {#if content.processingJob}
+
+                  {#if content.processingJob && isProcessingActive(content.processingJob.status)}
                     <p class="application-text-caption mt-1 truncate font-medium text-[#A9510D]">
                       {content.processingJob.progressLabel}
                       {#if content.processingJob.totalParts}
                         · {Math.min(content.processingJob.completedParts, content.processingJob.totalParts)}/{content.processingJob.totalParts} partes
                       {/if}
+                      {#if content.processingJob.attemptCount > 0}
+                        · tentativa {content.processingJob.attemptCount}/{content.processingJob.maxAttempts}
+                      {/if}
                     </p>
                   {:else}
                     <p class="application-text-caption mt-1 truncate text-[#858B99]">{content.categories.length ? content.categories.map((category) => category.name).join(" · ") : "Sem categoria"} · {content.stepCount} {content.stepCount === 1 ? "passo" : "passos"} · /{content.slug}</p>
                   {/if}
+
+                  {#if content.processingJob && !isProcessingActive(content.processingJob.status)}
+                    <p class={`mt-1 line-clamp-1 text-[10px] leading-4 ${content.processingJob.status === "failed" ? "text-[#9B2C2C]" : "text-[#5D7765]"}`}>
+                      {content.processingJob.progressDetail}
+                    </p>
+                  {/if}
+
                   {#if content.summary}<p class="mt-2 line-clamp-2 max-w-[780px] text-[11px] leading-5 text-[#737989]">{content.summary}</p>{/if}
-                </a>
+                </div>
+
                 <div class="flex shrink-0 flex-wrap items-center gap-2">
                   {#if content.processingJob}
-                    <span class="application-text-meta inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#F1D7BD] bg-[#FFF9F3] px-3 font-semibold text-[#A9510D]"><LoaderCircle size={13} class="animate-spin"/>Em andamento</span>
-                  {:else}
+                    <button
+                      type="button"
+                      on:click={() => openProcessingDetails(content.id)}
+                      class={`application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 font-semibold ${content.processingJob.status === "failed" ? "border-[#F0C8C8] bg-[#FFF7F7] text-[#9B2C2C]" : content.processingJob.status === "completed" ? "border-[#CFE8D7] bg-[#F6FBF7] text-[#2D7143]" : "border-[#F1D7BD] bg-[#FFF9F3] text-[#A9510D]"}`}
+                    >
+                      {#if isProcessingActive(content.processingJob.status)}<LoaderCircle size={13} class="animate-spin"/>{:else if content.processingJob.status === "failed"}<TriangleAlert size={13}/>{:else}<CheckCircle2 size={13}/>{/if}
+                      {isProcessingActive(content.processingJob.status) ? "Andamento" : "Detalhes"}
+                    </button>
+                  {/if}
+
+                  {#if !isProcessingActive(content.processingJob?.status)}
                     <a href={`/app/help/content/${content.id}/preview`} class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#626979]"><Eye size={13}/>Preview</a>
                     {#if content.publishedSlug}<a href={`/ajuda-f10/${content.publishedSlug}`} target="_blank" rel="noopener noreferrer" class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 font-semibold text-white">Ver artigo<ExternalLink size={12}/></a>{:else if content.status !== "archived"}<a href={`/app/help/content/${content.id}/images`} class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#777D8D]" aria-label="Editar"><ArrowRight size={14}/></a>{/if}
 
@@ -138,6 +254,7 @@
               </div>
             </div>
           {/each}
+        </div>          {/each}
         </div>
       {/if}
     </section>
@@ -157,6 +274,99 @@
     {/if}
   </div>
 </ApplicationContent>
+
+{#if processingTarget && processingTargetJob}
+  <div class="fixed inset-0 z-[125] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation" on:click={(event) => event.currentTarget === event.target && closeProcessingDetails()}>
+    <section role="dialog" aria-modal="true" aria-labelledby="processing-details-title" class="max-h-[88vh] w-full max-w-[620px] overflow-y-auto rounded-[24px] bg-white p-5 shadow-2xl sm:p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <h2 id="processing-details-title" class="truncate text-[16px] font-semibold text-[#11182C]">{processingTarget.title}</h2>
+            {#if processingTargetJob.status === "completed"}
+              <span class="application-text-meta rounded-full bg-[#EEF8F1] px-2 py-1 font-bold text-[#2F7045]">CONCLUÍDO</span>
+            {:else if processingTargetJob.status === "failed"}
+              <span class="application-text-meta rounded-full bg-[#FFF0F0] px-2 py-1 font-bold text-[#9B2C2C]">FALHOU</span>
+            {:else}
+              <span class="application-text-meta rounded-full bg-[#FFF3E9] px-2 py-1 font-bold text-[#A9510D]">{processingStatusLabel(processingTargetJob).toUpperCase()}</span>
+            {/if}
+          </div>
+          <p class="mt-1 text-[10px] text-[#858A98]">Histórico do processamento do vídeo</p>
+        </div>
+        <button type="button" on:click={closeProcessingDetails} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482]" aria-label="Fechar"><X size={16}/></button>
+      </div>
+
+      <div class={`mt-4 rounded-2xl border px-4 py-3 ${processingTargetJob.status === "failed" ? "border-[#F0C8C8] bg-[#FFF7F7]" : processingTargetJob.status === "completed" ? "border-[#CFE8D7] bg-[#F6FBF7]" : "border-[#F1D7BD] bg-[#FFF9F3]"}`}>
+        <div class="flex items-start gap-3">
+          <span class="mt-0.5">
+            {#if processingTargetJob.status === "completed"}
+              <CheckCircle2 size={17} class="text-[#2D7143]"/>
+            {:else if processingTargetJob.status === "failed"}
+              <TriangleAlert size={17} class="text-[#9B2C2C]"/>
+            {:else}
+              <LoaderCircle size={17} class="animate-spin text-[#A9510D]"/>
+            {/if}
+          </span>
+          <div class="min-w-0 flex-1">
+            <strong class="block text-[11px] text-[#343A49]">{processingTargetJob.progressLabel}</strong>
+            {#if processingTargetJob.progressDetail}<p class="mt-1 text-[10px] leading-5 text-[#747A89]">{processingTargetJob.progressDetail}</p>{/if}
+            <div class="mt-2 flex flex-wrap gap-2">
+              {#if processingTargetJob.totalParts}
+                <span class="application-text-meta rounded-full bg-white px-2 py-1 font-semibold text-[#666D7C]">{Math.min(processingTargetJob.completedParts, processingTargetJob.totalParts)}/{processingTargetJob.totalParts} partes</span>
+              {/if}
+              {#if processingTargetJob.attemptCount > 0}
+                <span class="application-text-meta rounded-full bg-white px-2 py-1 font-semibold text-[#666D7C]">Tentativa {processingTargetJob.attemptCount}/{processingTargetJob.maxAttempts}</span>
+              {/if}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-5">
+        <h3 class="text-[11px] font-semibold text-[#303645]">Etapas realizadas</h3>
+        {#if processingTargetJob.events.length > 0}
+          <div class="mt-3 space-y-1.5">
+            {#each processingTargetJob.events as event, eventIndex}
+              <div class="flex items-start gap-3 rounded-xl border border-[#EEF0F5] bg-[#FAFAFC] px-3 py-2.5">
+                <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white">
+                  {#if eventIndex === processingTargetJob.events.length - 1 && isProcessingActive(processingTargetJob.status)}
+                    <LoaderCircle size={13} class="animate-spin text-[#A9510D]"/>
+                  {:else if event.status === "failed"}
+                    <TriangleAlert size={13} class="text-[#9B2C2C]"/>
+                  {:else if event.eventType === "retry_scheduled" || event.eventType === "manual_retry" || event.eventType === "resumed"}
+                    <RotateCcw size={13} class="text-[#A9510D]"/>
+                  {:else}
+                    <CheckCircle2 size={13} class="text-[#2D7143]"/>
+                  {/if}
+                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <strong class="text-[10px] font-semibold text-[#454C5D]">{event.label}</strong>
+                    <span class="application-text-meta text-[#9A9EAA]">{processingTime(event.createdAt)}</span>
+                  </div>
+                  {#if event.detail}<p class="mt-0.5 text-[9px] leading-4 text-[#858B99]">{event.detail}</p>{/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <div class="mt-3 rounded-xl border border-[#E2E5ED] bg-[#FAFAFC] px-4 py-3 text-[10px] text-[#777D8D]">Esta execução é anterior ao histórico detalhado. O status atual continua preservado.</div>
+        {/if}
+      </div>
+
+      <div class="mt-5 flex flex-wrap justify-end gap-2">
+        <button type="button" on:click={closeProcessingDetails} class="min-h-10 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[10px] font-semibold text-[#626979]">Fechar</button>
+        {#if processingTargetJob.status === "failed" && data.canEdit}
+          <button type="button" on:click={() => retryProcessing(processingTargetJob!)} disabled={retryingJobId === processingTargetJob.id} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">
+            {#if retryingJobId === processingTargetJob.id}<LoaderCircle size={14} class="animate-spin"/>{:else}<RefreshCw size={14}/>{/if}
+            Tentar novamente
+          </button>
+        {:else if processingTargetJob.status === "completed"}
+          <a href={`/app/help/content/${processingTarget.id}/images`} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white"><ArrowRight size={14}/>Revisar conteúdo</a>
+        {/if}
+      </div>
+    </section>
+  </div>
+{/if}
 
 {#if deleteTarget}
   <div class="fixed inset-0 z-[120] flex items-center justify-center bg-[#050A1A]/55 px-4" role="presentation" on:click={(event) => event.currentTarget === event.target && closeDeleteModal()}>

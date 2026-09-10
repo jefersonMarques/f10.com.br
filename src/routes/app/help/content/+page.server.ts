@@ -15,7 +15,7 @@ import {
 } from "$lib/server/help/structuredHelpRepository";
 import {
   getActiveHelpVideoProcessingJob,
-  listActiveHelpVideoProcessingJobViews,
+  listLatestHelpVideoProcessingJobDetails,
 } from "$lib/server/help/helpVideoProcessingRepository";
 import { listPublishedStructuredHelpLinks } from "$lib/server/help/publicStructuredHelpRepository";
 
@@ -55,12 +55,14 @@ export const load: PageServerLoad = async ({ parent }) => {
     throw error(403, "Acesso não autorizado.");
   }
 
-  const [contents, publishedLinks, categories, processingJobs] = await Promise.all([
+  const [contents, publishedLinks, categories] = await Promise.all([
     listStructuredHelpContents(),
     listPublishedStructuredHelpLinks(),
     listHelpCategories(true),
-    listActiveHelpVideoProcessingJobViews(),
   ]);
+  const processingJobs = await listLatestHelpVideoProcessingJobDetails(
+    contents.map((content) => content.id),
+  );
   const publishedById = new Map(
     publishedLinks.map((publication) => [publication.entityId, publication]),
   );

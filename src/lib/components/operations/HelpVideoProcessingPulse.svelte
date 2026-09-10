@@ -22,6 +22,10 @@
     contentTitle: string;
     status: VideoProcessingJobStatus;
     stage: string;
+    progressLabel: string;
+    progressDetail: string;
+    attemptCount: number;
+    maxAttempts: number;
     completedParts: number;
     totalParts: number | null;
   };
@@ -45,19 +49,6 @@
     : hasFailedJob
       ? "Atenção"
       : "Pronto";
-
-  function stageLabel(job: VideoProcessingJob): string {
-    if (job.status === "completed") return "Pronto para revisão";
-    if (job.status === "failed") return "Processamento interrompido";
-    if (job.status === "retry_waiting") return "Tentando novamente";
-    if (job.status === "queued") return "Aguardando processamento";
-
-    if (job.stage === "transcribe") return "Transcrevendo vídeo";
-    if (job.stage === "analyze") return "Gerando conteúdo";
-    if (job.stage === "package") return "Finalizando conteúdo";
-    if (job.stage === "source" || job.stage === "extract") return "Preparando vídeo";
-    return "Processando conteúdo";
-  }
 
   function triggerClasses(): string {
     if (activeJobs.length > 0) {
@@ -153,7 +144,7 @@
         <div class="max-h-[420px] overflow-y-auto p-1.5">
           {#each jobs as job}
             <a
-              href={`/app/help/content/${job.contentId}/images`}
+              href={ACTIVE_STATUSES.has(job.status) ? "/app/help/content" : `/app/help/content/${job.contentId}/images`}
               class="flex items-start gap-3 rounded-xl px-3 py-3 transition hover:bg-[#F6F7FB]"
               on:click={() => (panelOpen = false)}
             >
@@ -171,12 +162,21 @@
                 <strong class="block truncate text-[12px] font-semibold text-[#303645]">
                   {job.contentTitle}
                 </strong>
-                <span class="mt-1 block text-[11px] leading-4 text-[#747A89]">
-                  {stageLabel(job)}
+                <span class="mt-1 block text-[11px] font-medium leading-4 text-[#5E6575]">
+                  {job.progressLabel}
                 </span>
+                {#if job.progressDetail}
+                  <span class="mt-0.5 block line-clamp-2 text-[10px] leading-4 text-[#8A909E]">
+                    {job.progressDetail}
+                  </span>
+                {/if}
                 {#if job.totalParts && job.totalParts > 0}
                   <span class="mt-1.5 block text-[10px] font-semibold text-[#8A909E]">
                     {Math.min(job.completedParts, job.totalParts)} de {job.totalParts} partes
+                  </span>
+                {:else if ACTIVE_STATUSES.has(job.status) && job.attemptCount > 0}
+                  <span class="mt-1.5 block text-[10px] font-semibold text-[#8A909E]">
+                    Tentativa {job.attemptCount} de {job.maxAttempts}
                   </span>
                 {/if}
               </span>
