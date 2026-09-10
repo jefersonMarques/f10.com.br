@@ -19,8 +19,7 @@ export type HelpVideoProcessingJobStatus =
   | "running"
   | "retry_waiting"
   | "completed"
-  | "failed"
-  | "cancelled";
+  | "failed";
 
 export type HelpVideoProcessingSourceKind = "current" | "upload";
 
