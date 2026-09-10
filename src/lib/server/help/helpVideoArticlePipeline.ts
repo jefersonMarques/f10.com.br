@@ -53,9 +53,11 @@ type IdentifiedSegment = HelpVideoSourceSegment & {
   sourceIndex: number;
 };
 
-type ClassifiedSegment = IdentifiedSegment & {
-  classification: HelpVideoSegmentClassification;
-  topicKey: string;
+type GenerationPart = {
+  partIndex: number;
+  core: IdentifiedSegment[];
+  before: IdentifiedSegment[];
+  after: IdentifiedSegment[];
 };
 
 export type HelpVideoGeneratedPartStep = HelpVideoGeneratedStep & {
@@ -65,7 +67,8 @@ export type HelpVideoGeneratedPartStep = HelpVideoGeneratedStep & {
 type GeneratedPartStep = HelpVideoGeneratedPartStep;
 
 type GeneratedPartResponse = {
-  steps: GeneratedPartStep[];
+  hasUsefulContent: boolean;
+  steps: HelpVideoGeneratedStep[];
 };
 
 export type HelpVideoGeneratedMetadata = Omit<HelpVideoGeneratedArticle, "steps">;
@@ -127,7 +130,9 @@ type PipelineAiUsageHandler = (
 
 const GENERATION_PART_SEGMENTS = 36;
 const GENERATION_PART_SECONDS = 6 * 60;
-const GENERATION_CONCURRENCY = 2;
+const PART_CONTEXT_SECONDS = 45;
+const PART_CONTEXT_SEGMENTS = 8;
+const PART_GENERATION_ATTEMPTS = 2;
 
 const EDITORIAL_INVALID_PATTERNS = [
   /\bna transcri(?:ção|cao)\b/i,
@@ -155,6 +160,16 @@ function aiFailureCode(cause: unknown): string {
   return "AI_REQUEST_FAILED";
 }
 
+function retryablePartFailure(cause: unknown): boolean {
+  return cause instanceof AiGatewayError
+    && new Set([
+      "AI_TIMEOUT",
+      "AI_OUTPUT_INCOMPLETE",
+      "AI_EMPTY_RESPONSE",
+      "AI_INVALID_JSON",
+    ]).has(cause.code);
+}
+
 async function reportAiUsage(
   handler: PipelineAiUsageHandler | undefined,
   usage: HelpVideoArticlePipelineAiUsage,
@@ -180,73 +195,81 @@ function formatTime(seconds: number): string {
 function identifiedSegments(
   segments: HelpVideoSourceSegment[],
 ): IdentifiedSegment[] {
-  return segments.map((segment, index) => ({
-    ...segment,
-    id: segmentId(index),
-    sourceIndex: index,
-  }));
+  return segments
+    .map((segment, index) => ({
+      ...segment,
+      text: segment.text.trim(),
+      id: segmentId(index),
+      sourceIndex: index,
+    }))
+    .filter((segment) => segment.text.length > 0);
 }
 
-function classifyTranscript(
-  segments: IdentifiedSegment[],
-): ClassifiedSegment[] {
-  return segments.map((segment) => ({
-    ...segment,
-    classification: "explanation",
-    topicKey: `janela_${String(
-      Math.floor(segment.start / GENERATION_PART_SECONDS) + 1,
-    ).padStart(3, "0")}`,
-  }));
-}
-
-function isRelevant(segment: ClassifiedSegment): boolean {
-  return segment.classification !== "irrelevant";
-}
-
-function buildGenerationParts(segments: ClassifiedSegment[]): ClassifiedSegment[][] {
-  const relevant = segments.filter(isRelevant);
-  if (relevant.length === 0) return [];
-
-  const parts: ClassifiedSegment[][] = [];
-  let current: ClassifiedSegment[] = [];
+function buildCoreParts(segments: IdentifiedSegment[]): IdentifiedSegment[][] {
+  const parts: IdentifiedSegment[][] = [];
+  let current: IdentifiedSegment[] = [];
 
   const flush = () => {
-    if (current.length > 0) parts.push(current);
+    if (current.length === 0) return;
+    parts.push(current);
     current = [];
   };
 
-  for (const segment of relevant) {
+  for (const segment of segments) {
     const first = current[0];
-    const previous = current.at(-1);
-    const duration = first ? segment.end - first.start : 0;
-    const topicChanged =
-      Boolean(previous) &&
-      previous!.topicKey !== segment.topicKey &&
-      first !== undefined &&
-      previous!.end - first.start >= 3 * 60;
-    const sourceGap =
-      Boolean(previous) && segment.sourceIndex - previous!.sourceIndex > 8;
+    const exceedsSegmentLimit = current.length >= GENERATION_PART_SEGMENTS;
+    const exceedsTimeLimit =
+      Boolean(first)
+      && segment.end - first!.start > GENERATION_PART_SECONDS;
 
-    if (
-      current.length >= GENERATION_PART_SEGMENTS ||
-      duration > GENERATION_PART_SECONDS ||
-      topicChanged ||
-      sourceGap
-    ) {
-      flush();
-    }
+    if (exceedsSegmentLimit || exceedsTimeLimit) flush();
     current.push(segment);
   }
+
   flush();
   return parts;
+}
+
+function buildGenerationParts(segments: IdentifiedSegment[]): GenerationPart[] {
+  return buildCoreParts(segments).map((core, partIndex) => {
+    const first = core[0]!;
+    const last = core.at(-1)!;
+    const coreIds = new Set(core.map((segment) => segment.id));
+
+    const before = segments
+      .filter(
+        (segment) =>
+          !coreIds.has(segment.id)
+          && segment.end <= first.start
+          && segment.end >= first.start - PART_CONTEXT_SECONDS,
+      )
+      .slice(-PART_CONTEXT_SEGMENTS);
+
+    const after = segments
+      .filter(
+        (segment) =>
+          !coreIds.has(segment.id)
+          && segment.start >= last.end
+          && segment.start <= last.end + PART_CONTEXT_SECONDS,
+      )
+      .slice(0, PART_CONTEXT_SEGMENTS);
+
+    return {
+      partIndex,
+      core,
+      before,
+      after,
+    };
+  });
 }
 
 function partSchema(): Record<string, unknown> {
   return {
     type: "object",
     additionalProperties: false,
-    required: ["steps"],
+    required: ["hasUsefulContent", "steps"],
     properties: {
+      hasUsefulContent: { type: "boolean" },
       steps: {
         type: "array",
         items: {
@@ -256,17 +279,12 @@ function partSchema(): Record<string, unknown> {
             "title",
             "description",
             "instruction",
-            "sourceSegmentIds",
             "screenshots",
           ],
           properties: {
             title: { type: "string" },
             description: { type: "string" },
             instruction: { type: "string" },
-            sourceSegmentIds: {
-              type: "array",
-              items: { type: "string" },
-            },
             screenshots: {
               type: "array",
               items: {
@@ -301,7 +319,7 @@ function editorialInvalid(value: string): boolean {
   return EDITORIAL_INVALID_PATTERNS.some((pattern) => pattern.test(value));
 }
 
-function stepHasEditorialIssue(step: GeneratedPartStep): boolean {
+function stepHasEditorialIssue(step: HelpVideoGeneratedStep): boolean {
   return [
     step.title,
     step.description,
@@ -314,321 +332,136 @@ function stepHasEditorialIssue(step: GeneratedPartStep): boolean {
   ].some((value) => editorialInvalid(value));
 }
 
+function normalizeScreenshot(
+  screenshot: HelpVideoPlannedScreenshot,
+): HelpVideoPlannedScreenshot | null {
+  const startSeconds = Number(screenshot.startSeconds);
+  const endSeconds = Number(screenshot.endSeconds);
+  if (
+    !Number.isFinite(startSeconds)
+    || !Number.isFinite(endSeconds)
+    || endSeconds <= startSeconds
+  ) {
+    return null;
+  }
+
+  return {
+    startSeconds: Math.max(0, startSeconds),
+    endSeconds: Math.max(0, endSeconds),
+    capture: screenshot.capture === "before" ? "before" : "after",
+    target: screenshot.target.trim().slice(0, 1_000),
+    altText: screenshot.altText.trim().slice(0, 500),
+    assistantDescription: screenshot.assistantDescription.trim().slice(0, 20_000),
+  };
+}
+
 function normalizePartSteps(
   response: GeneratedPartResponse,
-  allowedIds: Set<string>,
+  segmentIds: string[],
 ): GeneratedPartStep[] {
   return response.steps.flatMap((step) => {
     const title = step.title.trim().slice(0, 180);
+    const description = step.description.trim().slice(0, 2_000);
     const instruction = step.instruction.trim().slice(0, 50_000);
     if (!title || !instruction) return [];
 
-    const sourceSegmentIds = Array.from(
-      new Set(
-        step.sourceSegmentIds.filter(
-          (id) => typeof id === "string" && allowedIds.has(id),
-        ),
-      ),
-    );
-    const screenshots = (step.screenshots ?? []).slice(0, 1).flatMap((item) => {
-      const startSeconds = Number(item.startSeconds);
-      const endSeconds = Number(item.endSeconds);
-      if (!Number.isFinite(startSeconds) || !Number.isFinite(endSeconds) || endSeconds <= startSeconds) {
-        return [];
-      }
-      return [{
-        startSeconds: Math.max(0, startSeconds),
-        endSeconds: Math.max(0, endSeconds),
-        capture: item.capture === "before" ? "before" as const : "after" as const,
-        target: item.target.trim().slice(0, 1_000),
-        altText: item.altText.trim().slice(0, 500),
-        assistantDescription: item.assistantDescription.trim().slice(0, 20_000),
-      }];
-    });
+    const screenshots = (step.screenshots ?? [])
+      .slice(0, 1)
+      .flatMap((item) => {
+        const normalized = normalizeScreenshot(item);
+        return normalized ? [normalized] : [];
+      });
 
     return [{
       title,
-      description: step.description.trim().slice(0, 2_000),
+      description,
       instruction,
-      sourceSegmentIds,
       screenshots,
+      sourceSegmentIds: [...segmentIds],
     }];
   });
 }
 
-function missingCoverage(
-  requiredIds: string[],
-  steps: GeneratedPartStep[],
-): string[] {
-  const covered = new Set(steps.flatMap((step) => step.sourceSegmentIds));
-  return requiredIds.filter((id) => !covered.has(id));
+function segmentInput(segment: IdentifiedSegment): string {
+  return `[${formatTime(segment.start)}-${formatTime(segment.end)}] ${segment.text}`;
 }
 
-type CoverageAuditResponse = {
-  segments: Array<{
-    segmentId: string;
-    covered: boolean;
-  }>;
-};
+function partInput(part: GenerationPart): string {
+  const sections: string[] = [];
 
-function coverageAuditSchema(): Record<string, unknown> {
-  return {
-    type: "object",
-    additionalProperties: false,
-    required: ["segments"],
-    properties: {
-      segments: {
-        type: "array",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          required: ["segmentId", "covered"],
-          properties: {
-            segmentId: { type: "string" },
-            covered: { type: "boolean" },
-          },
-        },
-      },
-    },
-  };
-}
-
-async function auditPartCoverage(
-  part: ClassifiedSegment[],
-  steps: GeneratedPartStep[],
-  onAiUsage?: PipelineAiUsageHandler,
-): Promise<string[]> {
-  const startedAt = Date.now();
-  let responseMeta: {
-    provider?: string;
-    model: string;
-    inputTokens?: number | null;
-    outputTokens?: number | null;
-  } = { model: "ai-gateway" };
-
-  try {
-    const response = await createAiStructuredResponse<CoverageAuditResponse>({
-      task: "content_edit",
-      requiredCapabilities: ["content.draft"],
-      instructions: [
-        "Audite se cada segmento da fonte está REALMENTE representado no texto público gerado.",
-        "Retorne exatamente um item para cada segmentId recebido.",
-        "Marque covered=true somente quando a ação, regra, condição, resultado ou explicação daquele segmento estiver expressa no título, descrição ou instrução.",
-        "Ignore sourceSegmentIds declarados pelas etapas; eles não são prova de cobertura.",
-        "Não exija repetição literal. Considere paráfrases fiéis equivalentes.",
-        "Se qualquer detalhe operacional relevante do segmento estiver ausente, marque covered=false.",
-      ].join("\n"),
-      userInput: [
-        "FONTE:",
-        partInput(part),
-        "CONTEÚDO GERADO:",
-        steps.map((step, index) => [
-          `ETAPA ${index + 1}: ${step.title}`,
-          step.description,
-          step.instruction,
-        ].filter(Boolean).join("\n")).join("\n\n"),
-      ].join("\n\n"),
-      schemaName: "f10_help_video_coverage_audit",
-      schema: coverageAuditSchema(),
-      maxOutputTokens: 6_000,
-      timeoutMs: 120_000,
-    });
-    responseMeta = {
-      provider: response.provider,
-      model: response.model,
-      inputTokens: response.inputTokens,
-      outputTokens: response.outputTokens,
-    };
-
-    const expected = new Set(part.map((segment) => segment.id));
-    const seen = new Set<string>();
-    const uncovered: string[] = [];
-    for (const item of response.data.segments) {
-      if (!expected.has(item.segmentId) || seen.has(item.segmentId)) {
-        throw new Error("HELP_VIDEO_COVERAGE_AUDIT_INVALID");
-      }
-      seen.add(item.segmentId);
-      if (!item.covered) uncovered.push(item.segmentId);
-    }
-    if (seen.size !== expected.size) {
-      throw new Error("HELP_VIDEO_COVERAGE_AUDIT_INVALID");
-    }
-
-    await reportAiUsage(onAiUsage, {
-      operation: "video_coverage_audit",
-      ...responseMeta,
-      latencyMs: Date.now() - startedAt,
-      status: "success",
-    });
-    return uncovered;
-  } catch (cause) {
-    await reportAiUsage(onAiUsage, {
-      operation: "video_coverage_audit",
-      ...responseMeta,
-      latencyMs: Date.now() - startedAt,
-      status: "failed",
-      failureCode: aiFailureCode(cause),
-    });
-    throw new Error(`HELP_VIDEO_COVERAGE_AUDIT_FAILED:${aiFailureCode(cause)}`);
+  if (part.before.length > 0) {
+    sections.push([
+      "CONTEXTO ANTERIOR — apenas para continuidade; não repita conteúdo já resolvido:",
+      ...part.before.map(segmentInput),
+    ].join("\n"));
   }
-}
 
-function partInput(part: ClassifiedSegment[]): string {
-  return part
-    .map(
-      (segment) =>
-        `[${segment.id}] [${segment.classification}] [${segment.topicKey}] [${formatTime(segment.start)}-${formatTime(segment.end)}] ${segment.text}`,
-    )
-    .join("\n");
-}
+  sections.push([
+    "JANELA PRINCIPAL — gere conteúdo somente a partir destes trechos:",
+    ...part.core.map(segmentInput),
+  ].join("\n"));
 
-async function generateCoverageRecovery(
-  missingSegments: ClassifiedSegment[],
-  existingSteps: GeneratedPartStep[],
-  partIndex: number,
-  partCount: number,
-  onAiUsage?: PipelineAiUsageHandler,
-): Promise<GeneratedPartStep[]> {
-  if (missingSegments.length === 0) return [];
-
-  const startedAt = Date.now();
-  const requiredIds = missingSegments.map((segment) => segment.id);
-  const allowedIds = new Set(requiredIds);
-  let responseMeta: {
-    provider?: string;
-    model: string;
-    inputTokens?: number | null;
-    outputTokens?: number | null;
-  } = { model: "ai-gateway" };
-
-  try {
-    const response = await createAiStructuredResponse<GeneratedPartResponse>({
-      task: "content_edit",
-      requiredCapabilities: ["content.draft"],
-      instructions: [
-        "Complete um artigo F10 já existente usando SOMENTE os segmentos pendentes fornecidos.",
-        "Crie apenas as etapas adicionais necessárias para representar integralmente esses segmentos.",
-        "Não reescreva, resuma nem repita etapas que já estão cobertas.",
-        "Cada segmentId recebido DEVE aparecer em sourceSegmentIds e seu fato operacional deve estar realmente presente no texto público.",
-        "A fonte é evidência interna. NUNCA mencione transcrição, vídeo, gravação, narrador, áudio, processo de geração, ausência de ações ou ausência de screenshot.",
-        "Não produza placeholders ou artefatos como **svg**, <svg>, **html**, JSON isolado ou nomes de formatos sem função editorial.",
-        "Escreva diretamente a orientação ao usuário final.",
-        "Preserve ações, campos, valores, regras, condições, exceções e resultados.",
-        "Toda ação executável deve ficar em linha numerada usando **1.**, **2.**, **3.**.",
-        "Para etapa de interface, planeje no máximo um screenshot usando os tempos dos segmentos pendentes.",
-        "Não invente fatos, telas, campos, URLs ou resultados.",
-      ].join("\n"),
-      userInput: [
-        `PARTE ORIGINAL ${partIndex + 1} DE ${partCount}`,
-        `SEGMENTOS PENDENTES: ${requiredIds.join(", ")}`,
-        "TRECHOS PENDENTES:",
-        partInput(missingSegments),
-        "ETAPAS JÁ GERADAS — USE APENAS PARA EVITAR DUPLICAÇÃO:",
-        existingSteps
-          .map((step, index) => [
-            `ETAPA EXISTENTE ${index + 1}: ${step.title}`,
-            step.description,
-            step.instruction,
-          ].filter(Boolean).join("\n"))
-          .join("\n\n"),
-      ].join("\n\n"),
-      schemaName: "f10_help_video_article_coverage_recovery",
-      schema: partSchema(),
-      maxOutputTokens: 8_000,
-      timeoutMs: 180_000,
-    });
-
-    responseMeta = {
-      provider: response.provider,
-      model: response.model,
-      inputTokens: response.inputTokens,
-      outputTokens: response.outputTokens,
-    };
-
-    const recoverySteps = normalizePartSteps(response.data, allowedIds);
-    if (recoverySteps.length === 0 || recoverySteps.some(stepHasEditorialIssue)) {
-      throw new Error("HELP_VIDEO_COVERAGE_RECOVERY_INVALID");
-    }
-
-    const referencedMissing = missingCoverage(requiredIds, recoverySteps);
-    if (referencedMissing.length > 0) {
-      throw new Error("HELP_VIDEO_COVERAGE_RECOVERY_INCOMPLETE");
-    }
-
-    await reportAiUsage(onAiUsage, {
-      operation: "video_article_part",
-      ...responseMeta,
-      latencyMs: Date.now() - startedAt,
-      status: "success",
-    });
-
-    return recoverySteps;
-  } catch (cause) {
-    await reportAiUsage(onAiUsage, {
-      operation: "video_article_part",
-      ...responseMeta,
-      latencyMs: Date.now() - startedAt,
-      status: "failed",
-      failureCode: aiFailureCode(cause),
-    });
-    throw new Error(`HELP_VIDEO_COVERAGE_RECOVERY_FAILED:${aiFailureCode(cause)}`);
+  if (part.after.length > 0) {
+    sections.push([
+      "CONTEXTO POSTERIOR — apenas para continuidade; não antecipe conteúdo que será tratado depois:",
+      ...part.after.map(segmentInput),
+    ].join("\n"));
   }
+
+  return sections.join("\n\n");
 }
 
 async function generatePart(
-  part: ClassifiedSegment[],
-  partIndex: number,
+  part: GenerationPart,
   partCount: number,
   onAiUsage?: PipelineAiUsageHandler,
 ): Promise<GeneratedPartStep[]> {
   const startedAt = Date.now();
-  const requiredIds = part.map((segment) => segment.id);
-  const allowedIds = new Set(requiredIds);
+  const segmentIds = part.core.map((segment) => segment.id);
+  let lastCause: unknown = null;
   let lastResponseMeta: {
     provider?: string;
     model: string;
     inputTokens?: number | null;
     outputTokens?: number | null;
   } = { model: "ai-gateway" };
-  let lastMissing = requiredIds;
-  let latestSteps: GeneratedPartStep[] = [];
-  let latestEditorialIssue = false;
 
-  try {
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
+  for (let attempt = 1; attempt <= PART_GENERATION_ATTEMPTS; attempt += 1) {
+    try {
       const response = await createAiStructuredResponse<GeneratedPartResponse>({
         task: "content_edit",
         requiredCapabilities: ["content.draft"],
         instructions: [
-          "Escreva documentação oficial F10 para o usuário final usando somente os segmentos fornecidos.",
-          "A fonte recebida é evidência interna. NUNCA mencione transcrição, gravação, narrador, áudio usado na geração, nem diga 'no vídeo é mostrado', 'foi dito' ou frases equivalentes.",
-          "NUNCA explique o processo de geração. Não escreva frases como 'nesta etapa não há ações de interface', 'etapa explicativa', 'sem necessidade de screenshot' ou justificativas sobre por que uma imagem não foi criada.",
-          "Se o trecho for conceitual, escreva diretamente o conceito útil ao usuário, sem comentar que ele é conceitual ou que não possui ações.",
-          "Não produza marcadores soltos, placeholders ou lixo de formatação como **svg**, <svg>, **html**, JSON isolado ou nomes de formatos sem função no texto.",
-          "Escreva diretamente a orientação: transforme cada fato em instrução, regra, condição, resultado ou explicação útil.",
-          "Não resuma a ponto de perder ações, campos, valores, regras, condições, exceções ou resultados.",
+          "Escreva documentação oficial F10 para o usuário final usando somente a JANELA PRINCIPAL.",
+          "Os blocos de contexto anterior e posterior servem apenas para manter continuidade entre partes. Não repita o contexto anterior e não antecipe o contexto posterior.",
+          "Preserve ações, campos, valores, regras, condições, exceções e resultados úteis presentes na janela principal.",
+          "Agrupe falas relacionadas em etapas coerentes. Não crie uma etapa para cada frase.",
+          "Remova saudações, hesitações, repetições e falas sem valor operacional.",
+          "Se a janela principal realmente não contiver informação útil para um artigo de ajuda, retorne hasUsefulContent=false e steps=[].",
+          "Se houver informação operacional útil, retorne hasUsefulContent=true e pelo menos uma etapa.",
+          "A fonte é evidência interna. NUNCA mencione transcrição, vídeo, gravação, narrador, áudio ou processo de geração.",
+          "Não explique que uma etapa é conceitual, que não possui ação de interface ou que não precisa de screenshot.",
+          "Não produza placeholders ou artefatos como **svg**, <svg>, **html>, JSON isolado ou nomes de formatos sem função editorial.",
           "Toda ação executável deve ficar em linha numerada usando **1.**, **2.**, **3.**.",
-          "Agrupe ações relacionadas em etapas coerentes; não transforme automaticamente cada linha em uma etapa.",
-          "Cada segmentId relevante recebido DEVE aparecer em sourceSegmentIds de pelo menos uma etapa.",
-          "sourceSegmentIds é metadado interno e nunca deve ser citado no texto.",
-          "Para etapa de interface, planeje no máximo um screenshot usando os tempos dos próprios segmentos da etapa.",
-          "Não invente telas, campos, regras, URLs ou resultados.",
+          "Para etapa de interface, planeje no máximo um screenshot usando os timecodes da JANELA PRINCIPAL.",
+          "Use screenshots: [] quando não houver estado visual útil a capturar.",
+          "Não invente telas, campos, URLs, regras ou resultados.",
           attempt === 2
-            ? `CORREÇÃO OBRIGATÓRIA: a auditoria detectou estes segmentos sem representação suficiente ou texto editorial inválido: ${lastMissing.join(", ") || "linguagem_de_bastidor_ou_artefato"}. Reescreva somente como documentação final para o usuário, sem comentar fonte, transcrição, vídeo, ausência de ações/screenshot ou processo de geração; remova qualquer token solto como **svg**.`
+            ? "A tentativa anterior falhou estruturalmente ou editorialmente. Gere uma resposta simples, completa e estritamente dentro do schema."
             : "",
         ].filter(Boolean).join("\n"),
         userInput: [
-          `PARTE ${partIndex + 1} DE ${partCount}`,
-          `SEGMENTOS OBRIGATÓRIOS: ${requiredIds.join(", ")}`,
+          `PARTE ${part.partIndex + 1} DE ${partCount}`,
           partInput(part),
         ].join("\n\n"),
         schemaName: attempt === 1
           ? "f10_help_video_article_part"
           : "f10_help_video_article_part_retry",
         schema: partSchema(),
-        maxOutputTokens: 14_000,
+        maxOutputTokens: 10_000,
         timeoutMs: 180_000,
       });
+
       lastResponseMeta = {
         provider: response.provider,
         model: response.model,
@@ -636,89 +469,52 @@ async function generatePart(
         outputTokens: response.outputTokens,
       };
 
-      const steps = normalizePartSteps(response.data, allowedIds);
-      latestSteps = steps;
-      lastMissing = missingCoverage(requiredIds, steps);
-      const editorialLeak = steps.some(stepHasEditorialIssue);
-      latestEditorialIssue = editorialLeak;
-      if (steps.length > 0 && lastMissing.length === 0 && !editorialLeak) {
-        lastMissing = await auditPartCoverage(part, steps, onAiUsage);
-        if (lastMissing.length === 0) {
-          await reportAiUsage(onAiUsage, {
-            operation: "video_article_part",
-            ...lastResponseMeta,
-            latencyMs: Date.now() - startedAt,
-            status: "success",
-          });
-          return steps;
-        }
-      }
-      if (editorialLeak && lastMissing.length === 0) {
-        lastMissing = ["linguagem_de_bastidor_ou_artefato"];
-      }
-    }
-
-    const recoverableIds = lastMissing.filter((id) => allowedIds.has(id));
-    if (
-      latestSteps.length > 0
-      && !latestEditorialIssue
-      && recoverableIds.length > 0
-      && recoverableIds.length === lastMissing.length
-    ) {
-      let combined = [...latestSteps];
-      let pendingIds = [...recoverableIds];
-
-      for (let recoveryRound = 1; recoveryRound <= 3 && pendingIds.length > 0; recoveryRound += 1) {
-        const pendingIdSet = new Set(pendingIds);
-        const missingSegments = part.filter((segment) => pendingIdSet.has(segment.id));
-        const recoverySteps = await generateCoverageRecovery(
-          missingSegments,
-          combined,
-          partIndex,
-          partCount,
-          onAiUsage,
-        );
-        combined = [...combined, ...recoverySteps];
-
-        const referencedMissing = missingCoverage(requiredIds, combined);
-        if (referencedMissing.length > 0) {
-          pendingIds = referencedMissing;
-          continue;
-        }
-        if (combined.some(stepHasEditorialIssue)) {
-          throw new Error("HELP_VIDEO_ARTICLE_EDITORIAL_INVALID");
-        }
-
-        pendingIds = await auditPartCoverage(part, combined, onAiUsage);
-      }
-
-      if (pendingIds.length === 0) {
+      const steps = normalizePartSteps(response.data, segmentIds);
+      if (!response.data.hasUsefulContent && steps.length === 0) {
         await reportAiUsage(onAiUsage, {
           operation: "video_article_part",
           ...lastResponseMeta,
           latencyMs: Date.now() - startedAt,
           status: "success",
         });
-        return combined;
+        return [];
       }
 
-      lastMissing = pendingIds;
-    }
+      if (steps.length === 0) {
+        lastCause = new Error("HELP_VIDEO_ARTICLE_PART_EMPTY");
+        continue;
+      }
 
-    throw new Error("HELP_VIDEO_ARTICLE_PART_COVERAGE_INCOMPLETE");
-  } catch (cause) {
-    await reportAiUsage(onAiUsage, {
-      operation: "video_article_part",
-      ...lastResponseMeta,
-      latencyMs: Date.now() - startedAt,
-      status: "failed",
-      failureCode: aiFailureCode(cause),
-    });
-    if (cause instanceof Error && cause.message === "HELP_VIDEO_ARTICLE_PART_COVERAGE_INCOMPLETE") {
-      throw cause;
+      if (steps.some(stepHasEditorialIssue)) {
+        lastCause = new Error("HELP_VIDEO_ARTICLE_EDITORIAL_INVALID");
+        continue;
+      }
+
+      await reportAiUsage(onAiUsage, {
+        operation: "video_article_part",
+        ...lastResponseMeta,
+        latencyMs: Date.now() - startedAt,
+        status: "success",
+      });
+      return steps;
+    } catch (cause) {
+      lastCause = cause;
+      if (attempt < PART_GENERATION_ATTEMPTS && retryablePartFailure(cause)) {
+        continue;
+      }
+      break;
     }
-    throw new Error(`HELP_VIDEO_ARTICLE_PART_FAILED:${aiFailureCode(cause)}`);
   }
+
+  const failure = lastCause ?? new Error("HELP_VIDEO_ARTICLE_PART_FAILED");
+  await reportAiUsage(onAiUsage, {
+    operation: "video_article_part",
+    ...lastResponseMeta,
+    latencyMs: Date.now() - startedAt,
+    status: "failed",
+    failureCode: aiFailureCode(failure),
+  });
+  throw new Error(`HELP_VIDEO_ARTICLE_PART_FAILED:${aiFailureCode(failure)}`);
 }
 
 function metadataSchema(): Record<string, unknown> {
@@ -757,21 +553,17 @@ function metadataHasEditorialIssue(metadata: GeneratedMetadata): boolean {
 
 async function generateMetadata(
   steps: GeneratedPartStep[],
-  classifications: ClassifiedSegment[],
   categories: HelpVideoArticleCategory[],
   onAiUsage?: PipelineAiUsageHandler,
 ): Promise<GeneratedMetadata> {
   const startedAt = Date.now();
-  const topics = Array.from(
-    new Map(
-      classifications
-        .filter(isRelevant)
-        .map((segment) => [segment.topicKey, segment.text.slice(0, 240)]),
-    ).entries(),
-  ).slice(0, 120);
   const stepOutline = steps
-    .map((step, index) => `${index + 1}. ${step.title} — ${step.description}`)
-    .join("\n");
+    .map((step, index) => [
+      `ETAPA ${index + 1}: ${step.title}`,
+      step.description,
+      step.instruction,
+    ].filter(Boolean).join("\n"))
+    .join("\n\n");
 
   let lastResponseMeta: {
     provider?: string;
@@ -787,19 +579,19 @@ async function generateMetadata(
         requiredCapabilities: ["content.draft"],
         instructions: [
           "Crie somente os metadados editoriais para um artigo oficial da Base de Conhecimento F10.",
-          "O artigo já foi gerado em etapas com cobertura validada. Não reescreva nem resuma as etapas.",
-          "quickGuide deve ser curto e sequencial; não precisa repetir todos os detalhes do artigo.",
-          "A fonte é interna. NUNCA mencione transcrição, gravação, narrador, áudio de geração, 'no vídeo', 'foi dito' ou processo de criação.",
-          "Não explique que uma etapa é conceitual, que não possui ações de interface ou que não precisa de screenshot. Escreva somente a informação útil ao usuário.",
-          "Não produza placeholders ou artefatos como **svg**, <svg>, **html**, JSON isolado ou nomes de formatos sem função editorial.",
+          "As etapas abaixo já foram produzidas e não devem ser reescritas.",
+          "Use o conjunto das etapas para produzir título, slug, resumo, guia rápido, categorias, aliases e conhecimento complementar.",
+          "quickGuide deve ser curto, sequencial e baseado apenas nas etapas existentes.",
           "Não invente fatos.",
-          attempt === 2 ? "A tentativa anterior usou linguagem de bastidor. Reescreva como documentação direta ao usuário." : "",
+          "Nunca mencione transcrição, vídeo, gravação, narrador, áudio ou processo de geração.",
+          "Não produza placeholders ou artefatos de formatação.",
+          attempt === 2
+            ? "A tentativa anterior falhou editorialmente. Reescreva os metadados de forma direta e objetiva."
+            : "",
         ].filter(Boolean).join("\n"),
         userInput: [
-          "ETAPAS:",
+          "ETAPAS DO ARTIGO:",
           stepOutline,
-          "TÓPICOS COBERTOS:",
-          topics.map(([key, sample]) => `${key}: ${sample}`).join("\n"),
           `CATEGORIAS PERMITIDAS: ${categories.map((category) => `${category.slug} (${category.name})`).join(", ")}`,
         ].join("\n\n"),
         schemaName: attempt === 1
@@ -809,6 +601,7 @@ async function generateMetadata(
         maxOutputTokens: 4_000,
         timeoutMs: 120_000,
       });
+
       lastResponseMeta = {
         provider: response.provider,
         model: response.model,
@@ -821,8 +614,14 @@ async function generateMetadata(
         slug: response.data.slug.trim().slice(0, 120),
         summary: response.data.summary.trim().slice(0, 320),
         quickGuide: response.data.quickGuide.trim().slice(0, 12_000),
-        categories: response.data.categories.map((value) => value.trim()).filter(Boolean).slice(0, 12),
-        searchAliases: response.data.searchAliases.map((value) => value.trim()).filter(Boolean).slice(0, 80),
+        categories: response.data.categories
+          .map((value) => value.trim())
+          .filter(Boolean)
+          .slice(0, 12),
+        searchAliases: response.data.searchAliases
+          .map((value) => value.trim())
+          .filter(Boolean)
+          .slice(0, 80),
         assistantKnowledge: response.data.assistantKnowledge.trim().slice(0, 40_000),
       };
 
@@ -846,11 +645,96 @@ async function generateMetadata(
       status: "failed",
       failureCode: aiFailureCode(cause),
     });
-    if (cause instanceof Error && cause.message === "HELP_VIDEO_ARTICLE_EDITORIAL_INVALID") {
+    if (
+      cause instanceof Error
+      && cause.message === "HELP_VIDEO_ARTICLE_EDITORIAL_INVALID"
+    ) {
       throw cause;
     }
     throw new Error(`HELP_VIDEO_ARTICLE_METADATA_FAILED:${aiFailureCode(cause)}`);
   }
+}
+
+function checkpointMatchesPart(
+  candidate: NonNullable<HelpVideoArticleCheckpoint["completedParts"]>[number],
+  part: GenerationPart,
+): boolean {
+  const segmentIds = part.core.map((segment) => segment.id);
+  return (
+    candidate.partIndex === part.partIndex
+    && candidate.segmentIds.length === segmentIds.length
+    && candidate.segmentIds.every((id, index) => id === segmentIds[index])
+    && !candidate.steps.some(stepHasEditorialIssue)
+  );
+}
+
+function coverageFromParts(
+  segments: IdentifiedSegment[],
+  parts: GenerationPart[],
+  completedByPart: Map<number, {
+    partIndex: number;
+    segmentIds: string[];
+    steps: GeneratedPartStep[];
+  }>,
+  generated: GeneratedPartStep[],
+): HelpVideoCoverage {
+  const stepIndexesByPart = new Map<number, number[]>();
+  let stepOffset = 0;
+
+  for (const part of parts) {
+    const completed = completedByPart.get(part.partIndex);
+    const indexes = completed
+      ? completed.steps.map((_, index) => stepOffset + index)
+      : [];
+    stepIndexesByPart.set(part.partIndex, indexes);
+    stepOffset += completed?.steps.length ?? 0;
+  }
+
+  const partBySegmentId = new Map<string, number>();
+  for (const part of parts) {
+    for (const segment of part.core) {
+      partBySegmentId.set(segment.id, part.partIndex);
+    }
+  }
+
+  const usefulPartIndexes = new Set(
+    Array.from(completedByPart.values())
+      .filter((part) => part.steps.length > 0)
+      .map((part) => part.partIndex),
+  );
+  const relevantSegments = segments.filter((segment) => {
+    const partIndex = partBySegmentId.get(segment.id);
+    return partIndex !== undefined && usefulPartIndexes.has(partIndex);
+  });
+
+  return {
+    generatedAt: new Date().toISOString(),
+    summary: {
+      totalSegments: segments.length,
+      relevantSegments: relevantSegments.length,
+      coveredRelevantSegments: relevantSegments.length,
+      ignoredSegments: segments.length - relevantSegments.length,
+      uncoveredRelevantSegments: 0,
+      processingParts: parts.length,
+      generatedSteps: generated.length,
+    },
+    segments: segments.map((segment) => {
+      const partIndex = partBySegmentId.get(segment.id);
+      const useful = partIndex !== undefined && usefulPartIndexes.has(partIndex);
+      return {
+        id: segment.id,
+        start: segment.start,
+        end: segment.end,
+        classification: useful ? "explanation" : "irrelevant",
+        topicKey: partIndex === undefined
+          ? "sem_parte"
+          : `parte_${String(partIndex + 1).padStart(3, "0")}`,
+        stepIndexes: partIndex === undefined
+          ? []
+          : stepIndexesByPart.get(partIndex) ?? [],
+      };
+    }),
+  };
 }
 
 export async function generateHelpVideoArticle(input: {
@@ -870,18 +754,14 @@ export async function generateHelpVideoArticle(input: {
   const identified = identifiedSegments(input.segments);
   if (identified.length === 0) throw new Error("HELP_VIDEO_TRANSCRIPTION_EMPTY");
 
+  const parts = buildGenerationParts(identified);
+  if (parts.length === 0) throw new Error("HELP_VIDEO_COVERAGE_NO_RELEVANT_CONTENT");
+
   const checkpoint: HelpVideoArticleCheckpoint = {
-    totalParts: input.checkpoint?.totalParts,
+    totalParts: parts.length,
     completedParts: [...(input.checkpoint?.completedParts ?? [])],
     metadata: input.checkpoint?.metadata,
   };
-  const classified = classifyTranscript(identified);
-  const relevant = classified.filter(isRelevant);
-  const ignored = classified.filter((segment) => !isRelevant(segment));
-  if (relevant.length === 0) throw new Error("HELP_VIDEO_COVERAGE_NO_RELEVANT_CONTENT");
-
-  const parts = buildGenerationParts(classified);
-  checkpoint.totalParts = parts.length;
   await input.onCheckpoint?.(checkpoint);
 
   const completedByPart = new Map<number, {
@@ -890,27 +770,12 @@ export async function generateHelpVideoArticle(input: {
     steps: GeneratedPartStep[];
   }>();
 
-  for (const [index, part] of parts.entries()) {
-    const segmentIds = part.map((segment) => segment.id);
-    const saved = checkpoint.completedParts?.find(
-      (candidate) =>
-        candidate.partIndex === index
-        && candidate.segmentIds.length === segmentIds.length
-        && candidate.segmentIds.every((id, idIndex) => id === segmentIds[idIndex]),
+  for (const part of parts) {
+    const saved = checkpoint.completedParts?.find((candidate) =>
+      checkpointMatchesPart(candidate, part),
     );
-    if (
-      saved
-      && saved.steps.length > 0
-      && missingCoverage(segmentIds, saved.steps).length === 0
-      && !saved.steps.some(stepHasEditorialIssue)
-    ) {
-      completedByPart.set(index, saved);
-    }
+    if (saved) completedByPart.set(part.partIndex, saved);
   }
-
-  const pendingIndexes = parts
-    .map((_, index) => index)
-    .filter((index) => !completedByPart.has(index));
 
   if (completedByPart.size > 0) {
     await input.onProgress?.({
@@ -919,69 +784,40 @@ export async function generateHelpVideoArticle(input: {
     });
   }
 
-  for (
-    let offset = 0;
-    offset < pendingIndexes.length;
-    offset += GENERATION_CONCURRENCY
-  ) {
-    const batchIndexes = pendingIndexes.slice(
-      offset,
-      offset + GENERATION_CONCURRENCY,
-    );
+  for (const part of parts) {
+    if (completedByPart.has(part.partIndex)) continue;
+
     await input.onProgress?.({
-      label: "Gerando conteúdo sem perder etapas",
-      detail: `Partes ${batchIndexes.map((index) => index + 1).join(" e ")} de ${parts.length}`,
+      label: `Gerando parte ${part.partIndex + 1} de ${parts.length}`,
+      detail: `${formatTime(part.core[0]!.start)}–${formatTime(part.core.at(-1)!.end)}`,
     });
 
-    const settled = await Promise.allSettled(
-      batchIndexes.map(async (index) => {
-        const part = parts[index]!;
-        const segmentIds = part.map((segment) => segment.id);
-        const steps = await generatePart(
-          part,
-          index,
-          parts.length,
-          input.onAiUsage,
-        );
-        return { partIndex: index, segmentIds, steps };
-      }),
-    );
+    const steps = await generatePart(part, parts.length, input.onAiUsage);
+    completedByPart.set(part.partIndex, {
+      partIndex: part.partIndex,
+      segmentIds: part.core.map((segment) => segment.id),
+      steps,
+    });
 
-    let firstFailure: unknown = null;
-    for (const [resultIndex, result] of settled.entries()) {
-      if (result.status === "fulfilled") {
-        completedByPart.set(result.value.partIndex, result.value);
-      } else if (firstFailure === null) {
-        firstFailure = result.reason;
-      }
+    checkpoint.completedParts = Array.from(completedByPart.values())
+      .sort((left, right) => left.partIndex - right.partIndex);
+    checkpoint.metadata = undefined;
+    await input.onCheckpoint?.(checkpoint);
 
-      if (result.status === "fulfilled") {
-        checkpoint.completedParts = Array.from(completedByPart.values())
-          .sort((left, right) => left.partIndex - right.partIndex);
-        checkpoint.metadata = undefined;
-        await input.onCheckpoint?.(checkpoint);
-      } else {
-        const failedPartIndex = batchIndexes[resultIndex];
-        await input.onProgress?.({
-          label: "Parte aguardando nova tentativa",
-          detail: failedPartIndex === undefined
-            ? "O progresso concluído foi preservado."
-            : `Parte ${failedPartIndex + 1} de ${parts.length}; as demais concluídas foram preservadas.`,
-        });
-      }
-    }
-
-    if (firstFailure !== null) throw firstFailure;
+    await input.onProgress?.({
+      label: `Parte ${part.partIndex + 1} de ${parts.length} concluída`,
+      detail: steps.length > 0
+        ? `${steps.length} etapa(s) preservada(s)`
+        : "Sem conteúdo operacional novo nesta janela",
+    });
   }
 
-  const generated: GeneratedPartStep[] = parts.flatMap((_, index) =>
-    completedByPart.get(index)?.steps ?? [],
+  const generated = parts.flatMap(
+    (part) => completedByPart.get(part.partIndex)?.steps ?? [],
   );
 
-  const requiredIds = relevant.map((segment) => segment.id);
-  const uncovered = missingCoverage(requiredIds, generated);
-  if (uncovered.length > 0) {
-    throw new Error(`HELP_VIDEO_COVERAGE_INCOMPLETE:${uncovered.slice(0, 20).join(",")}`);
+  if (generated.length === 0) {
+    throw new Error("HELP_VIDEO_COVERAGE_NO_RELEVANT_CONTENT");
   }
   if (generated.some(stepHasEditorialIssue)) {
     throw new Error("HELP_VIDEO_ARTICLE_EDITORIAL_INVALID");
@@ -989,16 +825,18 @@ export async function generateHelpVideoArticle(input: {
 
   await input.onProgress?.({
     label: "Finalizando título e resumo",
-    detail: `${generated.length} etapa(s) · cobertura integral validada`,
+    detail: `${generated.length} etapa(s) geradas em ${parts.length} parte(s)`,
   });
-  const metadata = checkpoint.metadata && !metadataHasEditorialIssue(checkpoint.metadata)
-    ? checkpoint.metadata
-    : await generateMetadata(
-        generated,
-        classified,
-        input.categories,
-        input.onAiUsage,
-      );
+
+  const metadata =
+    checkpoint.metadata && !metadataHasEditorialIssue(checkpoint.metadata)
+      ? checkpoint.metadata
+      : await generateMetadata(
+          generated,
+          input.categories,
+          input.onAiUsage,
+        );
+
   if (!checkpoint.metadata) {
     checkpoint.metadata = metadata;
     await input.onCheckpoint?.(checkpoint);
@@ -1009,35 +847,14 @@ export async function generateHelpVideoArticle(input: {
     steps: generated.map(({ sourceSegmentIds: _sourceSegmentIds, ...step }) => step),
   };
 
-  const stepIndexesBySegment = new Map<string, number[]>();
-  generated.forEach((step, stepIndex) => {
-    for (const id of step.sourceSegmentIds) {
-      const indexes = stepIndexesBySegment.get(id) ?? [];
-      indexes.push(stepIndex);
-      stepIndexesBySegment.set(id, indexes);
-    }
-  });
-
-  const coverage: HelpVideoCoverage = {
-    generatedAt: new Date().toISOString(),
-    summary: {
-      totalSegments: classified.length,
-      relevantSegments: relevant.length,
-      coveredRelevantSegments: relevant.length - uncovered.length,
-      ignoredSegments: ignored.length,
-      uncoveredRelevantSegments: uncovered.length,
-      processingParts: parts.length,
-      generatedSteps: generated.length,
-    },
-    segments: classified.map((segment) => ({
-      id: segment.id,
-      start: segment.start,
-      end: segment.end,
-      classification: segment.classification,
-      topicKey: segment.topicKey,
-      stepIndexes: stepIndexesBySegment.get(segment.id) ?? [],
-    })),
+  return {
+    article,
+    coverage: coverageFromParts(
+      identified,
+      parts,
+      completedByPart,
+      generated,
+    ),
+    checkpoint,
   };
-
-  return { article, coverage, checkpoint };
 }
