@@ -68,10 +68,43 @@ const SEARCH_STOP_WORDS = new Set([
   "que",
   "um",
   "uma",
+  "ajuda",
+  "ajudar",
+  "favor",
+  "gostaria",
+  "pode",
+  "poderia",
+  "preciso",
+  "quero",
+  "suporte",
   "assunto",
   "anterior",
   "resposta",
   "continuacao",
+]);
+
+const GENERIC_SEARCH_TERMS = new Set([
+  "abrir",
+  "acessar",
+  "adicionar",
+  "alterar",
+  "botao",
+  "cadastrar",
+  "cadastro",
+  "campo",
+  "configurar",
+  "configuracao",
+  "criar",
+  "editar",
+  "excluir",
+  "f10",
+  "incluir",
+  "menu",
+  "opcao",
+  "remover",
+  "salvar",
+  "sistema",
+  "tela",
 ]);
 
 export function normalizeHelpSearchQuery(value: string): string {
@@ -141,8 +174,10 @@ function relevantSearchResult(
   ].join(" "));
   const words = searchable.split(" ").filter(Boolean);
   const wordSet = new Set(words);
-  const matchedTerms = terms.filter((term) => searchableHasTerm(words, wordSet, term)).length;
-  return matchedTerms >= 2;
+  const matchedTerms = terms.filter((term) => searchableHasTerm(words, wordSet, term));
+
+  if (matchedTerms.length >= 2) return true;
+  return matchedTerms.some((term) => term.length >= 3 && !GENERIC_SEARCH_TERMS.has(term));
 }
 
 function searchQueryText(query: string): string {
