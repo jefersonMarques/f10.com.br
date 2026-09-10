@@ -161,7 +161,7 @@ export async function regenerateHelpContentFromVideo(input: {
   };
 
   await input.onProgress?.({
-    stage: "save",
+    stage: "package",
     status: "active",
     label: "Salvando rascunho e screenshots",
     detail: "Aplicando o conteúdo processado à Base de Conhecimento.",
@@ -205,7 +205,7 @@ export async function regenerateHelpContentFromVideo(input: {
   );
 
   await input.onProgress?.({
-    stage: "save",
+    stage: "package",
     status: "done",
     label: "Rascunho e screenshots salvos",
     detail: "Conteúdo pronto para revisão.",
