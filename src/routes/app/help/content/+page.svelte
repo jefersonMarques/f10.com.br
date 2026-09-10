@@ -254,7 +254,6 @@
               </div>
             </div>
           {/each}
-        </div>          {/each}
         </div>
       {/if}
     </section>
@@ -328,7 +327,7 @@
             {#each processingTargetJob.events as event, eventIndex}
               <div class="flex items-start gap-3 rounded-xl border border-[#EEF0F5] bg-[#FAFAFC] px-3 py-2.5">
                 <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white">
-                  {#if eventIndex === processingTargetJob.events.length - 1 && isProcessingActive(processingTargetJob.status)}
+                  {#if eventIndex === processingTargetJob.events.length - 1 && isProcessingActive(processingTargetJob.status) && event.progressStatus !== "done"}
                     <LoaderCircle size={13} class="animate-spin text-[#A9510D]"/>
                   {:else if event.status === "failed"}
                     <TriangleAlert size={13} class="text-[#9B2C2C]"/>
@@ -356,7 +355,7 @@
       <div class="mt-5 flex flex-wrap justify-end gap-2">
         <button type="button" on:click={closeProcessingDetails} class="min-h-10 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[10px] font-semibold text-[#626979]">Fechar</button>
         {#if processingTargetJob.status === "failed" && data.canEdit}
-          <button type="button" on:click={() => retryProcessing(processingTargetJob!)} disabled={retryingJobId === processingTargetJob.id} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">
+          <button type="button" on:click={() => retryProcessing(processingTargetJob)} disabled={retryingJobId === processingTargetJob.id} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">
             {#if retryingJobId === processingTargetJob.id}<LoaderCircle size={14} class="animate-spin"/>{:else}<RefreshCw size={14}/>{/if}
             Tentar novamente
           </button>

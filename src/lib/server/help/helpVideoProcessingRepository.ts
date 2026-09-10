@@ -97,6 +97,7 @@ export type HelpVideoProcessingEventView = {
   label: string;
   detail: string;
   metadata: Record<string, unknown>;
+  progressStatus: "active" | "done" | null;
   createdAt: string;
 };
 
@@ -142,6 +143,7 @@ async function appendHelpVideoProcessingEvent(input: {
 function toEventView(
   event: typeof helpVideoProcessingEvents.$inferSelect,
 ): HelpVideoProcessingEventView {
+  const progressStatus = event.metadata.progressStatus;
   return {
     id: event.id,
     eventType: event.eventType,
@@ -150,6 +152,10 @@ function toEventView(
     label: event.label,
     detail: event.detail,
     metadata: event.metadata,
+    progressStatus:
+      progressStatus === "active" || progressStatus === "done"
+        ? progressStatus
+        : null,
     createdAt: event.createdAt.toISOString(),
   };
 }
@@ -639,6 +645,7 @@ export async function updateHelpVideoProcessingProgress(input: {
   stage: string;
   label: string;
   detail?: string;
+  progressStatus?: "active" | "done";
 }): Promise<void> {
   const now = new Date();
   const [updated] = await getDatabase()
@@ -673,6 +680,9 @@ export async function updateHelpVideoProcessingProgress(input: {
     status: updated.status,
     label: updated.progressLabel,
     detail: updated.progressDetail,
+    metadata: {
+      progressStatus: input.progressStatus ?? "active",
+    },
   });
 }
 
@@ -897,7 +907,9 @@ export async function failHelpVideoProcessingJob(
     : "Processamento interrompido";
   const detail = retry
     ? `Retomará do último checkpoint. Tentativa ${job.attemptCount} de ${job.maxAttempts}.`
-    : `Limite automático encerrado na tentativa ${job.attemptCount} de ${job.maxAttempts}.`;
+    : retryable
+      ? `Limite automático encerrado na tentativa ${job.attemptCount} de ${job.maxAttempts}.`
+      : "A falha exige correção ou uma nova tentativa manual.";
 
   await getDatabase()
     .update(helpVideoProcessingJobs)

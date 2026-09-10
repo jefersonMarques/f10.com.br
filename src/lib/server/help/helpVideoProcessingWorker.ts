@@ -90,6 +90,7 @@ async function processJob(job: HelpVideoProcessingJob): Promise<void> {
           stage: progress.stage,
           label: progress.label,
           detail: progress.detail,
+          progressStatus: progress.status,
         }),
     });
 
