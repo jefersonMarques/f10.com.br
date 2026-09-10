@@ -13,6 +13,17 @@ import type {
 
 type JsonSchema = Record<string, unknown>;
 
+type AttemptInput = {
+  provider: AiProviderCode;
+  model: string;
+  instructions: string;
+  userInput: string;
+  schemaName: string;
+  schema: JsonSchema;
+  maxOutputTokens?: number;
+  timeoutMs?: number;
+};
+
 export type AiStructuredResponse<T> = {
   data: T;
   provider: AiProviderCode;
@@ -40,22 +51,34 @@ function shouldUseFallback(cause: AiProviderError): boolean {
     cause.code === "AI_CREDENTIAL_UNAVAILABLE" ||
     cause.code === "AI_TIMEOUT" ||
     cause.code === "AI_REQUEST_FAILED" ||
+    cause.code === "AI_OUTPUT_INCOMPLETE" ||
     cause.status === 429 ||
     (cause.status !== null && cause.status >= 500)
   );
 }
 
-async function attempt<T>(input: {
-  provider: AiProviderCode;
-  model: string;
-  instructions: string;
-  userInput: string;
-  schemaName: string;
-  schema: JsonSchema;
-  maxOutputTokens?: number;
-  timeoutMs?: number;
-}) {
+async function attempt<T>(input: AttemptInput) {
   return createProviderStructuredResponse<T>(input);
+}
+
+function expandedOutputBudget(value?: number): number {
+  const current = Math.max(Math.round(value ?? 900), 100);
+  return Math.min(Math.max(current * 4, 1_200), 6_000);
+}
+
+async function attemptWithIncompleteRetry<T>(input: AttemptInput) {
+  try {
+    return await attempt<T>(input);
+  } catch (cause) {
+    if (!(cause instanceof AiProviderError) || cause.code !== "AI_OUTPUT_INCOMPLETE") {
+      throw cause;
+    }
+
+    return attempt<T>({
+      ...input,
+      maxOutputTokens: expandedOutputBudget(input.maxOutputTokens),
+    });
+  }
 }
 
 export async function createAiStructuredResponse<T>(input: {
@@ -81,7 +104,7 @@ export async function createAiStructuredResponse<T>(input: {
   }
 
   try {
-    const response = await attempt<T>({
+    const response = await attemptWithIncompleteRetry<T>({
       provider: profile.provider,
       model: profile.model,
       instructions: input.instructions,
@@ -106,7 +129,7 @@ export async function createAiStructuredResponse<T>(input: {
     }
 
     try {
-      const response = await attempt<T>({
+      const response = await attemptWithIncompleteRetry<T>({
         provider: profile.fallbackProvider,
         model: profile.fallbackModel,
         instructions: input.instructions,
