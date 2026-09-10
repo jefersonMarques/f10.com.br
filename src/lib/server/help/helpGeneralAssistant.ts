@@ -12,16 +12,17 @@ export type GeneralHelpAssistantResult = {
 
 function contextualizeQuestion(question: string, reinforced = false): string {
   return [
-    "Contexto obrigatório: esta pergunta é sobre o produto F10 e deve ser respondida usando a Base de Conhecimento do F10.",
-    "Não considere significados externos do mesmo termo, como WhatsApp em geral, salvo se o usuário pedir isso explicitamente.",
+    "Contexto obrigatório: você é o Assistente F10. Toda pergunta deve ser interpretada exclusivamente dentro do produto F10 e respondida usando a Base de Conhecimento do F10.",
+    "Termos que também existem fora do F10 devem ser entendidos somente como recursos, integrações ou conceitos relacionados ao uso do F10.",
+    "Nunca ofereça comparação, alternativa, explicação ou esclarecimento sobre serviços, produtos ou conceitos fora do F10.",
     reinforced
-      ? "Se houver artigo do F10 relacionado ao assunto, selecione e leia esse artigo antes de pedir qualquer esclarecimento."
+      ? "Pesquise a Base de Conhecimento, escolha o artigo F10 mais relacionado e leia o conteúdo antes de concluir que precisa de esclarecimento."
       : "",
     `Pergunta original do usuário: ${question.trim()}`,
   ].filter(Boolean).join("\n");
 }
 
-function containsExternalFork(answer: string): boolean {
+function leavesF10Context(answer: string): boolean {
   const normalized = answer
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -29,10 +30,12 @@ function containsExternalFork(answer: string): boolean {
     .replace(/\s+/g, " ")
     .trim();
 
-  return (
-    /whatsapp.{0,40}(?:em geral|em si|fora do f10)/.test(normalized) ||
-    /(?:f10|produto f10).{0,50}\bou\b.{0,60}(?:whatsapp|servico externo|outro sistema)/.test(normalized)
-  );
+  const externalTerms =
+    /(?:em geral|em si|fora do f10|fora da plataforma|servico externo|produto externo|outro sistema|outra plataforma|broadcast)/;
+  const externalFork =
+    /(?:whatsapp|instagram|facebook|google|meta|servico|plataforma).{0,100}\bou\b.{0,100}(?:f10|dentro do f10)|(?:f10|dentro do f10).{0,100}\bou\b.{0,100}(?:whatsapp|instagram|facebook|google|meta|servico|plataforma)/;
+
+  return externalTerms.test(normalized) || externalFork.test(normalized);
 }
 
 export async function runGeneralHelpAssistant(input: {
@@ -45,7 +48,7 @@ export async function runGeneralHelpAssistant(input: {
     question: contextualizeQuestion(input.question),
   });
 
-  if (result.action === "clarify" && containsExternalFork(result.answer)) {
+  if (leavesF10Context(result.answer)) {
     result = await runF10Assistant({
       surface: "helpdesk",
       question: contextualizeQuestion(input.question, true),
