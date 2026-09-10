@@ -4,6 +4,10 @@ import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstant
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import {
+  listHelpArticleSequence,
+  moveHelpArticle,
+} from "$lib/server/help/helpArticleSequenceRepository";
+import {
   archiveStructuredHelpContent,
   discardStructuredHelpContent,
   restoreArchivedStructuredHelpContent,
@@ -55,13 +59,22 @@ export const load: PageServerLoad = async ({ parent }) => {
     throw error(403, "Acesso não autorizado.");
   }
 
-  const [contents, publishedLinks, categories] = await Promise.all([
+  const [contents, publishedLinks, categories, sequence] = await Promise.all([
     listStructuredHelpContents(),
     listPublishedStructuredHelpLinks(),
     listHelpCategories(true),
+    listHelpArticleSequence(),
   ]);
+  const contentById = new Map(contents.map((content) => [content.id, content]));
+  const orderedContents = [
+    ...sequence.flatMap((item) => {
+      const content = contentById.get(item.contentId);
+      return content ? [content] : [];
+    }),
+    ...contents.filter((content) => !sequence.some((item) => item.contentId === content.id)),
+  ];
   const processingJobs = await listLatestHelpVideoProcessingJobDetails(
-    contents.map((content) => content.id),
+    orderedContents.map((content) => content.id),
   );
   const publishedById = new Map(
     publishedLinks.map((publication) => [publication.entityId, publication]),
@@ -71,7 +84,7 @@ export const load: PageServerLoad = async ({ parent }) => {
   );
 
   return {
-    contents: contents.map((content) => ({
+    contents: orderedContents.map((content) => ({
       ...content,
       publishedSlug: publishedById.get(content.id)?.slug ?? null,
       processingJob: processingByContentId.get(content.id) ?? null,
@@ -85,6 +98,26 @@ export const load: PageServerLoad = async ({ parent }) => {
 };
 
 export const actions: Actions = {
+  move: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(cookies, "help.edit", "/app/help/content");
+    const formData = await request.formData();
+    const contentId = readFormValue(formData, "contentId");
+    const direction = readFormValue(formData, "direction");
+    if (!isUuid(contentId) || (direction !== "up" && direction !== "down")) {
+      return fail(400, { success: false, message: "Sequência inválida." });
+    }
+
+    try {
+      await moveHelpArticle(session.user.id, contentId, direction);
+      return { success: true };
+    } catch {
+      return fail(409, {
+        success: false,
+        message: "Não foi possível alterar a sequência dos conteúdos.",
+      });
+    }
+  },
+
   create: async ({ cookies, request }) => {
     const { session } = await requireAppPermission(
       cookies,
