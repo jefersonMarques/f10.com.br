@@ -1,13 +1,9 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { AiGatewayError } from "$lib/server/ai/aiGateway";
 import { isAiTaskConfigured } from "$lib/server/ai/aiConfigurationRepository";
+import { runF10Assistant } from "$lib/server/assistant/f10AssistantEngine";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
-import { tryAnswerHelpArticleDeterministically } from "$lib/server/help/helpArticleDeterministicAnswer";
 import type { HelpKnowledgeScope } from "$lib/server/help/helpKnowledgeEngine";
-import {
-  answerHelpArticleWithGlobalFallback,
-  answerHelpGlobalWithArticleResolution,
-} from "$lib/server/help/helpKnowledgeOrchestrator";
 import { recordHelpKnowledgeRun } from "$lib/server/help/helpKnowledgeTelemetryRepository";
 import {
   claimHelpPublicAiRequest,
@@ -20,7 +16,7 @@ import { getHelpPublicAiSettings } from "$lib/server/settings/operationsSettings
 
 const MAX_BODY_BYTES = 12 * 1024;
 const MAX_CONVERSATION_CONTEXT_CHARS = 6_000;
-const ARTICLE_MAX_OUTPUT_TOKENS = 1_200;
+const MAX_OUTPUT_TOKENS = 1_200;
 
 function isBodyTooLarge(request: Request): boolean {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
@@ -97,42 +93,6 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
     return errorResponse("INVALID_QUESTION", 400);
   }
 
-  if (scope.type === "article") {
-    const deterministic = await tryAnswerHelpArticleDeterministically({
-      question,
-      slug: scope.slug,
-    });
-    if (deterministic) {
-      await recordHelpKnowledgeRun({
-        source: "public",
-        scope: "article",
-        question,
-        retrievalQuery: deterministic.retrievalQuery,
-        contextSlug: scope.slug,
-        resolution: deterministic.resolution,
-        target: deterministic.target
-          ? {
-              contentId: deterministic.target.contentId,
-              slug: deterministic.target.slug,
-              targetType: deterministic.target.targetType,
-            }
-          : null,
-        sources: deterministic.sources,
-        latencyMs: 0,
-      }).catch(() => undefined);
-
-      return json(
-        {
-          resolution: deterministic.resolution,
-          resolved: deterministic.resolved,
-          answer: deterministic.answer,
-          target: deterministic.target,
-        },
-        { headers: { "Cache-Control": "no-store" } },
-      );
-    }
-  }
-
   let clientAddress = "unknown";
   try {
     clientAddress = getClientAddress();
@@ -141,35 +101,25 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
   }
 
   let requestId: string | null = null;
-  let knowledgeStartedAt: number | null = null;
+  let startedAt: number | null = null;
   try {
     const sessionKey = getOrCreateHelpPublicAiSessionKey(cookies);
     const ipKey = createHelpPublicAiIpKey(clientAddress);
     requestId = await claimHelpPublicAiRequest(sessionKey, ipKey, settings);
 
-    knowledgeStartedAt = Date.now();
-    const result = scope.type === "article"
-      ? await answerHelpArticleWithGlobalFallback({
-          question,
-          scope,
-          source: "public",
-          conversationContext,
-          maxOutputTokens: ARTICLE_MAX_OUTPUT_TOKENS,
-        })
-      : await answerHelpGlobalWithArticleResolution({
-          question,
-          scope,
-          source: "public",
-          conversationContext,
-          maxOutputTokens: ARTICLE_MAX_OUTPUT_TOKENS,
-        });
-    const latencyMs = Date.now() - knowledgeStartedAt;
+    startedAt = Date.now();
+    const result = await runF10Assistant({
+      surface: scope.type === "article" ? "article" : "helpdesk",
+      question,
+      articleSlug: scope.type === "article" ? scope.slug : null,
+      conversationContext: scope.type === "article" ? conversationContext : "",
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
+    });
+    const latencyMs = Date.now() - startedAt;
+    const answered = result.action === "answer";
 
     await finishHelpPublicAiRequest(requestId, {
-      status:
-        result.resolution === "answered" || result.resolution === "navigate"
-          ? "answered"
-          : "not_found",
+      status: answered ? "answered" : "not_found",
       model: result.model ?? "",
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
@@ -182,7 +132,7 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
       question,
       retrievalQuery: result.retrievalQuery,
       contextSlug: scope.type === "article" ? scope.slug : "",
-      resolution: result.resolution,
+      resolution: answered ? "answered" : "not_found",
       target: result.target
         ? {
             contentId: result.target.contentId,
@@ -200,25 +150,26 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
 
     return json(
       {
-        resolution: result.resolution,
-        resolved: result.resolved,
+        action: result.action,
+        resolution: answered ? "answered" : "not_found",
+        resolved: answered,
         answer: result.answer,
         target: result.target,
       },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (cause) {
-    const code = cause instanceof Error ? cause.message : "HELP_PUBLIC_AI_FAILED";
+    const code = cause instanceof Error ? cause.message : "F10_ASSISTANT_FAILED";
     const failureCode = cause instanceof AiGatewayError ? cause.code : code;
 
-    if (knowledgeStartedAt !== null) {
+    if (startedAt !== null) {
       await recordHelpKnowledgeRun({
         source: "public",
         scope: scope.type,
         question,
         contextSlug: scope.type === "article" ? scope.slug : "",
         resolution: "failed",
-        latencyMs: Date.now() - knowledgeStartedAt,
+        latencyMs: Date.now() - startedAt,
         failureCode,
       }).catch(() => undefined);
     }
@@ -240,19 +191,19 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
     ) {
       return errorResponse("RATE_LIMITED", 429, settings.rateLimitWindowMinutes * 60);
     }
-    if (code === "HELP_KNOWLEDGE_QUESTION_INVALID") {
+    if (code === "F10_ASSISTANT_QUESTION_INVALID") {
       return errorResponse("INVALID_QUESTION", 400);
     }
-    if (code === "HELP_ARTICLE_NOT_FOUND") {
+    if (code === "F10_ASSISTANT_ARTICLE_NOT_FOUND") {
       return errorResponse("ARTICLE_NOT_FOUND", 404);
     }
     if (code === "HELP_PUBLIC_AI_SECRET_NOT_CONFIGURED") {
       return errorResponse("AI_UNAVAILABLE", 503);
     }
 
-    console.error("[help.public-ai]", {
+    console.error("[f10.assistant.public]", {
       causeType: cause instanceof Error ? cause.name : typeof cause,
-      code: cause instanceof AiGatewayError ? cause.code : "UNEXPECTED_FAILURE",
+      code: cause instanceof AiGatewayError ? cause.code : code,
     });
     return errorResponse("AI_UNAVAILABLE", 503);
   }

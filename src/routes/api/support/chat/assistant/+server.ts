@@ -1,5 +1,6 @@
 import { dev } from "$app/environment";
 import { json, type RequestHandler } from "@sveltejs/kit";
+import { isAiTaskConfigured } from "$lib/server/ai/aiConfigurationRepository";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { runGeneralHelpAssistant } from "$lib/server/help/helpGeneralAssistant";
 import { isSupportAiChatEnabled } from "$lib/server/support/supportAiChat";
@@ -118,7 +119,6 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
   const isGeneralHelpAssistant = Object.prototype.hasOwnProperty.call(body, "pageContext");
   if (!message) return json({ error: "INVALID_MESSAGE" }, { status: 400 });
 
-  // Mensagem enviada pelo cliente é atividade real; polling continua sem renovar a sessão.
   await getOptionalCustomerF10PortalSession(cookies).catch(() => null);
 
   let clientAddress = "unknown";
@@ -136,9 +136,12 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
     });
     if (!allowed) return json({ error: "RATE_LIMITED" }, { status: 429 });
 
-    const aiAvailable = await isSupportAiChatEnabled().catch(() => false);
-
     if (isGeneralHelpAssistant) {
+      const aiAvailable = await isAiTaskConfigured("help_public_answer", [
+        "knowledge.search",
+        "knowledge.read",
+        "public.reply",
+      ]).catch(() => false);
       if (!aiAvailable) {
         return json({ error: "ASSISTANT_UNAVAILABLE" }, {
           status: 503,
@@ -148,20 +151,25 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
 
       try {
         const result = await runGeneralHelpAssistant({ question: message });
+        const nextUnresolvedCount = result.action === "answer"
+          ? 0
+          : result.action === "clarify"
+            ? Math.min(unresolvedCount + 1, MAX_UNRESOLVED_COUNT)
+            : unresolvedCount;
 
         return json(assistantPayload({
           answer: result.answer,
           action: result.action,
           aiAvailable: true,
-          unresolvedCount: 0,
+          unresolvedCount: nextUnresolvedCount,
           handoffReason: result.action === "handoff"
-            ? "O cliente pediu atendimento humano no Assistente geral do Helpdesk."
+            ? "O cliente pediu atendimento humano no Assistente F10."
             : undefined,
           searchEventId: result.searchEventId,
           ticketUrl: result.action === "ticket_offer" ? "/cliente/chamados/novo" : undefined,
         }), { headers: { "Cache-Control": "no-store" } });
       } catch (cause) {
-        console.error("[help.general.assistant]", {
+        console.error("[f10.assistant.helpdesk]", {
           causeType: cause instanceof Error ? cause.name : typeof cause,
           code: cause instanceof Error ? cause.message.slice(0, 120) : "UNKNOWN",
         });
@@ -171,6 +179,8 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
         });
       }
     }
+
+    const aiAvailable = await isSupportAiChatEnabled().catch(() => false);
 
     if (requestsTicketCreation(message)) {
       return json(assistantPayload({
@@ -246,9 +256,9 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
 
     if (unresolvedCount >= MAX_UNRESOLVED_COUNT - 1) {
       return json(assistantPayload({
-        answer: "Não encontrei uma orientação segura mesmo depois de consultar a base e o contexto da conversa. Vou encaminhar para a equipe F10 continuar com você.",
+        answer: "Não consegui resolver por aqui. Vou encaminhar para a equipe F10 continuar com você.",
         action: "handoff",
-        handoffReason: result.escalationReason || "O Assistente F10 esgotou as tentativas de resposta com a Base de Conhecimento disponível.",
+        handoffReason: result.escalationReason || "O Assistente F10 solicitou atendimento humano.",
         aiAvailable,
         unresolvedCount: MAX_UNRESOLVED_COUNT,
         searchEventId: result.searchEventId,
@@ -256,7 +266,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
     }
 
     return json(assistantPayload({
-      answer: result.answer || "Ainda não encontrei uma orientação segura. Me diga em qual tela você está e o que deseja fazer nela para eu tentar por outro caminho.",
+      answer: result.answer,
       action: "clarify",
       aiAvailable,
       unresolvedCount: unresolvedCount + 1,
