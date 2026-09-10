@@ -39,22 +39,13 @@
     error?: boolean;
   };
 
-  type SupportStoredMessage = {
-    id: string;
-    role: "assistant" | "customer";
-    body: string;
-    createdAt: string;
-  };
-
-  const SUPPORT_GUEST_KEY = "f10-support-assistant-conversation-v2";
-  const SUPPORT_UNRESOLVED_KEY = "f10-support-assistant-unresolved-v1";
   const starterQuestions = [
     "Resuma este procedimento",
     "O que é obrigatório aqui?",
     "Quais pontos exigem atenção?",
   ];
 
-  let minimized = false;
+  let minimized = true;
   let question = "";
   let loading = false;
   let messages: ChatMessage[] = [];
@@ -116,27 +107,9 @@
     await revealTarget(helpTarget);
   }
 
-  function supportConversation(): SupportStoredMessage[] {
-    const now = Date.now();
-    return messages
-      .filter((message) => !message.error)
-      .slice(-20)
-      .map((message, index) => ({
-        id: `article-${now}-${index}`,
-        role: message.role === "user" ? "customer" : "assistant",
-        body: message.text,
-        createdAt: new Date(now + index).toISOString(),
-      }));
-  }
-
-  function requestSupport(): void {
-    try {
-      window.sessionStorage.setItem(SUPPORT_GUEST_KEY, JSON.stringify(supportConversation()));
-      window.sessionStorage.setItem(SUPPORT_UNRESOLVED_KEY, "0");
-    } catch {
-      // O contexto continua disponível na tela mesmo quando o navegador bloqueia o armazenamento.
-    }
-    window.dispatchEvent(new CustomEvent("f10:open-support-chat"));
+  function openGeneralAssistant(): void {
+    minimized = true;
+    window.dispatchEvent(new CustomEvent("f10:open-help-assistant"));
   }
 
   function errorFor(code: string): string {
@@ -312,9 +285,9 @@
                         <ArrowUpRight size={13}/>
                       </button>
                     {:else if message.resolution === "not_found" && !message.error}
-                      <button type="button" class="mt-3 inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white" on:click={requestSupport}>
+                      <button type="button" class="mt-3 inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white" on:click={openGeneralAssistant}>
                         <LifeBuoy size={13}/>
-                        Continuar no atendimento
+                        Abrir assistente geral
                       </button>
                     {/if}
                     {#if message.error && requiresAuthentication}<a href="/cliente" class="mt-2 block text-[10px] font-semibold text-[#000A57] hover:underline">Entrar na Área do Cliente</a>{/if}
@@ -358,21 +331,3 @@
     </aside>
   {/if}
 {/if}
-
-<style>
-  :global(.help-ai-target-highlight) {
-    animation: help-ai-target-pulse 1.2s ease-out 2;
-    outline: 3px solid rgba(234, 109, 11, 0.7);
-    outline-offset: 4px;
-    border-radius: 18px;
-  }
-
-  @keyframes help-ai-target-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(234, 109, 11, 0); }
-    45% { box-shadow: 0 0 0 10px rgba(234, 109, 11, 0.16); }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    :global(.help-ai-target-highlight) { animation: none; }
-  }
-</style>
