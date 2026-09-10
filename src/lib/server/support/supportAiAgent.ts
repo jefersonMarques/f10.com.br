@@ -13,10 +13,18 @@ import {
 import { recordHelpKnowledgeRun } from "$lib/server/help/helpKnowledgeTelemetryRepository";
 import { markHelpSearchOutcome } from "$lib/server/help/helpSearchRepository";
 
-const NOT_FOUND_MESSAGE =
-  "Não encontrei informação suficiente para responder isso com segurança. Você pode reformular a pergunta ou, se preferir, falar com a equipe F10.";
+const CLARIFY_MESSAGE =
+  "Quero entender exatamente o que você precisa no F10. Me diga em qual tela você está e o que deseja fazer nela.";
 const TECHNICAL_FAILURE_MESSAGE =
-  "Não consegui consultar as orientações do F10 agora. Se preferir, posso encaminhar você para a equipe de atendimento.";
+  "Não consegui fechar essa resposta agora. Continue me dizendo o que você está tentando fazer no F10 que eu tento por outro caminho.";
+const RETRYABLE_KNOWLEDGE_FAILURES = new Set([
+  "AI_TIMEOUT",
+  "AI_REQUEST_FAILED",
+  "AI_INVALID_RESPONSE",
+  "AI_EMPTY_RESPONSE",
+  "AI_INVALID_JSON",
+  "AI_INVALID_HELP_KNOWLEDGE_OUTPUT",
+]);
 
 export type SupportAiSource = {
   contentId: string;
@@ -49,6 +57,60 @@ export type RunSupportAiInput = {
   conversationContext?: string;
   maxOutputTokens?: number;
 };
+
+function normalizeText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function isFollowUpQuestion(value: string): boolean {
+  const normalized = normalizeText(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[?!.,;:]+$/g, "")
+    .trim();
+  if (!normalized) return false;
+  const words = normalized.split(" ").filter(Boolean);
+  if (words.length <= 2) return true;
+  return /^(?:e\s+)?(?:como|onde|qual|quais|quando|por que|porque|e depois|e agora|e para|e pro|e pros|e as|e os)\b/.test(normalized)
+    && words.length <= 6;
+}
+
+function previousCustomerTopic(conversationContext: string): string {
+  const candidates = conversationContext
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .flatMap((line) => {
+      const match = line.match(/^(?:Cliente|Usuário|Usuario):\s*(.+)$/i);
+      return match?.[1] ? [normalizeText(match[1]).slice(0, 300)] : [];
+    })
+    .filter((value) => value.length >= 3)
+    .reverse();
+
+  return candidates.find((value) => !isFollowUpQuestion(value)) ?? candidates[0] ?? "";
+}
+
+function resolvedQuestion(question: string, conversationContext: string): string {
+  if (!conversationContext || !isFollowUpQuestion(question)) return question;
+  const topic = previousCustomerTopic(conversationContext);
+  if (!topic) return question;
+  return `${topic}\nContinuação: ${question}`.slice(0, 600);
+}
+
+function clarificationMessage(question: string, conversationContext: string): string {
+  const topic = previousCustomerTopic(conversationContext);
+  if (isFollowUpQuestion(question) && topic) {
+    return "Posso detalhar isso. Você quer saber **onde clicar**, **o que preencher** ou **o que acontece depois**?";
+  }
+  return CLARIFY_MESSAGE;
+}
+
+function retryableKnowledgeFailure(cause: unknown): boolean {
+  if (!(cause instanceof Error)) return false;
+  return Array.from(RETRYABLE_KNOWLEDGE_FAILURES).some((code) =>
+    cause.message.includes(code),
+  );
+}
 
 async function saveRun(input: {
   actorUserId?: string | null;
@@ -94,6 +156,8 @@ async function saveRun(input: {
 
 function mapKnowledgeResult(
   result: HelpKnowledgeResult,
+  question: string,
+  conversationContext: string,
 ): {
   resolution: "answered" | "escalate";
   answer: string;
@@ -109,7 +173,7 @@ function mapKnowledgeResult(
 
   return {
     resolution: "escalate",
-    answer: NOT_FOUND_MESSAGE,
+    answer: clarificationMessage(question, conversationContext),
     escalationReason: "A Base de Conhecimento não sustentou uma resposta segura para esta pergunta.",
   };
 }
@@ -131,18 +195,38 @@ export async function runSupportAi(
   const question = input.question.trim().slice(0, 600);
   if (!question) throw new Error("SUPPORT_AI_QUESTION_REQUIRED");
   const profile = await getAiTaskProfile("support_answer");
+  const conversationContext = input.conversationContext?.trim().slice(0, 6_000) ?? "";
+  const knowledgeQuestion = resolvedQuestion(question, conversationContext);
 
   try {
-    const knowledge = await answerHelpQuestion({
-      question,
-      scope: { type: "global" },
-      source: "chat_ai",
-      actorUserId: input.actorUserId ?? null,
-      customerContactId: input.customerContactId ?? null,
-      conversationContext: input.conversationContext,
-      maxOutputTokens: input.maxOutputTokens,
-    });
-    const mapped = mapKnowledgeResult(knowledge);
+    let knowledge: HelpKnowledgeResult;
+    try {
+      knowledge = await answerHelpQuestion({
+        question: knowledgeQuestion,
+        scope: { type: "global" },
+        source: "chat_ai",
+        actorUserId: input.actorUserId ?? null,
+        customerContactId: input.customerContactId ?? null,
+        conversationContext,
+        maxOutputTokens: input.maxOutputTokens,
+      });
+    } catch (firstCause) {
+      if (!retryableKnowledgeFailure(firstCause)) throw firstCause;
+      console.warn("[support-ai] retrying knowledge request", {
+        code: firstCause instanceof Error ? firstCause.message.slice(0, 120) : "unknown",
+      });
+      knowledge = await answerHelpQuestion({
+        question: knowledgeQuestion,
+        scope: { type: "global" },
+        source: "chat_ai",
+        actorUserId: input.actorUserId ?? null,
+        customerContactId: input.customerContactId ?? null,
+        conversationContext,
+        maxOutputTokens: input.maxOutputTokens,
+      });
+    }
+
+    const mapped = mapKnowledgeResult(knowledge, question, conversationContext);
     const model = knowledge.model ?? profile.model;
     const provider = knowledge.provider ?? profile.provider;
     const latencyMs = Date.now() - startedAt;
@@ -219,6 +303,9 @@ export async function runSupportAi(
       failureCode === "AI_TASK_DISABLED"
         ? "A função de IA do atendimento não possui um provedor disponível."
         : "Falha técnica durante a consulta ao motor de conhecimento.";
+    const answer = isFollowUpQuestion(question)
+      ? clarificationMessage(question, conversationContext)
+      : TECHNICAL_FAILURE_MESSAGE;
 
     await recordHelpKnowledgeRun({
       source: "chat_ai",
@@ -235,7 +322,7 @@ export async function runSupportAi(
       actorUserId: input.actorUserId,
       searchEventId: null,
       question,
-      answer: TECHNICAL_FAILURE_MESSAGE,
+      answer,
       resolution: "failed",
       provider,
       model,
@@ -250,7 +337,7 @@ export async function runSupportAi(
       runId,
       searchEventId: null,
       resolution: "failed",
-      answer: TECHNICAL_FAILURE_MESSAGE,
+      answer,
       escalationReason,
       sources: [],
       provider,
