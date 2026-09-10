@@ -1,4 +1,8 @@
 import {
+  isHelpArticleSummaryRequest,
+  summarizeHelpArticle,
+} from "$lib/server/help/helpArticleSummary";
+import {
   answerHelpQuestion,
   type AnswerHelpQuestionInput,
   type HelpKnowledgeResult,
@@ -25,6 +29,14 @@ async function answerTargetArticle(
 export async function answerHelpArticleWithGlobalFallback(
   input: ArticleQuestionInput,
 ): Promise<HelpKnowledgeResult> {
+  if (isHelpArticleSummaryRequest(input.question)) {
+    return summarizeHelpArticle({
+      question: input.question,
+      slug: input.scope.slug,
+      source: input.source,
+    });
+  }
+
   const articleResult = await answerHelpQuestion(input);
   if (isAnswered(articleResult)) return articleResult;
 
