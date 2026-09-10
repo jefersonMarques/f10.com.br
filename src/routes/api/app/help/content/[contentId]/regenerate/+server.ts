@@ -2,6 +2,7 @@ import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import {
+  cancelHelpVideoProcessingJob,
   createHelpVideoProcessingJob,
   getHelpVideoProcessingJobView,
   getLatestHelpVideoProcessingJobView,
@@ -123,13 +124,31 @@ export const PATCH: RequestHandler = async ({ cookies, params, request }) => {
     action?: unknown;
   };
   const jobId = typeof body.jobId === "string" ? body.jobId.trim() : "";
-  if (!isUuid(jobId) || body.action !== "retry") {
+  if (
+    !isUuid(jobId)
+    || (body.action !== "retry" && body.action !== "cancel")
+  ) {
     return json({ success: false, message: "Ação inválida." }, { status: 400 });
   }
 
   const currentJob = await getHelpVideoProcessingJobView(jobId);
   if (!currentJob || currentJob.contentId !== params.contentId) {
     return json({ success: false, message: "Processamento não encontrado." }, { status: 404 });
+  }
+
+  if (body.action === "cancel") {
+    const job = await cancelHelpVideoProcessingJob(jobId);
+    if (!job) {
+      return json(
+        { success: false, message: "Este processamento já foi encerrado." },
+        { status: 409 },
+      );
+    }
+    return json({
+      success: true,
+      message: "Processamento cancelado.",
+      job,
+    });
   }
 
   const job = await retryHelpVideoProcessingJob(jobId);

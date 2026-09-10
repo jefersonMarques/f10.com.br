@@ -4,7 +4,7 @@ module.exports = {
       name: "f10.com.br",
       cwd: "/opt/f10.com.br",
       script: "build/index.js",
-      env_file: "/opt/f10.com.br/.env.production",
+      node_args: "--env-file-if-exists=.env.production",
       env: {
         NODE_ENV: "production",
         ORIGIN: "https://f10.com.br",
@@ -22,7 +22,9 @@ module.exports = {
       name: "f10-help-video-worker",
       cwd: "/opt/f10.com.br",
       script: "build/index.js",
-      env_file: "/opt/f10.com.br/.env.production",
+      node_args: "--env-file-if-exists=.env.production",
+      restart_delay: 4000,
+      min_uptime: "10s",
       env: {
         NODE_ENV: "production",
         ORIGIN: "http://127.0.0.1:3101",

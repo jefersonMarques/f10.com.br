@@ -35,6 +35,7 @@ export type HelpVideoProcessingEventType =
   | "retry_scheduled"
   | "completed"
   | "failed"
+  | "cancelled"
   | "manual_retry";
 
 export const helpVideoProcessingJobs = pgTable(

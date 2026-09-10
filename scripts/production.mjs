@@ -32,6 +32,32 @@ function run(label, command, args, env = process.env) {
   if (result.status !== 0) fail(`${label} retornou código ${result.status ?? "desconhecido"}.`);
 }
 
+function wait(milliseconds) {
+  Atomics.wait(
+    new Int32Array(new SharedArrayBuffer(4)),
+    0,
+    0,
+    milliseconds,
+  );
+}
+
+function requirePm2Online(names) {
+  let processes;
+  try {
+    processes = JSON.parse(output("pm2", ["jlist"]));
+  } catch {
+    fail("Não foi possível validar os processos do PM2.");
+  }
+
+  for (const name of names) {
+    const processInfo = processes.find((item) => item.name === name);
+    const status = processInfo?.pm2_env?.status ?? "ausente";
+    if (status !== "online") {
+      fail(`Processo PM2 ${name} não está online. Status: ${status}.`);
+    }
+  }
+}
+
 if (currentRoot !== productionRoot) {
   fail(`Execute em ${productionRoot}. Diretório atual: ${currentRoot}`);
 }
@@ -89,6 +115,8 @@ run("Atualizando PM2", "pm2", [
   "--env",
   "production",
 ]);
+wait(2_000);
+requirePm2Online(["f10.com.br", "f10-help-video-worker"]);
 run("Salvando PM2", "pm2", ["save"]);
 run("Status", "pm2", ["status"]);
 

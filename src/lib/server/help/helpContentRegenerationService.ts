@@ -160,6 +160,13 @@ export async function regenerateHelpContentFromVideo(input: {
     }],
   };
 
+  await input.onProgress?.({
+    stage: "save",
+    status: "active",
+    label: "Salvando rascunho e screenshots",
+    detail: "Aplicando o conteúdo processado à Base de Conhecimento.",
+  });
+
   const result = await importStructuredHelpFile(
     input.actorUserId,
     generated.file,
@@ -196,6 +203,13 @@ export async function regenerateHelpContentFromVideo(input: {
     input.contentId,
     generated.reviewCandidates,
   );
+
+  await input.onProgress?.({
+    stage: "save",
+    status: "done",
+    label: "Rascunho e screenshots salvos",
+    detail: "Conteúdo pronto para revisão.",
+  });
 
   const updated = await getStructuredHelpContent(input.contentId);
   if (!updated) throw new Error("CONTENT_NOT_FOUND");

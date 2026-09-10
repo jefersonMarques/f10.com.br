@@ -672,7 +672,7 @@ export async function updateHelpVideoProcessingProgress(input: {
       progressDetail: helpVideoProcessingJobs.progressDetail,
     });
 
-  if (!updated) return;
+  if (!updated) throw new Error("HELP_VIDEO_PROCESSING_CANCELLED");
   await appendHelpVideoProcessingEvent({
     jobId: updated.id,
     eventType: "progress",
@@ -710,7 +710,7 @@ export async function saveHelpVideoProcessingCheckpoint(
   const now = new Date();
 
   await db.transaction(async (tx) => {
-    await tx
+    const [activeJob] = await tx
       .update(helpVideoProcessingJobs)
       .set({
         checkpoint: checkpointWithoutParts(checkpoint),
@@ -720,7 +720,15 @@ export async function saveHelpVideoProcessingCheckpoint(
         leaseExpiresAt: new Date(now.getTime() + LEASE_MS),
         updatedAt: now,
       })
-      .where(eq(helpVideoProcessingJobs.id, jobId));
+      .where(
+        and(
+          eq(helpVideoProcessingJobs.id, jobId),
+          eq(helpVideoProcessingJobs.status, "running"),
+        ),
+      )
+      .returning({ id: helpVideoProcessingJobs.id });
+
+    if (!activeJob) throw new Error("HELP_VIDEO_PROCESSING_CANCELLED");
 
     for (const part of parts) {
       await tx
@@ -856,7 +864,7 @@ export async function completeHelpVideoProcessingJob(
     : "Conteúdo atualizado";
   const detail = completionDetail(result);
 
-  await getDatabase()
+  const [completedJob] = await getDatabase()
     .update(helpVideoProcessingJobs)
     .set({
       status: "completed",
@@ -872,7 +880,15 @@ export async function completeHelpVideoProcessingJob(
       completedAt: now,
       updatedAt: now,
     })
-    .where(eq(helpVideoProcessingJobs.id, job.id));
+    .where(
+      and(
+        eq(helpVideoProcessingJobs.id, job.id),
+        eq(helpVideoProcessingJobs.status, "running"),
+      ),
+    )
+    .returning({ id: helpVideoProcessingJobs.id });
+
+  if (!completedJob) return;
 
   await appendHelpVideoProcessingEvent({
     jobId: job.id,
@@ -911,7 +927,7 @@ export async function failHelpVideoProcessingJob(
       ? `Limite automático encerrado na tentativa ${job.attemptCount} de ${job.maxAttempts}.`
       : "A falha exige correção ou uma nova tentativa manual.";
 
-  await getDatabase()
+  const [failedJob] = await getDatabase()
     .update(helpVideoProcessingJobs)
     .set({
       status,
@@ -927,7 +943,15 @@ export async function failHelpVideoProcessingJob(
       heartbeatAt: now,
       updatedAt: now,
     })
-    .where(eq(helpVideoProcessingJobs.id, job.id));
+    .where(
+      and(
+        eq(helpVideoProcessingJobs.id, job.id),
+        eq(helpVideoProcessingJobs.status, "running"),
+      ),
+    )
+    .returning({ id: helpVideoProcessingJobs.id });
+
+  if (!failedJob) return;
 
   await appendHelpVideoProcessingEvent({
     jobId: job.id,
@@ -942,6 +966,55 @@ export async function failHelpVideoProcessingJob(
       failureCode: code.slice(0, 180),
     },
   });
+}
+
+export async function cancelHelpVideoProcessingJob(
+  jobId: string,
+): Promise<HelpVideoProcessingJobView | null> {
+  const now = new Date();
+  const [job] = await getDatabase()
+    .update(helpVideoProcessingJobs)
+    .set({
+      status: "failed",
+      stage: "cancelled",
+      progressLabel: "Processamento cancelado",
+      progressDetail: "Interrompido manualmente. O progresso salvo foi preservado.",
+      nextAttemptAt: null,
+      leaseExpiresAt: null,
+      heartbeatAt: now,
+      lastErrorCode: "HELP_VIDEO_PROCESSING_CANCELLED",
+      lastErrorMessage: "Processamento cancelado pelo usuário.",
+      completedAt: now,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(helpVideoProcessingJobs.id, jobId),
+        inArray(helpVideoProcessingJobs.status, ACTIVE_STATUSES),
+      ),
+    )
+    .returning();
+
+  if (!job) return null;
+
+  await appendHelpVideoProcessingEvent({
+    jobId: job.id,
+    eventType: "cancelled",
+    stage: "cancelled",
+    status: "failed",
+    label: "Processamento cancelado",
+    detail: "O usuário encerrou esta execução.",
+    metadata: {
+      attemptCount: job.attemptCount,
+      completedParts: await completedPartCount(job.id),
+    },
+  });
+
+  if (job.sourceKind === "upload" && job.sourceStorageKey) {
+    await deleteAssetObject(job.sourceStorageKey).catch(() => undefined);
+  }
+
+  return toView(job, await completedPartCount(job.id));
 }
 
 export async function retryHelpVideoProcessingJob(

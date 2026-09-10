@@ -21,6 +21,7 @@ const PERMANENT_FAILURE_CODES = new Set([
   "CONTENT_NOT_FOUND",
   "HELP_VIDEO_PROCESSING_ACTOR_MISSING",
   "HELP_VIDEO_PROCESSING_SOURCE_MISSING",
+  "HELP_VIDEO_PROCESSING_CANCELLED",
   "HELP_VIDEO_LOCAL_COPY_REQUIRED",
   "HELP_VIDEO_UPLOAD_FORMAT_INVALID",
   "HELP_VIDEO_UPLOAD_SIZE_INVALID",
@@ -114,6 +115,13 @@ async function runWorkerLoop(): Promise<void> {
       continue;
     }
 
+    console.info("[help-video-worker] job claimed", {
+      jobId: job.id,
+      contentId: job.contentId,
+      operation: job.operation,
+      attempt: job.attemptCount,
+    });
+
     try {
       await processJob(job);
     } catch (cause) {
@@ -143,9 +151,13 @@ async function runWorkerLoop(): Promise<void> {
 export function startHelpVideoProcessingWorker(): void {
   if (started || env.F10_HELP_VIDEO_WORKER !== "1") return;
   started = true;
+
+  console.info("[help-video-worker] started", {
+    pid: process.pid,
+  });
+
   void runWorkerLoop().catch((cause) => {
-    started = false;
-    console.error("[help-video-worker] loop stopped", { cause });
-    setTimeout(() => startHelpVideoProcessingWorker(), POLL_INTERVAL_MS);
+    console.error("[help-video-worker] fatal loop failure", { cause });
+    setTimeout(() => process.exit(1), 100);
   });
 }

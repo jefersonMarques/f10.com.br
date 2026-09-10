@@ -48,6 +48,7 @@
   let processingTarget: ContentItem | null = null;
   let processingTargetJob: ProcessingJob | null = null;
   let retryingJobId = "";
+  let cancellingJobId = "";
   let processingRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
   $: processingTarget = processingTargetId
@@ -88,12 +89,35 @@
     processingTargetId = null;
   }
 
+  function isProcessingCancelled(job: ProcessingJob): boolean {
+    return job.lastErrorCode === "HELP_VIDEO_PROCESSING_CANCELLED";
+  }
+
+  function isQueueStalled(job: ProcessingJob): boolean {
+    if (job.status !== "queued") return false;
+    const createdAt = new Date(job.createdAt).getTime();
+    return Number.isFinite(createdAt) && Date.now() - createdAt > 60_000;
+  }
+
   function processingStatusLabel(job: ProcessingJob): string {
     if (job.status === "completed") return "Concluído";
+    if (isProcessingCancelled(job)) return "Cancelado";
     if (job.status === "failed") return "Falhou";
     if (job.status === "retry_waiting") return "Nova tentativa";
-    if (job.status === "queued") return "Na fila";
+    if (job.status === "queued") return isQueueStalled(job) ? "Fila parada" : "Na fila";
     return "Processando";
+  }
+
+  function processingCurrentLabel(job: ProcessingJob): string {
+    return isQueueStalled(job)
+      ? "O servidor de processamento ainda não iniciou este job"
+      : job.progressLabel;
+  }
+
+  function processingCurrentDetail(job: ProcessingJob): string {
+    return isQueueStalled(job)
+      ? "Você pode cancelar esta execução. Após o deploy, o worker também será validado pelo PM2."
+      : job.progressDetail;
   }
 
   function processingTime(value: string): string {
@@ -105,6 +129,29 @@
       hour: "2-digit",
       minute: "2-digit",
     }).format(date);
+  }
+
+  async function cancelProcessing(job: ProcessingJob): Promise<void> {
+    if (cancellingJobId || !data.canEdit) return;
+    if (!confirm("Cancelar este processamento? O progresso já salvo será preservado.")) return;
+
+    cancellingJobId = job.id;
+    try {
+      const response = await fetch(
+        `/api/app/help/content/${job.contentId}/regenerate`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            jobId: job.id,
+            action: "cancel",
+          }),
+        },
+      );
+      if (response.ok) await invalidateAll();
+    } finally {
+      cancellingJobId = "";
+    }
   }
 
   async function retryProcessing(job: ProcessingJob): Promise<void> {
@@ -196,6 +243,8 @@
 
                     {#if content.processingJob?.status === "completed"}
                       <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#EEF8F1] px-2 py-1 font-bold uppercase tracking-[0.05em] text-[#2F7045]"><CheckCircle2 size={11}/>Processado</span>
+                    {:else if content.processingJob && isProcessingCancelled(content.processingJob)}
+                      <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#F1F1F3] px-2 py-1 font-bold uppercase tracking-[0.05em] text-[#676D7D]"><X size={11}/>Cancelado</span>
                     {:else if content.processingJob?.status === "failed"}
                       <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#FFF0F0] px-2 py-1 font-bold uppercase tracking-[0.05em] text-[#9B2C2C]"><TriangleAlert size={11}/>Falhou</span>
                     {:else if content.processingJob}
@@ -283,6 +332,8 @@
             <h2 id="processing-details-title" class="truncate text-[16px] font-semibold text-[#11182C]">{processingTarget.title}</h2>
             {#if processingTargetJob.status === "completed"}
               <span class="application-text-meta rounded-full bg-[#EEF8F1] px-2 py-1 font-bold text-[#2F7045]">CONCLUÍDO</span>
+            {:else if isProcessingCancelled(processingTargetJob)}
+              <span class="application-text-meta rounded-full bg-[#F1F1F3] px-2 py-1 font-bold text-[#676D7D]">CANCELADO</span>
             {:else if processingTargetJob.status === "failed"}
               <span class="application-text-meta rounded-full bg-[#FFF0F0] px-2 py-1 font-bold text-[#9B2C2C]">FALHOU</span>
             {:else}
@@ -306,8 +357,8 @@
             {/if}
           </span>
           <div class="min-w-0 flex-1">
-            <strong class="block text-[11px] text-[#343A49]">{processingTargetJob.progressLabel}</strong>
-            {#if processingTargetJob.progressDetail}<p class="mt-1 text-[10px] leading-5 text-[#747A89]">{processingTargetJob.progressDetail}</p>{/if}
+            <strong class="block text-[11px] text-[#343A49]">{processingCurrentLabel(processingTargetJob)}</strong>
+            {#if processingCurrentDetail(processingTargetJob)}<p class="mt-1 text-[10px] leading-5 text-[#747A89]">{processingCurrentDetail(processingTargetJob)}</p>{/if}
             <div class="mt-2 flex flex-wrap gap-2">
               {#if processingTargetJob.totalParts}
                 <span class="application-text-meta rounded-full bg-white px-2 py-1 font-semibold text-[#666D7C]">{Math.min(processingTargetJob.completedParts, processingTargetJob.totalParts)}/{processingTargetJob.totalParts} partes</span>
@@ -354,7 +405,12 @@
 
       <div class="mt-5 flex flex-wrap justify-end gap-2">
         <button type="button" on:click={closeProcessingDetails} class="min-h-10 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[10px] font-semibold text-[#626979]">Fechar</button>
-        {#if processingTargetJob.status === "failed" && data.canEdit}
+        {#if isProcessingActive(processingTargetJob.status) && data.canEdit}
+          <button type="button" on:click={() => cancelProcessing(processingTargetJob)} disabled={cancellingJobId === processingTargetJob.id} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#F0C8C8] bg-white px-4 text-[10px] font-semibold text-[#9B2C2C] disabled:opacity-50">
+            {#if cancellingJobId === processingTargetJob.id}<LoaderCircle size={14} class="animate-spin"/>{:else}<X size={14}/>{/if}
+            Cancelar processamento
+          </button>
+        {:else if processingTargetJob.status === "failed" && data.canEdit}
           <button type="button" on:click={() => retryProcessing(processingTargetJob)} disabled={retryingJobId === processingTargetJob.id} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">
             {#if retryingJobId === processingTargetJob.id}<LoaderCircle size={14} class="animate-spin"/>{:else}<RefreshCw size={14}/>{/if}
             Tentar novamente
