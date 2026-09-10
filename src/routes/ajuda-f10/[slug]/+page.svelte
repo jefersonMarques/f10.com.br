@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import {
     ArrowLeft,
+    ArrowRight,
     CheckCircle2,
     Download,
     ExternalLink,
@@ -23,6 +24,16 @@
     return data.isHistorical && data.releaseNumber
       ? `${base}?versao=${data.releaseNumber}`
       : base;
+  }
+
+  function articleHref(slug: string, releaseNumber: number | null = null): string {
+    const params = new URLSearchParams();
+    if (releaseNumber) params.set("versao", String(releaseNumber));
+    if (data.navigation.collection?.slug) {
+      params.set("colecao", data.navigation.collection.slug);
+    }
+    const query = params.toString();
+    return `/ajuda-f10/${encodeURIComponent(slug)}${query ? `?${query}` : ""}`;
   }
 
   function youtubeEmbedUrl(value: string | null): string | null {
@@ -90,7 +101,7 @@
     {#if data.isHistorical}
       <section class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[#7A3B08]">
         <div class="flex items-center gap-2"><History size={16}/><strong class="text-[10px]">Versão anterior · v{data.releaseNumber}</strong></div>
-        <a href={`/ajuda-f10/${data.routeSlug}`} class="rounded-xl bg-white px-3 py-2 text-[9px] font-semibold text-[#000A57]">Ver versão atual</a>
+        <a href={articleHref(data.routeSlug)} class="rounded-xl bg-white px-3 py-2 text-[9px] font-semibold text-[#000A57]">Ver versão atual</a>
       </section>
     {/if}
 
@@ -124,7 +135,7 @@
             <div class="absolute left-0 top-8 z-20 min-w-[190px] overflow-hidden rounded-xl border border-[#DDE1EA] bg-white py-1 shadow-xl">
               {#each data.releases as release}
                 <a
-                  href={release.releaseNumber === data.currentReleaseNumber ? `/ajuda-f10/${data.routeSlug}` : `/ajuda-f10/${data.routeSlug}?versao=${release.releaseNumber}`}
+                  href={articleHref(data.routeSlug, release.releaseNumber === data.currentReleaseNumber ? null : release.releaseNumber)}
                   class={`flex items-center justify-between gap-3 px-3 py-2.5 text-[9px] hover:bg-[#F7F8FB] ${release.releaseNumber === data.releaseNumber ? "font-bold text-[#000A57]" : "text-[#666D7D]"}`}
                 >
                   <span>Versão {release.releaseNumber}</span>
@@ -191,6 +202,26 @@
     </div>
 
     <section class="mt-7 flex items-center gap-3 rounded-[22px] border border-[#D8E9DE] bg-[#F4FBF6] px-5 py-4 text-[#356347]"><CheckCircle2 size={19}/><div><strong class="block text-[11px]">Conteúdo concluído</strong><span class="mt-1 block text-[9px] text-[#6E8C78]">Use o assistente deste artigo se quiser esclarecer algum ponto deste procedimento.</span></div></section>
+
+    {#if data.navigation.previous || data.navigation.next}
+      <nav class="mt-4 grid gap-3 sm:grid-cols-2" aria-label="Navegação entre artigos">
+        {#if data.navigation.previous}
+          <a href={articleHref(data.navigation.previous.slug)} class="group rounded-[20px] border border-[#E1E4EC] bg-white px-5 py-4 transition hover:border-[#C7CCDA] hover:shadow-[0_10px_28px_rgba(1,13,40,0.05)]">
+            <span class="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.1em] text-[#858B99]"><ArrowLeft size={13}/>Artigo anterior</span>
+            <strong class="mt-2 block text-[13px] font-semibold leading-5 text-[#303746] transition group-hover:text-[#000A57]">{data.navigation.previous.title}</strong>
+          </a>
+        {:else}
+          <span class="hidden sm:block"></span>
+        {/if}
+
+        {#if data.navigation.next}
+          <a href={articleHref(data.navigation.next.slug)} class="group rounded-[20px] border border-[#D8DDF4] bg-[#F8F9FF] px-5 py-4 text-right transition hover:border-[#BBC3EA] hover:shadow-[0_10px_28px_rgba(1,13,40,0.05)]">
+            <span class="flex items-center justify-end gap-2 text-[9px] font-bold uppercase tracking-[0.1em] text-[#626B97]">Próximo artigo<ArrowRight size={13}/></span>
+            <strong class="mt-2 block text-[13px] font-semibold leading-5 text-[#000A57]">{data.navigation.next.title}</strong>
+          </a>
+        {/if}
+      </nav>
+    {/if}
   </div>
 </main>
 
