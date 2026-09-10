@@ -92,7 +92,7 @@
   type RegenerationJob = {
     id: string;
     contentId: string;
-    status: "queued" | "running" | "retry_waiting" | "completed" | "failed" | "cancelled";
+    status: "queued" | "running" | "retry_waiting" | "completed" | "failed";
     stage: string;
     progressLabel: string;
     progressDetail: string;
@@ -121,7 +121,7 @@
           status:
             regenerationJob.status === "completed"
               ? "done"
-              : regenerationJob.status === "failed" || regenerationJob.status === "cancelled"
+              : regenerationJob.status === "failed"
                 ? "error"
                 : "active",
         }]
@@ -654,7 +654,7 @@
           status:
             job.status === "completed"
               ? "done"
-              : job.status === "failed" || job.status === "cancelled"
+              : job.status === "failed"
                 ? "error"
                 : "active",
         }]
@@ -663,7 +663,7 @@
     if (job?.status === "failed") {
       regenerationError =
         "O processamento foi pausado após várias tentativas. Você pode retomar do último checkpoint.";
-    } else if (job?.status !== "cancelled") {
+    } else {
       regenerationError = "";
     }
 
