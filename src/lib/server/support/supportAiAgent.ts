@@ -106,6 +106,19 @@ function isArticleReferenceFollowUp(value: string): boolean {
   );
 }
 
+function isContextContinuation(value: string): boolean {
+  const normalized = normalizedFollowUpText(value);
+  if (!normalized) return false;
+  const words = normalized.split(" ").filter(Boolean);
+  if (words.length > 10) return false;
+
+  return (
+    /^(?:(?:e|mas)\s+)?(?:na|no|nas|nos|em|pela|pelo|dentro|aqui|ali)\b/.test(normalized) ||
+    /^(?:estou|to)\s+(?:na|no|nas|nos|em)\b/.test(normalized) ||
+    /^(?:tela|aba|menu|campo|modulo|pagina)\b/.test(normalized)
+  );
+}
+
 function isFollowUpQuestion(value: string): boolean {
   const compact = value.trim();
   if (/^[?!.]+$/.test(compact)) return true;
@@ -114,7 +127,7 @@ function isFollowUpQuestion(value: string): boolean {
   if (!normalized) return false;
   const words = normalized.split(" ").filter(Boolean);
   if (words.length <= 2) return true;
-  if (isArticleReferenceFollowUp(value)) return true;
+  if (isArticleReferenceFollowUp(value) || isContextContinuation(value)) return true;
   return /^(?:(?:e|em)\s+)?(?:como|onde|qual|quais|quando|por que|porque|depois|agora|para|pro|pros)\b/.test(normalized)
     && words.length <= 6;
 }
