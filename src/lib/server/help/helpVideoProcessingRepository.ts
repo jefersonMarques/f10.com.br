@@ -369,6 +369,9 @@ export async function saveHelpVideoProcessingCheckpoint(
       .update(helpVideoProcessingJobs)
       .set({
         checkpoint: checkpointWithoutParts(checkpoint),
+        attemptCount: 0,
+        lastErrorCode: null,
+        lastErrorMessage: null,
         heartbeatAt: new Date(),
         leaseExpiresAt: new Date(Date.now() + LEASE_MS),
         updatedAt: new Date(),
