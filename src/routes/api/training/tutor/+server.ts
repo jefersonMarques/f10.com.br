@@ -7,7 +7,7 @@ import {
   helpTrainingPublicEvents,
 } from "$lib/server/db/helpTrainingSchema";
 import { tryAnswerHelpArticleDeterministically } from "$lib/server/help/helpArticleDeterministicAnswer";
-import { answerHelpQuestion } from "$lib/server/help/helpKnowledgeEngine";
+import { answerHelpArticleWithGlobalFallback } from "$lib/server/help/helpKnowledgeOrchestrator";
 import { recordHelpKnowledgeRun } from "$lib/server/help/helpKnowledgeTelemetryRepository";
 import {
   claimHelpPublicAiRequest,
@@ -41,6 +41,30 @@ function errorResponse(error: string, status: number, retryAfter?: number) {
   );
 }
 
+function normalizeText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[?!.,;:]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isContextDependentQuestion(question: string): boolean {
+  const normalized = normalizeText(question);
+  if (!normalized) return false;
+  const words = normalized.split(" ").filter(Boolean);
+  if (words.length <= 2) return true;
+  return /^(?:(?:e|em)\s+)?(?:como|onde|qual|quais|quando|depois|agora)\b/.test(normalized)
+    || /\b(isso|isto|esse|essa|aqui|ali|parte|ponto)\b/.test(normalized);
+}
+
+function knowledgeQuestion(question: string, stepTitle: string): string {
+  if (!stepTitle || !isContextDependentQuestion(question)) return question;
+  return `Etapa atual da trilha: ${stepTitle}\nPergunta: ${question}`.slice(0, 600);
+}
+
 async function resolveTrainingContext(cookies: Parameters<RequestHandler>[0]["cookies"]) {
   const inviteToken = getHelpTrainingSessionCookie(cookies);
   if (inviteToken) {
@@ -50,6 +74,7 @@ async function resolveTrainingContext(cookies: Parameters<RequestHandler>[0]["co
         kind: "invite" as const,
         sessionId: state.session.id,
         stepId: state.currentStep?.id ?? null,
+        stepTitle: state.currentStep?.title ?? "",
         articleSlug: state.snapshot.sourceContent.slug,
       };
     }
@@ -63,6 +88,7 @@ async function resolveTrainingContext(cookies: Parameters<RequestHandler>[0]["co
         kind: "public" as const,
         sessionId: state.session.id,
         stepId: state.currentStep?.id ?? null,
+        stepTitle: state.currentStep?.title ?? "",
         articleSlug: state.snapshot.sourceContent.slug,
       };
     }
@@ -186,8 +212,8 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
       settings,
     );
 
-    const result = await answerHelpQuestion({
-      question,
+    const result = await answerHelpArticleWithGlobalFallback({
+      question: knowledgeQuestion(question, context.stepTitle),
       scope: { type: "article", slug: context.articleSlug },
       source: "public",
       conversationContext,
@@ -230,6 +256,8 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
       recordTutorEvent(context, {
         resolution: result.resolution,
         deterministic: false,
+        targetSlug: result.target?.slug ?? null,
+        targetType: result.target?.targetType ?? null,
       }),
     ]);
 

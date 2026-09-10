@@ -11,6 +11,7 @@
     Sparkles,
   } from "lucide-svelte";
   import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
+  import HelpRichText from "$lib/components/help/HelpRichText.svelte";
   import SupportChatDialog from "$lib/components/onboarding/SupportChatDialog.svelte";
   import type { PageData } from "./$types";
 
@@ -80,6 +81,12 @@
       loading = false;
     }
   }
+
+  function handleQuestionKeydown(event: KeyboardEvent): void {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    void askHelp();
+  }
 </script>
 
 <svelte:head>
@@ -99,9 +106,18 @@
       <form class="mx-auto mt-8 max-w-[820px]" on:submit|preventDefault={askHelp}>
         <div class="flex items-end gap-2 rounded-[22px] border border-white/15 bg-white p-2 shadow-[0_18px_60px_rgba(0,0,0,0.16)] focus-within:border-[#EA6D0B] focus-within:ring-4 focus-within:ring-[#EA6D0B]/15">
           <Search size={19} class="mb-3 ml-2 shrink-0 text-[#7E8698]"/>
-          <textarea bind:value={question} rows="2" maxlength="600" disabled={!data.helpPublicAi.available || loading} placeholder={data.helpPublicAi.available ? "Ex.: Como cadastrar um funcionário?" : "Pesquisa inteligente temporariamente indisponível"} class="max-h-28 min-h-[48px] flex-1 resize-none bg-transparent px-1 py-3 text-[13px] leading-5 text-[#10172A] outline-none placeholder:text-[#8B91A0] disabled:cursor-not-allowed"></textarea>
+          <textarea
+            bind:value={question}
+            rows="2"
+            maxlength="600"
+            disabled={!data.helpPublicAi.available || loading}
+            placeholder={data.helpPublicAi.available ? "Ex.: Como cadastrar um funcionário?" : "Pesquisa inteligente temporariamente indisponível"}
+            class="max-h-28 min-h-[48px] flex-1 resize-none bg-transparent px-1 py-3 text-[13px] leading-5 text-[#10172A] outline-none placeholder:text-[#8B91A0] disabled:cursor-not-allowed"
+            on:keydown={handleQuestionKeydown}
+          ></textarea>
           <button type="submit" disabled={!data.helpPublicAi.available || loading || question.trim().length < 3} class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#EA6D0B] text-white transition hover:bg-[#D96208] disabled:cursor-not-allowed disabled:opacity-45" aria-label="Perguntar">{#if loading}<LoaderCircle size={18} class="animate-spin"/>{:else}<Send size={17}/>{/if}</button>
         </div>
+        <p class="mt-2 text-center text-[9px] text-white/50">Enter envia · Shift+Enter quebra linha</p>
       </form>
 
       {#if data.helpPublicAi.enabled && !data.helpPublicAi.available}
@@ -116,7 +132,19 @@
         {#if errorMessage}
           <p class="rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[11px] leading-5 text-[#7A3B08]">{errorMessage}</p>
         {:else}
-          <div class="flex items-start gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Sparkles size={16}/></span><div class="min-w-0 flex-1"><p class="whitespace-pre-line text-[13px] leading-6 text-[#343C4E]">{answer}</p>{#if target}<div class="mt-5 border-t border-[#EEF0F5] pt-4"><p class="text-[9px] font-bold uppercase tracking-[0.12em] text-[#949AA8]">Conteúdo relacionado</p><a href={targetHref(target)} class="mt-2 inline-flex items-center gap-2 text-[12px] font-semibold text-[#000A57] hover:underline">{target.title}<ArrowRight size={14}/></a>{#if resolution === "answered"}<p class="mt-1 text-[10px] text-[#858B99]">Ver passo a passo completo</p>{/if}</div>{/if}</div></div>
+          <div class="flex items-start gap-3">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Sparkles size={16}/></span>
+            <div class="min-w-0 flex-1">
+              <HelpRichText text={answer} className="space-y-1.5 text-[13px] leading-6 text-[#343C4E]" />
+              {#if target}
+                <div class="mt-5 border-t border-[#EEF0F5] pt-4">
+                  <p class="text-[9px] font-bold uppercase tracking-[0.12em] text-[#949AA8]">Conteúdo relacionado</p>
+                  <a href={targetHref(target)} class="mt-2 inline-flex items-center gap-2 text-[12px] font-semibold text-[#000A57] hover:underline">{target.title}<ArrowRight size={14}/></a>
+                  {#if resolution === "answered"}<p class="mt-1 text-[10px] text-[#858B99]">Ver ponto da explicação</p>{/if}
+                </div>
+              {/if}
+            </div>
+          </div>
         {/if}
       </section>
     {/if}

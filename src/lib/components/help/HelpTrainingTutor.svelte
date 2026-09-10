@@ -1,23 +1,39 @@
 <script lang="ts">
   import { tick } from "svelte";
   import {
+    ArrowUpRight,
     LoaderCircle,
     MessageCircleQuestion,
     Send,
     Sparkles,
     X,
   } from "lucide-svelte";
+  import HelpRichText from "$lib/components/help/HelpRichText.svelte";
 
   export let mode: "preview" | "invite" | "public";
   export let sourceContentSlug: string;
   export let embedded = false;
-  export let introText = "Se algo não estiver claro nesta etapa, pergunte aqui. O tutor usa apenas o conteúdo publicado da trilha.";
+  export let introText = "Se algo não estiver claro nesta etapa, pergunte aqui. O tutor começa pelo conteúdo atual e procura outras orientações publicadas quando necessário.";
   export let placeholder = "Pergunte sobre esta etapa...";
+
+  type HelpResolution = "answered" | "navigate" | "found_elsewhere" | "not_found";
+
+  type HelpTarget = {
+    contentId: string;
+    slug: string;
+    title: string;
+    targetType: "article" | "featured_video" | "step" | "block";
+    stepId: string | null;
+    blockId: string | null;
+    anchor: string | null;
+  };
 
   type ChatMessage = {
     id: number;
     role: "user" | "assistant";
     text: string;
+    resolution?: HelpResolution | null;
+    target?: HelpTarget | null;
     error?: boolean;
   };
 
@@ -35,6 +51,11 @@
       .map((message) => `${message.role === "user" ? "Cliente" : "Tutor"}: ${message.text}`)
       .join("\n")
       .slice(-5000);
+  }
+
+  function targetHref(helpTarget: HelpTarget): string {
+    const anchor = helpTarget.anchor ? `#${encodeURIComponent(helpTarget.anchor)}` : "";
+    return `/ajuda-f10/${encodeURIComponent(helpTarget.slug)}${anchor}`;
   }
 
   async function scrollToEnd(): Promise<void> {
@@ -83,7 +104,12 @@
               },
         ),
       });
-      const payload = await response.json() as { answer?: string; error?: string };
+      const payload = await response.json() as {
+        answer?: string;
+        error?: string;
+        resolution?: HelpResolution;
+        target?: HelpTarget | null;
+      };
       if (!response.ok || !payload.answer) {
         addMessage({
           role: "assistant",
@@ -92,7 +118,12 @@
         });
         return;
       }
-      addMessage({ role: "assistant", text: payload.answer });
+      addMessage({
+        role: "assistant",
+        text: payload.answer,
+        resolution: payload.resolution ?? "not_found",
+        target: payload.target ?? null,
+      });
     } catch {
       addMessage({ role: "assistant", text: errorMessage(""), error: true });
     } finally {
@@ -155,7 +186,22 @@
                 <div class="flex items-start gap-2.5">
                   <span class={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${message.error ? "bg-[#FFF0E8] text-[#A9510D]" : "bg-[#EEF0FF] text-[#000A57]"}`}><Sparkles size={14}/></span>
                   <div class={`max-w-[86%] rounded-2xl rounded-tl-md border px-4 py-3 ${message.error ? "border-[#F1D7BD] bg-[#FFF9F3]" : "border-[#E7EAF1] bg-white"}`}>
-                    <p class={`whitespace-pre-wrap text-[11px] leading-5 ${message.error ? "text-[#7A3B08]" : "text-[#424A5D]"}`}>{message.text}</p>
+                    {#if message.error}
+                      <p class="whitespace-pre-wrap text-[11px] leading-5 text-[#7A3B08]">{message.text}</p>
+                    {:else}
+                      <HelpRichText text={message.text} className="space-y-1.5 text-[11px] leading-5 text-[#424A5D]" />
+                    {/if}
+                    {#if message.target}
+                      <a
+                        href={targetHref(message.target)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="mt-3 inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#EEF0FF] px-3 text-[10px] font-semibold text-[#000A57]"
+                      >
+                        Ver ponto da explicação
+                        <ArrowUpRight size={13}/>
+                      </a>
+                    {/if}
                   </div>
                 </div>
               {/if}

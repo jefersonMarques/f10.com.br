@@ -9,7 +9,7 @@ const MAX_BODY_BYTES = 24 * 1024;
 const MAX_MESSAGE_CHARS = 2_000;
 const MAX_CONTEXT_CHARS = 6_000;
 const MAX_PAGE_CONTEXT_CHARS = 1_200;
-const MAX_UNRESOLVED_COUNT = 2;
+const MAX_UNRESOLVED_COUNT = 3;
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 const RATE_BLOCK_MS = 30 * 60 * 1000;
 const LAST_HELP_SEARCH_COOKIE = "f10_support_last_help_search";
@@ -50,11 +50,6 @@ function requestsTicketCreation(message: string): boolean {
 function requestsHumanSupport(message: string): boolean {
   const normalized = normalizeText(message);
   return /(?:quero|preciso|gostaria|posso|pode|chama|chamar|falar|conversar).{0,28}(?:atendente|humano|pessoa)|(?:atendente humano|suporte humano|falar com alguem)/i.test(normalized);
-}
-
-function showsFrustration(message: string): boolean {
-  const normalized = normalizeText(message);
-  return /(?:nao resolveu|nao resolve|nao funciona|continua igual|ja tentei|tentei de tudo|estou cansad|muito ruim|pessimo|horrivel|irritad|frustrad)/i.test(normalized);
 }
 
 function isGenericSupportRequest(message: string): boolean {
@@ -159,15 +154,6 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
-    if (showsFrustration(message) && conversationContext) {
-      return json(assistantPayload({
-        answer: "Entendi. Como as tentativas anteriores não resolveram, vou tentar chamar um atendente da equipe F10 para continuar com você por aqui.",
-        action: "handoff",
-        handoffReason: "O cliente demonstrou frustração após tentativas de resolução.",
-        aiAvailable,
-      }), { headers: { "Cache-Control": "no-store" } });
-    }
-
     if (isGenericSupportRequest(message)) {
       return json(assistantPayload({
         answer: "Claro. Me conte o que você está tentando fazer no F10, em qual tela está e o que aconteceu.",
@@ -217,27 +203,27 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
         answer: ASSISTANT_RETRY_MESSAGE,
         action: "answer",
         aiAvailable: false,
-        unresolvedCount: 0,
+        unresolvedCount,
         searchEventId: result.searchEventId,
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
-    if (unresolvedCount >= 1) {
+    if (unresolvedCount >= MAX_UNRESOLVED_COUNT - 1) {
       return json(assistantPayload({
-        answer: "Ainda não encontrei uma orientação segura. Vou tentar chamar um atendente da equipe F10 para continuar com você por aqui.",
+        answer: "Não encontrei uma orientação segura mesmo depois de consultar a base e o contexto da conversa. Vou encaminhar para a equipe F10 continuar com você.",
         action: "handoff",
-        handoffReason: result.escalationReason || "O Assistente F10 não conseguiu sustentar uma resposta segura após tentativa de esclarecimento.",
+        handoffReason: result.escalationReason || "O Assistente F10 esgotou as tentativas de resposta com a Base de Conhecimento disponível.",
         aiAvailable,
-        unresolvedCount: Math.min(unresolvedCount + 1, MAX_UNRESOLVED_COUNT),
+        unresolvedCount: MAX_UNRESOLVED_COUNT,
         searchEventId: result.searchEventId,
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
     return json(assistantPayload({
-      answer: "Ainda não encontrei uma orientação segura. Para eu tentar mais uma vez, me diga o que você estava tentando fazer, em qual tela isso aconteceu e qual resultado apareceu para você.",
+      answer: result.answer || "Ainda não encontrei uma orientação segura. Me diga em qual tela você está e o que deseja fazer nela para eu tentar por outro caminho.",
       action: "clarify",
       aiAvailable,
-      unresolvedCount: 1,
+      unresolvedCount: unresolvedCount + 1,
       searchEventId: result.searchEventId,
     }), { headers: { "Cache-Control": "no-store" } });
   } catch (cause) {
@@ -248,7 +234,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
       answer: ASSISTANT_RETRY_MESSAGE,
       action: "answer",
       aiAvailable: false,
-      unresolvedCount: 0,
+      unresolvedCount,
     }), { status: 200, headers: { "Cache-Control": "no-store" } });
   }
 };

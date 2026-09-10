@@ -4,6 +4,7 @@
   import { tick } from "svelte";
   import {
     ArrowUpRight,
+    LifeBuoy,
     LoaderCircle,
     MessageCircleQuestion,
     Send,
@@ -11,6 +12,7 @@
     Sparkles,
     X,
   } from "lucide-svelte";
+  import HelpRichText from "$lib/components/help/HelpRichText.svelte";
 
   export let enabled = false;
   export let available = false;
@@ -37,6 +39,15 @@
     error?: boolean;
   };
 
+  type SupportStoredMessage = {
+    id: string;
+    role: "assistant" | "customer";
+    body: string;
+    createdAt: string;
+  };
+
+  const SUPPORT_GUEST_KEY = "f10-support-assistant-conversation-v2";
+  const SUPPORT_UNRESOLVED_KEY = "f10-support-assistant-unresolved-v1";
   const starterQuestions = [
     "Resuma este procedimento",
     "O que é obrigatório aqui?",
@@ -64,16 +75,19 @@
   $: articleSlug = slugFromPath($page.url.pathname);
   $: if (articleSlug && articleSlug !== lastArticleSlug) {
     lastArticleSlug = articleSlug;
-    messages = [];
     question = "";
     loading = false;
-    minimized = false;
   }
 
   function targetElement(helpTarget: HelpTarget): HTMLElement | null {
     if (typeof document === "undefined") return null;
     if (helpTarget.anchor) return document.getElementById(helpTarget.anchor);
     return document.querySelector<HTMLElement>("[data-help-content-slug] header");
+  }
+
+  function targetPath(helpTarget: HelpTarget): string {
+    const anchor = helpTarget.anchor ? `#${encodeURIComponent(helpTarget.anchor)}` : "";
+    return `/ajuda-f10/${encodeURIComponent(helpTarget.slug)}${anchor}`;
   }
 
   async function scrollConversation(): Promise<void> {
@@ -98,7 +112,31 @@
       await revealTarget(helpTarget);
       return;
     }
-    await goto(`/ajuda-f10/${encodeURIComponent(helpTarget.slug)}`);
+    await goto(targetPath(helpTarget));
+    await revealTarget(helpTarget);
+  }
+
+  function supportConversation(): SupportStoredMessage[] {
+    const now = Date.now();
+    return messages
+      .filter((message) => !message.error)
+      .slice(-20)
+      .map((message, index) => ({
+        id: `article-${now}-${index}`,
+        role: message.role === "user" ? "customer" : "assistant",
+        body: message.text,
+        createdAt: new Date(now + index).toISOString(),
+      }));
+  }
+
+  function requestSupport(): void {
+    try {
+      window.sessionStorage.setItem(SUPPORT_GUEST_KEY, JSON.stringify(supportConversation()));
+      window.sessionStorage.setItem(SUPPORT_UNRESOLVED_KEY, "0");
+    } catch {
+      // O contexto continua disponível na tela mesmo quando o navegador bloqueia o armazenamento.
+    }
+    window.dispatchEvent(new CustomEvent("f10:open-support-chat"));
   }
 
   function errorFor(code: string): string {
@@ -222,7 +260,7 @@
           <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[#FF9A4B]"><Sparkles size={17} /></span>
           <div class="min-w-0">
             <strong class="block truncate text-[12px] font-semibold">Assistente F10</strong>
-            <span class="mt-0.5 block text-[9px] text-white/55">Conversa contextual sobre este artigo</span>
+            <span class="mt-0.5 block text-[9px] text-white/55">Conversa contextual sobre a página atual</span>
           </div>
         </div>
         <button type="button" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/65 transition hover:bg-white/10 hover:text-white" on:click={() => (minimized = true)} aria-label="Minimizar assistente"><X size={15}/></button>
@@ -239,7 +277,7 @@
             <div class="flex items-start gap-3">
               <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF0FF] text-[#000A57]"><MessageCircleQuestion size={15}/></span>
               <div class="max-w-[540px] rounded-2xl rounded-tl-md bg-white px-4 py-3 shadow-[0_4px_18px_rgba(1,13,40,0.05)]">
-                <p class="text-[12px] leading-6 text-[#424A5D]">Posso esclarecer este procedimento e continuar a conversa usando somente o conteúdo publicado deste artigo. Pergunte de forma natural, inclusive em sequência.</p>
+                <p class="text-[12px] leading-6 text-[#424A5D]">Começo por este artigo. Se a resposta estiver em outro conteúdo publicado, eu procuro e mostro o ponto exato para você.</p>
               </div>
             </div>
             <div class="ml-11 mt-3 flex flex-wrap gap-2">
@@ -263,11 +301,21 @@
                 <div class="flex items-start gap-2.5">
                   <span class={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${message.error ? "bg-[#FFF0E8] text-[#A9510D]" : "bg-[#EEF0FF] text-[#000A57]"}`}><Sparkles size={14}/></span>
                   <div class={`max-w-[86%] rounded-2xl rounded-tl-md border px-4 py-3 ${message.error ? "border-[#F1D7BD] bg-[#FFF9F3]" : "border-[#E7EAF1] bg-white"}`}>
-                    <p class={`whitespace-pre-wrap text-[12px] leading-6 ${message.error ? "text-[#7A3B08]" : "text-[#424A5D]"}`}>{message.text}</p>
-                    {#if message.target && message.resolution === "answered"}
-                      <button type="button" class="mt-3 inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#EEF0FF] px-3 text-[10px] font-semibold text-[#000A57]" on:click={() => message.target && openTarget(message.target)}>Ver ponto no artigo<ArrowUpRight size={13}/></button>
-                    {:else if message.target && message.resolution === "found_elsewhere"}
-                      <button type="button" class="mt-3 inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#EEF0FF] px-3 text-[10px] font-semibold text-[#000A57]" on:click={() => message.target && openTarget(message.target)}>Abrir {message.target.title}<ArrowUpRight size={13}/></button>
+                    {#if message.error}
+                      <p class="whitespace-pre-wrap text-[12px] leading-6 text-[#7A3B08]">{message.text}</p>
+                    {:else}
+                      <HelpRichText text={message.text} className="space-y-1.5 text-[12px] leading-6 text-[#424A5D]" />
+                    {/if}
+                    {#if message.target}
+                      <button type="button" class="mt-3 inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#EEF0FF] px-3 text-[10px] font-semibold text-[#000A57]" on:click={() => message.target && openTarget(message.target)}>
+                        {message.target.slug === articleSlug ? "Ver ponto no artigo" : `Abrir ponto em ${message.target.title}`}
+                        <ArrowUpRight size={13}/>
+                      </button>
+                    {:else if message.resolution === "not_found" && !message.error}
+                      <button type="button" class="mt-3 inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white" on:click={requestSupport}>
+                        <LifeBuoy size={13}/>
+                        Continuar no atendimento
+                      </button>
                     {/if}
                     {#if message.error && requiresAuthentication}<a href="/cliente" class="mt-2 block text-[10px] font-semibold text-[#000A57] hover:underline">Entrar na Área do Cliente</a>{/if}
                   </div>
@@ -278,7 +326,7 @@
             {#if loading}
               <div class="flex items-start gap-2.5">
                 <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF0FF] text-[#000A57]"><Sparkles size={14}/></span>
-                <div class="inline-flex min-h-11 items-center gap-2 rounded-2xl rounded-tl-md border border-[#E7EAF1] bg-white px-4 py-3 text-[10px] font-medium text-[#7A8190]"><LoaderCircle size={14} class="animate-spin"/>Consultando este artigo...</div>
+                <div class="inline-flex min-h-11 items-center gap-2 rounded-2xl rounded-tl-md border border-[#E7EAF1] bg-white px-4 py-3 text-[10px] font-medium text-[#7A8190]"><LoaderCircle size={14} class="animate-spin"/>Consultando orientações...</div>
               </div>
             {/if}
           </div>
@@ -293,7 +341,7 @@
             bind:value={question}
             maxlength="600"
             rows="1"
-            placeholder="Pergunte sobre este artigo ou continue a conversa..."
+            placeholder="Pergunte sobre esta página ou continue a conversa..."
             class="max-h-28 min-h-[42px] flex-1 resize-none bg-transparent px-2 py-2.5 text-[12px] leading-5 text-[#252C3D] outline-none placeholder:text-[#969CAA]"
             disabled={!available || loading}
             on:keydown={handleQuestionKeydown}
@@ -303,7 +351,7 @@
           </button>
         </div>
         <div class="mx-auto mt-2 flex max-w-[680px] items-center justify-between gap-3 px-1">
-          <span class="inline-flex items-center gap-1.5 text-[8px] font-medium text-[#8B91A0]"><ShieldCheck size={11}/>Respostas limitadas ao artigo; histórico usado apenas para contexto</span>
+          <span class="inline-flex items-center gap-1.5 text-[8px] font-medium text-[#8B91A0]"><ShieldCheck size={11}/>Prioriza a página atual e consulta a base publicada quando necessário</span>
           <span class="text-[8px] text-[#A0A5B1]">Enter envia · Shift+Enter quebra linha</span>
         </div>
       </form>

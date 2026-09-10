@@ -7,6 +7,7 @@ import {
   answerHelpQuestion,
   type HelpKnowledgeScope,
 } from "$lib/server/help/helpKnowledgeEngine";
+import { answerHelpArticleWithGlobalFallback } from "$lib/server/help/helpKnowledgeOrchestrator";
 import { recordHelpKnowledgeRun } from "$lib/server/help/helpKnowledgeTelemetryRepository";
 import {
   claimHelpPublicAiRequest,
@@ -147,13 +148,20 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress,
     requestId = await claimHelpPublicAiRequest(sessionKey, ipKey, settings);
 
     knowledgeStartedAt = Date.now();
-    const result = await answerHelpQuestion({
-      question,
-      scope,
-      source: "public",
-      conversationContext,
-      maxOutputTokens: scope.type === "article" ? ARTICLE_MAX_OUTPUT_TOKENS : undefined,
-    });
+    const result = scope.type === "article"
+      ? await answerHelpArticleWithGlobalFallback({
+          question,
+          scope,
+          source: "public",
+          conversationContext,
+          maxOutputTokens: ARTICLE_MAX_OUTPUT_TOKENS,
+        })
+      : await answerHelpQuestion({
+          question,
+          scope,
+          source: "public",
+          conversationContext,
+        });
     const latencyMs = Date.now() - knowledgeStartedAt;
 
     await finishHelpPublicAiRequest(requestId, {

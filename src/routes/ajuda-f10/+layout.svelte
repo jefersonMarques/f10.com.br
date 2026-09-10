@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { page } from "$app/stores";
   import { MessageCircleMore } from "lucide-svelte";
+  import HelpPublicAiAssistant from "$lib/components/help/HelpPublicAiAssistant.svelte";
   import SupportAssistantDialog from "$lib/components/onboarding/SupportAssistantDialog.svelte";
   import type { LayoutData } from "./$types";
 
@@ -9,6 +11,8 @@
   const HELP_CHAT_CLOSED_KEY = "f10-help-assistant-closed-v1";
   let chatOpen = false;
   let mounted = false;
+
+  $: isArticlePage = /^\/ajuda-f10\/[^/]+\/?$/.test($page.url.pathname);
 
   function openChat(): void {
     chatOpen = true;
@@ -22,13 +26,28 @@
 
   onMount(() => {
     mounted = true;
-    chatOpen = window.sessionStorage.getItem(HELP_CHAT_CLOSED_KEY) !== "1";
+    chatOpen = isArticlePage
+      ? false
+      : window.sessionStorage.getItem(HELP_CHAT_CLOSED_KEY) !== "1";
+
+    const handleOpenSupport = () => openChat();
+    window.addEventListener("f10:open-support-chat", handleOpenSupport);
+
+    return () => window.removeEventListener("f10:open-support-chat", handleOpenSupport);
   });
 </script>
 
 <slot />
 
-{#if mounted && !chatOpen}
+{#if isArticlePage}
+  <HelpPublicAiAssistant
+    enabled={data.helpPublicAi.enabled}
+    available={data.helpPublicAi.available}
+    requiresAuthentication={data.helpPublicAi.requiresAuthentication}
+  />
+{/if}
+
+{#if mounted && !chatOpen && !isArticlePage}
   <button
     type="button"
     class="fixed bottom-5 right-5 z-[10010] inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#000A57] text-white shadow-[0_14px_36px_rgba(1,13,40,0.24)] transition hover:-translate-y-0.5 hover:bg-[#111B71] hover:shadow-[0_18px_42px_rgba(1,13,40,0.3)] sm:bottom-6 sm:right-6"

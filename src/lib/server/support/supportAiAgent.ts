@@ -72,7 +72,7 @@ function isFollowUpQuestion(value: string): boolean {
   if (!normalized) return false;
   const words = normalized.split(" ").filter(Boolean);
   if (words.length <= 2) return true;
-  return /^(?:e\s+)?(?:como|onde|qual|quais|quando|por que|porque|e depois|e agora|e para|e pro|e pros|e as|e os)\b/.test(normalized)
+  return /^(?:(?:e|em)\s+)?(?:como|onde|qual|quais|quando|por que|porque|depois|agora|para|pro|pros)\b/.test(normalized)
     && words.length <= 6;
 }
 
