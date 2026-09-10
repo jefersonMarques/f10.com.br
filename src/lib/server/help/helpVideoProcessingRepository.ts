@@ -15,8 +15,10 @@ import {
 } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import {
+  helpVideoProcessingEvents,
   helpVideoProcessingJobs,
   helpVideoProcessingParts,
+  type HelpVideoProcessingEventType,
   type HelpVideoProcessingJobStatus,
   type HelpVideoProcessingOperation,
 } from "$lib/server/db/helpVideoProcessingSchema";
@@ -47,6 +49,7 @@ const TERMINAL_STATUSES: HelpVideoProcessingJobStatus[] = [
 ];
 const RECENT_JOB_VISIBILITY_MS = 30 * 60 * 1_000;
 const GLOBAL_JOB_LIMIT = 8;
+const EVENT_HISTORY_LIMIT = 60;
 const LEASE_MS = 90 * 1_000;
 
 export type HelpVideoProcessingSource =
@@ -86,9 +89,69 @@ export type HelpVideoProcessingJobSummary = HelpVideoProcessingJobView & {
   contentTitle: string;
 };
 
+export type HelpVideoProcessingEventView = {
+  id: string;
+  eventType: HelpVideoProcessingEventType;
+  stage: string;
+  status: HelpVideoProcessingJobStatus;
+  label: string;
+  detail: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type HelpVideoProcessingJobDetails = HelpVideoProcessingJobView & {
+  events: HelpVideoProcessingEventView[];
+};
+
 function retryDelayMs(attemptCount: number): number {
   const seconds = Math.min(30 * 2 ** Math.max(0, attemptCount - 1), 5 * 60);
   return seconds * 1_000;
+}
+
+async function appendHelpVideoProcessingEvent(input: {
+  jobId: string;
+  eventType: HelpVideoProcessingEventType;
+  stage: string;
+  status: HelpVideoProcessingJobStatus;
+  label: string;
+  detail?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    await getDatabase()
+      .insert(helpVideoProcessingEvents)
+      .values({
+        jobId: input.jobId,
+        eventType: input.eventType,
+        stage: input.stage.slice(0, 80),
+        status: input.status,
+        label: input.label.slice(0, 500),
+        detail: input.detail?.slice(0, 2_000) ?? "",
+        metadata: input.metadata ?? {},
+      });
+  } catch (cause) {
+    console.error("[help-video-processing] event persistence failed", {
+      jobId: input.jobId,
+      eventType: input.eventType,
+      cause,
+    });
+  }
+}
+
+function toEventView(
+  event: typeof helpVideoProcessingEvents.$inferSelect,
+): HelpVideoProcessingEventView {
+  return {
+    id: event.id,
+    eventType: event.eventType,
+    stage: event.stage,
+    status: event.status,
+    label: event.label,
+    detail: event.detail,
+    metadata: event.metadata,
+    createdAt: event.createdAt.toISOString(),
+  };
 }
 
 function checkpointTotalParts(job: HelpVideoProcessingJob): number | null {
@@ -216,32 +279,57 @@ export async function listHelpVideoProcessingJobSummaries(
   }));
 }
 
-export async function listActiveHelpVideoProcessingJobViews(): Promise<
-  HelpVideoProcessingJobView[]
-> {
+export async function listLatestHelpVideoProcessingJobDetails(
+  contentIds: string[],
+): Promise<HelpVideoProcessingJobDetails[]> {
+  if (contentIds.length === 0) return [];
+
   const db = getDatabase();
   const jobs = await db
-    .select()
+    .selectDistinctOn([helpVideoProcessingJobs.contentId])
     .from(helpVideoProcessingJobs)
-    .where(inArray(helpVideoProcessingJobs.status, ACTIVE_STATUSES))
-    .orderBy(desc(helpVideoProcessingJobs.updatedAt));
+    .where(inArray(helpVideoProcessingJobs.contentId, contentIds))
+    .orderBy(
+      helpVideoProcessingJobs.contentId,
+      desc(helpVideoProcessingJobs.createdAt),
+    );
 
   if (jobs.length === 0) return [];
 
   const jobIds = jobs.map((job) => job.id);
-  const partRows = await db
-    .select({
-      jobId: helpVideoProcessingParts.jobId,
-      value: count(),
-    })
-    .from(helpVideoProcessingParts)
-    .where(inArray(helpVideoProcessingParts.jobId, jobIds))
-    .groupBy(helpVideoProcessingParts.jobId);
+  const [partRows, eventRows] = await Promise.all([
+    db
+      .select({
+        jobId: helpVideoProcessingParts.jobId,
+        value: count(),
+      })
+      .from(helpVideoProcessingParts)
+      .where(inArray(helpVideoProcessingParts.jobId, jobIds))
+      .groupBy(helpVideoProcessingParts.jobId),
+    db
+      .select()
+      .from(helpVideoProcessingEvents)
+      .where(inArray(helpVideoProcessingEvents.jobId, jobIds))
+      .orderBy(
+        asc(helpVideoProcessingEvents.createdAt),
+        asc(helpVideoProcessingEvents.id),
+      ),
+  ]);
+
   const partCounts = new Map(
     partRows.map((row) => [row.jobId, Number(row.value)]),
   );
+  const eventsByJobId = new Map<string, HelpVideoProcessingEventView[]>();
+  for (const event of eventRows) {
+    const current = eventsByJobId.get(event.jobId) ?? [];
+    current.push(toEventView(event));
+    eventsByJobId.set(event.jobId, current);
+  }
 
-  return jobs.map((job) => toView(job, partCounts.get(job.id) ?? 0));
+  return jobs.map((job) => ({
+    ...toView(job, partCounts.get(job.id) ?? 0),
+    events: (eventsByJobId.get(job.id) ?? []).slice(-EVENT_HISTORY_LIMIT),
+  }));
 }
 
 export async function getActiveHelpVideoProcessingJob(
@@ -334,6 +422,16 @@ export async function createHelpVideoProcessingJob(input: {
       })
       .returning();
     if (!job) throw new Error("HELP_VIDEO_PROCESSING_JOB_NOT_CREATED");
+    await appendHelpVideoProcessingEvent({
+      jobId: job.id,
+      eventType: "queued",
+      stage: "queued",
+      status: "queued",
+      label: "Vídeo recebido",
+      detail: input.operation === "import"
+        ? "O conteúdo entrou na fila para criação do rascunho."
+        : "O conteúdo entrou na fila para atualização.",
+    });
     return toView(job, 0);
   } catch (cause) {
     if (sourceStorageKey) {
@@ -347,14 +445,60 @@ export async function createHelpVideoProcessingJob(input: {
 }
 
 export async function recoverStaleHelpVideoProcessingJobs(): Promise<void> {
+  const db = getDatabase();
   const now = new Date();
-  await getDatabase()
+
+  const exhaustedWaiting = await db
+    .update(helpVideoProcessingJobs)
+    .set({
+      status: "failed",
+      stage: "failed",
+      progressLabel: "Limite de tentativas atingido",
+      progressDetail: "O processamento foi interrompido e precisa de uma retomada manual.",
+      nextAttemptAt: null,
+      leaseExpiresAt: null,
+      lastErrorCode: "HELP_VIDEO_MAX_ATTEMPTS_REACHED",
+      lastErrorMessage: "O limite automático de tentativas foi atingido.",
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(helpVideoProcessingJobs.status, "retry_waiting"),
+        sql`${helpVideoProcessingJobs.attemptCount} >= ${helpVideoProcessingJobs.maxAttempts}`,
+      ),
+    )
+    .returning();
+
+  const exhaustedRunning = await db
+    .update(helpVideoProcessingJobs)
+    .set({
+      status: "failed",
+      stage: "failed",
+      progressLabel: "Processamento interrompido",
+      progressDetail: "O worker parou durante a última tentativa permitida.",
+      nextAttemptAt: null,
+      leaseExpiresAt: null,
+      lastErrorCode: "HELP_VIDEO_WORKER_INTERRUPTED",
+      lastErrorMessage: "O worker deixou de responder durante a última tentativa automática.",
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(helpVideoProcessingJobs.status, "running"),
+        isNotNull(helpVideoProcessingJobs.leaseExpiresAt),
+        lte(helpVideoProcessingJobs.leaseExpiresAt, now),
+        sql`${helpVideoProcessingJobs.attemptCount} >= ${helpVideoProcessingJobs.maxAttempts}`,
+      ),
+    )
+    .returning();
+
+  const recoverableRunning = await db
     .update(helpVideoProcessingJobs)
     .set({
       status: "retry_waiting",
       stage: "resume",
       progressLabel: "Retomando processamento interrompido",
-      progressDetail: "O worker será retomado a partir do último checkpoint.",
+      progressDetail: "O worker continuará a partir do último checkpoint.",
       nextAttemptAt: now,
       leaseExpiresAt: null,
       updatedAt: now,
@@ -364,8 +508,40 @@ export async function recoverStaleHelpVideoProcessingJobs(): Promise<void> {
         eq(helpVideoProcessingJobs.status, "running"),
         isNotNull(helpVideoProcessingJobs.leaseExpiresAt),
         lte(helpVideoProcessingJobs.leaseExpiresAt, now),
+        sql`${helpVideoProcessingJobs.attemptCount} < ${helpVideoProcessingJobs.maxAttempts}`,
       ),
-    );
+    )
+    .returning();
+
+  for (const job of [...exhaustedWaiting, ...exhaustedRunning]) {
+    await appendHelpVideoProcessingEvent({
+      jobId: job.id,
+      eventType: "failed",
+      stage: "failed",
+      status: "failed",
+      label: job.progressLabel,
+      detail: job.progressDetail,
+      metadata: {
+        attemptCount: job.attemptCount,
+        maxAttempts: job.maxAttempts,
+      },
+    });
+  }
+
+  for (const job of recoverableRunning) {
+    await appendHelpVideoProcessingEvent({
+      jobId: job.id,
+      eventType: "retry_scheduled",
+      stage: "resume",
+      status: "retry_waiting",
+      label: "Processamento será retomado",
+      detail: `Checkpoint preservado · tentativa ${job.attemptCount} de ${job.maxAttempts}.`,
+      metadata: {
+        attemptCount: job.attemptCount,
+        maxAttempts: job.maxAttempts,
+      },
+    });
+  }
 }
 
 export async function claimNextHelpVideoProcessingJob(): Promise<
@@ -377,15 +553,18 @@ export async function claimNextHelpVideoProcessingJob(): Promise<
     .select()
     .from(helpVideoProcessingJobs)
     .where(
-      or(
-        eq(helpVideoProcessingJobs.status, "queued"),
-        and(
-          eq(helpVideoProcessingJobs.status, "retry_waiting"),
-          or(
-            isNull(helpVideoProcessingJobs.nextAttemptAt),
-            lte(helpVideoProcessingJobs.nextAttemptAt, now),
+      and(
+        or(
+          eq(helpVideoProcessingJobs.status, "queued"),
+          and(
+            eq(helpVideoProcessingJobs.status, "retry_waiting"),
+            or(
+              isNull(helpVideoProcessingJobs.nextAttemptAt),
+              lte(helpVideoProcessingJobs.nextAttemptAt, now),
+            ),
           ),
         ),
+        sql`${helpVideoProcessingJobs.attemptCount} < ${helpVideoProcessingJobs.maxAttempts}`,
       ),
     )
     .orderBy(asc(helpVideoProcessingJobs.createdAt))
@@ -413,10 +592,27 @@ export async function claimNextHelpVideoProcessingJob(): Promise<
       and(
         eq(helpVideoProcessingJobs.id, candidate.id),
         inArray(helpVideoProcessingJobs.status, ["queued", "retry_waiting"]),
+        sql`${helpVideoProcessingJobs.attemptCount} < ${helpVideoProcessingJobs.maxAttempts}`,
       ),
     )
     .returning();
-  return claimed ?? null;
+  if (!claimed) return null;
+
+  const resumed = claimed.attemptCount > 1 || candidate.stage !== "queued";
+  await appendHelpVideoProcessingEvent({
+    jobId: claimed.id,
+    eventType: resumed ? "resumed" : "started",
+    stage: claimed.stage,
+    status: "running",
+    label: resumed ? "Processamento retomado" : "Processamento iniciado",
+    detail: `Tentativa ${claimed.attemptCount} de ${claimed.maxAttempts}.`,
+    metadata: {
+      attemptCount: claimed.attemptCount,
+      maxAttempts: claimed.maxAttempts,
+    },
+  });
+
+  return claimed;
 }
 
 export async function heartbeatHelpVideoProcessingJob(
@@ -445,7 +641,7 @@ export async function updateHelpVideoProcessingProgress(input: {
   detail?: string;
 }): Promise<void> {
   const now = new Date();
-  await getDatabase()
+  const [updated] = await getDatabase()
     .update(helpVideoProcessingJobs)
     .set({
       stage: input.stage.slice(0, 80),
@@ -460,7 +656,24 @@ export async function updateHelpVideoProcessingProgress(input: {
         eq(helpVideoProcessingJobs.id, input.jobId),
         eq(helpVideoProcessingJobs.status, "running"),
       ),
-    );
+    )
+    .returning({
+      id: helpVideoProcessingJobs.id,
+      stage: helpVideoProcessingJobs.stage,
+      status: helpVideoProcessingJobs.status,
+      progressLabel: helpVideoProcessingJobs.progressLabel,
+      progressDetail: helpVideoProcessingJobs.progressDetail,
+    });
+
+  if (!updated) return;
+  await appendHelpVideoProcessingEvent({
+    jobId: updated.id,
+    eventType: "progress",
+    stage: updated.stage,
+    status: updated.status,
+    label: updated.progressLabel,
+    detail: updated.progressDetail,
+  });
 }
 
 function checkpointWithoutParts(
@@ -483,18 +696,19 @@ export async function saveHelpVideoProcessingCheckpoint(
 ): Promise<void> {
   const db = getDatabase();
   const parts = checkpoint.article?.completedParts ?? [];
+  const previousPartCount = await completedPartCount(jobId);
+  const now = new Date();
 
   await db.transaction(async (tx) => {
     await tx
       .update(helpVideoProcessingJobs)
       .set({
         checkpoint: checkpointWithoutParts(checkpoint),
-        attemptCount: 0,
         lastErrorCode: null,
         lastErrorMessage: null,
-        heartbeatAt: new Date(),
-        leaseExpiresAt: new Date(Date.now() + LEASE_MS),
-        updatedAt: new Date(),
+        heartbeatAt: now,
+        leaseExpiresAt: new Date(now.getTime() + LEASE_MS),
+        updatedAt: now,
       })
       .where(eq(helpVideoProcessingJobs.id, jobId));
 
@@ -506,8 +720,8 @@ export async function saveHelpVideoProcessingCheckpoint(
           partIndex: part.partIndex,
           segmentIds: part.segmentIds,
           payload: { steps: part.steps },
-          completedAt: new Date(),
-          updatedAt: new Date(),
+          completedAt: now,
+          updatedAt: now,
         })
         .onConflictDoUpdate({
           target: [
@@ -517,11 +731,29 @@ export async function saveHelpVideoProcessingCheckpoint(
           set: {
             segmentIds: part.segmentIds,
             payload: { steps: part.steps },
-            updatedAt: new Date(),
+            updatedAt: now,
           },
         });
     }
   });
+
+  if (parts.length > previousPartCount) {
+    const totalParts = checkpoint.article?.totalParts ?? null;
+    await appendHelpVideoProcessingEvent({
+      jobId,
+      eventType: "checkpoint",
+      stage: "analyze",
+      status: "running",
+      label: totalParts
+        ? `${parts.length} de ${totalParts} partes concluídas`
+        : `${parts.length} parte(s) concluída(s)`,
+      detail: "Progresso salvo para retomada automática.",
+      metadata: {
+        completedParts: parts.length,
+        totalParts,
+      },
+    });
+  }
 }
 
 export async function loadHelpVideoProcessingCheckpoint(
@@ -583,18 +815,44 @@ export async function readHelpVideoProcessingSource(
   };
 }
 
+function completionDetail(result: Record<string, unknown>): string {
+  const summary = result.summary;
+  if (!summary || typeof summary !== "object" || Array.isArray(summary)) {
+    return "Conteúdo pronto para revisão.";
+  }
+
+  const record = summary as Record<string, unknown>;
+  const details: string[] = [];
+  const nextStepCount = Number(record.nextStepCount);
+  const screenshotCount = Number(record.screenshotCount);
+  if (Number.isFinite(nextStepCount) && nextStepCount >= 0) {
+    details.push(`${nextStepCount} etapa(s)`);
+  }
+  if (Number.isFinite(screenshotCount) && screenshotCount >= 0) {
+    details.push(`${screenshotCount} screenshot(s)`);
+  }
+  return details.length > 0
+    ? `${details.join(" · ")} · pronto para revisão.`
+    : "Conteúdo pronto para revisão.";
+}
+
 export async function completeHelpVideoProcessingJob(
   job: HelpVideoProcessingJob,
   result: Record<string, unknown>,
 ): Promise<void> {
   const now = new Date();
+  const label = job.operation === "import"
+    ? "Rascunho criado"
+    : "Conteúdo atualizado";
+  const detail = completionDetail(result);
+
   await getDatabase()
     .update(helpVideoProcessingJobs)
     .set({
       status: "completed",
       stage: "completed",
-      progressLabel: "Conteúdo atualizado",
-      progressDetail: "O novo rascunho está pronto para revisão.",
+      progressLabel: label,
+      progressDetail: detail,
       result,
       lastErrorCode: null,
       lastErrorMessage: null,
@@ -605,6 +863,18 @@ export async function completeHelpVideoProcessingJob(
       updatedAt: now,
     })
     .where(eq(helpVideoProcessingJobs.id, job.id));
+
+  await appendHelpVideoProcessingEvent({
+    jobId: job.id,
+    eventType: "completed",
+    stage: "completed",
+    status: "completed",
+    label,
+    detail,
+    metadata: {
+      attemptCount: job.attemptCount,
+    },
+  });
 
   if (job.sourceKind === "upload" && job.sourceStorageKey) {
     await deleteAssetObject(job.sourceStorageKey).catch(() => undefined);
@@ -619,17 +889,23 @@ export async function failHelpVideoProcessingJob(
 ): Promise<void> {
   const now = new Date();
   const retry = retryable && job.attemptCount < job.maxAttempts;
+  const status: HelpVideoProcessingJobStatus = retry
+    ? "retry_waiting"
+    : "failed";
+  const label = retry
+    ? "Falha temporária. Nova tentativa agendada"
+    : "Processamento interrompido";
+  const detail = retry
+    ? `Retomará do último checkpoint. Tentativa ${job.attemptCount} de ${job.maxAttempts}.`
+    : `Limite automático encerrado na tentativa ${job.attemptCount} de ${job.maxAttempts}.`;
+
   await getDatabase()
     .update(helpVideoProcessingJobs)
     .set({
-      status: retry ? "retry_waiting" : "failed",
+      status,
       stage: retry ? "retry" : "failed",
-      progressLabel: retry
-        ? "Falha temporária. Nova tentativa agendada"
-        : "Processamento interrompido",
-      progressDetail: retry
-        ? `Retomará do último checkpoint. Tentativa ${job.attemptCount}/${job.maxAttempts}.`
-        : "Use Tentar novamente para continuar do último checkpoint.",
+      progressLabel: label,
+      progressDetail: detail,
       lastErrorCode: code.slice(0, 180),
       lastErrorMessage: message.slice(0, 2_000),
       nextAttemptAt: retry
@@ -640,6 +916,20 @@ export async function failHelpVideoProcessingJob(
       updatedAt: now,
     })
     .where(eq(helpVideoProcessingJobs.id, job.id));
+
+  await appendHelpVideoProcessingEvent({
+    jobId: job.id,
+    eventType: retry ? "retry_scheduled" : "failed",
+    stage: retry ? "retry" : "failed",
+    status,
+    label,
+    detail,
+    metadata: {
+      attemptCount: job.attemptCount,
+      maxAttempts: job.maxAttempts,
+      failureCode: code.slice(0, 180),
+    },
+  });
 }
 
 export async function retryHelpVideoProcessingJob(
@@ -668,6 +958,17 @@ export async function retryHelpVideoProcessingJob(
       ),
     )
     .returning();
+
   if (!job) return getHelpVideoProcessingJobView(jobId);
+
+  await appendHelpVideoProcessingEvent({
+    jobId: job.id,
+    eventType: "manual_retry",
+    stage: "resume",
+    status: "queued",
+    label: "Nova tentativa solicitada",
+    detail: "O processamento será retomado do último checkpoint disponível.",
+  });
+
   return toView(job, await completedPartCount(job.id));
 }

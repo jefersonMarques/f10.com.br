@@ -25,6 +25,18 @@ export type HelpVideoProcessingSourceKind = "current" | "upload";
 
 export type HelpVideoProcessingOperation = "regenerate" | "import";
 
+export type HelpVideoProcessingEventType =
+  | "snapshot"
+  | "queued"
+  | "started"
+  | "resumed"
+  | "progress"
+  | "checkpoint"
+  | "retry_scheduled"
+  | "completed"
+  | "failed"
+  | "manual_retry";
+
 export const helpVideoProcessingJobs = pgTable(
   "help_video_processing_jobs",
   {
@@ -93,6 +105,38 @@ export const helpVideoProcessingJobs = pgTable(
     index("help_video_processing_jobs_lease_idx").on(
       table.status,
       table.leaseExpiresAt,
+    ),
+  ],
+);
+
+export const helpVideoProcessingEvents = pgTable(
+  "help_video_processing_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => helpVideoProcessingJobs.id, { onDelete: "cascade" }),
+    eventType: text("event_type")
+      .$type<HelpVideoProcessingEventType>()
+      .notNull(),
+    stage: text("stage").notNull(),
+    status: text("status")
+      .$type<HelpVideoProcessingJobStatus>()
+      .notNull(),
+    label: text("label").notNull(),
+    detail: text("detail").notNull().default(""),
+    metadata: jsonb("metadata")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("help_video_processing_events_job_created_idx").on(
+      table.jobId,
+      table.createdAt,
     ),
   ],
 );
