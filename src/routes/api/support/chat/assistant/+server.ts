@@ -13,6 +13,8 @@ const MAX_UNRESOLVED_COUNT = 2;
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 const RATE_BLOCK_MS = 30 * 60 * 1000;
 const LAST_HELP_SEARCH_COOKIE = "f10_support_last_help_search";
+const ASSISTANT_RETRY_MESSAGE =
+  "Não consegui consultar a Base de Conhecimento do F10 agora. Tente novamente em instantes.";
 
 type AssistantAction = "answer" | "clarify" | "handoff" | "ticket_offer";
 
@@ -137,7 +139,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
     });
     if (!allowed) return json({ error: "RATE_LIMITED" }, { status: 429 });
 
-    const aiAvailable = await isSupportAiChatEnabled();
+    const aiAvailable = await isSupportAiChatEnabled().catch(() => false);
 
     if (requestsTicketCreation(message)) {
       return json(assistantPayload({
@@ -150,7 +152,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
 
     if (requestsHumanSupport(message)) {
       return json(assistantPayload({
-        answer: "Certo. Passei a conversa para um atendente da equipe F10, que continua com você por aqui.",
+        answer: "Certo. Vou tentar chamar um atendente da equipe F10 para continuar com você por aqui.",
         action: "handoff",
         handoffReason: "O cliente pediu explicitamente atendimento humano.",
         aiAvailable,
@@ -159,7 +161,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
 
     if (showsFrustration(message) && conversationContext) {
       return json(assistantPayload({
-        answer: "Entendi. Como as tentativas anteriores não resolveram, passei a conversa para um atendente da equipe F10, que continua com você por aqui.",
+        answer: "Entendi. Como as tentativas anteriores não resolveram, vou tentar chamar um atendente da equipe F10 para continuar com você por aqui.",
         action: "handoff",
         handoffReason: "O cliente demonstrou frustração após tentativas de resolução.",
         aiAvailable,
@@ -184,15 +186,6 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
-    if (!aiAvailable) {
-      return json(assistantPayload({
-        answer: "Não consegui consultar as orientações do F10 agora. Passei a conversa para um atendente da equipe F10, que continua com você por aqui.",
-        action: "handoff",
-        handoffReason: "O Assistente F10 está temporariamente indisponível.",
-        aiAvailable: false,
-      }), { headers: { "Cache-Control": "no-store" } });
-    }
-
     const result = await runSupportAi({
       question: message,
       conversationContext: buildConversationContext(conversationContext, pageContext),
@@ -213,18 +206,28 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
       return json(assistantPayload({
         answer: result.answer,
         action: "answer",
-        aiAvailable: true,
+        aiAvailable,
         unresolvedCount: 0,
         searchEventId: result.searchEventId,
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
-    if (result.resolution === "failed" || unresolvedCount >= 1) {
+    if (result.resolution === "failed") {
       return json(assistantPayload({
-        answer: "Não consegui resolver isso com segurança por aqui. Passei a conversa para um atendente da equipe F10, que continua com você por aqui.",
+        answer: ASSISTANT_RETRY_MESSAGE,
+        action: "answer",
+        aiAvailable: false,
+        unresolvedCount: 0,
+        searchEventId: result.searchEventId,
+      }), { headers: { "Cache-Control": "no-store" } });
+    }
+
+    if (unresolvedCount >= 1) {
+      return json(assistantPayload({
+        answer: "Ainda não encontrei uma orientação segura. Vou tentar chamar um atendente da equipe F10 para continuar com você por aqui.",
         action: "handoff",
         handoffReason: result.escalationReason || "O Assistente F10 não conseguiu sustentar uma resposta segura após tentativa de esclarecimento.",
-        aiAvailable: result.resolution !== "failed",
+        aiAvailable,
         unresolvedCount: Math.min(unresolvedCount + 1, MAX_UNRESOLVED_COUNT),
         searchEventId: result.searchEventId,
       }), { headers: { "Cache-Control": "no-store" } });
@@ -233,7 +236,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
     return json(assistantPayload({
       answer: "Ainda não encontrei uma orientação segura. Para eu tentar mais uma vez, me diga o que você estava tentando fazer, em qual tela isso aconteceu e qual resultado apareceu para você.",
       action: "clarify",
-      aiAvailable: true,
+      aiAvailable,
       unresolvedCount: 1,
       searchEventId: result.searchEventId,
     }), { headers: { "Cache-Control": "no-store" } });
@@ -242,10 +245,10 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
       causeType: cause instanceof Error ? cause.name : typeof cause,
     });
     return json(assistantPayload({
-      answer: "Não consegui consultar as orientações do F10 agora. Passei a conversa para um atendente da equipe F10, que continua com você por aqui.",
-      action: "handoff",
-      handoffReason: "Falha técnica ao consultar o Assistente F10.",
+      answer: ASSISTANT_RETRY_MESSAGE,
+      action: "answer",
       aiAvailable: false,
+      unresolvedCount: 0,
     }), { status: 200, headers: { "Cache-Control": "no-store" } });
   }
 };
