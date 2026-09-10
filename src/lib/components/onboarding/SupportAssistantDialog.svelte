@@ -3,7 +3,7 @@
   import { onDestroy, tick } from "svelte";
   import HelpRichText from "$lib/components/help/HelpRichText.svelte";
   import {
-    CheckCircle2,
+    ArrowUpRight,
     Image as ImageIcon,
     LoaderCircle,
     LockKeyhole,
@@ -77,6 +77,7 @@
   type AssistantResponse = {
     answer?: string;
     action?: "answer" | "clarify" | "handoff" | "ticket_offer";
+    articleUrl?: string | null;
     requiresHuman?: boolean;
     unresolvedCount?: number;
     handoffReason?: string;
@@ -191,12 +192,7 @@
 
   function ensureGreeting(): void {
     if (guestMessages.length > 0) return;
-    guestMessages = [
-      createGuestMessage(
-        "assistant",
-        "Olá! Sou o Assistente F10. Me conte o que você precisa fazer ou o que não está funcionando.",
-      ),
-    ];
+    guestMessages = [createGuestMessage("assistant", "Como posso ajudar no F10?")];
   }
 
   function restoreState(): void {
@@ -281,16 +277,6 @@
     pollingSessionId = "";
   }
 
-  function pageContext(): string {
-    if (!browser) return "";
-    const heading = document.querySelector("main h1")?.textContent?.trim() ?? "";
-    return [
-      `Página: ${document.title}`,
-      `Caminho: ${window.location.pathname}`,
-      heading ? `Título visível: ${heading}` : "",
-    ].filter(Boolean).join("\n").slice(0, 1_200);
-  }
-
   function helpContext(): string {
     if (!browser || !window.location.pathname.startsWith("/ajuda-f10")) return "";
     return document.querySelector("main h1")?.textContent?.trim().slice(0, 200) ?? document.title.slice(0, 200);
@@ -337,13 +323,12 @@
     await scrollToLatest();
 
     try {
-      const response = await fetch("/api/support/chat/assistant", {
+      const response = await fetch("/api/help/general-assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: body,
           unresolvedCount,
-          pageContext: pageContext(),
         }),
       });
       const payload = await response.json() as AssistantResponse;
@@ -351,12 +336,14 @@
 
       const action = payload.action ?? (payload.requiresHuman ? "handoff" : "answer");
       unresolvedCount = Number.isFinite(payload.unresolvedCount) ? Math.max(0, Number(payload.unresolvedCount)) : 0;
-      const ticketAction = action === "ticket_offer" && payload.ticketUrl
+      const responseAction = action === "ticket_offer" && payload.ticketUrl
         ? { url: payload.ticketUrl, label: "Abrir chamado" }
-        : undefined;
+        : payload.articleUrl
+          ? { url: payload.articleUrl, label: "Ver artigo" }
+          : undefined;
       guestMessages = [
         ...guestMessages,
-        createGuestMessage("assistant", payload.answer || "Como posso ajudar?", ticketAction),
+        createGuestMessage("assistant", payload.answer || "Como posso ajudar?", responseAction),
       ];
       await scrollToLatest();
 
@@ -685,7 +672,7 @@
                   <p class="whitespace-pre-wrap">{message.body}</p>
                 {/if}
                 {#if message.actionUrl && message.actionLabel}
-                  <a href={message.actionUrl} class="mt-2.5 inline-flex items-center gap-1.5 rounded-xl bg-[#000A57] px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-[#111B71]"><CheckCircle2 size={13} />{message.actionLabel}</a>
+                  <a href={message.actionUrl} class="mt-2.5 inline-flex items-center gap-1.5 rounded-xl bg-[#000A57] px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-[#111B71]">{message.actionLabel}<ArrowUpRight size={13} /></a>
                 {/if}
               </div>
             </div>
