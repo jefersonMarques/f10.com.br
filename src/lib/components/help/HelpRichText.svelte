@@ -64,14 +64,14 @@
         <span class="mt-[1px] min-w-4 shrink-0 font-semibold">{line.marker}</span>
         <span class="min-w-0">
           {#each line.tokens as token}
-            {#if token.type === "strong"}<strong class="font-semibold text-current">{token.value}</strong>{:else if token.type === "emphasis"}<em>{token.value}</em>{:else if token.type === "code"}<code class="rounded bg-black/5 px-1 py-0.5 font-mono text-[0.9em]">{token.value}</code>{:else}{token.value}{/if}
+            {#if token.type === "strong"}<strong class="font-semibold text-current">{token.value}</strong>{:else if token.type === "emphasis"}<em>{token.value}</em>{:else if token.type === "code"}<code class="rounded-md border border-[#D8DDF4] bg-[#F2F3FF] px-1.5 py-0.5 font-sans text-[0.9em] font-semibold text-[#000A57]">{token.value}</code>{:else}{token.value}{/if}
           {/each}
         </span>
       </div>
     {:else}
       <p>
         {#each line.tokens as token}
-          {#if token.type === "strong"}<strong class="font-semibold text-current">{token.value}</strong>{:else if token.type === "emphasis"}<em>{token.value}</em>{:else if token.type === "code"}<code class="rounded bg-black/5 px-1 py-0.5 font-mono text-[0.9em]">{token.value}</code>{:else}{token.value}{/if}
+          {#if token.type === "strong"}<strong class="font-semibold text-current">{token.value}</strong>{:else if token.type === "emphasis"}<em>{token.value}</em>{:else if token.type === "code"}<code class="rounded-md border border-[#D8DDF4] bg-[#F2F3FF] px-1.5 py-0.5 font-sans text-[0.9em] font-semibold text-[#000A57]">{token.value}</code>{:else}{token.value}{/if}
         {/each}
       </p>
     {/if}
