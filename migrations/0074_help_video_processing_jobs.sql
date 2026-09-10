@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS "help_video_processing_jobs" (
   CONSTRAINT "help_video_processing_jobs_source_kind_check"
     CHECK ("source_kind" IN ('current', 'upload')),
   CONSTRAINT "help_video_processing_jobs_status_check"
-    CHECK ("status" IN ('queued', 'running', 'retry_waiting', 'completed', 'failed', 'cancelled'))
+    CHECK ("status" IN ('queued', 'running', 'retry_waiting', 'completed', 'failed'))
 );
 
 CREATE INDEX IF NOT EXISTS "help_video_processing_jobs_content_idx"
