@@ -1,6 +1,4 @@
-import {
-  createAiStructuredResponse,
-} from "$lib/server/ai/aiGateway";
+import { createAiStructuredResponse } from "$lib/server/ai/aiGateway";
 import {
   getPublishedHelpContext,
   markHelpSearchOutcome,
@@ -8,46 +6,122 @@ import {
   searchPublishedHelp,
 } from "$lib/server/help/helpSearchRepository";
 
-const MAX_ARTICLES = 6;
-const MAX_CONTEXT_CHARS = 26_000;
-const MAX_ARTICLE_CHARS = 4_500;
-const MAX_CONVERSATION_CHARS = 6_000;
-const MAX_PAGE_CONTEXT_CHARS = 1_200;
+const MAX_SEARCH_QUERY_CHARS = 220;
+const MAX_CANDIDATES = 10;
+const MAX_ARTICLE_CHARS = 36_000;
+const MAX_CANDIDATE_SUMMARY_CHARS = 900;
 
-const RESPONSE_SCHEMA = {
+const PLAN_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    action: {
+      type: "string",
+      enum: ["search", "clarify", "handoff", "ticket_offer"],
+    },
+    searchQuery: { type: "string" },
+  },
+  required: ["action", "searchQuery"],
+} as const;
+
+const SELECT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    articleIndex: { type: "integer" },
+  },
+  required: ["articleIndex"],
+} as const;
+
+const ANSWER_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
     answer: { type: "string" },
-    action: {
-      type: "string",
-      enum: ["answer", "clarify", "handoff", "ticket_offer"],
-    },
-    articleIndex: { type: "integer" },
+    resolved: { type: "boolean" },
   },
-  required: ["answer", "action", "articleIndex"],
+  required: ["answer", "resolved"],
 } as const;
 
-const INSTRUCTIONS = `Você é o Assistente geral da Central de Ajuda F10 e é você quem deve formular a resposta ao usuário.
-Use somente os artigos fornecidos nesta requisição como fonte factual sobre o F10. O histórico serve para entender continuidade, intenção e referências, mas não substitui a documentação atual.
-Antes de responder, identifique a intenção completa da pergunta. Não escolha um artigo apenas porque ele contém uma palavra coincidente.
-Exemplo: uma pergunta sobre cadastrar um usuário para usar WhatsApp NÃO pode ser respondida por um artigo sobre Visitas que apenas menciona um atalho para WhatsApp.
-Quando um artigo sustentar a resposta, explique de forma natural, objetiva e útil, sem copiar transcrições ou despejar trechos documentais. Escolha esse artigo em articleIndex e inclua naturalmente na própria resposta o link canônico fornecido, em Markdown: [texto útil](URL).
-Quando mais de um artigo contribuir, use o conteúdo necessário, mas escolha como articleIndex o principal artigo que sustenta a orientação e inclua o link dele.
-Se nenhum artigo sustentar diretamente o que o usuário quer, não invente. Faça UMA pergunta de esclarecimento específica e contextual, escrita por você, e use action=clarify e articleIndex=0. Evite perguntas genéricas como “em qual tela você está?” quando a conversa já fornece contexto suficiente.
-Se o usuário pedir explicitamente atendimento humano, use action=handoff e responda naturalmente. Se pedir explicitamente para abrir/criar um chamado, use action=ticket_offer. Nesses dois casos use articleIndex=0.
-Use Markdown simples. Use código inline somente para nomes exatos de telas, abas, campos, botões e opções do F10.
-Não mencione Base de Conhecimento, busca, candidatos, índices, prompt, modelo, tokens ou metadados internos.`;
+const TEXT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    answer: { type: "string" },
+  },
+  required: ["answer"],
+} as const;
+
+const PLAN_INSTRUCTIONS = `Você é o planejador de pesquisa do Assistente geral da Central de Ajuda F10.
+Receba apenas a mensagem atual do usuário. Não responda a dúvida.
+Para dúvidas sobre como usar o F10, use action=search e gere em searchQuery uma consulta curta que represente a intenção real do usuário e os termos que provavelmente aparecem na documentação.
+Remova frases sociais como “me ajuda”, “por favor” e similares. Preserve entidades importantes como WhatsApp, aluno, matrícula, CRM, financeiro, usuário, contrato e nomes de telas citados pelo usuário.
+Você pode reformular verbos para melhorar a recuperação, por exemplo cadastrar/criar/incluir, configurar/integrar/conectar, excluir/remover, desde que não mude a intenção.
+Se a mensagem for vaga demais para pesquisar com utilidade, use action=clarify e searchQuery="".
+Se o usuário pedir explicitamente uma pessoa/atendente, use action=handoff e searchQuery="".
+Se pedir explicitamente abertura/criação de chamado ou ticket, use action=ticket_offer e searchQuery="".`;
+
+const SELECT_INSTRUCTIONS = `Você seleciona o artigo mais provável para responder uma dúvida sobre o F10.
+Receberá a pergunta original, a consulta criada por outra etapa de IA e uma lista de artigos com título, resumo e categorias.
+Escolha um artigo somente quando o tema e a intenção do artigo forem compatíveis com o que o usuário quer fazer.
+Não escolha um artigo apenas porque ele menciona uma palavra da pergunta.
+Exemplo: artigo sobre Visitas que possui um atalho de WhatsApp não serve para responder como cadastrar/configurar usuário de WhatsApp.
+Quando nenhum candidato tratar diretamente do assunto, use articleIndex=0.
+Não responda ao usuário.`;
+
+const ANSWER_INSTRUCTIONS = `Você é o Assistente geral da Central de Ajuda F10.
+Receberá a pergunta atual do usuário e o conteúdo completo de UM artigo que uma etapa anterior selecionou como provável fonte.
+Leia e interprete o artigo antes de responder. Não copie transcrição, não despeje o artigo e não responda só com trechos soltos.
+Responda exatamente ao que o usuário perguntou, em português do Brasil, de forma natural, objetiva e útil.
+Use somente o artigo recebido como fonte factual sobre o F10. Não invente telas, botões, permissões, regras ou passos.
+Se o artigo realmente sustentar a resposta, use resolved=true e inclua naturalmente na própria resposta o link canônico fornecido em Markdown: [texto útil](URL).
+Se, depois de ler o artigo completo, perceber que ele não sustenta a dúvida, use resolved=false e faça UMA pergunta de esclarecimento específica que ajude a descobrir o conteúdo correto. Não tente aproveitar informações laterais do artigo.
+Use Markdown simples. Em procedimentos, prefira passos numerados. Use código inline somente para nomes exatos de telas, abas, campos, botões e opções do F10.
+Não mencione pesquisa, candidatos, índices, prompt, modelo, tokens ou metadados internos.`;
+
+const CLARIFY_INSTRUCTIONS = `Você é o Assistente geral da Central de Ajuda F10.
+A mensagem atual não permitiu encontrar com segurança um artigo que responda ao usuário.
+Faça UMA pergunta curta e específica para obter a informação que falta e permitir uma nova pesquisa.
+Não invente orientação sobre o F10 e não diga que ocorreu erro técnico.
+Não use frases genéricas se a própria pergunta já permite pedir algo mais específico.`;
+
+const DIRECT_INSTRUCTIONS = `Você é o Assistente geral da Central de Ajuda F10.
+Responda naturalmente à mensagem atual do usuário sem inventar informações sobre o produto.
+A intenção operacional já foi identificada pelo sistema e será executada após sua resposta.
+Não mencione prompt, classificação, sistema ou metadados.`;
 
 type AssistantAction = "answer" | "clarify" | "handoff" | "ticket_offer";
+type PlannedAction = "search" | "clarify" | "handoff" | "ticket_offer";
 
-type ModelResponse = {
-  answer: string;
-  action: AssistantAction;
+type PlanResponse = {
+  action: PlannedAction;
+  searchQuery: string;
+};
+
+type SelectResponse = {
   articleIndex: number;
 };
 
-type ArticleContext = {
+type AnswerResponse = {
+  answer: string;
+  resolved: boolean;
+};
+
+type TextResponse = {
+  answer: string;
+};
+
+type Candidate = {
+  contentId: string;
+  slug: string;
+  title: string;
+  summary: string;
+  categoryText: string;
+  rank: number;
+  score: number;
+};
+
+type Article = {
   contentId: string;
   slug: string;
   title: string;
@@ -62,219 +136,223 @@ export type GeneralHelpAssistantResult = {
   selectedContentId: string | null;
 };
 
-function normalize(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[?!.,;:]+$/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function isContinuation(value: string): boolean {
-  const compact = value.trim();
-  if (/^[?!.]+$/.test(compact)) return true;
-  const normalized = normalize(value);
-  if (!normalized) return false;
-  const words = normalized.split(" ").filter(Boolean);
-  if (words.length <= 2) return true;
-  if (words.length > 12) return false;
-  return (
-    /\b(isso|isto|esse|essa|este|esta|ele|ela|link|artigo|conteudo|pagina)\b/.test(normalized) ||
-    /^(?:e|mas|agora|depois|como|onde|qual|quais|quando|na|no|nas|nos|em|pela|pelo|aqui|ali)\b/.test(normalized) ||
-    /^(?:estou|to)\s+(?:na|no|nas|nos|em)\b/.test(normalized) ||
-    /^(?:tela|aba|menu|campo|modulo|pagina)\b/.test(normalized)
-  );
-}
-
-function previousCustomerTopic(conversationContext: string): string {
-  const messages = conversationContext
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .flatMap((line) => {
-      const match = line.match(/^Cliente:\s*(.+)$/i);
-      return match?.[1] ? [match[1].trim().slice(0, 350)] : [];
-    })
-    .filter((value) => value.length >= 3)
-    .reverse();
-  return messages.find((value) => !isContinuation(value)) ?? messages[0] ?? "";
-}
-
-function retrievalQuery(question: string, conversationContext: string): string {
-  if (!conversationContext || !isContinuation(question)) return question;
-  const previous = previousCustomerTopic(conversationContext);
-  return previous ? `${previous} ${question}`.slice(0, 500) : question;
-}
-
 function trim(value: string, limit: number): string {
   const normalized = value.trim();
   if (normalized.length <= limit) return normalized;
   return `${normalized.slice(0, Math.max(0, limit - 1))}…`;
 }
 
-function buildArticleContexts(
-  rows: Awaited<ReturnType<typeof getPublishedHelpContext>>,
-): ArticleContext[] {
-  let remaining = MAX_CONTEXT_CHARS;
-  const contexts: ArticleContext[] = [];
-
-  for (const row of rows.slice(0, MAX_ARTICLES)) {
-    if (remaining <= 0) break;
-    const url = `/ajuda-f10/${encodeURIComponent(row.slug)}`;
-    const body = [
-      row.summary.trim(),
-      row.publicText.trim(),
-      row.assistantText.trim(),
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-    const text = trim(body, Math.min(MAX_ARTICLE_CHARS, remaining));
-    contexts.push({
-      contentId: row.contentId,
-      slug: row.slug,
-      title: row.title,
-      url,
-      text,
-    });
-    remaining -= text.length;
-  }
-
-  return contexts;
-}
-
-function modelInput(input: {
-  question: string;
-  conversationContext: string;
-  pageContext: string;
-  articles: ArticleContext[];
-  correction?: string;
-}): string {
-  const articleBlocks = input.articles.map((article, index) => [
-    `ARTIGO ${index + 1}`,
-    `Título: ${article.title}`,
-    `URL canônica: ${article.url}`,
-    `Conteúdo:\n${article.text || "Sem texto disponível."}`,
-  ].join("\n"));
-
-  return [
-    input.conversationContext
-      ? `Histórico recente:\n${trim(input.conversationContext, MAX_CONVERSATION_CHARS)}`
-      : "",
-    input.pageContext
-      ? `Contexto visual atual:\n${trim(input.pageContext, MAX_PAGE_CONTEXT_CHARS)}`
-      : "",
-    `Pergunta atual:\n${input.question}`,
-    articleBlocks.length > 0
-      ? `Artigos recuperados:\n\n${articleBlocks.join("\n\n---\n\n")}`
-      : "Nenhum artigo foi recuperado para esta pergunta.",
-    input.correction ? `Correção obrigatória:\n${input.correction}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-}
-
-function selectedArticle(
-  response: ModelResponse,
-  articles: ArticleContext[],
-): ArticleContext | null {
-  if (response.articleIndex < 1 || response.articleIndex > articles.length) return null;
-  return articles[response.articleIndex - 1] ?? null;
-}
-
-function validationIssue(response: ModelResponse, articles: ArticleContext[]): string | null {
-  const answer = response.answer.trim();
-  if (!answer) return "A resposta ficou vazia. Gere uma resposta completa.";
-
-  if (response.action === "answer") {
-    const article = selectedArticle(response, articles);
-    if (!article) {
-      return "Para responder sobre o F10, selecione em articleIndex um artigo que realmente sustente a orientação. Se nenhum sustentar, use action=clarify e articleIndex=0.";
-    }
-    if (!answer.includes(article.url)) {
-      return `A resposta precisa ser reescrita pela IA incluindo naturalmente o link canônico exato do artigo principal: ${article.url}`;
-    }
-    return null;
-  }
-
-  if (response.articleIndex !== 0) {
-    return "Para clarify, handoff ou ticket_offer, use articleIndex=0.";
-  }
-  return null;
-}
-
-async function generateResponse(input: {
-  question: string;
-  conversationContext: string;
-  pageContext: string;
-  articles: ArticleContext[];
-}): Promise<ModelResponse> {
-  const request = async (correction?: string) => createAiStructuredResponse<ModelResponse>({
+async function plan(question: string): Promise<PlanResponse> {
+  const request = () => createAiStructuredResponse<PlanResponse>({
     task: "support_answer",
-    requiredCapabilities: ["knowledge.read", "customer.reply"],
-    instructions: INSTRUCTIONS,
-    userInput: modelInput({ ...input, correction }),
-    schemaName: "f10_general_help_assistant",
-    schema: RESPONSE_SCHEMA,
-    maxOutputTokens: 700,
+    requiredCapabilities: ["knowledge.search", "customer.reply"],
+    instructions: PLAN_INSTRUCTIONS,
+    userInput: `Mensagem atual:\n${question}`,
+    schemaName: "f10_general_help_plan",
+    schema: PLAN_SCHEMA,
+    maxOutputTokens: 180,
   });
 
   const first = await request();
-  let response = first.data;
-  let issue = validationIssue(response, input.articles);
-  if (!issue) return response;
+  let result = first.data;
+  const query = result.searchQuery.trim().slice(0, MAX_SEARCH_QUERY_CHARS);
+  if (result.action !== "search" || query) {
+    return { ...result, searchQuery: query };
+  }
 
-  const second = await request(issue);
-  response = second.data;
-  issue = validationIssue(response, input.articles);
-  if (issue) throw new Error("AI_INVALID_GENERAL_HELP_ASSISTANT_OUTPUT");
-  return response;
+  const second = await createAiStructuredResponse<PlanResponse>({
+    task: "support_answer",
+    requiredCapabilities: ["knowledge.search", "customer.reply"],
+    instructions: PLAN_INSTRUCTIONS,
+    userInput: `Mensagem atual:\n${question}\n\nCorreção obrigatória: action=search exige searchQuery não vazia. Gere a consulta de pesquisa.`,
+    schemaName: "f10_general_help_plan_retry",
+    schema: PLAN_SCHEMA,
+    maxOutputTokens: 180,
+  });
+  result = second.data;
+  const retryQuery = result.searchQuery.trim().slice(0, MAX_SEARCH_QUERY_CHARS);
+  if (result.action === "search" && !retryQuery) {
+    throw new Error("AI_INVALID_GENERAL_HELP_SEARCH_PLAN");
+  }
+  return { ...result, searchQuery: retryQuery };
+}
+
+function candidateInput(question: string, searchQuery: string, candidates: Candidate[]): string {
+  const rows = candidates.map((candidate, index) => [
+    `ARTIGO ${index + 1}`,
+    `Título: ${candidate.title}`,
+    candidate.categoryText ? `Categorias: ${trim(candidate.categoryText, 350)}` : "",
+    candidate.summary ? `Resumo: ${trim(candidate.summary, MAX_CANDIDATE_SUMMARY_CHARS)}` : "",
+  ].filter(Boolean).join("\n"));
+
+  return [
+    `Pergunta original:\n${question}`,
+    `Consulta de pesquisa:\n${searchQuery}`,
+    `Resultados encontrados:\n\n${rows.join("\n\n---\n\n")}`,
+  ].join("\n\n");
+}
+
+async function selectArticle(
+  question: string,
+  searchQuery: string,
+  candidates: Candidate[],
+): Promise<number> {
+  if (candidates.length === 0) return 0;
+
+  const request = async (correction = "") => createAiStructuredResponse<SelectResponse>({
+    task: "support_answer",
+    requiredCapabilities: ["knowledge.read", "customer.reply"],
+    instructions: SELECT_INSTRUCTIONS,
+    userInput: [
+      candidateInput(question, searchQuery, candidates),
+      correction,
+    ].filter(Boolean).join("\n\n"),
+    schemaName: "f10_general_help_article_selection",
+    schema: SELECT_SCHEMA,
+    maxOutputTokens: 140,
+  });
+
+  const first = await request();
+  if (first.data.articleIndex >= 0 && first.data.articleIndex <= candidates.length) {
+    return first.data.articleIndex;
+  }
+
+  const second = await request(`Correção obrigatória: articleIndex deve estar entre 0 e ${candidates.length}.`);
+  if (second.data.articleIndex < 0 || second.data.articleIndex > candidates.length) {
+    throw new Error("AI_INVALID_GENERAL_HELP_ARTICLE_SELECTION");
+  }
+  return second.data.articleIndex;
+}
+
+function buildArticle(
+  row: Awaited<ReturnType<typeof getPublishedHelpContext>>[number],
+): Article {
+  const url = `/ajuda-f10/${encodeURIComponent(row.slug)}`;
+  const text = trim([
+    row.summary ? `RESUMO:\n${row.summary.trim()}` : "",
+    row.categoryText ? `CATEGORIAS:\n${row.categoryText.trim()}` : "",
+    row.publicText ? `CONTEÚDO PUBLICADO:\n${row.publicText.trim()}` : "",
+    row.assistantText ? `CONHECIMENTO COMPLEMENTAR:\n${row.assistantText.trim()}` : "",
+  ].filter(Boolean).join("\n\n"), MAX_ARTICLE_CHARS);
+
+  return {
+    contentId: row.contentId,
+    slug: row.slug,
+    title: row.title,
+    url,
+    text,
+  };
+}
+
+async function answerFromArticle(question: string, article: Article): Promise<AnswerResponse> {
+  const input = [
+    `Pergunta atual:\n${question}`,
+    `Artigo selecionado:\nTítulo: ${article.title}\nURL canônica: ${article.url}`,
+    `Conteúdo do artigo:\n${article.text}`,
+  ].join("\n\n");
+
+  const request = async (correction = "") => createAiStructuredResponse<AnswerResponse>({
+    task: "support_answer",
+    requiredCapabilities: ["knowledge.read", "customer.reply"],
+    instructions: ANSWER_INSTRUCTIONS,
+    userInput: [input, correction].filter(Boolean).join("\n\n"),
+    schemaName: "f10_general_help_article_answer",
+    schema: ANSWER_SCHEMA,
+    maxOutputTokens: 900,
+  });
+
+  const first = await request();
+  const answer = first.data.answer.trim();
+  const firstValid = answer && (!first.data.resolved || answer.includes(article.url));
+  if (firstValid) return { ...first.data, answer };
+
+  const correction = first.data.resolved
+    ? `Correção obrigatória: reescreva a resposta pela IA e inclua naturalmente o link canônico exato ${article.url}. Não concatene texto fora da resposta.`
+    : "Correção obrigatória: a resposta ficou vazia. Gere a pergunta de esclarecimento.";
+  const second = await request(correction);
+  const retryAnswer = second.data.answer.trim();
+  if (!retryAnswer || (second.data.resolved && !retryAnswer.includes(article.url))) {
+    throw new Error("AI_INVALID_GENERAL_HELP_ARTICLE_ANSWER");
+  }
+  return { ...second.data, answer: retryAnswer };
+}
+
+async function generateText(question: string, mode: "clarify" | "handoff" | "ticket_offer"): Promise<string> {
+  const instructions = mode === "clarify"
+    ? CLARIFY_INSTRUCTIONS
+    : `${DIRECT_INSTRUCTIONS}\nAção identificada: ${mode}.`;
+  const response = await createAiStructuredResponse<TextResponse>({
+    task: "support_answer",
+    requiredCapabilities: ["customer.reply"],
+    instructions,
+    userInput: `Mensagem atual:\n${question}`,
+    schemaName: `f10_general_help_${mode}`,
+    schema: TEXT_SCHEMA,
+    maxOutputTokens: 260,
+  });
+  const answer = response.data.answer.trim();
+  if (!answer) throw new Error("AI_EMPTY_GENERAL_HELP_RESPONSE");
+  return answer;
 }
 
 export async function runGeneralHelpAssistant(input: {
   question: string;
-  conversationContext?: string;
-  pageContext?: string;
 }): Promise<GeneralHelpAssistantResult> {
   const question = input.question.trim().slice(0, 600);
   if (question.length < 2) throw new Error("GENERAL_HELP_ASSISTANT_QUESTION_INVALID");
 
-  const conversationContext = input.conversationContext?.trim().slice(0, MAX_CONVERSATION_CHARS) ?? "";
-  const pageContext = input.pageContext?.trim().slice(0, MAX_PAGE_CONTEXT_CHARS) ?? "";
-  const query = retrievalQuery(question, conversationContext);
+  const planned = await plan(question);
+  if (planned.action !== "search") {
+    return {
+      answer: await generateText(question, planned.action),
+      action: planned.action,
+      searchEventId: null,
+      selectedContentId: null,
+    };
+  }
+
   const search = await searchPublishedHelp({
-    query,
+    query: planned.searchQuery,
     source: "public",
-    limit: 10,
+    limit: MAX_CANDIDATES,
     includeAssistantKnowledge: true,
     relevanceMode: "broad",
   });
-  const contexts = await getPublishedHelpContext(
-    search.results.slice(0, MAX_ARTICLES).map((result) => result.contentId),
-  );
-  const articles = buildArticleContexts(contexts);
-  const response = await generateResponse({
-    question,
-    conversationContext,
-    pageContext,
-    articles,
-  });
-  const selected = selectedArticle(response, articles);
+  const candidates = search.results.slice(0, MAX_CANDIDATES);
+  const articleIndex = await selectArticle(question, planned.searchQuery, candidates);
+
+  if (articleIndex === 0) {
+    if (search.searchEventId) {
+      await markHelpSearchOutcome(search.searchEventId, { aiAnswered: false });
+    }
+    return {
+      answer: await generateText(question, "clarify"),
+      action: "clarify",
+      searchEventId: search.searchEventId,
+      selectedContentId: null,
+    };
+  }
+
+  const selected = candidates[articleIndex - 1];
+  if (!selected) throw new Error("GENERAL_HELP_ASSISTANT_ARTICLE_NOT_SELECTED");
+  const [context] = await getPublishedHelpContext([selected.contentId]);
+  if (!context) throw new Error("GENERAL_HELP_ASSISTANT_ARTICLE_CONTEXT_MISSING");
+
+  const article = buildArticle(context);
+  const response = await answerFromArticle(question, article);
+  const action: AssistantAction = response.resolved ? "answer" : "clarify";
 
   if (search.searchEventId) {
-    if (selected) {
-      await recordHelpSearchSelection(search.searchEventId, selected.contentId);
-    }
+    await recordHelpSearchSelection(search.searchEventId, selected.contentId);
     await markHelpSearchOutcome(search.searchEventId, {
-      aiAnswered: response.action === "answer",
-      escalated: response.action === "handoff",
+      aiAnswered: response.resolved,
     });
   }
 
   return {
-    answer: response.answer.trim(),
-    action: response.action,
+    answer: response.answer,
+    action,
     searchEventId: search.searchEventId,
-    selectedContentId: selected?.contentId ?? null,
+    selectedContentId: selected.contentId,
   };
 }
