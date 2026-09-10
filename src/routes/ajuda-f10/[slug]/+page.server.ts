@@ -2,6 +2,7 @@ import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { recordCustomerActivity } from "$lib/server/customerPortal/customerActivityRepository";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
+import { getPublicHelpArticleNavigation } from "$lib/server/help/helpArticleSequenceRepository";
 import {
   getPublicHelpContentRelease,
   listPublicHelpContentReleases,
@@ -12,6 +13,7 @@ export const prerender = false;
 
 export const load: PageServerLoad = async ({ params, cookies, url }) => {
   const requestedVersion = Number(url.searchParams.get("versao"));
+  const collectionSlug = url.searchParams.get("colecao")?.trim().slice(0, 120) || null;
   const currentContent = await getPublishedStructuredHelpBySlug(params.slug);
   if (!currentContent) throw error(404, "Conteúdo de ajuda não encontrado.");
   const historical =
@@ -22,9 +24,10 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
     throw error(404, "Versão de ajuda não encontrada.");
   }
   const content = historical ?? currentContent;
-  const [customer, releases] = await Promise.all([
+  const [customer, releases, navigation] = await Promise.all([
     getOptionalCustomerF10PortalSession(cookies),
     listPublicHelpContentReleases(currentContent.contentId),
+    getPublicHelpArticleNavigation(currentContent.contentId, collectionSlug),
   ]);
   const currentReleaseNumber = releases[0]?.releaseNumber ?? null;
   const releaseNumber = historical
@@ -45,6 +48,8 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
           slug: category.slug,
           name: category.name,
         })),
+        navigationContext: navigation.context,
+        collectionSlug: navigation.collection?.slug ?? null,
       },
     }).catch(() => undefined);
   }
@@ -56,5 +61,6 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
     currentReleaseNumber,
     isHistorical: Boolean(historical && releaseNumber !== currentReleaseNumber),
     routeSlug: currentContent.slug,
+    navigation,
   };
 };
