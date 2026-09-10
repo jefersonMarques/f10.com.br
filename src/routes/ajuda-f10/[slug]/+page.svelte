@@ -52,6 +52,12 @@
     return /^https?:\/\//i.test(value);
   }
 
+  function goBack(event: MouseEvent): void {
+    if (window.history.length <= 1) return;
+    event.preventDefault();
+    window.history.back();
+  }
+
   onMount(() => {
     const anchor = decodeURIComponent(window.location.hash.replace(/^#/, ""));
     if (!anchor.startsWith("help-")) return;
@@ -77,8 +83,8 @@
   data-help-content-slug={data.content.slug}
 >
   <div class="mx-auto max-w-[1080px] px-5 py-8 sm:px-8 sm:py-12">
-    <a href="/ajuda-f10" class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[12px] font-semibold text-[#606777] transition hover:bg-white hover:text-[#000A57]">
-      <ArrowLeft size={17} />Central de Ajuda
+    <a href="/ajuda-f10" on:click={goBack} class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[12px] font-semibold text-[#606777] transition hover:bg-white hover:text-[#000A57]">
+      <ArrowLeft size={17} />Voltar
     </a>
 
     {#if data.isHistorical}
