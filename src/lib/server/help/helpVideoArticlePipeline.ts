@@ -133,6 +133,12 @@ const GENERATION_PART_SECONDS = 6 * 60;
 const PART_CONTEXT_SECONDS = 45;
 const PART_CONTEXT_SEGMENTS = 8;
 const PART_GENERATION_ATTEMPTS = 2;
+const RETRYABLE_PART_FAILURE_CODES = new Set([
+  "AI_TIMEOUT",
+  "AI_OUTPUT_INCOMPLETE",
+  "AI_EMPTY_RESPONSE",
+  "AI_INVALID_JSON",
+]);
 
 const EDITORIAL_INVALID_PATTERNS = [
   /\bna transcri(?:ção|cao)\b/i,
@@ -162,12 +168,7 @@ function aiFailureCode(cause: unknown): string {
 
 function retryablePartFailure(cause: unknown): boolean {
   return cause instanceof AiGatewayError
-    && new Set([
-      "AI_TIMEOUT",
-      "AI_OUTPUT_INCOMPLETE",
-      "AI_EMPTY_RESPONSE",
-      "AI_INVALID_JSON",
-    ]).has(cause.code);
+    && RETRYABLE_PART_FAILURE_CODES.has(cause.code);
 }
 
 async function reportAiUsage(
@@ -441,7 +442,7 @@ async function generatePart(
           "Se houver informação operacional útil, retorne hasUsefulContent=true e pelo menos uma etapa.",
           "A fonte é evidência interna. NUNCA mencione transcrição, vídeo, gravação, narrador, áudio ou processo de geração.",
           "Não explique que uma etapa é conceitual, que não possui ação de interface ou que não precisa de screenshot.",
-          "Não produza placeholders ou artefatos como **svg**, <svg>, **html>, JSON isolado ou nomes de formatos sem função editorial.",
+          "Não produza placeholders ou artefatos como **svg**, <svg>, <html>, JSON isolado ou nomes de formatos sem função editorial.",
           "Toda ação executável deve ficar em linha numerada usando **1.**, **2.**, **3.**.",
           "Para etapa de interface, planeje no máximo um screenshot usando os timecodes da JANELA PRINCIPAL.",
           "Use screenshots: [] quando não houver estado visual útil a capturar.",
@@ -558,12 +559,11 @@ async function generateMetadata(
 ): Promise<GeneratedMetadata> {
   const startedAt = Date.now();
   const stepOutline = steps
-    .map((step, index) => [
-      `ETAPA ${index + 1}: ${step.title}`,
-      step.description,
-      step.instruction,
-    ].filter(Boolean).join("\n"))
-    .join("\n\n");
+    .map((step, index) => {
+      const context = step.description.trim() || step.instruction.trim().slice(0, 320);
+      return `${index + 1}. ${step.title}${context ? ` — ${context}` : ""}`;
+    })
+    .join("\n");
 
   let lastResponseMeta: {
     provider?: string;
