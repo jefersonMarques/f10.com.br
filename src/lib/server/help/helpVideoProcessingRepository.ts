@@ -5,6 +5,7 @@ import {
   count,
   desc,
   eq,
+  gte,
   inArray,
   isNotNull,
   isNull,
@@ -18,6 +19,7 @@ import {
   helpVideoProcessingParts,
   type HelpVideoProcessingJobStatus,
 } from "$lib/server/db/helpVideoProcessingSchema";
+import { helpContents } from "$lib/server/db/structuredHelpSchema";
 import { readManagedHelpAsset } from "$lib/server/help/helpAssetRepository";
 import {
   findImportedHelpVideoByChecksum,
@@ -38,6 +40,12 @@ const ACTIVE_STATUSES: HelpVideoProcessingJobStatus[] = [
   "running",
   "retry_waiting",
 ];
+const TERMINAL_STATUSES: HelpVideoProcessingJobStatus[] = [
+  "completed",
+  "failed",
+];
+const RECENT_JOB_VISIBILITY_MS = 30 * 60 * 1_000;
+const GLOBAL_JOB_LIMIT = 8;
 const LEASE_MS = 90 * 1_000;
 
 export type HelpVideoProcessingSource =
@@ -64,6 +72,7 @@ export type HelpVideoProcessingJobView = {
   attemptCount: number;
   maxAttempts: number;
   completedParts: number;
+  totalParts: number | null;
   lastErrorCode: string | null;
   lastErrorMessage: string | null;
   createdAt: string;
@@ -71,9 +80,23 @@ export type HelpVideoProcessingJobView = {
   completedAt: string | null;
 };
 
+export type HelpVideoProcessingJobSummary = HelpVideoProcessingJobView & {
+  contentTitle: string;
+};
+
 function retryDelayMs(attemptCount: number): number {
   const seconds = Math.min(30 * 2 ** Math.max(0, attemptCount - 1), 5 * 60);
   return seconds * 1_000;
+}
+
+function checkpointTotalParts(job: HelpVideoProcessingJob): number | null {
+  const checkpoint = job.checkpoint as HelpVideoAutomationCheckpoint;
+  const totalParts = checkpoint.article?.totalParts;
+  return typeof totalParts === "number"
+    && Number.isInteger(totalParts)
+    && totalParts > 0
+    ? totalParts
+    : null;
 }
 
 function toView(
@@ -90,6 +113,7 @@ function toView(
     attemptCount: job.attemptCount,
     maxAttempts: job.maxAttempts,
     completedParts,
+    totalParts: checkpointTotalParts(job),
     lastErrorCode: job.lastErrorCode,
     lastErrorMessage: job.lastErrorMessage,
     createdAt: job.createdAt.toISOString(),
@@ -129,6 +153,64 @@ export async function getLatestHelpVideoProcessingJobView(
     .limit(1);
   if (!job) return null;
   return toView(job, await completedPartCount(job.id));
+}
+
+export async function listHelpVideoProcessingJobSummaries(
+  actorUserId: string,
+): Promise<HelpVideoProcessingJobSummary[]> {
+  const db = getDatabase();
+  const recentCutoff = new Date(Date.now() - RECENT_JOB_VISIBILITY_MS);
+  const jobs = await db
+    .select()
+    .from(helpVideoProcessingJobs)
+    .where(
+      and(
+        eq(helpVideoProcessingJobs.actorUserId, actorUserId),
+        or(
+          inArray(helpVideoProcessingJobs.status, ACTIVE_STATUSES),
+          and(
+            inArray(helpVideoProcessingJobs.status, TERMINAL_STATUSES),
+            gte(helpVideoProcessingJobs.updatedAt, recentCutoff),
+          ),
+        ),
+      ),
+    )
+    .orderBy(desc(helpVideoProcessingJobs.updatedAt))
+    .limit(GLOBAL_JOB_LIMIT);
+
+  if (jobs.length === 0) return [];
+
+  const jobIds = jobs.map((job) => job.id);
+  const contentIds = Array.from(new Set(jobs.map((job) => job.contentId)));
+  const [partRows, contentRows] = await Promise.all([
+    db
+      .select({
+        jobId: helpVideoProcessingParts.jobId,
+        value: count(),
+      })
+      .from(helpVideoProcessingParts)
+      .where(inArray(helpVideoProcessingParts.jobId, jobIds))
+      .groupBy(helpVideoProcessingParts.jobId),
+    db
+      .select({
+        id: helpContents.id,
+        title: helpContents.title,
+      })
+      .from(helpContents)
+      .where(inArray(helpContents.id, contentIds)),
+  ]);
+
+  const partCounts = new Map(
+    partRows.map((row) => [row.jobId, Number(row.value)]),
+  );
+  const contentTitles = new Map(
+    contentRows.map((row) => [row.id, row.title]),
+  );
+
+  return jobs.map((job) => ({
+    ...toView(job, partCounts.get(job.id) ?? 0),
+    contentTitle: contentTitles.get(job.contentId) ?? "Conteúdo",
+  }));
 }
 
 export async function getActiveHelpVideoProcessingJob(
@@ -352,7 +434,10 @@ function checkpointWithoutParts(
   return {
     transcript: checkpoint.transcript,
     article: checkpoint.article
-      ? { metadata: checkpoint.article.metadata }
+      ? {
+          metadata: checkpoint.article.metadata,
+          totalParts: checkpoint.article.totalParts,
+        }
       : undefined,
   };
 }

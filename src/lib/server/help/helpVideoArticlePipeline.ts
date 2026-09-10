@@ -72,6 +72,7 @@ export type HelpVideoGeneratedMetadata = Omit<HelpVideoGeneratedArticle, "steps"
 type GeneratedMetadata = HelpVideoGeneratedMetadata;
 
 export type HelpVideoArticleCheckpoint = {
+  totalParts?: number;
   completedParts?: Array<{
     partIndex: number;
     segmentIds: string[];
@@ -870,6 +871,7 @@ export async function generateHelpVideoArticle(input: {
   if (identified.length === 0) throw new Error("HELP_VIDEO_TRANSCRIPTION_EMPTY");
 
   const checkpoint: HelpVideoArticleCheckpoint = {
+    totalParts: input.checkpoint?.totalParts,
     completedParts: [...(input.checkpoint?.completedParts ?? [])],
     metadata: input.checkpoint?.metadata,
   };
@@ -879,6 +881,9 @@ export async function generateHelpVideoArticle(input: {
   if (relevant.length === 0) throw new Error("HELP_VIDEO_COVERAGE_NO_RELEVANT_CONTENT");
 
   const parts = buildGenerationParts(classified);
+  checkpoint.totalParts = parts.length;
+  await input.onCheckpoint?.(checkpoint);
+
   const completedByPart = new Map<number, {
     partIndex: number;
     segmentIds: string[];

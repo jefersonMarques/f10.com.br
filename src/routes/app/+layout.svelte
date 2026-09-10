@@ -12,6 +12,7 @@
   import ApplicationSidebar from "$lib/components/application/ApplicationSidebar.svelte";
   import ActiveChatDock from "$lib/components/operations/ActiveChatDock.svelte";
   import GoogleCalendarSyncPulse from "$lib/components/operations/GoogleCalendarSyncPulse.svelte";
+  import HelpVideoProcessingPulse from "$lib/components/operations/HelpVideoProcessingPulse.svelte";
   import NotificationAlertStack from "$lib/components/operations/NotificationAlertStack.svelte";
   import { resolveOperationsRouteMetadata } from "$lib/application/routeMetadata";
   import type { LayoutData } from "./$types";
@@ -30,6 +31,8 @@
   const permissionCodes = new Set(data.permissions.map((permission) => permission.code));
   const canRespondToChat = permissionCodes.has("chat.respond");
   const canViewCustomers = permissionCodes.has("customers.view");
+  const canTrackHelpVideoProcessing =
+    permissionCodes.has("help.view") || permissionCodes.has("help.edit");
   const canUseGoogleCalendar = [
     "tasks.view",
     "tickets.view",
@@ -191,6 +194,8 @@
             <span class="hidden md:inline">Cliente</span>
           </a>
         {/if}
+
+        <HelpVideoProcessingPulse enabled={canTrackHelpVideoProcessing} />
 
         {#if canRespondToChat && presence}
           <div class="relative hidden sm:block">
