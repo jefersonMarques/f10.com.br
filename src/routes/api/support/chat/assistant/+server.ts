@@ -147,24 +147,15 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
       }
 
       try {
-        const result = await runGeneralHelpAssistant({
-          question: message,
-          conversationContext,
-          pageContext,
-        });
-        const nextUnresolvedCount = result.action === "answer"
-          ? 0
-          : result.action === "clarify"
-            ? Math.min(unresolvedCount + 1, MAX_UNRESOLVED_COUNT)
-            : unresolvedCount;
+        const result = await runGeneralHelpAssistant({ question: message });
 
         return json(assistantPayload({
           answer: result.answer,
           action: result.action,
           aiAvailable: true,
-          unresolvedCount: nextUnresolvedCount,
+          unresolvedCount: 0,
           handoffReason: result.action === "handoff"
-            ? "O cliente pediu ou aceitou atendimento humano no Assistente geral do Helpdesk."
+            ? "O cliente pediu atendimento humano no Assistente geral do Helpdesk."
             : undefined,
           searchEventId: result.searchEventId,
           ticketUrl: result.action === "ticket_offer" ? "/cliente/chamados/novo" : undefined,
