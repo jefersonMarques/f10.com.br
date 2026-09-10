@@ -30,12 +30,12 @@ function leavesF10Context(answer: string): boolean {
     .replace(/\s+/g, " ")
     .trim();
 
-  const externalTerms =
-    /(?:em geral|em si|fora do f10|fora da plataforma|servico externo|produto externo|outro sistema|outra plataforma|broadcast)/;
+  const externalMeaning =
+    /(?:whatsapp|instagram|facebook|google|meta).{0,35}(?:em geral|em si|fora do f10)/;
   const externalFork =
-    /(?:whatsapp|instagram|facebook|google|meta|servico|plataforma).{0,100}\bou\b.{0,100}(?:f10|dentro do f10)|(?:f10|dentro do f10).{0,100}\bou\b.{0,100}(?:whatsapp|instagram|facebook|google|meta|servico|plataforma)/;
+    /(?:quer|deseja|voce).{0,80}(?:whatsapp|instagram|facebook|google|meta|servico|plataforma).{0,100}\bou\b.{0,100}(?:f10|dentro do f10)|(?:quer|deseja|voce).{0,80}(?:f10|dentro do f10).{0,100}\bou\b.{0,100}(?:whatsapp|instagram|facebook|google|meta|servico|plataforma)/;
 
-  return externalTerms.test(normalized) || externalFork.test(normalized);
+  return externalMeaning.test(normalized) || externalFork.test(normalized);
 }
 
 export async function runGeneralHelpAssistant(input: {
