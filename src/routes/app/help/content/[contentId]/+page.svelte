@@ -72,6 +72,8 @@
     (block) => Boolean(block.asset?.extractedText.trim() || block.asset?.assistantSummary.trim()),
   ).length;
   $: stepsWithContent = data.content.steps.filter((step) => step.blocks.length > 0).length;
+  $: stepsReady = data.content.steps.length === 0 || stepsWithContent === data.content.steps.length;
+  $: hasPublicContent = Boolean(data.content.featuredVideo) || data.content.steps.length > 0;
   $: singleImagePerStep = data.content.steps.every(
     (step) => step.blocks.filter((block) => block.blockType === "image").length <= 1,
   );
@@ -90,8 +92,8 @@
   $: videoReady = !data.content.featuredVideo || Boolean(data.content.featuredVideo.subtitles.trim());
   $: publicationReady =
     realCategoriesReady &&
-    data.content.steps.length > 0 &&
-    stepsWithContent === data.content.steps.length &&
+    hasPublicContent &&
+    stepsReady &&
     singleImagePerStep &&
     imageOnlyStepsReady &&
     humanReviewReady &&
@@ -236,6 +238,9 @@
   <HelpQuickGuideEditor contentId={data.content.id} value={data.content.quickGuide} canEdit={data.canEdit}/>
 
   <div class="mt-5 space-y-5">
+    {#if data.content.steps.length === 0}
+      <div class="flex items-center gap-3 rounded-[20px] border border-dashed border-[#D6DAE3] bg-[#FAFAFC] px-5 py-4 text-[#697080]"><Video size={17}/><span class="text-[11px] font-medium">Sem passos. O vídeo principal pode ser publicado sozinho.</span></div>
+    {/if}
     {#each data.content.steps as step, stepIndex}
       <article class="overflow-hidden rounded-[22px] border border-[#DDE1EA] bg-white">
         <header class="flex flex-col gap-4 border-b border-[#EEF0F5] bg-[#FAFAFC] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -248,7 +253,7 @@
             <div class="flex items-center gap-1">
               <form method="POST" action="?/moveStep"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="up"/><button type="submit" disabled={stepIndex === 0} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#666D7D] disabled:opacity-30" aria-label="Mover passo para cima"><ArrowUp size={14}/></button></form>
               <form method="POST" action="?/moveStep"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="down"/><button type="submit" disabled={stepIndex === data.content.steps.length - 1} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#666D7D] disabled:opacity-30" aria-label="Mover passo para baixo"><ArrowDown size={14}/></button></form>
-              {#if data.content.steps.length > 1}<form method="POST" action="?/deleteStep" on:submit={(event) => { if (!confirm(`Remover o passo “${step.title}” e todo o conteúdo dele?`)) event.preventDefault(); }}><input type="hidden" name="stepId" value={step.id}/><button type="submit" class="application-text-caption inline-flex min-h-9 items-center gap-2 rounded-xl px-3 font-semibold text-[#9B2C2C]"><Trash2 size={14}/>Remover passo</button></form>{/if}
+              <form method="POST" action="?/deleteStep" on:submit={(event) => { if (!confirm(`Remover o passo “${step.title}” e todo o conteúdo dele?`)) event.preventDefault(); }}><input type="hidden" name="stepId" value={step.id}/><button type="submit" class="application-text-caption inline-flex min-h-9 items-center gap-2 rounded-xl px-3 font-semibold text-[#9B2C2C]"><Trash2 size={14}/>Remover passo</button></form>
             </div>
           {/if}
         </header>
@@ -332,7 +337,7 @@
 
         <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if realCategoriesReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Categorias reais</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">“Sem categoria” precisa ser substituída antes de publicar.</p></div>
-          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if stepsWithContent === data.content.steps.length && data.content.steps.length > 0}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Passos públicos</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{stepsWithContent}/{data.content.steps.length} com conteúdo público estruturado.</p></div>
+          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if hasPublicContent && stepsReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Conteúdo público</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{data.content.steps.length === 0 ? (data.content.featuredVideo ? "Vídeo principal disponível; passos são opcionais." : "Adicione um vídeo principal ou pelo menos um passo.") : `${stepsWithContent}/${data.content.steps.length} passos com conteúdo público estruturado.`}</p></div>
           <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if singleImagePerStep}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Uma imagem por passo</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">A estrutura editorial aceita no máximo um screenshot em cada passo.</p></div>
           <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if imageOnlyStepsReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Imagens compreensíveis</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{describedImageCount}/{imageBlocks.length} possuem texto alternativo ou descrição adicional.</p></div>
           <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if humanReviewReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Revisão humana</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{reviewedImageCount}/{imageBlocks.length} imagens confirmadas por uma pessoa. É obrigatório antes de publicar.</p></div>
