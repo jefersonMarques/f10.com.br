@@ -15,8 +15,8 @@ BEGIN
       ADD CONSTRAINT "help_video_processing_jobs_operation_check"
       CHECK ("operation" IN ('regenerate', 'import'));
   END IF;
-END
-$$;
+END;
+$;
 
 CREATE INDEX IF NOT EXISTS "help_video_processing_jobs_operation_status_idx"
   ON "help_video_processing_jobs" ("operation", "status", "updated_at");

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { invalidateAll } from "$app/navigation";
+  import { onDestroy, onMount } from "svelte";
   import {
     Archive,
     ArrowRight,
@@ -31,7 +33,9 @@
 
   let deleteTarget: { id: string; title: string; hasPublicVersion: boolean } | null = null;
   let deleteConfirmation = "";
+  let processingRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
+  $: hasProcessingJobs = data.contents.some((content) => Boolean(content.processingJob));
   $: values = form && "values" in form ? form.values : null;
   $: deleteConfirmationReady = deleteConfirmation.trim().toLocaleLowerCase("pt-BR").replace(/\s+/g, " ") === "quero excluir";
 
@@ -48,6 +52,18 @@
     deleteTarget = null;
     deleteConfirmation = "";
   }
+
+  onMount(() => {
+    processingRefreshTimer = setInterval(() => {
+      if (hasProcessingJobs && !document.hidden) {
+        void invalidateAll();
+      }
+    }, 5_000);
+  });
+
+  onDestroy(() => {
+    if (processingRefreshTimer) clearInterval(processingRefreshTimer);
+  });
 </script>
 
 <svelte:head><title>Base de Conhecimento | F10 Operations</title></svelte:head>
@@ -82,7 +98,7 @@
           {#each data.contents as content}
             <div class={`px-5 py-4 transition sm:px-6 ${content.status === "archived" ? "bg-[#FAFAFC] opacity-80" : "hover:bg-[#FAFAFC]"}`}>
               <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                <a href={`/app/help/content/${content.id}/images`} class="group min-w-0 flex-1">
+                <a href={`/app/help/content/${content.id}/images`} class={`group min-w-0 flex-1 ${content.processingJob ? "pointer-events-none cursor-default" : ""}`} aria-disabled={content.processingJob ? "true" : undefined}>
                   <div class="flex flex-wrap items-center gap-2">
                     <strong class="truncate text-[13px] font-semibold text-[#252B3B]">{content.title}</strong>
                     {#if content.processingJob}
