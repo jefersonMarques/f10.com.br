@@ -1,6 +1,7 @@
 import { dev } from "$app/environment";
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
+import { runGeneralHelpAssistant } from "$lib/server/help/helpGeneralAssistant";
 import { isSupportAiChatEnabled } from "$lib/server/support/supportAiChat";
 import { runSupportAi } from "$lib/server/support/supportAiAgent";
 import { consumeSupportPublicRateLimit } from "$lib/server/support/supportPublicRateLimit";
@@ -114,6 +115,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
   const conversationContext = readString(body.conversationContext, MAX_CONTEXT_CHARS);
   const pageContext = readString(body.pageContext, MAX_PAGE_CONTEXT_CHARS);
   const unresolvedCount = readUnresolvedCount(body.unresolvedCount);
+  const isGeneralHelpAssistant = Object.prototype.hasOwnProperty.call(body, "pageContext");
   if (!message) return json({ error: "INVALID_MESSAGE" }, { status: 400 });
 
   // Mensagem enviada pelo cliente é atividade real; polling continua sem renovar a sessão.
@@ -135,6 +137,49 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
     if (!allowed) return json({ error: "RATE_LIMITED" }, { status: 429 });
 
     const aiAvailable = await isSupportAiChatEnabled().catch(() => false);
+
+    if (isGeneralHelpAssistant) {
+      if (!aiAvailable) {
+        return json({ error: "ASSISTANT_UNAVAILABLE" }, {
+          status: 503,
+          headers: { "Cache-Control": "no-store" },
+        });
+      }
+
+      try {
+        const result = await runGeneralHelpAssistant({
+          question: message,
+          conversationContext,
+          pageContext,
+        });
+        const nextUnresolvedCount = result.action === "answer"
+          ? 0
+          : result.action === "clarify"
+            ? Math.min(unresolvedCount + 1, MAX_UNRESOLVED_COUNT)
+            : unresolvedCount;
+
+        return json(assistantPayload({
+          answer: result.answer,
+          action: result.action,
+          aiAvailable: true,
+          unresolvedCount: nextUnresolvedCount,
+          handoffReason: result.action === "handoff"
+            ? "O cliente pediu ou aceitou atendimento humano no Assistente geral do Helpdesk."
+            : undefined,
+          searchEventId: result.searchEventId,
+          ticketUrl: result.action === "ticket_offer" ? "/cliente/chamados/novo" : undefined,
+        }), { headers: { "Cache-Control": "no-store" } });
+      } catch (cause) {
+        console.error("[help.general.assistant]", {
+          causeType: cause instanceof Error ? cause.name : typeof cause,
+          code: cause instanceof Error ? cause.message.slice(0, 120) : "UNKNOWN",
+        });
+        return json({ error: "ASSISTANT_UNAVAILABLE" }, {
+          status: 503,
+          headers: { "Cache-Control": "no-store" },
+        });
+      }
+    }
 
     if (requestsTicketCreation(message)) {
       return json(assistantPayload({
