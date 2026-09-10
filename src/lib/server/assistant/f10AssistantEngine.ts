@@ -26,7 +26,7 @@ import {
 export type F10AssistantSurface = "helpdesk" | "article" | "chat";
 export type F10AssistantAction = "answer" | "clarify" | "handoff" | "ticket_offer";
 
-type PlannedAction = "search" | "current_article" | "clarify" | "handoff" | "ticket_offer";
+type PlannedAction = "search" | "clarify" | "handoff" | "ticket_offer";
 
 type PlanResponse = {
   action: PlannedAction;
@@ -121,8 +121,8 @@ const MAX_SEARCH_QUERY_CHARS = 220;
 const MAX_CANDIDATES = 10;
 const MAX_CONVERSATION_CHARS = 4_500;
 const MAX_ARTICLE_CONTEXT_CHARS = 48_000;
-const MAX_CANDIDATE_SUMMARY_CHARS = 800;
-const DEFAULT_MAX_OUTPUT_TOKENS = 1_100;
+const MAX_CANDIDATE_SUMMARY_CHARS = 900;
+const DEFAULT_MAX_OUTPUT_TOKENS = 1_400;
 
 const RETRIABLE_CODES = new Set([
   "AI_TIMEOUT",
@@ -139,7 +139,7 @@ const PLAN_SCHEMA = {
   properties: {
     action: {
       type: "string",
-      enum: ["search", "current_article", "clarify", "handoff", "ticket_offer"],
+      enum: ["search", "clarify", "handoff", "ticket_offer"],
     },
     searchQuery: { type: "string" },
     reply: { type: "string" },
@@ -168,6 +168,29 @@ const ARTICLE_ANSWER_SCHEMA = {
   required: ["answer", "resolved", "fragmentIndex"],
 } as const;
 
+const GENERIC_TERMS = new Set([
+  "ajuda",
+  "ajudar",
+  "como",
+  "consigo",
+  "consegue",
+  "erro",
+  "fazer",
+  "funciona",
+  "funcionar",
+  "f10",
+  "gostaria",
+  "me",
+  "nao",
+  "pode",
+  "poderia",
+  "problema",
+  "quero",
+  "saber",
+  "sobre",
+  "tenho",
+]);
+
 function taskFor(surface: F10AssistantSurface): AiTaskCode {
   return surface === "chat" ? "support_answer" : "help_public_answer";
 }
@@ -186,6 +209,24 @@ function trim(value: string, limit: number): string {
   const normalized = value.trim();
   if (normalized.length <= limit) return normalized;
   return `${normalized.slice(0, Math.max(0, limit - 1))}…`;
+}
+
+function normalize(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function hasSearchableSubject(question: string, conversationContext: string): boolean {
+  const value = normalize([conversationContext, question].filter(Boolean).join(" "));
+  if (!value) return false;
+  return value
+    .split(" ")
+    .some((term) => term.length >= 4 && !GENERIC_TERMS.has(term));
 }
 
 function effectiveConversationContext(
@@ -317,21 +358,22 @@ function buildArticleContext(document: HelpKnowledgeDocument): ArticleContext {
 }
 
 function planInstructions(surface: F10AssistantSurface): string {
-  const contextRule = surface === "article"
-    ? "Você está dentro de um artigo. Quando a dúvida se referir ao conteúdo atual, use current_article. Quando pedir outro assunto, use search."
-    : surface === "chat"
-      ? "Você está em um atendimento. Use o histórico apenas para resolver referências ou continuação da mensagem atual."
-      : "Você está no Helpdesk geral. Trate somente a mensagem atual; não dependa de histórico anterior.";
+  const contextRule = surface === "chat"
+    ? "Você está em um atendimento do F10. Use o histórico apenas para resolver referências da mensagem atual."
+    : surface === "article"
+      ? "Você está dentro de um artigo do F10. O artigo atual será lido pelo sistema antes da pesquisa global."
+      : "Você está no Assistente geral do F10. A mensagem deve ser interpretada como uma dúvida sobre o F10 por padrão.";
 
-  return `Você é o planejador do Assistente F10. ${contextRule}
-Não responda dúvidas sobre o produto usando conhecimento próprio nesta etapa.
-Para dúvidas sobre como usar o F10, produza uma pesquisa curta e objetiva em searchQuery. Preserve entidades importantes e use termos que provavelmente aparecem na documentação. Pode incluir sinônimos úteis sem mudar a intenção.
-Use action=search quando for necessário localizar um artigo.
-Use action=current_article somente no contexto de artigo e somente quando a dúvida for sobre o artigo atual. Mesmo nesse caso, preencha searchQuery como consulta de reserva caso o artigo atual não responda.
-Se a mensagem não tiver informação suficiente nem para uma pesquisa útil, use action=clarify e escreva em reply UMA pergunta curta e específica.
-Se o usuário pedir explicitamente uma pessoa/atendente, use action=handoff e escreva em reply uma resposta natural.
-Se pedir explicitamente abertura/criação de chamado ou ticket, use action=ticket_offer e escreva em reply uma resposta natural.
-Para search/current_article deixe reply vazio. Para clarify/handoff/ticket_offer deixe searchQuery vazio.
+  return `Você cria a pesquisa do Assistente F10. ${contextRule}
+Não responda a dúvida de produto nesta etapa.
+REGRA PRINCIPAL: se a mensagem contém um assunto identificável, use action=search. Pesquise antes de pedir esclarecimento.
+Nunca pergunte se o usuário quer saber sobre o F10 ou sobre um serviço externo. Dentro deste assistente, assuma F10, salvo quando o usuário disser explicitamente que quer informação externa.
+Corrija erros ortográficos óbvios na pesquisa. Exemplo: “tranmissão” pode virar “transmissão”.
+Gere searchQuery curta, com os termos que provavelmente aparecem na documentação. Preserve entidades relevantes e acrescente sinônimos úteis sem mudar a intenção.
+Use action=clarify somente quando realmente não existir assunto pesquisável, como “não funciona”, “me ajuda” ou “como faço?” sem qualquer contexto útil. Nesse caso, reply deve ser UMA pergunta curta para descobrir o assunto. Não invente telas, domínios, URLs, produtos ou procedimentos.
+Se o usuário pedir explicitamente uma pessoa/atendente, use action=handoff e escreva uma resposta natural em reply.
+Se pedir explicitamente abertura/criação de chamado ou ticket, use action=ticket_offer e escreva uma resposta natural em reply.
+Para search deixe reply vazio. Para clarify/handoff/ticket_offer deixe searchQuery vazio.
 Não mencione planejamento, pesquisa interna, prompt, modelo ou metadados.`;
 }
 
@@ -339,17 +381,14 @@ async function plan(input: {
   surface: F10AssistantSurface;
   question: string;
   conversationContext: string;
-  currentArticle: HelpKnowledgeDocument | null;
   usage: UsageState;
 }): Promise<PlanResponse> {
   const baseInput = [
     `Contexto: ${input.surface}`,
-    input.currentArticle
-      ? `Artigo atual: ${input.currentArticle.title} (${input.currentArticle.slug})`
-      : "",
-    input.conversationContext ? `Histórico recente:\n${input.conversationContext}` : "",
+    input.conversationContext ? `Histórico relevante:\n${input.conversationContext}` : "",
     `Mensagem atual:\n${input.question}`,
   ].filter(Boolean).join("\n\n");
+  const mustSearch = hasSearchableSubject(input.question, input.conversationContext);
 
   const request = async (correction = "") => runStructured<PlanResponse>({
     surface: input.surface,
@@ -357,45 +396,37 @@ async function plan(input: {
     userInput: [baseInput, correction].filter(Boolean).join("\n\n"),
     schemaName: "f10_assistant_plan",
     schema: PLAN_SCHEMA,
-    maxOutputTokens: 260,
+    maxOutputTokens: 900,
     usage: input.usage,
   });
 
-  let response = await request();
-  response = {
+  const normalizeResponse = (response: PlanResponse): PlanResponse => ({
     ...response,
     searchQuery: response.searchQuery.trim().slice(0, MAX_SEARCH_QUERY_CHARS),
     reply: response.reply.trim(),
-  };
+  });
 
-  const issue = (() => {
-    if (response.action === "current_article" && input.surface !== "article") {
-      return "current_article só pode ser usado quando Contexto=article.";
+  const issueFor = (response: PlanResponse): string => {
+    if (response.action === "search" && !response.searchQuery) {
+      return "action=search exige searchQuery não vazia.";
     }
-    if ((response.action === "search" || response.action === "current_article") && !response.searchQuery) {
-      return "search e current_article exigem searchQuery não vazia.";
+    if (response.action === "clarify" && mustSearch) {
+      return "A mensagem contém assunto pesquisável. Use action=search e gere a consulta; não peça esclarecimento antes de pesquisar.";
     }
     if (["clarify", "handoff", "ticket_offer"].includes(response.action) && !response.reply) {
       return "clarify, handoff e ticket_offer exigem reply não vazio.";
     }
     return "";
-  })();
+  };
+
+  let response = normalizeResponse(await request());
+  let issue = issueFor(response);
   if (!issue) return response;
 
-  const retried = await request(`Correção obrigatória: ${issue}`);
-  const normalized = {
-    ...retried,
-    searchQuery: retried.searchQuery.trim().slice(0, MAX_SEARCH_QUERY_CHARS),
-    reply: retried.reply.trim(),
-  };
-  if (
-    (normalized.action === "current_article" && input.surface !== "article") ||
-    ((normalized.action === "search" || normalized.action === "current_article") && !normalized.searchQuery) ||
-    (["clarify", "handoff", "ticket_offer"].includes(normalized.action) && !normalized.reply)
-  ) {
-    throw new Error("AI_INVALID_F10_ASSISTANT_PLAN");
-  }
-  return normalized;
+  response = normalizeResponse(await request(`Correção obrigatória: ${issue}`));
+  issue = issueFor(response);
+  if (issue) throw new Error("AI_INVALID_F10_ASSISTANT_PLAN");
+  return response;
 }
 
 function candidateInput(input: {
@@ -407,17 +438,17 @@ function candidateInput(input: {
   const rows = input.candidates.map((candidate, index) => [
     `ARTIGO ${index + 1}`,
     `Título: ${candidate.title}`,
-    candidate.categoryText ? `Categorias: ${trim(candidate.categoryText, 320)}` : "",
+    candidate.categoryText ? `Categorias: ${trim(candidate.categoryText, 350)}` : "",
     candidate.summary ? `Resumo: ${trim(candidate.summary, MAX_CANDIDATE_SUMMARY_CHARS)}` : "",
   ].filter(Boolean).join("\n"));
 
   return [
     input.conversationContext ? `Histórico relevante:\n${input.conversationContext}` : "",
     `Pergunta atual:\n${input.question}`,
-    `Pesquisa produzida pela IA:\n${input.searchQuery}`,
+    `Pesquisa criada pela IA:\n${input.searchQuery}`,
     rows.length > 0
       ? `Artigos encontrados:\n\n${rows.join("\n\n---\n\n")}`
-      : "Nenhum artigo foi encontrado para a pesquisa.",
+      : "Nenhum artigo foi encontrado.",
   ].filter(Boolean).join("\n\n");
 }
 
@@ -429,12 +460,20 @@ async function selectArticle(input: {
   candidates: Candidate[];
   usage: UsageState;
 }): Promise<SelectionResponse> {
-  const instructions = `Você é a etapa de seleção do Assistente F10.
-Analise a intenção completa da pergunta e os artigos encontrados. Não escolha por simples coincidência de palavra.
-Escolha articleIndex de 1 a ${input.candidates.length} somente quando título/resumo/categoria indicarem que o artigo realmente pode responder ao que o usuário quer fazer.
-Se nenhum artigo for compatível, use articleIndex=0 e escreva em reply UMA pergunta de esclarecimento específica e útil para permitir uma nova tentativa.
-Quando escolher um artigo, deixe reply vazio.
-Não responda o procedimento nesta etapa e não invente informações sobre o F10.`;
+  if (input.candidates.length === 0) {
+    return {
+      articleIndex: 0,
+      reply: await clarifyAfterSearch(input),
+    };
+  }
+
+  const instructions = `Você seleciona a fonte do Assistente F10.
+Analise a intenção completa da pergunta e compare com título, categorias e resumo dos artigos.
+Não escolha por simples coincidência de palavra. Escolha articleIndex de 1 a ${input.candidates.length} somente quando o artigo realmente puder responder ao que o usuário quer fazer.
+Considere que a pergunta é sobre o F10. Não pergunte “F10 ou serviço externo”.
+Se nenhum artigo for compatível, use articleIndex=0 e escreva em reply UMA pergunta curta e específica para melhorar uma próxima pesquisa.
+Não invente domínios, URLs, telas ou procedimentos. Quando escolher um artigo, deixe reply vazio.
+Não responda o procedimento nesta etapa.`;
 
   const request = async (correction = "") => runStructured<SelectionResponse>({
     surface: input.surface,
@@ -442,28 +481,59 @@ Não responda o procedimento nesta etapa e não invente informações sobre o F1
     userInput: [candidateInput(input), correction].filter(Boolean).join("\n\n"),
     schemaName: "f10_assistant_article_selection",
     schema: SELECTION_SCHEMA,
-    maxOutputTokens: 320,
+    maxOutputTokens: 900,
     usage: input.usage,
   });
 
-  let response = await request();
-  response = { ...response, reply: response.reply.trim() };
-  const validIndex = response.articleIndex >= 0 && response.articleIndex <= input.candidates.length;
-  const validReply = response.articleIndex !== 0 || Boolean(response.reply);
-  if (validIndex && validReply) return response;
+  const normalizeResponse = (response: SelectionResponse): SelectionResponse => ({
+    articleIndex: response.articleIndex,
+    reply: response.reply.trim(),
+  });
+  const valid = (response: SelectionResponse) =>
+    response.articleIndex >= 0 &&
+    response.articleIndex <= input.candidates.length &&
+    (response.articleIndex !== 0 || Boolean(response.reply));
 
-  response = await request(
+  let response = normalizeResponse(await request());
+  if (valid(response)) return response;
+
+  response = normalizeResponse(await request(
     `Correção obrigatória: articleIndex deve estar entre 0 e ${input.candidates.length}; quando for 0, reply deve conter uma pergunta específica.`,
-  );
-  response = { ...response, reply: response.reply.trim() };
-  if (
-    response.articleIndex < 0 ||
-    response.articleIndex > input.candidates.length ||
-    (response.articleIndex === 0 && !response.reply)
-  ) {
-    throw new Error("AI_INVALID_F10_ASSISTANT_SELECTION");
-  }
+  ));
+  if (!valid(response)) throw new Error("AI_INVALID_F10_ASSISTANT_SELECTION");
   return response;
+}
+
+async function clarifyAfterSearch(input: {
+  surface: F10AssistantSurface;
+  question: string;
+  searchQuery: string;
+  conversationContext: string;
+  usage: UsageState;
+}): Promise<string> {
+  const response = await runStructured<{ reply: string }>({
+    surface: input.surface,
+    instructions: `Você é o Assistente F10. Uma pesquisa na documentação não encontrou artigos candidatos para a pergunta atual.
+Faça UMA pergunta curta e específica que permita ao usuário acrescentar o detalhe necessário para uma nova pesquisa.
+Assuma que a dúvida é sobre o F10. Não pergunte “F10 ou serviço externo”. Não invente domínio, URL, tela, recurso ou procedimento.`,
+    userInput: [
+      input.conversationContext ? `Histórico relevante:\n${input.conversationContext}` : "",
+      `Pergunta atual:\n${input.question}`,
+      `Pesquisa tentada:\n${input.searchQuery}`,
+    ].filter(Boolean).join("\n\n"),
+    schemaName: "f10_assistant_clarify_after_search",
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: { reply: { type: "string" } },
+      required: ["reply"],
+    },
+    maxOutputTokens: 700,
+    usage: input.usage,
+  });
+  const reply = response.reply.trim();
+  if (!reply) throw new Error("AI_EMPTY_F10_ASSISTANT_CLARIFICATION");
+  return reply;
 }
 
 function articleInput(input: {
@@ -480,9 +550,9 @@ function articleInput(input: {
   return [
     input.conversationContext ? `Histórico relevante:\n${input.conversationContext}` : "",
     `Pergunta atual:\n${input.question}`,
-    `Artigo selecionado: ${input.article.title}`,
+    `Artigo: ${input.article.title}`,
     `URL do artigo: ${input.article.url}`,
-    `Trechos do artigo em ordem:\n\n${fragments.join("\n\n---\n\n")}`,
+    `Trechos em ordem:\n\n${fragments.join("\n\n---\n\n")}`,
   ].filter(Boolean).join("\n\n");
 }
 
@@ -497,15 +567,15 @@ async function answerFromArticle(input: {
 }): Promise<{ response: ArticleAnswerResponse; target: F10AssistantTarget | null }> {
   if (input.article.fragments.length === 0) throw new Error("F10_ASSISTANT_ARTICLE_EMPTY");
   const linkRequired = input.surface !== "article" || input.article.slug !== input.currentArticleSlug;
-  const instructions = `Você é o Assistente F10 e esta é a etapa final de resposta.
-Leia o artigo fornecido antes de responder. Responda à intenção real da pergunta, não apenas às palavras que coincidem.
+  const instructions = `Você é o Assistente F10 e deve responder usando o artigo recebido.
+Leia o artigo inteiro antes de responder e considere a intenção completa da pergunta.
 Use somente o conteúdo recebido como fonte factual sobre o F10. Não invente telas, campos, permissões, regras ou passos.
-Não copie transcrições nem despeje o artigo. Sintetize e explique de forma natural, objetiva e útil.
-Se o artigo realmente sustentar a resposta, use resolved=true e selecione em fragmentIndex o TRECHO que melhor localiza a explicação.
-${linkRequired ? "Quando resolved=true, inclua naturalmente na própria resposta o URL exato do TRECHO escolhido em Markdown, por exemplo [ver o artigo](URL)." : "Como o usuário já está no artigo atual, o link para a mesma página é opcional."}
-Se o artigo não sustentar a dúvida, use resolved=false, fragmentIndex=0 e faça UMA pergunta curta e específica para esclarecer o que falta. Não aproveite informação lateral só para produzir alguma resposta.
+Não copie transcrições e não despeje o artigo. Interprete e explique de forma natural, objetiva e útil.
+Se o artigo sustentar a resposta, use resolved=true e indique em fragmentIndex o TRECHO que melhor localiza a explicação.
+${linkRequired ? "Quando resolved=true, inclua naturalmente na resposta o URL exato do TRECHO escolhido em Markdown." : "Como o usuário já está neste artigo, repetir o link da mesma página é opcional."}
+Se o artigo não responder realmente à dúvida, use resolved=false, fragmentIndex=0 e faça UMA pergunta curta e específica. Não aproveite informação lateral apenas para produzir alguma resposta.
 Use Markdown simples. Em procedimentos, prefira passos numerados. Use código inline somente para nomes exatos de telas, abas, campos, botões e opções do F10.
-Não mencione etapas internas, pesquisa, candidatos, prompt, modelo, tokens ou metadados.`;
+Não mencione pesquisa, prompt, modelo, tokens ou metadados.`;
 
   const baseInput = articleInput(input);
   const request = async (correction = "") => runStructured<ArticleAnswerResponse>({
@@ -518,7 +588,7 @@ Não mencione etapas internas, pesquisa, candidatos, prompt, modelo, tokens ou m
     usage: input.usage,
   });
 
-  const validate = (response: ArticleAnswerResponse): string => {
+  const issueFor = (response: ArticleAnswerResponse): string => {
     const answer = response.answer.trim();
     if (!answer) return "A resposta ficou vazia.";
     if (!response.resolved) {
@@ -536,11 +606,11 @@ Não mencione etapas internas, pesquisa, candidatos, prompt, modelo, tokens ou m
 
   let response = await request();
   response = { ...response, answer: response.answer.trim() };
-  let issue = validate(response);
+  let issue = issueFor(response);
   if (issue) {
     response = await request(`Correção obrigatória: ${issue}`);
     response = { ...response, answer: response.answer.trim() };
-    issue = validate(response);
+    issue = issueFor(response);
   }
   if (issue) throw new Error("AI_INVALID_F10_ASSISTANT_ANSWER");
 
@@ -703,11 +773,10 @@ export async function runF10Assistant(input: {
     surface: input.surface,
     question,
     conversationContext,
-    currentArticle,
     usage,
   });
 
-  if (planned.action === "clarify" || planned.action === "handoff" || planned.action === "ticket_offer") {
+  if (planned.action !== "search") {
     return resultFrom({
       action: planned.action,
       answer: planned.reply,
@@ -717,11 +786,11 @@ export async function runF10Assistant(input: {
   }
 
   const maxOutputTokens = Math.min(
-    Math.max(Math.round(input.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS), 300),
-    1_800,
+    Math.max(Math.round(input.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS), 900),
+    2_200,
   );
 
-  if (planned.action === "current_article" && currentArticle) {
+  if (currentArticle) {
     const article = buildArticleContext(currentArticle);
     const direct = await answerFromArticle({
       surface: input.surface,
@@ -737,7 +806,7 @@ export async function runF10Assistant(input: {
         action: "answer",
         answer: direct.response.answer,
         target: direct.target,
-        retrievalQuery: question,
+        retrievalQuery: planned.searchQuery,
         sources: [{
           contentId: currentArticle.contentId,
           slug: currentArticle.slug,
@@ -748,19 +817,6 @@ export async function runF10Assistant(input: {
         usage,
       });
     }
-
-    return searchAndAnswer({
-      surface: input.surface,
-      question,
-      searchQuery: planned.searchQuery,
-      conversationContext,
-      currentArticleSlug: currentArticle.slug,
-      excludeContentId: currentArticle.contentId,
-      actorUserId: input.actorUserId,
-      customerContactId: input.customerContactId,
-      maxOutputTokens,
-      usage,
-    });
   }
 
   return searchAndAnswer({
@@ -769,6 +825,7 @@ export async function runF10Assistant(input: {
     searchQuery: planned.searchQuery,
     conversationContext,
     currentArticleSlug: currentArticle?.slug ?? null,
+    excludeContentId: currentArticle?.contentId ?? null,
     actorUserId: input.actorUserId,
     customerContactId: input.customerContactId,
     maxOutputTokens,
