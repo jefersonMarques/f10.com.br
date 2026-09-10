@@ -46,6 +46,17 @@
     const trimmed = value.trim();
     if (!trimmed) return { type: "blank", marker: "", tokens: [] };
 
+    const rawHelpReference = trimmed.match(
+      /^(?:Trecho de referência:\s*)?((?:https?:\/\/(?:www\.)?f10\.com\.br)?\/ajuda-f10(?:\/\S*)?)$/i,
+    );
+    if (rawHelpReference?.[1]) {
+      return {
+        type: "paragraph",
+        marker: "",
+        tokens: [{ type: "link", value: "Abrir artigo", href: helpHref(rawHelpReference[1]) }],
+      };
+    }
+
     const bullet = trimmed.match(/^[-•]\s+(.+)$/);
     if (bullet) return { type: "bullet", marker: "•", tokens: inlineTokens(bullet[1] ?? "") };
 
@@ -73,14 +84,14 @@
         <span class="mt-[1px] min-w-4 shrink-0 font-semibold">{line.marker}</span>
         <span class="min-w-0">
           {#each line.tokens as token}
-            {#if token.type === "strong"}<strong class="font-semibold text-current">{token.value}</strong>{:else if token.type === "emphasis"}<em>{token.value}</em>{:else if token.type === "code"}<code class="rounded-md border border-[#D8DDF4] bg-[#F2F3FF] px-1.5 py-0.5 font-sans text-[0.9em] font-semibold text-[#000A57]">{token.value}</code>{:else if token.type === "link"}<a href={token.href} class="mx-1 inline-flex items-center gap-1.5 rounded-lg bg-[#000A57] px-3 py-1.5 text-[0.92em] font-semibold text-white no-underline transition hover:bg-[#101C73]">Ver no artigo<ArrowUpRight size={13}/></a>{:else}{token.value}{/if}
+            {#if token.type === "strong"}<strong class="font-semibold text-current">{token.value}</strong>{:else if token.type === "emphasis"}<em>{token.value}</em>{:else if token.type === "code"}<code class="rounded-md border border-[#D8DDF4] bg-[#F2F3FF] px-1.5 py-0.5 font-sans text-[0.9em] font-semibold text-[#000A57]">{token.value}</code>{:else if token.type === "link"}<a href={token.href} class="mx-1 inline-flex items-center gap-1.5 rounded-lg bg-[#000A57] px-3 py-1.5 text-[0.92em] font-semibold text-white no-underline transition hover:bg-[#101C73]">Abrir artigo<ArrowUpRight size={13}/></a>{:else}{token.value}{/if}
           {/each}
         </span>
       </div>
     {:else}
       <p>
         {#each line.tokens as token}
-          {#if token.type === "strong"}<strong class="font-semibold text-current">{token.value}</strong>{:else if token.type === "emphasis"}<em>{token.value}</em>{:else if token.type === "code"}<code class="rounded-md border border-[#D8DDF4] bg-[#F2F3FF] px-1.5 py-0.5 font-sans text-[0.9em] font-semibold text-[#000A57]">{token.value}</code>{:else if token.type === "link"}<a href={token.href} class="mx-1 inline-flex items-center gap-1.5 rounded-lg bg-[#000A57] px-3 py-1.5 text-[0.92em] font-semibold text-white no-underline transition hover:bg-[#101C73]">Ver no artigo<ArrowUpRight size={13}/></a>{:else}{token.value}{/if}
+          {#if token.type === "strong"}<strong class="font-semibold text-current">{token.value}</strong>{:else if token.type === "emphasis"}<em>{token.value}</em>{:else if token.type === "code"}<code class="rounded-md border border-[#D8DDF4] bg-[#F2F3FF] px-1.5 py-0.5 font-sans text-[0.9em] font-semibold text-[#000A57]">{token.value}</code>{:else if token.type === "link"}<a href={token.href} class="mx-1 inline-flex items-center gap-1.5 rounded-lg bg-[#000A57] px-3 py-1.5 text-[0.92em] font-semibold text-white no-underline transition hover:bg-[#101C73]">Abrir artigo<ArrowUpRight size={13}/></a>{:else}{token.value}{/if}
         {/each}
       </p>
     {/if}
