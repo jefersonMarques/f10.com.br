@@ -246,7 +246,7 @@
   {#if minimized}
     <button
       type="button"
-      class="fixed bottom-4 left-1/2 z-40 inline-flex min-h-12 -translate-x-1/2 items-center gap-2 rounded-full border border-[#D9DDE8] bg-white px-5 text-[11px] font-semibold text-[#000A57] shadow-[0_18px_50px_rgba(1,13,40,0.18)] transition hover:-translate-y-0.5 sm:bottom-6"
+      class="fixed bottom-4 right-4 z-40 inline-flex min-h-12 items-center gap-2 rounded-full border border-[#D9DDE8] bg-white px-5 text-[11px] font-semibold text-[#000A57] shadow-[0_18px_50px_rgba(1,13,40,0.18)] transition hover:-translate-y-0.5 sm:bottom-6 sm:right-6"
       on:click={() => (minimized = false)}
       aria-label="Abrir assistente deste artigo"
     >
@@ -254,7 +254,7 @@
       Conversar sobre este artigo
     </button>
   {:else}
-    <aside class="fixed bottom-3 left-1/2 z-40 w-[calc(100vw-20px)] max-w-[760px] -translate-x-1/2 overflow-hidden rounded-[26px] border border-[#D9DDE8] bg-white shadow-[0_24px_80px_rgba(1,13,40,0.20)] sm:bottom-6">
+    <aside class="fixed bottom-3 right-3 z-40 w-[calc(100vw-24px)] max-w-[420px] overflow-hidden rounded-[26px] border border-[#D9DDE8] bg-white shadow-[0_24px_80px_rgba(1,13,40,0.20)] sm:bottom-6 sm:right-6 sm:w-[420px]">
       <header class="flex items-center justify-between gap-3 border-b border-[#E7EAF1] bg-[#010D28] px-4 py-3 text-white sm:px-5">
         <div class="flex min-w-0 items-center gap-3">
           <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[#FF9A4B]"><Sparkles size={17} /></span>
