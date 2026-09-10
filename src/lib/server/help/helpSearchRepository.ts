@@ -21,6 +21,7 @@ export type HelpSearchInput = {
   includeAssistantKnowledge?: boolean;
   contentId?: string | null;
   categoryId?: string | null;
+  relevanceMode?: "strict" | "broad";
 };
 
 export type PublishedHelpContext = {
@@ -68,15 +69,6 @@ const SEARCH_STOP_WORDS = new Set([
   "que",
   "um",
   "uma",
-  "ajuda",
-  "ajudar",
-  "favor",
-  "gostaria",
-  "pode",
-  "poderia",
-  "preciso",
-  "quero",
-  "suporte",
   "assunto",
   "anterior",
   "resposta",
@@ -87,6 +79,8 @@ const GENERIC_SEARCH_TERMS = new Set([
   "abrir",
   "acessar",
   "adicionar",
+  "ajuda",
+  "ajudar",
   "alterar",
   "botao",
   "cadastrar",
@@ -98,12 +92,19 @@ const GENERIC_SEARCH_TERMS = new Set([
   "editar",
   "excluir",
   "f10",
+  "favor",
+  "gostaria",
   "incluir",
   "menu",
   "opcao",
+  "pode",
+  "poderia",
+  "preciso",
+  "quero",
   "remover",
   "salvar",
   "sistema",
+  "suporte",
   "tela",
 ]);
 
@@ -160,6 +161,7 @@ function relevantSearchResult(
     publicText: string;
     assistantText: string;
   },
+  mode: "strict" | "broad",
 ): boolean {
   const terms = meaningfulSearchTerms(query);
   if (terms.length <= 1) return true;
@@ -177,6 +179,7 @@ function relevantSearchResult(
   const matchedTerms = terms.filter((term) => searchableHasTerm(words, wordSet, term));
 
   if (matchedTerms.length >= 2) return true;
+  if (mode === "strict") return false;
   return matchedTerms.some((term) => term.length >= 3 && !GENERIC_SEARCH_TERMS.has(term));
 }
 
@@ -192,6 +195,7 @@ export async function searchPublishedHelp(input: HelpSearchInput) {
   const limit = Math.min(Math.max(input.limit ?? 8, 1), 20);
   const candidateLimit = Math.min(Math.max(limit * 3, limit), 50);
   const includeAssistantKnowledge = input.includeAssistantKnowledge ?? true;
+  const relevanceMode = input.relevanceMode ?? "strict";
 
   if (!normalizedQuery) {
     return { searchEventId: null, results: [] };
@@ -251,7 +255,7 @@ export async function searchPublishedHelp(input: HelpSearchInput) {
     .limit(candidateLimit);
 
   const rows = candidates
-    .filter((row) => relevantSearchResult(query, row))
+    .filter((row) => relevantSearchResult(query, row, relevanceMode))
     .slice(0, limit);
 
   const [searchEvent] = await db
