@@ -25,7 +25,7 @@
     <section class="mt-6 overflow-hidden rounded-[24px] border border-[#E3E6EE] bg-white shadow-[0_10px_30px_rgba(1,13,40,0.035)]">
       <div class="divide-y divide-[#EEF0F5]">
         {#each data.collection.items as item, index}
-          <a href={`/ajuda-f10/${encodeURIComponent(item.slug)}`} class="group flex items-center gap-4 px-5 py-4 transition hover:bg-[#FAFAFC] sm:px-6">
+          <a href={`/ajuda-f10/${encodeURIComponent(item.slug)}?colecao=${encodeURIComponent(data.collection.slug)}`} class="group flex items-center gap-4 px-5 py-4 transition hover:bg-[#FAFAFC] sm:px-6">
             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F3F5FF] text-[11px] font-bold text-[#000A57]">{index + 1}</span>
             <div class="min-w-0 flex-1">
               <h2 class="text-[12px] font-semibold leading-5 text-[#303746] transition group-hover:text-[#000A57]">{item.title}</h2>
