@@ -1,16 +1,15 @@
 import { desc, eq } from "drizzle-orm";
 import {
-  createAiStructuredResponse,
-} from "$lib/server/ai/aiGateway";
-import {
   getAiTaskProfile,
   isAiTaskConfigured,
 } from "$lib/server/ai/aiConfigurationRepository";
 import { AI_PROVIDER_DEFINITIONS } from "$lib/server/ai/aiTypes";
 import { getDatabase } from "$lib/server/db";
 import { supportAiRuns } from "$lib/server/db/supportAiSchema";
-import type { HelpKnowledgeResult } from "$lib/server/help/helpKnowledgeEngine";
-import { answerHelpGlobalWithArticleResolution } from "$lib/server/help/helpKnowledgeOrchestrator";
+import {
+  answerHelpQuestion,
+  type HelpKnowledgeResult,
+} from "$lib/server/help/helpKnowledgeEngine";
 import { recordHelpKnowledgeRun } from "$lib/server/help/helpKnowledgeTelemetryRepository";
 import { markHelpSearchOutcome } from "$lib/server/help/helpSearchRepository";
 
@@ -26,29 +25,6 @@ const RETRYABLE_KNOWLEDGE_FAILURES = new Set([
   "AI_INVALID_JSON",
   "AI_INVALID_HELP_KNOWLEDGE_OUTPUT",
 ]);
-
-const CONVERSATIONAL_ANSWER_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    answer: { type: "string" },
-  },
-  required: ["answer"],
-} as const;
-
-const CONVERSATIONAL_ANSWER_INSTRUCTIONS = `Você é o Assistente F10 em uma conversa de suporte.
-Receberá uma resposta factual já validada pela Base de Conhecimento, o histórico recente e, quando disponível, um artigo relacionado com sua URL real.
-Responda à pergunta atual de forma natural, útil e direta, preservando os fatos da resposta validada.
-Não invente informações, caminhos, telas ou URLs.
-Quando houver artigo relacionado, incorpore o link naturalmente na resposta usando Markdown no formato [texto do link](URL fornecida), principalmente quando o usuário pedir artigo, link, fonte, onde ver ou quiser continuar lendo.
-Quando a pergunta já estiver respondida por um artigo específico, você pode oferecer o link ao final de forma natural sem usar rótulos fixos ou linguagem de sistema.
-Se o usuário pedir apenas o link, responda diretamente com o link e uma frase curta que deixe claro qual artigo é.
-Use código inline somente para nomes exatos de telas, campos, botões e opções do F10.
-Não mencione Base de Conhecimento, prompt, modelo, tokens, metadados, target, contexto técnico ou que está reescrevendo outra resposta.`;
-
-type ConversationalAnswer = {
-  answer: string;
-};
 
 export type SupportAiSource = {
   contentId: string;
@@ -86,48 +62,16 @@ function normalizeText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function normalizedFollowUpText(value: string): string {
-  return normalizeText(value)
+function isFollowUpQuestion(value: string): boolean {
+  const normalized = normalizeText(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[?!.,;:]+$/g, "")
     .trim();
-}
-
-function isArticleReferenceFollowUp(value: string): boolean {
-  const normalized = normalizedFollowUpText(value);
-  if (!normalized) return false;
-  const words = normalized.split(" ").filter(Boolean);
-  if (words.length > 14) return false;
-  return (
-    /\b(link|artigo|conteudo|pagina|fonte)\b/.test(normalized) &&
-    /\b(tem|manda|mande|envia|envie|abrir|abre|ver|vejo|quero|qual|onde|cade|mostra|mostrar|passa|passar)\b/.test(normalized)
-  );
-}
-
-function isContextContinuation(value: string): boolean {
-  const normalized = normalizedFollowUpText(value);
-  if (!normalized) return false;
-  const words = normalized.split(" ").filter(Boolean);
-  if (words.length > 10) return false;
-
-  return (
-    /^(?:(?:e|mas)\s+)?(?:na|no|nas|nos|em|pela|pelo|dentro|aqui|ali)\b/.test(normalized) ||
-    /^(?:estou|to)\s+(?:na|no|nas|nos|em)\b/.test(normalized) ||
-    /^(?:tela|aba|menu|campo|modulo|pagina)\b/.test(normalized)
-  );
-}
-
-function isFollowUpQuestion(value: string): boolean {
-  const compact = value.trim();
-  if (/^[?!.]+$/.test(compact)) return true;
-
-  const normalized = normalizedFollowUpText(value);
   if (!normalized) return false;
   const words = normalized.split(" ").filter(Boolean);
   if (words.length <= 2) return true;
-  if (isArticleReferenceFollowUp(value) || isContextContinuation(value)) return true;
   return /^(?:(?:e|em)\s+)?(?:como|onde|qual|quais|quando|por que|porque|depois|agora|para|pro|pros)\b/.test(normalized)
     && words.length <= 6;
 }
@@ -166,55 +110,6 @@ function retryableKnowledgeFailure(cause: unknown): boolean {
   return Array.from(RETRYABLE_KNOWLEDGE_FAILURES).some((code) =>
     cause.message.includes(code),
   );
-}
-
-function articleUrl(result: HelpKnowledgeResult): string | null {
-  if (!result.target) return null;
-  const anchor = result.target.anchor ? `#${encodeURIComponent(result.target.anchor)}` : "";
-  return `/ajuda-f10/${encodeURIComponent(result.target.slug)}${anchor}`;
-}
-
-async function makeConversationalAnswer(input: {
-  question: string;
-  conversationContext: string;
-  knowledge: HelpKnowledgeResult;
-  maxOutputTokens?: number;
-}): Promise<string> {
-  const validatedAnswer = input.knowledge.answer.trim();
-  if (!validatedAnswer || !input.knowledge.target) return validatedAnswer;
-
-  const url = articleUrl(input.knowledge);
-  if (!url) return validatedAnswer;
-
-  try {
-    const response = await createAiStructuredResponse<ConversationalAnswer>({
-      task: "support_answer",
-      requiredCapabilities: ["knowledge.read", "customer.reply"],
-      instructions: CONVERSATIONAL_ANSWER_INSTRUCTIONS,
-      userInput: [
-        input.conversationContext
-          ? `Histórico recente:\n${input.conversationContext.slice(-4_500)}`
-          : "",
-        `Pergunta atual:\n${input.question}`,
-        `Resposta factual validada:\n${validatedAnswer}`,
-        `Artigo relacionado:\nTítulo: ${input.knowledge.target.title}\nURL: ${url}`,
-      ]
-        .filter(Boolean)
-        .join("\n\n"),
-      schemaName: "f10_support_conversational_answer",
-      schema: CONVERSATIONAL_ANSWER_SCHEMA,
-      maxOutputTokens: Math.min(
-        Math.max(Math.round(input.maxOutputTokens ?? 500), 250),
-        700,
-      ),
-    });
-    return response.data.answer.trim() || validatedAnswer;
-  } catch (cause) {
-    console.warn("[support-ai] conversational answer fallback", {
-      code: cause instanceof Error ? cause.message.slice(0, 120) : "UNKNOWN",
-    });
-    return validatedAnswer;
-  }
 }
 
 async function saveRun(input: {
@@ -259,25 +154,19 @@ async function saveRun(input: {
   return run.id;
 }
 
-async function mapKnowledgeResult(
+function mapKnowledgeResult(
   result: HelpKnowledgeResult,
   question: string,
   conversationContext: string,
-  maxOutputTokens?: number,
-): Promise<{
+): {
   resolution: "answered" | "escalate";
   answer: string;
   escalationReason: string;
-}> {
+} {
   if (result.resolution === "answered" || result.resolution === "navigate") {
     return {
       resolution: "answered",
-      answer: await makeConversationalAnswer({
-        question,
-        conversationContext,
-        knowledge: result,
-        maxOutputTokens,
-      }),
+      answer: result.answer,
       escalationReason: "",
     };
   }
@@ -312,7 +201,7 @@ export async function runSupportAi(
   try {
     let knowledge: HelpKnowledgeResult;
     try {
-      knowledge = await answerHelpGlobalWithArticleResolution({
+      knowledge = await answerHelpQuestion({
         question: knowledgeQuestion,
         scope: { type: "global" },
         source: "chat_ai",
@@ -326,7 +215,7 @@ export async function runSupportAi(
       console.warn("[support-ai] retrying knowledge request", {
         code: firstCause instanceof Error ? firstCause.message.slice(0, 120) : "unknown",
       });
-      knowledge = await answerHelpGlobalWithArticleResolution({
+      knowledge = await answerHelpQuestion({
         question: knowledgeQuestion,
         scope: { type: "global" },
         source: "chat_ai",
@@ -337,12 +226,7 @@ export async function runSupportAi(
       });
     }
 
-    const mapped = await mapKnowledgeResult(
-      knowledge,
-      question,
-      conversationContext,
-      input.maxOutputTokens,
-    );
+    const mapped = mapKnowledgeResult(knowledge, question, conversationContext);
     const model = knowledge.model ?? profile.model;
     const provider = knowledge.provider ?? profile.provider;
     const latencyMs = Date.now() - startedAt;
