@@ -18,6 +18,7 @@ export type TicketItem = {
   ticketNumber: number;
   subject: string;
   priority: string;
+  channel: string;
   customerName: string | null;
   organizationName: string | null;
   queueName: string;
@@ -73,6 +74,7 @@ export type TicketCardData = {
       subject: string;
       status: string;
       priority: string;
+      channel: string;
       queueName: string;
       assignedUserName: string | null;
       customerContactId: string | null;
