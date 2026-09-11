@@ -31,16 +31,16 @@ export type TicketStage = {
   id: string;
   name: string;
   stageType: string;
-  color: string | null;
-  linkedAreaId: string | null;
-  linkedAreaName: string | null;
+  color?: string | null;
+  linkedAreaId?: string | null;
+  linkedAreaName?: string | null;
 };
 
 export type TicketWorkflow = {
   id: string;
   kind: "global" | "area";
-  areaId: string | null;
-  areaName: string | null;
+  areaId?: string | null;
+  areaName?: string | null;
   stages: TicketStage[];
 };
 
