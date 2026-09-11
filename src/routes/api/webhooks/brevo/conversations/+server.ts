@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { env } from "$env/dynamic/private";
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { enqueueBrevoConversationWebhook } from "$lib/server/support/emailInboundService";
+import { startSupportEmailInboundWorker } from "$lib/server/support/emailInboundWorker";
 
 const MAX_WEBHOOK_BYTES = 2 * 1024 * 1024;
 
@@ -55,6 +56,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
   const payloadHash = createHash("sha256").update(rawBody).digest("hex");
   const event = await enqueueBrevoConversationWebhook({ payload, payloadHash });
+  startSupportEmailInboundWorker();
 
   return json(
     { accepted: true, duplicate: event.duplicate },
