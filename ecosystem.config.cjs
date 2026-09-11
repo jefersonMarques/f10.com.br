@@ -10,12 +10,14 @@ module.exports = {
         ORIGIN: "https://f10.com.br",
         BODY_SIZE_LIMIT: "100M",
         F10_HELP_VIDEO_WORKER: "0",
+        F10_BREVO_EMAIL_WORKER: "0",
       },
       env_production: {
         NODE_ENV: "production",
         ORIGIN: "https://f10.com.br",
         BODY_SIZE_LIMIT: "100M",
         F10_HELP_VIDEO_WORKER: "0",
+        F10_BREVO_EMAIL_WORKER: "0",
       },
     },
     {
@@ -32,6 +34,7 @@ module.exports = {
         PORT: "3101",
         BODY_SIZE_LIMIT: "100M",
         F10_HELP_VIDEO_WORKER: "1",
+        F10_BREVO_EMAIL_WORKER: "1",
       },
       env_production: {
         NODE_ENV: "production",
@@ -40,6 +43,7 @@ module.exports = {
         PORT: "3101",
         BODY_SIZE_LIMIT: "100M",
         F10_HELP_VIDEO_WORKER: "1",
+        F10_BREVO_EMAIL_WORKER: "1",
       },
     },
   ],
