@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Mail } from "lucide-svelte";
   import { labelClasses } from "./presentation";
   import type { TicketItem, TicketWorkflow } from "./types";
 
@@ -14,7 +15,10 @@
 <div class="divide-y divide-[#EEF0F4]">
   {#each tickets as ticket}
     <button type="button" on:click={() => void onOpenTicket(ticket.id)} class="grid w-full gap-2 px-5 py-4 text-left hover:bg-[#F8F9FC] md:grid-cols-[100px_1.6fr_1fr_1fr_180px]">
-      <span class="application-text-meta font-bold text-[#EA6D0B]">#{ticket.ticketNumber}</span>
+      <span class="application-text-meta flex items-center gap-1.5 font-bold text-[#EA6D0B]">
+        #{ticket.ticketNumber}
+        {#if ticket.channel === "email"}<Mail size={11} aria-label="Recebido por e-mail"/>{/if}
+      </span>
       <div>
         <strong class="block truncate text-[11px] text-[#2D3342]">{ticket.subject}</strong>
         {#if ticket.labels.length > 0}
@@ -23,7 +27,7 @@
           </div>
         {/if}
       </div>
-      <span class="application-text-meta truncate text-[#667080]">{ticket.customerName ?? "Cliente"}</span>
+      <span class="application-text-meta truncate text-[#667080]">{ticket.customerName ?? "Cliente não identificado"}</span>
       <span class="application-text-meta truncate text-[#667080]">{ticket.queueName}</span>
       <span class="application-text-meta font-semibold text-[#000A57]">{globalStageName(ticket)}</span>
     </button>
