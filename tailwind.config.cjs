@@ -46,6 +46,7 @@ module.exports = {
           primary: "var(--app-primary)",
           "primary-hover": "var(--app-primary-hover)",
           accent: "var(--app-accent)",
+          overlay: "rgb(1 13 40 / <alpha-value>)",
           "success-bg": "var(--app-success-bg)",
           "success-surface": "var(--app-success-surface)",
           "success-border": "var(--app-success-border)",
