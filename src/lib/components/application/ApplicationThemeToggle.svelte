@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from "$app/stores";
   import { onMount } from "svelte";
   import { Moon, Sun } from "lucide-svelte";
   import "$lib/application/theme.css";
@@ -8,6 +9,8 @@
   const THEME_STORAGE_KEY = "f10-application-theme";
 
   let theme: ApplicationTheme = "light";
+
+  $: isApplicationRoute = $page.url.pathname === "/app" || $page.url.pathname.startsWith("/app/");
 
   function resolveTheme(): ApplicationTheme {
     const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -29,6 +32,8 @@
   }
 
   onMount(() => {
+    if (!isApplicationRoute) return;
+
     const colorScheme = window.matchMedia("(prefers-color-scheme: dark)");
     const handleSystemThemeChange = (event: MediaQueryListEvent) => {
       if (window.localStorage.getItem(THEME_STORAGE_KEY)) return;
@@ -45,17 +50,19 @@
   });
 </script>
 
-<button
-  type="button"
-  class="application-theme-toggle"
-  aria-label={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}
-  aria-pressed={theme === "dark"}
-  title={theme === "dark" ? "Modo claro" : "Modo escuro"}
-  on:click={toggleTheme}
->
-  {#if theme === "dark"}
-    <Sun size={17} aria-hidden="true" />
-  {:else}
-    <Moon size={17} aria-hidden="true" />
-  {/if}
-</button>
+{#if isApplicationRoute}
+  <button
+    type="button"
+    class="application-theme-toggle"
+    aria-label={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}
+    aria-pressed={theme === "dark"}
+    title={theme === "dark" ? "Modo claro" : "Modo escuro"}
+    on:click={toggleTheme}
+  >
+    {#if theme === "dark"}
+      <Sun size={17} aria-hidden="true" />
+    {:else}
+      <Moon size={17} aria-hidden="true" />
+    {/if}
+  </button>
+{/if}
