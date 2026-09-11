@@ -1,0 +1,215 @@
+.application-ui {
+  --application-theme-background: #F5F6FA;
+  --application-theme-surface: #FFFFFF;
+  --application-theme-surface-subtle: #FAFAFC;
+  --application-theme-surface-muted: #F3F4F7;
+  --application-theme-surface-selected: #EEF0FF;
+  --application-theme-border: #E2E5ED;
+  --application-theme-border-soft: #EEF0F5;
+  --application-theme-border-control: #DDE1EA;
+  --application-theme-text: #202637;
+  --application-theme-text-muted: #676D7D;
+  --application-theme-text-soft: #858B99;
+  --application-theme-primary: #000A57;
+  --application-theme-primary-hover: #111B71;
+  --application-theme-accent: #EA6D0B;
+  --application-theme-danger: #D92D20;
+  background-color: var(--application-theme-background);
+  color: var(--application-theme-text);
+  color-scheme: light;
+}
+
+html[data-application-theme="dark"] .application-ui {
+  --application-theme-background: #0B1020;
+  --application-theme-surface: #11182A;
+  --application-theme-surface-subtle: #161E31;
+  --application-theme-surface-muted: #1B2438;
+  --application-theme-surface-selected: #202B49;
+  --application-theme-border: #2A344A;
+  --application-theme-border-soft: #222C40;
+  --application-theme-border-control: #33405A;
+  --application-theme-text: #E8ECF5;
+  --application-theme-text-muted: #B8C0CF;
+  --application-theme-text-soft: #929DB0;
+  --application-theme-primary: #6674E8;
+  --application-theme-primary-hover: #7885F0;
+  --application-theme-accent: #FF8A2B;
+  --application-theme-danger: #FF6B63;
+  color-scheme: dark;
+}
+
+.application-theme-toggle {
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--application-theme-border-control);
+  border-radius: 0.75rem;
+  background: var(--application-theme-surface-muted);
+  color: var(--application-theme-text-muted);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.application-theme-toggle:hover {
+  background: var(--application-theme-surface-selected);
+  color: var(--application-theme-text);
+}
+
+.application-theme-toggle:focus-visible {
+  outline: 2px solid var(--application-theme-accent);
+  outline-offset: 2px;
+}
+
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="bg-white"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="bg-white/60"] {
+  background-color: var(--application-theme-surface);
+}
+
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="bg-[#F5F6FA]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="bg-[#F7F8FA]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="bg-[#FAFAFC]"] {
+  background-color: var(--application-theme-surface-subtle);
+}
+
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="bg-[#F3F4F7]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="bg-[#F5F6F8]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="bg-[#F6F7FB]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="bg-[#F0F1F4]"] {
+  background-color: var(--application-theme-surface-muted);
+}
+
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="bg-[#EEF0FF]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="bg-[#F8F9FF]"] {
+  background-color: var(--application-theme-surface-selected);
+}
+
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="bg-[#000A57]"] {
+  background-color: var(--application-theme-primary);
+}
+
+html[data-application-theme="dark"] .application-ui [class~="hover:bg-[#111B71]"]:hover {
+  background-color: var(--application-theme-primary-hover);
+}
+
+html[data-application-theme="dark"] .application-ui [class~="hover:bg-[#F3F4F7]"]:hover,
+html[data-application-theme="dark"] .application-ui [class~="hover:bg-[#F6F7FB]"]:hover,
+html[data-application-theme="dark"] .application-ui [class~="hover:bg-[#F7F8FB]"]:hover,
+html[data-application-theme="dark"] .application-ui [class~="hover:bg-[#F8F9FF]"]:hover,
+html[data-application-theme="dark"] .application-ui [class~="hover:bg-[#F0F1F4]"]:hover,
+html[data-application-theme="dark"] .application-ui [class~="hover:bg-[#EEF0FF]"]:hover {
+  background-color: var(--application-theme-surface-selected);
+}
+
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#E2E5ED]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#E1E4EC]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#E4E7EE]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#E5E7EC]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#E0E3E8]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#E0E3EB]"] {
+  border-color: var(--application-theme-border);
+}
+
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#EEF0F5]"] {
+  border-color: var(--application-theme-border-soft);
+}
+
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#DDE1EA]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#DDE1E8]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#DDE1E7]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#D9DDE4]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#D8DCE5]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#DCE0E6]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#D6DAE3]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#CCD1DA]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#C7CBD4]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="border-[#B9C0CE]"] {
+  border-color: var(--application-theme-border-control);
+}
+
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#010D28]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#000A57]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#202637]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#252B3B]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#2B303A]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#303746]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#313747]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#343A46]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#343B4B]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#3D4452]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#3E4553]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#434A5A]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#4D5464]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#4E5565]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#555C6D]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#5E6574]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#606776]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#626978]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#676D7D]"] {
+  color: var(--application-theme-text);
+}
+
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#6C7381]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#6D7482]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#6F7685]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#737989]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#747A89]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#777D8C]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#7A8190]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#7B8190]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#7C8290]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#7D8392]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#858B99]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#8A8F9D]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#8B909D]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#8B909E]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#9297A5]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#9499A5]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#989DA8]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#9A9EAA]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#9A9FAC]"],
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#9A9FAD]"] {
+  color: var(--application-theme-text-soft);
+}
+
+html[data-application-theme="dark"] :is(.application-ui, .application-ui *)[class~="text-[#EA6D0B]"] {
+  color: var(--application-theme-accent);
+}
+
+html[data-application-theme="dark"] .application-ui :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, select) {
+  background-color: var(--application-theme-surface);
+  border-color: var(--application-theme-border-control);
+  color: var(--application-theme-text);
+}
+
+html[data-application-theme="dark"] .application-ui input[type="file"] {
+  color: var(--application-theme-text-muted);
+}
+
+html[data-application-theme="dark"] .application-ui :is(input, textarea)::placeholder {
+  color: var(--application-theme-text-soft);
+}
+
+html[data-application-theme="dark"] .application-ui [class~="focus:border-[#000A57]"]:focus {
+  border-color: var(--application-theme-primary);
+}
+
+html[data-application-theme="dark"] .application-ui .prose {
+  --tw-prose-body: var(--application-theme-text-muted);
+  --tw-prose-headings: var(--application-theme-text);
+  --tw-prose-lead: var(--application-theme-text-muted);
+  --tw-prose-links: #9AA7FF;
+  --tw-prose-bold: var(--application-theme-text);
+  --tw-prose-counters: var(--application-theme-text-soft);
+  --tw-prose-bullets: var(--application-theme-text-soft);
+  --tw-prose-hr: var(--application-theme-border);
+  --tw-prose-quotes: var(--application-theme-text);
+  --tw-prose-quote-borders: var(--application-theme-border-control);
+  --tw-prose-captions: var(--application-theme-text-soft);
+  --tw-prose-code: var(--application-theme-text);
+  --tw-prose-pre-code: #D7DEEA;
+  --tw-prose-pre-bg: #0A0F1B;
+  --tw-prose-th-borders: var(--application-theme-border-control);
+  --tw-prose-td-borders: var(--application-theme-border);
+}
