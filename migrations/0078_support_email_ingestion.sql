@@ -81,5 +81,7 @@ CREATE INDEX IF NOT EXISTS support_email_inbound_events_conversation_idx
   ON support_email_inbound_events (provider, conversation_id, received_at DESC);
 
 INSERT INTO support_queues (code, name, default_due_days, active)
-VALUES ('sucesso', 'Sucesso do Cliente', 3, true)
+VALUES
+  ('financeiro', 'Financeiro', 3, true),
+  ('sucesso', 'Sucesso do Cliente', 3, true)
 ON CONFLICT (code) DO NOTHING;
