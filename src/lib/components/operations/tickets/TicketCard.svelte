@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { UserRound } from "lucide-svelte";
+  import { Mail, UserRound } from "lucide-svelte";
   import { labelClasses, priorityLabels } from "./presentation";
   import type { TicketItem } from "./types";
 
@@ -23,7 +23,10 @@
       </div>
     {/if}
     <div class="flex items-start justify-between gap-2">
-      <span class="application-text-meta font-bold text-[#EA6D0B]">#{ticket.ticketNumber}</span>
+      <span class="application-text-meta flex items-center gap-1.5 font-bold text-[#EA6D0B]">
+        #{ticket.ticketNumber}
+        {#if ticket.channel === "email"}<Mail size={11} aria-label="Recebido por e-mail"/>{/if}
+      </span>
       <span class="application-text-meta text-[#7C8290]">{priorityLabels[ticket.priority]}</span>
     </div>
     <strong class="mt-1.5 block text-[11px] font-semibold leading-4 text-[#252B3B]">{ticket.subject}</strong>
