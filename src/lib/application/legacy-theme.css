@@ -1,0 +1,117 @@
+/* Compatibilidade temporária para telas /app que ainda usam cores Tailwind literais. */
+.operations-shell.application-ui :is(
+  [class~="text-[8px]"],
+  [class~="text-[8.5px]"],
+  [class~="text-[9px]"]
+) {
+  font-size: 10px !important;
+}
+
+.operations-shell.application-ui :is(
+  [class~="text-[9.5px]"],
+  [class~="text-[10px]"]
+) {
+  font-size: 11px !important;
+}
+
+.operations-shell.application-ui [class~="text-[10.5px]"] {
+  font-size: 11.5px !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="bg-[#F5F7FA]"],
+  [class~="bg-[#FAFBFD]"],
+  [class~="bg-[#FCFCFD]"]
+) {
+  background-color: var(--app-surface-subtle) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="bg-[#FFF9F4]"],
+  [class~="bg-[#FFF4E9]"],
+  [class~="bg-[#FFF8E9]"],
+  [class~="bg-[#FFF9DF]"]
+) {
+  background-color: var(--app-warning-bg) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="bg-[#F6FBF7]"],
+  [class~="bg-[#F0F8F2]"],
+  [class~="bg-[#F7FBF8]"]
+) {
+  background-color: var(--app-success-bg) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="bg-[#EEF3FF]"],
+  [class~="bg-[#F7F0FF]"],
+  [class~="bg-[#EDF8FC]"],
+  [class~="bg-[#F6FBE7]"],
+  [class~="bg-[#FFF1F8]"]
+) {
+  background-color: var(--app-info-bg) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="border-[#DDE2EA]"],
+  [class~="border-[#D8DDF4]"]
+) {
+  border-color: var(--app-border-control) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="border-[#F0D7C4]"],
+  [class~="border-[#F4E4D7]"],
+  [class~="border-[#E8DDA9]"]
+) {
+  border-color: var(--app-warning-border) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="border-[#DCEDE2]"],
+  [class~="border-[#C8E3D0]"],
+  [class~="border-[#CDE5D4]"]
+) {
+  border-color: var(--app-success-border) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="text-[#222839]"],
+  [class~="text-[#4D5565]"],
+  [class~="text-[#5C6475]"],
+  [class~="text-[#5E6575]"]
+) {
+  color: var(--app-text) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="text-[#63816D]"],
+  [class~="text-[#71788A]"],
+  [class~="text-[#7B8292]"],
+  [class~="text-[#777D8D]"],
+  [class~="text-[#8A909E]"],
+  [class~="text-[#969BA8]"]
+) {
+  color: var(--app-text-soft) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="text-[#7A3B08]"],
+  [class~="text-[#91603A]"],
+  [class~="text-[#76510A]"]
+) {
+  color: var(--app-warning-text) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell [class~="text-[#255D38]"] {
+  color: var(--app-success-text) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell [class~="hover:bg-white"]:hover {
+  background-color: var(--app-surface-selected) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell .group:hover [class~="group-hover:bg-[#000A57]"] {
+  background-color: var(--app-primary) !important;
+}
