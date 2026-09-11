@@ -18,8 +18,18 @@
   font-size: 11.5px !important;
 }
 
+/* Superfícies neutras que ainda aparecem em páginas legadas. */
 html[data-application-theme="dark"] .operations-shell :is(
+  [class~="bg-[#FFFFFF]"],
+  [class~="bg-[#FEFEFF]"],
+  [class~="bg-[#FAFAFA]"],
+  [class~="bg-[#F9FAFB]"],
+  [class~="bg-[#F9FAFC]"],
+  [class~="bg-[#F8F9FC]"],
   [class~="bg-[#F5F7FA]"],
+  [class~="bg-[#F5F6F9]"],
+  [class~="bg-[#F1F4F8]"],
+  [class~="bg-[#FAFBFC]"],
   [class~="bg-[#FAFBFD]"],
   [class~="bg-[#FCFCFD]"]
 ) {
@@ -27,24 +37,91 @@ html[data-application-theme="dark"] .operations-shell :is(
 }
 
 html[data-application-theme="dark"] .operations-shell :is(
-  [class~="bg-[#FFF9F4]"],
+  [class~="bg-slate-50"],
+  [class~="bg-slate-100"],
+  [class~="bg-gray-50"],
+  [class~="bg-gray-100"],
+  [class~="bg-zinc-50"],
+  [class~="bg-zinc-100"],
+  [class~="bg-neutral-50"],
+  [class~="bg-neutral-100"]
+) {
+  background-color: var(--app-surface-muted) !important;
+}
+
+/* Branco com opacidade também precisa seguir a superfície escura. */
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="bg-white/95"],
+  [class~="bg-white/90"],
+  [class~="bg-white/80"],
+  [class~="bg-white/70"]
+) {
+  background-color: color-mix(in srgb, var(--app-surface) 94%, transparent) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="bg-white/50"],
+  [class~="bg-white/40"],
+  [class~="bg-white/30"]
+) {
+  background-color: color-mix(in srgb, var(--app-surface) 68%, transparent) !important;
+}
+
+/* Estados positivos. */
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="bg-[#F1FBF4]"],
+  [class~="bg-[#EAF7EE]"],
+  [class~="bg-[#EAF6ED]"],
+  [class~="bg-[#EEF8F1]"],
+  [class~="bg-[#EEF7F1]"],
+  [class~="bg-[#F0F8F2]"],
+  [class~="bg-[#F1F8F3]"],
+  [class~="bg-[#F3F9F5]"],
+  [class~="bg-[#F6FBF7]"],
+  [class~="bg-[#F7FBF8]"],
+  [class~="bg-[#F8FBF9]"]
+) {
+  background-color: var(--app-success-bg) !important;
+}
+
+/* Estados de atenção. */
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="bg-[#FFF0E4]"],
+  [class~="bg-[#FFF0E5]"],
+  [class~="bg-[#FFF2E8]"],
+  [class~="bg-[#FFF3E9]"],
+  [class~="bg-[#FFF4E8]"],
   [class~="bg-[#FFF4E9]"],
+  [class~="bg-[#FFF5EA]"],
+  [class~="bg-[#FFF7EF]"],
   [class~="bg-[#FFF8E9]"],
+  [class~="bg-[#FFF8EC]"],
+  [class~="bg-[#FFF8F1]"],
+  [class~="bg-[#FFF9F3]"],
+  [class~="bg-[#FFF9F4]"],
   [class~="bg-[#FFF9DF]"]
 ) {
   background-color: var(--app-warning-bg) !important;
 }
 
+/* Estados de erro. */
 html[data-application-theme="dark"] .operations-shell :is(
-  [class~="bg-[#F6FBF7]"],
-  [class~="bg-[#F0F8F2]"],
-  [class~="bg-[#F7FBF8]"]
+  [class~="bg-[#FFF0F0]"],
+  [class~="bg-[#FFF3F3]"],
+  [class~="bg-[#FFF5F5]"],
+  [class~="bg-[#FFF7F7]"]
 ) {
-  background-color: var(--app-success-bg) !important;
+  background-color: var(--app-danger-bg) !important;
 }
 
+/* Informação e superfícies coloridas de baixa intensidade. */
 html[data-application-theme="dark"] .operations-shell :is(
+  [class~="bg-[#EEF0FF]"],
   [class~="bg-[#EEF3FF]"],
+  [class~="bg-[#F2F0FF]"],
+  [class~="bg-[#F3F4FF]"],
+  [class~="bg-[#F3F5FF]"],
+  [class~="bg-[#F6F7FF]"],
   [class~="bg-[#F7F0FF]"],
   [class~="bg-[#EDF8FC]"],
   [class~="bg-[#F6FBE7]"],
@@ -53,22 +130,37 @@ html[data-application-theme="dark"] .operations-shell :is(
   background-color: var(--app-info-bg) !important;
 }
 
+/* Bordas neutras. */
 html[data-application-theme="dark"] .operations-shell :is(
   [class~="border-[#DDE2EA]"],
-  [class~="border-[#D8DDF4]"]
+  [class~="border-[#D8DDF4]"],
+  [class~="border-[#D7DAE3]"],
+  [class~="border-[#D5D9E2]"],
+  [class~="border-[#CDD2DD]"],
+  [class~="border-[#CCD1DD]"],
+  [class~="border-[#C9CEDA]"],
+  [class~="border-[#BFC5D2]"],
+  [class~="border-[#B9C0CF]"],
+  [class~="border-[#E1E4EA]"],
+  [class~="border-[#E2E5EC]"],
+  [class~="border-[#E3E6ED]"],
+  [class~="border-[#E3E6EE]"],
+  [class~="border-[#E5E7ED]"],
+  [class~="border-[#ECEEF3]"]
 ) {
   border-color: var(--app-border-control) !important;
 }
 
-html[data-application-theme="dark"] .operations-shell :is(
-  [class~="border-[#F0D7C4]"],
-  [class~="border-[#F4E4D7]"],
-  [class~="border-[#E8DDA9]"]
-) {
-  border-color: var(--app-warning-border) !important;
+html[data-application-theme="dark"] .operations-shell [class~="border-white"] {
+  border-color: var(--app-surface) !important;
 }
 
+/* Bordas semânticas. */
 html[data-application-theme="dark"] .operations-shell :is(
+  [class~="border-[#B9E6C9]"],
+  [class~="border-[#A9D7B7]"],
+  [class~="border-[#C9E6D1]"],
+  [class~="border-[#CFE8D7]"],
   [class~="border-[#DCEDE2]"],
   [class~="border-[#C8E3D0]"],
   [class~="border-[#CDE5D4]"]
@@ -77,41 +169,172 @@ html[data-application-theme="dark"] .operations-shell :is(
 }
 
 html[data-application-theme="dark"] .operations-shell :is(
+  [class~="border-[#F0D7C4]"],
+  [class~="border-[#F4E4D7]"],
+  [class~="border-[#F1D7BD]"],
+  [class~="border-[#F0D6BD]"],
+  [class~="border-[#E8DDA9]"]
+) {
+  border-color: var(--app-warning-border) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="border-[#F0C8C8]"],
+  [class~="border-[#F2DADA]"]
+) {
+  border-color: var(--app-danger-border) !important;
+}
+
+/* Divide utilities aplicam borda nos filhos, não no elemento pai. */
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="divide-[#EEF0F5]"],
+  [class~="divide-[#EEF0F4]"],
+  [class~="divide-[#ECEEF3]"]
+) > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--app-border-soft) !important;
+}
+
+/* Textos principais ainda declarados com hex literal. */
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="text-[#202636]"],
   [class~="text-[#222839]"],
+  [class~="text-[#252C3D]"],
+  [class~="text-[#343B4B]"],
+  [class~="text-[#3A4050]"],
+  [class~="text-[#3B4150]"],
+  [class~="text-[#3D4454]"],
+  [class~="text-[#3E4453]"],
+  [class~="text-[#414858]"],
+  [class~="text-[#444A59]"],
+  [class~="text-[#454C5D]"],
+  [class~="text-[#4A5060]"],
   [class~="text-[#4D5565]"],
+  [class~="text-[#505666]"],
+  [class~="text-[#515868]"],
+  [class~="text-[#555B69]"],
+  [class~="text-[#555B6B]"],
+  [class~="text-[#5A6170]"],
   [class~="text-[#5C6475]"],
-  [class~="text-[#5E6575]"]
+  [class~="text-[#5E6575]"],
+  [class~="text-[#626877]"],
+  [class~="text-[#626879]"],
+  [class~="text-[#626979]"],
+  [class~="text-[#646A79]"]
 ) {
   color: var(--app-text) !important;
 }
 
+/* Textos secundários e auxiliares. */
 html[data-application-theme="dark"] .operations-shell :is(
   [class~="text-[#63816D]"],
+  [class~="text-[#656B7B]"],
+  [class~="text-[#666D7C]"],
+  [class~="text-[#686E7E]"],
+  [class~="text-[#687080]"],
+  [class~="text-[#6E7482]"],
+  [class~="text-[#6E7483]"],
+  [class~="text-[#707685]"],
   [class~="text-[#71788A]"],
-  [class~="text-[#7B8292]"],
+  [class~="text-[#727887]"],
+  [class~="text-[#727888]"],
+  [class~="text-[#737988]"],
+  [class~="text-[#747B8A]"],
   [class~="text-[#777D8D]"],
+  [class~="text-[#7B8292]"],
+  [class~="text-[#7C8291]"],
+  [class~="text-[#7F8594]"],
+  [class~="text-[#858A98]"],
   [class~="text-[#8A909E]"],
-  [class~="text-[#969BA8]"]
+  [class~="text-[#8B909C]"],
+  [class~="text-[#9297A4]"],
+  [class~="text-[#969BA7]"],
+  [class~="text-[#969BA8]"],
+  [class~="text-[#979CA8]"],
+  [class~="text-[#999EAA]"],
+  [class~="text-[#9B9FAC]"],
+  [class~="text-[#A0A5B2]"],
+  [class~="text-[#A2A7B2]"],
+  [class~="text-[#A9AFBC]"],
+  [class~="text-[#B5BAC7]"]
 ) {
   color: var(--app-text-soft) !important;
 }
 
 html[data-application-theme="dark"] .operations-shell :is(
+  [class~="text-slate-500"],
+  [class~="text-slate-600"],
+  [class~="text-gray-500"],
+  [class~="text-gray-600"],
+  [class~="text-zinc-500"],
+  [class~="text-zinc-600"]
+) {
+  color: var(--app-text-muted) !important;
+}
+
+/* Texto semântico com contraste adequado no dark. */
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="text-[#176B35]"],
+  [class~="text-[#255D38]"],
+  [class~="text-[#287645]"],
+  [class~="text-[#2D7143]"],
+  [class~="text-[#31553B]"],
+  [class~="text-[#427354]"]
+) {
+  color: var(--app-success-text) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
   [class~="text-[#7A3B08]"],
   [class~="text-[#91603A]"],
-  [class~="text-[#76510A]"]
+  [class~="text-[#76510A]"],
+  [class~="text-[#C85C08]"]
 ) {
   color: var(--app-warning-text) !important;
 }
 
-html[data-application-theme="dark"] .operations-shell [class~="text-[#255D38]"] {
-  color: var(--app-success-text) !important;
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="text-[#7F2525]"],
+  [class~="text-[#9B3C3C]"],
+  [class~="text-[#B42318]"]
+) {
+  color: var(--app-danger-text) !important;
 }
 
-html[data-application-theme="dark"] .operations-shell [class~="hover:bg-white"]:hover {
+/* Estados de interação que antes voltavam para branco/azul escuro. */
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="hover:bg-white"],
+  [class~="focus:bg-white"]
+):is(:hover, :focus) {
   background-color: var(--app-surface-selected) !important;
 }
 
-html[data-application-theme="dark"] .operations-shell .group:hover [class~="group-hover:bg-[#000A57]"] {
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="hover:bg-[#F8F9FC]"],
+  [class~="hover:bg-[#FAFBFD]"]
+):hover {
+  background-color: var(--app-surface-selected) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="hover:text-[#000A57]"],
+  [class~="focus:text-[#000A57]"]
+):is(:hover, :focus) {
+  color: var(--app-info-text) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell .group:hover :is(
+  [class~="group-hover:bg-[#000A57]"],
+  [class~="group-hover:text-[#000A57]"]
+) {
   background-color: var(--app-primary) !important;
+  color: #FFFFFF !important;
+}
+
+/* Campos desabilitados não devem voltar para a paleta clara. */
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="disabled:bg-[#FAFAFC]"],
+  [class~="disabled:bg-[#F8F9FB]"]
+):disabled {
+  background-color: var(--app-surface-muted) !important;
+  color: var(--app-text-soft) !important;
 }
