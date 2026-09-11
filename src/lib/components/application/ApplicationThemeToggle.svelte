@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import { Moon, Sun } from "lucide-svelte";
   import "$lib/application/theme.css";
+  import "$lib/application/legacy-theme.css";
 
   type ApplicationTheme = "light" | "dark";
 
