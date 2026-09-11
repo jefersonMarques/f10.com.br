@@ -28,6 +28,7 @@ html[data-application-theme="dark"] .operations-shell :is(
   [class~="bg-[#F8F9FC]"],
   [class~="bg-[#F5F7FA]"],
   [class~="bg-[#F5F6F9]"],
+  [class~="bg-[#F2F3F8]"],
   [class~="bg-[#F1F4F8]"],
   [class~="bg-[#FAFBFC]"],
   [class~="bg-[#FAFBFD]"],
@@ -224,6 +225,15 @@ html[data-application-theme="dark"] .operations-shell :is(
   color: var(--app-text) !important;
 }
 
+/* Textos de leitura contínua precisam de um contraste intermediário. */
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="text-[#555C6C]"],
+  [class~="text-[#596071]"],
+  [class~="text-[#656C7B]"]
+) {
+  color: var(--app-text-muted) !important;
+}
+
 /* Textos secundários e auxiliares. */
 html[data-application-theme="dark"] .operations-shell :is(
   [class~="text-[#63816D]"],
@@ -238,6 +248,7 @@ html[data-application-theme="dark"] .operations-shell :is(
   [class~="text-[#727887]"],
   [class~="text-[#727888]"],
   [class~="text-[#737988]"],
+  [class~="text-[#747A8A]"],
   [class~="text-[#747B8A]"],
   [class~="text-[#777D8D]"],
   [class~="text-[#7B8292]"],
@@ -252,6 +263,7 @@ html[data-application-theme="dark"] .operations-shell :is(
   [class~="text-[#979CA8]"],
   [class~="text-[#999EAA]"],
   [class~="text-[#9B9FAC]"],
+  [class~="text-[#9BA0AC]"],
   [class~="text-[#A0A5B2]"],
   [class~="text-[#A2A7B2]"],
   [class~="text-[#A9AFBC]"],
@@ -273,7 +285,9 @@ html[data-application-theme="dark"] .operations-shell :is(
 
 /* Texto semântico com contraste adequado no dark. */
 html[data-application-theme="dark"] .operations-shell :is(
+  [class~="text-[#174D29]"],
   [class~="text-[#176B35]"],
+  [class~="text-[#245B35]"],
   [class~="text-[#255D38]"],
   [class~="text-[#287645]"],
   [class~="text-[#2D7143]"],
@@ -281,6 +295,14 @@ html[data-application-theme="dark"] .operations-shell :is(
   [class~="text-[#427354]"]
 ) {
   color: var(--app-success-text) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="text-[#245D91]"],
+  [class~="text-[#27637B]"],
+  [class~="text-[#5C4BA2]"]
+) {
+  color: var(--app-info-text) !important;
 }
 
 html[data-application-theme="dark"] .operations-shell :is(
@@ -316,24 +338,33 @@ html[data-application-theme="dark"] .operations-shell :is(
 }
 
 html[data-application-theme="dark"] .operations-shell :is(
+  [class~="hover:bg-[#FFF0F0]"],
+  [class~="hover:bg-[#FFF7F7]"]
+):hover {
+  background-color: var(--app-danger-bg) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
   [class~="hover:text-[#000A57]"],
   [class~="focus:text-[#000A57]"]
 ):is(:hover, :focus) {
   color: var(--app-info-text) !important;
 }
 
-html[data-application-theme="dark"] .operations-shell .group:hover :is(
-  [class~="group-hover:bg-[#000A57]"],
-  [class~="group-hover:text-[#000A57]"]
-) {
+html[data-application-theme="dark"] .operations-shell .group:hover [class~="group-hover:bg-[#000A57]"] {
   background-color: var(--app-primary) !important;
   color: #FFFFFF !important;
+}
+
+html[data-application-theme="dark"] .operations-shell .group:hover [class~="group-hover:text-[#000A57]"] {
+  color: var(--app-info-text) !important;
 }
 
 /* Campos desabilitados não devem voltar para a paleta clara. */
 html[data-application-theme="dark"] .operations-shell :is(
   [class~="disabled:bg-[#FAFAFC]"],
-  [class~="disabled:bg-[#F8F9FB]"]
+  [class~="disabled:bg-[#F8F9FB]"],
+  [class~="disabled:bg-[#F1F2F5]"]
 ):disabled {
   background-color: var(--app-surface-muted) !important;
   color: var(--app-text-soft) !important;
