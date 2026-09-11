@@ -218,7 +218,7 @@
   );
 </script>
 
-<div class="bg-white">
+<div class="bg-app-surface">
   {#if items.length === 0}
     <div class="flex min-h-[320px] items-center justify-center px-5 py-12 text-center">
       <div>
@@ -230,7 +230,7 @@
     <div class="divide-y divide-[#ECEEF3]">
       {#each items as item}
         {@const date = formatDate(item.key)}
-        <div class={`grid gap-3 px-4 py-3 transition hover:bg-[#FAFAFC] sm:grid-cols-[92px_110px_minmax(0,1fr)_150px] sm:items-center lg:px-5 ${item.completed ? "opacity-60" : ""}`}>
+        <div class={`grid gap-3 px-4 py-3 transition hover:bg-app-subtle sm:grid-cols-[92px_110px_minmax(0,1fr)_150px] sm:items-center lg:px-5 ${item.completed ? "opacity-60" : ""}`}>
           <div class="flex items-baseline gap-2 sm:block">
             <strong class="application-text-body capitalize text-[#303747]">{date.day}</strong>
             <span class="application-text-meta capitalize text-[#9298A5] sm:mt-0.5 sm:block">{date.weekday}</span>
@@ -238,19 +238,19 @@
 
           <div>
             {#if item.source === "task"}
-              <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#EEF0FF] px-2 py-1 font-bold text-[#000A57]"><CheckSquare2 size={11}/>Tarefa</span>
+              <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-app-info-bg px-2 py-1 font-bold text-app-primary"><CheckSquare2 size={11}/>Tarefa</span>
             {:else if item.source === "ticket"}
-              <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#FFF4E8] px-2 py-1 font-bold text-[#9B530F]"><Headphones size={11}/>Ticket</span>
+              <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-app-warning-surface px-2 py-1 font-bold text-app-warning-text"><Headphones size={11}/>Ticket</span>
             {:else if item.source === "booking"}
-              <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#F2F0FF] px-2 py-1 font-bold text-[#5C4BA2]"><CalendarClock size={11}/>Agendamento</span>
+              <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-app-info-bg px-2 py-1 font-bold text-app-info-text"><CalendarClock size={11}/>Agendamento</span>
             {:else}
-              <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#EEF8F1] px-2 py-1 font-bold text-[#2F7045]"><Link2 size={11}/>Google</span>
+              <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-app-success-bg px-2 py-1 font-bold text-app-success-text"><Link2 size={11}/>Google</span>
             {/if}
           </div>
 
           <div class="min-w-0">
             {#if item.href}
-              <a href={item.href} target={item.external ? "_blank" : undefined} rel={item.external ? "noopener noreferrer" : undefined} class={`application-text-caption inline-flex max-w-full items-center gap-1.5 font-semibold text-[#343B4B] hover:text-[#000A57] ${item.completed ? "line-through" : ""}`}>
+              <a href={item.href} target={item.external ? "_blank" : undefined} rel={item.external ? "noopener noreferrer" : undefined} class={`application-text-caption inline-flex max-w-full items-center gap-1.5 font-semibold text-[#343B4B] hover:text-app-primary ${item.completed ? "line-through" : ""}`}>
                 <span class="truncate">{item.title}</span>
                 {#if item.external}<ExternalLink size={10} class="shrink-0"/>{/if}
               </a>
@@ -261,7 +261,7 @@
           </div>
 
           <div class="sm:text-right">
-            <span class={`application-text-meta inline-flex items-center gap-1 font-semibold ${item.completed ? "text-[#2F7045]" : "text-[#747B8A]"}`}>
+            <span class={`application-text-meta inline-flex items-center gap-1 font-semibold ${item.completed ? "text-app-success-text" : "text-[#747B8A]"}`}>
               {#if item.completed}<CheckCircle2 size={12}/>{/if}{item.status}
             </span>
           </div>

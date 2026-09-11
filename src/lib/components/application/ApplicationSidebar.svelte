@@ -153,20 +153,20 @@
   }
 </script>
 
-<aside class="border-b border-[#E2E5ED] bg-white transition-[width] duration-200 lg:sticky lg:top-0 lg:h-[100dvh] lg:min-h-[100dvh] lg:border-b-0 lg:border-r">
+<aside class="border-b border-app-border bg-app-surface transition-[width] duration-200 lg:sticky lg:top-0 lg:h-[100dvh] lg:min-h-[100dvh] lg:border-b-0 lg:border-r">
   <div class="flex h-full flex-col">
-    <div class={`flex h-[68px] items-center border-b border-[#EEF0F5] px-4 transition-all lg:px-3 ${collapsed ? "lg:justify-center lg:gap-1" : "justify-between lg:px-5"}`}>
+    <div class={`flex h-[68px] items-center border-b border-app-border-soft px-4 transition-all lg:px-3 ${collapsed ? "lg:justify-center lg:gap-1" : "justify-between lg:px-5"}`}>
       <a href="/app" class={`flex min-w-0 items-center ${collapsed ? "lg:justify-center" : "gap-3"}`} title={collapsed ? "F10 Operations" : ""}>
-        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-sm font-bold text-white">F10</span>
+        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-primary text-sm font-bold text-white">F10</span>
         <span class={collapsed ? "lg:hidden" : ""}>
           <strong class="block text-[14px] font-semibold leading-4">Operations</strong>
-          <small class="mt-0.5 block text-[11px] font-medium text-[#8A8F9D]">Área interna</small>
+          <small class="mt-0.5 block text-[11px] font-medium text-app-text-soft">Área interna</small>
         </span>
       </a>
 
       <button
         type="button"
-        class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#7B8190] transition hover:bg-[#F3F4F7] hover:text-[#000A57] lg:flex"
+        class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-app-text-muted transition hover:bg-app-muted hover:text-app-primary lg:flex"
         aria-label={collapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
         aria-pressed={collapsed}
         title={collapsed ? "Expandir menu" : "Recolher menu"}
@@ -174,16 +174,16 @@
       >
         {#if collapsed}<PanelLeftOpen size={16}/>{:else}<PanelLeftClose size={16}/>{/if}
       </button>
-      <ShieldCheck class="text-[#EA6D0B] lg:hidden" size={20} aria-hidden="true" />
+      <ShieldCheck class="text-app-accent lg:hidden" size={20} aria-hidden="true" />
     </div>
 
     <nav class={`hidden flex-1 overflow-y-auto py-4 lg:block ${collapsed ? "px-2" : "px-3"}`} aria-label="Navegação principal">
       {#each visibleNavigationSections as section, sectionIndex}
         <section class={sectionIndex > 0 ? "mt-4" : ""} aria-label={section.label}>
           {#if collapsed}
-            {#if sectionIndex > 0}<div class="mx-2 mb-3 border-t border-[#EEF0F5]"></div>{/if}
+            {#if sectionIndex > 0}<div class="mx-2 mb-3 border-t border-app-border-soft"></div>{/if}
           {:else}
-            <p class="application-text-meta px-3 pb-2 font-bold uppercase tracking-[0.14em] text-[#9A9FAD]">{section.label}</p>
+            <p class="application-text-meta px-3 pb-2 font-bold uppercase tracking-[0.14em] text-app-text-soft">{section.label}</p>
           {/if}
 
           <div class="space-y-1">
@@ -194,7 +194,7 @@
                 <div class="relative py-0.5">
                   <button
                     type="button"
-                    class={`relative flex min-h-10 w-full items-center rounded-xl text-[13px] font-semibold transition ${collapsed ? "justify-center px-2" : "gap-3 px-3 text-left"} ${groupActive ? "bg-[#F8F9FF] text-[#000A57]" : "text-[#676D7D] hover:bg-[#F7F8FB] hover:text-[#000A57]"}`}
+                    class={`relative flex min-h-10 w-full items-center rounded-xl text-[13px] font-semibold transition ${collapsed ? "justify-center px-2" : "gap-3 px-3 text-left"} ${groupActive ? "bg-app-selected text-app-primary" : "text-app-text-muted hover:bg-app-muted hover:text-app-primary"}`}
                     aria-expanded={groupOpen || (!collapsed && groupActive)}
                     aria-label={collapsed ? item.label : undefined}
                     title={collapsed ? item.label : ""}
@@ -208,9 +208,9 @@
                   </button>
 
                   {#if !collapsed && (groupOpen || groupActive)}
-                    <div class="ml-[22px] mt-1 space-y-1 border-l border-[#E4E7EE] pl-3">
+                    <div class="ml-[22px] mt-1 space-y-1 border-l border-app-border pl-3">
                       {#each item.children as child}
-                        <a href={child.href} class={`flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-[11px] font-semibold transition ${isActiveNavigationItem(pathname, child.href) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#747A89] hover:bg-[#F7F8FB] hover:text-[#000A57]"}`}>
+                        <a href={child.href} class={`flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-[11px] font-semibold transition ${isActiveNavigationItem(pathname, child.href) ? "bg-app-info-bg text-app-primary" : "text-app-text-muted hover:bg-app-muted hover:text-app-primary"}`}>
                           <svelte:component this={child.icon} size={15} aria-hidden="true" />
                           <span>{child.label}</span>
                         </a>
@@ -222,14 +222,14 @@
                 {@const badge = navigationBadge(item.href)}
                 <a
                   href={item.href}
-                  class={`relative flex min-h-10 items-center rounded-xl text-[13px] font-semibold transition ${collapsed ? "justify-center px-2" : "gap-3 px-3"} ${isActiveNavigationItem(pathname, item.href) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#676D7D] hover:bg-[#F7F8FB] hover:text-[#000A57]"}`}
+                  class={`relative flex min-h-10 items-center rounded-xl text-[13px] font-semibold transition ${collapsed ? "justify-center px-2" : "gap-3 px-3"} ${isActiveNavigationItem(pathname, item.href) ? "bg-app-info-bg text-app-primary" : "text-app-text-muted hover:bg-app-muted hover:text-app-primary"}`}
                   aria-label={collapsed ? item.label : undefined}
                   title={collapsed ? item.label : ""}
                 >
                   <svelte:component this={item.icon} size={18} aria-hidden="true" />
                   {#if !collapsed}<span class="flex-1">{item.label}</span>{/if}
                   {#if badge > 0}
-                    <span class={`application-text-meta inline-flex items-center justify-center rounded-full bg-[#D92D20] font-bold text-white ${collapsed ? "absolute right-0 top-0 h-4 min-w-4 px-1 text-[8px]" : "min-w-5 px-1.5 py-0.5"}`}>{Math.min(badge, 99)}</span>
+                    <span class={`application-text-meta inline-flex items-center justify-center rounded-full bg-red-600 font-bold text-white ${collapsed ? "absolute right-0 top-0 h-4 min-w-4 px-1 text-[8px]" : "min-w-5 px-1.5 py-0.5"}`}>{Math.min(badge, 99)}</span>
                   {:else if !collapsed}
                     <ChevronRight size={15} aria-hidden="true" />
                   {/if}
