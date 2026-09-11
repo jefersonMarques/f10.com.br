@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ApplicationThemeToggle from "./ApplicationThemeToggle.svelte";
+
   export let title: string;
   export let section: string | undefined = undefined;
   export let description: string | undefined = undefined;
@@ -26,6 +28,7 @@
     </div>
 
     <div class="flex shrink-0 items-center gap-2 sm:gap-3">
+      <ApplicationThemeToggle />
       <slot name="actions" />
     </div>
   </div>
