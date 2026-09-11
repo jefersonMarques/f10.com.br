@@ -168,10 +168,24 @@ export const ticketMessages = pgTable(
     visibility: supportMessageVisibility("visibility").notNull().default("public"),
     channel: supportChannel("channel").notNull().default("manual"),
     body: text("body").notNull(),
+    externalMessageId: text("external_message_id"),
+    externalThreadId: text("external_thread_id"),
+    externalMetadata: jsonb("external_metadata")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("ticket_messages_ticket_idx").on(table.ticketId, table.createdAt)],
+  (table) => [
+    index("ticket_messages_ticket_idx").on(table.ticketId, table.createdAt),
+    uniqueIndex("ticket_messages_email_external_message_unique")
+      .on(table.externalMessageId)
+      .where(sql`${table.channel} = 'email' AND ${table.externalMessageId} IS NOT NULL`),
+    index("ticket_messages_external_thread_idx")
+      .on(table.externalThreadId, table.createdAt)
+      .where(sql`${table.externalThreadId} IS NOT NULL`),
+  ],
 );
 
 export const ticketEvents = pgTable(
