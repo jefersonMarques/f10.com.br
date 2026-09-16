@@ -45,14 +45,14 @@ async function listCandidates(requestType: ServiceRequestType): Promise<ServiceR
 
 export async function getServiceRequestEmailSettings(): Promise<ServiceRequestEmailSetting[]> {
   const db = getDatabase();
-  const [saved, ...candidateLists] = await Promise.all([
+  const [saved, candidateLists] = await Promise.all([
     db
       .select({
         requestType: serviceRequestEmailRecipients.requestType,
         recipientUserId: serviceRequestEmailRecipients.recipientUserId,
       })
       .from(serviceRequestEmailRecipients),
-    ...SERVICE_REQUEST_TYPES.map((requestType) => listCandidates(requestType)),
+    Promise.all(SERVICE_REQUEST_TYPES.map((requestType) => listCandidates(requestType))),
   ]);
   const recipientByType = new Map(saved.map((row) => [row.requestType, row.recipientUserId]));
 
