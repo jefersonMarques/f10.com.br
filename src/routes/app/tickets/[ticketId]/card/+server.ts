@@ -1,6 +1,7 @@
 import { error, json, type RequestHandler } from "@sveltejs/kit";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
+import { getServiceRequestTicketSummary } from "$lib/server/serviceRequests/serviceRequestExport";
 import { getTicketCard } from "$lib/server/support/ticketCardRepository";
 import { markTicketFirstAgentView } from "$lib/server/support/ticketCustomerProgressRepository";
 import { listTicketTasks } from "$lib/server/support/ticketTaskBridge";
@@ -31,13 +32,14 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
       hasPermission(permissions, "tickets.reply") &&
       hasPermission(permissions, "tasks.create");
 
-    const [linkedTasks, taskProjects] = await Promise.all([
+    const [linkedTasks, taskProjects, serviceRequest] = await Promise.all([
       canViewTasks
         ? listTicketTasks(session.user.id, permissions, params.ticketId).catch(() => [])
         : Promise.resolve([]),
       canCreateTask
         ? listTaskProjects(session.user.id, permissions).catch(() => [])
         : Promise.resolve([]),
+      getServiceRequestTicketSummary(params.ticketId).catch(() => null),
     ]);
 
     return json(
@@ -46,6 +48,7 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
         linkedTasks,
         taskProjects,
         canCreateTask,
+        serviceRequest,
       },
       {
         headers: {
