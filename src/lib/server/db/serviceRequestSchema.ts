@@ -36,6 +36,21 @@ export const serviceRequestRoutes = pgTable("service_request_routes", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const serviceRequestEmailRecipients = pgTable(
+  "service_request_email_recipients",
+  {
+    requestType: serviceRequestType("request_type").primaryKey(),
+    recipientUserId: uuid("recipient_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    updatedBy: uuid("updated_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+);
+
 export const serviceRequests = pgTable(
   "service_requests",
   {
