@@ -25,8 +25,8 @@ function requestDetail(data: Record<string, ServiceRequestDataValue>): string {
   return typeof value === "string" ? value.trim().slice(0, 160) : "Solicitação recebida";
 }
 
-async function getRecipient(requestType: ServiceRequestType) {
-  const [recipient] = await getDatabase()
+async function getRecipients(requestType: ServiceRequestType) {
+  return getDatabase()
     .select({ id: users.id, name: users.name, email: users.email })
     .from(serviceRequestEmailRecipients)
     .innerJoin(users, eq(users.id, serviceRequestEmailRecipients.recipientUserId))
@@ -45,9 +45,7 @@ async function getRecipient(requestType: ServiceRequestType) {
         eq(teams.active, true),
         eq(users.status, "active"),
       ),
-    )
-    .limit(1);
-  return recipient ?? null;
+    );
 }
 
 export async function notifyServiceRequestRecipient(input: {
@@ -55,22 +53,27 @@ export async function notifyServiceRequestRecipient(input: {
   ticketNumber: number;
   data: Record<string, ServiceRequestDataValue>;
 }): Promise<void> {
-  const recipient = await getRecipient(input.requestType);
-  if (!recipient) return;
+  const recipients = await getRecipients(input.requestType);
+  if (recipients.length === 0) return;
 
   const label = serviceRequestLabel(input.requestType);
   const detail = requestDetail(input.data);
-  await sendTransactionalEmail({
-    to: { email: recipient.email, name: recipient.name },
-    subject: `Ticket #${input.ticketNumber} · Nova solicitação de ${label}`,
-    textContent: [
-      `Olá, ${recipient.name}.`,
-      "",
-      `Uma nova solicitação de ${label} foi recebida.`,
-      `Ticket: #${input.ticketNumber}`,
-      `Referência: ${detail}`,
-      "",
-      "Acesse o F10 Operations para visualizar e atender o ticket.",
-    ].join("\n"),
-  });
+
+  await Promise.all(
+    recipients.map((recipient) =>
+      sendTransactionalEmail({
+        to: { email: recipient.email, name: recipient.name },
+        subject: `Ticket #${input.ticketNumber} · Nova solicitação de ${label}`,
+        textContent: [
+          `Olá, ${recipient.name}.`,
+          "",
+          `Uma nova solicitação de ${label} foi recebida.`,
+          `Ticket: #${input.ticketNumber}`,
+          `Referência: ${detail}`,
+          "",
+          "Acesse o F10 Operations para visualizar e atender o ticket.",
+        ].join("\n"),
+      }),
+    ),
+  );
 }
