@@ -22,6 +22,7 @@ import {
   serviceRequestLabel,
   type ServiceRequestType,
 } from "$lib/server/serviceRequests/serviceRequestDefinitions";
+import { notifyServiceRequestRecipient } from "$lib/server/serviceRequests/serviceRequestEmailNotification";
 import { resolveServiceRequestIntake } from "$lib/server/serviceRequests/serviceRequestIntake";
 import {
   deleteStoredServiceRequestAttachments,
@@ -321,6 +322,17 @@ export async function createCustomerServiceRequest(
         ticketId: result.ticketId,
         requestType: input.requestType,
         causeType: cause instanceof Error ? cause.name : typeof cause,
+      });
+    });
+    await notifyServiceRequestRecipient({
+      requestType: input.requestType,
+      ticketNumber: result.ticketNumber,
+      data: normalized.data,
+    }).catch((cause) => {
+      console.error("[service-request.email]", {
+        ticketId: result.ticketId,
+        requestType: input.requestType,
+        errorCode: cause instanceof Error ? cause.message : "SERVICE_REQUEST_EMAIL_FAILED",
       });
     });
 
