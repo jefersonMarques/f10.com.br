@@ -1,7 +1,7 @@
 <script lang="ts">
   import { UserCheck } from "lucide-svelte";
 
-  export type SelectableUser = {
+  type SelectableUser = {
     id: string;
     name: string;
     email: string;
