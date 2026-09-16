@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ExternalLink, FileText, Paperclip, Tag, Trash2, X } from "lucide-svelte";
+  import { Download, ExternalLink, FileText, Paperclip, Tag, Trash2, X } from "lucide-svelte";
   import TicketTaskPanel from "$lib/components/operations/TicketTaskPanel.svelte";
   import { eventLabels, formatBytes, formatDateTime, labelClasses, priorityLabels } from "./presentation";
   import type { TicketCardData, TicketWorkflow, TicketWorkflowBoard } from "./types";
@@ -53,7 +53,12 @@
           <h2 class="mt-1 text-[23px] font-semibold leading-8 text-[#2B303A]">{card.details.ticket.subject}</h2>
           <p class="application-text-meta mt-1 text-[#858B99]">{card.workflowContext?.areaName ? `${card.workflowContext.areaName} · ${card.workflowContext.areaStageName ?? card.workflowContext.globalStageName}` : card.workflowContext?.globalStageName ?? "Fluxo global"}</p>
         </div>
-        <button type="button" on:click={onClose} class="flex h-9 w-9 items-center justify-center rounded-lg text-[#6F7685] hover:bg-[#F0F1F4]"><X size={18}/></button>
+        <div class="flex shrink-0 items-center gap-2">
+          {#if card.serviceRequest}
+            <a href={`/app/tickets/${card.details.ticket.id}/export`} class="application-text-caption inline-flex h-9 items-center gap-2 rounded-lg border border-[#CCD1DA] bg-white px-3 font-semibold text-[#000A57]" title={`Baixar dados de ${card.serviceRequest.label}`}><Download size={14}/><span class="hidden sm:inline">Baixar dados</span></a>
+          {/if}
+          <button type="button" on:click={onClose} class="flex h-9 w-9 items-center justify-center rounded-lg text-[#6F7685] hover:bg-[#F0F1F4]"><X size={18}/></button>
+        </div>
       </header>
 
       <div class="space-y-7 px-5 py-6 sm:px-7">
