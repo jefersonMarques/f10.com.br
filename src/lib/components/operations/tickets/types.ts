@@ -113,6 +113,10 @@ export type TicketCardData = {
   selectedLabels: TicketLabel[];
   attachments: TicketAttachment[];
   attachmentsEnabled: boolean;
+  serviceRequest: {
+    requestType: "nfse" | "cell_coin";
+    label: string;
+  } | null;
   linkedTasks: Array<{
     id: string;
     title: string;
