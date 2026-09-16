@@ -19,7 +19,7 @@ export type ServiceRequestEmailCandidate = {
 
 export type ServiceRequestEmailSetting = {
   requestType: ServiceRequestType;
-  recipientUserId: string | null;
+  recipientUserIds: string[];
   users: ServiceRequestEmailCandidate[];
 };
 
@@ -54,27 +54,37 @@ export async function getServiceRequestEmailSettings(): Promise<ServiceRequestEm
       .from(serviceRequestEmailRecipients),
     Promise.all(SERVICE_REQUEST_TYPES.map((requestType) => listCandidates(requestType))),
   ]);
-  const recipientByType = new Map(saved.map((row) => [row.requestType, row.recipientUserId]));
+  const recipientIdsByType = new Map<ServiceRequestType, string[]>();
+  for (const row of saved) {
+    const current = recipientIdsByType.get(row.requestType) ?? [];
+    current.push(row.recipientUserId);
+    recipientIdsByType.set(row.requestType, current);
+  }
 
   return SERVICE_REQUEST_TYPES.map((requestType, index) => ({
     requestType,
-    recipientUserId: recipientByType.get(requestType) ?? null,
+    recipientUserIds: recipientIdsByType.get(requestType) ?? [],
     users: candidateLists[index] ?? [],
   }));
 }
 
 export async function updateServiceRequestEmailRecipients(
   updatedBy: string,
-  recipients: Record<ServiceRequestType, string | null>,
+  recipients: Record<ServiceRequestType, string[]>,
 ): Promise<void> {
   const candidateLists = await Promise.all(
     SERVICE_REQUEST_TYPES.map((requestType) => listCandidates(requestType)),
   );
+  const normalized = Object.fromEntries(
+    SERVICE_REQUEST_TYPES.map((requestType) => [
+      requestType,
+      Array.from(new Set(recipients[requestType] ?? [])),
+    ]),
+  ) as Record<ServiceRequestType, string[]>;
 
   SERVICE_REQUEST_TYPES.forEach((requestType, index) => {
-    const recipientUserId = recipients[requestType];
-    if (!recipientUserId) return;
-    if (!(candidateLists[index] ?? []).some((user) => user.id === recipientUserId)) {
+    const allowedIds = new Set((candidateLists[index] ?? []).map((user) => user.id));
+    if (normalized[requestType].some((recipientUserId) => !allowedIds.has(recipientUserId))) {
       throw new Error(`SERVICE_REQUEST_EMAIL_RECIPIENT_INVALID:${requestType}`);
     }
   });
@@ -84,21 +94,21 @@ export async function updateServiceRequestEmailRecipients(
   await db.transaction(async (tx) => {
     for (const requestType of SERVICE_REQUEST_TYPES) {
       await tx
-        .insert(serviceRequestEmailRecipients)
-        .values({
+        .delete(serviceRequestEmailRecipients)
+        .where(eq(serviceRequestEmailRecipients.requestType, requestType));
+
+      const recipientUserIds = normalized[requestType];
+      if (recipientUserIds.length === 0) continue;
+
+      await tx.insert(serviceRequestEmailRecipients).values(
+        recipientUserIds.map((recipientUserId) => ({
           requestType,
-          recipientUserId: recipients[requestType],
+          recipientUserId,
           updatedBy,
+          createdAt: now,
           updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: serviceRequestEmailRecipients.requestType,
-          set: {
-            recipientUserId: recipients[requestType],
-            updatedBy,
-            updatedAt: now,
-          },
-        });
+        })),
+      );
     }
   });
 }
