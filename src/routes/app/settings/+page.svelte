@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Bot, Clock3, HardDrive, Save, Settings, Video } from "lucide-svelte";
+  import { Bot, Clock3, HardDrive, Mail, Save, Settings, Video } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -40,6 +40,10 @@
       <div class="mt-5 space-y-2">
         <a href="/app/settings/atendimento" class="flex items-center justify-between gap-3 rounded-xl border border-app-border px-3 py-3 transition hover:bg-app-subtle">
           <span class="flex items-center gap-3"><Clock3 size={16} class="text-app-accent"/><span><strong class="application-text-caption block text-[#343B4B]">Atendimento</strong><small class="application-text-meta mt-1 block text-app-text-soft">Equipe, entrada do chat, filas, distribuição e horário.</small></span></span>
+          <span class="application-text-meta font-semibold text-app-primary">Abrir</span>
+        </a>
+        <a href="/app/settings/formularios" class="flex items-center justify-between gap-3 rounded-xl border border-app-border px-3 py-3 transition hover:bg-app-subtle">
+          <span class="flex items-center gap-3"><Mail size={16} class="text-app-info-text"/><span><strong class="application-text-caption block text-[#343B4B]">Formulários</strong><small class="application-text-meta mt-1 block text-app-text-soft">Avisos por e-mail de Nota Fiscal e Cellcoin.</small></span></span>
           <span class="application-text-meta font-semibold text-app-primary">Abrir</span>
         </a>
         <a href="/app/settings/ai" class="flex items-center justify-between gap-3 rounded-xl border border-app-border px-3 py-3 transition hover:bg-app-subtle">
