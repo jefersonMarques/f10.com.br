@@ -5,6 +5,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -39,16 +40,22 @@ export const serviceRequestRoutes = pgTable("service_request_routes", {
 export const serviceRequestEmailRecipients = pgTable(
   "service_request_email_recipients",
   {
-    requestType: serviceRequestType("request_type").primaryKey(),
-    recipientUserId: uuid("recipient_user_id").references(() => users.id, {
-      onDelete: "set null",
-    }),
+    requestType: serviceRequestType("request_type").notNull(),
+    recipientUserId: uuid("recipient_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     updatedBy: uuid("updated_by").references(() => users.id, {
       onDelete: "set null",
     }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
+  (table) => [
+    primaryKey({
+      name: "service_request_email_recipients_pkey",
+      columns: [table.requestType, table.recipientUserId],
+    }),
+  ],
 );
 
 export const serviceRequests = pgTable(
