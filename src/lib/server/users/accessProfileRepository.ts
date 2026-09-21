@@ -167,17 +167,9 @@ export async function updateAccessProfile(
   }
 
   const db = getDatabase();
-  const actorPermissions = await resolveUserPermissions(actorUserId);
-  for (const [permissionCode, scope] of uniqueGrants) {
-    const actorScope = actorPermissions.get(permissionCode);
-    if (!actorScope || !isScopeAtLeast(actorScope, scope)) {
-      throw new Error("ACCESS_PROFILE_PERMISSION_NOT_DELEGABLE");
-    }
-  }
-
-  const [[profile], [duplicate]] = await Promise.all([
+  const [[profile], [duplicate], actorPermissions] = await Promise.all([
     db
-      .select({ id: roles.id, isSystem: roles.isSystem })
+      .select({ id: roles.id, code: roles.code })
       .from(roles)
       .where(eq(roles.id, profileId))
       .limit(1),
@@ -186,11 +178,24 @@ export async function updateAccessProfile(
       .from(roles)
       .where(and(ne(roles.id, profileId), sql`lower(${roles.name}) = ${name.toLowerCase()}`))
       .limit(1),
+    resolveUserPermissions(actorUserId),
   ]);
 
   if (!profile) throw new Error("ACCESS_PROFILE_NOT_FOUND");
-  if (profile.isSystem) throw new Error("ACCESS_PROFILE_SYSTEM_READ_ONLY");
+  if (profile.code === "SUPER_ADMIN") throw new Error("ACCESS_PROFILE_SUPER_ADMIN_READ_ONLY");
   if (duplicate) throw new Error("ACCESS_PROFILE_NAME_EXISTS");
+
+  for (const [permissionCode, scope] of uniqueGrants) {
+    const actorScope = actorPermissions.get(permissionCode);
+    if (!actorScope || !isScopeAtLeast(actorScope, scope)) {
+      throw new Error("ACCESS_PROFILE_PERMISSION_NOT_DELEGABLE");
+    }
+  }
+
+  const hasFullAccess =
+    uniqueGrants.size === PERMISSION_CODES.length &&
+    PERMISSION_CODES.every((permissionCode) => uniqueGrants.get(permissionCode) === "all");
+  if (hasFullAccess) throw new Error("ACCESS_PROFILE_FULL_ACCESS_RESERVED");
 
   await db.transaction(async (tx) => {
     await tx.update(roles).set({ name }).where(eq(roles.id, profileId));
