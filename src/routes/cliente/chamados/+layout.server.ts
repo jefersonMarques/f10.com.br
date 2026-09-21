@@ -2,10 +2,9 @@ import type { LayoutServerLoad } from "./$types";
 import { requireCustomerTicketPortalSession } from "$lib/server/customerPortal/customerPortalSession";
 
 export const load: LayoutServerLoad = async ({ cookies, url }) => {
-  const session = await requireCustomerF10PortalSession(
+  const session = await requireCustomerTicketPortalSession(
     cookies,
     `${url.pathname}${url.search}`,
-    false,
   );
   return {
     customer: {
