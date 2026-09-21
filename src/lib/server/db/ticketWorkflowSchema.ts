@@ -9,7 +9,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { teams, users } from "$lib/server/db/schema";
+import { roles, teams, users } from "$lib/server/db/schema";
 import { supportQueues, ticketStatus, tickets } from "$lib/server/db/supportSchema";
 
 export const ticketWorkflowKind = pgEnum("ticket_workflow_kind", ["global", "area"]);
@@ -162,5 +162,21 @@ export const ticketWorkflowHistory = pgTable(
     index("ticket_workflow_history_ticket_idx").on(table.ticketId, table.createdAt),
     index("ticket_workflow_history_queue_idx").on(table.toQueueId, table.createdAt),
     index("ticket_workflow_history_area_idx").on(table.toAreaId, table.createdAt),
+  ],
+);
+
+export const roleTicketAreas = pgTable(
+  "role_ticket_areas",
+  {
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    areaId: uuid("area_id")
+      .notNull()
+      .references(() => ticketAreas.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.roleId, table.areaId] }),
+    index("role_ticket_areas_area_idx").on(table.areaId, table.roleId),
   ],
 );
