@@ -31,6 +31,11 @@
             <p class="mt-1 text-[12px] leading-5 text-[#52705C]">{form?.message ?? "Obrigado por compartilhar sua experiência com a F10."}</p>
           </div>
         </div>
+      {:else if data.expired}
+        <div class="rounded-2xl border border-[#F0C89F] bg-[#FFF8F1] p-5">
+          <h2 class="text-[15px] font-semibold text-[#7A4310]">Pesquisa expirada</h2>
+          <p class="mt-1 text-[12px] leading-5 text-[#8D623A]">Este link não aceita mais respostas.</p>
+        </div>
       {:else}
         <p class="application-text-meta font-bold uppercase tracking-[0.08em] text-[#EA6D0B]">Ticket #{data.survey.ticketNumber}</p>
         <h2 class="mt-2 text-[18px] font-semibold text-[#252C3D]">{data.survey.subject}</h2>
