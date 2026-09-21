@@ -3,6 +3,7 @@ import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import { getServiceRequestTicketSummary } from "$lib/server/serviceRequests/serviceRequestExport";
 import { getTicketCard } from "$lib/server/support/ticketCardRepository";
+import { getTicketSatisfaction } from "$lib/server/support/ticketSatisfactionService";
 import { markTicketFirstAgentView } from "$lib/server/support/ticketCustomerProgressRepository";
 import { listTicketTasks } from "$lib/server/support/ticketTaskBridge";
 import { listTaskProjects } from "$lib/server/tasks/taskRepository";
@@ -32,7 +33,7 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
       hasPermission(permissions, "tickets.reply") &&
       hasPermission(permissions, "tasks.create");
 
-    const [linkedTasks, taskProjects, serviceRequest] = await Promise.all([
+    const [linkedTasks, taskProjects, serviceRequest, satisfaction] = await Promise.all([
       canViewTasks
         ? listTicketTasks(session.user.id, permissions, params.ticketId).catch(() => [])
         : Promise.resolve([]),
@@ -40,6 +41,7 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
         ? listTaskProjects(session.user.id, permissions).catch(() => [])
         : Promise.resolve([]),
       getServiceRequestTicketSummary(params.ticketId).catch(() => null),
+      getTicketSatisfaction(params.ticketId).catch(() => null),
     ]);
 
     return json(
@@ -49,6 +51,7 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
         taskProjects,
         canCreateTask,
         serviceRequest,
+        satisfaction,
       },
       {
         headers: {
