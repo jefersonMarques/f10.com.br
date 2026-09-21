@@ -101,9 +101,9 @@ function parsePayload(formData: FormData, requestType: ServiceRequestType): Reco
   return fields;
 }
 
-function readTextField(formData: FormData, name: string): string {
+function readRawTextField(formData: FormData, name: string): string {
   const value = formData.get(name);
-  return typeof value === "string" ? value.trim() : "";
+  return typeof value === "string" ? value : "";
 }
 
 function readPayloadText(
@@ -208,7 +208,7 @@ export async function handleLegacyServiceRequestSubmission(input: {
         });
 
     if (!authenticatedPortalSubmission && input.requestType === "cell_coin") {
-      const password = readTextField(formData, "portalPassword");
+      const password = readRawTextField(formData, "portalPassword");
       if (!password) throw new Error("CUSTOMER_PORTAL_PASSWORD_REQUIRED");
 
       await setupPublicCustomerOnboarding({
