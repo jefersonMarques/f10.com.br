@@ -152,6 +152,47 @@ export async function submitTicketSatisfaction(input: {
   });
 }
 
+export async function submitTicketSatisfactionForCustomer(input: {
+  ticketId: string;
+  customerContactId: string;
+  score: number;
+  comment: string;
+}): Promise<boolean> {
+  if (!Number.isInteger(input.score) || input.score < 1 || input.score > 5) {
+    throw new Error("TICKET_SATISFACTION_SCORE_INVALID");
+  }
+  const comment = input.comment.trim();
+  if (comment.length > 2000) throw new Error("TICKET_SATISFACTION_COMMENT_TOO_LONG");
+
+  const db = getDatabase();
+  const now = new Date();
+  const [updated] = await db
+    .update(ticketSatisfactionSurveys)
+    .set({
+      score: input.score,
+      comment: comment || null,
+      answeredAt: now,
+    })
+    .where(
+      and(
+        eq(ticketSatisfactionSurveys.ticketId, input.ticketId),
+        eq(ticketSatisfactionSurveys.customerContactId, input.customerContactId),
+        isNull(ticketSatisfactionSurveys.answeredAt),
+        gt(ticketSatisfactionSurveys.expiresAt, now),
+      ),
+    )
+    .returning({ ticketId: ticketSatisfactionSurveys.ticketId });
+
+  if (!updated) return false;
+
+  await db.insert(ticketEvents).values({
+    ticketId: updated.ticketId,
+    eventType: "ticket.satisfaction.received",
+    metadata: { score: input.score, source: "customer_portal" },
+  });
+  return true;
+}
+
 export async function getTicketSatisfaction(ticketId: string) {
   const [survey] = await getDatabase()
     .select({
