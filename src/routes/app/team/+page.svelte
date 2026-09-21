@@ -164,7 +164,7 @@
                 </span>
                 <span class="mt-1 block truncate text-[11px] text-[#8B909E]">{user.email}</span>
               </span>
-              <span class="flex items-center gap-2">{#each user.roles as role}<span class="application-text-meta rounded-full bg-[#F3F4F7] px-2.5 py-1 font-bold text-[#646A79]">{role}</span>{/each}<ExternalLink size={15} class="ml-1 text-[#A0A5B2] transition group-hover:text-[#EA6D0B]" aria-hidden="true" /></span>
+              <span class="flex items-center gap-2">{#each user.roleNames as roleName}<span class="application-text-meta rounded-full bg-[#F3F4F7] px-2.5 py-1 font-bold text-[#646A79]">{roleName}</span>{/each}<ExternalLink size={15} class="ml-1 text-[#A0A5B2] transition group-hover:text-[#EA6D0B]" aria-hidden="true" /></span>
             </a>
           {/each}
         </div>
