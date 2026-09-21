@@ -30,6 +30,7 @@ export type CreatePublicServiceRequestInput = {
   idempotencyKey: string;
   fields: Record<string, unknown>;
   attachments: ServiceRequestAttachmentInput[];
+  flow?: "onboarding" | null;
 };
 
 export type CreatedPublicServiceRequest = {
@@ -101,7 +102,7 @@ export async function createPublicServiceRequest(
 
   const normalized = normalizeServiceRequestFields(input.requestType, input.fields);
   const encryptedSecrets = encryptServiceRequestSecrets(normalized.secrets);
-  const intake = await resolveServiceRequestIntake(input.requestType);
+  const intake = await resolveServiceRequestIntake(input.requestType, input.flow ?? null);
   const serviceRequestId = randomUUID();
   const ticketId = randomUUID();
   const storedAttachments = await uploadServiceRequestAttachments(
@@ -266,6 +267,7 @@ export async function createPublicServiceRequest(
           serviceRequestId,
           requestType: input.requestType,
           publicSubmission: true,
+          flow: input.flow ?? null,
           attachmentCount: storedAttachments.length,
           version: 1,
         },
