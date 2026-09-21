@@ -1,0 +1,239 @@
+<script lang="ts">
+  import { onMount } from "svelte";
+  import {
+    ArrowLeft,
+    ArrowRight,
+    CheckCircle2,
+    Download,
+    ExternalLink,
+    History,
+    Info,
+    PlayCircle,
+    Sparkles,
+    TriangleAlert,
+  } from "lucide-svelte";
+  import HelpAnnotatedImage from "$lib/components/help/HelpAnnotatedImage.svelte";
+  import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
+  import HelpRichText from "$lib/components/help/HelpRichText.svelte";
+  import type { PageData } from "./$types";
+
+  export let data: PageData;
+
+  function managedAssetUrl(assetId: string): string {
+    const base = `/api/help/content/${encodeURIComponent(data.routeSlug)}/assets/${assetId}`;
+    return data.isHistorical && data.releaseNumber
+      ? `${base}?versao=${data.releaseNumber}`
+      : base;
+  }
+
+  function articleHref(slug: string, releaseNumber: number | null = null): string {
+    const params = new URLSearchParams();
+    if (releaseNumber) params.set("versao", String(releaseNumber));
+    if (data.navigation.collection?.slug) {
+      params.set("colecao", data.navigation.collection.slug);
+    }
+    const query = params.toString();
+    return `/ajuda-f10/${encodeURIComponent(slug)}${query ? `?${query}` : ""}`;
+  }
+
+  function youtubeEmbedUrl(value: string | null): string | null {
+    if (!value) return null;
+    try {
+      const url = new URL(value);
+      let videoId = "";
+      if (url.hostname === "youtu.be") videoId = url.pathname.slice(1).split("/")[0] ?? "";
+      if (
+        url.hostname === "www.youtube.com" ||
+        url.hostname === "youtube.com" ||
+        url.hostname === "m.youtube.com"
+      ) {
+        if (url.pathname === "/watch") videoId = url.searchParams.get("v") ?? "";
+        else if (url.pathname.startsWith("/embed/")) videoId = url.pathname.split("/")[2] ?? "";
+        else if (url.pathname.startsWith("/shorts/")) videoId = url.pathname.split("/")[2] ?? "";
+      }
+      return /^[A-Za-z0-9_-]{6,20}$/.test(videoId)
+        ? `https://www.youtube-nocookie.com/embed/${videoId}`
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function externalUrl(value: string): boolean {
+    return /^https?:\/\//i.test(value);
+  }
+
+  function goBack(event: MouseEvent): void {
+    if (window.history.length <= 1) return;
+    event.preventDefault();
+    window.history.back();
+  }
+
+  onMount(() => {
+    const anchor = decodeURIComponent(window.location.hash.replace(/^#/, ""));
+    if (!anchor.startsWith("help-")) return;
+    window.setTimeout(() => {
+      const element = document.getElementById(anchor);
+      if (!element) return;
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      element.classList.add("help-ai-target-highlight");
+      window.setTimeout(() => element.classList.remove("help-ai-target-highlight"), 4_500);
+    }, 160);
+  });
+</script>
+
+<svelte:head>
+  <title>{data.content.title} | Ajuda F10</title>
+  <meta name="description" content={data.content.summary || `Passo a passo: ${data.content.title}`} />
+  {#if data.isHistorical}<meta name="robots" content="noindex,follow" />{/if}
+</svelte:head>
+
+<main
+  class="min-h-screen bg-[#F7F8FB] text-[#10172A]"
+  data-help-content-id={data.content.contentId}
+  data-help-content-slug={data.content.slug}
+>
+  <div class="mx-auto max-w-[1080px] px-5 py-8 sm:px-8 sm:py-12">
+    <a href="/ajuda-f10" on:click={goBack} class="inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-[12px] font-semibold text-[#606777] transition hover:bg-white hover:text-[#000A57]">
+      <ArrowLeft size={17} />Voltar
+    </a>
+
+    {#if data.isHistorical}
+      <section class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[#7A3B08]">
+        <div class="flex items-center gap-2"><History size={16}/><strong class="text-[10px]">Versão anterior · v{data.releaseNumber}</strong></div>
+        <a href={articleHref(data.routeSlug)} class="rounded-xl bg-white px-3 py-2 text-[9px] font-semibold text-[#000A57]">Ver versão atual</a>
+      </section>
+    {/if}
+
+    <header class="mt-6 rounded-[28px] border border-[#E3E6EE] bg-white px-6 py-7 shadow-[0_14px_44px_rgba(1,13,40,0.05)] sm:px-9 sm:py-9">
+      {#if data.content.categories.length > 0}
+        <div class="flex flex-wrap gap-2">
+          {#each data.content.categories as category}
+            {#if category.destinationUrl}
+              <a
+                href={category.destinationUrl}
+                target={externalUrl(category.destinationUrl) ? "_blank" : undefined}
+                rel={externalUrl(category.destinationUrl) ? "noopener noreferrer" : undefined}
+                class="inline-flex items-center gap-1.5 rounded-full bg-[#FFF3E9] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-[#B85408] transition hover:bg-[#FFE8D6]"
+              >
+                <HelpCategoryIcon name={category.icon} size={12}/>{category.name}<ExternalLink size={10}/>
+              </a>
+            {:else}
+              <span class="inline-flex items-center gap-1.5 rounded-full bg-[#FFF3E9] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-[#B85408]"><HelpCategoryIcon name={category.icon} size={12}/>{category.name}</span>
+            {/if}
+          {/each}
+        </div>
+      {/if}
+      <h1 class="mt-3 max-w-[860px] text-[30px] font-semibold tracking-[-0.04em] text-[#010D28] sm:text-[44px]">{data.content.title}</h1>
+      {#if data.content.summary}<HelpRichText text={data.content.summary} className="mt-4 max-w-[820px] space-y-1 text-[14px] leading-7 text-[#6C7383] sm:text-[15px]"/>{/if}
+      <div class="mt-6 flex flex-wrap items-center gap-2 text-[9px] font-semibold text-[#777E8E]">
+        <span class="rounded-full bg-[#F4F5F8] px-3 py-1.5">{data.content.steps.length} {data.content.steps.length === 1 ? "passo" : "passos"}</span>
+        <span class="rounded-full bg-[#F4F5F8] px-3 py-1.5">Atualizado {new Intl.DateTimeFormat("pt-BR").format(new Date(data.content.publishedAt))}</span>
+        {#if data.releaseNumber}
+          <details class="relative">
+            <summary class="flex cursor-pointer list-none items-center gap-1.5 rounded-full bg-[#EEF0FF] px-3 py-1.5 text-[#000A57]"><History size={11}/>Versão {data.releaseNumber}</summary>
+            <div class="absolute left-0 top-8 z-20 min-w-[190px] overflow-hidden rounded-xl border border-[#DDE1EA] bg-white py-1 shadow-xl">
+              {#each data.releases as release}
+                <a
+                  href={articleHref(data.routeSlug, release.releaseNumber === data.currentReleaseNumber ? null : release.releaseNumber)}
+                  class={`flex items-center justify-between gap-3 px-3 py-2.5 text-[9px] hover:bg-[#F7F8FB] ${release.releaseNumber === data.releaseNumber ? "font-bold text-[#000A57]" : "text-[#666D7D]"}`}
+                >
+                  <span>Versão {release.releaseNumber}</span>
+                  <span>{new Intl.DateTimeFormat("pt-BR").format(new Date(release.publishedAt))}</span>
+                </a>
+              {/each}
+            </div>
+          </details>
+        {/if}
+      </div>
+    </header>
+
+    {#if data.content.featuredVideo}
+      {@const videoEmbed = youtubeEmbedUrl(data.content.featuredVideo.sourceUrl)}
+      <section id="help-featured-video" data-help-featured-video-id={data.content.featuredVideo.id} class="mt-7 scroll-mt-24 overflow-hidden rounded-[26px] border border-[#E3E6EE] bg-white shadow-[0_14px_44px_rgba(1,13,40,0.05)]">
+        {#if videoEmbed}
+          <div class="aspect-video overflow-hidden bg-black"><iframe src={videoEmbed} title={data.content.featuredVideo.altText || `Vídeo: ${data.content.title}`} class="h-full w-full" loading="eager" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>
+        {:else if data.content.featuredVideo.storageKey}
+          <video controls preload="metadata" class="aspect-video h-auto w-full bg-black" src={managedAssetUrl(data.content.featuredVideo.id)}><track kind="captions" /></video>
+        {:else if data.content.featuredVideo.sourceUrl}
+          <a href={data.content.featuredVideo.sourceUrl} target="_blank" rel="noopener noreferrer" class="flex min-h-24 items-center justify-between gap-4 px-6 py-5 text-[#000A57] transition hover:bg-[#FAFAFC]"><span class="flex items-center gap-3"><PlayCircle size={24}/><span><strong class="block text-[13px]">Assistir ao vídeo deste conteúdo</strong><small class="mt-1 block text-[10px] text-[#7E8493]">O vídeo abre em uma nova guia.</small></span></span><ExternalLink size={16}/></a>
+        {/if}
+      </section>
+
+      <section class="mt-3 flex items-start gap-3 rounded-[20px] border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3.5 text-[#7A3B08] sm:px-5">
+        <Info size={17} class="mt-0.5 shrink-0"/>
+        <p class="text-[11px] font-medium leading-5">Os ícones do sistema podem ser diferentes do atual, sempre leia os títulos de cada item.</p>
+      </section>
+    {/if}
+
+    {#if data.content.quickGuide}
+      <section id="help-quick-guide" class="mt-4 scroll-mt-24 rounded-[24px] border border-[#D8DDF4] bg-[#F8F9FF] px-5 py-5 sm:px-7 sm:py-6">
+        <div class="flex items-center gap-2"><Sparkles size={17} class="text-[#EA6D0B]"/><h2 class="text-[15px] font-semibold text-[#000A57]">Resumo rápido</h2></div>
+        <HelpRichText text={data.content.quickGuide} className="mt-4 space-y-1.5 text-[13px] leading-6 text-[#454D62]"/>
+      </section>
+    {/if}
+
+    <div class="mt-7 space-y-5">
+      {#each data.content.steps as step, index}
+        <section id={`help-step-${step.id}`} data-help-step-id={step.id} class="scroll-mt-24 overflow-hidden rounded-[26px] border border-[#E3E6EE] bg-white transition-[box-shadow,border-color,background-color] duration-300">
+          <header class="flex items-start gap-4 border-b border-[#EEF0F5] px-5 py-5 sm:px-7"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[12px] font-bold text-white">{index + 1}</span><div><h2 class="text-[18px] font-semibold tracking-[-0.02em] text-[#1F2638]">{step.title}</h2>{#if step.description}<HelpRichText text={step.description} className="mt-1.5 space-y-1 text-[12px] leading-6 text-[#757C8D]"/>{/if}</div></header>
+
+          <div class="space-y-5 px-5 py-6 sm:px-7">
+            {#each step.blocks as block}
+              <div id={`help-block-${block.id}`} data-help-block-id={block.id} data-help-block-type={block.blockType} class="scroll-mt-24 transition-[box-shadow,background-color] duration-300">
+                {#if block.blockType === "text"}
+                  <HelpRichText text={block.textContent} className="space-y-1.5 text-[14px] leading-7 text-[#4E5565]"/>
+                {:else if block.blockType === "notice"}
+                  <div class={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${block.noticeVariant === "warning" || block.noticeVariant === "danger" ? "border-[#F0D0C8] bg-[#FFF8F5] text-[#7D493D]" : "border-[#D8DEF2] bg-[#F8F9FF] text-[#4D587A]"}`}>{#if block.noticeVariant === "warning" || block.noticeVariant === "danger"}<TriangleAlert size={17} class="mt-0.5 shrink-0"/>{:else}<Info size={17} class="mt-0.5 shrink-0"/>{/if}<HelpRichText text={block.textContent} className="min-w-0 space-y-1 text-[12px] leading-6"/></div>
+                {:else if block.blockType === "image" && block.asset}
+                  {@const imageUrl = block.asset.storageKey ? managedAssetUrl(block.asset.id) : block.asset.sourceUrl}
+                  {#if imageUrl}<figure class="rounded-2xl border border-[#E6E8EE] bg-[#FAFAFC]"><HelpAnnotatedImage src={imageUrl} alt={block.asset.altText || "Imagem do passo"} annotations={block.annotations}/>{#if block.asset.altText}<figcaption class="border-t border-[#ECEEF3] px-4 py-2.5 text-[9px] text-[#848A99]">{block.asset.altText}</figcaption>{/if}</figure>{/if}
+                {:else if block.blockType === "file" && block.asset}
+                  {@const fileUrl = block.asset.storageKey ? managedAssetUrl(block.asset.id) : block.asset.sourceUrl}
+                  {#if fileUrl}<a href={fileUrl} target="_blank" rel="noopener noreferrer" class="flex items-center justify-between gap-3 rounded-2xl border border-[#E1E4EC] bg-[#FAFAFC] px-4 py-4 transition hover:border-[#C8CEE0]"><span><strong class="block text-[11px] text-[#303645]">{block.linkLabel || "Baixar arquivo"}</strong><small class="mt-1 block text-[9px] text-[#8A909E]">Material complementar</small></span><Download size={18} class="text-[#000A57]"/></a>{/if}
+                {:else if block.blockType === "link" && block.linkUrl}
+                  <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#EEF0FF] px-4 text-[11px] font-semibold text-[#000A57]">{block.linkLabel || "Abrir link"}<ExternalLink size={13}/></a>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        </section>
+      {/each}
+    </div>
+
+    <section class="mt-7 flex items-center gap-3 rounded-[22px] border border-[#D8E9DE] bg-[#F4FBF6] px-5 py-4 text-[#356347]"><CheckCircle2 size={19}/><div><strong class="block text-[11px]">Conteúdo concluído</strong><span class="mt-1 block text-[9px] text-[#6E8C78]">Use o assistente deste artigo se quiser esclarecer algum ponto deste procedimento.</span></div></section>
+
+    {#if data.navigation.previous || data.navigation.next}
+      <nav class="mt-4 grid gap-3 sm:grid-cols-2" aria-label="Navegação entre artigos">
+        {#if data.navigation.previous}
+          <a href={articleHref(data.navigation.previous.slug)} class="group rounded-[20px] border border-[#E1E4EC] bg-white px-5 py-4 transition hover:border-[#C7CCDA] hover:shadow-[0_10px_28px_rgba(1,13,40,0.05)]">
+            <span class="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.1em] text-[#858B99]"><ArrowLeft size={13}/>Artigo anterior</span>
+            <strong class="mt-2 block text-[13px] font-semibold leading-5 text-[#303746] transition group-hover:text-[#000A57]">{data.navigation.previous.title}</strong>
+          </a>
+        {:else}
+          <span class="hidden sm:block"></span>
+        {/if}
+
+        {#if data.navigation.next}
+          <a href={articleHref(data.navigation.next.slug)} class="group rounded-[20px] border border-[#D8DDF4] bg-[#F8F9FF] px-5 py-4 text-right transition hover:border-[#BBC3EA] hover:shadow-[0_10px_28px_rgba(1,13,40,0.05)]">
+            <span class="flex items-center justify-end gap-2 text-[9px] font-bold uppercase tracking-[0.1em] text-[#626B97]">Próximo artigo<ArrowRight size={13}/></span>
+            <strong class="mt-2 block text-[13px] font-semibold leading-5 text-[#000A57]">{data.navigation.next.title}</strong>
+          </a>
+        {/if}
+      </nav>
+    {/if}
+  </div>
+</main>
+
+<style>
+  :global(.help-ai-target-highlight) {
+    animation: help-ai-target-pulse 1.2s ease-out 2;
+    outline: 3px solid rgba(234, 109, 11, 0.7);
+    outline-offset: 4px;
+    border-radius: 18px;
+  }
+  @keyframes help-ai-target-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(234, 109, 11, 0); }
+    45% { box-shadow: 0 0 0 10px rgba(234, 109, 11, 0.16); }
+  }
+</style>

@@ -36,3 +36,6 @@ data/contact-modal-leads.json
 data/whatsapp-leads.json
 data/contact-jobs.json
 data/contact-leads.json
+data/registration-errors.log
+data/registration-files.json
+data/uploads/registration/

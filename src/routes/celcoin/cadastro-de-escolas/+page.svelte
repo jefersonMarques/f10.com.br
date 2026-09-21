@@ -12,6 +12,11 @@
   } from "lucide-svelte";
   import Breadcrumb from "$lib/components/Breadcrumb.svelte";
   import { getF10TermsText } from "$lib/legal/f10Terms";
+  import type { PageData } from "./$types";
+
+  export let data: PageData;
+
+  $: onboardingFlow = data.flow === "onboarding";
 
   // ==============================
   // Tipos
@@ -98,6 +103,15 @@
     }
     contract = { ...contract, error: "" };
     return true;
+  }
+
+  function submissionKey(): string {
+    if (submissionIdempotencyKey) return submissionIdempotencyKey;
+    submissionIdempotencyKey =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `cell-coin-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return submissionIdempotencyKey;
   }
 
   function isStep3DocType(docType: DocType): docType is Step3DocType {
@@ -194,6 +208,10 @@
 
   let errors: FormErrors = {};
   let isSubmitting = false;
+  let submissionIdempotencyKey = "";
+  let portalPassword = "";
+  let portalPasswordConfirm = "";
+  let portalPasswordError = "";
 
   // Loading silencioso (sem texto)
   let isCnpjLoading = false;
@@ -221,8 +239,8 @@
   // - Passo 3: múltiplos arquivos por tipo
   // - Passo 4: selfie única
   // ==============================
-  const maxSmallFileSizeBytes = 2 * 1024 * 1024; // 2MB
-  const maxLargeFileSizeBytes = 2 * 1024 * 1024 * 1024; // 2GB
+  const maxSmallFileSizeBytes = 5 * 1024 * 1024; // 5MB
+  const maxLargeFileSizeBytes = 10 * 1024 * 1024; // 10MB
   const maxFilesPerDocType = 6; // proteção contra exageros (ajuste se quiser)
 
   const step3DocTypes: Step3DocType[] = ["rg_cnh", "cnpj", "contrato"];
@@ -330,8 +348,8 @@
         ok: false,
         reason:
           docType === "selfie"
-            ? "Arquivo acima de 2MB."
-            : "Arquivo acima de 2GB.",
+            ? "Arquivo acima de 5MB."
+            : "Arquivo acima de 10MB.",
       };
     }
 
@@ -577,7 +595,7 @@
     closeCameraOverlay();
   }
 
-  // Captura com compressão adaptativa para caber em 2MB
+  // Captura com compressão adaptativa para caber em 5MB
   async function captureSelfie() {
     if (!videoEl || !canvasEl) return;
 
@@ -1140,11 +1158,20 @@
     if (!isEmailValid(formData.managerEmail))
       nextErrors = addError(nextErrors, "managerEmail", "E-mail inválido.");
 
+    portalPasswordError = "";
+    if (onboardingFlow) {
+      if (portalPassword.length < 8) {
+        portalPasswordError = "Use pelo menos 8 caracteres.";
+      } else if (portalPassword !== portalPasswordConfirm) {
+        portalPasswordError = "As senhas não coincidem.";
+      }
+    }
+
     if (!isUrlValid(formData.marketingSite))
       nextErrors = addError(nextErrors, "marketingSite", "Site inválido.");
 
     errors = nextErrors;
-    return Object.keys(nextErrors).length === 0;
+    return Object.keys(nextErrors).length === 0 && !portalPasswordError;
   }
 
   // ==============================
@@ -1519,6 +1546,11 @@
         }),
       );
 
+      if (onboardingFlow) {
+        fd.append("flow", "onboarding");
+        fd.append("portalPassword", portalPassword);
+      }
+
       // Passo 3 (múltiplos)
       for (const uf of docFiles.rg_cnh) fd.append("doc_rg_cnh", uf.file);
       for (const uf of docFiles.cnpj) fd.append("doc_cnpj", uf.file);
@@ -1530,6 +1562,7 @@
       // 2) Envia para o endpoint que dispara o e-mail via Brevo
       const res = await fetch("/api/registration/submit", {
         method: "POST",
+        headers: { "Idempotency-Key": submissionKey() },
         body: fd,
       });
 
@@ -1579,18 +1612,18 @@
 
   function docHint(docType: DocType): string {
     if (docType === "rg_cnh") {
-      return "CNH: inclua a foto do QR Code. PDF ou imagem. Até 2GB.";
+      return "CNH: inclua a foto do QR Code. PDF ou imagem. Até 10MB.";
     }
 
     if (docType === "cnpj") {
-      return "Arquivo PDF ou imagem. Até 2GB.";
+      return "Arquivo PDF ou imagem. Até 10MB.";
     }
 
     if (docType === "contrato") {
-      return "Arquivo PDF ou imagem. Até 2GB.";
+      return "Arquivo PDF ou imagem. Até 10MB.";
     }
 
-    return "Foto nítida segurando o documento. Até 2MB.";
+    return "Foto nítida segurando o documento. Até 5MB.";
   }
 
   function docCardBorderClass(docType: DocType): string {
@@ -1706,9 +1739,18 @@
             Tudo certo!
           </h2>
           <p class="mt-2 text-[13px] text-black/60">
-            Recebemos seus dados. Assista ao vídeo abaixo para as próximas
-            orientações.
+            {onboardingFlow
+              ? "Recebemos seus dados e enviamos a ativação da Área do Cliente por e-mail."
+              : "Recebemos seus dados. A equipe F10 seguirá com a solicitação."}
           </p>
+          {#if onboardingFlow}
+            <div class="mx-auto mt-4 max-w-[620px] rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-left">
+              <p class="text-[13px] font-semibold text-amber-900">Confirme seu e-mail para continuar</p>
+              <p class="mt-1 text-[12px] leading-5 text-amber-800">
+                Ao clicar em “Ativar acesso” no e-mail, você entra automaticamente na área de chamados e acompanha sua implantação.
+              </p>
+            </div>
+          {/if}
 
           <div
             class="mt-5 rounded-2xl overflow-hidden border border-black/10 bg-black"
@@ -1725,7 +1767,7 @@
             </div>
           </div>
 
-          <div class="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class={"mt-5 grid grid-cols-1 gap-3 " + (onboardingFlow ? "sm:grid-cols-4" : "sm:grid-cols-3")}>
             <a
               href={supportLink}
               target="_blank"
@@ -1742,6 +1784,15 @@
             >
               Baixar contrato
             </button>
+
+            {#if onboardingFlow}
+              <a
+                href="/cliente"
+                class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold border border-black/15 bg-white hover:bg-black/[0.03]"
+              >
+                Já ativei meu acesso
+              </a>
+            {/if}
 
             <a
               href={whatsappLink}
@@ -2350,6 +2401,48 @@
                     {errors.managerEmail}
                   </p>{/if}
               </div>
+
+              {#if onboardingFlow}
+                <div class="md:col-span-2 rounded-2xl border border-black/10 bg-black/[0.02] p-4">
+                  <p class="text-[13px] font-semibold text-black/75">Seu acesso à Área do Cliente</p>
+                  <p class="mt-1 text-[12px] leading-5 text-black/55">Crie a senha que você usará para acompanhar a implantação e falar com a equipe F10.</p>
+                  <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label for="portalPassword" class="block text-[13px] font-medium text-black/70">Senha</label>
+                      <input
+                        id="portalPassword"
+                        type="password"
+                        minlength="8"
+                        maxlength="256"
+                        autocomplete="new-password"
+                        value={portalPassword}
+                        class={"mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none " + (portalPasswordError ? "border-red-400" : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20")}
+                        on:input={(e) => {
+                          portalPassword = (e.currentTarget as HTMLInputElement).value;
+                          portalPasswordError = "";
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label for="portalPasswordConfirm" class="block text-[13px] font-medium text-black/70">Confirmar senha</label>
+                      <input
+                        id="portalPasswordConfirm"
+                        type="password"
+                        minlength="8"
+                        maxlength="256"
+                        autocomplete="new-password"
+                        value={portalPasswordConfirm}
+                        class={"mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none " + (portalPasswordError ? "border-red-400" : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20")}
+                        on:input={(e) => {
+                          portalPasswordConfirm = (e.currentTarget as HTMLInputElement).value;
+                          portalPasswordError = "";
+                        }}
+                      />
+                    </div>
+                  </div>
+                  {#if portalPasswordError}<p class="mt-2 text-[12px] text-red-600">{portalPasswordError}</p>{/if}
+                </div>
+              {/if}
             </div>
 
             <div class="mt-10">
@@ -2470,7 +2563,7 @@
                     Envie os documentos obrigatórios (você pode anexar mais de
                     um arquivo por item).
                   </p>
-                  <p>Formatos aceitos: PDF, JPG, PNG (é 2MB por arquivo).</p>
+                  <p>Formatos aceitos: PDF, JPG, PNG (até 10 MB por arquivo).</p>
                 </div>
               </div>
             </div>

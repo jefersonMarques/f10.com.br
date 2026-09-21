@@ -1,0 +1,412 @@
+import { and, eq, gte, lte } from "drizzle-orm";
+import {
+  getGoogleCalendarConnection,
+  listGoogleCalendarEvents,
+  type GoogleCalendarEvent,
+} from "$lib/server/calendar/googleCalendarRepository";
+import {
+  getGoogleCalendarSyncPreferences,
+  listGoogleCalendarSources,
+} from "$lib/server/calendar/googleCalendarPreferenceRepository";
+import { getDatabase } from "$lib/server/db";
+import {
+  taskGoogleCalendarLinks,
+  ticketGoogleCalendarLinks,
+} from "$lib/server/db/googleCalendarSchema";
+import { taskAssignees, tasks } from "$lib/server/db/taskSchema";
+
+export type CalendarAvailabilityUser = {
+  id: string;
+  name: string;
+  email: string;
+};
+
+export type CalendarAvailabilityConflict = {
+  start: string;
+  end: string;
+  allDay: boolean;
+  source: "google" | "f10";
+};
+
+export type CalendarAvailabilityResult = {
+  userId: string;
+  name: string;
+  email: string;
+  coverage: "google" | "f10-only";
+  conflicts: CalendarAvailabilityConflict[];
+};
+
+export type CalendarAvailabilityInput = {
+  users: CalendarAvailabilityUser[];
+  date: string;
+  startTime: string;
+  endTime: string;
+  timeZone: string;
+  excludeGoogleEventId?: string | null;
+  excludeGoogleIcalUid?: string | null;
+};
+
+export type CalendarAvailabilityWindowInput = {
+  user: CalendarAvailabilityUser;
+  startDate: string;
+  endDate: string;
+  timeZone: string;
+  excludeGoogleEventId?: string | null;
+  excludeGoogleIcalUid?: string | null;
+};
+
+function localDateTimeToUtc(date: string, time: string, timeZone: string): Date {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  const targetAsUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
+  let guess = targetAsUtc;
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const parts = Object.fromEntries(
+      formatter
+        .formatToParts(new Date(guess))
+        .filter((part) => part.type !== "literal")
+        .map((part) => [part.type, Number(part.value)]),
+    ) as Record<string, number>;
+    const representedAsUtc = Date.UTC(
+      parts.year,
+      (parts.month ?? 1) - 1,
+      parts.day ?? 1,
+      parts.hour ?? 0,
+      parts.minute ?? 0,
+      parts.second ?? 0,
+    );
+    const offset = representedAsUtc - guess;
+    const next = targetAsUtc - offset;
+    if (Math.abs(next - guess) < 1000) return new Date(next);
+    guess = next;
+  }
+
+  return new Date(guess);
+}
+
+function addDays(date: string, days: number): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const value = new Date(Date.UTC(year, month - 1, day));
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+function overlaps(start: Date, end: Date, busyStart: Date, busyEnd: Date): boolean {
+  return start.getTime() < busyEnd.getTime() && end.getTime() > busyStart.getTime();
+}
+
+function selfDeclined(event: GoogleCalendarEvent): boolean {
+  return event.attendees.some(
+    (attendee) => attendee.self && attendee.responseStatus === "declined",
+  );
+}
+
+function eventInterval(
+  event: GoogleCalendarEvent,
+  fallbackTimeZone: string,
+): { start: Date; end: Date; allDay: boolean } | null {
+  if (event.allDay && event.startDate) {
+    const endDate = event.endDate || addDays(event.startDate, 1);
+    return {
+      start: localDateTimeToUtc(event.startDate, "00:00", fallbackTimeZone),
+      end: localDateTimeToUtc(endDate, "00:00", fallbackTimeZone),
+      allDay: true,
+    };
+  }
+
+  if (!event.startDateTime || !event.endDateTime) return null;
+  const start = new Date(event.startDateTime);
+  const end = new Date(event.endDateTime);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return null;
+  return { start, end, allDay: false };
+}
+
+async function listF10ConflictsForWindow(
+  userId: string,
+  input: Pick<CalendarAvailabilityInput, "timeZone" | "excludeGoogleEventId" | "excludeGoogleIcalUid">,
+  requestedStart: Date,
+  requestedEnd: Date,
+  startDate: string,
+  endDate: string,
+): Promise<CalendarAvailabilityConflict[]> {
+  const db = getDatabase();
+  const rows = await db
+    .select({
+      taskId: tasks.id,
+      dueOn: tasks.dueOn,
+      linkUserId: taskGoogleCalendarLinks.userId,
+      googleEventId: taskGoogleCalendarLinks.googleEventId,
+      googleIcalUid: taskGoogleCalendarLinks.googleIcalUid,
+      allDay: taskGoogleCalendarLinks.allDay,
+      startTime: taskGoogleCalendarLinks.startTime,
+      endTime: taskGoogleCalendarLinks.endTime,
+      timeZone: taskGoogleCalendarLinks.timeZone,
+      attendees: taskGoogleCalendarLinks.attendees,
+      assigneeUserId: taskAssignees.userId,
+    })
+    .from(taskGoogleCalendarLinks)
+    .innerJoin(tasks, eq(taskGoogleCalendarLinks.taskId, tasks.id))
+    .leftJoin(taskAssignees, eq(taskAssignees.taskId, tasks.id))
+    .where(and(gte(tasks.dueOn, startDate), lte(tasks.dueOn, endDate)));
+
+  const conflictsByEvent = new Map<string, CalendarAvailabilityConflict>();
+  for (const row of rows) {
+    if (!row.dueOn || row.allDay || row.googleEventId === input.excludeGoogleEventId) continue;
+    if (input.excludeGoogleIcalUid && row.googleIcalUid === input.excludeGoogleIcalUid) continue;
+    const participates =
+      row.linkUserId === userId ||
+      row.assigneeUserId === userId ||
+      row.attendees.some((attendee) => attendee.userId === userId);
+    if (!participates) continue;
+
+    const zone = row.timeZone || input.timeZone;
+    const busyStart = row.allDay
+      ? localDateTimeToUtc(row.dueOn, "00:00", zone)
+      : row.startTime
+        ? localDateTimeToUtc(row.dueOn, row.startTime, zone)
+        : null;
+    const busyEnd = row.allDay
+      ? localDateTimeToUtc(addDays(row.dueOn, 1), "00:00", zone)
+      : row.endTime
+        ? localDateTimeToUtc(row.dueOn, row.endTime, zone)
+        : null;
+    if (!busyStart || !busyEnd) continue;
+    if (!overlaps(requestedStart, requestedEnd, busyStart, busyEnd)) continue;
+
+    conflictsByEvent.set(row.googleEventId, {
+      start: busyStart.toISOString(),
+      end: busyEnd.toISOString(),
+      allDay: row.allDay,
+      source: "f10",
+    });
+  }
+  return Array.from(conflictsByEvent.values());
+}
+
+async function listF10Conflicts(
+  userId: string,
+  input: CalendarAvailabilityInput,
+  requestedStart: Date,
+  requestedEnd: Date,
+): Promise<CalendarAvailabilityConflict[]> {
+  return listF10ConflictsForWindow(
+    userId,
+    input,
+    requestedStart,
+    requestedEnd,
+    input.date,
+    input.date,
+  );
+}
+
+async function listRelevantGoogleCalendarIds(userId: string): Promise<string[]> {
+  const [preferences, sources] = await Promise.all([
+    getGoogleCalendarSyncPreferences(userId),
+    listGoogleCalendarSources(userId),
+  ]);
+  const primaryCalendarId = sources.find((source) => source.isPrimary)?.calendarId ?? "primary";
+  const targetCalendarId = preferences.targetCalendarId === "primary"
+    ? primaryCalendarId
+    : preferences.targetCalendarId;
+  const configured = sources
+    .filter((source) => source.blocksScheduling)
+    .map((source) => source.calendarId);
+
+  if (configured.length > 0) return Array.from(new Set(configured));
+  return [targetCalendarId || primaryCalendarId];
+}
+
+async function listIgnoredAllDayGoogleEvents(userId: string) {
+  const db = getDatabase();
+  const [tasks, tickets] = await Promise.all([
+    db
+      .select({
+        calendarId: taskGoogleCalendarLinks.googleCalendarId,
+        eventId: taskGoogleCalendarLinks.googleEventId,
+      })
+      .from(taskGoogleCalendarLinks)
+      .where(
+        and(
+          eq(taskGoogleCalendarLinks.userId, userId),
+          eq(taskGoogleCalendarLinks.allDay, true),
+        ),
+      ),
+    db
+      .select({
+        calendarId: ticketGoogleCalendarLinks.googleCalendarId,
+        eventId: ticketGoogleCalendarLinks.googleEventId,
+      })
+      .from(ticketGoogleCalendarLinks)
+      .where(eq(ticketGoogleCalendarLinks.userId, userId)),
+  ]);
+
+  const ignored = new Map<string, Set<string>>();
+  for (const row of [...tasks, ...tickets]) {
+    if (row.eventId.startsWith("pending:")) continue;
+    const ids = ignored.get(row.calendarId) ?? new Set<string>();
+    ids.add(row.eventId);
+    ignored.set(row.calendarId, ids);
+  }
+  return ignored;
+}
+
+async function listGoogleConflictsForWindow(
+  userId: string,
+  input: Pick<CalendarAvailabilityInput, "timeZone" | "excludeGoogleEventId" | "excludeGoogleIcalUid">,
+  requestedStart: Date,
+  requestedEnd: Date,
+): Promise<CalendarAvailabilityConflict[]> {
+  const rangeStart = new Date(requestedStart.getTime() - 24 * 60 * 60 * 1000);
+  const rangeEnd = new Date(requestedEnd.getTime() + 24 * 60 * 60 * 1000);
+  const [calendarIds, ignoredByCalendar] = await Promise.all([
+    listRelevantGoogleCalendarIds(userId),
+    listIgnoredAllDayGoogleEvents(userId),
+  ]);
+  const eventGroups = await Promise.all(
+    calendarIds.map(async (calendarId) => ({
+      calendarId,
+      events: await listGoogleCalendarEvents(userId, rangeStart, rangeEnd, calendarId),
+    })),
+  );
+
+  return eventGroups.flatMap(({ calendarId, events }) =>
+    googleConflicts(
+      events,
+      input,
+      requestedStart,
+      requestedEnd,
+      ignoredByCalendar.get(calendarId) ?? new Set<string>(),
+    ),
+  );
+}
+
+function googleConflicts(
+  events: GoogleCalendarEvent[],
+  input: Pick<CalendarAvailabilityInput, "timeZone" | "excludeGoogleEventId" | "excludeGoogleIcalUid">,
+  requestedStart: Date,
+  requestedEnd: Date,
+  ignoredEventIds: Set<string> = new Set(),
+): CalendarAvailabilityConflict[] {
+  const conflicts: CalendarAvailabilityConflict[] = [];
+  for (const event of events) {
+    if (ignoredEventIds.has(event.id)) continue;
+    if (event.id === input.excludeGoogleEventId) continue;
+    if (input.excludeGoogleIcalUid && event.iCalUID === input.excludeGoogleIcalUid) continue;
+    if (event.transparency === "transparent" || selfDeclined(event)) continue;
+    const interval = eventInterval(event, input.timeZone);
+    if (!interval || !overlaps(requestedStart, requestedEnd, interval.start, interval.end)) continue;
+    conflicts.push({
+      start: interval.start.toISOString(),
+      end: interval.end.toISOString(),
+      allDay: interval.allDay,
+      source: "google",
+    });
+  }
+  return conflicts;
+}
+
+async function checkUser(
+  user: CalendarAvailabilityUser,
+  input: CalendarAvailabilityInput,
+  requestedStart: Date,
+  requestedEnd: Date,
+): Promise<CalendarAvailabilityResult> {
+  const connection = await getGoogleCalendarConnection(user.id);
+
+  if (connection.connected) {
+    try {
+      return {
+        userId: user.id,
+        name: user.name,
+        email: user.email,
+        coverage: "google",
+        conflicts: await listGoogleConflictsForWindow(
+          user.id,
+          input,
+          requestedStart,
+          requestedEnd,
+        ),
+      };
+    } catch {
+      // Se o Google estiver indisponível, ainda usamos compromissos temporizados conhecidos pelo F10.
+    }
+  }
+
+  return {
+    userId: user.id,
+    name: user.name,
+    email: user.email,
+    coverage: "f10-only",
+    conflicts: await listF10Conflicts(user.id, input, requestedStart, requestedEnd),
+  };
+}
+
+export async function checkF10CalendarAvailability(
+  input: CalendarAvailabilityInput,
+): Promise<CalendarAvailabilityResult[]> {
+  const requestedStart = localDateTimeToUtc(input.date, input.startTime, input.timeZone);
+  const requestedEnd = localDateTimeToUtc(input.date, input.endTime, input.timeZone);
+  if (requestedStart.getTime() >= requestedEnd.getTime()) {
+    throw new Error("CALENDAR_AVAILABILITY_INVALID_RANGE");
+  }
+
+  return Promise.all(
+    input.users.slice(0, 30).map((user) => checkUser(user, input, requestedStart, requestedEnd)),
+  );
+}
+
+export async function listF10CalendarBusyIntervals(
+  input: CalendarAvailabilityWindowInput,
+): Promise<CalendarAvailabilityResult> {
+  const requestedStart = localDateTimeToUtc(input.startDate, "00:00", input.timeZone);
+  const requestedEnd = localDateTimeToUtc(addDays(input.endDate, 1), "00:00", input.timeZone);
+  if (requestedStart.getTime() >= requestedEnd.getTime()) {
+    throw new Error("CALENDAR_AVAILABILITY_INVALID_RANGE");
+  }
+
+  const connection = await getGoogleCalendarConnection(input.user.id);
+  if (connection.connected) {
+    try {
+      return {
+        userId: input.user.id,
+        name: input.user.name,
+        email: input.user.email,
+        coverage: "google",
+        conflicts: await listGoogleConflictsForWindow(
+          input.user.id,
+          input,
+          requestedStart,
+          requestedEnd,
+        ),
+      };
+    } catch {
+      // O fallback F10 mantém a página utilizável sem expor detalhes privados do Google.
+    }
+  }
+
+  return {
+    userId: input.user.id,
+    name: input.user.name,
+    email: input.user.email,
+    coverage: "f10-only",
+    conflicts: await listF10ConflictsForWindow(
+      input.user.id,
+      input,
+      requestedStart,
+      requestedEnd,
+      input.startDate,
+      input.endDate,
+    ),
+  };
+}

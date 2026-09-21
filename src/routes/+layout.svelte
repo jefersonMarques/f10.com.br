@@ -65,15 +65,33 @@
 
   let modalSize: PopupSize = "xl";
 
+  function isInternalPath(pathname: string): boolean {
+    return (
+      pathname === "/login" ||
+      pathname.startsWith("/login/") ||
+      pathname === "/app" ||
+      pathname.startsWith("/app/") ||
+      pathname === "/cliente" ||
+      pathname.startsWith("/cliente/") ||
+      pathname.startsWith("/agendar/")
+    );
+  }
+
   $: modalConfig = $contactModalConfig;
   $: pathname = $page.url.pathname;
   $: isStandalonePage = standalonePaths.has(pathname);
+  $: isInternalAppPage = isInternalPath(pathname);
   $: isOnboardingPage = pathname === "/primeiros-passos-f10";
-  $: isHelpPage = pathname === "/ajuda-f10";
+  $: isHelpPage = pathname === "/ajuda-f10" || pathname.startsWith("/ajuda-f10/");
   $: seoOverride = seoOverrides[pathname];
 
-  onMount(initializeAnalytics);
-  afterNavigate(trackFacebookPageView);
+  onMount(() => {
+    if (!isInternalPath(window.location.pathname)) initializeAnalytics();
+  });
+
+  afterNavigate(({ to }) => {
+    if (to && !isInternalPath(to.url.pathname)) trackFacebookPageView();
+  });
 </script>
 
 <svelte:head>
@@ -117,7 +135,7 @@
   {/if}
 </svelte:head>
 
-{#if isStandalonePage}
+{#if isStandalonePage || isInternalAppPage}
   <slot />
 {:else if isOnboardingPage}
   <main class="h-[100dvh] overflow-hidden">
@@ -125,9 +143,7 @@
   </main>
   <FloatingWhatsappButton variant="support" />
 {:else if isHelpPage}
-  <main class="h-[100dvh] overflow-hidden">
-    <slot />
-  </main>
+  <slot />
 {:else}
   <Header />
   <main>

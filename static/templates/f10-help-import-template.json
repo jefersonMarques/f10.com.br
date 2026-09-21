@@ -1,0 +1,48 @@
+{
+  "format": "f10-help-import",
+  "version": 1,
+  "source": "video-subtitles",
+  "contents": [
+    {
+      "externalId": "REPLACE_WITH_STABLE_SOURCE_ID",
+      "title": "REPLACE_WITH_ARTICLE_TITLE",
+      "slug": "REPLACE_WITH_ARTICLE_SLUG",
+      "summary": "REPLACE_WITH_PUBLIC_SUMMARY",
+      "quickGuide": "🚀 **Passo 1:** REPLACE_WITH_QUICK_ACTION\n📍 **Passo 2:** REPLACE_WITH_QUICK_ACTION",
+      "categories": [
+        {
+          "slug": "uncategorized",
+          "destinationUrl": ""
+        }
+      ],
+      "searchAliases": [],
+      "assistantKnowledge": "",
+      "internalSupportNotes": "",
+      "featuredVideo": {
+        "url": "REPLACE_WITH_REAL_VIDEO_URL",
+        "description": "REPLACE_WITH_PUBLIC_VIDEO_DESCRIPTION",
+        "subtitles": "REPLACE_WITH_VIDEO_SUBTITLES",
+        "assistantSummary": ""
+      },
+      "steps": [
+        {
+          "title": "REPLACE_WITH_STEP_TITLE",
+          "description": "",
+          "assistantKnowledge": "",
+          "blocks": [
+            {
+              "type": "text",
+              "text": "REPLACE_WITH_PUBLIC_INSTRUCTION"
+            },
+            {
+              "type": "image",
+              "assetPath": "screenshots/REPLACE_WITH_ARTICLE_SLUG/step-01-01.png",
+              "altText": "REPLACE_WITH_SCREEN_DESCRIPTION",
+              "assistantDescription": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

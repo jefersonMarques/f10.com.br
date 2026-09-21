@@ -1,0 +1,430 @@
+import {
+  bigserial,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
+import { helpAssets, helpCategories, helpContents } from "$lib/server/db/structuredHelpSchema";
+import { supportQueues, tickets } from "$lib/server/db/supportSchema";
+import { helpContentStatus, users } from "$lib/server/db/schema";
+import type { HelpImageAnnotation } from "$lib/help/helpImageAnnotations";
+
+export type HelpTrainingAccessMode = "invite_only" | "public";
+export type HelpTrainingInteractionMode = "presentation" | "action";
+
+export type HelpTrainingSourceAsset = {
+  id: string;
+  assetType: "image" | "video" | "file";
+  sourceUrl: string | null;
+  storageKey: string | null;
+  altText: string;
+};
+
+export type HelpTrainingSourceBlock = {
+  id: string;
+  blockType: "text" | "image" | "notice" | "link" | "file";
+  textContent: string;
+  linkUrl: string | null;
+  linkLabel: string | null;
+  noticeVariant: string | null;
+  sortOrder: number;
+  annotations: HelpImageAnnotation[];
+  asset: HelpTrainingSourceAsset | null;
+};
+
+export type HelpTrainingSourceContent = {
+  contentId: string;
+  slug: string;
+  title: string;
+  summary: string;
+  quickGuide: string;
+  categories: Array<{
+    id: string;
+    slug: string;
+    name: string;
+    description: string;
+    icon: string;
+    destinationUrl: string;
+  }>;
+  featuredVideo: HelpTrainingSourceAsset | null;
+  steps: Array<{
+    id: string;
+    title: string;
+    description: string;
+    sortOrder: number;
+    blocks: HelpTrainingSourceBlock[];
+  }>;
+  publishedAt: string;
+};
+
+export const helpTrainingPaths = pgTable(
+  "help_training_paths",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    audience: text("audience").notNull().default(""),
+    description: text("description").notNull().default(""),
+    welcomeMessage: text("welcome_message").notNull().default(""),
+    status: helpContentStatus("status").notNull().default("draft"),
+    accessMode: text("access_mode").$type<HelpTrainingAccessMode>().notNull().default("invite_only"),
+    currentVersion: integer("current_version").notNull().default(0),
+    supportQueueId: uuid("support_queue_id").references(() => supportQueues.id, {
+      onDelete: "set null",
+    }),
+    sourceContentId: uuid("source_content_id")
+      .notNull()
+      .references(() => helpContents.id, { onDelete: "restrict" }),
+    sourcePublishedAt: timestamp("source_published_at", { withTimezone: true }).notNull(),
+    sourcePublicationSnapshot: jsonb("source_publication_snapshot")
+      .$type<HelpTrainingSourceContent>()
+      .notNull(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("help_training_paths_slug_unique").on(table.slug),
+    index("help_training_paths_status_idx").on(table.status, table.updatedAt),
+    index("help_training_paths_public_idx").on(table.accessMode, table.status, table.slug),
+  ],
+);
+
+export const helpTrainingPathItems = pgTable(
+  "help_training_path_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    pathId: uuid("path_id")
+      .notNull()
+      .references(() => helpTrainingPaths.id, { onDelete: "cascade" }),
+    sourceContentId: uuid("source_content_id")
+      .notNull()
+      .references(() => helpContents.id, { onDelete: "restrict" }),
+    sourcePublishedAt: timestamp("source_published_at", { withTimezone: true }).notNull(),
+    sourcePublicationSnapshot: jsonb("source_publication_snapshot")
+      .$type<HelpTrainingSourceContent>()
+      .notNull(),
+    sortOrder: integer("sort_order").notNull().default(10),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("help_training_path_items_content_unique").on(table.pathId, table.sourceContentId),
+    uniqueIndex("help_training_path_items_order_unique").on(table.pathId, table.sortOrder),
+    index("help_training_path_items_path_idx").on(table.pathId, table.sortOrder),
+    index("help_training_path_items_source_idx").on(table.sourceContentId),
+  ],
+);
+
+export const helpTrainingPathCategories = pgTable(
+  "help_training_path_categories",
+  {
+    pathId: uuid("path_id")
+      .notNull()
+      .references(() => helpTrainingPaths.id, { onDelete: "cascade" }),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => helpCategories.id, { onDelete: "restrict" }),
+    sortOrder: integer("sort_order").notNull().default(10),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.pathId, table.categoryId] }),
+    index("help_training_path_categories_category_idx").on(table.categoryId, table.sortOrder),
+    index("help_training_path_categories_path_idx").on(table.pathId),
+  ],
+);
+
+export const helpTrainingSteps = pgTable(
+  "help_training_steps",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    pathId: uuid("path_id")
+      .notNull()
+      .references(() => helpTrainingPaths.id, { onDelete: "cascade" }),
+    pathItemId: uuid("path_item_id")
+      .notNull()
+      .references(() => helpTrainingPathItems.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    question: text("question").notNull().default(""),
+    instruction: text("instruction").notNull().default(""),
+    expectedResult: text("expected_result").notNull().default(""),
+    successMessage: text("success_message").notNull().default(""),
+    primaryActionLabel: text("primary_action_label").notNull().default(""),
+    interactionMode: text("interaction_mode")
+      .$type<HelpTrainingInteractionMode>()
+      .notNull()
+      .default("action"),
+    estimatedSeconds: integer("estimated_seconds").notNull().default(45),
+    sourceContentStepId: uuid("source_content_step_id"),
+    videoStartSeconds: integer("video_start_seconds").notNull().default(0),
+    videoEndSeconds: integer("video_end_seconds").notNull().default(0),
+    sortOrder: integer("sort_order").notNull().default(10),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("help_training_steps_order_unique").on(table.pathId, table.sortOrder),
+    index("help_training_steps_path_idx").on(table.pathId, table.sortOrder),
+    index("help_training_steps_path_item_idx").on(table.pathItemId, table.sortOrder),
+  ],
+);
+
+export const helpTrainingStepMedia = pgTable(
+  "help_training_step_media",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    stepId: uuid("step_id")
+      .notNull()
+      .references(() => helpTrainingSteps.id, { onDelete: "cascade" }),
+    mediaType: text("media_type").notNull(),
+    assetId: uuid("asset_id").references(() => helpAssets.id, { onDelete: "restrict" }),
+    sourceUrl: text("source_url"),
+    altText: text("alt_text").notNull().default(""),
+    sortOrder: integer("sort_order").notNull().default(10),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("help_training_step_media_order_unique").on(table.stepId, table.sortOrder),
+    index("help_training_step_media_step_idx").on(table.stepId, table.sortOrder),
+    index("help_training_step_media_asset_idx").on(table.assetId),
+  ],
+);
+
+export const helpTrainingFailureReasons = pgTable(
+  "help_training_failure_reasons",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    stepId: uuid("step_id")
+      .notNull()
+      .references(() => helpTrainingSteps.id, { onDelete: "cascade" }),
+    reasonKey: text("reason_key").notNull(),
+    label: text("label").notNull(),
+    recoveryMessage: text("recovery_message").notNull().default(""),
+    sortOrder: integer("sort_order").notNull().default(10),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("help_training_failure_reason_key_unique").on(table.stepId, table.reasonKey),
+    uniqueIndex("help_training_failure_reason_order_unique").on(table.stepId, table.sortOrder),
+    index("help_training_failure_reasons_step_idx").on(table.stepId, table.sortOrder),
+  ],
+);
+
+export type HelpTrainingSnapshot = {
+  pathId: string;
+  slug: string;
+  title: string;
+  audience: string;
+  description: string;
+  welcomeMessage: string;
+  version: number;
+  sourceContent: HelpTrainingSourceContent;
+  modules?: Array<{
+    id: string;
+    title: string;
+    sortOrder: number;
+    sourceContent: HelpTrainingSourceContent;
+    stepIds: string[];
+  }>;
+  steps: Array<{
+    id: string;
+    pathItemId?: string | null;
+    title: string;
+    question?: string;
+    instruction: string;
+    expectedResult: string;
+    successMessage: string;
+    primaryActionLabel?: string;
+    interactionMode?: HelpTrainingInteractionMode;
+    estimatedSeconds: number;
+    sourceContentStepId?: string | null;
+    videoStartSeconds?: number;
+    videoEndSeconds?: number;
+    images: Array<{ assetId: string; altText: string; annotations?: HelpImageAnnotation[] }>;
+    videoUrl: string | null;
+    captionAssetId?: string | null;
+    failureReasons: Array<{
+      key: string;
+      label: string;
+      recoveryMessage: string;
+    }>;
+  }>;
+};
+
+export const helpTrainingVersions = pgTable(
+  "help_training_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    pathId: uuid("path_id")
+      .notNull()
+      .references(() => helpTrainingPaths.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    snapshot: jsonb("snapshot").$type<HelpTrainingSnapshot>().notNull(),
+    publishedBy: uuid("published_by").references(() => users.id, { onDelete: "set null" }),
+    publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("help_training_versions_path_version_unique").on(table.pathId, table.version),
+    index("help_training_versions_path_idx").on(table.pathId, table.version),
+  ],
+);
+
+export const helpTrainingInvites = pgTable(
+  "help_training_invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    pathId: uuid("path_id")
+      .notNull()
+      .references(() => helpTrainingPaths.id, { onDelete: "cascade" }),
+    versionId: uuid("version_id")
+      .notNull()
+      .references(() => helpTrainingVersions.id, { onDelete: "restrict" }),
+    participantName: text("participant_name").notNull(),
+    participantEmail: text("participant_email").notNull(),
+    organizationName: text("organization_name").notNull().default(""),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("help_training_invites_token_unique").on(table.tokenHash),
+    index("help_training_invites_path_idx").on(table.pathId, table.createdAt),
+    index("help_training_invites_email_idx").on(table.participantEmail),
+  ],
+);
+
+export const helpTrainingSessions = pgTable(
+  "help_training_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    inviteId: uuid("invite_id")
+      .notNull()
+      .references(() => helpTrainingInvites.id, { onDelete: "cascade" }),
+    sessionTokenHash: text("session_token_hash").notNull(),
+    currentStepIndex: integer("current_step_index").notNull().default(0),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    supportTicketId: uuid("support_ticket_id").references(() => tickets.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("help_training_sessions_invite_unique").on(table.inviteId),
+    uniqueIndex("help_training_sessions_token_unique").on(table.sessionTokenHash),
+    index("help_training_sessions_activity_idx").on(table.lastActivityAt),
+  ],
+);
+
+export const helpTrainingStepProgress = pgTable(
+  "help_training_step_progress",
+  {
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => helpTrainingSessions.id, { onDelete: "cascade" }),
+    stepKey: text("step_key").notNull(),
+    status: text("status").notNull().default("pending"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    failureReasonKey: text("failure_reason_key"),
+    failureDetail: text("failure_detail").notNull().default(""),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    helpTicketId: uuid("help_ticket_id").references(() => tickets.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.sessionId, table.stepKey] }),
+    index("help_training_step_progress_status_idx").on(table.status, table.updatedAt),
+  ],
+);
+
+export const helpTrainingEvents = pgTable(
+  "help_training_events",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => helpTrainingSessions.id, { onDelete: "cascade" }),
+    stepKey: text("step_key"),
+    eventType: text("event_type").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("help_training_events_session_idx").on(table.sessionId, table.createdAt),
+    index("help_training_events_type_idx").on(table.eventType, table.createdAt),
+  ],
+);
+
+export const helpTrainingPublicSessions = pgTable(
+  "help_training_public_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    versionId: uuid("version_id")
+      .notNull()
+      .references(() => helpTrainingVersions.id, { onDelete: "restrict" }),
+    sessionTokenHash: text("session_token_hash").notNull(),
+    currentStepIndex: integer("current_step_index").notNull().default(0),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("help_training_public_sessions_token_unique").on(table.sessionTokenHash),
+    index("help_training_public_sessions_version_idx").on(table.versionId, table.lastActivityAt),
+  ],
+);
+
+export const helpTrainingPublicStepProgress = pgTable(
+  "help_training_public_step_progress",
+  {
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => helpTrainingPublicSessions.id, { onDelete: "cascade" }),
+    stepKey: text("step_key").notNull(),
+    status: text("status").notNull().default("pending"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    failureReasonKey: text("failure_reason_key"),
+    failureDetail: text("failure_detail").notNull().default(""),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.sessionId, table.stepKey] }),
+    index("help_training_public_step_progress_status_idx").on(table.status, table.updatedAt),
+  ],
+);
+
+export const helpTrainingPublicEvents = pgTable(
+  "help_training_public_events",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => helpTrainingPublicSessions.id, { onDelete: "cascade" }),
+    stepKey: text("step_key"),
+    eventType: text("event_type").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("help_training_public_events_session_idx").on(table.sessionId, table.createdAt),
+    index("help_training_public_events_type_idx").on(table.eventType, table.createdAt),
+  ],
+);

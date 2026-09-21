@@ -9,7 +9,14 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "postinstall": "svelte-kit sync"
+    "postinstall": "svelte-kit sync",
+    "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
+    "admin:bootstrap": "node --env-file-if-exists=.env scripts/bootstrap-super-admin.mjs",
+    "operations:doctor": "node --env-file-if-exists=.env scripts/operations-doctor.mjs",
+    "operations:smoke": "node --env-file-if-exists=.env scripts/operations-smoke.mjs",
+    "support:doctor": "node --env-file-if-exists=.env scripts/support-doctor.mjs",
+    "production:doctor": "npm run operations:doctor && npm run support:doctor",
+    "prod": "node scripts/production.mjs"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^3.3.1",
@@ -34,6 +41,8 @@
     "@fontsource/plus-jakarta-sans": "^5.2.8",
     "@opentelemetry/api": "^1.9.1",
     "archiver": "^7.0.1",
-    "lucide-svelte": "^0.554.0"
+    "drizzle-orm": "0.45.2",
+    "lucide-svelte": "^0.554.0",
+    "postgres": "3.4.9"
   }
 }

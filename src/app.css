@@ -163,3 +163,326 @@ body::after {
     @apply rounded-2xl border border-slate-200 bg-card shadow-md;
   }
 }
+
+/* Fundação visual compartilhada somente pelas áreas autenticadas /app e /cliente. */
+.application-ui {
+  --application-header-height: 68px;
+  --application-content-wide: 1600px;
+  --application-content-standard: 1440px;
+  --application-content-narrow: 1120px;
+  --application-text-meta: 10px;
+  --application-text-caption: 11px;
+  --application-text-control: 12px;
+  --application-text-body: 13px;
+  --application-text-section: 16px;
+}
+
+.application-header {
+  min-height: var(--application-header-height);
+}
+
+.application-content {
+  width: 100%;
+  margin-inline: auto;
+  padding: 1rem;
+}
+
+.application-content--full {
+  max-width: none;
+}
+
+.application-content--wide {
+  max-width: var(--application-content-wide);
+}
+
+.application-content--standard {
+  max-width: var(--application-content-standard);
+}
+
+.application-content--narrow {
+  max-width: var(--application-content-narrow);
+}
+
+.application-content--normal {
+  padding-block: 1.25rem;
+}
+
+.application-text-meta {
+  font-size: var(--application-text-meta);
+}
+
+.application-text-caption {
+  font-size: var(--application-text-caption);
+}
+
+.application-text-control {
+  font-size: var(--application-text-control);
+}
+
+.application-text-body {
+  font-size: var(--application-text-body);
+}
+
+.application-text-section {
+  font-size: var(--application-text-section);
+}
+
+@media (min-width: 640px) {
+  .application-content {
+    padding: 1.25rem;
+  }
+
+  .application-content--normal {
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .application-content {
+    padding-inline: 1.5rem;
+  }
+}
+
+.application-content.application-content--flush {
+  padding: 0;
+}
+
+/* Trilhas: a referência visual domina a tela no desktop; a orientação fica estável à direita. */
+@media (min-width: 1100px) {
+  .training-step-enter:has(> div > img) {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
+    column-gap: clamp(1.75rem, 3vw, 3.75rem);
+    align-items: center !important;
+    align-content: center;
+    width: 100%;
+    max-width: none !important;
+    min-height: calc(100dvh - 7.5rem) !important;
+    padding-bottom: 0 !important;
+    text-align: left !important;
+  }
+
+  .training-step-enter:has(> div > img) > * {
+    grid-column: 2;
+    width: 100%;
+    max-width: none !important;
+    justify-self: stretch;
+  }
+
+  .training-step-enter:has(> div > img) > p:first-child {
+    margin-top: 0;
+    text-align: left;
+  }
+
+  .training-step-enter:has(> div > img) > h1 {
+    margin-top: 0.65rem;
+    font-size: clamp(1.85rem, 2.2vw, 2.4rem) !important;
+    line-height: 1.08;
+    text-align: left;
+  }
+
+  .training-step-enter:has(> div > img) > .training-rich {
+    margin-top: 1rem;
+    font-size: 0.94rem !important;
+    line-height: 1.7;
+    text-align: left;
+  }
+
+  .training-step-enter:has(> div > img) > div:has(> img) {
+    grid-column: 1;
+    grid-row: 1 / span 12;
+    align-self: center;
+    width: 100% !important;
+    height: calc(100dvh - 8.5rem);
+    min-height: 0 !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 8.5rem) !important;
+    margin-top: 0 !important;
+    border-radius: 1.1rem !important;
+  }
+
+  .training-step-enter:has(> div > img) > div:has(> img) > img {
+    width: 100% !important;
+    height: 100%;
+    max-height: 100% !important;
+    object-fit: contain;
+  }
+
+  .training-step-enter:has(> div > img) > div:has(> .training-rich) {
+    margin-top: 1.25rem !important;
+    text-align: left;
+  }
+
+  .training-step-enter:has(> div > img) > [role="status"],
+  .training-step-enter:has(> div > img) > [role="alert"] {
+    margin-top: 1rem !important;
+    justify-self: start;
+  }
+
+  .training-step-enter:has(> div > img) > div.grid {
+    grid-template-columns: minmax(0, 128px) minmax(0, 1fr) !important;
+    gap: 0.65rem !important;
+    margin-top: 1.5rem !important;
+  }
+
+  .training-step-enter:has(> div > img) > p:last-child {
+    margin-top: 1rem !important;
+    text-align: left;
+  }
+}
+
+/* Neutro = branco. */
+.training-primary.training-float {
+  animation: none !important;
+  transform: none !important;
+  background-color: #FFFFFF !important;
+  color: #000A57 !important;
+  border: 1px solid #C9D2E1 !important;
+  opacity: 1 !important;
+  box-shadow: 0 6px 18px rgba(12, 23, 52, 0.07) !important;
+}
+
+.training-primary.training-float svg {
+  color: #000A57;
+}
+
+.training-primary.training-float:not(:disabled):hover {
+  transform: none !important;
+  background-color: #FFFFFF !important;
+  color: #000A57 !important;
+  border-color: #9EACC1 !important;
+  opacity: 1 !important;
+  box-shadow: 0 8px 20px rgba(12, 23, 52, 0.10) !important;
+}
+
+/* Preparação positiva = verde sólido. */
+main > section .training-primary.training-float {
+  background-color: #15803D !important;
+  color: #FFFFFF !important;
+  border-color: #15803D !important;
+  box-shadow: 0 8px 20px rgba(21, 128, 61, 0.22) !important;
+}
+
+main > section .training-primary.training-float svg {
+  color: #FFFFFF !important;
+}
+
+main > section .training-primary.training-float:not(:disabled):hover {
+  background-color: #166534 !important;
+  color: #FFFFFF !important;
+  border-color: #166534 !important;
+}
+
+/* Atenção informa contexto; somente botões recebem preenchimento sólido. */
+.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) {
+  border-color: #F36B00 !important;
+  background: #FFFFFF !important;
+  padding: 1rem 1.1rem !important;
+  color: #4F5A70 !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > strong {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.86rem !important;
+  line-height: 1.4;
+  font-weight: 800 !important;
+  color: #C95A00 !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > strong svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex: 0 0 auto;
+  color: #F36B00 !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > .training-rich {
+  margin-top: 0.65rem !important;
+  font-size: 0.88rem !important;
+  line-height: 1.7 !important;
+  color: #4F5A70 !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > .training-rich strong,
+.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > .training-rich code {
+  color: #061333 !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div:has(> strong + .training-rich) > .training-rich code {
+  background: #EDF0F5 !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div.grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 0.75rem !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div.grid > button,
+.training-step-enter:has(> .training-verification-question) > div.grid > form > button {
+  min-height: 4rem !important;
+  flex-direction: row !important;
+  gap: 0.55rem !important;
+  animation: none !important;
+  transform: none !important;
+  font-size: 0.82rem !important;
+  font-weight: 800 !important;
+  opacity: 1 !important;
+}
+
+/* Negativo = vermelho sólido. */
+.training-step-enter:has(> .training-verification-question) > div.grid .training-subtle {
+  background: #C62828 !important;
+  color: #FFFFFF !important;
+  border: 1px solid #C62828 !important;
+  box-shadow: 0 7px 18px rgba(198, 40, 40, 0.20) !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div.grid .training-subtle svg {
+  color: #FFFFFF !important;
+}
+
+.training-step-enter:has(> .training-verification-question) > div.grid .training-subtle:hover {
+  background: #A61B1B !important;
+  color: #FFFFFF !important;
+  border-color: #A61B1B !important;
+  box-shadow: 0 9px 22px rgba(166, 27, 27, 0.24) !important;
+}
+
+/* Positivo = verde sólido, independentemente do wrapper do formulário. */
+.training-step-enter:has(> .training-verification-question) .training-primary.training-float {
+  background: #15803D !important;
+  color: #FFFFFF !important;
+  border: 1px solid #15803D !important;
+  box-shadow: 0 7px 18px rgba(21, 128, 61, 0.20) !important;
+}
+
+.training-step-enter:has(> .training-verification-question) .training-primary.training-float svg {
+  color: #FFFFFF !important;
+}
+
+.training-step-enter:has(> .training-verification-question) .training-primary.training-float:not(:disabled):hover {
+  background: #166534 !important;
+  color: #FFFFFF !important;
+  border-color: #166534 !important;
+  box-shadow: 0 9px 22px rgba(22, 101, 52, 0.24) !important;
+}
+
+/* Recuperação/atenção = laranja sólido somente no botão. */
+.training-step-enter > div.mt-7.w-full:not(.grid) > button.training-primary.training-float {
+  background-color: #F36B00 !important;
+  color: #FFFFFF !important;
+  border-color: #F36B00 !important;
+  box-shadow: 0 8px 20px rgba(243, 107, 0, 0.22) !important;
+}
+
+.training-step-enter > div.mt-7.w-full:not(.grid) > button.training-primary.training-float svg {
+  color: #FFFFFF !important;
+}
+
+.training-step-enter > div.mt-7.w-full:not(.grid) > button.training-primary.training-float:not(:disabled):hover {
+  background-color: #D85F00 !important;
+  color: #FFFFFF !important;
+  border-color: #D85F00 !important;
+}
