@@ -55,6 +55,13 @@ export type TicketQueue = {
   name: string;
 };
 
+export type TicketEntryPoint = {
+  stageId: string;
+  name: string;
+  areaId: string;
+  areaName: string;
+};
+
 export type TicketAttachment = {
   id: string;
   originalName: string;
