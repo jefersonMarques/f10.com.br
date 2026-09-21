@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, notInArray } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { teams } from "$lib/server/db/schema";
@@ -7,7 +7,7 @@ import {
   supportChatEntryOptions,
   type SupportChatInitialHandling,
 } from "$lib/server/db/supportChatEntrySchema";
-import { supportQueues } from "$lib/server/db/supportSchema";
+import { supportQueues, tickets } from "$lib/server/db/supportSchema";
 
 export type SupportChatEntryOptionInput = {
   label: string;
@@ -263,7 +263,8 @@ export async function updateSupportQueueSla(
     resolutionMinutes: number;
   },
 ): Promise<void> {
-  const [updated] = await getDatabase()
+  const db = getDatabase();
+  const [updated] = await db
     .update(supportQueues)
     .set({
       slaEnabled: input.enabled,
@@ -276,6 +277,22 @@ export async function updateSupportQueueSla(
     .returning({ id: supportQueues.id });
 
   if (!updated) throw new Error("SUPPORT_QUEUE_NOT_FOUND");
+
+  if (!input.enabled) {
+    await db
+      .update(tickets)
+      .set({
+        firstResponseDueAt: null,
+        nextResponseDueAt: null,
+        resolutionDueAt: null,
+      })
+      .where(
+        and(
+          eq(tickets.queueId, queueId),
+          notInArray(tickets.status, ["resolved", "closed"]),
+        ),
+      );
+  }
 
   await recordAuditEvent({
     actorUserId,
