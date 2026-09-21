@@ -131,29 +131,33 @@ export async function createCustomerPortalCredentialInvite(input: {
   const baseUrl = getCustomerPortalBaseUrl(input.requestOrigin || "https://f10.com.br");
   const activationUrl = `${baseUrl}/cliente/ativar?token=${encodeURIComponent(token)}`;
 
-  await sendTransactionalEmail({
-    to: { email, name: input.name },
-    subject: "Ative seu acesso à área do cliente F10",
-    textContent: [
-      `Olá, ${input.name || "cliente"}.`,
-      "",
-      "Seu acesso à área do cliente F10 foi criado.",
-      `Ative a conta por este link: ${activationUrl}`,
-      "",
-      "O link expira em 48 horas.",
-    ].join("\n"),
-    htmlContent: buildEmailHtml({
-      eyebrow: "Área do Cliente",
-      title: "Ative seu acesso",
-      greeting: `Olá, ${input.name || "cliente"}.`,
-      body: [
+  try {
+    await sendTransactionalEmail({
+      to: { email, name: input.name },
+      subject: "Ative seu acesso à área do cliente F10",
+      textContent: [
+        `Olá, ${input.name || "cliente"}.`,
+        "",
         "Seu acesso à área do cliente F10 foi criado.",
-        "Confirme seu e-mail para acompanhar tickets, respostas e etapas do atendimento.",
-      ],
-      action: { label: "Ativar acesso", href: activationUrl },
-      footer: "O link de ativação expira em 48 horas.",
-    }),
-  });
+        `Ative a conta por este link: ${activationUrl}`,
+        "",
+        "O link expira em 48 horas.",
+      ].join("\n"),
+      htmlContent: buildEmailHtml({
+        eyebrow: "Área do Cliente",
+        title: "Ative seu acesso",
+        greeting: `Olá, ${input.name || "cliente"}.`,
+        body: [
+          "Seu acesso à área do cliente F10 foi criado.",
+          "Confirme seu e-mail para acompanhar tickets, respostas e etapas do atendimento.",
+        ],
+        action: { label: "Ativar acesso", href: activationUrl },
+        footer: "O link de ativação expira em 48 horas.",
+      }),
+    });
+  } catch {
+    throw new Error("CUSTOMER_PORTAL_EMAIL_FAILED");
+  }
 }
 
 export async function activateCustomerPortalCredential(token: string): Promise<boolean> {
