@@ -211,6 +211,7 @@ export async function listTicketWorkflowConfiguration() {
         linkedAreaId: ticketWorkflowStages.linkedAreaId,
         lifecycleStatus: ticketWorkflowStages.lifecycleStatus,
         isInitial: ticketWorkflowStages.isInitial,
+        allowTicketStart: ticketWorkflowStages.allowTicketStart,
         sortOrder: ticketWorkflowStages.sortOrder,
         active: ticketWorkflowStages.active,
       })
@@ -253,6 +254,78 @@ export async function listTicketWorkflowConfiguration() {
           : null,
       })),
   }));
+}
+
+export type TicketWorkflowEntryPoint = {
+  stageId: string;
+  name: string;
+  areaId: string;
+  areaName: string;
+};
+
+export async function listTicketWorkflowEntryPoints(): Promise<TicketWorkflowEntryPoint[]> {
+  const configuration = await listTicketWorkflowConfiguration();
+  const globalWorkflow = configuration.find((workflow) => workflow.kind === "global");
+  if (!globalWorkflow) return [];
+
+  return globalWorkflow.stages
+    .filter(
+      (stage) =>
+        stage.allowTicketStart &&
+        stage.stageType === "area_gateway" &&
+        Boolean(stage.linkedAreaId),
+    )
+    .map((stage) => ({
+      stageId: stage.id,
+      name: stage.linkedAreaName ?? stage.name,
+      areaId: stage.linkedAreaId as string,
+      areaName: stage.linkedAreaName ?? stage.name,
+    }));
+}
+
+export async function updateTicketWorkflowStageEntryPoint(
+  stageId: string,
+  allowTicketStart: boolean,
+): Promise<void> {
+  const db = getDatabase();
+  const [stage] = await db
+    .select({
+      stageType: ticketWorkflowStages.stageType,
+      linkedAreaId: ticketWorkflowStages.linkedAreaId,
+      workflowKind: ticketWorkflows.kind,
+    })
+    .from(ticketWorkflowStages)
+    .innerJoin(ticketWorkflows, eq(ticketWorkflowStages.workflowId, ticketWorkflows.id))
+    .where(
+      and(
+        eq(ticketWorkflowStages.id, stageId),
+        eq(ticketWorkflowStages.active, true),
+        eq(ticketWorkflows.active, true),
+      ),
+    )
+    .limit(1);
+
+  if (!stage) throw new Error("TICKET_WORKFLOW_STAGE_NOT_FOUND");
+  if (
+    allowTicketStart &&
+    (stage.workflowKind !== "global" ||
+      stage.stageType !== "area_gateway" ||
+      !stage.linkedAreaId)
+  ) {
+    throw new Error("TICKET_WORKFLOW_ENTRY_POINT_INVALID");
+  }
+
+  await db
+    .update(ticketWorkflowStages)
+    .set({
+      allowTicketStart:
+        allowTicketStart &&
+        stage.workflowKind === "global" &&
+        stage.stageType === "area_gateway" &&
+        Boolean(stage.linkedAreaId),
+      updatedAt: new Date(),
+    })
+    .where(eq(ticketWorkflowStages.id, stageId));
 }
 
 export async function getTicketWorkflowBoard(
