@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { getPermissionScope, hasPermission } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
 import {
   webChatMessageAttachments,
   webChatMessages,
@@ -58,6 +59,7 @@ export async function createTicketFromChat(
       unitName: webChatSessions.unitName,
       unitSchema: webChatSessions.unitSchema,
       firstResponseAt: webChatSessions.firstResponseAt,
+      createdAt: webChatSessions.createdAt,
       defaultDueDays: supportQueues.defaultDueDays,
     })
     .from(webChatSessions)
@@ -69,6 +71,8 @@ export async function createTicketFromChat(
   if (!await canAccessChat(actorUserId, permissions, chat.queueId, chat.assignedUserId)) {
     throw new Error("CHAT_TICKET_CREATE_NOT_ALLOWED");
   }
+
+  const sla = await calculateTicketSlaDeadlines(chat.queueId, chat.createdAt);
 
   if (chat.ticketId) {
     const [existing] = await db
@@ -110,6 +114,8 @@ export async function createTicketFromChat(
         priority: "normal",
         channel: "web_chat",
         firstResponseAt: chat.firstResponseAt,
+        firstResponseDueAt: sla.firstResponseDueAt,
+        resolutionDueAt: sla.resolutionDueAt,
         dueOn: sql`CURRENT_DATE + ${chat.defaultDueDays}::integer`,
       })
       .returning({ id: tickets.id, ticketNumber: tickets.ticketNumber });
