@@ -128,6 +128,10 @@ async function canAccessAreaInternal(
   scope: PermissionScope,
   areaId: string,
 ): Promise<boolean> {
+  const areaRestriction = await getUserTicketAreaRestriction(actorUserId);
+  if (areaRestriction !== null && !areaRestriction.includes(areaId)) {
+    return false;
+  }
   if (scope === "all") return true;
 
   const db = getDatabase();
