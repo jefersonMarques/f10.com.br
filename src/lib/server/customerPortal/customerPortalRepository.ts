@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, asc, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { calculateNextResponseDueAt } from "$lib/server/support/ticketSlaService";
 import {
   customerPortalLoginTokens,
   customerPortalSessions,
@@ -238,6 +239,8 @@ export async function listCustomerPortalTickets(contactId: string) {
       id: tickets.id,
       ticketNumber: tickets.ticketNumber,
       subject: tickets.subject,
+      queueId: tickets.queueId,
+      firstResponseAt: tickets.firstResponseAt,
       status: tickets.status,
       priority: tickets.priority,
       channel: tickets.channel,
@@ -355,6 +358,9 @@ export async function replyCustomerPortalTicket(
   const messageId = randomUUID();
   const storedAttachments = await uploadSupportMessageAttachments(ticketId, messageId, files);
   const now = new Date();
+  const nextResponseDueAt = ticket.firstResponseAt
+    ? await calculateNextResponseDueAt(ticket.queueId, now)
+    : null;
 
   try {
     await db.transaction(async (tx) => {
@@ -389,6 +395,7 @@ export async function replyCustomerPortalTicket(
             ticket.status === "resolved" || ticket.status === "waiting_customer"
               ? "open"
               : ticket.status,
+          nextResponseDueAt,
           updatedAt: now,
         })
         .where(and(eq(tickets.id, ticketId), eq(tickets.customerContactId, contactId)));
