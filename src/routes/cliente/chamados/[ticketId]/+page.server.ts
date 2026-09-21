@@ -167,7 +167,6 @@ export const actions: Actions = {
     const session = await requireCustomerTicketPortalSession(
       cookies,
       `/cliente/chamados/${params.ticketId}`,
-      false,
     );
     if (session.authProvider !== "f10") {
       return fail(403, {
