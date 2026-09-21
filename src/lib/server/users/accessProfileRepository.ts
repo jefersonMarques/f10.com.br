@@ -167,6 +167,14 @@ export async function updateAccessProfile(
   }
 
   const db = getDatabase();
+  const actorPermissions = await resolveUserPermissions(actorUserId);
+  for (const [permissionCode, scope] of uniqueGrants) {
+    const actorScope = actorPermissions.get(permissionCode);
+    if (!actorScope || !isScopeAtLeast(actorScope, scope)) {
+      throw new Error("ACCESS_PROFILE_PERMISSION_NOT_DELEGABLE");
+    }
+  }
+
   const [[profile], [duplicate]] = await Promise.all([
     db
       .select({ id: roles.id, isSystem: roles.isSystem })
