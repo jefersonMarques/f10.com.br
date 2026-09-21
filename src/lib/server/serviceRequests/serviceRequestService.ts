@@ -16,6 +16,7 @@ import {
 } from "$lib/server/customerPortal/customerF10AuthRepository";
 import { autoAssignTicketIfConfigured } from "$lib/server/support/supportRoutingRepository";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
+import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
 import { encryptServiceRequestSecrets } from "$lib/server/serviceRequests/serviceRequestCrypto";
 import {
   normalizeServiceRequestFields,
@@ -134,6 +135,7 @@ export async function createCustomerServiceRequest(
   );
   const db = getDatabase();
   const now = new Date();
+  const sla = await calculateTicketSlaDeadlines(intake.queueId, now);
   const label = serviceRequestLabel(input.requestType);
   let createdNew = false;
 
@@ -176,6 +178,8 @@ export async function createCustomerServiceRequest(
           priority: "normal",
           channel: "portal",
           dueOn: sql`CURRENT_DATE + ${intake.defaultDueDays}::integer`,
+          firstResponseDueAt: sla.firstResponseDueAt,
+          resolutionDueAt: sla.resolutionDueAt,
         })
         .returning({ id: tickets.id, ticketNumber: tickets.ticketNumber });
       if (!ticket) throw new Error("SERVICE_REQUEST_TICKET_NOT_CREATED");
