@@ -1,4 +1,5 @@
 import { env } from "$env/dynamic/private";
+import { getGeneralOperationsSettings } from "$lib/server/settings/operationsSettingsRepository";
 
 type TransactionalEmailRecipient = {
   email: string;
@@ -9,10 +10,12 @@ export async function sendTransactionalEmail(input: {
   to: TransactionalEmailRecipient;
   subject: string;
   textContent: string;
+  htmlContent?: string;
 }): Promise<void> {
   const apiKey = env.BREVO_API_KEY?.trim() ?? "";
-  const senderEmail = env.BREVO_SENDER_EMAIL?.trim() ?? "";
-  const senderName = env.BREVO_SENDER_NAME?.trim() || "F10 Software";
+  const general = await getGeneralOperationsSettings();
+  const senderEmail = general.supportSenderEmail || env.BREVO_SENDER_EMAIL?.trim() || "";
+  const senderName = general.supportSenderName || env.BREVO_SENDER_NAME?.trim() || "F10 Software";
 
   if (!apiKey || !senderEmail) {
     throw new Error("BREVO_TRANSACTIONAL_EMAIL_NOT_CONFIGURED");
@@ -35,6 +38,7 @@ export async function sendTransactionalEmail(input: {
       ],
       subject: input.subject,
       textContent: input.textContent,
+      ...(input.htmlContent ? { htmlContent: input.htmlContent } : {}),
     }),
     signal: AbortSignal.timeout(10_000),
   });
