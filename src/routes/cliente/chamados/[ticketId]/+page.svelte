@@ -12,6 +12,7 @@
     Paperclip,
     School,
     Send,
+    Star,
     Users,
   } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
@@ -21,6 +22,8 @@
 
   export let data: PageData;
   export let form: ActionData;
+
+  let satisfactionScore = 0;
 
   const statusLabels: Record<string, string> = {
     new: "Aguardando atendimento",
@@ -144,11 +147,11 @@
     <dl class="mt-5 grid overflow-hidden rounded-2xl border border-[#E7E9EF] bg-[#FAFBFC] sm:grid-cols-2 lg:grid-cols-4">
       <div class="border-b border-[#E7E9EF] p-4 sm:border-r lg:border-b-0">
         <dt class="application-text-meta inline-flex items-center gap-1.5 font-medium text-[#9298A5]"><Users size={13} />Grupo</dt>
-        <dd class="mt-1 text-[12px] font-semibold text-[#424A5B]">{data.details.context.groupName}</dd>
+        <dd class="mt-1 text-[12px] font-semibold text-[#424A5B]">{data.details.context?.groupName ?? "Vínculo em andamento"}</dd>
       </div>
       <div class="border-b border-[#E7E9EF] p-4 lg:border-b-0 lg:border-r">
         <dt class="application-text-meta inline-flex items-center gap-1.5 font-medium text-[#9298A5]"><School size={13} />Escola</dt>
-        <dd class="mt-1 text-[12px] font-semibold text-[#424A5B]">{data.details.context.unitName}</dd>
+        <dd class="mt-1 text-[12px] font-semibold text-[#424A5B]">{data.details.context?.unitName ?? "Ainda não vinculada"}</dd>
       </div>
       <div class="border-b border-[#E7E9EF] p-4 sm:border-r sm:border-b-0">
         <dt class="application-text-meta inline-flex items-center gap-1.5 font-medium text-[#9298A5]">
@@ -181,6 +184,37 @@
     </div>
   {/if}
 
+  {#if data.satisfaction}
+    <section class="mt-4 rounded-[22px] border border-[#E1E4EC] bg-white p-5 shadow-[0_8px_28px_rgba(1,13,40,0.025)] sm:p-6">
+      <p class="application-text-meta font-bold uppercase tracking-[0.09em] text-[#EA6D0B]">Pesquisa de satisfação</p>
+      {#if data.satisfaction.answeredAt && data.satisfaction.score}
+        <div class="mt-3 flex items-center gap-1" aria-label={data.satisfaction.score + " de 5 estrelas"}>
+          {#each [1, 2, 3, 4, 5] as value}
+            <Star size={22} fill={value <= (data.satisfaction.score ?? 0) ? "currentColor" : "none"} class={value <= (data.satisfaction.score ?? 0) ? "text-[#EA6D0B]" : "text-[#CDD2DC]"} />
+          {/each}
+        </div>
+        <p class="mt-2 text-[12px] font-semibold text-[#3E4554]">Obrigado pela sua avaliação.</p>
+        {#if data.satisfaction.comment}<p class="application-text-caption mt-2 whitespace-pre-wrap leading-5 text-[#747B8A]">{data.satisfaction.comment}</p>{/if}
+      {:else}
+        <h2 class="mt-2 text-[17px] font-semibold text-[#303746]">Como foi o atendimento?</h2>
+        <form method="POST" action="?/satisfaction" class="mt-4">
+          <input type="hidden" name="score" value={satisfactionScore} />
+          <div class="flex gap-2">
+            {#each [1, 2, 3, 4, 5] as value}
+              <button type="button" on:click={() => (satisfactionScore = value)} class={"flex h-11 w-11 items-center justify-center rounded-xl border transition " + (satisfactionScore >= value ? "border-[#EA6D0B] bg-[#FFF4E8] text-[#EA6D0B]" : "border-[#DDE1EA] text-[#A1A7B3]")} aria-label={value + (value > 1 ? " estrelas" : " estrela")}>
+                <Star size={20} fill={satisfactionScore >= value ? "currentColor" : "none"} />
+              </button>
+            {/each}
+          </div>
+          <textarea name="comment" maxlength="2000" rows="3" placeholder="Comentário opcional" class="mt-4 w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#000A57]"></textarea>
+          {#if form?.message && "action" in form && form.action === "satisfaction"}
+            <p class={form.success ? "application-text-caption mt-3 text-[#2F7045]" : "application-text-caption mt-3 text-[#9B2C2C]"}>{form.message}</p>
+          {/if}
+          <button type="submit" disabled={satisfactionScore === 0} class="mt-4 min-h-10 rounded-xl bg-[#000A57] px-5 text-[11px] font-semibold text-white disabled:opacity-40">Enviar avaliação</button>
+        </form>
+      {/if}
+    </section>
+  {/if}
   <section class="mt-4 overflow-hidden rounded-[22px] border border-[#E1E4EC] bg-white shadow-[0_8px_28px_rgba(1,13,40,0.025)]">
     <header class="border-b border-[#ECEEF3] px-5 py-4 sm:px-6">
       <div class="flex items-center gap-2">
