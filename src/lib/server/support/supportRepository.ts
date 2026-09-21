@@ -638,6 +638,7 @@ export async function getSupportTicket(
       organizationName: customerOrganizations.name,
       linkedTaskId: tickets.linkedTaskId,
       firstResponseDueAt: tickets.firstResponseDueAt,
+      nextResponseDueAt: tickets.nextResponseDueAt,
       resolutionDueAt: tickets.resolutionDueAt,
       firstResponseAt: tickets.firstResponseAt,
       resolvedAt: tickets.resolvedAt,
