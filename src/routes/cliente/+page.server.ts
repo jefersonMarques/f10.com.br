@@ -6,9 +6,10 @@ import {
   sendCustomerPortalMagicLink,
 } from "$lib/server/customerPortal/customerPortalMailer";
 import { createCustomerPortalLoginToken } from "$lib/server/customerPortal/customerPortalRepository";
+import { authenticateCustomerPortalCredential } from "$lib/server/customerPortal/customerAuthService";
 import { createF10CustomerPortalSession } from "$lib/server/customerPortal/customerF10AuthRepository";
 import {
-  getOptionalCustomerF10PortalSession,
+  getOptionalCustomerTicketPortalSession,
   normalizeCustomerPortalReturnTo,
   setCustomerPortalSessionCookie,
 } from "$lib/server/customerPortal/customerPortalSession";
@@ -35,12 +36,48 @@ function f10LoginDiagnostic(cause: unknown): string {
 
 export const load: PageServerLoad = async ({ cookies, url }) => {
   const returnTo = normalizeCustomerPortalReturnTo(url.searchParams.get("returnTo") ?? "/cliente/chamados");
-  const session = await getOptionalCustomerF10PortalSession(cookies);
+  const session = await getOptionalCustomerTicketPortalSession(cookies);
   if (session) throw redirect(303, returnTo);
   return { returnTo };
 };
 
 export const actions: Actions = {
+  portalLogin: async ({ request, cookies }) => {
+    const formData = await request.formData();
+    const emailValue = formData.get("email");
+    const passwordValue = formData.get("password");
+    const returnToValue = formData.get("returnTo");
+    const email = typeof emailValue === "string" ? emailValue.trim().toLowerCase() : "";
+    const password = typeof passwordValue === "string" ? passwordValue : "";
+    const returnTo = normalizeCustomerPortalReturnTo(
+      typeof returnToValue === "string" ? returnToValue : "/cliente/chamados",
+    );
+
+    if (!isValidEmail(email) || password.length < 1 || password.length > 256) {
+      return fail(400, {
+        success: false,
+        action: "portalLogin",
+        message: "Informe seu e-mail e senha.",
+        email,
+        returnTo,
+      });
+    }
+
+    const session = await authenticateCustomerPortalCredential(email, password);
+    if (!session) {
+      return fail(401, {
+        success: false,
+        action: "portalLogin",
+        message: "E-mail ou senha inválidos, ou acesso ainda não ativado.",
+        email,
+        returnTo,
+      });
+    }
+
+    setCustomerPortalSessionCookie(cookies, session.token, session.expiresAt);
+    throw redirect(303, returnTo);
+  },
+
   f10Login: async ({ request, cookies }) => {
     const formData = await request.formData();
     const emailValue = formData.get("email");
