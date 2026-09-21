@@ -29,7 +29,7 @@ import {
   type TicketPriority,
 } from "$lib/server/support/supportRepository";
 import { listTicketCustomerContexts } from "$lib/server/support/ticketCustomerContextRepository";
-import { moveTicketAreaStage } from "$lib/server/support/ticketWorkflowRepository";
+import { listTicketWorkflowEntryPoints, moveTicketAreaStage } from "$lib/server/support/ticketWorkflowRepository";
 import {
   getTicketWorkflowBoardWithAppearance,
   moveTicketGlobalStageWithRules,
@@ -87,9 +87,10 @@ export const load: PageServerLoad = async ({ parent }) => {
   const canReply = hasPermission(permissionMap, "tickets.reply");
   const canManageWorkflow = hasPermission(permissionMap, "tickets.manage", "all");
   const canSearchCustomers = canCreate;
-  const [ticketRows, queues] = await Promise.all([
+  const [ticketRows, queues, entryPoints] = await Promise.all([
     listSupportTickets(layout.user.id, permissionMap),
     canCreate ? listSupportQueues() : Promise.resolve([]),
+    canCreate ? listTicketWorkflowEntryPoints() : Promise.resolve([]),
   ]);
   const ticketIds = ticketRows.map((ticket) => ticket.id);
   const [contexts, workflowBoard, labelRows] = await Promise.all([
@@ -115,6 +116,7 @@ export const load: PageServerLoad = async ({ parent }) => {
       labels: labelsByTicket.get(ticket.id) ?? [],
     })),
     queues,
+    entryPoints,
     workflowBoard: {
       globalWorkflow: workflowBoard.globalWorkflow,
       areaWorkflows: workflowBoard.areaWorkflows,
@@ -140,6 +142,7 @@ export const actions: Actions = {
     const priority = readFormValue(formData, "priority");
     const dueOn = readFormValue(formData, "dueOn");
     const queueId = readFormValue(formData, "queueId");
+    const startStageId = readFormValue(formData, "startStageId") || null;
     let customer;
     try {
       customer = parseTicketCustomerLinkForm(formData);
@@ -159,6 +162,9 @@ export const actions: Actions = {
     if (!queueId || !isTicketPriority(priority)) {
       return fail(400, { success: false, action: "create", message: "Revise fila e prioridade." });
     }
+    if (startStageId && !isUuid(startStageId)) {
+      return fail(400, { success: false, action: "create", message: "Processo inicial inválido." });
+    }
     if (!isTicketDueDate(dueOn)) {
       return fail(400, { success: false, action: "create", message: "Informe uma data planejada de conclusão válida." });
     }
@@ -171,6 +177,7 @@ export const actions: Actions = {
         dueOn,
         ...customer,
         queueId,
+        startStageId,
       });
       throw redirect(303, `/app/tickets/${ticket.id}`);
     } catch (cause) {
