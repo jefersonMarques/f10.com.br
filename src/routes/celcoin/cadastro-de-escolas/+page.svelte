@@ -12,6 +12,11 @@
   } from "lucide-svelte";
   import Breadcrumb from "$lib/components/Breadcrumb.svelte";
   import { getF10TermsText } from "$lib/legal/f10Terms";
+  import type { PageData } from "./$types";
+
+  export let data: PageData;
+
+  $: onboardingFlow = data.flow === "onboarding";
 
   // ==============================
   // Tipos
@@ -1154,10 +1159,12 @@
       nextErrors = addError(nextErrors, "managerEmail", "E-mail inválido.");
 
     portalPasswordError = "";
-    if (portalPassword.length < 8) {
-      portalPasswordError = "Use pelo menos 8 caracteres.";
-    } else if (portalPassword !== portalPasswordConfirm) {
-      portalPasswordError = "As senhas não coincidem.";
+    if (onboardingFlow) {
+      if (portalPassword.length < 8) {
+        portalPasswordError = "Use pelo menos 8 caracteres.";
+      } else if (portalPassword !== portalPasswordConfirm) {
+        portalPasswordError = "As senhas não coincidem.";
+      }
     }
 
     if (!isUrlValid(formData.marketingSite))
@@ -1539,7 +1546,10 @@
         }),
       );
 
-      fd.append("portalPassword", portalPassword);
+      if (onboardingFlow) {
+        fd.append("flow", "onboarding");
+        fd.append("portalPassword", portalPassword);
+      }
 
       // Passo 3 (múltiplos)
       for (const uf of docFiles.rg_cnh) fd.append("doc_rg_cnh", uf.file);
@@ -1729,14 +1739,18 @@
             Tudo certo!
           </h2>
           <p class="mt-2 text-[13px] text-black/60">
-            Recebemos seus dados e enviamos a ativação da Área do Cliente por e-mail.
+            {onboardingFlow
+              ? "Recebemos seus dados e enviamos a ativação da Área do Cliente por e-mail."
+              : "Recebemos seus dados. A equipe F10 seguirá com a solicitação."}
           </p>
-          <div class="mx-auto mt-4 max-w-[620px] rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-left">
-            <p class="text-[13px] font-semibold text-amber-900">Confirme seu e-mail para continuar</p>
-            <p class="mt-1 text-[12px] leading-5 text-amber-800">
-              Por segurança, o acesso aos tickets só é liberado depois da confirmação. Ao clicar em “Ativar acesso” no e-mail, você entra automaticamente na área de chamados.
-            </p>
-          </div>
+          {#if onboardingFlow}
+            <div class="mx-auto mt-4 max-w-[620px] rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-left">
+              <p class="text-[13px] font-semibold text-amber-900">Confirme seu e-mail para continuar</p>
+              <p class="mt-1 text-[12px] leading-5 text-amber-800">
+                Ao clicar em “Ativar acesso” no e-mail, você entra automaticamente na área de chamados e acompanha sua implantação.
+              </p>
+            </div>
+          {/if}
 
           <div
             class="mt-5 rounded-2xl overflow-hidden border border-black/10 bg-black"
@@ -1753,7 +1767,7 @@
             </div>
           </div>
 
-          <div class="mt-5 grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <div class={"mt-5 grid grid-cols-1 gap-3 " + (onboardingFlow ? "sm:grid-cols-4" : "sm:grid-cols-3")}>
             <a
               href={supportLink}
               target="_blank"
@@ -1771,12 +1785,14 @@
               Baixar contrato
             </button>
 
-            <a
-              href="/cliente"
-              class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold border border-black/15 bg-white hover:bg-black/[0.03]"
-            >
-              Já ativei meu acesso
-            </a>
+            {#if onboardingFlow}
+              <a
+                href="/cliente"
+                class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold border border-black/15 bg-white hover:bg-black/[0.03]"
+              >
+                Já ativei meu acesso
+              </a>
+            {/if}
 
             <a
               href={whatsappLink}
@@ -2386,44 +2402,47 @@
                   </p>{/if}
               </div>
 
-              <div class="md:col-span-2 rounded-2xl border border-black/10 bg-black/[0.02] p-4">
-                <p class="text-[13px] font-semibold text-black/75">Acesso à Área do Cliente</p>
-                <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label for="portalPassword" class="block text-[13px] font-medium text-black/70">Senha</label>
-                    <input
-                      id="portalPassword"
-                      type="password"
-                      minlength="8"
-                      maxlength="256"
-                      autocomplete="new-password"
-                      value={portalPassword}
-                      class={"mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none " + (portalPasswordError ? "border-red-400" : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20")}
-                      on:input={(e) => {
-                        portalPassword = (e.currentTarget as HTMLInputElement).value;
-                        portalPasswordError = "";
-                      }}
-                    />
+              {#if onboardingFlow}
+                <div class="md:col-span-2 rounded-2xl border border-black/10 bg-black/[0.02] p-4">
+                  <p class="text-[13px] font-semibold text-black/75">Seu acesso à Área do Cliente</p>
+                  <p class="mt-1 text-[12px] leading-5 text-black/55">Crie a senha que você usará para acompanhar a implantação e falar com a equipe F10.</p>
+                  <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label for="portalPassword" class="block text-[13px] font-medium text-black/70">Senha</label>
+                      <input
+                        id="portalPassword"
+                        type="password"
+                        minlength="8"
+                        maxlength="256"
+                        autocomplete="new-password"
+                        value={portalPassword}
+                        class={"mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none " + (portalPasswordError ? "border-red-400" : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20")}
+                        on:input={(e) => {
+                          portalPassword = (e.currentTarget as HTMLInputElement).value;
+                          portalPasswordError = "";
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label for="portalPasswordConfirm" class="block text-[13px] font-medium text-black/70">Confirmar senha</label>
+                      <input
+                        id="portalPasswordConfirm"
+                        type="password"
+                        minlength="8"
+                        maxlength="256"
+                        autocomplete="new-password"
+                        value={portalPasswordConfirm}
+                        class={"mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none " + (portalPasswordError ? "border-red-400" : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20")}
+                        on:input={(e) => {
+                          portalPasswordConfirm = (e.currentTarget as HTMLInputElement).value;
+                          portalPasswordError = "";
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label for="portalPasswordConfirm" class="block text-[13px] font-medium text-black/70">Confirmar senha</label>
-                    <input
-                      id="portalPasswordConfirm"
-                      type="password"
-                      minlength="8"
-                      maxlength="256"
-                      autocomplete="new-password"
-                      value={portalPasswordConfirm}
-                      class={"mt-2 w-full rounded-xl border px-4 py-3 text-[15px] outline-none " + (portalPasswordError ? "border-red-400" : "border-black/15 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20")}
-                      on:input={(e) => {
-                        portalPasswordConfirm = (e.currentTarget as HTMLInputElement).value;
-                        portalPasswordError = "";
-                      }}
-                    />
-                  </div>
+                  {#if portalPasswordError}<p class="mt-2 text-[12px] text-red-600">{portalPasswordError}</p>{/if}
                 </div>
-                {#if portalPasswordError}<p class="mt-2 text-[12px] text-red-600">{portalPasswordError}</p>{/if}
-              </div>
+              {/if}
             </div>
 
             <div class="mt-10">
