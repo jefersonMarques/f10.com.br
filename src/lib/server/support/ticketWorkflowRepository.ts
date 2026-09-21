@@ -24,6 +24,7 @@ import {
 import { ticketEvents, tickets } from "$lib/server/db/supportSchema";
 import {
   getUserSupportTeamIds,
+  getUserTicketAreaRestriction,
   requireTicketAccess,
   type SupportPermissionMap,
 } from "$lib/server/support/supportAccess";
@@ -340,11 +341,16 @@ export async function getTicketWorkflowBoard(
   ]);
   const globalWorkflow =
     configuration.find((workflow) => workflow.kind === "global") ?? null;
-  const teamIds = scope === "all" ? [] : await getUserSupportTeamIds(actorUserId);
+  const [teamIds, areaRestriction] = await Promise.all([
+    scope === "all" ? Promise.resolve([]) : getUserSupportTeamIds(actorUserId),
+    getUserTicketAreaRestriction(actorUserId),
+  ]);
   const visibleAreaIds = new Set(
     areas
       .filter(
-        (area) => scope === "all" || !area.teamId || teamIds.includes(area.teamId),
+        (area) =>
+          (scope === "all" || !area.teamId || teamIds.includes(area.teamId)) &&
+          (areaRestriction === null || areaRestriction.includes(area.id)),
       )
       .map((area) => area.id),
   );
