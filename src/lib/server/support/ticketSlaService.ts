@@ -8,6 +8,7 @@ import {
 } from "$lib/server/settings/supportHoursRepository";
 
 export type TicketSlaPolicy = {
+  enabled: boolean;
   firstResponseMinutes: number;
   nextResponseMinutes: number;
   resolutionMinutes: number;
@@ -145,6 +146,7 @@ async function addSlaMinutes(start: Date, minutes: number): Promise<Date> {
 export async function getQueueSlaPolicy(queueId: string): Promise<TicketSlaPolicy> {
   const [queue] = await getDatabase()
     .select({
+      enabled: supportQueues.slaEnabled,
       firstResponseMinutes: supportQueues.slaFirstResponseMinutes,
       nextResponseMinutes: supportQueues.slaNextResponseMinutes,
       resolutionMinutes: supportQueues.slaResolutionMinutes,
@@ -162,6 +164,13 @@ export async function calculateTicketSlaDeadlines(
   startAt = new Date(),
 ) {
   const policy = await getQueueSlaPolicy(queueId);
+  if (!policy.enabled) {
+    return {
+      firstResponseDueAt: null,
+      resolutionDueAt: null,
+    };
+  }
+
   const [firstResponseDueAt, resolutionDueAt] = await Promise.all([
     addSlaMinutes(startAt, policy.firstResponseMinutes),
     addSlaMinutes(startAt, policy.resolutionMinutes),
@@ -176,8 +185,9 @@ export async function calculateTicketSlaDeadlines(
 export async function calculateNextResponseDueAt(
   queueId: string,
   startAt = new Date(),
-): Promise<Date> {
+): Promise<Date | null> {
   const policy = await getQueueSlaPolicy(queueId);
+  if (!policy.enabled) return null;
   return addSlaMinutes(startAt, policy.nextResponseMinutes);
 }
 
