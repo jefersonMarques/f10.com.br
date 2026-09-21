@@ -15,6 +15,7 @@ import {
   calculateTicketSlaDeadlines,
   markTicketCustomerWaitingForResponse,
 } from "$lib/server/support/ticketSlaService";
+import { notifyTicketFollowers } from "$lib/server/support/ticketFollowerRepository";
 import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
 import {
   supportEmailInboundEvents,
@@ -635,6 +636,16 @@ async function saveIncomingMessage(input: {
     input.ticketId,
     input.message.createdAt,
   );
+
+  await notifyTicketFollowers(input.ticketId, {
+    kind: "ticket.follower.customer_reply",
+    body: input.message.text || "Cliente enviou uma mensagem por e-mail.",
+  }).catch((cause) => {
+    console.error("[ticket.follower.email_reply]", {
+      ticketId: input.ticketId,
+      causeType: cause instanceof Error ? cause.name : typeof cause,
+    });
+  });
 
   return true;
 }
