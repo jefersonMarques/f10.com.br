@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { Download, ExternalLink, FileText, Paperclip, Star, Tag, Trash2, X } from "lucide-svelte";
+  import { Clock3, Download, ExternalLink, FileText, Paperclip, Star, Tag, Trash2, UserPlus, UsersRound, X } from "lucide-svelte";
   import TicketTaskPanel from "$lib/components/operations/TicketTaskPanel.svelte";
   import { eventLabels, formatBytes, formatDateTime, labelClasses, priorityLabels } from "./presentation";
   import type { TicketCardData, TicketWorkflow, TicketWorkflowBoard } from "./types";
 
   export let card: TicketCardData;
   export let canReply = false;
+  export let embedded = false;
   export let workflowBoard: TicketWorkflowBoard;
   export let cardWorkflowId: string;
   export let cardStageId: string;
@@ -17,6 +18,8 @@
   export let onCreateLabel: (event: SubmitEvent) => void | Promise<void>;
   export let onUploadAttachment: (event: SubmitEvent) => void | Promise<void>;
   export let onDeleteAttachment: (attachmentId: string) => void | Promise<void>;
+  export let onAddFollower: (userId: string) => void | Promise<void>;
+  export let onRemoveFollower: (userId: string) => void | Promise<void>;
   export let onRefresh: () => void | Promise<void>;
 
   $: cardWorkflow = cardWorkflowId === workflowBoard.globalWorkflow?.id
@@ -32,6 +35,37 @@
     ),
   );
 
+  function initials(name: string): string {
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("");
+  }
+
+  function deadlineText(value: string | Date | null): string {
+    if (!value) return "Sem meta";
+    const diff = new Date(value).getTime() - Date.now();
+    const absMinutes = Math.max(1, Math.round(Math.abs(diff) / 60_000));
+    if (diff < 0) {
+      return absMinutes < 60
+        ? `Vencido há ${absMinutes} min`
+        : `Vencido há ${Math.floor(absMinutes / 60)}h`;
+    }
+    return absMinutes < 60
+      ? `${absMinutes} min restantes`
+      : `${Math.floor(absMinutes / 60)}h ${absMinutes % 60}min restantes`;
+  }
+
+  function deadlineClass(value: string | Date | null): string {
+    if (!value) return "text-[#8B909D]";
+    const diff = new Date(value).getTime() - Date.now();
+    if (diff < 0) return "text-[#A33A3A]";
+    if (diff <= 60 * 60_000) return "text-[#A9510D]";
+    return "text-[#2F7045]";
+  }
+
   function changeWorkflow(event: Event): void {
     const selectedWorkflowId = (event.currentTarget as HTMLSelectElement).value;
     cardWorkflowId = selectedWorkflowId;
@@ -42,9 +76,16 @@
   }
 </script>
 
-<div class="fixed inset-0 z-[120] overflow-y-auto bg-[#010D28]/45 p-3 sm:p-6" role="presentation">
-  <button type="button" class="fixed inset-0 cursor-default" aria-label={`Fechar ticket ${card.details.ticket.ticketNumber}`} on:click={onClose}></button>
-  <div class="relative z-10 mx-auto grid min-h-[680px] w-full max-w-[1120px] overflow-hidden rounded-[20px] border border-[#D8DCE5] bg-[#F7F8FA] shadow-[0_30px_100px_rgba(1,13,40,0.35)] lg:grid-cols-[minmax(0,1.65fr)_minmax(330px,0.85fr)]" role="dialog" aria-modal="true" aria-label={`Ticket ${card.details.ticket.ticketNumber}`}>
+<div class={embedded ? "relative min-h-[680px] w-full" : "fixed inset-0 z-[120] overflow-y-auto bg-[#010D28]/45 p-3 sm:p-6"} role="presentation">
+  {#if !embedded}
+    <button type="button" class="fixed inset-0 cursor-default" aria-label={`Fechar ticket ${card.details.ticket.ticketNumber}`} on:click={onClose}></button>
+  {/if}
+  <div class={embedded
+    ? "relative grid min-h-[680px] w-full overflow-hidden bg-[#F7F8FA] xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.8fr)]"
+    : "relative z-10 mx-auto grid min-h-[680px] w-full max-w-[1120px] overflow-hidden rounded-[20px] border border-[#D8DCE5] bg-[#F7F8FA] shadow-[0_30px_100px_rgba(1,13,40,0.35)] lg:grid-cols-[minmax(0,1.65fr)_minmax(330px,0.85fr)]"}
+    role={embedded ? "region" : "dialog"}
+    aria-modal={embedded ? undefined : "true"}
+    aria-label={`Ticket ${card.details.ticket.ticketNumber}`}>
     <div class="min-w-0 bg-white">
       <header class="flex items-start gap-3 border-b border-[#E5E7EC] px-5 py-5 sm:px-7">
         <FileText size={20} class="mt-1 shrink-0 text-[#5E6574]"/>
@@ -99,7 +140,7 @@
 
         <section>
           <h3 class="text-[13px] font-semibold text-[#343A46]">Comentários e atividade</h3>
-          {#if canReply}
+          {#if card.canCommentInternal}
             <form on:submit={onAddComment} class="mt-3 flex gap-2"><textarea name="body" required maxlength="10000" rows="2" placeholder="Escrever um comentário interno..." class="application-text-meta min-h-[54px] flex-1 resize-y rounded-xl border border-[#DCE0E6] bg-white px-3 py-2 leading-4 outline-none focus:border-[#000A57]"></textarea><button class="application-text-meta self-end rounded-lg bg-[#000A57] px-3 py-2 font-semibold text-white">Comentar</button></form>
           {/if}
           <div class="mt-3 space-y-3">
@@ -122,6 +163,66 @@
           <select value={cardWorkflowId} on:change={changeWorkflow} disabled={!canReply} class="application-text-meta mt-3 h-10 w-full rounded-lg border border-[#D9DDE4] bg-white px-2"><option value={workflowBoard.globalWorkflow?.id ?? ""}>Fluxo global</option>{#each movableAreaWorkflows as workflow}<option value={workflow.id}>Área · {workflow.areaName}</option>{/each}</select>
           <select bind:value={cardStageId} disabled={!canReply} class="application-text-meta mt-2 h-10 w-full rounded-lg border border-[#D9DDE4] bg-white px-2">{#each cardStages as stage}<option value={stage.id}>{stage.name}{stage.stageType === "area_gateway" ? ` · ${stage.linkedAreaName}` : ""}</option>{/each}</select>
           {#if canReply}<button type="button" on:click={() => void onMove()} class="application-text-meta mt-2 h-9 w-full rounded-lg bg-[#000A57] font-semibold text-white">Mover ticket</button>{/if}
+        </section>
+
+        <section class="rounded-xl border border-[#DDE1E7] bg-white p-4">
+          <h3 class="application-text-caption flex items-center gap-2 font-semibold text-[#3D4452]"><Clock3 size={13}/>SLA</h3>
+          <div class="mt-3 space-y-2">
+            <div class="flex items-center justify-between gap-3">
+              <span class="application-text-meta text-[#777E8D]">1ª resposta</span>
+              {#if card.details.ticket.firstResponseAt}
+                <span class="application-text-meta font-semibold text-[#2F7045]">Respondido</span>
+              {:else}
+                <span class={`application-text-meta font-semibold ${deadlineClass(card.details.ticket.firstResponseDueAt)}`}>{deadlineText(card.details.ticket.firstResponseDueAt)}</span>
+              {/if}
+            </div>
+            {#if card.details.ticket.firstResponseAt && card.details.ticket.nextResponseDueAt}
+              <div class="flex items-center justify-between gap-3">
+                <span class="application-text-meta text-[#777E8D]">Próxima resposta</span>
+                <span class={`application-text-meta font-semibold ${deadlineClass(card.details.ticket.nextResponseDueAt)}`}>{deadlineText(card.details.ticket.nextResponseDueAt)}</span>
+              </div>
+            {/if}
+            <div class="flex items-center justify-between gap-3">
+              <span class="application-text-meta text-[#777E8D]">Resolução</span>
+              {#if card.details.ticket.resolvedAt}
+                <span class="application-text-meta font-semibold text-[#2F7045]">Concluído</span>
+              {:else}
+                <span class={`application-text-meta font-semibold ${deadlineClass(card.details.ticket.resolutionDueAt)}`}>{deadlineText(card.details.ticket.resolutionDueAt)}</span>
+              {/if}
+            </div>
+          </div>
+        </section>
+
+        <section class="rounded-xl border border-[#DDE1E7] bg-white p-4">
+          <h3 class="application-text-caption flex items-center gap-2 font-semibold text-[#3D4452]"><UsersRound size={13}/>Seguidores</h3>
+          <div class="mt-3 flex flex-wrap gap-2">
+            {#each card.followers as follower}
+              <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full border border-[#E1E4EA] bg-[#FAFAFC] py-1 pl-1 pr-2 font-semibold text-[#555D6C]">
+                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-[#EEF0FF] text-[9px] font-bold text-[#000A57]">{initials(follower.name)}</span>
+                {follower.name}
+                {#if card.canManageFollowers}
+                  <button type="button" title="Remover seguidor" aria-label={`Remover ${follower.name}`} on:click={() => void onRemoveFollower(follower.id)} class="ml-0.5 text-[#9B3C3C]">×</button>
+                {/if}
+              </span>
+            {:else}
+              <span class="application-text-meta text-[#9297A4]">Ninguém acompanhando.</span>
+            {/each}
+          </div>
+          {#if card.canManageFollowers}
+            <select
+              class="application-text-meta mt-3 h-9 w-full rounded-lg border border-[#D9DDE4] bg-white px-2"
+              on:change={(event) => {
+                const userId = event.currentTarget.value;
+                if (userId) void onAddFollower(userId);
+                event.currentTarget.value = "";
+              }}
+            >
+              <option value="">Adicionar seguidor...</option>
+              {#each card.followerCandidates.filter((candidate) => !card.followers.some((follower) => follower.id === candidate.id)) as candidate}
+                <option value={candidate.id}>{candidate.name}</option>
+              {/each}
+            </select>
+          {/if}
         </section>
 
         <section class="rounded-xl border border-[#DDE1E7] bg-white p-4">
