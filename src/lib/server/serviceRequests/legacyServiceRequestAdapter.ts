@@ -1,5 +1,6 @@
 import { json, type Cookies } from "@sveltejs/kit";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
+import { setupPublicCustomerOnboarding } from "$lib/server/customerPortal/customerOnboardingService";
 import { createPublicServiceRequest } from "$lib/server/serviceRequests/publicServiceRequestService";
 import { createCustomerServiceRequest } from "$lib/server/serviceRequests/serviceRequestService";
 import {
@@ -37,6 +38,15 @@ function messageForError(code: string): string {
   if (code === "SERVICE_REQUEST_SECRET_KEY_NOT_CONFIGURED") {
     return "O armazenamento seguro de credenciais está temporariamente indisponível.";
   }
+  if (code === "CUSTOMER_PORTAL_PASSWORD_REQUIRED" || code === "CUSTOMER_PORTAL_PASSWORD_INVALID") {
+    return "Crie uma senha com pelo menos 8 caracteres para acessar a Área do Cliente.";
+  }
+  if (code === "CUSTOMER_PORTAL_ONBOARDING_IDENTITY_INVALID") {
+    return "Revise o nome e o e-mail do responsável.";
+  }
+  if (code === "CUSTOMER_PORTAL_EMAIL_FAILED") {
+    return "O cadastro foi recebido, mas não foi possível enviar o e-mail de ativação. Tente novamente.";
+  }
   if (code.includes("STORAGE") || code.startsWith("ASSET_STORAGE_")) {
     return "O armazenamento de documentos está temporariamente indisponível.";
   }
@@ -50,6 +60,12 @@ function statusForError(code: string): number {
   if (code === "UNIT_REQUIRED") return 409;
   if (code === "SERVICE_REQUEST_CONTEXT_REQUIRED") return 400;
   if (code === "SERVICE_REQUEST_CONTEXT_NOT_AUTHORIZED") return 403;
+  if (
+    code === "CUSTOMER_PORTAL_PASSWORD_REQUIRED" ||
+    code === "CUSTOMER_PORTAL_PASSWORD_INVALID" ||
+    code === "CUSTOMER_PORTAL_ONBOARDING_IDENTITY_INVALID"
+  ) return 400;
+  if (code === "CUSTOMER_PORTAL_EMAIL_FAILED") return 503;
   if (code === "SERVICE_REQUEST_IDEMPOTENCY_CONFLICT") return 409;
   if (code === "PAYLOAD_TOO_LARGE" || code.includes("TOO_LARGE")) return 413;
   if (
@@ -83,6 +99,19 @@ function parsePayload(formData: FormData, requestType: ServiceRequestType): Reco
     delete fields.emailFields;
   }
   return fields;
+}
+
+function readTextField(formData: FormData, name: string): string {
+  const value = formData.get(name);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function readPayloadText(
+  fields: Record<string, unknown>,
+  name: string,
+): string {
+  const value = fields[name];
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function readPositiveInteger(formData: FormData, name: string): number | null {
@@ -177,6 +206,25 @@ export async function handleLegacyServiceRequestSubmission(input: {
           fields,
           attachments,
         });
+
+    if (!authenticatedPortalSubmission && input.requestType === "cell_coin") {
+      const password = readTextField(formData, "portalPassword");
+      if (!password) throw new Error("CUSTOMER_PORTAL_PASSWORD_REQUIRED");
+
+      await setupPublicCustomerOnboarding({
+        ticketId: result.ticketId,
+        serviceRequestId: result.serviceRequestId,
+        name: readPayloadText(fields, "managerName"),
+        email: readPayloadText(fields, "managerEmail"),
+        whatsapp: readPayloadText(fields, "managerWhatsapp"),
+        organizationName:
+          readPayloadText(fields, "unitFantasyName") ||
+          readPayloadText(fields, "unitLegalName"),
+        organizationDocument: readPayloadText(fields, "cnpj"),
+        password,
+        requestOrigin: input.url.origin,
+      });
+    }
 
     return json(
       {
