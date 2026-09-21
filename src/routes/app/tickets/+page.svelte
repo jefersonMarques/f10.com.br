@@ -309,7 +309,7 @@
     const body = new FormData();
     body.set("ticketId", card.details.ticket.id);
     body.set("userId", userId);
-    if (await postCardAction("addFollower", body)) await refreshCard();
+    await postCardAction("addFollower", body);
   }
 
   async function removeFollower(userId: string): Promise<void> {
@@ -317,7 +317,7 @@
     const body = new FormData();
     body.set("ticketId", card.details.ticket.id);
     body.set("userId", userId);
-    if (await postCardAction("removeFollower", body)) await refreshCard();
+    await postCardAction("removeFollower", body);
   }
 
 </script>
