@@ -16,6 +16,11 @@ import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { serviceRequests } from "$lib/server/db/serviceRequestSchema";
 import { users } from "$lib/server/db/schema";
 import {
+  ticketWorkflowStages,
+  ticketWorkflowStates,
+  ticketWorkflows,
+} from "$lib/server/db/ticketWorkflowSchema";
+import {
   customerContacts,
   customerOrganizations,
   supportQueues,
@@ -62,6 +67,7 @@ export type CreateManualTicketInput = TicketCustomerLinkInput & {
   priority: TicketPriority;
   dueOn: string;
   queueId: string;
+  startStageId?: string | null;
 };
 
 type SupportDatabase = ReturnType<typeof getDatabase>;
@@ -77,6 +83,77 @@ type ResolvedTicketCustomer = {
   unitName: string;
   unitSchema: string;
 };
+
+type ManualTicketStart = {
+  globalWorkflowId: string;
+  globalStageId: string;
+  areaId: string;
+  areaWorkflowId: string;
+  areaStageId: string;
+  lifecycleStatus: TicketStatus;
+};
+
+async function resolveManualTicketStart(stageId: string): Promise<ManualTicketStart> {
+  const db = getDatabase();
+  const [gateway] = await db
+    .select({
+      globalWorkflowId: ticketWorkflows.id,
+      globalStageId: ticketWorkflowStages.id,
+      areaId: ticketWorkflowStages.linkedAreaId,
+      lifecycleStatus: ticketWorkflowStages.lifecycleStatus,
+    })
+    .from(ticketWorkflowStages)
+    .innerJoin(ticketWorkflows, eq(ticketWorkflowStages.workflowId, ticketWorkflows.id))
+    .where(
+      and(
+        eq(ticketWorkflowStages.id, stageId),
+        eq(ticketWorkflowStages.active, true),
+        eq(ticketWorkflowStages.allowTicketStart, true),
+        eq(ticketWorkflowStages.stageType, "area_gateway"),
+        isNotNull(ticketWorkflowStages.linkedAreaId),
+        eq(ticketWorkflows.kind, "global"),
+        eq(ticketWorkflows.active, true),
+      ),
+    )
+    .limit(1);
+
+  if (!gateway?.areaId) throw new Error("TICKET_WORKFLOW_ENTRY_POINT_INVALID");
+
+  const [areaWorkflow] = await db
+    .select({ id: ticketWorkflows.id })
+    .from(ticketWorkflows)
+    .where(
+      and(
+        eq(ticketWorkflows.kind, "area"),
+        eq(ticketWorkflows.areaId, gateway.areaId),
+        eq(ticketWorkflows.active, true),
+      ),
+    )
+    .limit(1);
+  if (!areaWorkflow) throw new Error("TICKET_WORKFLOW_AREA_NOT_CONFIGURED");
+
+  const [initialAreaStage] = await db
+    .select({ id: ticketWorkflowStages.id })
+    .from(ticketWorkflowStages)
+    .where(
+      and(
+        eq(ticketWorkflowStages.workflowId, areaWorkflow.id),
+        eq(ticketWorkflowStages.active, true),
+      ),
+    )
+    .orderBy(desc(ticketWorkflowStages.isInitial), asc(ticketWorkflowStages.sortOrder))
+    .limit(1);
+  if (!initialAreaStage) throw new Error("TICKET_WORKFLOW_AREA_EMPTY");
+
+  return {
+    globalWorkflowId: gateway.globalWorkflowId,
+    globalStageId: gateway.globalStageId,
+    areaId: gateway.areaId,
+    areaWorkflowId: areaWorkflow.id,
+    areaStageId: initialAreaStage.id,
+    lifecycleStatus: gateway.lifecycleStatus,
+  };
+}
 
 function requireSupportScope(
   permissions: SupportPermissionMap,
@@ -399,6 +476,10 @@ export async function createManualTicket(
     .limit(1);
   if (!queue) throw new Error("QUEUE_NOT_FOUND");
 
+  const start = input.startStageId
+    ? await resolveManualTicketStart(input.startStageId)
+    : null;
+
   return db.transaction(async (tx) => {
     const customer = await resolveTicketCustomer(tx, input);
     const [ticket] = await tx
@@ -408,6 +489,7 @@ export async function createManualTicket(
         queueId: queue.id,
         assignedUserId: actorUserId,
         subject: input.subject.trim(),
+        status: start?.lifecycleStatus,
         priority: input.priority,
         channel: "manual",
         dueOn: input.dueOn,
@@ -418,6 +500,22 @@ export async function createManualTicket(
     if (!ticket) throw new Error("TICKET_NOT_CREATED");
 
     await saveTicketCustomerContext(tx, ticket.id, customer);
+
+    if (start) {
+      const now = new Date();
+      await tx.insert(ticketWorkflowStates).values({
+        ticketId: ticket.id,
+        globalWorkflowId: start.globalWorkflowId,
+        globalStageId: start.globalStageId,
+        areaId: start.areaId,
+        areaWorkflowId: start.areaWorkflowId,
+        areaStageId: start.areaStageId,
+        enteredAt: now,
+        areaEnteredAt: now,
+        updatedAt: now,
+      });
+    }
+
     await tx.insert(ticketMessages).values({
       ticketId: ticket.id,
       authorType: "user",
@@ -438,6 +536,8 @@ export async function createManualTicket(
         customerContactId: customer.contactId,
         groupId: customer.groupId,
         unitId: customer.unitId,
+        startStageId: start?.globalStageId ?? null,
+        startAreaId: start?.areaId ?? null,
       },
     });
 
