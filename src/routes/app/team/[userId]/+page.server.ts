@@ -3,6 +3,7 @@ import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import { regenerateManagedUserInvite } from "$lib/server/users/userInviteManagement";
+import { sendManagedUserInviteEmail } from "$lib/server/users/userInviteMailer";
 import { listAssignableAccessProfiles } from "$lib/server/users/accessProfileRepository";
 import {
   getManagedUserDetails,
@@ -143,9 +144,23 @@ export const actions: Actions = {
     try {
       const invitation = await regenerateManagedUserInvite(session.user.id, session.roles, params.userId);
       const inviteUrl = new URL(`/login/activate?token=${encodeURIComponent(invitation.token)}`, url.origin).toString();
+      const emailSent = await sendManagedUserInviteEmail({
+        email: data.details.user.email,
+        name: data.details.user.name,
+        inviteUrl,
+        expiresAt: invitation.expiresAt,
+      }).then(() => true).catch((cause) => {
+        console.error("[user.invite.email.regenerated]", {
+          userId: params.userId,
+          errorCode: cause instanceof Error ? cause.message : "USER_INVITE_EMAIL_FAILED",
+        });
+        return false;
+      });
       return {
         success: true,
-        message: "Novo link de ativação criado. O link anterior foi invalidado.",
+        message: emailSent
+          ? "Novo convite criado e enviado por e-mail."
+          : "Novo link criado. O e-mail não foi enviado; copie o link abaixo.",
         inviteUrl,
         expiresAt: invitation.expiresAt.toISOString(),
       };
