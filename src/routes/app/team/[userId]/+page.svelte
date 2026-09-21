@@ -143,7 +143,7 @@
             <span class="application-text-caption mb-1.5 block font-semibold text-[#555B6B]">Perfil</span>
             <select name="roleCode" value={data.details.roles[0] ?? ""} disabled={!data.canManage} class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[12px] disabled:bg-[#F5F6F8]">
               {#if data.details.roles[0] && !data.accessProfiles.some((profile) => profile.code === data.details.roles[0])}
-                <option value={data.details.roles[0]}>{profileName(data.details.roles[0])}</option>
+                <option value={data.details.roles[0]}>{data.details.roleNames[0] ?? data.details.roles[0]}</option>
               {/if}
               {#each data.accessProfiles as profile}<option value={profile.code}>{profile.name}</option>{/each}
             </select>
