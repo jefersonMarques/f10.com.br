@@ -20,6 +20,7 @@ import {
   getSupportChatEntrySettings,
   updateSupportChatEntryOption,
   updateSupportQueueDueDays,
+  updateSupportQueueSla,
 } from "$lib/server/support/supportChatEntryRepository";
 import {
   getSupportRoutingConfiguration,
@@ -146,6 +147,54 @@ export const actions: Actions = {
       return { success: true, action: "createQueue", message: "Fila de atendimento criada." };
     } catch {
       return fail(400, { success: false, action: "createQueue", message: "Não foi possível criar a fila de atendimento." });
+    }
+  },
+
+  saveQueueSla: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(
+      cookies,
+      "system.settings.manage",
+      "/app/settings/atendimento",
+    );
+    const formData = await request.formData();
+    const queueId = readString(formData, "queueId");
+    const firstResponseMinutes = readInteger(formData, "firstResponseMinutes", 0);
+    const nextResponseMinutes = readInteger(formData, "nextResponseMinutes", 0);
+    const resolutionMinutes = readInteger(formData, "resolutionMinutes", 0);
+
+    if (
+      !isUuid(queueId) ||
+      firstResponseMinutes < 5 ||
+      firstResponseMinutes > 43200 ||
+      nextResponseMinutes < 5 ||
+      nextResponseMinutes > 43200 ||
+      resolutionMinutes < 30 ||
+      resolutionMinutes > 525600
+    ) {
+      return fail(400, {
+        success: false,
+        action: "saveQueueSla",
+        message: "Revise os tempos de SLA da fila.",
+      });
+    }
+
+    try {
+      await updateSupportQueueSla(session.user.id, queueId, {
+        firstResponseMinutes,
+        nextResponseMinutes,
+        resolutionMinutes,
+      });
+      return {
+        success: true,
+        action: "saveQueueSla",
+        message: "SLA da fila atualizado.",
+      };
+    } catch {
+      return fail(400, {
+        success: false,
+        action: "saveQueueSla",
+        message: "Não foi possível atualizar o SLA desta fila.",
+      });
     }
   },
 
