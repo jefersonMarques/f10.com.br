@@ -12,6 +12,7 @@ import {
 import { getDatabase } from "$lib/server/db";
 import {
   permissions,
+  rolePermissions,
   roles,
   sessions,
   userPermissions,
@@ -21,7 +22,7 @@ import {
 import { supportChatRoutingMembers } from "$lib/server/db/supportRoutingSchema";
 import { userInvites } from "$lib/server/db/userManagementSchema";
 
-export type ManagedRoleCode = "ADMIN" | "EMPLOYEE" | "VIEWER";
+export type ManagedRoleCode = string;
 export type UserPermissionEffect = "allow" | "deny";
 
 export type CreateManagedUserInput = {
@@ -46,18 +47,46 @@ function canActorManageRole(
   if (isSuperAdmin(actorRoles)) return true;
   return (
     actorRoles.includes("ADMIN") &&
-    (targetRoles.includes("EMPLOYEE") || targetRoles.includes("VIEWER")) &&
     !targetRoles.includes("ADMIN") &&
     !targetRoles.includes("SUPER_ADMIN")
   );
 }
 
-function canActorAssignRole(
+async function requireAssignableRole(
+  actorUserId: string,
   actorRoles: string[],
   roleCode: ManagedRoleCode,
-): boolean {
-  if (isSuperAdmin(actorRoles)) return true;
-  return actorRoles.includes("ADMIN") && (roleCode === "EMPLOYEE" || roleCode === "VIEWER");
+): Promise<{ id: string; code: string }> {
+  const db = getDatabase();
+  const [role] = await db
+    .select({ id: roles.id, code: roles.code })
+    .from(roles)
+    .where(eq(roles.code, roleCode))
+    .limit(1);
+
+  if (!role || role.code === "SUPER_ADMIN") throw new Error("ROLE_NOT_ALLOWED");
+  if (isSuperAdmin(actorRoles)) return role;
+  if (!actorRoles.includes("ADMIN") || role.code === "ADMIN") {
+    throw new Error("ROLE_NOT_ALLOWED");
+  }
+
+  const [actorPermissions, grants] = await Promise.all([
+    resolveUserPermissions(actorUserId),
+    db
+      .select({
+        permissionCode: rolePermissions.permissionCode,
+        scope: rolePermissions.scope,
+      })
+      .from(rolePermissions)
+      .where(eq(rolePermissions.roleId, role.id)),
+  ]);
+
+  const canDelegateProfile = grants.every((grant) => {
+    const actorScope = actorPermissions.get(grant.permissionCode);
+    return actorScope ? isScopeAtLeast(actorScope, grant.scope) : false;
+  });
+  if (!canDelegateProfile) throw new Error("ROLE_NOT_ALLOWED");
+  return role;
 }
 
 async function getUserRoles(userId: string): Promise<string[]> {
@@ -142,9 +171,7 @@ export async function createManagedUserInvite(
   actorRoles: string[],
   input: CreateManagedUserInput,
 ) {
-  if (!canActorAssignRole(actorRoles, input.roleCode)) {
-    throw new Error("ROLE_NOT_ALLOWED");
-  }
+  const role = await requireAssignableRole(actorUserId, actorRoles, input.roleCode);
 
   const db = getDatabase();
   const email = input.email.trim().toLowerCase();
@@ -176,14 +203,6 @@ export async function createManagedUserInvite(
       .returning({ id: users.id, name: users.name, email: users.email });
 
     if (!createdUser) throw new Error("USER_NOT_CREATED");
-
-    const [role] = await tx
-      .select({ id: roles.id })
-      .from(roles)
-      .where(eq(roles.code, input.roleCode))
-      .limit(1);
-
-    if (!role) throw new Error("ROLE_NOT_FOUND");
 
     await tx.insert(userRoles).values({
       userId: createdUser.id,
@@ -332,6 +351,37 @@ export async function setManagedUserPermission(
     entityType: "user",
     entityId: targetUserId,
     metadata: { permissionCode, effect, scope },
+  });
+}
+
+export async function setManagedUserProfile(
+  actorUserId: string,
+  actorRoles: string[],
+  targetUserId: string,
+  roleCode: string,
+): Promise<void> {
+  const { targetRoles, isSelf } = await requireManageableTarget(
+    actorUserId,
+    actorRoles,
+    targetUserId,
+  );
+  if (isSelf) throw new Error("SELF_PROFILE_CHANGE_NOT_ALLOWED");
+  if (targetRoles.includes("SUPER_ADMIN")) throw new Error("ROLE_NOT_ALLOWED");
+
+  const role = await requireAssignableRole(actorUserId, actorRoles, roleCode);
+  const db = getDatabase();
+  await db.transaction(async (tx) => {
+    await tx.delete(userRoles).where(eq(userRoles.userId, targetUserId));
+    await tx.insert(userRoles).values({ userId: targetUserId, roleId: role.id });
+    await tx.delete(userPermissions).where(eq(userPermissions.userId, targetUserId));
+  });
+
+  await recordAuditEvent({
+    actorUserId,
+    action: "user.profile.changed",
+    entityType: "user",
+    entityId: targetUserId,
+    metadata: { previousRoles: targetRoles, roleCode: role.code },
   });
 }
 
