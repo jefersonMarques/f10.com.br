@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Plus, Save, ShieldCheck } from "lucide-svelte";
+  import { LockKeyhole, Plus, Save, ShieldCheck } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
@@ -13,6 +13,7 @@
   let selectedProfileId = initialProfileId;
 
   $: selectedProfile = data.profiles.find((profile) => profile.id === selectedProfileId) ?? null;
+  $: selectedProfileProtected = selectedProfile?.code === "SUPER_ADMIN";
 
   function grantScope(permissionCode: string): string {
     return selectedProfile?.grants.find((grant) => grant.permissionCode === permissionCode)?.scope ?? "own";
@@ -50,7 +51,7 @@
               class={"w-full rounded-xl border px-3 py-3 text-left transition " + (selectedProfileId === profile.id ? "border-app-primary bg-app-selected" : "border-app-border hover:bg-app-subtle")}
             >
               <strong class="application-text-caption block text-app-text">{profile.name}</strong>
-              <span class="application-text-meta mt-1 block text-app-text-soft">{profile.isSystem ? "Padrão do sistema" : profile.grants.length + " permissões"}</span>
+              <span class="application-text-meta mt-1 block text-app-text-soft">{profile.code === "SUPER_ADMIN" ? "Protegido" : profile.isSystem ? "Padrão · editável" : profile.grants.length + " permissões"}</span>
             </button>
           {/each}
         </div>
@@ -71,15 +72,17 @@
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 class="text-[17px] font-semibold text-app-text">{selectedProfile.name}</h2>
-              <p class="application-text-meta mt-1 text-app-text-soft">{selectedProfile.isSystem ? "Perfil protegido." : "Defina os acessos herdados por todos os usuários deste perfil."}</p>
+              <p class="application-text-meta mt-1 text-app-text-soft">{selectedProfileProtected ? "Acesso total protegido." : "Defina os acessos herdados por todos os usuários deste perfil."}</p>
             </div>
-            {#if selectedProfile.isSystem}
-              <span class="application-text-meta rounded-full bg-app-muted px-2.5 py-1 font-bold text-app-text-muted">Sistema</span>
+            {#if selectedProfileProtected}
+              <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-app-muted px-2.5 py-1 font-bold text-app-text-muted"><LockKeyhole size={12}/>Super Admin</span>
+            {:else if selectedProfile.isSystem}
+              <span class="application-text-meta rounded-full bg-app-selected px-2.5 py-1 font-bold text-app-primary">Padrão</span>
             {/if}
           </div>
         </header>
 
-        {#if selectedProfile.isSystem}
+        {#if selectedProfileProtected}
           <div class="divide-y divide-app-border-soft">
             {#each data.permissionCatalog.filter((permission) => hasGrant(permission.code)) as permission}
               <div class="flex items-center justify-between gap-4 px-5 py-3 sm:px-6">
