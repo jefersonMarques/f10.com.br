@@ -11,6 +11,10 @@ import {
   sql,
 } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import {
+  calculateTicketSlaDeadlines,
+  markTicketCustomerWaitingForResponse,
+} from "$lib/server/support/ticketSlaService";
 import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
 import {
   supportEmailInboundEvents,
@@ -469,6 +473,7 @@ async function createThreadTicket(input: {
     .where(and(eq(supportQueues.code, input.route.code), eq(supportQueues.active, true)))
     .limit(1);
   if (!queue) throw new EmailInboundError("BREVO_EMAIL_QUEUE_NOT_FOUND");
+  const sla = await calculateTicketSlaDeadlines(queue.id, input.message.createdAt);
 
   const customer = input.message.from
     ? await findUnambiguousCustomer(input.message.from.email)
@@ -486,6 +491,8 @@ async function createThreadTicket(input: {
           status: "new",
           priority: "normal",
           channel: "email",
+          firstResponseDueAt: sla.firstResponseDueAt,
+          resolutionDueAt: sla.resolutionDueAt,
           createdByUserId: null,
         })
         .returning({ id: tickets.id });
@@ -623,6 +630,11 @@ async function saveIncomingMessage(input: {
       },
     });
   });
+
+  await markTicketCustomerWaitingForResponse(
+    input.ticketId,
+    input.message.createdAt,
+  );
 
   return true;
 }
