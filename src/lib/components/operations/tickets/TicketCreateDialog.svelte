@@ -1,9 +1,10 @@
 <script lang="ts">
   import { X } from "lucide-svelte";
   import TicketCustomerPicker from "$lib/components/operations/TicketCustomerPicker.svelte";
-  import type { TicketQueue } from "./types";
+  import type { TicketEntryPoint, TicketQueue } from "./types";
 
   export let queues: TicketQueue[] = [];
+  export let entryPoints: TicketEntryPoint[] = [];
   export let canSearchCustomers = false;
   export let onClose: () => void;
 </script>
@@ -15,6 +16,19 @@
       <div class="flex items-center justify-between sm:col-span-2"><h2 class="text-[16px] font-semibold">Novo ticket</h2><button type="button" on:click={onClose}><X size={16}/></button></div>
       <input name="subject" required maxlength="180" placeholder="Assunto" class="application-text-caption h-10 rounded-xl border border-[#DDE1EA] px-3 sm:col-span-2"/>
       <TicketCustomerPicker enabled={canSearchCustomers}/>
+      {#if entryPoints.length > 0}
+        <label class="sm:col-span-2">
+          <span class="application-text-meta mb-1.5 block font-bold uppercase tracking-[0.07em] text-app-text-soft">Processo inicial</span>
+          <select name="startStageId" class="application-text-caption h-10 w-full rounded-xl border border-app-border-control bg-app-surface px-3 text-app-text">
+            <option value="">Fluxo padrão</option>
+            {#each entryPoints as entryPoint}
+              <option value={entryPoint.stageId}>{entryPoint.name}</option>
+            {/each}
+          </select>
+        </label>
+      {:else}
+        <input type="hidden" name="startStageId" value=""/>
+      {/if}
       <label><span class="application-text-meta mb-1.5 block font-bold uppercase tracking-[0.07em] text-[#858B99]">Conclusão planejada</span><input name="dueOn" type="date" required class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3"/></label>
       <select name="queueId" required class="application-text-meta h-10 self-end rounded-xl border border-[#DDE1EA] px-2">{#each queues as queue}<option value={queue.id}>{queue.name}</option>{/each}</select>
       <select name="priority" class="application-text-meta h-10 rounded-xl border border-[#DDE1EA] px-2"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select>
