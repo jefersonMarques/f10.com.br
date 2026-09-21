@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm";
 import { getPermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { requestTicketSatisfaction } from "$lib/server/support/ticketSatisfactionService";
 import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { serviceRequests } from "$lib/server/db/serviceRequestSchema";
@@ -699,6 +700,15 @@ export async function updateTicketStatus(
       metadata: { status },
     });
   });
+
+  if (status === "resolved" || status === "closed") {
+    await requestTicketSatisfaction(ticketId).catch((cause) => {
+      console.error("[ticket.satisfaction.request]", {
+        ticketId,
+        errorCode: cause instanceof Error ? cause.message : "TICKET_SATISFACTION_REQUEST_FAILED",
+      });
+    });
+  }
 }
 
 export async function updateTicketPriority(
