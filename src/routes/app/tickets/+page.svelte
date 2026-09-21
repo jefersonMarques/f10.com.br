@@ -275,7 +275,7 @@
 </ApplicationContent>
 
 {#if createOpen}
-  <TicketCreateDialog queues={data.queues} canSearchCustomers={data.canSearchCustomers} onClose={() => (createOpen = false)}/>
+  <TicketCreateDialog queues={data.queues} entryPoints={data.entryPoints} canSearchCustomers={data.canSearchCustomers} onClose={() => (createOpen = false)}/>
 {/if}
 
 {#if cardLoading}
