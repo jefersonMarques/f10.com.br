@@ -214,7 +214,9 @@ export const actions: Actions = {
       const message =
         cause instanceof Error && cause.message === "EMAIL_ALREADY_EXISTS"
           ? "Já existe um usuário cadastrado com este e-mail."
-          : "Não foi possível criar o usuário com o perfil informado.";
+          : cause instanceof Error && cause.message === "CHAT_ROUTING_PERMISSION_REQUIRED"
+            ? "Este perfil não pode participar da distribuição do chat."
+            : "Não foi possível criar o usuário com o perfil informado.";
 
       return fail(409, {
         success: false,
