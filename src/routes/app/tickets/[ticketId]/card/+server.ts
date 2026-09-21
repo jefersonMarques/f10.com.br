@@ -4,6 +4,10 @@ import { hasPermission } from "$lib/server/auth/permissions";
 import { getServiceRequestTicketSummary } from "$lib/server/serviceRequests/serviceRequestExport";
 import { getTicketCard } from "$lib/server/support/ticketCardRepository";
 import { getTicketSatisfaction } from "$lib/server/support/ticketSatisfactionService";
+import {
+  listTicketFollowerCandidates,
+  listTicketFollowers,
+} from "$lib/server/support/ticketFollowerRepository";
 import { markTicketFirstAgentView } from "$lib/server/support/ticketCustomerProgressRepository";
 import { listTicketTasks } from "$lib/server/support/ticketTaskBridge";
 import { listTaskProjects } from "$lib/server/tasks/taskRepository";
@@ -29,11 +33,23 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
       });
     });
     const canViewTasks = hasPermission(permissions, "tasks.view");
+    const canReply = hasPermission(permissions, "tickets.reply");
+    const canCommentInternal =
+      canReply || hasPermission(permissions, "tickets.comment_internal");
+    const canManageFollowers =
+      canReply || hasPermission(permissions, "tickets.assign");
     const canCreateTask =
-      hasPermission(permissions, "tickets.reply") &&
+      canReply &&
       hasPermission(permissions, "tasks.create");
 
-    const [linkedTasks, taskProjects, serviceRequest, satisfaction] = await Promise.all([
+    const [
+      linkedTasks,
+      taskProjects,
+      serviceRequest,
+      satisfaction,
+      followers,
+      followerCandidates,
+    ] = await Promise.all([
       canViewTasks
         ? listTicketTasks(session.user.id, permissions, params.ticketId).catch(() => [])
         : Promise.resolve([]),
@@ -42,6 +58,10 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
         : Promise.resolve([]),
       getServiceRequestTicketSummary(params.ticketId).catch(() => null),
       getTicketSatisfaction(params.ticketId).catch(() => null),
+      listTicketFollowers(params.ticketId).catch(() => []),
+      canManageFollowers
+        ? listTicketFollowerCandidates().catch(() => [])
+        : Promise.resolve([]),
     ]);
 
     return json(
@@ -52,6 +72,10 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
         canCreateTask,
         serviceRequest,
         satisfaction,
+        followers,
+        followerCandidates,
+        canCommentInternal,
+        canManageFollowers,
       },
       {
         headers: {
