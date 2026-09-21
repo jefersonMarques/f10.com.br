@@ -12,6 +12,7 @@ import { customerContacts, ticketEvents, tickets } from "$lib/server/db/supportS
 import type { CustomerF10PortalSession } from "$lib/server/customerPortal/customerF10AuthRepository";
 import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
+import { calculateNextResponseDueAt } from "$lib/server/support/ticketSlaService";
 import {
   decryptServiceRequestSecret,
   encryptServiceRequestSecrets,
@@ -142,6 +143,8 @@ type ServiceRequestRow = {
   createdAt: Date;
   updatedAt: Date;
   ticketStatus: string;
+  ticketQueueId: string;
+  ticketFirstResponseAt: Date | null;
 };
 
 export type ServiceRequestFieldView = {
@@ -299,6 +302,8 @@ async function readRequestRow(ticketId: string, customerContactId?: string): Pro
       createdAt: serviceRequests.createdAt,
       updatedAt: serviceRequests.updatedAt,
       ticketStatus: tickets.status,
+      ticketQueueId: tickets.queueId,
+      ticketFirstResponseAt: tickets.firstResponseAt,
     })
     .from(serviceRequests)
     .innerJoin(tickets, eq(tickets.id, serviceRequests.ticketId))
@@ -482,6 +487,10 @@ async function updateRequest(params: {
   const nextSecrets = { ...params.row.secretsEncrypted, ...encryptedSecrets };
   const nextVersion = expectedVersion + 1;
   const now = new Date();
+  const nextResponseDueAt =
+    params.source === "customer" && params.row.ticketFirstResponseAt
+      ? await calculateNextResponseDueAt(params.row.ticketQueueId, now)
+      : null;
   const db = getDatabase();
 
   await db.transaction(async (tx) => {
@@ -556,6 +565,7 @@ async function updateRequest(params: {
           status: params.row.ticketStatus === "resolved" || params.row.ticketStatus === "waiting_customer"
             ? "open"
             : params.row.ticketStatus as "new" | "open" | "in_progress" | "waiting_customer" | "resolved" | "closed",
+          nextResponseDueAt,
           updatedAt: now,
         })
         .where(eq(tickets.id, params.row.ticketId));
