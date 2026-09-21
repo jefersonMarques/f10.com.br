@@ -99,6 +99,7 @@ export const supportQueues = pgTable(
     name: text("name").notNull(),
     teamId: uuid("team_id").references(() => teams.id, { onDelete: "set null" }),
     defaultDueDays: integer("default_due_days").notNull().default(3),
+    slaEnabled: boolean("sla_enabled").notNull().default(false),
     slaFirstResponseMinutes: integer("sla_first_response_minutes").notNull().default(240),
     slaNextResponseMinutes: integer("sla_next_response_minutes").notNull().default(480),
     slaResolutionMinutes: integer("sla_resolution_minutes").notNull().default(4320),
