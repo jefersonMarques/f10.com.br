@@ -57,6 +57,7 @@
   let selectedWorkflowId = data.workflows.find((workflow) => workflow.kind === "global")?.id
     ?? data.workflows[0]?.id
     ?? "";
+  let newStageType = "normal";
 
   $: selectedWorkflow = data.workflows.find((workflow) => workflow.id === selectedWorkflowId) ?? null;
   $: globalWorkflow = data.workflows.find((workflow) => workflow.kind === "global") ?? null;
@@ -64,6 +65,9 @@
   $: selectedArea = selectedWorkflow?.areaId
     ? data.areas.find((area) => area.id === selectedWorkflow?.areaId) ?? null
     : null;
+  $: if (selectedWorkflow?.kind === "area" && newStageType === "area_gateway") {
+    newStageType = "normal";
+  }
 
   function stageClass(stage: { stageType: string; color?: string }): string {
     if (selectedWorkflow?.kind === "area") {
@@ -199,7 +203,7 @@
               <div class="flex items-center gap-2"><Plus size={15} class="text-[#000A57]"/><strong class="text-[11px] text-[#303746]">Adicionar coluna</strong></div>
               <div class={`mt-3 grid gap-3 ${selectedWorkflow.kind === "area" ? "lg:grid-cols-4" : "lg:grid-cols-4"}`}>
                 <input name="name" required minlength="2" maxlength="80" placeholder="Nome da coluna" class="application-text-caption h-10 rounded-xl border border-[#DDE1EA] bg-white px-3"/>
-                <select name="stageType" class="application-text-meta h-10 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="normal">Etapa</option>{#if selectedWorkflow.kind === "global"}<option value="area_gateway">Área</option>{/if}<option value="terminal">Terminal</option></select>
+                <select name="stageType" bind:value={newStageType} class="application-text-meta h-10 rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="normal">Etapa</option>{#if selectedWorkflow.kind === "global"}<option value="area_gateway">Área</option>{/if}<option value="terminal">Terminal</option></select>
                 <select name="lifecycleStatus" class="application-text-meta h-10 rounded-xl border border-[#DDE1EA] bg-white px-2">{#if selectedWorkflow.kind === "area"}<option value="open">Aberto</option><option value="in_progress">Em andamento</option><option value="waiting_customer">Aguardando cliente</option>{:else}<option value="open">Aberto</option><option value="new">Novo</option><option value="in_progress">Em andamento</option><option value="waiting_customer">Aguardando cliente</option><option value="resolved">Resolvido</option><option value="closed">Fechado</option>{/if}</select>
                 {#if selectedWorkflow.kind === "global"}
                   <input type="hidden" name="color" value=""/>
@@ -209,7 +213,7 @@
                   <select name="color" class="application-text-meta h-10 rounded-xl border border-[#DDE1EA] bg-white px-2">{#each Object.entries(colorLabels) as [value, label]}<option value={value}>{label}</option>{/each}</select>
                 {/if}
               </div>
-              {#if selectedWorkflow.kind === "global"}
+              {#if selectedWorkflow.kind === "global" && newStageType === "area_gateway"}
                 <label class="application-text-meta mt-3 flex items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 py-2 font-semibold text-[#555B6B]">
                   <input name="allowTicketStart" type="checkbox" class="h-4 w-4 rounded border-[#C9CEDA]"/>
                   Permitir iniciar novos tickets nesta área
