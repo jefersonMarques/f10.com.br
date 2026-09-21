@@ -160,9 +160,11 @@ export async function createCustomerPortalCredentialInvite(input: {
   }
 }
 
-export async function activateCustomerPortalCredential(token: string): Promise<boolean> {
+export async function activateCustomerPortalCredential(
+  token: string,
+): Promise<{ token: string; expiresAt: Date } | null> {
   const cleanToken = token.trim();
-  if (!/^[A-Za-z0-9_-]{40,120}$/.test(cleanToken)) return false;
+  if (!/^[A-Za-z0-9_-]{40,120}$/.test(cleanToken)) return null;
 
   const db = getDatabase();
   const now = new Date();
@@ -199,9 +201,9 @@ export async function activateCustomerPortalCredential(token: string): Promise<b
     return updated ?? null;
   });
 
-  if (!identity) return false;
+  if (!identity) return null;
   await reconcileCustomerTickets(identity.customerContactId, identity.login);
-  return true;
+  return createPortalSession(identity.customerContactId);
 }
 
 export async function authenticateCustomerPortalCredential(
