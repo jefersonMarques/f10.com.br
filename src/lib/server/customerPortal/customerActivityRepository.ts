@@ -3,6 +3,7 @@ import { customerActivityEvents } from "$lib/server/db/customerPortalSchema";
 import { helpSearchEvents, helpSearchResults } from "$lib/server/db/helpSearchSchema";
 import type { PublishedStructuredHelpSummary } from "$lib/server/help/publicStructuredHelpRepository";
 import type { CustomerF10PortalSession } from "$lib/server/customerPortal/customerF10AuthRepository";
+import type { CustomerTicketPortalSession } from "$lib/server/customerPortal/customerPortalSession";
 
 function normalizeSearchText(value: string): string {
   return value
@@ -14,7 +15,7 @@ function normalizeSearchText(value: string): string {
 }
 
 export async function recordCustomerActivity(
-  session: CustomerF10PortalSession,
+  session: CustomerF10PortalSession | CustomerTicketPortalSession,
   input: {
     eventType: string;
     source: string;
