@@ -12,6 +12,7 @@ import { getPermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import { requestTicketSatisfaction } from "$lib/server/support/ticketSatisfactionService";
 import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
+import { notifyTicketFollowers } from "$lib/server/support/ticketFollowerRepository";
 import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { serviceRequests } from "$lib/server/db/serviceRequestSchema";
@@ -45,6 +46,15 @@ export type TicketStatus =
   | "closed";
 
 export type TicketPriority = "low" | "normal" | "high" | "urgent";
+
+const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
+  new: "Novo",
+  open: "Aberto",
+  in_progress: "Em andamento",
+  waiting_customer: "Aguardando cliente",
+  resolved: "Resolvido",
+  closed: "Fechado",
+};
 
 export type TicketCustomerLinkInput = {
   customerMode: "existing" | "new";
@@ -816,6 +826,17 @@ export async function updateTicketStatus(
       actorUserId,
       eventType: "ticket.status.changed",
       metadata: { status },
+    });
+  });
+
+  await notifyTicketFollowers(ticketId, {
+    kind: "ticket.follower.status",
+    body: `Status atualizado para ${TICKET_STATUS_LABELS[status]}.`,
+    actorUserId,
+  }).catch((cause) => {
+    console.error("[ticket.follower.status]", {
+      ticketId,
+      causeType: cause instanceof Error ? cause.name : typeof cause,
     });
   });
 
