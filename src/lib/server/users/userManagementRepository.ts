@@ -21,7 +21,7 @@ import {
 import { supportChatRoutingMembers } from "$lib/server/db/supportRoutingSchema";
 import { userInvites } from "$lib/server/db/userManagementSchema";
 
-export type ManagedRoleCode = "ADMIN" | "EMPLOYEE";
+export type ManagedRoleCode = "ADMIN" | "EMPLOYEE" | "VIEWER";
 export type UserPermissionEffect = "allow" | "deny";
 
 export type CreateManagedUserInput = {
@@ -46,7 +46,7 @@ function canActorManageRole(
   if (isSuperAdmin(actorRoles)) return true;
   return (
     actorRoles.includes("ADMIN") &&
-    targetRoles.includes("EMPLOYEE") &&
+    (targetRoles.includes("EMPLOYEE") || targetRoles.includes("VIEWER")) &&
     !targetRoles.includes("ADMIN") &&
     !targetRoles.includes("SUPER_ADMIN")
   );
@@ -57,7 +57,7 @@ function canActorAssignRole(
   roleCode: ManagedRoleCode,
 ): boolean {
   if (isSuperAdmin(actorRoles)) return true;
-  return actorRoles.includes("ADMIN") && roleCode === "EMPLOYEE";
+  return actorRoles.includes("ADMIN") && (roleCode === "EMPLOYEE" || roleCode === "VIEWER");
 }
 
 async function getUserRoles(userId: string): Promise<string[]> {
