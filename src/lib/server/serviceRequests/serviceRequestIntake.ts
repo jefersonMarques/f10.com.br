@@ -9,6 +9,7 @@ import {
   ticketWorkflows,
 } from "$lib/server/db/ticketWorkflowSchema";
 import type { ServiceRequestType } from "$lib/server/serviceRequests/serviceRequestDefinitions";
+import { getTicketOnboardingSettings } from "$lib/server/settings/operationsSettingsRepository";
 
 export type ServiceRequestIntake = {
   queueId: string;
@@ -24,6 +25,7 @@ export type ServiceRequestIntake = {
 
 export async function resolveServiceRequestIntake(
   requestType: ServiceRequestType,
+  flow: "onboarding" | null = null,
 ): Promise<ServiceRequestIntake> {
   const db = getDatabase();
   const [route] = await db
@@ -50,25 +52,70 @@ export async function resolveServiceRequestIntake(
 
   if (!route) throw new Error("SERVICE_REQUEST_TEAM_NOT_CONFIGURED");
 
-  const [globalLocation] = await db
-    .select({
-      workflowId: ticketWorkflows.id,
-      stageId: ticketWorkflowStages.id,
-      lifecycleStatus: ticketWorkflowStages.lifecycleStatus,
-    })
-    .from(ticketWorkflows)
-    .innerJoin(ticketWorkflowStages, eq(ticketWorkflowStages.workflowId, ticketWorkflows.id))
-    .where(
-      and(
-        eq(ticketWorkflows.kind, "global"),
-        eq(ticketWorkflows.active, true),
-        eq(ticketWorkflowStages.active, true),
-        eq(ticketWorkflowStages.stageType, "area_gateway"),
-        eq(ticketWorkflowStages.linkedAreaId, route.areaId),
-      ),
-    )
-    .orderBy(asc(ticketWorkflows.createdAt), asc(ticketWorkflowStages.sortOrder))
-    .limit(1);
+  let targetAreaId = route.areaId;
+  let globalLocation:
+    | {
+        workflowId: string;
+        stageId: string;
+        lifecycleStatus: ServiceRequestIntake["lifecycleStatus"];
+      }
+    | undefined;
+
+  if (flow === "onboarding") {
+    const onboarding = await getTicketOnboardingSettings();
+    if (!onboarding.startStageId) {
+      throw new Error("SERVICE_REQUEST_ONBOARDING_PROCESS_NOT_CONFIGURED");
+    }
+
+    [globalLocation] = await db
+      .select({
+        workflowId: ticketWorkflows.id,
+        stageId: ticketWorkflowStages.id,
+        lifecycleStatus: ticketWorkflowStages.lifecycleStatus,
+        areaId: ticketWorkflowStages.linkedAreaId,
+      })
+      .from(ticketWorkflows)
+      .innerJoin(ticketWorkflowStages, eq(ticketWorkflowStages.workflowId, ticketWorkflows.id))
+      .innerJoin(ticketAreas, eq(ticketAreas.id, ticketWorkflowStages.linkedAreaId))
+      .where(
+        and(
+          eq(ticketWorkflowStages.id, onboarding.startStageId),
+          eq(ticketWorkflows.kind, "global"),
+          eq(ticketWorkflows.active, true),
+          eq(ticketWorkflowStages.active, true),
+          eq(ticketWorkflowStages.stageType, "area_gateway"),
+          eq(ticketWorkflowStages.allowTicketStart, true),
+          eq(ticketAreas.active, true),
+        ),
+      )
+      .limit(1);
+
+    if (!globalLocation?.areaId) {
+      throw new Error("SERVICE_REQUEST_ONBOARDING_PROCESS_NOT_CONFIGURED");
+    }
+    targetAreaId = globalLocation.areaId;
+  } else {
+    [globalLocation] = await db
+      .select({
+        workflowId: ticketWorkflows.id,
+        stageId: ticketWorkflowStages.id,
+        lifecycleStatus: ticketWorkflowStages.lifecycleStatus,
+      })
+      .from(ticketWorkflows)
+      .innerJoin(ticketWorkflowStages, eq(ticketWorkflowStages.workflowId, ticketWorkflows.id))
+      .where(
+        and(
+          eq(ticketWorkflows.kind, "global"),
+          eq(ticketWorkflows.active, true),
+          eq(ticketWorkflowStages.active, true),
+          eq(ticketWorkflowStages.stageType, "area_gateway"),
+          eq(ticketWorkflowStages.linkedAreaId, route.areaId),
+        ),
+      )
+      .orderBy(asc(ticketWorkflows.createdAt), asc(ticketWorkflowStages.sortOrder))
+      .limit(1);
+  }
+
   if (!globalLocation) throw new Error("SERVICE_REQUEST_GLOBAL_STAGE_NOT_CONFIGURED");
 
   const [areaLocation] = await db
@@ -81,7 +128,7 @@ export async function resolveServiceRequestIntake(
     .where(
       and(
         eq(ticketWorkflows.kind, "area"),
-        eq(ticketWorkflows.areaId, route.areaId),
+        eq(ticketWorkflows.areaId, targetAreaId),
         eq(ticketWorkflows.active, true),
         eq(ticketWorkflowStages.active, true),
         eq(ticketWorkflowStages.isInitial, true),
@@ -93,7 +140,7 @@ export async function resolveServiceRequestIntake(
 
   return {
     queueId: route.queueId,
-    areaId: route.areaId,
+    areaId: targetAreaId,
     teamId: route.teamId,
     defaultDueDays: route.defaultDueDays,
     globalWorkflowId: globalLocation.workflowId,
