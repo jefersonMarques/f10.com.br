@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Bot, Clock3, HardDrive, Save, Settings, Ticket, Video } from "lucide-svelte";
+  import { Bot, Clock3, HardDrive, Save, Settings, ShieldCheck, Ticket, Video } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -44,6 +44,10 @@
         </a>
         <a href="/app/settings/tickets" class="flex items-center justify-between gap-3 rounded-xl border border-app-border px-3 py-3 transition hover:bg-app-subtle">
           <span class="flex items-center gap-3"><Ticket size={16} class="text-app-accent"/><span><strong class="application-text-caption block text-[#343B4B]">Tickets</strong><small class="application-text-meta mt-1 block text-app-text-soft">Notificações, regras e automações dos tickets.</small></span></span>
+          <span class="application-text-meta font-semibold text-app-primary">Abrir</span>
+        </a>
+        <a href="/app/settings/access-profiles" class="flex items-center justify-between gap-3 rounded-xl border border-app-border px-3 py-3 transition hover:bg-app-subtle">
+          <span class="flex items-center gap-3"><ShieldCheck size={16} class="text-app-info-text"/><span><strong class="application-text-caption block text-[#343B4B]">Perfis de acesso</strong><small class="application-text-meta mt-1 block text-app-text-soft">Crie perfis e defina os acessos herdados pela equipe.</small></span></span>
           <span class="application-text-meta font-semibold text-app-primary">Abrir</span>
         </a>
         <a href="/app/settings/ai" class="flex items-center justify-between gap-3 rounded-xl border border-app-border px-3 py-3 transition hover:bg-app-subtle">
