@@ -58,6 +58,7 @@ export async function resolveServiceRequestIntake(
         workflowId: string;
         stageId: string;
         lifecycleStatus: ServiceRequestIntake["lifecycleStatus"];
+        areaId?: string | null;
       }
     | undefined;
 
