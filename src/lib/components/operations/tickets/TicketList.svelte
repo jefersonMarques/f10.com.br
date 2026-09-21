@@ -80,16 +80,16 @@
   <div class="hidden overflow-x-auto md:block">
     <div class={compact ? "min-w-[760px]" : "min-w-[1020px]"}>
       <div class={`grid border-b border-[#EEF0F4] bg-[#FAFAFC] px-4 py-2.5 ${compact ? "grid-cols-[88px_minmax(220px,1.5fr)_minmax(160px,1fr)_120px]" : "grid-cols-[90px_minmax(220px,1.5fr)_minmax(160px,1fr)_minmax(180px,1fr)_110px_180px_120px_110px]"}`}>
-        <span class="application-text-meta font-bold uppercase tracking-[0.07em] text-[#969CAA]">Ticket</span>
-        <span class="application-text-meta font-bold uppercase tracking-[0.07em] text-[#969CAA]">Assunto</span>
-        <span class="application-text-meta font-bold uppercase tracking-[0.07em] text-[#969CAA]">Cliente</span>
+        <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Ticket</span>
+        <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Assunto</span>
+        <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Cliente</span>
         {#if !compact}
-          <span class="application-text-meta font-bold uppercase tracking-[0.07em] text-[#969CAA]">Processo</span>
-          <span class="application-text-meta font-bold uppercase tracking-[0.07em] text-[#969CAA]">Prioridade</span>
-          <span class="application-text-meta font-bold uppercase tracking-[0.07em] text-[#969CAA]">Responsável</span>
-          <span class="application-text-meta font-bold uppercase tracking-[0.07em] text-[#969CAA]">SLA</span>
+          <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Processo</span>
+          <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Prioridade</span>
+          <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Responsável</span>
+          <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">SLA</span>
         {/if}
-        <span class="application-text-meta font-bold uppercase tracking-[0.07em] text-[#969CAA]">Atualizado</span>
+        <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Atualizado</span>
       </div>
 
       <div class="divide-y divide-[#EEF0F4]">
@@ -99,13 +99,13 @@
             on:click={() => void onOpenTicket(ticket.id)}
             class={`grid w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-[#F8F9FC] ${selectedTicketId === ticket.id ? "bg-[#F3F5FF]" : ""} ${compact ? "grid-cols-[88px_minmax(220px,1.5fr)_minmax(160px,1fr)_120px]" : "grid-cols-[90px_minmax(220px,1.5fr)_minmax(160px,1fr)_minmax(180px,1fr)_110px_180px_120px_110px]"}`}
           >
-            <span class="application-text-meta flex items-center gap-1.5 font-bold text-[#EA6D0B]">
+            <span class="application-text-caption flex items-center gap-1.5 font-bold text-[#EA6D0B]">
               #{ticket.ticketNumber}
               {#if ticket.channel === "email"}<Mail size={11} aria-label="Recebido por e-mail"/>{/if}
             </span>
 
             <div class="min-w-0">
-              <strong class="block truncate text-[12px] font-semibold text-[#2D3342]">{ticket.subject}</strong>
+              <strong class="block truncate text-[13px] font-semibold text-[#2D3342]">{ticket.subject}</strong>
               {#if ticket.labels.length > 0}
                 <div class="mt-1 flex min-w-0 gap-1 overflow-hidden">
                   {#each ticket.labels.slice(0, 3) as label}
@@ -116,21 +116,21 @@
             </div>
 
             <div class="min-w-0">
-              <span class="application-text-caption block truncate font-semibold text-[#505868]">{ticket.customerName ?? "Cliente não identificado"}</span>
+              <span class="application-text-control block truncate font-semibold text-[#505868]">{ticket.customerName ?? "Cliente não identificado"}</span>
               {#if ticket.organizationName}<span class="application-text-meta block truncate text-[#9297A4]">{ticket.organizationName}</span>{/if}
             </div>
 
             {#if !compact}
-              <span class="application-text-meta truncate font-semibold text-[#5D6574]" title={processLabel(ticket)}>{processLabel(ticket)}</span>
-              <span class="application-text-meta font-semibold text-[#626978]">{priorityLabels[ticket.priority] ?? ticket.priority}</span>
+              <span class="application-text-caption truncate font-semibold text-[#5D6574]" title={processLabel(ticket)}>{processLabel(ticket)}</span>
+              <span class="application-text-caption font-semibold text-[#626978]">{priorityLabels[ticket.priority] ?? ticket.priority}</span>
               <span class="flex min-w-0 items-center gap-2">
                 <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF0FF] text-[10px] font-bold text-[#000A57]">{initials(ticket.assignedUserName)}</span>
-                <span class="application-text-meta truncate font-semibold text-[#5D6574]">{ticket.assignedUserName ?? "Sem responsável"}</span>
+                <span class="application-text-caption truncate font-semibold text-[#5D6574]">{ticket.assignedUserName ?? "Sem responsável"}</span>
               </span>
-              <span class={`application-text-meta inline-flex w-fit items-center gap-1 rounded-full px-2 py-1 font-bold ${slaClass(ticket)}`}><Clock3 size={11}/>{slaText(ticket)}</span>
+              <span class={`application-text-caption inline-flex w-fit items-center gap-1 rounded-full px-2 py-1 font-bold ${slaClass(ticket)}`}><Clock3 size={11}/>{slaText(ticket)}</span>
             {/if}
 
-            <span class="application-text-meta text-[#858B99]">{relativeUpdated(ticket.updatedAt)}</span>
+            <span class="application-text-caption text-[#858B99]">{relativeUpdated(ticket.updatedAt)}</span>
           </button>
         {/each}
       </div>
@@ -142,12 +142,12 @@
       <button type="button" on:click={() => void onOpenTicket(ticket.id)} class={`w-full px-4 py-4 text-left ${selectedTicketId === ticket.id ? "bg-[#F3F5FF]" : ""}`}>
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <span class="application-text-meta font-bold text-[#EA6D0B]">#{ticket.ticketNumber}</span>
-            <strong class="mt-1 block text-[12px] font-semibold leading-5 text-[#2D3342]">{ticket.subject}</strong>
+            <span class="application-text-caption font-bold text-[#EA6D0B]">#{ticket.ticketNumber}</span>
+            <strong class="mt-1 block text-[13px] font-semibold leading-5 text-[#2D3342]">{ticket.subject}</strong>
           </div>
-          <span class={`application-text-meta shrink-0 rounded-full px-2 py-1 font-bold ${slaClass(ticket)}`}>{slaText(ticket)}</span>
+          <span class={`application-text-caption shrink-0 rounded-full px-2 py-1 font-bold ${slaClass(ticket)}`}>{slaText(ticket)}</span>
         </div>
-        <div class="application-text-meta mt-2 flex items-center gap-2 text-[#777E8D]">
+        <div class="application-text-caption mt-2 flex items-center gap-2 text-[#777E8D]">
           <UserRound size={12}/>
           <span class="truncate">{ticket.customerName ?? "Cliente não identificado"}</span>
           <span>·</span>
