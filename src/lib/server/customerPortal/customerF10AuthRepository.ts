@@ -13,6 +13,7 @@ import {
   authenticateF10Customer,
   getAuthenticatedF10CustomerGroups,
 } from "$lib/server/customerPortal/legacyF10CustomerClient";
+import { upsertF10CustomerIdentity } from "$lib/server/customerPortal/customerAuthService";
 import {
   decryptF10CustomerToken,
   encryptF10CustomerToken,
@@ -178,6 +179,11 @@ function initialSelection(groups: CustomerF10GroupSnapshot[]): {
 export async function createF10CustomerPortalSession(email: string, password: string) {
   const authenticated = await authenticateF10Customer(email, password);
   const contact = await findOrCreateCustomerContact(authenticated.userId, authenticated.login);
+  await upsertF10CustomerIdentity({
+    customerContactId: contact.id,
+    legacyUserId: authenticated.userId,
+    login: authenticated.login,
+  });
   const sessionToken = createSessionToken();
   const now = new Date();
   const selected = initialSelection(authenticated.groups);
