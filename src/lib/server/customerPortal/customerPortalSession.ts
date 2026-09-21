@@ -4,12 +4,29 @@ import {
   authorizeCustomerPortalSession,
   revokeCustomerPortalSession,
 } from "$lib/server/customerPortal/customerPortalRepository";
+import type { CustomerF10GroupSnapshot } from "$lib/server/db/customerPortalSchema";
 import {
   authorizeF10CustomerPortalSession,
   type AuthorizeF10CustomerSessionOptions,
 } from "$lib/server/customerPortal/customerF10AuthRepository";
 
 export const CUSTOMER_PORTAL_SESSION_COOKIE = "f10_customer_session";
+
+export type CustomerTicketPortalSession = {
+  sessionId: string;
+  contactId: string;
+  name: string;
+  email: string;
+  authProvider: "f10" | "portal";
+  legacyUserId: string | null;
+  groups: CustomerF10GroupSnapshot[];
+  selectedGroupId: number | null;
+  selectedGroupName: string | null;
+  selectedUnitId: number | null;
+  selectedUnitName: string | null;
+  selectedUnitSchema: string | null;
+  expiresAt: Date;
+};
 
 export function normalizeCustomerPortalReturnTo(
   value: string,
@@ -75,6 +92,41 @@ export async function getOptionalCustomerF10PortalSession(
 export async function requireCustomerPortalSession(cookies: Cookies) {
   const session = await getOptionalCustomerPortalSession(cookies);
   if (!session) throw redirect(303, "/cliente");
+  return session;
+}
+
+export async function getOptionalCustomerTicketPortalSession(
+  cookies: Cookies,
+): Promise<CustomerTicketPortalSession | null> {
+  const f10Session = await getOptionalCustomerF10PortalSession(cookies, { touchActivity: false });
+  if (f10Session) {
+    return {
+      ...f10Session,
+      authProvider: "f10",
+    };
+  }
+
+  const session = await getOptionalCustomerPortalSession(cookies);
+  if (!session) return null;
+  return {
+    ...session,
+    authProvider: "portal",
+    legacyUserId: null,
+    groups: [],
+    selectedGroupId: null,
+    selectedGroupName: null,
+    selectedUnitId: null,
+    selectedUnitName: null,
+    selectedUnitSchema: null,
+  };
+}
+
+export async function requireCustomerTicketPortalSession(
+  cookies: Cookies,
+  returnTo = "/cliente/chamados",
+): Promise<CustomerTicketPortalSession> {
+  const session = await getOptionalCustomerTicketPortalSession(cookies);
+  if (!session) throw redirect(303, loginUrl(returnTo));
   return session;
 }
 
