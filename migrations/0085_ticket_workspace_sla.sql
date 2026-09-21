@@ -54,6 +54,12 @@ SET name = EXCLUDED.name, description = EXCLUDED.description;
 INSERT INTO role_permissions (role_id, permission_code, scope)
 SELECT roles.id, 'tickets.comment_internal', 'all'::permission_scope
 FROM roles
+WHERE roles.code = 'SUPER_ADMIN'
+ON CONFLICT (role_id, permission_code) DO UPDATE SET scope = EXCLUDED.scope;
+
+INSERT INTO role_permissions (role_id, permission_code, scope)
+SELECT roles.id, 'tickets.comment_internal', 'all'::permission_scope
+FROM roles
 WHERE roles.code = 'ADMIN'
 ON CONFLICT (role_id, permission_code) DO UPDATE SET scope = EXCLUDED.scope;
 
