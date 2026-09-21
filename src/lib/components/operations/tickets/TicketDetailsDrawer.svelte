@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Download, ExternalLink, FileText, Paperclip, Tag, Trash2, X } from "lucide-svelte";
+  import { Download, ExternalLink, FileText, Paperclip, Star, Tag, Trash2, X } from "lucide-svelte";
   import TicketTaskPanel from "$lib/components/operations/TicketTaskPanel.svelte";
   import { eventLabels, formatBytes, formatDateTime, labelClasses, priorityLabels } from "./presentation";
   import type { TicketCardData, TicketWorkflow, TicketWorkflowBoard } from "./types";
@@ -140,6 +140,24 @@
             <p class="application-text-meta mt-2 leading-4 text-[#8A5A2A]">Configure o storage S3 para habilitar anexos.</p>
           {/if}
         </section>
+
+        {#if card.satisfaction}
+          <section class="rounded-xl border border-app-border bg-app-surface p-4">
+            <h3 class="application-text-caption font-semibold text-app-text">Satisfação</h3>
+            {#if card.satisfaction.answeredAt && card.satisfaction.score}
+              <div class="mt-3 flex items-center gap-1 text-app-accent" aria-label={`${card.satisfaction.score} de 5 estrelas`}>
+                {#each [1, 2, 3, 4, 5] as value}
+                  <Star size={16} fill={value <= card.satisfaction.score ? "currentColor" : "none"} class={value <= card.satisfaction.score ? "text-app-accent" : "text-app-text-soft"}/>
+                {/each}
+              </div>
+              {#if card.satisfaction.comment}
+                <p class="application-text-meta mt-3 whitespace-pre-wrap leading-5 text-app-text-muted">“{card.satisfaction.comment}”</p>
+              {/if}
+            {:else}
+              <p class="application-text-meta mt-2 text-app-text-soft">Avaliação enviada ao cliente e aguardando resposta.</p>
+            {/if}
+          </section>
+        {/if}
 
         <TicketTaskPanel ticketId={card.details.ticket.id} ticketNumber={card.details.ticket.ticketNumber} ticketSubject={card.details.ticket.subject} tasks={card.linkedTasks} projects={card.taskProjects} canCreate={card.canCreateTask} onCreated={onRefresh}/>
 
