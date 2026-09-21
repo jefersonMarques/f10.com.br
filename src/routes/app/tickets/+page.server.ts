@@ -248,6 +248,70 @@ export const load: PageServerLoad = async ({ parent, url }) => {
 };
 
 export const actions: Actions = {
+  addFollower: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.view",
+      "/app/tickets",
+    );
+    const formData = await request.formData();
+    const ticketId = readFormValue(formData, "ticketId");
+    const userId = readFormValue(formData, "userId");
+    if (!isUuid(ticketId) || !isUuid(userId)) {
+      return fail(400, {
+        success: false,
+        action: "addFollower",
+        message: "Seguidor inválido.",
+      });
+    }
+    try {
+      await addTicketFollower(session.user.id, permissions, ticketId, userId);
+      return {
+        success: true,
+        action: "addFollower",
+        message: "Seguidor adicionado.",
+      };
+    } catch {
+      return fail(403, {
+        success: false,
+        action: "addFollower",
+        message: "Não foi possível adicionar este seguidor.",
+      });
+    }
+  },
+
+  removeFollower: async ({ cookies, request }) => {
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.view",
+      "/app/tickets",
+    );
+    const formData = await request.formData();
+    const ticketId = readFormValue(formData, "ticketId");
+    const userId = readFormValue(formData, "userId");
+    if (!isUuid(ticketId) || !isUuid(userId)) {
+      return fail(400, {
+        success: false,
+        action: "removeFollower",
+        message: "Seguidor inválido.",
+      });
+    }
+    try {
+      await removeTicketFollower(session.user.id, permissions, ticketId, userId);
+      return {
+        success: true,
+        action: "removeFollower",
+        message: "Seguidor removido.",
+      };
+    } catch {
+      return fail(403, {
+        success: false,
+        action: "removeFollower",
+        message: "Não foi possível remover este seguidor.",
+      });
+    }
+  },
+
   create: async ({ cookies, request }) => {
     const { session, permissions } = await requireAppPermission(
       cookies,
