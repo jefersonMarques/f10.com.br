@@ -347,6 +347,8 @@ export async function replyCustomerPortalTicket(
       assignedUserId: tickets.assignedUserId,
       ticketNumber: tickets.ticketNumber,
       subject: tickets.subject,
+      queueId: tickets.queueId,
+      firstResponseAt: tickets.firstResponseAt,
     })
     .from(tickets)
     .where(and(eq(tickets.id, ticketId), eq(tickets.customerContactId, contactId)))
