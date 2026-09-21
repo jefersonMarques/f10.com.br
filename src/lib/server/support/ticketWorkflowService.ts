@@ -9,6 +9,7 @@ import {
 } from "$lib/server/db/ticketWorkflowSchema";
 import { tickets } from "$lib/server/db/supportSchema";
 import type { SupportPermissionMap } from "$lib/server/support/supportAccess";
+import { requestTicketSatisfaction } from "$lib/server/support/ticketSatisfactionService";
 import {
   addTicketWorkflowStage,
   archiveTicketWorkflowStage,
@@ -367,6 +368,12 @@ export async function moveTicketGlobalStageWithRules(
 
   await moveTicketGlobalStage(actorUserId, permissions, ticketId, targetStageId);
   await restoreAssigneeIfCleared(ticketId, context.assignedUserId);
+  await requestTicketSatisfaction(ticketId).catch((cause) => {
+    console.error("[ticket.satisfaction.workflow]", {
+      ticketId,
+      errorCode: cause instanceof Error ? cause.message : "TICKET_SATISFACTION_REQUEST_FAILED",
+    });
+  });
 }
 
 export async function moveTicketToWorkflowLocationWithRules(
@@ -398,4 +405,10 @@ export async function moveTicketToWorkflowLocationWithRules(
     stageId,
   );
   await restoreAssigneeIfCleared(ticketId, context.assignedUserId);
+  await requestTicketSatisfaction(ticketId).catch((cause) => {
+    console.error("[ticket.satisfaction.workflow]", {
+      ticketId,
+      errorCode: cause instanceof Error ? cause.message : "TICKET_SATISFACTION_REQUEST_FAILED",
+    });
+  });
 }
