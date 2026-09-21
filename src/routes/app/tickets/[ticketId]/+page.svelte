@@ -3,6 +3,7 @@
     Building2,
     CalendarDays,
     CheckCircle2,
+    Clock3,
     CircleAlert,
     Headphones,
     ListTodo,
@@ -62,6 +63,28 @@
     "remote.started": "iniciou o acesso remoto",
     "remote.ended": "encerrou o acesso remoto",
   };
+
+  function deadlineText(value: string | Date | null): string {
+    if (!value) return "Sem meta";
+    const diff = new Date(value).getTime() - Date.now();
+    const minutes = Math.max(1, Math.round(Math.abs(diff) / 60_000));
+    if (diff < 0) {
+      return minutes < 60
+        ? `Vencido há ${minutes} min`
+        : `Vencido há ${Math.floor(minutes / 60)}h`;
+    }
+    return minutes < 60
+      ? `${minutes} min restantes`
+      : `${Math.floor(minutes / 60)}h ${minutes % 60}min restantes`;
+  }
+
+  function deadlineClass(value: string | Date | null): string {
+    if (!value) return "text-[#8B909D]";
+    const diff = new Date(value).getTime() - Date.now();
+    if (diff < 0) return "text-[#A33A3A]";
+    if (diff <= 60 * 60_000) return "text-[#A9510D]";
+    return "text-[#2F7045]";
+  }
 
   function formatDateTime(value: string | Date): string {
     return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
@@ -134,6 +157,17 @@
           <div class="mt-5 rounded-xl border border-[#E7E9EF] bg-[#FAFAFC] px-3 py-3"><span class="application-text-meta block font-semibold uppercase tracking-[0.07em] text-[#9297A4]">Conclusão planejada</span><strong class="application-text-caption mt-1 inline-flex items-center gap-1.5 text-[#3F4656]"><CalendarDays size={13}/>{formatDate(data.details.ticket.dueOn)}</strong></div>
         {/if}
         <div class="mt-5 border-t border-[#EEF0F5] pt-4"><span class="application-text-caption font-semibold text-[#555B6A]">Responsável</span><p class="mt-2 text-[11px] font-medium text-[#333948]">{data.details.ticket.assignedUserName ?? "Sem responsável"}</p>{#if data.canAssign}<form method="POST" action="?/assign" class="mt-3 flex gap-2"><select name="assignedUserId" required class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2">{#each data.agents as agent}<option value={agent.id} selected={agent.id === data.details.ticket.assignedUserId}>{agent.name}</option>{/each}</select><button type="submit" class="application-text-caption h-10 rounded-xl bg-[#000A57] px-3 font-semibold text-white">Atribuir</button></form>{/if}</div>
+      </section>
+
+      <section class="rounded-[24px] border border-[#E2E5ED] bg-white p-5">
+        <div class="flex items-center gap-3"><Clock3 size={18} class="text-[#000A57]"/><h2 class="text-[14px] font-semibold text-[#11182C]">SLA</h2></div>
+        <div class="mt-4 space-y-3">
+          <div class="flex items-center justify-between gap-3"><span class="application-text-caption text-[#777E8D]">Primeira resposta</span>{#if data.details.ticket.firstResponseAt}<span class="application-text-caption font-semibold text-[#2F7045]">Respondido</span>{:else}<span class={`application-text-caption font-semibold ${deadlineClass(data.details.ticket.firstResponseDueAt)}`}>{deadlineText(data.details.ticket.firstResponseDueAt)}</span>{/if}</div>
+          {#if data.details.ticket.firstResponseAt && data.details.ticket.nextResponseDueAt}
+            <div class="flex items-center justify-between gap-3"><span class="application-text-caption text-[#777E8D]">Próxima resposta</span><span class={`application-text-caption font-semibold ${deadlineClass(data.details.ticket.nextResponseDueAt)}`}>{deadlineText(data.details.ticket.nextResponseDueAt)}</span></div>
+          {/if}
+          <div class="flex items-center justify-between gap-3"><span class="application-text-caption text-[#777E8D]">Resolução</span>{#if data.details.ticket.resolvedAt}<span class="application-text-caption font-semibold text-[#2F7045]">Concluído</span>{:else}<span class={`application-text-caption font-semibold ${deadlineClass(data.details.ticket.resolutionDueAt)}`}>{deadlineText(data.details.ticket.resolutionDueAt)}</span>{/if}</div>
+        </div>
       </section>
 
       {#if data.canViewTasks}
