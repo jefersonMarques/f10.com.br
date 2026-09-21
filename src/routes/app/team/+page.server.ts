@@ -8,6 +8,7 @@ import {
   updateTeam as updateManagedTeam,
 } from "$lib/server/users/teamManagementRepository";
 import { listAssignableAccessProfiles } from "$lib/server/users/accessProfileRepository";
+import { sendManagedUserInviteEmail } from "$lib/server/users/userInviteMailer";
 import {
   createManagedUserInvite,
   listManagedUsers,
@@ -187,10 +188,24 @@ export const actions: Actions = {
         `/login/activate?token=${encodeURIComponent(invitation.token)}`,
         url.origin,
       ).toString();
+      const emailSent = await sendManagedUserInviteEmail({
+        email: invitation.user.email,
+        name: invitation.user.name,
+        inviteUrl,
+        expiresAt: invitation.expiresAt,
+      }).then(() => true).catch((cause) => {
+        console.error("[user.invite.email]", {
+          userId: invitation.user.id,
+          errorCode: cause instanceof Error ? cause.message : "USER_INVITE_EMAIL_FAILED",
+        });
+        return false;
+      });
 
       return {
         success: true,
-        message: "Usuário criado. Envie o link de ativação abaixo ao novo integrante.",
+        message: emailSent
+          ? "Usuário criado e convite enviado por e-mail."
+          : "Usuário criado. O e-mail não foi enviado; copie o link de ativação abaixo.",
         inviteUrl,
         invitedUserName: invitation.user.name,
         expiresAt: invitation.expiresAt.toISOString(),
