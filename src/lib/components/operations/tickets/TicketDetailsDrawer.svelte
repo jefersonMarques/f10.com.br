@@ -104,6 +104,9 @@
           {#if card.serviceRequest}
             <a href={`/app/tickets/${card.details.ticket.id}/export`} class="application-text-caption inline-flex h-9 items-center gap-2 rounded-lg border border-[#CCD1DA] bg-white px-3 font-semibold text-[#000A57]" title={`Baixar dados de ${card.serviceRequest.label}`}><Download size={14}/><span class="hidden sm:inline">Baixar dados</span></a>
           {/if}
+          {#if embedded}
+            <a href={`/app/tickets/${card.details.ticket.id}`} class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#E0E3EA] bg-white text-[#69707E] transition hover:bg-[#F6F7F9] hover:text-[#000A57]" aria-label="Abrir página completa do ticket"><ExternalLink size={14}/></a>
+          {/if}
           <button type="button" on:click={onClose} class="flex h-9 w-9 items-center justify-center rounded-lg text-[#6F7685] hover:bg-[#F0F1F4]"><X size={18}/></button>
         </div>
       </header>
@@ -161,7 +164,7 @@
       </div>
     </div>
 
-    <aside class={embedded ? "min-h-0 overflow-y-auto border-l border-[#E0E3E8] bg-[#F5F6FA] p-3" : "border-l border-[#E0E3E8] bg-[#F5F6F8] p-5 sm:p-6"}>
+    <aside class={embedded ? "hidden min-h-0 overflow-y-auto border-l border-[#E0E3E8] bg-[#F5F6FA] p-3 xl:block" : "border-l border-[#E0E3E8] bg-[#F5F6F8] p-5 sm:p-6"}>
       <div class={embedded ? "space-y-3" : "space-y-5"}>
         <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
           <h3 class="application-text-caption font-semibold text-[#3D4452]">Área e coluna</h3>
