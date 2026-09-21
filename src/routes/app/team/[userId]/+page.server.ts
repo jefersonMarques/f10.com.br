@@ -1,18 +1,13 @@
 import { error, fail, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
-import {
-  PERMISSION_CODES,
-  hasPermission,
-  type PermissionCode,
-  type PermissionScope,
-} from "$lib/server/auth/permissions";
+import { hasPermission } from "$lib/server/auth/permissions";
 import { regenerateManagedUserInvite } from "$lib/server/users/userInviteManagement";
+import { listAssignableAccessProfiles } from "$lib/server/users/accessProfileRepository";
 import {
   getManagedUserDetails,
-  setManagedUserPermission,
+  setManagedUserProfile,
   setManagedUserStatus,
-  type UserPermissionEffect,
 } from "$lib/server/users/userManagementRepository";
 import {
   listUserSupportTeams,
@@ -28,18 +23,6 @@ function readFormValue(formData: FormData, name: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function isPermissionCode(value: string): value is PermissionCode {
-  return (PERMISSION_CODES as readonly string[]).includes(value);
-}
-
-function isPermissionScope(value: string): value is PermissionScope {
-  return value === "own" || value === "team" || value === "all";
-}
-
-function isPermissionEffect(value: string): value is UserPermissionEffect | "inherit" {
-  return value === "inherit" || value === "allow" || value === "deny";
-}
-
 export const load: PageServerLoad = async ({ params, parent }) => {
   const layout = await parent();
   const permissionMap = new Map(
@@ -52,10 +35,15 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   if (!isUuid(params.userId)) throw error(404, "Usuário não encontrado.");
 
   try {
-    const details = await getManagedUserDetails(layout.user.id, layout.roles, params.userId);
+    const [details, supportTeams, accessProfiles] = await Promise.all([
+      getManagedUserDetails(layout.user.id, layout.roles, params.userId),
+      listUserSupportTeams(params.userId),
+      listAssignableAccessProfiles(layout.user.id, layout.roles),
+    ]);
     return {
       details,
-      supportTeams: await listUserSupportTeams(params.userId),
+      supportTeams,
+      accessProfiles,
       canManage:
         hasPermission(permissionMap, "users.manage") &&
         layout.user.id !== params.userId,
@@ -70,29 +58,33 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 };
 
 export const actions: Actions = {
-  permission: async ({ cookies, params, request }) => {
-    if (!isUuid(params.userId)) return fail(404, { success: false, message: "Usuário não encontrado." });
-    const { session } = await requireAppPermission(cookies, "users.manage", `/app/team/${params.userId}`);
-    const formData = await request.formData();
-    const permissionCode = readFormValue(formData, "permissionCode");
-    const effect = readFormValue(formData, "effect");
-    const scope = readFormValue(formData, "scope");
-
-    if (!isPermissionCode(permissionCode) || !isPermissionEffect(effect) || !isPermissionScope(scope)) {
-      return fail(400, { success: false, message: "Configuração de permissão inválida." });
+  profile: async ({ cookies, params, request }) => {
+    if (!isUuid(params.userId)) {
+      return fail(404, { success: false, message: "Usuário não encontrado." });
+    }
+    const { session } = await requireAppPermission(
+      cookies,
+      "users.manage",
+      `/app/team/${params.userId}`,
+    );
+    const roleCode = readFormValue(await request.formData(), "roleCode");
+    if (!roleCode) {
+      return fail(400, { success: false, message: "Selecione um perfil de acesso." });
     }
 
     try {
-      await setManagedUserPermission(session.user.id, session.roles, params.userId, permissionCode, effect, scope);
-      return { success: true, message: "Permissão atualizada." };
-    } catch (cause) {
-      const message =
-        cause instanceof Error && cause.message === "SCOPE_NOT_DELEGABLE"
-          ? "Você não pode conceder um escopo maior que o seu próprio acesso."
-          : cause instanceof Error && cause.message === "PERMISSION_NOT_DELEGABLE"
-            ? "Você não pode delegar uma permissão que não possui."
-            : "Não foi possível alterar esta permissão.";
-      return fail(403, { success: false, message });
+      await setManagedUserProfile(
+        session.user.id,
+        session.roles,
+        params.userId,
+        roleCode,
+      );
+      return { success: true, message: "Perfil de acesso atualizado." };
+    } catch {
+      return fail(403, {
+        success: false,
+        message: "Não foi possível atribuir este perfil ao usuário.",
+      });
     }
   },
 
