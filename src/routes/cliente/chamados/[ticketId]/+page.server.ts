@@ -5,7 +5,8 @@ import {
   getCustomerF10Ticket,
   replyCustomerF10Ticket,
 } from "$lib/server/customerPortal/customerF10TicketRepository";
-import { requireCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
+import type { CustomerF10PortalSession } from "$lib/server/customerPortal/customerF10AuthRepository";
+import { requireCustomerTicketPortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { parseServiceRequestUpdateForm } from "$lib/server/serviceRequests/serviceRequestForm";
 import {
   getCustomerServiceRequestForTicket,
@@ -18,14 +19,16 @@ function isUuid(value: string): boolean {
 
 export const load: PageServerLoad = async ({ params, cookies, url }) => {
   if (!isUuid(params.ticketId)) throw error(404, "Chamado não encontrado.");
-  const session = await requireCustomerF10PortalSession(
+  const session = await requireCustomerTicketPortalSession(
     cookies,
     `${url.pathname}${url.search}`,
     false,
   );
   const details = await getCustomerF10Ticket(session, params.ticketId);
   if (!details) throw error(404, "Chamado não encontrado.");
-  const serviceRequest = await getCustomerServiceRequestForTicket(session, params.ticketId);
+  const serviceRequest = session.authProvider === "f10"
+    ? await getCustomerServiceRequestForTicket(session as CustomerF10PortalSession, params.ticketId)
+    : null;
   await recordCustomerActivity(session, {
     eventType: "ticket.detail.view",
     source: "customer_portal",
@@ -41,7 +44,7 @@ export const actions: Actions = {
       return fail(404, { success: false, message: "Chamado não encontrado." });
     }
 
-    const session = await requireCustomerF10PortalSession(
+    const session = await requireCustomerTicketPortalSession(
       cookies,
       `/cliente/chamados/${params.ticketId}`,
       false,
@@ -109,11 +112,19 @@ export const actions: Actions = {
       });
     }
 
-    const session = await requireCustomerF10PortalSession(
+    const session = await requireCustomerTicketPortalSession(
       cookies,
       `/cliente/chamados/${params.ticketId}`,
       false,
     );
+    if (session.authProvider !== "f10") {
+      return fail(403, {
+        success: false,
+        action: "updateServiceRequest",
+        message: "Entre com o acesso do sistema F10 para alterar os dados estruturados desta solicitação.",
+      });
+    }
+
     const ticket = await getCustomerF10Ticket(session, params.ticketId);
     if (!ticket) {
       return fail(404, {
@@ -125,7 +136,7 @@ export const actions: Actions = {
 
     try {
       const input = parseServiceRequestUpdateForm(await request.formData());
-      await updateCustomerServiceRequest(session, params.ticketId, input);
+      await updateCustomerServiceRequest(session as CustomerF10PortalSession, params.ticketId, input);
       await recordCustomerActivity(session, {
         eventType: "service_request.updated",
         source: "customer_portal",
