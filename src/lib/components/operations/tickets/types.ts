@@ -1,5 +1,5 @@
 export type TicketScope = "mine" | "unassigned" | "all";
-export type TicketView = "board" | "list";
+export type TicketView = "board" | "list" | "split";
 
 export type TicketLabel = {
   id: string;
@@ -17,8 +17,16 @@ export type TicketItem = {
   id: string;
   ticketNumber: number;
   subject: string;
+  status: string;
   priority: string;
   channel: string;
+  dueOn: string;
+  firstResponseDueAt: string | Date | null;
+  nextResponseDueAt: string | Date | null;
+  resolutionDueAt: string | Date | null;
+  firstResponseAt: string | Date | null;
+  resolvedAt: string | Date | null;
+  updatedAt: string | Date;
   customerName: string | null;
   organizationName: string | null;
   queueName: string;
@@ -84,6 +92,12 @@ export type TicketCardData = {
       channel: string;
       queueName: string;
       assignedUserName: string | null;
+      dueOn: string;
+      firstResponseDueAt: string | Date | null;
+      nextResponseDueAt: string | Date | null;
+      resolutionDueAt: string | Date | null;
+      firstResponseAt: string | Date | null;
+      resolvedAt: string | Date | null;
       customerContactId: string | null;
       customerName: string | null;
       customerEmail: string | null;
@@ -141,4 +155,16 @@ export type TicketCardData = {
   }>;
   taskProjects: Array<{ id: string; name: string }>;
   canCreateTask: boolean;
+  canCommentInternal: boolean;
+  canManageFollowers: boolean;
+  followers: Array<{
+    id: string;
+    name: string;
+    email: string;
+  }>;
+  followerCandidates: Array<{
+    id: string;
+    name: string;
+    email: string;
+  }>;
 };
