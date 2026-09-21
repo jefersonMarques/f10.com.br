@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
-import { rolePermissions, userPermissions, userRoles } from "$lib/server/db/schema";
+import { rolePermissions, roles, userPermissions, userRoles } from "$lib/server/db/schema";
 
 export const PERMISSION_CODES = [
   "help.view",
@@ -74,6 +74,16 @@ export async function resolveUserPermissions(
 ): Promise<Map<string, PermissionScope>> {
   const db = getDatabase();
   const grants = new Map<string, PermissionScope>();
+
+  const assignedRoles = await db
+    .select({ code: roles.code })
+    .from(userRoles)
+    .innerJoin(roles, eq(userRoles.roleId, roles.id))
+    .where(eq(userRoles.userId, userId));
+
+  if (assignedRoles.some((role) => role.code === "SUPER_ADMIN")) {
+    return new Map(PERMISSION_CODES.map((permissionCode) => [permissionCode, "all"]));
+  }
 
   const roleGrants = await db
     .select({
