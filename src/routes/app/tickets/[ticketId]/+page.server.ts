@@ -16,6 +16,12 @@ import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { markTicketChatHumanTakeover } from "$lib/server/support/supportAiHandoff";
 import { createTaskFromTicket, listTicketTasks } from "$lib/server/support/ticketTaskBridge";
 import { getTicketCustomerContext } from "$lib/server/support/ticketCustomerContextRepository";
+import {
+  addTicketFollower,
+  listTicketFollowerCandidates,
+  listTicketFollowers,
+  removeTicketFollower,
+} from "$lib/server/support/ticketFollowerRepository";
 import { parseTicketCustomerLinkForm } from "$lib/server/support/ticketCustomerForm";
 import { isTicketDueDate } from "$lib/server/support/ticketDueDate";
 import {
@@ -122,10 +128,19 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     const canCommentInternal =
       canReply || hasPermission(permissions, "tickets.comment_internal");
     const canAssign = hasPermission(permissions, "tickets.assign");
+    const canManageFollowers = canReply || canAssign;
     const canViewTasks = hasPermission(permissions, "tasks.view");
     const canCreateTask = canReply && hasPermission(permissions, "tasks.create");
     const canLinkCustomer = canReply && hasPermission(permissions, "customers.view");
-    const [details, users, linkedTasks, taskProjects, serviceRequest] = await Promise.all([
+    const [
+      details,
+      users,
+      linkedTasks,
+      taskProjects,
+      serviceRequest,
+      followers,
+      followerCandidates,
+    ] = await Promise.all([
       getSupportTicket(layout.user.id, permissions, params.ticketId),
       canReply || canCommentInternal || canAssign ? listSupportAgents() : Promise.resolve([]),
       canViewTasks
@@ -135,6 +150,8 @@ export const load: PageServerLoad = async ({ params, parent }) => {
         ? listTaskProjects(layout.user.id, permissions).catch(() => [])
         : Promise.resolve([]),
       getSupportServiceRequestForTicket(layout.user.id, viewScope, params.ticketId),
+      listTicketFollowers(params.ticketId),
+      canManageFollowers ? listTicketFollowerCandidates() : Promise.resolve([]),
     ]);
     const [mentionUsers, customerContext] = await Promise.all([
       canCommentInternal
@@ -154,6 +171,9 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       taskProjects,
       canReply,
       canCommentInternal,
+      canManageFollowers,
+      followers,
+      followerCandidates,
       canAssign,
       canLinkCustomer,
       canViewTasks,
@@ -170,6 +190,48 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 };
 
 export const actions: Actions = {
+  addFollower: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, { success: false, action: "addFollower", message: "Ticket não encontrado." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.view",
+      `/app/tickets/${params.ticketId}`,
+    );
+    const userId = readFormValue(await request.formData(), "userId");
+    if (!isUuid(userId)) {
+      return fail(400, { success: false, action: "addFollower", message: "Seguidor inválido." });
+    }
+    try {
+      await addTicketFollower(session.user.id, permissions, params.ticketId, userId);
+      return { success: true, action: "addFollower", message: "Seguidor adicionado." };
+    } catch {
+      return fail(403, { success: false, action: "addFollower", message: "Não foi possível adicionar este seguidor." });
+    }
+  },
+
+  removeFollower: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, { success: false, action: "removeFollower", message: "Ticket não encontrado." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.view",
+      `/app/tickets/${params.ticketId}`,
+    );
+    const userId = readFormValue(await request.formData(), "userId");
+    if (!isUuid(userId)) {
+      return fail(400, { success: false, action: "removeFollower", message: "Seguidor inválido." });
+    }
+    try {
+      await removeTicketFollower(session.user.id, permissions, params.ticketId, userId);
+      return { success: true, action: "removeFollower", message: "Seguidor removido." };
+    } catch {
+      return fail(403, { success: false, action: "removeFollower", message: "Não foi possível remover este seguidor." });
+    }
+  },
+
   reply: async ({ cookies, params, request }) => {
     if (!isUuid(params.ticketId)) {
       return fail(404, { success: false, message: "Ticket não encontrado." });
