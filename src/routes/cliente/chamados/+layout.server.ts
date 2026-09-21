@@ -1,5 +1,5 @@
 import type { LayoutServerLoad } from "./$types";
-import { requireCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
+import { requireCustomerTicketPortalSession } from "$lib/server/customerPortal/customerPortalSession";
 
 export const load: LayoutServerLoad = async ({ cookies, url }) => {
   const session = await requireCustomerF10PortalSession(
@@ -13,6 +13,7 @@ export const load: LayoutServerLoad = async ({ cookies, url }) => {
       name: session.name,
       email: session.email,
       legacyUserId: session.legacyUserId,
+      authProvider: session.authProvider,
       groupId: session.selectedGroupId,
       groupName: session.selectedGroupName,
       unitId: session.selectedUnitId,
