@@ -107,6 +107,9 @@ export async function getSupportChatEntrySettings() {
         teamId: supportQueues.teamId,
         teamName: teams.name,
         defaultDueDays: supportQueues.defaultDueDays,
+        slaFirstResponseMinutes: supportQueues.slaFirstResponseMinutes,
+        slaNextResponseMinutes: supportQueues.slaNextResponseMinutes,
+        slaResolutionMinutes: supportQueues.slaResolutionMinutes,
         active: supportQueues.active,
       })
       .from(supportQueues)
@@ -246,6 +249,37 @@ export async function createSupportQueue(
     entityType: "support_queue",
     entityId: queue.id,
     metadata: { teamId, defaultDueDays, source: "chat_entry_settings" },
+  });
+}
+
+export async function updateSupportQueueSla(
+  actorUserId: string,
+  queueId: string,
+  input: {
+    firstResponseMinutes: number;
+    nextResponseMinutes: number;
+    resolutionMinutes: number;
+  },
+): Promise<void> {
+  const [updated] = await getDatabase()
+    .update(supportQueues)
+    .set({
+      slaFirstResponseMinutes: input.firstResponseMinutes,
+      slaNextResponseMinutes: input.nextResponseMinutes,
+      slaResolutionMinutes: input.resolutionMinutes,
+      updatedAt: new Date(),
+    })
+    .where(eq(supportQueues.id, queueId))
+    .returning({ id: supportQueues.id });
+
+  if (!updated) throw new Error("SUPPORT_QUEUE_NOT_FOUND");
+
+  await recordAuditEvent({
+    actorUserId,
+    action: "operations.support_queue.sla.updated",
+    entityType: "support_queue",
+    entityId: queueId,
+    metadata: input,
   });
 }
 
