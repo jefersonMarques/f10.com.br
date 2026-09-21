@@ -74,7 +74,9 @@ async function findExistingPublicRequest(
     .innerJoin(tickets, eq(tickets.id, serviceRequests.ticketId))
     .where(
       and(
-        isNull(serviceRequests.customerContactId),
+        isNull(serviceRequests.legacyUserId),
+        isNull(serviceRequests.groupId),
+        isNull(serviceRequests.unitId),
         eq(serviceRequests.requestType, requestType),
         eq(serviceRequests.idempotencyKey, idempotencyKey),
       ),
@@ -128,7 +130,9 @@ export async function createPublicServiceRequest(
         .innerJoin(tickets, eq(tickets.id, serviceRequests.ticketId))
         .where(
           and(
-            isNull(serviceRequests.customerContactId),
+            isNull(serviceRequests.legacyUserId),
+            isNull(serviceRequests.groupId),
+            isNull(serviceRequests.unitId),
             eq(serviceRequests.requestType, input.requestType),
             eq(serviceRequests.idempotencyKey, idempotencyKey),
           ),
