@@ -86,10 +86,9 @@ async function listActiveTickets(
 }
 
 export const load: PageServerLoad = async ({ cookies, url }) => {
-  const session = await requireCustomerF10PortalSession(
+  const session = await requireCustomerTicketPortalSession(
     cookies,
     `${url.pathname}${url.search}`,
-    false,
   );
 
   const groupParam = url.searchParams.get("groupId");
