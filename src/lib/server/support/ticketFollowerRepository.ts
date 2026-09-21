@@ -2,7 +2,12 @@ import { and, asc, eq } from "drizzle-orm";
 import { getPermissionScope, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
-import { users } from "$lib/server/db/schema";
+import {
+  rolePermissions,
+  userPermissions,
+  userRoles,
+  users,
+} from "$lib/server/db/schema";
 import { ticketFollowers, tickets } from "$lib/server/db/supportSchema";
 import {
   requireTicketAccess,
@@ -28,25 +33,48 @@ export async function listTicketFollowers(ticketId: string) {
 }
 
 export async function listTicketFollowerCandidates() {
-  const activeUsers = await getDatabase()
-    .select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-    })
-    .from(users)
-    .where(eq(users.status, "active"))
-    .orderBy(asc(users.name));
+  const db = getDatabase();
+  const [activeUsers, roleGrants, overrides] = await Promise.all([
+    db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+      })
+      .from(users)
+      .where(eq(users.status, "active"))
+      .orderBy(asc(users.name)),
+    db
+      .select({ userId: userRoles.userId })
+      .from(userRoles)
+      .innerJoin(
+        rolePermissions,
+        and(
+          eq(rolePermissions.roleId, userRoles.roleId),
+          eq(rolePermissions.permissionCode, "tickets.view"),
+        ),
+      ),
+    db
+      .select({
+        userId: userPermissions.userId,
+        effect: userPermissions.effect,
+      })
+      .from(userPermissions)
+      .where(eq(userPermissions.permissionCode, "tickets.view")),
+  ]);
 
-  const eligible = await Promise.all(
-    activeUsers.map(async (user) => {
-      const permissions = await resolveUserPermissions(user.id);
-      return getPermissionScope(permissions, "tickets.view") ? user : null;
-    }),
+  const roleGrantedIds = new Set(roleGrants.map((row) => row.userId));
+  const explicitlyAllowedIds = new Set(
+    overrides.filter((row) => row.effect === "allow").map((row) => row.userId),
+  );
+  const deniedIds = new Set(
+    overrides.filter((row) => row.effect === "deny").map((row) => row.userId),
   );
 
-  return eligible.filter(
-    (user): user is { id: string; name: string; email: string } => Boolean(user),
+  return activeUsers.filter(
+    (user) =>
+      !deniedIds.has(user.id) &&
+      (roleGrantedIds.has(user.id) || explicitlyAllowedIds.has(user.id)),
   );
 }
 
