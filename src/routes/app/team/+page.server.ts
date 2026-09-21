@@ -151,7 +151,11 @@ export const actions: Actions = {
     const email = readFormValue(formData, "email").toLowerCase();
     const requestedRole = readFormValue(formData, "roleCode");
     const roleCode: ManagedRoleCode =
-      requestedRole === "ADMIN" ? "ADMIN" : "EMPLOYEE";
+      requestedRole === "ADMIN"
+        ? "ADMIN"
+        : requestedRole === "VIEWER"
+          ? "VIEWER"
+          : "EMPLOYEE";
     const values = {
       name,
       email,
