@@ -5,6 +5,8 @@ import {
   submitTicketSatisfaction,
 } from "$lib/server/support/ticketSatisfactionService";
 
+export const prerender = false;
+
 export const load: PageServerLoad = async ({ params }) => {
   const survey = await getTicketSatisfactionByToken(params.token);
   return {
