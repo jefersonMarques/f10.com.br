@@ -35,6 +35,9 @@ function messageForError(code: string): string {
   if (code === "SERVICE_REQUEST_TEAM_NOT_CONFIGURED") {
     return "A equipe responsável por esta solicitação ainda não foi configurada.";
   }
+  if (code === "SERVICE_REQUEST_ONBOARDING_PROCESS_NOT_CONFIGURED") {
+    return "O processo de onboarding ainda não foi configurado pela F10.";
+  }
   if (code === "SERVICE_REQUEST_SECRET_KEY_NOT_CONFIGURED") {
     return "O armazenamento seguro de credenciais está temporariamente indisponível.";
   }
@@ -70,6 +73,7 @@ function statusForError(code: string): number {
   if (code === "PAYLOAD_TOO_LARGE" || code.includes("TOO_LARGE")) return 413;
   if (
     code === "SERVICE_REQUEST_TEAM_NOT_CONFIGURED" ||
+    code === "SERVICE_REQUEST_ONBOARDING_PROCESS_NOT_CONFIGURED" ||
     code === "SERVICE_REQUEST_GLOBAL_STAGE_NOT_CONFIGURED" ||
     code === "SERVICE_REQUEST_AREA_STAGE_NOT_CONFIGURED" ||
     code === "SERVICE_REQUEST_SECRET_KEY_NOT_CONFIGURED" ||
@@ -161,6 +165,10 @@ export async function handleLegacyServiceRequestSubmission(input: {
   const groupId = readPositiveInteger(formData, "serviceRequestGroupId");
   const unitId = readPositiveInteger(formData, "serviceRequestUnitId");
   const authenticatedPortalSubmission = Boolean(session && groupId !== null && unitId !== null);
+  const flowValue = readRawTextField(formData, "flow").trim();
+  const flow = flowValue === "onboarding" && input.requestType === "cell_coin"
+    ? "onboarding" as const
+    : null;
   const attachments = collectAttachments(formData);
 
   const publicRateLimitScope = `service-request:${input.requestType}`;
@@ -205,9 +213,10 @@ export async function handleLegacyServiceRequestSubmission(input: {
           idempotencyKey,
           fields,
           attachments,
+          flow,
         });
 
-    if (!authenticatedPortalSubmission && input.requestType === "cell_coin") {
+    if (!authenticatedPortalSubmission && input.requestType === "cell_coin" && flow === "onboarding") {
       const password = readRawTextField(formData, "portalPassword");
       if (!password) throw new Error("CUSTOMER_PORTAL_PASSWORD_REQUIRED");
 
