@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { invalidateAll } from "$app/navigation";
+  import { goto, invalidateAll } from "$app/navigation";
   import { CheckCircle2, CircleAlert } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import TicketBoard from "$lib/components/operations/tickets/TicketBoard.svelte";
@@ -19,10 +19,21 @@
 
   const AREA_EXIT_MESSAGE = "Entre na área e conclua o fluxo antes de movimentar o ticket.";
 
-  let scope: TicketScope = "all";
-  let view: TicketView = "board";
-  let search = "";
-  let workflowId = "global";
+  let scope: TicketScope = data.filters.scope;
+  let view: TicketView = data.filters.view;
+  let search = data.filters.search;
+  let status = data.filters.status ?? "";
+  let priority = data.filters.priority ?? "";
+  let queueId = data.filters.queueId ?? "";
+  let assigneeId = data.filters.assigneeId ?? "";
+  let areaId = data.filters.areaId ?? "";
+  let stageId = data.filters.stageId ?? "";
+  let channel = data.filters.channel ?? "";
+  let sla = data.filters.sla ?? "";
+  let tagId = data.filters.tagId ?? "";
+  let workflowId = areaId
+    ? data.workflowBoard.areaWorkflows.find((workflow) => workflow.areaId === areaId)?.id ?? "global"
+    : "global";
   let createOpen = false;
   let draggingTicketId: string | null = null;
   let moving = false;
@@ -30,23 +41,72 @@
   let cardLoading = false;
   let cardWorkflowId = "";
   let cardStageId = "";
+  let splitInitializedFor = "";
+
+  $: if (
+    view === "split"
+    && data.tickets.length > 0
+    && !card
+    && !cardLoading
+    && splitInitializedFor !== data.tickets[0].id
+  ) {
+    splitInitializedFor = data.tickets[0].id;
+    void openCard(data.tickets[0].id);
+  }
 
   $: activeWorkflow = workflowId === "global"
     ? data.workflowBoard.globalWorkflow
     : data.workflowBoard.areaWorkflows.find((workflow) => workflow.id === workflowId)
       ?? data.workflowBoard.globalWorkflow;
 
-  $: filteredTickets = data.tickets.filter((ticket) => {
-    if (scope === "mine" && ticket.assignedUserId !== data.currentUserId) return false;
-    if (scope === "unassigned" && ticket.assignedUserId) return false;
-    const query = search.trim().toLocaleLowerCase("pt-BR");
-    if (!query) return true;
-    return [ticket.ticketNumber, ticket.subject, ticket.customerName, ticket.organizationName, ticket.queueName]
-      .filter(Boolean)
-      .join(" ")
-      .toLocaleLowerCase("pt-BR")
-      .includes(query);
-  });
+  $: filteredTickets = data.tickets;
+
+  function workspaceUrl(page = 1): string {
+    const params = new URLSearchParams();
+    if (view !== "board") params.set("view", view);
+    if (scope !== "all") params.set("scope", scope);
+    if (search.trim()) params.set("q", search.trim());
+    if (status) params.set("status", status);
+    if (priority) params.set("priority", priority);
+    if (queueId) params.set("queueId", queueId);
+    if (assigneeId) params.set("assigneeId", assigneeId);
+    if (areaId) params.set("areaId", areaId);
+    if (stageId) params.set("stageId", stageId);
+    if (channel) params.set("channel", channel);
+    if (sla) params.set("sla", sla);
+    if (tagId) params.set("tagId", tagId);
+    if (page > 1) params.set("page", String(page));
+    const query = params.toString();
+    return query ? `/app/tickets?${query}` : "/app/tickets";
+  }
+
+  function applyFilters(): void {
+    if (areaId) {
+      workflowId = data.workflowBoard.areaWorkflows.find(
+        (workflow) => workflow.areaId === areaId,
+      )?.id ?? workflowId;
+    } else if (view === "board") {
+      workflowId = "global";
+    }
+    void goto(workspaceUrl(1), { keepFocus: true, noScroll: true });
+  }
+
+  function clearFilters(): void {
+    status = "";
+    priority = "";
+    queueId = "";
+    assigneeId = "";
+    areaId = "";
+    stageId = "";
+    channel = "";
+    sla = "";
+    tagId = "";
+    applyFilters();
+  }
+
+  function goToPage(page: number): void {
+    void goto(workspaceUrl(page), { keepFocus: true, noScroll: true });
+  }
 
   function ticketStageId(ticket: Ticket): string | null {
     if (!activeWorkflow) return null;
@@ -119,6 +179,7 @@
   async function openCard(ticketId: string): Promise<void> {
     cardLoading = true;
     card = null;
+    splitInitializedFor = ticketId;
     try {
       const response = await fetch(`/app/tickets/${ticketId}/card`, { cache: "no-store" });
       if (!response.ok) throw new Error("CARD_LOAD_FAILED");
@@ -184,7 +245,7 @@
 
   async function addCardComment(event: SubmitEvent): Promise<void> {
     event.preventDefault();
-    if (!card || !data.canReply) return;
+    if (!card || !card.canCommentInternal) return;
     const formElement = event.currentTarget as HTMLFormElement;
     const formData = new FormData(formElement);
     const bodyValue = String(formData.get("body") ?? "").trim();
@@ -243,6 +304,22 @@
     body.set("attachmentId", attachmentId);
     await postCardAction("deleteAttachment", body);
   }
+  async function addFollower(userId: string): Promise<void> {
+    if (!card) return;
+    const body = new FormData();
+    body.set("ticketId", card.details.ticket.id);
+    body.set("userId", userId);
+    if (await postCardAction("addFollower", body)) await refreshCard();
+  }
+
+  async function removeFollower(userId: string): Promise<void> {
+    if (!card) return;
+    const body = new FormData();
+    body.set("ticketId", card.details.ticket.id);
+    body.set("userId", userId);
+    if (await postCardAction("removeFollower", body)) await refreshCard();
+  }
+
 </script>
 
 <svelte:head><title>Tickets | F10 Operations</title></svelte:head>
@@ -255,9 +332,36 @@
   {/if}
 
   <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
-    <TicketToolbar bind:scope bind:view bind:search canManageWorkflow={data.canManageWorkflow} canCreate={data.canCreate} onCreate={() => (createOpen = true)}/>
+    <TicketToolbar
+      bind:scope
+      bind:view
+      bind:search
+      bind:status
+      bind:priority
+      bind:queueId
+      bind:assigneeId
+      bind:areaId
+      bind:stageId
+      bind:channel
+      bind:sla
+      bind:tagId
+      queues={data.filterOptions.queues}
+      agents={data.filterOptions.agents}
+      labels={data.filterOptions.labels}
+      workflowBoard={data.workflowBoard}
+      canManageWorkflow={data.canManageWorkflow}
+      canCreate={data.canCreate}
+      onApply={applyFilters}
+      onClear={clearFilters}
+      onCreate={() => (createOpen = true)}
+    />
 
     {#if view === "board"}
+      {#if data.pagination.boardLimited}
+        <div class="border-b border-[#F1DFC8] bg-[#FFF8EF] px-4 py-2.5 text-[11px] font-medium text-[#8A531F]">
+          Muitos tickets neste quadro. Refine os filtros para visualizar além dos primeiros {data.pagination.pageSize}.
+        </div>
+      {/if}
       <TicketBoard
         bind:workflowId
         {activeWorkflow}
@@ -268,8 +372,64 @@
         onStartDrag={startDrag}
         onOpenTicket={openCard}
       />
+    {:else if view === "split"}
+      <div class="grid min-h-[680px] xl:grid-cols-[minmax(360px,0.72fr)_minmax(0,1.7fr)]">
+        <div class="min-w-0 border-r border-[#E3E6EC] bg-white">
+          <TicketList
+            tickets={filteredTickets}
+            globalWorkflow={data.workflowBoard.globalWorkflow}
+            areaWorkflows={data.workflowBoard.areaWorkflows}
+            selectedTicketId={card?.details.ticket.id ?? null}
+            compact
+            onOpenTicket={openCard}
+          />
+        </div>
+        <div class="min-w-0 bg-[#F7F8FA]">
+          {#if card}
+            <TicketDetailsDrawer
+              {card}
+              embedded
+              canReply={data.canReply}
+              workflowBoard={data.workflowBoard}
+              bind:cardWorkflowId
+              bind:cardStageId
+              onClose={() => (card = null)}
+              onMove={moveCard}
+              onAddComment={addCardComment}
+              onAddLabel={addLabel}
+              onRemoveLabel={removeLabel}
+              onCreateLabel={createLabel}
+              onUploadAttachment={uploadAttachment}
+              onDeleteAttachment={deleteAttachment}
+              onAddFollower={addFollower}
+              onRemoveFollower={removeFollower}
+              onRefresh={refreshCard}
+            />
+          {:else if cardLoading}
+            <div class="flex min-h-[680px] items-center justify-center text-[11px] font-semibold text-[#777E8D]">Abrindo ticket...</div>
+          {:else}
+            <div class="flex min-h-[680px] items-center justify-center px-8 text-center text-[11px] text-[#9297A4]">Selecione um ticket para abrir os detalhes.</div>
+          {/if}
+        </div>
+      </div>
     {:else}
-      <TicketList tickets={filteredTickets} globalWorkflow={data.workflowBoard.globalWorkflow} onOpenTicket={openCard}/>
+      <TicketList
+        tickets={filteredTickets}
+        globalWorkflow={data.workflowBoard.globalWorkflow}
+        areaWorkflows={data.workflowBoard.areaWorkflows}
+        onOpenTicket={openCard}
+      />
+    {/if}
+
+    {#if view !== "board" && data.pagination.totalPages > 1}
+      <div class="flex items-center justify-between gap-3 border-t border-[#EEF0F5] px-4 py-3">
+        <span class="application-text-meta text-[#858B99]">{data.pagination.total} tickets</span>
+        <div class="flex items-center gap-2">
+          <button type="button" disabled={data.pagination.page <= 1} on:click={() => goToPage(data.pagination.page - 1)} class="application-text-meta h-9 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57] disabled:opacity-40">Anterior</button>
+          <span class="application-text-meta font-semibold text-[#626978]">{data.pagination.page} / {data.pagination.totalPages}</span>
+          <button type="button" disabled={data.pagination.page >= data.pagination.totalPages} on:click={() => goToPage(data.pagination.page + 1)} class="application-text-meta h-9 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57] disabled:opacity-40">Próxima</button>
+        </div>
+      </div>
     {/if}
   </section>
 </ApplicationContent>
@@ -278,11 +438,11 @@
   <TicketCreateDialog queues={data.queues} entryPoints={data.entryPoints} canSearchCustomers={data.canSearchCustomers} onClose={() => (createOpen = false)}/>
 {/if}
 
-{#if cardLoading}
+{#if cardLoading && view !== "split"}
   <div class="fixed inset-0 z-[120] flex items-center justify-center bg-[#010D28]/40"><div class="rounded-2xl bg-white px-5 py-4 text-[11px] font-semibold text-[#4D5464]">Abrindo ticket...</div></div>
 {/if}
 
-{#if card}
+{#if card && view !== "split"}
   <TicketDetailsDrawer
     {card}
     canReply={data.canReply}
@@ -297,6 +457,8 @@
     onCreateLabel={createLabel}
     onUploadAttachment={uploadAttachment}
     onDeleteAttachment={deleteAttachment}
+    onAddFollower={addFollower}
+    onRemoveFollower={removeFollower}
     onRefresh={refreshCard}
   />
 {/if}
