@@ -7,6 +7,7 @@ import {
   getTeamManagementSettings,
   updateTeam as updateManagedTeam,
 } from "$lib/server/users/teamManagementRepository";
+import { listAssignableAccessProfiles } from "$lib/server/users/accessProfileRepository";
 import {
   createManagedUserInvite,
   listManagedUsers,
@@ -54,14 +55,16 @@ export const load: PageServerLoad = async ({ parent }) => {
     throw error(403, "Acesso não autorizado.");
   }
 
-  const [managedUsers, teamManagement] = await Promise.all([
+  const [managedUsers, teamManagement, accessProfiles] = await Promise.all([
     listManagedUsers(layout.roles),
     getTeamManagementSettings(),
+    listAssignableAccessProfiles(layout.user.id, layout.roles),
   ]);
 
   return {
     users: managedUsers,
     teamManagement,
+    accessProfiles,
     canManage: hasPermission(permissionMap, "users.manage"),
     canManageTeams: hasPermission(permissionMap, "system.settings.manage"),
     canCreateAdmin: layout.roles.includes("SUPER_ADMIN"),
@@ -150,12 +153,7 @@ export const actions: Actions = {
     const name = readFormValue(formData, "name");
     const email = readFormValue(formData, "email").toLowerCase();
     const requestedRole = readFormValue(formData, "roleCode");
-    const roleCode: ManagedRoleCode =
-      requestedRole === "ADMIN"
-        ? "ADMIN"
-        : requestedRole === "VIEWER"
-          ? "VIEWER"
-          : "EMPLOYEE";
+    const roleCode: ManagedRoleCode = requestedRole || "EMPLOYEE";
     const values = {
       name,
       email,
