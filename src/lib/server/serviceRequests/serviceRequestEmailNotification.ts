@@ -6,6 +6,7 @@ import {
   serviceRequestRoutes,
 } from "$lib/server/db/serviceRequestSchema";
 import { supportQueues } from "$lib/server/db/supportSchema";
+import { buildEmailHtml } from "$lib/server/email/emailTemplate";
 import { sendTransactionalEmail } from "$lib/server/email/transactionalEmail";
 import {
   serviceRequestLabel,
@@ -58,6 +59,7 @@ export async function notifyServiceRequestRecipient(input: {
 
   const label = serviceRequestLabel(input.requestType);
   const detail = requestDetail(input.data);
+  const ticketUrl = `https://f10.com.br/app/tickets`;
 
   await Promise.all(
     recipients.map((recipient) =>
@@ -73,6 +75,17 @@ export async function notifyServiceRequestRecipient(input: {
           "",
           "Acesse o F10 Operations para visualizar e atender o ticket.",
         ].join("\n"),
+        htmlContent: buildEmailHtml({
+          eyebrow: label,
+          title: `Novo ticket #${input.ticketNumber}`,
+          greeting: `Olá, ${recipient.name}.`,
+          body: [
+            `Uma nova solicitação de ${label} foi recebida.`,
+            `Referência: ${detail}`,
+          ],
+          action: { label: "Abrir tickets", href: ticketUrl },
+          footer: "Este aviso foi enviado automaticamente pelo F10 Operations.",
+        }),
       }),
     ),
   );
