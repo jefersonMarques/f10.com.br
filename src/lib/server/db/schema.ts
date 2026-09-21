@@ -44,6 +44,7 @@ export const roles = pgTable(
     code: text("code").notNull(),
     name: text("name").notNull(),
     isSystem: boolean("is_system").notNull().default(false),
+    restrictTicketAreas: boolean("restrict_ticket_areas").notNull().default(false),
     createdAt: createdAt(),
   },
   (table) => [uniqueIndex("roles_code_unique").on(table.code)],
