@@ -241,7 +241,6 @@ export async function listCustomerPortalTickets(contactId: string) {
       ticketNumber: tickets.ticketNumber,
       subject: tickets.subject,
       queueId: tickets.queueId,
-      firstResponseAt: tickets.firstResponseAt,
       status: tickets.status,
       priority: tickets.priority,
       channel: tickets.channel,
