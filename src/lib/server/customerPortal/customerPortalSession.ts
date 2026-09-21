@@ -96,7 +96,7 @@ export async function requireCustomerPortalSession(cookies: Cookies) {
 export async function getOptionalCustomerTicketPortalSession(
   cookies: Cookies,
 ): Promise<CustomerTicketPortalSession | null> {
-  const f10Session = await getOptionalCustomerF10PortalSession(cookies, { touchActivity: false });
+  const f10Session = await getOptionalCustomerF10PortalSession(cookies);
   if (f10Session) {
     return {
       ...f10Session,
