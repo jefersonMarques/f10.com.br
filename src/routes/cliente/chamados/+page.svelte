@@ -309,7 +309,7 @@
     <section class="rounded-[22px] border border-dashed border-[#CBD1DE] bg-white px-6 py-12 text-center">
       <Inbox size={30} class="mx-auto text-[#9BA1AE]" />
       <h2 class="mt-4 text-[17px] font-semibold text-[#303746]">Nenhum chamado encontrado</h2>
-      <p class="mx-auto mt-2 max-w-[520px] text-[11px] leading-5 text-[#777E8D]">Ajuste os filtros ou use “Novo chamado” na barra superior.</p>
+      <p class="mx-auto mt-2 max-w-[520px] text-[11px] leading-5 text-[#777E8D]">{data.customer.authProvider === "f10" ? "Ajuste os filtros ou use “Novo chamado” na barra superior." : "Seus chamados vinculados aparecerão aqui assim que houver movimentação no atendimento."}</p>
     </section>
   {:else if data.filters.view === "cards"}
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
