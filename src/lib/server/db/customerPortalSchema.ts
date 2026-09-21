@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   index,
   boolean,
@@ -168,7 +169,7 @@ export const customerAuthIdentities = pgTable(
   },
   (table) => [
     index("customer_auth_contact_idx").on(table.customerContactId, table.provider),
-    uniqueIndex("customer_auth_provider_login_unique").on(table.provider, table.login),
+    uniqueIndex("customer_auth_provider_login_unique").on(table.provider, sql`lower(${table.login})`),
     uniqueIndex("customer_auth_provider_user_unique").on(table.provider, table.providerUserId),
   ],
 );
