@@ -64,6 +64,7 @@ export async function createCustomerPortalCredentialInvite(input: {
     .select({
       id: customerAuthIdentities.id,
       customerContactId: customerAuthIdentities.customerContactId,
+      verifiedAt: customerAuthIdentities.verifiedAt,
     })
     .from(customerAuthIdentities)
     .where(
@@ -76,6 +77,11 @@ export async function createCustomerPortalCredentialInvite(input: {
 
   if (existing && existing.customerContactId !== input.customerContactId) {
     throw new Error("CUSTOMER_PORTAL_LOGIN_ALREADY_IN_USE");
+  }
+
+  if (existing?.verifiedAt) {
+    await reconcileCustomerTickets(existing.customerContactId, email);
+    return;
   }
 
   let identityId = existing?.id ?? null;
@@ -107,6 +113,15 @@ export async function createCustomerPortalCredentialInvite(input: {
 
   const token = randomToken();
   const expiresAt = new Date(now.getTime() + ACTIVATION_TTL_MS);
+  await db
+    .update(customerAuthActivationTokens)
+    .set({ usedAt: now })
+    .where(
+      and(
+        eq(customerAuthActivationTokens.identityId, identityId),
+        isNull(customerAuthActivationTokens.usedAt),
+      ),
+    );
   await db.insert(customerAuthActivationTokens).values({
     identityId,
     tokenHash: hashToken(token),
