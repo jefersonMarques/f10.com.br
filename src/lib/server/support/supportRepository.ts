@@ -487,7 +487,7 @@ export async function createManualTicket(
       .values({
         customerContactId: customer.contactId,
         queueId: queue.id,
-        assignedUserId: actorUserId,
+        assignedUserId: start ? null : actorUserId,
         subject: input.subject.trim(),
         status: start?.lifecycleStatus,
         priority: input.priority,
