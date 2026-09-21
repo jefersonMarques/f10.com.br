@@ -30,6 +30,8 @@ import {
   tickets,
 } from "$lib/server/db/supportSchema";
 import { SUPPORT_AWAY_AFTER_MS } from "$lib/server/support/supportAgentPresence";
+import { markTicketCustomerWaitingForResponse } from "$lib/server/support/ticketSlaService";
+import { notifyTicketFollowers } from "$lib/server/support/ticketFollowerRepository";
 import { resolveCustomerContact } from "$lib/server/support/customerResolutionRepository";
 import { resolveSupportChatEntryOption } from "$lib/server/support/supportChatEntryRepository";
 import {
@@ -583,6 +585,22 @@ export async function addPublicChatMessage(
     await deleteStoredSupportImages(storedImages);
     throw cause;
   }
+
+  if (session.aiState !== "active") {
+    await markTicketCustomerWaitingForResponse(session.ticketId, now);
+  }
+
+  await notifyTicketFollowers(session.ticketId, {
+    kind: "ticket.follower.customer_reply",
+    body: normalizedBody || "Cliente enviou uma imagem pelo chat.",
+    excludeUserIds: [ticket.assignedUserId],
+    href: `/app/chat/${sessionId}`,
+  }).catch((cause) => {
+    console.error("[ticket.follower.chat_reply]", {
+      ticketId: session.ticketId,
+      causeType: cause instanceof Error ? cause.name : typeof cause,
+    });
+  });
 
   return {
     ticketId: session.ticketId,
