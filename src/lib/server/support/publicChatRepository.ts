@@ -509,6 +509,7 @@ export async function addPublicChatMessage(
     return { ticketId: null, messageId, aiState: session.aiState };
   }
 
+  const ticketId = session.ticketId;
   const [ticket] = await db
     .select({
       status: tickets.status,
@@ -526,7 +527,7 @@ export async function addPublicChatMessage(
     await db.transaction(async (tx) => {
       await tx.insert(ticketMessages).values({
         id: messageId,
-        ticketId: session.ticketId as string,
+        ticketId: ticketId,
         authorType: "customer",
         customerContactId: ticket.customerContactId,
         visibility: "public",
@@ -538,7 +539,7 @@ export async function addPublicChatMessage(
         await tx.insert(ticketMessageAttachments).values(
           storedImages.map((image) => ({
             messageId,
-            ticketId: session.ticketId as string,
+            ticketId: ticketId,
             storageKey: image.storageKey,
             originalName: image.originalName,
             mimeType: image.mimeType,
@@ -557,14 +558,14 @@ export async function addPublicChatMessage(
               : ticket.status,
           updatedAt: now,
         })
-        .where(eq(tickets.id, session.ticketId as string));
+        .where(eq(tickets.id, ticketId));
       await tx
         .update(webChatSessions)
         .set({ updatedAt: now })
         .where(eq(webChatSessions.id, sessionId));
 
       await tx.insert(ticketEvents).values({
-        ticketId: session.ticketId as string,
+        ticketId: ticketId,
         eventType: "chat.customer.message",
         metadata: { aiState: session.aiState, attachmentCount: storedImages.length },
       });
@@ -587,23 +588,23 @@ export async function addPublicChatMessage(
   }
 
   if (session.aiState !== "active") {
-    await markTicketCustomerWaitingForResponse(session.ticketId, now);
+    await markTicketCustomerWaitingForResponse(ticketId, now);
   }
 
-  await notifyTicketFollowers(session.ticketId, {
+  await notifyTicketFollowers(ticketId, {
     kind: "ticket.follower.customer_reply",
     body: normalizedBody || "Cliente enviou uma imagem pelo chat.",
     excludeUserIds: [ticket.assignedUserId],
     href: `/app/chat/${sessionId}`,
   }).catch((cause) => {
     console.error("[ticket.follower.chat_reply]", {
-      ticketId: session.ticketId,
+      ticketId: ticketId,
       causeType: cause instanceof Error ? cause.name : typeof cause,
     });
   });
 
   return {
-    ticketId: session.ticketId,
+    ticketId: ticketId,
     messageId,
     aiState: session.aiState,
   };
