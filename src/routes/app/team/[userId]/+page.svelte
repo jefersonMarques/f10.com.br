@@ -20,10 +20,6 @@
     all: "Tudo",
   };
 
-  function profileName(code: string): string {
-    return data.accessProfiles.find((profile) => profile.code === code)?.name ?? code;
-  }
-
   async function copyInviteLink(inviteUrl: string): Promise<void> {
     if (!navigator.clipboard) return;
     await navigator.clipboard.writeText(inviteUrl);
@@ -40,8 +36,8 @@
   <section class="mb-3 flex flex-col justify-between gap-4 rounded-[22px] border border-[#E2E5ED] bg-white px-5 py-4 sm:flex-row sm:items-center">
     <div class="min-w-0">
       <div class="flex flex-wrap items-center gap-2">
-        {#each data.details.roles as role}
-          <span class="application-text-caption rounded-full bg-[#EEF0FF] px-2.5 py-1 font-bold text-[#000A57]">{profileName(role)}</span>
+        {#each data.details.roleNames as roleName}
+          <span class="application-text-caption rounded-full bg-[#EEF0FF] px-2.5 py-1 font-bold text-[#000A57]">{roleName}</span>
         {/each}
         <span class={`application-text-caption rounded-full px-2.5 py-1 font-bold ${data.details.user.status === "active" ? "bg-[#EEF8F1] text-[#2F7045]" : data.details.user.status === "invited" ? "bg-[#FFF4E9] text-[#A9510D]" : "bg-[#F1F2F5] text-[#777D8C]"}`}>
           {data.details.user.status === "active" ? "Ativo" : data.details.user.status === "invited" ? "Convite pendente" : "Inativo"}
