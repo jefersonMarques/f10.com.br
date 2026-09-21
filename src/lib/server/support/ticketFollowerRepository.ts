@@ -78,6 +78,70 @@ export async function listTicketFollowerCandidates() {
   );
 }
 
+export async function notifyTicketFollowers(
+  ticketId: string,
+  input: {
+    kind: string;
+    body: string;
+    actorUserId?: string | null;
+    excludeUserIds?: Array<string | null | undefined>;
+    href?: string;
+  },
+): Promise<void> {
+  const db = getDatabase();
+  const [[ticket], followers] = await Promise.all([
+    db
+      .select({
+        ticketNumber: tickets.ticketNumber,
+        subject: tickets.subject,
+      })
+      .from(tickets)
+      .where(eq(tickets.id, ticketId))
+      .limit(1),
+    db
+      .select({ userId: ticketFollowers.userId })
+      .from(ticketFollowers)
+      .innerJoin(users, eq(ticketFollowers.userId, users.id))
+      .where(
+        and(
+          eq(ticketFollowers.ticketId, ticketId),
+          eq(users.status, "active"),
+        ),
+      ),
+  ]);
+
+  if (!ticket || followers.length === 0) return;
+
+  const excluded = new Set(
+    (input.excludeUserIds ?? []).filter(
+      (userId): userId is string => typeof userId === "string" && Boolean(userId),
+    ),
+  );
+  if (input.actorUserId) excluded.add(input.actorUserId);
+
+  const userIds = Array.from(
+    new Set(
+      followers
+        .map((follower) => follower.userId)
+        .filter((userId) => !excluded.has(userId)),
+    ),
+  );
+  if (userIds.length === 0) return;
+
+  await db.insert(internalNotifications).values(
+    userIds.map((userId) => ({
+      userId,
+      actorUserId: input.actorUserId ?? null,
+      kind: input.kind,
+      title: `Atualização no ticket #${ticket.ticketNumber}`,
+      body: input.body.trim().slice(0, 500) || ticket.subject.slice(0, 500),
+      href: input.href ?? `/app/tickets/${ticketId}`,
+      entityType: "ticket",
+      entityId: ticketId,
+    })),
+  );
+}
+
 export async function addTicketFollower(
   actorUserId: string,
   permissions: SupportPermissionMap,
