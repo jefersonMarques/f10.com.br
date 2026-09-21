@@ -11,7 +11,10 @@ import {
   hasPermission,
   type PermissionScope,
 } from "$lib/server/auth/permissions";
-import type { SupportPermissionMap } from "$lib/server/support/supportAccess";
+import {
+  getUserTicketAreaRestriction,
+  type SupportPermissionMap,
+} from "$lib/server/support/supportAccess";
 import {
   addTicketLabel,
   createTicketLabel,
@@ -184,13 +187,25 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     pageSize: view === "board" ? 300 : 50,
   };
 
-  const [workspace, queues, agents, allLabels, entryPoints] = await Promise.all([
+  const [
+    workspace,
+    queues,
+    agents,
+    allLabels,
+    allEntryPoints,
+    areaRestriction,
+  ] = await Promise.all([
     listTicketWorkspaceTickets(layout.user.id, permissionMap, filters),
     listSupportQueues(),
     listSupportAgents(),
     listTicketLabels(),
     canCreate ? listTicketWorkflowEntryPoints() : Promise.resolve([]),
+    getUserTicketAreaRestriction(layout.user.id),
   ]);
+  const entryPoints =
+    areaRestriction === null
+      ? allEntryPoints
+      : allEntryPoints.filter((entryPoint) => areaRestriction.includes(entryPoint.areaId));
 
   const ticketIds = workspace.tickets.map((ticket) => ticket.id);
   const [contexts, workflowBoard, labelRows] = await Promise.all([
