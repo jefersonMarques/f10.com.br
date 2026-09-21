@@ -13,6 +13,7 @@ import type { CustomerF10PortalSession } from "$lib/server/customerPortal/custom
 import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
 import { calculateNextResponseDueAt } from "$lib/server/support/ticketSlaService";
+import { notifyTicketFollowers } from "$lib/server/support/ticketFollowerRepository";
 import {
   decryptServiceRequestSecret,
   encryptServiceRequestSecrets,
@@ -573,16 +574,31 @@ async function updateRequest(params: {
   });
 
   if (params.source === "customer") {
-    await notifySupportTicketNeedsAttention(
-      params.row.ticketId,
-      `Cliente alterou os dados da solicitação de ${serviceRequestLabel(params.row.requestType)}.`,
-    ).catch((cause) => {
-      console.error("[service-request.update.notification]", {
-        ticketId: params.row.ticketId,
-        requestType: params.row.requestType,
-        causeType: cause instanceof Error ? cause.name : typeof cause,
-      });
-    });
+    const notificationBody =
+      `Cliente alterou os dados da solicitação de ${serviceRequestLabel(params.row.requestType)}.`;
+
+    await Promise.all([
+      notifySupportTicketNeedsAttention(
+        params.row.ticketId,
+        notificationBody,
+      ).catch((cause) => {
+        console.error("[service-request.update.notification]", {
+          ticketId: params.row.ticketId,
+          requestType: params.row.requestType,
+          causeType: cause instanceof Error ? cause.name : typeof cause,
+        });
+      }),
+      notifyTicketFollowers(params.row.ticketId, {
+        kind: "ticket.follower.customer_update",
+        body: notificationBody,
+      }).catch((cause) => {
+        console.error("[ticket.follower.customer_update]", {
+          ticketId: params.row.ticketId,
+          requestType: params.row.requestType,
+          causeType: cause instanceof Error ? cause.name : typeof cause,
+        });
+      }),
+    ]);
   }
 }
 
