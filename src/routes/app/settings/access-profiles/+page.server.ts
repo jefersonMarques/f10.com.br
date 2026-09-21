@@ -9,6 +9,7 @@ import {
   updateAccessProfile,
   type AccessProfileGrant,
 } from "$lib/server/users/accessProfileRepository";
+import { listTicketAreas } from "$lib/server/support/ticketWorkflowRepository";
 
 function readText(formData: FormData, name: string): string {
   const value = formData.get(name);
@@ -30,6 +31,9 @@ function profileMessage(cause: unknown): string {
   if (code === "ACCESS_PROFILE_SUPER_ADMIN_READ_ONLY") return "O perfil Super Admin é protegido e não pode ser alterado.";
   if (code === "ACCESS_PROFILE_FULL_ACCESS_RESERVED") return "Acesso total é reservado ao Super Admin. Remova ao menos uma permissão ou reduza um escopo.";
   if (code === "ACCESS_PROFILE_PERMISSION_NOT_DELEGABLE") return "O perfil não pode receber um acesso maior que o seu.";
+  if (code === "ACCESS_PROFILE_TICKET_AREA_REQUIRED") return "Selecione ao menos um processo permitido.";
+  if (code === "ACCESS_PROFILE_TICKET_AREA_INVALID") return "Um dos processos selecionados não está disponível.";
+  if (code === "ACCESS_PROFILE_TICKET_AREA_NOT_DELEGABLE") return "Você não pode liberar um processo fora do seu próprio acesso.";
   return "Não foi possível salvar o perfil.";
 }
 
@@ -38,12 +42,13 @@ export const load: PageServerLoad = async ({ parent }) => {
   const permissionMap = new Map(layout.permissions.map((permission) => [permission.code, permission.scope]));
   if (!hasPermission(permissionMap, "roles.manage")) throw error(403, "Acesso não autorizado.");
 
-  const [profiles, permissionCatalog] = await Promise.all([
+  const [profiles, permissionCatalog, ticketAreas] = await Promise.all([
     listAccessProfiles(),
     listPermissionCatalog(),
+    listTicketAreas(),
   ]);
 
-  return { profiles, permissionCatalog };
+  return { profiles, permissionCatalog, ticketAreas };
 };
 
 export const actions: Actions = {
@@ -92,9 +97,18 @@ export const actions: Actions = {
         permissionCode: permissionCode as AccessProfileGrant["permissionCode"],
         scope: readScope(formData.get(`scope:${permissionCode}`)),
       }));
+    const restrictTicketAreas = formData.has("restrictTicketAreas");
+    const ticketAreaIds = formData
+      .getAll("ticketAreaId")
+      .filter((value): value is string => typeof value === "string");
 
     try {
-      await updateAccessProfile(session.user.id, profileId, { name, grants });
+      await updateAccessProfile(session.user.id, profileId, {
+        name,
+        grants,
+        restrictTicketAreas,
+        ticketAreaIds,
+      });
       return {
         success: true,
         action: "update",
