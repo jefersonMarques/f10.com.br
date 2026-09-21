@@ -145,8 +145,8 @@ export const actions: Actions = {
       const invitation = await regenerateManagedUserInvite(session.user.id, session.roles, params.userId);
       const inviteUrl = new URL(`/login/activate?token=${encodeURIComponent(invitation.token)}`, url.origin).toString();
       const emailSent = await sendManagedUserInviteEmail({
-        email: data.details.user.email,
-        name: data.details.user.name,
+        email: invitation.user.email,
+        name: invitation.user.name,
         inviteUrl,
         expiresAt: invitation.expiresAt,
       }).then(() => true).catch((cause) => {
