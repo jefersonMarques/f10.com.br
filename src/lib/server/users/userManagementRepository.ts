@@ -178,6 +178,20 @@ export async function createManagedUserInvite(
   const role = await requireAssignableRole(actorUserId, actorRoles, input.roleCode);
 
   const db = getDatabase();
+  if (input.includeInChatRouting) {
+    const [chatPermission] = await db
+      .select({ permissionCode: rolePermissions.permissionCode })
+      .from(rolePermissions)
+      .where(
+        and(
+          eq(rolePermissions.roleId, role.id),
+          eq(rolePermissions.permissionCode, "chat.respond"),
+        ),
+      )
+      .limit(1);
+    if (!chatPermission) throw new Error("CHAT_ROUTING_PERMISSION_REQUIRED");
+  }
+
   const email = input.email.trim().toLowerCase();
   const name = input.name.trim();
   const rawToken = randomBytes(32).toString("base64url");
