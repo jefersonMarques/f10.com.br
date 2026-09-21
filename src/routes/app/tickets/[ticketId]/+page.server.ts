@@ -119,13 +119,15 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 
   try {
     const canReply = hasPermission(permissions, "tickets.reply");
+    const canCommentInternal =
+      canReply || hasPermission(permissions, "tickets.comment_internal");
     const canAssign = hasPermission(permissions, "tickets.assign");
     const canViewTasks = hasPermission(permissions, "tasks.view");
     const canCreateTask = canReply && hasPermission(permissions, "tasks.create");
     const canLinkCustomer = canReply && hasPermission(permissions, "customers.view");
     const [details, users, linkedTasks, taskProjects, serviceRequest] = await Promise.all([
       getSupportTicket(layout.user.id, permissions, params.ticketId),
-      canReply || canAssign ? listSupportAgents() : Promise.resolve([]),
+      canReply || canCommentInternal || canAssign ? listSupportAgents() : Promise.resolve([]),
       canViewTasks
         ? listTicketTasks(layout.user.id, permissions, params.ticketId)
         : Promise.resolve([]),
@@ -135,7 +137,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       getSupportServiceRequestForTicket(layout.user.id, viewScope, params.ticketId),
     ]);
     const [mentionUsers, customerContext] = await Promise.all([
-      canReply
+      canCommentInternal
         ? filterMentionUsersForTicket(users, params.ticketId)
         : Promise.resolve([]),
       getTicketCustomerContext(params.ticketId),
@@ -151,6 +153,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       linkedTasks,
       taskProjects,
       canReply,
+      canCommentInternal,
       canAssign,
       canLinkCustomer,
       canViewTasks,
@@ -213,9 +216,19 @@ export const actions: Actions = {
     }
     const { session, permissions } = await requireAppPermission(
       cookies,
-      "tickets.reply",
+      "tickets.view",
       `/app/tickets/${params.ticketId}`,
     );
+    if (
+      !hasPermission(permissions, "tickets.reply") &&
+      !hasPermission(permissions, "tickets.comment_internal")
+    ) {
+      return fail(403, {
+        success: false,
+        action: "note",
+        message: "Você não possui permissão para adicionar notas internas.",
+      });
+    }
     const formData = await request.formData();
     const body = readFormValue(formData, "body");
     const requestedMentionIds = readMentionedUserIds(formData);
