@@ -9,6 +9,10 @@ import type { CustomerF10PortalSession } from "$lib/server/customerPortal/custom
 import { requireCustomerTicketPortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { parseServiceRequestUpdateForm } from "$lib/server/serviceRequests/serviceRequestForm";
 import {
+  getTicketSatisfaction,
+  submitTicketSatisfactionForCustomer,
+} from "$lib/server/support/ticketSatisfactionService";
+import {
   getCustomerServiceRequestForTicket,
   updateCustomerServiceRequest,
 } from "$lib/server/serviceRequests/serviceRequestOperations";
@@ -26,16 +30,19 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
   );
   const details = await getCustomerF10Ticket(session, params.ticketId);
   if (!details) throw error(404, "Chamado não encontrado.");
-  const serviceRequest = session.authProvider === "f10"
-    ? await getCustomerServiceRequestForTicket(session as CustomerF10PortalSession, params.ticketId)
-    : null;
+  const [serviceRequest, satisfaction] = await Promise.all([
+    session.authProvider === "f10"
+      ? getCustomerServiceRequestForTicket(session as CustomerF10PortalSession, params.ticketId)
+      : Promise.resolve(null),
+    getTicketSatisfaction(params.ticketId),
+  ]);
   await recordCustomerActivity(session, {
     eventType: "ticket.detail.view",
     source: "customer_portal",
     path: url.pathname,
     metadata: { ticketId: params.ticketId, ticketNumber: details.ticket.ticketNumber },
   }).catch(() => undefined);
-  return { details, serviceRequest };
+  return { details, serviceRequest, satisfaction };
 };
 
 export const actions: Actions = {
@@ -99,6 +106,53 @@ export const actions: Actions = {
         success: false,
         message: "Não foi possível responder este chamado.",
         body,
+      });
+    }
+  },
+
+  satisfaction: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, { success: false, action: "satisfaction", message: "Chamado não encontrado." });
+    }
+
+    const session = await requireCustomerTicketPortalSession(
+      cookies,
+      `/cliente/chamados/${params.ticketId}`,
+    );
+    const ticket = await getCustomerF10Ticket(session, params.ticketId);
+    if (!ticket) {
+      return fail(404, { success: false, action: "satisfaction", message: "Chamado não encontrado." });
+    }
+
+    const formData = await request.formData();
+    const score = Number(formData.get("score"));
+    const commentValue = formData.get("comment");
+    const comment = typeof commentValue === "string" ? commentValue : "";
+
+    try {
+      const submitted = await submitTicketSatisfactionForCustomer({
+        ticketId: params.ticketId,
+        customerContactId: session.contactId,
+        score,
+        comment,
+      });
+      if (!submitted) {
+        return fail(409, {
+          success: false,
+          action: "satisfaction",
+          message: "Esta avaliação já foi respondida ou não está mais disponível.",
+        });
+      }
+      return {
+        success: true,
+        action: "satisfaction",
+        message: "Obrigado pela sua avaliação.",
+      };
+    } catch {
+      return fail(400, {
+        success: false,
+        action: "satisfaction",
+        message: "Escolha uma nota de 1 a 5 e tente novamente.",
       });
     }
   },
