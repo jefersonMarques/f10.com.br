@@ -99,6 +99,9 @@ export const supportQueues = pgTable(
     name: text("name").notNull(),
     teamId: uuid("team_id").references(() => teams.id, { onDelete: "set null" }),
     defaultDueDays: integer("default_due_days").notNull().default(3),
+    slaFirstResponseMinutes: integer("sla_first_response_minutes").notNull().default(240),
+    slaNextResponseMinutes: integer("sla_next_response_minutes").notNull().default(480),
+    slaResolutionMinutes: integer("sla_resolution_minutes").notNull().default(4320),
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -130,6 +133,7 @@ export const tickets = pgTable(
     channel: supportChannel("channel").notNull().default("manual"),
     dueOn: date("due_on").notNull().default(sql`CURRENT_DATE + 3`),
     firstResponseDueAt: timestamp("first_response_due_at", { withTimezone: true }),
+    nextResponseDueAt: timestamp("next_response_due_at", { withTimezone: true }),
     resolutionDueAt: timestamp("resolution_due_at", { withTimezone: true }),
     firstResponseAt: timestamp("first_response_at", { withTimezone: true }),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
@@ -225,6 +229,24 @@ export const ticketTags = pgTable(
   (table) => [
     primaryKey({ columns: [table.ticketId, table.tagId] }),
     index("ticket_tags_tag_idx").on(table.tagId),
+  ],
+);
+
+export const ticketFollowers = pgTable(
+  "ticket_followers",
+  {
+    ticketId: uuid("ticket_id")
+      .notNull()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.ticketId, table.userId] }),
+    index("ticket_followers_user_idx").on(table.userId, table.createdAt),
   ],
 );
 
