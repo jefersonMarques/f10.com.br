@@ -26,7 +26,6 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
   const session = await requireCustomerTicketPortalSession(
     cookies,
     `${url.pathname}${url.search}`,
-    false,
   );
   const details = await getCustomerF10Ticket(session, params.ticketId);
   if (!details) throw error(404, "Chamado não encontrado.");
@@ -54,7 +53,6 @@ export const actions: Actions = {
     const session = await requireCustomerTicketPortalSession(
       cookies,
       `/cliente/chamados/${params.ticketId}`,
-      false,
     );
     const formData = await request.formData();
     const value = formData.get("body");
