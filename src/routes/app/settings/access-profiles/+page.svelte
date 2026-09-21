@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { LockKeyhole, Plus, Save, ShieldCheck } from "lucide-svelte";
+  import { Boxes, LockKeyhole, Plus, Save, ShieldCheck } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
@@ -99,6 +99,28 @@
                 <span class="application-text-meta font-bold uppercase tracking-[0.07em] text-app-text-soft">Nome</span>
                 <input name="name" value={selectedProfile.name} required minlength="2" maxlength="80" class="application-text-caption mt-1.5 h-10 w-full rounded-xl border border-app-border-control bg-app-surface px-3"/>
               </label>
+            </div>
+
+            <div class="border-b border-app-border-soft px-5 py-4 sm:px-6">
+              <div class="flex items-start gap-3">
+                <Boxes size={16} class="mt-0.5 shrink-0 text-app-accent"/>
+                <div class="min-w-0 flex-1">
+                  <label class="application-text-caption flex items-center gap-2 font-semibold text-app-text">
+                    <input name="restrictTicketAreas" type="checkbox" checked={selectedProfile.restrictTicketAreas} class="h-4 w-4 rounded border-app-border-control"/>
+                    Restringir tickets por processo
+                  </label>
+                  <p class="application-text-meta mt-1 text-app-text-soft">Quando ativo, este perfil só enxerga tickets dos processos marcados abaixo.</p>
+
+                  <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                    {#each data.ticketAreas as area}
+                      <label class="application-text-caption flex items-center gap-2 rounded-xl border border-app-border px-3 py-2 text-app-text-muted">
+                        <input name="ticketAreaId" type="checkbox" value={area.id} checked={selectedProfile.ticketAreaIds.includes(area.id)} class="h-4 w-4 rounded border-app-border-control"/>
+                        <span class="min-w-0 truncate">{area.name}</span>
+                      </label>
+                    {/each}
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="divide-y divide-app-border-soft">
