@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Clock3, Download, ExternalLink, FileText, Paperclip, Star, Tag, Trash2, UserPlus, UsersRound, X } from "lucide-svelte";
+  import { Clock3, Download, ExternalLink, FileText, Paperclip, Star, Tag, Trash2, UsersRound, X } from "lucide-svelte";
   import TicketTaskPanel from "$lib/components/operations/TicketTaskPanel.svelte";
   import { eventLabels, formatBytes, formatDateTime, labelClasses, priorityLabels } from "./presentation";
   import type { TicketCardData, TicketWorkflow, TicketWorkflowBoard } from "./types";
