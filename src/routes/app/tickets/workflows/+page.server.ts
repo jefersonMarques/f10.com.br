@@ -10,6 +10,7 @@ import {
   reorderTicketWorkflowStage,
   setTicketWorkflowInitialStage,
   updateTicketArea,
+  updateTicketWorkflowStageEntryPoint,
   type TicketLifecycleStatus,
   type TicketWorkflowStageType,
 } from "$lib/server/support/ticketWorkflowRepository";
@@ -60,6 +61,7 @@ function workflowErrorMessage(cause: unknown): string {
     TICKET_WORKFLOW_STAGE_IN_USE: "Esta coluna possui tickets e não pode ser arquivada.",
     TICKET_WORKFLOW_INITIAL_STAGE_ARCHIVE_BLOCKED: "Defina outra coluna inicial antes de arquivar esta.",
     TICKET_WORKFLOW_LAST_STAGE_ARCHIVE_BLOCKED: "Um workflow precisa manter ao menos uma coluna ativa.",
+    TICKET_WORKFLOW_ENTRY_POINT_INVALID: "Somente uma coluna de Área no fluxo global pode iniciar novos tickets.",
   };
   if (cause.message.includes("ticket_areas_active_name_unique")) return "Já existe uma área ativa com esse nome.";
   return messages[cause.message] ?? "Não foi possível salvar a configuração.";
@@ -180,6 +182,10 @@ export const actions: Actions = {
       if (color && isTicketWorkflowStageColor(color)) {
         await updateTicketWorkflowStageColor(result.value, color);
       }
+      await updateTicketWorkflowStageEntryPoint(
+        result.value,
+        stageType === "area_gateway" && formData.has("allowTicketStart"),
+      );
       return {
         success: true,
         action: "addStage",
@@ -218,6 +224,10 @@ export const actions: Actions = {
       if (color && isTicketWorkflowStageColor(color)) {
         await updateTicketWorkflowStageColor(stageId, color);
       }
+      await updateTicketWorkflowStageEntryPoint(
+        stageId,
+        stageType === "area_gateway" && formData.has("allowTicketStart"),
+      );
       return {
         success: true,
         action: "updateStage",
