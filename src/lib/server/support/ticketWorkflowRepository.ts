@@ -359,6 +359,18 @@ export async function getTicketWorkflowBoard(
       workflow.kind === "area" &&
       Boolean(workflow.areaId && visibleAreaIds.has(workflow.areaId)),
   );
+  const visibleGlobalWorkflow =
+    globalWorkflow && areaRestriction !== null
+      ? {
+          ...globalWorkflow,
+          stages: globalWorkflow.stages.filter(
+            (stage) =>
+              stage.stageType !== "area_gateway" ||
+              !stage.linkedAreaId ||
+              visibleAreaIds.has(stage.linkedAreaId),
+          ),
+        }
+      : globalWorkflow;
 
   const db = getDatabase();
   const rawStates =
@@ -390,7 +402,7 @@ export async function getTicketWorkflowBoard(
     return state;
   });
 
-  return { globalWorkflow, areaWorkflows, areas, states };
+  return { globalWorkflow: visibleGlobalWorkflow, areaWorkflows, areas, states };
 }
 
 export async function getTicketWorkflowContext(
