@@ -87,14 +87,14 @@ export async function listPermissionCatalog() {
 export async function listAssignableAccessProfiles(
   actorUserId: string,
   actorRoles: string[],
-): Promise<Array<{ id: string; code: string; name: string }>> {
+): Promise<Array<{ id: string; code: string; name: string; grants: AccessProfileGrant[] }>> {
   const profiles = await listAccessProfiles();
   const isSuperAdmin = actorRoles.includes("SUPER_ADMIN");
 
   if (isSuperAdmin) {
     return profiles
       .filter((profile) => profile.code !== "SUPER_ADMIN")
-      .map(({ id, code, name }) => ({ id, code, name }));
+      .map(({ id, code, name, grants }) => ({ id, code, name, grants }));
   }
 
   if (!actorRoles.includes("ADMIN")) return [];
@@ -110,7 +110,7 @@ export async function listAssignableAccessProfiles(
           return actorScope ? isScopeAtLeast(actorScope, grant.scope) : false;
         }),
     )
-    .map(({ id, code, name }) => ({ id, code, name }));
+    .map(({ id, code, name, grants }) => ({ id, code, name, grants }));
 }
 
 export async function createAccessProfile(
