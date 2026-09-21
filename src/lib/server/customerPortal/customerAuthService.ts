@@ -60,33 +60,55 @@ export async function createCustomerPortalCredentialInvite(input: {
   const db = getDatabase();
   const passwordHash = await hashPassword(input.password);
   const now = new Date();
-  const [identity] = await db
-    .insert(customerAuthIdentities)
-    .values({
-      customerContactId: input.customerContactId,
-      provider: "portal",
-      login: email,
-      passwordHash,
-      verifiedAt: null,
-      updatedAt: now,
+  const [existing] = await db
+    .select({
+      id: customerAuthIdentities.id,
+      customerContactId: customerAuthIdentities.customerContactId,
     })
-    .onConflictDoUpdate({
-      target: [customerAuthIdentities.provider, customerAuthIdentities.login],
-      set: {
-        customerContactId: input.customerContactId,
+    .from(customerAuthIdentities)
+    .where(
+      and(
+        eq(customerAuthIdentities.provider, "portal"),
+        sql`lower(${customerAuthIdentities.login}) = ${email}`,
+      ),
+    )
+    .limit(1);
+
+  if (existing && existing.customerContactId !== input.customerContactId) {
+    throw new Error("CUSTOMER_PORTAL_LOGIN_ALREADY_IN_USE");
+  }
+
+  let identityId = existing?.id ?? null;
+  if (identityId) {
+    await db
+      .update(customerAuthIdentities)
+      .set({
         passwordHash,
         verifiedAt: null,
         updatedAt: now,
-      },
-    })
-    .returning({ id: customerAuthIdentities.id });
+      })
+      .where(eq(customerAuthIdentities.id, identityId));
+  } else {
+    const [created] = await db
+      .insert(customerAuthIdentities)
+      .values({
+        customerContactId: input.customerContactId,
+        provider: "portal",
+        login: email,
+        passwordHash,
+        verifiedAt: null,
+        updatedAt: now,
+      })
+      .returning({ id: customerAuthIdentities.id });
+    identityId = created?.id ?? null;
+  }
 
-  if (!identity) throw new Error("CUSTOMER_PORTAL_IDENTITY_NOT_CREATED");
+  if (!identityId) throw new Error("CUSTOMER_PORTAL_IDENTITY_NOT_CREATED");
 
   const token = randomToken();
   const expiresAt = new Date(now.getTime() + ACTIVATION_TTL_MS);
   await db.insert(customerAuthActivationTokens).values({
-    identityId: identity.id,
+    identityId,
     tokenHash: hashToken(token),
     expiresAt,
   });
