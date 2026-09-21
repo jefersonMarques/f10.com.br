@@ -76,22 +76,28 @@
   }
 </script>
 
-<div class={embedded ? "relative min-h-[680px] w-full" : "fixed inset-0 z-[120] overflow-y-auto bg-[#010D28]/45 p-3 sm:p-6"} role="presentation">
+<div class={embedded ? "relative h-full min-h-0 w-full" : "fixed inset-0 z-[120] overflow-y-auto bg-[#010D28]/45 p-3 sm:p-6"} role="presentation">
   {#if !embedded}
     <button type="button" class="fixed inset-0 cursor-default" aria-label={`Fechar ticket ${card.details.ticket.ticketNumber}`} on:click={onClose}></button>
   {/if}
   <div class={embedded
-    ? "relative grid min-h-[680px] w-full overflow-hidden bg-[#F7F8FA] xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.8fr)]"
+    ? "relative grid h-full min-h-0 w-full overflow-hidden bg-[#F7F8FA] xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.8fr)]"
     : "relative z-10 mx-auto grid min-h-[680px] w-full max-w-[1120px] overflow-hidden rounded-[20px] border border-[#D8DCE5] bg-[#F7F8FA] shadow-[0_30px_100px_rgba(1,13,40,0.35)] lg:grid-cols-[minmax(0,1.65fr)_minmax(330px,0.85fr)]"}
     role={embedded ? "region" : "dialog"}
     aria-modal={embedded ? undefined : "true"}
     aria-label={`Ticket ${card.details.ticket.ticketNumber}`}>
-    <div class="min-w-0 bg-white">
-      <header class="flex items-start gap-3 border-b border-[#E5E7EC] px-5 py-5 sm:px-7">
-        <FileText size={20} class="mt-1 shrink-0 text-[#5E6574]"/>
+    <div class={embedded ? "relative flex min-h-0 min-w-0 flex-col bg-white" : "min-w-0 bg-white"}>
+      {#if embedded}<span class="absolute inset-x-0 top-0 z-10 h-1 bg-[#EA6D0B]"></span>{/if}
+      <header class={embedded ? "flex shrink-0 items-start gap-3 border-b border-[#E9EBF1] bg-white px-4 pb-3 pt-4 sm:px-5" : "flex items-start gap-3 border-b border-[#E5E7EC] px-5 py-5 sm:px-7"}>
+        <span class={embedded ? "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]" : "mt-1 shrink-0 text-[#5E6574]"}>
+          <FileText size={embedded ? 19 : 20}/>
+        </span>
         <div class="min-w-0 flex-1">
-          <div class="flex flex-wrap items-center gap-2"><span class="application-text-meta font-bold text-[#EA6D0B]">#{card.details.ticket.ticketNumber}</span><span class="application-text-meta text-[#7C8290]">{priorityLabels[card.details.ticket.priority]}</span></div>
-          <h2 class="mt-1 text-[23px] font-semibold leading-8 text-[#2B303A]">{card.details.ticket.subject}</h2>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class={embedded ? "rounded-full bg-[#FFF0E4] px-2 py-1 text-[9px] font-bold text-[#B95B12]" : "application-text-meta font-bold text-[#EA6D0B]"}>#{card.details.ticket.ticketNumber}</span>
+            <span class={embedded ? "rounded-full bg-[#F2F3F6] px-2 py-1 text-[9px] font-semibold text-[#666D7C]" : "application-text-meta text-[#7C8290]"}>{priorityLabels[card.details.ticket.priority]}</span>
+          </div>
+          <h2 class={embedded ? "mt-1.5 line-clamp-2 text-[14px] font-semibold leading-5 text-[#202637]" : "mt-1 text-[23px] font-semibold leading-8 text-[#2B303A]"}>{card.details.ticket.subject}</h2>
           <p class="application-text-meta mt-1 text-[#858B99]">{card.workflowContext?.areaName ? `${card.workflowContext.areaName} · ${card.workflowContext.areaStageName ?? card.workflowContext.globalStageName}` : card.workflowContext?.globalStageName ?? "Fluxo global"}</p>
         </div>
         <div class="flex shrink-0 items-center gap-2">
@@ -102,7 +108,7 @@
         </div>
       </header>
 
-      <div class="space-y-7 px-5 py-6 sm:px-7">
+      <div class={embedded ? "min-h-0 flex-1 space-y-7 overflow-y-auto px-5 py-5 sm:px-6" : "space-y-7 px-5 py-6 sm:px-7"}>
         <section>
           <div class="flex flex-wrap items-center gap-2">
             {#each card.selectedLabels as label}
@@ -155,9 +161,9 @@
       </div>
     </div>
 
-    <aside class="border-l border-[#E0E3E8] bg-[#F5F6F8] p-5 sm:p-6">
-      <div class="space-y-5">
-        <section class="rounded-xl border border-[#DDE1E7] bg-white p-4">
+    <aside class={embedded ? "min-h-0 overflow-y-auto border-l border-[#E0E3E8] bg-[#F5F6FA] p-3" : "border-l border-[#E0E3E8] bg-[#F5F6F8] p-5 sm:p-6"}>
+      <div class={embedded ? "space-y-3" : "space-y-5"}>
+        <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
           <h3 class="application-text-caption font-semibold text-[#3D4452]">Área e coluna</h3>
           <p class="application-text-meta mt-1 leading-4 text-[#858B99]">Enquanto estiver em uma área, o ticket precisa alcançar uma coluna terminal antes de voltar ao fluxo global ou seguir para outra área.</p>
           <select value={cardWorkflowId} on:change={changeWorkflow} disabled={!canReply} class="application-text-meta mt-3 h-10 w-full rounded-lg border border-[#D9DDE4] bg-white px-2"><option value={workflowBoard.globalWorkflow?.id ?? ""}>Fluxo global</option>{#each movableAreaWorkflows as workflow}<option value={workflow.id}>Área · {workflow.areaName}</option>{/each}</select>
@@ -165,7 +171,7 @@
           {#if canReply}<button type="button" on:click={() => void onMove()} class="application-text-meta mt-2 h-9 w-full rounded-lg bg-[#000A57] font-semibold text-white">Mover ticket</button>{/if}
         </section>
 
-        <section class="rounded-xl border border-[#DDE1E7] bg-white p-4">
+        <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
           <h3 class="application-text-caption flex items-center gap-2 font-semibold text-[#3D4452]"><Clock3 size={13}/>SLA</h3>
           <div class="mt-3 space-y-2">
             <div class="flex items-center justify-between gap-3">
@@ -193,7 +199,7 @@
           </div>
         </section>
 
-        <section class="rounded-xl border border-[#DDE1E7] bg-white p-4">
+        <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
           <h3 class="application-text-caption flex items-center gap-2 font-semibold text-[#3D4452]"><UsersRound size={13}/>Seguidores</h3>
           <div class="mt-3 flex flex-wrap gap-2">
             {#each card.followers as follower}
@@ -225,7 +231,7 @@
           {/if}
         </section>
 
-        <section class="rounded-xl border border-[#DDE1E7] bg-white p-4">
+        <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
           <h3 class="application-text-caption flex items-center gap-2 font-semibold text-[#3D4452]"><Tag size={13}/>Etiquetas</h3>
           {#if canReply}
             <select on:change={(event) => { const id = (event.currentTarget as HTMLSelectElement).value; if (id) void onAddLabel(id); event.currentTarget.value = ""; }} class="application-text-meta mt-3 h-10 w-full rounded-lg border border-[#D9DDE4] bg-white px-2"><option value="">Adicionar etiqueta...</option>{#each card.labels.filter((label) => !card.selectedLabels.some((selected) => selected.id === label.id)) as label}<option value={label.id}>{label.name}</option>{/each}</select>
@@ -233,7 +239,7 @@
           {/if}
         </section>
 
-        <section class="rounded-xl border border-[#DDE1E7] bg-white p-4">
+        <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
           <h3 class="application-text-caption flex items-center gap-2 font-semibold text-[#3D4452]"><Paperclip size={13}/>Adicionar anexo</h3>
           {#if canReply && card.attachmentsEnabled}
             <form on:submit={onUploadAttachment} class="mt-3"><input name="file" type="file" required accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,.docx,.xlsx,.zip" class="application-text-meta block w-full text-[#6C7381]"/><button class="application-text-meta mt-3 h-9 w-full rounded-lg border border-[#D9DDE4] bg-white font-semibold text-[#4E5565]">Enviar arquivo</button></form>
@@ -262,7 +268,7 @@
 
         <TicketTaskPanel ticketId={card.details.ticket.id} ticketNumber={card.details.ticket.ticketNumber} ticketSubject={card.details.ticket.subject} tasks={card.linkedTasks} projects={card.taskProjects} canCreate={card.canCreateTask} onCreated={onRefresh}/>
 
-        <section class="application-text-meta rounded-xl border border-[#DDE1E7] bg-white p-4 leading-5 text-[#6D7482]"><p><strong>Cliente:</strong> {#if card.details.ticket.customerContactId}<a href={`/app/customers/${card.details.ticket.customerContactId}`} class="font-semibold text-[#000A57] hover:underline">{card.details.ticket.customerName ?? "Não identificado"}</a>{:else}{card.details.ticket.customerName ?? "Não identificado"}{/if}</p><p><strong>Fila técnica:</strong> {card.details.ticket.queueName}</p><p><strong>Responsável:</strong> {card.details.ticket.assignedUserName ?? "Sem responsável"}</p></section>
+        <section class="application-text-meta rounded-[20px] border border-[#E2E5ED] bg-white p-4 leading-5 text-[#6D7482] shadow-[0_10px_28px_rgba(1,13,40,0.04)]"><p><strong>Cliente:</strong> {#if card.details.ticket.customerContactId}<a href={`/app/customers/${card.details.ticket.customerContactId}`} class="font-semibold text-[#000A57] hover:underline">{card.details.ticket.customerName ?? "Não identificado"}</a>{:else}{card.details.ticket.customerName ?? "Não identificado"}{/if}</p><p><strong>Fila técnica:</strong> {card.details.ticket.queueName}</p><p><strong>Responsável:</strong> {card.details.ticket.assignedUserName ?? "Sem responsável"}</p></section>
         <a href={`/app/tickets/${card.details.ticket.id}`} class="application-text-meta flex h-10 items-center justify-center gap-2 rounded-lg border border-[#CCD1DA] bg-white font-semibold text-[#000A57]"><ExternalLink size={12}/>Abrir página completa</a>
       </div>
     </aside>

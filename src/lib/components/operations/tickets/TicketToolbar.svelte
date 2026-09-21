@@ -37,6 +37,7 @@
   export let onApply: () => void;
   export let onClear: () => void;
   export let onCreate: () => void;
+  export let workspace = false;
 
   $: selectedAreaWorkflow = areaId
     ? workflowBoard.areaWorkflows.find((workflow) => workflow.areaId === areaId) ?? null
@@ -70,7 +71,9 @@
   }
 </script>
 
-<div class="border-b border-[#EEF0F5] bg-white">
+<div class={workspace
+  ? "relative z-30 shrink-0 rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)]"
+  : "border-b border-[#EEF0F5] bg-white"}>
   <div class="flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between">
     <div class="flex min-w-0 flex-wrap items-center gap-2">
       <div class="flex rounded-xl bg-[#F3F4F7] p-1">
