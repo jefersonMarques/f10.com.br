@@ -268,6 +268,34 @@ export async function reconcileCustomerTickets(
   if (!email) return 0;
 
   const db = getDatabase();
+  const [contact] = await db
+    .select({
+      phone: customerContacts.phone,
+      whatsapp: customerContacts.whatsapp,
+    })
+    .from(customerContacts)
+    .where(and(eq(customerContacts.id, customerContactId), eq(customerContacts.active, true)))
+    .limit(1);
+  if (!contact) return 0;
+
+  const phones = Array.from(
+    new Set(
+      [contact.phone, contact.whatsapp]
+        .map((value) => (value ?? "").replace(/\D/g, ""))
+        .filter((value) => value.length >= 8),
+    ),
+  );
+
+  const identityMatches = [
+    sql`lower(coalesce(${supportEmailThreads.senderEmail}, '')) = ${email}`,
+    sql`lower(coalesce(${serviceRequests.data}->>'managerEmail', '')) = ${email}`,
+    sql`lower(coalesce(${serviceRequests.data}->>'email', '')) = ${email}`,
+    ...phones.flatMap((phone) => [
+      sql`regexp_replace(coalesce(${serviceRequests.data}->>'managerWhatsapp', ''), '\\D', '', 'g') = ${phone}`,
+      sql`regexp_replace(coalesce(${serviceRequests.data}->>'unitPhone', ''), '\\D', '', 'g') = ${phone}`,
+    ]),
+  ];
+
   const candidateRows = await db
     .select({ id: tickets.id })
     .from(tickets)
@@ -276,11 +304,7 @@ export async function reconcileCustomerTickets(
     .where(
       and(
         isNull(tickets.customerContactId),
-        or(
-          sql`lower(coalesce(${supportEmailThreads.senderEmail}, '')) = ${email}`,
-          sql`lower(coalesce(${serviceRequests.data}->>'managerEmail', '')) = ${email}`,
-          sql`lower(coalesce(${serviceRequests.data}->>'email', '')) = ${email}`,
-        ),
+        or(...identityMatches),
       ),
     )
     .limit(200);
@@ -318,7 +342,7 @@ export async function reconcileCustomerTickets(
         eventType: "ticket.customer.auto_linked",
         metadata: {
           customerContactId,
-          matchedBy: "verified_email",
+          matchedBy: phones.length > 0 ? "verified_identity" : "verified_email",
         },
       });
     }
