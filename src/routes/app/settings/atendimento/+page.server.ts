@@ -158,6 +158,7 @@ export const actions: Actions = {
     );
     const formData = await request.formData();
     const queueId = readString(formData, "queueId");
+    const enabled = formData.has("slaEnabled");
     const firstResponseMinutes = readInteger(formData, "firstResponseMinutes", 0);
     const nextResponseMinutes = readInteger(formData, "nextResponseMinutes", 0);
     const resolutionMinutes = readInteger(formData, "resolutionMinutes", 0);
@@ -180,6 +181,7 @@ export const actions: Actions = {
 
     try {
       await updateSupportQueueSla(session.user.id, queueId, {
+        enabled,
         firstResponseMinutes,
         nextResponseMinutes,
         resolutionMinutes,
