@@ -22,6 +22,7 @@ CREATE INDEX IF NOT EXISTS ticket_followers_user_idx
 ON ticket_followers(user_id, created_at);
 
 ALTER TABLE support_queues
+ADD COLUMN IF NOT EXISTS sla_enabled boolean NOT NULL DEFAULT false,
 ADD COLUMN IF NOT EXISTS sla_first_response_minutes integer NOT NULL DEFAULT 240,
 ADD COLUMN IF NOT EXISTS sla_next_response_minutes integer NOT NULL DEFAULT 480,
 ADD COLUMN IF NOT EXISTS sla_resolution_minutes integer NOT NULL DEFAULT 4320;
@@ -61,17 +62,3 @@ SELECT roles.id, 'tickets.comment_internal', 'team'::permission_scope
 FROM roles
 WHERE roles.code = 'EMPLOYEE'
 ON CONFLICT (role_id, permission_code) DO UPDATE SET scope = EXCLUDED.scope;
-
-UPDATE tickets
-SET
-  first_response_due_at = COALESCE(
-    first_response_due_at,
-    created_at + make_interval(mins => support_queues.sla_first_response_minutes)
-  ),
-  resolution_due_at = COALESCE(
-    resolution_due_at,
-    created_at + make_interval(mins => support_queues.sla_resolution_minutes)
-  )
-FROM support_queues
-WHERE tickets.queue_id = support_queues.id
-  AND tickets.status NOT IN ('resolved', 'closed');
