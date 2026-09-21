@@ -58,16 +58,16 @@
     {/if}
 
     <div class="flex items-start justify-between gap-2">
-      <span class="application-text-meta flex items-center gap-1.5 font-bold text-[#EA6D0B]">
+      <span class="application-text-caption flex items-center gap-1.5 font-bold text-[#EA6D0B]">
         #{ticket.ticketNumber}
         {#if ticket.channel === "email"}<Mail size={11} aria-label="Recebido por e-mail"/>{/if}
       </span>
-      <span class="application-text-meta text-[#7C8290]">{priorityLabels[ticket.priority] ?? ticket.priority}</span>
+      <span class="application-text-caption text-[#7C8290]">{priorityLabels[ticket.priority] ?? ticket.priority}</span>
     </div>
 
-    <strong class="mt-1.5 block text-[11px] font-semibold leading-4 text-[#252B3B]">{ticket.subject}</strong>
+    <strong class="mt-1.5 block text-[12px] font-semibold leading-5 text-[#252B3B]">{ticket.subject}</strong>
 
-    <div class="application-text-meta mt-3 flex items-center gap-1.5 text-[#7D8392]">
+    <div class="application-text-caption mt-3 flex items-center gap-1.5 text-[#7D8392]">
       <UserRound size={11}/>
       <span class="truncate">{ticket.customerName ?? "Cliente não identificado"}</span>
     </div>
@@ -75,9 +75,9 @@
     <div class="mt-3 flex items-center justify-between gap-2 border-t border-[#EEF0F4] pt-2.5">
       <div class="flex min-w-0 items-center gap-2">
         <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#EEF0FF] text-[9px] font-bold text-[#000A57]">{initials(ticket.assignedUserName)}</span>
-        <span class="application-text-meta truncate font-semibold text-[#6B7280]">{ticket.assignedUserName ?? "Sem responsável"}</span>
+        <span class="application-text-caption truncate font-semibold text-[#6B7280]">{ticket.assignedUserName ?? "Sem responsável"}</span>
       </div>
-      <span class={`application-text-meta inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 font-bold ${slaClass()}`}>
+      <span class={`application-text-caption inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 font-bold ${slaClass()}`}>
         <Clock3 size={10}/>
         {slaText()}
       </span>
