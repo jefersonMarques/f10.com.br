@@ -16,6 +16,7 @@ import {
   addTicketLabel,
   createTicketLabel,
   deleteTicketAttachment,
+  listTicketLabels,
   listTicketLabelsForTickets,
   removeTicketLabel,
   uploadTicketAttachment,
@@ -24,10 +25,21 @@ import { parseTicketCustomerLinkForm } from "$lib/server/support/ticketCustomerF
 import { isTicketDueDate } from "$lib/server/support/ticketDueDate";
 import {
   createManualTicket,
+  listSupportAgents,
   listSupportQueues,
-  listSupportTickets,
   type TicketPriority,
+  type TicketStatus,
 } from "$lib/server/support/supportRepository";
+import {
+  addTicketFollower,
+  removeTicketFollower,
+} from "$lib/server/support/ticketFollowerRepository";
+import {
+  listTicketWorkspaceTickets,
+  type TicketWorkspaceChannel,
+  type TicketWorkspaceScope,
+  type TicketWorkspaceSlaFilter,
+} from "$lib/server/support/ticketWorkspaceRepository";
 import { listTicketCustomerContexts } from "$lib/server/support/ticketCustomerContextRepository";
 import { listTicketWorkflowEntryPoints, moveTicketAreaStage } from "$lib/server/support/ticketWorkflowRepository";
 import {
@@ -47,6 +59,55 @@ function isUuid(value: string): boolean {
 
 function isTicketPriority(value: string): value is TicketPriority {
   return value === "low" || value === "normal" || value === "high" || value === "urgent";
+}
+
+const TICKET_STATUSES: TicketStatus[] = [
+  "new",
+  "open",
+  "in_progress",
+  "waiting_customer",
+  "resolved",
+  "closed",
+];
+const TICKET_CHANNELS: TicketWorkspaceChannel[] = [
+  "manual",
+  "web_chat",
+  "portal",
+  "email",
+  "whatsapp",
+];
+
+function parsePage(value: string | null): number {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? Math.min(parsed, 1000) : 1;
+}
+
+function parseScope(value: string | null): TicketWorkspaceScope {
+  return value === "mine" || value === "unassigned" ? value : "all";
+}
+
+function parseStatus(value: string | null): TicketStatus | null {
+  return TICKET_STATUSES.includes(value as TicketStatus) ? value as TicketStatus : null;
+}
+
+function parsePriority(value: string | null): TicketPriority | null {
+  return isTicketPriority(value ?? "") ? value as TicketPriority : null;
+}
+
+function parseChannel(value: string | null): TicketWorkspaceChannel | null {
+  return TICKET_CHANNELS.includes(value as TicketWorkspaceChannel)
+    ? value as TicketWorkspaceChannel
+    : null;
+}
+
+function parseSla(value: string | null): TicketWorkspaceSlaFilter {
+  return value === "overdue" || value === "risk" || value === "first_response"
+    ? value
+    : null;
+}
+
+function parseOptionalUuid(value: string | null): string | null {
+  return value && isUuid(value) ? value : null;
 }
 
 function createPermissionMap(
@@ -76,7 +137,7 @@ function actionErrorMessage(cause: unknown): string {
   return messages[cause.message] ?? "Não foi possível concluir a operação.";
 }
 
-export const load: PageServerLoad = async ({ parent }) => {
+export const load: PageServerLoad = async ({ parent, url }) => {
   const layout = await parent();
   const permissionMap = createPermissionMap(layout.permissions);
   const viewScope = getPermissionScope(permissionMap, "tickets.view");
@@ -85,14 +146,53 @@ export const load: PageServerLoad = async ({ parent }) => {
   const canCreate = hasPermission(permissionMap, "tickets.create")
     && hasPermission(permissionMap, "customers.view");
   const canReply = hasPermission(permissionMap, "tickets.reply");
+  const canCommentInternal =
+    canReply || hasPermission(permissionMap, "tickets.comment_internal");
+  const canManageFollowers =
+    canReply || hasPermission(permissionMap, "tickets.assign");
   const canManageWorkflow = hasPermission(permissionMap, "tickets.manage", "all");
   const canSearchCustomers = canCreate;
-  const [ticketRows, queues, entryPoints] = await Promise.all([
-    listSupportTickets(layout.user.id, permissionMap),
-    canCreate ? listSupportQueues() : Promise.resolve([]),
+
+  const requestedView = url.searchParams.get("view");
+  const view = requestedView === "list" || requestedView === "split"
+    ? requestedView
+    : "board";
+  const page = parsePage(url.searchParams.get("page"));
+  const queueId = parseOptionalUuid(url.searchParams.get("queueId"));
+  const areaId = parseOptionalUuid(url.searchParams.get("areaId"));
+  const stageId = parseOptionalUuid(url.searchParams.get("stageId"));
+  const tagId = parseOptionalUuid(url.searchParams.get("tagId"));
+  const assigneeValue = url.searchParams.get("assigneeId");
+  const assigneeId =
+    assigneeValue === "unassigned"
+      ? "unassigned"
+      : parseOptionalUuid(assigneeValue);
+
+  const filters = {
+    scope: parseScope(url.searchParams.get("scope")),
+    search: (url.searchParams.get("q") ?? "").trim().slice(0, 120),
+    status: parseStatus(url.searchParams.get("status")),
+    priority: parsePriority(url.searchParams.get("priority")),
+    queueId,
+    assigneeId,
+    areaId,
+    stageId,
+    channel: parseChannel(url.searchParams.get("channel")),
+    sla: parseSla(url.searchParams.get("sla")),
+    tagId,
+    page,
+    pageSize: view === "board" ? 300 : 50,
+  };
+
+  const [workspace, queues, agents, allLabels, entryPoints] = await Promise.all([
+    listTicketWorkspaceTickets(layout.user.id, permissionMap, filters),
+    listSupportQueues(),
+    listSupportAgents(),
+    listTicketLabels(),
     canCreate ? listTicketWorkflowEntryPoints() : Promise.resolve([]),
   ]);
-  const ticketIds = ticketRows.map((ticket) => ticket.id);
+
+  const ticketIds = workspace.tickets.map((ticket) => ticket.id);
   const [contexts, workflowBoard, labelRows] = await Promise.all([
     listTicketCustomerContexts(ticketIds),
     getTicketWorkflowBoardWithAppearance(layout.user.id, permissionMap, ticketIds),
@@ -109,13 +209,29 @@ export const load: PageServerLoad = async ({ parent }) => {
   }
 
   return {
-    tickets: ticketRows.map((ticket) => ({
+    tickets: workspace.tickets.map((ticket) => ({
       ...ticket,
       customerContext: contextByTicket.get(ticket.id) ?? null,
-      workflowState: stateByTicket.get(ticket.id) ?? null,
+      workflowState: stateByTicket.get(ticket.id) ?? ticket.workflowState,
       labels: labelsByTicket.get(ticket.id) ?? [],
     })),
-    queues,
+    pagination: {
+      total: workspace.total,
+      page: workspace.page,
+      pageSize: workspace.pageSize,
+      totalPages: workspace.totalPages,
+      boardLimited: view === "board" && workspace.total > workspace.pageSize,
+    },
+    filters: {
+      ...filters,
+      view,
+    },
+    filterOptions: {
+      queues,
+      agents,
+      labels: allLabels,
+    },
+    queues: canCreate ? queues : [],
     entryPoints,
     workflowBoard: {
       globalWorkflow: workflowBoard.globalWorkflow,
@@ -124,6 +240,8 @@ export const load: PageServerLoad = async ({ parent }) => {
     currentUserId: layout.user.id,
     canCreate,
     canReply,
+    canCommentInternal,
+    canManageFollowers,
     canManageWorkflow,
     canSearchCustomers,
   };
