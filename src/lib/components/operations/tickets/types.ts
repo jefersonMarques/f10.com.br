@@ -124,6 +124,13 @@ export type TicketCardData = {
     requestType: "nfse" | "cell_coin";
     label: string;
   } | null;
+  satisfaction: {
+    score: number | null;
+    comment: string | null;
+    requestedAt: string | Date;
+    answeredAt: string | Date | null;
+    expiresAt: string | Date;
+  } | null;
   linkedTasks: Array<{
     id: string;
     title: string;
