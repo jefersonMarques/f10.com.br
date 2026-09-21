@@ -10,6 +10,7 @@ import {
 import { ticketEvents, ticketMessages, tickets } from "$lib/server/db/supportSchema";
 import { ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
+import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
 import { encryptServiceRequestSecrets } from "$lib/server/serviceRequests/serviceRequestCrypto";
 import {
   normalizeServiceRequestFields,
@@ -112,6 +113,7 @@ export async function createPublicServiceRequest(
   );
   const db = getDatabase();
   const now = new Date();
+  const sla = await calculateTicketSlaDeadlines(intake.queueId, now);
   const label = serviceRequestLabel(input.requestType);
   let createdNew = false;
 
@@ -159,6 +161,8 @@ export async function createPublicServiceRequest(
           priority: "normal",
           channel: "manual",
           dueOn: sql`CURRENT_DATE + ${intake.defaultDueDays}::integer`,
+          firstResponseDueAt: sla.firstResponseDueAt,
+          resolutionDueAt: sla.resolutionDueAt,
         })
         .returning({ id: tickets.id, ticketNumber: tickets.ticketNumber });
       if (!ticket) throw new Error("SERVICE_REQUEST_TICKET_NOT_CREATED");
