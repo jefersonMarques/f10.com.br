@@ -477,7 +477,8 @@ export async function createManualTicket(
     .limit(1);
   if (!queue) throw new Error("QUEUE_NOT_FOUND");
 
-  const sla = await calculateTicketSlaDeadlines(queue.id);
+  const now = new Date();
+  const sla = await calculateTicketSlaDeadlines(queue.id, now);
   const start = input.startStageId
     ? await resolveManualTicketStart(input.startStageId)
     : null;
@@ -496,6 +497,7 @@ export async function createManualTicket(
         channel: "manual",
         dueOn: input.dueOn,
         firstResponseDueAt: sla.firstResponseDueAt,
+        firstResponseAt: now,
         resolutionDueAt: sla.resolutionDueAt,
         createdByUserId: actorUserId,
       })
@@ -506,7 +508,6 @@ export async function createManualTicket(
     await saveTicketCustomerContext(tx, ticket.id, customer);
 
     if (start) {
-      const now = new Date();
       await tx.insert(ticketWorkflowStates).values({
         ticketId: ticket.id,
         globalWorkflowId: start.globalWorkflowId,
