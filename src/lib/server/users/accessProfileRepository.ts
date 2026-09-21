@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import {
   PERMISSION_CODES,
@@ -15,6 +15,11 @@ import {
   roles,
   userRoles,
 } from "$lib/server/db/schema";
+import {
+  roleTicketAreas,
+  ticketAreas,
+} from "$lib/server/db/ticketWorkflowSchema";
+import { getUserTicketAreaRestriction } from "$lib/server/support/supportAccess";
 
 export type AccessProfileGrant = {
   permissionCode: PermissionCode;
@@ -26,6 +31,8 @@ export type AccessProfileSummary = {
   code: string;
   name: string;
   isSystem: boolean;
+  restrictTicketAreas: boolean;
+  ticketAreaIds: string[];
   grants: AccessProfileGrant[];
 };
 
@@ -37,13 +44,14 @@ function validName(value: string): string {
 
 export async function listAccessProfiles(): Promise<AccessProfileSummary[]> {
   const db = getDatabase();
-  const [profileRows, grantRows] = await Promise.all([
+  const [profileRows, grantRows, areaRows] = await Promise.all([
     db
       .select({
         id: roles.id,
         code: roles.code,
         name: roles.name,
         isSystem: roles.isSystem,
+        restrictTicketAreas: roles.restrictTicketAreas,
       })
       .from(roles)
       .orderBy(asc(roles.isSystem), asc(roles.name)),
@@ -54,6 +62,12 @@ export async function listAccessProfiles(): Promise<AccessProfileSummary[]> {
         scope: rolePermissions.scope,
       })
       .from(rolePermissions),
+    db
+      .select({
+        roleId: roleTicketAreas.roleId,
+        areaId: roleTicketAreas.areaId,
+      })
+      .from(roleTicketAreas),
   ]);
 
   const grantsByRole = new Map<string, AccessProfileGrant[]>();
@@ -67,8 +81,16 @@ export async function listAccessProfiles(): Promise<AccessProfileSummary[]> {
     grantsByRole.set(grant.roleId, current);
   }
 
+  const areasByRole = new Map<string, string[]>();
+  for (const row of areaRows) {
+    const current = areasByRole.get(row.roleId) ?? [];
+    current.push(row.areaId);
+    areasByRole.set(row.roleId, current);
+  }
+
   return profileRows.map((profile) => ({
     ...profile,
+    ticketAreaIds: areasByRole.get(profile.id) ?? [],
     grants: grantsByRole.get(profile.id) ?? [],
   }));
 }
@@ -152,6 +174,8 @@ export async function updateAccessProfile(
   input: {
     name: string;
     grants: AccessProfileGrant[];
+    restrictTicketAreas: boolean;
+    ticketAreaIds: string[];
   },
 ): Promise<void> {
   const name = validName(input.name);
@@ -197,9 +221,47 @@ export async function updateAccessProfile(
     PERMISSION_CODES.every((permissionCode) => uniqueGrants.get(permissionCode) === "all");
   if (hasFullAccess) throw new Error("ACCESS_PROFILE_FULL_ACCESS_RESERVED");
 
+  const ticketAreaIds = Array.from(new Set(input.ticketAreaIds));
+  if (ticketAreaIds.some((areaId) => !/^[0-9a-f-]{36}$/i.test(areaId))) {
+    throw new Error("ACCESS_PROFILE_TICKET_AREA_INVALID");
+  }
+  if (input.restrictTicketAreas && ticketAreaIds.length === 0) {
+    throw new Error("ACCESS_PROFILE_TICKET_AREA_REQUIRED");
+  }
+
+  if (ticketAreaIds.length > 0) {
+    const existingAreas = await db
+      .select({ id: ticketAreas.id })
+      .from(ticketAreas)
+      .where(
+        and(
+          inArray(ticketAreas.id, ticketAreaIds),
+          eq(ticketAreas.active, true),
+        ),
+      );
+    if (existingAreas.length !== ticketAreaIds.length) {
+      throw new Error("ACCESS_PROFILE_TICKET_AREA_INVALID");
+    }
+
+    const actorRestriction = await getUserTicketAreaRestriction(actorUserId);
+    if (
+      actorRestriction !== null &&
+      ticketAreaIds.some((areaId) => !actorRestriction.includes(areaId))
+    ) {
+      throw new Error("ACCESS_PROFILE_TICKET_AREA_NOT_DELEGABLE");
+    }
+  }
+
   await db.transaction(async (tx) => {
-    await tx.update(roles).set({ name }).where(eq(roles.id, profileId));
+    await tx
+      .update(roles)
+      .set({
+        name,
+        restrictTicketAreas: input.restrictTicketAreas,
+      })
+      .where(eq(roles.id, profileId));
     await tx.delete(rolePermissions).where(eq(rolePermissions.roleId, profileId));
+    await tx.delete(roleTicketAreas).where(eq(roleTicketAreas.roleId, profileId));
 
     if (uniqueGrants.size > 0) {
       await tx.insert(rolePermissions).values(
@@ -208,6 +270,12 @@ export async function updateAccessProfile(
           permissionCode,
           scope,
         })),
+      );
+    }
+
+    if (input.restrictTicketAreas && ticketAreaIds.length > 0) {
+      await tx.insert(roleTicketAreas).values(
+        ticketAreaIds.map((areaId) => ({ roleId: profileId, areaId })),
       );
     }
   });
@@ -220,6 +288,8 @@ export async function updateAccessProfile(
     metadata: {
       name,
       permissionCount: uniqueGrants.size,
+      restrictTicketAreas: input.restrictTicketAreas,
+      ticketAreaCount: input.restrictTicketAreas ? ticketAreaIds.length : 0,
     },
   });
 }
