@@ -16,6 +16,13 @@
   export let form: ActionData;
 
   $: values = form && "values" in form ? form.values : null;
+  let inviteRoleCode =
+    form && "values" in form && form.values?.roleCode
+      ? form.values.roleCode
+      : data.accessProfiles[0]?.code ?? "";
+  $: inviteCanUseChat = data.accessProfiles
+    .find((profile) => profile.code === inviteRoleCode)
+    ?.grants.some((grant) => grant.permissionCode === "chat.respond") ?? false;
 
   async function copyInviteLink(inviteUrl: string): Promise<void> {
     if (!navigator.clipboard) return;
@@ -181,11 +188,13 @@
         <form method="POST" action="?/invite" class="mt-6 space-y-4">
           <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Nome</span><input name="name" required maxlength="120" value={values?.name ?? ""} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10" /></label>
           <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">E-mail</span><input name="email" type="email" required maxlength="254" value={values?.email ?? ""} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10" /></label>
-          <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Perfil de acesso</span><select name="roleCode" value={values?.roleCode ?? "EMPLOYEE"} class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10">{#each data.accessProfiles as profile}<option value={profile.code}>{profile.name}</option>{/each}</select></label>
-          <label class="flex items-start gap-3 rounded-2xl border border-[#E2E5ED] bg-[#F8F9FC] px-4 py-3">
-            <input name="includeInChatRouting" type="checkbox" checked={values?.includeInChatRouting ?? false} class="mt-1 h-4 w-4 rounded border-[#C9CEDA]" />
-            <span><strong class="flex items-center gap-2 text-[11px] text-[#303746]"><MessageCircleMore size={14}/>Participar da distribuição do chat</strong><span class="application-text-meta mt-1 block leading-4 text-[#858B99]">Quando a conta for ativada e o usuário estiver Online, poderá entrar na rotação automática de novos atendimentos.</span></span>
-          </label>
+          <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Perfil de acesso</span><select name="roleCode" bind:value={inviteRoleCode} class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px] outline-none transition focus:border-[#000A57] focus:ring-2 focus:ring-[#000A57]/10">{#each data.accessProfiles as profile}<option value={profile.code}>{profile.name}</option>{/each}</select></label>
+          {#if inviteCanUseChat}
+            <label class="flex items-start gap-3 rounded-2xl border border-[#E2E5ED] bg-[#F8F9FC] px-4 py-3">
+              <input name="includeInChatRouting" type="checkbox" checked={values?.includeInChatRouting ?? false} class="mt-1 h-4 w-4 rounded border-[#C9CEDA]" />
+              <span><strong class="flex items-center gap-2 text-[11px] text-[#303746]"><MessageCircleMore size={14}/>Participar da distribuição do chat</strong><span class="application-text-meta mt-1 block leading-4 text-[#858B99]">Quando estiver Online, poderá entrar na rotação automática de novos atendimentos.</span></span>
+            </label>
+          {/if}
           <button type="submit" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white transition hover:bg-[#111B71]"><Plus size={17} aria-hidden="true" />Criar convite</button>
         </form>
 
