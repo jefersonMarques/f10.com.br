@@ -10,7 +10,7 @@ import {
   type CustomerTicketStatus,
 } from "$lib/server/customerPortal/customerF10TicketRepository";
 import { getCustomerF10TicketSummary } from "$lib/server/customerPortal/customerF10TicketSummaryRepository";
-import { requireCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
+import { requireCustomerTicketPortalSession } from "$lib/server/customerPortal/customerPortalSession";
 
 const PAGE_SIZE = 20;
 const MAX_PAGE = 100;
