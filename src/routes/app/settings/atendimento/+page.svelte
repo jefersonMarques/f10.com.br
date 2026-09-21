@@ -134,8 +134,21 @@
             <p class="application-text-meta mt-1 text-[#9297A4]">Equipe: {queue.teamName ?? "sem equipe"}</p>
             <form method="POST" action="?/saveQueueDueDays" class="mt-3 flex items-end gap-2">
               <input type="hidden" name="queueId" value={queue.id}/>
-              <label class="min-w-0 flex-1"><span class="application-text-meta mb-1 block font-semibold text-[#5A6170]">Conclusão padrão</span><div class="flex items-center gap-2"><input name="defaultDueDays" type="number" min="1" max="365" required value={queue.defaultDueDays} class="application-text-caption h-9 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"/><span class="application-text-meta shrink-0 text-[#858B99]">dias</span></div></label>
+              <label class="min-w-0 flex-1"><span class="application-text-meta mb-1 block font-semibold text-[#5A6170]">Conclusão planejada</span><div class="flex items-center gap-2"><input name="defaultDueDays" type="number" min="1" max="365" required value={queue.defaultDueDays} class="application-text-caption h-9 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2"/><span class="application-text-meta shrink-0 text-[#858B99]">dias</span></div></label>
               <button type="submit" class="application-text-meta inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]"><Save size={12}/>Salvar</button>
+            </form>
+
+            <form method="POST" action="?/saveQueueSla" class="mt-3 border-t border-[#EEF0F5] pt-3">
+              <input type="hidden" name="queueId" value={queue.id}/>
+              <div class="grid gap-2 sm:grid-cols-3">
+                <label><span class="application-text-meta mb-1 block font-semibold text-[#5A6170]">1ª resposta</span><div class="flex items-center gap-1.5"><input name="firstResponseMinutes" type="number" min="5" max="43200" required value={queue.slaFirstResponseMinutes} class="application-text-caption h-9 min-w-0 w-full rounded-xl border border-[#DDE1EA] bg-white px-2"/><span class="application-text-meta text-[#858B99]">min</span></div></label>
+                <label><span class="application-text-meta mb-1 block font-semibold text-[#5A6170]">Próxima resposta</span><div class="flex items-center gap-1.5"><input name="nextResponseMinutes" type="number" min="5" max="43200" required value={queue.slaNextResponseMinutes} class="application-text-caption h-9 min-w-0 w-full rounded-xl border border-[#DDE1EA] bg-white px-2"/><span class="application-text-meta text-[#858B99]">min</span></div></label>
+                <label><span class="application-text-meta mb-1 block font-semibold text-[#5A6170]">Resolução</span><div class="flex items-center gap-1.5"><input name="resolutionMinutes" type="number" min="30" max="525600" required value={queue.slaResolutionMinutes} class="application-text-caption h-9 min-w-0 w-full rounded-xl border border-[#DDE1EA] bg-white px-2"/><span class="application-text-meta text-[#858B99]">min</span></div></label>
+              </div>
+              <div class="mt-2 flex items-center justify-between gap-3">
+                <span class="application-text-meta text-[#9297A4]">Calculado dentro do horário de funcionamento configurado.</span>
+                <button type="submit" class="application-text-meta inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]"><Clock3 size={12}/>Salvar SLA</button>
+              </div>
             </form>
           </div>
         {/each}
