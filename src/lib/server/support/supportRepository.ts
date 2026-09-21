@@ -11,6 +11,7 @@ import {
 import { getPermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import { requestTicketSatisfaction } from "$lib/server/support/ticketSatisfactionService";
+import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
 import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { serviceRequests } from "$lib/server/db/serviceRequestSchema";
@@ -476,6 +477,7 @@ export async function createManualTicket(
     .limit(1);
   if (!queue) throw new Error("QUEUE_NOT_FOUND");
 
+  const sla = await calculateTicketSlaDeadlines(queue.id);
   const start = input.startStageId
     ? await resolveManualTicketStart(input.startStageId)
     : null;
@@ -493,6 +495,8 @@ export async function createManualTicket(
         priority: input.priority,
         channel: "manual",
         dueOn: input.dueOn,
+        firstResponseDueAt: sla.firstResponseDueAt,
+        resolutionDueAt: sla.resolutionDueAt,
         createdByUserId: actorUserId,
       })
       .returning({ id: tickets.id, ticketNumber: tickets.ticketNumber });
@@ -700,7 +704,11 @@ export async function addTicketMessage(
   visibility: "public" | "internal",
   mentionedUserIds: string[] = [],
 ): Promise<void> {
-  const scope = requireSupportScope(permissions, "tickets.reply");
+  const permissionCode =
+    visibility === "internal" && getPermissionScope(permissions, "tickets.comment_internal")
+      ? "tickets.comment_internal"
+      : "tickets.reply";
+  const scope = requireSupportScope(permissions, permissionCode);
   await requireTicketAccess(actorUserId, scope, ticketId);
 
   const db = getDatabase();
@@ -743,6 +751,7 @@ export async function addTicketMessage(
 
     if (visibility === "public") {
       if (!ticket.firstResponseAt) ticketUpdate.firstResponseAt = now;
+      ticketUpdate.nextResponseDueAt = null;
       if (ticket.status === "new") ticketUpdate.status = "open";
     }
 
