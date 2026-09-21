@@ -145,23 +145,27 @@ export async function listManagedUsers(actorRoles: string[]) {
       })
       .from(users),
     db
-      .select({ userId: userRoles.userId, code: roles.code })
+      .select({ userId: userRoles.userId, code: roles.code, name: roles.name })
       .from(userRoles)
       .innerJoin(roles, eq(userRoles.roleId, roles.id)),
   ]);
 
-  const rolesByUser = new Map<string, string[]>();
+  const rolesByUser = new Map<string, Array<{ code: string; name: string }>>();
   for (const role of roleRows) {
     const current = rolesByUser.get(role.userId) ?? [];
-    current.push(role.code);
+    current.push({ code: role.code, name: role.name });
     rolesByUser.set(role.userId, current);
   }
 
   return userRows
-    .map((user) => ({
-      ...user,
-      roles: rolesByUser.get(user.id) ?? [],
-    }))
+    .map((user) => {
+      const assignedRoles = rolesByUser.get(user.id) ?? [];
+      return {
+        ...user,
+        roles: assignedRoles.map((role) => role.code),
+        roleNames: assignedRoles.map((role) => role.name),
+      };
+    })
     .filter((user) => canActorManageRole(actorRoles, user.roles))
     .sort((first, second) => first.name.localeCompare(second.name, "pt-BR"));
 }
@@ -257,7 +261,7 @@ export async function getManagedUserDetails(
     actorRoles,
     targetUserId,
   );
-  const [permissionRows, overrideRows, effectivePermissions] = await Promise.all([
+  const [permissionRows, overrideRows, effectivePermissions, roleNameRows] = await Promise.all([
     db
       .select({
         code: permissions.code,
@@ -274,6 +278,11 @@ export async function getManagedUserDetails(
       .from(userPermissions)
       .where(eq(userPermissions.userId, targetUserId)),
     resolveUserPermissions(targetUserId),
+    db
+      .select({ code: roles.code, name: roles.name })
+      .from(userRoles)
+      .innerJoin(roles, eq(userRoles.roleId, roles.id))
+      .where(eq(userRoles.userId, targetUserId)),
   ]);
   const actorPermissions = await resolveUserPermissions(actorUserId);
   const overrideMap = new Map(
@@ -283,6 +292,7 @@ export async function getManagedUserDetails(
   return {
     user: target,
     roles: targetRoles,
+    roleNames: roleNameRows.map((role) => role.name),
     permissions: permissionRows
       .map((permission) => ({
         ...permission,
