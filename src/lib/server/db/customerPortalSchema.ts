@@ -149,3 +149,43 @@ export const customerActivityEvents = pgTable(
     index("customer_activity_events_type_idx").on(table.eventType, table.createdAt),
   ],
 );
+
+
+export const customerAuthIdentities = pgTable(
+  "customer_auth_identities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    customerContactId: uuid("customer_contact_id")
+      .notNull()
+      .references(() => customerContacts.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    providerUserId: text("provider_user_id"),
+    login: text("login").notNull(),
+    passwordHash: text("password_hash"),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("customer_auth_contact_idx").on(table.customerContactId, table.provider),
+    uniqueIndex("customer_auth_provider_user_unique").on(table.provider, table.providerUserId),
+  ],
+);
+
+export const customerAuthActivationTokens = pgTable(
+  "customer_auth_activation_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    identityId: uuid("identity_id")
+      .notNull()
+      .references(() => customerAuthIdentities.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("customer_auth_activation_token_unique").on(table.tokenHash),
+    index("customer_auth_activation_expiry_idx").on(table.expiresAt),
+  ],
+);
