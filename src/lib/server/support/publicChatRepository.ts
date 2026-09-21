@@ -518,16 +518,16 @@ export async function addPublicChatMessage(
       ticketNumber: tickets.ticketNumber,
     })
     .from(tickets)
-    .where(eq(tickets.id, session.ticketId))
+    .where(eq(tickets.id, ticketId))
     .limit(1);
   if (!ticket || ticket.status === "closed") throw new Error("CHAT_TICKET_CLOSED");
 
-  const storedImages = await uploadSupportMessageImages(session.ticketId, messageId, files);
+  const storedImages = await uploadSupportMessageImages(ticketId, messageId, files);
   try {
     await db.transaction(async (tx) => {
       await tx.insert(ticketMessages).values({
         id: messageId,
-        ticketId: ticketId,
+        ticketId,
         authorType: "customer",
         customerContactId: ticket.customerContactId,
         visibility: "public",
@@ -539,7 +539,7 @@ export async function addPublicChatMessage(
         await tx.insert(ticketMessageAttachments).values(
           storedImages.map((image) => ({
             messageId,
-            ticketId: ticketId,
+            ticketId,
             storageKey: image.storageKey,
             originalName: image.originalName,
             mimeType: image.mimeType,
@@ -565,7 +565,7 @@ export async function addPublicChatMessage(
         .where(eq(webChatSessions.id, sessionId));
 
       await tx.insert(ticketEvents).values({
-        ticketId: ticketId,
+        ticketId,
         eventType: "chat.customer.message",
         metadata: { aiState: session.aiState, attachmentCount: storedImages.length },
       });
@@ -578,7 +578,7 @@ export async function addPublicChatMessage(
           body: normalizedBody.slice(0, 500) || "Cliente enviou uma imagem.",
           href: `/app/chat/${sessionId}`,
           entityType: "ticket",
-          entityId: session.ticketId,
+          entityId: ticketId,
         });
       }
     });
@@ -598,13 +598,13 @@ export async function addPublicChatMessage(
     href: `/app/chat/${sessionId}`,
   }).catch((cause) => {
     console.error("[ticket.follower.chat_reply]", {
-      ticketId: ticketId,
+      ticketId,
       causeType: cause instanceof Error ? cause.name : typeof cause,
     });
   });
 
   return {
-    ticketId: ticketId,
+    ticketId,
     messageId,
     aiState: session.aiState,
   };
