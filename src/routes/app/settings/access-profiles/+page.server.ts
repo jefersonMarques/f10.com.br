@@ -28,6 +28,7 @@ function profileMessage(cause: unknown): string {
   if (code === "ACCESS_PROFILE_NAME_INVALID") return "Informe um nome entre 2 e 80 caracteres.";
   if (code === "ACCESS_PROFILE_NAME_EXISTS") return "Já existe um perfil com este nome.";
   if (code === "ACCESS_PROFILE_SYSTEM_READ_ONLY") return "Os perfis padrão do sistema não podem ser alterados.";
+  if (code === "ACCESS_PROFILE_PERMISSION_NOT_DELEGABLE") return "O perfil não pode receber um acesso maior que o seu.";
   return "Não foi possível salvar o perfil.";
 }
 
