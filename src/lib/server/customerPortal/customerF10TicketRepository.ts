@@ -35,6 +35,7 @@ import {
   CUSTOMER_TEAM_ACTIVITY_EVENT_TYPES,
 } from "$lib/server/support/ticketCustomerProgressRepository";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
+import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
 import {
   deleteStoredSupportImages,
   uploadSupportMessageAttachments,
@@ -457,6 +458,7 @@ export async function createCustomerF10Ticket(
   );
   const db = getDatabase();
   const now = new Date();
+  const sla = await calculateTicketSlaDeadlines(intake.queueId, now);
 
   let ticket: { id: string; ticketNumber: number };
   try {
@@ -472,6 +474,8 @@ export async function createCustomerF10Ticket(
           priority: "normal",
           channel: "portal",
           dueOn: sql`CURRENT_DATE + ${intake.defaultDueDays}::integer`,
+          firstResponseDueAt: sla.firstResponseDueAt,
+          resolutionDueAt: sla.resolutionDueAt,
         })
         .returning({ id: tickets.id, ticketNumber: tickets.ticketNumber });
       if (!created) throw new Error("CUSTOMER_TICKET_NOT_CREATED");
