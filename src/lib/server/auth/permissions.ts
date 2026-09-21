@@ -82,7 +82,9 @@ export async function resolveUserPermissions(
     .where(eq(userRoles.userId, userId));
 
   if (assignedRoles.some((role) => role.code === "SUPER_ADMIN")) {
-    return new Map(PERMISSION_CODES.map((permissionCode) => [permissionCode, "all"]));
+    return new Map<string, PermissionScope>(
+      PERMISSION_CODES.map((permissionCode) => [permissionCode, "all"] as const),
+    );
   }
 
   const roleGrants = await db
