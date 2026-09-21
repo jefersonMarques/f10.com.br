@@ -24,6 +24,10 @@ export type HelpVideoAutomationSettings = {
   enabled: boolean;
 };
 
+export type TicketOnboardingSettings = {
+  startStageId: string | null;
+};
+
 const DEFAULT_SETTINGS: GeneralOperationsSettings = {
   supportDisplayName: "Equipe F10",
   supportSenderEmail: "",
@@ -43,6 +47,10 @@ export const DEFAULT_HELP_PUBLIC_AI_SETTINGS: HelpPublicAiSettings = {
 
 export const DEFAULT_HELP_VIDEO_AUTOMATION_SETTINGS: HelpVideoAutomationSettings = {
   enabled: false,
+};
+
+export const DEFAULT_TICKET_ONBOARDING_SETTINGS: TicketOnboardingSettings = {
+  startStageId: null,
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -132,6 +140,21 @@ export async function getHelpPublicAiSettings(): Promise<HelpPublicAiSettings> {
   };
 }
 
+export async function getTicketOnboardingSettings(): Promise<TicketOnboardingSettings> {
+  const [row] = await getDatabase()
+    .select({ value: operationsSettings.value })
+    .from(operationsSettings)
+    .where(eq(operationsSettings.key, "ticket_onboarding"))
+    .limit(1);
+  const value = asRecord(row?.value);
+  const startStageId =
+    typeof value.startStageId === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.startStageId)
+      ? value.startStageId
+      : null;
+  return { startStageId };
+}
+
 export async function getHelpVideoAutomationSettings(): Promise<HelpVideoAutomationSettings> {
   const [row] = await getDatabase()
     .select({ value: operationsSettings.value })
@@ -172,6 +195,36 @@ export async function updateGeneralOperationsSettings(
     entityType: "operations_settings",
     entityId: "general",
     metadata: { timezone: normalized.timezone, remoteConsentMinutes: normalized.remoteConsentMinutes },
+  });
+}
+
+export async function updateTicketOnboardingSettings(
+  actorUserId: string,
+  value: TicketOnboardingSettings,
+): Promise<void> {
+  const normalized: TicketOnboardingSettings = {
+    startStageId: value.startStageId,
+  };
+  const now = new Date();
+  await getDatabase()
+    .insert(operationsSettings)
+    .values({
+      key: "ticket_onboarding",
+      value: normalized,
+      updatedBy: actorUserId,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: operationsSettings.key,
+      set: { value: normalized, updatedBy: actorUserId, updatedAt: now },
+    });
+
+  await recordAuditEvent({
+    actorUserId,
+    action: "operations.ticket_onboarding.settings.updated",
+    entityType: "operations_settings",
+    entityId: "ticket_onboarding",
+    metadata: normalized,
   });
 }
 
