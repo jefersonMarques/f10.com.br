@@ -17,6 +17,7 @@ export const PERMISSION_CODES = [
   "tickets.view",
   "tickets.create",
   "tickets.reply",
+  "tickets.comment_internal",
   "tickets.assign",
   "tickets.manage",
   "chat.view",
