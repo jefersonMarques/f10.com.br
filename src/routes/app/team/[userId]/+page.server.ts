@@ -46,7 +46,8 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       accessProfiles,
       canManage:
         hasPermission(permissionMap, "users.manage") &&
-        layout.user.id !== params.userId,
+        layout.user.id !== params.userId &&
+        accessProfiles.some((profile) => profile.code === details.roles[0]),
       isSelf: layout.user.id === params.userId,
     };
   } catch (cause) {
