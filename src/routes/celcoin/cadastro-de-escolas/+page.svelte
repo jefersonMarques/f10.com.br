@@ -1731,6 +1731,12 @@
           <p class="mt-2 text-[13px] text-black/60">
             Recebemos seus dados e enviamos a ativação da Área do Cliente por e-mail.
           </p>
+          <div class="mx-auto mt-4 max-w-[620px] rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-left">
+            <p class="text-[13px] font-semibold text-amber-900">Confirme seu e-mail para continuar</p>
+            <p class="mt-1 text-[12px] leading-5 text-amber-800">
+              Por segurança, o acesso aos tickets só é liberado depois da confirmação. Ao clicar em “Ativar acesso” no e-mail, você entra automaticamente na área de chamados.
+            </p>
+          </div>
 
           <div
             class="mt-5 rounded-2xl overflow-hidden border border-black/10 bg-black"
@@ -1769,7 +1775,7 @@
               href="/cliente"
               class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold border border-black/15 bg-white hover:bg-black/[0.03]"
             >
-              Área do Cliente
+              Já ativei meu acesso
             </a>
 
             <a
