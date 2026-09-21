@@ -161,6 +161,12 @@
                     {#if selectedWorkflow.kind === "global"}
                       <input type="hidden" name="color" value=""/>
                       <label><span class="application-text-meta mb-1 block font-bold uppercase tracking-[0.07em] text-[#838998]">Workflow de área</span><select name="linkedAreaId" value={stage.linkedAreaId ?? ""} class="application-text-meta h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-2"><option value="">Nenhuma</option>{#each data.areas as area}<option value={area.id}>{area.name}</option>{/each}</select></label>
+                      {#if stage.stageType === "area_gateway"}
+                        <label class="application-text-meta xl:col-span-4 flex items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 py-2 font-semibold text-[#555B6B]">
+                          <input name="allowTicketStart" type="checkbox" checked={stage.allowTicketStart} class="h-4 w-4 rounded border-[#C9CEDA]"/>
+                          Permitir iniciar novos tickets neste processo
+                        </label>
+                      {/if}
                     {:else}
                       <input type="hidden" name="linkedAreaId" value=""/>
                       <label><span class="application-text-meta mb-1 flex items-center gap-1 font-bold uppercase tracking-[0.07em] text-[#838998]"><Palette size={10}/>Cor</span><select name="color" value={stage.color ?? "gray"} class="application-text-meta h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-2">{#each Object.entries(colorLabels) as [value, label]}<option value={value}>{label}</option>{/each}</select></label>
@@ -172,6 +178,7 @@
                     <div class="application-text-meta flex flex-wrap gap-2 text-[#7D8392]">
                       <span class="rounded-full bg-white px-2 py-1 shadow-sm">{index + 1}ª</span>
                       {#if stage.stageType === "area_gateway"}<span class="rounded-full bg-[#FFE8D0] px-2 py-1 font-bold text-[#9C5618]">Área · {stage.linkedAreaName}</span>{/if}
+                      {#if stage.allowTicketStart}<span class="rounded-full bg-[#EEF8F1] px-2 py-1 font-bold text-[#2F7045]">Entrada de ticket</span>{/if}
                       {#if selectedWorkflow.kind === "area"}<span class="rounded-full bg-white px-2 py-1 font-semibold shadow-sm">Cor · {colorLabels[stage.color ?? "gray"]}</span>{/if}
                       {#if stage.stageType === "terminal"}<span class="rounded-full bg-[#E2F3E7] px-2 py-1 font-bold text-[#2C7041]">Conclui a área</span>{/if}
                       {#if stage.isInitial}<span class="rounded-full bg-[#000A57] px-2 py-1 font-bold text-white">Inicial</span>{/if}
