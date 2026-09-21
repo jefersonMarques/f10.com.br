@@ -89,6 +89,10 @@ function parseScope(value: string | null): TicketWorkspaceScope {
   return value === "mine" || value === "unassigned" ? value : "all";
 }
 
+function parseView(value: string | null): "board" | "list" | "split" {
+  return value === "list" || value === "split" ? value : "board";
+}
+
 function parseStatus(value: string | null): TicketStatus | null {
   return TICKET_STATUSES.includes(value as TicketStatus) ? value as TicketStatus : null;
 }
@@ -156,11 +160,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const canManageWorkflow = hasPermission(permissionMap, "tickets.manage", "all");
   const canSearchCustomers = canCreate;
 
-  const requestedView = url.searchParams.get("view");
-  const view = requestedView === "list" || requestedView === "split"
-    ? requestedView
-    : "board";
-  const page = parsePage(url.searchParams.get("page"));
+  const view = parseView(url.searchParams.get("view"));  const page = parsePage(url.searchParams.get("page"));
   const queueId = parseOptionalUuid(url.searchParams.get("queueId"));
   const areaId = parseOptionalUuid(url.searchParams.get("areaId"));
   const stageId = parseOptionalUuid(url.searchParams.get("stageId"));

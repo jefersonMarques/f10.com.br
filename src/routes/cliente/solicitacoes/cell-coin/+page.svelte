@@ -32,5 +32,5 @@
   bind:selectedUnitId
   bind:contextInvalid
 >
-  <LegacyCellCoinForm />
+  <LegacyCellCoinForm data={{ flow: "onboarding" }} />
 </ServiceRequestPortalFormShell>
