@@ -20,6 +20,10 @@
     all: "Tudo",
   };
 
+  function profileName(code: string): string {
+    return data.accessProfiles.find((profile) => profile.code === code)?.name ?? code;
+  }
+
   async function copyInviteLink(inviteUrl: string): Promise<void> {
     if (!navigator.clipboard) return;
     await navigator.clipboard.writeText(inviteUrl);
@@ -37,7 +41,7 @@
     <div class="min-w-0">
       <div class="flex flex-wrap items-center gap-2">
         {#each data.details.roles as role}
-          <span class="application-text-caption rounded-full bg-[#EEF0FF] px-2.5 py-1 font-bold text-[#000A57]">{role}</span>
+          <span class="application-text-caption rounded-full bg-[#EEF0FF] px-2.5 py-1 font-bold text-[#000A57]">{profileName(role)}</span>
         {/each}
         <span class={`application-text-caption rounded-full px-2.5 py-1 font-bold ${data.details.user.status === "active" ? "bg-[#EEF8F1] text-[#2F7045]" : data.details.user.status === "invited" ? "bg-[#FFF4E9] text-[#A9510D]" : "bg-[#F1F2F5] text-[#777D8C]"}`}>
           {data.details.user.status === "active" ? "Ativo" : data.details.user.status === "invited" ? "Convite pendente" : "Inativo"}
@@ -69,7 +73,7 @@
   {#if data.isSelf}
     <section class="mb-3 flex items-start gap-3 rounded-2xl border border-[#D8DCEC] bg-[#F7F8FC] px-5 py-4">
       <ShieldCheck size={19} class="mt-0.5 shrink-0 text-[#000A57]" aria-hidden="true" />
-      <p class="text-[11px] leading-5 text-[#666C7D]">Esta é sua própria conta. Alterações de status e permissões pessoais ficam bloqueadas para evitar perda acidental de acesso administrativo.</p>
+      <p class="text-[11px] leading-5 text-[#666C7D]">Esta é sua própria conta. Alterações de status e perfil ficam bloqueadas para evitar perda acidental de acesso.</p>
     </section>
   {/if}
 
@@ -127,30 +131,38 @@
       </section>
 
       <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
-        <div class="flex items-start gap-3"><ShieldCheck size={18} class="mt-0.5 shrink-0 text-[#EA6D0B]" aria-hidden="true" /><div><h2 class="text-[12px] font-semibold text-[#353B4A]">Como as permissões funcionam</h2><p class="application-text-caption mt-2 leading-5 text-[#777D8D]">“Herdar” usa o perfil base. “Permitir” concede um acesso específico e “Negar” remove até mesmo um acesso herdado do perfil.</p></div></div>
+        <div class="flex items-start gap-3"><ShieldCheck size={18} class="mt-0.5 shrink-0 text-[#EA6D0B]" aria-hidden="true" /><div><h2 class="text-[12px] font-semibold text-[#353B4A]">Acesso por perfil</h2><p class="application-text-caption mt-2 leading-5 text-[#777D8D]">Os acessos são definidos pelo perfil atribuído ao usuário. A equipe continua definindo onde ele atua.</p></div></div>
       </section>
     </aside>
 
     <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
-      <header class="border-b border-[#EEF0F5] px-5 py-4 sm:px-6"><h2 class="text-[16px] font-semibold text-[#11182C]">Permissões individuais</h2><p class="mt-1 text-[11px] text-[#858A98]">O acesso efetivo combina o perfil base com as exceções definidas abaixo.</p></header>
+      <header class="border-b border-[#EEF0F5] px-5 py-4 sm:px-6">
+        <h2 class="text-[16px] font-semibold text-[#11182C]">Perfil de acesso</h2>
+        <p class="mt-1 text-[11px] text-[#858A98]">O perfil concentra as permissões deste usuário.</p>
+      </header>
 
-      <div class="divide-y divide-[#EEF0F5]">
-        {#each data.details.permissions as permission}
-          <article class="grid gap-4 px-5 py-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_140px_150px_90px] lg:items-center">
-            <div class="min-w-0">
-              <div class="flex flex-wrap items-center gap-2"><h3 class="text-[12px] font-semibold text-[#303645]">{permission.name}</h3><span class="application-text-meta rounded-full bg-[#F2F3F6] px-2 py-1 font-medium text-[#777D8B]">{permission.effectiveScope ? scopeLabels[permission.effectiveScope] : "Sem acesso"}</span></div>
-              <p class="application-text-caption mt-1 leading-4 text-[#8B909D]">{permission.description}</p>
-              <code class="application-text-meta mt-1.5 block text-[#A0A5B0]">{permission.code}</code>
+      <div class="px-5 py-5 sm:px-6">
+        <form method="POST" action="?/profile" class="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label class="min-w-0 flex-1">
+            <span class="application-text-caption mb-1.5 block font-semibold text-[#555B6B]">Perfil</span>
+            <select name="roleCode" value={data.details.roles[0] ?? ""} disabled={!data.canManage} class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[12px] disabled:bg-[#F5F6F8]">
+              {#each data.accessProfiles as profile}<option value={profile.code}>{profile.name}</option>{/each}
+            </select>
+          </label>
+          {#if data.canManage}<button type="submit" class="application-text-caption inline-flex min-h-11 items-center justify-center rounded-xl bg-[#000A57] px-4 font-semibold text-white">Salvar perfil</button>{/if}
+        </form>
+      </div>
+
+      <div class="border-t border-[#EEF0F5]">
+        <div class="px-5 py-3 sm:px-6"><strong class="application-text-caption text-[#454C5B]">Acessos efetivos</strong></div>
+        <div class="divide-y divide-[#EEF0F5]">
+          {#each data.details.permissions.filter((permission) => permission.effectiveScope) as permission}
+            <div class="flex items-center justify-between gap-4 px-5 py-3 sm:px-6">
+              <span class="application-text-caption font-semibold text-[#4B5261]">{permission.name}</span>
+              <span class="application-text-meta rounded-full bg-[#F2F3F6] px-2 py-1 font-bold text-[#777D8B]">{scopeLabels[permission.effectiveScope ?? "own"]}</span>
             </div>
-
-            <form method="POST" action="?/permission" class="contents">
-              <input type="hidden" name="permissionCode" value={permission.code} />
-              <label class="block"><span class="application-text-meta mb-1 block font-bold uppercase tracking-[0.08em] text-[#9A9FAD] lg:hidden">Regra</span><select name="effect" value={permission.override?.effect ?? "inherit"} disabled={!data.canManage || !permission.canActorChange} class="application-text-caption h-10 w-full rounded-lg border border-[#DDE1EA] bg-white px-2 outline-none disabled:bg-[#F5F6F8] disabled:text-[#A0A5B0]"><option value="inherit">Herdar perfil</option><option value="allow">Permitir</option><option value="deny">Negar</option></select></label>
-              <label class="block"><span class="application-text-meta mb-1 block font-bold uppercase tracking-[0.08em] text-[#9A9FAD] lg:hidden">Escopo</span><select name="scope" value={permission.override?.scope ?? permission.effectiveScope ?? "own"} disabled={!data.canManage || !permission.canActorChange} class="application-text-caption h-10 w-full rounded-lg border border-[#DDE1EA] bg-white px-2 outline-none disabled:bg-[#F5F6F8] disabled:text-[#A0A5B0]"><option value="own">Próprio</option><option value="team">Equipe</option><option value="all">Tudo</option></select></label>
-              <button type="submit" disabled={!data.canManage || !permission.canActorChange} class="application-text-caption h-10 rounded-lg bg-[#000A57] px-3 font-semibold text-white transition hover:bg-[#111B71] disabled:cursor-not-allowed disabled:bg-[#D8DBE3]">Salvar</button>
-            </form>
-          </article>
-        {/each}
+          {/each}
+        </div>
       </div>
     </section>
   </div>
