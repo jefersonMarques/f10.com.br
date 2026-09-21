@@ -29,6 +29,7 @@ import {
   type CustomerF10AuthorizedContext,
   type CustomerF10PortalSession,
 } from "$lib/server/customerPortal/customerF10AuthRepository";
+import type { CustomerTicketPortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { resolveCustomerPortalTicketIntake } from "$lib/server/customerPortal/customerPortalTicketIntake";
 import {
   CUSTOMER_TEAM_ACTIVITY_EVENT_TYPES,
@@ -194,32 +195,43 @@ function ticketContextFromRow(
 }
 
 export async function listCustomerF10Tickets(
-  session: CustomerF10PortalSession,
+  session: CustomerF10PortalSession | CustomerTicketPortalSession,
   filters: CustomerTicketListFilters,
 ) {
-  const authorizedContexts = listAuthorizedF10Contexts(session);
-  if (authorizedContexts.length === 0) {
-    return { tickets: [], total: 0, page: 1, pageSize: filters.pageSize, totalPages: 0 };
-  }
-
-  const scopedContexts = filterAuthorizedContexts(authorizedContexts, filters);
+  const isF10Session = Boolean(session.legacyUserId);
+  const authorizedContexts = isF10Session ? listAuthorizedF10Contexts(session) : [];
   const hasContextFilter = filters.groupId !== null || filters.unitId !== null;
-  if (hasContextFilter && scopedContexts.length === 0) {
-    return { tickets: [], total: 0, page: 1, pageSize: filters.pageSize, totalPages: 0 };
-  }
 
-  const contextsForAuthorization = hasContextFilter ? scopedContexts : authorizedContexts;
-  const contextCondition = contextAuthorizationCondition(session, contextsForAuthorization);
-  if (!contextCondition) {
+  if (!isF10Session && hasContextFilter) {
     return { tickets: [], total: 0, page: 1, pageSize: filters.pageSize, totalPages: 0 };
   }
 
   const conditions: SQL[] = [eq(tickets.customerContactId, session.contactId)];
-  const allowLegacyWithoutContext = authorizedContexts.length === 1 && contextsForAuthorization.length === 1;
-  const authorizedTicketCondition = allowLegacyWithoutContext
-    ? or(contextCondition, isNull(ticketCustomerContexts.ticketId))
-    : contextCondition;
-  if (authorizedTicketCondition) conditions.push(authorizedTicketCondition);
+
+  if (isF10Session) {
+    if (authorizedContexts.length === 0) {
+      return { tickets: [], total: 0, page: 1, pageSize: filters.pageSize, totalPages: 0 };
+    }
+
+    const scopedContexts = filterAuthorizedContexts(authorizedContexts, filters);
+    if (hasContextFilter && scopedContexts.length === 0) {
+      return { tickets: [], total: 0, page: 1, pageSize: filters.pageSize, totalPages: 0 };
+    }
+
+    const contextsForAuthorization = hasContextFilter ? scopedContexts : authorizedContexts;
+    const contextCondition = contextAuthorizationCondition(
+      session as CustomerF10PortalSession,
+      contextsForAuthorization,
+    );
+    if (!contextCondition) {
+      return { tickets: [], total: 0, page: 1, pageSize: filters.pageSize, totalPages: 0 };
+    }
+
+    const authorizedTicketCondition = hasContextFilter
+      ? contextCondition
+      : or(contextCondition, isNull(ticketCustomerContexts.ticketId));
+    if (authorizedTicketCondition) conditions.push(authorizedTicketCondition);
+  }
 
   if (filters.status !== null) conditions.push(eq(tickets.status, filters.status));
   if (filters.priority !== null) conditions.push(eq(tickets.priority, filters.priority));
@@ -353,11 +365,15 @@ export async function listCustomerF10Tickets(
 }
 
 export async function getCustomerF10Ticket(
-  session: CustomerF10PortalSession,
+  session: CustomerF10PortalSession | CustomerTicketPortalSession,
   ticketId: string,
 ) {
   const details = await getCustomerPortalTicket(session.contactId, ticketId);
   if (!details) return null;
+
+  if (!session.legacyUserId) {
+    return { ...details, context: null };
+  }
 
   const authorizedContexts = listAuthorizedF10Contexts(session);
   const [context] = await getDatabase()
@@ -537,7 +553,7 @@ export async function createCustomerF10Ticket(
 }
 
 export async function replyCustomerF10Ticket(
-  session: CustomerF10PortalSession,
+  session: CustomerF10PortalSession | CustomerTicketPortalSession,
   ticketId: string,
   body: string,
   files: File[] = [],
