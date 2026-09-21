@@ -64,28 +64,41 @@ export async function requestTicketSatisfaction(ticketId: string): Promise<void>
   const surveyUrl = `${baseUrl}/avaliar/${encodeURIComponent(token)}`;
   const name = ticket.customerName || "cliente";
 
-  await sendTransactionalEmail({
-    to: { email: ticket.customerEmail, name },
-    subject: `Como foi o atendimento do ticket #${ticket.ticketNumber}?`,
-    textContent: [
-      `Olá, ${name}.`,
-      "",
-      `O ticket #${ticket.ticketNumber} foi resolvido.`,
-      "Conte para a F10 como foi sua experiência:",
-      surveyUrl,
-    ].join("\n"),
-    htmlContent: buildEmailHtml({
-      eyebrow: "Pesquisa de satisfação",
-      title: `Como foi o atendimento do ticket #${ticket.ticketNumber}?`,
-      greeting: `Olá, ${name}.`,
-      body: [
-        `O chamado “${ticket.subject}” foi resolvido.`,
-        "Sua avaliação leva menos de um minuto e ajuda a F10 a melhorar o atendimento.",
-      ],
-      action: { label: "Avaliar atendimento", href: surveyUrl },
-      footer: "A pesquisa é vinculada somente a este atendimento.",
-    }),
-  });
+  try {
+    await sendTransactionalEmail({
+      to: { email: ticket.customerEmail, name },
+      subject: `Como foi o atendimento do ticket #${ticket.ticketNumber}?`,
+      textContent: [
+        `Olá, ${name}.`,
+        "",
+        `O ticket #${ticket.ticketNumber} foi resolvido.`,
+        "Conte para a F10 como foi sua experiência:",
+        surveyUrl,
+      ].join("\n"),
+      htmlContent: buildEmailHtml({
+        eyebrow: "Pesquisa de satisfação",
+        title: `Como foi o atendimento do ticket #${ticket.ticketNumber}?`,
+        greeting: `Olá, ${name}.`,
+        body: [
+          `O chamado “${ticket.subject}” foi resolvido.`,
+          "Sua avaliação leva menos de um minuto e ajuda a F10 a melhorar o atendimento.",
+        ],
+        action: { label: "Avaliar atendimento", href: surveyUrl },
+        footer: "A pesquisa é vinculada somente a este atendimento.",
+      }),
+    });
+  } catch (cause) {
+    await db
+      .delete(ticketSatisfactionSurveys)
+      .where(
+        and(
+          eq(ticketSatisfactionSurveys.ticketId, ticket.id),
+          isNull(ticketSatisfactionSurveys.answeredAt),
+        ),
+      )
+      .catch(() => undefined);
+    throw cause;
+  }
 }
 
 export async function getTicketSatisfactionByToken(token: string) {
