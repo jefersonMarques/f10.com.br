@@ -107,6 +107,7 @@ export async function getSupportChatEntrySettings() {
         teamId: supportQueues.teamId,
         teamName: teams.name,
         defaultDueDays: supportQueues.defaultDueDays,
+        slaEnabled: supportQueues.slaEnabled,
         slaFirstResponseMinutes: supportQueues.slaFirstResponseMinutes,
         slaNextResponseMinutes: supportQueues.slaNextResponseMinutes,
         slaResolutionMinutes: supportQueues.slaResolutionMinutes,
@@ -256,6 +257,7 @@ export async function updateSupportQueueSla(
   actorUserId: string,
   queueId: string,
   input: {
+    enabled: boolean;
     firstResponseMinutes: number;
     nextResponseMinutes: number;
     resolutionMinutes: number;
@@ -264,6 +266,7 @@ export async function updateSupportQueueSla(
   const [updated] = await getDatabase()
     .update(supportQueues)
     .set({
+      slaEnabled: input.enabled,
       slaFirstResponseMinutes: input.firstResponseMinutes,
       slaNextResponseMinutes: input.nextResponseMinutes,
       slaResolutionMinutes: input.resolutionMinutes,
