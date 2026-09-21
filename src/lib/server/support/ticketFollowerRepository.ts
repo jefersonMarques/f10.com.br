@@ -27,6 +27,29 @@ export async function listTicketFollowers(ticketId: string) {
     .orderBy(asc(users.name));
 }
 
+export async function listTicketFollowerCandidates() {
+  const activeUsers = await getDatabase()
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+    })
+    .from(users)
+    .where(eq(users.status, "active"))
+    .orderBy(asc(users.name));
+
+  const eligible = await Promise.all(
+    activeUsers.map(async (user) => {
+      const permissions = await resolveUserPermissions(user.id);
+      return getPermissionScope(permissions, "tickets.view") ? user : null;
+    }),
+  );
+
+  return eligible.filter(
+    (user): user is { id: string; name: string; email: string } => Boolean(user),
+  );
+}
+
 export async function addTicketFollower(
   actorUserId: string,
   permissions: SupportPermissionMap,
