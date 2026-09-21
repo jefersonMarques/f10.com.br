@@ -105,15 +105,19 @@
         <div class="flex items-start gap-3"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><MessageSquare size={19}/></span><div><h2 class="text-[16px] font-semibold text-[#11182C]">Conversa</h2><p class="mt-1 text-[11px] text-[#858A98]">Respostas públicas e notas internas ficam no mesmo histórico.</p></div></div>
         <div class="mt-6 space-y-4">{#each data.details.messages as message}<article class={`rounded-2xl border px-4 py-4 ${message.visibility === "internal" ? "border-[#F1D7BD] bg-[#FFF9F3]" : message.authorType === "customer" ? "border-[#E3E6ED] bg-[#FAFAFC]" : "border-[#D8DDF4] bg-[#F6F7FF]"}`}><div class="flex flex-wrap items-center justify-between gap-2"><div class="flex items-center gap-2"><strong class="text-[11px] font-semibold text-[#3B4150]">{message.authorUserName ?? message.customerName ?? (message.authorType === "system" ? "Sistema" : "Atendimento F10")}</strong>{#if message.visibility === "internal"}<span class="application-text-meta rounded-full bg-[#FFE5C9] px-2 py-1 font-bold uppercase tracking-[0.06em] text-[#91500F]">Nota interna</span>{/if}</div><span class="application-text-meta text-[#999EAA]">{formatDateTime(message.createdAt)}</span></div><p class="mt-2 whitespace-pre-wrap text-[12px] leading-6 text-[#5D6372]">{message.body}</p></article>{/each}</div>
 
-        {#if data.canReply && data.details.ticket.status !== "closed"}
+        {#if (data.canReply || data.canCommentInternal) && data.details.ticket.status !== "closed"}
           <div class="mt-6 grid gap-4 lg:grid-cols-2">
-            <form method="POST" action="?/reply" class="rounded-2xl border border-[#D9DDF0] bg-[#F8F9FF] p-4"><label class="block"><span class="mb-2 block text-[11px] font-semibold text-[#000A57]">Resposta ao cliente</span><textarea name="body" required maxlength="10000" rows="5" class="w-full resize-y rounded-xl border border-[#DDE1EA] bg-white px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#000A57]"></textarea></label><button type="submit" class="mt-3 min-h-10 w-full rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white">Registrar resposta</button></form>
-            <form method="POST" action="?/note" class="rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] p-4">
-              <span class="mb-2 block text-[11px] font-semibold text-[#8B4D12]">Nota interna</span>
-              <MentionTextarea users={data.mentionUsers} name="body" rows={5} maxlength={10000} placeholder="Ex.: @jeferson pode ver esse caso aqui?" className="w-full resize-y rounded-xl border border-[#E9D6C1] bg-white px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#C46C17]" />
-              <p class="application-text-meta mt-2 leading-4 text-[#9A744F]">Digite <strong>@</strong> e selecione um usuário para gerar uma notificação interna. O cliente nunca vê esta nota.</p>
-              <button type="submit" class="mt-3 min-h-10 w-full rounded-xl bg-[#9A5513] px-4 text-[11px] font-semibold text-white">Adicionar nota interna</button>
-            </form>
+            {#if data.canReply}
+              <form method="POST" action="?/reply" class="rounded-2xl border border-[#D9DDF0] bg-[#F8F9FF] p-4"><label class="block"><span class="mb-2 block text-[11px] font-semibold text-[#000A57]">Resposta ao cliente</span><textarea name="body" required maxlength="10000" rows="5" class="w-full resize-y rounded-xl border border-[#DDE1EA] bg-white px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#000A57]"></textarea></label><button type="submit" class="mt-3 min-h-10 w-full rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white">Registrar resposta</button></form>
+            {/if}
+            {#if data.canCommentInternal}
+              <form method="POST" action="?/note" class="rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] p-4">
+                <span class="mb-2 block text-[11px] font-semibold text-[#8B4D12]">Nota interna</span>
+                <MentionTextarea users={data.mentionUsers} name="body" rows={5} maxlength={10000} placeholder="Ex.: @jeferson pode ver esse caso aqui?" className="w-full resize-y rounded-xl border border-[#E9D6C1] bg-white px-3 py-3 text-[12px] leading-5 outline-none focus:border-[#C46C17]" />
+                <p class="application-text-meta mt-2 leading-4 text-[#9A744F]">Digite <strong>@</strong> e selecione um usuário para gerar uma notificação interna. O cliente nunca vê esta nota.</p>
+                <button type="submit" class="mt-3 min-h-10 w-full rounded-xl bg-[#9A5513] px-4 text-[11px] font-semibold text-white">Adicionar nota interna</button>
+              </form>
+            {/if}
           </div>
         {/if}
       </section>
