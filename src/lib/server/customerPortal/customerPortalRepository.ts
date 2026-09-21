@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, asc, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { calculateNextResponseDueAt } from "$lib/server/support/ticketSlaService";
+import { notifyTicketFollowers } from "$lib/server/support/ticketFollowerRepository";
 import {
   customerPortalLoginTokens,
   customerPortalSessions,
@@ -424,4 +425,15 @@ export async function replyCustomerPortalTicket(
     await deleteStoredSupportImages(storedAttachments);
     throw cause;
   }
+
+  await notifyTicketFollowers(ticketId, {
+    kind: "ticket.follower.customer_reply",
+    body: body.trim() || "Cliente enviou um anexo.",
+    excludeUserIds: [ticket.assignedUserId],
+  }).catch((cause) => {
+    console.error("[ticket.follower.customer_reply]", {
+      ticketId,
+      causeType: cause instanceof Error ? cause.name : typeof cause,
+    });
+  });
 }
