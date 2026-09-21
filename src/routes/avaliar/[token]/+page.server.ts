@@ -7,7 +7,14 @@ import {
 
 export const load: PageServerLoad = async ({ params }) => {
   const survey = await getTicketSatisfactionByToken(params.token);
-  return { survey };
+  return {
+    survey,
+    expired: Boolean(
+      survey &&
+      !survey.answeredAt &&
+      new Date(survey.expiresAt).getTime() <= Date.now(),
+    ),
+  };
 };
 
 export const actions: Actions = {
