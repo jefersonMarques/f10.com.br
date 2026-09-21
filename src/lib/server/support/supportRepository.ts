@@ -31,6 +31,7 @@ import {
 } from "$lib/server/db/supportSchema";
 import {
   getUserSupportQueueIds,
+  getUserTicketAreaRestriction,
   requireTicketAccess,
   type SupportPermissionMap,
 } from "$lib/server/support/supportAccess";
@@ -482,6 +483,12 @@ export async function createManualTicket(
   const start = input.startStageId
     ? await resolveManualTicketStart(input.startStageId)
     : null;
+  if (start) {
+    const areaRestriction = await getUserTicketAreaRestriction(actorUserId);
+    if (areaRestriction !== null && !areaRestriction.includes(start.areaId)) {
+      throw new Error("TICKET_WORKFLOW_AREA_ACCESS_DENIED");
+    }
+  }
 
   return db.transaction(async (tx) => {
     const customer = await resolveTicketCustomer(tx, input);
