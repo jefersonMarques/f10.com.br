@@ -61,5 +61,13 @@ export async function regenerateManagedUserInvite(
     entityId: targetUserId,
   });
 
-  return { token: rawToken, expiresAt };
+  return {
+    token: rawToken,
+    expiresAt,
+    user: {
+      id: details.user.id,
+      name: details.user.name,
+      email: details.user.email,
+    },
+  };
 }
