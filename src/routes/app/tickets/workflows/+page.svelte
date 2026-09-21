@@ -209,6 +209,12 @@
                   <select name="color" class="application-text-meta h-10 rounded-xl border border-[#DDE1EA] bg-white px-2">{#each Object.entries(colorLabels) as [value, label]}<option value={value}>{label}</option>{/each}</select>
                 {/if}
               </div>
+              {#if selectedWorkflow.kind === "global"}
+                <label class="application-text-meta mt-3 flex items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 py-2 font-semibold text-[#555B6B]">
+                  <input name="allowTicketStart" type="checkbox" class="h-4 w-4 rounded border-[#C9CEDA]"/>
+                  Permitir iniciar novos tickets nesta área
+                </label>
+              {/if}
               <div class="mt-3 flex justify-end"><button type="submit" class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 font-semibold text-white"><Plus size={13}/>Adicionar coluna</button></div>
             </form>
 
