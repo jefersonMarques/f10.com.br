@@ -163,6 +163,7 @@ html[data-application-theme="dark"] .operations-shell :is(
 html[data-application-theme="dark"] .operations-shell :is(
   [class~="bg-[#EEF0FF]"],
   [class~="bg-[#F3F4FF]"],
+  [class~="bg-[#F5F6FF]"],
   [class~="bg-[#F3F5FF]"],
   [class~="bg-[#F6F7FF]"],
   [class~="bg-[#F8F9FF]"],
@@ -263,6 +264,7 @@ html[data-application-theme="dark"] .operations-shell :is(
   [class~="border-[#E1E4EC]"],
   [class~="border-[#E4E7EE]"],
   [class~="border-[#E5E7EC]"],
+  [class~="border-[#E5E7ED]"],
   [class~="border-[#E0E3E8]"],
   [class~="border-[#E0E3EB]"],
   [class~="border-[#E0E3EA]"],
@@ -355,7 +357,8 @@ html[data-application-theme="dark"] .operations-shell :is(
   [class~="border-[#BFC7ED]"],
   [class~="border-[#D7DDF0]"],
   [class~="border-[#D9DDF0]"],
-  [class~="border-[#C9D4F6]"]
+  [class~="border-[#C9D4F6]"],
+  [class~="border-[#C9CFF3]"]
 ) {
   border-color: var(--app-info-border) !important;
 }

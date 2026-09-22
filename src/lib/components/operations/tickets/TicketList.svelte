@@ -97,7 +97,7 @@
             <button
               type="button"
               on:click={() => void onOpenTicket(ticket.id)}
-              class={`block w-full overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition ${selectedTicketId === ticket.id ? "border-[#C9CFF3] bg-[#F5F6FF] shadow-sm" : "border-[#E7E9EF] bg-white hover:border-[#CDD2DE] hover:bg-[#FAFBFD]"}`}
+              class={`block w-full overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition ${selectedTicketId === ticket.id ? "border-[var(--app-info-border)] bg-[var(--app-surface-selected)] shadow-sm" : "border-[#E7E9EF] bg-white hover:border-[#CDD2DE] hover:bg-[#FAFBFD]"}`}
             >
               <div class="flex gap-3">
                 <span class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]">

@@ -408,7 +408,7 @@
             </div>
 
             {#if (ticketData.canReply || ticketData.canCommentInternal) && ticketData.details.ticket.status !== "closed"}
-              <div class="shrink-0 border-t border-[#E5E7ED] bg-white p-3 sm:p-4">
+              <div class="shrink-0 border-t border-[var(--app-border)] bg-[var(--app-surface)] p-3 sm:p-4">
                 <form
                   method="POST"
                   action={actionUrl(composerMode === "note" ? "note" : "reply")}
@@ -695,7 +695,7 @@
           </summary>
           <div class="mt-3 space-y-3 border-t border-[#EEF0F5] pt-3">
             {#each ticketData.details.events as event}
-              <div class="border-l-2 border-[#E5E7ED] pl-3">
+              <div class="border-l-2 border-[var(--app-border)] pl-3">
                 <p class="text-[10.5px] leading-5 text-[#626877]"><strong class="font-semibold text-[#3E4453]">{event.actorName ?? "Sistema"}</strong> {eventLabels[event.eventType] ?? event.eventType}</p>
                 <span class="mt-0.5 block text-[9.5px] text-[#9B9FAC]">{formatDateTime(event.createdAt)}</span>
               </div>

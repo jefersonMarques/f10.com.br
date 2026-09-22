@@ -517,8 +517,8 @@
       </div>
 
       {#if chat.status !== "closed" && (canWrite || data.canInternalNote)}
-        <footer class="shrink-0 border-t border-[#E2E5ED] bg-white p-4">
-          <div class="mx-auto max-w-[840px] overflow-hidden rounded-2xl border border-[#DDE1E8] bg-white shadow-[0_8px_22px_rgba(1,13,40,0.04)] focus-within:border-[#B8BFCE]">
+        <footer class="shrink-0 border-t border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+          <div class="mx-auto max-w-[840px] overflow-hidden rounded-2xl border border-[var(--app-border-control)] bg-[var(--app-surface)] shadow-[0_8px_22px_rgba(1,13,40,0.04)] focus-within:border-[var(--app-info-border)]">
             <div class="flex items-center gap-2 border-b border-[#ECEEF2] px-3 py-2.5">
               {#if canWrite}<button type="button" on:click={() => composerMode = "reply"} class={`rounded-full px-3 py-1.5 text-[10px] font-semibold transition ${composerMode === "reply" ? "bg-[#000A57] text-white" : "bg-[#F3F4F7] text-[#6D7382] hover:bg-[#ECEEF2]"}`}>Resposta</button>{/if}
               {#if data.canInternalNote}<button type="button" on:click={() => composerMode = "note"} class={`rounded-full px-3 py-1.5 text-[10px] font-semibold transition ${composerMode === "note" ? "bg-[#9A5513] text-white" : "bg-[#FFF3E7] text-[#8B4D12] hover:bg-[#FBE9D7]"}`}>Nota interna</button>{/if}

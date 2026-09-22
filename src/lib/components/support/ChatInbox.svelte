@@ -196,7 +196,7 @@
         {#each filteredChats as chat}
           <a
             href={`/app/chat/${chat.sessionId}`}
-            class={`block overflow-hidden rounded-2xl border px-3.5 py-3 transition ${selectedConversationKey === chat.conversationKey ? "border-[#C9CFF3] bg-[#F5F6FF] shadow-sm" : "border-[#E7E9EF] bg-white hover:border-[#CDD2DE] hover:bg-[#FAFBFD]"}`}
+            class={`block overflow-hidden rounded-2xl border px-3.5 py-3 transition ${selectedConversationKey === chat.conversationKey ? "border-[var(--app-info-border)] bg-[var(--app-surface-selected)] shadow-sm" : "border-[#E7E9EF] bg-white hover:border-[#CDD2DE] hover:bg-[#FAFBFD]"}`}
           >
             <div class="flex gap-3">
               <span class={`relative mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#A44141]" : "bg-[#EEF0FF] text-[#000A57]"}`}>
