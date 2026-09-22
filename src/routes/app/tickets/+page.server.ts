@@ -16,13 +16,8 @@ import {
   type SupportPermissionMap,
 } from "$lib/server/support/supportAccess";
 import {
-  addTicketLabel,
-  createTicketLabel,
-  deleteTicketAttachment,
   listTicketLabels,
   listTicketLabelsForTickets,
-  removeTicketLabel,
-  uploadTicketAttachment,
 } from "$lib/server/support/ticketCardRepository";
 import { parseTicketCustomerLinkForm } from "$lib/server/support/ticketCustomerForm";
 import { isTicketDueDate } from "$lib/server/support/ticketDueDate";
@@ -34,10 +29,6 @@ import {
   type TicketStatus,
 } from "$lib/server/support/supportRepository";
 import {
-  addTicketFollower,
-  removeTicketFollower,
-} from "$lib/server/support/ticketFollowerRepository";
-import {
   listTicketWorkspaceTickets,
   type TicketWorkspaceChannel,
   type TicketWorkspaceScope,
@@ -48,7 +39,6 @@ import { listTicketWorkflowEntryPoints, moveTicketAreaStage } from "$lib/server/
 import {
   getTicketWorkflowBoardWithAppearance,
   moveTicketGlobalStageWithRules,
-  moveTicketToWorkflowLocationWithRules,
 } from "$lib/server/support/ticketWorkflowService";
 
 function readFormValue(formData: FormData, name: string): string {
@@ -131,12 +121,6 @@ function actionErrorMessage(cause: unknown): string {
     TICKET_WORKFLOW_AREA_NOT_CONFIGURED: "Esta área não possui workflow ativo.",
     TICKET_WORKFLOW_AREA_EMPTY: "Esta área não possui colunas ativas.",
     TICKET_WORKFLOW_AREA_NOT_IN_GLOBAL: "Adicione esta área como uma coluna do fluxo global antes de mover tickets para ela.",
-    TICKET_LABEL_NAME_INVALID: "Informe uma etiqueta entre 2 e 40 caracteres.",
-    TICKET_LABEL_COLOR_INVALID: "Cor de etiqueta inválida.",
-    TICKET_ATTACHMENT_EMPTY: "Selecione um arquivo válido.",
-    TICKET_ATTACHMENT_TOO_LARGE: "O anexo deve ter no máximo 20 MB.",
-    TICKET_ATTACHMENT_TYPE_NOT_ALLOWED: "Este tipo de arquivo não é permitido.",
-    ASSET_STORAGE_NOT_CONFIGURED: "O storage de anexos ainda não está configurado.",
   };
   if (cause.message.includes("TICKET_WORKFLOW_AREA_NOT_COMPLETE")) {
     return messages.TICKET_WORKFLOW_AREA_NOT_COMPLETE;
@@ -263,70 +247,6 @@ export const load: PageServerLoad = async ({ parent, url }) => {
 };
 
 export const actions: Actions = {
-  addFollower: async ({ cookies, request }) => {
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      "tickets.view",
-      "/app/tickets",
-    );
-    const formData = await request.formData();
-    const ticketId = readFormValue(formData, "ticketId");
-    const userId = readFormValue(formData, "userId");
-    if (!isUuid(ticketId) || !isUuid(userId)) {
-      return fail(400, {
-        success: false,
-        action: "addFollower",
-        message: "Seguidor inválido.",
-      });
-    }
-    try {
-      await addTicketFollower(session.user.id, permissions, ticketId, userId);
-      return {
-        success: true,
-        action: "addFollower",
-        message: "Seguidor adicionado.",
-      };
-    } catch {
-      return fail(403, {
-        success: false,
-        action: "addFollower",
-        message: "Não foi possível adicionar este seguidor.",
-      });
-    }
-  },
-
-  removeFollower: async ({ cookies, request }) => {
-    const { session, permissions } = await requireAppPermission(
-      cookies,
-      "tickets.view",
-      "/app/tickets",
-    );
-    const formData = await request.formData();
-    const ticketId = readFormValue(formData, "ticketId");
-    const userId = readFormValue(formData, "userId");
-    if (!isUuid(ticketId) || !isUuid(userId)) {
-      return fail(400, {
-        success: false,
-        action: "removeFollower",
-        message: "Seguidor inválido.",
-      });
-    }
-    try {
-      await removeTicketFollower(session.user.id, permissions, ticketId, userId);
-      return {
-        success: true,
-        action: "removeFollower",
-        message: "Seguidor removido.",
-      };
-    } catch {
-      return fail(403, {
-        success: false,
-        action: "removeFollower",
-        message: "Não foi possível remover este seguidor.",
-      });
-    }
-  },
-
   create: async ({ cookies, request }) => {
     const { session, permissions } = await requireAppPermission(
       cookies,
@@ -405,102 +325,4 @@ export const actions: Actions = {
     }
   },
 
-  moveTicketLocation: async ({ cookies, request }) => {
-    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", "/app/tickets");
-    const formData = await request.formData();
-    const ticketId = readFormValue(formData, "ticketId");
-    const workflowId = readFormValue(formData, "workflowId");
-    const stageId = readFormValue(formData, "stageId");
-    if (!isUuid(ticketId) || !isUuid(workflowId) || !isUuid(stageId)) {
-      return fail(400, { success: false, action: "moveTicketLocation", message: "Área ou coluna inválida." });
-    }
-    try {
-      await moveTicketToWorkflowLocationWithRules(
-        session.user.id,
-        permissions,
-        ticketId,
-        workflowId,
-        stageId,
-      );
-      return { success: true, action: "moveTicketLocation", message: "Área e coluna atualizadas." };
-    } catch (cause) {
-      return fail(409, { success: false, action: "moveTicketLocation", message: actionErrorMessage(cause) });
-    }
-  },
-
-  createLabel: async ({ cookies, request }) => {
-    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", "/app/tickets");
-    const formData = await request.formData();
-    const ticketId = readFormValue(formData, "ticketId");
-    const name = readFormValue(formData, "name");
-    const color = readFormValue(formData, "color");
-    if (!isUuid(ticketId)) return fail(400, { success: false, action: "createLabel", message: "Ticket inválido." });
-    try {
-      const tagId = await createTicketLabel(session.user.id, permissions, name, color);
-      await addTicketLabel(session.user.id, permissions, ticketId, tagId);
-      return { success: true, action: "createLabel", message: "Etiqueta criada e adicionada." };
-    } catch (cause) {
-      return fail(409, { success: false, action: "createLabel", message: actionErrorMessage(cause) });
-    }
-  },
-
-  addLabel: async ({ cookies, request }) => {
-    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", "/app/tickets");
-    const formData = await request.formData();
-    const ticketId = readFormValue(formData, "ticketId");
-    const tagId = readFormValue(formData, "tagId");
-    if (!isUuid(ticketId) || !isUuid(tagId)) return fail(400, { success: false, action: "addLabel", message: "Etiqueta inválida." });
-    try {
-      await addTicketLabel(session.user.id, permissions, ticketId, tagId);
-      return { success: true, action: "addLabel", message: "Etiqueta adicionada." };
-    } catch (cause) {
-      return fail(409, { success: false, action: "addLabel", message: actionErrorMessage(cause) });
-    }
-  },
-
-  removeLabel: async ({ cookies, request }) => {
-    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", "/app/tickets");
-    const formData = await request.formData();
-    const ticketId = readFormValue(formData, "ticketId");
-    const tagId = readFormValue(formData, "tagId");
-    if (!isUuid(ticketId) || !isUuid(tagId)) return fail(400, { success: false, action: "removeLabel", message: "Etiqueta inválida." });
-    try {
-      await removeTicketLabel(session.user.id, permissions, ticketId, tagId);
-      return { success: true, action: "removeLabel", message: "Etiqueta removida." };
-    } catch (cause) {
-      return fail(409, { success: false, action: "removeLabel", message: actionErrorMessage(cause) });
-    }
-  },
-
-  uploadAttachment: async ({ cookies, request }) => {
-    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", "/app/tickets");
-    const formData = await request.formData();
-    const ticketId = readFormValue(formData, "ticketId");
-    const file = formData.get("file");
-    if (!isUuid(ticketId) || !(file instanceof File)) {
-      return fail(400, { success: false, action: "uploadAttachment", message: "Selecione um arquivo válido." });
-    }
-    try {
-      await uploadTicketAttachment(session.user.id, permissions, ticketId, file);
-      return { success: true, action: "uploadAttachment", message: "Anexo adicionado." };
-    } catch (cause) {
-      return fail(409, { success: false, action: "uploadAttachment", message: actionErrorMessage(cause) });
-    }
-  },
-
-  deleteAttachment: async ({ cookies, request }) => {
-    const { session, permissions } = await requireAppPermission(cookies, "tickets.reply", "/app/tickets");
-    const formData = await request.formData();
-    const ticketId = readFormValue(formData, "ticketId");
-    const attachmentId = readFormValue(formData, "attachmentId");
-    if (!isUuid(ticketId) || !isUuid(attachmentId)) {
-      return fail(400, { success: false, action: "deleteAttachment", message: "Anexo inválido." });
-    }
-    try {
-      await deleteTicketAttachment(session.user.id, permissions, ticketId, attachmentId);
-      return { success: true, action: "deleteAttachment", message: "Anexo removido." };
-    } catch (cause) {
-      return fail(409, { success: false, action: "deleteAttachment", message: actionErrorMessage(cause) });
-    }
-  },
 };
