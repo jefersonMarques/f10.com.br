@@ -355,7 +355,7 @@
           {#if (ticketData.canReply || ticketData.canCommentInternal) && ticketData.details.ticket.status !== "closed"}
             <div class="mt-5 grid gap-3 lg:grid-cols-2">
               {#if ticketData.canReply}
-                <form on:submit|preventDefault={(event) => void submitForm(event, "reply", true)} class="rounded-2xl border border-[#D9DDF0] bg-[#F8F9FF] p-3">
+                <form method="POST" action={actionUrl("reply")} on:submit|preventDefault={(event) => void submitForm(event, "reply", true)} class="rounded-2xl border border-[#D9DDF0] bg-[#F8F9FF] p-3">
                   <label class="block">
                     <span class="mb-1.5 block text-[10px] font-semibold text-[#000A57]">Resposta ao cliente</span>
                     <textarea name="body" required maxlength="10000" rows="4" placeholder="Escreva a resposta..." class="w-full resize-y rounded-xl border border-[#DDE1EA] bg-white px-3 py-2.5 text-[11px] leading-5 outline-none focus:border-[#000A57]"></textarea>
@@ -365,7 +365,7 @@
               {/if}
 
               {#if ticketData.canCommentInternal}
-                <form on:submit|preventDefault={(event) => void submitForm(event, "note", true)} class="rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] p-3">
+                <form method="POST" action={actionUrl("note")} on:submit|preventDefault={(event) => void submitForm(event, "note", true)} class="rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] p-3">
                   <span class="mb-1.5 block text-[10px] font-semibold text-[#8B4D12]">Nota interna</span>
                   <MentionTextarea users={ticketData.mentionUsers} name="body" rows={4} maxlength={10000} placeholder="Use @ para mencionar alguém..." className="w-full resize-y rounded-xl border border-[#E9D6C1] bg-white px-3 py-2.5 text-[11px] leading-5 outline-none focus:border-[#C46C17]" />
                   <button type="submit" disabled={Boolean(actionLoading)} class="mt-2.5 min-h-9 w-full rounded-xl bg-[#9A5513] px-3 text-[10px] font-semibold text-white disabled:opacity-50">Adicionar nota</button>
@@ -404,7 +404,7 @@
           <h3 class="flex items-center gap-2 text-[11px] font-semibold text-[#3D4452]"><Route size={13}/>Área e coluna</h3>
           <p class="mt-1 text-[9px] leading-4 text-[#858B99]">{ticketData.workflowContext?.areaName ? `${ticketData.workflowContext.areaName} · ${ticketData.workflowContext.areaStageName ?? "Sem etapa"}` : ticketData.workflowContext?.globalStageName ?? "Fluxo global"}</p>
           {#if ticketData.canReply && workflowId}
-            <form on:submit|preventDefault={(event) => void submitForm(event, "moveTicketLocation")} class="mt-3">
+            <form method="POST" action={actionUrl("moveTicketLocation")} on:submit|preventDefault={(event) => void submitForm(event, "moveTicketLocation")} class="mt-3">
               <select name="workflowId" value={workflowId} on:change={changeWorkflow} class="h-9 w-full rounded-xl border border-[#D9DDE4] bg-white px-2 text-[10px]">
                 {#if ticketData.workflowBoard.globalWorkflow}<option value={ticketData.workflowBoard.globalWorkflow.id}>Fluxo global</option>{/if}
                 {#each movableAreaWorkflows as workflow}<option value={workflow.id}>Área · {workflow.areaName}</option>{/each}
@@ -420,7 +420,7 @@
         <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
           <h3 class="flex items-center gap-2 text-[11px] font-semibold text-[#3D4452]"><Headphones size={13}/>Atendimento</h3>
           {#if ticketData.canReply}
-            <form on:submit|preventDefault={(event) => void submitForm(event, "status")} class="mt-3">
+            <form method="POST" action={actionUrl("status")} on:submit|preventDefault={(event) => void submitForm(event, "status")} class="mt-3">
               <label class="text-[9px] font-semibold text-[#666D7C]">Status</label>
               <div class="mt-1 flex gap-2">
                 <select name="status" value={ticketData.details.ticket.status} class="h-9 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2 text-[10px]">
@@ -430,7 +430,7 @@
               </div>
             </form>
 
-            <form on:submit|preventDefault={(event) => void submitForm(event, "priority")} class="mt-3">
+            <form method="POST" action={actionUrl("priority")} on:submit|preventDefault={(event) => void submitForm(event, "priority")} class="mt-3">
               <label class="text-[9px] font-semibold text-[#666D7C]">Prioridade</label>
               <div class="mt-1 flex gap-2">
                 <select name="priority" value={ticketData.details.ticket.priority} class="h-9 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2 text-[10px]"><option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option></select>
@@ -438,7 +438,7 @@
               </div>
             </form>
 
-            <form on:submit|preventDefault={(event) => void submitForm(event, "dueOn")} class="mt-3">
+            <form method="POST" action={actionUrl("dueOn")} on:submit|preventDefault={(event) => void submitForm(event, "dueOn")} class="mt-3">
               <label class="text-[9px] font-semibold text-[#666D7C]">Conclusão planejada</label>
               <div class="mt-1 flex gap-2">
                 <input name="dueOn" type="date" required value={ticketData.details.ticket.dueOn} class="h-9 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2 text-[10px]"/>
@@ -453,7 +453,7 @@
             <span class="text-[9px] text-[#8D93A0]">Responsável</span>
             <p class="mt-1 text-[10.5px] font-semibold text-[#414857]">{ticketData.details.ticket.assignedUserName ?? "Não atribuído"}</p>
             {#if ticketData.canAssign}
-              <form on:submit|preventDefault={(event) => void submitForm(event, "assign")} class="mt-2.5 flex gap-2">
+              <form method="POST" action={actionUrl("assign")} on:submit|preventDefault={(event) => void submitForm(event, "assign")} class="mt-2.5 flex gap-2">
                 <select name="assignedUserId" required class="h-9 min-w-0 flex-1 rounded-xl border border-[#DDE1EA] bg-white px-2.5 text-[10px]">
                   {#each ticketData.agents as agent}<option value={agent.id} selected={agent.id === ticketData.details.ticket.assignedUserId}>{agent.name}</option>{/each}
                 </select>
@@ -483,7 +483,7 @@
           {:else}
             <p class="mt-2 text-[9.5px] leading-4 text-[#8B919F]">Ticket sem cliente vinculado.</p>
             {#if ticketData.canLinkCustomer}
-              <form on:submit|preventDefault={(event) => void submitForm(event, "linkCustomer")} class="mt-3 grid gap-2">
+              <form method="POST" action={actionUrl("linkCustomer")} on:submit|preventDefault={(event) => void submitForm(event, "linkCustomer")} class="mt-3 grid gap-2">
                 <TicketCustomerPicker enabled={true}/>
                 <button type="submit" class="h-9 rounded-xl bg-[#000A57] px-3 text-[9.5px] font-semibold text-white">Vincular cliente</button>
               </form>
@@ -532,7 +532,7 @@
               <option value="">Adicionar etiqueta...</option>
               {#each ticketData.labels.filter((label) => !ticketData.selectedLabels.some((selected) => selected.id === label.id)) as label}<option value={label.id}>{label.name}</option>{/each}
             </select>
-            <form on:submit|preventDefault={(event) => void submitForm(event, "createLabel", true)} class="mt-2 grid grid-cols-[1fr_92px] gap-2">
+            <form method="POST" action={actionUrl("createLabel")} on:submit|preventDefault={(event) => void submitForm(event, "createLabel", true)} class="mt-2 grid grid-cols-[1fr_92px] gap-2">
               <input name="name" required minlength="2" maxlength="40" placeholder="Nova etiqueta" class="h-9 rounded-xl border border-[#D9DDE4] px-2 text-[9.5px]"/>
               <select name="color" class="h-9 rounded-xl border border-[#D9DDE4] bg-white px-2 text-[9px]"><option value="blue">Azul</option><option value="green">Verde</option><option value="yellow">Amarela</option><option value="orange">Laranja</option><option value="red">Vermelha</option><option value="purple">Roxa</option><option value="gray">Cinza</option></select>
               <button type="submit" class="col-span-2 h-8 rounded-lg border border-[#D9DDE4] text-[9px] font-semibold text-[#4E5565]">Criar e adicionar</button>
@@ -543,7 +543,7 @@
         <section class="rounded-[20px] border border-[#E2E5ED] bg-white p-4 shadow-[0_10px_28px_rgba(1,13,40,0.04)]">
           <h3 class="flex items-center gap-2 text-[11px] font-semibold text-[#3D4452]"><Paperclip size={13}/>Adicionar anexo</h3>
           {#if ticketData.canReply && ticketData.attachmentsEnabled}
-            <form on:submit|preventDefault={(event) => void submitForm(event, "uploadAttachment", true)} class="mt-3">
+            <form method="POST" action={actionUrl("uploadAttachment")} on:submit|preventDefault={(event) => void submitForm(event, "uploadAttachment", true)} class="mt-3">
               <input name="file" type="file" required accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,.docx,.xlsx,.zip" class="block w-full text-[9px] text-[#6C7381]"/>
               <button type="submit" class="mt-3 h-9 w-full rounded-xl border border-[#D9DDE4] bg-white text-[9.5px] font-semibold text-[#4E5565]">Enviar arquivo</button>
             </form>
