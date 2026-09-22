@@ -46,7 +46,7 @@
     view === "split"
     && data.tickets.length > 0
     && !ticketDetails
-    && !ticketDetailsLoading
+    && !detailsLoading
     && splitInitializedFor !== data.tickets[0].id
   ) {
     splitInitializedFor = data.tickets[0].id;
@@ -173,7 +173,7 @@
     splitInitializedFor = ticketId;
     try {
       const response = await fetch(`/app/tickets/${ticketId}/details`, { cache: "no-store" });
-      if (!response.ok) throw new Error("CARD_LOAD_FAILED");
+      if (!response.ok) throw new Error("TICKET_DETAILS_LOAD_FAILED");
       ticketDetails = await response.json() as TicketDetailsData;
     } catch {
       window.alert("Não foi possível abrir o ticket.");
@@ -188,7 +188,7 @@
 
     try {
       const response = await fetch(`/app/tickets/${ticketId}/details`, { cache: "no-store" });
-      if (!response.ok) throw new Error("CARD_REFRESH_FAILED");
+      if (!response.ok) throw new Error("TICKET_DETAILS_REFRESH_FAILED");
       ticketDetails = await response.json() as TicketDetailsData;
     } catch {
       window.alert("Não foi possível atualizar o ticket.");
