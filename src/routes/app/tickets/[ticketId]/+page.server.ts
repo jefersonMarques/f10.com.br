@@ -10,6 +10,13 @@ import { markEntityNotificationsRead } from "$lib/server/notifications/notificat
 import { parseServiceRequestUpdateForm } from "$lib/server/serviceRequests/serviceRequestForm";
 import { updateSupportServiceRequest } from "$lib/server/serviceRequests/serviceRequestOperations";
 import { requireTicketAccess } from "$lib/server/support/supportAccess";
+import {
+  addTicketLabel,
+  createTicketLabel,
+  deleteTicketAttachment,
+  removeTicketLabel,
+  uploadTicketAttachment,
+} from "$lib/server/support/ticketCardRepository";
 import { markTicketChatHumanTakeover } from "$lib/server/support/supportAiHandoff";
 import { createTaskFromTicket } from "$lib/server/support/ticketTaskBridge";
 import {
@@ -32,6 +39,7 @@ import {
 } from "$lib/server/support/supportRepository";
 import { type TaskPriority } from "$lib/server/tasks/taskRepository";
 import { getTicketDetailsData } from "$lib/server/support/ticketDetailsService";
+import { moveTicketToWorkflowLocationWithRules } from "$lib/server/support/ticketWorkflowService";
 
 type MentionUser = { id: string; name: string; email: string };
 
@@ -105,6 +113,30 @@ function isTaskPriority(value: string): value is TaskPriority {
   return ["low", "normal", "high", "urgent"].includes(value);
 }
 
+function actionErrorMessage(cause: unknown): string {
+  if (!(cause instanceof Error)) return "Não foi possível concluir a operação.";
+
+  const messages: Record<string, string> = {
+    TICKET_WORKFLOW_AREA_ACCESS_DENIED: "Você não possui acesso ao processo interno desta área.",
+    TICKET_WORKFLOW_AREA_NOT_COMPLETE: "Entre na área e conclua o fluxo antes de movimentar o ticket.",
+    TICKET_WORKFLOW_AREA_NOT_CONFIGURED: "Esta área não possui workflow ativo.",
+    TICKET_WORKFLOW_AREA_EMPTY: "Esta área não possui colunas ativas.",
+    TICKET_WORKFLOW_AREA_NOT_IN_GLOBAL: "Adicione esta área como uma coluna do fluxo global antes de mover tickets para ela.",
+    TICKET_LABEL_NAME_INVALID: "Informe uma etiqueta entre 2 e 40 caracteres.",
+    TICKET_LABEL_COLOR_INVALID: "Cor de etiqueta inválida.",
+    TICKET_ATTACHMENT_EMPTY: "Selecione um arquivo válido.",
+    TICKET_ATTACHMENT_TOO_LARGE: "O anexo deve ter no máximo 20 MB.",
+    TICKET_ATTACHMENT_TYPE_NOT_ALLOWED: "Este tipo de arquivo não é permitido.",
+    ASSET_STORAGE_NOT_CONFIGURED: "O storage de anexos ainda não está configurado.",
+  };
+
+  if (cause.message.includes("TICKET_WORKFLOW_AREA_NOT_COMPLETE")) {
+    return messages.TICKET_WORKFLOW_AREA_NOT_COMPLETE;
+  }
+
+  return messages[cause.message] ?? "Não foi possível concluir a operação.";
+}
+
 export const load: PageServerLoad = async ({ params, parent }) => {
   if (!isUuid(params.ticketId)) throw error(404, "Ticket não encontrado.");
 
@@ -174,6 +206,212 @@ export const actions: Actions = {
       return { success: true, action: "removeFollower", message: "Seguidor removido." };
     } catch {
       return fail(403, { success: false, action: "removeFollower", message: "Não foi possível remover este seguidor." });
+    }
+  },
+
+  moveTicketLocation: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, {
+        success: false,
+        action: "moveTicketLocation",
+        message: "Ticket não encontrado.",
+      });
+    }
+
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      `/app/tickets/${params.ticketId}`,
+    );
+    const formData = await request.formData();
+    const workflowId = readFormValue(formData, "workflowId");
+    const stageId = readFormValue(formData, "stageId");
+
+    if (!isUuid(workflowId) || !isUuid(stageId)) {
+      return fail(400, {
+        success: false,
+        action: "moveTicketLocation",
+        message: "Área ou coluna inválida.",
+      });
+    }
+
+    try {
+      await moveTicketToWorkflowLocationWithRules(
+        session.user.id,
+        permissions,
+        params.ticketId,
+        workflowId,
+        stageId,
+      );
+      return {
+        success: true,
+        action: "moveTicketLocation",
+        message: "Área e coluna atualizadas.",
+      };
+    } catch (cause) {
+      return fail(409, {
+        success: false,
+        action: "moveTicketLocation",
+        message: actionErrorMessage(cause),
+      });
+    }
+  },
+
+  createLabel: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, { success: false, action: "createLabel", message: "Ticket não encontrado." });
+    }
+
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      `/app/tickets/${params.ticketId}`,
+    );
+    const formData = await request.formData();
+    const name = readFormValue(formData, "name");
+    const color = readFormValue(formData, "color");
+
+    try {
+      const tagId = await createTicketLabel(session.user.id, permissions, name, color);
+      await addTicketLabel(session.user.id, permissions, params.ticketId, tagId);
+      return { success: true, action: "createLabel", message: "Etiqueta criada e adicionada." };
+    } catch (cause) {
+      return fail(409, {
+        success: false,
+        action: "createLabel",
+        message: actionErrorMessage(cause),
+      });
+    }
+  },
+
+  addLabel: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, { success: false, action: "addLabel", message: "Ticket não encontrado." });
+    }
+
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      `/app/tickets/${params.ticketId}`,
+    );
+    const tagId = readFormValue(await request.formData(), "tagId");
+    if (!isUuid(tagId)) {
+      return fail(400, { success: false, action: "addLabel", message: "Etiqueta inválida." });
+    }
+
+    try {
+      await addTicketLabel(session.user.id, permissions, params.ticketId, tagId);
+      return { success: true, action: "addLabel", message: "Etiqueta adicionada." };
+    } catch (cause) {
+      return fail(409, {
+        success: false,
+        action: "addLabel",
+        message: actionErrorMessage(cause),
+      });
+    }
+  },
+
+  removeLabel: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, { success: false, action: "removeLabel", message: "Ticket não encontrado." });
+    }
+
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      `/app/tickets/${params.ticketId}`,
+    );
+    const tagId = readFormValue(await request.formData(), "tagId");
+    if (!isUuid(tagId)) {
+      return fail(400, { success: false, action: "removeLabel", message: "Etiqueta inválida." });
+    }
+
+    try {
+      await removeTicketLabel(session.user.id, permissions, params.ticketId, tagId);
+      return { success: true, action: "removeLabel", message: "Etiqueta removida." };
+    } catch (cause) {
+      return fail(409, {
+        success: false,
+        action: "removeLabel",
+        message: actionErrorMessage(cause),
+      });
+    }
+  },
+
+  uploadAttachment: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, {
+        success: false,
+        action: "uploadAttachment",
+        message: "Ticket não encontrado.",
+      });
+    }
+
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      `/app/tickets/${params.ticketId}`,
+    );
+    const formData = await request.formData();
+    const file = formData.get("file");
+
+    if (!(file instanceof File)) {
+      return fail(400, {
+        success: false,
+        action: "uploadAttachment",
+        message: "Selecione um arquivo válido.",
+      });
+    }
+
+    try {
+      await uploadTicketAttachment(session.user.id, permissions, params.ticketId, file);
+      return { success: true, action: "uploadAttachment", message: "Anexo adicionado." };
+    } catch (cause) {
+      return fail(409, {
+        success: false,
+        action: "uploadAttachment",
+        message: actionErrorMessage(cause),
+      });
+    }
+  },
+
+  deleteAttachment: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, {
+        success: false,
+        action: "deleteAttachment",
+        message: "Ticket não encontrado.",
+      });
+    }
+
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      `/app/tickets/${params.ticketId}`,
+    );
+    const attachmentId = readFormValue(await request.formData(), "attachmentId");
+    if (!isUuid(attachmentId)) {
+      return fail(400, {
+        success: false,
+        action: "deleteAttachment",
+        message: "Anexo inválido.",
+      });
+    }
+
+    try {
+      await deleteTicketAttachment(
+        session.user.id,
+        permissions,
+        params.ticketId,
+        attachmentId,
+      );
+      return { success: true, action: "deleteAttachment", message: "Anexo removido." };
+    } catch (cause) {
+      return fail(409, {
+        success: false,
+        action: "deleteAttachment",
+        message: actionErrorMessage(cause),
+      });
     }
   },
 
