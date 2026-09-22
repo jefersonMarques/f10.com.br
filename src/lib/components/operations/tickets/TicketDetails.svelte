@@ -16,7 +16,6 @@
     Send,
     ShieldCheck,
     Star,
-    Tag,
     Trash2,
     UserRound,
     UsersRound,
