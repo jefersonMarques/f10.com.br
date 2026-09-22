@@ -80,7 +80,7 @@ function parseScope(value: string | null): TicketWorkspaceScope {
 }
 
 function parseView(value: string | null): "board" | "list" | "split" {
-  return value === "list" || value === "split" ? value : "board";
+  return value === "board" || value === "list" ? value : "split";
 }
 
 function parseStatus(value: string | null): TicketStatus | null {

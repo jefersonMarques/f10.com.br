@@ -62,7 +62,7 @@
 
   function workspaceUrl(page = 1): string {
     const params = new URLSearchParams();
-    if (view !== "board") params.set("view", view);
+    if (view !== "split") params.set("view", view);
     if (scope !== "all") params.set("scope", scope);
     if (search.trim()) params.set("q", search.trim());
     if (status) params.set("status", status);
@@ -256,7 +256,7 @@
         onOpenTicket={openTicketDetails}
       />
     {:else if view === "split"}
-      <div class="grid min-h-[680px] gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-[315px_minmax(0,1fr)] lg:gap-4">
+      <div class="grid min-h-[680px] gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-[330px_minmax(0,1fr)] lg:gap-4">
         <aside class="flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)]">
           <div class="min-h-0 flex-1">
             <TicketList

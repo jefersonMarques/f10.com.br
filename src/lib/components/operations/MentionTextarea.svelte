@@ -13,7 +13,7 @@
   export let className = "";
 
   let textarea: HTMLTextAreaElement;
-  let value = "";
+  export let value = "";
   let query = "";
   let mentionStart = -1;
   let open = false;

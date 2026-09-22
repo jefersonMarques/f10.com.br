@@ -81,9 +81,8 @@
     <section class="flex h-full min-h-0 flex-col bg-white">
       <header class="shrink-0 px-4 pb-3 pt-4">
         <div class="flex items-center gap-3">
-          <span class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white shadow-sm">
+          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white shadow-sm">
             <TicketCheck size={18} aria-hidden="true" />
-            <span class="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-[#EA6D0B]"></span>
           </span>
           <div class="min-w-0">
             <h2 class="truncate text-[14px] font-semibold text-[#202637]">Tickets</h2>
@@ -98,12 +97,8 @@
             <button
               type="button"
               on:click={() => void onOpenTicket(ticket.id)}
-              class={`relative block w-full overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition ${selectedTicketId === ticket.id ? "border-[#000A57] bg-[#F6F7FF] shadow-[0_8px_20px_rgba(0,10,87,0.08)]" : "border-[#E7E9EF] bg-white hover:border-[#CDD2DE] hover:shadow-sm"}`}
+              class={`block w-full overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition ${selectedTicketId === ticket.id ? "border-[#C9CFF3] bg-[#F5F6FF] shadow-sm" : "border-[#E7E9EF] bg-white hover:border-[#CDD2DE] hover:bg-[#FAFBFD]"}`}
             >
-              {#if selectedTicketId === ticket.id}
-                <span class="absolute inset-y-3 left-0 w-1 rounded-r-full bg-[#EA6D0B]"></span>
-              {/if}
-
               <div class="flex gap-3">
                 <span class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]">
                   <UserRound size={17} aria-hidden="true" />
@@ -111,21 +106,21 @@
 
                 <div class="min-w-0 flex-1">
                   <div class="flex items-start justify-between gap-2">
-                    <strong class="truncate text-[11.5px] font-semibold text-[#303645]">{ticket.customerName ?? "Cliente não identificado"}</strong>
-                    <span class="flex shrink-0 items-center gap-1 text-[9px] text-[#9CA1AD]"><Clock3 size={10} />{relativeUpdated(ticket.updatedAt)}</span>
+                    <strong class="truncate text-[12px] font-semibold text-[#303645]">{ticket.customerName ?? "Cliente não identificado"}</strong>
+                    <span class="flex shrink-0 items-center gap-1 text-[10px] text-[#949AA7]"><Clock3 size={10} />{relativeUpdated(ticket.updatedAt)}</span>
                   </div>
 
                   <div class="mt-1 flex min-w-0 items-center gap-2">
-                    <span class="shrink-0 rounded-md bg-[#FFF0E4] px-1.5 py-0.5 text-[9px] font-bold text-[#B95B12]">#{ticket.ticketNumber}</span>
-                    <span class="min-w-0 flex-1 truncate text-[9.5px] font-medium text-[#747B8B]">{processLabel(ticket)}</span>
+                    <span class="shrink-0 rounded-md bg-[#EEF0FF] px-1.5 py-0.5 text-[10px] font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
+                    <span class="min-w-0 flex-1 truncate text-[10.5px] font-medium text-[#747B8B]">{processLabel(ticket)}</span>
                     {#if ticket.channel === "email"}<Mail size={11} class="shrink-0 text-[#858B99]" aria-label="Recebido por e-mail"/>{/if}
                   </div>
 
-                  <p class="mt-2 line-clamp-2 text-[10.5px] font-semibold leading-4 text-[#4E5564]">{ticket.subject}</p>
+                  <p class="mt-2 line-clamp-2 text-[11.5px] font-semibold leading-[18px] text-[#4E5564]">{ticket.subject}</p>
 
                   <div class="mt-2 flex min-w-0 items-center gap-2">
                     <span class={`application-text-meta inline-flex shrink-0 items-center rounded-full px-2 py-1 font-bold ${slaClass(ticket)}`}>{slaText(ticket)}</span>
-                    <span class="truncate text-[9px] font-medium text-[#8A909D]">{priorityLabels[ticket.priority] ?? ticket.priority} · {ticket.assignedUserName ?? "Sem responsável"}</span>
+                    <span class="truncate text-[10px] font-medium text-[#8A909D]">{priorityLabels[ticket.priority] ?? ticket.priority} · {ticket.assignedUserName ?? "Sem responsável"}</span>
                   </div>
 
                   {#if ticket.labels.length > 0}
@@ -165,7 +160,7 @@
             on:click={() => void onOpenTicket(ticket.id)}
             class={`grid w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-[#F8F9FC] ${selectedTicketId === ticket.id ? "bg-[#F3F5FF]" : ""} ${compact ? "grid-cols-[88px_minmax(220px,1.5fr)_minmax(160px,1fr)_120px]" : "grid-cols-[90px_minmax(220px,1.5fr)_minmax(160px,1fr)_minmax(180px,1fr)_110px_180px_120px_110px]"}`}
           >
-            <span class="application-text-caption flex items-center gap-1.5 font-bold text-[#EA6D0B]">
+            <span class="application-text-caption flex items-center gap-1.5 font-bold text-[#000A57]">
               #{ticket.ticketNumber}
               {#if ticket.channel === "email"}<Mail size={11} aria-label="Recebido por e-mail"/>{/if}
             </span>
@@ -208,7 +203,7 @@
       <button type="button" on:click={() => void onOpenTicket(ticket.id)} class={`w-full px-4 py-4 text-left ${selectedTicketId === ticket.id ? "bg-[#F3F5FF]" : ""}`}>
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <span class="application-text-caption font-bold text-[#EA6D0B]">#{ticket.ticketNumber}</span>
+            <span class="application-text-caption font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
             <strong class="mt-1 block text-[13px] font-semibold leading-5 text-[#2D3342]">{ticket.subject}</strong>
           </div>
           <span class={`application-text-caption shrink-0 rounded-full px-2 py-1 font-bold ${slaClass(ticket)}`}>{slaText(ticket)}</span>
