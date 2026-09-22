@@ -254,7 +254,7 @@
   }
 </script>
 
-<div class={surface === "split" ? "h-full min-h-0 overflow-y-auto bg-[#F7F8FA]" : "bg-[#F5F6FA]"}>
+<div class={surface === "page" ? "bg-[#F5F6FA]" : "h-full min-h-0 overflow-y-auto bg-[#F7F8FA]"}>
   <section class={surface === "split"
     ? "relative min-h-full overflow-hidden bg-white"
     : "relative overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)]"}>
