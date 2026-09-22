@@ -290,7 +290,7 @@
   }
 </script>
 
-<section class="rounded-[22px] border border-[#DDE2EC] bg-white p-5 shadow-[0_8px_28px_rgba(1,13,40,0.025)] sm:p-6">
+<section class="rounded-[22px] border border-[var(--app-border-control)] bg-white p-5 shadow-[0_8px_28px_rgba(1,13,40,0.025)] sm:p-6">
   <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
     <div class="min-w-0">
       <div class="flex items-center gap-2 text-[#000A57]">
@@ -300,103 +300,103 @@
       <p class="application-text-meta mt-1 text-[#858C9C]">Versão {serviceRequest.version} · atualizado em {formatDate(serviceRequest.updatedAt)}</p>
     </div>
     <div class="flex shrink-0 flex-wrap gap-2">
-      <button type="button" on:click={openView} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE2EC] bg-white px-3 font-semibold text-[#000A57] transition hover:bg-[#F8F9FF]"><Eye size={14} />Ver dados</button>
-      {#if canEdit}<button type="button" on:click={openEdit} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 font-semibold text-white"><Pencil size={14} />Editar dados</button>{/if}
+      <button type="button" on:click={openView} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[var(--app-border-control)] bg-white px-3 font-semibold text-[#000A57] transition hover:bg-[var(--app-info-bg)]"><Eye size={14} />Ver dados</button>
+      {#if canEdit}<button type="button" on:click={openEdit} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[var(--app-primary)] px-3 font-semibold text-white"><Pencil size={14} />Editar dados</button>{/if}
     </div>
   </div>
 
   <div class="mt-4 grid gap-2 sm:grid-cols-3">
-    <div class="rounded-xl border border-[#ECEEF3] bg-[#FAFBFC] px-3 py-3"><span class="application-text-meta block text-[#9298A5]">Campos</span><strong class="mt-1 block text-[12px] text-[#424A5B]">{serviceRequest.fields.length}</strong></div>
-    <div class="rounded-xl border border-[#ECEEF3] bg-[#FAFBFC] px-3 py-3"><span class="application-text-meta block text-[#9298A5]">Documentos</span><strong class="mt-1 block text-[12px] text-[#424A5B]">{serviceRequest.attachments.length}</strong></div>
-    <div class="rounded-xl border border-[#ECEEF3] bg-[#FAFBFC] px-3 py-3"><span class="application-text-meta block text-[#9298A5]">Credenciais protegidas</span><strong class="mt-1 block text-[12px] text-[#424A5B]">{presentSecretCount}</strong></div>
+    <div class="rounded-xl border border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] px-3 py-3"><span class="application-text-meta block text-[#9298A5]">Campos</span><strong class="mt-1 block text-[12px] text-[#424A5B]">{serviceRequest.fields.length}</strong></div>
+    <div class="rounded-xl border border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] px-3 py-3"><span class="application-text-meta block text-[#9298A5]">Documentos</span><strong class="mt-1 block text-[12px] text-[#424A5B]">{serviceRequest.attachments.length}</strong></div>
+    <div class="rounded-xl border border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] px-3 py-3"><span class="application-text-meta block text-[#9298A5]">Credenciais protegidas</span><strong class="mt-1 block text-[12px] text-[#424A5B]">{presentSecretCount}</strong></div>
   </div>
 </section>
 
 {#if modalMode !== "closed"}
   <div class="fixed inset-0 z-[10040] flex items-end justify-center bg-[#010D28]/45 p-0 sm:items-center sm:p-5" role="presentation" on:click|self={closeModal}>
     <section class="max-h-[92dvh] w-full overflow-y-auto rounded-t-[24px] bg-white shadow-2xl sm:max-w-[860px] sm:rounded-[24px]" role="dialog" aria-modal="true" aria-label={`Dados da solicitação de ${serviceRequest.label}`}>
-      <header class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[#E8EAF0] bg-white px-5 py-4 sm:px-6">
+      <header class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[var(--app-border)] bg-white px-5 py-4 sm:px-6">
         <div><h2 class="text-[18px] font-semibold text-[#010D28]">{modalMode === "edit" ? "Editar" : "Dados da"} solicitação de {serviceRequest.label}</h2><p class="application-text-meta mt-1 text-[#858C9C]">Versão {serviceRequest.version} · criada em {formatDate(serviceRequest.createdAt)}</p></div>
-        <button type="button" on:click={closeModal} aria-label="Fechar" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#E1E4EC] text-[#6B7280] hover:bg-[#F7F8FA]"><X size={18} /></button>
+        <button type="button" on:click={closeModal} aria-label="Fechar" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border)] text-[#6B7280] hover:bg-[var(--app-surface-subtle)]"><X size={18} /></button>
       </header>
 
       {#if modalMode === "edit"}
         <form method="POST" action={updateAction} class="px-5 py-5 sm:px-6" on:submit|preventDefault={updateServiceRequest}>
-          {#if updateError}<p class="mb-4 rounded-xl bg-[#FFF0F0] px-3 py-2.5 text-[10px] font-medium text-[#9B3C3C]">{updateError}</p>{/if}
+          {#if updateError}<p class="mb-4 rounded-xl bg-[var(--app-danger-bg)] px-3 py-2.5 text-[10px] font-medium text-[#9B3C3C]">{updateError}</p>{/if}
           <input type="hidden" name="expectedVersion" value={serviceRequest.version} />
           <div class="grid gap-4 sm:grid-cols-2">
             {#each serviceRequest.fields.filter((field) => field.editable) as field}
               <label class={field.inputKind === "textarea" ? "sm:col-span-2" : ""}>
                 <span class="application-text-caption mb-1.5 block font-semibold text-[#555D6E]">{field.label}</span>
                 {#if field.inputKind === "boolean"}
-                  <select name={`field:${field.key}`} value={String(field.value)} class="application-text-caption h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 outline-none focus:border-[#000A57]"><option value="true">Sim</option><option value="false">Não</option></select>
+                  <select name={`field:${field.key}`} value={String(field.value)} class="application-text-caption h-11 w-full rounded-xl border border-[var(--app-border-control)] bg-white px-3 outline-none focus:border-[var(--app-primary)]"><option value="true">Sim</option><option value="false">Não</option></select>
                 {:else if field.inputKind === "number"}
-                  <input name={`field:${field.key}`} type="number" step="any" value={field.value ?? ""} class="application-text-caption h-11 w-full rounded-xl border border-[#DDE1EA] px-3 outline-none focus:border-[#000A57]" />
+                  <input name={`field:${field.key}`} type="number" step="any" value={field.value ?? ""} class="application-text-caption h-11 w-full rounded-xl border border-[var(--app-border-control)] px-3 outline-none focus:border-[var(--app-primary)]" />
                 {:else if field.inputKind === "textarea"}
-                  <textarea name={`field:${field.key}`} rows="4" maxlength="200000" class="application-text-caption w-full rounded-xl border border-[#DDE1EA] px-3 py-2.5 leading-5 outline-none focus:border-[#000A57]">{field.value ?? ""}</textarea>
+                  <textarea name={`field:${field.key}`} rows="4" maxlength="200000" class="application-text-caption w-full rounded-xl border border-[var(--app-border-control)] px-3 py-2.5 leading-5 outline-none focus:border-[var(--app-primary)]">{field.value ?? ""}</textarea>
                 {:else}
-                  <input name={`field:${field.key}`} type="text" maxlength="200000" value={field.value ?? ""} class="application-text-caption h-11 w-full rounded-xl border border-[#DDE1EA] px-3 outline-none focus:border-[#000A57]" />
+                  <input name={`field:${field.key}`} type="text" maxlength="200000" value={field.value ?? ""} class="application-text-caption h-11 w-full rounded-xl border border-[var(--app-border-control)] px-3 outline-none focus:border-[var(--app-primary)]" />
                 {/if}
               </label>
             {/each}
           </div>
 
           {#if serviceRequest.secrets.length > 0}
-            <div class="mt-6 border-t border-[#ECEEF3] pt-5">
+            <div class="mt-6 border-t border-[var(--app-border-soft)] pt-5">
               <div class="flex items-center gap-2"><KeyRound size={15} class="text-[#9A541A]" /><h3 class="text-[13px] font-semibold text-[#454C5C]">Credenciais</h3></div>
               <p class="application-text-meta mt-1 text-[#8B91A0]">Deixe o campo vazio para manter a credencial atual. O valor anterior nunca é exibido no formulário.</p>
               <div class="mt-4 grid gap-4 sm:grid-cols-2">
                 {#each serviceRequest.secrets as secret}
-                  <label><span class="application-text-caption mb-1.5 block font-semibold text-[#555D6E]">{secret.label}</span><input name={`secret:${secret.key}`} type="password" autocomplete="new-password" maxlength="512" placeholder={secret.present ? "Informada · deixe em branco para manter" : "Não informada"} class="application-text-caption h-11 w-full rounded-xl border border-[#DDE1EA] px-3 outline-none focus:border-[#000A57]" /></label>
+                  <label><span class="application-text-caption mb-1.5 block font-semibold text-[#555D6E]">{secret.label}</span><input name={`secret:${secret.key}`} type="password" autocomplete="new-password" maxlength="512" placeholder={secret.present ? "Informada · deixe em branco para manter" : "Não informada"} class="application-text-caption h-11 w-full rounded-xl border border-[var(--app-border-control)] px-3 outline-none focus:border-[var(--app-primary)]" /></label>
                 {/each}
               </div>
             </div>
           {/if}
 
           {#if mode === "customer"}
-            <label class="mt-6 flex items-start gap-3 rounded-xl border border-[#F0D7BD] bg-[#FFF9F3] p-4"><input name="delayAcknowledged" value="true" type="checkbox" required class="mt-0.5 h-4 w-4 rounded border-[#C8A27A]" /><span class="application-text-caption leading-5 text-[#76512F]">Confirmo que a alteração pode exigir nova conferência e atrasar a implantação. Se houver dúvida, vou acionar o suporte pelo próprio chamado antes de enviar.</span></label>
+            <label class="mt-6 flex items-start gap-3 rounded-xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] p-4"><input name="delayAcknowledged" value="true" type="checkbox" required class="mt-0.5 h-4 w-4 rounded border-[var(--app-warning-border)]" /><span class="application-text-caption leading-5 text-[#76512F]">Confirmo que a alteração pode exigir nova conferência e atrasar a implantação. Se houver dúvida, vou acionar o suporte pelo próprio chamado antes de enviar.</span></label>
           {/if}
 
-          <div class="mt-6 flex flex-col-reverse gap-2 border-t border-[#ECEEF3] pt-5 sm:flex-row sm:justify-end"><button type="button" on:click={closeModal} class="application-text-caption min-h-11 rounded-xl border border-[#DDE1EA] px-4 font-semibold text-[#555D6E]">Cancelar</button><button type="submit" disabled={updateLoading} class="application-text-caption min-h-11 rounded-xl bg-[#000A57] px-5 font-semibold text-white disabled:opacity-50">{updateLoading ? "Salvando..." : "Salvar alterações"}</button></div>
+          <div class="mt-6 flex flex-col-reverse gap-2 border-t border-[var(--app-border-soft)] pt-5 sm:flex-row sm:justify-end"><button type="button" on:click={closeModal} class="application-text-caption min-h-11 rounded-xl border border-[var(--app-border-control)] px-4 font-semibold text-[#555D6E]">Cancelar</button><button type="submit" disabled={updateLoading} class="application-text-caption min-h-11 rounded-xl bg-[var(--app-primary)] px-5 font-semibold text-white disabled:opacity-50">{updateLoading ? "Salvando..." : "Salvar alterações"}</button></div>
         </form>
       {:else}
         <div class="space-y-6 px-5 py-5 sm:px-6">
           <section>
             <h3 class="text-[13px] font-semibold text-[#454C5C]">Dados informados</h3>
-            <dl class="mt-3 grid gap-2 sm:grid-cols-2">{#each serviceRequest.fields as field}<div class="rounded-xl border border-[#ECEEF3] bg-[#FAFBFC] px-3 py-3"><dt class="application-text-meta font-semibold text-[#8B91A0]">{field.label}</dt><dd class="mt-1 break-words text-[12px] leading-5 text-[#414958]">{field.displayValue}</dd></div>{/each}</dl>
+            <dl class="mt-3 grid gap-2 sm:grid-cols-2">{#each serviceRequest.fields as field}<div class="rounded-xl border border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] px-3 py-3"><dt class="application-text-meta font-semibold text-[#8B91A0]">{field.label}</dt><dd class="mt-1 break-words text-[12px] leading-5 text-[#414958]">{field.displayValue}</dd></div>{/each}</dl>
           </section>
 
           {#if serviceRequest.secrets.length > 0}
-            <section class="border-t border-[#ECEEF3] pt-5">
+            <section class="border-t border-[var(--app-border-soft)] pt-5">
               <div class="flex items-center gap-2"><ShieldCheck size={15} class="text-[#000A57]" /><h3 class="text-[13px] font-semibold text-[#454C5C]">Credenciais protegidas</h3></div>
               <div class="mt-3 space-y-2">
                 {#each serviceRequest.secrets as secret}
-                  <div class="rounded-xl border border-[#E3E6ED] bg-[#FAFBFC] px-3 py-3"><div class="flex flex-wrap items-center justify-between gap-3"><div class="min-w-0"><span class="application-text-caption block font-semibold text-[#4E5565]">{secret.label}</span><span class="application-text-meta mt-1 block break-all font-mono text-[#737B8C]">{revealedSecrets[secret.key] ?? (secret.present ? "•••••••• · Informada" : "Não informada")}</span></div>{#if mode === "support" && secret.present}{#if revealedSecrets[secret.key]}<button type="button" on:click={() => hideSecret(secret.key)} class="application-text-caption inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#555D6E]"><EyeOff size={13} />Ocultar</button>{:else}<button type="button" disabled={revealLoading === secret.key} on:click={() => revealSecret(secret.key)} class="application-text-caption inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57] disabled:opacity-50"><Eye size={13} />{revealLoading === secret.key ? "Revelando..." : "Revelar"}</button>{/if}{/if}</div></div>
+                  <div class="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-subtle)] px-3 py-3"><div class="flex flex-wrap items-center justify-between gap-3"><div class="min-w-0"><span class="application-text-caption block font-semibold text-[#4E5565]">{secret.label}</span><span class="application-text-meta mt-1 block break-all font-mono text-[#737B8C]">{revealedSecrets[secret.key] ?? (secret.present ? "•••••••• · Informada" : "Não informada")}</span></div>{#if mode === "support" && secret.present}{#if revealedSecrets[secret.key]}<button type="button" on:click={() => hideSecret(secret.key)} class="application-text-caption inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[var(--app-border-control)] bg-white px-3 font-semibold text-[#555D6E]"><EyeOff size={13} />Ocultar</button>{:else}<button type="button" disabled={revealLoading === secret.key} on:click={() => revealSecret(secret.key)} class="application-text-caption inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[var(--app-border-control)] bg-white px-3 font-semibold text-[#000A57] disabled:opacity-50"><Eye size={13} />{revealLoading === secret.key ? "Revelando..." : "Revelar"}</button>{/if}{/if}</div></div>
                 {/each}
               </div>
               {#if revealError}<p class="application-text-caption mt-2 text-[#A04435]">{revealError}</p>{/if}
             </section>
           {/if}
 
-          <section class="border-t border-[#ECEEF3] pt-5">
+          <section class="border-t border-[var(--app-border-soft)] pt-5">
             <div class="flex items-center gap-2"><Paperclip size={15} class="text-[#000A57]" /><h3 class="text-[13px] font-semibold text-[#454C5C]">Documentos</h3></div>
-            {#if attachmentMessage}<p class="application-text-caption mt-3 rounded-xl bg-[#F1FBF4] px-3 py-2 text-[#356347]">{attachmentMessage}</p>{/if}
-            {#if attachmentError}<p class="application-text-caption mt-3 rounded-xl bg-[#FFF5F5] px-3 py-2 text-[#9B2C2C]">{attachmentError}</p>{/if}
+            {#if attachmentMessage}<p class="application-text-caption mt-3 rounded-xl bg-[var(--app-success-bg)] px-3 py-2 text-[#356347]">{attachmentMessage}</p>{/if}
+            {#if attachmentError}<p class="application-text-caption mt-3 rounded-xl bg-[var(--app-danger-bg)] px-3 py-2 text-[#9B2C2C]">{attachmentError}</p>{/if}
             <div class="mt-3 space-y-3">
               {#each attachmentSlots as slot}
-                <article class="rounded-xl border border-[#E3E6ED] bg-[#FAFBFC] p-3">
+                <article class="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-subtle)] p-3">
                   <div class="flex flex-wrap items-start justify-between gap-2"><div><strong class="application-text-caption text-[#4E5565]">{slot.label}</strong><p class="application-text-meta mt-0.5 text-[#8B91A0]">{slot.hint}</p></div><span class="application-text-meta rounded-full bg-white px-2 py-1 font-semibold text-[#7A8190]">{attachmentsFor(slot.fieldKey).length} arquivo(s)</span></div>
                   {#if attachmentsFor(slot.fieldKey).length > 0}
-                    <div class="mt-2 space-y-1.5">{#each attachmentsFor(slot.fieldKey) as attachment}<a href={attachment.href} target="_blank" rel="noopener noreferrer" class="application-text-caption flex items-center gap-2 rounded-lg border border-[#E4E7ED] bg-white px-3 py-2 font-semibold text-[#4E5565]"><Download size={13} class="shrink-0" /><span class="min-w-0 flex-1 truncate">{attachment.originalName}</span><span class="application-text-meta shrink-0 font-normal text-[#9499A5]">{formatBytes(attachment.sizeBytes)}</span></a>{/each}</div>
+                    <div class="mt-2 space-y-1.5">{#each attachmentsFor(slot.fieldKey) as attachment}<a href={attachment.href} target="_blank" rel="noopener noreferrer" class="application-text-caption flex items-center gap-2 rounded-lg border border-[var(--app-border)] bg-white px-3 py-2 font-semibold text-[#4E5565]"><Download size={13} class="shrink-0" /><span class="min-w-0 flex-1 truncate">{attachment.originalName}</span><span class="application-text-meta shrink-0 font-normal text-[#9499A5]">{formatBytes(attachment.sizeBytes)}</span></a>{/each}</div>
                   {:else}<p class="application-text-caption mt-2 text-[#9298A5]">Nenhum arquivo enviado.</p>{/if}
 
                   {#if canEdit}
-                    <form class="mt-3 border-t border-[#E8EAF0] pt-3" enctype="multipart/form-data" on:submit|preventDefault={(event) => replaceAttachment(event, slot.fieldKey)}>
+                    <form class="mt-3 border-t border-[var(--app-border)] pt-3" enctype="multipart/form-data" on:submit|preventDefault={(event) => replaceAttachment(event, slot.fieldKey)}>
                       <input type="hidden" name="expectedVersion" value={serviceRequest.version} />
                       <input type="hidden" name="fieldKey" value={slot.fieldKey} />
-                      <input name="files" type="file" required multiple={slot.maxFiles > 1} accept={slot.accept} class="application-text-caption block w-full rounded-lg border border-[#DDE1EA] bg-white px-2 py-2 text-[#555D6E] file:mr-2 file:rounded-md file:border-0 file:bg-[#EEF0FF] file:px-2 file:py-1 file:text-[10px] file:font-semibold file:text-[#000A57]" />
-                      {#if mode === "customer"}<label class="mt-2 flex items-start gap-2 rounded-lg bg-[#FFF7EF] px-3 py-2"><input name="delayAcknowledged" value="true" type="checkbox" required class="mt-0.5" /><span class="application-text-meta leading-4 text-[#76512F]">Confirmo que substituir documentos pode exigir nova conferência e atrasar a implantação. Em caso de dúvida, posso falar com o suporte neste chamado.</span></label>{/if}
-                      <button type="submit" disabled={Boolean(attachmentLoading)} class="application-text-caption mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 font-semibold text-white disabled:opacity-50"><Upload size={13} />{attachmentLoading === slot.fieldKey ? "Enviando..." : attachmentsFor(slot.fieldKey).length > 0 ? "Substituir documento" : "Enviar documento"}</button>
+                      <input name="files" type="file" required multiple={slot.maxFiles > 1} accept={slot.accept} class="application-text-caption block w-full rounded-lg border border-[var(--app-border-control)] bg-white px-2 py-2 text-[#555D6E] file:mr-2 file:rounded-md file:border-0 file:bg-[var(--app-info-bg)] file:px-2 file:py-1 file:text-[10px] file:font-semibold file:text-[#000A57]" />
+                      {#if mode === "customer"}<label class="mt-2 flex items-start gap-2 rounded-lg bg-[var(--app-warning-bg)] px-3 py-2"><input name="delayAcknowledged" value="true" type="checkbox" required class="mt-0.5" /><span class="application-text-meta leading-4 text-[#76512F]">Confirmo que substituir documentos pode exigir nova conferência e atrasar a implantação. Em caso de dúvida, posso falar com o suporte neste chamado.</span></label>{/if}
+                      <button type="submit" disabled={Boolean(attachmentLoading)} class="application-text-caption mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[var(--app-primary)] px-3 font-semibold text-white disabled:opacity-50"><Upload size={13} />{attachmentLoading === slot.fieldKey ? "Enviando..." : attachmentsFor(slot.fieldKey).length > 0 ? "Substituir documento" : "Enviar documento"}</button>
                     </form>
                   {/if}
                 </article>
@@ -404,16 +404,16 @@
             </div>
           </section>
 
-          <section class="border-t border-[#ECEEF3] pt-5">
+          <section class="border-t border-[var(--app-border-soft)] pt-5">
             <div class="flex items-center gap-2"><Clock3 size={15} class="text-[#000A57]" /><h3 class="text-[13px] font-semibold text-[#454C5C]">Histórico de alterações</h3></div>
             <div class="mt-3 space-y-3">
               {#each serviceRequest.history as entry}
-                <article class="rounded-xl border border-[#E5E8EE] bg-[#FAFBFC] p-3"><div class="flex flex-wrap items-center justify-between gap-2"><strong class="application-text-caption text-[#4B5262]">Versão {entry.version} · {sourceLabel(entry.source)}</strong><span class="application-text-meta text-[#9298A5]">{entry.actorName} · {formatDate(entry.createdAt)}</span></div>{#if entry.changes.length > 0}<div class="mt-2 space-y-2">{#each entry.changes as change}<div class="rounded-lg bg-white px-3 py-2"><span class="application-text-meta block font-semibold text-[#6A7180]">{change.label}</span>{#if change.secretChanged}<span class="application-text-caption mt-1 block text-[#8B5A2B]">Credencial alterada · valor protegido</span>{:else}<div class="application-text-caption mt-1 grid gap-1 text-[#555D6E] sm:grid-cols-2"><span class="whitespace-pre-wrap"><strong>Anterior:</strong> {change.previousValue}</span><span class="whitespace-pre-wrap"><strong>Novo:</strong> {change.nextValue}</span></div>{/if}</div>{/each}</div>{:else}<p class="application-text-meta mt-2 text-[#9298A5]">Registro inicial da solicitação.</p>{/if}</article>
+                <article class="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-subtle)] p-3"><div class="flex flex-wrap items-center justify-between gap-2"><strong class="application-text-caption text-[#4B5262]">Versão {entry.version} · {sourceLabel(entry.source)}</strong><span class="application-text-meta text-[#9298A5]">{entry.actorName} · {formatDate(entry.createdAt)}</span></div>{#if entry.changes.length > 0}<div class="mt-2 space-y-2">{#each entry.changes as change}<div class="rounded-lg bg-white px-3 py-2"><span class="application-text-meta block font-semibold text-[#6A7180]">{change.label}</span>{#if change.secretChanged}<span class="application-text-caption mt-1 block text-[#8B5A2B]">Credencial alterada · valor protegido</span>{:else}<div class="application-text-caption mt-1 grid gap-1 text-[#555D6E] sm:grid-cols-2"><span class="whitespace-pre-wrap"><strong>Anterior:</strong> {change.previousValue}</span><span class="whitespace-pre-wrap"><strong>Novo:</strong> {change.nextValue}</span></div>{/if}</div>{/each}</div>{:else}<p class="application-text-meta mt-2 text-[#9298A5]">Registro inicial da solicitação.</p>{/if}</article>
               {/each}
             </div>
           </section>
 
-          {#if canEdit}<div class="flex justify-end border-t border-[#ECEEF3] pt-5"><button type="button" on:click={openEdit} class="application-text-caption inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#000A57] px-5 font-semibold text-white"><Pencil size={14} />Editar dados</button></div>{/if}
+          {#if canEdit}<div class="flex justify-end border-t border-[var(--app-border-soft)] pt-5"><button type="button" on:click={openEdit} class="application-text-caption inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--app-primary)] px-5 font-semibold text-white"><Pencil size={14} />Editar dados</button></div>{/if}
         </div>
       {/if}
     </section>

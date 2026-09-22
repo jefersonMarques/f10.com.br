@@ -205,7 +205,7 @@
 <ApplicationContent
   width="full"
   padding={view === "split" ? "none" : "default"}
-  className={view === "split" ? "bg-[#F5F6FA] lg:h-[calc(100dvh-var(--application-header-height))] lg:min-h-[620px] lg:overflow-hidden" : ""}
+  className={view === "split" ? "bg-[var(--app-bg)] lg:h-[calc(100dvh-var(--application-header-height))] lg:min-h-[620px] lg:overflow-hidden" : ""}
 >
   {#if form?.message}
     <div class={`mb-3 flex items-center gap-2 rounded-xl border px-4 py-3 text-[11px] ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
@@ -215,7 +215,7 @@
 
   <section class={view === "split"
     ? "flex min-h-[680px] flex-col gap-3 p-3 lg:h-full lg:min-h-0 lg:gap-4 lg:p-4"
-    : "overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white"}>
+    : "overflow-hidden rounded-[22px] border border-[var(--app-border)] bg-white"}>
     <TicketToolbar
       bind:scope
       bind:view
@@ -259,7 +259,7 @@
       />
     {:else if view === "split"}
       <div class="grid min-h-[680px] gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-[330px_minmax(0,1fr)] lg:gap-4">
-        <aside class="flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)]">
+        <aside class="flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-[var(--app-border)] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)]">
           <div class="min-h-0 flex-1">
             <TicketList
               tickets={filteredTickets}
@@ -272,15 +272,15 @@
           </div>
 
           {#if data.pagination.totalPages > 1}
-            <div class="flex shrink-0 items-center justify-between gap-2 border-t border-[#EEF0F5] bg-white px-3 py-2.5">
-              <button type="button" disabled={data.pagination.page <= 1} on:click={() => goToPage(data.pagination.page - 1)} class="application-text-meta h-8 rounded-lg border border-[#DDE1EA] bg-white px-2.5 font-semibold text-[#000A57] disabled:opacity-40">Anterior</button>
+            <div class="flex shrink-0 items-center justify-between gap-2 border-t border-[var(--app-border-soft)] bg-white px-3 py-2.5">
+              <button type="button" disabled={data.pagination.page <= 1} on:click={() => goToPage(data.pagination.page - 1)} class="application-text-meta h-8 rounded-lg border border-[var(--app-border-control)] bg-white px-2.5 font-semibold text-[#000A57] disabled:opacity-40">Anterior</button>
               <span class="application-text-meta font-semibold text-[#737989]">{data.pagination.page} / {data.pagination.totalPages}</span>
-              <button type="button" disabled={data.pagination.page >= data.pagination.totalPages} on:click={() => goToPage(data.pagination.page + 1)} class="application-text-meta h-8 rounded-lg border border-[#DDE1EA] bg-white px-2.5 font-semibold text-[#000A57] disabled:opacity-40">Próxima</button>
+              <button type="button" disabled={data.pagination.page >= data.pagination.totalPages} on:click={() => goToPage(data.pagination.page + 1)} class="application-text-meta h-8 rounded-lg border border-[var(--app-border-control)] bg-white px-2.5 font-semibold text-[#000A57] disabled:opacity-40">Próxima</button>
             </div>
           {/if}
         </aside>
 
-        <main class="min-h-[680px] min-w-0 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)] lg:min-h-0">
+        <main class="min-h-[680px] min-w-0 overflow-hidden rounded-[22px] border border-[var(--app-border)] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)] lg:min-h-0">
           {#if ticketDetails}
             <TicketDetails ticketData={ticketDetails} surface="split" onRefresh={refreshTicketDetails}/>
           {:else if detailsLoading}
@@ -300,12 +300,12 @@
     {/if}
 
     {#if view === "list" && data.pagination.totalPages > 1}
-      <div class="flex items-center justify-between gap-3 border-t border-[#EEF0F5] px-4 py-3">
+      <div class="flex items-center justify-between gap-3 border-t border-[var(--app-border-soft)] px-4 py-3">
         <span class="application-text-meta text-[#858B99]">{data.pagination.total} tickets</span>
         <div class="flex items-center gap-2">
-          <button type="button" disabled={data.pagination.page <= 1} on:click={() => goToPage(data.pagination.page - 1)} class="application-text-meta h-9 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57] disabled:opacity-40">Anterior</button>
+          <button type="button" disabled={data.pagination.page <= 1} on:click={() => goToPage(data.pagination.page - 1)} class="application-text-meta h-9 rounded-lg border border-[var(--app-border-control)] bg-white px-3 font-semibold text-[#000A57] disabled:opacity-40">Anterior</button>
           <span class="application-text-meta font-semibold text-[#626978]">{data.pagination.page} / {data.pagination.totalPages}</span>
-          <button type="button" disabled={data.pagination.page >= data.pagination.totalPages} on:click={() => goToPage(data.pagination.page + 1)} class="application-text-meta h-9 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57] disabled:opacity-40">Próxima</button>
+          <button type="button" disabled={data.pagination.page >= data.pagination.totalPages} on:click={() => goToPage(data.pagination.page + 1)} class="application-text-meta h-9 rounded-lg border border-[var(--app-border-control)] bg-white px-3 font-semibold text-[#000A57] disabled:opacity-40">Próxima</button>
         </div>
       </div>
     {/if}

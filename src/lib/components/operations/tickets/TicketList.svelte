@@ -59,11 +59,11 @@
 
   function slaClass(ticket: TicketItem): string {
     const value = activeSla(ticket);
-    if (!value) return "bg-[#F1F2F5] text-[#777D8C]";
+    if (!value) return "bg-[var(--app-surface-muted)] text-[#777D8C]";
     const diff = new Date(value).getTime() - Date.now();
-    if (diff < 0) return "bg-[#FFF0F0] text-[#A33A3A]";
-    if (diff <= 60 * 60_000) return "bg-[#FFF4E9] text-[#A9510D]";
-    return "bg-[#EEF8F1] text-[#2F7045]";
+    if (diff < 0) return "bg-[var(--app-danger-bg)] text-[#A33A3A]";
+    if (diff <= 60 * 60_000) return "bg-[var(--app-warning-bg)] text-[#A9510D]";
+    return "bg-[var(--app-success-bg)] text-[#2F7045]";
   }
 
   function relativeUpdated(value: string | Date): string {
@@ -81,7 +81,7 @@
     <section class="flex h-full min-h-0 flex-col bg-white">
       <header class="shrink-0 px-4 pb-3 pt-4">
         <div class="flex items-center gap-3">
-          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white shadow-sm">
+          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--app-primary)] text-white shadow-sm">
             <TicketCheck size={18} aria-hidden="true" />
           </span>
           <div class="min-w-0">
@@ -97,10 +97,10 @@
             <button
               type="button"
               on:click={() => void onOpenTicket(ticket.id)}
-              class={`block w-full overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition ${selectedTicketId === ticket.id ? "border-[var(--app-info-border)] bg-[var(--app-surface-selected)] shadow-sm" : "border-[#E7E9EF] bg-white hover:border-[#CDD2DE] hover:bg-[#FAFBFD]"}`}
+              class={`block w-full overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition ${selectedTicketId === ticket.id ? "border-[var(--app-info-border)] bg-[var(--app-surface-selected)] shadow-sm" : "border-[var(--app-border)] bg-white hover:border-[var(--app-border-control)] hover:bg-[var(--app-surface-subtle)]"}`}
             >
               <div class="flex gap-3">
-                <span class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]">
+                <span class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--app-info-bg)] text-[#000A57]">
                   <UserRound size={17} aria-hidden="true" />
                 </span>
 
@@ -111,7 +111,7 @@
                   </div>
 
                   <div class="mt-1 flex min-w-0 items-center gap-2">
-                    <span class="shrink-0 rounded-md bg-[#EEF0FF] px-1.5 py-0.5 text-[10px] font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
+                    <span class="shrink-0 rounded-md bg-[var(--app-info-bg)] px-1.5 py-0.5 text-[10px] font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
                     <span class="min-w-0 flex-1 truncate text-[10.5px] font-medium text-[#747B8B]">{processLabel(ticket)}</span>
                     {#if ticket.channel === "email"}<Mail size={11} class="shrink-0 text-[#858B99]" aria-label="Recebido por e-mail"/>{/if}
                   </div>
@@ -140,7 +140,7 @@
   {:else}
   <div class="hidden overflow-x-auto md:block">
     <div class={compact ? "min-w-[760px]" : "min-w-[1020px]"}>
-      <div class={`grid border-b border-[#EEF0F4] bg-[#FAFAFC] px-4 py-2.5 ${compact ? "grid-cols-[88px_minmax(220px,1.5fr)_minmax(160px,1fr)_120px]" : "grid-cols-[90px_minmax(220px,1.5fr)_minmax(160px,1fr)_minmax(180px,1fr)_110px_180px_120px_110px]"}`}>
+      <div class={`grid border-b border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] px-4 py-2.5 ${compact ? "grid-cols-[88px_minmax(220px,1.5fr)_minmax(160px,1fr)_120px]" : "grid-cols-[90px_minmax(220px,1.5fr)_minmax(160px,1fr)_minmax(180px,1fr)_110px_180px_120px_110px]"}`}>
         <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Ticket</span>
         <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Assunto</span>
         <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Cliente</span>
@@ -158,7 +158,7 @@
           <button
             type="button"
             on:click={() => void onOpenTicket(ticket.id)}
-            class={`grid w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-[#F8F9FC] ${selectedTicketId === ticket.id ? "bg-[#F3F5FF]" : ""} ${compact ? "grid-cols-[88px_minmax(220px,1.5fr)_minmax(160px,1fr)_120px]" : "grid-cols-[90px_minmax(220px,1.5fr)_minmax(160px,1fr)_minmax(180px,1fr)_110px_180px_120px_110px]"}`}
+            class={`grid w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-[var(--app-surface-subtle)] ${selectedTicketId === ticket.id ? "bg-[var(--app-info-bg)]" : ""} ${compact ? "grid-cols-[88px_minmax(220px,1.5fr)_minmax(160px,1fr)_120px]" : "grid-cols-[90px_minmax(220px,1.5fr)_minmax(160px,1fr)_minmax(180px,1fr)_110px_180px_120px_110px]"}`}
           >
             <span class="application-text-caption flex items-center gap-1.5 font-bold text-[#000A57]">
               #{ticket.ticketNumber}
@@ -185,7 +185,7 @@
               <span class="application-text-caption truncate font-semibold text-[#5D6574]" title={processLabel(ticket)}>{processLabel(ticket)}</span>
               <span class="application-text-caption font-semibold text-[#626978]">{priorityLabels[ticket.priority] ?? ticket.priority}</span>
               <span class="flex min-w-0 items-center gap-2">
-                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF0FF] text-[10px] font-bold text-[#000A57]">{initials(ticket.assignedUserName)}</span>
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--app-info-bg)] text-[10px] font-bold text-[#000A57]">{initials(ticket.assignedUserName)}</span>
                 <span class="application-text-caption truncate font-semibold text-[#5D6574]">{ticket.assignedUserName ?? "Sem responsável"}</span>
               </span>
               <span class={`application-text-caption inline-flex w-fit items-center gap-1 rounded-full px-2 py-1 font-bold ${slaClass(ticket)}`}><Clock3 size={11}/>{slaText(ticket)}</span>
@@ -200,7 +200,7 @@
 
   <div class="divide-y divide-[#EEF0F4] md:hidden">
     {#each tickets as ticket}
-      <button type="button" on:click={() => void onOpenTicket(ticket.id)} class={`w-full px-4 py-4 text-left ${selectedTicketId === ticket.id ? "bg-[#F3F5FF]" : ""}`}>
+      <button type="button" on:click={() => void onOpenTicket(ticket.id)} class={`w-full px-4 py-4 text-left ${selectedTicketId === ticket.id ? "bg-[var(--app-info-bg)]" : ""}`}>
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
             <span class="application-text-caption font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
