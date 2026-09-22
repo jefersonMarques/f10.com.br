@@ -137,14 +137,11 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const canCreate = hasPermission(permissionMap, "tickets.create")
     && hasPermission(permissionMap, "customers.view");
   const canReply = hasPermission(permissionMap, "tickets.reply");
-  const canCommentInternal =
-    canReply || hasPermission(permissionMap, "tickets.comment_internal");
-  const canManageFollowers =
-    canReply || hasPermission(permissionMap, "tickets.assign");
   const canManageWorkflow = hasPermission(permissionMap, "tickets.manage", "all");
   const canSearchCustomers = canCreate;
 
-  const view = parseView(url.searchParams.get("view"));  const page = parsePage(url.searchParams.get("page"));
+  const view = parseView(url.searchParams.get("view"));
+  const page = parsePage(url.searchParams.get("page"));
   const queueId = parseOptionalUuid(url.searchParams.get("queueId"));
   const areaId = parseOptionalUuid(url.searchParams.get("areaId"));
   const stageId = parseOptionalUuid(url.searchParams.get("stageId"));
@@ -236,11 +233,8 @@ export const load: PageServerLoad = async ({ parent, url }) => {
       globalWorkflow: workflowBoard.globalWorkflow,
       areaWorkflows: workflowBoard.areaWorkflows,
     },
-    currentUserId: layout.user.id,
     canCreate,
     canReply,
-    canCommentInternal,
-    canManageFollowers,
     canManageWorkflow,
     canSearchCustomers,
   };
