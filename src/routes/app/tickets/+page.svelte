@@ -208,7 +208,7 @@
   className={view === "split" ? "bg-[var(--app-bg)] lg:h-[calc(100dvh-var(--application-header-height))] lg:min-h-[620px] lg:overflow-hidden" : ""}
 >
   {#if form?.message}
-    <div class={`mb-3 flex items-center gap-2 rounded-xl border px-4 py-3 text-[11px] ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
+    <div class={`mb-3 flex items-center gap-2 rounded-xl border px-4 py-3 text-[11px] ${form.success ? "border-[var(--app-success-border)] bg-[var(--app-success-bg)] text-[#176B35]" : "border-[var(--app-danger-border)] bg-[var(--app-danger-bg)] text-[#9B2C2C]"}`}>
       {#if form.success}<CheckCircle2 size={15}/>{:else}<CircleAlert size={15}/>{/if}{form.message}
     </div>
   {/if}
@@ -243,7 +243,7 @@
 
     {#if view === "board"}
       {#if data.pagination.boardLimited}
-        <div class="border-b border-[#F1DFC8] bg-[#FFF8EF] px-4 py-2.5 text-[11px] font-medium text-[#8A531F]">
+        <div class="border-b border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] px-4 py-2.5 text-[11px] font-medium text-[#8A531F]">
           Muitos tickets neste quadro. Refine os filtros para visualizar além dos primeiros {data.pagination.pageSize}.
         </div>
       {/if}
