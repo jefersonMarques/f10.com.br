@@ -8,18 +8,12 @@ import {
 } from "$lib/server/auth/permissions";
 import { markEntityNotificationsRead } from "$lib/server/notifications/notificationRepository";
 import { parseServiceRequestUpdateForm } from "$lib/server/serviceRequests/serviceRequestForm";
-import {
-  getSupportServiceRequestForTicket,
-  updateSupportServiceRequest,
-} from "$lib/server/serviceRequests/serviceRequestOperations";
+import { updateSupportServiceRequest } from "$lib/server/serviceRequests/serviceRequestOperations";
 import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { markTicketChatHumanTakeover } from "$lib/server/support/supportAiHandoff";
-import { createTaskFromTicket, listTicketTasks } from "$lib/server/support/ticketTaskBridge";
-import { getTicketCustomerContext } from "$lib/server/support/ticketCustomerContextRepository";
+import { createTaskFromTicket } from "$lib/server/support/ticketTaskBridge";
 import {
   addTicketFollower,
-  listTicketFollowerCandidates,
-  listTicketFollowers,
   removeTicketFollower,
 } from "$lib/server/support/ticketFollowerRepository";
 import { parseTicketCustomerLinkForm } from "$lib/server/support/ticketCustomerForm";
@@ -36,7 +30,8 @@ import {
   type TicketPriority,
   type TicketStatus,
 } from "$lib/server/support/supportRepository";
-import { listTaskProjects, type TaskPriority } from "$lib/server/tasks/taskRepository";
+import { type TaskPriority } from "$lib/server/tasks/taskRepository";
+import { getTicketDetailsData } from "$lib/server/support/ticketDetailsService";
 
 type MentionUser = { id: string; name: string; email: string };
 
@@ -120,65 +115,15 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   if (!hasPermission(permissions, "tickets.view")) {
     throw error(403, "Acesso não autorizado.");
   }
-  const viewScope = getPermissionScope(permissions, "tickets.view");
-  if (!viewScope) throw error(403, "Acesso não autorizado.");
 
   try {
-    const canReply = hasPermission(permissions, "tickets.reply");
-    const canCommentInternal =
-      canReply || hasPermission(permissions, "tickets.comment_internal");
-    const canAssign = hasPermission(permissions, "tickets.assign");
-    const canManageFollowers = canReply || canAssign;
-    const canViewTasks = hasPermission(permissions, "tasks.view");
-    const canCreateTask = canReply && hasPermission(permissions, "tasks.create");
-    const canLinkCustomer = canReply && hasPermission(permissions, "customers.view");
-    const [
-      details,
-      users,
-      linkedTasks,
-      taskProjects,
-      serviceRequest,
-      followers,
-      followerCandidates,
-    ] = await Promise.all([
-      getSupportTicket(layout.user.id, permissions, params.ticketId),
-      canReply || canCommentInternal || canAssign ? listSupportAgents() : Promise.resolve([]),
-      canViewTasks
-        ? listTicketTasks(layout.user.id, permissions, params.ticketId)
-        : Promise.resolve([]),
-      canCreateTask
-        ? listTaskProjects(layout.user.id, permissions).catch(() => [])
-        : Promise.resolve([]),
-      getSupportServiceRequestForTicket(layout.user.id, viewScope, params.ticketId),
-      listTicketFollowers(params.ticketId),
-      canManageFollowers ? listTicketFollowerCandidates() : Promise.resolve([]),
-    ]);
-    const [mentionUsers, customerContext] = await Promise.all([
-      canCommentInternal
-        ? filterMentionUsersForTicket(users, params.ticketId)
-        : Promise.resolve([]),
-      getTicketCustomerContext(params.ticketId),
-    ]);
+    const details = await getTicketDetailsData(
+      layout.user.id,
+      permissions,
+      params.ticketId,
+    );
     await markEntityNotificationsRead(layout.user.id, "ticket", params.ticketId);
-
-    return {
-      details,
-      customerContext,
-      serviceRequest,
-      agents: canAssign ? users : [],
-      mentionUsers,
-      linkedTasks,
-      taskProjects,
-      canReply,
-      canCommentInternal,
-      canManageFollowers,
-      followers,
-      followerCandidates,
-      canAssign,
-      canLinkCustomer,
-      canViewTasks,
-      canCreateTask,
-    };
+    return details;
   } catch (cause) {
     console.error("[operations.ticket.load]", {
       ticketId: params.ticketId,
