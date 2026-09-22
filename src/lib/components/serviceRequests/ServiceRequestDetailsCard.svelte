@@ -279,6 +279,7 @@
       attachmentMessage = "Documento atualizado e registrado no histórico.";
       form.reset();
       await invalidateAll();
+      await onUpdated();
     } catch (cause) {
       attachmentError = attachmentErrorMessage(
         cause instanceof Error ? cause.message : "SERVICE_REQUEST_ATTACHMENT_UPDATE_FAILED",
