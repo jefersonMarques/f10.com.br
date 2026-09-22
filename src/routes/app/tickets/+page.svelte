@@ -184,7 +184,15 @@
 
   async function refreshCard(): Promise<void> {
     if (!card) return;
-    await openCard(card.details.ticket.id);
+    const ticketId = card.details.ticket.id;
+
+    try {
+      const response = await fetch(`/app/tickets/${ticketId}/card`, { cache: "no-store" });
+      if (!response.ok) throw new Error("CARD_REFRESH_FAILED");
+      card = await response.json() as TicketCardData;
+    } catch {
+      window.alert("Não foi possível atualizar o ticket.");
+    }
   }
 
 
