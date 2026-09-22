@@ -9,6 +9,7 @@
     Clock3,
     FileText,
     Headphones,
+    MessageSquare,
     MonitorCog,
     Paperclip,
     Route,
