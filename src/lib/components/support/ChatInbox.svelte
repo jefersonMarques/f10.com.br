@@ -150,9 +150,8 @@
 <section class="flex h-full min-h-0 flex-col bg-white">
   <header class="shrink-0 px-4 pb-3 pt-4">
     <div class="flex items-center gap-3">
-      <span class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white shadow-sm">
+      <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white shadow-sm">
         <MessageCircleMore size={18} aria-hidden="true" />
-        <span class="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-[#EA6D0B]"></span>
       </span>
       <div class="min-w-0">
         <h2 class="truncate text-[14px] font-semibold text-[#202637]">Conversas</h2>
@@ -197,12 +196,8 @@
         {#each filteredChats as chat}
           <a
             href={`/app/chat/${chat.sessionId}`}
-            class={`relative block overflow-hidden rounded-2xl border px-3.5 py-3 transition ${selectedConversationKey === chat.conversationKey ? "border-[#000A57] bg-[#F6F7FF] shadow-[0_8px_20px_rgba(0,10,87,0.08)]" : "border-[#E7E9EF] bg-white hover:border-[#CDD2DE] hover:shadow-sm"}`}
+            class={`block overflow-hidden rounded-2xl border px-3.5 py-3 transition ${selectedConversationKey === chat.conversationKey ? "border-[#C9CFF3] bg-[#F5F6FF] shadow-sm" : "border-[#E7E9EF] bg-white hover:border-[#CDD2DE] hover:bg-[#FAFBFD]"}`}
           >
-            {#if selectedConversationKey === chat.conversationKey}
-              <span class="absolute inset-y-3 left-0 w-1 rounded-r-full bg-[#EA6D0B]"></span>
-            {/if}
-
             <div class="flex gap-3">
               <span class={`relative mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#A44141]" : "bg-[#EEF0FF] text-[#000A57]"}`}>
                 <UserRound size={17} aria-hidden="true" />

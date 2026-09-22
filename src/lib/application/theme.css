@@ -133,13 +133,17 @@ html[data-application-theme="dark"] .operations-shell :is(
   [class~="bg-[#F5F6FA]"],
   [class~="bg-[#F7F8FA]"],
   [class~="bg-[#FAFAFC]"],
-  [class~="bg-[#FBFCFD]"]
+  [class~="bg-[#FBFCFD]"],
+  [class~="bg-[#FCFCFE]"]
 ) {
   background-color: var(--app-surface-subtle) !important;
 }
 
 html[data-application-theme="dark"] .operations-shell :is(
+  [class~="bg-[#EDEFF4]"],
+  [class~="bg-[#F2F3F6]"],
   [class~="bg-[#F3F4F7]"],
+  [class~="bg-[#F5F7FA]"],
   [class~="bg-[#F5F6F8]"],
   [class~="bg-[#F6F7FA]"],
   [class~="bg-[#F6F7FB]"],
@@ -161,7 +165,8 @@ html[data-application-theme="dark"] .operations-shell :is(
   [class~="bg-[#F3F4FF]"],
   [class~="bg-[#F3F5FF]"],
   [class~="bg-[#F6F7FF]"],
-  [class~="bg-[#F8F9FF]"]
+  [class~="bg-[#F8F9FF]"],
+  [class~="bg-[#F8FAFF]"]
 ) {
   background-color: var(--app-info-bg) !important;
 }
@@ -169,6 +174,7 @@ html[data-application-theme="dark"] .operations-shell :is(
 html[data-application-theme="dark"] .operations-shell :is(
   [class~="bg-[#EEF8F1]"],
   [class~="bg-[#F1F8F3]"],
+  [class~="bg-[#F1FBF4]"],
   [class~="bg-[#F3F9F5]"],
   [class~="bg-[#EEF7F1]"],
   [class~="bg-[#F8FBF9]"],
@@ -182,6 +188,7 @@ html[data-application-theme="dark"] .operations-shell :is(
   [class~="bg-[#FFF8F1]"],
   [class~="bg-[#FFF4E8]"],
   [class~="bg-[#FFF9F3]"],
+  [class~="bg-[#FFF9EF]"],
   [class~="bg-[#FFF5EA]"],
   [class~="bg-[#FFF7EF]"],
   [class~="bg-[#FFF8EC]"],
@@ -194,7 +201,8 @@ html[data-application-theme="dark"] .operations-shell :is(
 html[data-application-theme="dark"] .operations-shell :is(
   [class~="bg-[#FFF0F0]"],
   [class~="bg-[#FFF3F3]"],
-  [class~="bg-[#FFF5F5]"]
+  [class~="bg-[#FFF5F5]"],
+  [class~="bg-[#FFF8F8]"]
 ) {
   background-color: var(--app-danger-bg) !important;
 }
@@ -261,7 +269,10 @@ html[data-application-theme="dark"] .operations-shell :is(
   [class~="border-[#E4E6EB]"],
   [class~="border-[#E4E6EC]"],
   [class~="border-[#E7E9EF]"],
-  [class~="border-[#E8EAF0]"]
+  [class~="border-[#E8EAF0]"],
+  [class~="border-[#E1E4EB]"],
+  [class~="border-[#E2E5EB]"],
+  [class~="border-[#ECEEF3]"]
 ) {
   border-color: var(--app-border) !important;
 }
@@ -276,6 +287,10 @@ html[data-application-theme="dark"] .operations-shell :is(
 
 html[data-application-theme="dark"] .operations-shell :is(
   [class~="border-[#DDE1EA]"],
+  [class~="border-[#DDE2EA]"],
+  [class~="border-[#C8CDD7]"],
+  [class~="border-[#C9D0E0]"],
+  [class~="border-[#E6E8EE]"],
   [class~="border-[#DDE1E8]"],
   [class~="border-[#DDE1E7]"],
   [class~="border-[#D9DDE4]"],
@@ -294,6 +309,8 @@ html[data-application-theme="dark"] .operations-shell :is(
 
 html[data-application-theme="dark"] .operations-shell :is(
   [class~="border-[#CFE0D5]"],
+  [class~="border-[#B9D5C3]"],
+  [class~="border-[#B9E6C9]"],
   [class~="border-[#DDE7E1]"],
   [class~="border-[#DDE9E0]"],
   [class~="border-[#DCE7DF]"],
@@ -313,6 +330,9 @@ html[data-application-theme="dark"] .operations-shell :is(
   [class~="border-[#E8C49F]"],
   [class~="border-[#E4C49F]"],
   [class~="border-[#F0D8BE]"],
+  [class~="border-[#F0D2A9]"],
+  [class~="border-[#F0D6BD]"],
+  [class~="border-[#E8C9A8]"],
   [class~="border-[#F0D2B5]"],
   [class~="border-[#F3D2B6]"]
 ) {
@@ -321,6 +341,7 @@ html[data-application-theme="dark"] .operations-shell :is(
 
 html[data-application-theme="dark"] .operations-shell :is(
   [class~="border-[#EFC6C6]"],
+  [class~="border-[#E7D1D1]"],
   [class~="border-[#F0C8C8]"],
   [class~="border-[#F2C5C5]"]
 ) {
@@ -329,6 +350,9 @@ html[data-application-theme="dark"] .operations-shell :is(
 
 html[data-application-theme="dark"] .operations-shell :is(
   [class~="border-[#D8DBFF]"],
+  [class~="border-[#D8DDF4]"],
+  [class~="border-[#DDE3F1]"],
+  [class~="border-[#BFC7ED]"],
   [class~="border-[#D7DDF0]"],
   [class~="border-[#D9DDF0]"],
   [class~="border-[#C9D4F6]"]
@@ -451,6 +475,9 @@ html[data-application-theme="dark"] .operations-shell :is(
 
 html[data-application-theme="dark"] .operations-shell :is(
   [class~="text-[#8A642B]"],
+  [class~="text-[#8A531F]"],
+  [class~="text-[#8B4D12]"],
+  [class~="text-[#935018]"],
   [class~="text-[#9B530F]"],
   [class~="text-[#A9510D]"],
   [class~="text-[#A76225]"],

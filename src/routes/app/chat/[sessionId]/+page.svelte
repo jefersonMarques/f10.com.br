@@ -391,8 +391,6 @@
     </aside>
 
     <main class="relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)]">
-      <span class="absolute inset-x-0 top-0 z-10 h-1 bg-[#EA6D0B]"></span>
-
       <header class="shrink-0 border-b border-[#E9EBF1] bg-white px-4 pb-3 pt-4 sm:px-5">
         <div class="flex items-start justify-between gap-3">
           <div class="flex min-w-0 items-center gap-3">

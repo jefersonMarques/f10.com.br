@@ -128,39 +128,60 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const calendarAnchor = isValidDate(requestedDate) ? requestedDate : todayKey();
   const range = agendaRange(calendarAnchor);
   const googleCalendar = await getGoogleCalendarConnection(layout.user.id);
-  let googleEvents: GoogleAgendaEvent[] = [];
-  let googleCalendarError = "";
-  let googleSyncedAt: Date | null = null;
+  const googleCalendarDataPromise: Promise<{
+    events: GoogleAgendaEvent[];
+    error: string;
+    syncedAt: Date | null;
+  }> = (async () => {
+    if (!googleCalendar.connected) {
+      return { events: [], error: "", syncedAt: null };
+    }
 
-  if (googleCalendar.connected) {
     if (googleCalendar.scopesReady) {
-      const sync = await synchronizeGoogleCalendar({
-        userId: layout.user.id,
-        permissions,
-        timeMin: range.timeMin,
-        timeMax: range.timeMax,
-      });
-      googleEvents = sync.events;
-      googleCalendarError = sync.warning;
-      googleSyncedAt = sync.syncedAt;
-    } else {
       try {
-        const legacyEvents = await listGoogleCalendarEvents(
-          layout.user.id,
-          range.timeMin,
-          range.timeMax,
-        );
-        googleEvents = legacyEvents.map((event) => ({
+        const sync = await synchronizeGoogleCalendar({
+          userId: layout.user.id,
+          permissions,
+          timeMin: range.timeMin,
+          timeMax: range.timeMax,
+        });
+        return {
+          events: sync.events,
+          error: sync.warning,
+          syncedAt: sync.syncedAt,
+        };
+      } catch {
+        return {
+          events: [],
+          error: "Não foi possível atualizar os eventos do Google Calendar agora.",
+          syncedAt: null,
+        };
+      }
+    }
+
+    try {
+      const legacyEvents = await listGoogleCalendarEvents(
+        layout.user.id,
+        range.timeMin,
+        range.timeMax,
+      );
+      return {
+        events: legacyEvents.map((event) => ({
           ...event,
           calendarId: "primary",
           calendarName: "Google Calendar",
-        }));
-        googleCalendarError = "Reconecte o Google Calendar para liberar agendas compartilhadas e sincronização completa.";
-      } catch {
-        googleCalendarError = "Não foi possível atualizar os eventos do Google Calendar agora.";
-      }
+        })),
+        error: "Reconecte o Google Calendar para liberar agendas compartilhadas e sincronização completa.",
+        syncedAt: null,
+      };
+    } catch {
+      return {
+        events: [],
+        error: "Não foi possível atualizar os eventos do Google Calendar agora.",
+        syncedAt: null,
+      };
     }
-  }
+  })();
 
   const projects = canViewTasks
     ? await listTaskProjects(layout.user.id, permissions)
@@ -224,6 +245,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
 
   const googleLinkedTaskIds = taskGoogleLinks.map((link) => link.taskId);
   const googleMeetTaskIds = taskGoogleLinks.filter((link) => link.googleMeetUrl).map((link) => link.taskId);
+  const googleCalendarData = await googleCalendarDataPromise;
 
   return {
     projects,
@@ -245,11 +267,11 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     schedulingBookings: personalSchedulingBookings,
     calendarAnchor,
     googleCalendar,
-    googleEvents,
+    googleEvents: googleCalendarData.events,
     googleLinkedTaskIds,
     googleMeetTaskIds,
-    googleCalendarError,
-    googleSyncedAt,
+    googleCalendarError: googleCalendarData.error,
+    googleSyncedAt: googleCalendarData.syncedAt,
     googleStatus: url.searchParams.get("google") ?? "",
   };
 };

@@ -40,6 +40,7 @@
   let moving = false;
   let ticketDetails: TicketDetailsData | null = null;
   let detailsLoading = false;
+  let modalOpen = false;
   let splitInitializedFor = "";
 
   $: if (
@@ -168,6 +169,7 @@
   }
 
   async function openTicketDetails(ticketId: string): Promise<void> {
+    modalOpen = view !== "split";
     detailsLoading = true;
     ticketDetails = null;
     splitInitializedFor = ticketId;
@@ -314,10 +316,10 @@
   <TicketCreateDialog queues={data.queues} entryPoints={data.entryPoints} canSearchCustomers={data.canSearchCustomers} onClose={() => (createOpen = false)}/>
 {/if}
 
-{#if detailsLoading && view !== "split"}
+{#if modalOpen && detailsLoading && view !== "split"}
   <div class="fixed inset-0 z-[120] flex items-center justify-center bg-[#010D28]/40"><div class="rounded-2xl bg-white px-5 py-4 text-[11px] font-semibold text-[#4D5464]">Abrindo ticket...</div></div>
 {/if}
 
-{#if ticketDetails && view !== "split"}
-  <TicketDetailsModal ticketData={ticketDetails} onClose={() => (ticketDetails = null)} onRefresh={refreshTicketDetails}/>
+{#if modalOpen && ticketDetails && view !== "split"}
+  <TicketDetailsModal ticketData={ticketDetails} onClose={() => { modalOpen = false; ticketDetails = null; }} onRefresh={refreshTicketDetails}/>
 {/if}

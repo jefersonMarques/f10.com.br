@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { page } from "$app/stores";
+  import { navigating, page } from "$app/stores";
   import { onDestroy, onMount } from "svelte";
   import {
     Bell,
     Building2,
     ChevronDown,
+    LoaderCircle,
     LogOut,
     UserCircle,
   } from "lucide-svelte";
@@ -43,6 +44,9 @@
 
   $: notifications = data.notifications;
   $: pathname = $page.url.pathname;
+  $: calendarNavigationLoading = Boolean(
+    $navigating?.to?.url.pathname.startsWith("/app/tasks/calendar"),
+  );
   $: routeMetadata = resolveOperationsRouteMetadata(pathname);
   $: customerProfileId = canViewCustomers ? resolvePageCustomerId($page.data) : null;
 
@@ -312,6 +316,17 @@
         </div>
       </svelte:fragment>
     </ApplicationHeader>
+
+    {#if calendarNavigationLoading}
+      <div class="fixed right-4 top-[82px] z-[190] flex max-w-[320px] items-center gap-3 rounded-2xl border border-[#DDE1EA] bg-white px-4 py-3 shadow-xl shadow-slate-900/10" role="status" aria-live="polite">
+        <LoaderCircle size={18} class="shrink-0 animate-spin text-[#000A57]" aria-hidden="true"/>
+        <span class="min-w-0">
+          <strong class="block text-[11px] font-semibold text-[#303746]">Carregando agenda...</strong>
+          <span class="application-text-meta mt-0.5 block text-[#858B99]">Buscando compromissos e sincronizações.</span>
+        </span>
+      </div>
+    {/if}
+
     <slot />
     <NotificationAlertStack notifications={notifications.recent} />
     <ActiveChatDock enabled={canRespondToChat} />
