@@ -122,6 +122,7 @@
   export let mode: "customer" | "support";
   export let canEdit = false;
   export let updateAction: string;
+  export let onUpdated: () => void | Promise<void> = () => undefined;
 
   let modalMode: "closed" | "view" | "edit" = "closed";
   let revealLoading = "";
@@ -130,6 +131,8 @@
   let attachmentLoading = "";
   let attachmentMessage = "";
   let attachmentError = "";
+  let updateLoading = false;
+  let updateError = "";
 
   $: presentSecretCount = serviceRequest.secrets.filter((secret) => secret.present).length;
   $: attachmentSlots = ATTACHMENT_SLOTS[serviceRequest.requestType];
@@ -177,6 +180,38 @@
     attachmentError = "";
     attachmentMessage = "";
     attachmentLoading = "";
+    updateLoading = false;
+    updateError = "";
+  }
+
+  async function updateServiceRequest(event: SubmitEvent): Promise<void> {
+    if (!canEdit || updateLoading) return;
+    const form = event.currentTarget as HTMLFormElement;
+    updateLoading = true;
+    updateError = "";
+
+    try {
+      const response = await fetch(updateAction, {
+        method: "POST",
+        body: new FormData(form),
+        credentials: "same-origin",
+        headers: {
+          "x-sveltekit-action": "true",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("SERVICE_REQUEST_UPDATE_FAILED");
+      }
+
+      await invalidateAll();
+      await onUpdated();
+      closeModal();
+    } catch {
+      updateError = "Não foi possível salvar as alterações. Revise os dados e tente novamente.";
+    } finally {
+      updateLoading = false;
+    }
   }
 
   function hideSecret(fieldKey: string): void {
@@ -285,7 +320,8 @@
       </header>
 
       {#if modalMode === "edit"}
-        <form method="POST" action={updateAction} class="px-5 py-5 sm:px-6">
+        <form method="POST" action={updateAction} class="px-5 py-5 sm:px-6" on:submit|preventDefault={updateServiceRequest}>
+          {#if updateError}<p class="mb-4 rounded-xl bg-[#FFF0F0] px-3 py-2.5 text-[10px] font-medium text-[#9B3C3C]">{updateError}</p>{/if}
           <input type="hidden" name="expectedVersion" value={serviceRequest.version} />
           <div class="grid gap-4 sm:grid-cols-2">
             {#each serviceRequest.fields.filter((field) => field.editable) as field}
@@ -320,7 +356,7 @@
             <label class="mt-6 flex items-start gap-3 rounded-xl border border-[#F0D7BD] bg-[#FFF9F3] p-4"><input name="delayAcknowledged" value="true" type="checkbox" required class="mt-0.5 h-4 w-4 rounded border-[#C8A27A]" /><span class="application-text-caption leading-5 text-[#76512F]">Confirmo que a alteração pode exigir nova conferência e atrasar a implantação. Se houver dúvida, vou acionar o suporte pelo próprio chamado antes de enviar.</span></label>
           {/if}
 
-          <div class="mt-6 flex flex-col-reverse gap-2 border-t border-[#ECEEF3] pt-5 sm:flex-row sm:justify-end"><button type="button" on:click={closeModal} class="application-text-caption min-h-11 rounded-xl border border-[#DDE1EA] px-4 font-semibold text-[#555D6E]">Cancelar</button><button type="submit" class="application-text-caption min-h-11 rounded-xl bg-[#000A57] px-5 font-semibold text-white">Salvar alterações</button></div>
+          <div class="mt-6 flex flex-col-reverse gap-2 border-t border-[#ECEEF3] pt-5 sm:flex-row sm:justify-end"><button type="button" on:click={closeModal} class="application-text-caption min-h-11 rounded-xl border border-[#DDE1EA] px-4 font-semibold text-[#555D6E]">Cancelar</button><button type="submit" disabled={updateLoading} class="application-text-caption min-h-11 rounded-xl bg-[#000A57] px-5 font-semibold text-white disabled:opacity-50">{updateLoading ? "Salvando..." : "Salvar alterações"}</button></div>
         </form>
       {:else}
         <div class="space-y-6 px-5 py-5 sm:px-6">
