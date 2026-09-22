@@ -411,7 +411,7 @@
           </select>
         {/if}
 
-        <div class="flex rounded-lg bg-[#EDEFF4] p-1" aria-label="Fontes da agenda">
+        <div class="flex rounded-lg bg-[var(--app-surface-muted)] p-1" aria-label="Fontes da agenda">
           {#if data.canViewTasks}<button type="button" aria-pressed={showTasks} on:click={() => (showTasks = !showTasks)} class={`application-text-meta h-7 rounded-md px-2.5 font-semibold transition ${showTasks ? "bg-white text-[#000A57] shadow-sm" : "text-[#9A9FAC]"}`}>Tarefas</button>{/if}
           {#if data.canViewTickets}<button type="button" aria-pressed={showTickets} on:click={() => (showTickets = !showTickets)} class={`application-text-meta h-7 rounded-md px-2.5 font-semibold transition ${showTickets ? "bg-white text-[#8B4D12] shadow-sm" : "text-[#9A9FAC]"}`}>Tickets</button>{/if}
           {#if data.canViewScheduling}<button type="button" aria-pressed={showScheduling} on:click={() => (showScheduling = !showScheduling)} class={`application-text-meta h-7 rounded-md px-2.5 font-semibold transition ${showScheduling ? "bg-white text-[#5C4BA2] shadow-sm" : "text-[#9A9FAC]"}`}>Agendamentos</button>{/if}
@@ -422,7 +422,7 @@
           <button type="button" aria-pressed={showCompleted} on:click={() => (showCompleted = !showCompleted)} class={`application-text-meta inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 font-semibold transition ${showCompleted ? "border-[#CFE0D5] bg-[#F1F8F3] text-[#2F7045]" : "border-[#DDE1EA] bg-white text-[#8A909E]"}`} title={showCompleted ? "Ocultar itens concluídos" : "Mostrar itens concluídos"}><CheckCircle2 size={13}/>Concluídos</button>
         {/if}
 
-        <div class="flex rounded-lg bg-[#EDEFF4] p-1">
+        <div class="flex rounded-lg bg-[var(--app-surface-muted)] p-1">
           <button type="button" on:click={() => setCalendarView("month")} class={`application-text-caption h-7 rounded-md px-3 font-semibold ${calendarView === "month" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Mês</button>
           <button type="button" on:click={() => setCalendarView("week")} class={`application-text-caption h-7 rounded-md px-3 font-semibold ${calendarView === "week" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Semana</button>
           <button type="button" on:click={() => setCalendarView("list")} class={`application-text-caption inline-flex h-7 items-center gap-1.5 rounded-md px-3 font-semibold ${calendarView === "list" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><ListIcon size={12}/>Lista</button>
@@ -467,11 +467,11 @@
 
     {#if calendarView === "list"}
       <div class="flex flex-wrap items-center gap-1.5 border-b border-[#E8EAF0] bg-white px-4 py-2.5">
-        <button type="button" on:click={() => setListPeriod("today")} class={`application-text-meta h-8 rounded-lg px-3 font-semibold ${listPeriod === "today" ? "bg-[#000A57] text-white" : "bg-[#F2F3F6] text-[#666D7C]"}`}>Hoje</button>
-        <button type="button" on:click={() => setListPeriod("tomorrow")} class={`application-text-meta h-8 rounded-lg px-3 font-semibold ${listPeriod === "tomorrow" ? "bg-[#000A57] text-white" : "bg-[#F2F3F6] text-[#666D7C]"}`}>Amanhã</button>
-        <button type="button" on:click={() => setListPeriod("week")} class={`application-text-meta h-8 rounded-lg px-3 font-semibold ${listPeriod === "week" ? "bg-[#000A57] text-white" : "bg-[#F2F3F6] text-[#666D7C]"}`}>Esta semana</button>
-        <button type="button" on:click={() => setListPeriod("next7")} class={`application-text-meta h-8 rounded-lg px-3 font-semibold ${listPeriod === "next7" ? "bg-[#000A57] text-white" : "bg-[#F2F3F6] text-[#666D7C]"}`}>7 dias</button>
-        <button type="button" on:click={() => setListPeriod("month")} class={`application-text-meta h-8 rounded-lg px-3 font-semibold ${listPeriod === "month" ? "bg-[#000A57] text-white" : "bg-[#F2F3F6] text-[#666D7C]"}`}>Mês</button>
+        <button type="button" on:click={() => setListPeriod("today")} class={`application-text-meta h-8 rounded-lg px-3 font-semibold ${listPeriod === "today" ? "bg-[#000A57] text-white" : "bg-[var(--app-surface-muted)] text-[#666D7C]"}`}>Hoje</button>
+        <button type="button" on:click={() => setListPeriod("tomorrow")} class={`application-text-meta h-8 rounded-lg px-3 font-semibold ${listPeriod === "tomorrow" ? "bg-[#000A57] text-white" : "bg-[var(--app-surface-muted)] text-[#666D7C]"}`}>Amanhã</button>
+        <button type="button" on:click={() => setListPeriod("week")} class={`application-text-meta h-8 rounded-lg px-3 font-semibold ${listPeriod === "week" ? "bg-[#000A57] text-white" : "bg-[var(--app-surface-muted)] text-[#666D7C]"}`}>Esta semana</button>
+        <button type="button" on:click={() => setListPeriod("next7")} class={`application-text-meta h-8 rounded-lg px-3 font-semibold ${listPeriod === "next7" ? "bg-[#000A57] text-white" : "bg-[var(--app-surface-muted)] text-[#666D7C]"}`}>7 dias</button>
+        <button type="button" on:click={() => setListPeriod("month")} class={`application-text-meta h-8 rounded-lg px-3 font-semibold ${listPeriod === "month" ? "bg-[#000A57] text-white" : "bg-[var(--app-surface-muted)] text-[#666D7C]"}`}>Mês</button>
       </div>
     {/if}
 
