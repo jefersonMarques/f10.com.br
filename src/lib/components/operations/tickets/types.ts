@@ -234,4 +234,3 @@ export type TicketDetailsData = {
   canCreateTask: boolean;
 };
 
-export type TicketCardData = TicketDetailsData;

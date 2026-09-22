@@ -8,7 +8,7 @@
   import TicketDetailsModal from "$lib/components/operations/tickets/TicketDetailsModal.svelte";
   import TicketList from "$lib/components/operations/tickets/TicketList.svelte";
   import TicketToolbar from "$lib/components/operations/tickets/TicketToolbar.svelte";
-  import type { TicketCardData, TicketScope, TicketView } from "$lib/components/operations/tickets/types";
+  import type { TicketDetailsData, TicketScope, TicketView } from "$lib/components/operations/tickets/types";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -38,19 +38,19 @@
   let createOpen = false;
   let draggingTicketId: string | null = null;
   let moving = false;
-  let card: TicketCardData | null = null;
-  let cardLoading = false;
+  let ticketDetails: TicketDetailsData | null = null;
+  let detailsLoading = false;
   let splitInitializedFor = "";
 
   $: if (
     view === "split"
     && data.tickets.length > 0
-    && !card
-    && !cardLoading
+    && !ticketDetails
+    && !ticketDetailsLoading
     && splitInitializedFor !== data.tickets[0].id
   ) {
     splitInitializedFor = data.tickets[0].id;
-    void openCard(data.tickets[0].id);
+    void openTicketDetails(data.tickets[0].id);
   }
 
   $: activeWorkflow = workflowId === "global"
@@ -167,29 +167,29 @@
     }
   }
 
-  async function openCard(ticketId: string): Promise<void> {
-    cardLoading = true;
-    card = null;
+  async function openTicketDetails(ticketId: string): Promise<void> {
+    detailsLoading = true;
+    ticketDetails = null;
     splitInitializedFor = ticketId;
     try {
-      const response = await fetch(`/app/tickets/${ticketId}/card`, { cache: "no-store" });
+      const response = await fetch(`/app/tickets/${ticketId}/details`, { cache: "no-store" });
       if (!response.ok) throw new Error("CARD_LOAD_FAILED");
-      card = await response.json() as TicketCardData;
+      ticketDetails = await response.json() as TicketDetailsData;
     } catch {
       window.alert("Não foi possível abrir o ticket.");
     } finally {
-      cardLoading = false;
+      detailsLoading = false;
     }
   }
 
-  async function refreshCard(): Promise<void> {
-    if (!card) return;
-    const ticketId = card.details.ticket.id;
+  async function refreshTicketDetails(): Promise<void> {
+    if (!ticketDetails) return;
+    const ticketId = ticketDetails.details.ticket.id;
 
     try {
-      const response = await fetch(`/app/tickets/${ticketId}/card`, { cache: "no-store" });
+      const response = await fetch(`/app/tickets/${ticketId}/details`, { cache: "no-store" });
       if (!response.ok) throw new Error("CARD_REFRESH_FAILED");
-      card = await response.json() as TicketCardData;
+      ticketDetails = await response.json() as TicketDetailsData;
     } catch {
       window.alert("Não foi possível atualizar o ticket.");
     }
@@ -253,7 +253,7 @@
         canReply={data.canReply}
         onDropTicket={dropTicket}
         onStartDrag={startDrag}
-        onOpenTicket={openCard}
+        onOpenTicket={openTicketDetails}
       />
     {:else if view === "split"}
       <div class="grid min-h-[680px] gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-[315px_minmax(0,1fr)] lg:gap-4">
@@ -263,9 +263,9 @@
               tickets={filteredTickets}
               globalWorkflow={data.workflowBoard.globalWorkflow}
               areaWorkflows={data.workflowBoard.areaWorkflows}
-              selectedTicketId={card?.details.ticket.id ?? null}
+              selectedTicketId={ticketDetails?.details.ticket.id ?? null}
               compact
-              onOpenTicket={openCard}
+              onOpenTicket={openTicketDetails}
             />
           </div>
 
@@ -279,9 +279,9 @@
         </aside>
 
         <main class="min-h-[680px] min-w-0 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)] lg:min-h-0">
-          {#if card}
-            <TicketDetails ticketData={card} surface="split" onRefresh={refreshCard}/>
-          {:else if cardLoading}
+          {#if ticketDetails}
+            <TicketDetails ticketData={ticketDetails} surface="split" onRefresh={refreshTicketDetails}/>
+          {:else if detailsLoading}
             <div class="flex h-full min-h-[680px] items-center justify-center text-[11px] font-semibold text-[#777E8D] lg:min-h-0">Abrindo ticket...</div>
           {:else}
             <div class="flex h-full min-h-[680px] items-center justify-center px-8 text-center text-[11px] text-[#9297A4] lg:min-h-0">Selecione um ticket para abrir os detalhes.</div>
@@ -293,7 +293,7 @@
         tickets={filteredTickets}
         globalWorkflow={data.workflowBoard.globalWorkflow}
         areaWorkflows={data.workflowBoard.areaWorkflows}
-        onOpenTicket={openCard}
+        onOpenTicket={openTicketDetails}
       />
     {/if}
 
@@ -314,10 +314,10 @@
   <TicketCreateDialog queues={data.queues} entryPoints={data.entryPoints} canSearchCustomers={data.canSearchCustomers} onClose={() => (createOpen = false)}/>
 {/if}
 
-{#if cardLoading && view !== "split"}
+{#if detailsLoading && view !== "split"}
   <div class="fixed inset-0 z-[120] flex items-center justify-center bg-[#010D28]/40"><div class="rounded-2xl bg-white px-5 py-4 text-[11px] font-semibold text-[#4D5464]">Abrindo ticket...</div></div>
 {/if}
 
-{#if card && view !== "split"}
-  <TicketDetailsModal ticketData={card} onClose={() => (card = null)} onRefresh={refreshCard}/>
+{#if ticketDetails && view !== "split"}
+  <TicketDetailsModal ticketData={ticketDetails} onClose={() => (ticketDetails = null)} onRefresh={refreshTicketDetails}/>
 {/if}
