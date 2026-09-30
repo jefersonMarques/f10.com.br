@@ -259,7 +259,7 @@ export async function listPublicHelpCollections(
       ),
     publishedCatalog
       ? Promise.resolve(publishedCatalog)
-      : listPublishedStructuredHelpCatalog(),
+      : listPublishedStructuredHelpCatalog("", "support_article"),
   ]);
 
   const publishedById = new Map(catalog.map((item) => [item.contentId, item]));

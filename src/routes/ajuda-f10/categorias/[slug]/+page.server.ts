@@ -5,7 +5,7 @@ import { listPublishedStructuredHelpCatalog } from "$lib/server/help/publicStruc
 
 export const load: PageServerLoad = async ({ params, url, cookies }) => {
   const [catalog, customer] = await Promise.all([
-    listPublishedStructuredHelpCatalog(),
+    listPublishedStructuredHelpCatalog("", "support_article"),
     getOptionalCustomerF10PortalSession(cookies),
   ]);
 
