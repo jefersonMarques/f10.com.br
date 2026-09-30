@@ -162,7 +162,9 @@
   $: visibleCards = cards.slice(0, 4);
 
   function solutionHref(href: string): string {
-    return embedded ? `${href}?iframef10=1` : href;
+    if (!embedded) return href;
+    const slug = href.split("/").filter(Boolean).at(-1) ?? "";
+    return `/iframef10/recursos/${slug}`;
   }
 </script>
 

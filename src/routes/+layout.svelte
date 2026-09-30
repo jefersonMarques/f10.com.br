@@ -83,17 +83,16 @@
   $: pathname = $page.url.pathname;
   $: isStandalonePage = standalonePaths.has(pathname);
   $: isInternalAppPage = isInternalPath(pathname);
-  $: isEmbeddedSolution = pathname.startsWith("/solucoes") && $page.url.searchParams.get("iframef10") === "1";
   $: isOnboardingPage = pathname === "/primeiros-passos-f10";
   $: isHelpPage = pathname === "/ajuda-f10" || pathname.startsWith("/ajuda-f10/");
   $: seoOverride = seoOverrides[pathname];
 
   onMount(() => {
-    if (!isInternalPath(window.location.pathname) && new URLSearchParams(window.location.search).get("iframef10") !== "1") initializeAnalytics();
+    if (!isInternalPath(window.location.pathname)) initializeAnalytics();
   });
 
   afterNavigate(({ to }) => {
-    if (to && !isInternalPath(to.url.pathname) && to.url.searchParams.get("iframef10") !== "1") trackFacebookPageView();
+    if (to && !isInternalPath(to.url.pathname)) trackFacebookPageView();
   });
 </script>
 
@@ -138,7 +137,7 @@
   {/if}
 </svelte:head>
 
-{#if isStandalonePage || isInternalAppPage || isEmbeddedSolution}
+{#if isStandalonePage || isInternalAppPage}
   <slot />
 {:else if isOnboardingPage}
   <main class="h-[100dvh] overflow-hidden">

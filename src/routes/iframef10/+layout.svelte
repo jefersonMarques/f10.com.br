@@ -104,7 +104,7 @@
 
   {#if mounted && visibleNotice}
     <div class="fixed inset-0 z-[10020] flex items-center justify-center bg-[#010D28]/45 p-4" role="presentation">
-      <section role="dialog" aria-modal="true" aria-labelledby="iframe-notice-title" class="w-full max-w-[460px] overflow-hidden rounded-[24px] bg-white shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-labelledby="iframe-notice-title" class="w-full max-w-[460px] overflow-hidden rounded-[24px] bg-white shadow-2xl">
         <div class={`h-1.5 ${visibleNotice.severity === "critical" ? "bg-[#D92D20]" : visibleNotice.severity === "warning" ? "bg-[#EA6D0B]" : "bg-[#000A57]"}`}></div>
         <div class="p-5 sm:p-6">
           <div class="flex items-start gap-3">
@@ -119,7 +119,7 @@
           </div>
           <button type="button" on:click={() => dismissNotice(visibleNotice.id)} class="mt-5 h-10 w-full rounded-xl bg-[#000A57] text-[11px] font-semibold text-white">{visibleNotice.requiresAcknowledgement ? "Entendi" : "Fechar"}</button>
         </div>
-      </section>
+      </div>
     </div>
   {/if}
 
