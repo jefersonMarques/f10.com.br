@@ -18,7 +18,7 @@
 
     <section class="mt-3 overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">
       {#if data.update.coverStorageKey}
-        <img src={"/api/iframef10/updates/" + data.update.id + "/cover"} alt="" class="max-h-[420px] w-full object-cover"/>
+        <img src={"/api/iframef10/updates/" + data.update.id + "/cover?v=" + new Date(data.update.updatedAt).getTime()} alt="" class="max-h-[420px] w-full object-cover"/>
       {/if}
       <div class="p-5 sm:p-7">
         <div class="flex flex-wrap items-center gap-2">

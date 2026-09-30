@@ -37,7 +37,7 @@
         {#each data.updates as update}
           <a href={"/iframef10/novidades/" + encodeURIComponent(update.slug)} class="group overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white transition hover:border-[#C9CFF3] hover:shadow-sm">
             {#if update.coverStorageKey}
-              <img src={"/api/iframef10/updates/" + update.id + "/cover"} alt="" class="aspect-[16/8] w-full object-cover"/>
+              <img src={"/api/iframef10/updates/" + update.id + "/cover?v=" + new Date(update.updatedAt).getTime()} alt="" class="aspect-[16/8] w-full object-cover"/>
             {/if}
             <div class="p-5">
               <div class="flex items-center justify-between gap-3">

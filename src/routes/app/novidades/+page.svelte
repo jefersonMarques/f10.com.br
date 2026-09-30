@@ -59,7 +59,7 @@
           {#each data.updates as update}
             <details class="group">
               <summary class="flex cursor-pointer list-none items-center gap-4 px-5 py-4 hover:bg-app-subtle">
-                {#if update.coverStorageKey}<img src={"/api/iframef10/updates/" + update.id + "/cover"} alt="" class="h-16 w-24 shrink-0 rounded-xl object-cover"/>{:else}<span class="flex h-16 w-24 shrink-0 items-center justify-center rounded-xl bg-app-muted text-app-text-soft"><ImageIcon size={18}/></span>{/if}
+                {#if update.coverStorageKey}<img src={"/api/iframef10/updates/" + update.id + "/cover?v=" + new Date(update.updatedAt).getTime()} alt="" class="h-16 w-24 shrink-0 rounded-xl object-cover"/>{:else}<span class="flex h-16 w-24 shrink-0 items-center justify-center rounded-xl bg-app-muted text-app-text-soft"><ImageIcon size={18}/></span>{/if}
                 <div class="min-w-0 flex-1">
                   <div class="flex flex-wrap items-center gap-2"><strong class="truncate text-[13px]">{update.title}</strong>{#if update.pinned}<span class="inline-flex items-center gap-1 rounded-full bg-app-info-bg px-2 py-1 text-[9px] font-bold text-app-primary"><Pin size={10}/>FIXADO</span>{/if}{#if !update.active}<span class="rounded-full bg-app-danger-bg px-2 py-1 text-[9px] font-bold text-app-danger-text">INATIVO</span>{/if}</div>
                   <p class="mt-1 text-[10px] text-app-text-soft">Validade: {formatDate(update.expiresAt)}</p>

@@ -131,7 +131,7 @@ export async function readIframeF10UpdateCover(updateId: string): Promise<Respon
   const source = await getAssetObject(cover.storageKey);
   const headers = new Headers();
   headers.set("Content-Type", cover.contentType);
-  headers.set("Cache-Control", "public, max-age=3600");
+  headers.set("Cache-Control", "no-cache, max-age=0, must-revalidate");
   const length = source.headers.get("content-length");
   if (length) headers.set("Content-Length", length);
   return new Response(source.body, { status: 200, headers });
