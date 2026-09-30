@@ -18,6 +18,8 @@ import {
 } from "$lib/server/db/structuredHelpSchema";
 import { deleteManagedHelpAsset } from "$lib/server/help/helpAssetRepository";
 import { saveHelpContentVersion } from "$lib/server/help/helpVersionRepository";
+import type { HelpContentKind } from "$lib/help/helpContentKind";
+import { normalizeHelpContentKind } from "$lib/help/helpContentKind";
 import {
   parsePublishedStructuredHelpSnapshot,
   type PublishedStructuredHelp,
@@ -65,6 +67,7 @@ type EditorSnapshotStep = {
 type EditorSnapshot = {
   slug: string;
   title: string;
+  contentKind: HelpContentKind;
   summary: string;
   quickGuide?: string;
   searchAliases: string[];
@@ -176,6 +179,7 @@ function parseEditorSnapshot(value: unknown): EditorSnapshot | null {
   return {
     slug,
     title,
+    contentKind: normalizeHelpContentKind(readString(record, "contentKind")),
     summary: readString(record, "summary"),
     quickGuide: readString(record, "quickGuide"),
     searchAliases: aliases,
@@ -345,6 +349,7 @@ export async function restoreHelpContentReleaseAsDraft(input: {
       .set({
         slug: snapshot.slug,
         title: snapshot.title,
+        contentKind: snapshot.contentKind,
         summary: snapshot.summary,
         quickGuide: snapshot.quickGuide ?? "",
         searchAliases: snapshot.searchAliases,

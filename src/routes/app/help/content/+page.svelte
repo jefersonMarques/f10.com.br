@@ -239,6 +239,8 @@
                       <a href={`/app/help/content/${content.id}/images`} class="truncate text-[13px] font-semibold text-[#252B3B] hover:text-[#000A57]">{content.title}</a>
                     {/if}
 
+                    <span class={`application-text-meta rounded-full px-2 py-1 font-bold uppercase tracking-[0.05em] ${content.contentKind === "update" ? "bg-[#EEF0FF] text-[#000A57]" : "bg-[#F2F3F7] text-[#707687]"}`}>{content.contentKind === "update" ? "Atualização" : "Suporte"}</span>
+
                     <span class={`application-text-meta rounded-full px-2 py-1 font-bold uppercase tracking-[0.05em] ${content.status === "published" ? "bg-[#EEF8F1] text-[#2F7045]" : content.status === "archived" ? "bg-[#F1F1F3] text-[#676D7D]" : "bg-[#F2F3F7] text-[#707687]"}`}>
                       {statusLabels[content.status] ?? content.status}
                     </span>

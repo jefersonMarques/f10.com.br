@@ -66,6 +66,7 @@ export type HelpKnowledgeCompilerInput = {
   id: string;
   slug: string;
   title: string;
+  contentKind: "support_article" | "update";
   summary: string;
   searchAliases: string[];
   assistantKnowledge: string;
@@ -207,6 +208,7 @@ export function compileHelpPublicSnapshot(content: HelpKnowledgeCompilerInput) {
   return {
     slug: content.slug,
     title: content.title,
+    contentKind: content.contentKind,
     summary: content.summary,
     categories: content.categories.map((category) => ({
       id: category.id,
@@ -274,6 +276,7 @@ export function compileHelpVersionSnapshot(
   return {
     slug: content.slug,
     title: content.title,
+    contentKind: content.contentKind,
     summary: content.summary,
     searchAliases: content.searchAliases,
     assistantKnowledge: content.assistantKnowledge,

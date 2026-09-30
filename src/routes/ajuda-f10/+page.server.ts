@@ -5,7 +5,7 @@ import { listPublicHelpCollections } from "$lib/server/help/helpCollectionReposi
 
 export const load: PageServerLoad = async ({ url, cookies }) => {
   const [articles, customer] = await Promise.all([
-    listPublishedStructuredHelpCatalog(),
+    listPublishedStructuredHelpCatalog("", "support_article"),
     getOptionalCustomerF10PortalSession(cookies),
   ]);
   const collections = await listPublicHelpCollections(articles);

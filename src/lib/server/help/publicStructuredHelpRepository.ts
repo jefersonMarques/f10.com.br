@@ -5,6 +5,8 @@ import {
 } from "$lib/help/helpImageAnnotations";
 import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
+import type { HelpContentKind } from "$lib/help/helpContentKind";
+import { normalizeHelpContentKind } from "$lib/help/helpContentKind";
 
 export type PublishedHelpAsset = {
   id: string;
@@ -47,6 +49,7 @@ export type PublishedStructuredHelp = {
   contentId: string;
   slug: string;
   title: string;
+  contentKind: HelpContentKind;
   summary: string;
   quickGuide: string;
   categories: PublishedHelpCategory[];
@@ -59,6 +62,7 @@ export type PublishedStructuredHelpSummary = {
   contentId: string;
   slug: string;
   title: string;
+  contentKind: HelpContentKind;
   summary: string;
   categories: PublishedHelpCategory[];
   stepCount: number;
@@ -178,6 +182,7 @@ export function parsePublishedStructuredHelpSnapshot(
     contentId: entityId,
     slug,
     title,
+    contentKind: normalizeHelpContentKind(readString(publicSnapshot, "contentKind")),
     summary: readString(publicSnapshot, "summary"),
     quickGuide: readString(publicSnapshot, "quickGuide"),
     categories,
@@ -203,7 +208,10 @@ function publicationSearchText(content: PublishedStructuredHelp): string {
   );
 }
 
-export async function listPublishedStructuredHelpCatalog(query = ""): Promise<PublishedStructuredHelpSummary[]> {
+export async function listPublishedStructuredHelpCatalog(
+  query = "",
+  contentKind: HelpContentKind | null = null,
+): Promise<PublishedStructuredHelpSummary[]> {
   const rows = await getDatabase()
     .select({ entityId: helpPublications.entityId, snapshot: helpPublications.snapshot, publishedAt: helpPublications.publishedAt })
     .from(helpPublications)
@@ -213,6 +221,7 @@ export async function listPublishedStructuredHelpCatalog(query = ""): Promise<Pu
   return rows
     .map((row) => parsePublishedStructuredHelpSnapshot(row.entityId, row.publishedAt, row.snapshot))
     .filter((content): content is PublishedStructuredHelp => Boolean(content))
+    .filter((content) => !contentKind || content.contentKind === contentKind)
     .filter((content) => {
       if (terms.length === 0) return true;
       const searchable = publicationSearchText(content);
@@ -222,6 +231,7 @@ export async function listPublishedStructuredHelpCatalog(query = ""): Promise<Pu
       contentId: content.contentId,
       slug: content.slug,
       title: content.title,
+      contentKind: content.contentKind,
       summary: content.summary,
       categories: content.categories,
       stepCount: content.steps.length,

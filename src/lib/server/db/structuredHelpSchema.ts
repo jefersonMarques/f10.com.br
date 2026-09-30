@@ -13,6 +13,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { helpContentStatus, users } from "$lib/server/db/schema";
+import type { HelpContentKind } from "$lib/help/helpContentKind";
 
 export const helpBlockType = pgEnum("help_block_type", [
   "text",
@@ -76,6 +77,7 @@ export const helpContents = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     slug: text("slug").notNull(),
     title: text("title").notNull(),
+    contentKind: text("content_kind").$type<HelpContentKind>().notNull().default("support_article"),
     summary: text("summary").notNull().default(""),
     quickGuide: text("quick_guide").notNull().default(""),
     searchAliases: jsonb("search_aliases").$type<string[]>().notNull().default([]),
@@ -94,6 +96,7 @@ export const helpContents = pgTable(
     uniqueIndex("help_contents_slug_unique").on(table.slug),
     uniqueIndex("help_contents_import_identity_unique").on(table.importSource, table.importExternalId),
     index("help_contents_status_idx").on(table.status),
+    index("help_contents_kind_idx").on(table.contentKind),
     index("help_contents_updated_idx").on(table.updatedAt),
     index("help_contents_import_source_idx").on(table.importSource),
   ],

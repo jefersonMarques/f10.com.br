@@ -2,6 +2,7 @@ import { error, fail, redirect, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
+import { normalizeHelpContentKind } from "$lib/help/helpContentKind";
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import { moveHelpBlock, moveHelpStep, type HelpMoveDirection } from "$lib/server/help/helpContentOrdering";
 import { publishHelpKnowledgeContent } from "$lib/server/help/helpKnowledgePublisher";
@@ -232,6 +233,7 @@ export const actions: Actions = {
     const { session } = await requireAppPermission(cookies, "help.edit", contentEditorPath(params.contentId));
     const formData = await request.formData();
     const title = readFormValue(formData, "title");
+    const contentKind = normalizeHelpContentKind(readFormValue(formData, "contentKind"));
     const slug = readFormValue(formData, "slug");
     const summary = readFormValue(formData, "summary");
     const searchAliases = readAliases(readFormValue(formData, "searchAliases"));
@@ -254,6 +256,7 @@ export const actions: Actions = {
     try {
       await updateStructuredHelpContent(session.user.id, params.contentId, {
         title,
+        contentKind,
         slug,
         summary,
         searchAliases,
@@ -302,6 +305,7 @@ export const actions: Actions = {
     try {
       await updateStructuredHelpContent(session.user.id, params.contentId, {
         title: content.title,
+        contentKind: content.contentKind,
         slug: content.slug,
         summary: content.summary,
         searchAliases,

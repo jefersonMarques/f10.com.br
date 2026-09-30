@@ -14,6 +14,7 @@ import {
 import { deleteManagedHelpAsset } from "$lib/server/help/helpAssetRepository";
 import { normalizeHelpSlug } from "$lib/server/help/helpArticleRepository";
 import { saveHelpContentVersion } from "$lib/server/help/helpVersionRepository";
+import type { HelpContentKind } from "$lib/help/helpContentKind";
 
 export type StructuredHelpBlockType =
   | "text"
@@ -30,6 +31,7 @@ export type StructuredHelpContentCategoryInput = {
 
 export type StructuredHelpContentInput = {
   title: string;
+  contentKind?: HelpContentKind;
   slug: string;
   summary: string;
   searchAliases: string[];
@@ -163,6 +165,7 @@ export async function listStructuredHelpContents() {
       id: helpContents.id,
       slug: helpContents.slug,
       title: helpContents.title,
+      contentKind: helpContents.contentKind,
       summary: helpContents.summary,
       status: helpContents.status,
       publishedAt: helpContents.publishedAt,
@@ -384,6 +387,7 @@ export async function createStructuredHelpContent(
       .values({
         slug,
         title: input.title.trim(),
+        contentKind: input.contentKind ?? "support_article",
         summary: input.summary.trim(),
         searchAliases: normalizeAliases(input.searchAliases),
         assistantKnowledge: input.assistantKnowledge.trim(),
@@ -437,6 +441,7 @@ export async function updateStructuredHelpContent(
       .set({
         slug,
         title: input.title.trim(),
+        contentKind: input.contentKind ?? content.contentKind,
         summary: input.summary.trim(),
         searchAliases: normalizeAliases(input.searchAliases),
         assistantKnowledge: input.assistantKnowledge.trim(),
