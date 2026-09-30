@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ExternalLink, Image as ImageIcon, Megaphone, Pin, Plus, Save, Trash2 } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
+  import IframeF10MarkdownEditor from "$lib/components/iframef10/IframeF10MarkdownEditor.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -33,7 +34,7 @@
         <summary class="flex cursor-pointer list-none items-center gap-2 text-[13px] font-semibold text-app-text"><Plus size={16}/>Nova novidade</summary>
         <form method="POST" action="?/create" enctype="multipart/form-data" class="mt-5 grid gap-4 lg:grid-cols-2">
           <label class="lg:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold">Título</span><input name="title" required maxlength="160" class="h-11 w-full rounded-xl border border-app-border-control bg-app-surface px-3 text-[12px]"/></label>
-          <label class="lg:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold">Markdown</span><textarea name="bodyMarkdown" required maxlength="50000" rows="10" placeholder="## Novidade&#10;&#10;Explique a melhoria e use [links](https://f10.com.br) quando necessário." class="w-full resize-y rounded-xl border border-app-border-control bg-app-surface px-3 py-3 font-mono text-[12px] leading-6"></textarea><span class="mt-1 block text-[10px] text-app-text-soft">Aceita títulos, listas, negrito, itálico, citações e links.</span></label>
+          <div class="lg:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold">Texto</span><IframeF10MarkdownEditor required rows={10} placeholder="Escreva a novidade..."/></div>
           <label><span class="mb-1.5 block text-[11px] font-semibold">Imagem de capa</span><input name="cover" type="file" accept="image/png,image/jpeg,image/webp" class="block w-full text-[11px] text-app-text-muted"/></label>
           <label><span class="mb-1.5 block text-[11px] font-semibold">Validade</span><input name="expiresAt" type="datetime-local" class="h-11 w-full rounded-xl border border-app-border-control bg-app-surface px-3 text-[12px]"/><span class="mt-1 block text-[10px] text-app-text-soft">Vazio = não expira.</span></label>
           <div class="flex flex-wrap gap-4 lg:col-span-2">
@@ -71,7 +72,7 @@
                   <form method="POST" action="?/update" enctype="multipart/form-data" class="grid gap-4 lg:grid-cols-2">
                     <input type="hidden" name="updateId" value={update.id}/>
                     <label class="lg:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold">Título</span><input name="title" required maxlength="160" value={update.title} class="h-11 w-full rounded-xl border border-app-border-control bg-app-surface px-3 text-[12px]"/></label>
-                    <label class="lg:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold">Markdown</span><textarea name="bodyMarkdown" required maxlength="50000" rows="10" class="w-full resize-y rounded-xl border border-app-border-control bg-app-surface px-3 py-3 font-mono text-[12px] leading-6">{update.bodyMarkdown}</textarea></label>
+                    <div class="lg:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold">Texto</span><IframeF10MarkdownEditor required rows={10} value={update.bodyMarkdown}/></div>
                     <label><span class="mb-1.5 block text-[11px] font-semibold">Trocar capa</span><input name="cover" type="file" accept="image/png,image/jpeg,image/webp" class="block w-full text-[11px] text-app-text-muted"/>{#if update.coverStorageKey}<span class="mt-2 flex items-center gap-2 text-[10px]"><input name="removeCover" type="checkbox"/>Remover capa atual</span>{/if}</label>
                     <label><span class="mb-1.5 block text-[11px] font-semibold">Validade</span><input name="expiresAt" type="datetime-local" value={dateTimeLocal(update.expiresAt)} class="h-11 w-full rounded-xl border border-app-border-control bg-app-surface px-3 text-[12px]"/><span class="mt-1 block text-[10px] text-app-text-soft">Vazio = não expira.</span></label>
                     <div class="flex flex-wrap gap-4 lg:col-span-2"><label class="flex items-center gap-2 text-[11px] font-semibold"><input name="active" type="checkbox" checked={update.active}/>Ativo</label><label class="flex items-center gap-2 text-[11px] font-semibold"><input name="pinned" type="checkbox" checked={update.pinned}/>Fixado no topo</label></div>
