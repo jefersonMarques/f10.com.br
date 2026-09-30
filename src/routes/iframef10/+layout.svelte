@@ -34,7 +34,13 @@
   async function refreshNotices(): Promise<void> {
     try {
       const response = await fetch("/api/iframef10/notices", { cache: "no-store" });
-      if (response.ok) notices = await response.json() as typeof notices;
+      if (response.ok) {
+        notices = await response.json() as typeof notices;
+        const storedDismissals = notices
+          .filter((notice) => window.localStorage.getItem(`f10-iframe-notice:${notice.id}`) === "1")
+          .map((notice) => notice.id);
+        dismissedIds = Array.from(new Set([...dismissedIds, ...storedDismissals]));
+      }
     } catch {
       // A próxima consulta tenta novamente sem interromper o WebView.
     }

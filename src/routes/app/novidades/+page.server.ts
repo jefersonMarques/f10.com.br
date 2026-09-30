@@ -34,7 +34,7 @@ export const load: PageServerLoad = async ({ parent }) => {
   return {
     contents: contents
       .filter((content) => content.contentKind === "update")
-      .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
+      .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())
       .map((content) => ({
         ...content,
         publishedSlug: publishedById.get(content.id)?.slug ?? null,

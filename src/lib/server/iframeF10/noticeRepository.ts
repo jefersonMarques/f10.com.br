@@ -40,11 +40,21 @@ export async function listActiveIframeF10Notices(now = new Date()) {
     info: 1,
   };
 
-  return rows.sort(
-    (left, right) =>
-      severityRank[right.severity] - severityRank[left.severity]
-      || right.createdAt.getTime() - left.createdAt.getTime(),
-  );
+  return rows
+    .sort(
+      (left, right) =>
+        severityRank[right.severity] - severityRank[left.severity]
+        || right.createdAt.getTime() - left.createdAt.getTime(),
+    )
+    .map((notice) => ({
+      id: notice.id,
+      title: notice.title,
+      message: notice.message,
+      severity: notice.severity,
+      startsAt: notice.startsAt,
+      expiresAt: notice.expiresAt,
+      requiresAcknowledgement: notice.requiresAcknowledgement,
+    }));
 }
 
 export async function createIframeF10Notice(
