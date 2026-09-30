@@ -1,6 +1,8 @@
 <script lang="ts">
   import SolutionCard from "$lib/components/SolutionCard.svelte";
 
+  export let embedded = false;
+
   type TabId = "finance" | "pedagogy" | "sales" | "marketing";
   type Tab = { id: TabId; label: string; el?: HTMLButtonElement | null };
 
@@ -158,6 +160,10 @@
 
   $: cards = content[activeTab] || [];
   $: visibleCards = cards.slice(0, 4);
+
+  function solutionHref(href: string): string {
+    return embedded ? `${href}?iframef10=1` : href;
+  }
 </script>
 
 <section
@@ -218,7 +224,7 @@
                 highlight={card.highlight}
                 title={card.title}
                 buttonText={card.buttonText}
-                href={card.href}
+                href={solutionHref(card.href)}
               />
             </div>
           </div>
