@@ -46,7 +46,7 @@ export const actions: Actions = {
     const title = read(formData, "title");
     const message = read(formData, "message");
     const startsRaw = read(formData, "startsAt");
-    const startsAt = startsRaw ? parseDate(startsRaw) : new Date();
+    const parsedStartsAt = startsRaw ? parseDate(startsRaw) : null;
     const expiresRaw = read(formData, "expiresAt");
     const expiresAt = parseDate(expiresRaw);
 
@@ -55,11 +55,13 @@ export const actions: Actions = {
       title.length > 120 ||
       message.length < 4 ||
       message.length > 2000 ||
-      (startsRaw && !startsAt) ||
+      (startsRaw && !parsedStartsAt) ||
       !expiresAt
     ) {
       return fail(400, { success: false, message: "Informe os dados do aviso e uma data/hora de término." });
     }
+
+    const startsAt = parsedStartsAt ?? new Date();
     if (expiresAt.getTime() <= startsAt.getTime()) {
       return fail(400, { success: false, message: "O término precisa ser posterior ao início." });
     }
