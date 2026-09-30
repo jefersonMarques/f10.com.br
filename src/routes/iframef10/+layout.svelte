@@ -12,15 +12,20 @@
   let notices = data.notices;
   let mounted = false;
 
-  const navigation = [
-    { label: "Suporte", href: "/iframef10/suporte", icon: BookOpen },
-    { label: "Atualizações", href: "/iframef10/novidades", icon: Megaphone },
-    { label: "Recursos", href: "/iframef10/recursos", icon: Boxes },
-    { label: "Avisos", href: "/iframef10/avisos", icon: BellRing },
+  type NavigationKey = "support" | "updates" | "resources" | "notices";
+
+  const navigation: Array<{ key: NavigationKey; label: string; href: string; icon: typeof BookOpen }> = [
+    { key: "support", label: "Suporte", href: "/iframef10/suporte", icon: BookOpen },
+    { key: "updates", label: "Atualizações", href: "/iframef10/novidades", icon: Megaphone },
+    { key: "resources", label: "Recursos", href: "/iframef10/recursos", icon: Boxes },
+    { key: "notices", label: "Avisos", href: "/iframef10/avisos", icon: BellRing },
   ];
 
   $: pathname = $page.url.pathname;
-  $: visibleNotice = notices.find((notice) => !dismissedIds.includes(notice.id)) ?? null;
+  $: visibleNavigation = navigation.filter((item) => data.visibility[item.key]);
+  $: visibleNotice = data.visibility.notices
+    ? notices.find((notice) => !dismissedIds.includes(notice.id)) ?? null
+    : null;
 
   function active(href: string): boolean {
     return pathname === href || pathname.startsWith(`${href}/`);
@@ -52,6 +57,8 @@
       .filter((notice) => window.localStorage.getItem(`f10-iframe-notice:${notice.id}`) === "1")
       .map((notice) => notice.id);
 
+    if (!data.visibility.notices) return;
+
     void refreshNotices();
     const timer = window.setInterval(() => void refreshNotices(), 60_000);
     return () => window.clearInterval(timer);
@@ -66,10 +73,10 @@
 <div class="min-h-[100dvh] bg-[#F5F6FA] text-[#202637]">
   <header class="sticky top-0 z-40 border-b border-[#E2E5ED] bg-white/95 backdrop-blur">
     <div class="mx-auto flex min-h-[62px] max-w-[1440px] items-center gap-3 px-3 sm:px-5">
-      <a href="/iframef10/suporte" class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[11px] font-bold text-white">F10</a>
+      <a href={data.firstEnabledHref} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[11px] font-bold text-white">F10</a>
 
       <nav class="flex min-w-0 flex-1 gap-1 overflow-x-auto" aria-label="F10">
-        {#each navigation as item}
+        {#each visibleNavigation as item}
           <a
             href={item.href}
             class={`inline-flex h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-[11px] font-semibold transition ${active(item.href) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#697080] hover:bg-[#F3F4F7]"}`}
@@ -83,9 +90,11 @@
         {/each}
       </nav>
 
-      <button type="button" on:click={() => (chatOpen = true)} class="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white" aria-label="Abrir suporte">
-        <MessageCircleMore size={15}/><span class="hidden sm:inline">Chat</span>
-      </button>
+      {#if data.visibility.support}
+        <button type="button" on:click={() => (chatOpen = true)} class="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-[#000A57] px-3 text-[10px] font-semibold text-white" aria-label="Abrir suporte">
+          <MessageCircleMore size={15}/><span class="hidden sm:inline">Chat</span>
+        </button>
+      {/if}
     </div>
   </header>
 
@@ -114,5 +123,7 @@
     </div>
   {/if}
 
-  <SupportAssistantDialog isOpen={chatOpen} onClose={() => (chatOpen = false)} customerSupport={data.customerSupport}/>
+  {#if data.visibility.support}
+    <SupportAssistantDialog isOpen={chatOpen} onClose={() => (chatOpen = false)} customerSupport={data.customerSupport}/>
+  {/if}
 </div>

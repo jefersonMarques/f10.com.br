@@ -3,7 +3,9 @@ import type { Actions, PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import {
   getGeneralOperationsSettings,
+  getIframeF10VisibilitySettings,
   updateGeneralOperationsSettings,
+  updateIframeF10VisibilitySettings,
 } from "$lib/server/settings/operationsSettingsRepository";
 
 function readString(formData: FormData, key: string): string {
@@ -17,12 +19,36 @@ function isValidOptionalEmail(value: string): boolean {
 
 export const load: PageServerLoad = async ({ cookies }) => {
   await requireAppPermission(cookies, "system.settings.manage", "/app/settings");
-  return {
-    general: await getGeneralOperationsSettings(),
-  };
+  const [general, iframeF10] = await Promise.all([
+    getGeneralOperationsSettings(),
+    getIframeF10VisibilitySettings(),
+  ]);
+  return { general, iframeF10 };
 };
 
 export const actions: Actions = {
+  saveIframeF10: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(
+      cookies,
+      "system.settings.manage",
+      "/app/settings",
+    );
+    const formData = await request.formData();
+
+    await updateIframeF10VisibilitySettings(session.user.id, {
+      support: formData.has("support"),
+      updates: formData.has("updates"),
+      resources: formData.has("resources"),
+      notices: formData.has("notices"),
+    });
+
+    return {
+      success: true,
+      action: "saveIframeF10",
+      message: "Opções do WebView atualizadas.",
+    };
+  },
+
   saveGeneral: async ({ cookies, request }) => {
     const { session } = await requireAppPermission(
       cookies,

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Bot, Clock3, HardDrive, Save, Settings, ShieldCheck, Ticket, Video } from "lucide-svelte";
+  import { Bot, Clock3, HardDrive, Monitor, Save, Settings, ShieldCheck, Ticket, Video } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -65,4 +65,37 @@
       </div>
     </section>
   </div>
+
+  <section class="mt-5 rounded-[22px] border border-app-border bg-app-surface p-5 sm:p-6">
+    <div class="flex items-center gap-3">
+      <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-app-info-bg text-app-primary"><Monitor size={18}/></span>
+      <div>
+        <h2 class="text-[14px] font-semibold text-app-text">WebView F10</h2>
+        <p class="application-text-meta mt-1 text-app-text-soft">Marque somente as áreas que devem aparecer para os clientes.</p>
+      </div>
+    </div>
+
+    <form method="POST" action="?/saveIframeF10" class="mt-5">
+      <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-app-border px-3 py-2.5 transition hover:bg-app-subtle">
+          <input name="support" type="checkbox" checked={data.iframeF10.support} class="h-4 w-4 rounded border-app-border-control"/>
+          <span class="text-[11px] font-semibold text-app-text">Suporte</span>
+        </label>
+        <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-app-border px-3 py-2.5 transition hover:bg-app-subtle">
+          <input name="updates" type="checkbox" checked={data.iframeF10.updates} class="h-4 w-4 rounded border-app-border-control"/>
+          <span class="text-[11px] font-semibold text-app-text">Atualizações</span>
+        </label>
+        <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-app-border px-3 py-2.5 transition hover:bg-app-subtle">
+          <input name="resources" type="checkbox" checked={data.iframeF10.resources} class="h-4 w-4 rounded border-app-border-control"/>
+          <span class="text-[11px] font-semibold text-app-text">Recursos</span>
+        </label>
+        <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-app-border px-3 py-2.5 transition hover:bg-app-subtle">
+          <input name="notices" type="checkbox" checked={data.iframeF10.notices} class="h-4 w-4 rounded border-app-border-control"/>
+          <span class="text-[11px] font-semibold text-app-text">Avisos</span>
+        </label>
+      </div>
+
+      <button type="submit" class="application-text-caption mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white"><Save size={14}/>Salvar WebView</button>
+    </form>
+  </section>
 </ApplicationContent>

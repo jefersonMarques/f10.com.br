@@ -28,6 +28,13 @@ export type TicketOnboardingSettings = {
   startStageId: string | null;
 };
 
+export type IframeF10VisibilitySettings = {
+  support: boolean;
+  updates: boolean;
+  resources: boolean;
+  notices: boolean;
+};
+
 const DEFAULT_SETTINGS: GeneralOperationsSettings = {
   supportDisplayName: "Equipe F10",
   supportSenderEmail: "",
@@ -51,6 +58,13 @@ export const DEFAULT_HELP_VIDEO_AUTOMATION_SETTINGS: HelpVideoAutomationSettings
 
 export const DEFAULT_TICKET_ONBOARDING_SETTINGS: TicketOnboardingSettings = {
   startStageId: null,
+};
+
+export const DEFAULT_IFRAME_F10_VISIBILITY_SETTINGS: IframeF10VisibilitySettings = {
+  support: false,
+  updates: false,
+  resources: false,
+  notices: false,
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -153,6 +167,30 @@ export async function getTicketOnboardingSettings(): Promise<TicketOnboardingSet
       ? value.startStageId
       : null;
   return { startStageId };
+}
+
+export async function getIframeF10VisibilitySettings(): Promise<IframeF10VisibilitySettings> {
+  const [row] = await getDatabase()
+    .select({ value: operationsSettings.value })
+    .from(operationsSettings)
+    .where(eq(operationsSettings.key, "iframe_f10_visibility"))
+    .limit(1);
+  const value = asRecord(row?.value);
+
+  return {
+    support: typeof value.support === "boolean"
+      ? value.support
+      : DEFAULT_IFRAME_F10_VISIBILITY_SETTINGS.support,
+    updates: typeof value.updates === "boolean"
+      ? value.updates
+      : DEFAULT_IFRAME_F10_VISIBILITY_SETTINGS.updates,
+    resources: typeof value.resources === "boolean"
+      ? value.resources
+      : DEFAULT_IFRAME_F10_VISIBILITY_SETTINGS.resources,
+    notices: typeof value.notices === "boolean"
+      ? value.notices
+      : DEFAULT_IFRAME_F10_VISIBILITY_SETTINGS.notices,
+  };
 }
 
 export async function getHelpVideoAutomationSettings(): Promise<HelpVideoAutomationSettings> {
@@ -289,6 +327,40 @@ export async function updateHelpVideoAutomationSettings(
     action: "operations.help_video_automation.settings.updated",
     entityType: "operations_settings",
     entityId: "help_video_automation",
+    metadata: normalized,
+  });
+}
+
+export async function updateIframeF10VisibilitySettings(
+  actorUserId: string,
+  value: IframeF10VisibilitySettings,
+): Promise<void> {
+  const normalized: IframeF10VisibilitySettings = {
+    support: Boolean(value.support),
+    updates: Boolean(value.updates),
+    resources: Boolean(value.resources),
+    notices: Boolean(value.notices),
+  };
+  const now = new Date();
+
+  await getDatabase()
+    .insert(operationsSettings)
+    .values({
+      key: "iframe_f10_visibility",
+      value: normalized,
+      updatedBy: actorUserId,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: operationsSettings.key,
+      set: { value: normalized, updatedBy: actorUserId, updatedAt: now },
+    });
+
+  await recordAuditEvent({
+    actorUserId,
+    action: "operations.iframe_f10.visibility.updated",
+    entityType: "operations_settings",
+    entityId: "iframe_f10_visibility",
     metadata: normalized,
   });
 }
