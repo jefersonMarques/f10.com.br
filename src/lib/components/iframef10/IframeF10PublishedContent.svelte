@@ -56,7 +56,7 @@
 </script>
 
 <div class="px-4 py-5 sm:px-6 sm:py-7">
-  <div class="mx-auto max-w-[1080px]">
+  <div class="mx-auto max-w-[1280px]">
     <a href={backHref} class="inline-flex h-9 items-center gap-2 rounded-xl px-2 text-[11px] font-semibold text-[#666D7D] hover:bg-white hover:text-[#000A57]"><ArrowLeft size={15}/>Voltar</a>
 
     <header class="mt-3 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-7">
