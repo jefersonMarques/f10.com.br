@@ -23,6 +23,7 @@
 
   $: pathname = $page.url.pathname;
   $: visibleNavigation = navigation.filter((item) => data.visibility[item.key]);
+  $: hasUnseenNotices = mounted && notices.some((notice) => !dismissedIds.includes(notice.id));
   $: visibleNotice = data.visibility.notices
     ? notices.find((notice) => !dismissedIds.includes(notice.id)) ?? null
     : null;
@@ -75,12 +76,12 @@
         {#each visibleNavigation as item}
           <a
             href={item.href}
-            class={`inline-flex h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-[11px] font-semibold transition ${pathname === item.href || pathname.startsWith(`${item.href}/`) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#697080] hover:bg-[#F3F4F7]"}`}
+            class={`relative inline-flex h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-[11px] font-semibold transition ${pathname === item.href || pathname.startsWith(`${item.href}/`) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#697080] hover:bg-[#F3F4F7]"}`}
           >
             <svelte:component this={item.icon} size={15}/>
             <span>{item.label}</span>
-            {#if item.href === "/iframef10/avisos" && notices.length > 0}
-              <span class="rounded-full bg-[#D92D20] px-1.5 py-0.5 text-[8px] font-bold text-white">{notices.length}</span>
+            {#if item.href === "/iframef10/avisos" && hasUnseenNotices}
+              <span class="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#D92D20] ring-2 ring-white animate-pulse" aria-label="Novo aviso"></span>
             {/if}
           </a>
         {/each}
