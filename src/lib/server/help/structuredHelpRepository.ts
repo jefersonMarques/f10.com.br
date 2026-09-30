@@ -324,6 +324,7 @@ async function buildVersionSnapshot(contentId: string) {
   return {
     slug: content.slug,
     title: content.title,
+    contentKind: content.contentKind,
     summary: content.summary,
     searchAliases: content.searchAliases,
     assistantKnowledge: content.assistantKnowledge,

@@ -9,6 +9,7 @@
 
   let chatOpen = false;
   let dismissedIds: string[] = [];
+  let notices = data.notices;
   let mounted = false;
 
   const navigation = [
@@ -19,7 +20,7 @@
   ];
 
   $: pathname = $page.url.pathname;
-  $: visibleNotice = data.notices.find((notice) => !dismissedIds.includes(notice.id)) ?? null;
+  $: visibleNotice = notices.find((notice) => !dismissedIds.includes(notice.id)) ?? null;
 
   function active(href: string): boolean {
     return pathname === href || pathname.startsWith(`${href}/`);
@@ -30,11 +31,24 @@
     dismissedIds = [...dismissedIds, id];
   }
 
+  async function refreshNotices(): Promise<void> {
+    try {
+      const response = await fetch("/api/iframef10/notices", { cache: "no-store" });
+      if (response.ok) notices = await response.json() as typeof notices;
+    } catch {
+      // A próxima consulta tenta novamente sem interromper o WebView.
+    }
+  }
+
   onMount(() => {
     mounted = true;
-    dismissedIds = data.notices
+    dismissedIds = notices
       .filter((notice) => window.localStorage.getItem(`f10-iframe-notice:${notice.id}`) === "1")
       .map((notice) => notice.id);
+
+    void refreshNotices();
+    const timer = window.setInterval(() => void refreshNotices(), 60_000);
+    return () => window.clearInterval(timer);
   });
 </script>
 
@@ -56,8 +70,8 @@
           >
             <svelte:component this={item.icon} size={15}/>
             <span>{item.label}</span>
-            {#if item.href === "/iframef10/avisos" && data.notices.length > 0}
-              <span class="rounded-full bg-[#D92D20] px-1.5 py-0.5 text-[8px] font-bold text-white">{data.notices.length}</span>
+            {#if item.href === "/iframef10/avisos" && notices.length > 0}
+              <span class="rounded-full bg-[#D92D20] px-1.5 py-0.5 text-[8px] font-bold text-white">{notices.length}</span>
             {/if}
           </a>
         {/each}

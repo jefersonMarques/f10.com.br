@@ -52,7 +52,7 @@ export const actions: Actions = {
     if (title.length < 4 || title.length > 120 || message.length < 4 || message.length > 2000 || (expiresRaw && !expiresAt)) {
       return fail(400, { success: false, message: "Revise os dados do aviso." });
     }
-    if (expiresAt && expiresAt <= startsAt) {
+    if (expiresAt && expiresAt.getTime() <= startsAt.getTime()) {
       return fail(400, { success: false, message: "O término precisa ser posterior ao início." });
     }
 
