@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { and, desc, eq, gt, lte } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { iframeF10Notices } from "$lib/server/db/iframeF10Schema";
 
@@ -9,7 +9,7 @@ export type IframeF10NoticeInput = {
   message: string;
   severity: IframeF10NoticeSeverity;
   startsAt: Date;
-  expiresAt: Date | null;
+  expiresAt: Date;
   active: boolean;
   requiresAcknowledgement: boolean;
 };
@@ -29,7 +29,7 @@ export async function listActiveIframeF10Notices(now = new Date()) {
       and(
         eq(iframeF10Notices.active, true),
         lte(iframeF10Notices.startsAt, now),
-        or(isNull(iframeF10Notices.expiresAt), gt(iframeF10Notices.expiresAt, now)),
+        gt(iframeF10Notices.expiresAt, now),
       ),
     )
     .orderBy(desc(iframeF10Notices.createdAt));

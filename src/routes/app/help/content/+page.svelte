@@ -239,8 +239,6 @@
                       <a href={`/app/help/content/${content.id}/images`} class="truncate text-[13px] font-semibold text-[#252B3B] hover:text-[#000A57]">{content.title}</a>
                     {/if}
 
-                    <span class={`application-text-meta rounded-full px-2 py-1 font-bold uppercase tracking-[0.05em] ${content.contentKind === "update" ? "bg-[#EEF0FF] text-[#000A57]" : "bg-[#F2F3F7] text-[#707687]"}`}>{content.contentKind === "update" ? "Atualização" : "Suporte"}</span>
-
                     <span class={`application-text-meta rounded-full px-2 py-1 font-bold uppercase tracking-[0.05em] ${content.status === "published" ? "bg-[#EEF8F1] text-[#2F7045]" : content.status === "archived" ? "bg-[#F1F1F3] text-[#676D7D]" : "bg-[#F2F3F7] text-[#707687]"}`}>
                       {statusLabels[content.status] ?? content.status}
                     </span>
@@ -307,7 +305,7 @@
 
                   {#if !isProcessingActive(content.processingJob?.status)}
                     <a href={`/app/help/content/${content.id}/preview`} class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#DDE1EA] bg-white px-3 font-semibold text-[#626979]"><Eye size={13}/>Preview</a>
-                    {#if content.publishedSlug}<a href={content.contentKind === "update" ? `/iframef10/novidades/${content.publishedSlug}` : `/ajuda-f10/${content.publishedSlug}`} target="_blank" rel="noopener noreferrer" class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 font-semibold text-white">{content.contentKind === "update" ? "Ver atualização" : "Ver artigo"}<ExternalLink size={12}/></a>{:else if content.status !== "archived"}<a href={`/app/help/content/${content.id}/images`} class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#777D8D]" aria-label="Editar"><ArrowRight size={14}/></a>{/if}
+                    {#if content.publishedSlug}<a href={`/ajuda-f10/${content.publishedSlug}`} target="_blank" rel="noopener noreferrer" class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 font-semibold text-white">Ver artigo<ExternalLink size={12}/></a>{:else if content.status !== "archived"}<a href={`/app/help/content/${content.id}/images`} class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#777D8D]" aria-label="Editar"><ArrowRight size={14}/></a>{/if}
 
                     {#if data.canEdit && content.status === "draft"}
                       <button type="button" on:click={() => openDeleteModal(content)} class="application-text-meta inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#F0C8C8] bg-white px-3 font-semibold text-[#9B2C2C]"><Trash2 size={12}/>Excluir</button>

@@ -158,7 +158,6 @@
 
       <div class="mt-6 grid gap-5 lg:grid-cols-2">
         <label class="block lg:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Título</span><input name="title" required maxlength="160" value={data.content.title} class="h-12 w-full rounded-xl border border-[#DDE1EA] px-4 text-[14px] font-medium" /></label>
-        <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Tipo</span><select name="contentKind" class="h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[12px]"><option value="support_article" selected={data.content.contentKind !== "update"}>Artigo de suporte</option><option value="update" selected={data.content.contentKind === "update"}>Atualização F10</option></select></label>
         <label class="block lg:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Endereço</span><input name="slug" maxlength="120" value={data.content.slug} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]" /></label>
         <label class="block lg:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Resumo público</span><textarea name="summary" maxlength="320" rows="3" class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[12px] leading-5">{data.content.summary}</textarea></label>
 

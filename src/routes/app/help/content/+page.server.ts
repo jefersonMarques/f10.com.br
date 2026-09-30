@@ -60,7 +60,7 @@ export const load: PageServerLoad = async ({ parent }) => {
   }
 
   const [contents, publishedLinks, categories, sequence] = await Promise.all([
-    listStructuredHelpContents(),
+    listStructuredHelpContents().then((items) => items.filter((content) => content.contentKind !== "update")),
     listPublishedStructuredHelpLinks(),
     listHelpCategories(true),
     listHelpArticleSequence(),

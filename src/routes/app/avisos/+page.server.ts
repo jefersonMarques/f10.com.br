@@ -45,14 +45,22 @@ export const actions: Actions = {
     const formData = await request.formData();
     const title = read(formData, "title");
     const message = read(formData, "message");
-    const startsAt = parseDate(read(formData, "startsAt")) ?? new Date();
+    const startsRaw = read(formData, "startsAt");
+    const startsAt = startsRaw ? parseDate(startsRaw) : new Date();
     const expiresRaw = read(formData, "expiresAt");
-    const expiresAt = expiresRaw ? parseDate(expiresRaw) : null;
+    const expiresAt = parseDate(expiresRaw);
 
-    if (title.length < 4 || title.length > 120 || message.length < 4 || message.length > 2000 || (expiresRaw && !expiresAt)) {
-      return fail(400, { success: false, message: "Revise os dados do aviso." });
+    if (
+      title.length < 4 ||
+      title.length > 120 ||
+      message.length < 4 ||
+      message.length > 2000 ||
+      (startsRaw && !startsAt) ||
+      !expiresAt
+    ) {
+      return fail(400, { success: false, message: "Informe os dados do aviso e uma data/hora de término." });
     }
-    if (expiresAt && expiresAt.getTime() <= startsAt.getTime()) {
+    if (expiresAt.getTime() <= startsAt.getTime()) {
       return fail(400, { success: false, message: "O término precisa ser posterior ao início." });
     }
 

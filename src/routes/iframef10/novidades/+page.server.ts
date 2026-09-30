@@ -1,11 +1,6 @@
 import type { PageServerLoad } from "./$types";
-import { listPublishedStructuredHelpCatalog } from "$lib/server/help/publicStructuredHelpRepository";
+import { listActiveIframeF10Updates } from "$lib/server/iframeF10/updateRepository";
 
-export const load: PageServerLoad = async () => {
-  const updates = await listPublishedStructuredHelpCatalog("", "update");
-  return {
-    updates: updates.sort(
-      (left, right) => new Date(right.publishedAt).getTime() - new Date(left.publishedAt).getTime(),
-    ),
-  };
-};
+export const load: PageServerLoad = async () => ({
+  updates: await listActiveIframeF10Updates(),
+});

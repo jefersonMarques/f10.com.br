@@ -13,7 +13,7 @@
   };
 
   function format(value: string | Date | null): string {
-    if (!value) return "Sem término";
+    if (!value) return "—";
     return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
   }
 </script>
@@ -30,8 +30,8 @@
           <textarea name="message" required maxlength="2000" rows="4" placeholder="Mensagem" class="rounded-xl border border-app-border-control bg-app-surface px-3 py-2.5 text-[12px] md:col-span-2"></textarea>
           <select name="severity" class="h-11 rounded-xl border border-app-border-control bg-app-surface px-3 text-[12px]"><option value="info">Informação</option><option value="warning">Atenção</option><option value="critical">Crítico</option></select>
           <label class="flex h-11 items-center gap-2 rounded-xl border border-app-border-control px-3 text-[11px]"><input type="checkbox" name="requiresAcknowledgement" checked/>Exigir confirmação</label>
-          <label class="text-[10px] text-app-text-soft">Início<input name="startsAt" type="datetime-local" class="mt-1 h-11 w-full rounded-xl border border-app-border-control bg-app-surface px-3 text-[12px]"/></label>
-          <label class="text-[10px] text-app-text-soft">Término opcional<input name="expiresAt" type="datetime-local" class="mt-1 h-11 w-full rounded-xl border border-app-border-control bg-app-surface px-3 text-[12px]"/></label>
+          <label class="text-[10px] text-app-text-soft">Início opcional<input name="startsAt" type="datetime-local" class="mt-1 h-11 w-full rounded-xl border border-app-border-control bg-app-surface px-3 text-[12px]"/><span class="mt-1 block text-[9px]">Vazio = mostrar imediatamente.</span></label>
+          <label class="text-[10px] text-app-text-soft">Término *<input name="expiresAt" type="datetime-local" required class="mt-1 h-11 w-full rounded-xl border border-app-border-control bg-app-surface px-3 text-[12px]"/></label>
           <button type="submit" class="h-11 rounded-xl bg-app-primary px-4 text-[11px] font-semibold text-white md:col-span-2">Publicar aviso</button>
         </form>
         {#if form?.message}<p class="mt-3 text-[11px] text-app-text-muted">{form.message}</p>{/if}
