@@ -11,6 +11,18 @@ type ApplicationRouteRule = ApplicationRouteMetadata & {
 
 const operationsRouteRules: ApplicationRouteRule[] = [
   {
+    prefix: "/app/novidades",
+    title: "Novidades F10",
+    section: "Base de Conhecimento",
+    description: "Atualizações publicadas para clientes",
+  },
+  {
+    prefix: "/app/avisos",
+    title: "Avisos F10",
+    section: "Base de Conhecimento",
+    description: "Mensagens exibidas no WebView",
+  },
+  {
     prefix: "/app/tickets/workflows",
     title: "Configurar Kanban",
     section: "Tickets",

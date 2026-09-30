@@ -15,6 +15,8 @@
     LayoutDashboard,
     Layers3,
     MessageCircleMore,
+    Megaphone,
+    BellRing,
     MonitorCog,
     PanelLeftClose,
     PanelLeftOpen,
@@ -83,6 +85,8 @@
           children: [
             { label: "Visão geral", icon: BarChart3, href: "/app/help" },
             { label: "Conteúdos", icon: FileText, href: "/app/help/content" },
+            { label: "Novidades", icon: Megaphone, href: "/app/novidades" },
+            { label: "Avisos", icon: BellRing, href: "/app/avisos" },
             { label: "Coleções", icon: Layers3, href: "/app/help/collections" },
             { label: "Trilhas", icon: GraduationCap, href: "/app/help/trilhas" },
           ],
