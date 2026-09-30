@@ -68,7 +68,7 @@
 
 <div class="min-h-[100dvh] bg-[#F5F6FA] text-[#202637]">
   <header class="sticky top-0 z-40 border-b border-[#E2E5ED] bg-white/95 backdrop-blur">
-    <div class="mx-auto flex min-h-[62px] max-w-[1440px] items-center gap-3 px-3 sm:px-5">
+    <div class="mx-auto flex min-h-[62px] max-w-[1080px] items-center gap-3 px-3 sm:px-5">
       <a href={data.firstEnabledHref} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[11px] font-bold text-white">F10</a>
 
       <nav class="flex min-w-0 flex-1 gap-1 overflow-x-auto" aria-label="F10">
@@ -94,7 +94,7 @@
     </div>
   </header>
 
-  <main class="mx-auto max-w-[1440px]">
+  <main class="mx-auto max-w-[1080px]">
     <slot/>
   </main>
 

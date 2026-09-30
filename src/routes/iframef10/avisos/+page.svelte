@@ -15,7 +15,7 @@
 <svelte:head><title>Avisos F10</title></svelte:head>
 
 <div class="px-4 py-5 sm:px-6 sm:py-7">
-  <div class="mx-auto max-w-[900px]">
+  <div class="mx-auto max-w-[1080px]">
     <header class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
       <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF4E8] text-[#9B530F]"><BellRing size={18}/></span><div><h1 class="text-[18px] font-semibold text-[#202637]">Avisos F10</h1><p class="mt-0.5 text-[11px] text-[#858B99]">Comunicados ativos para quem está usando o F10.</p></div></div>
     </header>

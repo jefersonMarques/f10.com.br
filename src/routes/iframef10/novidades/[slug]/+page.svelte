@@ -13,7 +13,7 @@
 <svelte:head><title>{data.update.title} | Atualizações F10</title></svelte:head>
 
 <div class="px-4 py-5 sm:px-6 sm:py-7">
-  <article class="mx-auto max-w-[900px]">
+  <article class="mx-auto max-w-[1080px]">
     <a href="/iframef10/novidades" class="inline-flex h-9 items-center gap-2 rounded-xl px-2 text-[11px] font-semibold text-[#666D7D] hover:bg-white hover:text-[#000A57]"><ArrowLeft size={15}/>Voltar</a>
 
     <section class="mt-3 overflow-hidden rounded-[24px] border border-[#E2E5ED] bg-white">

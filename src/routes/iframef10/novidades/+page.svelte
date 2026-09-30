@@ -22,7 +22,7 @@
 <svelte:head><title>Atualizações F10</title></svelte:head>
 
 <div class="px-4 py-5 sm:px-6 sm:py-7">
-  <div class="mx-auto max-w-[1040px]">
+  <div class="mx-auto max-w-[1080px]">
     <header class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
       <div class="flex items-center gap-3">
         <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Megaphone size={18}/></span>
