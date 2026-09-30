@@ -27,10 +27,6 @@
     ? notices.find((notice) => !dismissedIds.includes(notice.id)) ?? null
     : null;
 
-  function active(href: string): boolean {
-    return pathname === href || pathname.startsWith(`${href}/`);
-  }
-
   function dismissNotice(id: string): void {
     window.localStorage.setItem(`f10-iframe-notice:${id}`, "1");
     dismissedIds = [...dismissedIds, id];
@@ -79,7 +75,7 @@
         {#each visibleNavigation as item}
           <a
             href={item.href}
-            class={`inline-flex h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-[11px] font-semibold transition ${active(item.href) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#697080] hover:bg-[#F3F4F7]"}`}
+            class={`inline-flex h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-[11px] font-semibold transition ${pathname === item.href || pathname.startsWith(`${item.href}/`) ? "bg-[#EEF0FF] text-[#000A57]" : "text-[#697080] hover:bg-[#F3F4F7]"}`}
           >
             <svelte:component this={item.icon} size={15}/>
             <span>{item.label}</span>
