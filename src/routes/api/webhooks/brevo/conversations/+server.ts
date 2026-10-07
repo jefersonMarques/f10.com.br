@@ -30,6 +30,9 @@ function isAuthorized(request: Request): boolean {
 }
 
 export const POST: RequestHandler = async ({ request }) => {
+  if (env.BREVO_LEGACY_CONVERSATIONS_ENABLED !== "1") {
+    return json({ accepted: false }, { status: 410 });
+  }
   if (!env.BREVO_CONVERSATIONS_WEBHOOK_TOKEN?.trim()) {
     console.error("[brevo-conversations-webhook] token not configured");
     return json({ accepted: false }, { status: 503 });
