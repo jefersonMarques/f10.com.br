@@ -11,6 +11,7 @@ import {
   F10_TOKEN,
   F10_URL,
 } from "$env/static/private";
+import { sendTransactionalEmail } from "$lib/server/email/transactionalEmail";
 
 export type LeadChannel = "contact" | "contact-modal" | "whatsapp";
 
@@ -310,67 +311,44 @@ async function sendEmailBrevo(params: {
   replyToEmail?: string;
   replyToName?: string;
 }): Promise<IntegrationResult> {
-  const apiKey = safeString(env.BREVO_API_KEY);
   const toEmail = safeString(env.BREVO_SALES_MAIL_TO);
   const senderDomain = safeString(env.BREVO_INBOUND_DOMAIN) || "reply.f10.com.br";
   const fromEmail = `no-reply@${senderDomain.replace(/^@+/, "").toLowerCase()}`;
-
-  if (!apiKey) {
-    console.warn("[lead-service] BREVO_API_KEY não definido. Pulando e-mail.");
-    return { ok: false, skipped: true, error: "missing_brevo_api_key" };
-  }
 
   if (!toEmail) {
     console.warn("[lead-service] BREVO_SALES_MAIL_TO não definido. Pulando e-mail.");
     return { ok: false, skipped: true, error: "missing_brevo_sales_mail_to" };
   }
 
-  const body: Record<string, unknown> = {
-    sender: {
-      email: fromEmail,
-      name: "Leads F10",
-    },
-    to: [{ email: toEmail, name: "Comercial" }],
-    subject: params.subject,
-    htmlContent: params.htmlContent,
-  };
-
-  if (params.replyToEmail) {
-    body.replyTo = {
-      email: params.replyToEmail,
-      name: params.replyToName || "",
-    };
-  }
-
   debugLog("Brevo request", {
     toEmail,
     subject: params.subject,
-    hasReplyTo: !!params.replyToEmail,
+    hasReplyTo: Boolean(params.replyToEmail),
   });
 
-  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "api-key": apiKey,
-    },
-    body: JSON.stringify(body),
-  });
-
-  const parsedBody = await parseResponseBody(response);
-
-  debugLog("Brevo response", {
-    status: response.status,
-    ok: response.ok,
-    body: parsedBody,
-  });
-
-  if (!response.ok) {
-    console.error("[lead-service] Falha ao enviar e-mail via Brevo:", response.status, parsedBody);
-    return { ok: false, status: response.status, body: parsedBody };
+  try {
+    await sendTransactionalEmail({
+      to: { email: toEmail, name: "Comercial" },
+      sender: { email: fromEmail, name: "Leads F10" },
+      subject: params.subject,
+      textContent: params.subject,
+      htmlContent: params.htmlContent,
+      ...(params.replyToEmail
+        ? {
+            replyTo: {
+              email: params.replyToEmail,
+              ...(params.replyToName ? { name: params.replyToName } : {}),
+            },
+          }
+        : {}),
+      tags: ["lead", "site"],
+    });
+    return { ok: true, status: 201 };
+  } catch (cause) {
+    const error = cause instanceof Error ? cause.message : "BREVO_EMAIL_FAILED";
+    console.error("[lead-service] Falha ao enviar e-mail via Brevo:", error);
+    return { ok: false, error };
   }
-
-  return { ok: true, status: response.status, body: parsedBody };
 }
 
 function buildLeadRows(lead: BaseLead): Array<[string, string]> {
