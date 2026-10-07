@@ -62,6 +62,64 @@ export const load: PageServerLoad = async ({ cookies }) => {
 };
 
 export const actions: Actions = {
+  testBrevo: async ({ cookies }) => {
+    await requireAppPermission(
+      cookies,
+      "system.settings.manage",
+      "/app/settings/integracoes",
+    );
+
+    const apiKey = env.BREVO_API_KEY?.trim() ?? "";
+    if (!apiKey) {
+      return fail(503, {
+        success: false,
+        action: "testBrevo",
+        message: "Brevo não está configurado neste processo.",
+      });
+    }
+
+    try {
+      const response = await fetch("https://api.brevo.com/v3/account", {
+        headers: {
+          accept: "application/json",
+          "api-key": apiKey,
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) {
+        return fail(503, {
+          success: false,
+          action: "testBrevo",
+          message: "A conta Brevo não respondeu à validação.",
+        });
+      }
+
+      const account = await response.json() as Record<string, unknown>;
+      const userId = String(account.user_id ?? "");
+      const organizationId = String(account.organization_id ?? "");
+      const expectedUserId = env.BREVO_EXPECTED_ACCOUNT_USER_ID?.trim() ?? "";
+      const matches = !expectedUserId || userId === expectedUserId;
+
+      return matches
+        ? {
+            success: true,
+            action: "testBrevo",
+            message: `Brevo conectado à conta ${userId || "identificada"}${organizationId ? ` · organização ${organizationId}` : ""}.`,
+          }
+        : fail(409, {
+            success: false,
+            action: "testBrevo",
+            message: `Conta Brevo divergente: processo=${userId || "desconhecida"}, esperada=${expectedUserId}.`,
+          });
+    } catch {
+      return fail(503, {
+        success: false,
+        action: "testBrevo",
+        message: "Não foi possível validar a conta Brevo agora.",
+      });
+    }
+  },
+
   testStorage: async ({ cookies }) => {
     await requireAppPermission(
       cookies,
