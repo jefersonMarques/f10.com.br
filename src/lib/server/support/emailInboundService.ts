@@ -15,8 +15,9 @@ import {
   calculateTicketSlaDeadlines,
   markTicketCustomerWaitingForResponse,
 } from "$lib/server/support/ticketSlaService";
-import { notifyTicketFollowers } from "$lib/server/support/ticketFollowerRepository";
 import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
+import { internalNotifications } from "$lib/server/db/notificationSchema";
+import { teamMembers, users } from "$lib/server/db/schema";
 import {
   supportEmailInboundEvents,
   supportEmailThreads,
@@ -26,6 +27,7 @@ import {
   customerContacts,
   supportQueues,
   ticketEvents,
+  ticketFollowers,
   ticketMessages,
   tickets,
 } from "$lib/server/db/supportSchema";
@@ -459,6 +461,75 @@ function ticketSubject(message: BrevoEmailMessage): string {
   return `E-mail de ${message.from?.name || message.from?.email || "remetente externo"}`.slice(0, 180);
 }
 
+async function notifyInboundTicketAudience(input: {
+  ticketId: string;
+  isNewTicket: boolean;
+  body: string;
+}): Promise<void> {
+  const db = getDatabase();
+  const [ticket] = await db
+    .select({
+      ticketNumber: tickets.ticketNumber,
+      subject: tickets.subject,
+      assignedUserId: tickets.assignedUserId,
+      teamId: supportQueues.teamId,
+    })
+    .from(tickets)
+    .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
+    .where(eq(tickets.id, input.ticketId))
+    .limit(1);
+
+  if (!ticket) return;
+
+  const userIds = new Set<string>();
+
+  if (ticket.assignedUserId) {
+    userIds.add(ticket.assignedUserId);
+  } else if (ticket.teamId) {
+    const members = await db
+      .select({ userId: teamMembers.userId })
+      .from(teamMembers)
+      .innerJoin(users, eq(teamMembers.userId, users.id))
+      .where(
+        and(
+          eq(teamMembers.teamId, ticket.teamId),
+          eq(users.status, "active"),
+        ),
+      );
+    for (const member of members) userIds.add(member.userId);
+  }
+
+  const followers = await db
+    .select({ userId: ticketFollowers.userId })
+    .from(ticketFollowers)
+    .innerJoin(users, eq(ticketFollowers.userId, users.id))
+    .where(
+      and(
+        eq(ticketFollowers.ticketId, input.ticketId),
+        eq(users.status, "active"),
+      ),
+    );
+  for (const follower of followers) userIds.add(follower.userId);
+
+  if (userIds.size === 0) return;
+
+  const body = input.body.trim().slice(0, 500) || ticket.subject.slice(0, 500);
+  await db.insert(internalNotifications).values(
+    [...userIds].map((userId) => ({
+      userId,
+      actorUserId: null,
+      kind: input.isNewTicket ? "ticket.email.new" : "ticket.email.customer_reply",
+      title: input.isNewTicket
+        ? `Novo ticket #${ticket.ticketNumber} por e-mail`
+        : `Cliente respondeu o ticket #${ticket.ticketNumber}`,
+      body,
+      href: `/app/tickets/${input.ticketId}`,
+      entityType: "ticket",
+      entityId: input.ticketId,
+    })),
+  );
+}
+
 export async function createThreadTicket(input: {
   conversationId: string;
   route: InboxRoute;
@@ -580,8 +651,15 @@ export async function saveIncomingMessage(input: {
     );
   }
 
+  const db = getDatabase();
+  const [previousMessage] = await db
+    .select({ id: ticketMessages.id })
+    .from(ticketMessages)
+    .where(eq(ticketMessages.ticketId, input.ticketId))
+    .limit(1);
+
   const now = new Date();
-  const [created] = await getDatabase()
+  const [created] = await db
     .insert(ticketMessages)
     .values({
       ticketId: input.ticketId,
@@ -601,7 +679,7 @@ export async function saveIncomingMessage(input: {
     .returning({ id: ticketMessages.id });
   if (!created) return false;
 
-  await getDatabase().transaction(async (tx) => {
+  await db.transaction(async (tx) => {
     await tx
       .update(tickets)
       .set({ updatedAt: now })
@@ -637,11 +715,12 @@ export async function saveIncomingMessage(input: {
     input.message.createdAt,
   );
 
-  await notifyTicketFollowers(input.ticketId, {
-    kind: "ticket.follower.customer_reply",
+  await notifyInboundTicketAudience({
+    ticketId: input.ticketId,
+    isNewTicket: !previousMessage,
     body: input.message.text || "Cliente enviou uma mensagem por e-mail.",
   }).catch((cause) => {
-    console.error("[ticket.follower.email_reply]", {
+    console.error("[ticket.email.notification]", {
       ticketId: input.ticketId,
       causeType: cause instanceof Error ? cause.name : typeof cause,
     });
