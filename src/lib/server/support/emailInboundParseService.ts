@@ -89,7 +89,7 @@ function directInboxRoutes(): InboxRoute[] {
   ];
 }
 
-function resolveDirectInbox(recipients: EmailAddress[]): InboxRoute | null {
+function resolveRouteFromRecipients(recipients: EmailAddress[]): InboxRoute | null {
   const recipientEmails = new Set(recipients.map((recipient) => recipient.email));
   const matches = directInboxRoutes().filter((route) => recipientEmails.has(route.email));
 
@@ -102,6 +102,12 @@ function resolveDirectInbox(recipients: EmailAddress[]): InboxRoute | null {
   }
 
   return matches[0] ?? null;
+}
+
+function resolveDirectInbox(item: JsonObject): InboxRoute | null {
+  const headerRoute = resolveRouteFromRecipients(mailboxes(item.To));
+  if (headerRoute) return headerRoute;
+  return resolveRouteFromRecipients(mailboxes(item.Recipients));
 }
 
 function escapeRegExp(value: string): string {
@@ -124,6 +130,19 @@ function itemRecipients(item: JsonObject): EmailAddress[] {
   const unique = new Map<string, EmailAddress>();
   for (const recipient of recipients) unique.set(recipient.email, recipient);
   return [...unique.values()];
+}
+
+function itemReplyTokens(item: JsonObject): string[] {
+  const tokensFrom = (value: unknown) => Array.from(
+    new Set(
+      mailboxes(value)
+        .map((recipient) => replyToken(recipient.email))
+        .filter((token): token is string => Boolean(token)),
+    ),
+  );
+
+  const headerTokens = tokensFrom(item.To);
+  return headerTokens.length > 0 ? headerTokens : tokensFrom(item.Recipients);
 }
 
 function itemMessageIds(payload: JsonObject): string[] {
@@ -266,13 +285,7 @@ export async function processBrevoInboundParseEvent(
     const item = asObject(raw);
     if (!item) continue;
 
-    const tokens = Array.from(
-      new Set(
-        itemRecipients(item)
-          .map((recipient) => replyToken(recipient.email))
-          .filter((token): token is string => Boolean(token)),
-      ),
-    );
+    const tokens = itemReplyTokens(item);
 
     const message = normalizeInboundMessage(item);
     const thread = await resolveThread(tokens);
@@ -288,7 +301,7 @@ export async function processBrevoInboundParseEvent(
       continue;
     }
 
-    const route = resolveDirectInbox(itemRecipients(item));
+    const route = resolveDirectInbox(item);
     if (!route) continue;
 
     const conversationId = `inbound:${message.externalMessageId}`;
