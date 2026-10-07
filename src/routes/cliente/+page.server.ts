@@ -34,6 +34,26 @@ function f10LoginDiagnostic(cause: unknown): string {
   return "F10_LOGIN_FAILED";
 }
 
+function requiresF10Session(returnTo: string): boolean {
+  return (
+    returnTo.startsWith("/agendar/")
+    || returnTo === "/cliente/grupo"
+    || returnTo.startsWith("/cliente/grupo?")
+    || returnTo === "/cliente/unidade"
+    || returnTo.startsWith("/cliente/unidade?")
+    || returnTo === "/cliente/solicitacoes"
+    || returnTo.startsWith("/cliente/solicitacoes/")
+  );
+}
+
+function isInvalidF10Credentials(cause: unknown): boolean {
+  if (!(cause instanceof Error)) return false;
+  return (
+    cause.message === "F10_CUSTOMER_LOGIN_INVALID"
+    || cause.message === "F10_CUSTOMER_TOKEN_EXPIRED"
+  );
+}
+
 export const load: PageServerLoad = async ({ cookies, url }) => {
   const returnTo = normalizeCustomerPortalReturnTo(url.searchParams.get("returnTo") ?? "/cliente/chamados");
   const session = await getOptionalCustomerTicketPortalSession(cookies);
@@ -42,7 +62,7 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
 };
 
 export const actions: Actions = {
-  portalLogin: async ({ request, cookies }) => {
+  login: async ({ request, cookies }) => {
     const formData = await request.formData();
     const emailValue = formData.get("email");
     const passwordValue = formData.get("password");
@@ -53,76 +73,65 @@ export const actions: Actions = {
       typeof returnToValue === "string" ? returnToValue : "/cliente/chamados",
     );
 
-    if (!isValidEmail(email) || password.length < 1 || password.length > 256) {
+    if (!isValidEmail(email) || password.length < 1 || password.length > 512) {
       return fail(400, {
         success: false,
-        action: "portalLogin",
+        action: "login",
         message: "Informe seu e-mail e senha.",
         email,
         returnTo,
       });
     }
 
-    const session = await authenticateCustomerPortalCredential(email, password);
-    if (!session) {
-      return fail(401, {
-        success: false,
-        action: "portalLogin",
-        message: "E-mail ou senha inválidos, ou acesso ainda não ativado.",
-        email,
-        returnTo,
-      });
-    }
-
-    setCustomerPortalSessionCookie(cookies, session.token, session.expiresAt);
-    throw redirect(303, returnTo);
-  },
-
-  f10Login: async ({ request, cookies }) => {
-    const formData = await request.formData();
-    const emailValue = formData.get("email");
-    const passwordValue = formData.get("password");
-    const returnToValue = formData.get("returnTo");
-    const email = typeof emailValue === "string" ? emailValue.trim().toLowerCase() : "";
-    const password = typeof passwordValue === "string" ? passwordValue : "";
-    const returnTo = normalizeCustomerPortalReturnTo(typeof returnToValue === "string" ? returnToValue : "/cliente/chamados");
-
-    if (!isValidEmail(email) || password.length < 1 || password.length > 512) {
-      return fail(400, {
-        success: false,
-        action: "f10Login",
-        message: "Informe o e-mail e a senha usados para entrar na F10.",
-        email,
-        returnTo,
-      });
+    let portalFailure: unknown = null;
+    if (!requiresF10Session(returnTo)) {
+      try {
+        const portalSession = await authenticateCustomerPortalCredential(email, password);
+        if (portalSession) {
+          setCustomerPortalSessionCookie(
+            cookies,
+            portalSession.token,
+            portalSession.expiresAt,
+          );
+          throw redirect(303, returnTo);
+        }
+      } catch (cause) {
+        if (cause && typeof cause === "object" && "status" in cause && "location" in cause) {
+          throw cause;
+        }
+        portalFailure = cause;
+        console.error("[customer.portal.login]", {
+          causeType: cause instanceof Error ? cause.name : typeof cause,
+        });
+      }
     }
 
     try {
-      const session = await createF10CustomerPortalSession(email, password);
-      setCustomerPortalSessionCookie(cookies, session.token, session.expiresAt);
+      const f10Session = await createF10CustomerPortalSession(email, password);
+      setCustomerPortalSessionCookie(cookies, f10Session.token, f10Session.expiresAt);
       throw redirect(303, returnTo);
     } catch (cause) {
-      if (cause && typeof cause === "object" && "status" in cause && "location" in cause) throw cause;
+      if (cause && typeof cause === "object" && "status" in cause && "location" in cause) {
+        throw cause;
+      }
 
-      const code = cause instanceof Error ? cause.message : "";
-      const invalidCredentials = code === "F10_CUSTOMER_LOGIN_INVALID" || code === "F10_CUSTOMER_TOKEN_EXPIRED";
-      const diagnostic = f10LoginDiagnostic(cause);
+      const invalidCredentials = isInvalidF10Credentials(cause);
       if (!invalidCredentials) {
-        console.error("[customer.f10.login]", {
-          diagnosticCode: diagnostic,
+        console.error("[customer.login]", {
+          diagnosticCode: f10LoginDiagnostic(cause),
           causeType: cause instanceof Error ? cause.name : typeof cause,
         });
       }
 
-      return fail(invalidCredentials ? 401 : 503, {
+      const unavailable = Boolean(portalFailure) || !invalidCredentials;
+      return fail(unavailable ? 503 : 401, {
         success: false,
-        action: "f10Login",
-        message: invalidCredentials
-          ? "E-mail ou senha inválidos. Use os mesmos dados de acesso da F10."
-          : "Não foi possível validar seu acesso F10 agora. Tente novamente em instantes.",
+        action: "login",
+        message: unavailable
+          ? "Não foi possível entrar agora. Tente novamente em instantes."
+          : "E-mail ou senha inválidos.",
         email,
         returnTo,
-        ...(dev && !invalidCredentials ? { diagnosticCode: diagnostic } : {}),
       });
     }
   },
@@ -158,7 +167,7 @@ export const actions: Actions = {
       return {
         success: true,
         action: "requestAccess",
-        message: "Se este e-mail estiver cadastrado na F10, enviaremos um link de acesso válido por 15 minutos.",
+        message: "Se este e-mail estiver cadastrado, enviaremos um link de acesso.",
       };
     } catch (cause) {
       const diagnostic = diagnosticCode(cause);
@@ -170,7 +179,7 @@ export const actions: Actions = {
       return {
         success: true,
         action: "requestAccess",
-        message: "Se este e-mail estiver cadastrado na F10, enviaremos um link de acesso válido por 15 minutos.",
+        message: "Se este e-mail estiver cadastrado, enviaremos um link de acesso.",
         ...(dev ? { diagnosticCode: diagnostic } : {}),
       };
     }

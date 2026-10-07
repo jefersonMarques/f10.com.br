@@ -5,13 +5,10 @@
   export let data: PageData;
   export let form: ActionData;
 
-  $: loginEmail = form && "action" in form && form.action === "f10Login" && "email" in form
+  $: loginEmail = form && "action" in form && form.action === "login" && "email" in form
     ? form.email ?? ""
     : "";
-  $: portalEmail = form && "action" in form && form.action === "portalLogin" && "email" in form
-    ? form.email ?? ""
-    : "";
-  $: returnTo = form && "action" in form && form.action === "f10Login" && "returnTo" in form
+  $: returnTo = form && "action" in form && form.action === "login" && "returnTo" in form
     ? form.returnTo ?? data.returnTo
     : data.returnTo;
   $: schedulingLogin = returnTo.startsWith("/agendar/");
@@ -19,7 +16,7 @@
 
 <svelte:head>
   <title>Área do Cliente | F10 Software</title>
-  <meta name="description" content="Entre com sua conta F10 para iniciar atendimentos e acompanhar chamados de suporte." />
+  <meta name="description" content="Entre na Área do Cliente para acompanhar chamados e solicitações." />
 </svelte:head>
 
 <main class="min-h-screen bg-[#F7F8FB] px-5 py-8 text-[#10172A] sm:py-14">
@@ -31,91 +28,70 @@
         <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-[#FF9A4B]"><ShieldCheck size={21} /></span>
         <p class="application-text-caption mt-5 font-bold uppercase tracking-[0.14em] text-[#FF9A4B]">Área do Cliente F10</p>
         <h1 class="mt-2 text-[28px] font-semibold tracking-[-0.04em] sm:text-[34px]">Entre na Área do Cliente</h1>
-        <p class="application-text-control mt-3 leading-6 text-white/65">Use o acesso criado no onboarding ou os mesmos dados do sistema F10.</p>
+        <p class="application-text-control mt-3 leading-6 text-white/65">Informe seu e-mail e senha para continuar.</p>
       </header>
 
       <div class="px-6 py-7 sm:px-8">
-        {#if form?.message && (!('action' in form) || form.action === "f10Login")}
-          <div class={`application-text-caption mb-5 rounded-2xl px-4 py-3 leading-5 ${form.success ? "border border-[#CFE6D6] bg-[#F3FAF5] text-[#356347]" : "border border-[#F0D0C8] bg-[#FFF7F4] text-[#8A493A]"}`}>
+        {#if form?.message && "action" in form && form.action === "login"}
+          <div
+            class={form.success
+              ? "application-text-caption mb-5 rounded-2xl border border-[#CFE6D6] bg-[#F3FAF5] px-4 py-3 leading-5 text-[#356347]"
+              : "application-text-caption mb-5 rounded-2xl border border-[#F0D0C8] bg-[#FFF7F4] px-4 py-3 leading-5 text-[#8A493A]"}
+          >
             {form.message}
-            {#if "diagnosticCode" in form && form.diagnosticCode}
-              <span class="application-text-meta mt-1 block font-mono opacity-75">localhost: {form.diagnosticCode}</span>
-            {/if}
           </div>
         {/if}
 
-        {#if form?.message && "action" in form && form.action === "portalLogin"}
-          <div class="application-text-caption mb-5 rounded-2xl border border-[#F0D0C8] bg-[#FFF7F4] px-4 py-3 leading-5 text-[#8A493A]">{form.message}</div>
-        {/if}
-
-        <form method="POST" action="?/portalLogin" class="space-y-4">
+        <form method="POST" action="?/login" class="space-y-4">
           <input type="hidden" name="returnTo" value={returnTo} />
-          <div>
-            <p class="application-text-caption font-semibold text-[#343B4B]">Acesso criado no onboarding</p>
-            <p class="application-text-meta mt-1 text-[#9298A5]">Para quem já ativou uma conta na Área do Cliente.</p>
-          </div>
+
           <label class="block">
             <span class="application-text-caption font-semibold text-[#515868]">E-mail</span>
             <div class="relative mt-1.5">
               <Mail class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8A91A1]" size={17} />
-              <input name="email" type="email" required maxlength="254" autocomplete="username" value={portalEmail} placeholder="voce@empresa.com.br" class="application-text-control h-12 w-full rounded-xl border border-[#DDE1E9] pl-11 pr-3 outline-none transition focus:border-[#000A57] focus:ring-4 focus:ring-[#000A57]/10" />
+              <input
+                name="email"
+                type="email"
+                required
+                maxlength="254"
+                autocomplete="username"
+                value={loginEmail}
+                placeholder="voce@empresa.com.br"
+                class="application-text-control h-12 w-full rounded-xl border border-[#DDE1E9] pl-11 pr-3 outline-none transition focus:border-[#000A57] focus:ring-4 focus:ring-[#000A57]/10"
+              />
             </div>
           </label>
+
           <label class="block">
             <span class="application-text-caption font-semibold text-[#515868]">Senha</span>
             <div class="relative mt-1.5">
               <KeyRound class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8A91A1]" size={17} />
-              <input name="password" type="password" required maxlength="256" autocomplete="current-password" class="application-text-control h-12 w-full rounded-xl border border-[#DDE1E9] pl-11 pr-3 outline-none transition focus:border-[#000A57] focus:ring-4 focus:ring-[#000A57]/10" />
+              <input
+                name="password"
+                type="password"
+                required
+                maxlength="512"
+                autocomplete="current-password"
+                class="application-text-control h-12 w-full rounded-xl border border-[#DDE1E9] pl-11 pr-3 outline-none transition focus:border-[#000A57] focus:ring-4 focus:ring-[#000A57]/10"
+              />
             </div>
           </label>
-          <button type="submit" class="application-text-control inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[#000A57] px-5 font-semibold text-white transition hover:bg-[#111B71]">Entrar</button>
+
+          <button
+            type="submit"
+            class="application-text-control inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[#000A57] px-5 font-semibold text-white transition hover:bg-[#111B71] focus:outline-none focus:ring-4 focus:ring-[#000A57]/20"
+          >
+            Entrar
+          </button>
         </form>
-
-        <div class="my-6 flex items-center gap-3">
-          <span class="h-px flex-1 bg-[#ECEEF3]"></span>
-          <span class="application-text-meta font-semibold uppercase tracking-[0.08em] text-[#9AA0AC]">ou</span>
-          <span class="h-px flex-1 bg-[#ECEEF3]"></span>
-        </div>
-
-        <div class="mb-4">
-          <p class="application-text-caption font-semibold text-[#343B4B]">Acesso do sistema F10</p>
-          <p class="application-text-meta mt-1 text-[#9298A5]">Use o mesmo usuário e senha que você já utiliza no sistema.</p>
-        </div>
-
-        <form method="POST" action="?/f10Login" class="space-y-4">
-          <input type="hidden" name="returnTo" value={returnTo} />
-          <label class="block">
-            <span class="application-text-caption font-semibold text-[#515868]">E-mail da conta F10</span>
-            <div class="relative mt-1.5">
-              <Mail class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8A91A1]" size={17} />
-              <input name="email" type="email" required maxlength="254" autocomplete="username" value={loginEmail} placeholder="voce@empresa.com.br" class="application-text-control h-12 w-full rounded-xl border border-[#DDE1E9] pl-11 pr-3 outline-none transition focus:border-[#000A57] focus:ring-4 focus:ring-[#000A57]/10" />
-            </div>
-          </label>
-          <label class="block">
-            <span class="application-text-caption font-semibold text-[#515868]">Senha F10</span>
-            <div class="relative mt-1.5">
-              <KeyRound class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8A91A1]" size={17} />
-              <input name="password" type="password" required maxlength="512" autocomplete="current-password" class="application-text-control h-12 w-full rounded-xl border border-[#DDE1E9] pl-11 pr-3 outline-none transition focus:border-[#000A57] focus:ring-4 focus:ring-[#000A57]/10" />
-            </div>
-          </label>
-          <button type="submit" class="application-text-control inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[#000A57] px-5 font-semibold text-white transition hover:bg-[#111B71] focus:outline-none focus:ring-4 focus:ring-[#000A57]/20">Entrar e continuar</button>
-        </form>
-
-        <div class="mt-4 rounded-2xl border border-[#E5E8EF] bg-[#FAFAFC] px-4 py-3">
-          <p class="application-text-meta leading-4 text-[#7F8695]">A senha é usada somente durante a validação com a F10 e não é armazenada. O acesso ao suporte usa uma sessão própria e segura.</p>
-        </div>
 
         {#if !schedulingLogin}
         <details class="mt-6 border-t border-[#ECEEF3] pt-5">
-          <summary class="application-text-caption cursor-pointer font-semibold text-[#656C7C]">Acesso alternativo por e-mail</summary>
-          <p class="application-text-meta mt-2 leading-4 text-[#9298A5]">Mantemos o link de uso único para acessos convidados e cenários específicos. Para chat e chamados de clientes F10, o login da conta F10 é o acesso principal.</p>
+          <summary class="application-text-caption cursor-pointer font-semibold text-[#656C7C]">Não consegue entrar?</summary>
 
           {#if form?.message && "action" in form && form.action === "requestAccess"}
             <div class={`application-text-caption mt-4 rounded-2xl px-4 py-3 leading-5 ${form.success ? "border border-[#CFE6D6] bg-[#F3FAF5] text-[#356347]" : "border border-[#F0D0C8] bg-[#FFF7F4] text-[#8A493A]"}`}>
               {form.message}
-              {#if "diagnosticCode" in form && form.diagnosticCode}
-                <span class="application-text-meta mt-1 block font-mono opacity-75">localhost: {form.diagnosticCode}</span>
-              {/if}
             </div>
           {/if}
 
