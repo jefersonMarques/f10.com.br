@@ -6,6 +6,48 @@ type TransactionalEmailRecipient = {
   name?: string;
 };
 
+type TransactionalEmailAttachment = {
+  name: string;
+  content: string;
+};
+
+let brevoAccountCheck: Promise<void> | null = null;
+
+async function verifyBrevoAccount(apiKey: string): Promise<void> {
+  const expectedUserId = env.BREVO_EXPECTED_ACCOUNT_USER_ID?.trim() ?? "";
+  const expectedOrganizationId = env.BREVO_EXPECTED_ORGANIZATION_ID?.trim() ?? "";
+  if (!expectedUserId && !expectedOrganizationId) return;
+
+  brevoAccountCheck ??= (async () => {
+    const response = await fetch("https://api.brevo.com/v3/account", {
+      headers: {
+        accept: "application/json",
+        "api-key": apiKey,
+      },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) {
+      throw new Error(`BREVO_ACCOUNT_CHECK_FAILED:${response.status}`);
+    }
+
+    const account = await response.json() as Record<string, unknown>;
+    const userId = String(account.user_id ?? "");
+    const organizationId = String(account.organization_id ?? "");
+
+    if (expectedUserId && userId !== expectedUserId) {
+      throw new Error("BREVO_ACCOUNT_MISMATCH");
+    }
+    if (expectedOrganizationId && organizationId !== expectedOrganizationId) {
+      throw new Error("BREVO_ORGANIZATION_MISMATCH");
+    }
+  })().catch((cause) => {
+    brevoAccountCheck = null;
+    throw cause;
+  });
+
+  await brevoAccountCheck;
+}
+
 function transactionalSenderEmail(): string {
   const domain = (env.BREVO_INBOUND_DOMAIN?.trim().toLowerCase() || "reply.f10.com.br")
     .replace(/^@+/, "");
@@ -21,6 +63,7 @@ export async function sendTransactionalEmail(input: {
   sender?: TransactionalEmailRecipient;
   cc?: TransactionalEmailRecipient[];
   tags?: string[];
+  attachments?: TransactionalEmailAttachment[];
 }): Promise<void> {
   const apiKey = env.BREVO_API_KEY?.trim() ?? "";
   const general = await getGeneralOperationsSettings();
@@ -36,6 +79,8 @@ export async function sendTransactionalEmail(input: {
   if (!apiKey || !senderEmail) {
     throw new Error("BREVO_TRANSACTIONAL_EMAIL_NOT_CONFIGURED");
   }
+
+  await verifyBrevoAccount(apiKey);
 
   const response = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
@@ -72,6 +117,7 @@ export async function sendTransactionalEmail(input: {
           }
         : {}),
       ...(input.tags?.length ? { tags: input.tags } : {}),
+      ...(input.attachments?.length ? { attachment: input.attachments } : {}),
     }),
     signal: AbortSignal.timeout(10_000),
   });
