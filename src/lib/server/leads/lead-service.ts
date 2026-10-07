@@ -10,9 +10,6 @@ import {
   F10_MIDIA,
   F10_TOKEN,
   F10_URL,
-  BREVO_API_KEY,
-  BREVO_SALES_MAIL_TO,
-  BREVO_FROM_EMAIL,
 } from "$env/static/private";
 
 export type LeadChannel = "contact" | "contact-modal" | "whatsapp";
@@ -313,9 +310,10 @@ async function sendEmailBrevo(params: {
   replyToEmail?: string;
   replyToName?: string;
 }): Promise<IntegrationResult> {
-  const apiKey = safeString(BREVO_API_KEY);
-  const toEmail = safeString(BREVO_SALES_MAIL_TO);
-  const fromEmail = safeString(BREVO_FROM_EMAIL) || "no-reply@f10.com.br";
+  const apiKey = safeString(env.BREVO_API_KEY);
+  const toEmail = safeString(env.BREVO_SALES_MAIL_TO);
+  const senderDomain = safeString(env.BREVO_INBOUND_DOMAIN) || "reply.f10.com.br";
+  const fromEmail = `no-reply@${senderDomain.replace(/^@+/, "").toLowerCase()}`;
 
   if (!apiKey) {
     console.warn("[lead-service] BREVO_API_KEY não definido. Pulando e-mail.");
