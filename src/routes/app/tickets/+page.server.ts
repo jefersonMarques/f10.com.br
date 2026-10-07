@@ -54,6 +54,10 @@ function isTicketPriority(value: string): value is TicketPriority {
   return value === "low" || value === "normal" || value === "high" || value === "urgent";
 }
 
+function isTicketCreationChannel(value: string): value is "manual" | "email" {
+  return value === "manual" || value === "email";
+}
+
 const TICKET_STATUSES: TicketStatus[] = [
   "new",
   "open",
@@ -251,6 +255,7 @@ export const actions: Actions = {
     const subject = readFormValue(formData, "subject");
     const message = readFormValue(formData, "message");
     const priority = readFormValue(formData, "priority");
+    const channel = readFormValue(formData, "channel");
     const dueOn = readFormValue(formData, "dueOn");
     const queueId = readFormValue(formData, "queueId");
     const startStageId = readFormValue(formData, "startStageId") || null;
@@ -270,8 +275,8 @@ export const actions: Actions = {
     if (message.length < 1 || message.length > 10000) {
       return fail(400, { success: false, action: "create", message: "A descrição deve ter entre 1 e 10.000 caracteres." });
     }
-    if (!queueId || !isTicketPriority(priority)) {
-      return fail(400, { success: false, action: "create", message: "Revise fila e prioridade." });
+    if (!queueId || !isTicketPriority(priority) || !isTicketCreationChannel(channel)) {
+      return fail(400, { success: false, action: "create", message: "Revise fila, canal e prioridade." });
     }
     if (startStageId && !isUuid(startStageId)) {
       return fail(400, { success: false, action: "create", message: "Processo inicial inválido." });
@@ -285,6 +290,7 @@ export const actions: Actions = {
         subject,
         message,
         priority,
+        channel,
         dueOn,
         ...customer,
         queueId,
@@ -293,7 +299,14 @@ export const actions: Actions = {
       throw redirect(303, `/app/tickets/${ticket.id}`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
-      return fail(409, { success: false, action: "create", message: "Não foi possível criar o ticket." });
+      if (cause instanceof Error && cause.message === "TICKET_EMAIL_CUSTOMER_EMAIL_REQUIRED") {
+        return fail(400, {
+          success: false,
+          action: "create",
+          message: "Para usar o canal E-mail, o cliente precisa ter um e-mail válido cadastrado.",
+        });
+      }
+      return fail(409, { success: false, action: "create", message: actionErrorMessage(cause) });
     }
   },
 

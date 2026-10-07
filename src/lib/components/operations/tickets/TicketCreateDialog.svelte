@@ -31,7 +31,17 @@
       {/if}
       <label><span class="application-text-meta mb-1.5 block font-bold uppercase tracking-[0.07em] text-[#858B99]">Conclusão planejada</span><input name="dueOn" type="date" required class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3"/></label>
       <select name="queueId" required class="application-text-meta h-10 self-end rounded-xl border border-[#DDE1EA] px-2">{#each queues as queue}<option value={queue.id}>{queue.name}</option>{/each}</select>
-      <select name="priority" class="application-text-meta h-10 rounded-xl border border-[#DDE1EA] px-2"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select>
+      <label>
+        <span class="application-text-meta mb-1.5 block font-bold uppercase tracking-[0.07em] text-[#858B99]">Canal</span>
+        <select name="channel" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3">
+          <option value="manual">Manual</option>
+          <option value="email">E-mail</option>
+        </select>
+      </label>
+      <label>
+        <span class="application-text-meta mb-1.5 block font-bold uppercase tracking-[0.07em] text-[#858B99]">Prioridade</span>
+        <select name="priority" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3"><option value="normal">Normal</option><option value="low">Baixa</option><option value="high">Alta</option><option value="urgent">Urgente</option></select>
+      </label>
       <textarea name="message" required maxlength="10000" rows="5" placeholder="Descrição do atendimento" class="application-text-caption rounded-xl border border-[#DDE1EA] p-3 sm:col-span-2"></textarea>
       <button class="application-text-meta h-10 rounded-xl bg-[#000A57] font-semibold text-white sm:col-span-2">Criar ticket</button>
     </form>

@@ -78,6 +78,7 @@ export type CreateManualTicketInput = TicketCustomerLinkInput & {
   subject: string;
   message: string;
   priority: TicketPriority;
+  channel: "manual" | "email";
   dueOn: string;
   queueId: string;
   startStageId?: string | null;
@@ -503,6 +504,19 @@ export async function createManualTicket(
 
   return db.transaction(async (tx) => {
     const customer = await resolveTicketCustomer(tx, input);
+
+    if (input.channel === "email") {
+      const [contact] = await tx
+        .select({ email: customerContacts.email })
+        .from(customerContacts)
+        .where(eq(customerContacts.id, customer.contactId))
+        .limit(1);
+      const email = contact?.email?.trim().toLowerCase() ?? "";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new Error("TICKET_EMAIL_CUSTOMER_EMAIL_REQUIRED");
+      }
+    }
+
     const [ticket] = await tx
       .insert(tickets)
       .values({
@@ -512,7 +526,7 @@ export async function createManualTicket(
         subject: input.subject.trim(),
         status: start?.lifecycleStatus,
         priority: input.priority,
-        channel: "manual",
+        channel: input.channel,
         dueOn: input.dueOn,
         firstResponseDueAt: sla.firstResponseDueAt,
         firstResponseAt: now,
@@ -554,7 +568,7 @@ export async function createManualTicket(
       actorUserId,
       eventType: "ticket.created",
       metadata: {
-        channel: "manual",
+        channel: input.channel,
         dueOn: input.dueOn,
         customerContactId: customer.contactId,
         groupId: customer.groupId,
