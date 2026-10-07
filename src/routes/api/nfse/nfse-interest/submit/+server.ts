@@ -1,6 +1,8 @@
 // src/routes/api/nfse/nfse-interest/submit/+server.ts
-import "$lib/server/load-env";
+import { env } from "$env/dynamic/private";
 import { json } from "@sveltejs/kit";
+import { sendTransactionalEmail } from "$lib/server/email/transactionalEmail";
+import { createNfseInterestTicket } from "$lib/server/leads/nfseInterestLeadService";
 import type { RequestHandler } from "./$types";
 
 type CityCheckStatus = "available" | "unavailable" | "error";
@@ -30,8 +32,20 @@ type EmailTheme = {
 };
 
 function getEnv(key: string): string | undefined {
-  const value = process.env[key];
-  return typeof value === "string" && value.length > 0 ? value : undefined;
+  const value = env[key]?.trim();
+  return value || undefined;
+}
+
+function textValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254;
+}
+
+function isCityCheckStatus(value: unknown): value is CityCheckStatus {
+  return value === "available" || value === "unavailable" || value === "error";
 }
 
 function escapeHtml(value: unknown): string {
@@ -197,17 +211,10 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const contentType = request.headers.get("content-type") ?? "";
 
   if (!contentType.toLowerCase().includes("application/json")) {
-    return json({ success: false, message: "Conteúdo inválido. Envie como application/json." }, { status: 415 });
-  }
-
-  const apiKey = getEnv("BREVO_API_KEY");
-  const toEmail = getEnv("BREVO_MAIL_TO");
-  const copyEmail = getEnv("BREVO_COPY_TO");
-  const fromEmail = getEnv("BREVO_FROM_EMAIL");
-  const siteUrl = getEnv("SITE_URL") || url.origin;
-
-  if (!apiKey || !toEmail || !fromEmail) {
-    return json({ success: false, message: "E-mail não configurado no servidor." }, { status: 500 });
+    return json(
+      { success: false, message: "Conteúdo inválido. Envie como application/json." },
+      { status: 415 },
+    );
   }
 
   let payload: NfseInterestPayload;
@@ -221,35 +228,93 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return json({ success: false, message: "Tipo de solicitação inválido." }, { status: 400 });
   }
 
-  const subject = `Lead Nota Fiscal F10 • ${safeValue(payload.schoolName)} • ${safeValue(payload.city)}/${safeValue(payload.state)}`;
+  const submittedAt = textValue(payload.submittedAt);
+  const name = textValue(payload.name);
+  const email = textValue(payload.email).toLowerCase();
+  const whatsapp = textValue(payload.whatsapp);
+  const schoolName = textValue(payload.schoolName);
+  const city = textValue(payload.city);
+  const state = textValue(payload.state).toUpperCase();
+  const ibgeCode = textValue(payload.ibgeCode);
+  const cityCheckMessage = textValue(payload.cityCheckMessage);
 
-  try {
-    const brevoRes = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: {
-        "api-key": apiKey,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        sender: { email: fromEmail, name: "F10 Software" },
-        to: [{ email: toEmail, name: "Equipe F10" }],
-        ...(copyEmail ? { cc: [{ email: copyEmail, name: "Equipe F10" }] } : {}),
-        subject,
-        htmlContent: buildHtml(payload, siteUrl),
-        textContent: buildText(payload),
-        tags: ["nota-fiscal", "lead", "f10"],
-      }),
-    });
-
-    if (!brevoRes.ok) {
-      const errorText = await brevoRes.text().catch(() => "");
-      return json({ success: false, message: "Falha ao enviar e-mail via Brevo.", details: errorText.slice(0, 2000) }, { status: 502 });
-    }
-
-    const data = (await brevoRes.json().catch(() => null)) as { messageId?: string } | null;
-    return json({ success: true, message: "Lead enviado com sucesso.", messageId: data?.messageId ?? null });
-  } catch {
-    return json({ success: false, message: "Erro inesperado ao enviar e-mail." }, { status: 500 });
+  if (
+    !submittedAt
+    || Number.isNaN(new Date(submittedAt).getTime())
+    || !name
+    || !isValidEmail(email)
+    || !whatsapp
+    || !schoolName
+    || !city
+    || state.length !== 2
+    || !isCityCheckStatus(payload.cityCheckStatus)
+  ) {
+    return json({ success: false, message: "Revise os dados informados." }, { status: 400 });
   }
+
+  const normalizedPayload = {
+    submittedAt,
+    name,
+    email,
+    whatsapp,
+    schoolName,
+    city,
+    state,
+    ibgeCode,
+    cityCheckStatus: payload.cityCheckStatus,
+    cityCheckMessage,
+  };
+
+  let ticket;
+  try {
+    ticket = await createNfseInterestTicket(normalizedPayload);
+  } catch (cause) {
+    console.error("[nfse-interest.ticket]", {
+      causeType: cause instanceof Error ? cause.name : typeof cause,
+      errorCode: cause instanceof Error ? cause.message : "NFSE_INTEREST_TICKET_FAILED",
+    });
+    return json(
+      { success: false, message: "Não foi possível registrar seu interesse agora." },
+      { status: 500 },
+    );
+  }
+
+  const toEmail = getEnv("BREVO_MAIL_TO");
+  const copyEmail = getEnv("BREVO_COPY_TO");
+  const siteUrl = getEnv("SITE_URL") || url.origin;
+  const subject =
+    `[Ticket #${ticket.ticketNumber}] Lead Nota Fiscal F10 • ${schoolName} • ${city}/${state}`;
+
+  let emailSent = false;
+  if (toEmail && !ticket.deduplicated) {
+    try {
+      await sendTransactionalEmail({
+        to: { email: toEmail, name: "Equipe F10" },
+        ...(copyEmail
+          ? { cc: [{ email: copyEmail, name: "Equipe F10" }] }
+          : {}),
+        replyTo: { email, name },
+        subject,
+        htmlContent: buildHtml(normalizedPayload, siteUrl),
+        textContent: buildText(normalizedPayload),
+        tags: ["nota-fiscal", "lead", "f10"],
+      });
+      emailSent = true;
+    } catch (cause) {
+      console.error("[nfse-interest.email]", {
+        ticketId: ticket.ticketId,
+        errorCode: cause instanceof Error ? cause.message : "NFSE_INTEREST_EMAIL_FAILED",
+      });
+    }
+  }
+
+  return json({
+    success: true,
+    message: "Interesse registrado com sucesso.",
+    ticketId: ticket.ticketId,
+    ticketNumber: ticket.ticketNumber,
+    deduplicated: ticket.deduplicated,
+    emailSent,
+  });
 };
+
