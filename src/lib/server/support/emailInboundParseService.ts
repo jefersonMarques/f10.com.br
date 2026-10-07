@@ -105,9 +105,9 @@ function resolveRouteFromRecipients(recipients: EmailAddress[]): InboxRoute | nu
 }
 
 function resolveDirectInbox(item: JsonObject): InboxRoute | null {
-  const headerRoute = resolveRouteFromRecipients(mailboxes(item.To));
-  if (headerRoute) return headerRoute;
-  return resolveRouteFromRecipients(mailboxes(item.Recipients));
+  const envelopeRoute = resolveRouteFromRecipients(mailboxes(item.Recipients));
+  if (envelopeRoute) return envelopeRoute;
+  return resolveRouteFromRecipients(mailboxes(item.To));
 }
 
 function escapeRegExp(value: string): string {
@@ -141,8 +141,8 @@ function itemReplyTokens(item: JsonObject): string[] {
     ),
   );
 
-  const headerTokens = tokensFrom(item.To);
-  return headerTokens.length > 0 ? headerTokens : tokensFrom(item.Recipients);
+  const envelopeTokens = tokensFrom(item.Recipients);
+  return envelopeTokens.length > 0 ? envelopeTokens : tokensFrom(item.To);
 }
 
 function itemMessageIds(payload: JsonObject): string[] {
