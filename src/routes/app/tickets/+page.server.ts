@@ -33,6 +33,7 @@ import {
   type TicketWorkspaceChannel,
   type TicketWorkspaceScope,
   type TicketWorkspaceSlaFilter,
+  type TicketWorkspaceSort,
 } from "$lib/server/support/ticketWorkspaceRepository";
 import { listTicketCustomerContexts } from "$lib/server/support/ticketCustomerContextRepository";
 import { listTicketWorkflowEntryPoints, moveTicketAreaStage } from "$lib/server/support/ticketWorkflowRepository";
@@ -107,6 +108,24 @@ function parseSla(value: string | null): TicketWorkspaceSlaFilter {
     : null;
 }
 
+function parseSort(value: string | null): TicketWorkspaceSort {
+  if (
+    value === "updated_asc"
+    || value === "number_desc"
+    || value === "number_asc"
+    || value === "priority_desc"
+    || value === "subject_asc"
+  ) {
+    return value;
+  }
+  return "updated_desc";
+}
+
+function parsePageSize(value: string | null): 25 | 50 | 100 {
+  const parsed = Number(value);
+  return parsed === 25 || parsed === 100 ? parsed : 50;
+}
+
 function parseOptionalUuid(value: string | null): string | null {
   return value && isUuid(value) ? value : null;
 }
@@ -146,6 +165,13 @@ export const load: PageServerLoad = async ({ parent, url }) => {
 
   const view = parseView(url.searchParams.get("view"));
   const page = parsePage(url.searchParams.get("page"));
+  const status = parseStatus(url.searchParams.get("status"));
+  const includeFinished =
+    url.searchParams.get("finished") === "1"
+    || status === "resolved"
+    || status === "closed";
+  const sort = parseSort(url.searchParams.get("sort"));
+  const requestedPageSize = parsePageSize(url.searchParams.get("pageSize"));
   const queueId = parseOptionalUuid(url.searchParams.get("queueId"));
   const areaId = parseOptionalUuid(url.searchParams.get("areaId"));
   const stageId = parseOptionalUuid(url.searchParams.get("stageId"));
@@ -159,7 +185,9 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const filters = {
     scope: parseScope(url.searchParams.get("scope")),
     search: (url.searchParams.get("q") ?? "").trim().slice(0, 120),
-    status: parseStatus(url.searchParams.get("status")),
+    status,
+    includeFinished,
+    sort,
     priority: parsePriority(url.searchParams.get("priority")),
     queueId,
     assigneeId,
@@ -169,7 +197,11 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     sla: parseSla(url.searchParams.get("sla")),
     tagId,
     page,
-    pageSize: view === "board" ? 300 : 50,
+    pageSize: view === "board"
+      ? 300
+      : view === "list"
+        ? requestedPageSize
+        : 50,
   };
 
   const [

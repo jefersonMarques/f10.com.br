@@ -1,6 +1,6 @@
 import { and, eq, notInArray } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
-import { supportQueues, tickets } from "$lib/server/db/supportSchema";
+import { supportQueues, ticketEvents, tickets } from "$lib/server/db/supportSchema";
 import { getGeneralOperationsSettings } from "$lib/server/settings/operationsSettingsRepository";
 import {
   getSupportHoursSettings,
@@ -206,19 +206,36 @@ export async function markTicketCustomerWaitingForResponse(
     .where(eq(tickets.id, ticketId))
     .limit(1);
 
-  if (
-    !ticket ||
-    !ticket.firstResponseAt ||
-    ticket.status === "resolved" ||
-    ticket.status === "closed"
-  ) {
+  if (!ticket || ticket.status === "closed") return;
+
+  const nextResponseDueAt = ticket.firstResponseAt
+    ? await calculateNextResponseDueAt(ticket.queueId, receivedAt)
+    : null;
+
+  if (ticket.status === "resolved") {
+    const now = new Date();
+    await db.transaction(async (tx) => {
+      await tx
+        .update(tickets)
+        .set({
+          status: "open",
+          resolvedAt: null,
+          nextResponseDueAt,
+          updatedAt: now,
+        })
+        .where(eq(tickets.id, ticketId));
+
+      await tx.insert(ticketEvents).values({
+        ticketId,
+        actorUserId: null,
+        eventType: "ticket.reopened",
+        metadata: { source: "customer_message" },
+      });
+    });
     return;
   }
 
-  const nextResponseDueAt = await calculateNextResponseDueAt(
-    ticket.queueId,
-    receivedAt,
-  );
+  if (!ticket.firstResponseAt) return;
 
   await db
     .update(tickets)

@@ -1,5 +1,6 @@
 import {
   and,
+  asc,
   count,
   desc,
   eq,
@@ -43,11 +44,20 @@ import type {
 export type TicketWorkspaceScope = "mine" | "unassigned" | "all";
 export type TicketWorkspaceSlaFilter = "overdue" | "risk" | "first_response" | null;
 export type TicketWorkspaceChannel = "manual" | "web_chat" | "portal" | "email" | "whatsapp";
+export type TicketWorkspaceSort =
+  | "updated_desc"
+  | "updated_asc"
+  | "number_desc"
+  | "number_asc"
+  | "priority_desc"
+  | "subject_asc";
 
 export type TicketWorkspaceFilters = {
   scope: TicketWorkspaceScope;
   search: string;
   status: TicketStatus | null;
+  includeFinished: boolean;
+  sort: TicketWorkspaceSort;
   priority: TicketPriority | null;
   queueId: string | null;
   assigneeId: string | null;
@@ -69,6 +79,33 @@ function combine(conditions: Array<SQL | undefined>): SQL | undefined {
 
 function activeTicketCondition(): SQL {
   return notInArray(tickets.status, ["resolved", "closed"]);
+}
+
+function ticketSortOrder(sort: TicketWorkspaceSort): SQL[] {
+  if (sort === "updated_asc") {
+    return [asc(tickets.updatedAt), asc(tickets.ticketNumber)];
+  }
+  if (sort === "number_desc") {
+    return [desc(tickets.ticketNumber)];
+  }
+  if (sort === "number_asc") {
+    return [asc(tickets.ticketNumber)];
+  }
+  if (sort === "priority_desc") {
+    return [
+      sql`case ${tickets.priority}
+        when 'urgent' then 4
+        when 'high' then 3
+        when 'normal' then 2
+        else 1
+      end desc`,
+      desc(tickets.updatedAt),
+    ];
+  }
+  if (sort === "subject_asc") {
+    return [asc(tickets.subject), desc(tickets.updatedAt)];
+  }
+  return [desc(tickets.updatedAt), desc(tickets.ticketNumber)];
 }
 
 function slaCondition(
@@ -214,7 +251,11 @@ export async function listTicketWorkspaceTickets(
     scopedCondition,
     requestedScope,
     searchCondition,
-    filters.status ? eq(tickets.status, filters.status) : undefined,
+    filters.status
+      ? eq(tickets.status, filters.status)
+      : filters.includeFinished
+        ? undefined
+        : activeTicketCondition(),
     filters.priority ? eq(tickets.priority, filters.priority) : undefined,
     filters.queueId ? eq(tickets.queueId, filters.queueId) : undefined,
     filters.assigneeId === "unassigned"
@@ -286,7 +327,7 @@ export async function listTicketWorkspaceTickets(
 
   const [rows, countRows] = await Promise.all([
     (where ? baseSelect.where(where) : baseSelect)
-      .orderBy(desc(tickets.updatedAt))
+      .orderBy(...ticketSortOrder(filters.sort))
       .limit(filters.pageSize)
       .offset((filters.page - 1) * filters.pageSize),
     where ? countQuery.where(where) : countQuery,

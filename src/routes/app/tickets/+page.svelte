@@ -24,6 +24,9 @@
   let view: TicketView = data.filters.view;
   let search = data.filters.search;
   let status = data.filters.status ?? "";
+  let includeFinished = data.filters.includeFinished;
+  let sort = data.filters.sort;
+  let pageSize = data.filters.pageSize;
   let priority = data.filters.priority ?? "";
   let queueId = data.filters.queueId ?? "";
   let assigneeId = data.filters.assigneeId ?? "";
@@ -67,6 +70,9 @@
     if (scope !== "all") params.set("scope", scope);
     if (search.trim()) params.set("q", search.trim());
     if (status) params.set("status", status);
+    if (includeFinished) params.set("finished", "1");
+    if (view === "list" && sort !== "updated_desc") params.set("sort", sort);
+    if (view === "list" && pageSize !== 50) params.set("pageSize", String(pageSize));
     if (priority) params.set("priority", priority);
     if (queueId) params.set("queueId", queueId);
     if (assigneeId) params.set("assigneeId", assigneeId);
@@ -81,6 +87,7 @@
   }
 
   function applyFilters(): void {
+    if (status === "resolved" || status === "closed") includeFinished = true;
     if (areaId) {
       workflowId = data.workflowBoard.areaWorkflows.find(
         (workflow) => workflow.areaId === areaId,
@@ -93,6 +100,7 @@
 
   function clearFilters(): void {
     status = "";
+    includeFinished = false;
     priority = "";
     queueId = "";
     assigneeId = "";
@@ -106,6 +114,29 @@
 
   function goToPage(page: number): void {
     void goto(workspaceUrl(page), { keepFocus: true, noScroll: true });
+  }
+
+  function paginationPages(): number[] {
+    const totalPages = data.pagination.totalPages;
+    if (totalPages <= 0) return [];
+    const visible = Math.min(5, totalPages);
+    const start = Math.max(
+      1,
+      Math.min(data.pagination.page - 2, totalPages - visible + 1),
+    );
+    return Array.from({ length: visible }, (_, index) => start + index);
+  }
+
+  function pageRangeStart(): number {
+    if (data.pagination.total === 0) return 0;
+    return (data.pagination.page - 1) * data.pagination.pageSize + 1;
+  }
+
+  function pageRangeEnd(): number {
+    return Math.min(
+      data.pagination.page * data.pagination.pageSize,
+      data.pagination.total,
+    );
   }
 
   function ticketStageId(ticket: Ticket): string | null {
@@ -221,6 +252,8 @@
       bind:view
       bind:search
       bind:status
+      bind:includeFinished
+      bind:sort
       bind:priority
       bind:queueId
       bind:assigneeId
@@ -299,14 +332,66 @@
       />
     {/if}
 
-    {#if view === "list" && data.pagination.totalPages > 1}
-      <div class="flex items-center justify-between gap-3 border-t border-[var(--app-border-soft)] px-4 py-3">
-        <span class="application-text-meta text-[#858B99]">{data.pagination.total} tickets</span>
-        <div class="flex items-center gap-2">
-          <button type="button" disabled={data.pagination.page <= 1} on:click={() => goToPage(data.pagination.page - 1)} class="application-text-meta h-9 rounded-lg border border-[var(--app-border-control)] bg-white px-3 font-semibold text-[#000A57] disabled:opacity-40">Anterior</button>
-          <span class="application-text-meta font-semibold text-[#626978]">{data.pagination.page} / {data.pagination.totalPages}</span>
-          <button type="button" disabled={data.pagination.page >= data.pagination.totalPages} on:click={() => goToPage(data.pagination.page + 1)} class="application-text-meta h-9 rounded-lg border border-[var(--app-border-control)] bg-white px-3 font-semibold text-[#000A57] disabled:opacity-40">Próxima</button>
+    {#if view === "list" && data.pagination.total > 0}
+      <div class="flex flex-col gap-3 border-t border-[var(--app-border-soft)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-center gap-3">
+          <span class="application-text-meta text-[#858B99]">
+            {pageRangeStart()}–{pageRangeEnd()} de {data.pagination.total}
+          </span>
+          <label class="application-text-meta flex items-center gap-1.5 font-semibold text-[#737989]">
+            <span class="hidden sm:inline">Por página</span>
+            <select
+              bind:value={pageSize}
+              on:change={() => goToPage(1)}
+              aria-label="Tickets por página"
+              class="h-8 rounded-lg border border-[var(--app-border-control)] bg-white px-2 text-[10px] font-semibold text-[#525A69]"
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </label>
         </div>
+
+        {#if data.pagination.totalPages > 1}
+          <div class="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={data.pagination.page <= 1}
+              on:click={() => goToPage(data.pagination.page - 1)}
+              aria-label="Página anterior"
+              class="application-text-meta h-9 rounded-lg border border-[var(--app-border-control)] bg-white px-3 font-semibold text-[#000A57] disabled:opacity-40"
+            >
+              Anterior
+            </button>
+
+            {#each paginationPages() as pageNumber}
+              <button
+                type="button"
+                on:click={() => goToPage(pageNumber)}
+                aria-label={`Página ${pageNumber}`}
+                aria-current={pageNumber === data.pagination.page ? "page" : undefined}
+                class={`application-text-meta h-9 min-w-9 rounded-lg border px-2 font-bold ${
+                  pageNumber === data.pagination.page
+                    ? "border-[#000A57] bg-[#000A57] text-white"
+                    : "border-[var(--app-border-control)] bg-white text-[#626978]"
+                }`}
+              >
+                {pageNumber}
+              </button>
+            {/each}
+
+            <button
+              type="button"
+              disabled={data.pagination.page >= data.pagination.totalPages}
+              on:click={() => goToPage(data.pagination.page + 1)}
+              aria-label="Próxima página"
+              class="application-text-meta h-9 rounded-lg border border-[var(--app-border-control)] bg-white px-3 font-semibold text-[#000A57] disabled:opacity-40"
+            >
+              Próxima
+            </button>
+          </div>
+        {/if}
       </div>
     {/if}
   </section>

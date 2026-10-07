@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    ArrowUpDown,
     Columns3,
     List,
     PanelRight,
@@ -20,6 +21,8 @@
   export let view: TicketView;
   export let search: string;
   export let status: string;
+  export let includeFinished: boolean;
+  export let sort: string;
   export let priority: string;
   export let queueId: string;
   export let assigneeId: string;
@@ -99,7 +102,7 @@
             <label>
               <span class="application-text-caption mb-1 block font-semibold text-[#687080]">Status</span>
               <select bind:value={status} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-2">
-                <option value="">Todos</option>
+                <option value="">{includeFinished ? "Todos" : "Ativos"}</option>
                 <option value="new">Novo</option>
                 <option value="open">Aberto</option>
                 <option value="in_progress">Em andamento</option>
@@ -193,9 +196,37 @@
           {/if}
         </div>
       </details>
+
+      <label class="application-text-caption inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#525A69]">
+        <input
+          type="checkbox"
+          bind:checked={includeFinished}
+          on:change={onApply}
+          class="h-4 w-4 accent-[#000A57]"
+        />
+        <span>Ver finalizados</span>
+      </label>
     </div>
 
     <div class="flex flex-wrap items-center gap-2">
+      {#if view === "list"}
+        <label class="relative flex h-10 items-center rounded-xl border border-[#DDE1EA] bg-white pl-8 text-[#525A69]">
+          <ArrowUpDown size={14} class="pointer-events-none absolute left-2.5 text-[#7C8392]"/>
+          <select
+            bind:value={sort}
+            on:change={onApply}
+            aria-label="Ordenar tickets"
+            class="application-text-caption h-full rounded-xl bg-transparent py-0 pl-0 pr-8 font-semibold outline-none"
+          >
+            <option value="updated_desc">Atualizados recentemente</option>
+            <option value="updated_asc">Atualizados há mais tempo</option>
+            <option value="priority_desc">Maior prioridade</option>
+            <option value="number_desc">Ticket maior primeiro</option>
+            <option value="number_asc">Ticket menor primeiro</option>
+            <option value="subject_asc">Assunto A–Z</option>
+          </select>
+        </label>
+      {/if}
       <div class="flex rounded-xl bg-[#F3F4F7] p-1">
         <button type="button" title="Lista" aria-label="Lista" on:click={() => switchView("list")} class={`flex h-8 items-center gap-1 rounded-lg px-2.5 ${view === "list" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><List size={14}/><span class="application-text-caption font-semibold">Lista</span></button>
         <button type="button" title="Visão dividida" aria-label="Visão dividida" on:click={() => switchView("split")} class={`flex h-8 items-center gap-1 rounded-lg px-2.5 ${view === "split" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><PanelRight size={14}/><span class="application-text-caption hidden font-semibold sm:inline">Dividida</span></button>
