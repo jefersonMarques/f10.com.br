@@ -20,15 +20,16 @@ type TicketEmailRoute = {
 };
 
 function publicEmailRoutes(): TicketEmailRoute[] {
+  const domain = replyDomain();
   return [
     {
       code: "financeiro",
-      email: (env.BREVO_FINANCE_INBOX_EMAIL || "financeiro@f10.com.br").trim().toLowerCase(),
+      email: `financeiro@${domain}`,
       name: "Financeiro F10",
     },
     {
       code: "sucesso",
-      email: (env.BREVO_SUCCESS_INBOX_EMAIL || "sucesso@f10.com.br").trim().toLowerCase(),
+      email: `sucesso@${domain}`,
       name: "Sucesso F10",
     },
   ];
