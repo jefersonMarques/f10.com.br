@@ -6,6 +6,12 @@ type TransactionalEmailRecipient = {
   name?: string;
 };
 
+function transactionalSenderEmail(): string {
+  const domain = (env.BREVO_INBOUND_DOMAIN?.trim().toLowerCase() || "reply.f10.com.br")
+    .replace(/^@+/, "");
+  return `no-reply@${domain}`;
+}
+
 export async function sendTransactionalEmail(input: {
   to: TransactionalEmailRecipient;
   subject: string;
@@ -20,9 +26,7 @@ export async function sendTransactionalEmail(input: {
   const general = await getGeneralOperationsSettings();
   const senderEmail =
     input.sender?.email?.trim()
-    || general.supportSenderEmail
-    || env.BREVO_SENDER_EMAIL?.trim()
-    || "";
+    || transactionalSenderEmail();
   const senderName =
     input.sender?.name?.trim()
     || general.supportSenderName
