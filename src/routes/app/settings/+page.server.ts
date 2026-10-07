@@ -13,10 +13,6 @@ function readString(formData: FormData, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function isValidOptionalEmail(value: string): boolean {
-  return !value || (value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
-}
-
 export const load: PageServerLoad = async ({ cookies }) => {
   await requireAppPermission(cookies, "system.settings.manage", "/app/settings");
   const [general, iframeF10] = await Promise.all([
@@ -57,7 +53,6 @@ export const actions: Actions = {
     );
     const formData = await request.formData();
     const supportDisplayName = readString(formData, "supportDisplayName");
-    const supportSenderEmail = readString(formData, "supportSenderEmail").toLowerCase();
     const supportSenderName = readString(formData, "supportSenderName");
     const timezone = readString(formData, "timezone");
     const remoteConsentMinutes = Number(readString(formData, "remoteConsentMinutes"));
@@ -65,7 +60,6 @@ export const actions: Actions = {
     if (
       supportDisplayName.length < 2 ||
       supportDisplayName.length > 120 ||
-      !isValidOptionalEmail(supportSenderEmail) ||
       supportSenderName.length < 2 ||
       supportSenderName.length > 120 ||
       timezone.length < 3 ||
@@ -83,7 +77,7 @@ export const actions: Actions = {
 
     await updateGeneralOperationsSettings(session.user.id, {
       supportDisplayName,
-      supportSenderEmail,
+      supportSenderEmail: "",
       supportSenderName,
       timezone,
       remoteConsentMinutes,
