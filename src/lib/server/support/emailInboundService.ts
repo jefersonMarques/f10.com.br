@@ -41,7 +41,7 @@ export type EmailInboundOutcome = {
 
 type JsonObject = Record<string, unknown>;
 type EmailAddress = { email: string; name: string | null };
-type InboxRoute = {
+export type InboxRoute = {
   code: "financeiro" | "sucesso";
   email: string;
   groupId: string | null;
@@ -459,7 +459,7 @@ function ticketSubject(message: BrevoEmailMessage): string {
   return `E-mail de ${message.from?.name || message.from?.email || "remetente externo"}`.slice(0, 180);
 }
 
-async function createThreadTicket(input: {
+export async function createThreadTicket(input: {
   conversationId: string;
   route: InboxRoute;
   message: BrevoEmailMessage;

@@ -7,10 +7,12 @@ import {
   type SupportEmailInboundEvent,
 } from "$lib/server/db/supportEmailSchema";
 import {
+  createThreadTicket,
   EmailInboundError,
   saveIncomingMessage,
   type BrevoEmailMessage,
   type EmailInboundOutcome,
+  type InboxRoute,
 } from "$lib/server/support/emailInboundService";
 
 const PROVIDER = "brevo";
@@ -69,6 +71,37 @@ function mailboxes(value: unknown): EmailAddress[] {
 function inboundDomain(): string {
   return (env.BREVO_INBOUND_DOMAIN?.trim().toLowerCase() || "reply.f10.com.br")
     .replace(/^@+/, "");
+}
+
+function directInboxRoutes(): InboxRoute[] {
+  const domain = inboundDomain();
+  return [
+    {
+      code: "financeiro",
+      email: `financeiro@${domain}`,
+      groupId: null,
+    },
+    {
+      code: "sucesso",
+      email: `sucesso@${domain}`,
+      groupId: null,
+    },
+  ];
+}
+
+function resolveDirectInbox(recipients: EmailAddress[]): InboxRoute | null {
+  const recipientEmails = new Set(recipients.map((recipient) => recipient.email));
+  const matches = directInboxRoutes().filter((route) => recipientEmails.has(route.email));
+
+  if (matches.length > 1) {
+    throw new EmailInboundError(
+      "BREVO_INBOUND_INBOX_AMBIGUOUS",
+      "O e-mail inbound foi encaminhado para mais de uma caixa técnica.",
+      false,
+    );
+  }
+
+  return matches[0] ?? null;
 }
 
 function escapeRegExp(value: string): string {
@@ -241,16 +274,35 @@ export async function processBrevoInboundParseEvent(
       ),
     );
 
-    const thread = await resolveThread(tokens);
-    if (!thread) continue;
-
     const message = normalizeInboundMessage(item);
-    await saveIncomingMessage({
-      ticketId: thread.ticketId,
-      conversationId: thread.conversationId,
+    const thread = await resolveThread(tokens);
+
+    if (thread) {
+      await saveIncomingMessage({
+        ticketId: thread.ticketId,
+        conversationId: thread.conversationId,
+        message,
+      });
+      ticketIds.add(thread.ticketId);
+      processedMessages += 1;
+      continue;
+    }
+
+    const route = resolveDirectInbox(itemRecipients(item));
+    if (!route) continue;
+
+    const conversationId = `inbound:${message.externalMessageId}`;
+    const ticketId = await createThreadTicket({
+      conversationId,
+      route,
       message,
     });
-    ticketIds.add(thread.ticketId);
+    await saveIncomingMessage({
+      ticketId,
+      conversationId,
+      message,
+    });
+    ticketIds.add(ticketId);
     processedMessages += 1;
   }
 

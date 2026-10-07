@@ -12,11 +12,20 @@ export async function sendTransactionalEmail(input: {
   textContent: string;
   htmlContent?: string;
   replyTo?: TransactionalEmailRecipient;
+  sender?: TransactionalEmailRecipient;
 }): Promise<void> {
   const apiKey = env.BREVO_API_KEY?.trim() ?? "";
   const general = await getGeneralOperationsSettings();
-  const senderEmail = general.supportSenderEmail || env.BREVO_SENDER_EMAIL?.trim() || "";
-  const senderName = general.supportSenderName || env.BREVO_SENDER_NAME?.trim() || "F10 Software";
+  const senderEmail =
+    input.sender?.email?.trim()
+    || general.supportSenderEmail
+    || env.BREVO_SENDER_EMAIL?.trim()
+    || "";
+  const senderName =
+    input.sender?.name?.trim()
+    || general.supportSenderName
+    || env.BREVO_SENDER_NAME?.trim()
+    || "F10 Software";
 
   if (!apiKey || !senderEmail) {
     throw new Error("BREVO_TRANSACTIONAL_EMAIL_NOT_CONFIGURED");

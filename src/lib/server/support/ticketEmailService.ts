@@ -3,11 +3,40 @@ import { env } from "$env/dynamic/private";
 import { eq } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { supportEmailThreads } from "$lib/server/db/supportEmailSchema";
-import { customerContacts, tickets } from "$lib/server/db/supportSchema";
+import {
+  customerContacts,
+  supportQueues,
+  tickets,
+} from "$lib/server/db/supportSchema";
 import { buildEmailHtml } from "$lib/server/email/emailTemplate";
 import { sendTransactionalEmail } from "$lib/server/email/transactionalEmail";
 
 const PROVIDER = "brevo";
+
+type TicketEmailRoute = {
+  code: "financeiro" | "sucesso";
+  email: string;
+  name: string;
+};
+
+function publicEmailRoutes(): TicketEmailRoute[] {
+  return [
+    {
+      code: "financeiro",
+      email: (env.BREVO_FINANCE_INBOX_EMAIL || "financeiro@f10.com.br").trim().toLowerCase(),
+      name: "Financeiro F10",
+    },
+    {
+      code: "sucesso",
+      email: (env.BREVO_SUCCESS_INBOX_EMAIL || "sucesso@f10.com.br").trim().toLowerCase(),
+      name: "Sucesso F10",
+    },
+  ];
+}
+
+function resolveEmailRoute(code: string | null | undefined): TicketEmailRoute | null {
+  return publicEmailRoutes().find((route) => route.code === code) ?? null;
+}
 
 function replyDomain(): string {
   return (env.BREVO_INBOUND_DOMAIN?.trim().toLowerCase() || "reply.f10.com.br")
@@ -26,6 +55,7 @@ async function ensureReplyToken(input: {
   ticketId: string;
   recipientEmail: string;
   recipientName: string | null;
+  inboxCode: string;
 }): Promise<string> {
   const db = getDatabase();
 
@@ -56,7 +86,7 @@ async function ensureReplyToken(input: {
         provider: PROVIDER,
         conversationId: `ticket:${input.ticketId}`,
         ticketId: input.ticketId,
-        inboxCode: "ticket-reply",
+        inboxCode: input.inboxCode,
         senderName: input.recipientName,
         senderEmail: input.recipientEmail,
         recipientEmail: replyAddress(token),
@@ -89,10 +119,12 @@ export async function sendTicketPublicReplyEmail(
       ticketNumber: tickets.ticketNumber,
       subject: tickets.subject,
       channel: tickets.channel,
+      queueCode: supportQueues.code,
       customerName: customerContacts.name,
       customerEmail: customerContacts.email,
     })
     .from(tickets)
+    .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
     .leftJoin(customerContacts, eq(tickets.customerContactId, customerContacts.id))
     .where(eq(tickets.id, ticketId))
     .limit(1);
@@ -103,6 +135,7 @@ export async function sendTicketPublicReplyEmail(
     .select({
       senderName: supportEmailThreads.senderName,
       senderEmail: supportEmailThreads.senderEmail,
+      inboxCode: supportEmailThreads.inboxCode,
     })
     .from(supportEmailThreads)
     .where(eq(supportEmailThreads.ticketId, ticketId))
@@ -112,10 +145,14 @@ export async function sendTicketPublicReplyEmail(
   if (!recipientEmail || !recipientEmail.includes("@")) return false;
 
   const recipientName = thread?.senderName || ticket.customerName || undefined;
+  const emailRoute =
+    resolveEmailRoute(thread?.inboxCode)
+    || resolveEmailRoute(ticket.queueCode);
   const token = await ensureReplyToken({
     ticketId,
     recipientEmail,
     recipientName: recipientName ?? null,
+    inboxCode: emailRoute?.code ?? "ticket-reply",
   });
   const address = replyAddress(token);
   const subject = `[#${ticket.ticketNumber}] ${ticket.subject}`;
@@ -125,6 +162,9 @@ export async function sendTicketPublicReplyEmail(
       email: recipientEmail,
       ...(recipientName ? { name: recipientName } : {}),
     },
+    ...(emailRoute
+      ? { sender: { email: emailRoute.email, name: emailRoute.name } }
+      : {}),
     replyTo: { email: address, name: "F10 Suporte" },
     subject,
     textContent: [
