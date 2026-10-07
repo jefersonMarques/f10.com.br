@@ -114,6 +114,7 @@ run("Atualizando PM2", "pm2", [
   "ecosystem.config.cjs",
   "--env",
   "production",
+  "--update-env",
 ]);
 wait(2_000);
 requirePm2Online(["f10.com.br", "f10-help-video-worker"]);
