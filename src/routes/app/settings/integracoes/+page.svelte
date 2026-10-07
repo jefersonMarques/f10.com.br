@@ -74,12 +74,15 @@
     <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
       <div class="flex items-center gap-3">
         <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EEF8F1] text-[#2F7045]"><Mail size={18}/></span>
-        <div><h2 class="text-[14px] font-semibold">E-mail transacional</h2><p class="application-text-meta mt-1 text-[#9297A5]">Brevo usado pela Área do Cliente e notificações.</p></div>
+        <div><h2 class="text-[14px] font-semibold">E-mail transacional</h2><p class="application-text-meta mt-1 text-[#9297A5]">Uma única conta Brevo para envios e entrada de tickets.</p></div>
       </div>
       <div class="application-text-caption mt-5 space-y-3">
         <div class="flex justify-between"><span class="text-[#858B99]">Status</span><strong>{data.email.configured ? "Configurado" : "Pendente"}</strong></div>
-        <div class="flex justify-between gap-3"><span class="text-[#858B99]">Remetente</span><strong>{data.email.senderEmail || "—"}</strong></div>
-        <div class="flex justify-between gap-3"><span class="text-[#858B99]">Nome</span><strong>{data.email.senderName || "—"}</strong></div>
+        <div class="flex justify-between gap-3"><span class="text-[#858B99]">Domínio</span><strong>{data.email.inboundDomain}</strong></div>
+        <div class="flex justify-between gap-3"><span class="text-[#858B99]">Remetente padrão</span><strong>{data.email.senderEmail}</strong></div>
+        <div class="flex justify-between gap-3"><span class="text-[#858B99]">Inbound</span><strong>{data.email.inboundConfigured ? "Configurado" : "Pendente"}</strong></div>
+        <div class="flex justify-between gap-3"><span class="text-[#858B99]">Conta protegida</span><strong>{data.email.expectedAccountUserId || "Não fixada"}</strong></div>
+        <div class="flex justify-between gap-3"><span class="text-[#858B99]">Nome</span><strong>{data.email.senderName}</strong></div>
       </div>
     </section>
 
