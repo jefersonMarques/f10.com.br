@@ -150,31 +150,61 @@ try {
     }
   }
 
-  let settingsSenderEmail = "";
-  if (!missingTables.includes("operations_settings")) {
-    const [general] = await sql`
-      SELECT value
-      FROM operations_settings
-      WHERE key = 'general'
-      LIMIT 1
-    `;
-    settingsSenderEmail = typeof general?.value?.supportSenderEmail === "string"
-      ? general.value.supportSenderEmail.trim()
-      : "";
-  }
+  const apiKey = process.env.BREVO_API_KEY?.trim() ?? "";
+  const inboundDomain =
+    (process.env.BREVO_INBOUND_DOMAIN?.trim().toLowerCase() || "reply.f10.com.br")
+      .replace(/^@+/, "");
 
-  const apiKeyConfigured = Boolean(process.env.BREVO_API_KEY?.trim());
-  const senderEmail = settingsSenderEmail || process.env.BREVO_SENDER_EMAIL?.trim() || "";
-  const brevoConfigured = apiKeyConfigured && Boolean(senderEmail);
   check(
-    "customer portal email",
-    brevoConfigured,
-    brevoConfigured
-      ? "Brevo API key and sender configured"
-      : !apiKeyConfigured
-        ? "BREVO_API_KEY is required"
-        : "configure the support sender email in Operations settings",
+    "Brevo transactional email",
+    Boolean(apiKey),
+    apiKey ? `sender=no-reply@${inboundDomain}` : "BREVO_API_KEY is required",
   );
+  check(
+    "Brevo inbound webhook",
+    Boolean(process.env.BREVO_INBOUND_WEBHOOK_TOKEN?.trim()),
+    process.env.BREVO_INBOUND_WEBHOOK_TOKEN?.trim()
+      ? `domain=${inboundDomain}`
+      : "BREVO_INBOUND_WEBHOOK_TOKEN is required",
+  );
+
+  const expectedBrevoUserId = process.env.BREVO_EXPECTED_ACCOUNT_USER_ID?.trim() ?? "";
+  const expectedBrevoOrganizationId =
+    process.env.BREVO_EXPECTED_ORGANIZATION_ID?.trim() ?? "";
+
+  if (apiKey && (expectedBrevoUserId || expectedBrevoOrganizationId)) {
+    try {
+      const response = await fetch("https://api.brevo.com/v3/account", {
+        headers: { accept: "application/json", "api-key": apiKey },
+        signal: AbortSignal.timeout(10_000),
+      });
+      const account = response.ok ? await response.json() : {};
+      const userId = String(account?.user_id ?? "");
+      const organizationId = String(account?.organization_id ?? "");
+      const matches =
+        response.ok &&
+        (!expectedBrevoUserId || userId === expectedBrevoUserId) &&
+        (!expectedBrevoOrganizationId || organizationId === expectedBrevoOrganizationId);
+
+      check(
+        "Brevo account identity",
+        matches,
+        matches
+          ? `user_id=${userId || "unknown"} organization_id=${organizationId || "unknown"}`
+          : `expected user_id=${expectedBrevoUserId || "*"} organization_id=${expectedBrevoOrganizationId || "*"}`,
+      );
+    } catch (cause) {
+      check(
+        "Brevo account identity",
+        false,
+        cause instanceof Error ? cause.name : "account check failed",
+      );
+    }
+  } else {
+    process.stdout.write(
+      "[INFO] Brevo account identity guard: BREVO_EXPECTED_ACCOUNT_USER_ID not configured.\n",
+    );
+  }
 
   if (!missingTables.includes("support_queues") && !missingTables.includes("teams")) {
     const [queue] = await sql`
