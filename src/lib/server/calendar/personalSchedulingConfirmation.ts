@@ -1,5 +1,4 @@
-import { env } from "$env/dynamic/private";
-import { getGeneralOperationsSettings } from "$lib/server/settings/operationsSettingsRepository";
+import { sendTransactionalEmail } from "$lib/server/email/transactionalEmail";
 
 export type PersonalSchedulingCalendarEvent = {
   id: string;
@@ -70,17 +69,6 @@ export function buildPersonalSchedulingIcs(
 export async function sendPersonalSchedulingConfirmation(
   event: PersonalSchedulingCalendarEvent,
 ): Promise<void> {
-  const general = await getGeneralOperationsSettings();
-  const apiKey = env.BREVO_API_KEY?.trim();
-  const senderEmail =
-    general.supportSenderEmail || env.BREVO_SENDER_EMAIL?.trim() || "";
-  const senderName =
-    general.supportSenderName || env.BREVO_SENDER_NAME?.trim() || "F10 Software";
-
-  if (!apiKey || !senderEmail) {
-    throw new Error("SCHEDULING_EMAIL_NOT_CONFIGURED");
-  }
-
   const dateTime = new Intl.DateTimeFormat("pt-BR", {
     timeZone: event.timeZone,
     weekday: "long",
@@ -103,18 +91,10 @@ export async function sendPersonalSchedulingConfirmation(
     ? ` Link da reunião: ${event.googleMeetUrl}.`
     : "";
 
-  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      "api-key": apiKey,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      sender: { email: senderEmail, name: senderName },
-      to: [{ email: event.customerEmail, name: event.customerName }],
-      subject: `Agendamento confirmado: ${event.title}`,
-      htmlContent: `
+  await sendTransactionalEmail({
+    to: { email: event.customerEmail, name: event.customerName },
+    subject: `Agendamento confirmado: ${event.title}`,
+    htmlContent: `
         <div style="font-family:Arial,sans-serif;color:#202637;line-height:1.65;max-width:620px;margin:auto">
           <div style="padding:28px;border:1px solid #e5e7eb;border-radius:18px">
             <div style="font-size:12px;font-weight:700;letter-spacing:.08em;color:#ea6d0b;text-transform:uppercase">Agendamento confirmado</div>
@@ -126,17 +106,13 @@ export async function sendPersonalSchedulingConfirmation(
           </div>
         </div>
       `,
-      textContent: `Olá, ${event.customerName}. Seu agendamento "${event.title}" com ${event.hostName} está confirmado para ${dateTime}.${textMeet} O arquivo agendamento-f10.ics está anexado para adicionar o compromisso à sua agenda.`,
-      attachment: [
-        {
-          content: Buffer.from(buildPersonalSchedulingIcs(event), "utf8").toString("base64"),
-          name: "agendamento-f10.ics",
-        },
-      ],
-    }),
+    textContent: `Olá, ${event.customerName}. Seu agendamento "${event.title}" com ${event.hostName} está confirmado para ${dateTime}.${textMeet} O arquivo agendamento-f10.ics está anexado para adicionar o compromisso à sua agenda.`,
+    attachments: [
+      {
+        content: Buffer.from(buildPersonalSchedulingIcs(event), "utf8").toString("base64"),
+        name: "agendamento-f10.ics",
+      },
+    ],
+    tags: ["scheduling"],
   });
-
-  if (!response.ok) {
-    throw new Error(`SCHEDULING_EMAIL_FAILED_${response.status}`);
-  }
 }
