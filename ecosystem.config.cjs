@@ -5,6 +5,7 @@ module.exports = {
       cwd: "/opt/f10.com.br",
       script: "build/index.js",
       node_args: "--env-file-if-exists=.env.production",
+      filter_env: ["BREVO_"],
       env: {
         NODE_ENV: "production",
         ORIGIN: "https://f10.com.br",
@@ -25,6 +26,7 @@ module.exports = {
       cwd: "/opt/f10.com.br",
       script: "build/index.js",
       node_args: "--env-file-if-exists=.env.production",
+      filter_env: ["BREVO_"],
       restart_delay: 4000,
       min_uptime: "10s",
       env: {
