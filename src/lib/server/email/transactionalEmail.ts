@@ -13,6 +13,8 @@ export async function sendTransactionalEmail(input: {
   htmlContent?: string;
   replyTo?: TransactionalEmailRecipient;
   sender?: TransactionalEmailRecipient;
+  cc?: TransactionalEmailRecipient[];
+  tags?: string[];
 }): Promise<void> {
   const apiKey = env.BREVO_API_KEY?.trim() ?? "";
   const general = await getGeneralOperationsSettings();
@@ -46,6 +48,14 @@ export async function sendTransactionalEmail(input: {
           ...(input.to.name ? { name: input.to.name } : {}),
         },
       ],
+      ...(input.cc?.length
+        ? {
+            cc: input.cc.map((recipient) => ({
+              email: recipient.email,
+              ...(recipient.name ? { name: recipient.name } : {}),
+            })),
+          }
+        : {}),
       subject: input.subject,
       textContent: input.textContent,
       ...(input.htmlContent ? { htmlContent: input.htmlContent } : {}),
@@ -57,6 +67,7 @@ export async function sendTransactionalEmail(input: {
             },
           }
         : {}),
+      ...(input.tags?.length ? { tags: input.tags } : {}),
     }),
     signal: AbortSignal.timeout(10_000),
   });
