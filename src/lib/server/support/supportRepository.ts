@@ -723,7 +723,7 @@ export async function addTicketMessage(
   body: string,
   visibility: "public" | "internal",
   mentionedUserIds: string[] = [],
-): Promise<void> {
+): Promise<{ emailDelivery: "sent" | "skipped" | "failed" }> {
   const permissionCode =
     visibility === "internal" && getPermissionScope(permissions, "tickets.comment_internal")
       ? "tickets.comment_internal"
