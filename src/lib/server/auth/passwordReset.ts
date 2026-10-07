@@ -8,6 +8,7 @@ import { hashPassword } from "$lib/server/auth/password";
 import { getDatabase } from "$lib/server/db";
 import { authLoginAttempts, sessions, users } from "$lib/server/db/schema";
 import { passwordResetTokens } from "$lib/server/db/userManagementSchema";
+import { sendTransactionalEmail } from "$lib/server/email/transactionalEmail";
 import { getGeneralOperationsSettings } from "$lib/server/settings/operationsSettingsRepository";
 
 const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
@@ -121,13 +122,6 @@ async function sendPasswordResetEmail(input: {
   expiresAt: Date;
 }): Promise<void> {
   const general = await getGeneralOperationsSettings();
-  const apiKey = env.BREVO_API_KEY?.trim();
-  const senderEmail = general.supportSenderEmail || env.BREVO_SENDER_EMAIL?.trim() || "";
-  const senderName = general.supportSenderName || env.BREVO_SENDER_NAME?.trim() || "F10 Software";
-
-  if (!apiKey || !senderEmail) {
-    throw new Error("PASSWORD_RESET_EMAIL_NOT_CONFIGURED");
-  }
 
   const safeName = escapeHtml(input.name || "usuário");
   const safeUrl = escapeHtml(input.resetUrl);
@@ -137,18 +131,10 @@ async function sendPasswordResetEmail(input: {
     timeZone: general.timezone || "America/Sao_Paulo",
   }).format(input.expiresAt);
 
-  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      "api-key": apiKey,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      sender: { email: senderEmail, name: senderName },
-      to: [{ email: input.email, name: input.name }],
-      subject: "Redefinição de senha do F10 Operations",
-      htmlContent: `
+  await sendTransactionalEmail({
+    to: { email: input.email, name: input.name },
+    subject: "Redefinição de senha do F10 Operations",
+    htmlContent: `
         <div style="font-family:Arial,sans-serif;color:#1f2937;line-height:1.6">
           <h2 style="color:#010D28">Redefinição de senha</h2>
           <p>Olá, ${safeName}.</p>
@@ -158,13 +144,9 @@ async function sendPasswordResetEmail(input: {
           <p>Se você não solicitou a alteração, ignore esta mensagem. Sua senha atual continuará válida.</p>
         </div>
       `,
-      textContent: `Olá, ${input.name || "usuário"}. Redefina sua senha do F10 Operations por este link de uso único: ${input.resetUrl}. O link expira em 30 minutos. Se você não solicitou a alteração, ignore esta mensagem.`,
-    }),
+    textContent: `Olá, ${input.name || "usuário"}. Redefina sua senha do F10 Operations por este link de uso único: ${input.resetUrl}. O link expira em 30 minutos. Se você não solicitou a alteração, ignore esta mensagem.`,
+    tags: ["operations", "password-reset"],
   });
-
-  if (!response.ok) {
-    throw new Error(`PASSWORD_RESET_EMAIL_FAILED_${response.status}`);
-  }
 }
 
 export async function requestPasswordReset(
