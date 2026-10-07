@@ -84,6 +84,9 @@
         <div class="flex justify-between gap-3"><span class="text-[#858B99]">Conta protegida</span><strong>{data.email.expectedAccountUserId || "Não fixada"}</strong></div>
         <div class="flex justify-between gap-3"><span class="text-[#858B99]">Nome</span><strong>{data.email.senderName}</strong></div>
       </div>
+      <form method="POST" action="?/testBrevo" class="mt-4">
+        <button type="submit" class="application-text-meta min-h-9 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57]">Testar Brevo</button>
+      </form>
     </section>
 
     <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
