@@ -11,6 +11,7 @@ export async function sendTransactionalEmail(input: {
   subject: string;
   textContent: string;
   htmlContent?: string;
+  replyTo?: TransactionalEmailRecipient;
 }): Promise<void> {
   const apiKey = env.BREVO_API_KEY?.trim() ?? "";
   const general = await getGeneralOperationsSettings();
@@ -39,6 +40,14 @@ export async function sendTransactionalEmail(input: {
       subject: input.subject,
       textContent: input.textContent,
       ...(input.htmlContent ? { htmlContent: input.htmlContent } : {}),
+      ...(input.replyTo
+        ? {
+            replyTo: {
+              email: input.replyTo.email,
+              ...(input.replyTo.name ? { name: input.replyTo.name } : {}),
+            },
+          }
+        : {}),
     }),
     signal: AbortSignal.timeout(10_000),
   });

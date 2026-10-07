@@ -33,6 +33,7 @@ export const supportEmailThreads = pgTable(
     senderName: text("sender_name"),
     senderEmail: text("sender_email").notNull(),
     recipientEmail: text("recipient_email").notNull(),
+    replyToken: text("reply_token"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -42,6 +43,7 @@ export const supportEmailThreads = pgTable(
       table.conversationId,
     ),
     uniqueIndex("support_email_threads_ticket_unique").on(table.ticketId),
+    uniqueIndex("support_email_threads_reply_token_unique").on(table.replyToken),
     index("support_email_threads_sender_idx").on(table.senderEmail, table.updatedAt),
   ],
 );

@@ -433,7 +433,7 @@ export const actions: Actions = {
       });
     }
     try {
-      await addTicketMessage(
+      const result = await addTicketMessage(
         session.user.id,
         permissions,
         params.ticketId,
@@ -445,7 +445,16 @@ export const actions: Actions = {
         session.user.id,
         "Atendente respondeu pelo ticket.",
       );
-      return { success: true, action: "reply", message: "Resposta registrada." };
+      return {
+        success: true,
+        action: "reply",
+        message:
+          result.emailDelivery === "sent"
+            ? "Resposta registrada e enviada por e-mail."
+            : result.emailDelivery === "failed"
+              ? "Resposta registrada, mas o e-mail não pôde ser enviado."
+              : "Resposta registrada.",
+      };
     } catch {
       return fail(403, {
         success: false,

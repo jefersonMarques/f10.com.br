@@ -13,6 +13,7 @@ import { getDatabase } from "$lib/server/db";
 import { requestTicketSatisfaction } from "$lib/server/support/ticketSatisfactionService";
 import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
 import { notifyTicketFollowers } from "$lib/server/support/ticketFollowerRepository";
+import { sendTicketPublicReplyEmail } from "$lib/server/support/ticketEmailService";
 import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { serviceRequests } from "$lib/server/db/serviceRequestSchema";
@@ -798,6 +799,31 @@ export async function addTicketMessage(
       );
     }
   });
+
+  let emailDelivery: "sent" | "skipped" | "failed" = "skipped";
+  if (visibility === "public") {
+    try {
+      emailDelivery = await sendTicketPublicReplyEmail(ticketId, body.trim())
+        ? "sent"
+        : "skipped";
+    } catch (cause) {
+      emailDelivery = "failed";
+      console.error("[ticket.email.reply] send failed", {
+        ticketId,
+        errorCode: cause instanceof Error ? cause.message : "TICKET_EMAIL_SEND_FAILED",
+      });
+      await db.insert(ticketEvents).values({
+        ticketId,
+        actorUserId,
+        eventType: "ticket.email.send_failed",
+        metadata: {
+          errorCode: cause instanceof Error ? cause.message.slice(0, 180) : "TICKET_EMAIL_SEND_FAILED",
+        },
+      }).catch(() => undefined);
+    }
+  }
+
+  return { emailDelivery };
 }
 
 export async function updateTicketStatus(

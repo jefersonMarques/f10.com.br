@@ -46,7 +46,7 @@ type InboxRoute = {
   email: string;
   groupId: string | null;
 };
-type BrevoEmailMessage = {
+export type BrevoEmailMessage = {
   id: string;
   externalMessageId: string;
   type: string;
@@ -567,7 +567,7 @@ function messageMetadata(message: BrevoEmailMessage): Record<string, unknown> {
   };
 }
 
-async function saveIncomingMessage(input: {
+export async function saveIncomingMessage(input: {
   ticketId: string;
   conversationId: string;
   message: BrevoEmailMessage;
@@ -653,6 +653,13 @@ async function saveIncomingMessage(input: {
 export async function processEmailInboundEvent(
   event: SupportEmailInboundEvent,
 ): Promise<EmailInboundOutcome> {
+  if (event.eventType === "inboundEmailProcessed") {
+    const { processBrevoInboundParseEvent } = await import(
+      "$lib/server/support/emailInboundParseService"
+    );
+    return processBrevoInboundParseEvent(event);
+  }
+
   const payload = event.rawPayload;
   const eventName = asString(payload.eventName);
   if (!["conversationStarted", "conversationFragment", "conversationTranscript"].includes(eventName)) {
