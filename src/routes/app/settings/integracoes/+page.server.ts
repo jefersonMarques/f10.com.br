@@ -31,14 +31,18 @@ export const load: PageServerLoad = async ({ cookies }) => {
     storage: getAssetStorageStatus(),
     serviceRequestStorage: getServiceRequestStorageStatus(),
     serviceRequestSecretConfigured: isServiceRequestSecretKeyConfigured(),
-    email: {
-      configured: Boolean(
-        env.BREVO_API_KEY?.trim() &&
-        env.BREVO_SENDER_EMAIL?.trim(),
-      ),
-      senderEmail: env.BREVO_SENDER_EMAIL?.trim() ?? "",
-      senderName: env.BREVO_SENDER_NAME?.trim() ?? "",
-    },
+    email: (() => {
+      const domain = (env.BREVO_INBOUND_DOMAIN?.trim().toLowerCase() || "reply.f10.com.br")
+        .replace(/^@+/, "");
+      return {
+        configured: Boolean(env.BREVO_API_KEY?.trim()),
+        senderEmail: `no-reply@${domain}`,
+        senderName: env.BREVO_SENDER_NAME?.trim() || "F10 Software",
+        inboundDomain: domain,
+        inboundConfigured: Boolean(env.BREVO_INBOUND_WEBHOOK_TOKEN?.trim()),
+        expectedAccountUserId: env.BREVO_EXPECTED_ACCOUNT_USER_ID?.trim() ?? "",
+      };
+    })(),
     google: {
       configured: Boolean(
         env.GOOGLE_CALENDAR_CLIENT_ID?.trim() &&
