@@ -6,7 +6,10 @@ import { teamMembers, users } from "$lib/server/db/schema";
 import { ticketAreas, ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
 import { autoAssignChatIfConfigured } from "$lib/server/support/supportChatRoutingRepository";
-import { autoAssignTicketIfConfigured } from "$lib/server/support/supportRoutingRepository";
+import {
+  autoAssignTicketIfConfigured,
+  listEligibleTicketResponders,
+} from "$lib/server/support/supportRoutingRepository";
 
 export async function notifySupportChatNeedsAttention(
   sessionId: string,
@@ -111,6 +114,9 @@ export async function notifySupportTicketNeedsAttention(
       .innerJoin(users, eq(users.id, teamMembers.userId))
       .where(and(eq(teamMembers.teamId, teamId), eq(users.status, "active")));
     recipientIds = Array.from(new Set(members.map((member) => member.userId)));
+  } else if (ticket.channel === "email") {
+    const responders = await listEligibleTicketResponders();
+    recipientIds = responders.map((responder) => responder.id);
   }
 
   if (recipientIds.length === 0) return;
