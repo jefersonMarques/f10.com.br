@@ -65,7 +65,13 @@
   let composerMode: ComposerMode = ticketData.canReply ? "reply" : "note";
   let replyDraft = "";
   let noteDraft = "";
-  let detailsPanelOpen = surface === "page";
+  export let detailsPanelOpen = surface === "page";
+
+  function handlePanelKeydown(event: KeyboardEvent): void {
+    if (event.key === "Escape" && surface !== "page" && detailsPanelOpen) {
+      detailsPanelOpen = false;
+    }
+  }
 
   $: workflowStateKey = [
     ticketData.details.ticket.id,
@@ -300,6 +306,8 @@
   }
 
 </script>
+
+<svelte:window on:keydown={handlePanelKeydown}/>
 
 <div class={surface === "page"
   ? "bg-[var(--app-bg)]"
@@ -541,10 +549,35 @@
         {/if}
       </main>
 
+      {#if surface !== "page" && detailsPanelOpen}
+        <button
+          type="button"
+          class="fixed inset-0 z-[90] cursor-default bg-[#010D28]/35"
+          aria-label="Fechar painel de informações"
+          on:click={() => (detailsPanelOpen = false)}
+        ></button>
+      {/if}
       {#if surface === "page" || detailsPanelOpen}
-      <aside class={surface === "page"
-        ? "space-y-3 border-t border-[var(--app-border)] bg-[var(--app-bg)] p-3 xl:border-l xl:border-t-0"
-        : "absolute inset-y-0 right-0 z-20 w-[min(360px,100%)] space-y-3 overflow-y-auto border-l border-[var(--app-border)] bg-[var(--app-bg)] p-3 shadow-2xl"}>
+      <aside
+        aria-label="Informações do ticket"
+        class={surface === "page"
+          ? "space-y-3 border-t border-[var(--app-border)] bg-[var(--app-bg)] p-3 xl:border-l xl:border-t-0"
+          : "fixed inset-y-0 right-0 z-[100] w-[min(420px,100vw)] space-y-3 overflow-y-auto overscroll-contain border-l border-[var(--app-border)] bg-[var(--app-bg)] p-3 shadow-[-20px_0_60px_rgba(1,13,40,0.16)]"}
+      >
+        {#if surface !== "page"}
+          <header class="sticky -top-3 z-10 -mx-3 -mt-3 mb-3 flex items-center justify-between gap-3 border-b border-[var(--app-border)] bg-white px-4 py-3">
+            <div class="min-w-0">
+              <h2 class="text-[14px] font-semibold text-[#202637]">Informações do ticket</h2>
+              <p class="mt-0.5 truncate text-[12px] text-[#737989]">#{ticketData.details.ticket.ticketNumber} · {ticketData.details.ticket.subject}</p>
+            </div>
+            <button
+              type="button"
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--app-border)] text-[#626978] hover:bg-[var(--app-surface-muted)]"
+              aria-label="Fechar informações do ticket"
+              on:click={() => (detailsPanelOpen = false)}
+            ><X size={17}/></button>
+          </header>
+        {/if}
         <section class="rounded-[18px] border border-[var(--app-border)] bg-white p-4">
           <h3 class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><Headphones size={14}/>Atendimento</h3>
 
