@@ -301,7 +301,11 @@
               areaWorkflows={data.workflowBoard.areaWorkflows}
               selectedTicketId={ticketDetails?.details.ticket.id ?? null}
               compact
-              onShowTicketInfo={(ticketId) => { detailsPanelOpen = true; return openTicketDetails(ticketId); }}
+              onShowTicketInfo={(ticketId) => {
+                detailsPanelOpen = true;
+                if (ticketDetails?.details.ticket.id === ticketId) return;
+                return openTicketDetails(ticketId);
+              }}
               onOpenTicket={openTicketDetails}
             />
           </div>
