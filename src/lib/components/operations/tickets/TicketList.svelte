@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Clock3, Mail, TicketCheck, UserRound } from "lucide-svelte";
+  import { Check, Clock3, Copy, ExternalLink, Mail, MessageSquare, MoreHorizontal, PanelRightOpen, TicketCheck, UserRound } from "lucide-svelte";
+  import { tick } from "svelte";
   import { labelClasses, priorityLabels } from "./presentation";
   import type { TicketItem, TicketWorkflow } from "./types";
 
@@ -9,6 +10,59 @@
   export let selectedTicketId: string | null = null;
   export let compact = false;
   export let onOpenTicket: (ticketId: string) => void | Promise<void>;
+  export let onShowTicketInfo: ((ticketId: string) => void | Promise<void>) | null = null;
+
+  let menuTicket: TicketItem | null = null;
+  let menuTop = 0;
+  let menuLeft = 0;
+  let menuElement: HTMLDivElement;
+  let copiedTicketId: string | null = null;
+
+  function closeTicketMenu(): void {
+    menuTicket = null;
+  }
+
+  async function toggleTicketMenu(event: MouseEvent, ticket: TicketItem): Promise<void> {
+    event.stopPropagation();
+    if (menuTicket?.id === ticket.id) {
+      closeTicketMenu();
+      return;
+    }
+
+    const button = event.currentTarget as HTMLButtonElement;
+    const rect = button.getBoundingClientRect();
+    const height = 192;
+    menuTop = window.innerHeight - rect.bottom >= height + 8
+      ? rect.bottom + 6
+      : Math.max(8, rect.top - height - 6);
+    menuLeft = Math.max(8, Math.min(rect.right - 224, window.innerWidth - 232));
+    menuTicket = ticket;
+    await tick();
+    menuElement?.querySelector<HTMLElement>("[data-first-action]")?.focus();
+  }
+
+  function openTicketInfo(ticketId: string): void {
+    closeTicketMenu();
+    void onShowTicketInfo?.(ticketId);
+  }
+
+  async function copyTicketLink(ticketId: string): Promise<void> {
+    closeTicketMenu();
+    const url = `${window.location.origin}/app/tickets/${ticketId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      copiedTicketId = ticketId;
+      window.setTimeout(() => {
+        if (copiedTicketId === ticketId) copiedTicketId = null;
+      }, 2500);
+    } catch {
+      window.prompt("Copie o link do ticket:", url);
+    }
+  }
+
+  function handleMenuKeydown(event: KeyboardEvent): void {
+    if (event.key === "Escape" && menuTicket) closeTicketMenu();
+  }
 
   function initials(name: string | null): string {
     if (!name) return "—";
@@ -76,6 +130,8 @@
   }
 </script>
 
+<svelte:window on:click={closeTicketMenu} on:keydown={handleMenuKeydown} on:scroll|capture={closeTicketMenu} on:resize={closeTicketMenu}/>
+
 {#if tickets.length > 0}
   {#if compact}
     <section class="flex h-full min-h-0 flex-col bg-white">
@@ -86,32 +142,45 @@
 
       <div class="min-h-0 flex-1 overflow-y-auto">
         <div class="divide-y divide-[var(--app-border-soft)]">
-          {#each tickets as ticket}
-            <button
-              type="button"
-              on:click={() => void onOpenTicket(ticket.id)}
-              aria-pressed={selectedTicketId === ticket.id}
-              title={ticket.subject}
-              class={`block w-full border-l-[3px] px-3 py-3 text-left transition-colors ${selectedTicketId === ticket.id ? "border-[var(--app-primary)] bg-[var(--app-surface-selected)]" : "border-transparent hover:bg-[var(--app-surface-subtle)]"}`}
-            >
-              <div class="flex min-w-0 items-center gap-2">
-                <span class="shrink-0 text-[11px] font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
-                <strong class="min-w-0 flex-1 truncate text-[13px] font-semibold text-[#303645]">{ticket.subject}</strong>
-                <span class="shrink-0 text-[11px] text-[#858C99]">{relativeUpdated(ticket.updatedAt)}</span>
-              </div>
-              <div class="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] text-[#737989]">
-                <span class="min-w-0 flex-1 truncate">{ticket.customerName ?? ticket.assignedUserName ?? "Cliente pendente"}</span>
-                {#if ticket.channel === "email"}<Mail size={13} class="shrink-0" aria-label="Recebido por e-mail"/>{/if}
-                {#if activeSla(ticket)}
-                  <span class={`shrink-0 rounded px-1.5 py-0.5 text-[10.5px] font-semibold ${slaClass(ticket)}`}>{slaText(ticket)}</span>
-                {:else if ticket.priority !== "normal"}
-                  <span class="shrink-0 text-[11px] font-medium text-[#7B5561]">{priorityLabels[ticket.priority] ?? ticket.priority}</span>
+          {#each tickets as ticket (ticket.id)}
+            <div class={`relative border-l-[3px] transition-colors ${selectedTicketId === ticket.id ? "border-[var(--app-primary)] bg-[var(--app-surface-selected)]" : "border-transparent hover:bg-[var(--app-surface-subtle)]"}`}>
+              <button
+                type="button"
+                on:click={() => { closeTicketMenu(); void onOpenTicket(ticket.id); }}
+                aria-pressed={selectedTicketId === ticket.id}
+                title={ticket.subject}
+                class="block w-full px-3 py-3 pr-11 text-left"
+              >
+                <div class="flex min-w-0 items-center gap-2">
+                  <span class="shrink-0 text-[11px] font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
+                  <strong class="min-w-0 flex-1 truncate text-[13px] font-semibold text-[#303645]">{ticket.subject}</strong>
+                </div>
+                <div class="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] text-[#737989]">
+                  <span class="min-w-0 flex-1 truncate">{ticket.customerName ?? ticket.assignedUserName ?? "Cliente pendente"}</span>
+                  {#if ticket.channel === "email"}<Mail size={13} class="shrink-0" aria-label="Recebido por e-mail"/>{/if}
+                  {#if activeSla(ticket)}
+                    <span class={`shrink-0 rounded px-1.5 py-0.5 text-[10.5px] font-semibold ${slaClass(ticket)}`}>{slaText(ticket)}</span>
+                  {:else if ticket.priority !== "normal"}
+                    <span class="shrink-0 text-[11px] font-medium text-[#7B5561]">{priorityLabels[ticket.priority] ?? ticket.priority}</span>
+                  {/if}
+                </div>
+                {#if ticket.workflowState?.areaWorkflowId}
+                  <p class="mt-0.5 truncate text-[11px] text-[#989EAA]">{processLabel(ticket)}</p>
                 {/if}
+              </button>
+              <div class="absolute right-2 top-2 flex items-center gap-1">
+                <span class="hidden max-w-[65px] truncate text-[10px] text-[#9298A5] sm:block">{relativeUpdated(ticket.updatedAt)}</span>
+                <button
+                  type="button"
+                  on:click={(event) => void toggleTicketMenu(event, ticket)}
+                  class={`flex h-8 w-8 items-center justify-center rounded-lg text-[#747C8A] transition hover:bg-white hover:text-[#000A57] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#000A57] ${menuTicket?.id === ticket.id ? "bg-white text-[#000A57]" : ""}`}
+                  aria-label={`Ações do ticket #${ticket.ticketNumber}`}
+                  aria-haspopup="menu"
+                  aria-expanded={menuTicket?.id === ticket.id}
+                  title="Ações do ticket"
+                ><MoreHorizontal size={17}/></button>
               </div>
-              {#if ticket.workflowState?.areaWorkflowId}
-                <p class="mt-0.5 truncate text-[11px] text-[#989EAA]">{processLabel(ticket)}</p>
-              {/if}
-            </button>
+            </div>
           {/each}
         </div>
       </div>
@@ -201,5 +270,56 @@
   <div class="px-5 py-12 text-center">
     <p class="application-text-caption font-semibold text-[#5D6574]">Nenhum ticket encontrado.</p>
     <p class="application-text-meta mt-1 text-[#969CAA]">Ajuste os filtros para ampliar a busca.</p>
+  </div>
+{/if}
+
+{#if menuTicket}
+  <div
+    bind:this={menuElement}
+    role="menu"
+    aria-label={`Ações do ticket #${menuTicket.ticketNumber}`}
+    class="fixed z-[80] w-56 overflow-hidden rounded-xl border border-[var(--app-border)] bg-white py-1.5 shadow-[0_16px_45px_rgba(1,13,40,0.18)]"
+    style:top={`${menuTop}px`}
+    style:left={`${menuLeft}px`}
+  >
+    <button
+      type="button"
+      role="menuitem"
+      data-first-action
+      on:click={() => { const id = menuTicket?.id; closeTicketMenu(); if (id) void onOpenTicket(id); }}
+      class="flex h-9 w-full items-center gap-2.5 px-3 text-left text-[12px] font-medium text-[#4C5363] hover:bg-[var(--app-surface-subtle)]"
+    ><MessageSquare size={15}/>Abrir conversa</button>
+
+    {#if onShowTicketInfo}
+      <button
+        type="button"
+        role="menuitem"
+        on:click={() => { if (menuTicket) openTicketInfo(menuTicket.id); }}
+        class="flex h-9 w-full items-center gap-2.5 px-3 text-left text-[12px] font-medium text-[#4C5363] hover:bg-[var(--app-surface-subtle)]"
+      ><PanelRightOpen size={15}/>Ver informações</button>
+    {/if}
+
+    <a
+      role="menuitem"
+      href={`/app/tickets/${menuTicket.id}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="flex h-9 items-center gap-2.5 px-3 text-[12px] font-medium text-[#4C5363] hover:bg-[var(--app-surface-subtle)]"
+      on:click={closeTicketMenu}
+    ><ExternalLink size={15}/>Abrir página completa</a>
+
+    <div class="my-1 border-t border-[var(--app-border-soft)]"></div>
+    <button
+      type="button"
+      role="menuitem"
+      on:click={() => { if (menuTicket) void copyTicketLink(menuTicket.id); }}
+      class="flex h-9 w-full items-center gap-2.5 px-3 text-left text-[12px] font-medium text-[#4C5363] hover:bg-[var(--app-surface-subtle)]"
+    ><Copy size={15}/>Copiar link</button>
+  </div>
+{/if}
+
+{#if copiedTicketId}
+  <div class="pointer-events-none fixed bottom-5 right-5 z-[110] flex items-center gap-2 rounded-lg bg-[#202637] px-3 py-2 text-[12px] font-semibold text-white shadow-lg" role="status">
+    <Check size={14}/>Link copiado
   </div>
 {/if}
