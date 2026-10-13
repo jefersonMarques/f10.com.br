@@ -5,7 +5,7 @@ const productionRoot = resolve(
   process.env.F10_PRODUCTION_ROOT?.trim() || "/opt/f10.com.br",
 );
 const productionBranch =
-  process.env.F10_PRODUCTION_BRANCH?.trim() || "agent/service-request-foundation";
+  process.env.F10_PRODUCTION_BRANCH?.trim() || "main";
 const currentRoot = resolve(process.cwd());
 
 function fail(message) {
