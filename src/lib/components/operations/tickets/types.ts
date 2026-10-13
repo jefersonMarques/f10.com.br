@@ -1,5 +1,6 @@
 export type TicketScope = "mine" | "unassigned" | "all";
 export type TicketView = "board" | "list" | "split";
+export type TicketMainPanel = "conversation" | "request" | "attachments" | "service" | "customer" | "tasks" | "collaboration" | "history";
 
 export type TicketLabel = {
   id: string;

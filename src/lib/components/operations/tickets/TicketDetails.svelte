@@ -12,8 +12,8 @@
     MessageSquare,
     MonitorCog,
     Paperclip,
-    PanelRightClose,
-    PanelRightOpen,
+    ChevronDown,
+    ListChecks,
     Route,
     Send,
     ShieldCheck,
@@ -34,10 +34,9 @@
     labelClasses,
     priorityLabels,
   } from "./presentation";
-  import type { TicketDetailsData, TicketWorkflow } from "./types";
+  import type { TicketDetailsData, TicketMainPanel, TicketWorkflow } from "./types";
 
   type TicketSurface = "page" | "split" | "modal";
-  type MainPanel = "conversation" | "request" | "attachments";
   type ComposerMode = "reply" | "note";
   type ActionFeedback = { success?: boolean; message?: string } | null | undefined;
 
@@ -61,16 +60,27 @@
   let workflowSelectionKey = "";
   let workflowId = "";
   let stageId = "";
-  let activeMainPanel: MainPanel = "conversation";
+  export let activeMainPanel: TicketMainPanel = "conversation";
+  let moreMenuOpen = false;
   let composerMode: ComposerMode = ticketData.canReply ? "reply" : "note";
   let replyDraft = "";
   let noteDraft = "";
-  export let detailsPanelOpen = surface === "page";
+  $: isInfoPanel = surface !== "page" && ["service", "customer", "tasks", "collaboration", "history"].includes(activeMainPanel);
 
-  function handlePanelKeydown(event: KeyboardEvent): void {
-    if (event.key === "Escape" && surface !== "page" && detailsPanelOpen) {
-      detailsPanelOpen = false;
-    }
+  function tabClass(panel: TicketMainPanel, currentPanel: TicketMainPanel): string {
+    const base = "inline-flex h-full shrink-0 items-center gap-1.5 border-b-2 px-1 text-[12px] font-semibold transition-colors";
+    return currentPanel === panel
+      ? `${base} border-[var(--app-primary)] text-[#000A57]`
+      : `${base} border-transparent text-[#6F7685] hover:text-[#000A57]`;
+  }
+
+  function selectTab(panel: TicketMainPanel): void {
+    activeMainPanel = panel;
+    moreMenuOpen = false;
+  }
+
+  function handleMenuKeydown(event: KeyboardEvent): void {
+    if (event.key === "Escape") moreMenuOpen = false;
   }
 
   $: workflowStateKey = [
@@ -307,7 +317,7 @@
 
 </script>
 
-<svelte:window on:keydown={handlePanelKeydown}/>
+<svelte:window on:keydown={handleMenuKeydown}/>
 
 <div class={surface === "page"
   ? "bg-[var(--app-bg)]"
@@ -355,15 +365,6 @@
             aria-label="Acesso remoto"
             title="Acesso remoto"
           ><MonitorCog size={15}/></a>
-          {#if surface !== "page"}
-            <button type="button" on:click={() => (detailsPanelOpen = !detailsPanelOpen)}
-              class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-white text-[#69707E] hover:bg-[var(--app-surface-muted)] hover:text-[#000A57]"
-              aria-label={detailsPanelOpen ? "Ocultar informações do ticket" : "Mostrar informações do ticket"}
-              aria-expanded={detailsPanelOpen}
-              title={detailsPanelOpen ? "Ocultar informações" : "Informações do ticket"}>
-              {#if detailsPanelOpen}<PanelRightClose size={17}/>{:else}<PanelRightOpen size={17}/>{/if}
-            </button>
-          {/if}
           {#if surface === "modal" && onClose}
             <button type="button" on:click={onClose} class="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] text-[#69707E] hover:bg-[var(--app-surface-muted)]" aria-label="Fechar"><X size={16}/></button>
           {/if}
@@ -371,26 +372,30 @@
       </div>
     </header>
 
-    <nav class={surface === "split" ? "flex h-9 shrink-0 items-center gap-4 border-b border-[var(--app-border)] bg-white px-4" : "flex shrink-0 items-center gap-1 border-b border-[var(--app-border)] bg-white px-3 py-1 sm:px-4"} aria-label="Conteúdo do ticket">
-      <button
-        type="button"
-        on:click={() => (activeMainPanel = "conversation")}
-        class={`inline-flex h-full items-center gap-1.5 text-[12px] font-semibold transition ${surface === "split" ? "rounded-none border-b-2 px-0" : "h-8 rounded-lg px-2.5"} ${activeMainPanel === "conversation" ? (surface === "split" ? "border-[var(--app-primary)] text-[#000A57]" : "bg-[var(--app-info-bg)] text-[#000A57]") : (surface === "split" ? "border-transparent text-[#6F7685] hover:text-[#000A57]" : "text-[#6F7685] hover:bg-[var(--app-surface-muted)]")}`}
-      ><MessageSquare size={14}/>Conversa</button>
-
-      {#if ticketData.serviceRequest}
-        <button
-          type="button"
-          on:click={() => (activeMainPanel = "request")}
-          class={`inline-flex h-full items-center gap-1.5 text-[12px] font-semibold transition ${surface === "split" ? "rounded-none border-b-2 px-0" : "h-8 rounded-lg px-2.5"} ${activeMainPanel === "request" ? (surface === "split" ? "border-[var(--app-primary)] text-[#000A57]" : "bg-[var(--app-info-bg)] text-[#000A57]") : (surface === "split" ? "border-transparent text-[#6F7685] hover:text-[#000A57]" : "text-[#6F7685] hover:bg-[var(--app-surface-muted)]")}`}
-        ><FileText size={14}/>Solicitação</button>
+    <nav class="relative z-20 flex h-11 shrink-0 items-center border-b border-[var(--app-border)] bg-white px-3 sm:px-4" aria-label="Seções do ticket">
+      <div class="flex h-full min-w-0 flex-1 items-center gap-3 overflow-x-auto whitespace-nowrap sm:gap-5">
+        <button type="button" class={tabClass("conversation", activeMainPanel)} aria-pressed={activeMainPanel === "conversation"} on:click={() => selectTab("conversation")}><MessageSquare size={14}/>Conversa</button>
+        {#if ticketData.serviceRequest}
+          <button type="button" class={tabClass("request", activeMainPanel)} aria-pressed={activeMainPanel === "request"} on:click={() => selectTab("request")}><FileText size={14}/>Solicitação</button>
+        {/if}
+        <button type="button" class={tabClass("attachments", activeMainPanel)} aria-pressed={activeMainPanel === "attachments"} on:click={() => selectTab("attachments")}><Paperclip size={14}/>Anexos {#if ticketData.attachments.length > 0}<span class="text-[11px] text-[#858C99]">{ticketData.attachments.length}</span>{/if}</button>
+        {#if surface !== "page"}
+          <button type="button" class={tabClass("service", activeMainPanel)} aria-pressed={activeMainPanel === "service"} on:click={() => selectTab("service")}><Headphones size={14}/>Atendimento</button>
+          <button type="button" class={tabClass("customer", activeMainPanel)} aria-pressed={activeMainPanel === "customer"} on:click={() => selectTab("customer")}><UserRound size={14}/>Cliente</button>
+          {#if ticketData.canViewTasks}
+            <button type="button" class={tabClass("tasks", activeMainPanel)} aria-pressed={activeMainPanel === "tasks"} on:click={() => selectTab("tasks")}><ListChecks size={14}/>Tarefas</button>
+          {/if}
+        {/if}
+      </div>
+      {#if surface !== "page"}
+        <details class="relative z-30 ml-2 shrink-0" bind:open={moreMenuOpen}>
+          <summary class={`flex h-9 cursor-pointer list-none items-center gap-1 rounded-lg px-2 text-[12px] font-semibold hover:bg-[var(--app-surface-muted)] ${activeMainPanel === "collaboration" || activeMainPanel === "history" ? "text-[#000A57]" : "text-[#6F7685]"}`} aria-label="Mais seções"><span>Mais</span><ChevronDown size={14}/></summary>
+          <div class="absolute right-0 top-full z-40 mt-1 w-52 rounded-xl border border-[var(--app-border)] bg-white p-1.5 shadow-[0_12px_32px_rgba(1,13,40,0.16)]">
+            <button type="button" on:click={() => selectTab("collaboration")} class={`flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[12px] font-medium hover:bg-[var(--app-surface-subtle)] ${activeMainPanel === "collaboration" ? "text-[#000A57]" : "text-[#525A69]"}`}><UsersRound size={15}/>Colaboração e etiquetas</button>
+            <button type="button" on:click={() => selectTab("history")} class={`flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[12px] font-medium hover:bg-[var(--app-surface-subtle)] ${activeMainPanel === "history" ? "text-[#000A57]" : "text-[#525A69]"}`}><ShieldCheck size={15}/>Histórico</button>
+          </div>
+        </details>
       {/if}
-
-      <button
-        type="button"
-        on:click={() => (activeMainPanel = "attachments")}
-        class={`inline-flex h-full items-center gap-1.5 text-[12px] font-semibold transition ${surface === "split" ? "rounded-none border-b-2 px-0" : "h-8 rounded-lg px-2.5"} ${activeMainPanel === "attachments" ? (surface === "split" ? "border-[var(--app-primary)] text-[#000A57]" : "bg-[var(--app-info-bg)] text-[#000A57]") : (surface === "split" ? "border-transparent text-[#6F7685] hover:text-[#000A57]" : "text-[#6F7685] hover:bg-[var(--app-surface-muted)]")}`}
-      ><Paperclip size={14}/>Anexos {#if ticketData.attachments.length > 0}<span class="rounded-full bg-white px-1.5 py-0.5 text-[9px]">{ticketData.attachments.length}</span>{/if}</button>
     </nav>
 
     {#if visibleFeedback?.message}
@@ -405,7 +410,7 @@
       : "relative grid min-h-0 flex-1 grid-cols-1"}>
       <main class={surface === "page"
         ? "min-w-0 bg-white"
-        : "flex min-h-[500px] min-w-0 flex-col bg-white lg:min-h-0"}>
+        : isInfoPanel ? "hidden" : "flex min-h-[500px] min-w-0 flex-col bg-white lg:min-h-0"}>
         {#if activeMainPanel === "conversation"}
           <section class={surface === "page" ? "flex min-h-[720px] flex-col" : "flex min-h-0 flex-1 flex-col"}>
             <div class={surface === "page"
@@ -512,7 +517,7 @@
               onUpdated={refreshDetails}
             />
           </div>
-        {:else}
+        {:else if activeMainPanel === "attachments"}
           <section class="min-h-0 flex-1 overflow-y-auto bg-[var(--app-surface-subtle)] p-4 sm:p-5">
             <div class="mx-auto max-w-[900px] rounded-[20px] border border-[var(--app-border)] bg-white p-4 sm:p-5">
               <div class="flex flex-wrap items-center justify-between gap-3">
@@ -549,36 +554,15 @@
         {/if}
       </main>
 
-      {#if surface !== "page" && detailsPanelOpen}
-        <button
-          type="button"
-          class="fixed inset-0 z-[90] cursor-default bg-[#010D28]/35"
-          aria-label="Fechar painel de informações"
-          on:click={() => (detailsPanelOpen = false)}
-        ></button>
-      {/if}
-      {#if surface === "page" || detailsPanelOpen}
+      {#if surface === "page" || isInfoPanel}
       <aside
-        aria-label="Informações do ticket"
+        aria-label={surface === "page" ? "Informações do ticket" : "Seção do ticket"}
         class={surface === "page"
           ? "space-y-3 border-t border-[var(--app-border)] bg-[var(--app-bg)] p-3 xl:border-l xl:border-t-0"
-          : "fixed inset-y-0 right-0 z-[100] w-[min(420px,100vw)] space-y-3 overflow-y-auto overscroll-contain border-l border-[var(--app-border)] bg-[var(--app-bg)] p-3 shadow-[-20px_0_60px_rgba(1,13,40,0.16)]"}
+          : "min-h-0 w-full overflow-y-auto bg-white px-3 py-4 sm:px-6"}
       >
-        {#if surface !== "page"}
-          <header class="sticky -top-3 z-10 -mx-3 -mt-3 mb-3 flex items-center justify-between gap-3 border-b border-[var(--app-border)] bg-white px-4 py-3">
-            <div class="min-w-0">
-              <h2 class="text-[14px] font-semibold text-[#202637]">Informações do ticket</h2>
-              <p class="mt-0.5 truncate text-[12px] text-[#737989]">#{ticketData.details.ticket.ticketNumber} · {ticketData.details.ticket.subject}</p>
-            </div>
-            <button
-              type="button"
-              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--app-border)] text-[#626978] hover:bg-[var(--app-surface-muted)]"
-              aria-label="Fechar informações do ticket"
-              on:click={() => (detailsPanelOpen = false)}
-            ><X size={17}/></button>
-          </header>
-        {/if}
-        <section class="rounded-[18px] border border-[var(--app-border)] bg-white p-4">
+        {#if surface === "page" || activeMainPanel === "service"}
+        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto w-full max-w-[940px] p-2 sm:p-4"}>
           <h3 class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><Headphones size={14}/>Atendimento</h3>
 
           <div class="mt-3 border-t border-[var(--app-border-soft)] pt-3">
@@ -641,8 +625,10 @@
             </div>
           </div>
         </section>
+        {/if}
 
-        <section class="rounded-[18px] border border-[var(--app-border)] bg-white p-4">
+        {#if surface === "page" || activeMainPanel === "customer"}
+        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto w-full max-w-[940px] p-2 sm:p-4"}>
           <h3 class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><UserRound size={14}/>Cliente F10</h3>
           {#if ticketData.details.ticket.customerContactId}
             <dl class="mt-3 space-y-2.5 text-[11px]">
@@ -673,8 +659,10 @@
             <p class="mt-3 border-t border-[var(--app-border-soft)] pt-3 text-[11px] text-[#646B7A]">{ticketData.details.ticket.organizationName}</p>
           {/if}
         </section>
+        {/if}
 
-        <section class="rounded-[18px] border border-[var(--app-border)] bg-white p-4">
+        {#if surface === "page" || activeMainPanel === "collaboration"}
+        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto w-full max-w-[940px] p-2 sm:p-4"}>
           <h3 class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><UsersRound size={14}/>Colaboração</h3>
 
           <div class="mt-3">
@@ -729,7 +717,7 @@
         </section>
 
         {#if ticketData.satisfaction}
-          <section class="rounded-[18px] border border-[var(--app-border)] bg-white p-4">
+          <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto mt-4 w-full max-w-[940px] p-2 sm:p-4"}>
             <h3 class="text-[12px] font-semibold text-[#3D4452]">Satisfação</h3>
             {#if ticketData.satisfaction.answeredAt && ticketData.satisfaction.score}
               <div class="mt-3 flex items-center gap-1 text-[#EA6D0B]" aria-label={`${ticketData.satisfaction.score} de 5 estrelas`}>
@@ -742,7 +730,10 @@
           </section>
         {/if}
 
-        {#if ticketData.canViewTasks}
+        {/if}
+
+        {#if ticketData.canViewTasks && (surface === "page" || activeMainPanel === "tasks")}
+          <div class={surface === "page" ? "" : "mx-auto w-full max-w-[940px]"}>
           <TicketTaskPanel
             ticketId={ticketData.details.ticket.id}
             ticketNumber={ticketData.details.ticket.ticketNumber}
@@ -752,9 +743,11 @@
             canCreate={ticketData.canCreateTask && ticketData.details.ticket.status !== "closed"}
             onCreated={refreshDetails}
           />
+          </div>
         {/if}
 
-        <details class="rounded-[18px] border border-[var(--app-border)] bg-white p-4">
+        {#if surface === "page" || activeMainPanel === "history"}
+        <details open={surface !== "page"} class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto w-full max-w-[940px] p-2 sm:p-4"}>
           <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
             <span class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><ShieldCheck size={14}/>Histórico</span>
             <span class="rounded-full bg-[var(--app-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[#777E8D]">{ticketData.details.events.length}</span>
@@ -768,6 +761,7 @@
             {/each}
           </div>
         </details>
+        {/if}
       </aside>
       {/if}
     </div>

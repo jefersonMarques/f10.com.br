@@ -10,7 +10,7 @@
   export let selectedTicketId: string | null = null;
   export let compact = false;
   export let onOpenTicket: (ticketId: string) => void | Promise<void>;
-  export let onShowTicketInfo: ((ticketId: string) => void | Promise<void>) | null = null;
+  export let onOpenTicketService: ((ticketId: string) => void | Promise<void>) | null = null;
 
   let menuTicket: TicketItem | null = null;
   let menuTop = 0;
@@ -41,9 +41,9 @@
     menuElement?.querySelector<HTMLElement>("[data-first-action]")?.focus();
   }
 
-  function openTicketInfo(ticketId: string): void {
+  function openTicketService(ticketId: string): void {
     closeTicketMenu();
-    void onShowTicketInfo?.(ticketId);
+    void onOpenTicketService?.(ticketId);
   }
 
   async function copyTicketLink(ticketId: string): Promise<void> {
@@ -290,13 +290,13 @@
       class="flex h-9 w-full items-center gap-2.5 px-3 text-left text-[12px] font-medium text-[#4C5363] hover:bg-[var(--app-surface-subtle)]"
     ><MessageSquare size={15}/>Abrir conversa</button>
 
-    {#if onShowTicketInfo}
+    {#if onOpenTicketService}
       <button
         type="button"
         role="menuitem"
-        on:click={() => { if (menuTicket) openTicketInfo(menuTicket.id); }}
+        on:click={() => { if (menuTicket) openTicketService(menuTicket.id); }}
         class="flex h-9 w-full items-center gap-2.5 px-3 text-left text-[12px] font-medium text-[#4C5363] hover:bg-[var(--app-surface-subtle)]"
-      ><PanelRightOpen size={15}/>Ver informações</button>
+      ><PanelRightOpen size={15}/>Abrir Atendimento</button>
     {/if}
 
     <a
