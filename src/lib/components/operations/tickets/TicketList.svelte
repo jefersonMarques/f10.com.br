@@ -79,58 +79,39 @@
 {#if tickets.length > 0}
   {#if compact}
     <section class="flex h-full min-h-0 flex-col bg-white">
-      <header class="shrink-0 px-4 pb-3 pt-4">
-        <div class="flex items-center gap-3">
-          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--app-primary)] text-white shadow-sm">
-            <TicketCheck size={18} aria-hidden="true" />
-          </span>
-          <div class="min-w-0">
-            <h2 class="truncate text-[14px] font-semibold text-[#202637]">Tickets</h2>
-            <p class="mt-0.5 text-[10px] text-[#8B919F]">{tickets.length} chamados nesta página</p>
-          </div>
-        </div>
+      <header class="flex shrink-0 items-center justify-between border-b border-[var(--app-border-soft)] px-3 py-2.5">
+        <h2 class="text-[13px] font-semibold text-[#202637]">Tickets</h2>
+        <span class="rounded-full bg-[var(--app-surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-[#687080]">{tickets.length}</span>
       </header>
 
-      <div class="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-        <div class="space-y-2">
+      <div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+        <div class="space-y-1.5">
           {#each tickets as ticket}
             <button
               type="button"
               on:click={() => void onOpenTicket(ticket.id)}
-              class={`block w-full overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition ${selectedTicketId === ticket.id ? "border-[var(--app-info-border)] bg-[var(--app-surface-selected)] shadow-sm" : "border-[var(--app-border)] bg-white hover:border-[var(--app-border-control)] hover:bg-[var(--app-surface-subtle)]"}`}
+              aria-pressed={selectedTicketId === ticket.id}
+              title={ticket.subject}
+              class={`block w-full rounded-xl border px-3 py-2 text-left transition ${selectedTicketId === ticket.id ? "border-[var(--app-info-border)] bg-[var(--app-surface-selected)]" : "border-[var(--app-border)] bg-white hover:border-[var(--app-border-control)] hover:bg-[var(--app-surface-subtle)]"}`}
             >
-              <div class="flex gap-3">
-                <span class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--app-info-bg)] text-[#000A57]">
-                  <UserRound size={17} aria-hidden="true" />
-                </span>
-
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-start justify-between gap-2">
-                    <strong class="truncate text-[12px] font-semibold text-[#303645]">{ticket.customerName ?? "Cliente não identificado"}</strong>
-                    <span class="flex shrink-0 items-center gap-1 text-[10px] text-[#949AA7]"><Clock3 size={10} />{relativeUpdated(ticket.updatedAt)}</span>
-                  </div>
-
-                  <div class="mt-1 flex min-w-0 items-center gap-2">
-                    <span class="shrink-0 rounded-md bg-[var(--app-info-bg)] px-1.5 py-0.5 text-[10px] font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
-                    <span class="min-w-0 flex-1 truncate text-[10.5px] font-medium text-[#747B8B]">{processLabel(ticket)}</span>
-                    {#if ticket.channel === "email"}<Mail size={11} class="shrink-0 text-[#858B99]" aria-label="Recebido por e-mail"/>{/if}
-                  </div>
-
-                  <p class="mt-2 line-clamp-2 text-[11.5px] font-semibold leading-[18px] text-[#4E5564]">{ticket.subject}</p>
-
-                  <div class="mt-2 flex min-w-0 items-center gap-2">
-                    <span class={`application-text-meta inline-flex shrink-0 items-center rounded-full px-2 py-1 font-bold ${slaClass(ticket)}`}>{slaText(ticket)}</span>
-                    <span class="truncate text-[10px] font-medium text-[#8A909D]">{priorityLabels[ticket.priority] ?? ticket.priority} · {ticket.assignedUserName ?? "Sem responsável"}</span>
-                  </div>
-
-                  {#if ticket.labels.length > 0}
-                    <div class="mt-2 flex min-w-0 gap-1 overflow-hidden">
-                      {#each ticket.labels.slice(0, 2) as label}
-                        <span class={`application-text-meta max-w-[100px] truncate rounded px-1.5 py-0.5 font-semibold ${labelClasses[label.color] ?? labelClasses.gray}`}>{label.name}</span>
-                      {/each}
-                    </div>
-                  {/if}
-                </div>
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="shrink-0 rounded-md bg-[var(--app-info-bg)] px-1.5 py-0.5 text-[11px] font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
+                <strong class="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#303645]">{ticket.subject}</strong>
+                <span class="shrink-0 text-[11px] text-[#8A909D]">{relativeUpdated(ticket.updatedAt)}</span>
+              </div>
+              <div class="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] text-[#656D7D]">
+                <UserRound size={12} class="shrink-0" aria-hidden="true"/>
+                <span class="min-w-0 flex-1 truncate">{ticket.customerName ?? "Cliente não identificado"}</span>
+                <span class="shrink-0 text-[#C0C4CD]">·</span>
+                <span class="min-w-0 flex-1 truncate">{processLabel(ticket)}</span>
+                {#if ticket.channel === "email"}<Mail size={12} class="shrink-0" aria-label="Recebido por e-mail"/>{/if}
+              </div>
+              <div class="mt-1.5 flex min-w-0 items-center gap-1.5">
+                <span class={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${slaClass(ticket)}`}>{slaText(ticket)}</span>
+                <span class="min-w-0 flex-1 truncate text-[11px] text-[#747B8B]">{priorityLabels[ticket.priority] ?? ticket.priority} · {ticket.assignedUserName ?? "Sem responsável"}</span>
+                {#if ticket.labels.length > 0}
+                  <span class={`max-w-[70px] shrink-0 truncate rounded px-1 py-0.5 text-[10px] font-semibold ${labelClasses[ticket.labels[0].color] ?? labelClasses.gray}`}>{ticket.labels[0].name}</span>
+                {/if}
               </div>
             </button>
           {/each}

@@ -77,15 +77,15 @@
 <div class={workspace
   ? "relative z-30 shrink-0 rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)]"
   : "border-b border-[#EEF0F5] bg-white"}>
-  <div class="flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between">
-    <div class="flex min-w-0 flex-wrap items-center gap-2">
+  <div class={workspace ? "flex flex-wrap items-center gap-2 p-2.5" : "flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between"}>
+    <div class={workspace ? "flex min-w-0 flex-1 flex-wrap items-center gap-2" : "flex min-w-0 flex-wrap items-center gap-2"}>
       <div class="flex rounded-xl bg-[#F3F4F7] p-1">
         <button type="button" on:click={() => switchScope("mine")} class={`application-text-caption h-8 rounded-lg px-3 font-semibold ${scope === "mine" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Minha fila</button>
         <button type="button" on:click={() => switchScope("unassigned")} class={`application-text-caption h-8 rounded-lg px-3 font-semibold ${scope === "unassigned" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Sem responsável</button>
         <button type="button" on:click={() => switchScope("all")} class={`application-text-caption h-8 rounded-lg px-3 font-semibold ${scope === "all" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Todos</button>
       </div>
 
-      <form on:submit|preventDefault={onApply} class="relative min-w-[220px] flex-1 xl:min-w-[300px]">
+      <form on:submit|preventDefault={onApply} class={workspace ? "relative min-w-[160px] flex-[1_1_180px]" : "relative min-w-[220px] flex-1 xl:min-w-[300px]"}>
         <Search size={14} class="absolute left-3 top-1/2 -translate-y-1/2 text-[#9499A5]"/>
         <input bind:value={search} placeholder="Buscar ticket, cliente, empresa ou fila" class="application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-9 pr-3"/>
       </form>
@@ -99,6 +99,12 @@
 
         <div class="absolute left-0 top-12 z-50 w-[min(640px,calc(100vw-32px))] rounded-2xl border border-[#DDE1EA] bg-white p-4 shadow-[0_18px_50px_rgba(1,13,40,0.16)]">
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {#if workspace}
+              <label class="flex items-center gap-2 sm:col-span-2 lg:col-span-3">
+                <input type="checkbox" bind:checked={includeFinished} on:change={onApply} class="h-4 w-4 accent-[#000A57]" />
+                <span class="application-text-caption font-semibold text-[#525A69]">Ver finalizados</span>
+              </label>
+            {/if}
             <label>
               <span class="application-text-caption mb-1 block font-semibold text-[#687080]">Status</span>
               <select bind:value={status} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-2">
@@ -197,6 +203,7 @@
         </div>
       </details>
 
+      {#if !workspace}
       <label class="application-text-caption inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#525A69]">
         <input
           type="checkbox"
@@ -206,9 +213,10 @@
         />
         <span>Ver finalizados</span>
       </label>
+      {/if}
     </div>
 
-    <div class="flex flex-wrap items-center gap-2">
+    <div class={workspace ? "flex shrink-0 flex-wrap items-center gap-2" : "flex flex-wrap items-center gap-2"}>
       {#if view === "list"}
         <label class="relative flex h-10 items-center rounded-xl border border-[#DDE1EA] bg-white pl-8 text-[#525A69]">
           <ArrowUpDown size={14} class="pointer-events-none absolute left-2.5 text-[#7C8392]"/>
@@ -228,9 +236,9 @@
         </label>
       {/if}
       <div class="flex rounded-xl bg-[#F3F4F7] p-1">
-        <button type="button" title="Lista" aria-label="Lista" on:click={() => switchView("list")} class={`flex h-8 items-center gap-1 rounded-lg px-2.5 ${view === "list" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><List size={14}/><span class="application-text-caption font-semibold">Lista</span></button>
-        <button type="button" title="Visão dividida" aria-label="Visão dividida" on:click={() => switchView("split")} class={`flex h-8 items-center gap-1 rounded-lg px-2.5 ${view === "split" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><PanelRight size={14}/><span class="application-text-caption hidden font-semibold sm:inline">Dividida</span></button>
-        <button type="button" title="Kanban" aria-label="Kanban" on:click={() => switchView("board")} class={`flex h-8 items-center gap-1 rounded-lg px-2.5 ${view === "board" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><Columns3 size={14}/><span class="application-text-caption font-semibold">Kanban</span></button>
+        <button type="button" title="Lista" aria-label="Lista" on:click={() => switchView("list")} class={`flex h-8 items-center gap-1 rounded-lg px-2.5 ${view === "list" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><List size={14}/><span class={workspace ? "sr-only" : "application-text-caption font-semibold"}>Lista</span></button>
+        <button type="button" title="Visão dividida" aria-label="Visão dividida" on:click={() => switchView("split")} class={`flex h-8 items-center gap-1 rounded-lg px-2.5 ${view === "split" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><PanelRight size={14}/><span class={workspace ? "sr-only" : "application-text-caption hidden font-semibold sm:inline"}>Dividida</span></button>
+        <button type="button" title="Kanban" aria-label="Kanban" on:click={() => switchView("board")} class={`flex h-8 items-center gap-1 rounded-lg px-2.5 ${view === "board" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><Columns3 size={14}/><span class={workspace ? "sr-only" : "application-text-caption font-semibold"}>Kanban</span></button>
       </div>
 
       {#if canManageWorkflow}
