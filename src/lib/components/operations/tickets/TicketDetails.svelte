@@ -327,7 +327,7 @@
               <span class="truncate">{ticketData.details.ticket.customerName ?? "Cliente pendente"}</span>
             </div>
           {:else}
-  
+            <div class="flex flex-wrap items-center gap-1.5">
               <span class="rounded-full bg-[var(--app-info-bg)] px-2 py-1 text-[10px] font-bold text-[#000A57]">#{ticketData.details.ticket.ticketNumber}</span>
               <span class="rounded-full bg-[var(--app-info-bg)] px-2 py-1 text-[10px] font-semibold text-[#35509A]">{statusLabels[ticketData.details.ticket.status] ?? ticketData.details.ticket.status}</span>
               <span class="rounded-full bg-[var(--app-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[#666D7C]">{priorityLabels[ticketData.details.ticket.priority] ?? ticketData.details.ticket.priority}</span>
