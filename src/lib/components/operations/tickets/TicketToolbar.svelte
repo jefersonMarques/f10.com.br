@@ -75,23 +75,23 @@
 </script>
 
 <div class={workspace
-  ? "relative z-30 shrink-0 rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)]"
+  ? "relative z-30 shrink-0 border-b border-[var(--app-border)] bg-white"
   : "border-b border-[#EEF0F5] bg-white"}>
-  <div class={workspace ? "flex flex-wrap items-center gap-2 p-2.5" : "flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between"}>
+  <div class={workspace ? "flex min-h-[54px] flex-wrap items-center gap-2 px-3 py-1.5" : "flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between"}>
     <div class={workspace ? "flex min-w-0 flex-1 flex-wrap items-center gap-2" : "flex min-w-0 flex-wrap items-center gap-2"}>
-      <div class="flex rounded-xl bg-[#F3F4F7] p-1">
+      <div class={workspace ? "flex rounded-lg bg-[#F3F4F7] p-0.5" : "flex rounded-xl bg-[#F3F4F7] p-1"}>
         <button type="button" on:click={() => switchScope("mine")} class={`application-text-caption h-8 rounded-lg px-3 font-semibold ${scope === "mine" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Minha fila</button>
         <button type="button" on:click={() => switchScope("unassigned")} class={`application-text-caption h-8 rounded-lg px-3 font-semibold ${scope === "unassigned" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Sem responsável</button>
         <button type="button" on:click={() => switchScope("all")} class={`application-text-caption h-8 rounded-lg px-3 font-semibold ${scope === "all" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Todos</button>
       </div>
 
-      <form on:submit|preventDefault={onApply} class={workspace ? "relative min-w-[160px] flex-[1_1_180px]" : "relative min-w-[220px] flex-1 xl:min-w-[300px]"}>
+      <form on:submit|preventDefault={onApply} class={workspace ? "relative min-w-[170px] flex-[1_1_220px]" : "relative min-w-[220px] flex-1 xl:min-w-[300px]"}>
         <Search size={14} class="absolute left-3 top-1/2 -translate-y-1/2 text-[#9499A5]"/>
-        <input bind:value={search} placeholder="Buscar ticket, cliente, empresa ou fila" class="application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-9 pr-3"/>
+        <input bind:value={search} placeholder="Buscar ticket, cliente, empresa ou fila" class={workspace ? "application-text-control h-9 w-full rounded-lg border border-[#E6E8EF] bg-[#F8F9FC] pl-9 pr-3 text-[13px]" : "application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-9 pr-3"}/>
       </form>
 
       <details class="relative">
-        <summary class={`application-text-caption flex h-10 cursor-pointer list-none items-center gap-2 rounded-xl border px-3 font-semibold ${activeFilterCount > 0 ? "border-[#AEB7E8] bg-[#F3F5FF] text-[#000A57]" : "border-[#DDE1EA] bg-white text-[#525A69]"}`}>
+        <summary class={`application-text-caption flex cursor-pointer list-none items-center gap-2 rounded-lg border px-3 font-semibold ${workspace ? "h-9" : "h-10"} ${activeFilterCount > 0 ? "border-[#AEB7E8] bg-[#F3F5FF] text-[#000A57]" : "border-[#DDE1EA] bg-white text-[#525A69]"}`}>
           <SlidersHorizontal size={14}/>
           Filtros
           {#if activeFilterCount > 0}<span class="rounded-full bg-[#000A57] px-1.5 py-0.5 text-[9px] text-white">{activeFilterCount}</span>{/if}
@@ -235,7 +235,7 @@
           </select>
         </label>
       {/if}
-      <div class="flex rounded-xl bg-[#F3F4F7] p-1">
+      <div class={workspace ? "flex rounded-lg bg-[#F3F4F7] p-0.5" : "flex rounded-xl bg-[#F3F4F7] p-1"}>
         <button type="button" title="Lista" aria-label="Lista" on:click={() => switchView("list")} class={`flex h-8 items-center gap-1 rounded-lg px-2.5 ${view === "list" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><List size={14}/><span class={workspace ? "sr-only" : "application-text-caption font-semibold"}>Lista</span></button>
         <button type="button" title="Visão dividida" aria-label="Visão dividida" on:click={() => switchView("split")} class={`flex h-8 items-center gap-1 rounded-lg px-2.5 ${view === "split" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><PanelRight size={14}/><span class={workspace ? "sr-only" : "application-text-caption hidden font-semibold sm:inline"}>Dividida</span></button>
         <button type="button" title="Kanban" aria-label="Kanban" on:click={() => switchView("board")} class={`flex h-8 items-center gap-1 rounded-lg px-2.5 ${view === "board" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><Columns3 size={14}/><span class={workspace ? "sr-only" : "application-text-caption font-semibold"}>Kanban</span></button>
