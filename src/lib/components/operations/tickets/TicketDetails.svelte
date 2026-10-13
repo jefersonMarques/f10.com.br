@@ -67,9 +67,9 @@
   let noteDraft = "";
   $: isInfoPanel = surface !== "page" && ["service", "customer", "tasks", "collaboration", "history"].includes(activeMainPanel);
 
-  function tabClass(panel: TicketMainPanel): string {
+  function tabClass(panel: TicketMainPanel, currentPanel: TicketMainPanel): string {
     const base = "inline-flex h-full shrink-0 items-center gap-1.5 border-b-2 px-1 text-[12px] font-semibold transition-colors";
-    return activeMainPanel === panel
+    return currentPanel === panel
       ? `${base} border-[var(--app-primary)] text-[#000A57]`
       : `${base} border-transparent text-[#6F7685] hover:text-[#000A57]`;
   }
@@ -374,16 +374,16 @@
 
     <nav class="relative z-20 flex h-11 shrink-0 items-center border-b border-[var(--app-border)] bg-white px-3 sm:px-4" aria-label="Seções do ticket">
       <div class="flex h-full min-w-0 flex-1 items-center gap-3 overflow-x-auto whitespace-nowrap sm:gap-5">
-        <button type="button" class={tabClass("conversation")} aria-pressed={activeMainPanel === "conversation"} on:click={() => selectTab("conversation")}><MessageSquare size={14}/>Conversa</button>
+        <button type="button" class={tabClass("conversation", activeMainPanel)} aria-pressed={activeMainPanel === "conversation"} on:click={() => selectTab("conversation")}><MessageSquare size={14}/>Conversa</button>
         {#if ticketData.serviceRequest}
-          <button type="button" class={tabClass("request")} aria-pressed={activeMainPanel === "request"} on:click={() => selectTab("request")}><FileText size={14}/>Solicitação</button>
+          <button type="button" class={tabClass("request", activeMainPanel)} aria-pressed={activeMainPanel === "request"} on:click={() => selectTab("request")}><FileText size={14}/>Solicitação</button>
         {/if}
-        <button type="button" class={tabClass("attachments")} aria-pressed={activeMainPanel === "attachments"} on:click={() => selectTab("attachments")}><Paperclip size={14}/>Anexos {#if ticketData.attachments.length > 0}<span class="text-[11px] text-[#858C99]">{ticketData.attachments.length}</span>{/if}</button>
+        <button type="button" class={tabClass("attachments", activeMainPanel)} aria-pressed={activeMainPanel === "attachments"} on:click={() => selectTab("attachments")}><Paperclip size={14}/>Anexos {#if ticketData.attachments.length > 0}<span class="text-[11px] text-[#858C99]">{ticketData.attachments.length}</span>{/if}</button>
         {#if surface !== "page"}
-          <button type="button" class={tabClass("service")} aria-pressed={activeMainPanel === "service"} on:click={() => selectTab("service")}><Headphones size={14}/>Atendimento</button>
-          <button type="button" class={tabClass("customer")} aria-pressed={activeMainPanel === "customer"} on:click={() => selectTab("customer")}><UserRound size={14}/>Cliente</button>
+          <button type="button" class={tabClass("service", activeMainPanel)} aria-pressed={activeMainPanel === "service"} on:click={() => selectTab("service")}><Headphones size={14}/>Atendimento</button>
+          <button type="button" class={tabClass("customer", activeMainPanel)} aria-pressed={activeMainPanel === "customer"} on:click={() => selectTab("customer")}><UserRound size={14}/>Cliente</button>
           {#if ticketData.canViewTasks}
-            <button type="button" class={tabClass("tasks")} aria-pressed={activeMainPanel === "tasks"} on:click={() => selectTab("tasks")}><ListChecks size={14}/>Tarefas</button>
+            <button type="button" class={tabClass("tasks", activeMainPanel)} aria-pressed={activeMainPanel === "tasks"} on:click={() => selectTab("tasks")}><ListChecks size={14}/>Tarefas</button>
           {/if}
         {/if}
       </div>
