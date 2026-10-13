@@ -236,7 +236,7 @@
 <ApplicationContent
   width="full"
   padding={view === "split" ? "none" : "default"}
-  className={view === "split" ? "bg-[var(--app-bg)] lg:h-[calc(100dvh-var(--application-header-height))] lg:min-h-[620px] lg:overflow-hidden" : ""}
+  className={view === "split" ? "bg-white lg:h-[calc(100dvh-var(--application-header-height))] lg:min-h-[540px] lg:overflow-hidden" : ""}
 >
   {#if form?.message}
     <div class={`mb-3 flex items-center gap-2 rounded-xl border px-4 py-3 text-[11px] ${form.success ? "border-[var(--app-success-border)] bg-[var(--app-success-bg)] text-[#176B35]" : "border-[var(--app-danger-border)] bg-[var(--app-danger-bg)] text-[#9B2C2C]"}`}>
@@ -245,7 +245,7 @@
   {/if}
 
   <section class={view === "split"
-    ? "tickets-workspace flex min-h-[620px] flex-col gap-2 p-2 lg:h-full lg:min-h-0 lg:p-3"
+    ? "tickets-workspace flex min-h-[540px] flex-col bg-white lg:h-full lg:min-h-0"
     : "overflow-hidden rounded-[22px] border border-[var(--app-border)] bg-white"}>
     <TicketToolbar
       bind:scope
@@ -291,8 +291,8 @@
         onOpenTicket={openTicketDetails}
       />
     {:else if view === "split"}
-      <div class="grid min-h-[620px] gap-2 lg:min-h-0 lg:flex-1 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-3">
-        <aside class="flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-[var(--app-border)] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)]">
+      <div class="grid min-h-[540px] bg-white lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)]">
+        <aside class="flex min-h-[240px] max-h-[38dvh] flex-col overflow-hidden border-b border-[var(--app-border)] bg-white lg:max-h-none lg:min-h-0 lg:border-b-0 lg:border-r">
           <div class="min-h-0 flex-1">
             <TicketList
               tickets={filteredTickets}
@@ -305,7 +305,7 @@
           </div>
 
           {#if data.pagination.totalPages > 1}
-            <div class="flex shrink-0 items-center justify-between gap-2 border-t border-[var(--app-border-soft)] bg-white px-3 py-2.5">
+            <div class="flex shrink-0 items-center justify-between gap-2 border-t border-[var(--app-border-soft)] bg-white px-3 py-1.5">
               <button type="button" disabled={data.pagination.page <= 1} on:click={() => goToPage(data.pagination.page - 1)} class="application-text-meta h-8 rounded-lg border border-[var(--app-border-control)] bg-white px-2.5 font-semibold text-[#000A57] disabled:opacity-40">Anterior</button>
               <span class="application-text-meta font-semibold text-[#737989]">{data.pagination.page} / {data.pagination.totalPages}</span>
               <button type="button" disabled={data.pagination.page >= data.pagination.totalPages} on:click={() => goToPage(data.pagination.page + 1)} class="application-text-meta h-8 rounded-lg border border-[var(--app-border-control)] bg-white px-2.5 font-semibold text-[#000A57] disabled:opacity-40">Próxima</button>
@@ -313,13 +313,13 @@
           {/if}
         </aside>
 
-        <main class="min-h-[620px] min-w-0 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)] lg:min-h-0">
+        <main class="min-h-[480px] min-w-0 overflow-hidden bg-white lg:min-h-0">
           {#if ticketDetails}
             <TicketDetails ticketData={ticketDetails} surface="split" onRefresh={refreshTicketDetails}/>
           {:else if detailsLoading}
-            <div class="flex h-full min-h-[620px] items-center justify-center text-[12px] font-semibold text-[#777E8D] lg:min-h-0">Abrindo ticket...</div>
+            <div class="flex h-full min-h-[480px] items-center justify-center text-[12px] font-semibold text-[#777E8D] lg:min-h-0">Abrindo ticket...</div>
           {:else}
-            <div class="flex h-full min-h-[620px] items-center justify-center px-8 text-center text-[12px] text-[#9297A4] lg:min-h-0">Selecione um ticket para abrir os detalhes.</div>
+            <div class="flex h-full min-h-[480px] items-center justify-center px-8 text-center text-[12px] text-[#9297A4] lg:min-h-0">Selecione um ticket para abrir os detalhes.</div>
           {/if}
         </main>
       </div>
