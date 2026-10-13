@@ -72,8 +72,9 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
   const provider = getRemoteProviderStatus();
   const control = getMeshCentralControlStatus();
   let syncError = "";
+  const requiresCustomerLink = !details.ticket.customerContactId;
 
-  if (provider.configured && control.configured) {
+  if (!requiresCustomerLink && provider.configured && control.configured) {
     try {
       await syncRemoteDevicesForTicket(params.ticketId);
     } catch {
@@ -83,7 +84,8 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 
   return {
     ticket: details.ticket,
-    devices: await listKnownRemoteDevicesForTicket(params.ticketId),
+    devices: requiresCustomerLink ? [] : await listKnownRemoteDevicesForTicket(params.ticketId),
+    requiresCustomerLink,
     provider,
     control,
     syncError,
@@ -105,7 +107,14 @@ export const actions: Actions = {
         message: "O MeshCentral ainda não está pronto para gerar o instalador de suporte.",
       });
     }
-    const { session } = await requireTicketRequestAccess(cookies, params.ticketId);
+    const { session, details } = await requireTicketRequestAccess(cookies, params.ticketId);
+    if (!details.ticket.customerContactId) {
+      return fail(409, {
+        success: false,
+        action: "enroll",
+        message: "Vincule um cliente ao ticket antes de enviar o instalador remoto.",
+      });
+    }
 
     try {
       await createRemoteDeviceEnrollment(
@@ -131,7 +140,14 @@ export const actions: Actions = {
     if (!isUuid(params.ticketId)) {
       return fail(404, { success: false, message: "Ticket não encontrado." });
     }
-    await requireTicketRequestAccess(cookies, params.ticketId);
+    const { details } = await requireTicketRequestAccess(cookies, params.ticketId);
+    if (!details.ticket.customerContactId) {
+      return fail(409, {
+        success: false,
+        action: "sync",
+        message: "Vincule um cliente ao ticket antes de sincronizar os computadores.",
+      });
+    }
     try {
       const devices = await syncRemoteDevicesForTicket(params.ticketId);
       return {
@@ -154,7 +170,14 @@ export const actions: Actions = {
     if (!isUuid(params.ticketId)) {
       return fail(404, { success: false, message: "Ticket não encontrado." });
     }
-    const { session } = await requireTicketUseAccess(cookies, params.ticketId);
+    const { session, details } = await requireTicketUseAccess(cookies, params.ticketId);
+    if (!details.ticket.customerContactId) {
+      return fail(409, {
+        success: false,
+        action: "start",
+        message: "Vincule um cliente ao ticket antes de iniciar o acesso remoto.",
+      });
+    }
     const formData = await request.formData();
     const deviceId = readString(formData, "deviceId");
     if (!isUuid(deviceId)) {

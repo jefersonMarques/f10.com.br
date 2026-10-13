@@ -79,40 +79,38 @@
 {#if tickets.length > 0}
   {#if compact}
     <section class="flex h-full min-h-0 flex-col bg-white">
-      <header class="flex shrink-0 items-center justify-between border-b border-[var(--app-border-soft)] px-3 py-2.5">
+      <header class="flex h-11 shrink-0 items-center justify-between border-b border-[var(--app-border-soft)] px-4">
         <h2 class="text-[13px] font-semibold text-[#202637]">Tickets</h2>
-        <span class="rounded-full bg-[var(--app-surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-[#687080]">{tickets.length}</span>
+        <span class="text-[12px] font-medium tabular-nums text-[#707787]">{tickets.length}</span>
       </header>
 
-      <div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-        <div class="space-y-1.5">
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        <div class="divide-y divide-[var(--app-border-soft)]">
           {#each tickets as ticket}
             <button
               type="button"
               on:click={() => void onOpenTicket(ticket.id)}
               aria-pressed={selectedTicketId === ticket.id}
               title={ticket.subject}
-              class={`block w-full rounded-xl border px-3 py-2 text-left transition ${selectedTicketId === ticket.id ? "border-[var(--app-info-border)] bg-[var(--app-surface-selected)]" : "border-[var(--app-border)] bg-white hover:border-[var(--app-border-control)] hover:bg-[var(--app-surface-subtle)]"}`}
+              class={`block w-full border-l-[3px] px-3 py-3 text-left transition-colors ${selectedTicketId === ticket.id ? "border-[var(--app-primary)] bg-[var(--app-surface-selected)]" : "border-transparent hover:bg-[var(--app-surface-subtle)]"}`}
             >
               <div class="flex min-w-0 items-center gap-2">
-                <span class="shrink-0 rounded-md bg-[var(--app-info-bg)] px-1.5 py-0.5 text-[11px] font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
-                <strong class="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#303645]">{ticket.subject}</strong>
-                <span class="shrink-0 text-[11px] text-[#8A909D]">{relativeUpdated(ticket.updatedAt)}</span>
+                <span class="shrink-0 text-[11px] font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
+                <strong class="min-w-0 flex-1 truncate text-[13px] font-semibold text-[#303645]">{ticket.subject}</strong>
+                <span class="shrink-0 text-[11px] text-[#858C99]">{relativeUpdated(ticket.updatedAt)}</span>
               </div>
-              <div class="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] text-[#656D7D]">
-                <UserRound size={12} class="shrink-0" aria-hidden="true"/>
-                <span class="min-w-0 flex-1 truncate">{ticket.customerName ?? "Cliente não identificado"}</span>
-                <span class="shrink-0 text-[#C0C4CD]">·</span>
-                <span class="min-w-0 flex-1 truncate">{processLabel(ticket)}</span>
-                {#if ticket.channel === "email"}<Mail size={12} class="shrink-0" aria-label="Recebido por e-mail"/>{/if}
-              </div>
-              <div class="mt-1.5 flex min-w-0 items-center gap-1.5">
-                <span class={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${slaClass(ticket)}`}>{slaText(ticket)}</span>
-                <span class="min-w-0 flex-1 truncate text-[11px] text-[#747B8B]">{priorityLabels[ticket.priority] ?? ticket.priority} · {ticket.assignedUserName ?? "Sem responsável"}</span>
-                {#if ticket.labels.length > 0}
-                  <span class={`max-w-[70px] shrink-0 truncate rounded px-1 py-0.5 text-[10px] font-semibold ${labelClasses[ticket.labels[0].color] ?? labelClasses.gray}`}>{ticket.labels[0].name}</span>
+              <div class="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] text-[#737989]">
+                <span class="min-w-0 flex-1 truncate">{ticket.customerName ?? ticket.assignedUserName ?? "Cliente pendente"}</span>
+                {#if ticket.channel === "email"}<Mail size={13} class="shrink-0" aria-label="Recebido por e-mail"/>{/if}
+                {#if activeSla(ticket)}
+                  <span class={`shrink-0 rounded px-1.5 py-0.5 text-[10.5px] font-semibold ${slaClass(ticket)}`}>{slaText(ticket)}</span>
+                {:else if ticket.priority !== "normal"}
+                  <span class="shrink-0 text-[11px] font-medium text-[#7B5561]">{priorityLabels[ticket.priority] ?? ticket.priority}</span>
                 {/if}
               </div>
+              {#if ticket.workflowState?.areaWorkflowId}
+                <p class="mt-0.5 truncate text-[11px] text-[#989EAA]">{processLabel(ticket)}</p>
+              {/if}
             </button>
           {/each}
         </div>

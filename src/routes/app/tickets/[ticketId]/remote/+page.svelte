@@ -58,6 +58,17 @@
     </div>
   {/if}
 
+  {#if data.requiresCustomerLink}
+    <div class="mt-4 flex items-start gap-3 rounded-xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] px-4 py-3 text-[13px] text-[#7C4B21]">
+      <CircleAlert size={18} class="mt-0.5 shrink-0"/>
+      <div class="min-w-0">
+        <strong class="font-semibold">Cliente não vinculado</strong>
+        <p class="mt-1 leading-5">Vincule o cliente a este ticket antes de enviar o instalador ou acessar um computador.</p>
+        <a href={`/app/tickets/${data.ticket.id}`} class="mt-2 inline-flex font-semibold text-[#000A57] underline underline-offset-2">Abrir ticket para vincular cliente</a>
+      </div>
+    </div>
+  {/if}
+
   {#if data.syncError}
     <div class="application-text-caption mt-5 flex items-center gap-2 rounded-xl bg-[#FFF7EA] px-4 py-3 text-[#8B5A12]">
       <CircleAlert size={15}/>
@@ -79,7 +90,7 @@
         <p class="application-text-meta mt-1 text-[#9297A5]">A lista é sincronizada automaticamente com o grupo deste cliente no MeshCentral.</p>
       </div>
       <form method="POST" action="?/sync">
-        <button type="submit" disabled={!data.control.configured} class="application-text-meta inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57] disabled:cursor-not-allowed disabled:opacity-50">
+        <button type="submit" disabled={!data.control.configured || data.requiresCustomerLink} class="application-text-meta inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 font-semibold text-[#000A57] disabled:cursor-not-allowed disabled:opacity-50">
           <RefreshCw size={13}/>
           Verificar agora
         </button>
@@ -108,7 +119,7 @@
             </div>
             <form method="POST" action="?/start">
               <input type="hidden" name="deviceId" value={device.id}/>
-              <button type="submit" disabled={!data.canUseRemote || !device.online || !data.provider.configured} class="application-text-meta inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#C7CAD3]">
+              <button type="submit" disabled={!data.canUseRemote || !device.online || !data.provider.configured || data.requiresCustomerLink} class="application-text-meta inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#C7CAD3]">
                 <MonitorCog size={14}/>
                 Iniciar acesso remoto
               </button>
@@ -125,7 +136,7 @@
       </div>
 
       <form method="POST" action="?/enroll" class="mt-4">
-        <button type="submit" disabled={!data.control.configured} class="application-text-caption inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#D9DDE7] bg-white px-4 font-semibold text-[#000A57] transition hover:bg-[#F8F9FF] disabled:cursor-not-allowed disabled:opacity-50">
+        <button type="submit" disabled={!data.control.configured || data.requiresCustomerLink} class="application-text-caption inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#D9DDE7] bg-white px-4 font-semibold text-[#000A57] transition hover:bg-[#F8F9FF] disabled:cursor-not-allowed disabled:opacity-50">
           <Download size={15}/>
           {data.devices.length === 0 ? "Enviar instalador de Suporte Remoto F10" : "Adicionar outro computador"}
         </button>

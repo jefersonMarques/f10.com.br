@@ -11,6 +11,8 @@
   export let maxlength = 5000;
   export let placeholder = "Escreva uma mensagem...";
   export let className = "";
+  export let autoGrow = false;
+  export let suggestionsAbove = false;
 
   let textarea: HTMLTextAreaElement;
   export let value = "";
@@ -45,6 +47,18 @@
   $: activeMentionIds = selectedMentions
     .filter((mention) => value.includes(mention.token))
     .map((mention) => mention.id);
+
+  function resizeTextarea(): void {
+    if (!autoGrow || !textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 144)}px`;
+    textarea.style.overflowY = textarea.scrollHeight > 144 ? "auto" : "hidden";
+  }
+
+  function handleInput(): void {
+    refreshMentionState();
+    resizeTextarea();
+  }
 
   function refreshMentionState(): void {
     const cursor = textarea?.selectionStart ?? value.length;
@@ -83,6 +97,7 @@
       const nextCursor = start + token.length + 1;
       textarea.focus();
       textarea.setSelectionRange(nextCursor, nextCursor);
+      resizeTextarea();
     });
   }
 
@@ -101,15 +116,16 @@
     {placeholder}
     required
     class={className}
-    on:input={refreshMentionState}
+    on:input={handleInput}
     on:click={refreshMentionState}
+    on:focus={resizeTextarea}
     on:keyup={refreshMentionState}
     on:keydown={handleKeydown}
   ></textarea>
   <input type="hidden" name="mentionedUserIds" value={JSON.stringify(activeMentionIds)} />
 
   {#if open && suggestions.length > 0}
-    <div class="absolute left-0 right-0 z-30 mt-1 max-h-60 overflow-y-auto rounded-xl border border-[#DDE1EA] bg-white p-1.5 shadow-xl shadow-slate-900/10">
+    <div class={`absolute left-0 right-0 z-30 max-h-60 overflow-y-auto rounded-xl border border-[#DDE1EA] bg-white p-1.5 shadow-xl shadow-slate-900/10 ${suggestionsAbove ? "bottom-full mb-2" : "mt-1"}`}>
       {#each suggestions as user (user.id)}
         <button
           type="button"

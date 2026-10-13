@@ -18,6 +18,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    # Valores fictícios apenas para compilar módulos legados no CI.
+    env:
+      DEBUG: "false"
+      EXACT_TOKEN: "ci-only"
+      EXACT_FUNNEL_ID: "ci-only"
+      F10_FONTE: "ci-only"
+      F10_UID: "ci-only"
+      F10_MIDIA: "ci-only"
+      F10_TOKEN: "ci-only"
+      F10_URL: "https://example.invalid"
+      BREVO_API_KEY: "ci-only"
+      BREVO_FROM_EMAIL: "ci@example.invalid"
+      BREVO_FROM_NAME: "CI"
+      JOBS_MAIL_TO: "ci@example.invalid"
+      JOBS_RESUME_MAX_MB: "5"
+      SITE_URL: "https://example.invalid"
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
