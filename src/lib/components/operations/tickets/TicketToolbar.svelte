@@ -78,7 +78,7 @@
   ? "relative z-30 shrink-0 rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)]"
   : "border-b border-[#EEF0F5] bg-white"}>
   <div class={workspace ? "flex flex-wrap items-center gap-2 p-2.5" : "flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between"}>
-    <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+    <div class={workspace ? "flex min-w-0 flex-1 flex-wrap items-center gap-2" : "flex min-w-0 flex-wrap items-center gap-2"}>
       <div class="flex rounded-xl bg-[#F3F4F7] p-1">
         <button type="button" on:click={() => switchScope("mine")} class={`application-text-caption h-8 rounded-lg px-3 font-semibold ${scope === "mine" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Minha fila</button>
         <button type="button" on:click={() => switchScope("unassigned")} class={`application-text-caption h-8 rounded-lg px-3 font-semibold ${scope === "unassigned" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Sem responsável</button>
@@ -216,7 +216,7 @@
       {/if}
     </div>
 
-    <div class="flex shrink-0 flex-wrap items-center gap-2">
+    <div class={workspace ? "flex shrink-0 flex-wrap items-center gap-2" : "flex flex-wrap items-center gap-2"}>
       {#if view === "list"}
         <label class="relative flex h-10 items-center rounded-xl border border-[#DDE1EA] bg-white pl-8 text-[#525A69]">
           <ArrowUpDown size={14} class="pointer-events-none absolute left-2.5 text-[#7C8392]"/>
