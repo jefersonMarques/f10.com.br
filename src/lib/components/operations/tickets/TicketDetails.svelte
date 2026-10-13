@@ -12,6 +12,8 @@
     MessageSquare,
     MonitorCog,
     Paperclip,
+    PanelRightClose,
+    PanelRightOpen,
     Route,
     Send,
     ShieldCheck,
@@ -63,6 +65,7 @@
   let composerMode: ComposerMode = ticketData.canReply ? "reply" : "note";
   let replyDraft = "";
   let noteDraft = "";
+  let detailsPanelOpen = surface === "page";
 
   $: workflowStateKey = [
     ticketData.details.ticket.id,
@@ -293,13 +296,13 @@
 
 <div class={surface === "page"
   ? "bg-[var(--app-bg)]"
-  : "h-full min-h-0 overflow-y-auto bg-white xl:overflow-hidden"}>
+  : "h-full min-h-0 overflow-y-auto bg-white lg:overflow-hidden"}>
   <section class={surface === "page"
     ? "overflow-hidden rounded-[24px] border border-[var(--app-border)] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)]"
-    : "flex min-h-full flex-col bg-white xl:h-full xl:min-h-0"}>
-    <header class="shrink-0 border-b border-[var(--app-border)] bg-white px-4 py-3.5 sm:px-5">
+    : "flex min-h-full flex-col bg-white lg:h-full lg:min-h-0"}>
+    <header class="shrink-0 border-b border-[var(--app-border)] bg-white px-3 py-2 sm:px-4">
       <div class="flex items-start gap-3">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--app-info-bg)] text-[11px] font-bold text-[#000A57]">
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--app-info-bg)] text-[12px] font-bold text-[#000A57]">
           {initials(ticketData.details.ticket.customerName ?? "Cliente")}
         </span>
 
@@ -310,7 +313,7 @@
             <span class="rounded-full bg-[var(--app-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[#666D7C]">{priorityLabels[ticketData.details.ticket.priority] ?? ticketData.details.ticket.priority}</span>
             <span class="inline-flex items-center gap-1 rounded-full bg-[var(--app-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[#6D7382]"><CalendarDays size={11}/>{formatDate(ticketData.details.ticket.dueOn)}</span>
           </div>
-          <h1 class="mt-1.5 line-clamp-2 text-[16px] font-semibold leading-6 text-[#202637]">{ticketData.details.ticket.subject}</h1>
+          <h1 title={ticketData.details.ticket.subject} class="mt-1 line-clamp-1 text-[15px] font-semibold leading-5 text-[#202637]">{ticketData.details.ticket.subject}</h1>
           <p class="mt-0.5 truncate text-[11px] text-[#858B98]">
             {ticketData.details.ticket.customerName ?? "Cliente não identificado"} · {ticketData.details.ticket.queueName}
           </p>
@@ -323,6 +326,15 @@
             aria-label="Acesso remoto"
             title="Acesso remoto"
           ><MonitorCog size={15}/></a>
+          {#if surface !== "page"}
+            <button type="button" on:click={() => (detailsPanelOpen = !detailsPanelOpen)}
+              class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-white text-[#69707E] hover:bg-[var(--app-surface-muted)] hover:text-[#000A57]"
+              aria-label={detailsPanelOpen ? "Ocultar informações do ticket" : "Mostrar informações do ticket"}
+              aria-expanded={detailsPanelOpen}
+              title={detailsPanelOpen ? "Ocultar informações" : "Informações do ticket"}>
+              {#if detailsPanelOpen}<PanelRightClose size={17}/>{:else}<PanelRightOpen size={17}/>{/if}
+            </button>
+          {/if}
           {#if surface === "modal" && onClose}
             <button type="button" on:click={onClose} class="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] text-[#69707E] hover:bg-[var(--app-surface-muted)]" aria-label="Fechar"><X size={16}/></button>
           {/if}
@@ -330,25 +342,25 @@
       </div>
     </header>
 
-    <nav class="flex shrink-0 items-center gap-1 border-b border-[var(--app-border)] bg-white px-4 py-1.5 sm:px-5" aria-label="Conteúdo do ticket">
+    <nav class="flex shrink-0 items-center gap-1 border-b border-[var(--app-border)] bg-white px-3 py-1 sm:px-4" aria-label="Conteúdo do ticket">
       <button
         type="button"
         on:click={() => (activeMainPanel = "conversation")}
-        class={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-[11px] font-semibold transition ${activeMainPanel === "conversation" ? "bg-[var(--app-info-bg)] text-[#000A57]" : "text-[#6F7685] hover:bg-[var(--app-surface-muted)]"}`}
+        class={`inline-flex h-8 items-center gap-2 rounded-lg px-2.5 text-[12px] font-semibold transition ${activeMainPanel === "conversation" ? "bg-[var(--app-info-bg)] text-[#000A57]" : "text-[#6F7685] hover:bg-[var(--app-surface-muted)]"}`}
       ><MessageSquare size={14}/>Conversa</button>
 
       {#if ticketData.serviceRequest}
         <button
           type="button"
           on:click={() => (activeMainPanel = "request")}
-          class={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-[11px] font-semibold transition ${activeMainPanel === "request" ? "bg-[var(--app-info-bg)] text-[#000A57]" : "text-[#6F7685] hover:bg-[var(--app-surface-muted)]"}`}
+          class={`inline-flex h-8 items-center gap-2 rounded-lg px-2.5 text-[12px] font-semibold transition ${activeMainPanel === "request" ? "bg-[var(--app-info-bg)] text-[#000A57]" : "text-[#6F7685] hover:bg-[var(--app-surface-muted)]"}`}
         ><FileText size={14}/>Solicitação</button>
       {/if}
 
       <button
         type="button"
         on:click={() => (activeMainPanel = "attachments")}
-        class={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-[11px] font-semibold transition ${activeMainPanel === "attachments" ? "bg-[var(--app-info-bg)] text-[#000A57]" : "text-[#6F7685] hover:bg-[var(--app-surface-muted)]"}`}
+        class={`inline-flex h-8 items-center gap-2 rounded-lg px-2.5 text-[12px] font-semibold transition ${activeMainPanel === "attachments" ? "bg-[var(--app-info-bg)] text-[#000A57]" : "text-[#6F7685] hover:bg-[var(--app-surface-muted)]"}`}
       ><Paperclip size={14}/>Anexos {#if ticketData.attachments.length > 0}<span class="rounded-full bg-white px-1.5 py-0.5 text-[9px]">{ticketData.attachments.length}</span>{/if}</button>
     </nav>
 
@@ -361,15 +373,15 @@
 
     <div class={surface === "page"
       ? "grid xl:grid-cols-[minmax(0,1fr)_350px]"
-      : "grid min-h-0 flex-1 xl:grid-cols-[minmax(0,1fr)_350px]"}>
+      : `relative grid min-h-0 flex-1 ${detailsPanelOpen ? "2xl:grid-cols-[minmax(0,1fr)_320px]" : "grid-cols-1"}`}>
       <main class={surface === "page"
         ? "min-w-0 bg-white"
-        : "flex min-h-[680px] min-w-0 flex-col bg-white xl:min-h-0"}>
+        : "flex min-h-[500px] min-w-0 flex-col bg-white lg:min-h-0"}>
         {#if activeMainPanel === "conversation"}
           <section class={surface === "page" ? "flex min-h-[720px] flex-col" : "flex min-h-0 flex-1 flex-col"}>
             <div class={surface === "page"
               ? "flex-1 space-y-3 bg-[var(--app-surface-subtle)] px-4 py-5 sm:px-6"
-              : "min-h-0 flex-1 space-y-3 overflow-y-auto bg-[var(--app-surface-subtle)] px-4 py-5 sm:px-6"}>
+              : "min-h-0 flex-1 space-y-2 overflow-y-auto bg-[var(--app-surface-subtle)] px-3 py-3 sm:px-4"}>
               {#each ticketData.details.messages as message}
                 {#if message.authorType === "system"}
                   <div class="flex justify-center py-1">
@@ -378,7 +390,7 @@
                         <strong class="font-semibold text-[#69707F]">Sistema</strong>
                         <span>{formatDateTime(message.createdAt)}</span>
                       </div>
-                      <p class="mt-1 whitespace-pre-wrap text-[11.5px] leading-5 text-[#606776]">{message.body}</p>
+                      <p class="mt-1 whitespace-pre-wrap text-[12px] leading-5 text-[#606776]">{message.body}</p>
                     </article>
                   </div>
                 {:else if message.visibility === "internal"}
@@ -388,7 +400,7 @@
                         <strong class="text-[11px] font-semibold text-[#7B4A1F]">{message.authorUserName ?? "Equipe F10"} · Nota interna</strong>
                         <span class="text-[10px] text-[#A17D5C]">{formatDateTime(message.createdAt)}</span>
                       </div>
-                      <p class="mt-1.5 whitespace-pre-wrap text-[13px] leading-6 text-[#684A31]">{message.body}</p>
+                      <p class="mt-1.5 whitespace-pre-wrap text-[14px] leading-[1.6] text-[#684A31]">{message.body}</p>
                     </article>
                   </div>
                 {:else}
@@ -398,7 +410,7 @@
                         <strong class="text-[11px] font-semibold text-[#4A5160]">{message.authorUserName ?? message.customerName ?? "Atendimento F10"}</strong>
                         <span class="text-[10px] text-[#858C99]">{formatDateTime(message.createdAt)}</span>
                       </div>
-                      <p class="mt-1.5 whitespace-pre-wrap text-[13px] leading-6 text-[#343A47]">{message.body}</p>
+                      <p class="mt-1.5 whitespace-pre-wrap text-[14px] leading-[1.6] text-[#343A47]">{message.body}</p>
                     </article>
                   </div>
                 {/if}
@@ -408,14 +420,14 @@
             </div>
 
             {#if (ticketData.canReply || ticketData.canCommentInternal) && ticketData.details.ticket.status !== "closed"}
-              <div class="shrink-0 border-t border-[var(--app-border)] bg-[var(--app-surface)] p-3 sm:p-4">
+              <div class="shrink-0 border-t border-[var(--app-border)] bg-[var(--app-surface)] p-2 sm:px-3 sm:py-2">
                 <form
                   method="POST"
                   action={actionUrl(composerMode === "note" ? "note" : "reply")}
                   on:submit|preventDefault={submitComposer}
                   class={`overflow-visible rounded-2xl border bg-white shadow-[0_8px_24px_rgba(1,13,40,0.04)] ${composerMode === "note" ? "border-[var(--app-warning-border)]" : "border-[var(--app-border-control)]"}`}
                 >
-                  <div class="flex items-center justify-between gap-3 border-b border-[var(--app-border-soft)] px-3 py-2">
+                  <div class="flex items-center justify-between gap-3 border-b border-[var(--app-border-soft)] px-3 py-1">
                     <div class="flex rounded-lg bg-[var(--app-surface-muted)] p-0.5">
                       {#if ticketData.canReply}
                         <button type="button" on:click={() => (composerMode = "reply")} class={`h-8 rounded-md px-3 text-[11px] font-semibold ${composerMode === "reply" ? "bg-white text-[#000A57] shadow-sm" : "text-[#6F7685]"}`}>Responder</button>
@@ -427,31 +439,31 @@
                     <span class="hidden text-[10.5px] font-medium text-[#9298A5] sm:inline">{composerMode === "note" ? "Visível somente para a equipe" : "Visível para o cliente"}</span>
                   </div>
 
-                  <div class="px-3 py-2.5">
+                  <div class="px-3 py-1.5">
                     {#if composerMode === "reply"}
                       <textarea
                         name="body"
                         bind:value={replyDraft}
                         required
                         maxlength="10000"
-                        rows="4"
+                        rows="2"
                         placeholder="Escreva uma resposta..."
-                        class="min-h-[112px] w-full resize-none border-0 bg-transparent px-1 py-1 text-[13px] leading-6 text-[#343A47] outline-none placeholder:text-[#A0A5B0]"
+                        class="min-h-[52px] max-h-[200px] w-full resize-y border-0 bg-transparent px-1 py-1 text-[14px] leading-6 text-[#343A47] focus:min-h-[112px] outline-none placeholder:text-[#A0A5B0]"
                       ></textarea>
                     {:else}
                       <MentionTextarea
                         users={ticketData.mentionUsers}
                         name="body"
                         bind:value={noteDraft}
-                        rows={4}
+                        rows={2}
                         maxlength={10000}
                         placeholder="Escreva uma nota interna..."
-                        className="min-h-[112px] w-full resize-none border-0 bg-transparent px-1 py-1 text-[13px] leading-6 text-[#4E4339] outline-none placeholder:text-[#AAA098]"
+                        className="min-h-[52px] max-h-[200px] w-full resize-y border-0 bg-transparent px-1 py-1 text-[14px] leading-6 text-[#4E4339] focus:min-h-[112px] outline-none placeholder:text-[#AAA098]"
                       />
                     {/if}
                   </div>
 
-                  <div class="flex items-center justify-between border-t border-[var(--app-border-soft)] px-3 py-2.5">
+                  <div class="flex items-center justify-between border-t border-[var(--app-border-soft)] px-3 py-1.5">
                     <button type="button" on:click={() => (activeMainPanel = "attachments")} class="flex h-9 w-9 items-center justify-center rounded-lg text-[#777E8D] hover:bg-[var(--app-surface-muted)] hover:text-[#000A57]" aria-label="Abrir anexos" title="Anexos"><Paperclip size={16}/></button>
                     <button type="submit" disabled={Boolean(actionLoading)} class={`inline-flex h-9 items-center gap-2 rounded-xl px-4 text-[11px] font-semibold text-white disabled:opacity-50 ${composerMode === "note" ? "bg-[#9A5A1B]" : "bg-[var(--app-primary)]"}`}>
                       <Send size={14}/>{actionLoading ? "Enviando..." : composerMode === "note" ? "Adicionar nota" : "Enviar"}
@@ -509,9 +521,10 @@
         {/if}
       </main>
 
+      {#if surface === "page" || detailsPanelOpen}
       <aside class={surface === "page"
         ? "space-y-3 border-t border-[var(--app-border)] bg-[var(--app-bg)] p-3 xl:border-l xl:border-t-0"
-        : "space-y-3 border-t border-[var(--app-border)] bg-[var(--app-bg)] p-3 xl:min-h-0 xl:overflow-y-auto xl:border-l xl:border-t-0"}>
+        : "absolute inset-y-0 right-0 z-20 w-[min(360px,100%)] space-y-3 overflow-y-auto border-l border-[var(--app-border)] bg-[var(--app-bg)] p-3 shadow-2xl 2xl:static 2xl:w-auto 2xl:min-h-0 2xl:shadow-none"}>
         <section class="rounded-[18px] border border-[var(--app-border)] bg-white p-4">
           <h3 class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><Headphones size={14}/>Atendimento</h3>
 
@@ -703,6 +716,7 @@
           </div>
         </details>
       </aside>
+      {/if}
     </div>
   </section>
 </div>
