@@ -245,7 +245,7 @@
   {/if}
 
   <section class={view === "split"
-    ? "flex min-h-[680px] flex-col gap-3 p-3 lg:h-full lg:min-h-0 lg:gap-4 lg:p-4"
+    ? "tickets-workspace flex min-h-[620px] flex-col gap-2 p-2 lg:h-full lg:min-h-0 lg:p-3"
     : "overflow-hidden rounded-[22px] border border-[var(--app-border)] bg-white"}>
     <TicketToolbar
       bind:scope
@@ -291,7 +291,7 @@
         onOpenTicket={openTicketDetails}
       />
     {:else if view === "split"}
-      <div class="grid min-h-[680px] gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-[330px_minmax(0,1fr)] lg:gap-4">
+      <div class="grid min-h-[620px] gap-2 lg:min-h-0 lg:flex-1 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-3">
         <aside class="flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-[var(--app-border)] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)]">
           <div class="min-h-0 flex-1">
             <TicketList
@@ -313,13 +313,13 @@
           {/if}
         </aside>
 
-        <main class="min-h-[680px] min-w-0 overflow-hidden rounded-[22px] border border-[var(--app-border)] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)] lg:min-h-0">
+        <main class="min-h-[620px] min-w-0 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)] lg:min-h-0">
           {#if ticketDetails}
             <TicketDetails ticketData={ticketDetails} surface="split" onRefresh={refreshTicketDetails}/>
           {:else if detailsLoading}
-            <div class="flex h-full min-h-[680px] items-center justify-center text-[11px] font-semibold text-[#777E8D] lg:min-h-0">Abrindo ticket...</div>
+            <div class="flex h-full min-h-[620px] items-center justify-center text-[12px] font-semibold text-[#777E8D] lg:min-h-0">Abrindo ticket...</div>
           {:else}
-            <div class="flex h-full min-h-[680px] items-center justify-center px-8 text-center text-[11px] text-[#9297A4] lg:min-h-0">Selecione um ticket para abrir os detalhes.</div>
+            <div class="flex h-full min-h-[620px] items-center justify-center px-8 text-center text-[12px] text-[#9297A4] lg:min-h-0">Selecione um ticket para abrir os detalhes.</div>
           {/if}
         </main>
       </div>
@@ -408,3 +408,13 @@
 {#if modalOpen && ticketDetails && view !== "split"}
   <TicketDetailsModal ticketData={ticketDetails} onClose={() => { modalOpen = false; ticketDetails = null; }} onRefresh={refreshTicketDetails}/>
 {/if}
+
+<style>
+  :global(.tickets-workspace .application-text-meta) {
+    font-size: 11px;
+  }
+
+  :global(.tickets-workspace .application-text-caption) {
+    font-size: 12px;
+  }
+</style>
