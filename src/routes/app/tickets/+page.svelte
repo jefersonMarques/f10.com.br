@@ -42,6 +42,7 @@
   let draggingTicketId: string | null = null;
   let moving = false;
   let ticketDetails: TicketDetailsData | null = null;
+  let detailsPanelOpen = false;
   let detailsLoading = false;
   let modalOpen = false;
   let splitInitializedFor = "";
@@ -300,6 +301,11 @@
               areaWorkflows={data.workflowBoard.areaWorkflows}
               selectedTicketId={ticketDetails?.details.ticket.id ?? null}
               compact
+              onShowTicketInfo={(ticketId) => {
+                detailsPanelOpen = true;
+                if (ticketDetails?.details.ticket.id === ticketId) return;
+                return openTicketDetails(ticketId);
+              }}
               onOpenTicket={openTicketDetails}
             />
           </div>
@@ -315,7 +321,7 @@
 
         <main class="min-h-[480px] min-w-0 overflow-hidden bg-white lg:min-h-0">
           {#if ticketDetails}
-            <TicketDetails ticketData={ticketDetails} surface="split" onRefresh={refreshTicketDetails}/>
+            <TicketDetails ticketData={ticketDetails} surface="split" bind:detailsPanelOpen onRefresh={refreshTicketDetails}/>
           {:else if detailsLoading}
             <div class="flex h-full min-h-[480px] items-center justify-center text-[12px] font-semibold text-[#777E8D] lg:min-h-0">Abrindo ticket...</div>
           {:else}
