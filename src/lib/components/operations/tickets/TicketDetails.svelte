@@ -562,7 +562,7 @@
           : "min-h-0 w-full overflow-y-auto bg-white px-3 py-4 sm:px-6"}
       >
         {#if surface === "page" || activeMainPanel === "service"}
-        <section class="rounded-[18px] border border-[var(--app-border)] bg-white p-4">
+        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto w-full max-w-[940px] p-2 sm:p-4"}>
           <h3 class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><Headphones size={14}/>Atendimento</h3>
 
           <div class="mt-3 border-t border-[var(--app-border-soft)] pt-3">
@@ -625,8 +625,10 @@
             </div>
           </div>
         </section>
+        {/if}
 
-        <section class="rounded-[18px] border border-[var(--app-border)] bg-white p-4">
+        {#if surface === "page" || activeMainPanel === "customer"}
+        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto w-full max-w-[940px] p-2 sm:p-4"}>
           <h3 class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><UserRound size={14}/>Cliente F10</h3>
           {#if ticketData.details.ticket.customerContactId}
             <dl class="mt-3 space-y-2.5 text-[11px]">
@@ -657,8 +659,10 @@
             <p class="mt-3 border-t border-[var(--app-border-soft)] pt-3 text-[11px] text-[#646B7A]">{ticketData.details.ticket.organizationName}</p>
           {/if}
         </section>
+        {/if}
 
-        <section class="rounded-[18px] border border-[var(--app-border)] bg-white p-4">
+        {#if surface === "page" || activeMainPanel === "collaboration"}
+        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto w-full max-w-[940px] p-2 sm:p-4"}>
           <h3 class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><UsersRound size={14}/>Colaboração</h3>
 
           <div class="mt-3">
@@ -713,7 +717,7 @@
         </section>
 
         {#if ticketData.satisfaction}
-          <section class="rounded-[18px] border border-[var(--app-border)] bg-white p-4">
+          <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto mt-4 w-full max-w-[940px] p-2 sm:p-4"}>
             <h3 class="text-[12px] font-semibold text-[#3D4452]">Satisfação</h3>
             {#if ticketData.satisfaction.answeredAt && ticketData.satisfaction.score}
               <div class="mt-3 flex items-center gap-1 text-[#EA6D0B]" aria-label={`${ticketData.satisfaction.score} de 5 estrelas`}>
@@ -726,7 +730,10 @@
           </section>
         {/if}
 
-        {#if ticketData.canViewTasks}
+        {/if}
+
+        {#if ticketData.canViewTasks && (surface === "page" || activeMainPanel === "tasks")}
+          <div class={surface === "page" ? "" : "mx-auto w-full max-w-[940px]"}>
           <TicketTaskPanel
             ticketId={ticketData.details.ticket.id}
             ticketNumber={ticketData.details.ticket.ticketNumber}
@@ -736,9 +743,11 @@
             canCreate={ticketData.canCreateTask && ticketData.details.ticket.status !== "closed"}
             onCreated={refreshDetails}
           />
+          </div>
         {/if}
 
-        <details class="rounded-[18px] border border-[var(--app-border)] bg-white p-4">
+        {#if surface === "page" || activeMainPanel === "history"}
+        <details open={surface !== "page"} class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto w-full max-w-[940px] p-2 sm:p-4"}>
           <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
             <span class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><ShieldCheck size={14}/>Histórico</span>
             <span class="rounded-full bg-[var(--app-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[#777E8D]">{ticketData.details.events.length}</span>
@@ -752,6 +761,7 @@
             {/each}
           </div>
         </details>
+        {/if}
       </aside>
       {/if}
     </div>
