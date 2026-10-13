@@ -8,7 +8,7 @@
   import TicketDetailsModal from "$lib/components/operations/tickets/TicketDetailsModal.svelte";
   import TicketList from "$lib/components/operations/tickets/TicketList.svelte";
   import TicketToolbar from "$lib/components/operations/tickets/TicketToolbar.svelte";
-  import type { TicketDetailsData, TicketScope, TicketView } from "$lib/components/operations/tickets/types";
+  import type { TicketDetailsData, TicketMainPanel, TicketScope, TicketView } from "$lib/components/operations/tickets/types";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -42,7 +42,7 @@
   let draggingTicketId: string | null = null;
   let moving = false;
   let ticketDetails: TicketDetailsData | null = null;
-  let detailsPanelOpen = false;
+  let activeTicketPanel: TicketMainPanel = "conversation";
   let detailsLoading = false;
   let modalOpen = false;
   let splitInitializedFor = "";
@@ -200,7 +200,9 @@
     }
   }
 
-  async function openTicketDetails(ticketId: string): Promise<void> {
+  async function openTicketDetails(ticketId: string, panel: TicketMainPanel = "conversation"): Promise<void> {
+    activeTicketPanel = panel;
+    if (ticketDetails?.details.ticket.id === ticketId) return;
     modalOpen = view !== "split";
     detailsLoading = true;
     ticketDetails = null;
@@ -301,11 +303,7 @@
               areaWorkflows={data.workflowBoard.areaWorkflows}
               selectedTicketId={ticketDetails?.details.ticket.id ?? null}
               compact
-              onShowTicketInfo={(ticketId) => {
-                detailsPanelOpen = true;
-                if (ticketDetails?.details.ticket.id === ticketId) return;
-                return openTicketDetails(ticketId);
-              }}
+              onOpenTicketService={(ticketId) => openTicketDetails(ticketId, "service")}
               onOpenTicket={openTicketDetails}
             />
           </div>
@@ -321,7 +319,7 @@
 
         <main class="min-h-[480px] min-w-0 overflow-hidden bg-white lg:min-h-0">
           {#if ticketDetails}
-            <TicketDetails ticketData={ticketDetails} surface="split" bind:detailsPanelOpen onRefresh={refreshTicketDetails}/>
+            <TicketDetails ticketData={ticketDetails} surface="split" bind:activeMainPanel={activeTicketPanel} onRefresh={refreshTicketDetails}/>
           {:else if detailsLoading}
             <div class="flex h-full min-h-[480px] items-center justify-center text-[12px] font-semibold text-[#777E8D] lg:min-h-0">Abrindo ticket...</div>
           {:else}
