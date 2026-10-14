@@ -215,14 +215,22 @@ export async function createProviderStructuredResponse<T>(input: {
   }
 }
 
+export type AiProviderConnectionTest = {
+  ok: boolean;
+  model: string;
+  errorCode?: string;
+  status?: number | null;
+};
+
 export async function testAiProviderConnection(
   actorUserId: string,
   provider: AiProviderCode,
   modelValue?: string,
-): Promise<{ ok: boolean; model: string }> {
+): Promise<AiProviderConnectionTest> {
   const model = modelValue?.trim() || defaultAiModel(provider);
+
   try {
-    await createProviderStructuredResponse<{ ok: boolean }>({
+    const response = await createProviderStructuredResponse<{ ok: boolean }>({
       provider,
       model,
       instructions: "Return a JSON object with ok=true. Do not add other fields.",
@@ -234,12 +242,35 @@ export async function testAiProviderConnection(
         properties: { ok: { type: "boolean" } },
         required: ["ok"],
       },
-      maxOutputTokens: 100,
+      maxOutputTokens: 512,
+      timeoutMs: 45_000,
     });
+
+    if (response.data.ok !== true) {
+      throw new AiProviderError("AI_TEST_INVALID_RESULT", provider);
+    }
+
     await markAiProviderTest(actorUserId, provider, true);
     return { ok: true, model };
-  } catch {
+  } catch (cause) {
+    const error = cause instanceof AiProviderError
+      ? cause
+      : new AiProviderError("AI_TEST_FAILED", provider);
+
+    // Diagnóstico seguro: não registrar credenciais nem o conteúdo retornado.
+    console.warn("[ai-provider] connection test failed", {
+      provider,
+      model,
+      code: error.code,
+      status: error.status,
+    });
+
     await markAiProviderTest(actorUserId, provider, false).catch(() => undefined);
-    return { ok: false, model };
+    return {
+      ok: false,
+      model,
+      errorCode: error.code,
+      status: error.status,
+    };
   }
 }
