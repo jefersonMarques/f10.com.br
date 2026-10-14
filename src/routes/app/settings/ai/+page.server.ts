@@ -12,7 +12,7 @@ import {
   updateAiTaskProfile,
 } from "$lib/server/ai/aiConfigurationRepository";
 import { isAiSecretsKeyConfigured } from "$lib/server/ai/aiSecretCrypto";
-import { testAiProviderConnection } from "$lib/server/ai/aiProviderRegistry";
+import { testAiProviderConnection, type AiProviderConnectionTest } from "$lib/server/ai/aiProviderRegistry";
 import {
   AI_CAPABILITY_LABELS,
   AI_TASK_DEFINITIONS,
@@ -34,6 +34,40 @@ function readString(formData: FormData, key: string): string {
 function readInteger(formData: FormData, key: string, fallback: number): number {
   const value = Number.parseInt(readString(formData, key), 10);
   return Number.isFinite(value) ? value : fallback;
+}
+
+function connectionTestFailure(result: AiProviderConnectionTest): string {
+  const code = result.errorCode ?? "";
+  const status = result.status;
+
+  if (code === "AI_PROVIDER_INSUFFICIENT_QUOTA") {
+    return "A OpenAI recusou a chamada por saldo insuficiente ou limite de cobrança. Confira os créditos da API.";
+  }
+  if (code === "AI_PROVIDER_INVALID_API_KEY" || status === 401) {
+    return "A OpenAI rejeitou a chave de API (401). Confira a chave salva no painel.";
+  }
+  if (code === "AI_PROVIDER_MODEL_NOT_FOUND" || status === 404) {
+    return `O modelo ${result.model} não foi encontrado ou não está disponível para esta chave.`;
+  }
+  if (status === 403) {
+    return "A chave não tem permissão para acessar o modelo ou projeto selecionado (403).";
+  }
+  if (status === 429 || code.includes("RATE_LIMIT")) {
+    return "A OpenAI bloqueou a chamada por limite de uso (429). Verifique as cotas, o saldo e tente novamente.";
+  }
+  if (code === "AI_TIMEOUT") {
+    return "A OpenAI demorou mais que 45 segundos para responder ao teste. Tente novamente.";
+  }
+  if (code === "AI_OUTPUT_INCOMPLETE" || code === "AI_EMPTY_RESPONSE" || code === "AI_INVALID_JSON" || code === "AI_TEST_INVALID_RESULT") {
+    return `A OpenAI respondeu, mas o F10 não conseguiu validar o resultado do modelo ${result.model}. Tente novamente ou escolha outro modelo.`;
+  }
+  if (code === "AI_CREDENTIAL_UNAVAILABLE" || code === "AI_PROVIDER_NOT_CONFIGURED") {
+    return "O F10 não conseguiu acessar a chave salva. Confira a configuração da credencial no painel ou servidor.";
+  }
+  if (status === 400) {
+    return `A OpenAI recusou a configuração enviada para o modelo ${result.model} (400). Confira o modelo selecionado.`;
+  }
+  return `O teste de conexão falhou${status ? ` (HTTP ${status})` : ""}. Consulte os registros do servidor para identificar a causa.`;
 }
 
 export const load: PageServerLoad = async ({ cookies }) => {
@@ -159,9 +193,7 @@ export const actions: Actions = {
       : fail(503, {
           success: false,
           action: "testProvider",
-          message: "O provedor " +
-            (provider === "openai" ? "OpenAI" : "DeepSeek") +
-            " não respondeu ao teste. Revise a chave, o modelo e o acesso à API.",
+          message: connectionTestFailure(result),
         });
   },
 
