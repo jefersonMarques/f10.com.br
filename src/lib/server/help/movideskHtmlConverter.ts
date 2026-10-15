@@ -1,3 +1,4 @@
+import { env } from "$env/dynamic/private";
 import { normalizeHelpSlug } from "$lib/server/help/helpArticleRepository";
 import type { HelpImportContent, HelpImportBlock } from "$lib/server/help/structuredHelpImport";
 import type { HelpImportPackageAsset } from "$lib/server/help/helpImportPackage";
@@ -10,18 +11,30 @@ const ENTITY_NAMES: Record<string, string> = {
   bull: "•", ndash: "–", mdash: "—", hellip: "…",
   aacute: "á", eacute: "é", iacute: "í", oacute: "ó", uacute: "ú",
   agrave: "à", atilde: "ã", otilde: "õ", ccedil: "ç",
+  ldquo: "“", rdquo: "”", lsquo: "‘", rsquo: "’", laquo: "«", raquo: "»",
+  ndash: "–", euro: "€", reg: "®", copy: "©", trade: "™",
+  ecirc: "ê", acirc: "â", ocirc: "ô", ucirc: "û", icirc: "î",
+  egrave: "è", euml: "ë", uuml: "ü", ouml: "ö", auml: "ä",
+  Aacute: "Á", Eacute: "É", Iacute: "Í", Oacute: "Ó", Uacute: "Ú",
 };
 
 function decode(value: string): string {
-  return value.replace(/&(#(?:x[0-9a-f]+|\d+)|[a-z]+);/gi, (raw, name: string) => {
-    if (name.startsWith("#")) {
-      const hex = name[1]?.toLowerCase() === "x";
-      const code = Number.parseInt(name.slice(hex ? 2 : 1), hex ? 16 : 10);
-      return Number.isFinite(code) && code >= 32 && code <= 0x10ffff
-        ? String.fromCodePoint(code) : raw;
-    }
-    return ENTITY_NAMES[name.toLowerCase()] ?? raw;
-  });
+  let output = value;
+  // Movidesk costuma devolver entidades HTML duplamente escapadas.
+  for (let pass = 0; pass < 3; pass++) {
+    const next = output.replace(/&(#(?:x[0-9a-f]+|\d+)|[a-z]+);/gi, (raw, name: string) => {
+      if (name.startsWith("#")) {
+        const hex = name[1]?.toLowerCase() === "x";
+        const code = Number.parseInt(name.slice(hex ? 2 : 1), hex ? 16 : 10);
+        return Number.isFinite(code) && code >= 32 && code <= 0x10ffff
+          && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : raw;
+      }
+      return ENTITY_NAMES[name] ?? ENTITY_NAMES[name.toLowerCase()] ?? raw;
+    });
+    if (next === output) break;
+    output = next;
+  }
+  return output;
 }
 
 function attribute(tag: string, name: string): string {
@@ -43,8 +56,18 @@ function mediaUrl(raw: string, baseUrl: string): URL {
   const value = safeHttpUrl(raw, baseUrl);
   if (!value) throw new Error("MOVIDESK_IMAGE_URL_INVALID");
   const url = new URL(value);
-  if (url.protocol !== "https:" || !(SAFE_IMAGE_HOST.test(url.hostname) || url.hostname === "ajuda.f10.com.br")) {
-    throw new Error("MOVIDESK_IMAGE_HOST_NOT_ALLOWED");
+  const host = url.hostname.toLowerCase();
+  const additionalHosts = (env.MOVIDESK_IMAGE_ALLOWED_HOSTS ?? "")
+    .split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
+  // Apenas hosts HTTPS explicitamente permitidos, nunca IPs, localhost ou wildcards.
+  const allowed = SAFE_IMAGE_HOST.test(host) || host === "ajuda.f10.com.br"
+    || host === "movidesk-static.s3.amazonaws.com"
+    || (additionalHosts.includes(host)
+      && /^[a-z0-9][a-z0-9.-]*[a-z0-9]$/.test(host)
+      && host.includes(".") && !/^(?:\d+\.){3}\d+$/.test(host)
+      && !host.endsWith(".local") && !host.endsWith(".internal"));
+  if (url.protocol !== "https:" || !allowed) {
+    throw new Error(`MOVIDESK_IMAGE_HOST_NOT_ALLOWED:${host.slice(0, 150)}`);
   }
   return url;
 }
@@ -91,6 +114,7 @@ export async function convertMovideskHtml(input: {
   text: string;
   categorySlugs: string[];
   attachments: Array<{ name: string }>;
+  resolveArticleUrl?: (sourceId: number) => string | null;
 }): Promise<{
   content: HelpImportContent;
   assets: Map<string, HelpImportPackageAsset>;
@@ -99,7 +123,7 @@ export async function convertMovideskHtml(input: {
   const issues: string[] = [];
   const html = input.html.slice(0, 2_000_000);
   if (html.length < input.html.length) issues.push("HTML original maior que o limite de conversão.");
-  if (/<(?:table|iframe|object|embed|video|audio|svg|math|form|script|style)\b/i.test(html)) {
+  if (/<(?:table|iframe|object|embed|video|audio|math|form|script|style)\b/i.test(html)) {
     issues.push("HTML complexo: confira a formatação no artigo importado.");
   }
   if (input.attachments.length) issues.push(`${input.attachments.length} anexo(s) precisam ser conferidos e copiados manualmente.`);
@@ -110,7 +134,7 @@ export async function convertMovideskHtml(input: {
   let blocks: HelpImportBlock[] = [];
   let paragraph = "";
   let imageIndex = 0;
-  let pendingLink: { href: string; label: string } | null = null;
+  let pendingLink: { href: string; label: string; skip: boolean } | null = null;
 
   function flushParagraph(): void {
     const text = paragraph.replace(/[ \t]+/g, " ").replace(/\n[ \t]+/g, "\n").trim();
@@ -153,12 +177,27 @@ export async function convertMovideskHtml(input: {
     }
     if (name === "a") {
       if (!closing) {
+        // O F10 já gera navegação entre conteúdos. Não importar o "Próximo:" antigo.
+        const skip = /(?:^|\\n)\\s*(?:pr[oó]ximo|anterior)\\s*:\\s*$/i.test(paragraph);
+        if (skip) paragraph = paragraph.replace(/(?:^|\\n)\\s*(?:pr[oó]ximo|anterior)\\s*:\\s*$/i, "");
         flushParagraph();
-        pendingLink = { href: attribute(token, "href"), label: "" };
+        pendingLink = { href: attribute(token, "href"), label: "", skip };
       } else if (pendingLink) {
-        const href = safeHttpUrl(pendingLink.href, input.sourceUrl);
-        if (href) blocks.push({ type: "link", url: href, label: pendingLink.label.trim() || href });
-        else paragraph += pendingLink.label;
+        if (!pendingLink.skip) {
+          let href = safeHttpUrl(pendingLink.href, input.sourceUrl);
+          if (href) {
+            const url = new URL(href);
+            const match = /^\\/kb\\/(?:[a-z]{2}-[a-z]{2}\\/)?article\\/(\\d+)(?:\\/|$)/i.exec(url.pathname);
+            if ((url.hostname === "f10.movidesk.com" || url.hostname === "ajuda.f10.com.br") && match) {
+              const target = input.resolveArticleUrl?.(Number(match[1]));
+              if (target) href = target;
+              else issues.push(`Link interno #${match[1]} sem artigo correspondente no inventário.`);
+            }
+            blocks.push({ type: "link", url: href, label: pendingLink.label.trim() || href });
+          } else {
+            paragraph += pendingLink.label;
+          }
+        }
         pendingLink = null;
       }
       continue;
@@ -183,7 +222,7 @@ export async function convertMovideskHtml(input: {
   }
   flushStep();
   if (!steps.length && input.text.trim()) {
-    steps.push({ title: "Conteúdo original", blocks: [{ type: "text", text: input.text.slice(0, 50_000) }] });
+    steps.push({ title: "Conteúdo original", blocks: [{ type: "text", text: decode(input.text).slice(0, 50_000) }] });
   }
   if (!steps.length) throw new Error("MOVIDESK_ARTICLE_EMPTY");
 
