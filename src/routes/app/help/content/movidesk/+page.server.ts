@@ -1,4 +1,5 @@
-import { error, fail, type Actions, type PageServerLoad } from "@sveltejs/kit";
+import { error, fail } from "@sveltejs/kit";
+import type { Actions, PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import {
   approveMovideskArticle,
