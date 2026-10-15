@@ -147,7 +147,7 @@
     </div>
   {/if}
 
-  {#if data.movideskArticle}
+  {#if data.movideskArticle && data.canManageMovidesk}
     <section class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#D9DFEA] bg-[#FAFBFD] px-4 py-3">
       <div>
         <p class="text-[13px] font-semibold text-[#303645]">Artigo importado do Movidesk</p>
