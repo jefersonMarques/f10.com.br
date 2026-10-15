@@ -291,7 +291,13 @@ export async function convertMovideskHtml(input: {
     }
     if (name === "img" && !closing) {
       flushParagraph();
-      if (++imageIndex > MAX_IMAGE_COUNT) throw new Error("MOVIDESK_IMAGE_COUNT_LIMIT");
+      imageIndex++;
+      if (imageIndex > MAX_IMAGE_COUNT) {
+        issues.push("Muitos screenshots: imagens adicionais disponíveis no artigo original.");
+        const href = safeHttpUrl(attribute(token, "src"), input.sourceUrl);
+        if (href) blocks.push({ type: "link", url: href, label: "Ver imagem original" });
+        continue;
+      }
       // Um screenshot por etapa é uma regra de publicação do F10.
       flushStep();
       currentTitle = `Imagem ${imageIndex}`;
