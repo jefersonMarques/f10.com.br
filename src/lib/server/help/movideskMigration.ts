@@ -123,6 +123,16 @@ export async function retryFailedMovideskArticles(actorUserId: string): Promise<
   }).where(eq(helpMovideskImportState.id, 1));
 }
 
+export async function getMovideskArticleByContentId(contentId: string) {
+  const [article] = await getDatabase().select({
+    sourceId: helpMovideskArticles.sourceId,
+    sourceUrl: helpMovideskArticles.sourceUrl,
+    needsReview: helpMovideskArticles.needsReview,
+    issue: helpMovideskArticles.issue,
+  }).from(helpMovideskArticles).where(eq(helpMovideskArticles.contentId, contentId)).limit(1);
+  return article ?? null;
+}
+
 export async function approveMovideskArticle(sourceId: number): Promise<void> {
   await getDatabase().update(helpMovideskArticles).set({
     needsReview: false, issue: null, updatedAt: new Date(),
@@ -211,7 +221,9 @@ async function catalogPage(page: number): Promise<{ totalCount: number; finished
     });
   }
   return { totalCount: Number.isFinite(totalCount) && totalCount >= 0 ? totalCount : 0,
-    finished: items.length < PAGE_SIZE || (Number.isFinite(totalCount) && totalCount > 0 && (page + 1) * PAGE_SIZE >= totalCount) };
+    finished: items.length === 0 || (Number.isFinite(totalCount) && totalCount > 0
+      ? (page + 1) * PAGE_SIZE >= totalCount
+      : items.length < PAGE_SIZE) };
 }
 
 async function importArticle(sourceId: number, actorUserId: string): Promise<void> {
