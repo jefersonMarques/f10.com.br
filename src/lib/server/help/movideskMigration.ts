@@ -67,18 +67,14 @@ function errorMessage(cause: unknown): string {
 }
 
 async function requestMovideskApi(path: string, authorization: string): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 25_000);
-  try {
-    return await fetch(`${BASE}${path}`, {
-      headers: { Authorization: authorization, Accept: "application/json" },
-      signal: controller.signal,
-      redirect: "manual",
-    });
-  } finally {
-    clearTimeout(timer);
-  }
+  return fetch(`${BASE}${path}`, {
+    headers: { Authorization: authorization, Accept: "application/json" },
+    signal: AbortSignal.timeout(25_000),
+    redirect: "manual",
+  });
 }
+
+let movideskAuthMode: "raw" | "bearer" = "raw";
 
 async function callApi(path: string): Promise<SourceRecord> {
   const configuredToken = env.MOVIDESK_KB_API_TOKEN?.trim();
@@ -86,17 +82,18 @@ async function callApi(path: string): Promise<SourceRecord> {
   // A documentação de artigos usa Authorization: TOKEN; a geral usa Bearer TOKEN.
   const token = configuredToken.replace(/^Bearer\s+/i, "").trim();
   if (!token) throw new Error("MOVIDESK_TOKEN_MISSING");
-  let response = await requestMovideskApi(path, token);
+  let response = await requestMovideskApi(path, movideskAuthMode === "bearer" ? `Bearer ${token}` : token);
 
-  if (response.status === 401) {
+  if (response.status === 401 && movideskAuthMode === "raw") {
     await response.body?.cancel();
-    // Segunda tentativa só em 401. Respeita o limite da API (10 requisições/min).
+    // Tenta Bearer uma única vez e reutiliza o formato nos pedidos seguintes.
     await new Promise<void>((resolve) => setTimeout(resolve, INTERVAL_MS));
     response = await requestMovideskApi(path, `Bearer ${token}`);
-    if (response.status === 401) {
-      await response.body?.cancel();
-      throw new Error("MOVIDESK_API_AUTH_REJECTED");
-    }
+    if (response.ok) movideskAuthMode = "bearer";
+  }
+  if (response.status === 401) {
+    await response.body?.cancel();
+    throw new Error("MOVIDESK_API_AUTH_REJECTED");
   }
 
   if (!response.ok) {
