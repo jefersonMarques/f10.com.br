@@ -2,8 +2,9 @@ import { env } from "$env/dynamic/private";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { helpMovideskArticles, helpMovideskImportState } from "$lib/server/db/helpMovideskSchema";
-import { helpCategories, helpContents } from "$lib/server/db/structuredHelpSchema";
+import { helpCategories, helpContents, helpContentReleases } from "$lib/server/db/structuredHelpSchema";
 import { listPublishedStructuredHelpLinks } from "$lib/server/help/publicStructuredHelpRepository";
+import { helpPublications } from "$lib/server/db/helpPublications";
 import { normalizeHelpCategorySlug, createHelpCategory, listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import { normalizeHelpSlug } from "$lib/server/help/helpArticleRepository";
 import { importStructuredHelpFile, type HelpImportFile } from "$lib/server/help/structuredHelpImport";
@@ -137,6 +138,64 @@ export async function retryFailedMovideskArticles(actorUserId: string): Promise<
   }).where(eq(helpMovideskImportState.id, 1));
 }
 
+async function safeToReplaceMovideskDraft(
+  contentId: string,
+  importedAt: Date | null,
+  needsReview: boolean,
+): Promise<boolean> {
+  if (!importedAt || !needsReview) return false;
+  const db = getDatabase();
+  const [[content], [publication], [release]] = await Promise.all([
+    db.select({
+      id: helpContents.id, status: helpContents.status,
+      updatedAt: helpContents.updatedAt, importSource: helpContents.importSource,
+    }).from(helpContents).where(eq(helpContents.id, contentId)).limit(1),
+    db.select({ id: helpPublications.entityId }).from(helpPublications).where(and(
+      eq(helpPublications.entityType, "content"),
+      eq(helpPublications.entityId, contentId),
+    )).limit(1),
+    db.select({ id: helpContentReleases.id }).from(helpContentReleases)
+      .where(eq(helpContentReleases.contentId, contentId)).limit(1),
+  ]);
+  return Boolean(content?.importSource === "movidesk" && content.status === "draft"
+    && content.updatedAt <= importedAt && !publication && !release);
+}
+
+export async function reprocessMovideskArticles(actorUserId: string) {
+  if (!isMovideskMigrationEnabled()) throw new Error("MOVIDESK_MIGRATION_DISABLED");
+  if (!isMovideskTokenConfigured()) throw new Error("MOVIDESK_TOKEN_MISSING");
+  const db = getDatabase();
+  const rows = await db.select({
+    sourceId: helpMovideskArticles.sourceId,
+    contentId: helpMovideskArticles.contentId,
+    importedAt: helpMovideskArticles.importedAt,
+    needsReview: helpMovideskArticles.needsReview,
+  }).from(helpMovideskArticles);
+  const selected: number[] = [];
+  for (const row of rows) {
+    if (!row.contentId || await safeToReplaceMovideskDraft(row.contentId, row.importedAt, row.needsReview)) {
+      selected.push(row.sourceId);
+    }
+  }
+  if (selected.length === 0) return { queued: 0, skipped: rows.length };
+
+  await db.transaction(async (tx) => {
+    const [state] = await tx.select().from(helpMovideskImportState)
+      .where(eq(helpMovideskImportState.id, 1)).for("update").limit(1);
+    if (!state || state.enabled || (state.phase !== "done" && state.phase !== "details")) {
+      throw new Error("MOVIDESK_REPROCESS_BUSY");
+    }
+    await tx.update(helpMovideskArticles).set({
+      state: "discovered", issue: null, needsReview: true, updatedAt: new Date(),
+    }).where(inArray(helpMovideskArticles.sourceId, selected));
+    await tx.update(helpMovideskImportState).set({
+      phase: "details", enabled: true, startedBy: actorUserId,
+      lastError: null, nextRequestAt: new Date(), updatedAt: new Date(),
+    }).where(eq(helpMovideskImportState.id, 1));
+  });
+  return { queued: selected.length, skipped: rows.length - selected.length };
+}
+
 export async function getMovideskArticleByContentId(contentId: string) {
   const [article] = await getDatabase().select({
     sourceId: helpMovideskArticles.sourceId,
@@ -246,7 +305,16 @@ async function catalogPage(page: number): Promise<{ totalCount: number; finished
 
 async function importArticle(sourceId: number, actorUserId: string): Promise<void> {
   const [staged] = await getDatabase().select().from(helpMovideskArticles).where(eq(helpMovideskArticles.sourceId, sourceId)).limit(1);
-  if (!staged || staged.contentId) return;
+  if (!staged) return;
+  if (staged.contentId && !await safeToReplaceMovideskDraft(
+    staged.contentId, staged.importedAt, staged.needsReview,
+  )) {
+    await getDatabase().update(helpMovideskArticles).set({
+      state: "review", issue: "Rascunho preservado: já foi editado, aprovado ou publicado.",
+      updatedAt: new Date(),
+    }).where(eq(helpMovideskArticles.sourceId, sourceId));
+    return;
+  }
   const raw = await getMovideskArticle(sourceId);
   if (numeric(raw.id) !== sourceId) throw new Error("MOVIDESK_ARTICLE_MISMATCH");
   const html = text(raw.contentHtml);
@@ -266,9 +334,10 @@ async function importArticle(sourceId: number, actorUserId: string): Promise<voi
     eq(helpContents.importSource, "movidesk"),
     eq(helpContents.importExternalId, String(sourceId)),
   )).limit(1);
-  if (existing) {
+  if (existing && existing.id !== staged.contentId) {
     await getDatabase().update(helpMovideskArticles).set({
-      contentId: existing.id, state: "review", needsReview: true, issue: "Artigo já existia no F10. Confira antes de publicar.",
+      contentId: existing.id, state: "review", needsReview: true,
+      issue: "Artigo já existia no F10. Edição preservada; confira antes de publicar.",
       importedAt: new Date(), updatedAt: new Date(),
     }).where(eq(helpMovideskArticles.sourceId, sourceId));
     return;
@@ -278,11 +347,32 @@ async function importArticle(sourceId: number, actorUserId: string): Promise<voi
   const desiredSlug = normalizeHelpSlug(slug || text(raw.title) || staged.title);
   const [slugConflict] = await getDatabase().select({ id: helpContents.id }).from(helpContents)
     .where(eq(helpContents.slug, desiredSlug)).limit(1);
-  const safeSlug = slugConflict ? `${desiredSlug.slice(0, 92)}-${sourceId}` : desiredSlug;
+  const safeSlug = existing
+    ? staged.slug && (await getDatabase().select({ slug: helpContents.slug }).from(helpContents)
+        .where(eq(helpContents.id, existing.id)).limit(1))[0]?.slug || desiredSlug
+    : slugConflict ? `${desiredSlug.slice(0, 92)}-${sourceId}` : desiredSlug;
+
+  // Links Movidesk são resolvidos pelo ID de origem, não pelo título.
+  const [catalog, natives] = await Promise.all([
+    getDatabase().select({
+      id: helpMovideskArticles.sourceId, title: helpMovideskArticles.title,
+      slug: helpMovideskArticles.slug,
+    }).from(helpMovideskArticles),
+    getDatabase().select({
+      externalId: helpContents.importExternalId, slug: helpContents.slug,
+    }).from(helpContents).where(eq(helpContents.importSource, "movidesk")),
+  ]);
+  const nativeSlugs = new Map(natives.map(row => [Number(row.externalId), row.slug]));
+  const links = new Map(catalog.map(row => [
+    row.id, `https://f10.com.br/ajuda-f10/${encodeURIComponent(
+      nativeSlugs.get(row.id) || normalizeHelpSlug(row.slug || row.title),
+    )}`,
+  ]));
   const converted = await convertMovideskHtml({
     sourceId, title: text(raw.title) || staged.title, slug: safeSlug,
     summary: text(raw.summary), sourceUrl: sourceUrl(sourceId, slug),
     html, text: plain, categorySlugs, attachments: files,
+    resolveArticleUrl: id => links.get(id) ?? null,
   });
   const file: HelpImportFile = {
     format: "f10-help-import", version: 1, source: "movidesk",
