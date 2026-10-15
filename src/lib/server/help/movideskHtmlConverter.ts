@@ -127,6 +127,70 @@ async function downloadImage(src: string, baseUrl: string, index: number): Promi
   };
 }
 
+function stripLegacyNavigation(html: string): string {
+  return html.replace(/<p\b[^>]*>[\s\S]*?<\/p>/gi, (original) => {
+    const label = decode(original.replace(/<[^>]*>/g, ""))
+      .replace(/\s+/g, " ").trim();
+    return /^(?:pr[oó]ximo|anterior)\s*:/i.test(label)
+      && /\/kb\/(?:[a-z]{2}-[a-z]{2}\/)?article\/\d+/i.test(original)
+      ? "" : original;
+  });
+}
+
+function organizeSteps(steps: HelpImportContent["steps"]): HelpImportContent["steps"] {
+  const organized: HelpImportContent["steps"] = [];
+  for (const section of steps) {
+    const synthetic = /^(?:Conteúdo original|Seção|Imagem \d+)$/i.test(section.title);
+    let group: HelpImportBlock[] = [];
+    let chars = 0;
+    let texts = 0;
+    let images = 0;
+    let part = 0;
+    function commit(): void {
+      if (!group.length) return;
+      part++;
+      const first = group[0]!;
+      const media = group.filter(block => block.type === "link"
+        && (block.label === "Vídeo do YouTube" || block.label === "Vídeo MP4"));
+      const lead = group.find((block): block is Extract<HelpImportBlock, { type: "text" }> =>
+        block.type === "text" && block.text.trim().length > 0);
+      const plainLead = lead?.text.replace(/[*_#]/g, "")
+        .replace(/\s+/g, " ").trim() ?? "";
+      const sentence = plainLead.match(/^.{1,90}?(?:[.!?:;](?=\s|$)|$)/)?.[0] ?? plainLead;
+      const excerpt = sentence.length > 78
+        ? sentence.slice(0, 75).replace(/\s+\S*$/, "") + "…"
+        : sentence;
+      const title = !synthetic
+        ? (part === 1 ? section.title : section.title + " · continuação")
+        : first.type === "image" ? "Imagem e orientações"
+        : media.length && first.type === "link" ? (media.length > 1 ? "Vídeos e orientações" : "Vídeo e orientações")
+        : excerpt || "Orientações do artigo";
+      organized.push({ title: title.slice(0, 160), blocks: group });
+      group = [];
+      chars = 0;
+      texts = 0;
+      images = 0;
+    }
+    for (const block of section.blocks) {
+      if (block.type === "text") {
+        block.text = block.text.replace(/\u00a0/g, " ")
+          .replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+        if (!block.text) continue;
+      }
+      const len = block.type === "text" ? block.text.length : 0;
+      if (group.length && ((block.type === "image" && images > 0)
+        || (block.type === "text" && (texts >= 3 || chars + len > 1500))
+        || group.length >= 14)) commit();
+      group.push(block);
+      chars += len;
+      if (block.type === "text") texts++;
+      if (block.type === "image") images++;
+    }
+    commit();
+  }
+  return organized;
+}
+
 export async function convertMovideskHtml(input: {
   sourceId: number;
   title: string;
@@ -144,7 +208,7 @@ export async function convertMovideskHtml(input: {
   issues: string[];
 }> {
   const issues: string[] = [];
-  const html = input.html.slice(0, 2_000_000);
+  const html = stripLegacyNavigation(input.html.slice(0, 2_000_000));
   if (html.length < input.html.length) issues.push("HTML original maior que o limite de conversão.");
   const iframes = html.match(/<iframe\b[^>]*>/gi) ?? [];
   const unknownIframes = iframes.some(tag => {
@@ -304,8 +368,9 @@ export async function convertMovideskHtml(input: {
     }
   }
 
-  if (steps.length > 80) throw new Error("MOVIDESK_STEP_LIMIT");
-  if (steps.some(step => step.blocks.length > 80)) throw new Error("MOVIDESK_BLOCK_LIMIT");
+  const organized = organizeSteps(steps);
+  if (organized.length > 80) throw new Error("MOVIDESK_STEP_LIMIT");
+  if (organized.some(step => step.blocks.length > 80)) throw new Error("MOVIDESK_BLOCK_LIMIT");
   return {
     content: {
       externalId: String(input.sourceId),
@@ -316,7 +381,7 @@ export async function convertMovideskHtml(input: {
       searchAliases: [],
       assistantKnowledge: "",
       internalSupportNotes: "",
-      steps,
+      steps: organized,
     },
     assets,
     issues,
