@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS help_movidesk_articles (
   source_updated_at timestamptz,
   categories jsonb NOT NULL DEFAULT '[]'::jsonb,
   attachments jsonb NOT NULL DEFAULT '[]'::jsonb,
-  content_id uuid UNIQUE REFERENCES help_contents(id) ON DELETE SET NULL,
+  content_id uuid REFERENCES help_contents(id) ON DELETE SET NULL,
   state text NOT NULL DEFAULT 'discovered',
   needs_review boolean NOT NULL DEFAULT true,
   issue text,
@@ -33,4 +33,4 @@ CREATE TABLE IF NOT EXISTS help_movidesk_articles (
 );
 
 CREATE INDEX IF NOT EXISTS help_movidesk_articles_state_idx ON help_movidesk_articles(state, source_id);
-CREATE INDEX IF NOT EXISTS help_movidesk_articles_content_idx ON help_movidesk_articles(content_id);
+CREATE UNIQUE INDEX IF NOT EXISTS help_movidesk_articles_content_idx ON help_movidesk_articles(content_id);
