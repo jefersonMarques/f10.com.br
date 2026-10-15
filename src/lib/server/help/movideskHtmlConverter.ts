@@ -5,7 +5,8 @@ import type { HelpImportPackageAsset } from "$lib/server/help/helpImportPackage"
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_IMAGE_COUNT = 60;
-const SAFE_IMAGE_HOST = /(^|\.)(movidesk\.com)$/i;
+const SAFE_IMAGE_HOST = /(^|\\.)(movidesk\\.com)$/i;
+const SAFE_S3_HOST = /^(?:[a-z0-9.-]+\\.)?s3(?:[.-][a-z0-9-]+)?\\.amazonaws\\.com$/i;
 const ENTITY_NAMES: Record<string, string> = {
   amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
   bull: "•", ndash: "–", mdash: "—", hellip: "…",
@@ -84,7 +85,7 @@ function mediaUrl(raw: string, baseUrl: string): URL {
     .split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
   // Apenas hosts HTTPS explicitamente permitidos, nunca IPs, localhost ou wildcards.
   const allowed = SAFE_IMAGE_HOST.test(host) || ["f10.com.br", "www.f10.com.br", "ajuda.f10.com.br"].includes(host)
-    || host === "movidesk-static.s3.amazonaws.com" || host === "s3.amazonaws.com"
+    || SAFE_S3_HOST.test(host)
     || (additionalHosts.includes(host)
       && /^[a-z0-9][a-z0-9.-]*[a-z0-9]$/.test(host)
       && host.includes(".") && !/^(?:\d+\.){3}\d+$/.test(host)
@@ -98,12 +99,22 @@ function mediaUrl(raw: string, baseUrl: string): URL {
 async function downloadImage(src: string, baseUrl: string, index: number): Promise<{
   asset: HelpImportPackageAsset; path: string;
 }> {
-  const url = mediaUrl(src, baseUrl);
-  const response = await fetch(url, {
-    redirect: "manual",
-    signal: AbortSignal.timeout(25_000),
-    headers: { "User-Agent": "F10-Help-Migration/1.0" },
-  });
+  let url = mediaUrl(src, baseUrl);
+  let response: Response | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    response = await fetch(url, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(25_000),
+      headers: { "User-Agent": "F10-Help-Migration/1.0" },
+    });
+    if (![301, 302, 303, 307, 308].includes(response.status)) break;
+    const location = response.headers.get("location");
+    await response.body?.cancel();
+    if (!location) throw new Error("MOVIDESK_IMAGE_REDIRECT_INVALID");
+    url = mediaUrl(location, url.href);
+    response = null;
+  }
+  if (!response) throw new Error("MOVIDESK_IMAGE_REDIRECT_LIMIT");
   if (!response.ok) throw new Error(`MOVIDESK_IMAGE_HTTP_${response.status}`);
   const declaredSize = Number(response.headers.get("content-length") ?? 0);
   if (declaredSize > MAX_IMAGE_BYTES) throw new Error("MOVIDESK_IMAGE_TOO_LARGE");
@@ -227,6 +238,7 @@ export async function convertMovideskHtml(input: {
   let paragraph = "";
   let imageIndex = 0;
   let pendingLink: { href: string; label: string; skip: boolean } | null = null;
+  let videoSourceHandled = false;
 
   function flushParagraph(): void {
     const text = paragraph.replace(/[ \t]+/g, " ").replace(/\n[ \t]+/g, "\n").trim();
@@ -257,6 +269,12 @@ export async function convertMovideskHtml(input: {
     const closing = Boolean(tag[1]);
     const name = tag[2]!.toLowerCase();
     if (name === "iframe" || name === "video" || name === "source" || name === "embed") {
+      if (name === "video" && closing) {
+        videoSourceHandled = false;
+        continue;
+      }
+      if (name === "video" && !closing) videoSourceHandled = false;
+      if (name === "source" && videoSourceHandled) continue;
       if (!closing) {
         const rawSrc = attribute(token, "src") || attribute(token, "data-src");
         const youtube = youtubeWatchUrl(rawSrc, input.sourceUrl);
@@ -265,6 +283,7 @@ export async function convertMovideskHtml(input: {
         if (href) {
           flushParagraph();
           blocks.push({ type: "link", url: href, label: youtube ? "Vídeo do YouTube" : mp4 ? "Vídeo MP4" : "Abrir mídia original" });
+          if (name === "source" || name === "video") videoSourceHandled = true;
           if (!youtube && !mp4) issues.push("Mídia externa não reconhecida: conferir o arquivo.");
         }
       }
