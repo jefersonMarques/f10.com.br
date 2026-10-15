@@ -12,7 +12,7 @@ import { getPublishedStructuredHelpById } from "$lib/server/help/publicStructure
 
 const BASE = "https://api.movidesk.com/public/v1/article";
 const INTERVAL_MS = 8_000;
-const REQUEST_LEASE_MS = 90_000;
+const REQUEST_LEASE_MS = 10 * 60_000;
 const PAGE_SIZE = 40;
 
 type SourceRecord = Record<string, unknown>;
@@ -336,12 +336,17 @@ export async function tickMovideskMigration(): Promise<void> {
 }
 
 let started = false;
+let tickInProgress = false;
 export function startMovideskMigrationWorker(): void {
   if (started || !isMovideskMigrationEnabled()) return;
   if (env.NODE_ENV === "production" && env.F10_HELP_VIDEO_WORKER !== "1") return;
   started = true;
   const timer = setInterval(() => {
-    void tickMovideskMigration().catch(cause => console.error("[help-movidesk] worker", errorMessage(cause)));
+    if (tickInProgress) return;
+    tickInProgress = true;
+    void tickMovideskMigration()
+      .catch(cause => console.error("[help-movidesk] worker", errorMessage(cause)))
+      .finally(() => { tickInProgress = false; });
   }, 5_000);
   timer.unref();
 }
