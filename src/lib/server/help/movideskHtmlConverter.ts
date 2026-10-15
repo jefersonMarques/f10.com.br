@@ -177,9 +177,18 @@ export async function convertMovideskHtml(input: {
     }
     if (name === "a") {
       if (!closing) {
-        // O F10 já gera navegação entre conteúdos. Não importar o "Próximo:" antigo.
-        const skip = /(?:^|\n)\s*(?:pr[oó]ximo|anterior)\s*:\s*$/i.test(paragraph);
-        if (skip) paragraph = paragraph.replace(/(?:^|\n)\s*(?:pr[oó]ximo|anterior)\s*:\s*$/i, "");
+        const nextLabel = /(?:^|\n)\s*(?:pr[oó]ximo|anterior)\s*:\s*$/i;
+        const last = blocks.at(-1);
+        const skip = nextLabel.test(paragraph)
+          || (last?.type === "text" && nextLabel.test(last.text));
+        if (skip) {
+          paragraph = paragraph.replace(nextLabel, "");
+          if (last?.type === "text" && nextLabel.test(last.text)) {
+            const remaining = last.text.replace(nextLabel, "").trim();
+            if (remaining) last.text = remaining;
+            else blocks.pop();
+          }
+        }
         flushParagraph();
         pendingLink = { href: attribute(token, "href"), label: "", skip };
       } else if (pendingLink) {
@@ -189,9 +198,12 @@ export async function convertMovideskHtml(input: {
             const url = new URL(href);
             const match = /^\/kb\/(?:[a-z]{2}-[a-z]{2}\/)?article\/(\d+)(?:\/|$)/i.exec(url.pathname);
             if ((url.hostname === "f10.movidesk.com" || url.hostname === "ajuda.f10.com.br") && match) {
-              const target = input.resolveArticleUrl?.(Number(match[1]));
-              if (target) href = target;
-              else issues.push(`Link interno #${match[1]} sem artigo correspondente no inventário.`);
+              const sourceId = Number(match[1]);
+              const native = input.resolveArticleUrl?.(sourceId);
+              const fallback = normalizeHelpSlug(url.pathname.split("/").at(-1) || "")
+                || `movidesk-${sourceId}`;
+              href = native || `https://f10.com.br/ajuda-f10/${encodeURIComponent(fallback)}`;
+              if (!native) issues.push(`Link do artigo #${sourceId} precisa de conferência no F10.`);
             }
             blocks.push({ type: "link", url: href, label: pendingLink.label.trim() || href });
           } else {
