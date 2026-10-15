@@ -23,6 +23,16 @@
     return true;
   });
 
+  function migrationError(value: string): string {
+    if (value === "MOVIDESK_API_AUTH_REJECTED" || value === "MOVIDESK_API_HTTP_401") {
+      return "O Movidesk não autorizou o token (401). Confira o token de API em Configurações → Conta → Parâmetros → Ambiente.";
+    }
+    if (value === "MOVIDESK_API_HTTP_404") {
+      return "O endereço da API não foi encontrado (404). Confirme se o servidor está atualizado.";
+    }
+    return value;
+  }
+
   function stateName(value: string): string {
     if (value === "catalog") return "Listando artigos";
     if (value === "details") return "Importando conteúdos";
@@ -60,7 +70,7 @@
     <div class="mt-4 flex items-start gap-3 rounded-xl border border-[#F2D4B0] bg-[#FFF9F1] px-4 py-3 text-[13px] text-[#81501B]"><CircleAlert size={18} class="shrink-0"/>Configure a variável MOVIDESK_KB_API_TOKEN no servidor e reinicie o serviço para iniciar a migração. A chave não deve ser enviada pelo navegador.</div>
   {/if}
   {#if data.state?.lastError}
-    <div class="mt-4 flex items-start gap-3 rounded-xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[13px] text-[#9B2C2C]"><CircleAlert size={18} class="shrink-0"/>{data.state.lastError}</div>
+    <div class="mt-4 flex items-start gap-3 rounded-xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[13px] text-[#9B2C2C]"><CircleAlert size={18} class="shrink-0"/>{migrationError(data.state.lastError)}</div>
   {/if}
 
   <div class="mt-5 grid gap-3 sm:grid-cols-4">
