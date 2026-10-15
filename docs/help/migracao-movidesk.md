@@ -11,6 +11,13 @@ F10_MOVIDESK_MIGRATION_ENABLED=true
 MOVIDESK_KB_API_TOKEN=SEU_TOKEN_DE_API_MOViDESK
 ```
 
+Se as imagens estiverem hospedadas fora dos domínios Movidesk, a importação mostrará
+`MOVIDESK_IMAGE_HOST_NOT_ALLOWED:dominio`. Confira no HTML original se é uma origem confiável e
+adicione **somente esse hostname** à variável opcional
+`MOVIDESK_IMAGE_ALLOWED_HOSTS` no `.env.production` (hosts separados por vírgula, sem protocolo).
+Reinicie o worker para aplicar. Não use curingas ou domínios internos. As imagens permanecem
+bloqueadas até a origem ser autorizada, evitando baixar arquivos de hosts arbitrários.
+
 Não coloque o token no repositório, em screenshots ou no navegador. O token é obtido na administração do Movidesk. O worker usa o processo PM2 `f10-help-video-worker` e deve conseguir gravar no armazenamento S3/MinIO do F10. Faça backup do PostgreSQL e dos assets antes de iniciar.
 
 Faça o deploy com `npm run prod`. Depois abra **Base de Conhecimento → Migração Movidesk** com um usuário que tenha `system.settings.manage`.
@@ -22,6 +29,23 @@ Faça o deploy com `npm run prod`. Depois abra **Base de Conhecimento → Migra�
 3. Cada artigo vira um rascunho F10. Categorias existentes são reaproveitadas, e categorias ausentes são criadas com identificação Movidesk.
 4. Confira **Original salvo** e **Abrir no F10**. Reveja texto, imagens e anexos. Tabelas, embeds e anexos sem URL na API são sinalizados.
 5. Clique **Aprovar** após verificação editorial e complete a revisão humana de screenshots no editor, quando exigida. Só então publique.
+
+## Correções e reprocessamento
+
+Depois de concluir a primeira importação, use **Reprocessar artigos** no painel para aplicar
+correções do conversor aos rascunhos e tentar novamente os artigos com falha.
+O worker reutiliza HTML e metadados originais salvos no banco; somente artigos sem cópia
+original precisam de nova consulta à API Movidesk. A operação
+trabalha no worker, com progresso persistido e sem usar IA. O mesmo conteúdo mantém seu
+ID original e o histórico original é preservado.
+
+**Proteção:** só são reprocessados conteúdos ainda não revisados nem editados após a
+importação. Artigos aprovados, publicados, com release ou com alterações no editor são
+pulados. Faça backup antes de usar e confira os resultados antes de aprovar.
+
+O conversor decodifica entidades HTML, converte links internos Movidesk para URLs do F10
+por ID do artigo e não copia links automáticos de navegação Próximo/Anterior. Referências
+sem correspondência no inventário geram um aviso de revisão.
 
 O conteúdo bruto é mantido em `help_movidesk_articles.source_html` e `source_text`. A identidade usa `import_source=movidesk` + `import_external_id=ID`. A sincronização não apaga correções manuais nem republica artigos.
 

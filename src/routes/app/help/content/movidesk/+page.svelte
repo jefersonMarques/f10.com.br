@@ -104,9 +104,16 @@
         {#if data.failed > 0 && !data.state?.enabled}
           <form method="POST" action="?/retry"><button disabled={!data.tokenConfigured} class="inline-flex h-9 items-center gap-2 rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold text-[#9B3C3C] disabled:opacity-40">Tentar falhas novamente</button></form>
         {/if}
+        {#if !data.state?.enabled && (data.state?.phase === "done" || data.state?.phase === "details") && data.total > 0}
+          <form method="POST" action="?/reprocess" on:submit={(event) => {
+            if (!confirm("Reprocessar os artigos ainda não revisados? Rascunhos editados, aprovados e publicados serão preservados. A fila continua no servidor.")) event.preventDefault();
+          }}>
+            <button disabled={!data.tokenConfigured} class="inline-flex h-9 items-center gap-2 rounded-lg border border-[#CAD7F6] bg-[#EFF3FF] px-3 text-[12px] font-semibold text-[#000A57] disabled:opacity-40"><RefreshCw size={15}/>Reprocessar artigos</button>
+          </form>
+        {/if}
       </div>
     </div>
-    <p class="mt-3 text-[12px] leading-5 text-[#828997]">O servidor continua trabalhando mesmo com esta página fechada. Nenhum artigo existente no F10 será sobrescrito. A publicação e o redirecionamento exigem revisão.</p>
+    <p class="mt-3 text-[12px] leading-5 text-[#828997]">O servidor continua mesmo com a página fechada. O reprocessamento substitui apenas rascunhos importados e ainda não editados. A publicação exige revisão.</p>
   </section>
 
   <section class="mt-5 overflow-hidden rounded-2xl border border-[#E2E5ED] bg-white">

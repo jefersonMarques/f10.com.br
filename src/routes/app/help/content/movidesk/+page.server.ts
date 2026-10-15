@@ -7,6 +7,7 @@ import {
   isMovideskTokenConfigured,
   listMovideskMigrationDashboard,
   retryFailedMovideskArticles,
+  reprocessMovideskArticles,
   setMovideskMigrationRunning,
   startMovideskCatalogSync,
 } from "$lib/server/help/movideskMigration";
@@ -60,6 +61,21 @@ export const actions: Actions = {
       await retryFailedMovideskArticles(session.user.id);
       return { success: true, message: "Artigos com falha colocados novamente na fila." };
     } catch (cause) { return fail(409, { success: false, message: errorText(cause) }); }
+  },
+  reprocess: async ({ cookies }) => {
+    requireMigrationEnabled();
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", ROUTE);
+    try {
+      const result = await reprocessMovideskArticles(session.user.id);
+      return { success: true, message: result.queued
+        ? `${result.queued} artigos colocados na fila; ${result.skipped} preservados (editados, aprovados ou publicados).`
+        : "Nenhum artigo elegível para reprocessamento." };
+    } catch (cause) {
+      return fail(409, { success: false, message: cause instanceof Error
+        && cause.message === "MOVIDESK_REPROCESS_BUSY"
+        ? "Conclua ou pause a importação atual antes de reprocessar."
+        : errorText(cause) });
+    }
   },
   approve: async ({ cookies, request }) => {
     requireMigrationEnabled();
