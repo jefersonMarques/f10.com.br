@@ -132,6 +132,7 @@
             <div class="flex shrink-0 flex-wrap items-center gap-2">
               <a href={article.sourceUrl} target="_blank" rel="noopener noreferrer" title="Abrir original no Movidesk" aria-label="Abrir original no Movidesk" class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#E3E6ED] text-[#697182] hover:text-[#000A57]"><ExternalLink size={16}/></a>
               {#if article.contentId}
+                <a href={`/app/help/content/movidesk/${article.sourceId}`} class="inline-flex h-9 items-center rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold text-[#4D596B]">Original salvo</a>
                 <a href={`/app/help/content/${article.contentId}`} class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold text-[#000A57]">Abrir no F10<ArrowUpRight size={14}/></a>
                 {#if article.needsReview}
                   <form method="POST" action="?/approve" on:submit={(event) => { if (!confirm("Você conferiu o conteúdo, as imagens e os anexos deste artigo no F10?")) event.preventDefault(); }}>
