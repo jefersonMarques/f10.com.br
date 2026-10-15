@@ -1,9 +1,9 @@
 import { env } from "$env/dynamic/private";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { helpMovideskArticles, helpMovideskImportState } from "$lib/server/db/helpMovideskSchema";
 import { helpCategories, helpContents } from "$lib/server/db/structuredHelpSchema";
-import { helpPublications } from "$lib/server/db/helpPublications";
+import { listPublishedStructuredHelpLinks } from "$lib/server/help/publicStructuredHelpRepository";
 import { normalizeHelpCategorySlug, createHelpCategory, listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import { normalizeHelpSlug } from "$lib/server/help/helpArticleRepository";
 import { importStructuredHelpFile, type HelpImportFile } from "$lib/server/help/structuredHelpImport";
@@ -155,24 +155,28 @@ export async function listMovideskMigrationDashboard() {
     needsReview: helpMovideskArticles.needsReview,
     issue: helpMovideskArticles.issue,
     categories: helpMovideskArticles.categories,
-    published: helpPublications.entityId,
-    publishedSlug: sql<string | null>`${helpPublications.snapshot}->'public'->>'slug'`,
   }).from(helpMovideskArticles)
-    .leftJoin(helpPublications, and(
-      eq(helpPublications.entityType, "content"),
-      eq(helpPublications.entityId, helpMovideskArticles.contentId),
-    ))
     .orderBy(asc(helpMovideskArticles.sourceId))
     .limit(1000);
+  // help_publications.entity_id é TEXT e help_movidesk_articles.content_id é UUID.
+  // Cruzar os IDs em memória evita uma comparação SQL inválida (text = uuid).
+  const publishedById = new Map(
+    (await listPublishedStructuredHelpLinks()).map((item) => [item.entityId, item.slug]),
+  );
+  const articles = rows.map((row) => ({
+    ...row,
+    published: Boolean(row.contentId && publishedById.has(row.contentId)),
+    publishedSlug: row.contentId ? (publishedById.get(row.contentId) ?? null) : null,
+  }));
   return {
     state,
-    total: rows.length,
-    imported: rows.filter(r => Boolean(r.contentId)).length,
-    published: rows.filter(r => Boolean(r.published)).length,
-    pending: rows.filter(r => r.state === "discovered").length,
-    failed: rows.filter(r => r.state === "failed").length,
-    review: rows.filter(r => r.needsReview && Boolean(r.contentId)).length,
-    articles: rows.map(r => ({ ...r, published: Boolean(r.published) })),
+    total: articles.length,
+    imported: articles.filter(r => Boolean(r.contentId)).length,
+    published: articles.filter(r => r.published).length,
+    pending: articles.filter(r => r.state === "discovered").length,
+    failed: articles.filter(r => r.state === "failed").length,
+    review: articles.filter(r => r.needsReview && Boolean(r.contentId)).length,
+    articles,
   };
 }
 
