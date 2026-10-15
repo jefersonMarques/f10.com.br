@@ -257,8 +257,12 @@ async function importArticle(sourceId: number, actorUserId: string): Promise<voi
   }
 
   const categorySlugs = await ensureCategories(actorUserId, cats);
+  const desiredSlug = normalizeHelpSlug(slug || text(raw.title) || staged.title);
+  const [slugConflict] = await getDatabase().select({ id: helpContents.id }).from(helpContents)
+    .where(eq(helpContents.slug, desiredSlug)).limit(1);
+  const safeSlug = slugConflict ? `${desiredSlug.slice(0, 92)}-${sourceId}` : desiredSlug;
   const converted = await convertMovideskHtml({
-    sourceId, title: text(raw.title) || staged.title, slug,
+    sourceId, title: text(raw.title) || staged.title, slug: safeSlug,
     summary: text(raw.summary), sourceUrl: sourceUrl(sourceId, slug),
     html, text: plain, categorySlugs, attachments: files,
   });
