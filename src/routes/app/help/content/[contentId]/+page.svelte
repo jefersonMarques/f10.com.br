@@ -97,7 +97,8 @@
     singleImagePerStep &&
     imageOnlyStepsReady &&
     humanReviewReady &&
-    videoReady;
+    videoReady &&
+    !data.movideskArticle?.needsReview;
   $: knowledgeTopics = Array.from(
     new Set(
       [
@@ -144,6 +145,22 @@
     <div class={`mb-4 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
       {#if form.success}<CheckCircle2 size={18}/>{:else}<CircleAlert size={18}/>{/if}<span>{form.message}</span>
     </div>
+  {/if}
+
+  {#if data.movideskArticle}
+    <section class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#D9DFEA] bg-[#FAFBFD] px-4 py-3">
+      <div>
+        <p class="text-[13px] font-semibold text-[#303645]">Artigo importado do Movidesk</p>
+        <p class="mt-1 text-[12px] text-[#7A8190]">
+          {data.movideskArticle.needsReview ? "Confira texto, imagens e anexos antes de publicar." : "Origem preservada · revisão inicial aprovada."}
+          {#if data.movideskArticle.issue}<span class="ml-1 text-[#9B5C20]">{data.movideskArticle.issue}</span>{/if}
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <a href={data.movideskArticle.sourceUrl} rel="noopener noreferrer" target="_blank" class="rounded-lg border border-[#DDE1EA] bg-white px-3 py-2 text-[12px] font-semibold text-[#000A57]">Ver original</a>
+        <a href="/app/help/content/movidesk" class="rounded-lg border border-[#DDE1EA] bg-white px-3 py-2 text-[12px] font-semibold text-[#000A57]">Revisão da migração</a>
+      </div>
+    </section>
   {/if}
 
   {#if data.content.status === "archived"}
