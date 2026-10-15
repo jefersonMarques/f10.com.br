@@ -66,26 +66,48 @@ function errorMessage(cause: unknown): string {
   return "Não foi possível concluir a operação. Confira os registros do servidor.";
 }
 
-async function callApi(path: string): Promise<SourceRecord> {
-  const token = env.MOVIDESK_KB_API_TOKEN?.trim();
-  if (!token) throw new Error("MOVIDESK_TOKEN_MISSING");
+async function requestMovideskApi(path: string, authorization: string): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 25_000);
   try {
-    const response = await fetch(`${BASE}${path}`, {
-      headers: { Authorization: token, Accept: "application/json" },
+    return await fetch(`${BASE}${path}`, {
+      headers: { Authorization: authorization, Accept: "application/json" },
       signal: controller.signal,
       redirect: "manual",
     });
-    if (!response.ok) throw new Error(`MOVIDESK_API_HTTP_${response.status}`);
-    const payload = await response.json() as unknown;
-    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-      throw new Error("MOVIDESK_INVALID_RESPONSE");
-    }
-    return record(payload);
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function callApi(path: string): Promise<SourceRecord> {
+  const configuredToken = env.MOVIDESK_KB_API_TOKEN?.trim();
+  if (!configuredToken) throw new Error("MOVIDESK_TOKEN_MISSING");
+  // A documentação de artigos usa Authorization: TOKEN; a geral usa Bearer TOKEN.
+  const token = configuredToken.replace(/^Bearer\s+/i, "").trim();
+  if (!token) throw new Error("MOVIDESK_TOKEN_MISSING");
+  let response = await requestMovideskApi(path, token);
+
+  if (response.status === 401) {
+    await response.body?.cancel();
+    // Segunda tentativa só em 401. Respeita o limite da API (10 requisições/min).
+    await new Promise<void>((resolve) => setTimeout(resolve, INTERVAL_MS));
+    response = await requestMovideskApi(path, `Bearer ${token}`);
+    if (response.status === 401) {
+      await response.body?.cancel();
+      throw new Error("MOVIDESK_API_AUTH_REJECTED");
+    }
+  }
+
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new Error(`MOVIDESK_API_HTTP_${response.status}`);
+  }
+  const payload = await response.json() as unknown;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("MOVIDESK_INVALID_RESPONSE");
+  }
+  return record(payload);
 }
 
 async function getMovideskArticle(sourceId: number): Promise<SourceRecord> {
@@ -336,6 +358,11 @@ export async function tickMovideskMigration(): Promise<void> {
       try {
         await importArticle(claimed.articleId, claimed.actor);
       } catch (cause) {
+        // Falha de credencial é global; não marque todos os artigos como falhos.
+        if (cause instanceof Error && (
+          cause.message === "MOVIDESK_API_AUTH_REJECTED" ||
+          cause.message === "MOVIDESK_TOKEN_MISSING"
+        )) throw cause;
         const issue = errorMessage(cause);
         console.warn("[help-movidesk] article import failed", { articleId: claimed.articleId, issue });
         await db.update(helpMovideskArticles).set({
