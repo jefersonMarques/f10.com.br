@@ -71,3 +71,12 @@ Antes de mudar o DNS, verifique:
 Quando a migração estiver concluída, remova `F10_MOVIDESK_MIGRATION_ENABLED=true` (ou defina `false`) e reinicie o PM2. O atalho e a rota administrativa ficarão ocultos, e o worker parará. **Não apague a tabela de mapeamentos**: os 301 continuam dependendo dela.
 
 O host `f10.movidesk.com` pertence ao Movidesk; seus próprios redirecionamentos não podem ser garantidos após o cancelamento.
+
+
+### Organização do conteúdo migrado
+
+- Parágrafos são separados em seções curtas com títulos extraídos do próprio texto; títulos reais do HTML são preservados.
+- Vídeos do YouTube e arquivos HTTPS MP4 (inclusive Oracle Object Storage) ficam na posição original e são reproduzidos diretamente no preview e artigo público. O formato do importador continua compatível com os blocos de link existentes: não inventar transcrição de vídeo.
+- Imagens do Movidesk e dos endereços oficiais Amazon S3 são copiadas para o armazenamento F10 quando possíveis. Redirects S3 passam pela mesma validação HTTPS e hostname. Se uma imagem falhar, o artigo é importado para revisão com link para a imagem original e aviso, em vez de descartar o conteúdo inteiro.
+- Links de navegação "Próximo"/"Anterior" do Movidesk são descartados; a navegação nativa do F10 é a referência.
+- Após o deploy, usar **Reprocessar artigos** (somente rascunhos intactos) para aplicar as melhorias; artigos editados e publicados são protegidos. Conferir vídeo e imagem na visualização antes de aprovar.
