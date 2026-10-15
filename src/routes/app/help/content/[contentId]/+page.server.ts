@@ -5,6 +5,7 @@ import { hasPermission } from "$lib/server/auth/permissions";
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import { moveHelpBlock, moveHelpStep, type HelpMoveDirection } from "$lib/server/help/helpContentOrdering";
 import { publishHelpKnowledgeContent } from "$lib/server/help/helpKnowledgePublisher";
+import { getMovideskArticleByContentId } from "$lib/server/help/movideskMigration";
 import { findImportedHelpVideoByChecksum } from "$lib/server/help/helpImportedFeaturedVideo";
 import {
   createManagedHelpAsset,
@@ -211,9 +212,10 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   );
   if (!hasPermission(permissions, "help.view")) throw error(403, "Acesso não autorizado.");
 
-  const [content, categories] = await Promise.all([
+  const [content, categories, movideskArticle] = await Promise.all([
     getStructuredHelpContent(params.contentId),
     listHelpCategories(),
+    getMovideskArticleByContentId(params.contentId),
   ]);
   if (!content) throw error(404, "Conteúdo não encontrado.");
 
@@ -221,6 +223,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   return {
     content,
     categories,
+    movideskArticle,
     canEdit: !archived && hasPermission(permissions, "help.edit"),
     canPublish: !archived && hasPermission(permissions, "help.publish"),
   };
@@ -564,6 +567,10 @@ export const actions: Actions = {
   publish: async ({ cookies, params }) => {
     if (!isUuid(params.contentId)) return fail(404, { success: false, message: "Conteúdo não encontrado." });
     const { session } = await requireAppPermission(cookies, "help.publish", contentEditorPath(params.contentId));
+    const origin = await getMovideskArticleByContentId(params.contentId);
+    if (origin?.needsReview) {
+      return fail(409, { success: false, message: "Este artigo foi importado do Movidesk. Conclua a revisão na área de Migração antes de publicar." });
+    }
     try {
       await publishHelpKnowledgeContent(session.user.id, params.contentId);
     } catch (cause) {
