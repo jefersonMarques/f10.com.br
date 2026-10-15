@@ -12,7 +12,7 @@ const ENTITY_NAMES: Record<string, string> = {
   aacute: "á", eacute: "é", iacute: "í", oacute: "ó", uacute: "ú",
   agrave: "à", atilde: "ã", otilde: "õ", ccedil: "ç",
   ldquo: "“", rdquo: "”", lsquo: "‘", rsquo: "’", laquo: "«", raquo: "»",
-  ndash: "–", euro: "€", reg: "®", copy: "©", trade: "™",
+  euro: "€", reg: "®", copy: "©", trade: "™",
   ecirc: "ê", acirc: "â", ocirc: "ô", ucirc: "û", icirc: "î",
   egrave: "è", euml: "ë", uuml: "ü", ouml: "ö", auml: "ä",
   Aacute: "Á", Eacute: "É", Iacute: "Í", Oacute: "Ó", Uacute: "Ú",
@@ -38,7 +38,7 @@ function decode(value: string): string {
 }
 
 function attribute(tag: string, name: string): string {
-  const match = tag.match(new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"));
+  const match = tag.match(new RegExp(`\\b${name}\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))`, "i"));
   return decode(match?.[1] ?? match?.[2] ?? match?.[3] ?? "").trim();
 }
 
@@ -178,8 +178,8 @@ export async function convertMovideskHtml(input: {
     if (name === "a") {
       if (!closing) {
         // O F10 já gera navegação entre conteúdos. Não importar o "Próximo:" antigo.
-        const skip = /(?:^|\\n)\\s*(?:pr[oó]ximo|anterior)\\s*:\\s*$/i.test(paragraph);
-        if (skip) paragraph = paragraph.replace(/(?:^|\\n)\\s*(?:pr[oó]ximo|anterior)\\s*:\\s*$/i, "");
+        const skip = /(?:^|\n)\s*(?:pr[oó]ximo|anterior)\s*:\s*$/i.test(paragraph);
+        if (skip) paragraph = paragraph.replace(/(?:^|\n)\s*(?:pr[oó]ximo|anterior)\s*:\s*$/i, "");
         flushParagraph();
         pendingLink = { href: attribute(token, "href"), label: "", skip };
       } else if (pendingLink) {
@@ -187,7 +187,7 @@ export async function convertMovideskHtml(input: {
           let href = safeHttpUrl(pendingLink.href, input.sourceUrl);
           if (href) {
             const url = new URL(href);
-            const match = /^\\/kb\\/(?:[a-z]{2}-[a-z]{2}\\/)?article\\/(\\d+)(?:\\/|$)/i.exec(url.pathname);
+            const match = /^\/kb\/(?:[a-z]{2}-[a-z]{2}\/)?article\/(\d+)(?:\/|$)/i.exec(url.pathname);
             if ((url.hostname === "f10.movidesk.com" || url.hostname === "ajuda.f10.com.br") && match) {
               const target = input.resolveArticleUrl?.(Number(match[1]));
               if (target) href = target;
