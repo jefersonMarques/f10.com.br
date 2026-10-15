@@ -192,7 +192,15 @@
                   {@const fileUrl = block.asset.storageKey ? managedAssetUrl(block.asset.id) : block.asset.sourceUrl}
                   {#if fileUrl}<a href={fileUrl} target="_blank" rel="noopener noreferrer" class="flex items-center justify-between gap-3 rounded-2xl border border-[#E1E4EC] bg-[#FAFAFC] px-4 py-4 transition hover:border-[#C8CEE0]"><span><strong class="block text-[11px] text-[#303645]">{block.linkLabel || "Baixar arquivo"}</strong><small class="mt-1 block text-[9px] text-[#8A909E]">Material complementar</small></span><Download size={18} class="text-[#000A57]"/></a>{/if}
                 {:else if block.blockType === "link" && block.linkUrl}
-                  <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#EEF0FF] px-4 text-[11px] font-semibold text-[#000A57]">{block.linkLabel || "Abrir link"}<ExternalLink size={13}/></a>
+                  {@const inlineYouTube = youtubeEmbedUrl(block.linkUrl)}
+                  {#if inlineYouTube}
+                    <div class="max-w-[850px] overflow-hidden rounded-2xl border border-[#E2E5ED] bg-white">
+                      <div class="aspect-video bg-black"><iframe src={inlineYouTube} title={block.linkLabel || "Vídeo do YouTube"} class="h-full w-full" loading="lazy" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>
+                      <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-10 items-center gap-2 px-4 text-[12px] font-semibold text-[#000A57]">Assistir no YouTube<ExternalLink size={13}/></a>
+                    </div>
+                  {:else}
+                    <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#EEF0FF] px-4 text-[11px] font-semibold text-[#000A57]">{block.linkLabel || "Abrir link"}<ExternalLink size={13}/></a>
+                  {/if}
                 {/if}
               </div>
             {/each}
