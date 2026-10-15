@@ -208,6 +208,7 @@
     <a href="/app/help/insights" class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57]"><BarChart3 size={15}/>Insights</a>
     <a href="/app/help/categories" class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57]">Categorias</a>
     <a href="/app/help/assets" class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57]"><HardDrive size={15}/>Biblioteca</a>
+    {#if data.canManageMovidesk}<a href="/app/help/content/movidesk" class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[12px] font-semibold text-[#000A57]">Migração Movidesk</a>{/if}
     {#if data.canEdit}<a href="/app/help/content/import" class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#000A57]"><UploadCloud size={15}/>Importar</a>{/if}
   </div>
 
