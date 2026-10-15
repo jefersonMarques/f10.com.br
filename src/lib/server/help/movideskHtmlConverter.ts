@@ -38,7 +38,7 @@ function decode(value: string): string {
 }
 
 function attribute(tag: string, name: string): string {
-  const match = tag.match(new RegExp(\`\\b\${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))\`, "i"));
+  const match = tag.match(new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"));
   return decode(match?.[1] ?? match?.[2] ?? match?.[3] ?? "").trim();
 }
 
