@@ -163,6 +163,10 @@
           <div class="aspect-video overflow-hidden bg-black"><iframe src={videoEmbed} title={data.content.featuredVideo.altText || `Vídeo: ${data.content.title}`} class="h-full w-full" loading="eager" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>
         {:else if data.content.featuredVideo.storageKey}
           <video controls preload="metadata" class="aspect-video h-auto w-full bg-black" src={managedAssetUrl(data.content.featuredVideo.id)}><track kind="captions" /></video>
+        {:else if mp4LinkUrl(data.content.featuredVideo.sourceUrl)}
+          <div class="aspect-video bg-black">
+            <video src={data.content.featuredVideo.sourceUrl ?? undefined} controls preload="metadata" playsinline class="h-full w-full"><track kind="captions" /></video>
+          </div>
         {:else if data.content.featuredVideo.sourceUrl}
           <a href={data.content.featuredVideo.sourceUrl} target="_blank" rel="noopener noreferrer" class="flex min-h-24 items-center justify-between gap-4 px-6 py-5 text-[#000A57] transition hover:bg-[#FAFAFC]"><span class="flex items-center gap-3"><PlayCircle size={24}/><span><strong class="block text-[13px]">Assistir ao vídeo deste conteúdo</strong><small class="mt-1 block text-[10px] text-[#7E8493]">O vídeo abre em uma nova guia.</small></span></span><ExternalLink size={16}/></a>
         {/if}
