@@ -338,6 +338,7 @@ export async function tickMovideskMigration(): Promise<void> {
 let started = false;
 export function startMovideskMigrationWorker(): void {
   if (started || !isMovideskMigrationEnabled()) return;
+  if (env.NODE_ENV === "production" && env.F10_HELP_VIDEO_WORKER !== "1") return;
   started = true;
   const timer = setInterval(() => {
     void tickMovideskMigration().catch(cause => console.error("[help-movidesk] worker", errorMessage(cause)));
