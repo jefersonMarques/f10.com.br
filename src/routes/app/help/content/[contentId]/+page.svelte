@@ -48,6 +48,14 @@
     file: "Arquivo",
   };
 
+  function isMp4Link(value: string | null): boolean {
+    if (!value) return false;
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" && /\.mp4$/i.test(url.pathname);
+    } catch { return false; }
+  }
+
   function assignedCategory(categoryId: string) {
     return data.content.categories.find((category) => category.id === categoryId);
   }
@@ -297,7 +305,7 @@
                 {#each step.blocks as block, blockIndex}
                   <div class="rounded-2xl border border-[#E3E6ED] bg-[#FAFAFC] p-4 sm:p-5">
                     <div class="flex flex-wrap items-center justify-between gap-3">
-                      <span class="application-text-meta inline-flex items-center gap-2 font-bold uppercase tracking-[0.08em] text-[#737989]">{#if block.blockType === "text" || block.blockType === "file"}<FileText size={14}/>{:else if block.blockType === "image"}<ImageIcon size={14}/>{:else if block.blockType === "link"}<Link2 size={14}/>{:else}<Info size={14}/>{/if}{blockLabels[block.blockType] ?? block.blockType} {blockIndex + 1}</span>
+                      <span class="application-text-meta inline-flex items-center gap-2 font-bold uppercase tracking-[0.08em] text-[#737989]">{#if block.blockType === "text" || block.blockType === "file"}<FileText size={14}/>{:else if block.blockType === "image"}<ImageIcon size={14}/>{:else if block.blockType === "link" && isMp4Link(block.linkUrl)}<Video size={14}/>{:else if block.blockType === "link"}<Link2 size={14}/>{:else}<Info size={14}/>{/if}{blockLabels[block.blockType] ?? block.blockType} {blockIndex + 1}</span>
                       {#if data.canEdit}
                         <div class="flex items-center gap-1">
                           <form method="POST" action="?/moveBlock"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockId" value={block.id}/><input type="hidden" name="direction" value="up"/><button type="submit" disabled={blockIndex === 0} class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#777D8D] disabled:opacity-30" aria-label="Mover bloco para cima"><ArrowUp size={13}/></button></form>
@@ -313,6 +321,9 @@
                       {#if block.asset.storageKey}<img src={`/api/app/help/assets/${block.asset.id}`} alt={block.asset.altText || "Imagem"} class="mt-4 max-h-[380px] w-auto rounded-xl border border-[#E2E5ED] bg-white object-contain" />{:else if block.asset.sourceUrl}<img src={block.asset.sourceUrl} alt={block.asset.altText || "Imagem"} class="mt-4 max-h-[380px] w-auto rounded-xl border border-[#E2E5ED] bg-white object-contain" />{/if}
                       <div class="mt-3 rounded-xl bg-white px-3 py-2 text-[10px] leading-5 text-[#6F7584]"><strong>Texto alternativo:</strong> {block.asset.altText || "não informado"}<br/><strong>Descrição para o assistente:</strong> {block.asset.assistantDescription || "não necessária / não informada"}</div>
                     {:else if block.blockType === "link"}
+                      {#if isMp4Link(block.linkUrl)}
+                        <div class="mt-4 max-w-[720px] overflow-hidden rounded-xl border border-[#E2E5ED] bg-black"><video src={block.linkUrl ?? undefined} controls preload="metadata" playsinline class="aspect-video w-full"><track kind="captions" /></video></div>
+                      {/if}
                       <form method="POST" action="?/updateBlock" class="mt-4 grid gap-3 lg:grid-cols-2"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockId" value={block.id}/><input type="hidden" name="blockType" value="link"/><input name="linkLabel" required maxlength="240" value={block.linkLabel ?? ""} class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"/><input name="linkUrl" required value={block.linkUrl ?? ""} class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"/>{#if data.canEdit}<div class="flex justify-end lg:col-span-2"><button type="submit" class="application-text-caption min-h-9 rounded-xl bg-white px-3 font-semibold text-[#000A57] ring-1 ring-[#DDE1EA]">Salvar link</button></div>{/if}</form>
                     {:else if block.blockType === "file" && block.asset}
                       <div class="mt-4 rounded-xl border border-[#DDE1EA] bg-white p-3"><strong class="text-[11px] text-[#303645]">{block.linkLabel || block.asset.originalName || "Arquivo"}</strong>{#if block.asset.extractedText}<p class="mt-2 line-clamp-4 whitespace-pre-wrap text-[10px] leading-5 text-[#777D8D]">{block.asset.extractedText}</p>{/if}</div>
