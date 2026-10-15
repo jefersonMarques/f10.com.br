@@ -33,7 +33,9 @@ Faça o deploy com `npm run prod`. Depois abra **Base de Conhecimento → Migra�
 ## Correções e reprocessamento
 
 Depois de concluir a primeira importação, use **Reprocessar artigos** no painel para aplicar
-correções do conversor aos rascunhos e tentar novamente os artigos com falha. A operação
+correções do conversor aos rascunhos e tentar novamente os artigos com falha.
+O worker reutiliza HTML e metadados originais salvos no banco; somente artigos sem cópia
+original precisam de nova consulta à API Movidesk. A operação
 trabalha no worker, com progresso persistido e sem usar IA. O mesmo conteúdo mantém seu
 ID original e o histórico original é preservado.
 
