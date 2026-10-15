@@ -60,7 +60,7 @@ function mediaUrl(raw: string, baseUrl: string): URL {
   const additionalHosts = (env.MOVIDESK_IMAGE_ALLOWED_HOSTS ?? "")
     .split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
   // Apenas hosts HTTPS explicitamente permitidos, nunca IPs, localhost ou wildcards.
-  const allowed = SAFE_IMAGE_HOST.test(host) || host === "ajuda.f10.com.br"
+  const allowed = SAFE_IMAGE_HOST.test(host) || ["f10.com.br", "www.f10.com.br", "ajuda.f10.com.br"].includes(host)
     || host === "movidesk-static.s3.amazonaws.com"
     || (additionalHosts.includes(host)
       && /^[a-z0-9][a-z0-9.-]*[a-z0-9]$/.test(host)
