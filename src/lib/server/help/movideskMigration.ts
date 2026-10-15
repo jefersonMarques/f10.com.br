@@ -333,7 +333,16 @@ async function importArticle(sourceId: number, actorUserId: string): Promise<voi
     }).where(eq(helpMovideskArticles.sourceId, sourceId));
     return;
   }
-  const raw = await getMovideskArticle(sourceId);
+  // Reprocessamentos usam o HTML original preservado e dispensam novas chamadas à API.
+  const raw: SourceRecord = staged.sourceHtml || staged.sourceText
+    ? {
+        id: sourceId, title: staged.title, slug: staged.slug,
+        summary: staged.summary, contentHtml: staged.sourceHtml,
+        contentText: staged.sourceText, categories: staged.categories,
+        attachments: staged.attachments, revisionId: staged.sourceRevision,
+        updatedDate: staged.sourceUpdatedAt?.toISOString(),
+      }
+    : await getMovideskArticle(sourceId);
   if (numeric(raw.id) !== sourceId) throw new Error("MOVIDESK_ARTICLE_MISMATCH");
   const html = text(raw.contentHtml);
   const plain = text(raw.contentText);
@@ -419,13 +428,18 @@ export async function tickMovideskMigration(): Promise<void> {
     if (state.phase !== "catalog" && state.phase !== "details") return null;
     const [next] = state.phase === "details" ? await tx.select({
       sourceId: helpMovideskArticles.sourceId,
+      sourceHtml: helpMovideskArticles.sourceHtml,
+      sourceText: helpMovideskArticles.sourceText,
     }).from(helpMovideskArticles)
       .where(eq(helpMovideskArticles.state, "discovered"))
       .orderBy(asc(helpMovideskArticles.sourceId)).limit(1) : [];
     await tx.update(helpMovideskImportState).set({
       nextRequestAt: new Date(Date.now() + REQUEST_LEASE_MS),
     }).where(eq(helpMovideskImportState.id, 1));
-    return { phase: state.phase, page: state.nextPage, articleId: next?.sourceId ?? null, actor: state.startedBy };
+    return {
+      phase: state.phase, page: state.nextPage, articleId: next?.sourceId ?? null,
+      hasOriginal: Boolean(next?.sourceHtml || next?.sourceText), actor: state.startedBy,
+    };
   });
   if (!claimed) return;
   try {
@@ -458,7 +472,8 @@ export async function tickMovideskMigration(): Promise<void> {
         }).where(eq(helpMovideskArticles.sourceId, claimed.articleId));
       }
       await db.update(helpMovideskImportState).set({
-        nextRequestAt: new Date(Date.now() + INTERVAL_MS), updatedAt: new Date(),
+        nextRequestAt: new Date(Date.now() + (claimed.hasOriginal ? 0 : INTERVAL_MS)),
+        updatedAt: new Date(),
       }).where(eq(helpMovideskImportState.id, 1));
     }
   } catch (cause) {
