@@ -5,8 +5,8 @@ import type { HelpImportPackageAsset } from "$lib/server/help/helpImportPackage"
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_IMAGE_COUNT = 60;
-const SAFE_IMAGE_HOST = /(^|\\.)(movidesk\\.com)$/i;
-const SAFE_S3_HOST = /^(?:[a-z0-9.-]+\\.)?s3(?:[.-][a-z0-9-]+)?\\.amazonaws\\.com$/i;
+const SAFE_IMAGE_HOST = /(^|\.)(movidesk\.com)$/i;
+const SAFE_S3_HOST = /^(?:[a-z0-9.-]+\.)?s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com$/i;
 const ENTITY_NAMES: Record<string, string> = {
   amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
   bull: "•", ndash: "–", mdash: "—", hellip: "…",
@@ -90,6 +90,9 @@ function mediaUrl(raw: string, baseUrl: string): URL {
       && /^[a-z0-9][a-z0-9.-]*[a-z0-9]$/.test(host)
       && host.includes(".") && !/^(?:\d+\.){3}\d+$/.test(host)
       && !host.endsWith(".local") && !host.endsWith(".internal"));
+  // Imagens antigas da base podem referenciar HTTP em origens já confiáveis.
+  // Força TLS antes do download, sem permitir servidores arbitrários.
+  if (allowed && url.protocol === "http:") url.protocol = "https:";
   if (url.protocol !== "https:" || !allowed) {
     throw new Error(`MOVIDESK_IMAGE_HOST_NOT_ALLOWED:${host.slice(0, 150)}`);
   }
@@ -217,10 +220,12 @@ export async function convertMovideskHtml(input: {
   content: HelpImportContent;
   assets: Map<string, HelpImportPackageAsset>;
   issues: string[];
+  primaryVideo: { url: string; kind: "youtube" | "mp4" } | null;
 }> {
   const issues: string[] = [];
-  const html = stripLegacyNavigation(input.html.slice(0, 2_000_000));
-  if (html.length < input.html.length) issues.push("HTML original maior que o limite de conversão.");
+  const originalSlice = input.html.slice(0, 2_000_000);
+  const html = stripLegacyNavigation(originalSlice);
+  if (originalSlice.length < input.html.length) issues.push("HTML original maior que o limite de conversão.");
   const iframes = html.match(/<iframe\b[^>]*>/gi) ?? [];
   const unknownIframes = iframes.some(tag => {
     const src = attribute(tag, "src");
@@ -386,11 +391,33 @@ export async function convertMovideskHtml(input: {
       issues.push(`Imagem ${i + 1}: ${issue}. Conferir no original.`);
       const fallback = safeHttpUrl(image.src, input.sourceUrl);
       if (image.block.type === "image" && fallback) {
-        Object.assign(image.block, { type: "link", url: fallback, label: "Ver imagem original" });
+        // Mantém um bloco de imagem real mesmo sem espelhar o arquivo,
+        // para revisão ou importação posterior, em vez de perder a estrutura.
+        image.block.url = fallback;
       } else if (image.block.type === "image") {
         Object.assign(image.block, { type: "notice", text: "Imagem indisponível. Consulte o artigo original.", variant: "warning" });
       }
     }
+  }
+
+  // Primeiro vídeo do artigo vira o vídeo principal nativo do F10.
+  // Vídeos adicionais permanecem na posição original como blocos auxiliares.
+  let primaryVideo: { url: string; kind: "youtube" | "mp4" } | null = null;
+  for (const step of steps) {
+    const videoIndex = step.blocks.findIndex(block => block.type === "link"
+      && (block.label === "Vídeo do YouTube" || block.label === "Vídeo MP4"));
+    if (videoIndex < 0) continue;
+    const block = step.blocks[videoIndex]!;
+    if (block.type !== "link") continue;
+    primaryVideo = {
+      url: block.url,
+      kind: block.label === "Vídeo MP4" ? "mp4" : "youtube",
+    };
+    // Evita duplicar o vídeo no topo e dentro do texto.
+    if (steps.some(item => item.blocks.some(other => other !== block))) {
+      step.blocks.splice(videoIndex, 1);
+    }
+    break;
   }
 
   const organized = organizeSteps(steps);
@@ -410,5 +437,6 @@ export async function convertMovideskHtml(input: {
     },
     assets,
     issues,
+    primaryVideo,
   };
 }

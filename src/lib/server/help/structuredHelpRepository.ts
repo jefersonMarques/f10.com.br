@@ -353,7 +353,7 @@ async function buildVersionSnapshot(contentId: string) {
   };
 }
 
-async function saveStructuredContentVersion(
+export async function saveStructuredContentVersion(
   contentId: string,
   actorUserId: string,
 ): Promise<void> {

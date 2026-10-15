@@ -80,3 +80,16 @@ O host `f10.movidesk.com` pertence ao Movidesk; seus próprios redirecionamentos
 - Imagens do Movidesk e dos endereços oficiais Amazon S3 são copiadas para o armazenamento F10 quando possíveis. Redirects S3 passam pela mesma validação HTTPS e hostname. Se uma imagem falhar, o artigo é importado para revisão com link para a imagem original e aviso, em vez de descartar o conteúdo inteiro.
 - Links de navegação "Próximo"/"Anterior" do Movidesk são descartados; a navegação nativa do F10 é a referência.
 - Após o deploy, usar **Reprocessar artigos** (somente rascunhos intactos) para aplicar as melhorias; artigos editados e publicados são protegidos. Conferir vídeo e imagem na visualização antes de aprovar.
+
+
+### Vídeos nativos e preparação para IA
+
+- O primeiro YouTube/MP4 incorporado no HTML original é registrado no **Vídeo principal** nativo do conteúdo F10.
+- Quando a origem é um MP4 HTTPS confiável, o worker tenta copiá-lo para o armazenamento do F10 (até 90 MB, formato validado). Isso permite usar o vídeo local no fluxo existente de análise da IA **mais tarde**, sem processá-lo durante a migração.
+- Se não puder baixar ou for YouTube, a URL permanece no campo **Vídeo principal**; o painel avisa que ainda será necessário um MP4 local antes da análise.
+- Não inventamos legendas nem resumos. O campo de transcrição fica vazio para processamento posterior; os requisitos normais de publicação permanecem ativos.
+- Vídeos adicionais continuam em ordem dentro dos passos. O F10 só possui um campo **Vídeo principal** por artigo.
+- Os dados originais continuam salvos para reprocessamentos seguros. O aviso de HTML excedido usa agora somente a comparação com o limite real, não o resultado de limpar a navegação.
+- Domínios S3 reconhecidos passam a ser aceitos pela lista segura. Se a imagem falhar, mantém o bloco de imagem original no rascunho para revisão, em vez de substituí-lo por um link genérico.
+
+Antes de reprocessar em lote, teste um artigo com YouTube, outro com MP4 Oracle e um com screenshots S3. Não publique automaticamente.

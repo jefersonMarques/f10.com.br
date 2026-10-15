@@ -9,6 +9,9 @@ import { normalizeHelpCategorySlug, createHelpCategory, listHelpCategories } fro
 import { normalizeHelpSlug } from "$lib/server/help/helpArticleRepository";
 import { importStructuredHelpFile, type HelpImportFile } from "$lib/server/help/structuredHelpImport";
 import { convertMovideskHtml } from "$lib/server/help/movideskHtmlConverter";
+import { downloadMovideskMp4 } from "$lib/server/help/movideskVideoMirror";
+import { attachImportedMp4AsFeaturedVideo } from "$lib/server/help/helpImportedFeaturedVideo";
+import { saveStructuredContentVersion, upsertStructuredHelpFeaturedVideo } from "$lib/server/help/structuredHelpRepository";
 import { getPublishedStructuredHelpById } from "$lib/server/help/publicStructuredHelpRepository";
 
 const BASE = "https://api.movidesk.com/public/v1";
@@ -408,10 +411,51 @@ async function importArticle(sourceId: number, actorUserId: string): Promise<voi
   const result = await importStructuredHelpFile(actorUserId, file, converted.assets);
   const imported = result.imported[0];
   if (!imported) throw new Error("MOVIDESK_IMPORT_EMPTY");
+
+  if (converted.primaryVideo) {
+    const source = converted.primaryVideo;
+    const videoMeta = {
+      sourceUrl: source.url,
+      altText: `Vídeo original: ${text(raw.title) || staged.title}`.slice(0, 500),
+      subtitles: "", // A futura IA transcreverá. Nunca inventar legendas.
+      assistantSummary: "",
+    };
+    if (source.kind === "mp4") {
+      try {
+        const bytes = await downloadMovideskMp4(source.url);
+        await attachImportedMp4AsFeaturedVideo({
+          actorUserId, contentId: imported.id, bytes,
+          fileName: `movidesk-${sourceId}.mp4`,
+          sourceUrl: source.url, subtitles: "",
+          altText: videoMeta.altText, assistantSummary: "",
+        });
+        await saveStructuredContentVersion(imported.id, actorUserId);
+      } catch (cause) {
+        // Mantém o vídeo no campo nativo mesmo se o download exceder o limite.
+        await upsertStructuredHelpFeaturedVideo(actorUserId, imported.id, videoMeta);
+        const reason = cause instanceof Error && cause.message.startsWith("MOVIDESK_")
+          ? cause.message : "MOVIDESK_VIDEO_COPY_FAILED";
+        converted.issues.push(`Vídeo principal externo: ${reason}. Precisa de MP4 local para a IA.`);
+      }
+    } else {
+      await upsertStructuredHelpFeaturedVideo(actorUserId, imported.id, videoMeta);
+      converted.issues.push("Vídeo YouTube no campo principal; adicione MP4 local antes da análise com IA.");
+    }
+  }
+
   const requiresReview = converted.issues.length > 0;
+  // Consolida dezenas de falhas repetidas em um único aviso de revisão.
+  const imageIssues = converted.issues.filter(item => item.startsWith("Imagem "));
+  const otherIssues = converted.issues.filter(item => !item.startsWith("Imagem "));
+  const issueSummary = [
+    ...otherIssues,
+    ...(imageIssues.length ? [
+      `${imageIssues.length} imagem(ns) sem cópia local: conferir os arquivos no F10.`,
+    ] : []),
+  ].join(" ").slice(0, 1000);
   await getDatabase().update(helpMovideskArticles).set({
     contentId: imported.id, state: requiresReview ? "review" : "imported",
-    issue: converted.issues.join(" ").slice(0, 1000) || null,
+    issue: issueSummary || null,
     // Todos entram em revisão editorial, inclusive os sem alertas automáticos.
     needsReview: true,
     importedAt: new Date(), updatedAt: new Date(),
