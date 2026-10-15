@@ -33,6 +33,14 @@
       return null;
     }
   }
+  function mp4LinkUrl(value: string | null): string | null {
+    if (!value) return null;
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" && /\.mp4$/i.test(url.pathname) ? url.href : null;
+    } catch { return null; }
+  }
+
 </script>
 
 <svelte:head><title>Preview: {data.content.title} | F10 Operations</title></svelte:head>
@@ -97,7 +105,12 @@
                       <div class="aspect-video bg-black"><iframe src={inlineYouTube} title={block.linkLabel || "Vídeo do YouTube"} class="h-full w-full" loading="lazy" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>
                       <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-10 items-center gap-2 px-4 text-[12px] font-semibold text-[#000A57]">Assistir no YouTube<ExternalLink size={13}/></a>
                     </div>
-                  {:else}
+
+                  {:else if mp4LinkUrl(block.linkUrl)}
+                    <div class="max-w-[850px] overflow-hidden rounded-2xl border border-[#E2E5ED] bg-white">
+                      <video src={mp4LinkUrl(block.linkUrl) ?? undefined} controls preload="metadata" playsinline class="aspect-video w-full bg-black"><track kind="captions" /></video>
+                      <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-10 items-center gap-2 px-4 text-[12px] font-semibold text-[#000A57]">Abrir vídeo original<ExternalLink size={13}/></a>
+                    </div>                  {:else}
                     <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption inline-flex items-center gap-2 rounded-xl bg-[#EEF0FF] px-4 py-2.5 font-semibold text-[#000A57]">{block.linkLabel || "Abrir link"}<ExternalLink size={12}/></a>
                   {/if}
                 {/if}

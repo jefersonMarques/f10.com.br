@@ -5,7 +5,8 @@ import type { HelpImportPackageAsset } from "$lib/server/help/helpImportPackage"
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_IMAGE_COUNT = 60;
-const SAFE_IMAGE_HOST = /(^|\.)(movidesk\.com)$/i;
+const SAFE_IMAGE_HOST = /(^|\\.)(movidesk\\.com)$/i;
+const SAFE_S3_HOST = /^(?:[a-z0-9.-]+\\.)?s3(?:[.-][a-z0-9-]+)?\\.amazonaws\\.com$/i;
 const ENTITY_NAMES: Record<string, string> = {
   amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
   bull: "•", ndash: "–", mdash: "—", hellip: "…",
@@ -67,6 +68,14 @@ function youtubeWatchUrl(raw: string, baseUrl: string): string | null {
   return /^[a-zA-Z0-9_-]{11}$/.test(id) ? `https://www.youtube.com/watch?v=${id}` : null;
 }
 
+function mp4Url(raw: string, baseUrl: string): string | null {
+  const href = safeHttpUrl(raw, baseUrl);
+  if (!href) return null;
+  const url = new URL(href);
+  // Somente mídia HTTPS explícita, sem executáveis ou embeds de terceiros.
+  return url.protocol === "https:" && /\.mp4$/i.test(url.pathname) ? url.href : null;
+}
+
 function mediaUrl(raw: string, baseUrl: string): URL {
   const value = safeHttpUrl(raw, baseUrl);
   if (!value) throw new Error("MOVIDESK_IMAGE_URL_INVALID");
@@ -76,7 +85,7 @@ function mediaUrl(raw: string, baseUrl: string): URL {
     .split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
   // Apenas hosts HTTPS explicitamente permitidos, nunca IPs, localhost ou wildcards.
   const allowed = SAFE_IMAGE_HOST.test(host) || ["f10.com.br", "www.f10.com.br", "ajuda.f10.com.br"].includes(host)
-    || host === "movidesk-static.s3.amazonaws.com"
+    || SAFE_S3_HOST.test(host)
     || (additionalHosts.includes(host)
       && /^[a-z0-9][a-z0-9.-]*[a-z0-9]$/.test(host)
       && host.includes(".") && !/^(?:\d+\.){3}\d+$/.test(host)
@@ -90,12 +99,22 @@ function mediaUrl(raw: string, baseUrl: string): URL {
 async function downloadImage(src: string, baseUrl: string, index: number): Promise<{
   asset: HelpImportPackageAsset; path: string;
 }> {
-  const url = mediaUrl(src, baseUrl);
-  const response = await fetch(url, {
-    redirect: "manual",
-    signal: AbortSignal.timeout(25_000),
-    headers: { "User-Agent": "F10-Help-Migration/1.0" },
-  });
+  let url = mediaUrl(src, baseUrl);
+  let response: Response | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    response = await fetch(url, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(25_000),
+      headers: { "User-Agent": "F10-Help-Migration/1.0" },
+    });
+    if (![301, 302, 303, 307, 308].includes(response.status)) break;
+    const location = response.headers.get("location");
+    await response.body?.cancel();
+    if (!location) throw new Error("MOVIDESK_IMAGE_REDIRECT_INVALID");
+    url = mediaUrl(location, url.href);
+    response = null;
+  }
+  if (!response) throw new Error("MOVIDESK_IMAGE_REDIRECT_LIMIT");
   if (!response.ok) throw new Error(`MOVIDESK_IMAGE_HTTP_${response.status}`);
   const declaredSize = Number(response.headers.get("content-length") ?? 0);
   if (declaredSize > MAX_IMAGE_BYTES) throw new Error("MOVIDESK_IMAGE_TOO_LARGE");
@@ -119,6 +138,70 @@ async function downloadImage(src: string, baseUrl: string, index: number): Promi
   };
 }
 
+function stripLegacyNavigation(html: string): string {
+  return html.replace(/<p\b[^>]*>[\s\S]*?<\/p>/gi, (original) => {
+    const label = decode(original.replace(/<[^>]*>/g, ""))
+      .replace(/\s+/g, " ").trim();
+    return /^(?:pr[oó]ximo|anterior)\s*:/i.test(label)
+      && /\/kb\/(?:[a-z]{2}-[a-z]{2}\/)?article\/\d+/i.test(original)
+      ? "" : original;
+  });
+}
+
+function organizeSteps(steps: HelpImportContent["steps"]): HelpImportContent["steps"] {
+  const organized: HelpImportContent["steps"] = [];
+  for (const section of steps) {
+    const synthetic = /^(?:Conteúdo original|Seção|Imagem \d+)$/i.test(section.title);
+    let group: HelpImportBlock[] = [];
+    let chars = 0;
+    let texts = 0;
+    let images = 0;
+    let part = 0;
+    function commit(): void {
+      if (!group.length) return;
+      part++;
+      const first = group[0]!;
+      const media = group.filter(block => block.type === "link"
+        && (block.label === "Vídeo do YouTube" || block.label === "Vídeo MP4"));
+      const lead = group.find((block): block is Extract<HelpImportBlock, { type: "text" }> =>
+        block.type === "text" && block.text.trim().length > 0);
+      const plainLead = lead?.text.replace(/[*_#]/g, "")
+        .replace(/\s+/g, " ").trim() ?? "";
+      const sentence = plainLead.match(/^.{1,90}?(?:[.!?:;](?=\s|$)|$)/)?.[0] ?? plainLead;
+      const excerpt = sentence.length > 78
+        ? sentence.slice(0, 75).replace(/\s+\S*$/, "") + "…"
+        : sentence;
+      const title = !synthetic
+        ? (part === 1 ? section.title : section.title + " · continuação")
+        : first.type === "image" ? "Imagem e orientações"
+        : media.length && first.type === "link" ? (media.length > 1 ? "Vídeos e orientações" : "Vídeo e orientações")
+        : excerpt || "Orientações do artigo";
+      organized.push({ title: title.slice(0, 160), blocks: group });
+      group = [];
+      chars = 0;
+      texts = 0;
+      images = 0;
+    }
+    for (const block of section.blocks) {
+      if (block.type === "text") {
+        block.text = block.text.replace(/\u00a0/g, " ")
+          .replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+        if (!block.text) continue;
+      }
+      const len = block.type === "text" ? block.text.length : 0;
+      if (group.length && ((block.type === "image" && images > 0)
+        || (block.type === "text" && (texts >= 3 || chars + len > 1500))
+        || group.length >= 14)) commit();
+      group.push(block);
+      chars += len;
+      if (block.type === "text") texts++;
+      if (block.type === "image") images++;
+    }
+    commit();
+  }
+  return organized;
+}
+
 export async function convertMovideskHtml(input: {
   sourceId: number;
   title: string;
@@ -136,12 +219,15 @@ export async function convertMovideskHtml(input: {
   issues: string[];
 }> {
   const issues: string[] = [];
-  const html = input.html.slice(0, 2_000_000);
+  const html = stripLegacyNavigation(input.html.slice(0, 2_000_000));
   if (html.length < input.html.length) issues.push("HTML original maior que o limite de conversão.");
   const iframes = html.match(/<iframe\b[^>]*>/gi) ?? [];
-  const unknownIframes = iframes.some(tag => !youtubeWatchUrl(attribute(tag, "src"), input.sourceUrl));
-  if (/<(?:table|object|embed|video|audio|math|form|script|style)\b/i.test(html) || unknownIframes) {
-    issues.push("HTML complexo: confira a formatação no artigo importado.");
+  const unknownIframes = iframes.some(tag => {
+    const src = attribute(tag, "src");
+    return !youtubeWatchUrl(src, input.sourceUrl) && !mp4Url(src, input.sourceUrl);
+  });
+  if (/<(?:table|object|audio|math|form|script|style)\b/i.test(html) || unknownIframes) {
+    issues.push("Elementos especiais do HTML exigem conferência.");
   }
   if (input.attachments.length) issues.push(`${input.attachments.length} anexo(s) precisam ser conferidos e copiados manualmente.`);
 
@@ -152,6 +238,7 @@ export async function convertMovideskHtml(input: {
   let paragraph = "";
   let imageIndex = 0;
   let pendingLink: { href: string; label: string; skip: boolean } | null = null;
+  let videoSourceHandled = false;
 
   function flushParagraph(): void {
     const text = paragraph.replace(/[ \t]+/g, " ").replace(/\n[ \t]+/g, "\n").trim();
@@ -181,21 +268,36 @@ export async function convertMovideskHtml(input: {
     if (!tag) continue;
     const closing = Boolean(tag[1]);
     const name = tag[2]!.toLowerCase();
-    if (name === "iframe") {
+    if (name === "iframe" || name === "video" || name === "source" || name === "embed") {
+      if (name === "video" && closing) {
+        videoSourceHandled = false;
+        continue;
+      }
+      if (name === "video" && !closing) videoSourceHandled = false;
+      if (name === "source" && videoSourceHandled) continue;
       if (!closing) {
-        const rawSrc = attribute(token, "src");
+        const rawSrc = attribute(token, "src") || attribute(token, "data-src");
         const youtube = youtubeWatchUrl(rawSrc, input.sourceUrl);
-        const href = youtube || safeHttpUrl(rawSrc, input.sourceUrl);
+        const mp4 = mp4Url(rawSrc, input.sourceUrl);
+        const href = youtube || mp4 || safeHttpUrl(rawSrc, input.sourceUrl);
         if (href) {
           flushParagraph();
-          blocks.push({ type: "link", url: href, label: youtube ? "Vídeo do YouTube" : "Abrir conteúdo incorporado" });
+          blocks.push({ type: "link", url: href, label: youtube ? "Vídeo do YouTube" : mp4 ? "Vídeo MP4" : "Abrir mídia original" });
+          if (name === "source" || name === "video") videoSourceHandled = true;
+          if (!youtube && !mp4) issues.push("Mídia externa não reconhecida: conferir o arquivo.");
         }
       }
       continue;
     }
     if (name === "img" && !closing) {
       flushParagraph();
-      if (++imageIndex > MAX_IMAGE_COUNT) throw new Error("MOVIDESK_IMAGE_COUNT_LIMIT");
+      imageIndex++;
+      if (imageIndex > MAX_IMAGE_COUNT) {
+        issues.push("Muitos screenshots: imagens adicionais disponíveis no artigo original.");
+        const href = safeHttpUrl(attribute(token, "src"), input.sourceUrl);
+        if (href) blocks.push({ type: "link", url: href, label: "Ver imagem original" });
+        continue;
+      }
       // Um screenshot por etapa é uma regra de publicação do F10.
       flushStep();
       currentTitle = `Imagem ${imageIndex}`;
@@ -254,6 +356,10 @@ export async function convertMovideskHtml(input: {
       continue;
     }
     if (name === "li" && !closing) paragraph += "\n- ";
+    if (name === "p" && closing) {
+      flushParagraph();
+      continue;
+    }
     if (name === "br" || name === "p" || name === "div" || name === "li" || name === "tr") {
       if (name === "br" || closing) paragraph += "\n";
     }
@@ -267,16 +373,29 @@ export async function convertMovideskHtml(input: {
   }
   if (!steps.length) throw new Error("MOVIDESK_ARTICLE_EMPTY");
 
-  // Não substitui imagens por links externos: falha explicitamente se não puder copiá-las.
+  // Imagem individual com problema não bloqueia a importação do artigo inteiro.
   for (let i = 0; i < images.length; i++) {
     const image = images[i]!;
-    const saved = await downloadImage(image.src, input.sourceUrl, i + 1);
-    assets.set(saved.path, saved.asset);
-    if (image.block.type === "image") image.block.url = `package:${saved.path}`;
+    try {
+      const saved = await downloadImage(image.src, input.sourceUrl, i + 1);
+      assets.set(saved.path, saved.asset);
+      if (image.block.type === "image") image.block.url = `package:${saved.path}`;
+    } catch (cause) {
+      const issue = cause instanceof Error && cause.message.startsWith("MOVIDESK_")
+        ? cause.message : "MOVIDESK_IMAGE_IMPORT_FAILED";
+      issues.push(`Imagem ${i + 1}: ${issue}. Conferir no original.`);
+      const fallback = safeHttpUrl(image.src, input.sourceUrl);
+      if (image.block.type === "image" && fallback) {
+        Object.assign(image.block, { type: "link", url: fallback, label: "Ver imagem original" });
+      } else if (image.block.type === "image") {
+        Object.assign(image.block, { type: "notice", text: "Imagem indisponível. Consulte o artigo original.", variant: "warning" });
+      }
+    }
   }
 
-  if (steps.length > 80) throw new Error("MOVIDESK_STEP_LIMIT");
-  if (steps.some(step => step.blocks.length > 80)) throw new Error("MOVIDESK_BLOCK_LIMIT");
+  const organized = organizeSteps(steps);
+  if (organized.length > 80) throw new Error("MOVIDESK_STEP_LIMIT");
+  if (organized.some(step => step.blocks.length > 80)) throw new Error("MOVIDESK_BLOCK_LIMIT");
   return {
     content: {
       externalId: String(input.sourceId),
@@ -287,7 +406,7 @@ export async function convertMovideskHtml(input: {
       searchAliases: [],
       assistantKnowledge: "",
       internalSupportNotes: "",
-      steps,
+      steps: organized,
     },
     assets,
     issues,
