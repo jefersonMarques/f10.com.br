@@ -171,12 +171,30 @@ export async function reprocessMovideskArticles(actorUserId: string) {
     importedAt: helpMovideskArticles.importedAt,
     needsReview: helpMovideskArticles.needsReview,
   }).from(helpMovideskArticles);
-  const selected: number[] = [];
-  for (const row of rows) {
-    if (!row.contentId || await safeToReplaceMovideskDraft(row.contentId, row.importedAt, row.needsReview)) {
-      selected.push(row.sourceId);
-    }
-  }
+  const contentIds = rows.flatMap(row => row.contentId ? [row.contentId] : []);
+  const [nativeRows, publishedRows, releases] = contentIds.length ? await Promise.all([
+    db.select({
+      id: helpContents.id, updatedAt: helpContents.updatedAt,
+      status: helpContents.status, importSource: helpContents.importSource,
+    }).from(helpContents).where(inArray(helpContents.id, contentIds)),
+    db.select({ id: helpPublications.entityId }).from(helpPublications).where(and(
+      eq(helpPublications.entityType, "content"),
+      inArray(helpPublications.entityId, contentIds),
+    )),
+    db.select({ id: helpContentReleases.contentId }).from(helpContentReleases)
+      .where(inArray(helpContentReleases.contentId, contentIds)),
+  ]) : [[], [], []];
+  const natives = new Map(nativeRows.map(row => [row.id, row]));
+  const published = new Set(publishedRows.map(row => row.id));
+  const released = new Set(releases.map(row => row.id));
+  const selected = rows.filter(row => {
+    if (!row.contentId) return true;
+    const native = natives.get(row.contentId);
+    return Boolean(row.needsReview && row.importedAt && native
+      && native.importSource === "movidesk" && native.status === "draft"
+      && native.updatedAt <= row.importedAt
+      && !published.has(row.contentId) && !released.has(row.contentId));
+  }).map(row => row.sourceId);
   if (selected.length === 0) return { queued: 0, skipped: rows.length };
 
   await db.transaction(async (tx) => {
