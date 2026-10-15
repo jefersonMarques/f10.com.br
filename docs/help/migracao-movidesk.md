@@ -43,6 +43,11 @@ ID original e o histórico original é preservado.
 importação. Artigos aprovados, publicados, com release ou com alterações no editor são
 pulados. Faça backup antes de usar e confira os resultados antes de aprovar.
 
+Os embeds do YouTube presentes no HTML (como `<iframe src="//www.youtube.com/embed/...">`)
+são preservados como links de vídeo estruturados. O preview e o artigo publicado
+exibem o player no ponto original do conteúdo, sem baixar MP4 ou exigir uma
+transcrição nesta migração. Outros embeds continuam sinalizados para revisão.
+
 O conversor decodifica entidades HTML, converte links internos Movidesk para URLs do F10
 por ID do artigo e não copia links automáticos de navegação Próximo/Anterior. Referências
 sem correspondência no inventário geram um aviso de revisão.

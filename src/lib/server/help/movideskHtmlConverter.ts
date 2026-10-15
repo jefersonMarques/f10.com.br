@@ -52,6 +52,21 @@ function safeHttpUrl(raw: string, baseUrl: string): string | null {
   }
 }
 
+function youtubeWatchUrl(raw: string, baseUrl: string): string | null {
+  const href = safeHttpUrl(raw, baseUrl);
+  if (!href) return null;
+  const url = new URL(href);
+  if (url.protocol !== "https:") return null;
+  const host = url.hostname.toLowerCase();
+  let id = "";
+  if (host === "youtu.be") id = url.pathname.split("/")[1] ?? "";
+  else if (["youtube.com", "www.youtube.com", "m.youtube.com", "www.youtube-nocookie.com", "youtube-nocookie.com"].includes(host)) {
+    if (url.pathname === "/watch") id = url.searchParams.get("v") ?? "";
+    else if (/^\/(?:embed|shorts|live)\//.test(url.pathname)) id = url.pathname.split("/")[2] ?? "";
+  }
+  return /^[a-zA-Z0-9_-]{11}$/.test(id) ? `https://www.youtube.com/watch?v=${id}` : null;
+}
+
 function mediaUrl(raw: string, baseUrl: string): URL {
   const value = safeHttpUrl(raw, baseUrl);
   if (!value) throw new Error("MOVIDESK_IMAGE_URL_INVALID");
@@ -123,7 +138,9 @@ export async function convertMovideskHtml(input: {
   const issues: string[] = [];
   const html = input.html.slice(0, 2_000_000);
   if (html.length < input.html.length) issues.push("HTML original maior que o limite de conversão.");
-  if (/<(?:table|iframe|object|embed|video|audio|math|form|script|style)\b/i.test(html)) {
+  const iframes = html.match(/<iframe\b[^>]*>/gi) ?? [];
+  const unknownIframes = iframes.some(tag => !youtubeWatchUrl(attribute(tag, "src"), input.sourceUrl));
+  if (/<(?:table|object|embed|video|audio|math|form|script|style)\b/i.test(html) || unknownIframes) {
     issues.push("HTML complexo: confira a formatação no artigo importado.");
   }
   if (input.attachments.length) issues.push(`${input.attachments.length} anexo(s) precisam ser conferidos e copiados manualmente.`);
@@ -154,7 +171,7 @@ export async function convertMovideskHtml(input: {
 
   const cleaned = html
     .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<(script|style|iframe|object|svg|form)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
+    .replace(/<(script|style|object|svg|form)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
   const tokens = cleaned.match(/<[^>]*>|[^<]+/g) ?? [];
   const images: Array<{ src: string; alt: string; block: HelpImportBlock }> = [];
 
@@ -164,6 +181,18 @@ export async function convertMovideskHtml(input: {
     if (!tag) continue;
     const closing = Boolean(tag[1]);
     const name = tag[2]!.toLowerCase();
+    if (name === "iframe") {
+      if (!closing) {
+        const rawSrc = attribute(token, "src");
+        const youtube = youtubeWatchUrl(rawSrc, input.sourceUrl);
+        const href = youtube || safeHttpUrl(rawSrc, input.sourceUrl);
+        if (href) {
+          flushParagraph();
+          blocks.push({ type: "link", url: href, label: youtube ? "Vídeo do YouTube" : "Abrir conteúdo incorporado" });
+        }
+      }
+      continue;
+    }
     if (name === "img" && !closing) {
       flushParagraph();
       if (++imageIndex > MAX_IMAGE_COUNT) throw new Error("MOVIDESK_IMAGE_COUNT_LIMIT");
