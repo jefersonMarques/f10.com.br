@@ -5,7 +5,7 @@ import { hasPermission } from "$lib/server/auth/permissions";
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import { moveHelpBlock, moveHelpStep, type HelpMoveDirection } from "$lib/server/help/helpContentOrdering";
 import { publishHelpKnowledgeContent } from "$lib/server/help/helpKnowledgePublisher";
-import { getMovideskArticleByContentId } from "$lib/server/help/movideskMigration";
+import { getMovideskArticleByContentId, isMovideskMigrationEnabled } from "$lib/server/help/movideskMigration";
 import { findImportedHelpVideoByChecksum } from "$lib/server/help/helpImportedFeaturedVideo";
 import {
   createManagedHelpAsset,
@@ -224,6 +224,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     content,
     categories,
     movideskArticle,
+    canManageMovidesk: isMovideskMigrationEnabled() && hasPermission(permissions, "system.settings.manage"),
     canEdit: !archived && hasPermission(permissions, "help.edit"),
     canPublish: !archived && hasPermission(permissions, "help.publish"),
   };
