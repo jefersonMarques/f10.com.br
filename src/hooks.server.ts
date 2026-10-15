@@ -4,9 +4,11 @@
 import { redirect, type Handle } from "@sveltejs/kit";
 import { startHelpVideoProcessingWorker } from "$lib/server/help/helpVideoProcessingWorker";
 import { startSupportEmailInboundWorker } from "$lib/server/support/emailInboundWorker";
+import { getMovideskLegacyRedirect, startMovideskMigrationWorker } from "$lib/server/help/movideskMigration";
 
 startHelpVideoProcessingWorker();
 startSupportEmailInboundWorker();
+startMovideskMigrationWorker();
 
 type RedirectRule = {
   from: string;
@@ -195,6 +197,24 @@ function isGoneSpamPath(pathname: string): boolean {
 const redirectMap = buildRedirectMap(redirectRules);
 
 export const handle: Handle = async ({ event, resolve }) => {
+  // Ativado quando ajuda.f10.com.br for apontado para a infraestrutura do F10.
+  if (event.url.hostname === "ajuda.f10.com.br") {
+    const article = event.url.pathname.match(/^\/kb\/(?:pt-br\/)?article\/(\d+)(?:\/[^/]*)?\/?$/i);
+    if (article) {
+      const id = Number(article[1]);
+      const destination = Number.isSafeInteger(id) ? await getMovideskLegacyRedirect(id) : null;
+      if (destination) throw redirect(301, destination);
+      return new Response("Este artigo ainda não está disponível na nova Central de Ajuda.", {
+        status: 404, headers: { "Content-Type": "text/plain; charset=utf-8", "X-Robots-Tag": "noindex" },
+      });
+    }
+    if (event.url.pathname === "/" || /^\/kb\/?(?:pt-br\/?)?$/i.test(event.url.pathname)) {
+      throw redirect(301, "https://f10.com.br/ajuda-f10");
+    }
+    return new Response("Endereço não encontrado.", {
+      status: 404, headers: { "Content-Type": "text/plain; charset=utf-8", "X-Robots-Tag": "noindex" },
+    });
+  }
   if (ALTERNATE_HOSTS.has(event.url.hostname)) {
     throw redirect(308, buildCanonicalUrl(event.url));
   }
