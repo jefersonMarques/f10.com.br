@@ -10,7 +10,7 @@ import { importStructuredHelpFile, type HelpImportFile } from "$lib/server/help/
 import { convertMovideskHtml } from "$lib/server/help/movideskHtmlConverter";
 import { getPublishedStructuredHelpById } from "$lib/server/help/publicStructuredHelpRepository";
 
-const BASE = "https://api.movidesk.com/public/v1/article";
+const BASE = "https://api.movidesk.com/public/v1";
 const INTERVAL_MS = 8_000;
 const REQUEST_LEASE_MS = 10 * 60_000;
 const PAGE_SIZE = 40;
@@ -85,6 +85,18 @@ async function callApi(path: string): Promise<SourceRecord> {
     return record(payload);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+async function getMovideskArticle(sourceId: number): Promise<SourceRecord> {
+  try {
+    return await callApi(`/article/${sourceId}`);
+  } catch (cause) {
+    // A documentação Movidesk apresenta também a variante /article/:id/kb.
+    if (!(cause instanceof Error) || cause.message !== "MOVIDESK_API_HTTP_404") throw cause;
+    // A API limita a 10 requisições/minuto, inclusive nas tentativas de fallback.
+    await new Promise<void>((resolve) => setTimeout(resolve, INTERVAL_MS));
+    return callApi(`/article/${sourceId}/kb`);
   }
 }
 
@@ -204,7 +216,7 @@ async function ensureCategories(actorUserId: string, original: Category[]): Prom
 }
 
 async function catalogPage(page: number): Promise<{ totalCount: number; finished: boolean }> {
-  const data = await callApi(`/?status=1&page=${page}&pageSize=${PAGE_SIZE}`);
+  const data = await callApi(`/kb/article?status=1&page=${page}&pageSize=${PAGE_SIZE}`);
   if (!Array.isArray(data.items)) throw new Error("MOVIDESK_CATALOG_INVALID");
   const items = data.items.map(record);
   const totalCount = Number(data.totalSize ?? 0);
@@ -233,7 +245,7 @@ async function catalogPage(page: number): Promise<{ totalCount: number; finished
 async function importArticle(sourceId: number, actorUserId: string): Promise<void> {
   const [staged] = await getDatabase().select().from(helpMovideskArticles).where(eq(helpMovideskArticles.sourceId, sourceId)).limit(1);
   if (!staged || staged.contentId) return;
-  const raw = await callApi(`/${sourceId}`);
+  const raw = await getMovideskArticle(sourceId);
   if (numeric(raw.id) !== sourceId) throw new Error("MOVIDESK_ARTICLE_MISMATCH");
   const html = text(raw.contentHtml);
   const plain = text(raw.contentText);
