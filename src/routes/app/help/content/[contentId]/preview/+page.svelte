@@ -71,6 +71,10 @@
           <div class="aspect-video overflow-hidden bg-black"><iframe src={featuredEmbed} title={data.content.featuredVideo.altText || `Vídeo: ${data.content.title}`} class="h-full w-full" allowfullscreen></iframe></div>
         {:else if data.content.featuredVideo.storageKey}
           <video controls preload="metadata" class="aspect-video h-auto w-full bg-black" src={assetUrl(data.content.featuredVideo.id)}><track kind="captions" /></video>
+        {:else if mp4LinkUrl(data.content.featuredVideo.sourceUrl)}
+          <div class="aspect-video bg-black">
+            <video src={data.content.featuredVideo.sourceUrl ?? undefined} controls preload="metadata" playsinline class="h-full w-full"><track kind="captions" /></video>
+          </div>
         {:else if data.content.featuredVideo.sourceUrl}
           <a href={data.content.featuredVideo.sourceUrl} target="_blank" rel="noopener noreferrer" class="flex min-h-20 items-center justify-between gap-3 px-5 py-4 text-[11px] font-semibold text-[#000A57]"><span class="inline-flex items-center gap-2"><PlayCircle size={18}/>Assistir ao vídeo principal</span><ExternalLink size={13}/></a>
         {/if}
