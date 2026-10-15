@@ -90,6 +90,9 @@ function mediaUrl(raw: string, baseUrl: string): URL {
       && /^[a-z0-9][a-z0-9.-]*[a-z0-9]$/.test(host)
       && host.includes(".") && !/^(?:\d+\.){3}\d+$/.test(host)
       && !host.endsWith(".local") && !host.endsWith(".internal"));
+  // Imagens antigas da base podem referenciar HTTP em origens já confiáveis.
+  // Força TLS antes do download, sem permitir servidores arbitrários.
+  if (allowed && url.protocol === "http:") url.protocol = "https:";
   if (url.protocol !== "https:" || !allowed) {
     throw new Error(`MOVIDESK_IMAGE_HOST_NOT_ALLOWED:${host.slice(0, 150)}`);
   }
