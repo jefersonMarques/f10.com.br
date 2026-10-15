@@ -90,7 +90,17 @@
                   {@const imageUrl = block.asset.storageKey ? assetUrl(block.asset.id) : block.asset.sourceUrl}
                   {#if imageUrl}<HelpAnnotatedImage src={imageUrl} alt={block.asset.altText || "Imagem do passo"} annotations={readHelpImageAnnotationsFromMetadata(block.metadata)} className="rounded-2xl border border-[#E6E8EE] bg-white" />{/if}
                 {:else if block.blockType === "file" && block.asset}{@const fileUrl = block.asset.storageKey ? assetUrl(block.asset.id) : block.asset.sourceUrl}{#if fileUrl}<a href={fileUrl} target="_blank" rel="noopener noreferrer" class="flex items-center justify-between rounded-2xl border border-[#E1E4EC] bg-[#FAFAFC] px-4 py-4"><span class="text-[11px] font-semibold text-[#303645]">{block.linkLabel || "Baixar arquivo"}</span><Download size={17} class="text-[#000A57]"/></a>{/if}
-                {:else if block.blockType === "link" && block.linkUrl}<a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption inline-flex items-center gap-2 rounded-xl bg-[#EEF0FF] px-4 py-2.5 font-semibold text-[#000A57]">{block.linkLabel || "Abrir link"}<ExternalLink size={12}/></a>{/if}
+                {:else if block.blockType === "link" && block.linkUrl}
+                  {@const inlineYouTube = youtubeEmbedUrl(block.linkUrl)}
+                  {#if inlineYouTube}
+                    <div class="max-w-[850px] overflow-hidden rounded-2xl border border-[#E2E5ED] bg-white">
+                      <div class="aspect-video bg-black"><iframe src={inlineYouTube} title={block.linkLabel || "Vídeo do YouTube"} class="h-full w-full" loading="lazy" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>
+                      <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="inline-flex min-h-10 items-center gap-2 px-4 text-[12px] font-semibold text-[#000A57]">Assistir no YouTube<ExternalLink size={13}/></a>
+                    </div>
+                  {:else}
+                    <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption inline-flex items-center gap-2 rounded-xl bg-[#EEF0FF] px-4 py-2.5 font-semibold text-[#000A57]">{block.linkLabel || "Abrir link"}<ExternalLink size={12}/></a>
+                  {/if}
+                {/if}
               </div>
             {/each}
           </div>
