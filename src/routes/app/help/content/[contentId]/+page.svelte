@@ -157,7 +157,7 @@
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        <a href={data.movideskArticle.sourceUrl} rel="noopener noreferrer" target="_blank" class="rounded-lg border border-[#DDE1EA] bg-white px-3 py-2 text-[12px] font-semibold text-[#000A57]">Ver original</a>
+        <a href={`/app/help/content/movidesk/${data.movideskArticle.sourceId}`} class="rounded-lg border border-[#DDE1EA] bg-white px-3 py-2 text-[12px] font-semibold text-[#000A57]">Original preservado</a>
         <a href="/app/help/content/movidesk" class="rounded-lg border border-[#DDE1EA] bg-white px-3 py-2 text-[12px] font-semibold text-[#000A57]">Revisão da migração</a>
       </div>
     </section>
