@@ -82,7 +82,17 @@ export const actions: Actions = {
     await requireAppPermission(cookies, "system.settings.manage", ROUTE);
     const id = Number((await request.formData()).get("sourceId"));
     if (!Number.isSafeInteger(id) || id <= 0) return fail(400, { success: false, message: "Artigo inválido." });
-    await approveMovideskArticle(id);
-    return { success: true, message: "Revisão marcada como concluída. Agora o artigo pode ser publicado no editor." };
+    try {
+      await approveMovideskArticle(id);
+      return { success: true, message: "Artigo aprovado para publicação no editor." };
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : "";
+      if (code.startsWith("MOVIDESK_IMAGES_PENDING:")) {
+        const [, saved, total] = code.split(":");
+        return fail(409, { success: false, message:
+          `Aprovação bloqueada: ${saved} de ${total} imagens foram copiadas. Reprocesse o artigo antes de aprovar.` });
+      }
+      return fail(409, { success: false, message: "Não foi possível aprovar este artigo." });
+    }
   },
 };
