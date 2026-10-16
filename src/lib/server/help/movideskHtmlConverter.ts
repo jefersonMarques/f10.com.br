@@ -43,6 +43,15 @@ function attribute(tag: string, name: string): string {
   return decode(match?.[1] ?? match?.[2] ?? match?.[3] ?? "").trim();
 }
 
+function imageSource(tag: string): string {
+  const direct = attribute(tag, "src");
+  const alternatives = [
+    direct, attribute(tag, "data-src"), attribute(tag, "data-original"),
+    attribute(tag, "data-lazy-src"), attribute(tag, "srcset").split(",")[0]?.trim().split(/\\s+/)[0] ?? "",
+  ];
+  return alternatives.find((url) => url && !/^(?:data|blob):/i.test(url)) ?? direct;
+}
+
 function safeHttpUrl(raw: string, baseUrl: string): string | null {
   if (!raw || /^(?:javascript|data|file|vbscript):/i.test(raw.trim())) return null;
   try {
@@ -299,7 +308,7 @@ export async function convertMovideskHtml(input: {
       imageIndex++;
       if (imageIndex > MAX_IMAGE_COUNT) {
         issues.push("Muitos screenshots: imagens adicionais disponíveis no artigo original.");
-        const href = safeHttpUrl(attribute(token, "src"), input.sourceUrl);
+        const href = safeHttpUrl(imageSource(token), input.sourceUrl);
         if (href) blocks.push({ type: "link", url: href, label: "Ver imagem original" });
         continue;
       }
@@ -308,7 +317,7 @@ export async function convertMovideskHtml(input: {
       currentTitle = `Imagem ${imageIndex}`;
       const block: HelpImportBlock = { type: "image", url: "", altText: attribute(token, "alt") || `Imagem do artigo ${input.title}` };
       blocks.push(block);
-      images.push({ src: attribute(token, "src"), alt: attribute(token, "alt"), block });
+      images.push({ src: imageSource(token), alt: attribute(token, "alt"), block });
       continue;
     }
     if (name === "a") {
