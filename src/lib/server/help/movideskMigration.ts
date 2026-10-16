@@ -2,7 +2,7 @@ import { env } from "$env/dynamic/private";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { helpMovideskArticles, helpMovideskImportState } from "$lib/server/db/helpMovideskSchema";
-import { helpAssets, helpCategories, helpContents, helpContentReleases } from "$lib/server/db/structuredHelpSchema";
+import { helpAssets, helpCategories, helpContents, helpContentReleases, helpContentSteps, helpStepBlocks } from "$lib/server/db/structuredHelpSchema";
 import { listPublishedStructuredHelpLinks } from "$lib/server/help/publicStructuredHelpRepository";
 import { helpPublications } from "$lib/server/db/helpPublications";
 import { normalizeHelpCategorySlug, createHelpCategory, listHelpCategories } from "$lib/server/help/helpCategoryRepository";
@@ -241,10 +241,12 @@ export async function approveMovideskArticle(sourceId: number): Promise<void> {
 
   const originalCount = (article.sourceHtml?.match(/<img\b/gi) ?? []).length;
   const images = await db.select({ storageKey: helpAssets.storageKey })
-    .from(helpAssets)
+    .from(helpStepBlocks)
+    .innerJoin(helpContentSteps, eq(helpContentSteps.id, helpStepBlocks.stepId))
+    .leftJoin(helpAssets, eq(helpAssets.id, helpStepBlocks.assetId))
     .where(and(
-      eq(helpAssets.contentId, article.contentId),
-      eq(helpAssets.assetType, "image"),
+      eq(helpContentSteps.contentId, article.contentId),
+      eq(helpStepBlocks.blockType, "image"),
     ));
   const locallyStored = images.filter((image) => Boolean(image.storageKey)).length;
 
@@ -280,12 +282,15 @@ export async function listMovideskMigrationDashboard() {
     .limit(1000);
   const contentIds = rows.flatMap((row) => row.contentId ? [row.contentId] : []);
   const storedImages = contentIds.length ? await getDatabase().select({
-    contentId: helpAssets.contentId,
+    contentId: helpContentSteps.contentId,
     storageKey: helpAssets.storageKey,
-  }).from(helpAssets).where(and(
-    inArray(helpAssets.contentId, contentIds),
-    eq(helpAssets.assetType, "image"),
-  )) : [];
+  }).from(helpStepBlocks)
+    .innerJoin(helpContentSteps, eq(helpContentSteps.id, helpStepBlocks.stepId))
+    .leftJoin(helpAssets, eq(helpAssets.id, helpStepBlocks.assetId))
+    .where(and(
+      inArray(helpContentSteps.contentId, contentIds),
+      eq(helpStepBlocks.blockType, "image"),
+    )) : [];
   const imagesByContent = new Map<string, { total: number; stored: number }>();
   for (const asset of storedImages) {
     if (!asset.contentId) continue;
