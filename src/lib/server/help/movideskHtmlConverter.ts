@@ -47,7 +47,7 @@ function imageSource(tag: string): string {
   const direct = attribute(tag, "src");
   const alternatives = [
     direct, attribute(tag, "data-src"), attribute(tag, "data-original"),
-    attribute(tag, "data-lazy-src"), attribute(tag, "srcset").split(",")[0]?.trim().split(/\\s+/)[0] ?? "",
+    attribute(tag, "data-lazy-src"), attribute(tag, "srcset").split(",")[0]?.trim().split(/\s+/)[0] ?? "",
   ];
   return alternatives.find((url) => url && !/^(?:data|blob):/i.test(url)) ?? direct;
 }
