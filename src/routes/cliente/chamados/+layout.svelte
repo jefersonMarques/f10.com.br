@@ -1,10 +1,7 @@
 <script lang="ts">
-  import { page } from "$app/stores";
   import { onMount } from "svelte";
-  import { CircleHelp, LogOut, MessageCircleMore, Plus } from "lucide-svelte";
-  import ApplicationHeader from "$lib/components/application/ApplicationHeader.svelte";
+  import { MessageCircleMore } from "lucide-svelte";
   import SupportAssistantDialog from "$lib/components/onboarding/SupportAssistantDialog.svelte";
-  import { resolveCustomerRouteMetadata } from "$lib/application/routeMetadata";
   import type { LayoutData } from "./$types";
 
   type StoredChatSession = {
@@ -28,10 +25,6 @@
   let observedSessionId = "";
   let observedAgentMessageId = "";
 
-  $: routeMetadata = resolveCustomerRouteMetadata($page.url.pathname);
-  $: customerContext = data.customer.groupName
-    ? `${data.customer.name} · ${data.customer.groupName}`
-    : `${data.customer.name} · ${data.customer.email}`;
   $: customerSupport = {
     authenticated: true,
     name: data.customer.name,
@@ -139,32 +132,6 @@
 </script>
 
 <div class="min-h-screen bg-[#F7F8FB] text-[#10172A]">
-  <ApplicationHeader
-    title={routeMetadata.title}
-    section={routeMetadata.section}
-    description={customerContext}
-    contentWidth="standard"
-  >
-    <svelte:fragment slot="actions">
-      <a href="/ajuda-f10" aria-label="Central de ajuda" class="inline-flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-xl border border-[#E0E3EA] bg-white px-2.5 text-[11px] font-semibold text-[#5E6575] transition hover:border-[#C8CEDB] hover:text-[#000A57] lg:px-3">
-        <CircleHelp size={15} />
-        <span class="hidden xl:inline">Central de ajuda</span>
-      </a>
-      {#if data.customer.authProvider === "f10"}
-        <a href="/cliente/chamados/novo" aria-label="Novo chamado" class="inline-flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-2.5 text-[11px] font-semibold text-white transition hover:bg-[#111B71] sm:px-3.5">
-          <Plus size={15} />
-          <span class="hidden sm:inline">Novo chamado</span>
-        </a>
-      {/if}
-      <form method="POST" action="/cliente/sair">
-        <button type="submit" aria-label="Sair" class="inline-flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-xl bg-[#F1F3F7] px-2.5 text-[11px] font-semibold text-[#5E6575] transition hover:bg-[#E9ECF2] hover:text-[#000A57] sm:px-3">
-          <LogOut size={15} />
-          <span class="hidden sm:inline">Sair</span>
-        </button>
-      </form>
-    </svelte:fragment>
-  </ApplicationHeader>
-
   <slot />
 
   {#if !chatOpen}
