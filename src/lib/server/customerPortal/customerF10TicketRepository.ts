@@ -392,8 +392,16 @@ export async function getCustomerF10Ticket(
     .limit(1);
 
   if (!context) {
-    if (authorizedContexts.length !== 1) return null;
-    return { ...details, context: unitDisplayContext(authorizedContexts[0]) };
+    // A lista já permite chamados sem contexto quando pertencem ao contato
+    // autenticado. Os detalhes devem usar a mesma regra: a propriedade foi
+    // validada por getCustomerPortalTicket(session.contactId, ticketId).
+    if (authorizedContexts.length === 0) return null;
+    return {
+      ...details,
+      context: authorizedContexts.length === 1
+        ? unitDisplayContext(authorizedContexts[0])
+        : null,
+    };
   }
 
   if (context.legacyUserId !== session.legacyUserId) return null;
