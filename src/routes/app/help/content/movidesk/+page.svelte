@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { invalidateAll } from "$app/navigation";
-  import { ArrowLeft, ArrowUpRight, CheckCircle2, CircleAlert, Clock3, ExternalLink, Pause, Play, RefreshCw, ShieldCheck } from "lucide-svelte";
+  import { enhance } from "$app/forms";
+  import { ArrowLeft, ArrowUpRight, CheckCircle2, ChevronLeft, ChevronRight, CircleAlert, Clock3, ExternalLink, Eye, Images, Pause, Play, RefreshCw, ShieldCheck, X } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -11,6 +12,45 @@
   let query = "";
   let filter = "all";
   let timer: ReturnType<typeof setInterval> | undefined;
+  let previewId: number | null = null;
+  let approvalMessage = "";
+  let savingApproval = false;
+  let previousFocus: HTMLElement | null = null;
+  $: previewArticle = data.articles.find((article) => article.sourceId === previewId) ?? null;
+  $: previewIndex = filtered.findIndex((article) => article.sourceId === previewId);
+
+  function openPreview(sourceId: number): void {
+    previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    previewId = sourceId;
+    approvalMessage = "";
+    document.body.style.overflow = "hidden";
+  }
+  function closePreview(): void {
+    previewId = null;
+    approvalMessage = "";
+    document.body.style.overflow = "";
+    previousFocus?.focus();
+  }
+  function movePreview(direction: -1 | 1): void {
+    const next = filtered[previewIndex + direction];
+    if (next?.contentId) {
+      previewId = next.sourceId;
+      approvalMessage = "";
+    }
+  }
+  function leaveDraft(): void {
+    const next = filtered.slice(previewIndex + 1).find((article) => article.contentId && article.needsReview);
+    if (next) {
+      previewId = next.sourceId;
+      approvalMessage = "";
+    } else {
+      closePreview();
+    }
+  }
+  function modalKeydown(event: KeyboardEvent): void {
+    if (previewId === null || savingApproval) return;
+    if (event.key === "Escape") closePreview();
+  }
 
   $: filtered = data.articles.filter((article) => {
     const term = query.trim().toLocaleLowerCase("pt-BR");
@@ -45,10 +85,11 @@
       if (data.state?.enabled && !document.hidden) void invalidateAll();
     }, 8_000);
   });
-  onDestroy(() => { if (timer) clearInterval(timer); });
+  onDestroy(() => { if (timer) clearInterval(timer); if (typeof document !== "undefined") document.body.style.overflow = ""; });
 </script>
 
 <svelte:head><title>Migração Movidesk | F10 Operations</title></svelte:head>
+<svelte:window on:keydown={modalKeydown} />
 
 <ApplicationContent width="wide">
   <a href="/app/help/content" class="mb-4 inline-flex items-center gap-2 text-[13px] font-semibold text-[#566075] hover:text-[#000A57]"><ArrowLeft size={16}/>Base de Conhecimento</a>
@@ -148,15 +189,18 @@
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
               <a href={article.sourceUrl} target="_blank" rel="noopener noreferrer" title="Abrir original no Movidesk" aria-label="Abrir original no Movidesk" class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#E3E6ED] text-[#697182] hover:text-[#000A57]"><ExternalLink size={16}/></a>
+              {#if article.contentId}
+                <button type="button" on:click={() => openPreview(article.sourceId)} class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#000A57] px-3 text-[12px] font-semibold text-white hover:bg-[#121E77]"><Eye size={15}/>Prévia</button>
+              {/if}
               <a href={`/app/help/content/movidesk/${article.sourceId}`} class="inline-flex h-9 items-center rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold text-[#4D596B]">Original salvo</a>
               {#if article.contentId}
                 <a href={`/app/help/content/${article.contentId}`} class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold text-[#000A57]">Abrir no F10<ArrowUpRight size={14}/></a>
-                {#if article.needsReview}
-                  <form method="POST" action="?/approve" on:submit={(event) => { if (!confirm("Você conferiu o conteúdo, as imagens e os anexos deste artigo no F10?")) event.preventDefault(); }}>
-                    <input type="hidden" name="sourceId" value={article.sourceId}/>
-                    <button class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#EDF5EF] px-3 text-[12px] font-semibold text-[#287B49]"><ShieldCheck size={15}/>Aprovar</button>
-                  </form>
-                {:else}
+                {#if article.imageStats && article.imageStats.total > 0}
+                  <span class="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-[12px] font-semibold {article.imageStats.stored === article.imageStats.total ? 'text-[#287B49]' : 'text-[#A14C3E]'}" title="Imagens armazenadas no F10">
+                    <Images size={14}/>{article.imageStats.stored}/{article.imageStats.total}
+                  </span>
+                {/if}
+                {#if !article.needsReview}
                   <span class="inline-flex items-center gap-1 text-[12px] font-semibold text-[#27804E]"><CheckCircle2 size={15}/>Revisado</span>
                 {/if}
               {/if}
@@ -167,3 +211,67 @@
     {/if}
   </section>
 </ApplicationContent>
+
+{#if previewArticle && previewArticle.contentId}
+  <div class="application-ui fixed inset-0 z-[22000] flex flex-col bg-[#F5F6FA]" role="dialog" aria-modal="true" aria-labelledby="movidesk-preview-title">
+    <header class="flex min-h-[72px] shrink-0 items-center justify-between gap-3 border-b border-[#DDE1E9] bg-white px-4 py-3 shadow-sm sm:px-6">
+      <div class="min-w-0">
+        <p class="text-[11px] font-semibold text-[#7C8492]">Revisão Movidesk · #{previewArticle.sourceId} · {previewIndex + 1}/{filtered.length}</p>
+        <h2 id="movidesk-preview-title" class="mt-0.5 truncate text-[17px] font-semibold text-[#202637]">{previewArticle.title}</h2>
+      </div>
+      <div class="flex shrink-0 items-center gap-2">
+        <button type="button" on:click={() => movePreview(-1)} disabled={previewIndex <= 0 || !filtered[previewIndex - 1]?.contentId} class="flex h-10 w-10 items-center justify-center rounded-xl border border-[#DDE1E9] disabled:opacity-30" aria-label="Artigo anterior"><ChevronLeft size={19}/></button>
+        <button type="button" on:click={() => movePreview(1)} disabled={previewIndex >= filtered.length - 1 || !filtered[previewIndex + 1]?.contentId} class="flex h-10 w-10 items-center justify-center rounded-xl border border-[#DDE1E9] disabled:opacity-30" aria-label="Próximo artigo"><ChevronRight size={19}/></button>
+        <button type="button" on:click={closePreview} class="flex h-10 w-10 items-center justify-center rounded-xl border border-[#DDE1E9]" aria-label="Fechar prévia"><X size={20}/></button>
+      </div>
+    </header>
+
+    <div class="min-h-0 flex-1">
+      {#key previewArticle.contentId}
+        <iframe src={`/app/help/content/${previewArticle.contentId}/preview?movideskReview=1`} title={`Prévia do artigo: ${previewArticle.title}`} class="h-full w-full border-0" />
+      {/key}
+    </div>
+
+    <footer class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[#DDE1E9] bg-white px-4 py-3 sm:px-6">
+      <div class="min-w-0 text-[12px] text-[#697182]">
+        {#if previewArticle.imageStats && previewArticle.imageStats.total > 0}
+          <span class={previewArticle.imageStats.stored === previewArticle.imageStats.total ? "text-[#287B49]" : "font-semibold text-[#A14C3E]"}>
+            Imagens no F10: {previewArticle.imageStats.stored}/{previewArticle.imageStats.total}
+          </span>
+        {:else}
+          <span>Confira os vídeos, textos e imagens antes de aprovar.</span>
+        {/if}
+        {#if approvalMessage}<p role="alert" class="mt-1 font-semibold text-[#A14C3E]">{approvalMessage}</p>{/if}
+      </div>
+      <div class="flex items-center gap-2">
+        <a href={`/app/help/content/${previewArticle.contentId}`} target="_blank" rel="noopener noreferrer" class="hidden min-h-10 items-center gap-1.5 rounded-xl border border-[#DDE1E9] px-4 text-[12px] font-semibold text-[#000A57] sm:inline-flex">Editar<ArrowUpRight size={15}/></a>
+        <button type="button" on:click={leaveDraft} class="min-h-10 rounded-xl border border-[#DDE1E9] px-4 text-[12px] font-semibold text-[#48526A]">Manter rascunho</button>
+        {#if previewArticle.needsReview}
+          <form method="POST" action="?/approve" use:enhance={() => {
+            savingApproval = true;
+            approvalMessage = "";
+            const index = previewIndex;
+            const nextId = filtered.slice(index + 1).find((article) => article.contentId && article.needsReview)?.sourceId ?? null;
+            return async ({ result, update }) => {
+              savingApproval = false;
+              if (result.type === "success") {
+                await update({ reset: false, invalidateAll: true });
+                if (nextId) previewId = nextId;
+                else closePreview();
+              } else {
+                approvalMessage = result.type === "failure"
+                  ? String(result.data?.message ?? "Não foi possível aprovar.")
+                  : "Não foi possível aprovar.";
+              }
+            };
+          }}>
+            <input type="hidden" name="sourceId" value={previewArticle.sourceId}/>
+            <button disabled={savingApproval || Boolean(previewArticle.imageStats && previewArticle.imageStats.stored < previewArticle.imageStats.total)} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#EDF5EF] px-4 text-[12px] font-semibold text-[#287B49] disabled:cursor-not-allowed disabled:opacity-50"><ShieldCheck size={16}/>{savingApproval ? "Aprovando..." : "Aprovar"}</button>
+          </form>
+        {:else}
+          <span class="inline-flex min-h-10 items-center gap-2 px-3 text-[12px] font-semibold text-[#287B49]"><CheckCircle2 size={16}/>Revisado</span>
+        {/if}
+      </div>
+    </footer>
+  </div>
+{/if}

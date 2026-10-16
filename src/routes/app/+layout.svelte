@@ -44,6 +44,8 @@
 
   $: notifications = data.notifications;
   $: pathname = $page.url.pathname;
+  $: compactMovideskPreview = /^\/app\/help\/content\/[0-9a-f-]+\/preview$/.test(pathname)
+    && $page.url.searchParams.get("movideskReview") === "1";
   $: calendarNavigationLoading = Boolean(
     $navigating?.to?.url.pathname.startsWith("/app/tasks/calendar"),
   );
@@ -178,6 +180,9 @@
   <meta name="googlebot" content="noindex,nofollow,noarchive" />
 </svelte:head>
 
+{#if compactMovideskPreview}
+  <div class="application-ui min-h-screen bg-[#F5F6FA] py-4"><slot /></div>
+{:else}
 <div class={`application-ui operations-shell min-h-[100dvh] bg-[#F5F6FA] text-[#010D28] transition-[grid-template-columns] duration-200 lg:grid ${sidebarCollapsed ? "lg:grid-cols-[76px_minmax(0,1fr)]" : "lg:grid-cols-[256px_minmax(0,1fr)]"}`}>
   <ApplicationSidebar
     bind:collapsed={sidebarCollapsed}
@@ -333,3 +338,4 @@
     <GoogleCalendarSyncPulse enabled={canUseGoogleCalendar} />
   </main>
 </div>
+{/if}

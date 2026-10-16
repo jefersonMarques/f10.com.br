@@ -2,7 +2,7 @@ import { env } from "$env/dynamic/private";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { helpMovideskArticles, helpMovideskImportState } from "$lib/server/db/helpMovideskSchema";
-import { helpCategories, helpContents, helpContentReleases } from "$lib/server/db/structuredHelpSchema";
+import { helpAssets, helpCategories, helpContents, helpContentReleases, helpContentSteps, helpStepBlocks } from "$lib/server/db/structuredHelpSchema";
 import { listPublishedStructuredHelpLinks } from "$lib/server/help/publicStructuredHelpRepository";
 import { helpPublications } from "$lib/server/db/helpPublications";
 import { normalizeHelpCategorySlug, createHelpCategory, listHelpCategories } from "$lib/server/help/helpCategoryRepository";
@@ -228,7 +228,35 @@ export async function getMovideskArticleByContentId(contentId: string) {
 }
 
 export async function approveMovideskArticle(sourceId: number): Promise<void> {
-  await getDatabase().update(helpMovideskArticles).set({
+  const db = getDatabase();
+  const [article] = await db.select({
+    contentId: helpMovideskArticles.contentId,
+    sourceHtml: helpMovideskArticles.sourceHtml,
+    state: helpMovideskArticles.state,
+  }).from(helpMovideskArticles)
+    .where(eq(helpMovideskArticles.sourceId, sourceId)).limit(1);
+  if (!article?.contentId || !["imported", "review"].includes(article.state)) {
+    throw new Error("MOVIDESK_ARTICLE_NOT_IMPORTED");
+  }
+
+  const originalCount = (article.sourceHtml?.match(/<img\b/gi) ?? []).length;
+  const images = await db.select({ storageKey: helpAssets.storageKey })
+    .from(helpStepBlocks)
+    .innerJoin(helpContentSteps, eq(helpContentSteps.id, helpStepBlocks.stepId))
+    .leftJoin(helpAssets, eq(helpAssets.id, helpStepBlocks.assetId))
+    .where(and(
+      eq(helpContentSteps.contentId, article.contentId),
+      eq(helpStepBlocks.blockType, "image"),
+    ));
+  const locallyStored = images.filter((image) => Boolean(image.storageKey)).length;
+
+  // Nenhuma aprovação com imagem dependente de servidores externos do Movidesk/S3.
+  // A contagem original também detecta imagens descartadas por limites do conversor.
+  if (locallyStored < originalCount || images.some((image) => !image.storageKey)) {
+    throw new Error(`MOVIDESK_IMAGES_PENDING:${locallyStored}:${originalCount}`);
+  }
+
+  await db.update(helpMovideskArticles).set({
     needsReview: false, issue: null, updatedAt: new Date(),
   }).where(and(
     eq(helpMovideskArticles.sourceId, sourceId),
@@ -252,6 +280,25 @@ export async function listMovideskMigrationDashboard() {
   }).from(helpMovideskArticles)
     .orderBy(asc(helpMovideskArticles.sourceId))
     .limit(1000);
+  const contentIds = rows.flatMap((row) => row.contentId ? [row.contentId] : []);
+  const storedImages = contentIds.length ? await getDatabase().select({
+    contentId: helpContentSteps.contentId,
+    storageKey: helpAssets.storageKey,
+  }).from(helpStepBlocks)
+    .innerJoin(helpContentSteps, eq(helpContentSteps.id, helpStepBlocks.stepId))
+    .leftJoin(helpAssets, eq(helpAssets.id, helpStepBlocks.assetId))
+    .where(and(
+      inArray(helpContentSteps.contentId, contentIds),
+      eq(helpStepBlocks.blockType, "image"),
+    )) : [];
+  const imagesByContent = new Map<string, { total: number; stored: number }>();
+  for (const asset of storedImages) {
+    if (!asset.contentId) continue;
+    const count = imagesByContent.get(asset.contentId) ?? { total: 0, stored: 0 };
+    count.total++;
+    if (asset.storageKey) count.stored++;
+    imagesByContent.set(asset.contentId, count);
+  }
   // help_publications.entity_id é TEXT e help_movidesk_articles.content_id é UUID.
   // Cruzar os IDs em memória evita uma comparação SQL inválida (text = uuid).
   const publishedById = new Map(
@@ -261,6 +308,7 @@ export async function listMovideskMigrationDashboard() {
     ...row,
     published: Boolean(row.contentId && publishedById.has(row.contentId)),
     publishedSlug: row.contentId ? (publishedById.get(row.contentId) ?? null) : null,
+    imageStats: row.contentId ? (imagesByContent.get(row.contentId) ?? { total: 0, stored: 0 }) : null,
   }));
   return {
     state,
