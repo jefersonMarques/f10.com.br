@@ -200,12 +200,7 @@
                     <Images size={14}/>{article.imageStats.stored}/{article.imageStats.total}
                   </span>
                 {/if}
-                {#if article.needsReview}
-                  <form method="POST" action="?/approve" on:submit={(event) => { if (!confirm("Você conferiu o conteúdo, as imagens e os anexos deste artigo no F10?")) event.preventDefault(); }}>
-                    <input type="hidden" name="sourceId" value={article.sourceId}/>
-                    <button class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#EDF5EF] px-3 text-[12px] font-semibold text-[#287B49]"><ShieldCheck size={15}/>Aprovar</button>
-                  </form>
-                {:else}
+                {#if !article.needsReview}
                   <span class="inline-flex items-center gap-1 text-[12px] font-semibold text-[#27804E]"><CheckCircle2 size={15}/>Revisado</span>
                 {/if}
               {/if}
