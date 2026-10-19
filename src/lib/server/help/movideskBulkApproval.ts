@@ -1,5 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
+import { withHelpBulkEditorialAcceptance } from "$lib/help/helpBulkEditorialAcceptance";
 import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
 import { getDatabase } from "$lib/server/db";
 import { helpMovideskArticles } from "$lib/server/db/helpMovideskSchema";
@@ -122,4 +123,88 @@ export async function approveSafeMovideskArticleBatch(actorUserId: string) {
     }).catch((cause) => console.error("[movidesk-publicacao] auditoria", cause));
   }
   return { checked: candidates.length, approved, blocked, remaining: (await listMovideskSafeApprovalCandidates()).length };
+}
+
+
+/**
+ * Aprovação editorial em lote solicitada pelo administrador.
+ * As capturas não são marcadas como "revisadas visualmente"; cada bloco
+ * recebe um aceite administrativo identificável e vinculado ao ativo atual.
+ */
+export async function approveCuratedMovideskArticle(
+  sourceId: number,
+  actorUserId: string,
+): Promise<"approved" | "already-approved"> {
+  if (!MOVIDESK_PUBLIC_SOURCE_IDS.includes(sourceId)) throw new Error("FORA_DO_PLANO_PUBLICO");
+  const db = getDatabase();
+  const [article] = await db.select({
+    contentId: helpMovideskArticles.contentId,
+    sourceHtml: helpMovideskArticles.sourceHtml,
+    needsReview: helpMovideskArticles.needsReview,
+    state: helpMovideskArticles.state,
+    issue: helpMovideskArticles.issue,
+  }).from(helpMovideskArticles).where(eq(helpMovideskArticles.sourceId, sourceId)).limit(1);
+  if (!article?.contentId || !["imported", "review"].includes(article.state)
+    || article.sourceHtml === null || article.issue?.trim()) {
+    throw new Error("ARTIGO_COM_PENDENCIA");
+  }
+  if (!article.needsReview) return "already-approved";
+
+  const content = await getStructuredHelpContent(article.contentId);
+  if (!content || content.status !== "draft"
+    || content.contentKind !== "support_article" || content.importSource !== "movidesk"
+    || content.categories.length === 0
+    || content.categories.some((category) => !category.active
+      || category.slug === UNCATEGORIZED_HELP_CATEGORY_SLUG)) {
+    throw new Error("ARTIGO_NAO_ELEGIVEL");
+  }
+
+  const imageBlocks = content.steps.flatMap((step) => step.blocks)
+    .filter((block) => block.blockType === "image");
+  const expectedImageCount = (article.sourceHtml.match(/<img\b/gi) ?? []).length;
+  if (expectedImageCount !== imageBlocks.length
+    || imageBlocks.some((block) => !block.asset?.storageKey)
+    || content.steps.some((step) =>
+      step.blocks.filter((block) => block.blockType === "image").length > 1)) {
+    throw new Error("IMAGENS_PENDENTES_OU_INCOMPLETAS");
+  }
+  validateHelpKnowledgePublication(content);
+
+  // Protege o aceite contra alterações concorrentes de texto ou troca de mídia.
+  await db.transaction(async (tx) => {
+    const [current] = await tx.select({
+      id: helpContents.id, updatedAt: helpContents.updatedAt, status: helpContents.status,
+    }).from(helpContents).where(eq(helpContents.id, content.id)).for("update").limit(1);
+    if (!current || current.status !== "draft"
+      || current.updatedAt.getTime() !== content.updatedAt.getTime()) {
+      throw new Error("ARTIGO_ALTERADO_DURANTE_APROVACAO");
+    }
+    for (const block of imageBlocks) {
+      const [updated] = await tx.update(helpStepBlocks).set({
+        metadata: withHelpBulkEditorialAcceptance(
+          block.metadata, block.asset!.id, actorUserId, content.updatedAt,
+        ),
+        updatedAt: new Date(),
+      }).where(and(
+        eq(helpStepBlocks.id, block.id),
+        eq(helpStepBlocks.assetId, block.asset!.id),
+      )).returning({ id: helpStepBlocks.id });
+      if (!updated) throw new Error("IMAGEM_ALTERADA_DURANTE_APROVACAO");
+    }
+  });
+
+  await approveMovideskArticle(sourceId);
+  await recordAuditEvent({
+    actorUserId,
+    action: "help.movidesk.bulk_editorial_acceptance",
+    entityType: "help_content",
+    entityId: content.id,
+    metadata: {
+      sourceId, imageCount: imageBlocks.length,
+      mode: "admin_bulk_editorial_acceptance",
+      visualInspectionClaimed: false,
+      version: content.updatedAt.toISOString(),
+    },
+  });
+  return "approved";
 }
