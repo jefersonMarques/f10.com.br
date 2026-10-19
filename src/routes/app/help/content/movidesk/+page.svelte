@@ -174,29 +174,24 @@
           <ShieldCheck size={19} class="text-[#000A57]"/>
           <h2 class="text-[16px] font-semibold text-[#18223A]">Publicação em massa</h2>
         </div>
-        <p class="mt-1 text-[12px] text-[#667085]">Somente artigos aprovados e com imagens verificadas. O servidor continua mesmo com a página fechada.</p>
+        <p class="mt-1 text-[12px] text-[#667085]">Um clique para revisar pendências, aprovar os elegíveis, publicar e organizar as coleções. Pode fechar a página.</p>
       </div>
       <div class="flex flex-wrap gap-2">
         {#if data.publication.job?.enabled}
           <form method="POST" action="?/pausePublication">
             <button class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold"><Pause size={15}/>Pausar</button>
           </form>
-        {:else if data.publication.job && (data.publication.job.phase === "approving" || data.publication.job.phase === "publishing" || data.publication.job.phase === "collections")}
+        {:else if data.publication.job && (data.publication.job.phase === "approving" || data.publication.job.phase === "approving-and-publishing" || data.publication.job.phase === "publishing" || data.publication.job.phase === "collections")}
           <form method="POST" action="?/resumePublication">
             <button class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold text-[#000A57]"><Play size={15}/>Retomar</button>
           </form>
         {:else}
-          <form method="POST" action="?/publishReviewed" on:submit={(event) => {
-            if (!confirm("Publicar somente os artigos já aprovados? A publicação torna os conteúdos acessíveis publicamente. Artigos com imagens pendentes, conteúdo interno ou outras restrições serão bloqueados.")) event.preventDefault();
+          <form method="POST" action="?/runCompletePublication" on:submit={(event) => {
+            if (!confirm("Executar tudo uma vez? O F10 verificará e aprovará os artigos gerais elegíveis, publicará os aptos e organizará as coleções automaticamente. Isso tornará os artigos publicados acessíveis ao público. Materiais internos e artigos com problemas serão excluídos.")) event.preventDefault();
           }}>
-            <button disabled={data.publication.readyToCheck === 0} class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#000A57] px-3 text-[12px] font-semibold text-white disabled:opacity-40"><Play size={15}/>Publicar aprovados</button>
+            <button class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#000A57] px-4 text-[13px] font-semibold text-white"><Play size={16}/>Executar aprovação e publicação</button>
           </form>
         {/if}
-        <form method="POST" action="?/syncPublicationCollections" on:submit={(event) => {
-          if (!confirm("Criar e organizar coleções com os artigos já publicados? Os itens existentes serão mantidos.")) event.preventDefault();
-        }}>
-          <button disabled={data.publication.job?.enabled} class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#CAD7F6] px-3 text-[12px] font-semibold text-[#000A57] disabled:opacity-40">Organizar coleções</button>
-        </form>
       </div>
     </div>
     <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -205,45 +200,6 @@
       <div class="rounded-xl bg-[#FFF6EB] px-3 py-3"><div class="text-[22px] font-semibold text-[#8F571B]">{data.publication.pendingReview}</div><div class="text-[12px] text-[#56657A]">Aguardando aprovação</div></div>
       <div class="rounded-xl bg-[#F2F4F9] px-3 py-3"><div class="text-[22px] font-semibold text-[#202637]">{data.publication.publicCollections}</div><div class="text-[12px] text-[#56657A]">Coleções propostas</div></div>
     </div>
-    {#if data.publication.pendingReview > 0 && !data.publication.job?.enabled
-      && data.publication.job?.phase !== "approving"
-      && data.publication.job?.phase !== "publishing"
-      && data.publication.job?.phase !== "collections"}
-      <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#CAD7F6] bg-[#F6F8FF] px-3 py-3">
-        <div class="min-w-0">
-          <p class="text-[13px] font-semibold text-[#000A57]">Aprovar os conteúdos revisados em lote</p>
-          <p class="mt-1 text-[12px] text-[#566277]">Confere imagens no bucket, estrutura e categorias. Registra aceite administrativo, sem alegar conferência visual individual. Artigos com pendências ou fora do plano público ficam de fora.</p>
-        </div>
-        <form method="POST" action="?/approveCuratedBatch" on:submit={(event) => {
-          if (!confirm("Autorizar em lote os rascunhos do plano público que passaram pela revisão editorial e nas verificações de integridade? As imagens NÃO serão registradas como inspecionadas visualmente uma a uma. Artigos internos e com pendências serão bloqueados. Nenhum artigo será publicado nesta ação.")) event.preventDefault();
-        }}>
-          <button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#000A57] px-3 text-[12px] font-semibold text-white">
-            <ShieldCheck size={16}/> Aprovar revisados em lote
-          </button>
-        </form>
-      </div>
-    {/if}
-    {#if data.safeApprovalCandidates.length}
-      <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#D5E9DB] bg-[#F5FBF6] px-3 py-3">
-        <div class="min-w-0">
-          <p class="text-[13px] font-semibold text-[#267444]">{data.safeApprovalCandidates.length} artigo(s) sem imagens disponíveis para aprovação em lote</p>
-          <p class="mt-1 text-[12px] text-[#516477]">Somente conteúdos do plano público e sem alertas. As verificações continuam obrigatórias antes da publicação.</p>
-        </div>
-        <form method="POST" action="?/approveSafeBatch" on:submit={(event) => {
-          if (!confirm("Aprovar em lote apenas artigos do plano público SEM imagens e SEM alertas de importação? O F10 verificará cada artigo novamente. Nada será publicado nesta ação.")) event.preventDefault();
-        }}>
-          <button disabled={data.publication.job?.enabled} class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#267444] px-3 text-[12px] font-semibold text-white disabled:opacity-40"><ShieldCheck size={15}/>Aprovar sem imagens</button>
-        </form>
-        <details class="w-full text-[12px] text-[#46516A]">
-          <summary class="cursor-pointer font-semibold text-[#267444]">Ver artigos antes de aprovar</summary>
-          <div class="mt-2 grid max-h-64 gap-1 overflow-auto sm:grid-cols-2">
-            {#each data.safeApprovalCandidates as candidate}
-              <a href={`/app/help/content/${candidate.contentId}/preview`} target="_blank" rel="noopener noreferrer" class="rounded-lg px-2 py-1.5 hover:bg-white">#{candidate.sourceId} · {candidate.title}</a>
-            {/each}
-          </div>
-        </details>
-      </div>
-    {/if}
     {#if data.publication.candidates.length}
       <details class="mt-3 rounded-xl border border-[#E4E7EF] p-3">
         <summary class="cursor-pointer text-[12px] font-semibold text-[#000A57]">Conferir {data.publication.candidates.length} artigo(s) aprovados antes de publicar</summary>
@@ -259,7 +215,7 @@
     {#if data.publication.job && data.publication.job.phase !== "idle"}
       <div class="mt-3 rounded-xl border border-[#E4E7EF] p-3">
         <div class="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#45516A]">
-          <strong>{data.publication.job.phase === "done" ? "Concluído" : data.publication.job.phase === "collections" ? "Organizando coleções" : data.publication.job.phase === "approving" ? (data.publication.job.enabled ? "Aprovando em lote" : "Aprovação pausada") : data.publication.job.enabled ? "Publicando" : "Pausado"}</strong>
+          <strong>{data.publication.job.phase === "done" ? "Concluído" : data.publication.job.phase === "collections" ? "Organizando coleções" : (data.publication.job.phase === "approving" || data.publication.job.phase === "approving-and-publishing") ? (data.publication.job.enabled ? "Conferindo e aprovando" : "Aprovação pausada") : data.publication.job.enabled ? "Publicando" : "Pausado"}</strong>
           <span>{data.publication.job.processed}/{data.publication.job.total} · {data.publication.job.approved} aprovados · {data.publication.job.published} publicados · {data.publication.job.blocked} bloqueados</span>
         </div>
         {#if data.publication.job.total > 0}
@@ -269,6 +225,16 @@
         {/if}
         {#if data.publication.job.lastError}
           <p class="mt-2 text-[12px] font-semibold text-[#A14C3E]">Verificar: {data.publication.job.lastError}</p>
+        {/if}
+        {#if data.publication.job.errors.length}
+          <details class="mt-3 rounded-lg border border-[#F1DBD4] p-3">
+            <summary class="cursor-pointer text-[12px] font-semibold text-[#9B4C3B]">{data.publication.job.errors.length} registro(s) com pendência — ver motivos</summary>
+            <ul class="mt-2 max-h-56 space-y-1 overflow-auto text-[12px] text-[#6A5660]">
+              {#each data.publication.job.errors as item}
+                <li>#{item.sourceId} — {item.reason}</li>
+              {/each}
+            </ul>
+          </details>
         {/if}
         {#if data.publication.job.recent.length}
           <details class="mt-2">
@@ -282,7 +248,7 @@
         {/if}
       </div>
     {/if}
-    <p class="mt-3 text-[12px] leading-5 text-[#667085]">A revisão textual já aplicada não substitui a aprovação editorial nem a conferência individual das imagens. Materiais internos, antigos ou específicos de empresas ficam fora da primeira publicação.</p>
+    <p class="mt-3 text-[12px] leading-5 text-[#667085]">Os artigos aptos recebem aceite administrativo em lote, sem declarar inspeção visual individual. Materiais internos, legados ou com falhas permanecem fora da publicação.</p>
     {#if data.publication.missing > 0}
       <p class="mt-2 text-[12px] text-[#7A8190]">{data.publication.missing} referência(s) do plano não estão disponíveis como artigos no F10.</p>
     {/if}
