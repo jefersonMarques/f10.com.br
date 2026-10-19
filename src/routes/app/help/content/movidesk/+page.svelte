@@ -2,7 +2,7 @@
   import { onDestroy, onMount } from "svelte";
   import { invalidateAll } from "$app/navigation";
   import { enhance } from "$app/forms";
-  import { ArrowLeft, ArrowUpRight, CheckCircle2, ChevronLeft, ChevronRight, CircleAlert, Clock3, ExternalLink, Eye, Images, Pause, Play, RefreshCw, ShieldCheck, X } from "lucide-svelte";
+  import { ArrowLeft, ArrowUpRight, CheckCircle2, ChevronLeft, ChevronRight, CircleAlert, Clock3, ExternalLink, Eye, Images, Pause, Play, RefreshCw, ShieldCheck, X, Download } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -99,10 +99,20 @@
       <h1 class="text-[21px] font-semibold text-[#202637]">Migração Movidesk</h1>
       <p class="mt-1 text-[13px] text-[#737989]">Importação temporária sem IA · o conteúdo original permanece preservado.</p>
     </div>
-    <span class="rounded-full px-3 py-1.5 text-[12px] font-semibold {data.state?.enabled ? 'bg-[#E9F7ED] text-[#267444]' : 'bg-[#F1F2F6] text-[#677080]'}">
-      {data.state?.enabled ? "Em execução" : stateName(data.state?.phase ?? "idle")}
-    </span>
+    <div class="flex items-center gap-2">
+      <a href="/app/help/content/movidesk/export" class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#CAD7F6] bg-white px-3 text-[13px] font-semibold text-[#000A57] hover:bg-[#F5F7FF]" title="Baixar ZIP para revisão com IA">
+        <Download size={16}/>Exportar pacote
+      </a>
+      <span class="rounded-full px-3 py-1.5 text-[12px] font-semibold {data.state?.enabled ? 'bg-[#E9F7ED] text-[#267444]' : 'bg-[#F1F2F6] text-[#677080]'}">
+        {data.state?.enabled ? "Em execução" : stateName(data.state?.phase ?? "idle")}
+      </span>
+    </div>
   </header>
+
+  <p class="mt-3 text-[12px] leading-5 text-[#737989]">
+    O ZIP inclui todos os originais, rascunhos do F10, categorias e coleções, além dos artigos publicados somente para comparação.
+    Imagens e vídeos locais são identificados por ID, sem duplicar arquivos.
+  </p>
 
   {#if form?.message}
     <div role="status" class="mt-4 rounded-xl border px-4 py-3 text-[13px] {form.success ? 'border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]' : 'border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]'}">{form.message}</div>
