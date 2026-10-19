@@ -37,22 +37,139 @@ function retryableIssue(issue: string): boolean {
   return Boolean(status && (Number(status) === 429 || Number(status) >= 500));
 }
 
-async function downloadRecoverableImage(sourceUrl: string) {
+const MAX_ARTICLE_HTML_BYTES = 3 * 1024 * 1024;
+
+function trustedMovideskArticleUrl(raw: string, expectedArticleId: number): URL | null {
   try {
-    return await downloadMovideskImageSource(sourceUrl);
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    if (!["ajuda.f10.com.br", "f10.movidesk.com"].includes(url.hostname.toLowerCase())) return null;
+    const articleId = /^\/kb\/(?:pt-br\/)?article\/(\d+)(?:\/|$)/i.exec(url.pathname)?.[1];
+    if (Number(articleId) !== expectedArticleId) return null;
+    url.search = "";
+    url.hash = "";
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+async function readOriginalArticleHtml(sourceUrl: string, sourceId: number): Promise<string | null> {
+  let url = trustedMovideskArticleUrl(sourceUrl, sourceId);
+  if (!url) return null;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await fetch(url, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(25_000),
+      headers: {
+        Accept: "text/html",
+        "User-Agent": "F10-Help-Migration/1.0",
+        "Cache-Control": "no-cache",
+      },
+    });
+
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get("location");
+      await response.body?.cancel();
+      url = location ? trustedMovideskArticleUrl(new URL(location, url).href, sourceId) : null;
+      if (!url) return null;
+      continue;
+    }
+
+    if (!response.ok || !response.headers.get("content-type")?.toLowerCase().includes("text/html")) {
+      await response.body?.cancel();
+      return null;
+    }
+
+    const declaredSize = Number(response.headers.get("content-length") ?? 0);
+    if (declaredSize > MAX_ARTICLE_HTML_BYTES || !response.body) {
+      await response.body?.cancel();
+      return null;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let html = "";
+    let receivedBytes = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        receivedBytes += value.byteLength;
+        if (receivedBytes > MAX_ARTICLE_HTML_BYTES) return null;
+        html += decoder.decode(value, { stream: true });
+      }
+      return html + decoder.decode();
+    } finally {
+      await reader.cancel().catch(() => undefined);
+    }
+  }
+
+  return null;
+}
+
+function signedImageUrlFromArticle(html: string, expectedHash: string): string | null {
+  // Alguns atributos escapam '&' no HTML ou barras dentro de scripts JSON.
+  const normalized = html
+    .replace(/\\u0026/gi, "&")
+    .replace(/\\u003d/gi, "=")
+    .replace(/\\\//g, "/")
+    .replace(/&amp;|&#0*38;|&#x0*26;/gi, "&");
+  const matches = normalized.match(
+    /(?:https?:)?\/\/s3\.amazonaws\.com\/movidesk-files\/[a-f0-9]{32}\?[^\s"'<>\\]+/gi,
+  ) ?? [];
+
+  for (const match of matches) {
+    try {
+      const url = new URL(match.startsWith("//") ? "https:" + match : match);
+      const hash = movideskStorageHash(url.href);
+      if (hash?.toLowerCase() !== expectedHash.toLowerCase()) continue;
+      const expiry = Number(url.searchParams.get("Expires"));
+      if (!Number.isSafeInteger(expiry) || expiry <= Math.floor(Date.now() / 1000) + 60) continue;
+      if (!url.searchParams.get("AWSAccessKeyId") || !url.searchParams.get("Signature")) continue;
+      return url.href;
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
+async function signedImageUrlForAsset(contentId: string, hash: string): Promise<string | null> {
+  const [article] = await getDatabase().select({
+    sourceId: helpMovideskArticles.sourceId,
+    sourceUrl: helpMovideskArticles.sourceUrl,
+  }).from(helpMovideskArticles).where(eq(helpMovideskArticles.contentId, contentId)).limit(1);
+  if (!article) return null;
+  const html = await readOriginalArticleHtml(article.sourceUrl, article.sourceId);
+  return html ? signedImageUrlFromArticle(html, hash) : null;
+}
+
+async function downloadRecoverableImage(asset: { contentId: string; sourceUrl: string }) {
+  try {
+    return await downloadMovideskImageSource(asset.sourceUrl);
   } catch (cause) {
     const issue = errorCode(cause);
     if (!["MOVIDESK_IMAGE_HTTP_401", "MOVIDESK_IMAGE_HTTP_403", "MOVIDESK_IMAGE_HTTP_404"].includes(issue)) {
       throw cause;
     }
 
-    const hash = movideskStorageHash(sourceUrl);
+    const hash = movideskStorageHash(asset.sourceUrl);
     if (!hash) throw cause;
+
+    // A URL assinada só é usada para baixar o hash correspondente, nunca persistida.
+    try {
+      const signedUrl = await signedImageUrlForAsset(asset.contentId, hash);
+      if (signedUrl) return await downloadMovideskImageSource(signedUrl);
+    } catch {
+      // Caso a página original não forneça acesso, permanece o fallback da API.
+    }
 
     const token = env.MOVIDESK_KB_API_TOKEN?.trim().replace(/^Bearer\s+/i, "");
     if (!token) throw new Error("MOVIDESK_IMAGE_STORAGE_TOKEN_MISSING");
 
-    // O hash identifica o arquivo original; URLs assinadas de outros hashes não são intercambiáveis.
     const url = new URL("https://api.movidesk.com/public/v1/storage/download");
     url.searchParams.set("token", token);
     url.searchParams.set("id", hash);
@@ -182,7 +299,7 @@ async function markImageFailure(assetId: string, issue: string) {
 
 async function mirrorImage(asset: { id: string; contentId: string | null; sourceUrl: string | null }) {
   if (!asset.sourceUrl || !asset.contentId) throw new Error("MOVIDESK_IMAGE_URL_INVALID");
-  const downloaded = await downloadRecoverableImage(asset.sourceUrl);
+  const downloaded = await downloadRecoverableImage({ contentId: asset.contentId, sourceUrl: asset.sourceUrl });
   const ext = downloaded.mimeType === "image/png" ? "png"
     : downloaded.mimeType === "image/webp" ? "webp" : "jpg";
   const key = `help/movidesk-recovered/${asset.contentId}/${asset.id}-${randomUUID()}.${ext}`;
