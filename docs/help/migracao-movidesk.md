@@ -155,8 +155,8 @@ e categorias não são alterados. A URL original permanece apenas como referênc
 de origem, mas a entrega do arquivo passa a usar a chave armazenada no bucket.
 
 - A fila é persistida em `help_movidesk_image_recovery_state`, migration `0090`.
-- Se uma imagem de `s3.amazonaws.com/movidesk-files/HASH` retornar HTTP 401/403/404, o worker consulta a página pública **do mesmo artigo** para localizar uma URL AWS assinada e ainda válida **do mesmo hash**. Se encontrada, baixa imediatamente o arquivo para o bucket F10, sem gravar a assinatura temporária no banco. Se o HTML não trouxer a assinatura ou o download falhar, tenta o mesmo hash por `GET /public/v1/storage/download` com o token Movidesk, apenas no servidor. Isso depende de a origem disponibilizar o arquivo; nunca relaciona imagens por ordem ou por hashes diferentes.
-- Para respeitar o limite documentado de 10 chamadas/minuto, a fila espera pelo menos 8 segundos entre arquivos e aguarda o término da fila de importação de artigos. HTTP 429 e 5xx recebem nova tentativa com espera de 60 segundos, sem marcar falha permanente.
+- Para URLs `s3.amazonaws.com/movidesk-files/HASH`, o worker acessa diretamente `https://f10.movidesk.com/Storage/Download?id=HASH`. Essa rota foi verificada no servidor e responde HTTP 302 para o mesmo arquivo no S3 com `AWSAccessKeyId`, `Expires` e `Signature`; o S3 respondeu HTTP 206 com `image/png` no teste do artigo #119824. O worker valida HTTPS, host, hash e validade da assinatura antes de baixar e gravar o arquivo no bucket F10. Não armazena a URL assinada no banco. Não acessa a página pública do artigo nem depende de token na rota de download.
+- A fila espera pelo menos 8 segundos entre arquivos, aguarda o término da fila de importação de artigos e aplica espera de 60 segundos para HTTP 429 ou 5xx. A rota de imagens não consome chamadas do endpoint de artigos da API.
 - Imagens copiadas são validadas por assinatura PNG/JPEG/WebP, até 8MB por arquivo,
   hosts HTTPS autorizados (incluindo Amazon S3) e leitura de volta do bucket.
 - O painel apresenta arquivos no bucket, pendentes e falhas. Ao terminar, a fila
@@ -171,7 +171,7 @@ de origem, mas a entrega do arquivo passa a usar a chave armazenada no bucket.
 **Não use “Reprocessar artigos” para esta recuperação:** ele substitui rascunhos
 e pode desfazer a revisão editorial. Inicie **Recuperar imagens** no painel.
 
-Se a API de armazenamento retornar 404, o arquivo pode não estar disponível por hash; confira a origem e a correspondência antes de qualquer atualização manual. URLs temporárias assinadas não devem permanecer como dependência no F10. Após o deploy, use **Repetir falhas** para reenfileirar imagens marcadas pela versão anterior.
+Se `/Storage/Download?id=HASH` retornar erro, confira se o arquivo continua disponível no Movidesk; nunca substitua pelo hash de outra imagem. URLs temporárias assinadas não devem permanecer como dependência no F10. Após o deploy, use **Repetir falhas** para reenfileirar imagens marcadas pela versão anterior.
 
 Só desligue o Movidesk quando não houver imagens sem cópia local e os recursos
 forem verificáveis pelas URLs do próprio F10.
