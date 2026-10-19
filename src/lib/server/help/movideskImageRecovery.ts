@@ -80,7 +80,7 @@ export async function movideskImageRecoveryDashboard() {
   }
   const unimported = originals.flatMap((row) => {
     if (!row.contentId || !row.sourceHtml) return [];
-    const originalCount = (row.sourceHtml.match(/<img\\b/gi) ?? []).length;
+    const originalCount = (row.sourceHtml.match(/<img\b/gi) ?? []).length;
     const gap = Math.max(0, originalCount - (byContentId.get(row.contentId) ?? 0));
     return gap ? [{ sourceId: row.sourceId, missing: gap }] : [];
   });
