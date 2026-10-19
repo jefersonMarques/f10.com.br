@@ -3,6 +3,8 @@ import { recordAuditEvent } from "$lib/server/auth/audit";
 import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
 import { getDatabase } from "$lib/server/db";
 import { helpMovideskArticles } from "$lib/server/db/helpMovideskSchema";
+import { helpMovideskImportState } from "$lib/server/db/helpMovideskSchema";
+import { helpMovideskPublicationState } from "$lib/server/db/helpMovideskPublicationSchema";
 import { helpContentSteps, helpContents, helpStepBlocks } from "$lib/server/db/structuredHelpSchema";
 import { helpPublications } from "$lib/server/db/helpPublications";
 import { validateHelpKnowledgePublication } from "$lib/server/help/helpKnowledgeCompiler";
@@ -76,6 +78,14 @@ export async function listMovideskSafeApprovalCandidates(): Promise<MovideskSafe
 }
 
 export async function approveSafeMovideskArticleBatch(actorUserId: string) {
+  const db = getDatabase();
+  const [[importState], [publicationState]] = await Promise.all([
+    db.select({ enabled: helpMovideskImportState.enabled }).from(helpMovideskImportState)
+      .where(eq(helpMovideskImportState.id, 1)).limit(1),
+    db.select({ enabled: helpMovideskPublicationState.enabled }).from(helpMovideskPublicationState)
+      .where(eq(helpMovideskPublicationState.id, 1)).limit(1),
+  ]);
+  if (importState?.enabled || publicationState?.enabled) throw new Error("MOVIDESK_APPROVAL_BUSY");
   const candidates = (await listMovideskSafeApprovalCandidates()).slice(0, MAX_BATCH);
   let approved = 0;
   const blocked: Array<{ sourceId: number; reason: string }> = [];
