@@ -93,3 +93,28 @@ O host `f10.movidesk.com` pertence ao Movidesk; seus próprios redirecionamentos
 - Domínios S3 reconhecidos passam a ser aceitos pela lista segura. Se a imagem falhar, mantém o bloco de imagem original no rascunho para revisão, em vez de substituí-lo por um link genérico.
 
 Antes de reprocessar em lote, teste um artigo com YouTube, outro com MP4 Oracle e um com screenshots S3. Não publique automaticamente.
+
+
+## Exportar para revisão editorial com IA
+
+No painel temporário `/app/help/content/movidesk`, administradores encontram
+**Exportar pacote**. Ele gera `f10-revisao-movidesk.zip` com:
+
+- `movidesk-originais.json`: HTML/texto original, ID e anexos de cada artigo;
+- `rascunhos-f10.json`: passos e blocos editáveis no F10, IDs e metadados de mídia,
+  categorias e estado do rascunho;
+- `publicados-referencia.json`: snapshots efetivamente publicados de toda a base,
+  **somente para comparação** e detecção de duplicidades;
+- `categorias-colecoes.json`: categorias, coleções e sequência atual;
+- `inventario.json` e `LEIA-ME.md`: escopo, formato e cuidados.
+
+O arquivo não inclui a chave Movidesk nem os binários de imagens/vídeos; os assets
+já armazenados no F10 são referenciados por IDs persistentes. O download é autorizado
+apenas a `system.settings.manage`, com `Cache-Control: private, no-store`.
+
+**Importante:** este ZIP é um formato editorial de análise, não deve ser enviado
+ao importador genérico `/app/help/content/import`. Esse importador substitui passos
+e ativos do rascunho, o que não é adequado para aplicar alterações de IA preservando
+mídias e relações. Após a revisão, usar ou implementar um aplicador editorial que
+valide as versões-base, IDs e escopo antes de alterar algo. Artigos publicados
+não devem ser modificados por essa operação.
