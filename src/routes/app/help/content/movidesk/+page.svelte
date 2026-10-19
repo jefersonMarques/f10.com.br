@@ -205,6 +205,20 @@
       <div class="rounded-xl bg-[#FFF6EB] px-3 py-3"><div class="text-[22px] font-semibold text-[#8F571B]">{data.publication.pendingReview}</div><div class="text-[12px] text-[#56657A]">Aguardando aprovação</div></div>
       <div class="rounded-xl bg-[#F2F4F9] px-3 py-3"><div class="text-[22px] font-semibold text-[#202637]">{data.publication.publicCollections}</div><div class="text-[12px] text-[#56657A]">Coleções propostas</div></div>
     </div>
+    {#if data.imageReviewRemaining > 0}
+      <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#D6DEF6] bg-[#F6F8FF] px-3 py-3">
+        <div class="min-w-0">
+          <p class="text-[13px] font-semibold text-[#000A57]">{data.imageReviewRemaining} artigo(s) com imagens aguardando revisão</p>
+          <p class="mt-1 text-[12px] text-[#566277]">Confira as capturas em sequência e aprove cada artigo. As imagens externas continuam bloqueadas.</p>
+        </div>
+        <a href="/app/help/content/movidesk/revisao" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#000A57] px-3 text-[12px] font-semibold text-white">
+          <Images size={16}/> Revisar imagens
+        </a>
+      </div>
+    {/if}
+    {#if data.outsidePublicPlan > 0}
+      <p class="mt-2 text-[12px] text-[#657084]">{data.outsidePublicPlan} artigo(s) importados estão fora do plano público inicial e exigem triagem separada.</p>
+    {/if}
     {#if data.safeApprovalCandidates.length}
       <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#D5E9DB] bg-[#F5FBF6] px-3 py-3">
         <div class="min-w-0">
