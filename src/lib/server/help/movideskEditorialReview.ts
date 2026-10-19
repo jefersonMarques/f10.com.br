@@ -86,7 +86,7 @@ function parseReview(raw: string): ReviewItem[] {
         return {
           id: bid, type,
           text: type === "text" ? field(block, "text") : undefined,
-          label: type === "link" ? field(block, "label", 240) : undefined,
+          label: type === "link" ? field(block, "label", 2_000) : undefined,
         };
       });
       return {
@@ -270,11 +270,21 @@ export async function processMovideskEditorialReview(
     return { checked: active.length, applied: active.length, held: parsed.length - active.length };
   });
 
-  if (apply) await recordAuditEvent({
-    actorUserId, action: "help.movidesk.editorial_review_applied",
-    entityType: "help_content", entityId: active[0]!.contentId,
-    metadata: { applied: report.applied, held: report.held,
-      sourceExportedAt: record(JSON.parse(rawJson) as unknown).sourceExportedAt },
-  });
+  if (apply) {
+    try {
+      await recordAuditEvent({
+        actorUserId, action: "help.movidesk.editorial_review_applied",
+        entityType: "help_content", entityId: active[0]!.contentId,
+        metadata: {
+          applied: report.applied, held: report.held,
+          sourceExportedAt: record(JSON.parse(rawJson) as unknown).sourceExportedAt,
+        },
+      });
+    } catch (cause) {
+      // A transação já foi concluída. Nunca dizer ao administrador que nada foi
+      // aplicado quando apenas a gravação do evento de auditoria falhar.
+      console.error("[help-editorial] audit failed after commit", cause);
+    }
+  }
   return report;
 }
