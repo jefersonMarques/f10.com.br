@@ -150,6 +150,13 @@ async function downloadImage(src: string, baseUrl: string, index: number): Promi
   };
 }
 
+// Reutiliza a validação de URL, redirects, tamanho e assinatura da importação original.
+// Não altera nenhum bloco ou passo durante o espelhamento posterior.
+export async function downloadMovideskImageSource(sourceUrl: string): Promise<HelpImportPackageAsset> {
+  const result = await downloadImage(sourceUrl, sourceUrl, 1);
+  return result.asset;
+}
+
 function stripLegacyNavigation(html: string): string {
   return html.replace(/<p\b[^>]*>[\s\S]*?<\/p>/gi, (original) => {
     const label = decode(original.replace(/<[^>]*>/g, ""))
