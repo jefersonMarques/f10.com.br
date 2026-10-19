@@ -179,7 +179,7 @@ function isImportedMovideskEmptyStep(
     if (block.blockType === "text" || block.blockType === "notice") {
       return !block.textContent.trim();
     }
-    if (block.blockType === "link") return !block.linkUrl && !block.linkLabel.trim();
+    if (block.blockType === "link") return !(block.linkUrl && block.linkLabel.trim());
     return !block.asset?.storageKey && !block.asset?.sourceUrl;
   });
 }
