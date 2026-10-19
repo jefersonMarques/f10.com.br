@@ -205,6 +205,27 @@
       <div class="rounded-xl bg-[#FFF6EB] px-3 py-3"><div class="text-[22px] font-semibold text-[#8F571B]">{data.publication.pendingReview}</div><div class="text-[12px] text-[#56657A]">Aguardando aprovação</div></div>
       <div class="rounded-xl bg-[#F2F4F9] px-3 py-3"><div class="text-[22px] font-semibold text-[#202637]">{data.publication.publicCollections}</div><div class="text-[12px] text-[#56657A]">Coleções propostas</div></div>
     </div>
+    {#if data.safeApprovalCandidates.length}
+      <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#D5E9DB] bg-[#F5FBF6] px-3 py-3">
+        <div class="min-w-0">
+          <p class="text-[13px] font-semibold text-[#267444]">{data.safeApprovalCandidates.length} artigo(s) sem imagens disponíveis para aprovação em lote</p>
+          <p class="mt-1 text-[12px] text-[#516477]">Somente conteúdos do plano público e sem alertas. As verificações continuam obrigatórias antes da publicação.</p>
+        </div>
+        <form method="POST" action="?/approveSafeBatch" on:submit={(event) => {
+          if (!confirm("Aprovar em lote apenas artigos do plano público SEM imagens e SEM alertas de importação? O F10 verificará cada artigo novamente. Nada será publicado nesta ação.")) event.preventDefault();
+        }}>
+          <button disabled={data.publication.job?.enabled} class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#267444] px-3 text-[12px] font-semibold text-white disabled:opacity-40"><ShieldCheck size={15}/>Aprovar sem imagens</button>
+        </form>
+        <details class="w-full text-[12px] text-[#46516A]">
+          <summary class="cursor-pointer font-semibold text-[#267444]">Ver artigos antes de aprovar</summary>
+          <div class="mt-2 grid max-h-64 gap-1 overflow-auto sm:grid-cols-2">
+            {#each data.safeApprovalCandidates as candidate}
+              <a href={`/app/help/content/${candidate.contentId}/preview`} target="_blank" rel="noopener noreferrer" class="rounded-lg px-2 py-1.5 hover:bg-white">#{candidate.sourceId} · {candidate.title}</a>
+            {/each}
+          </div>
+        </details>
+      </div>
+    {/if}
     {#if data.publication.candidates.length}
       <details class="mt-3 rounded-xl border border-[#E4E7EF] p-3">
         <summary class="cursor-pointer text-[12px] font-semibold text-[#000A57]">Conferir {data.publication.candidates.length} artigo(s) aprovados antes de publicar</summary>
