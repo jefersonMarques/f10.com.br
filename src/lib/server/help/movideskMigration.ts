@@ -1,5 +1,5 @@
 import { env } from "$env/dynamic/private";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { helpMovideskArticles, helpMovideskImportState } from "$lib/server/db/helpMovideskSchema";
 import { helpMovideskImageRecoveryState } from "$lib/server/db/helpMovideskImageRecoverySchema";
@@ -169,7 +169,6 @@ async function safeToReplaceMovideskDraft(
 export async function reprocessMovideskArticles(actorUserId: string) {
   if (!isMovideskMigrationEnabled()) throw new Error("MOVIDESK_MIGRATION_DISABLED");
   if (!isMovideskTokenConfigured()) throw new Error("MOVIDESK_TOKEN_MISSING");
-  if (!getAssetStorageStatus().configured) throw new Error("ASSET_STORAGE_NOT_CONFIGURED");
   const db = getDatabase();
   const rows = await db.select({
     sourceId: helpMovideskArticles.sourceId,
@@ -202,6 +201,7 @@ export async function reprocessMovideskArticles(actorUserId: string) {
       && !published.has(row.contentId) && !released.has(row.contentId));
   }).map(row => row.sourceId);
   if (selected.length === 0) return { queued: 0, skipped: rows.length };
+  if (!getAssetStorageStatus().configured) throw new Error("ASSET_STORAGE_NOT_CONFIGURED");
 
   await db.transaction(async (tx) => {
     const [state] = await tx.select().from(helpMovideskImportState)
@@ -463,6 +463,17 @@ async function importArticle(sourceId: number, actorUserId: string): Promise<voi
     html, text: plain, categorySlugs, attachments: files,
     resolveArticleUrl: id => links.get(id) ?? null,
   });
+  // Nunca apaga uma cópia local boa ao substituir um rascunho se algum download falhou.
+  if (staged.contentId && converted.issues.some((issue) => issue.startsWith("Imagem "))) {
+    const [storedImage] = await getDatabase().select({ id: helpAssets.id })
+      .from(helpAssets).where(and(
+        eq(helpAssets.contentId, staged.contentId),
+        eq(helpAssets.assetType, "image"),
+        isNotNull(helpAssets.storageKey),
+      )).limit(1);
+    if (storedImage) throw new Error("MOVIDESK_IMAGE_REPROCESS_INCOMPLETE");
+  }
+
   const file: HelpImportFile = {
     format: "f10-help-import", version: 1, source: "movidesk",
     contents: [converted.content],
