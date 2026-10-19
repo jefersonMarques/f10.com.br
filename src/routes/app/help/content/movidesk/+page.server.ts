@@ -1,5 +1,6 @@
 import { processMovideskEditorialReview } from "$lib/server/help/movideskEditorialReview";
 import { movideskPublicationOverview, startMovideskBulkPublication, setMovideskBulkPublicationRunning, syncMovideskPublicCollections } from "$lib/server/help/movideskBulkPublication";
+import { listMovideskSafeApprovalCandidates, approveSafeMovideskArticleBatch } from "$lib/server/help/movideskBulkApproval";
 import { readHelpZipTextEntry } from "$lib/server/help/helpImportPackage";
 import { movideskImageRecoveryDashboard, setMovideskImageRecoveryRunning, retryFailedMovideskImages } from "$lib/server/help/movideskImageRecovery";
 import { error, fail } from "@sveltejs/kit";
@@ -31,15 +32,27 @@ function errorText(cause: unknown): string {
 export const load: PageServerLoad = async ({ cookies }) => {
   requireMigrationEnabled();
   await requireAppPermission(cookies, "system.settings.manage", ROUTE);
-  const [dashboard, imageRecovery, publication] = await Promise.all([
+  const [dashboard, imageRecovery, publication, safeApprovalCandidates] = await Promise.all([
     listMovideskMigrationDashboard(),
     movideskImageRecoveryDashboard(),
     movideskPublicationOverview(),
+    listMovideskSafeApprovalCandidates(),
   ]);
-  return { tokenConfigured: isMovideskTokenConfigured(), ...dashboard, imageRecovery, publication };
+  return { tokenConfigured: isMovideskTokenConfigured(), ...dashboard, imageRecovery, publication, safeApprovalCandidates };
 };
 
 export const actions: Actions = {
+  approveSafeBatch: async ({ cookies }) => {
+    requireMigrationEnabled();
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", ROUTE);
+    await requireAppPermission(cookies, "help.publish", ROUTE);
+    try {
+      const result = await approveSafeMovideskArticleBatch(session.user.id);
+      return { success: true, message: `${result.approved} aprovado(s), ${result.blocked.length} precisam de revisão, ${result.remaining} ainda candidatos. Nenhum artigo foi publicado.` };
+    } catch {
+      return fail(409, { success: false, message: "Não foi possível concluir as aprovações seguras. Confira os registros do servidor." });
+    }
+  },
   publishReviewed: async ({ cookies }) => {
     requireMigrationEnabled();
     const { session } = await requireAppPermission(cookies, "system.settings.manage", ROUTE);
