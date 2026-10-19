@@ -1,5 +1,5 @@
 import { processMovideskEditorialReview } from "$lib/server/help/movideskEditorialReview";
-import { movideskPublicationOverview, startMovideskBulkPublication, setMovideskBulkPublicationRunning, syncMovideskPublicCollections } from "$lib/server/help/movideskBulkPublication";
+import { movideskPublicationOverview, startMovideskBulkPublication, startMovideskMassApproval, setMovideskBulkPublicationRunning, syncMovideskPublicCollections } from "$lib/server/help/movideskBulkPublication";
 import { listMovideskSafeApprovalCandidates, approveSafeMovideskArticleBatch } from "$lib/server/help/movideskBulkApproval";
 import { readHelpZipTextEntry } from "$lib/server/help/helpImportPackage";
 import { movideskImageRecoveryDashboard, setMovideskImageRecoveryRunning, retryFailedMovideskImages } from "$lib/server/help/movideskImageRecovery";
@@ -42,6 +42,29 @@ export const load: PageServerLoad = async ({ cookies }) => {
 };
 
 export const actions: Actions = {
+  approveCuratedBatch: async ({ cookies }) => {
+    requireMigrationEnabled();
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", ROUTE);
+    await requireAppPermission(cookies, "help.publish", ROUTE);
+    await requireAppPermission(cookies, "help.edit", ROUTE);
+    try {
+      const queued = await startMovideskMassApproval(session.user.id);
+      return {
+        success: true,
+        message: `${queued} artigos enviados à conferência automática. Aprovados e bloqueados aparecerão no acompanhamento. Nada foi publicado.`,
+      };
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : "";
+      const message = code === "MOVIDESK_NO_BULK_APPROVAL_CANDIDATES"
+        ? "Não há novos rascunhos do plano público aguardando aprovação."
+        : code === "MOVIDESK_PUBLICATION_JOB_EXISTS"
+          ? "Já existe uma fila ativa ou pausada. Conclua ou retome antes de iniciar outra."
+          : code === "MOVIDESK_REPROCESS_BUSY"
+            ? "Conclua a migração de artigos antes da aprovação em lote."
+            : errorText(cause);
+      return fail(409, { success: false, message });
+    }
+  },
   approveSafeBatch: async ({ cookies }) => {
     requireMigrationEnabled();
     const { session } = await requireAppPermission(cookies, "system.settings.manage", ROUTE);
