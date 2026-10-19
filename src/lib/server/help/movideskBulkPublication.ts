@@ -30,6 +30,7 @@ export async function movideskPublicationOverview() {
     db.select().from(helpMovideskPublicationState).where(eq(helpMovideskPublicationState.id, 1)).limit(1),
     db.select({
       sourceId: helpMovideskArticles.sourceId,
+      title: helpMovideskArticles.title,
       contentId: helpMovideskArticles.contentId,
       needsReview: helpMovideskArticles.needsReview,
     }).from(helpMovideskArticles).where(inArray(helpMovideskArticles.sourceId, MOVIDESK_PUBLIC_SOURCE_IDS)),
@@ -40,6 +41,7 @@ export async function movideskPublicationOverview() {
       .from(helpContents).where(inArray(helpContents.id, contentIds)) : [];
   const status = new Map(contents.map((row) => [row.id, row.status]));
   const known = new Map(originals.map((row) => [row.sourceId, row]));
+  const candidates: Array<{ sourceId: number; title: string; contentId: string }> = [];
   let pendingReview = 0;
   let readyToCheck = 0;
   let alreadyPublished = 0;
@@ -50,13 +52,14 @@ export async function movideskPublicationOverview() {
     if (status.get(row.contentId) === "published") { alreadyPublished++; continue; }
     if (row.needsReview || status.get(row.contentId) !== "draft") { pendingReview++; continue; }
     readyToCheck++;
+    candidates.push({ sourceId: id, title: row.title, contentId: row.contentId });
   }
   const state = states[0];
   const results = state?.results ?? [];
   return {
     planned: MOVIDESK_PUBLIC_SOURCE_IDS.length,
     publicCollections: MOVIDESK_PUBLIC_COLLECTIONS.length,
-    pendingReview, readyToCheck, alreadyPublished, missing,
+    pendingReview, readyToCheck, alreadyPublished, missing, candidates,
     job: state ? {
       enabled: state.enabled, phase: state.phase,
       processed: state.cursor, total: state.sourceIds.length,
