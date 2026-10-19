@@ -22,30 +22,9 @@ function errorCode(cause: unknown): string {
     ? value.slice(0, 180) : "MOVIDESK_IMAGE_COPY_FAILED";
 }
 
-function movideskStorageHash(sourceUrl: string): string | null {
-  try {
-    const url = new URL(sourceUrl);
-    if (url.protocol !== "https:" || url.hostname !== "s3.amazonaws.com") return null;
-    return /^\/movidesk-files\/([a-f0-9]{32})\/?$/i.exec(url.pathname)?.[1] ?? null;
-  } catch {
-    return null;
-  }
-}
-
 function retryableIssue(issue: string): boolean {
   const status = /^MOVIDESK_IMAGE_(?:STORAGE_)?HTTP_(\d{3})$/.exec(issue)?.[1];
   return Boolean(status && (Number(status) === 429 || Number(status) >= 500));
-}
-
-async function downloadRecoverableImage(sourceUrl: string) {
-  const hash = movideskStorageHash(sourceUrl);
-  if (!hash) return downloadMovideskImageSource(sourceUrl);
-
-  // A rota do Movidesk redireciona para o S3 com uma assinatura temporária.
-  // Somente o arquivo cujo hash corresponde ao ativo original pode ser armazenado.
-  const url = new URL("https://f10.movidesk.com/Storage/Download");
-  url.searchParams.set("id", hash);
-  return downloadMovideskImageSource(url.href, hash);
 }
 
 function pendingImage() {
@@ -161,7 +140,7 @@ async function markImageFailure(assetId: string, issue: string) {
 
 async function mirrorImage(asset: { id: string; contentId: string | null; sourceUrl: string | null }) {
   if (!asset.sourceUrl || !asset.contentId) throw new Error("MOVIDESK_IMAGE_URL_INVALID");
-  const downloaded = await downloadRecoverableImage(asset.sourceUrl);
+  const downloaded = await downloadMovideskImageSource(asset.sourceUrl);
   const ext = downloaded.mimeType === "image/png" ? "png"
     : downloaded.mimeType === "image/webp" ? "webp" : "jpg";
   const key = `help/movidesk-recovered/${asset.contentId}/${asset.id}-${randomUUID()}.${ext}`;
