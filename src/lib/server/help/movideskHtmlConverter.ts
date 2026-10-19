@@ -108,7 +108,20 @@ function mediaUrl(raw: string, baseUrl: string): URL {
   return url;
 }
 
-async function downloadImage(src: string, baseUrl: string, index: number): Promise<{
+function validateMovideskSignedImage(url: URL, expectedHash: string): void {
+  if (url.hostname !== "s3.amazonaws.com"
+    || url.pathname.toLowerCase() !== `/movidesk-files/${expectedHash.toLowerCase()}`) {
+    throw new Error("MOVIDESK_IMAGE_STORAGE_REDIRECT_INVALID");
+  }
+
+  const expiry = Number(url.searchParams.get("Expires"));
+  if (!Number.isSafeInteger(expiry) || expiry <= Math.floor(Date.now() / 1000)
+    || !url.searchParams.get("AWSAccessKeyId") || !url.searchParams.get("Signature")) {
+    throw new Error("MOVIDESK_IMAGE_STORAGE_SIGNATURE_INVALID");
+  }
+}
+
+async function downloadImage(src: string, baseUrl: string, index: number, expectedHash?: string): Promise<{
   asset: HelpImportPackageAsset; path: string;
 }> {
   let url = mediaUrl(src, baseUrl);
@@ -128,6 +141,14 @@ async function downloadImage(src: string, baseUrl: string, index: number): Promi
   }
   if (!response) throw new Error("MOVIDESK_IMAGE_REDIRECT_LIMIT");
   if (!response.ok) throw new Error(`MOVIDESK_IMAGE_HTTP_${response.status}`);
+  if (expectedHash) {
+    try {
+      validateMovideskSignedImage(url, expectedHash);
+    } catch (cause) {
+      await response.body?.cancel();
+      throw cause;
+    }
+  }
   const declaredSize = Number(response.headers.get("content-length") ?? 0);
   if (declaredSize > MAX_IMAGE_BYTES) throw new Error("MOVIDESK_IMAGE_TOO_LARGE");
   const bytes = new Uint8Array(await response.arrayBuffer());
@@ -152,8 +173,8 @@ async function downloadImage(src: string, baseUrl: string, index: number): Promi
 
 // Reutiliza a validação de URL, redirects, tamanho e assinatura da importação original.
 // Não altera nenhum bloco ou passo durante o espelhamento posterior.
-export async function downloadMovideskImageSource(sourceUrl: string): Promise<HelpImportPackageAsset> {
-  const result = await downloadImage(sourceUrl, sourceUrl, 1);
+export async function downloadMovideskImageSource(sourceUrl: string, expectedHash?: string): Promise<HelpImportPackageAsset> {
+  const result = await downloadImage(sourceUrl, sourceUrl, 1, expectedHash);
   return result.asset;
 }
 
