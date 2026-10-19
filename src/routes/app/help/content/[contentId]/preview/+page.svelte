@@ -5,6 +5,7 @@
   import HelpAnnotatedImage from "$lib/components/help/HelpAnnotatedImage.svelte";
   import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
   import HelpRichText from "$lib/components/help/HelpRichText.svelte";
+  import { isRedundantLegacyImageLink } from "$lib/help/legacyImageLinks";
   import { readHelpImageAnnotationsFromMetadata } from "$lib/help/helpImageAnnotations";
   import type { PageData } from "./$types";
 
@@ -94,7 +95,8 @@
         <section id={`help-step-${step.id}`} data-help-step-id={step.id} class="scroll-mt-24 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
           <header class="flex items-start gap-4 border-b border-[#EEF0F5] px-5 py-5 sm:px-6"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[12px] font-bold text-white">{index + 1}</span><div><h2 class="text-[17px] font-semibold text-[#252B3B]">{step.title}</h2>{#if step.description}<HelpRichText text={step.description} className="mt-1 space-y-1 text-[11px] leading-5 text-[#7A8190]"/>{/if}</div></header>
           <div class="space-y-5 px-5 py-6 sm:px-6">
-            {#each step.blocks as block}
+            {#each step.blocks as block, blockIndex}
+              {#if !isRedundantLegacyImageLink(step.blocks, blockIndex)}
               <div id={`help-block-${block.id}`} data-help-block-id={block.id} data-help-block-type={block.blockType} class="scroll-mt-24">
                 {#if block.blockType === "text"}<HelpRichText text={block.textContent} className="space-y-1.5 text-[13px] leading-7 text-[#505767]"/>
                 {:else if block.blockType === "notice"}<div class={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${block.noticeVariant === "warning" || block.noticeVariant === "danger" ? "border-[#F0D0C8] bg-[#FFF8F5]" : "border-[#D8DEF2] bg-[#F8F9FF]"}`}>{#if block.noticeVariant === "warning" || block.noticeVariant === "danger"}<TriangleAlert size={16}/>{:else}<Info size={16}/>{/if}<HelpRichText text={block.textContent} className="min-w-0 space-y-1 text-[11px] leading-6"/></div>
@@ -119,6 +121,7 @@
                   {/if}
                 {/if}
               </div>
+              {/if}
             {/each}
           </div>
         </section>
