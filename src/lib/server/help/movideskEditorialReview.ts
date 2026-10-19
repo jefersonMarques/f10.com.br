@@ -130,7 +130,7 @@ export async function processMovideskEditorialReview(
       tx.select({
         id: helpContents.id, status: helpContents.status,
         importSource: helpContents.importSource, updatedAt: helpContents.updatedAt,
-      }).from(helpContents).where(inArray(helpContents.id, contentIds)),
+      }).from(helpContents).where(inArray(helpContents.id, contentIds)).for("update"),
       tx.select({
         id: helpMovideskArticles.sourceId,
         contentId: helpMovideskArticles.contentId,
@@ -218,17 +218,17 @@ export async function processMovideskEditorialReview(
     // Três alterações SQL parametrizadas; nenhum bloco de imagem/vídeo é recriado.
     const contentChanges = active.map((row) => ({
       id: row.contentId, title: row.title, summary: row.summary,
-      quickGuide: row.quickGuide, assistantKnowledge: row.assistantKnowledge,
-      internalSupportNotes: row.internalSupportNotes,
+      quick_guide: row.quickGuide, assistant_knowledge: row.assistantKnowledge,
+      internal_support_notes: row.internalSupportNotes,
     }));
     const stepChanges = active.flatMap((row) => row.steps.map((step) => ({
       id: step.id, title: step.title, description: step.description,
-      assistantKnowledge: step.assistantKnowledge,
+      assistant_knowledge: step.assistantKnowledge,
     })));
     const textChanges = active.flatMap((row) => row.steps.flatMap((step) =>
       step.blocks.filter((block) => block.type === "text" || block.type === "link")
-        .map((block) => ({ id: block.id, textContent: block.text ?? "",
-          linkLabel: block.label ?? "" }))));
+        .map((block) => ({ id: block.id, text_content: block.text ?? "",
+          link_label: block.label ?? "" }))));
 
     await tx.execute(sql`UPDATE ${helpContents} AS c
       SET title = r.title, summary = r.summary, quick_guide = r.quick_guide,
