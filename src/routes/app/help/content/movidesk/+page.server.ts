@@ -62,10 +62,34 @@ export const actions: Actions = {
       };
     } catch (cause) {
       const code = cause instanceof Error ? cause.message : "";
-      const known = /^HELP_EDITORIAL_(?:CONTENT_PROTECTED|VERSION_CHANGED|STEPS_CHANGED|BLOCKS_CHANGED|VIDEO_CHANGED|IMAGES_CHANGED|CATEGORY_INVALID):([0-9]+)$/.exec(code);
+      const known = /^HELP_EDITORIAL_(CONTENT_PROTECTED|VERSION_CHANGED|STEPS_CHANGED|BLOCKS_CHANGED|VIDEO_CHANGED|IMAGES_CHANGED|CATEGORY_INVALID|STEP_OWNERSHIP|BLOCK_OWNERSHIP):([0-9]+)$/.exec(code);
+      const invalidField = /^HELP_EDITORIAL_INVALID_FIELD:([a-zA-Z]+)$/.exec(code);
+      const labels: Record<string, string> = {
+        CONTENT_PROTECTED: "está protegido ou já foi aprovado/publicado",
+        VERSION_CHANGED: "foi alterado após a exportação",
+        STEPS_CHANGED: "teve suas etapas modificadas",
+        BLOCKS_CHANGED: "teve seus blocos modificados",
+        VIDEO_CHANGED: "teve o vídeo principal modificado",
+        IMAGES_CHANGED: "teve suas imagens modificadas",
+        CATEGORY_INVALID: "possui uma categoria inválida ou inativa",
+        STEP_OWNERSHIP: "possui etapa pertencente a outro artigo",
+        BLOCK_OWNERSHIP: "possui bloco incompatível",
+      };
       const message = known
-        ? `A revisão não foi aplicada. Artigo Movidesk #${known[1]} alterado ou protegido no F10 (${known[0].split(":")[0].replace("HELP_EDITORIAL_", "")}). Gere um novo pacote ou revise esse artigo.`
-        : "O pacote não passou na validação. Nenhum artigo foi alterado. Confira o formato e os identificadores.";
+        ? `Artigo #${known[2]} ${labels[known[1]]}. Gere uma exportação atualizada antes de aplicar.`
+        : invalidField
+          ? `O campo "${invalidField[1]}" tem formato inválido ou excede o limite. Nenhuma alteração realizada.`
+          : code === "HELP_EDITORIAL_INVALID_STEPS" || code === "HELP_EDITORIAL_INVALID_BLOCKS"
+            ? "O pacote contém etapas ou blocos fora dos limites permitidos. Nenhuma alteração realizada."
+            : code.startsWith("HELP_EDITORIAL_")
+              ? `O arquivo não passou na verificação (${code}). Nenhuma alteração realizada.`
+              : "Erro ao consultar ou aplicar o pacote. Consulte os logs do servidor antes de tentar novamente.";
+      // Não registrar o conteúdo do ZIP ou parâmetros SQL, que podem conter dados internos.
+      if (!code.startsWith("HELP_EDITORIAL_")) {
+        const dbCode = cause && typeof cause === "object" && "code" in cause
+          ? String(cause.code).slice(0, 30) : "unknown";
+        console.error("[help-editorial] failed", { name: cause instanceof Error ? cause.name : "unknown", dbCode });
+      }
       return fail(409, { success: false, action: "editorialReview", message });
     }
   },
