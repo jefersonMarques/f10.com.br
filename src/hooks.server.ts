@@ -6,11 +6,13 @@ import { startHelpVideoProcessingWorker } from "$lib/server/help/helpVideoProces
 import { startSupportEmailInboundWorker } from "$lib/server/support/emailInboundWorker";
 import { getMovideskLegacyRedirect, startMovideskMigrationWorker } from "$lib/server/help/movideskMigration";
 import { startMovideskImageRecoveryWorker } from "$lib/server/help/movideskImageRecovery";
+import { startMovideskBulkPublicationWorker } from "$lib/server/help/movideskBulkPublication";
 
 startHelpVideoProcessingWorker();
 startSupportEmailInboundWorker();
 startMovideskMigrationWorker();
 startMovideskImageRecoveryWorker();
+startMovideskBulkPublicationWorker();
 
 type RedirectRule = {
   from: string;
