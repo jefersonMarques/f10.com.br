@@ -2,6 +2,7 @@ import { env } from "$env/dynamic/private";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { helpMovideskArticles, helpMovideskImportState } from "$lib/server/db/helpMovideskSchema";
+import { helpMovideskImageRecoveryState } from "$lib/server/db/helpMovideskImageRecoverySchema";
 import { helpAssets, helpCategories, helpContents, helpContentReleases, helpContentSteps, helpStepBlocks } from "$lib/server/db/structuredHelpSchema";
 import { listPublishedStructuredHelpLinks } from "$lib/server/help/publicStructuredHelpRepository";
 import { helpPublications } from "$lib/server/db/helpPublications";
@@ -13,6 +14,7 @@ import { downloadMovideskMp4 } from "$lib/server/help/movideskVideoMirror";
 import { attachImportedMp4AsFeaturedVideo } from "$lib/server/help/helpImportedFeaturedVideo";
 import { saveStructuredContentVersion, upsertStructuredHelpFeaturedVideo } from "$lib/server/help/structuredHelpRepository";
 import { getPublishedStructuredHelpById } from "$lib/server/help/publicStructuredHelpRepository";
+import { getAssetStorageStatus } from "$lib/server/storage/assetStorage";
 
 const BASE = "https://api.movidesk.com/public/v1";
 const INTERVAL_MS = 8_000;
@@ -167,6 +169,7 @@ async function safeToReplaceMovideskDraft(
 export async function reprocessMovideskArticles(actorUserId: string) {
   if (!isMovideskMigrationEnabled()) throw new Error("MOVIDESK_MIGRATION_DISABLED");
   if (!isMovideskTokenConfigured()) throw new Error("MOVIDESK_TOKEN_MISSING");
+  if (!getAssetStorageStatus().configured) throw new Error("ASSET_STORAGE_NOT_CONFIGURED");
   const db = getDatabase();
   const rows = await db.select({
     sourceId: helpMovideskArticles.sourceId,
@@ -213,6 +216,14 @@ export async function reprocessMovideskArticles(actorUserId: string) {
       phase: "details", enabled: true, startedBy: actorUserId,
       lastError: null, nextRequestAt: new Date(), updatedAt: new Date(),
     }).where(eq(helpMovideskImportState.id, 1));
+    // Falhas isoladas de imagens são recuperadas após a importação, sem outro clique.
+    // O worker de imagens aguarda enquanto a fila de artigos estiver ativa.
+    await tx.insert(helpMovideskImageRecoveryState).values({
+      id: 1, enabled: true, nextRequestAt: new Date(), updatedAt: new Date(),
+    }).onConflictDoUpdate({
+      target: helpMovideskImageRecoveryState.id,
+      set: { enabled: true, nextRequestAt: new Date(), lastError: null, updatedAt: new Date() },
+    });
   });
   return { queued: selected.length, skipped: rows.length - selected.length };
 }
