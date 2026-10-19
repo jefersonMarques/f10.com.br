@@ -108,6 +108,11 @@ function mediaUrl(raw: string, baseUrl: string): URL {
   return url;
 }
 
+function movideskStorageHash(url: URL): string | null {
+  if (url.protocol !== "https:" || url.hostname !== "s3.amazonaws.com") return null;
+  return /^\/movidesk-files\/([a-f0-9]{32})\/?$/i.exec(url.pathname)?.[1] ?? null;
+}
+
 function validateMovideskSignedImage(url: URL, expectedHash: string): void {
   if (url.hostname !== "s3.amazonaws.com"
     || url.pathname.toLowerCase() !== `/movidesk-files/${expectedHash.toLowerCase()}`) {
@@ -125,6 +130,16 @@ async function downloadImage(src: string, baseUrl: string, index: number, expect
   asset: HelpImportPackageAsset; path: string;
 }> {
   let url = mediaUrl(src, baseUrl);
+  const hash = movideskStorageHash(url);
+  if (hash) {
+    // O HTML da API contém S3 sem assinatura; a rota de download gera uma URL temporária válida.
+    if (expectedHash && expectedHash.toLowerCase() !== hash.toLowerCase()) {
+      throw new Error("MOVIDESK_IMAGE_STORAGE_REDIRECT_INVALID");
+    }
+    expectedHash = hash;
+    url = new URL("https://f10.movidesk.com/Storage/Download");
+    url.searchParams.set("id", hash);
+  }
   let response: Response | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     response = await fetch(url, {
@@ -136,7 +151,9 @@ async function downloadImage(src: string, baseUrl: string, index: number, expect
     const location = response.headers.get("location");
     await response.body?.cancel();
     if (!location) throw new Error("MOVIDESK_IMAGE_REDIRECT_INVALID");
-    url = mediaUrl(location, url.href);
+    const next = mediaUrl(location, url.href);
+    if (expectedHash) validateMovideskSignedImage(next, expectedHash);
+    url = next;
     response = null;
   }
   if (!response) throw new Error("MOVIDESK_IMAGE_REDIRECT_LIMIT");

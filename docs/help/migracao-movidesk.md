@@ -168,8 +168,17 @@ de origem, mas a entrega do arquivo passa a usar a chave armazenada no bucket.
   aparecerão em um aviso separado. Elas precisam ser reinseridas no artigo, pois
   não há vínculo de mídia para atualizar automaticamente.
 
-**Não use “Reprocessar artigos” para esta recuperação:** ele substitui rascunhos
-e pode desfazer a revisão editorial. Inicie **Recuperar imagens** no painel.
+**Reprocessar artigos** (somente rascunhos Movidesk não editados e sem publicação)
+usa o mesmo fluxo de `/Storage/Download?id=HASH` durante a importação:
+baixa, valida e grava as imagens no bucket antes de concluir cada artigo. Se alguma
+imagem ainda ficar externa, a fila persistente de recuperação é acionada
+automaticamente após o reprocessamento, sem segundo clique. O reprocesso
+exige bucket configurado. Se um download falhar e o artigo tiver imagens já
+armazenadas, o conteúdo anterior permanece intacto em vez de perder imagens.
+Rascunhos editados, aprovados e conteúdos publicados continuam protegidos.
+
+Para corrigir **apenas imagens** sem mudar os rascunhos nem a revisão editorial,
+use **Recuperar imagens** ou **Repetir falhas**.
 
 Se `/Storage/Download?id=HASH` retornar erro, confira se o arquivo continua disponível no Movidesk; nunca substitua pelo hash de outra imagem. URLs temporárias assinadas não devem permanecer como dependência no F10. Após o deploy, use **Repetir falhas** para reenfileirar imagens marcadas pela versão anterior.
 

@@ -1,7 +1,8 @@
 import { env } from "$env/dynamic/private";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { helpMovideskArticles, helpMovideskImportState } from "$lib/server/db/helpMovideskSchema";
+import { helpMovideskImageRecoveryState } from "$lib/server/db/helpMovideskImageRecoverySchema";
 import { helpAssets, helpCategories, helpContents, helpContentReleases, helpContentSteps, helpStepBlocks } from "$lib/server/db/structuredHelpSchema";
 import { listPublishedStructuredHelpLinks } from "$lib/server/help/publicStructuredHelpRepository";
 import { helpPublications } from "$lib/server/db/helpPublications";
@@ -13,6 +14,7 @@ import { downloadMovideskMp4 } from "$lib/server/help/movideskVideoMirror";
 import { attachImportedMp4AsFeaturedVideo } from "$lib/server/help/helpImportedFeaturedVideo";
 import { saveStructuredContentVersion, upsertStructuredHelpFeaturedVideo } from "$lib/server/help/structuredHelpRepository";
 import { getPublishedStructuredHelpById } from "$lib/server/help/publicStructuredHelpRepository";
+import { getAssetStorageStatus } from "$lib/server/storage/assetStorage";
 
 const BASE = "https://api.movidesk.com/public/v1";
 const INTERVAL_MS = 8_000;
@@ -199,6 +201,7 @@ export async function reprocessMovideskArticles(actorUserId: string) {
       && !published.has(row.contentId) && !released.has(row.contentId));
   }).map(row => row.sourceId);
   if (selected.length === 0) return { queued: 0, skipped: rows.length };
+  if (!getAssetStorageStatus().configured) throw new Error("ASSET_STORAGE_NOT_CONFIGURED");
 
   await db.transaction(async (tx) => {
     const [state] = await tx.select().from(helpMovideskImportState)
@@ -213,6 +216,14 @@ export async function reprocessMovideskArticles(actorUserId: string) {
       phase: "details", enabled: true, startedBy: actorUserId,
       lastError: null, nextRequestAt: new Date(), updatedAt: new Date(),
     }).where(eq(helpMovideskImportState.id, 1));
+    // Falhas isoladas de imagens são recuperadas após a importação, sem outro clique.
+    // O worker de imagens aguarda enquanto a fila de artigos estiver ativa.
+    await tx.insert(helpMovideskImageRecoveryState).values({
+      id: 1, enabled: true, nextRequestAt: new Date(), updatedAt: new Date(),
+    }).onConflictDoUpdate({
+      target: helpMovideskImageRecoveryState.id,
+      set: { enabled: true, nextRequestAt: new Date(), lastError: null, updatedAt: new Date() },
+    });
   });
   return { queued: selected.length, skipped: rows.length - selected.length };
 }
@@ -452,6 +463,17 @@ async function importArticle(sourceId: number, actorUserId: string): Promise<voi
     html, text: plain, categorySlugs, attachments: files,
     resolveArticleUrl: id => links.get(id) ?? null,
   });
+  // Nunca apaga uma cópia local boa ao substituir um rascunho se algum download falhou.
+  if (staged.contentId && converted.issues.some((issue) => issue.startsWith("Imagem "))) {
+    const [storedImage] = await getDatabase().select({ id: helpAssets.id })
+      .from(helpAssets).where(and(
+        eq(helpAssets.contentId, staged.contentId),
+        eq(helpAssets.assetType, "image"),
+        isNotNull(helpAssets.storageKey),
+      )).limit(1);
+    if (storedImage) throw new Error("MOVIDESK_IMAGE_REPROCESS_INCOMPLETE");
+  }
+
   const file: HelpImportFile = {
     format: "f10-help-import", version: 1, source: "movidesk",
     contents: [converted.content],

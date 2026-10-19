@@ -157,7 +157,7 @@
         {/if}
         {#if !data.state?.enabled && (data.state?.phase === "done" || data.state?.phase === "details") && data.total > 0}
           <form method="POST" action="?/reprocess" on:submit={(event) => {
-            if (!confirm("Reprocessar os artigos ainda não revisados? Rascunhos editados, aprovados e publicados serão preservados. A fila continua no servidor.")) event.preventDefault();
+            if (!confirm("Reprocessar os rascunhos não editados e copiar suas imagens para o F10? Artigos editados, aprovados e publicados serão preservados. O servidor continua em segundo plano.")) event.preventDefault();
           }}>
             <button disabled={!data.tokenConfigured} class="inline-flex h-9 items-center gap-2 rounded-lg border border-[#CAD7F6] bg-[#EFF3FF] px-3 text-[12px] font-semibold text-[#000A57] disabled:opacity-40"><RefreshCw size={15}/>Reprocessar artigos</button>
           </form>
