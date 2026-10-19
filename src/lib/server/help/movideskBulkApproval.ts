@@ -1,8 +1,9 @@
 import { and, eq, inArray } from "drizzle-orm";
+import { recordAuditEvent } from "$lib/server/auth/audit";
 import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
 import { getDatabase } from "$lib/server/db";
 import { helpMovideskArticles } from "$lib/server/db/helpMovideskSchema";
-import { helpAssets, helpContentSteps, helpContents, helpStepBlocks } from "$lib/server/db/structuredHelpSchema";
+import { helpContentSteps, helpContents, helpStepBlocks } from "$lib/server/db/structuredHelpSchema";
 import { helpPublications } from "$lib/server/db/helpPublications";
 import { validateHelpKnowledgePublication } from "$lib/server/help/helpKnowledgeCompiler";
 import { getStructuredHelpContent } from "$lib/server/help/structuredHelpRepository";
@@ -36,7 +37,8 @@ export async function listMovideskSafeApprovalCandidates(): Promise<MovideskSafe
     article.contentId && article.needsReview
     && (article.state === "imported" || article.state === "review")
     && !article.issue?.trim()
-    && !/<img\b/i.test(article.sourceHtml ?? ""),
+    && article.sourceHtml !== null
+    && !/<img\b/i.test(article.sourceHtml),
   );
   const ids = preliminary.flatMap((article) => article.contentId ? [article.contentId] : []);
   if (!ids.length) return [];
@@ -73,7 +75,7 @@ export async function listMovideskSafeApprovalCandidates(): Promise<MovideskSafe
   ).sort((a, b) => a.sourceId - b.sourceId);
 }
 
-export async function approveSafeMovideskArticleBatch() {
+export async function approveSafeMovideskArticleBatch(actorUserId: string) {
   const candidates = (await listMovideskSafeApprovalCandidates()).slice(0, MAX_BATCH);
   let approved = 0;
   const blocked: Array<{ sourceId: number; reason: string }> = [];
@@ -101,5 +103,13 @@ export async function approveSafeMovideskArticleBatch() {
     }
   }
 
+  if (approved) {
+    await recordAuditEvent({
+      actorUserId,
+      action: "help.movidesk.safe_bulk_approved",
+      entityType: "help_content",
+      metadata: { approved, checked: candidates.length, sourceIds: candidates.map((row) => row.sourceId) },
+    }).catch((cause) => console.error("[movidesk-publicacao] auditoria", cause));
+  }
   return { checked: candidates.length, approved, blocked, remaining: (await listMovideskSafeApprovalCandidates()).length };
 }
