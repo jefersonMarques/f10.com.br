@@ -26,14 +26,14 @@ function movideskStorageHash(sourceUrl: string): string | null {
   try {
     const url = new URL(sourceUrl);
     if (url.protocol !== "https:" || url.hostname !== "s3.amazonaws.com") return null;
-    return /^\\/movidesk-files\\/([a-f0-9]{32})\\/?$/i.exec(url.pathname)?.[1] ?? null;
+    return /^\/movidesk-files\/([a-f0-9]{32})\/?$/i.exec(url.pathname)?.[1] ?? null;
   } catch {
     return null;
   }
 }
 
 function retryableIssue(issue: string): boolean {
-  const status = /^MOVIDESK_IMAGE_(?:STORAGE_)?HTTP_(\\d{3})$/.exec(issue)?.[1];
+  const status = /^MOVIDESK_IMAGE_(?:STORAGE_)?HTTP_(\d{3})$/.exec(issue)?.[1];
   return Boolean(status && (Number(status) === 429 || Number(status) >= 500));
 }
 
@@ -49,7 +49,7 @@ async function downloadRecoverableImage(sourceUrl: string) {
     const hash = movideskStorageHash(sourceUrl);
     if (!hash) throw cause;
 
-    const token = env.MOVIDESK_KB_API_TOKEN?.trim().replace(/^Bearer\\s+/i, "");
+    const token = env.MOVIDESK_KB_API_TOKEN?.trim().replace(/^Bearer\s+/i, "");
     if (!token) throw new Error("MOVIDESK_IMAGE_STORAGE_TOKEN_MISSING");
 
     // O hash identifica o arquivo original; URLs assinadas de outros hashes não são intercambiáveis.
@@ -61,7 +61,7 @@ async function downloadRecoverableImage(sourceUrl: string) {
       return await downloadMovideskImageSource(url.href);
     } catch (storageCause) {
       const storageIssue = errorCode(storageCause);
-      if (/^MOVIDESK_IMAGE_HTTP_\\d{3}$/.test(storageIssue)) {
+      if (/^MOVIDESK_IMAGE_HTTP_\d{3}$/.test(storageIssue)) {
         throw new Error(storageIssue.replace("MOVIDESK_IMAGE_HTTP_", "MOVIDESK_IMAGE_STORAGE_HTTP_"));
       }
       throw storageCause;
