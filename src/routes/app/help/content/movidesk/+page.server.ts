@@ -1,4 +1,5 @@
 import { processMovideskEditorialReview } from "$lib/server/help/movideskEditorialReview";
+import { movideskPublicationOverview, startMovideskBulkPublication, setMovideskBulkPublicationRunning, syncMovideskPublicCollections } from "$lib/server/help/movideskBulkPublication";
 import { readHelpZipTextEntry } from "$lib/server/help/helpImportPackage";
 import { movideskImageRecoveryDashboard, setMovideskImageRecoveryRunning, retryFailedMovideskImages } from "$lib/server/help/movideskImageRecovery";
 import { error, fail } from "@sveltejs/kit";
@@ -30,14 +31,64 @@ function errorText(cause: unknown): string {
 export const load: PageServerLoad = async ({ cookies }) => {
   requireMigrationEnabled();
   await requireAppPermission(cookies, "system.settings.manage", ROUTE);
-  const [dashboard, imageRecovery] = await Promise.all([
+  const [dashboard, imageRecovery, publication] = await Promise.all([
     listMovideskMigrationDashboard(),
     movideskImageRecoveryDashboard(),
+    movideskPublicationOverview(),
   ]);
-  return { tokenConfigured: isMovideskTokenConfigured(), ...dashboard, imageRecovery };
+  return { tokenConfigured: isMovideskTokenConfigured(), ...dashboard, imageRecovery, publication };
 };
 
 export const actions: Actions = {
+  publishReviewed: async ({ cookies }) => {
+    requireMigrationEnabled();
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", ROUTE);
+    await requireAppPermission(cookies, "help.publish", ROUTE);
+    try {
+      const count = await startMovideskBulkPublication(session.user.id);
+      return { success: true, message: `Fila iniciada com ${count} artigo(s) aprovados. Os bloqueados não serão publicados.` };
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : "";
+      return fail(409, { success: false, message:
+        code === "MOVIDESK_PUBLICATION_NOT_APPROVED"
+          ? "Não há rascunhos aprovados para publicar. A revisão editorial e das imagens é obrigatória."
+          : code === "MOVIDESK_PUBLICATION_JOB_EXISTS"
+            ? "Há uma publicação em andamento ou pausada. Retome-a antes de iniciar outra."
+            : code === "MOVIDESK_REPROCESS_BUSY"
+              ? "Conclua primeiro a importação de artigos."
+              : errorText(cause),
+      });
+    }
+  },
+  pausePublication: async ({ cookies }) => {
+    requireMigrationEnabled();
+    await requireAppPermission(cookies, "system.settings.manage", ROUTE);
+    await requireAppPermission(cookies, "help.publish", ROUTE);
+    try {
+      await setMovideskBulkPublicationRunning(false);
+      return { success: true, message: "Publicação pausada. O progresso foi preservado." };
+    } catch { return fail(409, { success: false, message: "Não há publicação em andamento." }); }
+  },
+  resumePublication: async ({ cookies }) => {
+    requireMigrationEnabled();
+    await requireAppPermission(cookies, "system.settings.manage", ROUTE);
+    await requireAppPermission(cookies, "help.publish", ROUTE);
+    try {
+      await setMovideskBulkPublicationRunning(true);
+      return { success: true, message: "Publicação retomada." };
+    } catch { return fail(409, { success: false, message: "Não há publicação pausada." }); }
+  },
+  syncPublicationCollections: async ({ cookies }) => {
+    requireMigrationEnabled();
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", ROUTE);
+    await requireAppPermission(cookies, "help.edit", ROUTE);
+    try {
+      const summary = await syncMovideskPublicCollections(session.user.id);
+      return { success: true, message: `Coleções: ${summary.created} criadas e ${summary.updated} atualizadas. Somente artigos publicados foram vinculados.` };
+    } catch {
+      return fail(409, { success: false, message: "Não foi possível atualizar as coleções. Consulte os registros do servidor." });
+    }
+  },
   recoverImages: async ({ cookies }) => {
     requireMigrationEnabled();
     await requireAppPermission(cookies, "system.settings.manage", ROUTE);
