@@ -187,7 +187,7 @@ export const actions: Actions = {
       if (code.startsWith("MOVIDESK_IMAGES_PENDING:")) {
         const [, saved, total] = code.split(":");
         return fail(409, { success: false, message:
-          `Aprovação bloqueada: ${saved} de ${total} imagens foram copiadas. Reprocesse o artigo antes de aprovar.` });
+          `Aprovação bloqueada: ${saved} de ${total} imagens foram copiadas. Use Recuperar imagens ou Repetir falhas antes de aprovar.` });
       }
       return fail(409, { success: false, message: "Não foi possível aprovar este artigo." });
     }
