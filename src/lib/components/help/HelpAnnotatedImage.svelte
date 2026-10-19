@@ -12,12 +12,12 @@
   }
 </script>
 
-<div class={`relative isolate w-full ${className}`}>
+<div class={`relative isolate inline-block max-w-full align-top ${className}`}>
   <img
     {src}
     {alt}
     {loading}
-    class="block h-auto w-full object-contain"
+    class="block h-auto max-w-full"
   />
 
   {#each annotations as annotation (annotation.id)}
