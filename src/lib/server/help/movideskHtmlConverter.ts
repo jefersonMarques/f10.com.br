@@ -302,7 +302,7 @@ export async function convertMovideskHtml(input: {
   let blocks: HelpImportBlock[] = [];
   let paragraph = "";
   let imageIndex = 0;
-  let pendingLink: { href: string; label: string; skip: boolean } | null = null;
+  let pendingLink: { href: string; label: string; skip: boolean; imageOnly: boolean } | null = null;
   let videoSourceHandled = false;
 
   function flushParagraph(): void {
@@ -355,6 +355,11 @@ export async function convertMovideskHtml(input: {
       continue;
     }
     if (name === "img" && !closing) {
+      if (pendingLink) {
+        const linked = safeHttpUrl(pendingLink.href, input.sourceUrl);
+        const image = safeHttpUrl(imageSource(token), input.sourceUrl);
+        if (linked && image && linked === image) pendingLink.imageOnly = true;
+      }
       flushParagraph();
       imageIndex++;
       if (imageIndex > MAX_IMAGE_COUNT) {
@@ -386,9 +391,9 @@ export async function convertMovideskHtml(input: {
           }
         }
         flushParagraph();
-        pendingLink = { href: attribute(token, "href"), label: "", skip };
+        pendingLink = { href: attribute(token, "href"), label: "", skip, imageOnly: false };
       } else if (pendingLink) {
-        if (!pendingLink.skip) {
+        if (!pendingLink.skip && !(pendingLink.imageOnly && !pendingLink.label.trim())) {
           let href = safeHttpUrl(pendingLink.href, input.sourceUrl);
           if (href) {
             const url = new URL(href);
