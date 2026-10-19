@@ -35,7 +35,7 @@ export async function createMovideskEditorialExport(): Promise<{
   const articleIds = Array.from(new Set([
     ...originals.flatMap((row) => row.contentId ? [row.contentId] : []),
     ...publicationRows.map((row) => row.entityId),
-  ]));
+  ])).filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
   const contents = articleIds.length
     ? await db.select().from(helpContents).where(inArray(helpContents.id, articleIds))
     : [];
