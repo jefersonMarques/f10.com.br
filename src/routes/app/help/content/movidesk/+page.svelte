@@ -181,7 +181,7 @@
           <form method="POST" action="?/pausePublication">
             <button class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold"><Pause size={15}/>Pausar</button>
           </form>
-        {:else if data.publication.job && (data.publication.job.phase === "publishing" || data.publication.job.phase === "collections")}
+        {:else if data.publication.job && (data.publication.job.phase === "approving" || data.publication.job.phase === "publishing" || data.publication.job.phase === "collections")}
           <form method="POST" action="?/resumePublication">
             <button class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold text-[#000A57]"><Play size={15}/>Retomar</button>
           </form>
