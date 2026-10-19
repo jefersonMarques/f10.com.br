@@ -20,18 +20,25 @@ function errorCode(cause: unknown): string {
     ? value.slice(0, 180) : "MOVIDESK_IMAGE_COPY_FAILED";
 }
 
-const inMigratedContents = inArray(helpAssets.contentId,
-  getDatabase().select({ id: helpContents.id }).from(helpContents)
-    .where(eq(helpContents.importSource, "movidesk")));
-
-const pendingImage = and(
-  inMigratedContents,
-  eq(helpAssets.assetType, "image"),
-  isNull(helpAssets.storageKey),
-  isNotNull(helpAssets.sourceUrl),
-);
-const eligibleImage = and(pendingImage,
-  sql`coalesce(${helpAssets.metadata}->'movideskImageRecovery'->>'status','') <> 'failed'`);
+function pendingImage() {
+  const migratedIds = getDatabase().select({ id: helpContents.id }).from(helpContents)
+    .where(eq(helpContents.importSource, "movidesk"));
+  return and(
+    inArray(helpAssets.contentId, migratedIds),
+    eq(helpAssets.assetType, "image"),
+    isNull(helpAssets.storageKey),
+    isNotNull(helpAssets.sourceUrl),
+  );
+}
+function eligibleImage() {
+  return and(pendingImage(),
+    sql`coalesce(${helpAssets.metadata}->'movideskImageRecovery'->>'status','') <> 'failed'`);
+}
+function allMigratedImages() {
+  const migratedIds = getDatabase().select({ id: helpContents.id }).from(helpContents)
+    .where(eq(helpContents.importSource, "movidesk"));
+  return and(inArray(helpAssets.contentId, migratedIds), eq(helpAssets.assetType, "image"));
+}
 
 export async function movideskImageRecoveryDashboard() {
   const db = getDatabase();
@@ -41,7 +48,7 @@ export async function movideskImageRecoveryDashboard() {
       storageKey: helpAssets.storageKey,
       sourceUrl: helpAssets.sourceUrl,
       metadata: helpAssets.metadata,
-    }).from(helpAssets).where(and(inMigratedContents, eq(helpAssets.assetType, "image"))),
+    }).from(helpAssets).where(allMigratedImages()),
   ]);
   let stored = 0;
   let pending = 0;
@@ -91,7 +98,7 @@ export async function retryFailedMovideskImages() {
   await db.update(helpAssets).set({
     metadata: sql`coalesce(${helpAssets.metadata}, '{}'::jsonb) - 'movideskImageRecovery'`,
     updatedAt: new Date(),
-  }).where(and(pendingImage,
+  }).where(and(pendingImage(),
     sql`coalesce(${helpAssets.metadata}->'movideskImageRecovery'->>'status','') = 'failed'`));
   await setMovideskImageRecoveryRunning(true);
 }
@@ -146,7 +153,7 @@ export async function tickMovideskImageRecovery(): Promise<void> {
     if (!state?.enabled || state.nextRequestAt > new Date()) return null;
     const [next] = await tx.select({
       id: helpAssets.id, contentId: helpAssets.contentId, sourceUrl: helpAssets.sourceUrl,
-    }).from(helpAssets).where(eligibleImage).orderBy(asc(helpAssets.id)).limit(1);
+    }).from(helpAssets).where(eligibleImage()).orderBy(asc(helpAssets.id)).limit(1);
     await tx.update(helpMovideskImageRecoveryState).set({
       enabled: Boolean(next),
       nextRequestAt: new Date(Date.now() + LEASE_MS),
