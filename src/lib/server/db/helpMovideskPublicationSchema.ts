@@ -3,7 +3,7 @@ import { users } from "$lib/server/db/schema";
 
 export type MovideskPublicationResult = {
   sourceId: number;
-  status: "published" | "blocked" | "already-published";
+  status: "published" | "blocked" | "already-published" | "approved" | "already-approved";
   reason?: string;
 };
 

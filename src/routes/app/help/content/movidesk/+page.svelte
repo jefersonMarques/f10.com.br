@@ -181,7 +181,7 @@
           <form method="POST" action="?/pausePublication">
             <button class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold"><Pause size={15}/>Pausar</button>
           </form>
-        {:else if data.publication.job && (data.publication.job.phase === "publishing" || data.publication.job.phase === "collections")}
+        {:else if data.publication.job && (data.publication.job.phase === "approving" || data.publication.job.phase === "publishing" || data.publication.job.phase === "collections")}
           <form method="POST" action="?/resumePublication">
             <button class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold text-[#000A57]"><Play size={15}/>Retomar</button>
           </form>
@@ -205,6 +205,24 @@
       <div class="rounded-xl bg-[#FFF6EB] px-3 py-3"><div class="text-[22px] font-semibold text-[#8F571B]">{data.publication.pendingReview}</div><div class="text-[12px] text-[#56657A]">Aguardando aprovação</div></div>
       <div class="rounded-xl bg-[#F2F4F9] px-3 py-3"><div class="text-[22px] font-semibold text-[#202637]">{data.publication.publicCollections}</div><div class="text-[12px] text-[#56657A]">Coleções propostas</div></div>
     </div>
+    {#if data.publication.pendingReview > 0 && !data.publication.job?.enabled
+      && data.publication.job?.phase !== "approving"
+      && data.publication.job?.phase !== "publishing"
+      && data.publication.job?.phase !== "collections"}
+      <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#CAD7F6] bg-[#F6F8FF] px-3 py-3">
+        <div class="min-w-0">
+          <p class="text-[13px] font-semibold text-[#000A57]">Aprovar os conteúdos revisados em lote</p>
+          <p class="mt-1 text-[12px] text-[#566277]">Confere imagens no bucket, estrutura e categorias. Registra aceite administrativo, sem alegar conferência visual individual. Artigos com pendências ou fora do plano público ficam de fora.</p>
+        </div>
+        <form method="POST" action="?/approveCuratedBatch" on:submit={(event) => {
+          if (!confirm("Autorizar em lote os rascunhos do plano público que passaram pela revisão editorial e nas verificações de integridade? As imagens NÃO serão registradas como inspecionadas visualmente uma a uma. Artigos internos e com pendências serão bloqueados. Nenhum artigo será publicado nesta ação.")) event.preventDefault();
+        }}>
+          <button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#000A57] px-3 text-[12px] font-semibold text-white">
+            <ShieldCheck size={16}/> Aprovar revisados em lote
+          </button>
+        </form>
+      </div>
+    {/if}
     {#if data.safeApprovalCandidates.length}
       <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#D5E9DB] bg-[#F5FBF6] px-3 py-3">
         <div class="min-w-0">
@@ -241,8 +259,8 @@
     {#if data.publication.job && data.publication.job.phase !== "idle"}
       <div class="mt-3 rounded-xl border border-[#E4E7EF] p-3">
         <div class="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#45516A]">
-          <strong>{data.publication.job.phase === "done" ? "Concluído" : data.publication.job.phase === "collections" ? "Organizando coleções" : data.publication.job.enabled ? "Em execução" : "Pausado"}</strong>
-          <span>{data.publication.job.processed}/{data.publication.job.total} · {data.publication.job.published} publicados · {data.publication.job.blocked} bloqueados</span>
+          <strong>{data.publication.job.phase === "done" ? "Concluído" : data.publication.job.phase === "collections" ? "Organizando coleções" : data.publication.job.phase === "approving" ? (data.publication.job.enabled ? "Aprovando em lote" : "Aprovação pausada") : data.publication.job.enabled ? "Publicando" : "Pausado"}</strong>
+          <span>{data.publication.job.processed}/{data.publication.job.total} · {data.publication.job.approved} aprovados · {data.publication.job.published} publicados · {data.publication.job.blocked} bloqueados</span>
         </div>
         {#if data.publication.job.total > 0}
           <div class="mt-2 h-2 overflow-hidden rounded-full bg-[#E8ECF5]">
@@ -257,7 +275,7 @@
             <summary class="cursor-pointer text-[12px] font-semibold text-[#000A57]">Resultados dos últimos artigos</summary>
             <ul class="mt-2 space-y-1 text-[12px] text-[#566075]">
               {#each data.publication.job.recent as result}
-                <li>#{result.sourceId} — {result.status === "published" ? "Publicado" : result.status === "already-published" ? "Já publicado" : `Bloqueado: ${result.reason ?? "conferir"}`}</li>
+                <li>#{result.sourceId} — {result.status === "published" ? "Publicado" : result.status === "approved" ? "Aprovado em lote" : result.status === "already-approved" ? "Já aprovado" : result.status === "already-published" ? "Já publicado" : `Bloqueado: ${result.reason ?? "conferir"}`}</li>
               {/each}
             </ul>
           </details>

@@ -2,6 +2,7 @@ import { eq, max } from "drizzle-orm";
 import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
 import { readHelpImageAnnotationsFromMetadata } from "$lib/help/helpImageAnnotations";
 import { isHelpHumanReviewComplete } from "$lib/help/helpHumanReview";
+import { hasHelpBulkEditorialAcceptance } from "$lib/help/helpBulkEditorialAcceptance";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
@@ -50,7 +51,10 @@ export async function publishHelpKnowledgeContent(
       step.blocks.some(
         (block) =>
           block.blockType === "image" &&
-          !isHelpHumanReviewComplete(block.metadata, block.asset?.id),
+          !isHelpHumanReviewComplete(block.metadata, block.asset?.id) &&
+          !(content.importSource === "movidesk" && Boolean(block.asset?.storageKey) && hasHelpBulkEditorialAcceptance(
+            block.metadata, block.asset?.id, content.updatedAt,
+          )),
       ),
     )
   ) {
