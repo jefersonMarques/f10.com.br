@@ -13,7 +13,7 @@ import { publishHelpKnowledgeContent } from "$lib/server/help/helpKnowledgePubli
 import { listHelpCollections, saveHelpCollection } from "$lib/server/help/helpCollectionRepository";
 import { MOVIDESK_PUBLIC_COLLECTIONS, MOVIDESK_PUBLIC_EXCLUSIONS, MOVIDESK_PUBLIC_SOURCE_IDS } from "$lib/server/help/movideskPublicationPlan";
 
-const INTERVAL_MS = 5_000;
+const INTERVAL_MS = 1_500;
 const LEASE_MS = 5 * 60_000;
 const PUBLIC_IDS = new Set(MOVIDESK_PUBLIC_SOURCE_IDS);
 
@@ -66,6 +66,7 @@ export async function movideskPublicationOverview() {
       enabled: state.enabled, phase: state.phase,
       processed: state.cursor, total: state.sourceIds.length,
       published: results.filter((result) => result.status === "published").length,
+      errors: results.filter((result) => result.status === "blocked").map((result) => ({ sourceId: result.sourceId, reason: result.reason ?? "REVISAR_ARTIGO" })),
       approved: results.filter((result) => result.status === "approved").length,
       blocked: results.filter((result) => result.status === "blocked").length,
       lastError: state.lastError,
@@ -81,7 +82,7 @@ export async function startMovideskBulkPublication(actorUserId: string): Promise
   return db.transaction(async (tx) => {
     const [state] = await tx.select().from(helpMovideskPublicationState)
       .where(eq(helpMovideskPublicationState.id, 1)).for("update").limit(1);
-    if (state?.enabled || ["approving", "publishing", "collections"].includes(state?.phase ?? "")) {
+    if ((state?.enabled && state.phase !== "done") || ["approving", "approving-and-publishing", "publishing", "collections"].includes(state?.phase ?? "")) {
       throw new Error("MOVIDESK_PUBLICATION_JOB_EXISTS");
     }
     const [importState] = await tx.select({ enabled: helpMovideskImportState.enabled })
@@ -171,13 +172,87 @@ export async function startMovideskMassApproval(actorUserId: string): Promise<nu
   });
 }
 
+
+/**
+ * Um único pedido confirmado executa aprovação, publicação e coleções.
+ * Também retoma uma aprovação antiga em andamento, preservando seu cursor.
+ */
+export async function startMovideskCompletePublication(actorUserId: string): Promise<number> {
+  if (!enabled()) throw new Error("MOVIDESK_MIGRATION_DISABLED");
+  await ensureState();
+  const db = getDatabase();
+  return db.transaction(async (tx) => {
+    const [state] = await tx.select().from(helpMovideskPublicationState)
+      .where(eq(helpMovideskPublicationState.id, 1)).for("update").limit(1);
+    const [importState] = await tx.select({ enabled: helpMovideskImportState.enabled })
+      .from(helpMovideskImportState).where(eq(helpMovideskImportState.id, 1)).limit(1);
+    if (importState?.enabled) throw new Error("MOVIDESK_REPROCESS_BUSY");
+
+    // Uma publicação anterior não deve ser reiniciada enquanto está no meio.
+    if (state && ["publishing", "collections"].includes(state.phase)) {
+      await tx.update(helpMovideskPublicationState).set({
+        enabled: true, nextRequestAt: new Date(), updatedAt: new Date(),
+      }).where(eq(helpMovideskPublicationState.id, 1));
+      return state.sourceIds.length;
+    }
+
+    const rows = await tx.select({
+      sourceId: helpMovideskArticles.sourceId,
+      contentId: helpMovideskArticles.contentId,
+    }).from(helpMovideskArticles).where(inArray(
+      helpMovideskArticles.sourceId, MOVIDESK_PUBLIC_SOURCE_IDS,
+    ));
+    const contentIds = rows.flatMap((row) => row.contentId ? [row.contentId] : []);
+    const contentRows = contentIds.length
+      ? await tx.select({
+          id: helpContents.id, status: helpContents.status,
+          importSource: helpContents.importSource,
+          contentKind: helpContents.contentKind,
+        }).from(helpContents).where(inArray(helpContents.id, contentIds))
+      : [];
+    const drafts = new Set(contentRows.filter((row) =>
+      row.status === "draft" && row.importSource === "movidesk"
+        && row.contentKind === "support_article",
+    ).map((row) => row.id));
+    const candidates = rows
+      .filter((row) => row.contentId && drafts.has(row.contentId))
+      .map((row) => row.sourceId).sort((a, b) => a - b);
+
+    // Preserva artigos já processados se o usuário mudar da aprovação antiga
+    // para o fluxo completo enquanto ela continua rodando.
+    const continuing = state && ["approving", "approving-and-publishing"].includes(state.phase);
+    const completed = continuing ? state.sourceIds.slice(0, state.cursor) : [];
+    const sourceIds = continuing
+      ? [...completed, ...new Set([...state.sourceIds.slice(state.cursor), ...candidates]
+        .filter((id) => !completed.includes(id)))]
+      : candidates;
+    if (!sourceIds.length) {
+      // Mesmo sem novos artigos, a coleção pode estar desatualizada.
+      await tx.update(helpMovideskPublicationState).set({
+        enabled: true, phase: "collections", sourceIds: [], cursor: 0, results: [],
+        startedBy: actorUserId, lastError: null,
+        nextRequestAt: new Date(), updatedAt: new Date(),
+      }).where(eq(helpMovideskPublicationState.id, 1));
+      return 0;
+    }
+    await tx.update(helpMovideskPublicationState).set({
+      enabled: true, phase: "approving-and-publishing",
+      sourceIds, cursor: completed.length,
+      results: continuing ? state.results : [],
+      startedBy: actorUserId, lastError: null,
+      nextRequestAt: new Date(), updatedAt: new Date(),
+    }).where(eq(helpMovideskPublicationState.id, 1));
+    return sourceIds.length;
+  });
+}
+
 export async function setMovideskBulkPublicationRunning(running: boolean): Promise<void> {
   if (!enabled()) throw new Error("MOVIDESK_MIGRATION_DISABLED");
   await ensureState();
   const db = getDatabase();
   const [state] = await db.select().from(helpMovideskPublicationState)
     .where(eq(helpMovideskPublicationState.id, 1)).limit(1);
-  if (!state || !["approving", "publishing", "collections"].includes(state.phase)) {
+  if (!state || !["approving", "approving-and-publishing", "publishing", "collections"].includes(state.phase)) {
     throw new Error("MOVIDESK_PUBLICATION_NO_ACTIVE_JOB");
   }
   await db.update(helpMovideskPublicationState)
@@ -279,7 +354,7 @@ export async function tickMovideskBulkPublication(): Promise<void> {
     const [state] = await tx.select().from(helpMovideskPublicationState)
       .where(eq(helpMovideskPublicationState.id, 1)).for("update").limit(1);
     if (!state?.enabled || state.nextRequestAt > new Date()) return null;
-    if (!["approving", "publishing", "collections"].includes(state.phase)) return null;
+    if (!["approving", "approving-and-publishing", "publishing", "collections"].includes(state.phase)) return null;
     if (!state.startedBy) {
       await tx.update(helpMovideskPublicationState).set({
         enabled: false, lastError: "RESPONSAVEL_INDISPONIVEL", updatedAt: new Date(),
@@ -311,7 +386,7 @@ export async function tickMovideskBulkPublication(): Promise<void> {
     }
     return;
   }
-  const result: MovideskPublicationResult = claimed.phase === "approving"
+  const result: MovideskPublicationResult = claimed.phase === "approving" || claimed.phase === "approving-and-publishing"
     ? await (async (): Promise<MovideskPublicationResult> => {
         const sourceId = claimed.sourceId!;
         try {
@@ -332,13 +407,17 @@ export async function tickMovideskBulkPublication(): Promise<void> {
     if (!state || state.phase !== claimed.phase || state.cursor !== claimed.cursor) return;
     const nextCursor = state.cursor + 1;
     await tx.update(helpMovideskPublicationState).set({
-      cursor: nextCursor,
+      cursor: nextCursor >= state.sourceIds.length && claimed.phase === "approving-and-publishing"
+        ? 0 : nextCursor,
+      enabled: nextCursor >= state.sourceIds.length && claimed.phase === "approving"
+        ? false : state.enabled,
       phase: nextCursor >= state.sourceIds.length
-        ? (claimed.phase === "approving" ? "done" : "collections")
+        ? (claimed.phase === "approving" ? "done"
+          : claimed.phase === "approving-and-publishing" ? "publishing" : "collections")
         : claimed.phase,
       results: [...state.results, result],
       nextRequestAt: new Date(Date.now() + INTERVAL_MS),
-      lastError: result.status === "blocked" ? result.reason ?? null : null,
+      lastError: null,
       updatedAt: new Date(),
     }).where(eq(helpMovideskPublicationState.id, 1));
   });

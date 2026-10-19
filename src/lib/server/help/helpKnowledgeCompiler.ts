@@ -67,6 +67,7 @@ export type HelpKnowledgeCompilerInput = {
   slug: string;
   title: string;
   contentKind: "support_article" | "update";
+  importSource?: string | null;
   summary: string;
   searchAliases: string[];
   assistantKnowledge: string;
@@ -167,17 +168,38 @@ function addFragment(
   });
 }
 
+// O conversor do Movidesk pode criar etapas vazias ao retirar a navegação antiga.
+// Não apague o rascunho: omita apenas a etapa realmente sem instrução na publicação.
+function isImportedMovideskEmptyStep(
+  content: HelpKnowledgeCompilerInput,
+  step: CompilerStep,
+): boolean {
+  if (content.importSource !== "movidesk" || step.description.trim()) return false;
+  return step.blocks.every((block) => {
+    if (block.blockType === "text" || block.blockType === "notice") {
+      return !block.textContent.trim();
+    }
+    if (block.blockType === "link") return !(block.linkUrl && block.linkLabel.trim());
+    return !block.asset?.storageKey && !block.asset?.sourceUrl;
+  });
+}
+
+function publishableSteps(content: HelpKnowledgeCompilerInput): CompilerStep[] {
+  return content.steps.filter((step) => !isImportedMovideskEmptyStep(content, step));
+}
+
 export function validateHelpKnowledgePublication(content: HelpKnowledgeCompilerInput): void {
   if (content.categories.length === 0 || content.categories.some((category) => !category.active)) {
     throw new Error("CONTENT_CATEGORY_REQUIRED");
   }
-  if (!content.featuredVideo && content.steps.length === 0) {
+  const steps = publishableSteps(content);
+  if (!content.featuredVideo && steps.length === 0) {
     throw new Error("CONTENT_PUBLIC_CONTENT_REQUIRED");
   }
 
-  for (const step of content.steps) {
+  for (const step of steps) {
     if (!step.title.trim()) throw new Error("STEP_TITLE_REQUIRED");
-    if (step.blocks.length === 0) throw new Error("STEP_BLOCK_REQUIRED");
+    if (step.blocks.length === 0 && !step.description.trim()) throw new Error("STEP_BLOCK_REQUIRED");
 
     const meaningfulBlocks = step.blocks.filter((block) => {
       if (block.blockType === "text" || block.blockType === "notice") {
@@ -186,7 +208,7 @@ export function validateHelpKnowledgePublication(content: HelpKnowledgeCompilerI
       if (block.blockType === "link") return Boolean(block.linkUrl && block.linkLabel);
       return Boolean(block.asset?.sourceUrl || block.asset?.storageKey || block.asset?.extractedText);
     });
-    if (meaningfulBlocks.length === 0) throw new Error("STEP_BLOCK_REQUIRED");
+    if (meaningfulBlocks.length === 0 && !step.description.trim()) throw new Error("STEP_BLOCK_REQUIRED");
 
     const images = step.blocks.filter((block) => block.blockType === "image");
     const hasOnlyImages = images.length > 0 && images.length === step.blocks.length;
@@ -224,7 +246,7 @@ export function compileHelpPublicSnapshot(content: HelpKnowledgeCompilerInput) {
           altText: content.featuredVideo.altText,
         }
       : null,
-    steps: content.steps.map((step) => ({
+    steps: publishableSteps(content).map((step) => ({
       id: step.id,
       title: step.title,
       description: step.description,
@@ -347,7 +369,7 @@ export function compileHelpKnowledgeDocument(
     });
   }
 
-  for (const step of content.steps) {
+  for (const step of publishableSteps(content)) {
     addFragment(fragments, {
       id: `step:${step.id}`,
       targetType: "step",

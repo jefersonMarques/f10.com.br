@@ -1,5 +1,5 @@
 import { processMovideskEditorialReview } from "$lib/server/help/movideskEditorialReview";
-import { movideskPublicationOverview, startMovideskBulkPublication, startMovideskMassApproval, setMovideskBulkPublicationRunning, syncMovideskPublicCollections } from "$lib/server/help/movideskBulkPublication";
+import { movideskPublicationOverview, startMovideskBulkPublication, startMovideskMassApproval, startMovideskCompletePublication, setMovideskBulkPublicationRunning, syncMovideskPublicCollections } from "$lib/server/help/movideskBulkPublication";
 import { listMovideskSafeApprovalCandidates, approveSafeMovideskArticleBatch } from "$lib/server/help/movideskBulkApproval";
 import { readHelpZipTextEntry } from "$lib/server/help/helpImportPackage";
 import { movideskImageRecoveryDashboard, setMovideskImageRecoveryRunning, retryFailedMovideskImages } from "$lib/server/help/movideskImageRecovery";
@@ -42,6 +42,28 @@ export const load: PageServerLoad = async ({ cookies }) => {
 };
 
 export const actions: Actions = {
+  runCompletePublication: async ({ cookies }) => {
+    requireMigrationEnabled();
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", ROUTE);
+    await requireAppPermission(cookies, "help.publish", ROUTE);
+    await requireAppPermission(cookies, "help.edit", ROUTE);
+    try {
+      const queued = await startMovideskCompletePublication(session.user.id);
+      return {
+        success: true,
+        message: queued
+          ? `Processo iniciado com ${queued} artigo(s). Aprovação, publicação e coleções seguem automaticamente no servidor. As pendências serão listadas.`
+          : "Sem novos artigos. O servidor vai sincronizar as coleções publicadas.",
+      };
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : "";
+      return fail(409, { success: false, message:
+        code === "MOVIDESK_REPROCESS_BUSY"
+          ? "Conclua a importação de artigos antes de iniciar a publicação."
+          : errorText(cause),
+      });
+    }
+  },
   approveCuratedBatch: async ({ cookies }) => {
     requireMigrationEnabled();
     const { session } = await requireAppPermission(cookies, "system.settings.manage", ROUTE);
