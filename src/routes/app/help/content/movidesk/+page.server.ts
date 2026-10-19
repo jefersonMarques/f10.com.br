@@ -44,6 +44,7 @@ export const actions: Actions = {
     requireMigrationEnabled();
     const { session } = await requireAppPermission(cookies, "system.settings.manage", ROUTE);
     await requireAppPermission(cookies, "help.publish", ROUTE);
+    await requireAppPermission(cookies, "help.edit", ROUTE);
     try {
       const count = await startMovideskBulkPublication(session.user.id);
       return { success: true, message: `Fila iniciada com ${count} artigo(s) aprovados. Os bloqueados não serão publicados.` };
