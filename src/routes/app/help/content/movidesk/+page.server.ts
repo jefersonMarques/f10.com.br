@@ -1,6 +1,7 @@
 import { processMovideskEditorialReview } from "$lib/server/help/movideskEditorialReview";
 import { movideskPublicationOverview, startMovideskBulkPublication, setMovideskBulkPublicationRunning, syncMovideskPublicCollections } from "$lib/server/help/movideskBulkPublication";
 import { listMovideskSafeApprovalCandidates, approveSafeMovideskArticleBatch } from "$lib/server/help/movideskBulkApproval";
+import { MOVIDESK_PUBLIC_SOURCE_IDS } from "$lib/server/help/movideskPublicationPlan";
 import { readHelpZipTextEntry } from "$lib/server/help/helpImportPackage";
 import { movideskImageRecoveryDashboard, setMovideskImageRecoveryRunning, retryFailedMovideskImages } from "$lib/server/help/movideskImageRecovery";
 import { error, fail } from "@sveltejs/kit";
@@ -38,7 +39,18 @@ export const load: PageServerLoad = async ({ cookies }) => {
     movideskPublicationOverview(),
     listMovideskSafeApprovalCandidates(),
   ]);
-  return { tokenConfigured: isMovideskTokenConfigured(), ...dashboard, imageRecovery, publication, safeApprovalCandidates };
+  const publicIds = new Set(MOVIDESK_PUBLIC_SOURCE_IDS);
+  const imageReviewRemaining = dashboard.articles.filter((article) =>
+    publicIds.has(article.sourceId) && article.needsReview && !article.published
+    && Boolean(article.contentId) && Boolean(article.imageStats?.total),
+  ).length;
+  const outsidePublicPlan = dashboard.articles.filter((article) =>
+    article.contentId && !publicIds.has(article.sourceId),
+  ).length;
+  return {
+    tokenConfigured: isMovideskTokenConfigured(), ...dashboard, imageRecovery,
+    publication, safeApprovalCandidates, imageReviewRemaining, outsidePublicPlan,
+  };
 };
 
 export const actions: Actions = {
