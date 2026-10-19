@@ -241,17 +241,19 @@ export async function tickMovideskImageRecovery(): Promise<void> {
   });
   if (!claimed) return;
   let issue: string | null = null;
+  let retryable = false;
   try {
     await mirrorImage(claimed);
   } catch (cause) {
     issue = errorCode(cause);
-    if (!retryableIssue(issue)) {
+    retryable = retryableIssue(issue);
+    if (!retryable) {
       await markImageFailure(claimed.id, issue);
     }
     console.warn("[help-movidesk-images] image skipped", { assetId: claimed.id, issue });
   }
   await db.update(helpMovideskImageRecoveryState).set({
-    nextRequestAt: new Date(Date.now() + (issue && retryableIssue(issue) ? API_BACKOFF_MS : INTERVAL_MS)),
+    nextRequestAt: new Date(Date.now() + (retryable ? API_BACKOFF_MS : INTERVAL_MS)),
     lastError: issue, updatedAt: new Date(),
   }).where(eq(helpMovideskImageRecoveryState.id, 1));
 }
