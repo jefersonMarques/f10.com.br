@@ -29,3 +29,28 @@ export function isRedundantLegacyImageLink(
     return false;
   }
 }
+
+type HelpDisplayBlock = ImageLinkBlock & {
+  textContent?: string | null;
+  asset?: { sourceUrl?: string | null; storageKey?: string | null } | null;
+};
+
+/** Keep empty editor steps intact, but omit them from public and preview reading views. */
+export function hasVisibleHelpStepContent(step: {
+  description?: string | null;
+  blocks: readonly HelpDisplayBlock[];
+}): boolean {
+  if (step.description?.trim()) return true;
+  return step.blocks.some((block, index) => {
+    if (block.blockType === "text" || block.blockType === "notice") {
+      return Boolean(block.textContent?.trim());
+    }
+    if (block.blockType === "link") {
+      return Boolean(block.linkUrl) && !isRedundantLegacyImageLink(step.blocks, index);
+    }
+    if (block.blockType === "image" || block.blockType === "file") {
+      return Boolean(block.asset?.storageKey || block.asset?.sourceUrl);
+    }
+    return false;
+  });
+}

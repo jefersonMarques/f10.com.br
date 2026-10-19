@@ -5,7 +5,7 @@
   import HelpAnnotatedImage from "$lib/components/help/HelpAnnotatedImage.svelte";
   import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
   import HelpRichText from "$lib/components/help/HelpRichText.svelte";
-  import { isRedundantLegacyImageLink } from "$lib/help/legacyImageLinks";
+  import { hasVisibleHelpStepContent, isRedundantLegacyImageLink } from "$lib/help/legacyImageLinks";
   import { readHelpImageAnnotationsFromMetadata } from "$lib/help/helpImageAnnotations";
   import type { PageData } from "./$types";
 
@@ -91,7 +91,7 @@
     {/if}
 
     <div class="mt-5 space-y-5">
-      {#each data.content.steps as step, index}
+      {#each data.content.steps.filter(hasVisibleHelpStepContent) as step, index}
         <section id={`help-step-${step.id}`} data-help-step-id={step.id} class="scroll-mt-24 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
           <header class="flex items-start gap-4 border-b border-[#EEF0F5] px-5 py-5 sm:px-6"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[12px] font-bold text-white">{index + 1}</span><div><h2 class="text-[17px] font-semibold text-[#252B3B]">{step.title}</h2>{#if step.description}<HelpRichText text={step.description} className="mt-1 space-y-1 text-[11px] leading-5 text-[#7A8190]"/>{/if}</div></header>
           <div class="space-y-5 px-5 py-6 sm:px-6">
