@@ -1,6 +1,7 @@
 import { env } from "$env/dynamic/private";
 import { and, eq, inArray } from "drizzle-orm";
 import { isHelpHumanReviewComplete } from "$lib/help/helpHumanReview";
+import { hasHelpBulkEditorialAcceptance } from "$lib/help/helpBulkEditorialAcceptance";
 import { getDatabase } from "$lib/server/db";
 import { helpMovideskPublicationState, type MovideskPublicationResult } from "$lib/server/db/helpMovideskPublicationSchema";
 import { helpMovideskArticles, helpMovideskImportState } from "$lib/server/db/helpMovideskSchema";
@@ -194,7 +195,10 @@ async function publishOne(sourceId: number, actorUserId: string): Promise<Movide
   const imageBlocks = content.steps.flatMap((step) => step.blocks)
     .filter((block) => block.blockType === "image");
   if (imageBlocks.some((block) => !block.asset?.storageKey)) return blocked("IMAGENS_FORA_DO_BUCKET");
-  if (imageBlocks.some((block) => !isHelpHumanReviewComplete(block.metadata, block.asset?.id))) {
+  if (imageBlocks.some((block) =>
+    !isHelpHumanReviewComplete(block.metadata, block.asset?.id) &&
+    !hasHelpBulkEditorialAcceptance(block.metadata, block.asset?.id, content.updatedAt)
+  )) {
     return blocked("REVISAO_HUMANA_DAS_IMAGENS_PENDENTE");
   }
   try {
