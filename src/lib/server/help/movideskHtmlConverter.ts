@@ -140,7 +140,10 @@ async function downloadImage(src: string, baseUrl: string, index: number, expect
     response = null;
   }
   if (!response) throw new Error("MOVIDESK_IMAGE_REDIRECT_LIMIT");
-  if (!response.ok) throw new Error(`MOVIDESK_IMAGE_HTTP_${response.status}`);
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new Error(`MOVIDESK_IMAGE_HTTP_${response.status}`);
+  }
   if (expectedHash) {
     try {
       validateMovideskSignedImage(url, expectedHash);
@@ -150,7 +153,10 @@ async function downloadImage(src: string, baseUrl: string, index: number, expect
     }
   }
   const declaredSize = Number(response.headers.get("content-length") ?? 0);
-  if (declaredSize > MAX_IMAGE_BYTES) throw new Error("MOVIDESK_IMAGE_TOO_LARGE");
+  if (declaredSize > MAX_IMAGE_BYTES) {
+    await response.body?.cancel();
+    throw new Error("MOVIDESK_IMAGE_TOO_LARGE");
+  }
   const bytes = new Uint8Array(await response.arrayBuffer());
   if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) throw new Error("MOVIDESK_IMAGE_TOO_LARGE");
   const isPng = bytes.length >= 8 && [137,80,78,71,13,10,26,10].every((n,i) => bytes[i] === n);
