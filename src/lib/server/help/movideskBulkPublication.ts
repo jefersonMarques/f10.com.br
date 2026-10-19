@@ -257,7 +257,7 @@ async function publishOne(sourceId: number, actorUserId: string): Promise<Movide
   if (imageBlocks.some((block) => !block.asset?.storageKey)) return blocked("IMAGENS_FORA_DO_BUCKET");
   if (imageBlocks.some((block) =>
     !isHelpHumanReviewComplete(block.metadata, block.asset?.id) &&
-    !hasHelpBulkEditorialAcceptance(block.metadata, block.asset?.id, content.updatedAt)
+    !(Boolean(block.asset?.storageKey) && hasHelpBulkEditorialAcceptance(block.metadata, block.asset?.id, content.updatedAt))
   )) {
     return blocked("REVISAO_HUMANA_DAS_IMAGENS_PENDENTE");
   }
