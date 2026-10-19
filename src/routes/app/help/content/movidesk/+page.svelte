@@ -82,7 +82,7 @@
 
   onMount(() => {
     timer = setInterval(() => {
-      if (data.state?.enabled && !document.hidden) void invalidateAll();
+      if ((data.state?.enabled || data.imageRecovery.enabled) && !document.hidden) void invalidateAll();
     }, 8_000);
   });
   onDestroy(() => { if (timer) clearInterval(timer); if (typeof document !== "undefined") document.body.style.overflow = ""; });
@@ -165,6 +165,44 @@
       </div>
     </div>
     <p class="mt-3 text-[12px] leading-5 text-[#828997]">O servidor continua mesmo com a página fechada. O reprocessamento substitui apenas rascunhos importados e ainda não editados. A publicação exige revisão.</p>
+  </section>
+
+  <section class="mt-5 rounded-2xl border border-[#CAD7F6] bg-white p-4 sm:p-5">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <div class="flex items-center gap-2"><Images size={18} class="text-[#000A57]"/><h2 class="text-[15px] font-semibold text-[#111D3C]">Recuperar imagens para o bucket F10</h2></div>
+        <p class="mt-1 text-[12px] text-[#667085]">Copia os arquivos e conserva artigos, vídeos, etapas e IDs. Pode fechar esta página.</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        {#if data.imageRecovery.enabled}
+          <form method="POST" action="?/pauseImages"><button class="inline-flex h-9 items-center gap-2 rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold"><Pause size={15}/>Pausar</button></form>
+        {:else}
+          {#if data.imageRecovery.pending > 0}
+            <form method="POST" action="?/recoverImages"><button disabled={!data.imageRecovery.bucketConfigured} class="inline-flex h-9 items-center gap-2 rounded-lg bg-[#000A57] px-3 text-[12px] font-semibold text-white disabled:opacity-40"><Play size={15}/>Recuperar imagens</button></form>
+          {/if}
+          {#if data.imageRecovery.failed > 0}
+            <form method="POST" action="?/retryImages" on:submit={(event) => { if (!confirm("Tentar novamente as imagens com falha? Confira antes os hosts externos autorizados.")) event.preventDefault(); }}><button disabled={!data.imageRecovery.bucketConfigured} class="inline-flex h-9 items-center gap-2 rounded-lg border border-[#CAD7F6] px-3 text-[12px] font-semibold text-[#000A57] disabled:opacity-40"><RefreshCw size={15}/>Repetir falhas</button></form>
+          {/if}
+        {/if}
+      </div>
+    </div>
+    <div class="mt-4 grid grid-cols-3 gap-2 text-center">
+      <div class="rounded-lg bg-[#F2F7F4] px-2 py-3"><div class="text-[21px] font-semibold text-[#267444]">{data.imageRecovery.stored}</div><p class="text-[11px] text-[#657082]">No bucket</p></div>
+      <div class="rounded-lg bg-[#F2F4F9] px-2 py-3"><div class="text-[21px] font-semibold text-[#202637]">{data.imageRecovery.pending}</div><p class="text-[11px] text-[#657082]">Na fila</p></div>
+      <div class="rounded-lg bg-[#FFF5F1] px-2 py-3"><div class="text-[21px] font-semibold text-[#A14C3E]">{data.imageRecovery.failed}</div><p class="text-[11px] text-[#657082]">Com falha</p></div>
+    </div>
+    {#if !data.imageRecovery.bucketConfigured}
+      <p class="mt-3 text-[12px] font-semibold text-[#A14C3E]"><CircleAlert size={14} class="mr-1 inline"/>Bucket F10 não configurado neste processo.</p>
+    {/if}
+    {#if data.imageRecovery.failedHosts.length}
+      <p class="mt-3 text-[12px] text-[#657082]">Domínios das imagens com falha: {data.imageRecovery.failedHosts.map(item => `${item.host} (${item.count})`).join(", ")}.</p>
+    {/if}
+    {#if data.imageRecovery.unimported.length}
+      <p class="mt-3 text-[12px] font-semibold text-[#A14C3E]">
+        <CircleAlert size={14} class="mr-1 inline"/>Ainda há {data.imageRecovery.unimported.reduce((sum, item) => sum + item.missing, 0)} imagem(ns) do HTML original que não viraram bloco no F10. Revise os artigos {data.imageRecovery.unimported.map(item => "#" + item.sourceId).join(", ")} separadamente.
+      </p>
+    {/if}
+
   </section>
 
   <section class="mt-5 rounded-2xl border border-[#CAD7F6] bg-white p-4 sm:p-5">

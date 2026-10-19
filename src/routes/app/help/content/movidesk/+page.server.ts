@@ -1,5 +1,6 @@
 import { processMovideskEditorialReview } from "$lib/server/help/movideskEditorialReview";
 import { readHelpZipTextEntry } from "$lib/server/help/helpImportPackage";
+import { movideskImageRecoveryDashboard, setMovideskImageRecoveryRunning, retryFailedMovideskImages } from "$lib/server/help/movideskImageRecovery";
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
@@ -29,10 +30,44 @@ function errorText(cause: unknown): string {
 export const load: PageServerLoad = async ({ cookies }) => {
   requireMigrationEnabled();
   await requireAppPermission(cookies, "system.settings.manage", ROUTE);
-  return { tokenConfigured: isMovideskTokenConfigured(), ...await listMovideskMigrationDashboard() };
+  const [dashboard, imageRecovery] = await Promise.all([
+    listMovideskMigrationDashboard(),
+    movideskImageRecoveryDashboard(),
+  ]);
+  return { tokenConfigured: isMovideskTokenConfigured(), ...dashboard, imageRecovery };
 };
 
 export const actions: Actions = {
+  recoverImages: async ({ cookies }) => {
+    requireMigrationEnabled();
+    await requireAppPermission(cookies, "system.settings.manage", ROUTE);
+    try {
+      await setMovideskImageRecoveryRunning(true);
+      return { success: true, message: "Cópia das imagens iniciada no servidor. Os artigos não serão reprocessados." };
+    } catch (cause) {
+      return fail(409, { success: false, message: cause instanceof Error
+        && cause.message === "ASSET_STORAGE_NOT_CONFIGURED"
+        ? "Configure o bucket do F10 antes de iniciar." : errorText(cause) });
+    }
+  },
+  pauseImages: async ({ cookies }) => {
+    requireMigrationEnabled();
+    await requireAppPermission(cookies, "system.settings.manage", ROUTE);
+    await setMovideskImageRecoveryRunning(false);
+    return { success: true, message: "Recuperação de imagens pausada." };
+  },
+  retryImages: async ({ cookies }) => {
+    requireMigrationEnabled();
+    await requireAppPermission(cookies, "system.settings.manage", ROUTE);
+    try {
+      await retryFailedMovideskImages();
+      return { success: true, message: "As imagens pendentes foram colocadas novamente na fila." };
+    } catch (cause) {
+      return fail(409, { success: false, message: cause instanceof Error
+        && cause.message === "ASSET_STORAGE_NOT_CONFIGURED"
+        ? "Configure o bucket do F10 antes de continuar." : errorText(cause) });
+    }
+  },
   editorialReview: async ({ cookies, request }) => {
     requireMigrationEnabled();
     const { session } = await requireAppPermission(cookies, "system.settings.manage", ROUTE);

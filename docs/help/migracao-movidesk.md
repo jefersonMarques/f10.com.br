@@ -143,3 +143,31 @@ pacote para **análise**, não para aplicar diretamente.
 Os binários de imagens/vídeos que permanecerem remotos exigem correção separada
 antes de desativar o Movidesk. Reescrever o artigo não transforma URL externa
 em imagem armazenada localmente.
+
+
+## Recuperar imagens antigas sem reprocessar artigos
+
+Após a migração, o painel Movidesk oferece **Recuperar imagens para o bucket F10**.
+O worker dedicado `f10-help-video-worker` copia, uma a uma, as imagens dos
+`help_assets` dos conteúdos com `import_source = movidesk` e
+`storage_key IS NULL`. Os passos, blocos, IDs, revisões de IA, artigos publicados
+e categorias não são alterados. A URL original permanece apenas como referência
+de origem, mas a entrega do arquivo passa a usar a chave armazenada no bucket.
+
+- A fila é persistida em `help_movidesk_image_recovery_state`, migration `0090`.
+- Imagens copiadas são validadas por assinatura PNG/JPEG/WebP, até 8MB por arquivo,
+  hosts HTTPS autorizados (incluindo Amazon S3) e leitura de volta do bucket.
+- O painel apresenta arquivos no bucket, pendentes e falhas. Ao terminar, a fila
+  pausa sozinha; erros podem ser repetidos depois de autorizar os domínios necessários
+  via `MOVIDESK_IMAGE_ALLOWED_HOSTS` no servidor. Não use curingas.
+- Erros individuais não param o lote; o status de cada imagem é salvo em
+  `help_assets.metadata.movideskImageRecovery`.
+- Se o HTML original tiver imagens que nunca foram importadas como blocos, elas
+  aparecerão em um aviso separado. Elas precisam ser reinseridas no artigo, pois
+  não há vínculo de mídia para atualizar automaticamente.
+
+**Não use “Reprocessar artigos” para esta recuperação:** ele substitui rascunhos
+e pode desfazer a revisão editorial. Inicie **Recuperar imagens** no painel.
+
+Só desligue o Movidesk quando não houver imagens sem cópia local e os recursos
+forem verificáveis pelas URLs do próprio F10.
