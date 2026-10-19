@@ -335,3 +335,21 @@ export function prepareHelpImportPackageJson(
     referencedAssetCount: referenced.size,
   };
 }
+
+/** Extrai apenas uma entrada UTF-8 conhecida de um ZIP editorial privado, com limites. */
+export function readHelpZipTextEntry(
+  bytes: Uint8Array, path: string, maxBytes = 8 * 1024 * 1024,
+): string {
+  if (bytes.byteLength < 22 || bytes.byteLength > MAX_HELP_IMPORT_PACKAGE_BYTES) {
+    throw new Error("HELP_EDITORIAL_ZIP_TOO_LARGE");
+  }
+  const buffer = Buffer.from(bytes);
+  const entries = readZipEntries(buffer).filter((entry) => entry.path === path);
+  if (entries.length !== 1) throw new Error("HELP_EDITORIAL_ZIP_ENTRY_MISSING");
+  const extracted = extractEntry(buffer, entries[0]!, maxBytes);
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(extracted);
+  } catch {
+    throw new Error("HELP_EDITORIAL_ENCODING");
+  }
+}

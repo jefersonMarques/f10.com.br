@@ -118,3 +118,28 @@ e ativos do rascunho, o que não é adequado para aplicar alterações de IA pre
 mídias e relações. Após a revisão, usar ou implementar um aplicador editorial que
 valide as versões-base, IDs e escopo antes de alterar algo. Artigos publicados
 não devem ser modificados por essa operação.
+
+## Aplicar um pacote editorial revisado com IA
+
+O painel de migração também oferece **Importar revisão organizada**.
+Envie um ZIP editorial com `revisao-f10.json` na raiz (ou o JSON diretamente).
+Use **Conferir pacote** antes de **Aplicar revisão**.
+
+O formato `f10-help-editorial-review` versão 1 traz os mesmos IDs de conteúdo,
+passos e blocos exportados, `baseUpdatedAt` e somente ajustes editoriais.
+A aplicação:
+- rejeita conteúdo que tenha sido editado desde o pacote ou já esteja aprovado/publicado;
+- exige mesma quantidade e IDs de passos e blocos, mesmos tipos e mídias;
+- atualiza títulos, resumos, textos e observações do rascunho sem remover seus assets;
+- acrescenta uma categoria principal recomendada sem apagar categorias antigas;
+- não cria novos artigos, não consolida duplicatas automaticamente e não publica;
+- não modifica as coleções existentes. As coleções sugeridas precisam ser
+  configuradas quando os respectivos conteúdos estiverem publicados.
+
+Toda a validação e aplicação ocorrem em uma transação: erro interrompe o lote sem
+alterações parciais. O ZIP de exportação original não segue esse formato: é um
+pacote para **análise**, não para aplicar diretamente.
+
+Os binários de imagens/vídeos que permanecerem remotos exigem correção separada
+antes de desativar o Movidesk. Reescrever o artigo não transforma URL externa
+em imagem armazenada localmente.

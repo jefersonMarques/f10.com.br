@@ -167,6 +167,30 @@
     <p class="mt-3 text-[12px] leading-5 text-[#828997]">O servidor continua mesmo com a página fechada. O reprocessamento substitui apenas rascunhos importados e ainda não editados. A publicação exige revisão.</p>
   </section>
 
+  <section class="mt-5 rounded-2xl border border-[#CAD7F6] bg-white p-4 sm:p-5">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h2 class="text-[15px] font-semibold text-[#111D3C]">Importar revisão organizada</h2>
+        <p class="mt-1 text-[12px] leading-5 text-[#667085]">Atualiza somente rascunhos Movidesk ainda intactos. IDs, imagens e vídeos são preservados; nada é publicado.</p>
+      </div>
+    </div>
+    <form method="POST" action="?/editorialReview" enctype="multipart/form-data"
+      class="mt-3 flex flex-wrap items-center gap-2"
+      on:submit={(event) => {
+        const mode = (event.submitter as HTMLButtonElement | null)?.value;
+        if (mode === "apply" && !confirm("Aplicar a revisão editorial aos rascunhos? Serão verificados IDs, versões e mídias. Artigos publicados não serão alterados.")) event.preventDefault();
+      }}>
+      <label class="sr-only" for="movidesk-review-file">Pacote de revisão ZIP</label>
+      <input id="movidesk-review-file" type="file" name="reviewFile" accept=".zip,.json,application/zip,application/json" required
+        class="min-w-[180px] max-w-full rounded-lg border border-[#DDE1EA] px-2 py-2 text-[12px] text-[#45516A] file:mr-2 file:rounded file:border-0 file:bg-[#EEF0FC] file:px-2 file:py-1 file:font-semibold file:text-[#000A57]" />
+      <button type="submit" name="mode" value="validate" class="min-h-10 rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold text-[#000A57]">Conferir pacote</button>
+      <button type="submit" name="mode" value="apply" class="min-h-10 rounded-lg bg-[#000A57] px-3 text-[12px] font-semibold text-white">Aplicar revisão</button>
+    </form>
+    {#if form?.action === "editorialReview"}
+      <p role="status" class="mt-3 text-[12px] font-semibold {form.success ? 'text-[#287B49]' : 'text-[#A14C3E]'}">{form.message}</p>
+    {/if}
+  </section>
+
   <section class="mt-5 overflow-hidden rounded-2xl border border-[#E2E5ED] bg-white">
     <div class="flex flex-wrap items-center gap-3 border-b border-[#ECEEF3] px-4 py-3">
       <h2 class="mr-auto text-[14px] font-semibold text-[#303645]">Artigos</h2>
