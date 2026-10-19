@@ -82,7 +82,7 @@
 
   onMount(() => {
     timer = setInterval(() => {
-      if ((data.state?.enabled || data.imageRecovery.enabled) && !document.hidden) void invalidateAll();
+      if ((data.state?.enabled || data.imageRecovery.enabled || data.publication.job?.enabled) && !document.hidden) void invalidateAll();
     }, 8_000);
   });
   onDestroy(() => { if (timer) clearInterval(timer); if (typeof document !== "undefined") document.body.style.overflow = ""; });
@@ -165,6 +165,88 @@
       </div>
     </div>
     <p class="mt-3 text-[12px] leading-5 text-[#828997]">O servidor continua mesmo com a página fechada. O reprocessamento substitui apenas rascunhos importados e ainda não editados. A publicação exige revisão.</p>
+  </section>
+
+  <section class="mt-5 rounded-2xl border border-[#CAD7F6] bg-white p-4 sm:p-5">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <div class="flex items-center gap-2">
+          <ShieldCheck size={19} class="text-[#000A57]"/>
+          <h2 class="text-[16px] font-semibold text-[#18223A]">Publicação em massa</h2>
+        </div>
+        <p class="mt-1 text-[12px] text-[#667085]">Somente artigos aprovados e com imagens verificadas. O servidor continua mesmo com a página fechada.</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        {#if data.publication.job?.enabled}
+          <form method="POST" action="?/pausePublication">
+            <button class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold"><Pause size={15}/>Pausar</button>
+          </form>
+        {:else if data.publication.job && (data.publication.job.phase === "publishing" || data.publication.job.phase === "collections")}
+          <form method="POST" action="?/resumePublication">
+            <button class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold text-[#000A57]"><Play size={15}/>Retomar</button>
+          </form>
+        {:else}
+          <form method="POST" action="?/publishReviewed" on:submit={(event) => {
+            if (!confirm("Publicar somente os artigos já aprovados? A publicação torna os conteúdos acessíveis publicamente. Artigos com imagens pendentes, conteúdo interno ou outras restrições serão bloqueados.")) event.preventDefault();
+          }}>
+            <button disabled={data.publication.readyToCheck === 0} class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#000A57] px-3 text-[12px] font-semibold text-white disabled:opacity-40"><Play size={15}/>Publicar aprovados</button>
+          </form>
+        {/if}
+        <form method="POST" action="?/syncPublicationCollections" on:submit={(event) => {
+          if (!confirm("Criar e organizar coleções com os artigos já publicados? Os itens existentes serão mantidos.")) event.preventDefault();
+        }}>
+          <button disabled={data.publication.job?.enabled} class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#CAD7F6] px-3 text-[12px] font-semibold text-[#000A57] disabled:opacity-40">Organizar coleções</button>
+        </form>
+      </div>
+    </div>
+    <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div class="rounded-xl bg-[#F1F6FF] px-3 py-3"><div class="text-[22px] font-semibold text-[#000A57]">{data.publication.alreadyPublished}</div><div class="text-[12px] text-[#56657A]">Publicados</div></div>
+      <div class="rounded-xl bg-[#F2F7F4] px-3 py-3"><div class="text-[22px] font-semibold text-[#267444]">{data.publication.readyToCheck}</div><div class="text-[12px] text-[#56657A]">Aprovados para verificar</div></div>
+      <div class="rounded-xl bg-[#FFF6EB] px-3 py-3"><div class="text-[22px] font-semibold text-[#8F571B]">{data.publication.pendingReview}</div><div class="text-[12px] text-[#56657A]">Aguardando aprovação</div></div>
+      <div class="rounded-xl bg-[#F2F4F9] px-3 py-3"><div class="text-[22px] font-semibold text-[#202637]">{data.publication.publicCollections}</div><div class="text-[12px] text-[#56657A]">Coleções propostas</div></div>
+    </div>
+    {#if data.publication.candidates.length}
+      <details class="mt-3 rounded-xl border border-[#E4E7EF] p-3">
+        <summary class="cursor-pointer text-[12px] font-semibold text-[#000A57]">Conferir {data.publication.candidates.length} artigo(s) aprovados antes de publicar</summary>
+        <div class="mt-3 grid gap-1.5 sm:grid-cols-2">
+          {#each data.publication.candidates as candidate}
+            <a href={`/app/help/content/${candidate.contentId}/preview`} target="_blank" rel="noopener noreferrer" class="rounded-lg px-2 py-2 text-[12px] text-[#46516A] hover:bg-[#F1F4FC] hover:text-[#000A57]">
+              #{candidate.sourceId} · {candidate.title}
+            </a>
+          {/each}
+        </div>
+      </details>
+    {/if}
+    {#if data.publication.job && data.publication.job.phase !== "idle"}
+      <div class="mt-3 rounded-xl border border-[#E4E7EF] p-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#45516A]">
+          <strong>{data.publication.job.phase === "done" ? "Concluído" : data.publication.job.phase === "collections" ? "Organizando coleções" : data.publication.job.enabled ? "Em execução" : "Pausado"}</strong>
+          <span>{data.publication.job.processed}/{data.publication.job.total} · {data.publication.job.published} publicados · {data.publication.job.blocked} bloqueados</span>
+        </div>
+        {#if data.publication.job.total > 0}
+          <div class="mt-2 h-2 overflow-hidden rounded-full bg-[#E8ECF5]">
+            <div class="h-full rounded-full bg-[#000A57]" style:width={`${Math.round(100 * data.publication.job.processed / data.publication.job.total)}%`}></div>
+          </div>
+        {/if}
+        {#if data.publication.job.lastError}
+          <p class="mt-2 text-[12px] font-semibold text-[#A14C3E]">Verificar: {data.publication.job.lastError}</p>
+        {/if}
+        {#if data.publication.job.recent.length}
+          <details class="mt-2">
+            <summary class="cursor-pointer text-[12px] font-semibold text-[#000A57]">Resultados dos últimos artigos</summary>
+            <ul class="mt-2 space-y-1 text-[12px] text-[#566075]">
+              {#each data.publication.job.recent as result}
+                <li>#{result.sourceId} — {result.status === "published" ? "Publicado" : result.status === "already-published" ? "Já publicado" : `Bloqueado: ${result.reason ?? "conferir"}`}</li>
+              {/each}
+            </ul>
+          </details>
+        {/if}
+      </div>
+    {/if}
+    <p class="mt-3 text-[12px] leading-5 text-[#667085]">A revisão textual já aplicada não substitui a aprovação editorial nem a conferência individual das imagens. Materiais internos, antigos ou específicos de empresas ficam fora da primeira publicação.</p>
+    {#if data.publication.missing > 0}
+      <p class="mt-2 text-[12px] text-[#7A8190]">{data.publication.missing} referência(s) do plano não estão disponíveis como artigos no F10.</p>
+    {/if}
   </section>
 
   <section class="mt-5 rounded-2xl border border-[#CAD7F6] bg-white p-4 sm:p-5">
