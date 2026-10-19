@@ -205,6 +205,18 @@
       <div class="rounded-xl bg-[#FFF6EB] px-3 py-3"><div class="text-[22px] font-semibold text-[#8F571B]">{data.publication.pendingReview}</div><div class="text-[12px] text-[#56657A]">Aguardando aprovação</div></div>
       <div class="rounded-xl bg-[#F2F4F9] px-3 py-3"><div class="text-[22px] font-semibold text-[#202637]">{data.publication.publicCollections}</div><div class="text-[12px] text-[#56657A]">Coleções propostas</div></div>
     </div>
+    {#if data.publication.candidates.length}
+      <details class="mt-3 rounded-xl border border-[#E4E7EF] p-3">
+        <summary class="cursor-pointer text-[12px] font-semibold text-[#000A57]">Conferir {data.publication.candidates.length} artigo(s) aprovados antes de publicar</summary>
+        <div class="mt-3 grid gap-1.5 sm:grid-cols-2">
+          {#each data.publication.candidates as candidate}
+            <a href={`/app/help/content/${candidate.contentId}/preview`} target="_blank" rel="noopener noreferrer" class="rounded-lg px-2 py-2 text-[12px] text-[#46516A] hover:bg-[#F1F4FC] hover:text-[#000A57]">
+              #{candidate.sourceId} · {candidate.title}
+            </a>
+          {/each}
+        </div>
+      </details>
+    {/if}
     {#if data.publication.job && data.publication.job.phase !== "idle"}
       <div class="mt-3 rounded-xl border border-[#E4E7EF] p-3">
         <div class="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#45516A]">
