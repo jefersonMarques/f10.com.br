@@ -171,9 +171,6 @@ export function validateHelpKnowledgePublication(content: HelpKnowledgeCompilerI
   if (content.categories.length === 0 || content.categories.some((category) => !category.active)) {
     throw new Error("CONTENT_CATEGORY_REQUIRED");
   }
-  if (content.featuredVideo && !content.featuredVideo.subtitles.trim()) {
-    throw new Error("FEATURED_VIDEO_SUBTITLES_REQUIRED");
-  }
   if (!content.featuredVideo && content.steps.length === 0) {
     throw new Error("CONTENT_PUBLIC_CONTENT_REQUIRED");
   }
