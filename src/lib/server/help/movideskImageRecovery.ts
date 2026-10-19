@@ -3,13 +3,15 @@ import { env } from "$env/dynamic/private";
 import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { helpMovideskImageRecoveryState } from "$lib/server/db/helpMovideskImageRecoverySchema";
-import { helpMovideskArticles } from "$lib/server/db/helpMovideskSchema";
+import { helpMovideskArticles, helpMovideskImportState } from "$lib/server/db/helpMovideskSchema";
 import { helpAssets, helpContents } from "$lib/server/db/structuredHelpSchema";
 import { downloadMovideskImageSource } from "$lib/server/help/movideskHtmlConverter";
 import { deleteAssetObject, getAssetObject, putAssetObject, getAssetStorageStatus } from "$lib/server/storage/assetStorage";
 
 const LEASE_MS = 120_000;
-const INTERVAL_MS = 2_000;
+const INTERVAL_MS = 8_000;
+const IMPORT_WAIT_MS = 30_000;
+const API_BACKOFF_MS = 60_000;
 
 function enabled(): boolean {
   return env.F10_MOVIDESK_MIGRATION_ENABLED?.trim() === "true";
@@ -18,6 +20,53 @@ function errorCode(cause: unknown): string {
   const value = cause instanceof Error ? cause.message : "";
   return /^(MOVIDESK_IMAGE_[A-Z0-9_:.-]+|ASSET_STORAGE_[A-Z0-9_]+)$/.test(value)
     ? value.slice(0, 180) : "MOVIDESK_IMAGE_COPY_FAILED";
+}
+
+function movideskStorageHash(sourceUrl: string): string | null {
+  try {
+    const url = new URL(sourceUrl);
+    if (url.protocol !== "https:" || url.hostname !== "s3.amazonaws.com") return null;
+    return /^\\/movidesk-files\\/([a-f0-9]{32})\\/?$/i.exec(url.pathname)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function retryableIssue(issue: string): boolean {
+  const status = /^MOVIDESK_IMAGE_(?:STORAGE_)?HTTP_(\\d{3})$/.exec(issue)?.[1];
+  return Boolean(status && (Number(status) === 429 || Number(status) >= 500));
+}
+
+async function downloadRecoverableImage(sourceUrl: string) {
+  try {
+    return await downloadMovideskImageSource(sourceUrl);
+  } catch (cause) {
+    const issue = errorCode(cause);
+    if (!["MOVIDESK_IMAGE_HTTP_401", "MOVIDESK_IMAGE_HTTP_403", "MOVIDESK_IMAGE_HTTP_404"].includes(issue)) {
+      throw cause;
+    }
+
+    const hash = movideskStorageHash(sourceUrl);
+    if (!hash) throw cause;
+
+    const token = env.MOVIDESK_KB_API_TOKEN?.trim().replace(/^Bearer\\s+/i, "");
+    if (!token) throw new Error("MOVIDESK_IMAGE_STORAGE_TOKEN_MISSING");
+
+    // O hash identifica o arquivo original; URLs assinadas de outros hashes não são intercambiáveis.
+    const url = new URL("https://api.movidesk.com/public/v1/storage/download");
+    url.searchParams.set("token", token);
+    url.searchParams.set("id", hash);
+
+    try {
+      return await downloadMovideskImageSource(url.href);
+    } catch (storageCause) {
+      const storageIssue = errorCode(storageCause);
+      if (/^MOVIDESK_IMAGE_HTTP_\\d{3}$/.test(storageIssue)) {
+        throw new Error(storageIssue.replace("MOVIDESK_IMAGE_HTTP_", "MOVIDESK_IMAGE_STORAGE_HTTP_"));
+      }
+      throw storageCause;
+    }
+  }
 }
 
 function pendingImage() {
@@ -133,7 +182,7 @@ async function markImageFailure(assetId: string, issue: string) {
 
 async function mirrorImage(asset: { id: string; contentId: string | null; sourceUrl: string | null }) {
   if (!asset.sourceUrl || !asset.contentId) throw new Error("MOVIDESK_IMAGE_URL_INVALID");
-  const downloaded = await downloadMovideskImageSource(asset.sourceUrl);
+  const downloaded = await downloadRecoverableImage(asset.sourceUrl);
   const ext = downloaded.mimeType === "image/png" ? "png"
     : downloaded.mimeType === "image/webp" ? "webp" : "jpg";
   const key = `help/movidesk-recovered/${asset.contentId}/${asset.id}-${randomUUID()}.${ext}`;
@@ -170,6 +219,16 @@ export async function tickMovideskImageRecovery(): Promise<void> {
     const [state] = await tx.select().from(helpMovideskImageRecoveryState)
       .where(eq(helpMovideskImageRecoveryState.id, 1)).for("update").limit(1);
     if (!state?.enabled || state.nextRequestAt > new Date()) return null;
+    const [importState] = await tx.select({ enabled: helpMovideskImportState.enabled })
+      .from(helpMovideskImportState).where(eq(helpMovideskImportState.id, 1)).limit(1);
+    if (importState?.enabled) {
+      // As duas filas compartilham o limite de chamadas da API Movidesk.
+      await tx.update(helpMovideskImageRecoveryState).set({
+        nextRequestAt: new Date(Date.now() + IMPORT_WAIT_MS),
+        updatedAt: new Date(),
+      }).where(eq(helpMovideskImageRecoveryState.id, 1));
+      return null;
+    }
     const [next] = await tx.select({
       id: helpAssets.id, contentId: helpAssets.contentId, sourceUrl: helpAssets.sourceUrl,
     }).from(helpAssets).where(eligibleImage()).orderBy(asc(helpAssets.id)).limit(1);
@@ -186,11 +245,13 @@ export async function tickMovideskImageRecovery(): Promise<void> {
     await mirrorImage(claimed);
   } catch (cause) {
     issue = errorCode(cause);
-    await markImageFailure(claimed.id, issue);
+    if (!retryableIssue(issue)) {
+      await markImageFailure(claimed.id, issue);
+    }
     console.warn("[help-movidesk-images] image skipped", { assetId: claimed.id, issue });
   }
   await db.update(helpMovideskImageRecoveryState).set({
-    nextRequestAt: new Date(Date.now() + INTERVAL_MS),
+    nextRequestAt: new Date(Date.now() + (issue && retryableIssue(issue) ? API_BACKOFF_MS : INTERVAL_MS)),
     lastError: issue, updatedAt: new Date(),
   }).where(eq(helpMovideskImageRecoveryState.id, 1));
 }
