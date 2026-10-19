@@ -52,7 +52,7 @@ export async function publishHelpKnowledgeContent(
         (block) =>
           block.blockType === "image" &&
           !isHelpHumanReviewComplete(block.metadata, block.asset?.id) &&
-          !(content.importSource === "movidesk" && hasHelpBulkEditorialAcceptance(
+          !(content.importSource === "movidesk" && Boolean(block.asset?.storageKey) && hasHelpBulkEditorialAcceptance(
             block.metadata, block.asset?.id, content.updatedAt,
           )),
       ),
