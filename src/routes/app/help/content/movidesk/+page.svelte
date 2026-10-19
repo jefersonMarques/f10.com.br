@@ -181,7 +181,7 @@
             <form method="POST" action="?/recoverImages"><button disabled={!data.imageRecovery.bucketConfigured} class="inline-flex h-9 items-center gap-2 rounded-lg bg-[#000A57] px-3 text-[12px] font-semibold text-white disabled:opacity-40"><Play size={15}/>Recuperar imagens</button></form>
           {/if}
           {#if data.imageRecovery.failed > 0}
-            <form method="POST" action="?/retryImages" on:submit={(event) => { if (!confirm("Tentar novamente as imagens com falha? Confira antes os hosts externos autorizados.")) event.preventDefault(); }}><button disabled={!data.imageRecovery.bucketConfigured} class="inline-flex h-9 items-center gap-2 rounded-lg border border-[#CAD7F6] px-3 text-[12px] font-semibold text-[#000A57] disabled:opacity-40"><RefreshCw size={15}/>Repetir falhas</button></form>
+            <form method="POST" action="?/retryImages" on:submit={(event) => { if (!confirm("Tentar novamente as imagens com falha? O servidor tentará também a API de arquivos do Movidesk.")) event.preventDefault(); }}><button disabled={!data.imageRecovery.bucketConfigured} class="inline-flex h-9 items-center gap-2 rounded-lg border border-[#CAD7F6] px-3 text-[12px] font-semibold text-[#000A57] disabled:opacity-40"><RefreshCw size={15}/>Repetir falhas</button></form>
           {/if}
         {/if}
       </div>
