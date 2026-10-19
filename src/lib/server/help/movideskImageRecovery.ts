@@ -3,13 +3,13 @@ import { env } from "$env/dynamic/private";
 import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { helpMovideskImageRecoveryState } from "$lib/server/db/helpMovideskImageRecoverySchema";
+import { helpMovideskArticles } from "$lib/server/db/helpMovideskSchema";
 import { helpAssets, helpContents } from "$lib/server/db/structuredHelpSchema";
 import { downloadMovideskImageSource } from "$lib/server/help/movideskHtmlConverter";
 import { deleteAssetObject, getAssetObject, putAssetObject, getAssetStorageStatus } from "$lib/server/storage/assetStorage";
 
 const LEASE_MS = 120_000;
 const INTERVAL_MS = 2_000;
-const ERROR_PATH = ["movideskImageRecovery"];
 
 function enabled(): boolean {
   return env.F10_MOVIDESK_MIGRATION_ENABLED?.trim() === "true";
@@ -42,13 +42,19 @@ function allMigratedImages() {
 
 export async function movideskImageRecoveryDashboard() {
   const db = getDatabase();
-  const [state, rows] = await Promise.all([
+  const [state, rows, originals] = await Promise.all([
     db.select().from(helpMovideskImageRecoveryState).where(eq(helpMovideskImageRecoveryState.id, 1)).limit(1),
     db.select({
+      contentId: helpAssets.contentId,
       storageKey: helpAssets.storageKey,
       sourceUrl: helpAssets.sourceUrl,
       metadata: helpAssets.metadata,
     }).from(helpAssets).where(allMigratedImages()),
+    db.select({
+      sourceId: helpMovideskArticles.sourceId,
+      contentId: helpMovideskArticles.contentId,
+      sourceHtml: helpMovideskArticles.sourceHtml,
+    }).from(helpMovideskArticles),
   ]);
   let stored = 0;
   let pending = 0;
@@ -66,6 +72,18 @@ export async function movideskImageRecoveryDashboard() {
       } catch { /* invalid URL reported by failed state */ }
     } else pending++;
   }
+  // Detecta imagens presentes no HTML que nem chegaram a virar um ativo F10.
+  const byContentId = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.contentId) continue;
+    byContentId.set(row.contentId, (byContentId.get(row.contentId) ?? 0) + 1);
+  }
+  const unimported = originals.flatMap((row) => {
+    if (!row.contentId || !row.sourceHtml) return [];
+    const originalCount = (row.sourceHtml.match(/<img\\b/gi) ?? []).length;
+    const gap = Math.max(0, originalCount - (byContentId.get(row.contentId) ?? 0));
+    return gap ? [{ sourceId: row.sourceId, missing: gap }] : [];
+  });
   const storage = getAssetStorageStatus();
   return {
     enabled: state[0]?.enabled ?? false,
@@ -73,6 +91,7 @@ export async function movideskImageRecoveryDashboard() {
     stored, pending, failed,
     bucketConfigured: storage.configured,
     lastError: state[0]?.lastError ?? null,
+    unimported,
     failedHosts: [...blocked].sort((a,b) => b[1] - a[1])
       .slice(0, 8).map(([host, count]) => ({ host, count })),
   };
