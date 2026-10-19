@@ -165,13 +165,15 @@ export const actions: Actions = {
     try {
       const result = await reprocessMovideskArticles(session.user.id);
       return { success: true, message: result.queued
-        ? `${result.queued} artigos colocados na fila; ${result.skipped} preservados (editados, aprovados ou publicados).`
+        ? `${result.queued} artigos na fila, com cópia automática das imagens; ${result.skipped} preservados.`
         : "Nenhum artigo elegível para reprocessamento." };
     } catch (cause) {
       return fail(409, { success: false, message: cause instanceof Error
         && cause.message === "MOVIDESK_REPROCESS_BUSY"
         ? "Conclua ou pause a importação atual antes de reprocessar."
-        : errorText(cause) });
+        : cause instanceof Error && cause.message === "ASSET_STORAGE_NOT_CONFIGURED"
+          ? "Configure o bucket F10 antes de reprocessar artigos."
+          : errorText(cause) });
     }
   },
   approve: async ({ cookies, request }) => {
