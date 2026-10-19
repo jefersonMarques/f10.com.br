@@ -197,6 +197,12 @@
     {#if data.imageRecovery.failedHosts.length}
       <p class="mt-3 text-[12px] text-[#657082]">Domínios das imagens com falha: {data.imageRecovery.failedHosts.map(item => `${item.host} (${item.count})`).join(", ")}.</p>
     {/if}
+    {#if data.imageRecovery.unimported.length}
+      <p class="mt-3 text-[12px] font-semibold text-[#A14C3E]">
+        <CircleAlert size={14} class="mr-1 inline"/>Ainda há {data.imageRecovery.unimported.reduce((sum, item) => sum + item.missing, 0)} imagem(ns) do HTML original que não viraram bloco no F10. Revise os artigos {data.imageRecovery.unimported.map(item => "#" + item.sourceId).join(", ")} separadamente.
+      </p>
+    {/if}
+
   </section>
 
   <section class="mt-5 rounded-2xl border border-[#CAD7F6] bg-white p-4 sm:p-5">
