@@ -168,24 +168,40 @@ function addFragment(
   });
 }
 
-// O conversor do Movidesk pode criar etapas vazias ao retirar a navegação antiga.
-// Não apague o rascunho: omita apenas a etapa realmente sem instrução na publicação.
-function isImportedMovideskEmptyStep(
-  content: HelpKnowledgeCompilerInput,
-  step: CompilerStep,
-): boolean {
-  if (content.importSource !== "movidesk" || step.description.trim()) return false;
-  return step.blocks.every((block) => {
-    if (block.blockType === "text" || block.blockType === "notice") {
-      return !block.textContent.trim();
-    }
-    if (block.blockType === "link") return !(block.linkUrl && block.linkLabel.trim());
-    return !block.asset?.storageKey && !block.asset?.sourceUrl;
-  });
-}
-
+// A publicação Movidesk ignora capturas antigas que nunca chegaram ao bucket F10.
+// O rascunho e o snapshot editorial continuam com as referências originais.
 function publishableSteps(content: HelpKnowledgeCompilerInput): CompilerStep[] {
-  return content.steps.filter((step) => !isImportedMovideskEmptyStep(content, step));
+  if (content.importSource !== "movidesk") return content.steps;
+
+  return content.steps.flatMap((step) => {
+    const unavailableSources = new Set(
+      step.blocks
+        .filter((block) => block.blockType === "image" && !block.asset?.storageKey)
+        .flatMap((block) => block.asset?.sourceUrl ? [block.asset.sourceUrl] : []),
+    );
+    const blocks = step.blocks.filter((block) => {
+      if (block.blockType === "image") return Boolean(block.asset?.storageKey);
+      // Algumas páginas antigas também traziam um link para o arquivo ausente.
+      if (block.blockType === "link" && block.linkUrl &&
+        unavailableSources.has(block.linkUrl) &&
+        (!(block.linkLabel?.trim()) || block.linkLabel?.trim() === block.linkUrl ||
+          block.linkLabel?.trim() === "Ver imagem original")) return false;
+      return true;
+    });
+
+    const usefulBlocks = blocks.some((block) => {
+      if (block.blockType === "text" || block.blockType === "notice") {
+        return Boolean(block.textContent.trim());
+      }
+      if (block.blockType === "link") {
+        return Boolean(block.linkUrl && block.linkLabel.trim());
+      }
+      return Boolean(block.asset?.storageKey || block.asset?.sourceUrl);
+    });
+
+    if (!step.description.trim() && !usefulBlocks) return [];
+    return [{ ...step, blocks }];
+  });
 }
 
 export function validateHelpKnowledgePublication(content: HelpKnowledgeCompilerInput): void {

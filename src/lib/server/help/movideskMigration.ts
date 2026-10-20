@@ -238,7 +238,10 @@ export async function getMovideskArticleByContentId(contentId: string) {
   return article ?? null;
 }
 
-export async function approveMovideskArticle(sourceId: number): Promise<void> {
+export async function approveMovideskArticle(
+  sourceId: number,
+  options: { allowMissingImages?: boolean } = {},
+): Promise<void> {
   const db = getDatabase();
   const [article] = await db.select({
     contentId: helpMovideskArticles.contentId,
@@ -261,9 +264,10 @@ export async function approveMovideskArticle(sourceId: number): Promise<void> {
     ));
   const locallyStored = images.filter((image) => Boolean(image.storageKey)).length;
 
-  // Nenhuma aprovação com imagem dependente de servidores externos do Movidesk/S3.
+  // Aprovação individual exige imagens locais. Somente a autorização administrativa
+  // explícita da publicação em lote pode aceitar imagens antigas ausentes.
   // A contagem original também detecta imagens descartadas por limites do conversor.
-  if (locallyStored < originalCount || images.some((image) => !image.storageKey)) {
+  if (!options.allowMissingImages && (locallyStored < originalCount || images.some((image) => !image.storageKey))) {
     throw new Error(`MOVIDESK_IMAGES_PENDING:${locallyStored}:${originalCount}`);
   }
 

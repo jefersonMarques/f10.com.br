@@ -172,12 +172,11 @@ export async function approveCuratedMovideskArticle(
 
   const imageBlocks = content.steps.flatMap((step) => step.blocks)
     .filter((block) => block.blockType === "image");
-  const expectedImageCount = (article.sourceHtml.match(/<img\b/gi) ?? []).length;
-  if (expectedImageCount !== imageBlocks.length
-    || imageBlocks.some((block) => !block.asset?.storageKey)
-    || content.steps.some((step) =>
-      step.blocks.filter((block) => block.blockType === "image").length > 1)) {
-    throw new Error("IMAGENS_PENDENTES_OU_INCOMPLETAS");
+  const storedImages = imageBlocks.filter((block) => Boolean(block.asset?.storageKey));
+  if (content.steps.some((step) =>
+    step.blocks.filter((block) =>
+      block.blockType === "image" && Boolean(block.asset?.storageKey)).length > 1)) {
+    throw new Error("STEP_IMAGE_LIMIT_EXCEEDED");
   }
   validateHelpKnowledgePublication(content);
 
@@ -190,7 +189,7 @@ export async function approveCuratedMovideskArticle(
       || current.updatedAt.getTime() !== content.updatedAt.getTime()) {
       throw new Error("ARTIGO_ALTERADO_DURANTE_APROVACAO");
     }
-    for (const block of imageBlocks) {
+    for (const block of storedImages) {
       const [updated] = await tx.update(helpStepBlocks).set({
         metadata: withHelpBulkEditorialAcceptance(
           block.metadata, block.asset!.id, actorUserId, content.updatedAt,
@@ -204,14 +203,15 @@ export async function approveCuratedMovideskArticle(
     }
   });
 
-  await approveMovideskArticle(sourceId);
+  await approveMovideskArticle(sourceId, { allowMissingImages: true });
   await recordAuditEvent({
     actorUserId,
     action: "help.movidesk.bulk_editorial_acceptance",
     entityType: "help_content",
     entityId: content.id,
     metadata: {
-      sourceId, imageCount: imageBlocks.length,
+      sourceId, imageCount: storedImages.length,
+      missingImageCount: imageBlocks.length - storedImages.length,
       mode: "admin_bulk_editorial_acceptance",
       visualInspectionClaimed: false,
       version: content.updatedAt.toISOString(),
