@@ -1,14 +1,50 @@
 import type { PageServerLoad } from "./$types";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { listPublishedStructuredHelpCatalog } from "$lib/server/help/publicStructuredHelpRepository";
+import { searchPublishedHelp } from "$lib/server/help/helpSearchRepository";
 import { listPublicHelpCollections } from "$lib/server/help/helpCollectionRepository";
 
 export const load: PageServerLoad = async ({ url, cookies }) => {
+  const query = (url.searchParams.get("q") ?? "").trim().slice(0, 500);
   const [articles, customer] = await Promise.all([
     listPublishedStructuredHelpCatalog("", "support_article"),
     getOptionalCustomerF10PortalSession(cookies),
   ]);
   const collections = await listPublicHelpCollections(articles);
+
+  // Busca textual independente de modelos, saldo ou configuração de IA.
+  // Confere os IDs no catálogo publicado antes de enviar resultados ao público.
+  let searchResults: Array<{
+    contentId: string;
+    slug: string;
+    title: string;
+    summary: string;
+    categoryText: string;
+  }> = [];
+  let searchError = false;
+  if (query.length >= 2) {
+    try {
+      const search = await searchPublishedHelp({
+        query,
+        source: "public",
+        includeAssistantKnowledge: false,
+        relevanceMode: "broad",
+        limit: 20,
+      });
+      const publicIds = new Set(articles.map((article) => article.contentId));
+      searchResults = search.results
+        .filter((result) => publicIds.has(result.contentId))
+        .slice(0, 12)
+        .map(({ contentId, slug, title, summary, categoryText }) => ({
+          contentId, slug, title, summary, categoryText,
+        }));
+    } catch (cause) {
+      searchError = true;
+      console.error("[help.public.search]", {
+        cause: cause instanceof Error ? cause.name : typeof cause,
+      });
+    }
+  }
 
   const categoryMap = new Map<
     string,
@@ -38,6 +74,7 @@ export const load: PageServerLoad = async ({ url, cookies }) => {
   }
 
   return {
+    search: { query, results: searchResults, error: searchError },
     articleCount: articles.length,
     collections,
     categories: Array.from(categoryMap.values()).sort((left, right) =>
