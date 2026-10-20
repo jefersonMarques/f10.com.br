@@ -12,6 +12,7 @@ import { validateHelpKnowledgePublication } from "$lib/server/help/helpKnowledge
 import { getStructuredHelpContent } from "$lib/server/help/structuredHelpRepository";
 import { approveMovideskArticle } from "$lib/server/help/movideskMigration";
 import { MOVIDESK_PUBLIC_SOURCE_IDS } from "$lib/server/help/movideskPublicationPlan";
+import { unresolvedMovideskImportIssue } from "$lib/server/help/movideskLegacyImportWarnings";
 
 const MAX_BATCH = 50;
 
@@ -148,16 +149,6 @@ export async function approveCuratedMovideskArticle(
     || article.sourceHtml === null) {
     throw new Error("ARTIGO_NAO_IMPORTADO");
   }
-  // Importação anterior pode manter avisos de imagem já recuperada e de vídeo
-  // sem MP4 para IA. A conferência real de imagens continua obrigatória abaixo.
-  const issue = (article.issue ?? "").trim();
-  const preservedDraftNotice = issue.startsWith("Rascunho preservado:")
-    || issue.startsWith("Artigo já existia no F10. Edição preservada;");
-  const pendingIssue = preservedDraftNotice ? "" : issue
-    .replace(/\d+ imagem\(ns\) sem cópia local: conferir os arquivos no F10\./g, "")
-    .replace(/Vídeo YouTube no campo principal; adicione MP4 local antes da análise com IA\./g, "")
-    .trim();
-  if (pendingIssue) throw new Error("PENDENCIA_DE_IMPORTACAO");
   if (!article.needsReview) return "already-approved";
 
   const content = await getStructuredHelpContent(article.contentId);
@@ -168,6 +159,25 @@ export async function approveCuratedMovideskArticle(
     || content.categories.some((category) => !category.active
       || category.slug === UNCATEGORIZED_HELP_CATEGORY_SLUG)) {
     throw new Error("ARTIGO_NAO_ELEGIVEL");
+  }
+
+  // Estes registros são apenas iframes externos: não contêm instruções
+  // próprias para o F10 publicar como artigo. O simulador antigo está offline.
+  if (sourceId === 140107 || sourceId === 167790) {
+    throw new Error("ARTIGO_APENAS_LINK_EXTERNO");
+  }
+
+  const preservedTextLength = content.steps.reduce(
+    (total, step) => total + step.description.trim().length
+      + step.blocks.reduce((sum, block) =>
+        sum + ((block.blockType === "text" || block.blockType === "notice")
+          ? block.textContent.trim().length : 0), 0),
+    0,
+  );
+  if (unresolvedMovideskImportIssue(
+    sourceId, article.issue, article.sourceHtml, preservedTextLength,
+  )) {
+    throw new Error("PENDENCIA_DE_IMPORTACAO");
   }
 
   const imageBlocks = content.steps.flatMap((step) => step.blocks)
