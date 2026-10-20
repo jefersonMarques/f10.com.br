@@ -177,7 +177,7 @@
         <p class="mt-1 text-[12px] text-[#667085]">Um clique para revisar pendências, aprovar os elegíveis, publicar e organizar as coleções. Pode fechar a página.</p>
       </div>
       <div class="flex flex-wrap gap-2">
-        {#if data.publication.job?.enabled}
+        {#if data.publication.job?.enabled && data.publication.job.phase !== "done" && data.publication.job.phase !== "idle"}
           <form method="POST" action="?/pausePublication">
             <button class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#DDE1EA] px-3 text-[12px] font-semibold"><Pause size={15}/>Pausar</button>
           </form>
@@ -194,6 +194,12 @@
         {/if}
       </div>
     </div>
+    {#if data.publication.job?.phase === "done" && data.publication.readyToCheck > 0}
+      <p class="mt-3 text-[13px] font-semibold text-[#000A57]">
+        {data.publication.readyToCheck} artigo(s) já aprovados aguardam publicação.
+        Use “Executar aprovação e publicação” para concluir sem repetir as aprovações.
+      </p>
+    {/if}
     <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
       <div class="rounded-xl bg-[#F1F6FF] px-3 py-3"><div class="text-[22px] font-semibold text-[#000A57]">{data.publication.alreadyPublished}</div><div class="text-[12px] text-[#56657A]">Publicados</div></div>
       <div class="rounded-xl bg-[#F2F7F4] px-3 py-3"><div class="text-[22px] font-semibold text-[#267444]">{data.publication.readyToCheck}</div><div class="text-[12px] text-[#56657A]">Aprovados para verificar</div></div>
