@@ -17,3 +17,12 @@ Os materiais internos, legados, duplicados e os artigos específicos fora do man
 Pausar ou fechar a página não perde o cursor. A fila aceita retomada. **Não use Reprocessar artigos** após a revisão editorial.
 
 A aprovação administrativa em lote é uma decisão do responsável pelo conteúdo e não substitui uma inspeção visual individual. Quando houver suspeita de imagem incorreta, dados sensíveis ou procedimento específico de cliente, mantenha o artigo fora do plano público ou faça revisão manual antes de publicá-lo.
+
+
+## Correção da migração já revisada
+
+O ZIP editorial atualiza o rascunho e conserva `help_movidesk_articles.needs_review`, portanto não indica publicação pendente de conteúdo editorial. No botão **Executar aprovação e publicação**, a fila agora passa por **um único artigo de cada vez**: se `needs_review` ainda estiver ativo, tenta sua aprovação administrativa, conferindo categorias, vínculo Movidesk, conteúdo e imagens antes de publicar. Não é necessário reiniciar a fila ou aprovar manualmente cada artigo.
+
+Avisos antigos que informam apenas a preservação de um rascunho editado são reavaliados. Outros problemas de importação, imagens externas, falhas de validação ou exclusão do plano público permanecem bloqueados com motivo real; não são rotulados genericamente como `REVISAO_EDITORIAL_PENDENTE`.
+
+Nenhuma aprovação nem publicação ocorre automaticamente no deploy. Uma confirmação no painel inicia a única passagem por todos os rascunhos públicos elegíveis.

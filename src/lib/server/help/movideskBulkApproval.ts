@@ -145,13 +145,24 @@ export async function approveCuratedMovideskArticle(
     issue: helpMovideskArticles.issue,
   }).from(helpMovideskArticles).where(eq(helpMovideskArticles.sourceId, sourceId)).limit(1);
   if (!article?.contentId || !["imported", "review"].includes(article.state)
-    || article.sourceHtml === null || article.issue?.trim()) {
-    throw new Error("ARTIGO_COM_PENDENCIA");
+    || article.sourceHtml === null) {
+    throw new Error("ARTIGO_NAO_IMPORTADO");
   }
+  // Importação anterior pode manter avisos de imagem já recuperada e de vídeo
+  // sem MP4 para IA. A conferência real de imagens continua obrigatória abaixo.
+  const issue = (article.issue ?? "").trim();
+  const preservedDraftNotice = issue.startsWith("Rascunho preservado:")
+    || issue.startsWith("Artigo já existia no F10. Edição preservada;");
+  const pendingIssue = preservedDraftNotice ? "" : issue
+    .replace(/\d+ imagem\(ns\) sem cópia local: conferir os arquivos no F10\./g, "")
+    .replace(/Vídeo YouTube no campo principal; adicione MP4 local antes da análise com IA\./g, "")
+    .trim();
+  if (pendingIssue) throw new Error("PENDENCIA_DE_IMPORTACAO");
   if (!article.needsReview) return "already-approved";
 
   const content = await getStructuredHelpContent(article.contentId);
   if (!content || content.status !== "draft"
+    || content.importExternalId !== String(sourceId)
     || content.contentKind !== "support_article" || content.importSource !== "movidesk"
     || content.categories.length === 0
     || content.categories.some((category) => !category.active
