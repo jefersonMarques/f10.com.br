@@ -8,7 +8,6 @@ import type { Actions, PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import {
   approveMovideskArticle,
-  isMovideskMigrationEnabled,
   isMovideskTokenConfigured,
   listMovideskMigrationDashboard,
   retryFailedMovideskArticles,
@@ -19,8 +18,9 @@ import {
 
 const ROUTE = "/app/help/content/movidesk";
 
-function requireMigrationEnabled(): void {
-  if (!isMovideskMigrationEnabled()) throw error(404, "Ferramenta de migração desativada.");
+function requireMigrationEnabled(): never {
+  // Aposentada definitivamente: todas as ações, inclusive POSTs antigos, retornam 404.
+  throw error(404, "Ferramenta de migração encerrada.");
 }
 function errorText(cause: unknown): string {
   const code = cause instanceof Error ? cause.message : "";
