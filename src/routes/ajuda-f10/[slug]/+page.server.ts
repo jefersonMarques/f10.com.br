@@ -1,4 +1,5 @@
-import { error } from "@sveltejs/kit";
+import { error, redirect } from "@sveltejs/kit";
+import { resolveMovideskLegacyHelpLink } from "$lib/server/help/movideskLegacyLinks";
 import type { PageServerLoad } from "./$types";
 import { recordCustomerActivity } from "$lib/server/customerPortal/customerActivityRepository";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
@@ -15,7 +16,11 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
   const requestedVersion = Number(url.searchParams.get("versao"));
   const collectionSlug = url.searchParams.get("colecao")?.trim().slice(0, 120) || null;
   const currentContent = await getPublishedStructuredHelpBySlug(params.slug);
-  if (!currentContent) throw error(404, "Conteúdo de ajuda não encontrado.");
+  if (!currentContent) {
+    const legacy = await resolveMovideskLegacyHelpLink(params.slug);
+    if (legacy) throw redirect(legacy.status, legacy.location);
+    throw error(404, "Conteúdo de ajuda não encontrado.");
+  }
   const historical =
     Number.isInteger(requestedVersion) && requestedVersion > 0
       ? await getPublicHelpContentRelease(currentContent.contentId, requestedVersion)
