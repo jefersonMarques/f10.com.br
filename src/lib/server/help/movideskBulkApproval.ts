@@ -145,13 +145,21 @@ export async function approveCuratedMovideskArticle(
     issue: helpMovideskArticles.issue,
   }).from(helpMovideskArticles).where(eq(helpMovideskArticles.sourceId, sourceId)).limit(1);
   if (!article?.contentId || !["imported", "review"].includes(article.state)
-    || article.sourceHtml === null || article.issue?.trim()) {
-    throw new Error("ARTIGO_COM_PENDENCIA");
+    || article.sourceHtml === null) {
+    throw new Error("ARTIGO_NAO_IMPORTADO");
+  }
+  // O reprocessamento antigo deixava um aviso mesmo ao preservar corretamente
+  // o rascunho já editado. Não é falha do conteúdo nem invalida os ZIPs aplicados.
+  const preservedDraftNotice = article.issue?.startsWith("Rascunho preservado:")
+    || article.issue?.startsWith("Artigo já existia no F10. Edição preservada;");
+  if (article.issue?.trim() && !preservedDraftNotice) {
+    throw new Error("PENDENCIA_DE_IMPORTACAO");
   }
   if (!article.needsReview) return "already-approved";
 
   const content = await getStructuredHelpContent(article.contentId);
   if (!content || content.status !== "draft"
+    || content.importExternalId !== String(sourceId)
     || content.contentKind !== "support_article" || content.importSource !== "movidesk"
     || content.categories.length === 0
     || content.categories.some((category) => !category.active
