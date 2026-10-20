@@ -16,13 +16,24 @@ import { MOVIDESK_PUBLIC_COLLECTIONS, MOVIDESK_PUBLIC_EXCLUSIONS, MOVIDESK_PUBLI
 const INTERVAL_MS = 1_500;
 const LEASE_MS = 5 * 60_000;
 const PUBLIC_IDS = new Set(MOVIDESK_PUBLIC_SOURCE_IDS);
+const ACTIVE_PHASES = new Set(["approving", "approving-and-publishing", "publishing", "collections"]);
 
 function enabled(): boolean {
   return env.F10_MOVIDESK_MIGRATION_ENABLED?.trim() === "true";
 }
 
 async function ensureState(): Promise<void> {
-  await getDatabase().insert(helpMovideskPublicationState).values({ id: 1 }).onConflictDoNothing();
+  const db = getDatabase();
+  await db.insert(helpMovideskPublicationState).values({ id: 1 }).onConflictDoNothing();
+  // Versões anteriores concluíam a aprovação sem desativar o trabalho.
+  // Corrige a inconsistência persistida sem reiniciar ou alterar os resultados.
+  await db.update(helpMovideskPublicationState)
+    .set({ enabled: false, updatedAt: new Date() })
+    .where(and(
+      eq(helpMovideskPublicationState.id, 1),
+      eq(helpMovideskPublicationState.phase, "done"),
+      eq(helpMovideskPublicationState.enabled, true),
+    ));
 }
 
 export async function movideskPublicationOverview() {
@@ -63,7 +74,7 @@ export async function movideskPublicationOverview() {
     publicCollections: MOVIDESK_PUBLIC_COLLECTIONS.length,
     pendingReview, readyToCheck, alreadyPublished, missing, candidates,
     job: state ? {
-      enabled: state.enabled, phase: state.phase,
+      enabled: state.enabled && ACTIVE_PHASES.has(state.phase), phase: state.phase,
       processed: state.cursor, total: state.sourceIds.length,
       published: results.filter((result) => result.status === "published").length,
       errors: results.filter((result) => result.status === "blocked").map((result) => ({ sourceId: result.sourceId, reason: result.reason ?? "REVISAR_ARTIGO" })),
