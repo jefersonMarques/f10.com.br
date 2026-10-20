@@ -4,7 +4,8 @@
 import { redirect, type Handle } from "@sveltejs/kit";
 import { startHelpVideoProcessingWorker } from "$lib/server/help/helpVideoProcessingWorker";
 import { startSupportEmailInboundWorker } from "$lib/server/support/emailInboundWorker";
-import { getMovideskLegacyRedirect } from "$lib/server/help/movideskMigration";
+import { resolveMovideskLegacyArticleId } from "$lib/server/help/movideskLegacyLinks";
+import { getPublicHelpCollectionBySlug } from "$lib/server/help/helpCollectionRepository";
 
 startHelpVideoProcessingWorker();
 startSupportEmailInboundWorker();
@@ -21,6 +22,42 @@ type RedirectRule = {
 const CANONICAL_ORIGIN = "https://f10.com.br";
 const BLOG_BASE_URL = "https://blog.f10.com.br";
 const ALTERNATE_HOSTS = new Set(["www.f10.com.br", "www2.f10.com.br"]);
+
+const LEGACY_KB_CATEGORY_COLLECTIONS = new Map<string, string>([
+  ["primeiros-passos", "primeiros-passos"],
+  ["cadastros-iniciais", "primeiros-passos"],
+  ["comercial", "comercial-visitas-e-contratos"],
+  ["crm-e-funil-de-vendas", "crm-e-whatsapp"],
+  ["mensagens-de-sms", "sms"],
+  ["aceite-online", "aceite-online"],
+  ["financeiro", "contas-bancos-conciliacao"],
+  ["emissao-de-boletos", "boletos-remessa-retorno"],
+  ["emissao-de-notas-fiscais", "notas-fiscais"],
+  ["sistema", "parametrizacao"],
+  ["aplicativo-portal-do-aluno", "portal-app-aluno"],
+  ["dashboards-e-bi", "dashboards-relatorios"],
+]);
+
+function isOldHelpHostname(event: Parameters<Handle>[0]["event"]): boolean {
+  // O adapter-node pode usar ORIGIN=https://f10.com.br mesmo para requests
+  // recebidas para o subdomínio. O proxy deve preservar o header Host real.
+  const rawHost = event.request.headers.get("host")?.toLowerCase().trim() ?? "";
+  return event.url.hostname === "ajuda.f10.com.br"
+    || rawHost === "ajuda.f10.com.br"
+    || rawHost === "ajuda.f10.com.br:443";
+}
+
+function retiredKnowledgePath(): Response {
+  return new Response("Endereço de ajuda não encontrado.", {
+    status: 404,
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex, nofollow",
+    },
+  });
+}
+
 
 function normalizePath(pathname: string): string {
   if (pathname.length > 1 && pathname.endsWith("/")) {
@@ -79,11 +116,11 @@ const redirectRules: RedirectRule[] = [
   { from: "/galaxpay", to: "/solucoes/financeiro" },
   {
     from: "/treinamentos",
-    to: "https://ajuda.f10.com.br/kb/pt-br/article/291730/treinamentos-novo-cliente-f10",
+    to: "/ajuda-f10",
   },
   {
     from: "/passopasso/index.html",
-    to: "https://ajuda.f10.com.br/kb/pt-br/article/291730/treinamentos-novo-cliente-f10",
+    to: "/ajuda-f10",
   },
   { from: "/novidades_2020", to: `${BLOG_BASE_URL}/` },
   { from: "/atualizacoes", to: `${BLOG_BASE_URL}/` },
@@ -199,23 +236,35 @@ function isGoneSpamPath(pathname: string): boolean {
 const redirectMap = buildRedirectMap(redirectRules);
 
 export const handle: Handle = async ({ event, resolve }) => {
-  // Ativado quando ajuda.f10.com.br for apontado para a infraestrutura do F10.
-  if (event.url.hostname === "ajuda.f10.com.br") {
-    const article = event.url.pathname.match(/^\/kb\/(?:pt-br\/)?article\/(\d+)(?:\/[^/]*)?\/?$/i);
+  // Só assume o domínio antigo depois de o DNS e o HTTPS apontarem para o F10.
+  // Nenhuma requisição a f10.com.br/ajuda-f10 entra nesta regra.
+  if (isOldHelpHostname(event)) {
+    const oldPath = normalizePath(event.url.pathname);
+    const article = /^\/kb\/(?:pt-br\/)?article\/(\d+)(?:\/[^/]*)?$/i.exec(oldPath);
     if (article) {
-      const id = Number(article[1]);
-      const destination = Number.isSafeInteger(id) ? await getMovideskLegacyRedirect(id) : null;
-      if (destination) throw redirect(301, destination);
-      return new Response("Este artigo ainda não está disponível na nova Central de Ajuda.", {
-        status: 404, headers: { "Content-Type": "text/plain; charset=utf-8", "X-Robots-Tag": "noindex" },
-      });
+      const destination = await resolveMovideskLegacyArticleId(Number(article[1]));
+      if (!destination) return retiredKnowledgePath();
+      // URL absoluta, para garantir que nunca redirecione de volta ao subdomínio.
+      throw redirect(destination.status, CANONICAL_ORIGIN + destination.location);
     }
-    if (event.url.pathname === "/" || /^\/kb\/?(?:pt-br\/?)?$/i.test(event.url.pathname)) {
-      throw redirect(301, "https://f10.com.br/ajuda-f10");
+    if (oldPath === "/" || /^\/kb(?:\/pt-br)?$/i.test(oldPath)) {
+      throw redirect(301, CANONICAL_ORIGIN + "/ajuda-f10");
     }
-    return new Response("Endereço não encontrado.", {
-      status: 404, headers: { "Content-Type": "text/plain; charset=utf-8", "X-Robots-Tag": "noindex" },
-    });
+
+    const category = /^\/kb\/(?:pt-br\/)?category\/([a-z0-9-]+)$/i.exec(oldPath);
+    if (category) {
+      const collectionSlug = LEGACY_KB_CATEGORY_COLLECTIONS.get(category[1].toLowerCase());
+      if (collectionSlug) {
+        const publishedCollection = await getPublicHelpCollectionBySlug(collectionSlug);
+        if (publishedCollection) {
+          throw redirect(301, CANONICAL_ORIGIN + "/ajuda-f10/colecoes/" +
+            encodeURIComponent(publishedCollection.slug));
+        }
+      }
+      // Sem coleção ativa correspondente: não declarar equivalência permanente.
+      return retiredKnowledgePath();
+    }
+    return retiredKnowledgePath();
   }
   if (ALTERNATE_HOSTS.has(event.url.hostname)) {
     throw redirect(308, buildCanonicalUrl(event.url));
