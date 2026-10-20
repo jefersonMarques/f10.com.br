@@ -184,8 +184,8 @@ function publishableSteps(content: HelpKnowledgeCompilerInput): CompilerStep[] {
       // Algumas páginas antigas também traziam um link para o arquivo ausente.
       if (block.blockType === "link" && block.linkUrl &&
         unavailableSources.has(block.linkUrl) &&
-        (!block.linkLabel.trim() || block.linkLabel.trim() === block.linkUrl ||
-          block.linkLabel.trim() === "Ver imagem original")) return false;
+        (!(block.linkLabel?.trim()) || block.linkLabel?.trim() === block.linkUrl ||
+          block.linkLabel?.trim() === "Ver imagem original")) return false;
       return true;
     });
 
