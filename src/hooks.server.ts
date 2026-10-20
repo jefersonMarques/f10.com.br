@@ -116,11 +116,11 @@ const redirectRules: RedirectRule[] = [
   { from: "/galaxpay", to: "/solucoes/financeiro" },
   {
     from: "/treinamentos",
-    to: "https://ajuda.f10.com.br/kb/pt-br/article/291730/treinamentos-novo-cliente-f10",
+    to: "/ajuda-f10",
   },
   {
     from: "/passopasso/index.html",
-    to: "https://ajuda.f10.com.br/kb/pt-br/article/291730/treinamentos-novo-cliente-f10",
+    to: "/ajuda-f10",
   },
   { from: "/novidades_2020", to: `${BLOG_BASE_URL}/` },
   { from: "/atualizacoes", to: `${BLOG_BASE_URL}/` },
