@@ -3,7 +3,6 @@ import type { PageServerLoad } from "./$types";
 import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
-import { isMovideskMigrationEnabled } from "$lib/server/help/movideskMigration";
 import {
   listHelpArticleSequence,
   moveHelpArticle,
@@ -94,7 +93,6 @@ export const load: PageServerLoad = async ({ parent }) => {
       (category) => category.active && category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG,
     ),
     canEdit: hasPermission(permissions, "help.edit"),
-    canManageMovidesk: isMovideskMigrationEnabled() && hasPermission(permissions, "system.settings.manage"),
     canArchive: hasPermission(permissions, "help.publish"),
   };
 };
