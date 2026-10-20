@@ -352,8 +352,10 @@ async function publishOne(sourceId: number, actorUserId: string): Promise<Movide
 
   const imageBlocks = content.steps.flatMap((step) => step.blocks)
     .filter((block) => block.blockType === "image");
-  if (imageBlocks.some((block) => !block.asset?.storageKey)) return blocked("IMAGENS_FORA_DO_BUCKET");
-  if (imageBlocks.some((block) =>
+  // Imagens antigas sem cópia não impedem a publicação do texto.
+  // Só as imagens efetivamente exibidas exigem revisão.
+  const displayedImages = imageBlocks.filter((block) => Boolean(block.asset?.storageKey));
+  if (displayedImages.some((block) =>
     !isHelpHumanReviewComplete(block.metadata, block.asset?.id) &&
     !(Boolean(block.asset?.storageKey) && hasHelpBulkEditorialAcceptance(block.metadata, block.asset?.id, content.updatedAt))
   )) {
