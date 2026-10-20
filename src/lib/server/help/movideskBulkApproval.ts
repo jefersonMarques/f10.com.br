@@ -149,6 +149,12 @@ export async function approveCuratedMovideskArticle(
     || article.sourceHtml === null) {
     throw new Error("ARTIGO_NAO_IMPORTADO");
   }
+  // Estes registros são apenas iframes externos: não contêm instruções
+  // próprias para o F10 publicar como artigo. O simulador antigo está offline.
+  if (sourceId === 140107 || sourceId === 167790) {
+    throw new Error("ARTIGO_APENAS_LINK_EXTERNO");
+  }
+
   if (!article.needsReview) return "already-approved";
 
   const content = await getStructuredHelpContent(article.contentId);
@@ -159,12 +165,6 @@ export async function approveCuratedMovideskArticle(
     || content.categories.some((category) => !category.active
       || category.slug === UNCATEGORIZED_HELP_CATEGORY_SLUG)) {
     throw new Error("ARTIGO_NAO_ELEGIVEL");
-  }
-
-  // Estes registros são apenas iframes externos: não contêm instruções
-  // próprias para o F10 publicar como artigo. O simulador antigo está offline.
-  if (sourceId === 140107 || sourceId === 167790) {
-    throw new Error("ARTIGO_APENAS_LINK_EXTERNO");
   }
 
   const preservedTextLength = content.steps.reduce(
