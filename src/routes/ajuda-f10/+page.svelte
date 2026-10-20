@@ -7,7 +7,6 @@
     Layers3,
     LoaderCircle,
     Search,
-    Send,
     Sparkles,
   } from "lucide-svelte";
   import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
@@ -33,7 +32,7 @@
   };
 
   let chatOpen = data.openChat;
-  let question = "";
+  let question = data.search.query;
   let answer = "";
   let resolution: HelpResolution | null = null;
   let target: HelpTarget | null = null;
@@ -104,11 +103,6 @@
     }
   }
 
-  function handleQuestionKeydown(event: KeyboardEvent): void {
-    if (event.key !== "Enter" || event.shiftKey) return;
-    event.preventDefault();
-    void askHelp();
-  }
 </script>
 
 <svelte:head>
@@ -122,29 +116,36 @@
       <div class="mx-auto max-w-[820px] text-center">
         <div class="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-white/70"><Sparkles size={14}/>Central de Ajuda F10</div>
         <h1 class="mt-5 text-[34px] font-semibold tracking-[-0.045em] sm:text-[50px]">O que você precisa fazer no F10?</h1>
-        <p class="mx-auto mt-4 max-w-[680px] text-[14px] leading-7 text-white/68 sm:text-[15px]">Descreva sua dúvida como você falaria com o suporte. A Central procura o conteúdo publicado e responde usando a orientação mais adequada.</p>
+        <p class="mx-auto mt-4 max-w-[680px] text-[14px] leading-7 text-white/68 sm:text-[15px]">Pesquise pelo título, assunto ou procedimento. Encontre orientações mesmo quando a IA estiver indisponível.</p>
       </div>
 
-      <form class="mx-auto mt-8 max-w-[820px]" on:submit|preventDefault={askHelp}>
-        <div class="flex items-end gap-2 rounded-[22px] border border-white/15 bg-white p-2 shadow-[0_18px_60px_rgba(0,0,0,0.16)] focus-within:border-[#EA6D0B] focus-within:ring-4 focus-within:ring-[#EA6D0B]/15">
-          <Search size={19} class="mb-3 ml-2 shrink-0 text-[#7E8698]"/>
-          <textarea
+      <form method="GET" action="/ajuda-f10" role="search" class="mx-auto mt-8 max-w-[820px]">
+        <div class="flex items-center gap-2 rounded-[22px] border border-white/15 bg-white p-2 shadow-[0_18px_60px_rgba(0,0,0,0.16)] focus-within:border-[#EA6D0B] focus-within:ring-4 focus-within:ring-[#EA6D0B]/15">
+          <Search size={19} class="ml-2 shrink-0 text-[#7E8698]" aria-hidden="true" />
+          <input
+            type="search"
+            name="q"
             bind:value={question}
-            rows="2"
-            maxlength="600"
-            disabled={!data.helpPublicAi.available || loading}
-            placeholder={data.helpPublicAi.available ? "Ex.: Como cadastrar um funcionário?" : "Pesquisa inteligente temporariamente indisponível"}
-            class="max-h-28 min-h-[48px] flex-1 resize-none bg-transparent px-1 py-3 text-[13px] leading-5 text-[#10172A] outline-none placeholder:text-[#8B91A0] disabled:cursor-not-allowed"
-            on:keydown={handleQuestionKeydown}
-          ></textarea>
-          <button type="submit" disabled={!data.helpPublicAi.available || loading || question.trim().length < 3} class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#EA6D0B] text-white transition hover:bg-[#D96208] disabled:cursor-not-allowed disabled:opacity-45" aria-label="Perguntar">{#if loading}<LoaderCircle size={18} class="animate-spin"/>{:else}<Send size={17}/>{/if}</button>
+            minlength="2"
+            maxlength="500"
+            aria-label="Pesquisar artigos da Central de Ajuda"
+            placeholder="Ex.: Como cadastrar um funcionário?"
+            class="h-12 min-w-0 flex-1 bg-transparent px-1 text-[14px] text-[#10172A] outline-none placeholder:text-[#8B91A0]"
+          />
+          <button type="submit" disabled={question.trim().length < 2} class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#EA6D0B] px-4 text-[13px] font-semibold text-white transition hover:bg-[#D96208] disabled:cursor-not-allowed disabled:opacity-45">
+            <Search size={17}/>Buscar
+          </button>
         </div>
-        <p class="mt-2 text-center text-[9px] text-white/50">Enter envia · Shift+Enter quebra linha</p>
+        <div class="mt-3 flex flex-wrap items-center justify-center gap-3">
+          <span class="text-[12px] text-white/70">Busca por texto · não utiliza créditos de IA</span>
+          {#if data.helpPublicAi.available}
+            <button type="button" disabled={loading || question.trim().length < 3} on:click={() => void askHelp()} class="inline-flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45">
+              {#if loading}<LoaderCircle size={15} class="animate-spin"/>{:else}<Sparkles size={15}/>{/if}
+              Perguntar à IA
+            </button>
+          {/if}
+        </div>
       </form>
-
-      {#if data.helpPublicAi.enabled && !data.helpPublicAi.available}
-        <p class="mx-auto mt-3 max-w-[820px] text-center text-[10px] text-white/55">Assistente temporariamente indisponível. Os conteúdos continuam disponíveis abaixo.</p>
-      {/if}
     </div>
   </section>
 
@@ -171,6 +172,41 @@
       </section>
     {/if}
 
+    {#if data.search.query.length >= 2}
+      <section class="mx-auto mt-8 max-w-[820px]" aria-label="Resultados da busca">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-[22px] font-semibold text-[#010D28]">Resultados para “{data.search.query}”</h2>
+            {#if !data.search.error}<p class="mt-1 text-[12px] text-[#737A8B]">{data.search.results.length} {data.search.results.length === 1 ? "artigo encontrado" : "artigos encontrados"}</p>{/if}
+          </div>
+          <a href="/ajuda-f10" class="text-[12px] font-semibold text-[#000A57] hover:underline">Ver todos os artigos</a>
+        </div>
+        {#if data.search.error}
+          <div class="rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] px-5 py-4 text-[13px] text-[#7A3B08]">
+            A busca está temporariamente indisponível. Você ainda pode navegar pelas categorias.
+          </div>
+        {:else if data.search.results.length === 0}
+          <div class="rounded-2xl border border-[#E2E5EC] bg-white px-5 py-8 text-center">
+            <p class="text-[14px] font-semibold text-[#303746]">Nenhum artigo encontrado</p>
+            <p class="mt-2 text-[12px] text-[#737A8B]">Tente outros termos, como o nome da função ou do procedimento.</p>
+          </div>
+        {:else}
+          <div class="space-y-2">
+            {#each data.search.results as result (result.contentId)}
+              <a href={`/ajuda-f10/${encodeURIComponent(result.slug)}`} class="group flex items-start gap-3 rounded-2xl border border-[#E2E5EC] bg-white p-4 transition hover:border-[#BAC1D2] hover:shadow-sm sm:p-5">
+                <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><BookOpen size={18}/></span>
+                <span class="min-w-0 flex-1">
+                  <strong class="block text-[14px] font-semibold leading-5 text-[#303746] group-hover:text-[#000A57]">{result.title}</strong>
+                  {#if result.categoryText}<span class="mt-1 block line-clamp-1 text-[11px] text-[#797F8E]">{result.categoryText}</span>{/if}
+                  {#if result.summary}<span class="mt-2 block line-clamp-2 text-[12px] leading-5 text-[#6B7282]">{result.summary}</span>{/if}
+                </span>
+                <ArrowRight size={17} class="mt-2 shrink-0 text-[#8C94A6] group-hover:text-[#000A57]"/>
+              </a>
+            {/each}
+          </div>
+        {/if}
+      </section>
+    {:else}
     {#if data.collections.length > 0}
       <section class="mt-10">
         <div><p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#EA6D0B]">Seleções F10</p><h2 class="mt-1 text-[24px] font-semibold tracking-[-0.035em] text-[#010D28]">Coleções</h2></div>
@@ -217,6 +253,8 @@
         <div class="mt-6 rounded-[24px] border border-dashed border-[#CDD2DE] bg-white px-6 py-10 text-center"><BookOpen size={28} class="mx-auto text-[#9097A6]"/><h3 class="mt-4 text-[16px] font-semibold text-[#252C3D]">Nenhum conteúdo publicado</h3></div>
       {/if}
     </section>
+
+    {/if}
 
     <section class="mt-10 flex flex-col gap-5 rounded-[28px] border border-[#D9DDE7] bg-[#010D28] px-6 py-7 text-white sm:flex-row sm:items-center sm:justify-between sm:px-8">
       <div class="flex items-start gap-4"><span class="inline-flex h-11 min-w-11 items-center justify-center rounded-2xl bg-white/10 text-[#FF9A4B]"><LifeBuoy size={21}/></span><div><h2 class="text-[18px] font-semibold">Ainda precisa de ajuda?</h2><p class="mt-1.5 max-w-[620px] text-[11px] leading-5 text-white/65">Converse com o atendimento F10. O chat também consulta esta mesma Base de Conhecimento antes de oferecer atendimento humano.</p></div></div>
