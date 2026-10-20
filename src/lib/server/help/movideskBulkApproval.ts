@@ -148,13 +148,16 @@ export async function approveCuratedMovideskArticle(
     || article.sourceHtml === null) {
     throw new Error("ARTIGO_NAO_IMPORTADO");
   }
-  // O reprocessamento antigo deixava um aviso mesmo ao preservar corretamente
-  // o rascunho já editado. Não é falha do conteúdo nem invalida os ZIPs aplicados.
-  const preservedDraftNotice = article.issue?.startsWith("Rascunho preservado:")
-    || article.issue?.startsWith("Artigo já existia no F10. Edição preservada;");
-  if (article.issue?.trim() && !preservedDraftNotice) {
-    throw new Error("PENDENCIA_DE_IMPORTACAO");
-  }
+  // Importação anterior pode manter avisos de imagem já recuperada e de vídeo
+  // sem MP4 para IA. A conferência real de imagens continua obrigatória abaixo.
+  const issue = (article.issue ?? "").trim();
+  const preservedDraftNotice = issue.startsWith("Rascunho preservado:")
+    || issue.startsWith("Artigo já existia no F10. Edição preservada;");
+  const pendingIssue = preservedDraftNotice ? "" : issue
+    .replace(/\d+ imagem\(ns\) sem cópia local: conferir os arquivos no F10\./g, "")
+    .replace(/Vídeo YouTube no campo principal; adicione MP4 local antes da análise com IA\./g, "")
+    .trim();
+  if (pendingIssue) throw new Error("PENDENCIA_DE_IMPORTACAO");
   if (!article.needsReview) return "already-approved";
 
   const content = await getStructuredHelpContent(article.contentId);
