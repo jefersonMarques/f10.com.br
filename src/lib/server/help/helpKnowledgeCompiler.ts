@@ -1,3 +1,5 @@
+import { isUnavailableLegacyMovideskLink } from "$lib/server/help/movideskLegacyImportWarnings";
+
 export type HelpKnowledgeTargetType = "article" | "featured_video" | "step" | "block";
 
 export type HelpKnowledgeCompiledFragment = {
@@ -68,6 +70,7 @@ export type HelpKnowledgeCompilerInput = {
   title: string;
   contentKind: "support_article" | "update";
   importSource?: string | null;
+  importExternalId?: string | null;
   summary: string;
   searchAliases: string[];
   assistantKnowledge: string;
@@ -180,6 +183,12 @@ function publishableSteps(content: HelpKnowledgeCompilerInput): CompilerStep[] {
         .flatMap((block) => block.asset?.sourceUrl ? [block.asset.sourceUrl] : []),
     );
     const blocks = step.blocks.filter((block) => {
+      // As URLs dos três links de artigos Movidesk nunca migrados não podem
+      // aparecer como destino de navegação pública. Mantém os dados no editor.
+      if (block.blockType === "link" &&
+        isUnavailableLegacyMovideskLink(content.importExternalId, block.linkUrl)) {
+        return false;
+      }
       if (block.blockType === "image") return Boolean(block.asset?.storageKey);
       // Algumas páginas antigas também traziam um link para o arquivo ausente.
       if (block.blockType === "link" && block.linkUrl &&
