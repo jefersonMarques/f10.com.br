@@ -41,7 +41,8 @@ export async function publishHelpKnowledgeContent(
   }
   if (
     content.steps.some(
-      (step) => step.blocks.filter((block) => block.blockType === "image").length > 1,
+      (step) => step.blocks.filter((block) => block.blockType === "image"
+        && (content.importSource !== "movidesk" || Boolean(block.asset?.storageKey))).length > 1,
     )
   ) {
     throw new Error("STEP_IMAGE_LIMIT_EXCEEDED");
@@ -51,6 +52,7 @@ export async function publishHelpKnowledgeContent(
       step.blocks.some(
         (block) =>
           block.blockType === "image" &&
+          (content.importSource !== "movidesk" || Boolean(block.asset?.storageKey)) &&
           !isHelpHumanReviewComplete(block.metadata, block.asset?.id) &&
           !(content.importSource === "movidesk" && Boolean(block.asset?.storageKey) && hasHelpBulkEditorialAcceptance(
             block.metadata, block.asset?.id, content.updatedAt,
