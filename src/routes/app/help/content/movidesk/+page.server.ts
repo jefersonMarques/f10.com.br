@@ -18,7 +18,7 @@ import {
 
 const ROUTE = "/app/help/content/movidesk";
 
-function requireMigrationEnabled(): never {
+function requireMigrationEnabled(): void {
   // Aposentada definitivamente: todas as ações, inclusive POSTs antigos, retornam 404.
   throw error(404, "Ferramenta de migração encerrada.");
 }
