@@ -4,15 +4,13 @@
 import { redirect, type Handle } from "@sveltejs/kit";
 import { startHelpVideoProcessingWorker } from "$lib/server/help/helpVideoProcessingWorker";
 import { startSupportEmailInboundWorker } from "$lib/server/support/emailInboundWorker";
-import { getMovideskLegacyRedirect, startMovideskMigrationWorker } from "$lib/server/help/movideskMigration";
-import { startMovideskImageRecoveryWorker } from "$lib/server/help/movideskImageRecovery";
-import { startMovideskBulkPublicationWorker } from "$lib/server/help/movideskBulkPublication";
+import { getMovideskLegacyRedirect } from "$lib/server/help/movideskMigration";
 
 startHelpVideoProcessingWorker();
 startSupportEmailInboundWorker();
-startMovideskMigrationWorker();
-startMovideskImageRecoveryWorker();
-startMovideskBulkPublicationWorker();
+// Migração Movidesk encerrada: não iniciar trabalhadores de importação,
+// recuperação de imagens ou publicação em massa no servidor.
+// Os artigos e os redirecionamentos legados permanecem preservados.
 
 type RedirectRule = {
   from: string;
@@ -224,6 +222,22 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   const pathname = normalizePath(event.url.pathname);
+
+  // Ferramenta temporária encerrada. Bloqueia GET, POST de ações antigas,
+  // exportações e páginas filhas antes de executar qualquer handler.
+  if (
+    pathname === "/app/help/content/movidesk" ||
+    pathname.startsWith("/app/help/content/movidesk/")
+  ) {
+    return new Response("Página não encontrada.", {
+      status: 404,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Robots-Tag": "noindex, nofollow",
+      },
+    });
+  }
 
   if (isGoneSpamPath(pathname)) {
     return new Response("Gone", {

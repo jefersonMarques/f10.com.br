@@ -1,3 +1,5 @@
+> **ENCERRADA — outubro de 2026.** A área `/app/help/content/movidesk`, suas páginas filhas, exportação e ações POST retornam HTTP 404. Os três workers de migração, recuperação de imagens e publicação em lote não são mais iniciados pela aplicação. Os artigos, os ativos e os redirecionamentos históricos permanecem preservados; o editor e a publicação regulares da Central de Ajuda não foram alterados. As instruções abaixo são apenas histórico operacional. Para reabrir a migração, será necessária uma mudança explícita no código e a conferência de eventuais filas persistidas antes de reativar os workers.
+
 # Migração temporária Movidesk → F10
 
 A migração **não usa IA**. Ela copia o conteúdo para rascunhos estruturados do F10, preserva o HTML/texto originais e importa imagens compatíveis para o armazenamento próprio. Nunca sobrescreve um artigo F10 já importado.
