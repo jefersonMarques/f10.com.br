@@ -229,14 +229,9 @@ export async function startMovideskCompletePublication(actorUserId: string): Pro
       .filter((row) => row.contentId && drafts.has(row.contentId))
       .map((row) => row.sourceId).sort((a, b) => a - b);
 
-    // Preserva artigos já processados se o usuário mudar da aprovação antiga
-    // para o fluxo completo enquanto ela continua rodando.
-    const continuing = state && ["approving", "approving-and-publishing"].includes(state.phase);
-    const completed = continuing ? state.sourceIds.slice(0, state.cursor) : [];
-    const sourceIds = continuing
-      ? [...completed, ...new Set([...state.sourceIds.slice(state.cursor), ...candidates]
-        .filter((id) => !completed.includes(id)))]
-      : candidates;
+    // Uma única passagem: aprova cada rascunho quando necessário e publica
+    // imediatamente. O progresso anterior de aprovação não precisa ser repetido.
+    const sourceIds = [...new Set(candidates)];
     if (!sourceIds.length) {
       // Mesmo sem novos artigos, a coleção pode estar desatualizada.
       await tx.update(helpMovideskPublicationState).set({
@@ -247,9 +242,8 @@ export async function startMovideskCompletePublication(actorUserId: string): Pro
       return 0;
     }
     await tx.update(helpMovideskPublicationState).set({
-      enabled: true, phase: "approving-and-publishing",
-      sourceIds, cursor: completed.length,
-      results: continuing ? state.results : [],
+      enabled: true, phase: "publishing",
+      sourceIds, cursor: 0, results: [],
       startedBy: actorUserId, lastError: null,
       nextRequestAt: new Date(), updatedAt: new Date(),
     }).where(eq(helpMovideskPublicationState.id, 1));
@@ -324,7 +318,25 @@ async function publishOne(sourceId: number, actorUserId: string): Promise<Movide
     needsReview: helpMovideskArticles.needsReview,
   }).from(helpMovideskArticles).where(eq(helpMovideskArticles.sourceId, sourceId)).limit(1);
   if (!article?.contentId) return blocked("ARTIGO_NAO_ENCONTRADO");
-  if (article.needsReview) return blocked("REVISAO_EDITORIAL_PENDENTE");
+  if (article.needsReview) {
+    // O ZIP editorial altera o rascunho, mas não limpa needs_review.
+    // Reaproveite a autorização administrativa desta execução e rode a
+    // aprovação com todas as verificações, sem outro clique.
+    let approvalIssue: string | null = null;
+    try {
+      await approveCuratedMovideskArticle(sourceId, actorUserId);
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : "";
+      approvalIssue = /^[A-Z][A-Z0-9_]{3,80}$/.test(code)
+        ? code : code.startsWith("MOVIDESK_IMAGES_PENDING:")
+          ? "IMAGENS_PENDENTES_OU_INCOMPLETAS" : "APROVACAO_NAO_CONCLUIDA";
+    }
+    const [afterApproval] = await db.select({ needsReview: helpMovideskArticles.needsReview })
+      .from(helpMovideskArticles).where(eq(helpMovideskArticles.sourceId, sourceId)).limit(1);
+    if (!afterApproval || afterApproval.needsReview) {
+      return blocked(approvalIssue ?? "APROVACAO_NAO_CONCLUIDA");
+    }
+  }
   const content = await getStructuredHelpContent(article.contentId);
   if (!content || content.importSource !== "movidesk" || content.contentKind !== "support_article") {
     return blocked("CONTEUDO_INCOMPATIVEL");
