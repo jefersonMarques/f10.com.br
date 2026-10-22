@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { BellRing, MessageCircleMore, CheckSquare2, AtSign, MonitorCog, X } from "lucide-svelte";
-  import { notificationSoundDataUri } from "$lib/components/operations/notificationSound";
+
 
   type NotificationItem = {
     id: string;
@@ -120,7 +120,9 @@
       ...alerts,
     ].slice(0, MAX_VISIBLE_ALERTS);
 
-    void playNotificationSound();
+    if (incoming.some((item) => item.kind.startsWith("ticket.") || item.kind.startsWith("chat."))) {
+      void playNotificationSound();
+    }
   }
 
   $: captureNewNotifications(notifications);
@@ -136,7 +138,7 @@
     }
 
     knownIds = new Set(notifications.map((notification) => notification.id));
-    audio = new Audio(notificationSoundDataUri);
+    audio = new Audio("/f10-notification.mp3");
     audio.preload = "auto";
     audio.volume = 0.6;
     mounted = true;
