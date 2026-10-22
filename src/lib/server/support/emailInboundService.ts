@@ -1,4 +1,5 @@
 import { env } from "$env/dynamic/private";
+import { persistInboundAttachments, resolveEmailImages } from "$lib/server/support/emailInboundMediaService";
 import {
   and,
   asc,
@@ -60,6 +61,7 @@ export type BrevoEmailMessage = {
   cc: EmailAddress[];
   bcc: EmailAddress[];
   attachments: unknown[];
+  htmlImages?: Array<{ src: string; alt: string }>;
   isForward: boolean;
 };
 type CustomerMatch = {
@@ -563,6 +565,7 @@ function messageMetadata(message: BrevoEmailMessage): Record<string, unknown> {
     cc: message.cc,
     bcc: message.bcc,
     attachments: message.attachments,
+    inlineImages: [],
     isForward: message.isForward,
   };
 }
@@ -606,6 +609,41 @@ export async function saveIncomingMessage(input: {
     })
     .onConflictDoNothing()
     .returning({ id: ticketMessages.id });
+  // Persist media even when replaying an already-saved message. This makes
+  // retries and historical recovery idempotent without duplicating tickets.
+  let savedMessageId = created?.id;
+  if (!savedMessageId) {
+    const [existing] = await db
+      .select({ id: ticketMessages.id })
+      .from(ticketMessages)
+      .where(and(
+        eq(ticketMessages.ticketId, input.ticketId),
+        eq(ticketMessages.externalMessageId, input.message.externalMessageId),
+        eq(ticketMessages.channel, "email"),
+      ))
+      .limit(1);
+    if (!existing) return false;
+    savedMessageId = existing.id;
+  }
+
+  if (input.message.attachments.length > 0 || (input.message.htmlImages?.length ?? 0) > 0) {
+    const stored = await persistInboundAttachments({
+      ticketId: input.ticketId,
+      messageId: savedMessageId,
+      attachments: input.message.attachments,
+    });
+    const inlineImages = resolveEmailImages(input.message.htmlImages ?? [], stored, input.ticketId);
+    await db
+      .update(ticketMessages)
+      .set({
+        externalMetadata: {
+          ...messageMetadata(input.message),
+          inlineImages,
+        },
+      })
+      .where(eq(ticketMessages.id, savedMessageId));
+  }
+
   if (!created) return false;
 
   await db.transaction(async (tx) => {
