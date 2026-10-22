@@ -474,10 +474,11 @@ export const actions: Actions = {
     const title = readFormValue(formData, "title");
     const description = readFormValue(formData, "description");
     const assistantKnowledge = readFormValue(formData, "assistantKnowledge");
-    const hasManualDetails = Boolean(title || description || assistantKnowledge);
+    const initialText = readFormValue(formData, "initialText");
+    const hasManualDetails = Boolean(title || description || assistantKnowledge || initialText);
     if (hasManualDetails && (
       title.length < 2 || title.length > 180 ||
-      description.length > 2_000 || assistantKnowledge.length > 20_000
+      description.length > 2_000 || assistantKnowledge.length > 20_000 || initialText.length > 50_000
     )) {
       return fail(400, { success: false, message: "Informe um título válido para a nova etapa." });
     }
@@ -485,7 +486,7 @@ export const actions: Actions = {
       const stepId = await addStructuredHelpStep(
         session.user.id,
         params.contentId,
-        hasManualDetails ? { title, description, assistantKnowledge } : undefined,
+        hasManualDetails ? { title, description, assistantKnowledge, initialText } : undefined,
       );
       redirectToContentEditor(params.contentId, stepId);
     } catch (cause) {
