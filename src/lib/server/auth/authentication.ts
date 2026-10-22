@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { authLoginAttempts, users } from "$lib/server/db/schema";
 import { recordAuditEvent } from "$lib/server/auth/audit";
@@ -23,8 +23,14 @@ function hashValue(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+// Chaves não reversíveis por conta/IP permitem limpar somente o bloqueio
+// do próprio usuário depois de redefinir a senha, sem tocar outras contas.
+export function loginAttemptKeyPrefix(email: string): string {
+  return `operations-login:v2:${hashValue(normalizeEmail(email))}:`;
+}
+
 function createAttemptKey(email: string, clientAddress: string): string {
-  return hashValue(`${email}|${clientAddress}`);
+  return loginAttemptKeyPrefix(email) + hashValue(clientAddress);
 }
 
 async function isBlocked(attemptKey: string, now: Date): Promise<boolean> {
@@ -42,45 +48,35 @@ async function recordFailedAttempt(attemptKey: string, now: Date): Promise<void>
   const db = getDatabase();
 
   await db.transaction(async (tx) => {
-    const [existing] = await tx
-      .select()
+    // Inicializar primeiro e bloquear a linha evita perder tentativas quando
+    // o navegador envia duas requisições simultaneamente.
+    await tx.insert(authLoginAttempts).values({
+      key: attemptKey,
+      attemptCount: 0,
+      windowStartedAt: now,
+      blockedUntil: null,
+      updatedAt: now,
+    }).onConflictDoNothing();
+
+    const [existing] = await tx.select()
       .from(authLoginAttempts)
       .where(eq(authLoginAttempts.key, attemptKey))
+      .for("update")
       .limit(1);
+    if (!existing) throw new Error("LOGIN_ATTEMPT_RECORD_NOT_FOUND");
 
-    const windowExpired =
-      !existing || existing.windowStartedAt.getTime() <= now.getTime() - LOGIN_WINDOW_MS;
+    const expired = existing.windowStartedAt.getTime() <= now.getTime() - LOGIN_WINDOW_MS;
+    const attemptCount = expired ? 1 : existing.attemptCount + 1;
+    const blockedUntil = attemptCount >= MAX_LOGIN_ATTEMPTS
+      ? new Date(now.getTime() + LOGIN_BLOCK_MS)
+      : null;
 
-    if (windowExpired) {
-      await tx
-        .insert(authLoginAttempts)
-        .values({
-          key: attemptKey,
-          attemptCount: 1,
-          windowStartedAt: now,
-          blockedUntil: null,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: authLoginAttempts.key,
-          set: {
-            attemptCount: 1,
-            windowStartedAt: now,
-            blockedUntil: null,
-            updatedAt: now,
-          },
-        });
-      return;
-    }
-
-    const attemptCount = existing.attemptCount + 1;
-    const blockedUntil =
-      attemptCount >= MAX_LOGIN_ATTEMPTS ? new Date(now.getTime() + LOGIN_BLOCK_MS) : null;
-
-    await tx
-      .update(authLoginAttempts)
-      .set({ attemptCount, blockedUntil, updatedAt: now })
-      .where(eq(authLoginAttempts.key, attemptKey));
+    await tx.update(authLoginAttempts).set({
+      attemptCount,
+      windowStartedAt: expired ? now : existing.windowStartedAt,
+      blockedUntil,
+      updatedAt: now,
+    }).where(eq(authLoginAttempts.key, attemptKey));
   });
 }
 
@@ -107,7 +103,12 @@ export async function authenticateUser(
   }
 
   const db = getDatabase();
-  const [user] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
+  // Contas antigas podem ter sido cadastradas com letras maiúsculas ou
+  // espaços no e-mail. Nunca escolher arbitrariamente entre duplicatas.
+  const matches = await db.select().from(users)
+    .where(sql`lower(btrim(${users.email})) = ${normalizedEmail}`)
+    .limit(2);
+  const user = matches.length === 1 ? matches[0] : undefined;
   const passwordMatches = await verifyPassword(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
   const canLogin = Boolean(user && user.status === "active" && passwordMatches);
 
@@ -116,7 +117,14 @@ export async function authenticateUser(
     await recordAuditEvent({
       actorUserId: user?.id ?? null,
       action: "auth.login_failed",
-      metadata: { emailHash: hashValue(normalizedEmail) },
+      metadata: {
+        emailHash: hashValue(normalizedEmail),
+        failureKind: matches.length > 1
+          ? "duplicate_email"
+          : !user ? "account_not_found"
+            : user.status !== "active" ? "account_not_active"
+              : "password_mismatch",
+      },
     });
     return { ok: false, reason: "invalid" };
   }
