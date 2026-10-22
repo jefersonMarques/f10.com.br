@@ -6,6 +6,7 @@
     AlertTriangle,
     Check,
     CheckCircle2,
+    CircleAlert,
     Download,
     ArrowUp,
     ArrowDown,
@@ -1062,12 +1063,9 @@
               </div>
             </div>
             {#if data.canEdit}
-              <form method="POST" action="?/moveStep"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="up"/><button type="submit" disabled={index === 0 || hasUnsavedReview || openEditors.size > 0} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] disabled:opacity-30" aria-label="Subir etapa"><ArrowUp size={14}/></button></form>
-              <form method="POST" action="?/moveStep"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="down"/><button type="submit" disabled={index === reviewSteps.length - 1 || hasUnsavedReview || openEditors.size > 0} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] disabled:opacity-30" aria-label="Descer etapa"><ArrowDown size={14}/></button></form>
               <button type="button" on:click={() => openSplitDialog(step)} disabled={splitApplying} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#F1D7BD] bg-[#FFF9F3] text-[#A9510D] transition hover:bg-[#FFF4E9] disabled:opacity-50" aria-label="Quebrar etapa com IA" title="Quebrar etapa">
                 <Sparkles size={14}/>
               </button>
-              <button type="button" on:click={() => openDeleteStep(step)} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#F0C8C8] bg-[#FFF7F7] text-[#9B2C2C] transition hover:bg-[#FFF0F0]" aria-label="Excluir etapa" title="Excluir etapa"><Trash2 size={14}/></button>
             {/if}
             {#if data.canEdit}
               <button type="button" on:click={() => openStepSettings(step.id)} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] text-[#606777]" aria-label="Configurar etapa" title="Configurar etapa"><Settings2 size={14}/></button>
@@ -1117,10 +1115,10 @@
                 <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption inline-flex items-center gap-2 rounded-xl bg-[#EEF0FF] px-4 py-2.5 font-semibold text-[#000A57]">{block.linkLabel || "Abrir link"}<ExternalLink size={12}/></a>
               {/if}
               {#if data.canEdit}
-                <div class="flex justify-end gap-2 border-b border-[#EEF0F5] pb-3">
-                  <form method="POST" action="?/moveBlock"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockId" value={block.id}/><input type="hidden" name="direction" value="up"/><button type="submit" disabled={blockIndex === 0 || hasUnsavedReview || openEditors.size > 0} aria-label="Subir bloco" title="Subir bloco" class="rounded-lg border border-[#DDE1EA] p-2 disabled:opacity-30"><ArrowUp size={14}/></button></form>
-                  <form method="POST" action="?/moveBlock"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockId" value={block.id}/><input type="hidden" name="direction" value="down"/><button type="submit" disabled={blockIndex === step.blocks.length - 1 || hasUnsavedReview || openEditors.size > 0} aria-label="Descer bloco" title="Descer bloco" class="rounded-lg border border-[#DDE1EA] p-2 disabled:opacity-30"><ArrowDown size={14}/></button></form>
-                  <form method="POST" action="?/deleteBlock" on:submit={(event) => { if (!confirm("Excluir este bloco?")) event.preventDefault(); }}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockId" value={block.id}/><button type="submit" disabled={hasUnsavedReview || openEditors.size > 0} aria-label="Excluir bloco" class="rounded-lg border border-[#F0C8C8] p-2 text-[#9B2C2C] disabled:opacity-30"><Trash2 size={14}/></button></form>
+                <div class="flex justify-end border-b border-[#EEF0F5] pb-3">
+                  <button type="button" on:click={() => openBlockSettings(step.id, block.id)} class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#DDE1EA] bg-white px-3 text-[12px] font-semibold text-[#000A57]" aria-label="Editar ou organizar bloco" title="Editar bloco">
+                    <Pencil size={14}/>Editar bloco
+                  </button>
                 </div>
               {/if}
             {/each}
