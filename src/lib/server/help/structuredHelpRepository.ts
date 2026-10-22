@@ -728,7 +728,14 @@ export async function deleteStructuredHelpFeaturedVideo(
 export async function addStructuredHelpStep(
   actorUserId: string,
   contentId: string,
+  input?: StructuredHelpStepInput,
 ): Promise<string> {
+  if (input && (
+    input.title.trim().length < 2 ||
+    input.title.trim().length > 180 ||
+    input.description.trim().length > 2_000 ||
+    input.assistantKnowledge.trim().length > 20_000
+  )) throw new Error("STEP_INPUT_INVALID");
   const db = getDatabase();
   const content = await getContentRow(contentId);
   if (!content) throw new Error("CONTENT_NOT_FOUND");
@@ -745,9 +752,9 @@ export async function addStructuredHelpStep(
     .insert(helpContentSteps)
     .values({
       contentId,
-      title: `Passo ${stepNumber}`,
-      description: "",
-      assistantKnowledge: "",
+      title: input?.title.trim() ?? `Passo ${stepNumber}`,
+      description: input?.description.trim() ?? "",
+      assistantKnowledge: input?.assistantKnowledge.trim() ?? "",
       sortOrder,
     })
     .returning({ id: helpContentSteps.id });
