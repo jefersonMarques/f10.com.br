@@ -25,6 +25,7 @@
   let presenceOpen = false;
   let profileOpen = false;
   let notificationTimer: ReturnType<typeof setInterval> | null = null;
+  let notificationRefreshInFlight = false;
   let presenceTimer: ReturnType<typeof setInterval> | null = null;
   let notifications = data.notifications;
   let presence = data.presence;
@@ -101,11 +102,18 @@
   }
 
   async function refreshNotifications(): Promise<void> {
+    if (notificationRefreshInFlight || document.hidden) return;
+    notificationRefreshInFlight = true;
     try {
-      const response = await fetch("/app/notifications/summary", { cache: "no-store" });
+      const response = await fetch("/app/notifications/summary", {
+        cache: "no-store",
+        headers: { "Accept": "application/json" },
+      });
       if (response.ok) notifications = await response.json() as typeof notifications;
     } catch {
-      // A próxima consulta tenta novamente sem interromper o painel.
+      // Falhas temporárias não interrompem a navegação.
+    } finally {
+      notificationRefreshInFlight = false;
     }
   }
 
@@ -154,7 +162,15 @@
   }
 
   onMount(() => {
-    notificationTimer = setInterval(() => void refreshNotifications(), 8_000);
+    const syncNotifications = () => {
+      if (!document.hidden) void refreshNotifications();
+    };
+    notificationTimer = setInterval(syncNotifications, 5_000);
+    document.addEventListener("visibilitychange", syncNotifications);
+    window.addEventListener("focus", syncNotifications);
+    window.addEventListener("pageshow", syncNotifications);
+    syncNotifications();
+
     if (canRespondToChat) {
       presenceTimer = setInterval(() => void refreshPresence(), 60_000);
       const handleActivity = () => void heartbeatPresence();
@@ -162,11 +178,19 @@
       window.addEventListener("keydown", handleActivity, { passive: true });
       window.addEventListener("touchstart", handleActivity, { passive: true });
       return () => {
+        document.removeEventListener("visibilitychange", syncNotifications);
+        window.removeEventListener("focus", syncNotifications);
+        window.removeEventListener("pageshow", syncNotifications);
         window.removeEventListener("pointerdown", handleActivity);
         window.removeEventListener("keydown", handleActivity);
         window.removeEventListener("touchstart", handleActivity);
       };
     }
+    return () => {
+      document.removeEventListener("visibilitychange", syncNotifications);
+      window.removeEventListener("focus", syncNotifications);
+      window.removeEventListener("pageshow", syncNotifications);
+    };
   });
 
   onDestroy(() => {
