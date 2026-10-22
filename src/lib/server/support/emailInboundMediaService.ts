@@ -114,6 +114,8 @@ export async function persistInboundAttachments(input: {
     );
     if (!response.ok) throw new Error(`BREVO_INBOUND_ATTACHMENT_HTTP_${response.status}`);
     const bytes = new Uint8Array(await response.arrayBuffer());
+    accumulated += Math.max(0, bytes.length - length);
+    if (accumulated > MAX_TOTAL_BYTES) throw new Error("BREVO_INBOUND_TOTAL_ATTACHMENTS_TOO_LARGE");
     if (bytes.length === 0 || bytes.length > MAX_FILE_BYTES || (length > 0 && bytes.length > length * 2)
       || !fileLooksCorrect(mime, bytes)) {
       throw new Error("BREVO_INBOUND_ATTACHMENT_CONTENT_INVALID");
@@ -176,7 +178,7 @@ export function resolveEmailImages(
   stored: StoredInboundAttachment[],
   ticketId: string,
 ): Array<{ src: string; alt: string; external: boolean }> {
-  return images.flatMap((item) => {
+  return images.flatMap((item): Array<{ src: string; alt: string; external: boolean }> => {
     if (item.src.startsWith("cid:")) {
       const id = item.src.slice(4);
       const attachment = stored.find((candidate) => candidate.contentId === id && candidate.mimeType.startsWith("image/"));
