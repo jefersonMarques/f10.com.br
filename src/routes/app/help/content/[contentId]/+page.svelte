@@ -53,6 +53,7 @@
   let settingsModal: "general" | "video" | "advanced" | null = null;
   let stepModalId: string | null = null;
   let createStepOpen = false;
+  let readinessOpen = false;
   let selectedStepId = data.content.steps[0]?.id ?? "";
   let lastRequestedStepId = "";
   let editBlockId: string | null = null;
@@ -214,6 +215,16 @@
     reviewPending === 0 &&
     openEditors.size === 0 &&
     !hasUnsavedReview;
+
+  function isMp4Link(value: string | null): boolean {
+    if (!value) return false;
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" && /\\.mp4$/i.test(url.pathname);
+    } catch {
+      return false;
+    }
+  }
 
   function assetUrl(assetId: string): string {
     return `/api/app/help/assets/${assetId}`;
@@ -956,6 +967,10 @@
         <button type="button" on:click={() => openSettings("video")} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px] font-semibold text-[#000A57]"><Video size={15}/>Vídeo</button>
         <button type="button" on:click={() => openSettings("advanced")} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px] font-semibold text-[#000A57]"><Sparkles size={15}/>IA e pesquisa</button>
       {/if}
+      <button type="button" on:click={() => (readinessOpen = true)} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px] font-semibold text-[#000A57]">
+        {#if publicationReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}
+        Verificação
+      </button>
       {#if data.canPublish}
         <button type="button" on:click={publish} disabled={!publicationReady || publishing} title={publicationReady ? "Publicar" : "Conclua as pendências antes de publicar"} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#B8BCC8]">{#if publishing}<LoaderCircle size={14} class="animate-spin"/>{:else}<CheckCircle2 size={14}/>{/if}Publicar</button>
       {/if}
@@ -1144,7 +1159,10 @@
                 {@const fileUrl = block.asset.storageKey ? assetUrl(block.asset.id) : block.asset.sourceUrl}
                 {#if fileUrl}<a href={fileUrl} target="_blank" rel="noopener noreferrer" class="flex items-center justify-between rounded-2xl border border-[#E1E4EC] bg-[#FAFAFC] px-4 py-4"><span class="inline-flex items-center gap-2 text-[13px] font-semibold text-[#303645]"><Download size={15}/>{block.linkLabel || "Baixar arquivo"}</span></a>{/if}
               {:else if block.blockType === "link" && block.linkUrl}
-                <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption inline-flex items-center gap-2 rounded-xl bg-[#EEF0FF] px-4 py-2.5 font-semibold text-[#000A57]">{block.linkLabel || "Abrir link"}<ExternalLink size={12}/></a>
+                {#if isMp4Link(block.linkUrl)}
+                  <video src={block.linkUrl} controls preload="metadata" playsinline class="aspect-video w-full max-w-[760px] rounded-xl bg-black"><track kind="captions"/></video>
+                {/if}
+                <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption mt-2 inline-flex items-center gap-2 rounded-xl bg-[#EEF0FF] px-4 py-2.5 font-semibold text-[#000A57]">{block.linkLabel || "Abrir link"}<ExternalLink size={12}/></a>
               {/if}
               {#if data.canEdit}
                 <div class="flex justify-end border-b border-[#EEF0F5] pb-3">
@@ -1483,6 +1501,37 @@
   </div>
 {/if}
 
+
+
+{#if readinessOpen}
+  <div class="fixed inset-0 z-[149] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
+    <section role="dialog" aria-modal="true" aria-labelledby="help-checklist-title" class="max-h-[88vh] w-full max-w-[570px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+      <div class="mb-4 flex items-center justify-between">
+        <h2 id="help-checklist-title" class="text-[18px] font-semibold">Verificação para publicação</h2>
+        <button type="button" on:click={() => (readinessOpen = false)} class="rounded-lg p-2 text-[#707787]" aria-label="Fechar"><X size={18}/></button>
+      </div>
+      <div class="space-y-2">
+        {#each [
+          { label: "Categoria válida", ready: realCategoriesReady },
+          { label: "Etapas com conteúdo", ready: stepsReady },
+          { label: "Uma imagem por etapa", ready: singleImagePerStep },
+          { label: "Imagens com descrição", ready: imageOnlyStepsReady },
+          { label: "Transcrição do vídeo", ready: videoReady },
+          { label: "Imagens revisadas", ready: reviewPending === 0 },
+          { label: "Alterações salvas", ready: openEditors.size === 0 && !hasUnsavedReview },
+        ] as item}
+          <div class="flex items-center justify-between gap-3 rounded-xl border border-[#E2E5ED] px-3 py-3">
+            <span class="text-[13px] font-medium text-[#303746]">{item.label}</span>
+            {#if item.ready}<CheckCircle2 size={18} class="text-[#2F7045]"/>{:else}<CircleAlert size={18} class="text-[#A9510D]"/>{/if}
+          </div>
+        {/each}
+      </div>
+      <div class="mt-5 flex justify-end">
+        <button type="button" on:click={() => (readinessOpen = false)} class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Fechar</button>
+      </div>
+    </section>
+  </div>
+{/if}
 
 {#if createStepOpen && data.canEdit}
   <div class="fixed inset-0 z-[148] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
