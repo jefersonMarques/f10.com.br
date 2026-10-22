@@ -47,11 +47,11 @@ test("entities and HTML layout are converted to inert visible text", () => {
 
 test("HTML complete formatting wins when it covers the text body", () => {
   const selected = selectInboundEmailBody({
-    markdown: "Mensagem com anexo\\nNEGRITO",
-    plain: "Mensagem com anexo\\nNEGRITO\\nITALICO\\nCOLORIDO",
+    markdown: "Mensagem com anexo\nNEGRITO",
+    plain: "Mensagem com anexo\nNEGRITO\nITALICO\nCOLORIDO",
     html: "<p>Mensagem com anexo</p><b>NEGRITO</b><br><i>ITALICO</i><br>COLORIDO",
   });
   assert.equal(selected.source, "html");
-  assert.match(selected.text, /\\*\\*NEGRITO\\*\\*/);
-  assert.match(selected.text, /\\*ITALICO\\*/);
+  assert.match(selected.text, /\*\*NEGRITO\*\*/);
+  assert.match(selected.text, /\*ITALICO\*/);
 });
