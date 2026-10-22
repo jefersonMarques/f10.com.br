@@ -97,6 +97,15 @@ export async function getTicketDetailsData(
 
   return {
     ...card,
+    details: {
+      ...card.details,
+      messages: card.details.messages.map((message) => ({
+        ...message,
+        attachments: card.attachments.filter(
+          (attachment) => attachment.messageId === message.id,
+        ),
+      })),
+    },
     workflowBoard: {
       globalWorkflow: workflowBoard.globalWorkflow,
       areaWorkflows: workflowBoard.areaWorkflows,
