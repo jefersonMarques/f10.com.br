@@ -1,9 +1,27 @@
 <script lang="ts">
-  import { ArrowLeft, CheckCircle2, LockKeyhole } from "lucide-svelte";
+  import { ArrowLeft, CheckCircle2, LoaderCircle, LockKeyhole } from "lucide-svelte";
+  import { enhance } from "$app/forms";
+  import type { SubmitFunction } from "@sveltejs/kit";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
   export let form: ActionData;
+
+  let submitting = false;
+  const enhanceLogin: SubmitFunction = ({ cancel }) => {
+    if (submitting) {
+      cancel();
+      return;
+    }
+    submitting = true;
+    return async ({ update }) => {
+      try {
+        await update();
+      } finally {
+        submitting = false;
+      }
+    };
+  };
 </script>
 
 <svelte:head>
@@ -69,7 +87,7 @@
             </div>
           {/if}
 
-          <form method="POST" class="mt-8 space-y-5">
+          <form method="POST" use:enhance={enhanceLogin} class="mt-8 space-y-5">
             <input type="hidden" name="returnTo" value={form?.returnTo ?? data.returnTo} />
 
             <label class="block">
@@ -109,9 +127,10 @@
 
             <button
               type="submit"
+              disabled={submitting}
               class="flex h-12 w-full items-center justify-center rounded-xl bg-[#000A57] px-5 text-[15px] font-semibold text-white transition hover:bg-[#111B71] focus:outline-none focus:ring-4 focus:ring-[#000A57]/20"
             >
-              Entrar
+              {#if submitting}<LoaderCircle size={18} class="mr-2 animate-spin" aria-hidden="true" />Entrando...{:else}Entrar{/if}
             </button>
           </form>
         </div>
