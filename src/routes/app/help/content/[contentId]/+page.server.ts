@@ -467,15 +467,31 @@ export const actions: Actions = {
     redirectToContentEditor(params.contentId);
   },
 
-  addStep: async ({ cookies, params }) => {
+  addStep: async ({ cookies, params, request }) => {
     if (!isUuid(params.contentId)) return fail(404, { success: false, message: "Conteúdo não encontrado." });
     const { session } = await requireAppPermission(cookies, "help.edit", contentEditorPath(params.contentId));
+    const formData = await request.formData();
+    const title = readFormValue(formData, "title");
+    const description = readFormValue(formData, "description");
+    const assistantKnowledge = readFormValue(formData, "assistantKnowledge");
+    const initialText = readFormValue(formData, "initialText");
+    const hasManualDetails = Boolean(title || description || assistantKnowledge || initialText);
+    if (hasManualDetails && (
+      title.length < 2 || title.length > 180 ||
+      description.length > 2_000 || assistantKnowledge.length > 20_000 || initialText.length > 50_000
+    )) {
+      return fail(400, { success: false, message: "Informe um título válido para a nova etapa." });
+    }
     try {
-      const stepId = await addStructuredHelpStep(session.user.id, params.contentId);
+      const stepId = await addStructuredHelpStep(
+        session.user.id,
+        params.contentId,
+        hasManualDetails ? { title, description, assistantKnowledge, initialText } : undefined,
+      );
       redirectToContentEditor(params.contentId, stepId);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
-      return fail(409, { success: false, message: "Não foi possível adicionar o passo." });
+      return fail(409, { success: false, message: "Não foi possível adicionar a etapa." });
     }
   },
 

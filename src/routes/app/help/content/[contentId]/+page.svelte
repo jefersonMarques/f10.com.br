@@ -1,14 +1,21 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
+  import { page } from "$app/stores";
+  import { enhance } from "$app/forms";
+  import type { SubmitFunction } from "@sveltejs/kit";
   import { onDestroy, onMount } from "svelte";
   import {
     AlertTriangle,
     Check,
     CheckCircle2,
+    CircleAlert,
     Download,
     ArrowUp,
     ArrowDown,
     FilePlus2,
+    ChevronLeft,
+    ChevronRight,
+    Pencil,
     ExternalLink,
     Eye,
     FileText,
@@ -34,6 +41,8 @@
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
   import HelpInlineTextEditor from "$lib/components/help/HelpInlineTextEditor.svelte";
+  import HelpNewStepDialog from "$lib/components/help/HelpNewStepDialog.svelte";
+  import HelpBlockEditorDialog from "$lib/components/help/HelpBlockEditorDialog.svelte";
   import HelpRichText from "$lib/components/help/HelpRichText.svelte";
   import HelpScreenshotReviewCarousel from "$lib/components/help/HelpScreenshotReviewCarousel.svelte";
   import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
@@ -45,6 +54,12 @@
   export let form: ActionData;
   let settingsModal: "general" | "video" | "advanced" | null = null;
   let stepModalId: string | null = null;
+  let createStepOpen = false;
+  let readinessOpen = false;
+  let selectedStepId = data.content.steps[0]?.id ?? "";
+  let lastRequestedStepId = "";
+  let editBlockId: string | null = null;
+  let editBlockStepId = "";
 
   type ReviewStep = PageData["content"]["steps"][number];
   type ReviewContent = PageData["content"];
@@ -202,6 +217,16 @@
     reviewPending === 0 &&
     openEditors.size === 0 &&
     !hasUnsavedReview;
+
+  function isMp4Link(value: string | null): boolean {
+    if (!value) return false;
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" && /\.mp4$/i.test(url.pathname);
+    } catch {
+      return false;
+    }
+  }
 
   function assetUrl(assetId: string): string {
     return `/api/app/help/assets/${assetId}`;
@@ -378,6 +403,9 @@
       }
       applyUpdatedContent(payload.content);
       categoryPickerOpen = false;
+    } catch {
+      saveSuccess = false;
+      saveMessage = "A conexão foi interrompida. Tente salvar novamente.";
     } finally {
       categorySaving = false;
     }
@@ -481,6 +509,9 @@
       }
       applyUpdatedContent(payload.content);
       addPanel = null;
+    } catch {
+      saveSuccess = false;
+      saveMessage = "A conexão foi interrompida. Tente novamente.";
     } finally {
       addSaving = false;
     }
@@ -814,10 +845,8 @@
 
   onMount(() => {
     const stepId = new URLSearchParams(window.location.search).get("step");
-    if (stepId && /^[a-f0-9-]{36}$/i.test(stepId)) {
-      requestAnimationFrame(() => {
-        document.getElementById(`help-step-${stepId}`)?.scrollIntoView({ block: "center" });
-      });
+    if (stepId && data.content.steps.some((step) => step.id === stepId)) {
+      selectedStepId = stepId;
     }
   });
 
@@ -845,6 +874,60 @@
 
 
   $: editingStep = reviewSteps.find((step) => step.id === stepModalId) ?? null;
+  $: editingBlock = reviewSteps
+    .flatMap((step) => step.blocks)
+    .find((block) => block.id === editBlockId) ?? null;
+  $: selectedStepIndex = Math.max(0, reviewSteps.findIndex((step) => step.id === selectedStepId));
+  $: if (reviewSteps.length > 0 && !reviewSteps.some((step) => step.id === selectedStepId)) {
+    selectedStepId = reviewSteps[0].id;
+  }
+  // React to in-app redirects after saving/adding a step, without requiring a page reload.
+  $: {
+    const requestedStepId = $page.url.searchParams.get("step") ?? "";
+    if (!requestedStepId) lastRequestedStepId = "";
+    else if (requestedStepId !== lastRequestedStepId && reviewSteps.some((step) => step.id === requestedStepId)) {
+      lastRequestedStepId = requestedStepId;
+      selectedStepId = requestedStepId;
+    }
+  }
+
+  function selectStep(stepId: string): void {
+    if (openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = "Salve ou cancele o texto em edição antes de mudar de etapa.";
+      return;
+    }
+    selectedStepId = stepId;
+  }
+
+  const submitEditorModal: SubmitFunction = () => async ({ result, update }) => {
+    // Leave the dialog open with its inputs intact when validation fails.
+    if (result.type === "redirect" || result.type === "success") {
+      createStepOpen = false;
+      stepModalId = null;
+      editBlockId = null;
+      settingsModal = null;
+    }
+    await update({ reset: false });
+  };
+
+  function openCreateStep(): void {
+    if (!allowModal()) return;
+    createStepOpen = true;
+  }
+
+  function openBlockSettings(stepId: string, blockId: string): void {
+    if (!allowModal()) return;
+    editBlockStepId = stepId;
+    editBlockId = blockId;
+  }
+
+  function cancelCategorySelection(): void {
+    selectedCategoryIds = reviewCategories
+      .filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG)
+      .map((category) => category.id);
+    categoryPickerOpen = false;
+  }
 
   function allowModal(): boolean {
     if (hasUnsavedReview || openEditors.size > 0) {
@@ -886,6 +969,10 @@
         <button type="button" on:click={() => openSettings("video")} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px] font-semibold text-[#000A57]"><Video size={15}/>Vídeo</button>
         <button type="button" on:click={() => openSettings("advanced")} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px] font-semibold text-[#000A57]"><Sparkles size={15}/>IA e pesquisa</button>
       {/if}
+      <button type="button" on:click={() => (readinessOpen = true)} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px] font-semibold text-[#000A57]">
+        {#if publicationReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}
+        Verificação
+      </button>
       {#if data.canPublish}
         <button type="button" on:click={publish} disabled={!publicationReady || publishing} title={publicationReady ? "Publicar" : "Conclua as pendências antes de publicar"} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#B8BCC8]">{#if publishing}<LoaderCircle size={14} class="animate-spin"/>{:else}<CheckCircle2 size={14}/>{/if}Publicar</button>
       {/if}
@@ -920,7 +1007,7 @@
           <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#FFF3E9] px-3 py-1.5 font-bold uppercase tracking-[0.08em] text-[#B85408]"><HelpCategoryIcon name={category.icon} size={12}/>{category.name}</span>
         {/each}
         {#if data.canEdit}
-          <button type="button" on:click={() => { if (allowModal()) categoryPickerOpen = true; }} class="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-[#C7CCD7] bg-white text-[#000A57]" aria-label="Editar categorias" title="Editar categorias"><Plus size={13}/></button>
+          <button type="button" on:click={() => { if (allowModal()) { selectedCategoryIds = reviewCategories.filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG).map((category) => category.id); categoryPickerOpen = true; } }} class="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-[#C7CCD7] bg-white text-[#000A57]" aria-label="Editar categorias" title="Editar categorias"><Plus size={13}/></button>
         {/if}
       </div>
 
@@ -942,15 +1029,18 @@
 
     {#if data.content.featuredVideo}
       {@const featuredEmbed = youtubeEmbedUrl(data.content.featuredVideo.sourceUrl)}
-      <section class="mt-5 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
+      <details class="mt-3 overflow-hidden rounded-[18px] border border-[#E2E5ED] bg-white">
+        <summary class="flex min-h-12 cursor-pointer items-center gap-2 px-4 text-[13px] font-semibold text-[#000A57]"><PlayCircle size={17}/>Vídeo principal</summary>
+        <div class="border-t border-[#EEF0F5]">
         {#if featuredEmbed}<div class="aspect-video overflow-hidden bg-black"><iframe src={featuredEmbed} title={data.content.featuredVideo.altText || `Vídeo: ${data.content.title}`} class="h-full w-full" allowfullscreen></iframe></div>{:else if data.content.featuredVideo.storageKey}<video controls preload="metadata" class="aspect-video h-auto w-full bg-black" src={assetUrl(data.content.featuredVideo.id)}><track kind="captions" /></video>{:else if data.content.featuredVideo.sourceUrl}<a href={data.content.featuredVideo.sourceUrl} target="_blank" rel="noopener noreferrer" class="flex min-h-20 items-center justify-between gap-3 px-5 py-4 text-[13px] font-semibold text-[#000A57]"><span class="inline-flex items-center gap-2"><PlayCircle size={18}/>Assistir ao vídeo principal</span><ExternalLink size={13}/></a>{/if}
-      </section>
+        </div>
+      </details>
     {/if}
 
     {#if reviewQuickGuide || data.canEdit}
-      <section class="mt-4 rounded-[20px] border border-[#D8DDF4] bg-[#F8F9FF] px-5 py-5">
-        <div class="flex items-center gap-2"><Sparkles size={16} class="text-[#EA6D0B]"/><h2 class="text-[13px] font-semibold text-[#000A57]">Resumo rápido</h2></div>
-        <div class="mt-3">
+      <details class="mt-3 rounded-[18px] border border-[#D8DDF4] bg-[#F8F9FF]">
+        <summary class="flex min-h-12 cursor-pointer items-center gap-2 px-4 text-[13px] font-semibold text-[#000A57]"><Sparkles size={16} class="text-[#EA6D0B]"/>Resumo rápido</summary>
+        <div class="border-t border-[#D8DDF4] px-4 py-4">
           <HelpInlineTextEditor
             contentId={data.content.id}
             operation="quick_guide"
@@ -963,12 +1053,34 @@
             on:editing={(event) => editorState("quick-guide", event.detail.active)}
           />
         </div>
-      </section>
+      </details>
     {/if}
 
-    <div class="mt-5 space-y-5">
-      {#each reviewSteps as step, index}
-        <section id={`help-step-${step.id}`} class="scroll-mt-24 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
+    <div class="mt-5 grid items-start gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <aside class="min-w-0 rounded-2xl border border-[#E2E5ED] bg-white p-3 lg:sticky lg:top-24" aria-label="Navegação das etapas">
+        <div class="mb-3 flex items-center justify-between px-2">
+          <h2 class="text-[14px] font-semibold text-[#202637]">Etapas</h2>
+          <span class="rounded-full bg-[#F2F3F7] px-2 py-1 text-[12px] font-semibold text-[#6E7584]">{reviewSteps.length}</span>
+        </div>
+        <div class="flex gap-2 overflow-x-auto pb-1 lg:max-h-[calc(100dvh-220px)] lg:flex-col lg:overflow-y-auto">
+          {#each reviewSteps as navStep, navIndex (navStep.id)}
+            <button type="button" on:click={() => selectStep(navStep.id)} aria-current={selectedStepId === navStep.id ? "step" : undefined}
+              class={`flex min-w-[180px] items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition lg:min-w-0 ${selectedStepId === navStep.id ? "border-[#BFC8F2] bg-[#EEF0FF] text-[#000A57]" : "border-transparent text-[#5F6675] hover:bg-[#F4F5FA]"}`}>
+              <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-[12px] font-bold ring-1 ring-[#E2E5ED]">{navIndex + 1}</span>
+              <span class="min-w-0 flex-1 truncate text-[13px] font-semibold" title={navStep.title}>{navStep.title}</span>
+              {#if navStep.blocks.length === 0}<CircleAlert size={15} class="shrink-0 text-[#A9510D]"/>{/if}
+            </button>
+          {/each}
+        </div>
+        {#if data.canEdit}
+          <button type="button" on:click={openCreateStep} class="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#B9C2D7] bg-white text-[13px] font-semibold text-[#000A57] hover:bg-[#F5F6FC]">
+            <Plus size={15}/>Nova etapa
+          </button>
+        {/if}
+      </aside>
+      <div class="min-w-0 space-y-4">
+      {#each reviewSteps as step, index (step.id)}
+        <section id={`help-step-${step.id}`} class={`scroll-mt-24 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white ${selectedStepId === step.id ? "" : "hidden"}`}>
           <header class="flex items-start gap-4 border-b border-[#EEF0F5] px-5 py-5 sm:px-6">
             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[12px] font-bold text-white">{index + 1}</span>
             <div class="min-w-0 flex-1">
@@ -1000,12 +1112,9 @@
               </div>
             </div>
             {#if data.canEdit}
-              <form method="POST" action="?/moveStep"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="up"/><button type="submit" disabled={index === 0 || hasUnsavedReview || openEditors.size > 0} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] disabled:opacity-30" aria-label="Subir etapa"><ArrowUp size={14}/></button></form>
-              <form method="POST" action="?/moveStep"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="down"/><button type="submit" disabled={index === reviewSteps.length - 1 || hasUnsavedReview || openEditors.size > 0} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] disabled:opacity-30" aria-label="Descer etapa"><ArrowDown size={14}/></button></form>
               <button type="button" on:click={() => openSplitDialog(step)} disabled={splitApplying} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#F1D7BD] bg-[#FFF9F3] text-[#A9510D] transition hover:bg-[#FFF4E9] disabled:opacity-50" aria-label="Quebrar etapa com IA" title="Quebrar etapa">
                 <Sparkles size={14}/>
               </button>
-              <button type="button" on:click={() => openDeleteStep(step)} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#F0C8C8] bg-[#FFF7F7] text-[#9B2C2C] transition hover:bg-[#FFF0F0]" aria-label="Excluir etapa" title="Excluir etapa"><Trash2 size={14}/></button>
             {/if}
             {#if data.canEdit}
               <button type="button" on:click={() => openStepSettings(step.id)} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] text-[#606777]" aria-label="Configurar etapa" title="Configurar etapa"><Settings2 size={14}/></button>
@@ -1013,7 +1122,7 @@
           </header>
 
           <div class="space-y-5 px-5 py-6 sm:px-6">
-            {#each step.blocks as block, blockIndex}
+            {#each step.blocks as block, blockIndex (block.id)}
               {#if block.blockType === "text"}
                 <div class="rounded-2xl border border-transparent p-1 transition hover:border-[#E4E7ED]">
                   <HelpInlineTextEditor
@@ -1052,13 +1161,16 @@
                 {@const fileUrl = block.asset.storageKey ? assetUrl(block.asset.id) : block.asset.sourceUrl}
                 {#if fileUrl}<a href={fileUrl} target="_blank" rel="noopener noreferrer" class="flex items-center justify-between rounded-2xl border border-[#E1E4EC] bg-[#FAFAFC] px-4 py-4"><span class="inline-flex items-center gap-2 text-[13px] font-semibold text-[#303645]"><Download size={15}/>{block.linkLabel || "Baixar arquivo"}</span></a>{/if}
               {:else if block.blockType === "link" && block.linkUrl}
-                <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption inline-flex items-center gap-2 rounded-xl bg-[#EEF0FF] px-4 py-2.5 font-semibold text-[#000A57]">{block.linkLabel || "Abrir link"}<ExternalLink size={12}/></a>
+                {#if isMp4Link(block.linkUrl)}
+                  <video src={block.linkUrl} controls preload="metadata" playsinline class="aspect-video w-full max-w-[760px] rounded-xl bg-black"><track kind="captions"/></video>
+                {/if}
+                <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption mt-2 inline-flex items-center gap-2 rounded-xl bg-[#EEF0FF] px-4 py-2.5 font-semibold text-[#000A57]">{block.linkLabel || "Abrir link"}<ExternalLink size={12}/></a>
               {/if}
               {#if data.canEdit}
-                <div class="flex justify-end gap-2 border-b border-[#EEF0F5] pb-3">
-                  <form method="POST" action="?/moveBlock"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockId" value={block.id}/><input type="hidden" name="direction" value="up"/><button type="submit" disabled={blockIndex === 0 || hasUnsavedReview || openEditors.size > 0} aria-label="Subir bloco" title="Subir bloco" class="rounded-lg border border-[#DDE1EA] p-2 disabled:opacity-30"><ArrowUp size={14}/></button></form>
-                  <form method="POST" action="?/moveBlock"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockId" value={block.id}/><input type="hidden" name="direction" value="down"/><button type="submit" disabled={blockIndex === step.blocks.length - 1 || hasUnsavedReview || openEditors.size > 0} aria-label="Descer bloco" title="Descer bloco" class="rounded-lg border border-[#DDE1EA] p-2 disabled:opacity-30"><ArrowDown size={14}/></button></form>
-                  <form method="POST" action="?/deleteBlock" on:submit={(event) => { if (!confirm("Excluir este bloco?")) event.preventDefault(); }}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockId" value={block.id}/><button type="submit" disabled={hasUnsavedReview || openEditors.size > 0} aria-label="Excluir bloco" class="rounded-lg border border-[#F0C8C8] p-2 text-[#9B2C2C] disabled:opacity-30"><Trash2 size={14}/></button></form>
+                <div class="flex justify-end border-b border-[#EEF0F5] pb-3">
+                  <button type="button" on:click={() => openBlockSettings(step.id, block.id)} class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#DDE1EA] bg-white px-3 text-[12px] font-semibold text-[#000A57]" aria-label="Editar ou organizar bloco" title="Editar bloco">
+                    <Pencil size={14}/>Editar bloco
+                  </button>
                 </div>
               {/if}
             {/each}
@@ -1080,10 +1192,21 @@
           </div>
         </section>
       {/each}
+      {#if reviewSteps.length === 0}
+        <div class="rounded-2xl border border-dashed border-[#DDE1EA] bg-white p-8 text-center">
+          <h2 class="text-[16px] font-semibold">Comece pela primeira etapa</h2>
+          <p class="mt-1 text-[13px] text-[#767D8B]">Adicione uma etapa para descrever o procedimento.</p>
+          {#if data.canEdit}<button type="button" on:click={openCreateStep} class="mt-4 rounded-xl bg-[#000A57] px-4 py-2.5 text-[13px] font-semibold text-white"><Plus size={15} class="inline"/> Criar etapa</button>{/if}
+        </div>
+      {:else}
+        <div class="flex items-center justify-between gap-2 rounded-xl border border-[#E2E5ED] bg-white px-3 py-2">
+          <button type="button" on:click={() => selectStep(reviewSteps[selectedStepIndex - 1]?.id ?? selectedStepId)} disabled={selectedStepIndex === 0} class="inline-flex min-h-9 items-center gap-1 rounded-lg px-3 text-[13px] font-semibold text-[#000A57] disabled:opacity-35"><ChevronLeft size={16}/>Anterior</button>
+          <span class="text-[12px] font-medium text-[#737989]">{selectedStepIndex + 1} de {reviewSteps.length}</span>
+          <button type="button" on:click={() => selectStep(reviewSteps[selectedStepIndex + 1]?.id ?? selectedStepId)} disabled={selectedStepIndex === reviewSteps.length - 1} class="inline-flex min-h-9 items-center gap-1 rounded-lg px-3 text-[13px] font-semibold text-[#000A57] disabled:opacity-35">Próxima<ChevronRight size={16}/></button>
+        </div>
+      {/if}
+      </div>
     </div>
-    {#if data.canEdit}
-      <form method="POST" action="?/addStep" class="mt-5"><button type="submit" disabled={hasUnsavedReview || openEditors.size > 0} class="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[#B9C2D7] bg-white text-[14px] font-semibold text-[#000A57] disabled:opacity-40"><FilePlus2 size={17}/>Adicionar etapa</button></form>
-    {/if}
   </main>
 
   {#if data.canEdit && data.humanReview.total > 0}
@@ -1253,10 +1376,13 @@
 
 {#if categoryPickerOpen}
   <div class="fixed inset-0 z-[146] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
-      {#if true}
-        <div role="dialog" aria-modal="true" aria-label="Selecionar categorias" class="max-h-[85vh] w-full max-w-[560px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+        <div role="dialog" aria-modal="true" aria-labelledby="help-categories-title" class="max-h-[85vh] w-full max-w-[560px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+          <div class="mb-4 flex items-center justify-between">
+            <h2 id="help-categories-title" class="text-[18px] font-semibold">Categorias</h2>
+            <button type="button" on:click={cancelCategorySelection} aria-label="Fechar" class="rounded-lg p-2 text-[#737989] hover:bg-[#F4F5FA]"><X size={18}/></button>
+          </div>
           <div class="grid gap-2 sm:grid-cols-2">
-            {#each data.categories.filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG) as category}
+            {#each data.categories.filter((category) => category.active && category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG) as category}
               <button type="button" on:click={() => toggleCategory(category.id)} class={`flex min-h-10 items-center justify-between rounded-xl border px-3 text-left text-[13px] font-semibold ${selectedCategoryIds.includes(category.id) ? "border-[#BFC7F4] bg-[#EEF0FF] text-[#000A57]" : "border-[#E1E4EB] bg-white text-[#606777]"}`}>
                 <span class="flex items-center gap-2"><HelpCategoryIcon name={category.icon} size={13}/>{category.name}</span>
                 {#if selectedCategoryIds.includes(category.id)}<Check size={13}/>{/if}
@@ -1264,19 +1390,20 @@
             {/each}
           </div>
           <div class="mt-3 flex justify-end gap-2">
-            <button type="button" on:click={() => (categoryPickerOpen = false)} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] text-[#6C7383]" aria-label="Cancelar"><X size={14}/></button>
+            <button type="button" on:click={cancelCategorySelection} class="min-h-10 rounded-lg border border-[#DDE1EA] px-3 text-[13px] font-semibold text-[#6C7383]" aria-label="Cancelar"><X size={14}/></button>
             <button type="button" on:click={saveCategories} disabled={categorySaving || selectedCategoryIds.length === 0} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#000A57] text-white disabled:opacity-40" aria-label="Salvar categorias">{#if categorySaving}<LoaderCircle size={13} class="animate-spin"/>{:else}<Check size={14}/>{/if}</button>
           </div>
         </div>
-      {/if}
-
   </div>
 {/if}
 
 {#if addPanel}
   <div class="fixed inset-0 z-[146] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
-                {#if true}
-                  <div role="dialog" aria-modal="true" aria-label="Adicionar bloco" class="max-h-[85vh] w-full max-w-[620px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+                  <div role="dialog" aria-modal="true" aria-labelledby="help-add-block-title" class="max-h-[85vh] w-full max-w-[620px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+                    <div class="mb-5 flex items-center justify-between">
+                      <h2 id="help-add-block-title" class="text-[18px] font-semibold">Adicionar {addPanel.type === "image" ? "imagem" : addPanel.type === "notice" ? "aviso" : addPanel.type === "link" ? "link" : "texto"}</h2>
+                      <button type="button" on:click={() => (addPanel = null)} aria-label="Fechar" disabled={addSaving || Boolean(imageAddingMode)} class="rounded-lg p-2 text-[#737989] hover:bg-[#F4F5FA]"><X size={18}/></button>
+                    </div>
                     {#if addPanel.type === "image"}
                       <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                         {#if data.canGenerateVideoFrames}
@@ -1309,6 +1436,7 @@
                         </div>
                       {/if}
                     {/if}
+                    {#if saveMessage && !saveSuccess}<p role="alert" class="mt-3 rounded-lg bg-[#FFF5F5] px-3 py-2 text-[13px] text-[#9B2C2C]">{saveMessage}</p>{/if}
                     <div class="mt-3 flex justify-end gap-2">
                       <button type="button" on:click={() => (addPanel = null)} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] text-[#6C7383]" aria-label="Cancelar"><X size={14}/></button>
                       {#if addPanel.type !== "image"}
@@ -1316,7 +1444,6 @@
                       {/if}
                     </div>
                   </div>
-                {/if}
   </div>
 {/if}
 
@@ -1333,11 +1460,12 @@
         <button type="button" aria-label="Fechar" on:click={() => (settingsModal = null)}><X size={18}/></button>
       </div>
       {#if settingsModal === "general"}
-        <form method="POST" action="?/updateContent" class="space-y-4">
+        {#if form?.message}<p role="alert" class="mb-4 rounded-lg bg-[#FFF5F5] p-3 text-[13px] text-[#9B2C2C]">{form.message}</p>{/if}
+        <form method="POST" action="?/updateContent" use:enhance={submitEditorModal} class="space-y-4">
           <label class="block text-[13px] font-semibold">Título<input name="title" required minlength="4" maxlength="160" value={data.content.title} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
           <label class="block text-[13px] font-semibold">Endereço<input name="slug" maxlength="120" value={data.content.slug} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
-          <label class="block text-[13px] font-semibold">Resumo público<textarea name="summary" maxlength="320" rows="3" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.summary}</textarea></label>
-          {#each data.content.categories as category}
+          <label class="block text-[13px] font-semibold">Resumo público<textarea name="summary" maxlength="320" rows="3" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{reviewSummary}</textarea></label>
+          {#each reviewCategories as category}
             <input type="hidden" name="categoryId" value={category.id}/>
             <label class="block text-[13px] font-semibold">Link específico para {category.name} (opcional)<input name={`categoryDestination:${category.id}`} value={category.destinationUrl} maxlength="1000" class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
           {/each}
@@ -1347,14 +1475,14 @@
           <div class="flex justify-end"><button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar informações</button></div>
         </form>
       {:else if settingsModal === "advanced"}
-        <form method="POST" action="?/updateAdvanced" class="space-y-4">
+        <form method="POST" action="?/updateAdvanced" use:enhance={submitEditorModal} class="space-y-4">
           <label class="block text-[13px] font-semibold">Termos de pesquisa<textarea name="searchAliases" rows="4" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.searchAliases.join("\n")}</textarea></label>
           <label class="block text-[13px] font-semibold">Conhecimento adicional da IA<textarea name="assistantKnowledge" rows="6" maxlength="40000" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.assistantKnowledge}</textarea></label>
           <label class="block text-[13px] font-semibold">Notas internas<textarea name="internalSupportNotes" rows="4" maxlength="40000" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.internalSupportNotes}</textarea></label>
           <div class="flex justify-end"><button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar configurações</button></div>
         </form>
       {:else}
-        <form method="POST" action="?/updateFeaturedVideo" enctype="multipart/form-data" class="space-y-4">
+        <form method="POST" action="?/updateFeaturedVideo" use:enhance={submitEditorModal} enctype="multipart/form-data" class="space-y-4">
           {#if !data.content.featuredVideo?.storageKey}
             <label class="block text-[13px] font-semibold">URL do vídeo<input name="sourceUrl" value={data.content.featuredVideo?.sourceUrl ?? ""} placeholder="https://youtube.com/..." class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
             <label class="block text-[13px] font-semibold">Ou selecione MP4<input name="videoFile" type="file" accept="video/mp4,.mp4" class="mt-1.5 block w-full rounded-xl border border-[#DDE1EA] p-3 text-[13px]"/></label>
@@ -1375,17 +1503,87 @@
   </div>
 {/if}
 
+
+
+{#if readinessOpen}
+  <div class="fixed inset-0 z-[149] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
+    <section role="dialog" aria-modal="true" aria-labelledby="help-checklist-title" class="max-h-[88vh] w-full max-w-[570px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+      <div class="mb-4 flex items-center justify-between">
+        <h2 id="help-checklist-title" class="text-[18px] font-semibold">Verificação para publicação</h2>
+        <button type="button" on:click={() => (readinessOpen = false)} class="rounded-lg p-2 text-[#707787]" aria-label="Fechar"><X size={18}/></button>
+      </div>
+      <div class="space-y-2">
+        {#each [
+          { label: "Categoria válida", ready: realCategoriesReady },
+          { label: "Etapas com conteúdo", ready: stepsReady },
+          { label: "Uma imagem por etapa", ready: singleImagePerStep },
+          { label: "Imagens com descrição", ready: imageOnlyStepsReady },
+          { label: "Transcrição do vídeo", ready: videoReady },
+          { label: "Imagens revisadas", ready: reviewPending === 0 },
+          { label: "Alterações salvas", ready: openEditors.size === 0 && !hasUnsavedReview },
+        ] as item}
+          <div class="flex items-center justify-between gap-3 rounded-xl border border-[#E2E5ED] px-3 py-3">
+            <span class="text-[13px] font-medium text-[#303746]">{item.label}</span>
+            {#if item.ready}<CheckCircle2 size={18} class="text-[#2F7045]"/>{:else}<CircleAlert size={18} class="text-[#A9510D]"/>{/if}
+          </div>
+        {/each}
+      </div>
+      <div class="mt-5 flex justify-end">
+        <button type="button" on:click={() => (readinessOpen = false)} class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Fechar</button>
+      </div>
+    </section>
+  </div>
+{/if}
+
+{#if createStepOpen && data.canEdit}
+  <HelpNewStepDialog
+    onClose={() => (createStepOpen = false)}
+    {submitEditorModal}
+    errorMessage={form?.message ?? null}
+  />
+{/if}
+
+{#if editingBlock && data.canEdit}
+  <HelpBlockEditorDialog
+    {editingBlock}
+    {editBlockStepId}
+    editingBlockIndex={reviewSteps.find((step) => step.id === editBlockStepId)?.blocks.findIndex((block) => block.id === editingBlock.id) ?? -1}
+    editingBlockCount={reviewSteps.find((step) => step.id === editBlockStepId)?.blocks.length ?? 0}
+    onClose={() => (editBlockId = null)}
+    {submitEditorModal}
+    errorMessage={form?.message ?? null}
+  />
+{/if}
+
 {#if editingStep}
   <div class="fixed inset-0 z-[148] flex items-center justify-center bg-[#050A1A]/60 px-4" role="presentation">
     <section role="dialog" aria-modal="true" aria-label="Configurar etapa" class="max-h-[85vh] w-full max-w-[620px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
       <div class="mb-5 flex justify-between gap-3"><h2 class="text-[18px] font-semibold">Configurar etapa</h2><button type="button" aria-label="Fechar" on:click={() => (stepModalId = null)}><X size={18}/></button></div>
-      <form method="POST" action="?/updateStep" class="space-y-4">
+      <form method="POST" action="?/updateStep" use:enhance={submitEditorModal} class="space-y-4">
         <input type="hidden" name="stepId" value={editingStep.id}/>
         <label class="block text-[13px] font-semibold">Título<input name="title" minlength="2" required maxlength="180" value={editingStep.title} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
         <label class="block text-[13px] font-semibold">Descrição<input name="description" maxlength="2000" value={editingStep.description} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
         <label class="block text-[13px] font-semibold">Conhecimento adicional da IA<textarea name="assistantKnowledge" maxlength="20000" rows="6" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{editingStep.assistantKnowledge}</textarea></label>
-        <div class="flex justify-end"><button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar etapa</button></div>
+        {#if form?.message}<p role="alert" class="text-[13px] font-medium text-[#9B2C2C]">{form.message}</p>{/if}
+        <div class="flex justify-end gap-2">
+          <button type="button" on:click={() => (stepModalId = null)} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[13px] font-semibold">Cancelar</button>
+          <button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar etapa</button>
+        </div>
       </form>
+      <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#EEF0F5] pt-4">
+        <div class="flex gap-2">
+          {#each [["up","Subir"],["down","Descer"]] as direction, directionIndex}
+            <form method="POST" action="?/moveStep">
+              <input type="hidden" name="stepId" value={editingStep.id}/>
+              <input type="hidden" name="direction" value={direction[0]}/>
+              <button type="submit" disabled={directionIndex === 0 ? selectedStepIndex === 0 : selectedStepIndex === reviewSteps.length - 1} class="inline-flex min-h-9 items-center gap-1 rounded-lg border border-[#DDE1EA] px-3 text-[13px] font-semibold text-[#000A57] disabled:opacity-35">
+                {#if directionIndex === 0}<ArrowUp size={14}/>{:else}<ArrowDown size={14}/>{/if}{direction[1]}
+              </button>
+            </form>
+          {/each}
+        </div>
+        <button type="button" on:click={() => { const step = editingStep; stepModalId = null; openDeleteStep(step); }} class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#F0C8C8] px-3 text-[13px] font-semibold text-[#9B2C2C]"><Trash2 size={15}/>Excluir etapa</button>
+      </div>
     </section>
   </div>
 {/if}

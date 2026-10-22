@@ -728,7 +728,15 @@ export async function deleteStructuredHelpFeaturedVideo(
 export async function addStructuredHelpStep(
   actorUserId: string,
   contentId: string,
+  input?: StructuredHelpStepInput & { initialText?: string },
 ): Promise<string> {
+  if (input && (
+    input.title.trim().length < 2 ||
+    input.title.trim().length > 180 ||
+    input.description.trim().length > 2_000 ||
+    input.assistantKnowledge.trim().length > 20_000 ||
+    (input.initialText?.trim().length ?? 0) > 50_000
+  )) throw new Error("STEP_INPUT_INVALID");
   const db = getDatabase();
   const content = await getContentRow(contentId);
   if (!content) throw new Error("CONTENT_NOT_FOUND");
@@ -741,17 +749,30 @@ export async function addStructuredHelpStep(
   const sortOrder = Number(currentMax ?? 0) + 10;
   const stepNumber = Math.max(1, Math.round(sortOrder / 10));
 
-  const [step] = await db
-    .insert(helpContentSteps)
-    .values({
-      contentId,
-      title: `Passo ${stepNumber}`,
-      description: "",
-      assistantKnowledge: "",
-      sortOrder,
-    })
-    .returning({ id: helpContentSteps.id });
-  if (!step) throw new Error("STEP_NOT_CREATED");
+  const step = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(helpContentSteps)
+      .values({
+        contentId,
+        title: input?.title.trim() ?? `Passo ${stepNumber}`,
+        description: input?.description.trim() ?? "",
+        assistantKnowledge: input?.assistantKnowledge.trim() ?? "",
+        sortOrder,
+      })
+      .returning({ id: helpContentSteps.id });
+    if (!created) throw new Error("STEP_NOT_CREATED");
+
+    const firstText = input?.initialText?.trim();
+    if (firstText) {
+      await tx.insert(helpStepBlocks).values({
+        stepId: created.id,
+        blockType: "text",
+        textContent: firstText,
+        sortOrder: 10,
+      });
+    }
+    return created;
+  });
 
   await markContentDraft(contentId, actorUserId);
   await saveStructuredContentVersion(contentId, actorUserId);
