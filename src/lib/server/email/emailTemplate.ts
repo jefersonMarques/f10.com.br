@@ -13,6 +13,8 @@ export function buildEmailHtml(input: {
   greeting?: string;
   body: string[];
   action?: { label: string; href: string };
+  secondaryAction?: { label: string; href: string };
+  ratingLinks?: Array<{ score: number; href: string }>;
   footer?: string;
 }): string {
   const eyebrow = input.eyebrow
@@ -26,6 +28,14 @@ export function buildEmailHtml(input: {
     .join("");
   const action = input.action
     ? `<div style="margin:26px 0"><a href="${escapeEmailHtml(input.action.href)}" style="display:inline-block;background:#000A57;color:#fff;text-decoration:none;font-weight:700;padding:13px 20px;border-radius:12px">${escapeEmailHtml(input.action.label)}</a></div>`
+    : "";
+  const secondaryAction = input.secondaryAction
+    ? `<div style="margin:12px 0 24px"><a href="${escapeEmailHtml(input.secondaryAction.href)}" style="color:#000A57;font-weight:700;font-size:13px;text-decoration:underline">${escapeEmailHtml(input.secondaryAction.label)}</a></div>`
+    : "";
+  const ratingLinks = input.ratingLinks?.length === 5
+    ? `<div style="margin:22px 0 8px"><div style="font-size:14px;font-weight:700;margin-bottom:12px">Avalie seu atendimento</div>${input.ratingLinks.map(({ score, href }) =>
+      `<a href="${escapeEmailHtml(href)}" aria-label="Avaliar com ${score} estrelas" style="display:inline-block;padding:11px 9px;margin:0 4px 6px 0;border:1px solid #E2E5ED;border-radius:9px;color:#EA6D0B;font-size:17px;text-decoration:none">${"★".repeat(score)}</a>`
+    ).join("")}</div>`
     : "";
   const footer = input.footer
     ? `<p style="margin:24px 0 0;color:#8A91A1;font-size:12px;line-height:1.6">${escapeEmailHtml(input.footer)}</p>`
@@ -50,7 +60,9 @@ export function buildEmailHtml(input: {
                 <h1 style="margin:0 0 18px;font-size:24px;line-height:1.25;color:#11182C">${escapeEmailHtml(input.title)}</h1>
                 ${greeting}
                 ${body}
+                ${ratingLinks}
                 ${action}
+                ${secondaryAction}
                 ${footer}
               </td>
             </tr>
