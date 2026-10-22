@@ -28,7 +28,7 @@
           <summary class="cursor-pointer text-[13px] font-semibold text-[#000A57]">Instruções adicionais para a IA</summary>
           <textarea name="assistantKnowledge" maxlength="20000" rows="4" aria-label="Instruções adicionais para a IA" class="mt-3 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]"></textarea>
         </details>
-        {#if errorMessage}<p role="alert" class="text-[13px] font-medium text-[#9B2C2C]">{form.message}</p>{/if}
+        {#if errorMessage}<p role="alert" class="text-[13px] font-medium text-[#9B2C2C]">{errorMessage}</p>{/if}
         <div class="flex justify-end gap-2">
           <button type="button" on:click={onClose} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[13px] font-semibold">Cancelar</button>
           <button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Criar etapa</button>
