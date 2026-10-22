@@ -80,6 +80,8 @@ export type TicketAttachment = {
   createdAt: string | Date;
   href: string;
   previewable: boolean;
+  messageId?: string | null;
+  source?: "ticket" | "email";
 };
 
 export type TicketServiceRequestField = {
@@ -174,6 +176,8 @@ export type TicketDetailsData = {
       visibility: string;
       channel?: string;
       body: string;
+      inlineImages?: Array<{ src: string; alt: string; external: boolean }>;
+      attachments?: TicketAttachment[];
       createdAt: string | Date;
     }>;
     events: Array<{
