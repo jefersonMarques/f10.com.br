@@ -165,9 +165,9 @@
 >
   <div class={`flex h-full w-full flex-col bg-app-surface transition-[width] duration-200 lg:absolute lg:left-0 lg:top-0 lg:h-[100dvh] lg:border-r lg:border-app-border ${expanded ? "lg:w-[256px]" : "lg:w-[76px]"} ${collapsed && expanded ? "lg:shadow-2xl" : ""}`}>
     <div class={`flex h-[68px] items-center border-b border-app-border-soft px-4 transition-all lg:px-3 ${!expanded ? "lg:justify-center lg:gap-1" : "justify-between lg:px-5"}`}>
-      <a href="/app" class={`flex min-w-0 items-center ${!expanded ? "lg:justify-center" : "gap-3"}`} title={collapsed ? "F10 Operations" : ""}>
+      <a href="/app" class={`flex min-w-0 items-center ${!expanded ? "lg:justify-center" : "gap-3"}`} title={!expanded ? "F10 Operations" : ""}>
         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-primary text-sm font-bold text-white">F10</span>
-        <span class={collapsed ? "lg:hidden" : ""}>
+        <span class={!expanded ? "lg:hidden" : ""}>
           <strong class="block text-[14px] font-semibold leading-4">Operations</strong>
           <small class="mt-0.5 block text-[11px] font-medium text-app-text-soft">Área interna</small>
         </span>
@@ -176,9 +176,9 @@
       <button
         type="button"
         class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-app-text-muted transition hover:bg-app-muted hover:text-app-primary lg:flex"
-        aria-label={collapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+        aria-label={collapsed ? "Fixar menu aberto" : "Desafixar menu"}
         aria-pressed={!collapsed}
-        title={collapsed ? "Expandir menu" : "Recolher menu"}
+        title={collapsed ? "Fixar menu aberto" : "Desafixar menu"}
         on:click={toggleCollapsed}
       >
         {#if collapsed}<Pin size={16}/>{:else}<PinOff size={16}/>{/if}
