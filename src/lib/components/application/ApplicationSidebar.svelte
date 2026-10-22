@@ -18,15 +18,15 @@
     Megaphone,
     BellRing,
     MonitorCog,
-    PanelLeftClose,
-    PanelLeftOpen,
+    Pin,
+    PinOff,
     Search,
     Settings,
     ShieldCheck,
     Users,
   } from "lucide-svelte";
 
-  export let collapsed = false;
+  export let collapsed = true;
   export let permissions: Array<{ code: string; scope: string }> = [];
   export let notifications: {
     chatUnreadCount: number;
@@ -54,7 +54,9 @@
     items: NavigationItem[];
   };
 
-  const SIDEBAR_STORAGE_KEY = "f10-operations-sidebar-collapsed";
+  const SIDEBAR_PIN_KEY = "f10-operations-sidebar-pinned";
+  let hovered = false;
+  $: expanded = !collapsed || hovered;
   let openNavigationGroup: string | null = null;
 
   const navigationSections: NavigationSection[] = [
@@ -119,13 +121,13 @@
     .filter((section) => section.items.length > 0);
 
   onMount(() => {
-    collapsed = window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "1";
+    collapsed = window.localStorage.getItem(SIDEBAR_PIN_KEY) !== "1";
   });
 
   function toggleCollapsed(): void {
     collapsed = !collapsed;
     openNavigationGroup = null;
-    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, collapsed ? "1" : "0");
+    window.localStorage.setItem(SIDEBAR_PIN_KEY, collapsed ? "0" : "1");
   }
 
   function isActiveNavigationItem(currentPathname: string, href?: string): boolean {
@@ -140,12 +142,7 @@
   }
 
   function toggleNavigationGroup(label: string): void {
-    if (collapsed) {
-      collapsed = false;
-      openNavigationGroup = label;
-      window.localStorage.setItem(SIDEBAR_STORAGE_KEY, "0");
-      return;
-    }
+    if (!expanded) hovered = true;
     openNavigationGroup = openNavigationGroup === label ? null : label;
   }
 
@@ -157,34 +154,42 @@
   }
 </script>
 
-<aside class="border-b border-app-border bg-app-surface transition-[width] duration-200 lg:sticky lg:top-0 lg:h-[100dvh] lg:min-h-[100dvh] lg:border-b-0 lg:border-r">
-  <div class="flex h-full flex-col">
-    <div class={`flex h-[68px] items-center border-b border-app-border-soft px-4 transition-all lg:px-3 ${collapsed ? "lg:justify-center lg:gap-1" : "justify-between lg:px-5"}`}>
-      <a href="/app" class={`flex min-w-0 items-center ${collapsed ? "lg:justify-center" : "gap-3"}`} title={collapsed ? "F10 Operations" : ""}>
+<aside
+  class="relative z-40 border-b border-app-border bg-app-surface lg:sticky lg:top-0 lg:h-[100dvh] lg:min-h-[100dvh] lg:border-0 lg:bg-transparent"
+  on:mouseenter={() => (hovered = true)}
+  on:mouseleave={() => (hovered = false)}
+  on:focusin={() => (hovered = true)}
+  on:focusout={(event) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) hovered = false;
+  }}
+>
+  <div class={`flex h-full w-full flex-col bg-app-surface transition-[width] duration-200 lg:absolute lg:left-0 lg:top-0 lg:h-[100dvh] lg:border-r lg:border-app-border ${expanded ? "lg:w-[256px]" : "lg:w-[76px]"} ${collapsed && expanded ? "lg:shadow-2xl" : ""}`}>
+    <div class={`flex h-[68px] items-center border-b border-app-border-soft px-4 transition-all lg:px-3 ${!expanded ? "lg:justify-center lg:gap-1" : "justify-between lg:px-5"}`}>
+      <a href="/app" class={`flex min-w-0 items-center ${!expanded ? "lg:justify-center" : "gap-3"}`} title={!expanded ? "F10 Operations" : ""}>
         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-primary text-sm font-bold text-white">F10</span>
-        <span class={collapsed ? "lg:hidden" : ""}>
+        <span class={!expanded ? "lg:hidden" : ""}>
           <strong class="block text-[14px] font-semibold leading-4">Operations</strong>
-          <small class="mt-0.5 block text-[11px] font-medium text-app-text-soft">Área interna</small>
+          <small class="mt-0.5 block text-[13px] font-medium text-app-text-soft">Área interna</small>
         </span>
       </a>
 
       <button
         type="button"
-        class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-app-text-muted transition hover:bg-app-muted hover:text-app-primary lg:flex"
-        aria-label={collapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
-        aria-pressed={collapsed}
-        title={collapsed ? "Expandir menu" : "Recolher menu"}
+        class={`hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-app-text-muted transition hover:bg-app-muted hover:text-app-primary ${expanded ? "lg:flex" : "lg:hidden"}`}
+        aria-label={collapsed ? "Fixar menu aberto" : "Desafixar menu"}
+        aria-pressed={!collapsed}
+        title={collapsed ? "Fixar menu aberto" : "Desafixar menu"}
         on:click={toggleCollapsed}
       >
-        {#if collapsed}<PanelLeftOpen size={16}/>{:else}<PanelLeftClose size={16}/>{/if}
+        {#if collapsed}<Pin size={16}/>{:else}<PinOff size={16}/>{/if}
       </button>
       <ShieldCheck class="text-app-accent lg:hidden" size={20} aria-hidden="true" />
     </div>
 
-    <nav class={`hidden flex-1 overflow-y-auto py-4 lg:block ${collapsed ? "px-2" : "px-3"}`} aria-label="Navegação principal">
+    <nav class={`hidden flex-1 overflow-y-auto py-4 lg:block ${!expanded ? "px-2" : "px-3"}`} aria-label="Navegação principal">
       {#each visibleNavigationSections as section, sectionIndex}
         <section class={sectionIndex > 0 ? "mt-4" : ""} aria-label={section.label}>
-          {#if collapsed}
+          {#if !expanded}
             {#if sectionIndex > 0}<div class="mx-2 mb-3 border-t border-app-border-soft"></div>{/if}
           {:else}
             <p class="application-text-meta px-3 pb-2 font-bold uppercase tracking-[0.14em] text-app-text-soft">{section.label}</p>
@@ -198,23 +203,23 @@
                 <div class="relative py-0.5">
                   <button
                     type="button"
-                    class={`relative flex min-h-10 w-full items-center rounded-xl text-[13px] font-semibold transition ${collapsed ? "justify-center px-2" : "gap-3 px-3 text-left"} ${groupActive ? "bg-app-selected text-app-primary" : "text-app-text-muted hover:bg-app-muted hover:text-app-primary"}`}
-                    aria-expanded={groupOpen || (!collapsed && groupActive)}
+                    class={`relative flex min-h-10 w-full items-center rounded-xl text-[13px] font-semibold transition ${!expanded ? "justify-center px-2" : "gap-3 px-3 text-left"} ${groupActive ? "bg-app-selected text-app-primary" : "text-app-text-muted hover:bg-app-muted hover:text-app-primary"}`}
+                    aria-expanded={groupOpen || (expanded && groupActive)}
                     aria-label={collapsed ? item.label : undefined}
                     title={collapsed ? item.label : ""}
                     on:click={() => toggleNavigationGroup(item.label)}
                   >
                     <svelte:component this={item.icon} size={18} aria-hidden="true" />
-                    {#if !collapsed}
+                    {#if expanded}
                       <span class="flex-1">{item.label}</span>
                       <ChevronDown size={15} class={`transition-transform duration-150 ${groupOpen || groupActive ? "rotate-180" : ""}`} aria-hidden="true" />
                     {/if}
                   </button>
 
-                  {#if !collapsed && (groupOpen || groupActive)}
+                  {#if expanded && (groupOpen || groupActive)}
                     <div class="ml-[22px] mt-1 space-y-1 border-l border-app-border pl-3">
                       {#each item.children as child}
-                        <a href={child.href} class={`flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-[11px] font-semibold transition ${isActiveNavigationItem(pathname, child.href) ? "bg-app-info-bg text-app-primary" : "text-app-text-muted hover:bg-app-muted hover:text-app-primary"}`}>
+                        <a href={child.href} class={`flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-[13px] font-semibold transition ${isActiveNavigationItem(pathname, child.href) ? "bg-app-info-bg text-app-primary" : "text-app-text-muted hover:bg-app-muted hover:text-app-primary"}`}>
                           <svelte:component this={child.icon} size={15} aria-hidden="true" />
                           <span>{child.label}</span>
                         </a>
@@ -226,15 +231,15 @@
                 {@const badge = navigationBadge(item.href)}
                 <a
                   href={item.href}
-                  class={`relative flex min-h-10 items-center rounded-xl text-[13px] font-semibold transition ${collapsed ? "justify-center px-2" : "gap-3 px-3"} ${isActiveNavigationItem(pathname, item.href) ? "bg-app-info-bg text-app-primary" : "text-app-text-muted hover:bg-app-muted hover:text-app-primary"}`}
+                  class={`relative flex min-h-10 items-center rounded-xl text-[13px] font-semibold transition ${!expanded ? "justify-center px-2" : "gap-3 px-3"} ${isActiveNavigationItem(pathname, item.href) ? "bg-app-info-bg text-app-primary" : "text-app-text-muted hover:bg-app-muted hover:text-app-primary"}`}
                   aria-label={collapsed ? item.label : undefined}
                   title={collapsed ? item.label : ""}
                 >
                   <svelte:component this={item.icon} size={18} aria-hidden="true" />
-                  {#if !collapsed}<span class="flex-1">{item.label}</span>{/if}
+                  {#if expanded}<span class="flex-1">{item.label}</span>{/if}
                   {#if badge > 0}
-                    <span class={`application-text-meta inline-flex items-center justify-center rounded-full bg-red-600 font-bold text-white ${collapsed ? "absolute right-0 top-0 h-4 min-w-4 px-1 text-[8px]" : "min-w-5 px-1.5 py-0.5"}`}>{Math.min(badge, 99)}</span>
-                  {:else if !collapsed}
+                    <span class={`application-text-meta inline-flex items-center justify-center rounded-full bg-red-600 font-bold text-white ${!expanded ? "absolute right-0 top-0 h-4 min-w-4 px-1 text-[12px]" : "min-w-5 px-1.5 py-0.5"}`}>{Math.min(badge, 99)}</span>
+                  {:else if expanded}
                     <ChevronRight size={15} aria-hidden="true" />
                   {/if}
                 </a>

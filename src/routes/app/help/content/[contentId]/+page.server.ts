@@ -1,3 +1,5 @@
+import { getHelpHumanReviewStatus, listHelpScreenshotReviewGroups } from "$lib/server/help/helpScreenshotReviewRepository";
+import { getLatestHelpVideoProcessingJobView } from "$lib/server/help/helpVideoProcessingRepository";
 import { error, fail, redirect, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
@@ -204,6 +206,28 @@ function redirectToContentEditor(contentId: string, stepId?: string): never {
   throw redirect(303, contentEditorPath(contentId, stepId));
 }
 
+function generationCoverageSummary(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const coverage = value as Record<string, unknown>;
+  const summaryValue = coverage.summary;
+  if (!summaryValue || typeof summaryValue !== "object" || Array.isArray(summaryValue)) return null;
+  const summary = summaryValue as Record<string, unknown>;
+  const readNumber = (key: string) => {
+    const number = Number(summary[key]);
+    return Number.isFinite(number) && number >= 0 ? number : 0;
+  };
+  return {
+    totalSegments: readNumber("totalSegments"),
+    relevantSegments: readNumber("relevantSegments"),
+    coveredRelevantSegments: readNumber("coveredRelevantSegments"),
+    ignoredSegments: readNumber("ignoredSegments"),
+    uncoveredRelevantSegments: readNumber("uncoveredRelevantSegments"),
+    processingParts: readNumber("processingParts"),
+    generatedSteps: readNumber("generatedSteps"),
+  };
+}
+
+
 export const load: PageServerLoad = async ({ params, parent }) => {
   if (!isUuid(params.contentId)) throw error(404, "Conteúdo não encontrado.");
   const layout = await parent();
@@ -212,19 +236,32 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   );
   if (!hasPermission(permissions, "help.view")) throw error(403, "Acesso não autorizado.");
 
-  const [content, categories, movideskArticle] = await Promise.all([
+  const [content, categories, movideskArticle, screenshotReview, humanReview, videoProcessingJob] = await Promise.all([
     getStructuredHelpContent(params.contentId),
-    listHelpCategories(),
+    listHelpCategories(true),
     getMovideskArticleByContentId(params.contentId),
+    listHelpScreenshotReviewGroups(params.contentId),
+    getHelpHumanReviewStatus(params.contentId),
+    getLatestHelpVideoProcessingJobView(params.contentId),
   ]);
   if (!content) throw error(404, "Conteúdo não encontrado.");
-
   const archived = content.status === "archived";
+  const transcriptTimeline = content.featuredVideo?.metadata?.transcriptTimeline;
+
   return {
     content,
     categories,
     movideskArticle,
     canManageMovidesk: isMovideskMigrationEnabled() && hasPermission(permissions, "system.settings.manage"),
+    screenshotReview,
+    humanReview,
+    generationCoverage: generationCoverageSummary(content.featuredVideo?.metadata?.generationCoverage),
+    videoProcessingJob,
+    canGenerateVideoFrames: Boolean(
+      content.featuredVideo?.storageKey
+      && Array.isArray(transcriptTimeline)
+      && transcriptTimeline.length > 0,
+    ),
     canEdit: !archived && hasPermission(permissions, "help.edit"),
     canPublish: !archived && hasPermission(permissions, "help.publish"),
   };

@@ -20,7 +20,7 @@
 
   export let data: LayoutData;
 
-  let sidebarCollapsed = false;
+  let sidebarCollapsed = true;
   let notificationOpen = false;
   let presenceOpen = false;
   let profileOpen = false;
