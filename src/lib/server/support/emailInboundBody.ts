@@ -115,7 +115,7 @@ export function selectInboundEmailBody(input: {
   // Prefer safe rich-text conversion when it contains every word from the
   // selected source, even if HTML also preserves additional signature text.
   if (chosen && chosen.source !== "html" && html &&
-      /(?:\\*\\*[^*]+\\*\\*|\\*[^*\\n]+\\*)/.test(html)) {
+      /(?:\*\*[^*]+\*\*|\*[^*\n]+\*)/.test(html)) {
     const htmlWords = options[2].words;
     if (missingWordCount(htmlWords, chosen.words) === 0) {
       chosen = options[2];
