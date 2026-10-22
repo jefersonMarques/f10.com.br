@@ -73,13 +73,14 @@ export const actions: Actions = {
     );
 
     if (authentication.ok === false) {
-      return fail(authentication.reason === "throttled" ? 429 : 400, {
+      const isThrottled = authentication.reason === "throttled";
+      const minutes = Math.max(1, Math.ceil((authentication.retryAfterSeconds ?? 900) / 60));
+      return fail(isThrottled ? 429 : 400, {
         email,
         returnTo,
-        message:
-          authentication.reason === "throttled"
-            ? "Muitas tentativas de acesso. Aguarde 15 minutos ou redefina sua senha pelo link acima."
-            : "E-mail ou senha inválidos.",
+        message: isThrottled
+          ? `Acesso temporariamente bloqueado. Tente novamente em cerca de ${minutes} minuto(s) ou redefina sua senha.`
+          : "Não foi possível entrar. Confira seus dados ou utilize Esqueci minha senha.",
       });
     }
 
