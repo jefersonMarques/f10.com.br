@@ -78,7 +78,7 @@ export const actions: Actions = {
         returnTo,
         message:
           authentication.reason === "throttled"
-            ? "Muitas tentativas de acesso. Aguarde alguns minutos e tente novamente."
+            ? "Muitas tentativas de acesso. Aguarde 15 minutos ou redefina sua senha pelo link acima."
             : "E-mail ou senha inválidos.",
       });
     }
