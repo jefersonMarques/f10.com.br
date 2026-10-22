@@ -32,7 +32,12 @@
         publicKey = typeof value.publicKey === "string" ? value.publicKey : "";
         configured = Boolean(value.enabled && publicKey);
         const registration = await navigator.serviceWorker.getRegistration("/app/");
-        enabled = Boolean(await registration?.pushManager.getSubscription()) &&
+        const subscription = await registration?.pushManager.getSubscription();
+        if (subscription && value.linked !== true) {
+          // Prevent previous accounts' pushes on a shared browser after logout.
+          await subscription.unsubscribe();
+        }
+        enabled = Boolean(subscription && value.linked === true) &&
           Notification.permission === "granted";
       } catch { /* Settings remain available for retry. */ }
     })();
