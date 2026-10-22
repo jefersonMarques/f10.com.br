@@ -87,6 +87,11 @@ function directInboxRoutes(): InboxRoute[] {
       email: `sucesso@${domain}`,
       groupId: null,
     },
+    {
+      code: "support",
+      email: `suporte@${domain}`,
+      groupId: null,
+    },
   ];
 }
 
@@ -282,6 +287,7 @@ export async function processBrevoInboundParseEvent(
 ): Promise<EmailInboundOutcome> {
   const ticketIds = new Set<string>();
   let processedMessages = 0;
+  let unknownInbox = false;
 
   for (const raw of asArray(event.rawPayload.items)) {
     const item = asObject(raw);
@@ -304,7 +310,10 @@ export async function processBrevoInboundParseEvent(
     }
 
     const route = resolveDirectInbox(item);
-    if (!route) continue;
+    if (!route) {
+      unknownInbox = true;
+      continue;
+    }
 
     const conversationId = `inbound:${message.externalMessageId}`;
     const ticketId = await createThreadTicket({
@@ -322,7 +331,13 @@ export async function processBrevoInboundParseEvent(
   }
 
   if (processedMessages === 0) {
-    return { status: "ignored", ticketId: null };
+    return {
+      status: "ignored",
+      ticketId: null,
+      ignoreReason: unknownInbox
+        ? "BREVO_INBOUND_INBOX_NOT_MAPPED"
+        : "BREVO_INBOUND_NO_VALID_MESSAGES",
+    };
   }
 
   return {

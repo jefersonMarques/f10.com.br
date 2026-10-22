@@ -16,7 +16,7 @@ import { sendTransactionalEmail } from "$lib/server/email/transactionalEmail";
 const PROVIDER = "brevo";
 
 type TicketEmailRoute = {
-  code: "financeiro" | "sucesso";
+  code: "financeiro" | "sucesso" | "support";
   email: string;
   name: string;
 };
@@ -33,6 +33,11 @@ function publicEmailRoutes(): TicketEmailRoute[] {
       code: "sucesso",
       email: `sucesso@${domain}`,
       name: "Sucesso F10",
+    },
+    {
+      code: "support",
+      email: `suporte@${domain}`,
+      name: "Suporte F10",
     },
   ];
 }

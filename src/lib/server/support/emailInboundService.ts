@@ -38,12 +38,13 @@ const MAX_MESSAGE_IDS = 100;
 export type EmailInboundOutcome = {
   status: "processed" | "ignored";
   ticketId: string | null;
+  ignoreReason?: string;
 };
 
 type JsonObject = Record<string, unknown>;
 type EmailAddress = { email: string; name: string | null };
 export type InboxRoute = {
-  code: "financeiro" | "sucesso";
+  code: "financeiro" | "sucesso" | "support";
   email: string;
   groupId: string | null;
 };
@@ -757,6 +758,10 @@ export async function completeEmailInboundEvent(
     .set({
       status: outcome.status,
       ticketId: outcome.ticketId,
+      lastErrorCode: outcome.status === "ignored"
+        ? (outcome.ignoreReason ?? "BREVO_INBOUND_EVENT_IGNORED")
+        : null,
+      lastErrorMessage: null,
       lockedAt: null,
       leaseExpiresAt: null,
       processedAt: now,
