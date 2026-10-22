@@ -3,6 +3,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { webChatMessageAttachments } from "$lib/server/db/chatSchema";
 import { ticketMessageAttachments } from "$lib/server/db/supportChatEntrySchema";
+import { ticketMessages } from "$lib/server/db/supportSchema";
 import { deleteAssetObject, getAssetObject, putAssetObject } from "$lib/server/storage/assetStorage";
 
 export const SUPPORT_IMAGE_MAX_FILES = 4;
@@ -303,6 +304,29 @@ export async function getSupportMessageAttachment(
           )
         : eq(ticketMessageAttachments.id, attachmentId),
     )
+    .limit(1);
+  return attachment ?? null;
+}
+
+/** Never expose agent notes through a customer attachment URL. */
+export async function getPublicSupportMessageAttachment(attachmentId: string, ticketId: string) {
+  const [attachment] = await getDatabase()
+    .select({
+      id: ticketMessageAttachments.id,
+      messageId: ticketMessageAttachments.messageId,
+      ticketId: ticketMessageAttachments.ticketId,
+      storageKey: ticketMessageAttachments.storageKey,
+      originalName: ticketMessageAttachments.originalName,
+      mimeType: ticketMessageAttachments.mimeType,
+      sizeBytes: ticketMessageAttachments.sizeBytes,
+    })
+    .from(ticketMessageAttachments)
+    .innerJoin(ticketMessages, eq(ticketMessageAttachments.messageId, ticketMessages.id))
+    .where(and(
+      eq(ticketMessageAttachments.id, attachmentId),
+      eq(ticketMessageAttachments.ticketId, ticketId),
+      eq(ticketMessages.visibility, "public"),
+    ))
     .limit(1);
   return attachment ?? null;
 }
