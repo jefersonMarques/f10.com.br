@@ -43,7 +43,7 @@ export type EmailInboundOutcome = {
 type JsonObject = Record<string, unknown>;
 type EmailAddress = { email: string; name: string | null };
 export type InboxRoute = {
-  code: "financeiro" | "sucesso";
+  code: "financeiro" | "sucesso" | "support";
   email: string;
   groupId: string | null;
 };
