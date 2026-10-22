@@ -435,7 +435,7 @@ export const actions: Actions = {
       return fail(400, {
         success: false,
         action: "reply",
-        message: "A resposta deve ter entre 1 e 10.000 caracteres.",
+        message: "Escreva uma resposta ou selecione anexos. O texto pode ter até 10.000 caracteres.",
       });
     }
     try {
@@ -499,7 +499,7 @@ export const actions: Actions = {
       return fail(400, {
         success: false,
         action: "note",
-        message: "A nota deve ter entre 1 e 10.000 caracteres.",
+        message: "Escreva uma nota ou selecione anexos. O texto pode ter até 10.000 caracteres.",
       });
     }
     try {
