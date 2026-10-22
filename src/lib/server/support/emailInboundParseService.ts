@@ -1,5 +1,6 @@
 import { env } from "$env/dynamic/private";
 import { extractEmailImages } from "$lib/server/support/emailInboundMediaService";
+import { selectInboundEmailBody } from "$lib/server/support/emailInboundBody";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -194,16 +195,20 @@ function normalizeInboundMessage(item: JsonObject): BrevoEmailMessage {
     );
   }
 
+  const body = selectInboundEmailBody({
+    markdown: item.ExtractedMarkdownMessage,
+    plain: item.RawTextBody,
+    html: item.RawHtmlBody,
+  });
+
   return {
     id: asArray(item.Uuid).map(asString).find(Boolean) || externalMessageId,
     externalMessageId,
     type: "visitor",
     messageType: "email",
     subject: asString(item.Subject),
-    text:
-      asString(item.ExtractedMarkdownMessage)
-      || asString(item.RawTextBody)
-      || "Mensagem recebida por e-mail.",
+    text: body.text,
+    bodySource: body.source,
     createdAt: parsedDate(item.SentAtDate),
     from,
     to,
