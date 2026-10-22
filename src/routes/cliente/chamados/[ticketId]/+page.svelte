@@ -1,4 +1,5 @@
 <script lang="ts">
+  import EmailMessageBody from "$lib/components/operations/tickets/EmailMessageBody.svelte";
   import {
     Activity,
     CalendarDays,
@@ -237,7 +238,13 @@
                 {/if}
 
                 <div class={`max-w-[88%] rounded-2xl px-4 py-3 shadow-[0_5px_16px_rgba(1,13,40,0.045)] ${entry.message.authorType === "customer" ? "bg-[#000A57] text-white" : "border border-[#E0E4EC] bg-white text-[#343B4C]"}`}>
-                  {#if entry.message.body}<p class="whitespace-pre-wrap text-[12px] leading-5">{entry.message.body}</p>{/if}
+                  {#if entry.message.body}
+                    {#if entry.message.channel === "email"}
+                      <EmailMessageBody text={entry.message.body} className="text-[12px] leading-5"/>
+                    {:else}
+                      <p class="whitespace-pre-wrap text-[12px] leading-5">{entry.message.body}</p>
+                    {/if}
+                  {/if}
                   {#if entry.message.attachments.length > 0}
                     <div class={`space-y-2 ${entry.message.body ? "mt-3" : ""}`}>
                       {#each entry.message.attachments as attachment}
