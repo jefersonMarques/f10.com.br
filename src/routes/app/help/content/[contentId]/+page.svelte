@@ -1464,8 +1464,8 @@
         <form method="POST" action="?/updateContent" use:enhance={submitEditorModal} class="space-y-4">
           <label class="block text-[13px] font-semibold">Título<input name="title" required minlength="4" maxlength="160" value={data.content.title} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
           <label class="block text-[13px] font-semibold">Endereço<input name="slug" maxlength="120" value={data.content.slug} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
-          <label class="block text-[13px] font-semibold">Resumo público<textarea name="summary" maxlength="320" rows="3" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.summary}</textarea></label>
-          {#each data.content.categories as category}
+          <label class="block text-[13px] font-semibold">Resumo público<textarea name="summary" maxlength="320" rows="3" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{reviewSummary}</textarea></label>
+          {#each reviewCategories as category}
             <input type="hidden" name="categoryId" value={category.id}/>
             <label class="block text-[13px] font-semibold">Link específico para {category.name} (opcional)<input name={`categoryDestination:${category.id}`} value={category.destinationUrl} maxlength="1000" class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
           {/each}
