@@ -17,7 +17,7 @@ function createSurveyToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
-export async function requestTicketSatisfaction(ticketId: string): Promise<void> {
+export async function requestTicketSatisfaction(ticketId: string): Promise<boolean> {
   const db = getDatabase();
   const [ticket] = await db
     .select({
@@ -40,7 +40,7 @@ export async function requestTicketSatisfaction(ticketId: string): Promise<void>
     !ticket.customerContactId ||
     !ticket.customerEmail
   ) {
-    return;
+    return false;
   }
 
   const token = createSurveyToken();
@@ -58,11 +58,12 @@ export async function requestTicketSatisfaction(ticketId: string): Promise<void>
     .onConflictDoNothing()
     .returning({ ticketId: ticketSatisfactionSurveys.ticketId });
 
-  if (!created) return;
+  if (!created) return false;
 
   const baseUrl = getCustomerPortalBaseUrl("https://f10.com.br");
   const surveyUrl = `${baseUrl}/avaliar/${encodeURIComponent(token)}`;
   const name = ticket.customerName || "cliente";
+  const ticketUrl = `${baseUrl}/cliente/chamados/${encodeURIComponent(ticket.id)}`;
 
   try {
     await sendTransactionalEmail({
@@ -74,6 +75,8 @@ export async function requestTicketSatisfaction(ticketId: string): Promise<void>
         `O ticket #${ticket.ticketNumber} foi resolvido.`,
         "Conte para a F10 como foi sua experiência:",
         surveyUrl,
+        "",
+        `Acompanhe seu chamado no painel: ${ticketUrl}`,
       ].join("\n"),
       htmlContent: buildEmailHtml({
         eyebrow: "Pesquisa de satisfação",
@@ -83,7 +86,12 @@ export async function requestTicketSatisfaction(ticketId: string): Promise<void>
           `O chamado “${ticket.subject}” foi resolvido.`,
           "Sua avaliação leva menos de um minuto e ajuda a F10 a melhorar o atendimento.",
         ],
+        ratingLinks: [1, 2, 3, 4, 5].map((score) => ({
+          score,
+          href: `${surveyUrl}?score=${score}`,
+        })),
         action: { label: "Avaliar atendimento", href: surveyUrl },
+        secondaryAction: { label: "Acompanhar chamado no painel", href: ticketUrl },
         footer: "A pesquisa é vinculada somente a este atendimento.",
       }),
     });
@@ -99,6 +107,7 @@ export async function requestTicketSatisfaction(ticketId: string): Promise<void>
       .catch(() => undefined);
     throw cause;
   }
+  return true;
 }
 
 export async function getTicketSatisfactionByToken(token: string) {
