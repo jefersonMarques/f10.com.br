@@ -286,6 +286,7 @@ export async function getCustomerPortalTicket(contactId: string, ticketId: strin
         id: ticketMessages.id,
         authorType: ticketMessages.authorType,
         body: ticketMessages.body,
+        channel: ticketMessages.channel,
         createdAt: ticketMessages.createdAt,
       })
       .from(ticketMessages)

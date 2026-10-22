@@ -35,6 +35,7 @@
     priorityLabels,
   } from "./presentation";
   import type { TicketDetailsData, TicketMainPanel, TicketWorkflow } from "./types";
+  import EmailMessageBody from "./EmailMessageBody.svelte";
 
   type TicketSurface = "page" | "split" | "modal";
   type ComposerMode = "reply" | "note";
@@ -464,7 +465,11 @@
                         <strong class="text-[11px] font-semibold text-[#4A5160]">{message.authorUserName ?? message.customerName ?? "Atendimento F10"}</strong>
                         <span class="text-[10px] text-[#858C99]">{formatDateTime(message.createdAt)}</span>
                       </div>
-                      <p class="mt-1.5 whitespace-pre-wrap text-[14px] leading-[1.6] text-[#343A47]">{message.body}</p>
+                      {#if message.channel === "email"}
+                        <EmailMessageBody text={message.body} className="mt-1.5 text-[14px] leading-[1.6] text-[#343A47]"/>
+                      {:else}
+                        <p class="mt-1.5 whitespace-pre-wrap text-[14px] leading-[1.6] text-[#343A47]">{message.body}</p>
+                      {/if}
                       {#if message.inlineImages?.length}
                         <div class="mt-3 space-y-2">
                           {#each message.inlineImages as emailImage}
