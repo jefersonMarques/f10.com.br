@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shortTicketSubject } from "./shortSubject";
   import { Check, Clock3, Copy, ExternalLink, Mail, MessageSquare, MoreHorizontal, PanelRightOpen, TicketCheck, UserRound } from "lucide-svelte";
   import { tick } from "svelte";
   import { labelClasses, priorityLabels } from "./presentation";
@@ -153,7 +154,7 @@
               >
                 <div class="flex min-w-0 items-center gap-2">
                   <span class="shrink-0 text-[11px] font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
-                  <strong class="min-w-0 flex-1 truncate text-[13px] font-semibold text-[#303645]">{ticket.subject}</strong>
+                  <strong class="min-w-0 flex-1 truncate text-[13px] font-semibold text-[#303645]">{shortTicketSubject(ticket.subject)}</strong>
                 </div>
                 <div class="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] text-[#737989]">
                   <span class="min-w-0 flex-1 truncate">{ticket.customerName ?? ticket.assignedUserName ?? "Cliente pendente"}</span>
@@ -214,7 +215,7 @@
             </span>
 
             <div class="min-w-0">
-              <strong class="block truncate text-[13px] font-semibold text-[#2D3342]">{ticket.subject}</strong>
+              <strong class="block truncate text-[13px] font-semibold text-[#2D3342]">{shortTicketSubject(ticket.subject)}</strong>
               {#if ticket.labels.length > 0}
                 <div class="mt-1 flex min-w-0 gap-1 overflow-hidden">
                   {#each ticket.labels.slice(0, 3) as label}
@@ -252,7 +253,7 @@
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
             <span class="application-text-caption font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
-            <strong class="mt-1 block text-[13px] font-semibold leading-5 text-[#2D3342]">{ticket.subject}</strong>
+            <strong class="mt-1 block text-[13px] font-semibold leading-5 text-[#2D3342]">{shortTicketSubject(ticket.subject)}</strong>
           </div>
           <span class={`application-text-caption shrink-0 rounded-full px-2 py-1 font-bold ${slaClass(ticket)}`}>{slaText(ticket)}</span>
         </div>
