@@ -70,9 +70,9 @@ export function validatePushSubscription(raw: unknown): ClientSubscription | nul
   return { endpoint, keys: { p256dh, auth } };
 }
 
-export async function saveDeviceSubscription(userId: string, subscription: ClientSubscription): Promise<void> {
+export async function saveDeviceSubscription(userId: string, subscription: ClientSubscription): Promise<string> {
   const db = getDatabase();
-  await db.insert(notificationPushSubscriptions).values({
+  const [saved] = await db.insert(notificationPushSubscriptions).values({
     userId, endpoint: subscription.endpoint,
     p256dh: subscription.keys.p256dh, authSecret: subscription.keys.auth,
   }).onConflictDoUpdate({
@@ -83,7 +83,28 @@ export async function saveDeviceSubscription(userId: string, subscription: Clien
       authSecret: subscription.keys.auth,
       updatedAt: new Date(),
     },
-  });
+  }).returning({ id: notificationPushSubscriptions.id });
+  if (!saved) throw new Error("PUSH_SUBSCRIPTION_NOT_SAVED");
+  return saved.id;
+}
+
+export async function isDeviceSubscriptionLinked(userId: string, deviceId: string | undefined): Promise<boolean> {
+  if (!deviceId || !/^[a-f0-9-]{36}$/i.test(deviceId)) return false;
+  const [row] = await getDatabase().select({ id: notificationPushSubscriptions.id })
+    .from(notificationPushSubscriptions)
+    .where(and(
+      eq(notificationPushSubscriptions.id, deviceId),
+      eq(notificationPushSubscriptions.userId, userId),
+    )).limit(1);
+  return Boolean(row);
+}
+
+export async function removeDeviceSubscriptionById(userId: string, deviceId: string | undefined): Promise<void> {
+  if (!deviceId || !/^[a-f0-9-]{36}$/i.test(deviceId)) return;
+  await getDatabase().delete(notificationPushSubscriptions).where(and(
+    eq(notificationPushSubscriptions.id, deviceId),
+    eq(notificationPushSubscriptions.userId, userId),
+  ));
 }
 
 export async function removeDeviceSubscription(userId: string, endpoint: string): Promise<void> {
