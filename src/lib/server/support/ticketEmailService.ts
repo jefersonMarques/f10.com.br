@@ -9,6 +9,8 @@ import {
   tickets,
 } from "$lib/server/db/supportSchema";
 import { buildEmailHtml } from "$lib/server/email/emailTemplate";
+import { getCustomerPortalBaseUrl } from "$lib/server/customerPortal/customerPortalMailer";
+import { requestTicketSatisfaction } from "$lib/server/support/ticketSatisfactionService";
 import { sendTransactionalEmail } from "$lib/server/email/transactionalEmail";
 
 const PROVIDER = "brevo";
@@ -113,6 +115,7 @@ function emailParagraphs(body: string): string[] {
 export async function sendTicketPublicReplyEmail(
   ticketId: string,
   body: string,
+  attachments: Array<{ name: string; content: string }> = [],
 ): Promise<boolean> {
   const db = getDatabase();
   const [ticket] = await db
@@ -130,7 +133,7 @@ export async function sendTicketPublicReplyEmail(
     .where(eq(tickets.id, ticketId))
     .limit(1);
 
-  if (!ticket || ticket.channel !== "email") return false;
+  if (!ticket) return false;
 
   const [thread] = await db
     .select({
@@ -142,10 +145,10 @@ export async function sendTicketPublicReplyEmail(
     .where(eq(supportEmailThreads.ticketId, ticketId))
     .limit(1);
 
-  const recipientEmail = (thread?.senderEmail || ticket.customerEmail || "").trim().toLowerCase();
+  const recipientEmail = (ticket.customerEmail || thread?.senderEmail || "").trim().toLowerCase();
   if (!recipientEmail || !recipientEmail.includes("@")) return false;
 
-  const recipientName = thread?.senderName || ticket.customerName || undefined;
+  const recipientName = ticket.customerName || thread?.senderName || undefined;
   const emailRoute =
     resolveEmailRoute(thread?.inboxCode)
     || resolveEmailRoute(ticket.queueCode);
@@ -156,6 +159,7 @@ export async function sendTicketPublicReplyEmail(
     inboxCode: emailRoute?.code ?? "ticket-reply",
   });
   const address = replyAddress(token);
+  const ticketUrl = `${getCustomerPortalBaseUrl("https://f10.com.br")}/cliente/chamados/${encodeURIComponent(ticketId)}`;
   const subject = `[#${ticket.ticketNumber}] ${ticket.subject}`;
 
   await sendTransactionalEmail({
@@ -168,20 +172,101 @@ export async function sendTicketPublicReplyEmail(
       : {}),
     replyTo: { email: address, name: "F10 Suporte" },
     subject,
+    ...(attachments.length ? { attachments } : {}),
     textContent: [
       body.trim(),
       "",
       `Ticket #${ticket.ticketNumber}`,
       "Você pode responder diretamente a este e-mail para continuar o atendimento.",
+      `Acompanhe seu chamado no painel: ${ticketUrl}`,
     ].join("\n"),
     htmlContent: buildEmailHtml({
       eyebrow: `Ticket #${ticket.ticketNumber}`,
       title: ticket.subject,
       ...(recipientName ? { greeting: `Olá, ${recipientName}.` } : {}),
       body: emailParagraphs(body),
+      action: { label: "Ver chamado no painel", href: ticketUrl },
       footer: "Responda diretamente a este e-mail para continuar o atendimento no mesmo ticket.",
     }),
   });
 
   return true;
+}
+
+/** Called only after a persisted status transition, including workflow moves. */
+export async function notifyCustomerOfTicketStatus(
+  ticketId: string,
+  previousStatus: string | null,
+): Promise<void> {
+  const db = getDatabase();
+  const [ticket] = await db
+    .select({
+      status: tickets.status,
+      number: tickets.ticketNumber,
+      subject: tickets.subject,
+      queueCode: supportQueues.code,
+      name: customerContacts.name,
+      email: customerContacts.email,
+    })
+    .from(tickets)
+    .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
+    .leftJoin(customerContacts, eq(tickets.customerContactId, customerContacts.id))
+    .where(eq(tickets.id, ticketId))
+    .limit(1);
+
+  if (!ticket || ticket.status === previousStatus) return;
+  if (!["waiting_customer", "resolved", "closed"].includes(ticket.status)) return;
+
+  // The existing survey sends the resolution email and an evaluation link.
+  // It is unique per ticket; never send a second satisfaction survey.
+  if (ticket.status === "resolved" || ticket.status === "closed") {
+    const sentSurvey = await requestTicketSatisfaction(ticketId);
+    if (sentSurvey || ticket.status === "closed") return;
+  }
+
+  const [thread] = await db
+    .select({
+      name: supportEmailThreads.senderName,
+      email: supportEmailThreads.senderEmail,
+      inboxCode: supportEmailThreads.inboxCode,
+    })
+    .from(supportEmailThreads)
+    .where(eq(supportEmailThreads.ticketId, ticketId))
+    .limit(1);
+  const recipient = (ticket.email?.trim() || thread?.email?.trim() || "").toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) return;
+  const name = ticket.name?.trim() || thread?.name?.trim() || undefined;
+  const route = resolveEmailRoute(thread?.inboxCode) || resolveEmailRoute(ticket.queueCode);
+  const portalUrl = `${getCustomerPortalBaseUrl("https://f10.com.br")}/cliente/chamados/${encodeURIComponent(ticketId)}`;
+  const waiting = ticket.status === "waiting_customer";
+  const headline = waiting ? "Seu atendimento aguarda uma resposta" : "Seu atendimento foi resolvido";
+  const description = waiting
+    ? "Precisamos da sua resposta para continuar o atendimento. Você pode responder a este e-mail ou acessar o chamado no painel."
+    : "Concluímos seu atendimento. Você pode consultar os detalhes no painel de chamados.";
+  const token = await ensureReplyToken({
+    ticketId,
+    recipientEmail: recipient,
+    recipientName: name ?? null,
+    inboxCode: route?.code ?? "ticket-reply",
+  });
+  await sendTransactionalEmail({
+    to: { email: recipient, ...(name ? { name } : {}) },
+    ...(route ? { sender: { email: route.email, name: route.name } } : {}),
+    replyTo: { email: replyAddress(token), name: "F10 Suporte" },
+    subject: `[#${ticket.number}] ${headline}`,
+    textContent: [
+      `Olá${name ? `, ${name}` : ""}.`,
+      "", description,
+      `Ticket #${ticket.number} — ${ticket.subject}`,
+      `Acesse seu chamado: ${portalUrl}`,
+    ].join("\n"),
+    htmlContent: buildEmailHtml({
+      eyebrow: `Ticket #${ticket.number}`,
+      title: headline,
+      ...(name ? { greeting: `Olá, ${name}.` } : {}),
+      body: [description, ticket.subject],
+      action: { label: "Acompanhar chamado", href: portalUrl },
+      footer: "A consulta no painel exige acesso à área do cliente.",
+    }),
+  });
 }

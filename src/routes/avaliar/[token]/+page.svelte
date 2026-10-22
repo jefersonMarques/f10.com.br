@@ -5,7 +5,7 @@
   export let data: PageData;
   export let form: ActionData;
 
-  let score = 0;
+  let score = data.suggestedScore;
 </script>
 
 <svelte:head>

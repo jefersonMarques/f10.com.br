@@ -128,6 +128,10 @@ function actionErrorMessage(cause: unknown): string {
     TICKET_ATTACHMENT_TOO_LARGE: "O anexo deve ter no máximo 20 MB.",
     TICKET_ATTACHMENT_TYPE_NOT_ALLOWED: "Este tipo de arquivo não é permitido.",
     ASSET_STORAGE_NOT_CONFIGURED: "O storage de anexos ainda não está configurado.",
+    SUPPORT_ATTACHMENT_TOO_MANY: "Envie até 4 arquivos por mensagem.",
+    SUPPORT_ATTACHMENT_SIZE_INVALID: "Cada anexo deve ter no máximo 10 MB.",
+    SUPPORT_ATTACHMENT_TOTAL_TOO_LARGE: "Os anexos devem somar no máximo 12 MB.",
+    SUPPORT_ATTACHMENT_TYPE_INVALID: "Formato não permitido. Use imagens, PDF, DOCX, XLSX, ZIP ou texto.",
   };
 
   if (cause.message.includes("TICKET_WORKFLOW_AREA_NOT_COMPLETE")) {
@@ -424,12 +428,14 @@ export const actions: Actions = {
       "tickets.reply",
       `/app/tickets/${params.ticketId}`,
     );
-    const body = readFormValue(await request.formData(), "body");
-    if (body.length < 1 || body.length > 10000) {
+    const formData = await request.formData();
+    const body = readFormValue(formData, "body");
+    const files = formData.getAll("files").filter((file): file is File => file instanceof File && file.size > 0);
+    if ((body.length < 1 && files.length === 0) || body.length > 10000) {
       return fail(400, {
         success: false,
         action: "reply",
-        message: "A resposta deve ter entre 1 e 10.000 caracteres.",
+        message: "Escreva uma resposta ou selecione anexos. O texto pode ter até 10.000 caracteres.",
       });
     }
     try {
@@ -439,6 +445,8 @@ export const actions: Actions = {
         params.ticketId,
         body,
         "public",
+        [],
+        files,
       );
       await markTicketChatHumanTakeover(
         params.ticketId,
@@ -455,11 +463,11 @@ export const actions: Actions = {
               ? "Resposta registrada, mas o e-mail não pôde ser enviado."
               : "Resposta registrada.",
       };
-    } catch {
-      return fail(403, {
+    } catch (cause) {
+      return fail(400, {
         success: false,
         action: "reply",
-        message: "Não foi possível responder este ticket.",
+        message: actionErrorMessage(cause),
       });
     }
   },
@@ -485,12 +493,13 @@ export const actions: Actions = {
     }
     const formData = await request.formData();
     const body = readFormValue(formData, "body");
+    const files = formData.getAll("files").filter((file): file is File => file instanceof File && file.size > 0);
     const requestedMentionIds = readMentionedUserIds(formData);
-    if (body.length < 1 || body.length > 10000) {
+    if ((body.length < 1 && files.length === 0) || body.length > 10000) {
       return fail(400, {
         success: false,
         action: "note",
-        message: "A nota deve ter entre 1 e 10.000 caracteres.",
+        message: "Escreva uma nota ou selecione anexos. O texto pode ter até 10.000 caracteres.",
       });
     }
     try {
@@ -505,6 +514,7 @@ export const actions: Actions = {
         body,
         "internal",
         mentionedUserIds,
+        files,
       );
       return {
         success: true,
@@ -514,11 +524,11 @@ export const actions: Actions = {
             ? "Nota interna adicionada e menções notificadas."
             : "Nota interna adicionada.",
       };
-    } catch {
-      return fail(403, {
+    } catch (cause) {
+      return fail(400, {
         success: false,
         action: "note",
-        message: "Não foi possível adicionar a nota interna.",
+        message: actionErrorMessage(cause),
       });
     }
   },

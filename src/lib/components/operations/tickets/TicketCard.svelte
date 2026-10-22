@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shortTicketSubject } from "./shortSubject";
   import { Clock3, Mail, UserRound } from "lucide-svelte";
   import { labelClasses, priorityLabels } from "./presentation";
   import type { TicketItem } from "./types";
@@ -65,7 +66,7 @@
       <span class="application-text-caption text-[#7C8290]">{priorityLabels[ticket.priority] ?? ticket.priority}</span>
     </div>
 
-    <strong class="mt-1.5 block text-[12px] font-semibold leading-5 text-[#252B3B]">{ticket.subject}</strong>
+    <strong title={ticket.subject} class="mt-1.5 block min-w-0 truncate text-[12px] font-semibold leading-5 text-[#252B3B]">{shortTicketSubject(ticket.subject)}</strong>
 
     <div class="application-text-caption mt-3 flex items-center gap-1.5 text-[#7D8392]">
       <UserRound size={11}/>

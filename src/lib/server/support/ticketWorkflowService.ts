@@ -9,12 +9,13 @@ import {
 } from "$lib/server/db/ticketWorkflowSchema";
 import { tickets } from "$lib/server/db/supportSchema";
 import type { SupportPermissionMap } from "$lib/server/support/supportAccess";
-import { requestTicketSatisfaction } from "$lib/server/support/ticketSatisfactionService";
+import { notifyCustomerOfTicketStatus } from "$lib/server/support/ticketEmailService";
 import {
   addTicketWorkflowStage,
   archiveTicketWorkflowStage,
   getTicketWorkflowBoard,
   listTicketWorkflowConfiguration,
+  moveTicketAreaStage,
   moveTicketGlobalStage,
   moveTicketToWorkflowLocation,
   updateTicketWorkflowStage,
@@ -357,6 +358,35 @@ async function restoreAssigneeIfCleared(
     .where(and(eq(tickets.id, ticketId), isNull(tickets.assignedUserId)));
 }
 
+async function notifyAfterWorkflowMove(ticketId: string, previousStatus: string | null): Promise<void> {
+  await notifyCustomerOfTicketStatus(ticketId, previousStatus).catch((cause) => {
+    console.error("[ticket.customer.workflow_status_email]", {
+      ticketId,
+      errorCode: cause instanceof Error ? cause.message : "TICKET_STATUS_EMAIL_FAILED",
+    });
+  });
+}
+
+async function ticketStatusBeforeMove(ticketId: string): Promise<string | null> {
+  const [ticket] = await getDatabase()
+    .select({ status: tickets.status })
+    .from(tickets)
+    .where(eq(tickets.id, ticketId))
+    .limit(1);
+  return ticket?.status ?? null;
+}
+
+export async function moveTicketAreaStageWithNotifications(
+  actorUserId: string,
+  permissions: SupportPermissionMap,
+  ticketId: string,
+  targetStageId: string,
+): Promise<void> {
+  const previousStatus = await ticketStatusBeforeMove(ticketId);
+  await moveTicketAreaStage(actorUserId, permissions, ticketId, targetStageId);
+  await notifyAfterWorkflowMove(ticketId, previousStatus);
+}
+
 export async function moveTicketGlobalStageWithRules(
   actorUserId: string,
   permissions: SupportPermissionMap,
@@ -364,16 +394,12 @@ export async function moveTicketGlobalStageWithRules(
   targetStageId: string,
 ): Promise<void> {
   const context = await getMovementContext(ticketId);
+  const previousStatus = await ticketStatusBeforeMove(ticketId);
   requireCompletedArea(context);
 
   await moveTicketGlobalStage(actorUserId, permissions, ticketId, targetStageId);
   await restoreAssigneeIfCleared(ticketId, context.assignedUserId);
-  await requestTicketSatisfaction(ticketId).catch((cause) => {
-    console.error("[ticket.satisfaction.workflow]", {
-      ticketId,
-      errorCode: cause instanceof Error ? cause.message : "TICKET_SATISFACTION_REQUEST_FAILED",
-    });
-  });
+  await notifyAfterWorkflowMove(ticketId, previousStatus);
 }
 
 export async function moveTicketToWorkflowLocationWithRules(
@@ -384,6 +410,7 @@ export async function moveTicketToWorkflowLocationWithRules(
   stageId: string,
 ): Promise<void> {
   const context = await getMovementContext(ticketId);
+  const previousStatus = await ticketStatusBeforeMove(ticketId);
   const db = getDatabase();
   const [targetWorkflow] = await db
     .select({ id: ticketWorkflows.id, kind: ticketWorkflows.kind })
@@ -405,10 +432,5 @@ export async function moveTicketToWorkflowLocationWithRules(
     stageId,
   );
   await restoreAssigneeIfCleared(ticketId, context.assignedUserId);
-  await requestTicketSatisfaction(ticketId).catch((cause) => {
-    console.error("[ticket.satisfaction.workflow]", {
-      ticketId,
-      errorCode: cause instanceof Error ? cause.message : "TICKET_SATISFACTION_REQUEST_FAILED",
-    });
-  });
+  await notifyAfterWorkflowMove(ticketId, previousStatus);
 }

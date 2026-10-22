@@ -7,10 +7,12 @@ import {
 
 export const prerender = false;
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, url }) => {
   const survey = await getTicketSatisfactionByToken(params.token);
   return {
     survey,
+    suggestedScore: [1, 2, 3, 4, 5].includes(Number(url.searchParams.get("score")))
+      ? Number(url.searchParams.get("score")) : 0,
     expired: Boolean(
       survey &&
       !survey.answeredAt &&
