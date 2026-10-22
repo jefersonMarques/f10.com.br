@@ -145,10 +145,10 @@ export async function sendTicketPublicReplyEmail(
     .where(eq(supportEmailThreads.ticketId, ticketId))
     .limit(1);
 
-  const recipientEmail = (thread?.senderEmail || ticket.customerEmail || "").trim().toLowerCase();
+  const recipientEmail = (ticket.customerEmail || thread?.senderEmail || "").trim().toLowerCase();
   if (!recipientEmail || !recipientEmail.includes("@")) return false;
 
-  const recipientName = thread?.senderName || ticket.customerName || undefined;
+  const recipientName = ticket.customerName || thread?.senderName || undefined;
   const emailRoute =
     resolveEmailRoute(thread?.inboxCode)
     || resolveEmailRoute(ticket.queueCode);
