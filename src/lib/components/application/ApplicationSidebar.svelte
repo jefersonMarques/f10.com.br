@@ -155,7 +155,7 @@
 </script>
 
 <aside
-  class="relative z-40 border-b border-app-border bg-app-surface lg:sticky lg:top-0 lg:h-[100dvh] lg:min-h-[100dvh] lg:border-0 lg:bg-transparent"
+  class="relative z-40 border-b border-app-border bg-app-surface lg:sticky lg:top-0 lg:z-[70] lg:h-[100dvh] lg:min-h-[100dvh] lg:border-0 lg:bg-transparent"
   on:mouseenter={() => (hovered = true)}
   on:mouseleave={() => (hovered = false)}
   on:focusin={() => (hovered = true)}
