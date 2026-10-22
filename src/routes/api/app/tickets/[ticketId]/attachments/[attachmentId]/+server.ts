@@ -11,8 +11,9 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-function contentDisposition(name: string): string {
-  return `inline; filename*=UTF-8''${encodeURIComponent(name)}`;
+function contentDisposition(name: string, mimeType: string): string {
+  const safeInline = mimeType.startsWith("image/") || mimeType === "application/pdf";
+  return `${safeInline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(name)}`;
 }
 
 export const GET: RequestHandler = async ({ params, cookies }) => {
@@ -41,9 +42,10 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
       headers: {
         "Content-Type": attachment.mimeType,
         "Content-Length": String(attachment.sizeBytes),
-        "Content-Disposition": contentDisposition(attachment.originalName),
+        "Content-Disposition": contentDisposition(attachment.originalName, attachment.mimeType),
         "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "sandbox",
       },
     });
   } catch {
