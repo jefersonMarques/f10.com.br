@@ -1,4 +1,5 @@
 import { env } from "$env/dynamic/private";
+import { extractEmailImages } from "$lib/server/support/emailInboundMediaService";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -205,6 +206,7 @@ function normalizeInboundMessage(item: JsonObject): BrevoEmailMessage {
     cc: mailboxes(item.Cc),
     bcc: [],
     attachments: asArray(item.Attachments),
+    htmlImages: extractEmailImages(asString(item.RawHtmlBody)),
     isForward: /^fwd?:/i.test(asString(item.Subject)),
   };
 }
