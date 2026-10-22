@@ -1309,3 +1309,73 @@
                 {/if}
   </div>
 {/if}
+
+
+{#if form?.message}
+  <div role="alert" class="fixed bottom-5 right-5 z-[175] max-w-[440px] rounded-xl border border-[#F0C8C8] bg-white px-5 py-4 text-[13px] text-[#9B2C2C] shadow-xl">{form.message}</div>
+{/if}
+
+{#if settingsModal}
+  <div class="fixed inset-0 z-[148] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
+    <section role="dialog" aria-modal="true" aria-label="Configurações do artigo" class="max-h-[88vh] w-full max-w-[690px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+      <div class="mb-5 flex justify-between gap-3">
+        <h2 class="text-[18px] font-semibold">{settingsModal === "general" ? "Informações do artigo" : settingsModal === "video" ? "Vídeo principal" : "IA e pesquisa"}</h2>
+        <button type="button" aria-label="Fechar" on:click={() => (settingsModal = null)}><X size={18}/></button>
+      </div>
+      {#if settingsModal === "general"}
+        <form method="POST" action="?/updateContent" class="space-y-4">
+          <label class="block text-[13px] font-semibold">Título<input name="title" required minlength="4" maxlength="160" value={data.content.title} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
+          <label class="block text-[13px] font-semibold">Endereço<input name="slug" maxlength="120" value={data.content.slug} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
+          <label class="block text-[13px] font-semibold">Resumo público<textarea name="summary" maxlength="320" rows="3" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.summary}</textarea></label>
+          {#each data.content.categories as category}
+            <input type="hidden" name="categoryId" value={category.id}/>
+            <input type="hidden" name={`categoryDestination:${category.id}`} value={category.destinationUrl}/>
+          {/each}
+          <input type="hidden" name="searchAliases" value={data.content.searchAliases.join("\n")}/>
+          <input type="hidden" name="assistantKnowledge" value={data.content.assistantKnowledge}/>
+          <input type="hidden" name="internalSupportNotes" value={data.content.internalSupportNotes}/>
+          <div class="flex justify-end"><button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar informações</button></div>
+        </form>
+      {:else if settingsModal === "advanced"}
+        <form method="POST" action="?/updateAdvanced" class="space-y-4">
+          <label class="block text-[13px] font-semibold">Termos de pesquisa<textarea name="searchAliases" rows="4" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.searchAliases.join("\n")}</textarea></label>
+          <label class="block text-[13px] font-semibold">Conhecimento adicional da IA<textarea name="assistantKnowledge" rows="6" maxlength="40000" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.assistantKnowledge}</textarea></label>
+          <label class="block text-[13px] font-semibold">Notas internas<textarea name="internalSupportNotes" rows="4" maxlength="40000" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.internalSupportNotes}</textarea></label>
+          <div class="flex justify-end"><button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar configurações</button></div>
+        </form>
+      {:else}
+        <form method="POST" action="?/updateFeaturedVideo" enctype="multipart/form-data" class="space-y-4">
+          {#if !data.content.featuredVideo?.storageKey}
+            <label class="block text-[13px] font-semibold">URL do vídeo<input name="sourceUrl" value={data.content.featuredVideo?.sourceUrl ?? ""} placeholder="https://youtube.com/..." class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
+            <label class="block text-[13px] font-semibold">Ou selecione MP4<input name="videoFile" type="file" accept="video/mp4,.mp4" class="mt-1.5 block w-full rounded-xl border border-[#DDE1EA] p-3 text-[13px]"/></label>
+          {:else}
+            <p class="text-[13px] text-[#777D8D]">Vídeo armazenado. Você pode ajustar os metadados abaixo.</p>
+          {/if}
+          <label class="block text-[13px] font-semibold">Descrição pública<input name="altText" maxlength="500" value={data.content.featuredVideo?.altText ?? ""} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
+          <label class="block text-[13px] font-semibold">Legendas / transcrição<textarea name="subtitles" required maxlength="200000" rows="5" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.featuredVideo?.subtitles ?? ""}</textarea></label>
+          <label class="block text-[13px] font-semibold">Resumo operacional da IA<textarea name="assistantSummary" maxlength="20000" rows="3" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.featuredVideo?.assistantSummary ?? ""}</textarea></label>
+          <div class="flex justify-between gap-2">
+            {#if data.content.featuredVideo}<button type="submit" form="delete-featured-video" class="min-h-10 rounded-xl border border-[#F0C8C8] px-4 text-[13px] font-semibold text-[#9B2C2C]">Excluir vídeo</button>{/if}
+            <button type="submit" class="ml-auto min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar vídeo</button>
+          </div>
+        </form>
+        <form id="delete-featured-video" method="POST" action="?/deleteFeaturedVideo" on:submit={(event) => { if (!confirm("Excluir o vídeo principal?")) event.preventDefault(); }}></form>
+      {/if}
+    </section>
+  </div>
+{/if}
+
+{#if editingStep}
+  <div class="fixed inset-0 z-[148] flex items-center justify-center bg-[#050A1A]/60 px-4" role="presentation">
+    <section role="dialog" aria-modal="true" aria-label="Configurar etapa" class="max-h-[85vh] w-full max-w-[620px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+      <div class="mb-5 flex justify-between gap-3"><h2 class="text-[18px] font-semibold">Configurar etapa</h2><button type="button" aria-label="Fechar" on:click={() => (stepModalId = null)}><X size={18}/></button></div>
+      <form method="POST" action="?/updateStep" class="space-y-4">
+        <input type="hidden" name="stepId" value={editingStep.id}/>
+        <label class="block text-[13px] font-semibold">Título<input name="title" minlength="2" required maxlength="180" value={editingStep.title} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
+        <label class="block text-[13px] font-semibold">Descrição<input name="description" maxlength="2000" value={editingStep.description} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
+        <label class="block text-[13px] font-semibold">Conhecimento adicional da IA<textarea name="assistantKnowledge" maxlength="20000" rows="6" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{editingStep.assistantKnowledge}</textarea></label>
+        <div class="flex justify-end"><button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar etapa</button></div>
+      </form>
+    </section>
+  </div>
+{/if}
