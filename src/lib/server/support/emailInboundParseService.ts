@@ -87,6 +87,11 @@ function directInboxRoutes(): InboxRoute[] {
       email: `sucesso@${domain}`,
       groupId: null,
     },
+    {
+      code: "support",
+      email: `suporte@${domain}`,
+      groupId: null,
+    },
   ];
 }
 
