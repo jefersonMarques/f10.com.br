@@ -1,7 +1,8 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
   import { page } from "$app/stores";
-  import { enhance, type SubmitFunction } from "$app/forms";
+  import { enhance } from "$app/forms";
+  import type { SubmitFunction } from "@sveltejs/kit";
   import { onDestroy, onMount } from "svelte";
   import {
     AlertTriangle,
