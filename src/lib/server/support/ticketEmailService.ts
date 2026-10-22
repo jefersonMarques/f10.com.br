@@ -234,7 +234,7 @@ export async function notifyCustomerOfTicketStatus(
     .where(eq(supportEmailThreads.ticketId, ticketId))
     .limit(1);
   const recipient = (ticket.email?.trim() || thread?.email?.trim() || "").toLowerCase();
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(recipient)) return;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) return;
   const name = ticket.name?.trim() || thread?.name?.trim() || undefined;
   const route = resolveEmailRoute(thread?.inboxCode) || resolveEmailRoute(ticket.queueCode);
   const portalUrl = `${getCustomerPortalBaseUrl("https://f10.com.br")}/cliente/chamados/${encodeURIComponent(ticketId)}`;
