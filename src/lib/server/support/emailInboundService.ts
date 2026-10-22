@@ -626,27 +626,9 @@ export async function saveIncomingMessage(input: {
     savedMessageId = existing.id;
   }
 
-  if (input.message.attachments.length > 0 || (input.message.htmlImages?.length ?? 0) > 0) {
-    const stored = await persistInboundAttachments({
-      ticketId: input.ticketId,
-      messageId: savedMessageId,
-      attachments: input.message.attachments,
-    });
-    const inlineImages = resolveEmailImages(input.message.htmlImages ?? [], stored, input.ticketId);
-    await db
-      .update(ticketMessages)
-      .set({
-        externalMetadata: {
-          ...messageMetadata(input.message),
-          inlineImages,
-        },
-      })
-      .where(eq(ticketMessages.id, savedMessageId));
-  }
 
-  if (!created) return false;
-
-  await db.transaction(async (tx) => {
+  if (created) {
+    await db.transaction(async (tx) => {
     await tx
       .update(tickets)
       .set({ updatedAt: now })
@@ -694,7 +676,28 @@ export async function saveIncomingMessage(input: {
     });
   });
 
-  return true;
+  }
+
+  if (input.message.attachments.length > 0 || (input.message.htmlImages?.length ?? 0) > 0) {
+    const stored = await persistInboundAttachments({
+      ticketId: input.ticketId,
+      messageId: savedMessageId,
+      attachments: input.message.attachments,
+    });
+    const inlineImages = resolveEmailImages(input.message.htmlImages ?? [], stored, input.ticketId);
+    await db
+      .update(ticketMessages)
+      .set({
+        externalMetadata: {
+          ...messageMetadata(input.message),
+          inlineImages,
+        },
+      })
+      .where(eq(ticketMessages.id, savedMessageId));
+  }
+
+
+  return Boolean(created);
 }
 
 export async function processEmailInboundEvent(
