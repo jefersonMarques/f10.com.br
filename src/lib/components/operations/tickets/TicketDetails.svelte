@@ -64,6 +64,7 @@
   let moreMenuOpen = false;
   let composerMode: ComposerMode = ticketData.canReply ? "reply" : "note";
   let replyDraft = "";
+  let showExternalEmailImages = false;
   let noteDraft = "";
   $: isInfoPanel = surface !== "page" && ["service", "customer", "tasks", "collaboration", "history"].includes(activeMainPanel);
 
@@ -445,6 +446,32 @@
                         <span class="text-[10px] text-[#858C99]">{formatDateTime(message.createdAt)}</span>
                       </div>
                       <p class="mt-1.5 whitespace-pre-wrap text-[14px] leading-[1.6] text-[#343A47]">{message.body}</p>
+                      {#if message.inlineImages?.length}
+                        <div class="mt-3 space-y-2">
+                          {#each message.inlineImages as emailImage}
+                            {#if !emailImage.external || showExternalEmailImages}
+                              <a href={emailImage.src} target="_blank" rel="noopener noreferrer" class="block">
+                                <img src={emailImage.src} alt={emailImage.alt || "Imagem do e-mail"} loading="lazy" referrerpolicy="no-referrer" class="max-h-[480px] max-w-full rounded-xl border border-[#DDE1EA] bg-white object-contain"/>
+                              </a>
+                            {:else}
+                              <button type="button" on:click={() => (showExternalEmailImages = true)} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px] font-semibold text-[#000A57]">
+                                <FileText size={15}/>Mostrar imagens externas
+                              </button>
+                            {/if}
+                          {/each}
+                        </div>
+                      {/if}
+                      {#if message.attachments?.length}
+                        <div class="mt-3 space-y-1.5 border-t border-[#DDE1EA] pt-3">
+                          {#each message.attachments as file}
+                            <a href={file.href} target="_blank" rel="noopener noreferrer" class="flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 text-[12px] font-semibold text-[#000A57]">
+                              <Paperclip size={15} class="shrink-0"/>
+                              <span class="min-w-0 flex-1 truncate">{file.originalName}</span>
+                              <span class="shrink-0 text-[11px] font-normal text-[#737989]">{formatBytes(file.sizeBytes)}</span>
+                            </a>
+                          {/each}
+                        </div>
+                      {/if}
                     </article>
                   </div>
                 {/if}
@@ -541,7 +568,7 @@
                       <a href={attachment.href} target="_blank" rel="noreferrer" class="block truncate text-[11.5px] font-semibold text-[#303746] hover:underline">{attachment.originalName}</a>
                       <p class="mt-0.5 text-[10px] text-[#8B909D]">{formatBytes(attachment.sizeBytes)} · {formatDateTime(attachment.createdAt)}</p>
                     </div>
-                    {#if ticketData.canReply}
+                    {#if ticketData.canReply && attachment.source !== "email"}
                       <button type="button" on:click={() => void deleteAttachment(attachment.id)} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#A33A3A] hover:bg-[var(--app-danger-bg)]" aria-label={`Remover ${attachment.originalName}`}><Trash2 size={14}/></button>
                     {/if}
                   </article>
