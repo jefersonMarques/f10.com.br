@@ -878,13 +878,13 @@
         <button type="button" on:click={() => openSettings("advanced")} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px] font-semibold text-[#000A57]"><Sparkles size={15}/>IA e pesquisa</button>
       {/if}
       {#if data.canPublish}
-        <button type="button" on:click={publish} disabled={!publicationReady || publishing} title={publicationReady ? "Publicar" : "Conclua as pendências antes de publicar"} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#B8BCC8]">{#if publishing}<LoaderCircle size={14} class="animate-spin"/>{:else}<CheckCircle2 size={14}/>{/if}Publicar</button>
+        <button type="button" on:click={publish} disabled={!publicationReady || publishing} title={publicationReady ? "Publicar" : "Conclua as pendências antes de publicar"} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#B8BCC8]">{#if publishing}<LoaderCircle size={14} class="animate-spin"/>{:else}<CheckCircle2 size={14}/>{/if}Publicar</button>
       {/if}
     </div>
   </div>
 
   {#if saveMessage}
-    <div class={`mb-4 flex items-start gap-2 rounded-2xl border px-4 py-3 text-[10px] font-medium ${saveSuccess ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
+    <div class={`mb-4 flex items-start gap-2 rounded-2xl border px-4 py-3 text-[12px] font-medium ${saveSuccess ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
       {#if saveSuccess}<CheckCircle2 size={15}/>{:else}<TriangleAlert size={15}/>{/if}<span>{saveMessage}</span>
     </div>
   {/if}
@@ -896,11 +896,11 @@
       {:else}
         <TriangleAlert size={15} class="text-[#9B2C2C]"/>
       {/if}
-      <strong class="text-[10px] font-semibold text-[#303645]">Cobertura do vídeo</strong>
-      <span class="rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold text-[#5E6575]">100% analisado</span>
-      <span class="rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold text-[#5E6575]">{data.generationCoverage.coveredRelevantSegments}/{data.generationCoverage.relevantSegments} relevantes incorporados</span>
-      <span class="rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold text-[#5E6575]">{data.generationCoverage.processingParts} partes</span>
-      <span class={`rounded-full px-2.5 py-1 text-[9px] font-semibold ${data.generationCoverage.uncoveredRelevantSegments === 0 ? "bg-[#EAF7EE] text-[#2D7143]" : "bg-[#FFF0F0] text-[#9B2C2C]"}`}>{data.generationCoverage.uncoveredRelevantSegments} pendentes</span>
+      <strong class="text-[12px] font-semibold text-[#303645]">Cobertura do vídeo</strong>
+      <span class="rounded-full bg-white px-2.5 py-1 text-[12px] font-semibold text-[#5E6575]">100% analisado</span>
+      <span class="rounded-full bg-white px-2.5 py-1 text-[12px] font-semibold text-[#5E6575]">{data.generationCoverage.coveredRelevantSegments}/{data.generationCoverage.relevantSegments} relevantes incorporados</span>
+      <span class="rounded-full bg-white px-2.5 py-1 text-[12px] font-semibold text-[#5E6575]">{data.generationCoverage.processingParts} partes</span>
+      <span class={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${data.generationCoverage.uncoveredRelevantSegments === 0 ? "bg-[#EAF7EE] text-[#2D7143]" : "bg-[#FFF0F0] text-[#9B2C2C]"}`}>{data.generationCoverage.uncoveredRelevantSegments} pendentes</span>
     </section>
   {/if}
 
@@ -934,7 +934,7 @@
     {#if data.content.featuredVideo}
       {@const featuredEmbed = youtubeEmbedUrl(data.content.featuredVideo.sourceUrl)}
       <section class="mt-5 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
-        {#if featuredEmbed}<div class="aspect-video overflow-hidden bg-black"><iframe src={featuredEmbed} title={data.content.featuredVideo.altText || `Vídeo: ${data.content.title}`} class="h-full w-full" allowfullscreen></iframe></div>{:else if data.content.featuredVideo.storageKey}<video controls preload="metadata" class="aspect-video h-auto w-full bg-black" src={assetUrl(data.content.featuredVideo.id)}><track kind="captions" /></video>{:else if data.content.featuredVideo.sourceUrl}<a href={data.content.featuredVideo.sourceUrl} target="_blank" rel="noopener noreferrer" class="flex min-h-20 items-center justify-between gap-3 px-5 py-4 text-[11px] font-semibold text-[#000A57]"><span class="inline-flex items-center gap-2"><PlayCircle size={18}/>Assistir ao vídeo principal</span><ExternalLink size={13}/></a>{/if}
+        {#if featuredEmbed}<div class="aspect-video overflow-hidden bg-black"><iframe src={featuredEmbed} title={data.content.featuredVideo.altText || `Vídeo: ${data.content.title}`} class="h-full w-full" allowfullscreen></iframe></div>{:else if data.content.featuredVideo.storageKey}<video controls preload="metadata" class="aspect-video h-auto w-full bg-black" src={assetUrl(data.content.featuredVideo.id)}><track kind="captions" /></video>{:else if data.content.featuredVideo.sourceUrl}<a href={data.content.featuredVideo.sourceUrl} target="_blank" rel="noopener noreferrer" class="flex min-h-20 items-center justify-between gap-3 px-5 py-4 text-[13px] font-semibold text-[#000A57]"><span class="inline-flex items-center gap-2"><PlayCircle size={18}/>Assistir ao vídeo principal</span><ExternalLink size={13}/></a>{/if}
       </section>
     {/if}
 
@@ -982,7 +982,7 @@
                   targetId={step.id}
                   text={step.description}
                   canEdit={data.canEdit}
-                  className="space-y-1 pr-10 text-[11px] leading-5 text-[#7A8190]"
+                  className="space-y-1 pr-10 text-[13px] leading-5 text-[#7A8190]"
                   rows={3}
                   placeholder="Descrição opcional"
                   on:saved={inlineSaved}
@@ -1021,7 +1021,7 @@
                 </div>
               {:else if block.blockType === "notice"}
                 <div class={`rounded-2xl border px-4 py-3 ${block.noticeVariant === "warning" || block.noticeVariant === "danger" ? "border-[#F0D0C8] bg-[#FFF8F5]" : "border-[#D8DEF2] bg-[#F8F9FF]"}`}>
-                  <div class="flex gap-3">{#if block.noticeVariant === "warning" || block.noticeVariant === "danger"}<AlertTriangle size={16} class="mt-1 shrink-0 text-[#A9510D]"/>{:else}<Info size={16} class="mt-1 shrink-0 text-[#000A57]"/>{/if}<div class="min-w-0 flex-1"><HelpInlineTextEditor contentId={data.content.id} operation="block_text" targetId={block.id} text={block.textContent} canEdit={data.canEdit} className="space-y-1 pr-10 text-[11px] leading-6 text-[#555D6C]" rows={4} on:saved={inlineSaved} on:editing={(event) => editorState(`block:${block.id}`, event.detail.active)}/></div></div>
+                  <div class="flex gap-3">{#if block.noticeVariant === "warning" || block.noticeVariant === "danger"}<AlertTriangle size={16} class="mt-1 shrink-0 text-[#A9510D]"/>{:else}<Info size={16} class="mt-1 shrink-0 text-[#000A57]"/>{/if}<div class="min-w-0 flex-1"><HelpInlineTextEditor contentId={data.content.id} operation="block_text" targetId={block.id} text={block.textContent} canEdit={data.canEdit} className="space-y-1 pr-10 text-[13px] leading-6 text-[#555D6C]" rows={4} on:saved={inlineSaved} on:editing={(event) => editorState(`block:${block.id}`, event.detail.active)}/></div></div>
                 </div>
               {:else if block.blockType === "image" && block.asset}
                 {@const review = data.screenshotReview.find((item) => item.blockId === block.id)}
@@ -1041,7 +1041,7 @@
                 />
               {:else if block.blockType === "file" && block.asset}
                 {@const fileUrl = block.asset.storageKey ? assetUrl(block.asset.id) : block.asset.sourceUrl}
-                {#if fileUrl}<a href={fileUrl} target="_blank" rel="noopener noreferrer" class="flex items-center justify-between rounded-2xl border border-[#E1E4EC] bg-[#FAFAFC] px-4 py-4"><span class="inline-flex items-center gap-2 text-[11px] font-semibold text-[#303645]"><Download size={15}/>{block.linkLabel || "Baixar arquivo"}</span></a>{/if}
+                {#if fileUrl}<a href={fileUrl} target="_blank" rel="noopener noreferrer" class="flex items-center justify-between rounded-2xl border border-[#E1E4EC] bg-[#FAFAFC] px-4 py-4"><span class="inline-flex items-center gap-2 text-[13px] font-semibold text-[#303645]"><Download size={15}/>{block.linkLabel || "Baixar arquivo"}</span></a>{/if}
               {:else if block.blockType === "link" && block.linkUrl}
                 <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption inline-flex items-center gap-2 rounded-xl bg-[#EEF0FF] px-4 py-2.5 font-semibold text-[#000A57]">{block.linkLabel || "Abrir link"}<ExternalLink size={12}/></a>
               {/if}
@@ -1057,11 +1057,11 @@
             {#if data.canEdit}
               <div class="border-t border-dashed border-[#DDE1EA] pt-4">
                 <div class="flex flex-wrap gap-2">
-                  <button type="button" on:click={() => openAddPanel(step.id, "text")} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><FileText size={13}/>Texto</button>
-                  <button type="button" on:click={() => openAddPanel(step.id, "notice")} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-3 text-[10px] font-semibold text-[#A9510D]"><Info size={13}/>Aviso</button>
-                  <button type="button" on:click={() => openAddPanel(step.id, "link")} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-3 text-[10px] font-semibold text-[#000A57]"><Link2 size={13}/>Link</button>
+                  <button type="button" on:click={() => openAddPanel(step.id, "text")} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[12px] font-semibold text-[#000A57]"><FileText size={13}/>Texto</button>
+                  <button type="button" on:click={() => openAddPanel(step.id, "notice")} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-3 text-[12px] font-semibold text-[#A9510D]"><Info size={13}/>Aviso</button>
+                  <button type="button" on:click={() => openAddPanel(step.id, "link")} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-3 text-[12px] font-semibold text-[#000A57]"><Link2 size={13}/>Link</button>
                   {#if !step.blocks.some((block) => block.blockType === "image")}
-                    <button type="button" on:click={() => openAddPanel(step.id, "image")} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#D8DDF4] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><ImagePlus size={13}/>Imagem</button>
+                    <button type="button" on:click={() => openAddPanel(step.id, "image")} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#D8DDF4] bg-white px-3 text-[12px] font-semibold text-[#000A57]"><ImagePlus size={13}/>Imagem</button>
                   {/if}
                 </div>
 
@@ -1079,10 +1079,10 @@
 
   {#if data.canEdit && data.humanReview.total > 0}
     <div class="sticky bottom-4 z-20 mt-5 flex flex-col gap-3 rounded-2xl border border-[#D8DDF4] bg-white/95 px-4 py-3 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-      <div class="flex items-center gap-2"><PenTool size={14} class="text-[#000A57]"/><span class="text-[9px] font-semibold text-[#707788]">{reviewPending === 0 && !hasUnsavedReview ? "Imagens revisadas" : `${data.humanReview.total - reviewPending}/${data.humanReview.total} imagens revisadas`}</span></div>
+      <div class="flex items-center gap-2"><PenTool size={14} class="text-[#000A57]"/><span class="text-[12px] font-semibold text-[#707788]">{reviewPending === 0 && !hasUnsavedReview ? "Imagens revisadas" : `${data.humanReview.total - reviewPending}/${data.humanReview.total} imagens revisadas`}</span></div>
       <div class="flex shrink-0 flex-wrap gap-2">
-        <button type="button" disabled={Boolean(savingMode)} on:click={saveDraft} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#D8DDF4] bg-white px-4 text-[10px] font-semibold text-[#000A57] disabled:opacity-60">{#if savingMode === "draft"}<LoaderCircle size={14} class="animate-spin"/>{:else}<Save size={14}/>{/if}Salvar imagens</button>
-        <button type="button" disabled={Boolean(savingMode)} on:click={concludeReview} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-60">{#if savingMode === "confirm"}<LoaderCircle size={14} class="animate-spin"/>{:else}<CheckCircle2 size={14}/>{/if}Concluir imagens</button>
+        <button type="button" disabled={Boolean(savingMode)} on:click={saveDraft} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#D8DDF4] bg-white px-4 text-[12px] font-semibold text-[#000A57] disabled:opacity-60">{#if savingMode === "draft"}<LoaderCircle size={14} class="animate-spin"/>{:else}<Save size={14}/>{/if}Salvar imagens</button>
+        <button type="button" disabled={Boolean(savingMode)} on:click={concludeReview} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white disabled:opacity-60">{#if savingMode === "confirm"}<LoaderCircle size={14} class="animate-spin"/>{:else}<CheckCircle2 size={14}/>{/if}Concluir imagens</button>
       </div>
     </div>
   {/if}
@@ -1094,7 +1094,7 @@
       <div class="flex items-start justify-between gap-4">
         <div class="flex items-center gap-3">
           <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Sparkles size={17}/></span>
-          <div><h2 class="text-[16px] font-semibold text-[#11182C]">Atualizar com IA</h2><p class="mt-1 text-[10px] text-[#858A98]">A publicação atual permanece ativa.</p></div>
+          <div><h2 class="text-[16px] font-semibold text-[#11182C]">Atualizar com IA</h2><p class="mt-1 text-[12px] text-[#858A98]">A publicação atual permanece ativa.</p></div>
         </div>
         <button type="button" on:click={closeVideoUpdate} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482]" aria-label="Fechar"><X size={16}/></button>
       </div>
@@ -1102,15 +1102,15 @@
       <div class="mt-5 grid gap-3 sm:grid-cols-2">
         <button type="button" on:click={() => runRegeneration("current")} disabled={regenerating || !data.content.featuredVideo?.storageKey} class="rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4 text-left disabled:opacity-40">
           <Video size={19} class="text-[#000A57]"/>
-          <strong class="mt-3 block text-[11px] text-[#303645]">Reprocessar vídeo atual</strong>
-          <span class="mt-1 block text-[9px] text-[#858A98]">Refaz texto, etapas e prints.</span>
+          <strong class="mt-3 block text-[13px] text-[#303645]">Reprocessar vídeo atual</strong>
+          <span class="mt-1 block text-[12px] text-[#858A98]">Refaz texto, etapas e prints.</span>
         </button>
 
         <div class="rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] p-4">
           <UploadCloud size={19} class="text-[#EA6D0B]"/>
-          <strong class="mt-3 block text-[11px] text-[#303645]">Novo vídeo</strong>
-          <input type="file" accept="video/mp4,.mp4" on:change={chooseRegenerationFile} disabled={regenerating} class="mt-3 block w-full text-[9px]"/>
-          <button type="button" on:click={() => runRegeneration("upload")} disabled={regenerating || !regenerationFile} class="mt-3 inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#EA6D0B] px-3 text-[9px] font-semibold text-white disabled:opacity-40"><RefreshCw size={12}/>Atualizar</button>
+          <strong class="mt-3 block text-[13px] text-[#303645]">Novo vídeo</strong>
+          <input type="file" accept="video/mp4,.mp4" on:change={chooseRegenerationFile} disabled={regenerating} class="mt-3 block w-full text-[12px]"/>
+          <button type="button" on:click={() => runRegeneration("upload")} disabled={regenerating || !regenerationFile} class="mt-3 inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#EA6D0B] px-3 text-[12px] font-semibold text-white disabled:opacity-40"><RefreshCw size={12}/>Atualizar</button>
         </div>
       </div>
 
@@ -1125,14 +1125,14 @@
               {:else}
                 <LoaderCircle size={13} class="mt-0.5 shrink-0 animate-spin text-[#000A57]"/>
               {/if}
-              <div><strong class="block text-[9px] text-[#454C5D]">{item.label}</strong>{#if item.detail}<span class="mt-0.5 block text-[8px] text-[#9297A5]">{item.detail}</span>{/if}</div>
+              <div><strong class="block text-[12px] text-[#454C5D]">{item.label}</strong>{#if item.detail}<span class="mt-0.5 block text-[12px] text-[#9297A5]">{item.detail}</span>{/if}</div>
             </div>
           {/each}
         </div>
       {/if}
 
       {#if regenerationError}
-        <div class="mt-4 flex items-start gap-2 rounded-xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[9px] font-medium text-[#9B2C2C]">
+        <div class="mt-4 flex items-start gap-2 rounded-xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[12px] font-medium text-[#9B2C2C]">
           <TriangleAlert size={13} class="mt-0.5 shrink-0"/>
           <span>{regenerationError}</span>
         </div>
@@ -1140,19 +1140,19 @@
 
       {#if regenerationJob?.status === "failed"}
         <div class="mt-3 flex justify-end">
-          <button type="button" on:click={retryRegeneration} class="inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#000A57] px-3 text-[9px] font-semibold text-white">
+          <button type="button" on:click={retryRegeneration} class="inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#000A57] px-3 text-[12px] font-semibold text-white">
             <RefreshCw size={12}/>Tentar novamente
           </button>
         </div>
       {/if}
 
       {#if regenerating}
-        <div class="mt-4 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-4 py-3 text-[9px] font-medium text-[#000A57]">
+        <div class="mt-4 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-4 py-3 text-[12px] font-medium text-[#000A57]">
           O processamento continua no servidor. Você pode fechar esta tela e voltar depois.
         </div>
       {/if}
 
-      <div class="mt-4 rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[9px] font-medium text-[#7A3B08]">O rascunho atual será substituído somente quando todo o processamento terminar. A versão publicada permanece ativa.</div>
+      <div class="mt-4 rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[12px] font-medium text-[#7A3B08]">O rascunho atual será substituído somente quando todo o processamento terminar. A versão publicada permanece ativa.</div>
     </section>
   </div>
 {/if}
@@ -1160,10 +1160,10 @@
 {#if deleteStepTarget}
   <div class="fixed inset-0 z-[148] flex items-center justify-center bg-[#050A1A]/60 px-4" role="presentation">
     <section role="dialog" aria-modal="true" class="w-full max-w-[420px] rounded-[22px] bg-white p-5 shadow-2xl">
-      <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0F0] text-[#9B2C2C]"><Trash2 size={17}/></span><div><h2 class="text-[14px] font-semibold text-[#11182C]">Excluir etapa?</h2><p class="mt-1 text-[9px] text-[#858A98]">{deleteStepTarget.title}</p></div></div>
+      <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0F0] text-[#9B2C2C]"><Trash2 size={17}/></span><div><h2 class="text-[14px] font-semibold text-[#11182C]">Excluir etapa?</h2><p class="mt-1 text-[12px] text-[#858A98]">{deleteStepTarget.title}</p></div></div>
       <div class="mt-5 flex justify-end gap-2">
-        <button type="button" on:click={() => (deleteStepTarget = null)} disabled={deletingStep} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[10px] font-semibold text-[#626979]">Cancelar</button>
-        <button type="button" on:click={confirmDeleteStep} disabled={deletingStep} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#9B2C2C] px-4 text-[10px] font-semibold text-white disabled:opacity-50">{#if deletingStep}<LoaderCircle size={13} class="animate-spin"/>{:else}<Trash2 size={13}/>{/if}Excluir</button>
+        <button type="button" on:click={() => (deleteStepTarget = null)} disabled={deletingStep} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[12px] font-semibold text-[#626979]">Cancelar</button>
+        <button type="button" on:click={confirmDeleteStep} disabled={deletingStep} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#9B2C2C] px-4 text-[12px] font-semibold text-white disabled:opacity-50">{#if deletingStep}<LoaderCircle size={13} class="animate-spin"/>{:else}<Trash2 size={13}/>{/if}Excluir</button>
       </div>
     </section>
   </div>
@@ -1177,19 +1177,19 @@
           <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Sparkles size={17}/></span>
           <div>
             <h2 class="text-[16px] font-semibold text-[#11182C]">Quebrar etapa</h2>
-            <p class="mt-1 text-[10px] text-[#858A98]">{splitTargetStep.title}</p>
+            <p class="mt-1 text-[12px] text-[#858A98]">{splitTargetStep.title}</p>
           </div>
         </div>
         <button type="button" on:click={closeSplitDialog} disabled={splitApplying} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482]" aria-label="Fechar"><X size={16}/></button>
       </div>
 
       <div class="mt-5">
-        <strong class="text-[11px] font-semibold text-[#303645]">Quantas partes?</strong>
+        <strong class="text-[13px] font-semibold text-[#303645]">Quantas partes?</strong>
         <div class="mt-2 flex flex-wrap gap-2">
           {#each [2, 3, 4, 5, 6] as count}
-            <button type="button" on:click={() => { splitDesiredParts = count; splitSuggestion = null; splitError = ""; }} class={`flex h-10 w-10 items-center justify-center rounded-xl border text-[11px] font-bold ${splitDesiredParts === count ? "border-[#000A57] bg-[#000A57] text-white" : "border-[#DDE1EA] bg-white text-[#5F6676]"}`}>{count}</button>
+            <button type="button" on:click={() => { splitDesiredParts = count; splitSuggestion = null; splitError = ""; }} class={`flex h-10 w-10 items-center justify-center rounded-xl border text-[13px] font-bold ${splitDesiredParts === count ? "border-[#000A57] bg-[#000A57] text-white" : "border-[#DDE1EA] bg-white text-[#5F6676]"}`}>{count}</button>
           {/each}
-          <button type="button" on:click={analyzeSplitTarget} disabled={Boolean(splitLoadingStepId) || splitApplying} class="ml-auto inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[10px] font-semibold text-white disabled:opacity-50">
+          <button type="button" on:click={analyzeSplitTarget} disabled={Boolean(splitLoadingStepId) || splitApplying} class="ml-auto inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[12px] font-semibold text-white disabled:opacity-50">
             {#if splitLoadingStepId}<LoaderCircle size={14} class="animate-spin"/>{:else}<Sparkles size={14}/>{/if}
             Analisar
           </button>
@@ -1197,7 +1197,7 @@
       </div>
 
       {#if splitError}
-        <div class="mt-4 flex items-start gap-2 rounded-xl border border-[#F0C8C8] bg-[#FFF5F5] px-3 py-2.5 text-[9px] font-medium text-[#9B2C2C]">
+        <div class="mt-4 flex items-start gap-2 rounded-xl border border-[#F0C8C8] bg-[#FFF5F5] px-3 py-2.5 text-[12px] font-medium text-[#9B2C2C]">
           <TriangleAlert size={13} class="mt-0.5 shrink-0"/>
           <span>{splitError}</span>
         </div>
@@ -1208,11 +1208,11 @@
           {#each splitSuggestion.parts as part, index}
             <article class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4">
               <div class="flex items-start gap-3">
-                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#000A57] text-[10px] font-bold text-white">{index + 1}</span>
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#000A57] text-[12px] font-bold text-white">{index + 1}</span>
                 <div class="min-w-0 flex-1">
                   <strong class="text-[12px] font-semibold text-[#303645]">{part.title}</strong>
-                  {#if part.description}<p class="mt-1 text-[9px] leading-4 text-[#858B99]">{part.description}</p>{/if}
-                  <div class="mt-2"><HelpRichText text={part.instruction} className="space-y-1 text-[10px] leading-5 text-[#555D6C]"/></div>
+                  {#if part.description}<p class="mt-1 text-[12px] leading-4 text-[#858B99]">{part.description}</p>{/if}
+                  <div class="mt-2"><HelpRichText text={part.instruction} className="space-y-1 text-[12px] leading-5 text-[#555D6C]"/></div>
                 </div>
               </div>
             </article>
@@ -1221,9 +1221,9 @@
       {/if}
 
       <div class="mt-5 flex justify-end gap-2">
-        <button type="button" on:click={closeSplitDialog} disabled={splitApplying} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[10px] font-semibold text-[#626979]">Cancelar</button>
+        <button type="button" on:click={closeSplitDialog} disabled={splitApplying} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[12px] font-semibold text-[#626979]">Cancelar</button>
         {#if splitSuggestion?.shouldSplit}
-          <button type="button" on:click={applyStepSplit} disabled={splitApplying} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">
+          <button type="button" on:click={applyStepSplit} disabled={splitApplying} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white disabled:opacity-50">
             {#if splitApplying}<LoaderCircle size={14} class="animate-spin"/>{:else}<Check size={14}/>{/if}
             Aplicar
           </button>
@@ -1236,8 +1236,8 @@
 {#if showUntouchedModal}
   <div class="fixed inset-0 z-[140] flex items-center justify-center bg-[#050A1A]/60 px-4" role="presentation">
     <section role="dialog" aria-modal="true" class="w-full max-w-[460px] rounded-[24px] bg-white p-5 shadow-2xl sm:p-6">
-      <div class="flex items-start justify-between gap-4"><div><h2 class="text-[16px] font-semibold text-[#11182C]">Imagens sem interação</h2><p class="mt-1 text-[10px] text-[#777D8D]">{untouchedCount} {untouchedCount === 1 ? "imagem ainda não foi alterada." : "imagens ainda não foram alteradas."}</p></div><button type="button" on:click={() => (showUntouchedModal = false)} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482]" aria-label="Fechar"><X size={16}/></button></div>
-      <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" on:click={() => (showUntouchedModal = false)} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[10px] font-semibold text-[#626979]">Voltar</button><button type="button" disabled={Boolean(savingMode)} on:click={() => persistAll("confirm", true)} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-60"><CheckCircle2 size={14}/>Confirmar imagens</button></div>
+      <div class="flex items-start justify-between gap-4"><div><h2 class="text-[16px] font-semibold text-[#11182C]">Imagens sem interação</h2><p class="mt-1 text-[12px] text-[#777D8D]">{untouchedCount} {untouchedCount === 1 ? "imagem ainda não foi alterada." : "imagens ainda não foram alteradas."}</p></div><button type="button" on:click={() => (showUntouchedModal = false)} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482]" aria-label="Fechar"><X size={16}/></button></div>
+      <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" on:click={() => (showUntouchedModal = false)} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[12px] font-semibold text-[#626979]">Voltar</button><button type="button" disabled={Boolean(savingMode)} on:click={() => persistAll("confirm", true)} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white disabled:opacity-60"><CheckCircle2 size={14}/>Confirmar imagens</button></div>
     </section>
   </div>
 {/if}
