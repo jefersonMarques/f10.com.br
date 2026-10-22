@@ -384,6 +384,7 @@
   }
 
   function openAddPanel(stepId: string, type: AddBlockType): void {
+    if (!allowModal()) return;
     addPanel = { stepId, type };
     addText = "";
     addLinkLabel = "";
@@ -910,7 +911,7 @@
           <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#FFF3E9] px-3 py-1.5 font-bold uppercase tracking-[0.08em] text-[#B85408]"><HelpCategoryIcon name={category.icon} size={12}/>{category.name}</span>
         {/each}
         {#if data.canEdit}
-          <button type="button" on:click={() => (categoryPickerOpen = !categoryPickerOpen)} class="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-[#C7CCD7] bg-white text-[#000A57]" aria-label="Editar categorias" title="Editar categorias"><Plus size={13}/></button>
+          <button type="button" on:click={() => { if (allowModal()) categoryPickerOpen = true; }} class="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-[#C7CCD7] bg-white text-[#000A57]" aria-label="Editar categorias" title="Editar categorias"><Plus size={13}/></button>
         {/if}
       </div>
 
