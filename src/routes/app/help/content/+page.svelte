@@ -280,7 +280,7 @@
       <button type="submit" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[13px] font-semibold text-white"><SlidersHorizontal size={16}/>Aplicar</button>
     </form>
 
-    <div class="overflow-x-auto">
+    <div class="overflow-x-auto lg:overflow-visible">
       <table class="w-full min-w-[780px] border-collapse text-left">
         <thead class="bg-[#FAFBFD] text-[12px] font-semibold text-[#666D7F]">
           <tr>
