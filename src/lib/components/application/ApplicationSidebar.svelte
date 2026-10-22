@@ -175,7 +175,7 @@
 
       <button
         type="button"
-        class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-app-text-muted transition hover:bg-app-muted hover:text-app-primary lg:flex"
+        class={`hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-app-text-muted transition hover:bg-app-muted hover:text-app-primary ${expanded ? "lg:flex" : "lg:hidden"}`}
         aria-label={collapsed ? "Fixar menu aberto" : "Desafixar menu"}
         aria-pressed={!collapsed}
         title={collapsed ? "Fixar menu aberto" : "Desafixar menu"}
