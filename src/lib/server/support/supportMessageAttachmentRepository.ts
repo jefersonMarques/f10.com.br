@@ -206,7 +206,7 @@ export async function uploadSupportAgentMessageAttachments(
     for (const file of files) {
       const mime = file.type.toLowerCase().split(";")[0].trim();
       const extension = AGENT_ATTACHMENT_TYPES.get(mime);
-      if (!extension || !file.name.toLowerCase().endsWith(`.${extension}`)) {
+      if (!extension || !(file.name.toLowerCase().endsWith(`.${extension}`) || (mime === "image/jpeg" && file.name.toLowerCase().endsWith(".jpeg")))) {
         throw new Error("SUPPORT_ATTACHMENT_TYPE_INVALID");
       }
       if (!file.size || file.size > 10 * 1024 * 1024) {
