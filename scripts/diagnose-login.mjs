@@ -7,7 +7,7 @@ const email = (process.env.DIAGNOSE_LOGIN_EMAIL ?? "").trim().toLowerCase();
 const databaseUrl = process.env.DATABASE_URL?.trim();
 
 if (!databaseUrl) throw new Error("DATABASE_URL is required.");
-if (!email || email.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(email)) {
   throw new Error("Set DIAGNOSE_LOGIN_EMAIL to an internal F10 Operations email.");
 }
 
