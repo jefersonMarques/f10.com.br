@@ -1404,7 +1404,7 @@
         <button type="button" aria-label="Fechar" on:click={() => (settingsModal = null)}><X size={18}/></button>
       </div>
       {#if settingsModal === "general"}
-        <form method="POST" action="?/updateContent" class="space-y-4">
+        <form method="POST" action="?/updateContent" use:enhance class="space-y-4">
           <label class="block text-[13px] font-semibold">Título<input name="title" required minlength="4" maxlength="160" value={data.content.title} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
           <label class="block text-[13px] font-semibold">Endereço<input name="slug" maxlength="120" value={data.content.slug} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
           <label class="block text-[13px] font-semibold">Resumo público<textarea name="summary" maxlength="320" rows="3" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.summary}</textarea></label>
@@ -1418,14 +1418,14 @@
           <div class="flex justify-end"><button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar informações</button></div>
         </form>
       {:else if settingsModal === "advanced"}
-        <form method="POST" action="?/updateAdvanced" class="space-y-4">
+        <form method="POST" action="?/updateAdvanced" use:enhance class="space-y-4">
           <label class="block text-[13px] font-semibold">Termos de pesquisa<textarea name="searchAliases" rows="4" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.searchAliases.join("\n")}</textarea></label>
           <label class="block text-[13px] font-semibold">Conhecimento adicional da IA<textarea name="assistantKnowledge" rows="6" maxlength="40000" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.assistantKnowledge}</textarea></label>
           <label class="block text-[13px] font-semibold">Notas internas<textarea name="internalSupportNotes" rows="4" maxlength="40000" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.internalSupportNotes}</textarea></label>
           <div class="flex justify-end"><button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar configurações</button></div>
         </form>
       {:else}
-        <form method="POST" action="?/updateFeaturedVideo" enctype="multipart/form-data" class="space-y-4">
+        <form method="POST" action="?/updateFeaturedVideo" use:enhance enctype="multipart/form-data" class="space-y-4">
           {#if !data.content.featuredVideo?.storageKey}
             <label class="block text-[13px] font-semibold">URL do vídeo<input name="sourceUrl" value={data.content.featuredVideo?.sourceUrl ?? ""} placeholder="https://youtube.com/..." class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
             <label class="block text-[13px] font-semibold">Ou selecione MP4<input name="videoFile" type="file" accept="video/mp4,.mp4" class="mt-1.5 block w-full rounded-xl border border-[#DDE1EA] p-3 text-[13px]"/></label>
@@ -1440,8 +1440,125 @@
             <button type="submit" class="ml-auto min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar vídeo</button>
           </div>
         </form>
-        <form id="delete-featured-video" method="POST" action="?/deleteFeaturedVideo" on:submit={(event) => { if (!confirm("Excluir o vídeo principal?")) event.preventDefault(); }}></form>
+        <form id="delete-featured-video" method="POST" action="?/deleteFeaturedVideo" use:enhance on:submit={(event) => { if (!confirm("Excluir o vídeo principal?")) event.preventDefault(); }}></form>
       {/if}
+    </section>
+  </div>
+{/if}
+
+
+{#if createStepOpen && data.canEdit}
+  <div class="fixed inset-0 z-[148] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
+    <section role="dialog" aria-modal="true" aria-labelledby="create-help-step-title" class="max-h-[90vh] w-full max-w-[620px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+      <div class="mb-5 flex items-center justify-between">
+        <h2 id="create-help-step-title" class="text-[18px] font-semibold">Nova etapa</h2>
+        <button type="button" aria-label="Fechar" on:click={() => (createStepOpen = false)} class="rounded-lg p-2 text-[#6E7584] hover:bg-[#F3F4F7]"><X size={18}/></button>
+      </div>
+      <form method="POST" action="?/addStep" use:enhance class="space-y-4">
+        <label class="block text-[13px] font-semibold text-[#303746]">O que o usuário fará nesta etapa?
+          <input name="title" required minlength="2" maxlength="180" placeholder="Ex.: Acessar o menu Cadastros" class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/>
+        </label>
+        <label class="block text-[13px] font-semibold text-[#303746]">Descrição (opcional)
+          <textarea name="description" maxlength="2000" rows="3" placeholder="Orientação inicial da etapa" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]"></textarea>
+        </label>
+        <details class="rounded-xl border border-[#E2E5ED] p-3">
+          <summary class="cursor-pointer text-[13px] font-semibold text-[#000A57]">Instruções adicionais para a IA</summary>
+          <textarea name="assistantKnowledge" maxlength="20000" rows="4" aria-label="Instruções adicionais para a IA" class="mt-3 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]"></textarea>
+        </details>
+        {#if form?.message}<p role="alert" class="text-[13px] font-medium text-[#9B2C2C]">{form.message}</p>{/if}
+        <div class="flex justify-end gap-2">
+          <button type="button" on:click={() => (createStepOpen = false)} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[13px] font-semibold">Cancelar</button>
+          <button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Criar etapa</button>
+        </div>
+      </form>
+    </section>
+  </div>
+{/if}
+
+{#if editingBlock && data.canEdit}
+  {@const editingBlockIndex = reviewSteps.find((step) => step.id === editBlockStepId)?.blocks.findIndex((block) => block.id === editingBlock.id) ?? -1}
+  {@const editingBlockCount = reviewSteps.find((step) => step.id === editBlockStepId)?.blocks.length ?? 0}
+  <div class="fixed inset-0 z-[148] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
+    <section role="dialog" aria-modal="true" aria-labelledby="help-block-edit-title" class="max-h-[90vh] w-full max-w-[670px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+      <div class="mb-5 flex items-center justify-between">
+        <h2 id="help-block-edit-title" class="text-[18px] font-semibold">{editingBlock.blockType === "image" ? "Imagem" : editingBlock.blockType === "file" ? "Arquivo" : editingBlock.blockType === "notice" ? "Aviso" : editingBlock.blockType === "link" ? "Link" : "Texto"}</h2>
+        <button type="button" aria-label="Fechar" on:click={() => (editBlockId = null)} class="rounded-lg p-2 text-[#6E7584] hover:bg-[#F3F4F7]"><X size={18}/></button>
+      </div>
+      <form id="help-block-edit-form" method="POST" action="?/updateBlock" use:enhance class="space-y-4">
+        <input type="hidden" name="stepId" value={editBlockStepId}/>
+        <input type="hidden" name="blockId" value={editingBlock.id}/>
+        <input type="hidden" name="blockType" value={editingBlock.blockType}/>
+        {#if editingBlock.blockType === "text" || editingBlock.blockType === "notice"}
+          <label class="block text-[13px] font-semibold">Conteúdo
+            <textarea name="textContent" required maxlength="50000" rows="8" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px] leading-6">{editingBlock.textContent}</textarea>
+          </label>
+          {#if editingBlock.blockType === "notice"}
+            <label class="block text-[13px] font-semibold">Tipo de aviso
+              <select name="noticeVariant" class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[14px]">
+                {#each [["info","Informação"],["warning","Atenção"],["success","Sucesso"],["danger","Importante"]] as option}
+                  <option value={option[0]} selected={(editingBlock.noticeVariant ?? "info") === option[0]}>{option[1]}</option>
+                {/each}
+              </select>
+            </label>
+          {/if}
+        {:else if editingBlock.blockType === "link"}
+          <label class="block text-[13px] font-semibold">Texto do link
+            <input name="linkLabel" required maxlength="240" value={editingBlock.linkLabel ?? ""} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/>
+          </label>
+          <label class="block text-[13px] font-semibold">Endereço
+            <input name="linkUrl" required type="url" value={editingBlock.linkUrl ?? ""} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/>
+          </label>
+        {:else}
+          {#if !editingBlock.asset?.storageKey}
+            <label class="block text-[13px] font-semibold">URL do arquivo ou imagem
+              <input name="sourceUrl" type="url" value={editingBlock.asset?.sourceUrl ?? ""} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/>
+            </label>
+          {:else}
+            <input type="hidden" name="sourceUrl" value={editingBlock.asset?.sourceUrl ?? ""}/>
+            <p class="text-[13px] text-[#737989]">Arquivo armazenado no F10.</p>
+          {/if}
+          <label class="block text-[13px] font-semibold">Texto alternativo
+            <input name="altText" maxlength="500" value={editingBlock.asset?.altText ?? ""} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/>
+          </label>
+          <label class="block text-[13px] font-semibold">Descrição para IA
+            <textarea name="assistantDescription" maxlength="20000" rows="4" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{editingBlock.asset?.assistantDescription ?? ""}</textarea>
+          </label>
+          <label class="block text-[13px] font-semibold">Texto extraído (opcional)
+            <textarea name="extractedText" maxlength="200000" rows="3" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{editingBlock.asset?.extractedText ?? ""}</textarea>
+          </label>
+          <input type="hidden" name="assistantSummary" value={editingBlock.asset?.assistantSummary ?? ""}/>
+          <input type="hidden" name="subtitles" value={editingBlock.asset?.subtitles ?? ""}/>
+          {#if editingBlock.blockType === "file"}
+            <label class="block text-[13px] font-semibold">Nome do arquivo
+              <input name="linkLabel" maxlength="240" value={editingBlock.linkLabel ?? ""} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/>
+            </label>
+          {/if}
+        {/if}
+        {#if form?.message}<p role="alert" class="text-[13px] font-medium text-[#9B2C2C]">{form.message}</p>{/if}
+        <div class="flex justify-end gap-2">
+          <button type="button" on:click={() => (editBlockId = null)} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[13px] font-semibold">Cancelar</button>
+          <button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar bloco</button>
+        </div>
+      </form>
+      <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#EEF0F5] pt-4">
+        <div class="flex gap-2">
+          {#each [["up","Subir"],["down","Descer"]] as direction, directionIndex}
+            <form method="POST" action="?/moveBlock" use:enhance>
+              <input type="hidden" name="stepId" value={editBlockStepId}/>
+              <input type="hidden" name="blockId" value={editingBlock.id}/>
+              <input type="hidden" name="direction" value={direction[0]}/>
+              <button type="submit" disabled={directionIndex === 0 ? editingBlockIndex === 0 : editingBlockIndex >= editingBlockCount - 1} class="inline-flex min-h-9 items-center gap-1 rounded-lg border border-[#DDE1EA] px-3 text-[13px] font-semibold text-[#000A57] disabled:opacity-35">
+                {#if directionIndex === 0}<ArrowUp size={14}/>{:else}<ArrowDown size={14}/>{/if}{direction[1]}
+              </button>
+            </form>
+          {/each}
+        </div>
+        <form method="POST" action="?/deleteBlock" use:enhance on:submit={(event) => { if (!confirm("Excluir este bloco?")) event.preventDefault(); }}>
+          <input type="hidden" name="stepId" value={editBlockStepId}/>
+          <input type="hidden" name="blockId" value={editingBlock.id}/>
+          <button type="submit" class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#F0C8C8] px-3 text-[13px] font-semibold text-[#9B2C2C]"><Trash2 size={15}/>Excluir bloco</button>
+        </form>
+      </div>
     </section>
   </div>
 {/if}
@@ -1450,13 +1567,31 @@
   <div class="fixed inset-0 z-[148] flex items-center justify-center bg-[#050A1A]/60 px-4" role="presentation">
     <section role="dialog" aria-modal="true" aria-label="Configurar etapa" class="max-h-[85vh] w-full max-w-[620px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
       <div class="mb-5 flex justify-between gap-3"><h2 class="text-[18px] font-semibold">Configurar etapa</h2><button type="button" aria-label="Fechar" on:click={() => (stepModalId = null)}><X size={18}/></button></div>
-      <form method="POST" action="?/updateStep" class="space-y-4">
+      <form method="POST" action="?/updateStep" use:enhance class="space-y-4">
         <input type="hidden" name="stepId" value={editingStep.id}/>
         <label class="block text-[13px] font-semibold">Título<input name="title" minlength="2" required maxlength="180" value={editingStep.title} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
         <label class="block text-[13px] font-semibold">Descrição<input name="description" maxlength="2000" value={editingStep.description} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
         <label class="block text-[13px] font-semibold">Conhecimento adicional da IA<textarea name="assistantKnowledge" maxlength="20000" rows="6" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{editingStep.assistantKnowledge}</textarea></label>
-        <div class="flex justify-end"><button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar etapa</button></div>
+        {#if form?.message}<p role="alert" class="text-[13px] font-medium text-[#9B2C2C]">{form.message}</p>{/if}
+        <div class="flex justify-end gap-2">
+          <button type="button" on:click={() => (stepModalId = null)} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[13px] font-semibold">Cancelar</button>
+          <button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar etapa</button>
+        </div>
       </form>
+      <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#EEF0F5] pt-4">
+        <div class="flex gap-2">
+          {#each [["up","Subir"],["down","Descer"]] as direction, directionIndex}
+            <form method="POST" action="?/moveStep" use:enhance>
+              <input type="hidden" name="stepId" value={editingStep.id}/>
+              <input type="hidden" name="direction" value={direction[0]}/>
+              <button type="submit" disabled={directionIndex === 0 ? selectedStepIndex === 0 : selectedStepIndex === reviewSteps.length - 1} class="inline-flex min-h-9 items-center gap-1 rounded-lg border border-[#DDE1EA] px-3 text-[13px] font-semibold text-[#000A57] disabled:opacity-35">
+                {#if directionIndex === 0}<ArrowUp size={14}/>{:else}<ArrowDown size={14}/>{/if}{direction[1]}
+              </button>
+            </form>
+          {/each}
+        </div>
+        <button type="button" on:click={() => { stepModalId = null; if (editingStep) openDeleteStep(editingStep); }} class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#F0C8C8] px-3 text-[13px] font-semibold text-[#9B2C2C]"><Trash2 size={15}/>Excluir etapa</button>
+      </div>
     </section>
   </div>
 {/if}
