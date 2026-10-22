@@ -182,6 +182,62 @@ export async function uploadSupportMessageAttachments(
   });
 }
 
+
+const AGENT_ATTACHMENT_TYPES = new Map<string, string>([
+  ["image/png", "png"], ["image/jpeg", "jpg"], ["image/webp", "webp"],
+  ["application/pdf", "pdf"],
+  ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"],
+  ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx"],
+  ["application/zip", "zip"], ["text/plain", "txt"], ["text/csv", "csv"],
+]);
+
+/** Files belong to the message, not the ticket-level upload drawer. */
+export async function uploadSupportAgentMessageAttachments(
+  ticketId: string,
+  messageId: string,
+  files: File[],
+): Promise<StoredSupportAttachment[]> {
+  if (!files.length) return [];
+  if (files.length > 4) throw new Error("SUPPORT_ATTACHMENT_TOO_MANY");
+  const stored: StoredSupportAttachment[] = [];
+  let total = 0;
+  try {
+    for (const file of files) {
+      const mime = file.type.toLowerCase().split(";")[0].trim();
+      const extension = AGENT_ATTACHMENT_TYPES.get(mime);
+      if (!extension || !file.name.toLowerCase().endsWith(`.${extension}`)) {
+        throw new Error("SUPPORT_ATTACHMENT_TYPE_INVALID");
+      }
+      if (!file.size || file.size > 10 * 1024 * 1024) {
+        throw new Error("SUPPORT_ATTACHMENT_SIZE_INVALID");
+      }
+      total += file.size;
+      if (total > 12 * 1024 * 1024) throw new Error("SUPPORT_ATTACHMENT_TOTAL_TOO_LARGE");
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const detected = detectedPortalType(bytes);
+      const isOffice = extension === "docx" || extension === "xlsx" || extension === "zip";
+      const isZip = bytes[0] === 0x50 && bytes[1] === 0x4b;
+      const isText = extension === "txt" || extension === "csv";
+      if (isOffice ? !isZip : isText ? bytes.includes(0) : detected !== mime) {
+        throw new Error("SUPPORT_ATTACHMENT_TYPE_INVALID");
+      }
+      const key = `support/tickets/${ticketId}/${messageId}/${randomUUID()}.${extension}`;
+      const item = await putAssetObject(key, bytes, mime);
+      stored.push({
+        storageKey: item.key,
+        originalName: safeFileName(file.name),
+        mimeType: mime,
+        sizeBytes: item.size,
+        checksumSha256: item.checksumSha256,
+      });
+    }
+    return stored;
+  } catch (cause) {
+    await deleteStoredSupportImages(stored);
+    throw cause;
+  }
+}
+
 export async function deleteStoredSupportImages(images: StoredSupportAttachment[]): Promise<void> {
   await Promise.all(images.map((image) => deleteAssetObject(image.storageKey).catch(() => undefined)));
 }
