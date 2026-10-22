@@ -220,7 +220,7 @@
     if (!value) return false;
     try {
       const url = new URL(value);
-      return url.protocol === "https:" && /\\.mp4$/i.test(url.pathname);
+      return url.protocol === "https:" && /\.mp4$/i.test(url.pathname);
     } catch {
       return false;
     }
