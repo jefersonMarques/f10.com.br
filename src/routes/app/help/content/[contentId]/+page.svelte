@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
   import { page } from "$app/stores";
-  import { enhance } from "$app/forms";
+  import { enhance, type SubmitFunction } from "$app/forms";
   import { onDestroy, onMount } from "svelte";
   import {
     AlertTriangle,
@@ -886,6 +886,17 @@
     selectedStepId = stepId;
   }
 
+  const submitEditorModal: SubmitFunction = () => async ({ result, update }) => {
+    // Leave the dialog open with its inputs intact when validation fails.
+    if (result.type === "redirect" || result.type === "success") {
+      createStepOpen = false;
+      stepModalId = null;
+      editBlockId = null;
+      settingsModal = null;
+    }
+    await update({ reset: false });
+  };
+
   function openCreateStep(): void {
     if (!allowModal()) return;
     createStepOpen = true;
@@ -1429,7 +1440,7 @@
       </div>
       {#if settingsModal === "general"}
         {#if form?.message}<p role="alert" class="mb-4 rounded-lg bg-[#FFF5F5] p-3 text-[13px] text-[#9B2C2C]">{form.message}</p>{/if}
-        <form method="POST" action="?/updateContent" use:enhance class="space-y-4">
+        <form method="POST" action="?/updateContent" use:enhance={submitEditorModal} class="space-y-4">
           <label class="block text-[13px] font-semibold">Título<input name="title" required minlength="4" maxlength="160" value={data.content.title} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
           <label class="block text-[13px] font-semibold">Endereço<input name="slug" maxlength="120" value={data.content.slug} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
           <label class="block text-[13px] font-semibold">Resumo público<textarea name="summary" maxlength="320" rows="3" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.summary}</textarea></label>
@@ -1443,14 +1454,14 @@
           <div class="flex justify-end"><button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar informações</button></div>
         </form>
       {:else if settingsModal === "advanced"}
-        <form method="POST" action="?/updateAdvanced" use:enhance class="space-y-4">
+        <form method="POST" action="?/updateAdvanced" use:enhance={submitEditorModal} class="space-y-4">
           <label class="block text-[13px] font-semibold">Termos de pesquisa<textarea name="searchAliases" rows="4" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.searchAliases.join("\n")}</textarea></label>
           <label class="block text-[13px] font-semibold">Conhecimento adicional da IA<textarea name="assistantKnowledge" rows="6" maxlength="40000" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.assistantKnowledge}</textarea></label>
           <label class="block text-[13px] font-semibold">Notas internas<textarea name="internalSupportNotes" rows="4" maxlength="40000" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.internalSupportNotes}</textarea></label>
           <div class="flex justify-end"><button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar configurações</button></div>
         </form>
       {:else}
-        <form method="POST" action="?/updateFeaturedVideo" use:enhance enctype="multipart/form-data" class="space-y-4">
+        <form method="POST" action="?/updateFeaturedVideo" use:enhance={submitEditorModal} enctype="multipart/form-data" class="space-y-4">
           {#if !data.content.featuredVideo?.storageKey}
             <label class="block text-[13px] font-semibold">URL do vídeo<input name="sourceUrl" value={data.content.featuredVideo?.sourceUrl ?? ""} placeholder="https://youtube.com/..." class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
             <label class="block text-[13px] font-semibold">Ou selecione MP4<input name="videoFile" type="file" accept="video/mp4,.mp4" class="mt-1.5 block w-full rounded-xl border border-[#DDE1EA] p-3 text-[13px]"/></label>
@@ -1465,7 +1476,7 @@
             <button type="submit" class="ml-auto min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar vídeo</button>
           </div>
         </form>
-        <form id="delete-featured-video" method="POST" action="?/deleteFeaturedVideo" use:enhance on:submit={(event) => { if (!confirm("Excluir o vídeo principal?")) event.preventDefault(); }}></form>
+        <form id="delete-featured-video" method="POST" action="?/deleteFeaturedVideo" on:submit={(event) => { if (!confirm("Excluir o vídeo principal?")) event.preventDefault(); }}></form>
       {/if}
     </section>
   </div>
@@ -1479,7 +1490,7 @@
         <h2 id="create-help-step-title" class="text-[18px] font-semibold">Nova etapa</h2>
         <button type="button" aria-label="Fechar" on:click={() => (createStepOpen = false)} class="rounded-lg p-2 text-[#6E7584] hover:bg-[#F3F4F7]"><X size={18}/></button>
       </div>
-      <form method="POST" action="?/addStep" use:enhance class="space-y-4">
+      <form method="POST" action="?/addStep" use:enhance={submitEditorModal} class="space-y-4">
         <label class="block text-[13px] font-semibold text-[#303746]">O que o usuário fará nesta etapa?
           <input name="title" required minlength="2" maxlength="180" placeholder="Ex.: Acessar o menu Cadastros" class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/>
         </label>
@@ -1509,7 +1520,7 @@
         <h2 id="help-block-edit-title" class="text-[18px] font-semibold">{editingBlock.blockType === "image" ? "Imagem" : editingBlock.blockType === "file" ? "Arquivo" : editingBlock.blockType === "notice" ? "Aviso" : editingBlock.blockType === "link" ? "Link" : "Texto"}</h2>
         <button type="button" aria-label="Fechar" on:click={() => (editBlockId = null)} class="rounded-lg p-2 text-[#6E7584] hover:bg-[#F3F4F7]"><X size={18}/></button>
       </div>
-      <form id="help-block-edit-form" method="POST" action="?/updateBlock" use:enhance class="space-y-4">
+      <form id="help-block-edit-form" method="POST" action="?/updateBlock" use:enhance={submitEditorModal} class="space-y-4">
         <input type="hidden" name="stepId" value={editBlockStepId}/>
         <input type="hidden" name="blockId" value={editingBlock.id}/>
         <input type="hidden" name="blockType" value={editingBlock.blockType}/>
@@ -1568,7 +1579,7 @@
       <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#EEF0F5] pt-4">
         <div class="flex gap-2">
           {#each [["up","Subir"],["down","Descer"]] as direction, directionIndex}
-            <form method="POST" action="?/moveBlock" use:enhance>
+            <form method="POST" action="?/moveBlock">
               <input type="hidden" name="stepId" value={editBlockStepId}/>
               <input type="hidden" name="blockId" value={editingBlock.id}/>
               <input type="hidden" name="direction" value={direction[0]}/>
@@ -1578,7 +1589,7 @@
             </form>
           {/each}
         </div>
-        <form method="POST" action="?/deleteBlock" use:enhance on:submit={(event) => { if (!confirm("Excluir este bloco?")) event.preventDefault(); }}>
+        <form method="POST" action="?/deleteBlock" on:submit={(event) => { if (!confirm("Excluir este bloco?")) event.preventDefault(); }}>
           <input type="hidden" name="stepId" value={editBlockStepId}/>
           <input type="hidden" name="blockId" value={editingBlock.id}/>
           <button type="submit" class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#F0C8C8] px-3 text-[13px] font-semibold text-[#9B2C2C]"><Trash2 size={15}/>Excluir bloco</button>
@@ -1592,7 +1603,7 @@
   <div class="fixed inset-0 z-[148] flex items-center justify-center bg-[#050A1A]/60 px-4" role="presentation">
     <section role="dialog" aria-modal="true" aria-label="Configurar etapa" class="max-h-[85vh] w-full max-w-[620px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
       <div class="mb-5 flex justify-between gap-3"><h2 class="text-[18px] font-semibold">Configurar etapa</h2><button type="button" aria-label="Fechar" on:click={() => (stepModalId = null)}><X size={18}/></button></div>
-      <form method="POST" action="?/updateStep" use:enhance class="space-y-4">
+      <form method="POST" action="?/updateStep" use:enhance={submitEditorModal} class="space-y-4">
         <input type="hidden" name="stepId" value={editingStep.id}/>
         <label class="block text-[13px] font-semibold">Título<input name="title" minlength="2" required maxlength="180" value={editingStep.title} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
         <label class="block text-[13px] font-semibold">Descrição<input name="description" maxlength="2000" value={editingStep.description} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
@@ -1606,7 +1617,7 @@
       <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#EEF0F5] pt-4">
         <div class="flex gap-2">
           {#each [["up","Subir"],["down","Descer"]] as direction, directionIndex}
-            <form method="POST" action="?/moveStep" use:enhance>
+            <form method="POST" action="?/moveStep">
               <input type="hidden" name="stepId" value={editingStep.id}/>
               <input type="hidden" name="direction" value={direction[0]}/>
               <button type="submit" disabled={directionIndex === 0 ? selectedStepIndex === 0 : selectedStepIndex === reviewSteps.length - 1} class="inline-flex min-h-9 items-center gap-1 rounded-lg border border-[#DDE1EA] px-3 text-[13px] font-semibold text-[#000A57] disabled:opacity-35">
