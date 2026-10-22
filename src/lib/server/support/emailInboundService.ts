@@ -347,7 +347,13 @@ export async function claimNextEmailInboundEvent(): Promise<SupportEmailInboundE
         sql`${supportEmailInboundEvents.attemptCount} < ${supportEmailInboundEvents.maxAttempts}`,
       ),
     )
-    .orderBy(asc(supportEmailInboundEvents.receivedAt))
+    // Fresh deliveries must never wait behind historical media recovery.
+    // processedAt remains populated when a previously processed event is requeued.
+    .orderBy(
+      sql`CASE WHEN ${supportEmailInboundEvents.processedAt} IS NOT NULL THEN 1 ELSE 0 END`,
+      sql`CASE WHEN ${supportEmailInboundEvents.status} = 'pending' THEN 0 ELSE 1 END`,
+      asc(supportEmailInboundEvents.receivedAt),
+    )
     .limit(1);
   if (!candidate) return null;
 
@@ -788,7 +794,7 @@ export async function failEmailInboundEvent(
       leaseExpiresAt: null,
       lastErrorCode: code,
       lastErrorMessage: message,
-      processedAt: canRetry ? null : now,
+      processedAt: canRetry ? event.processedAt : now,
       updatedAt: now,
     })
     .where(eq(supportEmailInboundEvents.id, event.id));
