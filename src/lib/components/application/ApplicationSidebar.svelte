@@ -169,7 +169,7 @@
         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-primary text-sm font-bold text-white">F10</span>
         <span class={!expanded ? "lg:hidden" : ""}>
           <strong class="block text-[14px] font-semibold leading-4">Operations</strong>
-          <small class="mt-0.5 block text-[11px] font-medium text-app-text-soft">Área interna</small>
+          <small class="mt-0.5 block text-[13px] font-medium text-app-text-soft">Área interna</small>
         </span>
       </a>
 
@@ -219,7 +219,7 @@
                   {#if expanded && (groupOpen || groupActive)}
                     <div class="ml-[22px] mt-1 space-y-1 border-l border-app-border pl-3">
                       {#each item.children as child}
-                        <a href={child.href} class={`flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-[11px] font-semibold transition ${isActiveNavigationItem(pathname, child.href) ? "bg-app-info-bg text-app-primary" : "text-app-text-muted hover:bg-app-muted hover:text-app-primary"}`}>
+                        <a href={child.href} class={`flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-[13px] font-semibold transition ${isActiveNavigationItem(pathname, child.href) ? "bg-app-info-bg text-app-primary" : "text-app-text-muted hover:bg-app-muted hover:text-app-primary"}`}>
                           <svelte:component this={child.icon} size={15} aria-hidden="true" />
                           <span>{child.label}</span>
                         </a>
@@ -238,7 +238,7 @@
                   <svelte:component this={item.icon} size={18} aria-hidden="true" />
                   {#if expanded}<span class="flex-1">{item.label}</span>{/if}
                   {#if badge > 0}
-                    <span class={`application-text-meta inline-flex items-center justify-center rounded-full bg-red-600 font-bold text-white ${!expanded ? "absolute right-0 top-0 h-4 min-w-4 px-1 text-[8px]" : "min-w-5 px-1.5 py-0.5"}`}>{Math.min(badge, 99)}</span>
+                    <span class={`application-text-meta inline-flex items-center justify-center rounded-full bg-red-600 font-bold text-white ${!expanded ? "absolute right-0 top-0 h-4 min-w-4 px-1 text-[12px]" : "min-w-5 px-1.5 py-0.5"}`}>{Math.min(badge, 99)}</span>
                   {:else if expanded}
                     <ChevronRight size={15} aria-hidden="true" />
                   {/if}
