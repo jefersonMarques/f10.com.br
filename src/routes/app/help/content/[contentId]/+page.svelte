@@ -1547,6 +1547,9 @@
         <label class="block text-[13px] font-semibold text-[#303746]">Descrição (opcional)
           <textarea name="description" maxlength="2000" rows="3" placeholder="Orientação inicial da etapa" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]"></textarea>
         </label>
+        <label class="block text-[13px] font-semibold text-[#303746]">Instrução para o cliente (opcional)
+          <textarea name="initialText" maxlength="50000" rows="6" placeholder="Escreva aqui o que o cliente precisa fazer..." class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px] leading-6"></textarea>
+        </label>
         <details class="rounded-xl border border-[#E2E5ED] p-3">
           <summary class="cursor-pointer text-[13px] font-semibold text-[#000A57]">Instruções adicionais para a IA</summary>
           <textarea name="assistantKnowledge" maxlength="20000" rows="4" aria-label="Instruções adicionais para a IA" class="mt-3 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]"></textarea>
