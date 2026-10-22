@@ -2,7 +2,7 @@ import { error, type RequestHandler } from "@sveltejs/kit";
 import { getCustomerF10Ticket } from "$lib/server/customerPortal/customerF10TicketRepository";
 import { requireCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import {
-  getSupportMessageAttachment,
+  getPublicSupportMessageAttachment,
   readSupportMessageAttachment,
 } from "$lib/server/support/supportMessageAttachmentRepository";
 
@@ -19,7 +19,7 @@ export const GET: RequestHandler = async ({ params, cookies, url }) => {
   const ticket = await getCustomerF10Ticket(session, ticketId);
   if (!ticket) throw error(404, "Anexo não encontrado.");
 
-  const attachment = await getSupportMessageAttachment(attachmentId, ticketId);
+  const attachment = await getPublicSupportMessageAttachment(attachmentId, ticketId);
   if (!attachment) throw error(404, "Anexo não encontrado.");
 
   const stored = await readSupportMessageAttachment(attachment.storageKey);
