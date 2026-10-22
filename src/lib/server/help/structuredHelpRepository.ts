@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, max } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, max, ne, or } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { helpPublications } from "$lib/server/db/helpPublications";
@@ -156,6 +156,96 @@ async function getBlockRow(blockId: string) {
     .where(eq(helpStepBlocks.id, blockId))
     .limit(1);
   return block ?? null;
+}
+
+export type HelpContentListFilters = {
+  query: string;
+  status: string;
+  categoryId: string;
+  sort: "updated" | "title" | "status";
+  page: number;
+  perPage: number;
+};
+
+export async function searchStructuredHelpContents(filters: HelpContentListFilters) {
+  const db = getDatabase();
+  const search = filters.query.trim().slice(0, 160);
+  const conditions = [
+    ne(helpContents.contentKind, "update"),
+    ...(search
+      ? [or(ilike(helpContents.title, `%${search}%`), ilike(helpContents.summary, `%${search}%`))!]
+      : []),
+    ...(filters.status ? [eq(helpContents.status, filters.status as typeof helpContents.status.enumValues[number])] : []),
+    ...(filters.categoryId
+      ? [inArray(
+          helpContents.id,
+          db.select({ id: helpContentCategories.contentId })
+            .from(helpContentCategories)
+            .where(eq(helpContentCategories.categoryId, filters.categoryId)),
+        )]
+      : []),
+  ];
+  const where = and(...conditions);
+  const orderBy = filters.sort === "title"
+    ? [asc(helpContents.title), asc(helpContents.id)]
+    : filters.sort === "status"
+      ? [asc(helpContents.status), asc(helpContents.title)]
+      : [desc(helpContents.updatedAt), asc(helpContents.id)];
+
+  const [{ total }, rows] = await Promise.all([
+    db.select({ total: count() }).from(helpContents).where(where).then((items) => items[0] ?? { total: 0 }),
+    db.select({
+      id: helpContents.id,
+      slug: helpContents.slug,
+      title: helpContents.title,
+      contentKind: helpContents.contentKind,
+      summary: helpContents.summary,
+      status: helpContents.status,
+      publishedAt: helpContents.publishedAt,
+      updatedAt: helpContents.updatedAt,
+    })
+      .from(helpContents)
+      .where(where)
+      .orderBy(...orderBy)
+      .limit(filters.perPage)
+      .offset((filters.page - 1) * filters.perPage),
+  ]);
+
+  if (rows.length === 0) return { contents: [], total: Number(total) };
+  const ids = rows.map((row) => row.id);
+  const [steps, categories] = await Promise.all([
+    db.select({ contentId: helpContentSteps.contentId, total: count() })
+      .from(helpContentSteps)
+      .where(inArray(helpContentSteps.contentId, ids))
+      .groupBy(helpContentSteps.contentId),
+    db.select({
+      contentId: helpContentCategories.contentId,
+      id: helpCategories.id,
+      name: helpCategories.name,
+      slug: helpCategories.slug,
+    })
+      .from(helpContentCategories)
+      .innerJoin(helpCategories, eq(helpContentCategories.categoryId, helpCategories.id))
+      .where(inArray(helpContentCategories.contentId, ids))
+      .orderBy(asc(helpCategories.sortOrder), asc(helpCategories.name)),
+  ]);
+
+  const stepsByContent = new Map(steps.map((step) => [step.contentId, Number(step.total)]));
+  const categoriesByContent = new Map<string, Array<{ id: string; name: string; slug: string }>>();
+  for (const category of categories) {
+    const current = categoriesByContent.get(category.contentId) ?? [];
+    current.push({ id: category.id, name: category.name, slug: category.slug });
+    categoriesByContent.set(category.contentId, current);
+  }
+
+  return {
+    total: Number(total),
+    contents: rows.map((row) => ({
+      ...row,
+      stepCount: stepsByContent.get(row.id) ?? 0,
+      categories: categoriesByContent.get(row.id) ?? [],
+    })),
+  };
 }
 
 export async function listStructuredHelpContents() {
