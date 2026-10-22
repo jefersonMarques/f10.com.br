@@ -15,6 +15,7 @@ import {
   archiveTicketWorkflowStage,
   getTicketWorkflowBoard,
   listTicketWorkflowConfiguration,
+  moveTicketAreaStage,
   moveTicketGlobalStage,
   moveTicketToWorkflowLocation,
   updateTicketWorkflowStage,
@@ -373,6 +374,17 @@ async function ticketStatusBeforeMove(ticketId: string): Promise<string | null> 
     .where(eq(tickets.id, ticketId))
     .limit(1);
   return ticket?.status ?? null;
+}
+
+export async function moveTicketAreaStageWithNotifications(
+  actorUserId: string,
+  permissions: SupportPermissionMap,
+  ticketId: string,
+  targetStageId: string,
+): Promise<void> {
+  const previousStatus = await ticketStatusBeforeMove(ticketId);
+  await moveTicketAreaStage(actorUserId, permissions, ticketId, targetStageId);
+  await notifyAfterWorkflowMove(ticketId, previousStatus);
 }
 
 export async function moveTicketGlobalStageWithRules(
