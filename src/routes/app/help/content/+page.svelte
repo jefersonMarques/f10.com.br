@@ -337,7 +337,7 @@
                       {/if}
                       {#if data.canEdit}
                         <div class="mt-1 border-t border-[#EEF0F5] pt-1">
-                          <p class="px-3 py-1 text-[11px] text-[#89909B]">Ordem pública</p>
+                          <p class="px-3 py-1 text-[13px] text-[#89909B]">Ordem pública</p>
                           <div class="flex gap-2 px-2">
                             <form method="POST" action="?/move"><input type="hidden" name="contentId" value={content.id}/><input type="hidden" name="direction" value="up"/><button type="submit" title="Subir na ordem pública" aria-label="Subir na ordem pública" class="rounded-lg border border-[#E0E4EC] p-2"><ArrowUp size={15}/></button></form>
                             <form method="POST" action="?/move"><input type="hidden" name="contentId" value={content.id}/><input type="hidden" name="direction" value="down"/><button type="submit" title="Descer na ordem pública" aria-label="Descer na ordem pública" class="rounded-lg border border-[#E0E4EC] p-2"><ArrowDown size={15}/></button></form>
@@ -419,7 +419,7 @@
               <span class="application-text-meta rounded-full bg-[#FFF3E9] px-2 py-1 font-bold text-[#A9510D]">{processingStatusLabel(processingTargetJob).toUpperCase()}</span>
             {/if}
           </div>
-          <p class="mt-1 text-[10px] text-[#858A98]">Histórico do processamento do vídeo</p>
+          <p class="mt-1 text-[12px] text-[#858A98]">Histórico do processamento do vídeo</p>
         </div>
         <button type="button" on:click={closeProcessingDetails} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482]" aria-label="Fechar"><X size={16}/></button>
       </div>
@@ -436,8 +436,8 @@
             {/if}
           </span>
           <div class="min-w-0 flex-1">
-            <strong class="block text-[11px] text-[#343A49]">{processingCurrentLabel(processingTargetJob)}</strong>
-            {#if processingCurrentDetail(processingTargetJob)}<p class="mt-1 text-[10px] leading-5 text-[#747A89]">{processingCurrentDetail(processingTargetJob)}</p>{/if}
+            <strong class="block text-[13px] text-[#343A49]">{processingCurrentLabel(processingTargetJob)}</strong>
+            {#if processingCurrentDetail(processingTargetJob)}<p class="mt-1 text-[12px] leading-5 text-[#747A89]">{processingCurrentDetail(processingTargetJob)}</p>{/if}
             <div class="mt-2 flex flex-wrap gap-2">
               {#if processingTargetJob.totalParts}
                 <span class="application-text-meta rounded-full bg-white px-2 py-1 font-semibold text-[#666D7C]">{Math.min(processingTargetJob.completedParts, processingTargetJob.totalParts)}/{processingTargetJob.totalParts} partes</span>
@@ -451,7 +451,7 @@
       </div>
 
       <div class="mt-5">
-        <h3 class="text-[11px] font-semibold text-[#303645]">Etapas realizadas</h3>
+        <h3 class="text-[13px] font-semibold text-[#303645]">Etapas realizadas</h3>
         {#if processingTargetJob.events.length > 0}
           <div class="mt-3 space-y-1.5">
             {#each processingTargetJob.events as event, eventIndex}
@@ -469,33 +469,33 @@
                 </span>
                 <div class="min-w-0 flex-1">
                   <div class="flex flex-wrap items-center justify-between gap-2">
-                    <strong class="text-[10px] font-semibold text-[#454C5D]">{event.label}</strong>
+                    <strong class="text-[12px] font-semibold text-[#454C5D]">{event.label}</strong>
                     <span class="application-text-meta text-[#9A9EAA]">{processingTime(event.createdAt)}</span>
                   </div>
-                  {#if event.detail}<p class="mt-0.5 text-[9px] leading-4 text-[#858B99]">{event.detail}</p>{/if}
+                  {#if event.detail}<p class="mt-0.5 text-[12px] leading-4 text-[#858B99]">{event.detail}</p>{/if}
                 </div>
               </div>
             {/each}
           </div>
         {:else}
-          <div class="mt-3 rounded-xl border border-[#E2E5ED] bg-[#FAFAFC] px-4 py-3 text-[10px] text-[#777D8D]">Esta execução é anterior ao histórico detalhado. O status atual continua preservado.</div>
+          <div class="mt-3 rounded-xl border border-[#E2E5ED] bg-[#FAFAFC] px-4 py-3 text-[12px] text-[#777D8D]">Esta execução é anterior ao histórico detalhado. O status atual continua preservado.</div>
         {/if}
       </div>
 
       <div class="mt-5 flex flex-wrap justify-end gap-2">
-        <button type="button" on:click={closeProcessingDetails} class="min-h-10 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[10px] font-semibold text-[#626979]">Fechar</button>
+        <button type="button" on:click={closeProcessingDetails} class="min-h-10 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[12px] font-semibold text-[#626979]">Fechar</button>
         {#if isProcessingActive(processingTargetJob.status) && data.canEdit}
-          <button type="button" on:click={() => cancelProcessing(processingTargetJob)} disabled={cancellingJobId === processingTargetJob.id} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#F0C8C8] bg-white px-4 text-[10px] font-semibold text-[#9B2C2C] disabled:opacity-50">
+          <button type="button" on:click={() => cancelProcessing(processingTargetJob)} disabled={cancellingJobId === processingTargetJob.id} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#F0C8C8] bg-white px-4 text-[12px] font-semibold text-[#9B2C2C] disabled:opacity-50">
             {#if cancellingJobId === processingTargetJob.id}<LoaderCircle size={14} class="animate-spin"/>{:else}<X size={14}/>{/if}
             Cancelar processamento
           </button>
         {:else if processingTargetJob.status === "failed" && data.canEdit}
-          <button type="button" on:click={() => retryProcessing(processingTargetJob)} disabled={retryingJobId === processingTargetJob.id} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">
+          <button type="button" on:click={() => retryProcessing(processingTargetJob)} disabled={retryingJobId === processingTargetJob.id} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white disabled:opacity-50">
             {#if retryingJobId === processingTargetJob.id}<LoaderCircle size={14} class="animate-spin"/>{:else}<RefreshCw size={14}/>{/if}
             Tentar novamente
           </button>
         {:else if processingTargetJob.status === "completed"}
-          <a href={`/app/help/content/${processingTarget.id}/images`} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white"><ArrowRight size={14}/>Revisar conteúdo</a>
+          <a href={`/app/help/content/${processingTarget.id}/images`} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white"><ArrowRight size={14}/>Revisar conteúdo</a>
         {/if}
       </div>
     </section>
@@ -506,21 +506,21 @@
   <div class="fixed inset-0 z-[120] flex items-center justify-center bg-[#050A1A]/55 px-4" role="presentation" on:click={(event) => event.currentTarget === event.target && closeDeleteModal()}>
     <section role="dialog" aria-modal="true" aria-labelledby="delete-help-content-title" class="w-full max-w-[520px] rounded-[24px] border border-[#F0C8C8] bg-white p-5 shadow-2xl sm:p-6">
       <div class="flex items-start justify-between gap-4">
-        <div><h2 id="delete-help-content-title" class="text-[17px] font-semibold text-[#7F2525]">Excluir rascunho definitivamente</h2><p class="mt-1 text-[11px] leading-5 text-[#777D8D]">{deleteTarget.title}</p></div>
+        <div><h2 id="delete-help-content-title" class="text-[17px] font-semibold text-[#7F2525]">Excluir rascunho definitivamente</h2><p class="mt-1 text-[13px] leading-5 text-[#777D8D]">{deleteTarget.title}</p></div>
         <button type="button" on:click={closeDeleteModal} class="flex h-9 w-9 items-center justify-center rounded-lg text-[#777D8D] hover:bg-[#F3F4F7]" aria-label="Fechar"><X size={16}/></button>
       </div>
 
-      <div class="mt-4 rounded-2xl border border-[#F2DADA] bg-[#FFF7F7] px-4 py-3 text-[10px] leading-5 text-[#7D4A4A]">
+      <div class="mt-4 rounded-2xl border border-[#F2DADA] bg-[#FFF7F7] px-4 py-3 text-[12px] leading-5 text-[#7D4A4A]">
         Esta ação remove o conteúdo, versões editoriais, publicação e índice de pesquisa relacionados. Não pode ser desfeita.
         {#if deleteTarget.hasPublicVersion}<strong class="mt-2 block text-[#8C2F2F]">Este rascunho ainda possui uma versão pública anterior. Ela também será retirada imediatamente.</strong>{/if}
       </div>
 
       <form method="POST" action="?/discard" class="mt-5 space-y-4">
         <input type="hidden" name="contentId" value={deleteTarget.id}/>
-        <label class="block"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Digite <strong>quero excluir</strong> para confirmar</span><input name="confirmation" bind:value={deleteConfirmation} autocomplete="off" autofocus class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#9B2C2C]" /></label>
+        <label class="block"><span class="mb-1.5 block text-[13px] font-semibold text-[#4A5060]">Digite <strong>quero excluir</strong> para confirmar</span><input name="confirmation" bind:value={deleteConfirmation} autocomplete="off" autofocus class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px] outline-none focus:border-[#9B2C2C]" /></label>
         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button type="button" on:click={closeDeleteModal} class="min-h-10 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[11px] font-semibold text-[#626979]">Cancelar</button>
-          <button type="submit" disabled={!deleteConfirmationReady} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#9B2C2C] px-4 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Trash2 size={14}/>Excluir definitivamente</button>
+          <button type="button" on:click={closeDeleteModal} class="min-h-10 rounded-xl border border-[#DDE1EA] bg-white px-4 text-[13px] font-semibold text-[#626979]">Cancelar</button>
+          <button type="submit" disabled={!deleteConfirmationReady} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#9B2C2C] px-4 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Trash2 size={14}/>Excluir definitivamente</button>
         </div>
       </form>
     </section>
