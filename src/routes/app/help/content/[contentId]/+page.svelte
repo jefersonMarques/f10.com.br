@@ -1330,7 +1330,7 @@
           <label class="block text-[13px] font-semibold">Resumo público<textarea name="summary" maxlength="320" rows="3" class="mt-1.5 w-full rounded-xl border border-[#DDE1EA] p-3 text-[14px]">{data.content.summary}</textarea></label>
           {#each data.content.categories as category}
             <input type="hidden" name="categoryId" value={category.id}/>
-            <input type="hidden" name={`categoryDestination:${category.id}`} value={category.destinationUrl}/>
+            <label class="block text-[13px] font-semibold">Link específico para {category.name} (opcional)<input name={`categoryDestination:${category.id}`} value={category.destinationUrl} maxlength="1000" class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
           {/each}
           <input type="hidden" name="searchAliases" value={data.content.searchAliases.join("\n")}/>
           <input type="hidden" name="assistantKnowledge" value={data.content.assistantKnowledge}/>
