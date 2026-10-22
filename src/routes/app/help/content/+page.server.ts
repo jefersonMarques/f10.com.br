@@ -4,7 +4,6 @@ import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstant
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import {
-  listHelpArticleSequence,
   moveHelpArticle,
 } from "$lib/server/help/helpArticleSequenceRepository";
 import {
@@ -15,7 +14,7 @@ import {
 import { listHelpCategories } from "$lib/server/help/helpCategoryRepository";
 import {
   createStructuredHelpContent,
-  listStructuredHelpContents,
+  searchStructuredHelpContents,
 } from "$lib/server/help/structuredHelpRepository";
 import {
   getActiveHelpVideoProcessingJob,
@@ -49,33 +48,37 @@ function isManualCategoryAllowed(
   );
 }
 
-export const load: PageServerLoad = async ({ parent }) => {
+export const load: PageServerLoad = async ({ parent, url }) => {
   const layout = await parent();
   const permissions = new Map(
     layout.permissions.map((permission) => [permission.code, permission.scope]),
   );
-
   if (!hasPermission(permissions, "help.view")) {
     throw error(403, "Acesso não autorizado.");
   }
 
-  const [contents, publishedLinks, categories, sequence] = await Promise.all([
-    listStructuredHelpContents().then((items) => items.filter((content) => content.contentKind !== "update")),
+  const search = url.searchParams.get("q")?.trim().slice(0, 160) ?? "";
+  const statusInput = url.searchParams.get("status") ?? "";
+  const status = ["draft", "review", "published", "archived"].includes(statusInput)
+    ? statusInput : "";
+  const categoryInput = url.searchParams.get("category") ?? "";
+  const categoryId = isUuid(categoryInput) ? categoryInput : "";
+  const sortInput = url.searchParams.get("sort") ?? "";
+  const sort: "updated" | "title" | "status" =
+    sortInput === "title" || sortInput === "status" ? sortInput : "updated";
+  const page = Math.max(1, Math.min(100_000, Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1));
+  const perPageInput = Number(url.searchParams.get("perPage"));
+  const perPage = [25, 50, 100].includes(perPageInput) ? perPageInput : 25;
+  const filters = { query: search, status, categoryId, sort, page, perPage };
+
+  const [{ contents, total }, publishedLinks, categories] = await Promise.all([
+    searchStructuredHelpContents(filters),
     listPublishedStructuredHelpLinks(),
     listHelpCategories(true),
-    listHelpArticleSequence(),
   ]);
-  const contentById = new Map(contents.map((content) => [content.id, content]));
-  const orderedContents = [
-    ...sequence.flatMap((item) => {
-      const content = contentById.get(item.contentId);
-      return content ? [content] : [];
-    }),
-    ...contents.filter((content) => !sequence.some((item) => item.contentId === content.id)),
-  ];
-  const processingJobs = await listLatestHelpVideoProcessingJobDetails(
-    orderedContents.map((content) => content.id),
-  );
+  const [processingJobs] = await Promise.all([
+    listLatestHelpVideoProcessingJobDetails(contents.map((content) => content.id)),
+  ]);
   const publishedById = new Map(
     publishedLinks.map((publication) => [publication.entityId, publication]),
   );
@@ -84,11 +87,14 @@ export const load: PageServerLoad = async ({ parent }) => {
   );
 
   return {
-    contents: orderedContents.map((content) => ({
+    contents: contents.map((content) => ({
       ...content,
       publishedSlug: publishedById.get(content.id)?.slug ?? null,
       processingJob: processingByContentId.get(content.id) ?? null,
     })),
+    total,
+    filters,
+    totalPages: Math.max(1, Math.ceil(total / perPage)),
     categories: categories.filter(
       (category) => category.active && category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG,
     ),
