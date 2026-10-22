@@ -387,6 +387,9 @@
       }
       applyUpdatedContent(payload.content);
       categoryPickerOpen = false;
+    } catch {
+      saveSuccess = false;
+      saveMessage = "A conexão foi interrompida. Tente salvar novamente.";
     } finally {
       categorySaving = false;
     }
@@ -490,6 +493,9 @@
       }
       applyUpdatedContent(payload.content);
       addPanel = null;
+    } catch {
+      saveSuccess = false;
+      saveMessage = "A conexão foi interrompida. Tente novamente.";
     } finally {
       addSaving = false;
     }
@@ -961,7 +967,7 @@
           <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#FFF3E9] px-3 py-1.5 font-bold uppercase tracking-[0.08em] text-[#B85408]"><HelpCategoryIcon name={category.icon} size={12}/>{category.name}</span>
         {/each}
         {#if data.canEdit}
-          <button type="button" on:click={() => { if (allowModal()) categoryPickerOpen = true; }} class="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-[#C7CCD7] bg-white text-[#000A57]" aria-label="Editar categorias" title="Editar categorias"><Plus size={13}/></button>
+          <button type="button" on:click={() => { if (allowModal()) { selectedCategoryIds = reviewCategories.filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG).map((category) => category.id); categoryPickerOpen = true; } }} class="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-[#C7CCD7] bg-white text-[#000A57]" aria-label="Editar categorias" title="Editar categorias"><Plus size={13}/></button>
         {/if}
       </div>
 
@@ -1324,10 +1330,13 @@
 
 {#if categoryPickerOpen}
   <div class="fixed inset-0 z-[146] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
-      {#if true}
-        <div role="dialog" aria-modal="true" aria-label="Selecionar categorias" class="max-h-[85vh] w-full max-w-[560px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+        <div role="dialog" aria-modal="true" aria-labelledby="help-categories-title" class="max-h-[85vh] w-full max-w-[560px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+          <div class="mb-4 flex items-center justify-between">
+            <h2 id="help-categories-title" class="text-[18px] font-semibold">Categorias</h2>
+            <button type="button" on:click={cancelCategorySelection} aria-label="Fechar" class="rounded-lg p-2 text-[#737989] hover:bg-[#F4F5FA]"><X size={18}/></button>
+          </div>
           <div class="grid gap-2 sm:grid-cols-2">
-            {#each data.categories.filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG) as category}
+            {#each data.categories.filter((category) => category.active && category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG) as category}
               <button type="button" on:click={() => toggleCategory(category.id)} class={`flex min-h-10 items-center justify-between rounded-xl border px-3 text-left text-[13px] font-semibold ${selectedCategoryIds.includes(category.id) ? "border-[#BFC7F4] bg-[#EEF0FF] text-[#000A57]" : "border-[#E1E4EB] bg-white text-[#606777]"}`}>
                 <span class="flex items-center gap-2"><HelpCategoryIcon name={category.icon} size={13}/>{category.name}</span>
                 {#if selectedCategoryIds.includes(category.id)}<Check size={13}/>{/if}
@@ -1335,19 +1344,20 @@
             {/each}
           </div>
           <div class="mt-3 flex justify-end gap-2">
-            <button type="button" on:click={() => (categoryPickerOpen = false)} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] text-[#6C7383]" aria-label="Cancelar"><X size={14}/></button>
+            <button type="button" on:click={cancelCategorySelection} class="min-h-10 rounded-lg border border-[#DDE1EA] px-3 text-[13px] font-semibold text-[#6C7383]" aria-label="Cancelar"><X size={14}/></button>
             <button type="button" on:click={saveCategories} disabled={categorySaving || selectedCategoryIds.length === 0} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#000A57] text-white disabled:opacity-40" aria-label="Salvar categorias">{#if categorySaving}<LoaderCircle size={13} class="animate-spin"/>{:else}<Check size={14}/>{/if}</button>
           </div>
         </div>
-      {/if}
-
   </div>
 {/if}
 
 {#if addPanel}
   <div class="fixed inset-0 z-[146] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
-                {#if true}
-                  <div role="dialog" aria-modal="true" aria-label="Adicionar bloco" class="max-h-[85vh] w-full max-w-[620px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+                  <div role="dialog" aria-modal="true" aria-labelledby="help-add-block-title" class="max-h-[85vh] w-full max-w-[620px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+                    <div class="mb-5 flex items-center justify-between">
+                      <h2 id="help-add-block-title" class="text-[18px] font-semibold">Adicionar {addPanel.type === "image" ? "imagem" : addPanel.type === "notice" ? "aviso" : addPanel.type === "link" ? "link" : "texto"}</h2>
+                      <button type="button" on:click={() => (addPanel = null)} aria-label="Fechar" disabled={addSaving || Boolean(imageAddingMode)} class="rounded-lg p-2 text-[#737989] hover:bg-[#F4F5FA]"><X size={18}/></button>
+                    </div>
                     {#if addPanel.type === "image"}
                       <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                         {#if data.canGenerateVideoFrames}
@@ -1380,6 +1390,7 @@
                         </div>
                       {/if}
                     {/if}
+                    {#if saveMessage && !saveSuccess}<p role="alert" class="mt-3 rounded-lg bg-[#FFF5F5] px-3 py-2 text-[13px] text-[#9B2C2C]">{saveMessage}</p>{/if}
                     <div class="mt-3 flex justify-end gap-2">
                       <button type="button" on:click={() => (addPanel = null)} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] text-[#6C7383]" aria-label="Cancelar"><X size={14}/></button>
                       {#if addPanel.type !== "image"}
@@ -1387,7 +1398,6 @@
                       {/if}
                     </div>
                   </div>
-                {/if}
   </div>
 {/if}
 
@@ -1404,6 +1414,7 @@
         <button type="button" aria-label="Fechar" on:click={() => (settingsModal = null)}><X size={18}/></button>
       </div>
       {#if settingsModal === "general"}
+        {#if form?.message}<p role="alert" class="mb-4 rounded-lg bg-[#FFF5F5] p-3 text-[13px] text-[#9B2C2C]">{form.message}</p>{/if}
         <form method="POST" action="?/updateContent" use:enhance class="space-y-4">
           <label class="block text-[13px] font-semibold">Título<input name="title" required minlength="4" maxlength="160" value={data.content.title} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
           <label class="block text-[13px] font-semibold">Endereço<input name="slug" maxlength="120" value={data.content.slug} class="mt-1.5 h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[14px]"/></label>
@@ -1590,7 +1601,7 @@
             </form>
           {/each}
         </div>
-        <button type="button" on:click={() => { stepModalId = null; if (editingStep) openDeleteStep(editingStep); }} class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#F0C8C8] px-3 text-[13px] font-semibold text-[#9B2C2C]"><Trash2 size={15}/>Excluir etapa</button>
+        <button type="button" on:click={() => { const step = editingStep; stepModalId = null; openDeleteStep(step); }} class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#F0C8C8] px-3 text-[13px] font-semibold text-[#9B2C2C]"><Trash2 size={15}/>Excluir etapa</button>
       </div>
     </section>
   </div>
