@@ -10,10 +10,9 @@ import {
 } from "drizzle-orm";
 import { getPermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
-import { requestTicketSatisfaction } from "$lib/server/support/ticketSatisfactionService";
 import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
 import { notifyTicketFollowers } from "$lib/server/support/ticketFollowerRepository";
-import { sendTicketPublicReplyEmail } from "$lib/server/support/ticketEmailService";
+import { notifyCustomerOfTicketStatus, sendTicketPublicReplyEmail } from "$lib/server/support/ticketEmailService";
 import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { serviceRequests } from "$lib/server/db/serviceRequestSchema";
@@ -883,6 +882,9 @@ export async function updateTicketStatus(
   await requireTicketAccess(actorUserId, scope, ticketId);
 
   const db = getDatabase();
+  const [previous] = await db.select({ status: tickets.status }).from(tickets)
+    .where(eq(tickets.id, ticketId)).limit(1);
+  if (!previous || previous.status === status) return;
   const now = new Date();
   await db.transaction(async (tx) => {
     await tx
@@ -913,14 +915,12 @@ export async function updateTicketStatus(
     });
   });
 
-  if (status === "resolved" || status === "closed") {
-    await requestTicketSatisfaction(ticketId).catch((cause) => {
-      console.error("[ticket.satisfaction.request]", {
-        ticketId,
-        errorCode: cause instanceof Error ? cause.message : "TICKET_SATISFACTION_REQUEST_FAILED",
-      });
+  await notifyCustomerOfTicketStatus(ticketId, previous.status).catch((cause) => {
+    console.error("[ticket.customer.status_email]", {
+      ticketId,
+      errorCode: cause instanceof Error ? cause.message : "TICKET_STATUS_EMAIL_FAILED",
     });
-  }
+  });
 }
 
 export async function updateTicketPriority(
