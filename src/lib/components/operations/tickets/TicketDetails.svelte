@@ -70,7 +70,7 @@
   let composerFiles: File[] = [];
   function pickComposerFiles(event: Event): void {
     const control = event.currentTarget as HTMLInputElement;
-    composerFiles = Array.from(control.files ?? []).slice(0, 4);
+    composerFiles = Array.from(control.files ?? []);
   }
   $: isInfoPanel = surface !== "page" && ["service", "customer", "tasks", "collaboration", "history"].includes(activeMainPanel);
 
@@ -518,7 +518,7 @@
 
                   {#if composerFiles.length > 0}
                     <div class="flex w-full flex-wrap items-center gap-2 border-b border-[#E5E8EE] px-2 py-2">
-                      {#each composerFiles as attached, index}
+                      {#each composerFiles as attached}
                         <span class="inline-flex max-w-[210px] items-center gap-1.5 rounded-lg bg-[#F1F3F8] px-2.5 py-1.5 text-[12px] text-[#404858]">
                           <Paperclip size={13} class="shrink-0"/>
                           <span class="truncate">{attached.name}</span>
@@ -526,6 +526,9 @@
                       {/each}
                       <span class="text-[12px] font-semibold {composerMode === "note" ? 'text-[#8A4D13]' : 'text-[#396351]'}">
                         {composerMode === "note" ? "Somente equipe · não enviado por e-mail" : "Enviado ao cliente na resposta"}
+                      {#if composerFiles.length > 4 || composerFiles.reduce((total, item) => total + item.size, 0) > 12 * 1024 * 1024}
+                        <span role="alert" class="text-[12px] font-semibold text-[#A33A3A]">Máximo de 4 arquivos e 12 MB por mensagem.</span>
+                      {/if}
                       </span>
                     </div>
                   {/if}
@@ -559,7 +562,7 @@
 
                   <input bind:this={composerFileInput} type="file" name="files" multiple accept="image/png,image/jpeg,image/webp,.pdf,.docx,.xlsx,.zip,.txt,.csv" class="sr-only" on:change={pickComposerFiles} aria-label="Anexar arquivos à mensagem"/>
                   <button type="button" on:click={() => composerFileInput?.click()} class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#777E8D] hover:bg-[var(--app-surface-muted)] hover:text-[#000A57]" aria-label="Anexar arquivos à mensagem" title={composerMode === "note" ? "Anexo interno (não enviar ao cliente)" : "Anexar à resposta do cliente"}><Paperclip size={17}/></button>
-                  <button type="submit" disabled={Boolean(actionLoading)} aria-label={composerMode === "note" ? "Adicionar nota interna" : "Enviar resposta"} class={`inline-flex h-8 shrink-0 items-center gap-2 rounded-lg px-3 text-[12px] font-semibold text-white disabled:opacity-50 ${composerMode === "note" ? "bg-[#9A5A1B]" : "bg-[var(--app-primary)]"}`}>
+                  <button type="submit" disabled={Boolean(actionLoading) || composerFiles.length > 4 || composerFiles.reduce((total, item) => total + item.size, 0) > 12 * 1024 * 1024} aria-label={composerMode === "note" ? "Adicionar nota interna" : "Enviar resposta"} class={`inline-flex h-8 shrink-0 items-center gap-2 rounded-lg px-3 text-[12px] font-semibold text-white disabled:opacity-50 ${composerMode === "note" ? "bg-[#9A5A1B]" : "bg-[var(--app-primary)]"}`}>
                     <Send size={15}/><span class="hidden sm:inline">{actionLoading ? "Enviando..." : composerMode === "note" ? "Salvar nota" : "Enviar"}</span>
                   </button>
                 </form>
