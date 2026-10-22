@@ -4,6 +4,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getPermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import { users } from "$lib/server/db/schema";
+import { ticketMessageAttachments } from "$lib/server/db/supportChatEntrySchema";
 import {
   supportTags,
   ticketAttachments,
@@ -102,7 +103,7 @@ export async function getTicketCard(
   ]);
 
   const db = getDatabase();
-  const [tagRows, attachments] = await Promise.all([
+  const [tagRows, attachments, inboundAttachments] = await Promise.all([
     db
       .select({ tagId: ticketTags.tagId })
       .from(ticketTags)
@@ -121,6 +122,18 @@ export async function getTicketCard(
       .leftJoin(users, eq(ticketAttachments.uploadedBy, users.id))
       .where(eq(ticketAttachments.ticketId, ticketId))
       .orderBy(desc(ticketAttachments.createdAt)),
+    db
+      .select({
+        id: ticketMessageAttachments.id,
+        messageId: ticketMessageAttachments.messageId,
+        originalName: ticketMessageAttachments.originalName,
+        contentType: ticketMessageAttachments.mimeType,
+        sizeBytes: ticketMessageAttachments.sizeBytes,
+        createdAt: ticketMessageAttachments.createdAt,
+      })
+      .from(ticketMessageAttachments)
+      .where(eq(ticketMessageAttachments.ticketId, ticketId))
+      .orderBy(desc(ticketMessageAttachments.createdAt)),
   ]);
   const selectedTagIds = new Set(tagRows.map((row) => row.tagId));
   const selectedLabels = labels.filter((label) => selectedTagIds.has(label.id));
@@ -131,13 +144,26 @@ export async function getTicketCard(
     workflowContext,
     labels,
     selectedLabels,
-    attachments: attachments.map((attachment) => ({
-      ...attachment,
-      href: `/app/tickets/${ticketId}/attachments/${attachment.id}`,
-      previewable:
-        attachment.contentType.startsWith("image/") ||
-        attachment.contentType === "application/pdf",
-    })),
+    attachments: [
+      ...attachments.map((attachment) => ({
+        ...attachment,
+        messageId: null as string | null,
+        source: "ticket" as const,
+        href: `/app/tickets/${ticketId}/attachments/${attachment.id}`,
+        previewable:
+          attachment.contentType.startsWith("image/") ||
+          attachment.contentType === "application/pdf",
+      })),
+      ...inboundAttachments.map((attachment) => ({
+        ...attachment,
+        uploadedBy: null,
+        uploadedByName: null,
+        source: "email" as const,
+        href: `/api/app/tickets/${ticketId}/attachments/${attachment.id}`,
+        previewable: attachment.contentType.startsWith("image/") ||
+          attachment.contentType === "application/pdf",
+      })),
+    ].sort((first, second) => second.createdAt.getTime() - first.createdAt.getTime()),
     attachmentsEnabled: storageStatus.configured,
   };
 }
