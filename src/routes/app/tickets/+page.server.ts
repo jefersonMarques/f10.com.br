@@ -36,9 +36,10 @@ import {
   type TicketWorkspaceSort,
 } from "$lib/server/support/ticketWorkspaceRepository";
 import { listTicketCustomerContexts } from "$lib/server/support/ticketCustomerContextRepository";
-import { listTicketWorkflowEntryPoints, moveTicketAreaStage } from "$lib/server/support/ticketWorkflowRepository";
+import { listTicketWorkflowEntryPoints } from "$lib/server/support/ticketWorkflowRepository";
 import {
   getTicketWorkflowBoardWithAppearance,
+  moveTicketAreaStageWithNotifications,
   moveTicketGlobalStageWithRules,
 } from "$lib/server/support/ticketWorkflowService";
 
@@ -357,7 +358,7 @@ export const actions: Actions = {
       if (workflowKind === "global") {
         await moveTicketGlobalStageWithRules(session.user.id, permissions, ticketId, stageId);
       } else {
-        await moveTicketAreaStage(session.user.id, permissions, ticketId, stageId);
+        await moveTicketAreaStageWithNotifications(session.user.id, permissions, ticketId, stageId);
       }
       return { success: true, action: "moveWorkflowStage", message: "Ticket movimentado." };
     } catch (cause) {
