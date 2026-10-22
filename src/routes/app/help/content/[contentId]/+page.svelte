@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
-  import { onDestroy } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import {
     AlertTriangle,
     Check,
@@ -812,6 +812,15 @@
     }
   }
 
+  onMount(() => {
+    const stepId = new URLSearchParams(window.location.search).get("step");
+    if (stepId && /^[a-f0-9-]{36}$/i.test(stepId)) {
+      requestAnimationFrame(() => {
+        document.getElementById(`help-step-${stepId}`)?.scrollIntoView({ block: "center" });
+      });
+    }
+  });
+
   onDestroy(clearRegenerationPolling);
 
   async function publish(): Promise<void> {
@@ -959,7 +968,7 @@
 
     <div class="mt-5 space-y-5">
       {#each reviewSteps as step, index}
-        <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
+        <section id={`help-step-${step.id}`} class="scroll-mt-24 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
           <header class="flex items-start gap-4 border-b border-[#EEF0F5] px-5 py-5 sm:px-6">
             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[12px] font-bold text-white">{index + 1}</span>
             <div class="min-w-0 flex-1">
