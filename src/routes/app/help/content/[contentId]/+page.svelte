@@ -1122,7 +1122,7 @@
           </header>
 
           <div class="space-y-5 px-5 py-6 sm:px-6">
-            {#each step.blocks as block, blockIndex}
+            {#each step.blocks as block, blockIndex (block.id)}
               {#if block.blockType === "text"}
                 <div class="rounded-2xl border border-transparent p-1 transition hover:border-[#E4E7ED]">
                   <HelpInlineTextEditor
