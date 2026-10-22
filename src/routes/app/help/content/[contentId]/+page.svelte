@@ -1,398 +1,1299 @@
 <script lang="ts">
-  import { page } from "$app/stores";
+  import { invalidateAll } from "$app/navigation";
+  import { onDestroy } from "svelte";
   import {
-    ArrowDown,
-    ArrowUp,
-    BrainCircuit,
+    AlertTriangle,
+    Check,
     CheckCircle2,
-    ChevronDown,
-    CircleAlert,
-    CloudUpload,
+    Download,
+    ArrowUp,
+    ArrowDown,
+    FilePlus2,
     ExternalLink,
+    Eye,
     FileText,
-    HardDrive,
-    Image as ImageIcon,
+    History,
+    ImagePlus,
     Info,
     Link2,
-    LockKeyhole,
+    LoaderCircle,
     PenTool,
+    PlayCircle,
     Plus,
+    RefreshCw,
     Save,
-    Search,
+    Settings2,
+    Sparkles,
     Trash2,
+    TriangleAlert,
+    UploadCloud,
     Video,
+    X,
   } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
-  import HelpQuickGuideEditor from "$lib/components/help/HelpQuickGuideEditor.svelte";
-  import HelpImageUploader from "$lib/components/operations/HelpImageUploader.svelte";
+  import HelpInlineTextEditor from "$lib/components/help/HelpInlineTextEditor.svelte";
+  import HelpRichText from "$lib/components/help/HelpRichText.svelte";
+  import HelpScreenshotReviewCarousel from "$lib/components/help/HelpScreenshotReviewCarousel.svelte";
   import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
-  import { isHelpHumanReviewComplete } from "$lib/help/helpHumanReview";
+  import { readHelpImageAnnotationsFromMetadata } from "$lib/help/helpImageAnnotations";
+  import type { HelpHumanReviewInteraction } from "$lib/help/helpHumanReview";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
   export let form: ActionData;
+  let settingsModal: "general" | "video" | "advanced" | null = null;
+  let stepModalId: string | null = null;
 
-  const requestedStepId = $page.url.searchParams.get("step");
-  let expandedStepId =
-    requestedStepId && data.content.steps.some((step) => step.id === requestedStepId)
-      ? requestedStepId
-      : data.content.steps[0]?.id ?? "";
-
-  const blockLabels: Record<string, string> = {
-    text: "Texto",
-    image: "Imagem",
-    notice: "Aviso",
-    link: "Link",
-    file: "Arquivo",
+  type ReviewStep = PageData["content"]["steps"][number];
+  type ReviewContent = PageData["content"];
+  type AddBlockType = "text" | "notice" | "link" | "image";
+  type SplitSuggestion = {
+    stepId: string;
+    sourceSignature: string;
+    shouldSplit: boolean;
+    parts: Array<{
+      title: string;
+      description: string;
+      instruction: string;
+    }>;
   };
 
-  function isMp4Link(value: string | null): boolean {
-    if (!value) return false;
-    try {
-      const url = new URL(value);
-      return url.protocol === "https:" && /\.mp4$/i.test(url.pathname);
-    } catch { return false; }
-  }
+  let savingMode: "draft" | "confirm" | null = null;
+  let saveMessage = "";
+  let saveSuccess = false;
+  let hasUnsavedReview = false;
+  let showUntouchedModal = false;
+  let untouchedCount = 0;
+  let publishing = false;
+  let categoryPickerOpen = false;
+  let categorySaving = false;
+  let addPanel: { stepId: string; type: AddBlockType } | null = null;
+  let addText = "";
+  let addLinkLabel = "";
+  let addLinkUrl = "";
+  let addNoticeVariant = "info";
+  let addImageFile: File | null = null;
+  let addSaving = false;
+  let imageAddingMode: "generate" | "upload" | null = null;
+  let openEditors = new Set<string>();
+  let appliedContentUpdatedAt = "";
+  let reviewSummary = "";
+  let reviewQuickGuide = "";
+  let reviewSteps: ReviewStep[] = [];
+  let reviewCategories = data.content.categories;
+  let selectedCategoryIds: string[] = [];
+  let reviewPending = data.humanReview.pending;
+  let splitTargetStep: ReviewStep | null = null;
+  let splitDesiredParts = 2;
+  let splitSuggestion: SplitSuggestion | null = null;
+  let splitLoadingStepId = "";
+  let splitApplying = false;
+  let splitError = "";
+  let deleteStepTarget: ReviewStep | null = null;
+  let deletingStep = false;
+  let showVideoUpdateModal = false;
+  let regenerationFile: File | null = null;
+  type RegenerationJob = {
+    id: string;
+    contentId: string;
+    status: "queued" | "running" | "retry_waiting" | "completed" | "failed";
+    stage: string;
+    progressLabel: string;
+    progressDetail: string;
+    attemptCount: number;
+    maxAttempts: number;
+    completedParts: number;
+    lastErrorCode: string | null;
+    lastErrorMessage: string | null;
+    createdAt: string;
+    updatedAt: string;
+    completedAt: string | null;
+  };
 
-  function assignedCategory(categoryId: string) {
-    return data.content.categories.find((category) => category.id === categoryId);
-  }
-
-  function stepHasImage(step: PageData["content"]["steps"][number]): boolean {
-    return step.blocks.some((block) => block.blockType === "image");
-  }
-
-  $: allBlocks = data.content.steps.flatMap((step) => step.blocks);
-  $: imageBlocks = allBlocks.filter((block) => block.blockType === "image");
-  $: describedImageCount = imageBlocks.filter(
-    (block) => Boolean(block.asset?.altText.trim() || block.asset?.assistantDescription.trim()),
-  ).length;
-  $: humanReviewReady = imageBlocks.every(
-    (block) => isHelpHumanReviewComplete(block.metadata, block.asset?.id),
+  let regenerationJob: RegenerationJob | null = data.videoProcessingJob;
+  let regenerating = Boolean(
+    regenerationJob
+    && ["queued", "running", "retry_waiting"].includes(regenerationJob.status),
   );
-  $: reviewedImageCount = imageBlocks.filter(
-    (block) => isHelpHumanReviewComplete(block.metadata, block.asset?.id),
-  ).length;
-  $: fileBlocks = allBlocks.filter((block) => block.blockType === "file");
-  $: indexedFileCount = fileBlocks.filter(
-    (block) => Boolean(block.asset?.extractedText.trim() || block.asset?.assistantSummary.trim()),
-  ).length;
-  $: stepsWithContent = data.content.steps.filter((step) => step.blocks.length > 0).length;
-  $: stepsReady = data.content.steps.length === 0 || stepsWithContent === data.content.steps.length;
-  $: hasPublicContent = Boolean(data.content.featuredVideo) || data.content.steps.length > 0;
-  $: singleImagePerStep = data.content.steps.every(
+  let regenerationError = "";
+  let regenerationProgress: Array<{ stage: string; label: string; detail?: string; status: string }> =
+    regenerationJob
+      ? [{
+          stage: regenerationJob.stage,
+          label: regenerationJob.progressLabel,
+          detail: regenerationJob.progressDetail,
+          status:
+            regenerationJob.status === "completed"
+              ? "done"
+              : regenerationJob.status === "failed"
+                ? "error"
+                : "active",
+        }]
+      : [];
+  let regenerationPollTimer: ReturnType<typeof setTimeout> | null = null;
+  let completedRegenerationJobId =
+    regenerationJob?.status === "completed" ? regenerationJob.id : "";
+
+  type ReviewItemPayload = {
+    blockId: string;
+    assetId: string;
+    annotations: unknown[];
+    interactions: HelpHumanReviewInteraction[];
+    reviewed: boolean;
+    touched: boolean;
+  };
+
+  $: {
+    const signature = String(data.content.updatedAt);
+    if (signature !== appliedContentUpdatedAt && !hasUnsavedReview) {
+      appliedContentUpdatedAt = signature;
+      reviewSummary = data.content.summary;
+      reviewQuickGuide = data.content.quickGuide;
+      reviewSteps = data.content.steps.map((step) => ({
+        ...step,
+        blocks: [...step.blocks],
+      }));
+      reviewCategories = data.content.categories;
+      selectedCategoryIds = data.content.categories
+        .filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG)
+        .map((category) => category.id);
+      reviewPending = data.humanReview.pending;
+    }
+  }
+
+  $: realCategoriesReady =
+    selectedCategoryIds.length > 0 &&
+    selectedCategoryIds.every((id) =>
+      data.categories.some(
+        (category) =>
+          category.id === id &&
+          category.active &&
+          category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG,
+      ),
+    );
+  $: stepsReady =
+    reviewSteps.length > 0 &&
+    reviewSteps.every((step) => step.blocks.some((block) =>
+      block.blockType === "text" ||
+      block.blockType === "notice" ||
+      block.blockType === "link" ||
+      Boolean(block.asset?.sourceUrl || block.asset?.storageKey || block.asset?.extractedText),
+    ));
+  $: singleImagePerStep = reviewSteps.every(
     (step) => step.blocks.filter((block) => block.blockType === "image").length <= 1,
   );
-  $: imageOnlyStepsReady = data.content.steps.every((step) => {
+  $: imageOnlyStepsReady = reviewSteps.every((step) => {
     const images = step.blocks.filter((block) => block.blockType === "image");
     if (images.length === 0 || images.length !== step.blocks.length) return true;
     return images.every(
       (block) => Boolean(block.asset?.altText.trim() || block.asset?.assistantDescription.trim()),
     );
   });
-  $: realCategoriesReady =
-    data.content.categories.length > 0 &&
-    data.content.categories.every(
-      (category) => category.active && category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG,
-    );
-  $: videoReady = !data.content.featuredVideo || Boolean(data.content.featuredVideo.subtitles.trim());
+  $: videoReady =
+    !data.content.featuredVideo || Boolean(data.content.featuredVideo.subtitles.trim());
   $: publicationReady =
     realCategoriesReady &&
-    hasPublicContent &&
     stepsReady &&
     singleImagePerStep &&
     imageOnlyStepsReady &&
-    humanReviewReady &&
     videoReady &&
-    !data.movideskArticle?.needsReview;
-  $: knowledgeTopics = Array.from(
-    new Set(
-      [
-        data.content.title,
-        ...data.content.categories.map((category) => category.name),
-        ...data.content.searchAliases,
-        ...data.content.steps.map((step) => step.title),
-      ]
-        .map((item) => item.trim())
-        .filter(Boolean),
-    ),
-  ).slice(0, 12);
+    reviewPending === 0 &&
+    openEditors.size === 0 &&
+    !hasUnsavedReview;
+
+  function assetUrl(assetId: string): string {
+    return `/api/app/help/assets/${assetId}`;
+  }
+
+  function youtubeEmbedUrl(value: string | null): string | null {
+    if (!value) return null;
+    try {
+      const url = new URL(value);
+      let id = "";
+      if (url.hostname === "youtu.be") id = url.pathname.slice(1).split("/")[0] ?? "";
+      if (["youtube.com", "www.youtube.com", "m.youtube.com"].includes(url.hostname)) {
+        if (url.pathname === "/watch") id = url.searchParams.get("v") ?? "";
+        else if (url.pathname.startsWith("/embed/") || url.pathname.startsWith("/shorts/")) {
+          id = url.pathname.split("/")[2] ?? "";
+        }
+      }
+      return /^[A-Za-z0-9_-]{6,20}$/.test(id)
+        ? `https://www.youtube-nocookie.com/embed/${id}`
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function safeJson<T>(value: string, fallback: T): T {
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function collectReviewItems(): ReviewItemPayload[] {
+    return Array.from(document.querySelectorAll<HTMLElement>("[data-human-review-item]")).map((element) => {
+      const annotationsInput = element.querySelector<HTMLInputElement>("[data-review-annotations]");
+      const interactionsInput = element.querySelector<HTMLInputElement>("[data-review-interactions]");
+      return {
+        blockId: element.dataset.blockId ?? "",
+        assetId: element.dataset.assetId ?? "",
+        annotations: safeJson<unknown[]>(annotationsInput?.value ?? "[]", []),
+        interactions: safeJson<HelpHumanReviewInteraction[]>(interactionsInput?.value ?? "[]", []),
+        reviewed: element.dataset.reviewed === "true",
+        touched: element.dataset.touched === "true",
+      };
+    });
+  }
+
+  function applyUpdatedContent(value: unknown): void {
+    if (!value || typeof value !== "object") return;
+    const updated = value as ReviewContent;
+    reviewSummary = updated.summary;
+    reviewQuickGuide = updated.quickGuide;
+    reviewSteps = updated.steps.map((step) => ({ ...step, blocks: [...step.blocks] }));
+    reviewCategories = updated.categories;
+    selectedCategoryIds = updated.categories
+      .filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG)
+      .map((category) => category.id);
+    appliedContentUpdatedAt = String(updated.updatedAt);
+    saveSuccess = true;
+    saveMessage = "Alteração salva.";
+  }
+
+  function editorState(key: string, active: boolean): void {
+    const next = new Set(openEditors);
+    if (active) next.add(key);
+    else next.delete(key);
+    openEditors = next;
+  }
+
+  function inlineSaved(event: CustomEvent<{ content: unknown }>): void {
+    applyUpdatedContent(event.detail.content);
+  }
+
+  async function persistAll(
+    mode: "draft" | "confirm",
+    confirmUntouched: boolean,
+  ): Promise<void> {
+    if (openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = "Salve ou cancele o texto que está em edição.";
+      return;
+    }
+    const items = collectReviewItems();
+    savingMode = mode;
+    saveMessage = "";
+    saveSuccess = false;
+    try {
+      const response = await fetch(`/api/app/help/content/${data.content.id}/images/review`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode,
+          confirmUntouched,
+          items: items.map((item) => ({
+            blockId: item.blockId,
+            assetId: item.assetId,
+            annotations: item.annotations,
+            interactions: item.interactions,
+          })),
+        }),
+      });
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+      };
+      saveSuccess = response.ok && Boolean(payload.success);
+      saveMessage = payload.message || (saveSuccess ? "Revisão salva." : "Não foi possível salvar.");
+      if (!saveSuccess) return;
+      hasUnsavedReview = false;
+      showUntouchedModal = false;
+      if (mode === "confirm") reviewPending = 0;
+      await invalidateAll();
+    } catch {
+      saveMessage = "A conexão foi interrompida.";
+    } finally {
+      savingMode = null;
+    }
+  }
+
+  async function saveDraft(): Promise<void> {
+    if (savingMode || !data.canEdit || data.humanReview.total === 0) return;
+    await persistAll("draft", false);
+  }
+
+  async function concludeReview(): Promise<void> {
+    if (savingMode || !data.canEdit || data.humanReview.total === 0) return;
+    if (openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = "Salve ou cancele o texto que está em edição.";
+      return;
+    }
+    const items = collectReviewItems();
+    untouchedCount = items.filter((item) => !item.reviewed && !item.touched).length;
+    if (untouchedCount > 0) {
+      showUntouchedModal = true;
+      return;
+    }
+    await persistAll("confirm", false);
+  }
+
+  function markInteraction(): void {
+    hasUnsavedReview = true;
+    saveMessage = "";
+  }
+
+  function toggleCategory(categoryId: string): void {
+    selectedCategoryIds = selectedCategoryIds.includes(categoryId)
+      ? selectedCategoryIds.filter((id) => id !== categoryId)
+      : [...selectedCategoryIds, categoryId];
+  }
+
+  async function saveCategories(): Promise<void> {
+    if (categorySaving || selectedCategoryIds.length === 0) return;
+    categorySaving = true;
+    try {
+      const response = await fetch(`/api/app/help/content/${data.content.id}/review`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          operation: "categories",
+          categoryIds: selectedCategoryIds,
+        }),
+      });
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+        content?: unknown;
+      };
+      if (!response.ok || !payload.success) {
+        saveSuccess = false;
+        saveMessage = payload.message || "Não foi possível salvar as categorias.";
+        return;
+      }
+      applyUpdatedContent(payload.content);
+      categoryPickerOpen = false;
+    } finally {
+      categorySaving = false;
+    }
+  }
+
+  function openAddPanel(stepId: string, type: AddBlockType): void {
+    addPanel = { stepId, type };
+    addText = "";
+    addLinkLabel = "";
+    addLinkUrl = "";
+    addNoticeVariant = "info";
+    addImageFile = null;
+  }
+
+  function chooseStepImageFile(event: Event): void {
+    const input = event.currentTarget as HTMLInputElement;
+    addImageFile = input.files?.[0] ?? null;
+  }
+
+  async function addStepImage(action: "generate" | "upload"): Promise<void> {
+    if (!addPanel || addPanel.type !== "image" || imageAddingMode) return;
+    if (hasUnsavedReview || openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = hasUnsavedReview
+        ? "Salve as alterações das imagens antes de adicionar outra."
+        : "Salve ou cancele o texto que está em edição.";
+      return;
+    }
+    if (action === "upload" && !addImageFile) return;
+
+    imageAddingMode = action;
+    saveMessage = "";
+    try {
+      let response: Response;
+      if (action === "generate") {
+        response = await fetch(
+          `/api/app/help/content/${data.content.id}/steps/${addPanel.stepId}/image`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "generate" }),
+          },
+        );
+      } else {
+        const formData = new FormData();
+        formData.set("file", addImageFile!);
+        response = await fetch(
+          `/api/app/help/content/${data.content.id}/steps/${addPanel.stepId}/image`,
+          { method: "POST", body: formData },
+        );
+      }
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+      };
+      if (!response.ok || !payload.success) {
+        saveSuccess = false;
+        saveMessage = payload.message || "Não foi possível adicionar a imagem.";
+        return;
+      }
+      saveSuccess = true;
+      saveMessage = payload.message || "Imagem adicionada.";
+      addPanel = null;
+      addImageFile = null;
+      await invalidateAll();
+    } catch {
+      saveSuccess = false;
+      saveMessage = "A conexão foi interrompida ao adicionar a imagem.";
+    } finally {
+      imageAddingMode = null;
+    }
+  }
+
+  async function addBlock(): Promise<void> {
+    if (!addPanel || addPanel.type === "image" || addSaving) return;
+    addSaving = true;
+    try {
+      const response = await fetch(`/api/app/help/content/${data.content.id}/review`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          operation: "add_block",
+          targetId: addPanel.stepId,
+          blockType: addPanel.type,
+          text: addText,
+          noticeVariant: addNoticeVariant,
+          linkLabel: addLinkLabel,
+          linkUrl: addLinkUrl,
+        }),
+      });
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+        content?: unknown;
+      };
+      if (!response.ok || !payload.success) {
+        saveSuccess = false;
+        saveMessage = payload.message || "Não foi possível adicionar.";
+        return;
+      }
+      applyUpdatedContent(payload.content);
+      addPanel = null;
+    } finally {
+      addSaving = false;
+    }
+  }
+
+  function openSplitDialog(step: ReviewStep): void {
+    if (hasUnsavedReview || openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = hasUnsavedReview
+        ? "Salve as alterações das imagens antes de reorganizar a etapa."
+        : "Salve ou cancele o texto que está em edição.";
+      return;
+    }
+    splitTargetStep = step;
+    splitDesiredParts = 2;
+    splitSuggestion = null;
+    splitError = "";
+    saveMessage = "";
+  }
+
+  function closeSplitDialog(): void {
+    if (splitApplying) return;
+    splitTargetStep = null;
+    splitSuggestion = null;
+    splitError = "";
+    splitLoadingStepId = "";
+  }
+
+  async function analyzeSplitTarget(): Promise<void> {
+    if (!splitTargetStep) return;
+    await previewStepSplit(splitTargetStep);
+  }
+
+  async function previewStepSplit(step: ReviewStep): Promise<void> {
+    if (splitLoadingStepId || splitApplying) return;
+    if (hasUnsavedReview || openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = hasUnsavedReview
+        ? "Salve as alterações das imagens antes de reorganizar a etapa."
+        : "Salve ou cancele o texto que está em edição.";
+      return;
+    }
+    splitLoadingStepId = step.id;
+    splitError = "";
+    saveMessage = "";
+    try {
+      const response = await fetch(
+        `/api/app/help/content/${data.content.id}/steps/${step.id}/split`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            action: "preview",
+            desiredParts: splitDesiredParts,
+          }),
+        },
+      );
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+        suggestion?: Omit<SplitSuggestion, "stepId">;
+      };
+      if (!response.ok || !payload.success || !payload.suggestion) {
+        splitError = payload.message || "Não foi possível analisar a etapa.";
+        return;
+      }
+      splitSuggestion = { stepId: step.id, ...payload.suggestion };
+    } catch {
+      splitError = "A conexão foi interrompida ao analisar a etapa.";
+    } finally {
+      splitLoadingStepId = "";
+    }
+  }
+
+  async function applyStepSplit(): Promise<void> {
+    if (!splitSuggestion?.shouldSplit || splitApplying) return;
+    if (hasUnsavedReview || openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = "Salve as alterações pendentes antes de aplicar.";
+      return;
+    }
+    splitApplying = true;
+    splitError = "";
+    try {
+      const response = await fetch(
+        `/api/app/help/content/${data.content.id}/steps/${splitSuggestion.stepId}/split`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            action: "apply",
+            sourceSignature: splitSuggestion.sourceSignature,
+            parts: splitSuggestion.parts,
+          }),
+        },
+      );
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+        content?: unknown;
+      };
+      if (!response.ok || !payload.success) {
+        splitError = payload.message || "Não foi possível reorganizar a etapa.";
+        return;
+      }
+      applyUpdatedContent(payload.content);
+      splitSuggestion = null;
+      splitTargetStep = null;
+      saveSuccess = true;
+      saveMessage = payload.message || "Etapa reorganizada.";
+    } catch {
+      splitError = "A conexão foi interrompida ao reorganizar a etapa.";
+    } finally {
+      splitApplying = false;
+    }
+  }
+
+  function openDeleteStep(step: ReviewStep): void {
+    if (hasUnsavedReview || openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = hasUnsavedReview
+        ? "Salve as alterações das imagens antes de excluir uma etapa."
+        : "Salve ou cancele o texto que está em edição.";
+      return;
+    }
+    deleteStepTarget = step;
+  }
+
+  async function confirmDeleteStep(): Promise<void> {
+    if (!deleteStepTarget || deletingStep) return;
+    deletingStep = true;
+    try {
+      const response = await fetch(
+        `/api/app/help/content/${data.content.id}/steps/${deleteStepTarget.id}`,
+        { method: "DELETE" },
+      );
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+      };
+      if (!response.ok || !payload.success) {
+        saveSuccess = false;
+        saveMessage = payload.message || "Não foi possível excluir a etapa.";
+        return;
+      }
+      saveSuccess = true;
+      saveMessage = payload.message || "Etapa excluída.";
+      deleteStepTarget = null;
+      await invalidateAll();
+    } finally {
+      deletingStep = false;
+    }
+  }
+
+  function chooseRegenerationFile(event: Event): void {
+    const input = event.currentTarget as HTMLInputElement;
+    regenerationFile = input.files?.[0] ?? null;
+  }
+
+  function clearRegenerationPolling(): void {
+    if (regenerationPollTimer) clearTimeout(regenerationPollTimer);
+    regenerationPollTimer = null;
+  }
+
+  async function applyRegenerationJob(job: RegenerationJob | null): Promise<void> {
+    regenerationJob = job;
+    regenerating = Boolean(
+      job && ["queued", "running", "retry_waiting"].includes(job.status),
+    );
+    regenerationProgress = job
+      ? [{
+          stage: job.stage,
+          label: job.progressLabel,
+          detail: [
+            job.progressDetail,
+            job.completedParts > 0 ? `${job.completedParts} parte(s) preservada(s)` : "",
+          ].filter(Boolean).join(" · "),
+          status:
+            job.status === "completed"
+              ? "done"
+              : job.status === "failed"
+                ? "error"
+                : "active",
+        }]
+      : [];
+
+    if (job?.status === "failed") {
+      regenerationError =
+        "O processamento foi pausado após várias tentativas. Você pode retomar do último checkpoint.";
+    } else {
+      regenerationError = "";
+    }
+
+    if (
+      job?.status === "completed"
+      && completedRegenerationJobId !== job.id
+    ) {
+      completedRegenerationJobId = job.id;
+      saveSuccess = true;
+      saveMessage = "Novo rascunho gerado. Revise o conteúdo antes de publicar.";
+      regenerationFile = null;
+      await invalidateAll();
+    }
+  }
+
+  function scheduleRegenerationPoll(jobId: string): void {
+    clearRegenerationPolling();
+    regenerationPollTimer = setTimeout(() => {
+      void loadRegenerationJob(jobId);
+    }, 4_000);
+  }
+
+  async function loadRegenerationJob(jobId = ""): Promise<void> {
+    try {
+      const query = jobId ? `?jobId=${encodeURIComponent(jobId)}` : "";
+      const response = await fetch(
+        `/api/app/help/content/${data.content.id}/regenerate${query}`,
+        { headers: { Accept: "application/json" } },
+      );
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        job?: RegenerationJob | null;
+      };
+      if (!response.ok || !payload.success) return;
+      await applyRegenerationJob(payload.job ?? null);
+      if (
+        showVideoUpdateModal
+        && payload.job
+        && ["queued", "running", "retry_waiting"].includes(payload.job.status)
+      ) {
+        scheduleRegenerationPoll(payload.job.id);
+      }
+    } catch {
+      if (showVideoUpdateModal && regenerationJob?.id) {
+        scheduleRegenerationPoll(regenerationJob.id);
+      }
+    }
+  }
+
+  function openVideoUpdate(): void {
+    if (hasUnsavedReview || openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = hasUnsavedReview
+        ? "Salve as alterações das imagens antes de reprocessar."
+        : "Salve ou cancele o texto que está em edição.";
+      return;
+    }
+    regenerationFile = null;
+    regenerationError = "";
+    regenerationProgress = [];
+    showVideoUpdateModal = true;
+    void loadRegenerationJob();
+  }
+
+  function closeVideoUpdate(): void {
+    showVideoUpdateModal = false;
+    clearRegenerationPolling();
+  }
+
+  async function runRegeneration(mode: "current" | "upload"): Promise<void> {
+    if (regenerating || (mode === "upload" && !regenerationFile)) return;
+    regenerating = true;
+    regenerationError = "";
+    saveMessage = "";
+
+    try {
+      let response: Response;
+      if (mode === "upload") {
+        const formData = new FormData();
+        formData.set("videoFile", regenerationFile!);
+        response = await fetch(
+          `/api/app/help/content/${data.content.id}/regenerate`,
+          { method: "POST", body: formData },
+        );
+      } else {
+        response = await fetch(
+          `/api/app/help/content/${data.content.id}/regenerate`,
+          { method: "POST" },
+        );
+      }
+
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+        job?: RegenerationJob;
+      };
+      if (!response.ok || !payload.success || !payload.job) {
+        regenerationError = payload.message || "Não foi possível iniciar a atualização.";
+        regenerating = false;
+        return;
+      }
+
+      await applyRegenerationJob(payload.job);
+      scheduleRegenerationPoll(payload.job.id);
+    } catch {
+      regenerating = false;
+      regenerationError = "Não foi possível iniciar o processamento no servidor.";
+    }
+  }
+
+  async function retryRegeneration(): Promise<void> {
+    if (!regenerationJob || regenerating) return;
+    regenerationError = "";
+    try {
+      const response = await fetch(
+        `/api/app/help/content/${data.content.id}/regenerate`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jobId: regenerationJob.id,
+            action: "retry",
+          }),
+        },
+      );
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+        job?: RegenerationJob | null;
+      };
+      if (!response.ok || !payload.success || !payload.job) {
+        regenerationError = payload.message || "Não foi possível retomar.";
+        return;
+      }
+      await applyRegenerationJob(payload.job);
+      scheduleRegenerationPoll(payload.job.id);
+    } catch {
+      regenerationError = "Não foi possível solicitar a retomada.";
+    }
+  }
+
+  onDestroy(clearRegenerationPolling);
+
+  async function publish(): Promise<void> {
+    if (!publicationReady || publishing) return;
+    publishing = true;
+    saveMessage = "";
+    try {
+      const response = await fetch(`/api/app/help/content/${data.content.id}/publish`, {
+        method: "POST",
+      });
+      const payload = await response.json().catch(() => ({})) as {
+        success?: boolean;
+        message?: string;
+      };
+      saveSuccess = response.ok && Boolean(payload.success);
+      saveMessage = payload.message || (saveSuccess ? "Conteúdo publicado." : "Não foi possível publicar.");
+      if (saveSuccess) await invalidateAll();
+    } finally {
+      publishing = false;
+    }
+  }
+
+
+  $: editingStep = reviewSteps.find((step) => step.id === stepModalId) ?? null;
+
+  function allowModal(): boolean {
+    if (hasUnsavedReview || openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = "Salve ou cancele as alterações pendentes antes de continuar.";
+      return false;
+    }
+    return true;
+  }
+
+  function openSettings(mode: "general" | "video" | "advanced"): void {
+    if (allowModal()) settingsModal = mode;
+  }
+  function openStepSettings(id: string): void {
+    if (allowModal()) stepModalId = id;
+  }
+
+  function beforeUnload(event: BeforeUnloadEvent): void {
+    if (!hasUnsavedReview && openEditors.size === 0) return;
+    event.preventDefault();
+    event.returnValue = "";
+  }
 </script>
 
-<svelte:head><title>{data.content.title} | Base de Conhecimento | F10 Operations</title></svelte:head>
+<svelte:head><title>Editar conteúdo | {data.content.title} | F10 Operations</title></svelte:head>
+<svelte:window on:beforeunload={beforeUnload} />
 
 <ApplicationContent width="wide">
-  <div class="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-    <ApplicationBackLink href="/app/help/content" label="Base de Conhecimento" />
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <ApplicationBackLink href="/app/help/content" label="Conteúdos" />
     <div class="flex flex-wrap items-center gap-2">
-      <span class={`application-text-caption rounded-full px-3 py-1.5 font-bold uppercase tracking-[0.08em] ${data.content.status === "published" ? "bg-[#EEF8F1] text-[#2F7045]" : data.content.status === "archived" ? "bg-[#F1F1F3] text-[#676D7D]" : "bg-[#EEF0FF] text-[#000A57]"}`}>
-        {data.content.status === "published" ? "Publicado" : data.content.status === "archived" ? "Arquivado" : "Rascunho"}
-      </span>
-      <span class="application-text-caption rounded-full bg-[#F3F4F7] px-3 py-1.5 font-semibold text-[#737989]">{data.content.steps.length} {data.content.steps.length === 1 ? "passo" : "passos"}</span>
+      <a href={`/app/help/content/${data.content.id}/history`} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><History size={14}/>Histórico</a>
+      {#if data.canEdit}
+        <button type="button" on:click={openVideoUpdate} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-3.5 font-semibold text-[#A9510D]">{#if regenerating}<LoaderCircle size={14} class="animate-spin"/>{:else}<RefreshCw size={14}/>{/if}{regenerating ? "Processando" : "Atualizar IA"}</button>
+      {/if}
+      <a href={`/app/help/content/${data.content.id}/preview`} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><Eye size={14}/>Preview</a>
+      {#if data.canEdit}
+        <button type="button" on:click={() => openSettings("general")} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px] font-semibold text-[#000A57]"><Settings2 size={15}/>Informações</button>
+        <button type="button" on:click={() => openSettings("video")} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px] font-semibold text-[#000A57]"><Video size={15}/>Vídeo</button>
+        <button type="button" on:click={() => openSettings("advanced")} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px] font-semibold text-[#000A57]"><Sparkles size={15}/>IA e pesquisa</button>
+      {/if}
+      {#if data.canPublish}
+        <button type="button" on:click={publish} disabled={!publicationReady || publishing} title={publicationReady ? "Publicar" : "Conclua as pendências antes de publicar"} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#B8BCC8]">{#if publishing}<LoaderCircle size={14} class="animate-spin"/>{:else}<CheckCircle2 size={14}/>{/if}Publicar</button>
+      {/if}
     </div>
   </div>
 
-  <section class="mb-4 rounded-[22px] border border-[#E2E5ED] bg-white px-5 py-4 sm:px-6">
-    <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
-      <div class="min-w-0"><h1 class="truncate text-[18px] font-semibold text-[#11182C]">{data.content.title}</h1><p class="mt-1 truncate text-[11px] text-[#838897]">/{data.content.slug}</p></div>
-      <div class="flex flex-wrap gap-2">
-        <a href={`/app/help/content/${data.content.id}/preview`} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]">Preview<ExternalLink size={12}/></a>
-        <a href={`/app/help/content/${data.content.id}/images`} class={`application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border px-3.5 font-semibold ${humanReviewReady ? "border-[#CFE4D6] bg-[#F7FCF8] text-[#2F7045]" : "border-[#F1D7BD] bg-[#FFF9F3] text-[#A9510D]"}`}><PenTool size={13}/>Revisar conteúdo{#if imageBlocks.length > 0}<span class="rounded-full bg-white px-1.5 py-0.5 text-[8px]">{reviewedImageCount}/{imageBlocks.length}</span>{/if}</a>
-        <a href="/app/help/categories" class="application-text-caption inline-flex min-h-10 items-center justify-center rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]">Categorias</a>
-        <a href="/app/help/assets" class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3.5 font-semibold text-[#000A57]"><HardDrive size={14}/>Biblioteca</a>
-        {#if data.canPublish && data.content.status !== "published"}
-          <form method="POST" action="?/publish"><button type="submit" disabled={!publicationReady} title={!humanReviewReady ? "Conclua a revisão humana das imagens antes de publicar." : !publicationReady ? "Ainda existem pendências de publicação." : "Publicar conteúdo"} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#B8BCC8]"><CloudUpload size={15}/>Publicar conteúdo</button></form>
-        {/if}
-      </div>
-    </div>
-  </section>
-
-  {#if form?.message}
-    <div class={`mb-4 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[12px] font-medium ${form.success ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
-      {#if form.success}<CheckCircle2 size={18}/>{:else}<CircleAlert size={18}/>{/if}<span>{form.message}</span>
+  {#if saveMessage}
+    <div class={`mb-4 flex items-start gap-2 rounded-2xl border px-4 py-3 text-[10px] font-medium ${saveSuccess ? "border-[#B9E6C9] bg-[#F1FBF4] text-[#176B35]" : "border-[#F0C8C8] bg-[#FFF5F5] text-[#9B2C2C]"}`}>
+      {#if saveSuccess}<CheckCircle2 size={15}/>{:else}<TriangleAlert size={15}/>{/if}<span>{saveMessage}</span>
     </div>
   {/if}
 
-  {#if data.movideskArticle && data.canManageMovidesk}
-    <section class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#D9DFEA] bg-[#FAFBFD] px-4 py-3">
-      <div>
-        <p class="text-[13px] font-semibold text-[#303645]">Artigo importado do Movidesk</p>
-        <p class="mt-1 text-[12px] text-[#7A8190]">
-          {data.movideskArticle.needsReview ? "Confira texto, imagens e anexos antes de publicar." : "Origem preservada · revisão inicial aprovada."}
-          {#if data.movideskArticle.issue}<span class="ml-1 text-[#9B5C20]">{data.movideskArticle.issue}</span>{/if}
-        </p>
-      </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <a href={`/app/help/content/movidesk/${data.movideskArticle.sourceId}`} class="rounded-lg border border-[#DDE1EA] bg-white px-3 py-2 text-[12px] font-semibold text-[#000A57]">Original preservado</a>
-        <a href="/app/help/content/movidesk" class="rounded-lg border border-[#DDE1EA] bg-white px-3 py-2 text-[12px] font-semibold text-[#000A57]">Revisão da migração</a>
-      </div>
+  {#if data.generationCoverage}
+    <section class={`mb-4 flex flex-wrap items-center gap-2 rounded-2xl border px-4 py-3 ${data.generationCoverage.uncoveredRelevantSegments === 0 ? "border-[#CFE8D7] bg-[#F6FBF7]" : "border-[#F0C8C8] bg-[#FFF5F5]"}`}>
+      {#if data.generationCoverage.uncoveredRelevantSegments === 0}
+        <CheckCircle2 size={15} class="text-[#2D7143]"/>
+      {:else}
+        <TriangleAlert size={15} class="text-[#9B2C2C]"/>
+      {/if}
+      <strong class="text-[10px] font-semibold text-[#303645]">Cobertura do vídeo</strong>
+      <span class="rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold text-[#5E6575]">100% analisado</span>
+      <span class="rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold text-[#5E6575]">{data.generationCoverage.coveredRelevantSegments}/{data.generationCoverage.relevantSegments} relevantes incorporados</span>
+      <span class="rounded-full bg-white px-2.5 py-1 text-[9px] font-semibold text-[#5E6575]">{data.generationCoverage.processingParts} partes</span>
+      <span class={`rounded-full px-2.5 py-1 text-[9px] font-semibold ${data.generationCoverage.uncoveredRelevantSegments === 0 ? "bg-[#EAF7EE] text-[#2D7143]" : "bg-[#FFF0F0] text-[#9B2C2C]"}`}>{data.generationCoverage.uncoveredRelevantSegments} pendentes</span>
     </section>
   {/if}
 
-  {#if data.content.status === "archived"}
-    <section class="mb-4 rounded-2xl border border-[#DDE1EA] bg-[#F7F8FA] px-5 py-4"><p class="text-[12px] font-semibold text-[#505666]">Este conteúdo está arquivado e permanece somente para consulta interna. Restaure-o pela lista da Base de Conhecimento para voltar a editar.</p></section>
-  {:else if data.content.hasPublishedVersion && data.content.status !== "published"}
-    <section class="mb-4 rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] px-5 py-4"><p class="text-[12px] font-semibold text-[#7A3B08]">A versão publicada anterior continua atendendo clientes até a próxima publicação.</p></section>
-  {/if}
+  <main data-help-content-id={data.content.id}>
+    <header class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+      <div class="flex flex-wrap items-center gap-2">
+        {#each reviewCategories as category}
+          <span class="application-text-meta inline-flex items-center gap-1.5 rounded-full bg-[#FFF3E9] px-3 py-1.5 font-bold uppercase tracking-[0.08em] text-[#B85408]"><HelpCategoryIcon name={category.icon} size={12}/>{category.name}</span>
+        {/each}
+        {#if data.canEdit}
+          <button type="button" on:click={() => (categoryPickerOpen = !categoryPickerOpen)} class="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-[#C7CCD7] bg-white text-[#000A57]" aria-label="Editar categorias" title="Editar categorias"><Plus size={13}/></button>
+        {/if}
+      </div>
 
-  <form method="POST" action="?/updateContent" class="rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
-    <fieldset disabled={!data.canEdit} class="disabled:opacity-70">
-      <div class="flex items-start justify-between gap-4"><div><h2 class="text-[16px] font-semibold text-[#11182C]">Informações gerais</h2><p class="mt-1 text-[11px] text-[#858A98]">Título, endereço e classificação do conteúdo.</p></div><Save size={18} class="text-[#000A57]"/></div>
-
-      <div class="mt-6 grid gap-5 lg:grid-cols-2">
-        <label class="block lg:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Título</span><input name="title" required maxlength="160" value={data.content.title} class="h-12 w-full rounded-xl border border-[#DDE1EA] px-4 text-[14px] font-medium" /></label>
-        <label class="block lg:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Endereço</span><input name="slug" maxlength="120" value={data.content.slug} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]" /></label>
-        <label class="block lg:col-span-2"><span class="mb-1.5 block text-[11px] font-semibold text-[#4A5060]">Resumo público</span><textarea name="summary" maxlength="320" rows="3" class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2.5 text-[12px] leading-5">{data.content.summary}</textarea></label>
-
-        <section class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4 lg:col-span-2">
-          <div><h3 class="text-[12px] font-semibold text-[#303645]">Categorias *</h3><p class="mt-1 text-[10px] leading-5 text-[#858A98]">Selecione uma ou mais categorias reais. “Sem categoria” pode existir em rascunhos automáticos, mas bloqueia publicação.</p></div>
-          <div class="mt-4 grid gap-3 lg:grid-cols-2">
-            {#each data.categories as category}
-              <div class={`rounded-xl border p-3 ${assignedCategory(category.id) ? "border-[#BFC7F4] bg-white" : "border-[#E2E5ED] bg-white"}`}>
-                <label class="flex items-center gap-2 text-[11px] font-semibold text-[#333A4A]"><input type="checkbox" name="categoryId" value={category.id} checked={Boolean(assignedCategory(category.id))} disabled={!category.active && !assignedCategory(category.id)} class="h-4 w-4" /><HelpCategoryIcon name={category.icon} size={15}/>{category.name}{#if category.slug === UNCATEGORIZED_HELP_CATEGORY_SLUG}<span class="text-[9px] text-[#A9510D]">rascunho</span>{:else if !category.active}<span class="text-[9px] text-[#9B2C2C]">inativa</span>{/if}</label>
-                <input name={`categoryDestination:${category.id}`} maxlength="1000" value={assignedCategory(category.id)?.destinationUrl ?? ""} placeholder={category.destinationUrl || "Link específico opcional"} class="mt-2 h-9 w-full rounded-lg border border-[#DDE1EA] px-3 text-[10px]" />
-                {#if category.destinationUrl}<p class="mt-1 text-[9px] text-[#9297A5]">Padrão: {category.destinationUrl}</p>{/if}
-              </div>
+      {#if categoryPickerOpen}
+        <div class="mt-3 rounded-2xl border border-[#DDE1EA] bg-[#FAFAFC] p-3">
+          <div class="grid gap-2 sm:grid-cols-2">
+            {#each data.categories.filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG) as category}
+              <button type="button" on:click={() => toggleCategory(category.id)} class={`flex min-h-10 items-center justify-between rounded-xl border px-3 text-left text-[10px] font-semibold ${selectedCategoryIds.includes(category.id) ? "border-[#BFC7F4] bg-[#EEF0FF] text-[#000A57]" : "border-[#E1E4EB] bg-white text-[#606777]"}`}>
+                <span class="flex items-center gap-2"><HelpCategoryIcon name={category.icon} size={13}/>{category.name}</span>
+                {#if selectedCategoryIds.includes(category.id)}<Check size={13}/>{/if}
+              </button>
             {/each}
           </div>
-        </section>
-
-        <input type="hidden" name="searchAliases" value={data.content.searchAliases.join("\n")}/>
-        <input type="hidden" name="assistantKnowledge" value={data.content.assistantKnowledge}/>
-        <input type="hidden" name="internalSupportNotes" value={data.content.internalSupportNotes}/>
-      </div>
-      {#if data.canEdit}<div class="mt-5 flex justify-end"><button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white"><Save size={15}/>Salvar informações gerais</button></div>{/if}
-    </fieldset>
-  </form>
-
-  <section class="mt-5 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
-    <div class="flex items-start gap-3"><span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Video size={20}/></span><div><h2 class="text-[16px] font-semibold text-[#11182C]">Vídeo principal</h2><p class="mt-1 max-w-[760px] text-[11px] leading-5 text-[#858A98]">Quando existir, subtitles são obrigatórios e formam a fonte textual do vídeo para pesquisa e respostas.</p></div></div>
-
-    {#if data.content.featuredVideo?.storageKey}
-      <div class="mt-5 rounded-2xl border border-[#CFE3D6] bg-[#F4FBF6] p-4">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <strong class="text-[11px] text-[#2F7045]">MP4 local ativo</strong>
-            <p class="mt-1 text-[10px] leading-5 text-[#6F7D73]">O artigo público e novas versões da trilha usam este arquivo local, sem dependência do YouTube.</p>
+          <div class="mt-3 flex justify-end gap-2">
+            <button type="button" on:click={() => (categoryPickerOpen = false)} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] text-[#6C7383]" aria-label="Cancelar"><X size={14}/></button>
+            <button type="button" on:click={saveCategories} disabled={categorySaving || selectedCategoryIds.length === 0} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#000A57] text-white disabled:opacity-40" aria-label="Salvar categorias">{#if categorySaving}<LoaderCircle size={13} class="animate-spin"/>{:else}<Check size={14}/>{/if}</button>
           </div>
-          <a href={`/api/app/help/assets/${data.content.featuredVideo.id}`} target="_blank" rel="noopener noreferrer" class="application-text-caption inline-flex min-h-9 shrink-0 items-center gap-2 rounded-lg border border-[#CFE3D6] bg-white px-3 font-semibold text-[#2F7045]">Abrir MP4<ExternalLink size={12}/></a>
         </div>
+      {/if}
+
+      <h1 class="mt-3 text-[24px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[30px]">{data.content.title}</h1>
+      <div class="mt-2 max-w-[800px]">
+        <HelpInlineTextEditor
+          contentId={data.content.id}
+          operation="summary"
+          text={reviewSummary}
+          canEdit={data.canEdit}
+          className="space-y-1 text-[12px] leading-6 text-[#707788]"
+          placeholder="Resumo público"
+          on:saved={inlineSaved}
+          on:editing={(event) => editorState("summary", event.detail.active)}
+        />
       </div>
-    {:else if data.content.featuredVideo?.sourceUrl}
-      <div class="mt-5 rounded-2xl border border-[#F0D6B8] bg-[#FFF9F2] p-4">
-        <strong class="text-[11px] text-[#A9510D]">Vídeo externo legado</strong>
-        <p class="mt-1 text-[10px] leading-5 text-[#826B56]">Este conteúdo ainda usa uma URL externa. Selecione um MP4 abaixo para substituir a referência sem alterar os textos do conteúdo.</p>
-        <a href={data.content.featuredVideo.sourceUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption mt-3 inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#F0D6B8] bg-white px-3 font-semibold text-[#A9510D]">Abrir URL atual<ExternalLink size={12}/></a>
-      </div>
+    </header>
+
+    {#if data.content.featuredVideo}
+      {@const featuredEmbed = youtubeEmbedUrl(data.content.featuredVideo.sourceUrl)}
+      <section class="mt-5 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
+        {#if featuredEmbed}<div class="aspect-video overflow-hidden bg-black"><iframe src={featuredEmbed} title={data.content.featuredVideo.altText || `Vídeo: ${data.content.title}`} class="h-full w-full" allowfullscreen></iframe></div>{:else if data.content.featuredVideo.storageKey}<video controls preload="metadata" class="aspect-video h-auto w-full bg-black" src={assetUrl(data.content.featuredVideo.id)}><track kind="captions" /></video>{:else if data.content.featuredVideo.sourceUrl}<a href={data.content.featuredVideo.sourceUrl} target="_blank" rel="noopener noreferrer" class="flex min-h-20 items-center justify-between gap-3 px-5 py-4 text-[11px] font-semibold text-[#000A57]"><span class="inline-flex items-center gap-2"><PlayCircle size={18}/>Assistir ao vídeo principal</span><ExternalLink size={13}/></a>{/if}
+      </section>
     {/if}
 
-    <form method="POST" action="?/updateFeaturedVideo" enctype="multipart/form-data" class="mt-5">
-      <fieldset disabled={!data.canEdit} class="grid gap-4 disabled:opacity-70 lg:grid-cols-2">
-        {#if !data.content.featuredVideo?.storageKey}
-          <label class="block lg:col-span-2">
-            <span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">URL externa atual</span>
-            <input name="sourceUrl" value={data.content.featuredVideo?.sourceUrl ?? ""} placeholder="https://www.youtube.com/watch?v=..." class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]" />
-            <span class="mt-1.5 block text-[9px] leading-4 text-[#8A909D]">Mantida apenas para conteúdos legados. Para a trilha, prefira substituir por MP4 local.</span>
-          </label>
-        {:else}
-          <input type="hidden" name="sourceUrl" value="" />
-        {/if}
-
-        <label class="block rounded-2xl border border-dashed border-[#C8CFDC] bg-[#FAFBFD] p-4 lg:col-span-2">
-          <span class="flex items-center gap-2 text-[11px] font-semibold text-[#000A57]"><CloudUpload size={15}/>MP4 local</span>
-          <span class="mt-1 block text-[10px] leading-5 text-[#777D8D]">{data.content.featuredVideo?.storageKey ? "Selecione outro MP4 somente quando quiser substituir o vídeo atual." : "Selecione um MP4 para substituir o link do YouTube e tornar o vídeo compatível com a trilha."}</span>
-          <input name="videoFile" type="file" accept="video/mp4,.mp4" class="mt-3 block w-full rounded-xl border border-[#DDE1EA] bg-white px-3 py-2 text-[11px] text-[#555B6A] file:mr-3 file:rounded-lg file:border-0 file:bg-[#000A57] file:px-3 file:py-2 file:text-[10px] file:font-semibold file:text-white" />
-          <span class="mt-1.5 block text-[9px] text-[#9297A5]">Formato MP4 · até 25 MB.</span>
-        </label>
-
-        <label class="block lg:col-span-2"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Descrição pública</span><input name="altText" maxlength="500" value={data.content.featuredVideo?.altText ?? ""} placeholder="Ex.: Demonstração completa do cadastro" class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]" /></label>
-        <label class="block rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4 lg:col-span-2"><span class="application-text-caption font-semibold text-[#000A57]">Subtitles *</span><span class="mt-1 block text-[10px] leading-5 text-[#777D8D]">Cole o conteúdo de SRT, VTT ou texto equivalente. É a fonte factual do vídeo.</span><textarea name="subtitles" required maxlength="200000" rows="10" class="mt-3 w-full resize-y rounded-xl border border-[#D8DDF4] bg-white px-3 py-2.5 text-[11px] leading-5">{data.content.featuredVideo?.subtitles ?? ""}</textarea></label>
-        <label class="block rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4 lg:col-span-2"><span class="application-text-caption font-semibold text-[#000A57]">Resumo operacional opcional</span><span class="mt-1 block text-[10px] leading-5 text-[#777D8D]">Resumo curto do que o vídeo demonstra; serve como apoio ao retrieval.</span><textarea name="assistantSummary" maxlength="20000" rows="5" class="mt-3 w-full resize-y rounded-xl border border-[#D8DDF4] bg-white px-3 py-2.5 text-[11px] leading-5">{data.content.featuredVideo?.assistantSummary ?? ""}</textarea></label>
-        {#if data.canEdit}
-          <div class="flex justify-end lg:col-span-2">
-            <button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white"><Save size={15}/>{data.content.featuredVideo ? "Salvar vídeo" : "Adicionar vídeo"}</button>
-          </div>
-        {/if}
-      </fieldset>
-    </form>
-    {#if data.canEdit && data.content.featuredVideo}<form method="POST" action="?/deleteFeaturedVideo" class="mt-3 flex justify-end" on:submit={(event) => { if (!confirm("Remover o vídeo principal?")) event.preventDefault(); }}><button type="submit" class="application-text-caption inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#F0C8C8] bg-white px-3 font-semibold text-[#9B2C2C]"><Trash2 size={14}/>Remover vídeo</button></form>{/if}
-  </section>
-
-  <HelpQuickGuideEditor contentId={data.content.id} value={data.content.quickGuide} canEdit={data.canEdit}/>
-
-  <div class="mt-5 space-y-5">
-    {#if data.content.steps.length === 0}
-      <div class="flex items-center gap-3 rounded-[20px] border border-dashed border-[#D6DAE3] bg-[#FAFAFC] px-5 py-4 text-[#697080]"><Video size={17}/><span class="text-[11px] font-medium">Sem passos. O vídeo principal pode ser publicado sozinho.</span></div>
+    {#if reviewQuickGuide || data.canEdit}
+      <section class="mt-4 rounded-[20px] border border-[#D8DDF4] bg-[#F8F9FF] px-5 py-5">
+        <div class="flex items-center gap-2"><Sparkles size={16} class="text-[#EA6D0B]"/><h2 class="text-[13px] font-semibold text-[#000A57]">Resumo rápido</h2></div>
+        <div class="mt-3">
+          <HelpInlineTextEditor
+            contentId={data.content.id}
+            operation="quick_guide"
+            text={reviewQuickGuide}
+            canEdit={data.canEdit}
+            className="space-y-1.5 text-[12px] leading-6 text-[#4E5565]"
+            rows={7}
+            placeholder="Resumo rápido do procedimento"
+            on:saved={inlineSaved}
+            on:editing={(event) => editorState("quick-guide", event.detail.active)}
+          />
+        </div>
+      </section>
     {/if}
-    {#each data.content.steps as step, stepIndex}
-      <article class="overflow-hidden rounded-[22px] border border-[#DDE1EA] bg-white">
-        <header class="flex flex-col gap-4 border-b border-[#EEF0F5] bg-[#FAFAFC] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <button type="button" on:click={() => (expandedStepId = expandedStepId === step.id ? "" : step.id)} class="flex min-w-0 flex-1 items-center gap-4 text-left">
-            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#000A57] text-[13px] font-bold text-white">{stepIndex + 1}</span>
-            <div class="min-w-0 flex-1"><p class="application-text-meta font-bold uppercase tracking-[0.12em] text-[#EA6D0B]">Etapa {stepIndex + 1}</p><h2 class="mt-1 truncate text-[16px] font-semibold text-[#222839]">{step.title}</h2></div>
-            <ChevronDown size={16} class={`shrink-0 text-[#737989] transition ${expandedStepId === step.id ? "rotate-180" : ""}`}/>
-          </button>
-          {#if data.canEdit}
-            <div class="flex items-center gap-1">
-              <form method="POST" action="?/moveStep"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="up"/><button type="submit" disabled={stepIndex === 0} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#666D7D] disabled:opacity-30" aria-label="Mover passo para cima"><ArrowUp size={14}/></button></form>
-              <form method="POST" action="?/moveStep"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="down"/><button type="submit" disabled={stepIndex === data.content.steps.length - 1} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#666D7D] disabled:opacity-30" aria-label="Mover passo para baixo"><ArrowDown size={14}/></button></form>
-              <form method="POST" action="?/deleteStep" on:submit={(event) => { if (!confirm(`Remover o passo “${step.title}” e todo o conteúdo dele?`)) event.preventDefault(); }}><input type="hidden" name="stepId" value={step.id}/><button type="submit" class="application-text-caption inline-flex min-h-9 items-center gap-2 rounded-xl px-3 font-semibold text-[#9B2C2C]"><Trash2 size={14}/>Remover passo</button></form>
-            </div>
-          {/if}
-        </header>
 
-        {#if expandedStepId === step.id}
-        <div class="p-5 sm:p-6">
-          <form method="POST" action="?/updateStep" class="grid gap-4 lg:grid-cols-2">
-            <input type="hidden" name="stepId" value={step.id}/>
-            <fieldset disabled={!data.canEdit} class="contents disabled:opacity-70">
-              <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Título do passo</span><input name="title" required maxlength="180" value={step.title} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]" /></label>
-              <label class="block"><span class="application-text-caption mb-1.5 block font-semibold text-[#555B6A]">Descrição pública</span><input name="description" maxlength="2000" value={step.description} class="h-11 w-full rounded-xl border border-[#DDE1EA] px-3 text-[12px]" /><span class="mt-1 block text-[9px] text-[#9297A5]">Aceita **negrito**, *itálico*, `código` e emojis.</span></label>
-              <label class="block rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4 lg:col-span-2"><span class="application-text-caption flex items-center gap-2 font-semibold text-[#000A57]"><BrainCircuit size={14}/>Conhecimento adicional do assistente</span><span class="mt-1 block text-[10px] text-[#777D8D]">Deixe vazio se o conteúdo público do passo já for suficiente.</span><textarea name="assistantKnowledge" maxlength="20000" rows="4" class="mt-3 w-full resize-y rounded-xl border border-[#D8DDF4] bg-white px-3 py-2.5 text-[11px] leading-5">{step.assistantKnowledge}</textarea></label>
-              {#if data.canEdit}<div class="flex justify-end lg:col-span-2"><button type="submit" class="application-text-caption inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-4 font-semibold text-[#000A57]"><Save size={14}/>Salvar passo</button></div>{/if}
-            </fieldset>
-          </form>
-
-          <section class="mt-7 border-t border-[#EEF0F5] pt-6">
-            <div><h3 class="text-[13px] font-semibold text-[#303645]">Conteúdo visível deste passo</h3><p class="application-text-caption mt-1 text-[#9297A5]">Textos e avisos aceitam Markdown simples. Cada passo aceita no máximo um screenshot.</p></div>
-
-            {#if step.blocks.length === 0}
-              <div class="mt-4 rounded-2xl border border-dashed border-[#D6DAE3] bg-[#FAFAFC] px-5 py-8 text-center"><p class="text-[11px] font-semibold text-[#5F6574]">Este passo ainda está vazio.</p></div>
-            {:else}
-              <div class="mt-4 space-y-4">
-                {#each step.blocks as block, blockIndex}
-                  <div class="rounded-2xl border border-[#E3E6ED] bg-[#FAFAFC] p-4 sm:p-5">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                      <span class="application-text-meta inline-flex items-center gap-2 font-bold uppercase tracking-[0.08em] text-[#737989]">{#if block.blockType === "text" || block.blockType === "file"}<FileText size={14}/>{:else if block.blockType === "image"}<ImageIcon size={14}/>{:else if block.blockType === "link" && isMp4Link(block.linkUrl)}<Video size={14}/>{:else if block.blockType === "link"}<Link2 size={14}/>{:else}<Info size={14}/>{/if}{blockLabels[block.blockType] ?? block.blockType} {blockIndex + 1}</span>
-                      {#if data.canEdit}
-                        <div class="flex items-center gap-1">
-                          <form method="POST" action="?/moveBlock"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockId" value={block.id}/><input type="hidden" name="direction" value="up"/><button type="submit" disabled={blockIndex === 0} class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#777D8D] disabled:opacity-30" aria-label="Mover bloco para cima"><ArrowUp size={13}/></button></form>
-                          <form method="POST" action="?/moveBlock"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockId" value={block.id}/><input type="hidden" name="direction" value="down"/><button type="submit" disabled={blockIndex === step.blocks.length - 1} class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDE1EA] bg-white text-[#777D8D] disabled:opacity-30" aria-label="Mover bloco para baixo"><ArrowDown size={13}/></button></form>
-                          <form method="POST" action="?/deleteBlock" on:submit={(event) => { if (!confirm(`Remover este bloco de ${blockLabels[block.blockType] ?? "conteúdo"}?`)) event.preventDefault(); }}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockId" value={block.id}/><button type="submit" class="flex h-8 w-8 items-center justify-center rounded-lg text-[#969BA7] hover:bg-[#FFF0F0] hover:text-[#A52A2A]" aria-label="Remover bloco"><Trash2 size={14}/></button></form>
-                        </div>
-                      {/if}
-                    </div>
-
-                    {#if block.blockType === "text" || block.blockType === "notice"}
-                      <form method="POST" action="?/updateBlock" class="mt-4 space-y-3"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockId" value={block.id}/><input type="hidden" name="blockType" value={block.blockType}/><textarea name="textContent" required maxlength="50000" rows="5" class="w-full resize-y rounded-xl border border-[#DDE1EA] bg-white px-3 py-2.5 text-[12px] leading-6">{block.textContent}</textarea>{#if block.blockType === "notice"}<select name="noticeVariant" value={block.noticeVariant ?? "info"} class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"><option value="info">Informação</option><option value="warning">Atenção</option><option value="success">Sucesso</option><option value="danger">Perigo</option></select>{/if}{#if data.canEdit}<div class="flex justify-end"><button type="submit" class="application-text-caption min-h-9 rounded-xl bg-white px-3 font-semibold text-[#000A57] ring-1 ring-[#DDE1EA]">Salvar bloco</button></div>{/if}</form>
-                    {:else if block.blockType === "image" && block.asset}
-                      {#if block.asset.storageKey}<img src={`/api/app/help/assets/${block.asset.id}`} alt={block.asset.altText || "Imagem"} class="mt-4 max-h-[380px] w-auto rounded-xl border border-[#E2E5ED] bg-white object-contain" />{:else if block.asset.sourceUrl}<img src={block.asset.sourceUrl} alt={block.asset.altText || "Imagem"} class="mt-4 max-h-[380px] w-auto rounded-xl border border-[#E2E5ED] bg-white object-contain" />{/if}
-                      <div class="mt-3 rounded-xl bg-white px-3 py-2 text-[10px] leading-5 text-[#6F7584]"><strong>Texto alternativo:</strong> {block.asset.altText || "não informado"}<br/><strong>Descrição para o assistente:</strong> {block.asset.assistantDescription || "não necessária / não informada"}</div>
-                    {:else if block.blockType === "link"}
-                      {#if isMp4Link(block.linkUrl)}
-                        <div class="mt-4 max-w-[720px] overflow-hidden rounded-xl border border-[#E2E5ED] bg-black"><video src={block.linkUrl ?? undefined} controls preload="metadata" playsinline class="aspect-video w-full"><track kind="captions" /></video></div>
-                      {/if}
-                      <form method="POST" action="?/updateBlock" class="mt-4 grid gap-3 lg:grid-cols-2"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockId" value={block.id}/><input type="hidden" name="blockType" value="link"/><input name="linkLabel" required maxlength="240" value={block.linkLabel ?? ""} class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"/><input name="linkUrl" required value={block.linkUrl ?? ""} class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"/>{#if data.canEdit}<div class="flex justify-end lg:col-span-2"><button type="submit" class="application-text-caption min-h-9 rounded-xl bg-white px-3 font-semibold text-[#000A57] ring-1 ring-[#DDE1EA]">Salvar link</button></div>{/if}</form>
-                    {:else if block.blockType === "file" && block.asset}
-                      <div class="mt-4 rounded-xl border border-[#DDE1EA] bg-white p-3"><strong class="text-[11px] text-[#303645]">{block.linkLabel || block.asset.originalName || "Arquivo"}</strong>{#if block.asset.extractedText}<p class="mt-2 line-clamp-4 whitespace-pre-wrap text-[10px] leading-5 text-[#777D8D]">{block.asset.extractedText}</p>{/if}</div>
-                    {/if}
-                  </div>
-                {/each}
+    <div class="mt-5 space-y-5">
+      {#each reviewSteps as step, index}
+        <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
+          <header class="flex items-start gap-4 border-b border-[#EEF0F5] px-5 py-5 sm:px-6">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[12px] font-bold text-white">{index + 1}</span>
+            <div class="min-w-0 flex-1">
+              <HelpInlineTextEditor
+                contentId={data.content.id}
+                operation="step_title"
+                targetId={step.id}
+                text={step.title}
+                canEdit={data.canEdit}
+                mode="plain"
+                className="pr-10 text-[17px] font-semibold text-[#252B3B]"
+                rows={2}
+                on:saved={inlineSaved}
+                on:editing={(event) => editorState(`step-title:${step.id}`, event.detail.active)}
+              />
+              <div class="mt-1">
+                <HelpInlineTextEditor
+                  contentId={data.content.id}
+                  operation="step_description"
+                  targetId={step.id}
+                  text={step.description}
+                  canEdit={data.canEdit}
+                  className="space-y-1 pr-10 text-[11px] leading-5 text-[#7A8190]"
+                  rows={3}
+                  placeholder="Descrição opcional"
+                  on:saved={inlineSaved}
+                  on:editing={(event) => editorState(`step-description:${step.id}`, event.detail.active)}
+                />
               </div>
+            </div>
+            {#if data.canEdit}
+              <form method="POST" action="?/moveStep"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="up"/><button type="submit" disabled={index === 0 || hasUnsavedReview || openEditors.size > 0} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] disabled:opacity-30" aria-label="Subir etapa"><ArrowUp size={14}/></button></form>
+              <form method="POST" action="?/moveStep"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="direction" value="down"/><button type="submit" disabled={index === reviewSteps.length - 1 || hasUnsavedReview || openEditors.size > 0} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] disabled:opacity-30" aria-label="Descer etapa"><ArrowDown size={14}/></button></form>
+              <button type="button" on:click={() => openSplitDialog(step)} disabled={splitApplying} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#F1D7BD] bg-[#FFF9F3] text-[#A9510D] transition hover:bg-[#FFF4E9] disabled:opacity-50" aria-label="Quebrar etapa com IA" title="Quebrar etapa">
+                <Sparkles size={14}/>
+              </button>
+              <button type="button" on:click={() => openDeleteStep(step)} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#F0C8C8] bg-[#FFF7F7] text-[#9B2C2C] transition hover:bg-[#FFF0F0]" aria-label="Excluir etapa" title="Excluir etapa"><Trash2 size={14}/></button>
             {/if}
+            {#if data.canEdit}
+              <button type="button" on:click={() => openStepSettings(step.id)} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] text-[#606777]" aria-label="Configurar etapa" title="Configurar etapa"><Settings2 size={14}/></button>
+            {/if}
+          </header>
+
+          <div class="space-y-5 px-5 py-6 sm:px-6">
+            {#each step.blocks as block, blockIndex}
+              {#if block.blockType === "text"}
+                <div class="rounded-2xl border border-transparent p-1 transition hover:border-[#E4E7ED]">
+                  <HelpInlineTextEditor
+                    contentId={data.content.id}
+                    operation="block_text"
+                    targetId={block.id}
+                    text={block.textContent}
+                    canEdit={data.canEdit}
+                    className="space-y-1.5 pr-10 text-[13px] leading-7 text-[#505767]"
+                    rows={6}
+                    on:saved={inlineSaved}
+                    on:editing={(event) => editorState(`block:${block.id}`, event.detail.active)}
+                  />
+                </div>
+              {:else if block.blockType === "notice"}
+                <div class={`rounded-2xl border px-4 py-3 ${block.noticeVariant === "warning" || block.noticeVariant === "danger" ? "border-[#F0D0C8] bg-[#FFF8F5]" : "border-[#D8DEF2] bg-[#F8F9FF]"}`}>
+                  <div class="flex gap-3">{#if block.noticeVariant === "warning" || block.noticeVariant === "danger"}<AlertTriangle size={16} class="mt-1 shrink-0 text-[#A9510D]"/>{:else}<Info size={16} class="mt-1 shrink-0 text-[#000A57]"/>{/if}<div class="min-w-0 flex-1"><HelpInlineTextEditor contentId={data.content.id} operation="block_text" targetId={block.id} text={block.textContent} canEdit={data.canEdit} className="space-y-1 pr-10 text-[11px] leading-6 text-[#555D6C]" rows={4} on:saved={inlineSaved} on:editing={(event) => editorState(`block:${block.id}`, event.detail.active)}/></div></div>
+                </div>
+              {:else if block.blockType === "image" && block.asset}
+                {@const review = data.screenshotReview.find((item) => item.blockId === block.id)}
+                {@const humanStatus = data.humanReview.items.find((item) => item.blockId === block.id)}
+                <HelpScreenshotReviewCarousel
+                  contentId={data.content.id}
+                  blockId={block.id}
+                  candidates={review?.candidates ?? [{ assetId: block.asset.id, candidateIndex: 1, timeSeconds: null, recommended: false }]}
+                  activeAssetId={block.asset.id}
+                  initialSelectedAssetId={review?.draftSelectedAssetId ?? null}
+                  initialAnnotations={review?.draftAnnotations ?? readHelpImageAnnotationsFromMetadata(block.metadata)}
+                  initialInteractions={review?.draftInteractions ?? []}
+                  reviewed={humanStatus?.reviewed ?? false}
+                  canGenerateFrames={data.canGenerateVideoFrames}
+                  disabled={!data.canEdit}
+                  on:interaction={markInteraction}
+                />
+              {:else if block.blockType === "file" && block.asset}
+                {@const fileUrl = block.asset.storageKey ? assetUrl(block.asset.id) : block.asset.sourceUrl}
+                {#if fileUrl}<a href={fileUrl} target="_blank" rel="noopener noreferrer" class="flex items-center justify-between rounded-2xl border border-[#E1E4EC] bg-[#FAFAFC] px-4 py-4"><span class="inline-flex items-center gap-2 text-[11px] font-semibold text-[#303645]"><Download size={15}/>{block.linkLabel || "Baixar arquivo"}</span></a>{/if}
+              {:else if block.blockType === "link" && block.linkUrl}
+                <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption inline-flex items-center gap-2 rounded-xl bg-[#EEF0FF] px-4 py-2.5 font-semibold text-[#000A57]">{block.linkLabel || "Abrir link"}<ExternalLink size={12}/></a>
+              {/if}
+              {#if data.canEdit}
+                <div class="flex justify-end gap-2 border-b border-[#EEF0F5] pb-3">
+                  <form method="POST" action="?/moveBlock"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockId" value={block.id}/><input type="hidden" name="direction" value="up"/><button type="submit" disabled={blockIndex === 0 || hasUnsavedReview || openEditors.size > 0} aria-label="Subir bloco" title="Subir bloco" class="rounded-lg border border-[#DDE1EA] p-2 disabled:opacity-30"><ArrowUp size={14}/></button></form>
+                  <form method="POST" action="?/moveBlock"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockId" value={block.id}/><input type="hidden" name="direction" value="down"/><button type="submit" disabled={blockIndex === step.blocks.length - 1 || hasUnsavedReview || openEditors.size > 0} aria-label="Descer bloco" title="Descer bloco" class="rounded-lg border border-[#DDE1EA] p-2 disabled:opacity-30"><ArrowDown size={14}/></button></form>
+                  <form method="POST" action="?/deleteBlock" on:submit={(event) => { if (!confirm("Excluir este bloco?")) event.preventDefault(); }}><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockId" value={block.id}/><button type="submit" disabled={hasUnsavedReview || openEditors.size > 0} aria-label="Excluir bloco" class="rounded-lg border border-[#F0C8C8] p-2 text-[#9B2C2C] disabled:opacity-30"><Trash2 size={14}/></button></form>
+                </div>
+              {/if}
+            {/each}
 
             {#if data.canEdit}
-              <div class="mt-5 grid gap-3 lg:grid-cols-2">
-                <details class="rounded-2xl border border-[#DDE1EA] bg-white p-4"><summary class="application-text-caption flex cursor-pointer list-none items-center gap-2 font-semibold text-[#000A57]"><FileText size={15}/>Adicionar texto</summary><form method="POST" action="?/addBlock" class="mt-4 space-y-3"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockType" value="text"/><p class="text-[9px] leading-4 text-[#9297A5]">Use **negrito**, *itálico*, `código`, listas e emojis quando ajudarem a destacar a ação.</p><textarea name="textContent" required maxlength="50000" rows="5" placeholder="Explique o que o usuário deve fazer." class="w-full resize-y rounded-xl border border-[#DDE1EA] px-3 py-2 text-[11px] leading-5"></textarea><button type="submit" class="application-text-caption min-h-9 w-full rounded-xl bg-[#000A57] px-3 font-semibold text-white">Adicionar texto</button></form></details>
-                {#if stepHasImage(step)}
-                  <div class="rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4"><div class="flex items-start gap-3"><ImageIcon size={16} class="mt-0.5 text-[#000A57]"/><div><strong class="application-text-caption block text-[#000A57]">Screenshot já definido</strong><p class="mt-1 text-[9px] leading-5 text-[#777D8D]">Cada passo aceita uma única imagem. Use “Revisão humana” para revisar ou substituir a imagem atual.</p></div></div></div>
-                {:else}
-                  <HelpImageUploader contentId={data.content.id} stepId={step.id}/>
+              <div class="border-t border-dashed border-[#DDE1EA] pt-4">
+                <div class="flex flex-wrap gap-2">
+                  <button type="button" on:click={() => openAddPanel(step.id, "text")} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><FileText size={13}/>Texto</button>
+                  <button type="button" on:click={() => openAddPanel(step.id, "notice")} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-3 text-[10px] font-semibold text-[#A9510D]"><Info size={13}/>Aviso</button>
+                  <button type="button" on:click={() => openAddPanel(step.id, "link")} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-3 text-[10px] font-semibold text-[#000A57]"><Link2 size={13}/>Link</button>
+                  {#if !step.blocks.some((block) => block.blockType === "image")}
+                    <button type="button" on:click={() => openAddPanel(step.id, "image")} class="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#D8DDF4] bg-white px-3 text-[10px] font-semibold text-[#000A57]"><ImagePlus size={13}/>Imagem</button>
+                  {/if}
+                </div>
+
+                {#if addPanel?.stepId === step.id}
+                  <div class="mt-3 rounded-2xl border border-[#DDE1EA] bg-[#FAFAFC] p-3">
+                    {#if addPanel.type === "image"}
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        {#if data.canGenerateVideoFrames}
+                          <button type="button" on:click={() => addStepImage("generate")} disabled={Boolean(imageAddingMode)} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">
+                            {#if imageAddingMode === "generate"}<LoaderCircle size={14} class="animate-spin"/>{:else}<Sparkles size={14}/>{/if}
+                            Gerar do vídeo
+                          </button>
+                        {/if}
+                        <label class="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 py-2">
+                          <ImagePlus size={14} class="shrink-0 text-[#000A57]"/>
+                          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" on:change={chooseStepImageFile} class="min-w-0 flex-1 text-[9px]"/>
+                        </label>
+                        <button type="button" on:click={() => addStepImage("upload")} disabled={!addImageFile || Boolean(imageAddingMode)} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-4 text-[10px] font-semibold text-[#000A57] disabled:opacity-40">
+                          {#if imageAddingMode === "upload"}<LoaderCircle size={14} class="animate-spin"/>{:else}<Check size={14}/>{/if}
+                          Enviar
+                        </button>
+                      </div>
+                    {:else if addPanel.type === "link"}
+                      <div class="grid gap-2 sm:grid-cols-2">
+                        <input bind:value={addLinkLabel} maxlength="240" placeholder="Texto do link" class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"/>
+                        <input bind:value={addLinkUrl} placeholder="https://..." class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"/>
+                      </div>
+                    {:else}
+                      <textarea bind:value={addText} rows={4} maxlength="50000" placeholder={addPanel.type === "notice" ? "Texto do aviso" : "Novo texto"} class="w-full resize-y rounded-xl border border-[#DDE1EA] bg-white px-3 py-2.5 text-[11px] leading-5"></textarea>
+                      {#if addPanel.type === "notice"}
+                        <div class="mt-2 flex flex-wrap gap-2">
+                          {#each [["info","Informação"],["warning","Atenção"],["success","Sucesso"],["danger","Importante"]] as option}
+                            <button type="button" on:click={() => (addNoticeVariant = option[0])} class={`rounded-lg border px-3 py-2 text-[9px] font-semibold ${addNoticeVariant === option[0] ? "border-[#000A57] bg-[#000A57] text-white" : "border-[#DDE1EA] bg-white text-[#687080]"}`}>{option[1]}</button>
+                          {/each}
+                        </div>
+                      {/if}
+                    {/if}
+                    <div class="mt-3 flex justify-end gap-2">
+                      <button type="button" on:click={() => (addPanel = null)} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] text-[#6C7383]" aria-label="Cancelar"><X size={14}/></button>
+                      {#if addPanel.type !== "image"}
+                        <button type="button" on:click={addBlock} disabled={addSaving} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#000A57] text-white disabled:opacity-50" aria-label="Adicionar">{#if addSaving}<LoaderCircle size={13} class="animate-spin"/>{:else}<Check size={14}/>{/if}</button>
+                      {/if}
+                    </div>
+                  </div>
                 {/if}
-                <details class="rounded-2xl border border-[#DDE1EA] bg-white p-4"><summary class="application-text-caption cursor-pointer font-semibold text-[#000A57]">Adicionar aviso</summary><form method="POST" action="?/addBlock" class="mt-4 space-y-3"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockType" value="notice"/><textarea name="textContent" required rows="3" maxlength="50000" class="w-full rounded-xl border border-[#DDE1EA] px-3 py-2 text-[11px]"></textarea><select name="noticeVariant" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"><option value="info">Informação</option><option value="warning">Atenção</option><option value="success">Sucesso</option><option value="danger">Perigo</option></select><button type="submit" class="application-text-caption min-h-9 w-full rounded-xl bg-[#000A57] px-3 font-semibold text-white">Adicionar aviso</button></form></details>
-                <details class="rounded-2xl border border-[#DDE1EA] bg-white p-4"><summary class="application-text-caption cursor-pointer font-semibold text-[#000A57]">Adicionar link</summary><form method="POST" action="?/addBlock" class="mt-4 space-y-3"><input type="hidden" name="stepId" value={step.id}/><input type="hidden" name="blockType" value="link"/><input name="linkLabel" required maxlength="240" placeholder="Texto do link" class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/><input name="linkUrl" required placeholder="https://..." class="h-10 w-full rounded-xl border border-[#DDE1EA] px-3 text-[11px]"/><button type="submit" class="application-text-caption min-h-9 w-full rounded-xl bg-[#000A57] px-3 font-semibold text-white">Adicionar link</button></form></details>
               </div>
             {/if}
-          </section>
-        </div>
-        {/if}
-      </article>
-    {/each}
-  </div>
+          </div>
+        </section>
+      {/each}
+    </div>
+    {#if data.canEdit}
+      <form method="POST" action="?/addStep" class="mt-5"><button type="submit" disabled={hasUnsavedReview || openEditors.size > 0} class="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[#B9C2D7] bg-white text-[14px] font-semibold text-[#000A57] disabled:opacity-40"><FilePlus2 size={17}/>Adicionar etapa</button></form>
+    {/if}
+  </main>
 
-  {#if data.canEdit}<form method="POST" action="?/addStep" class="mt-5"><button type="submit" class="flex min-h-14 w-full items-center justify-center gap-2 rounded-[20px] border border-dashed border-[#BCC2CF] bg-white text-[12px] font-semibold text-[#000A57]"><Plus size={18}/>Adicionar próximo passo</button></form>{/if}
-
-  <section class="mt-5 rounded-[22px] border border-[#D8DDF4] bg-[#F8F9FF] p-5 sm:p-6">
-    <div class="flex items-start gap-3">
-      <BrainCircuit size={20} class="mt-0.5 shrink-0 text-[#000A57]"/>
-      <div class="min-w-0 flex-1">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div><h2 class="text-[13px] font-semibold text-[#000A57]">Cobertura do conhecimento</h2><p class="mt-1 text-[10px] leading-5 text-[#777D8D]">Verificação determinística do que ficará disponível para pesquisa e respostas depois da publicação.</p></div>
-          <span class={`rounded-full px-3 py-1.5 text-[9px] font-bold ${publicationReady ? "bg-[#E7F6EC] text-[#2F7045]" : "bg-[#FFF1E7] text-[#A9510D]"}`}>{publicationReady ? "Estrutura pronta" : "Revisão necessária"}</span>
-        </div>
-
-        <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if realCategoriesReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Categorias reais</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">“Sem categoria” precisa ser substituída antes de publicar.</p></div>
-          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if hasPublicContent && stepsReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Conteúdo público</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{data.content.steps.length === 0 ? (data.content.featuredVideo ? "Vídeo principal disponível; passos são opcionais." : "Adicione um vídeo principal ou pelo menos um passo.") : `${stepsWithContent}/${data.content.steps.length} passos com conteúdo público estruturado.`}</p></div>
-          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if singleImagePerStep}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Uma imagem por passo</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">A estrutura editorial aceita no máximo um screenshot em cada passo.</p></div>
-          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if imageOnlyStepsReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Imagens compreensíveis</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{describedImageCount}/{imageBlocks.length} possuem texto alternativo ou descrição adicional.</p></div>
-          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if humanReviewReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Revisão humana</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{reviewedImageCount}/{imageBlocks.length} imagens confirmadas por uma pessoa. É obrigatório antes de publicar.</p></div>
-          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if videoReady}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<CircleAlert size={15} class="text-[#A9510D]"/>{/if}<strong class="text-[10px] text-[#303645]">Vídeo e subtitles</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{data.content.featuredVideo ? (videoReady ? "Vídeo com fonte textual disponível." : "Vídeo sem subtitles.") : "Sem vídeo principal."}</p></div>
-          <div class="rounded-xl border border-[#DDE1EA] bg-white p-3"><div class="flex items-center gap-2">{#if fileBlocks.length === 0 || indexedFileCount === fileBlocks.length}<CheckCircle2 size={15} class="text-[#2F7045]"/>{:else}<Info size={15} class="text-[#76510A]"/>{/if}<strong class="text-[10px] text-[#303645]">Arquivos indexáveis</strong></div><p class="mt-2 text-[9px] leading-4 text-[#818795]">{indexedFileCount}/{fileBlocks.length} possuem texto extraído ou resumo.</p></div>
-        </div>
-
-        {#if knowledgeTopics.length > 0}
-          <div class="mt-5 border-t border-[#DDE1EA] pt-4"><strong class="text-[10px] font-semibold text-[#303645]">O motor conseguirá localizar este artigo por</strong><div class="mt-2 flex flex-wrap gap-2">{#each knowledgeTopics as topic}<span class="rounded-full border border-[#D8DDF4] bg-white px-2.5 py-1 text-[9px] font-medium text-[#4F5870]">{topic}</span>{/each}</div></div>
-        {/if}
+  {#if data.canEdit && data.humanReview.total > 0}
+    <div class="sticky bottom-4 z-20 mt-5 flex flex-col gap-3 rounded-2xl border border-[#D8DDF4] bg-white/95 px-4 py-3 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-center gap-2"><PenTool size={14} class="text-[#000A57]"/><span class="text-[9px] font-semibold text-[#707788]">{reviewPending === 0 && !hasUnsavedReview ? "Imagens revisadas" : `${data.humanReview.total - reviewPending}/${data.humanReview.total} imagens revisadas`}</span></div>
+      <div class="flex shrink-0 flex-wrap gap-2">
+        <button type="button" disabled={Boolean(savingMode)} on:click={saveDraft} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#D8DDF4] bg-white px-4 text-[10px] font-semibold text-[#000A57] disabled:opacity-60">{#if savingMode === "draft"}<LoaderCircle size={14} class="animate-spin"/>{:else}<Save size={14}/>{/if}Salvar imagens</button>
+        <button type="button" disabled={Boolean(savingMode)} on:click={concludeReview} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-60">{#if savingMode === "confirm"}<LoaderCircle size={14} class="animate-spin"/>{:else}<CheckCircle2 size={14}/>{/if}Concluir imagens</button>
       </div>
     </div>
-  </section>
-
-  <section class="mt-5 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
-    <div class="flex items-center gap-3">
-      <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F3F4F7] text-[#000A57]"><BrainCircuit size={17}/></span>
-      <div><h2 class="text-[14px] font-semibold text-[#11182C]">Configurações avançadas</h2><p class="mt-1 text-[10px] text-[#858A98]">Pesquisa, IA e informações internas.</p></div>
-    </div>
-
-    <form method="POST" action="?/updateAdvanced" class="mt-5 grid gap-4">
-      <fieldset disabled={!data.canEdit} class="contents disabled:opacity-70">
-        <label class="block rounded-2xl border border-[#DDE1EA] bg-[#FAFAFC] p-4"><span class="flex items-center gap-2 text-[11px] font-semibold text-[#303645]"><Search size={15}/>Termos de pesquisa</span><textarea name="searchAliases" maxlength="8000" rows="4" class="mt-3 w-full resize-y rounded-xl border border-[#DDE1EA] bg-white px-3 py-2.5 text-[11px] leading-5">{data.content.searchAliases.join("\n")}</textarea></label>
-        <label class="block rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4"><span class="flex items-center gap-2 text-[11px] font-semibold text-[#000A57]"><BrainCircuit size={15}/>Conhecimento da IA</span><textarea name="assistantKnowledge" maxlength="40000" rows="5" class="mt-3 w-full resize-y rounded-xl border border-[#D8DDF4] bg-white px-3 py-2.5 text-[11px] leading-5">{data.content.assistantKnowledge}</textarea></label>
-        <label class="block rounded-2xl border border-[#F0D7C4] bg-[#FFF9F4] p-4"><span class="flex items-center gap-2 text-[11px] font-semibold text-[#7A3B08]"><LockKeyhole size={15}/>Notas internas</span><textarea name="internalSupportNotes" maxlength="40000" rows="4" class="mt-3 w-full resize-y rounded-xl border border-[#F0D7C4] bg-white px-3 py-2.5 text-[11px] leading-5">{data.content.internalSupportNotes}</textarea></label>
-        {#if data.canEdit}<div class="flex justify-end"><button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white"><Save size={14}/>Salvar configurações</button></div>{/if}
-      </fieldset>
-    </form>
-  </section>
+  {/if}
 </ApplicationContent>
+
+{#if showVideoUpdateModal}
+  <div class="fixed inset-0 z-[150] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
+    <section role="dialog" aria-modal="true" class="max-h-[88vh] w-full max-w-[620px] overflow-y-auto rounded-[24px] bg-white p-5 shadow-2xl sm:p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Sparkles size={17}/></span>
+          <div><h2 class="text-[16px] font-semibold text-[#11182C]">Atualizar com IA</h2><p class="mt-1 text-[10px] text-[#858A98]">A publicação atual permanece ativa.</p></div>
+        </div>
+        <button type="button" on:click={closeVideoUpdate} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482]" aria-label="Fechar"><X size={16}/></button>
+      </div>
+
+      <div class="mt-5 grid gap-3 sm:grid-cols-2">
+        <button type="button" on:click={() => runRegeneration("current")} disabled={regenerating || !data.content.featuredVideo?.storageKey} class="rounded-2xl border border-[#D8DDF4] bg-[#F8F9FF] p-4 text-left disabled:opacity-40">
+          <Video size={19} class="text-[#000A57]"/>
+          <strong class="mt-3 block text-[11px] text-[#303645]">Reprocessar vídeo atual</strong>
+          <span class="mt-1 block text-[9px] text-[#858A98]">Refaz texto, etapas e prints.</span>
+        </button>
+
+        <div class="rounded-2xl border border-[#F1D7BD] bg-[#FFF9F3] p-4">
+          <UploadCloud size={19} class="text-[#EA6D0B]"/>
+          <strong class="mt-3 block text-[11px] text-[#303645]">Novo vídeo</strong>
+          <input type="file" accept="video/mp4,.mp4" on:change={chooseRegenerationFile} disabled={regenerating} class="mt-3 block w-full text-[9px]"/>
+          <button type="button" on:click={() => runRegeneration("upload")} disabled={regenerating || !regenerationFile} class="mt-3 inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#EA6D0B] px-3 text-[9px] font-semibold text-white disabled:opacity-40"><RefreshCw size={12}/>Atualizar</button>
+        </div>
+      </div>
+
+      {#if regenerating || regenerationProgress.length > 0}
+        <div class="mt-4 space-y-2 rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-3">
+          {#each regenerationProgress as item}
+            <div class="flex items-start gap-2 rounded-xl bg-white px-3 py-2.5">
+              {#if item.status === "done"}
+                <CheckCircle2 size={13} class="mt-0.5 shrink-0 text-[#2D7143]"/>
+              {:else if item.status === "error"}
+                <TriangleAlert size={13} class="mt-0.5 shrink-0 text-[#9B2C2C]"/>
+              {:else}
+                <LoaderCircle size={13} class="mt-0.5 shrink-0 animate-spin text-[#000A57]"/>
+              {/if}
+              <div><strong class="block text-[9px] text-[#454C5D]">{item.label}</strong>{#if item.detail}<span class="mt-0.5 block text-[8px] text-[#9297A5]">{item.detail}</span>{/if}</div>
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      {#if regenerationError}
+        <div class="mt-4 flex items-start gap-2 rounded-xl border border-[#F0C8C8] bg-[#FFF5F5] px-4 py-3 text-[9px] font-medium text-[#9B2C2C]">
+          <TriangleAlert size={13} class="mt-0.5 shrink-0"/>
+          <span>{regenerationError}</span>
+        </div>
+      {/if}
+
+      {#if regenerationJob?.status === "failed"}
+        <div class="mt-3 flex justify-end">
+          <button type="button" on:click={retryRegeneration} class="inline-flex min-h-9 items-center gap-2 rounded-xl bg-[#000A57] px-3 text-[9px] font-semibold text-white">
+            <RefreshCw size={12}/>Tentar novamente
+          </button>
+        </div>
+      {/if}
+
+      {#if regenerating}
+        <div class="mt-4 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-4 py-3 text-[9px] font-medium text-[#000A57]">
+          O processamento continua no servidor. Você pode fechar esta tela e voltar depois.
+        </div>
+      {/if}
+
+      <div class="mt-4 rounded-xl border border-[#F1D7BD] bg-[#FFF9F3] px-4 py-3 text-[9px] font-medium text-[#7A3B08]">O rascunho atual será substituído somente quando todo o processamento terminar. A versão publicada permanece ativa.</div>
+    </section>
+  </div>
+{/if}
+
+{#if deleteStepTarget}
+  <div class="fixed inset-0 z-[148] flex items-center justify-center bg-[#050A1A]/60 px-4" role="presentation">
+    <section role="dialog" aria-modal="true" class="w-full max-w-[420px] rounded-[22px] bg-white p-5 shadow-2xl">
+      <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0F0] text-[#9B2C2C]"><Trash2 size={17}/></span><div><h2 class="text-[14px] font-semibold text-[#11182C]">Excluir etapa?</h2><p class="mt-1 text-[9px] text-[#858A98]">{deleteStepTarget.title}</p></div></div>
+      <div class="mt-5 flex justify-end gap-2">
+        <button type="button" on:click={() => (deleteStepTarget = null)} disabled={deletingStep} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[10px] font-semibold text-[#626979]">Cancelar</button>
+        <button type="button" on:click={confirmDeleteStep} disabled={deletingStep} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#9B2C2C] px-4 text-[10px] font-semibold text-white disabled:opacity-50">{#if deletingStep}<LoaderCircle size={13} class="animate-spin"/>{:else}<Trash2 size={13}/>{/if}Excluir</button>
+      </div>
+    </section>
+  </div>
+{/if}
+
+{#if splitTargetStep}
+  <div class="fixed inset-0 z-[145] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
+    <section role="dialog" aria-modal="true" class="max-h-[88vh] w-full max-w-[680px] overflow-y-auto rounded-[24px] bg-white p-5 shadow-2xl sm:p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF3E9] text-[#EA6D0B]"><Sparkles size={17}/></span>
+          <div>
+            <h2 class="text-[16px] font-semibold text-[#11182C]">Quebrar etapa</h2>
+            <p class="mt-1 text-[10px] text-[#858A98]">{splitTargetStep.title}</p>
+          </div>
+        </div>
+        <button type="button" on:click={closeSplitDialog} disabled={splitApplying} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482]" aria-label="Fechar"><X size={16}/></button>
+      </div>
+
+      <div class="mt-5">
+        <strong class="text-[11px] font-semibold text-[#303645]">Quantas partes?</strong>
+        <div class="mt-2 flex flex-wrap gap-2">
+          {#each [2, 3, 4, 5, 6] as count}
+            <button type="button" on:click={() => { splitDesiredParts = count; splitSuggestion = null; splitError = ""; }} class={`flex h-10 w-10 items-center justify-center rounded-xl border text-[11px] font-bold ${splitDesiredParts === count ? "border-[#000A57] bg-[#000A57] text-white" : "border-[#DDE1EA] bg-white text-[#5F6676]"}`}>{count}</button>
+          {/each}
+          <button type="button" on:click={analyzeSplitTarget} disabled={Boolean(splitLoadingStepId) || splitApplying} class="ml-auto inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#EA6D0B] px-4 text-[10px] font-semibold text-white disabled:opacity-50">
+            {#if splitLoadingStepId}<LoaderCircle size={14} class="animate-spin"/>{:else}<Sparkles size={14}/>{/if}
+            Analisar
+          </button>
+        </div>
+      </div>
+
+      {#if splitError}
+        <div class="mt-4 flex items-start gap-2 rounded-xl border border-[#F0C8C8] bg-[#FFF5F5] px-3 py-2.5 text-[9px] font-medium text-[#9B2C2C]">
+          <TriangleAlert size={13} class="mt-0.5 shrink-0"/>
+          <span>{splitError}</span>
+        </div>
+      {/if}
+
+      {#if splitSuggestion}
+        <div class="mt-5 space-y-3">
+          {#each splitSuggestion.parts as part, index}
+            <article class="rounded-2xl border border-[#E2E5ED] bg-[#FAFAFC] p-4">
+              <div class="flex items-start gap-3">
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#000A57] text-[10px] font-bold text-white">{index + 1}</span>
+                <div class="min-w-0 flex-1">
+                  <strong class="text-[12px] font-semibold text-[#303645]">{part.title}</strong>
+                  {#if part.description}<p class="mt-1 text-[9px] leading-4 text-[#858B99]">{part.description}</p>{/if}
+                  <div class="mt-2"><HelpRichText text={part.instruction} className="space-y-1 text-[10px] leading-5 text-[#555D6C]"/></div>
+                </div>
+              </div>
+            </article>
+          {/each}
+        </div>
+      {/if}
+
+      <div class="mt-5 flex justify-end gap-2">
+        <button type="button" on:click={closeSplitDialog} disabled={splitApplying} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[10px] font-semibold text-[#626979]">Cancelar</button>
+        {#if splitSuggestion?.shouldSplit}
+          <button type="button" on:click={applyStepSplit} disabled={splitApplying} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">
+            {#if splitApplying}<LoaderCircle size={14} class="animate-spin"/>{:else}<Check size={14}/>{/if}
+            Aplicar
+          </button>
+        {/if}
+      </div>
+    </section>
+  </div>
+{/if}
+
+{#if showUntouchedModal}
+  <div class="fixed inset-0 z-[140] flex items-center justify-center bg-[#050A1A]/60 px-4" role="presentation">
+    <section role="dialog" aria-modal="true" class="w-full max-w-[460px] rounded-[24px] bg-white p-5 shadow-2xl sm:p-6">
+      <div class="flex items-start justify-between gap-4"><div><h2 class="text-[16px] font-semibold text-[#11182C]">Imagens sem interação</h2><p class="mt-1 text-[10px] text-[#777D8D]">{untouchedCount} {untouchedCount === 1 ? "imagem ainda não foi alterada." : "imagens ainda não foram alteradas."}</p></div><button type="button" on:click={() => (showUntouchedModal = false)} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482]" aria-label="Fechar"><X size={16}/></button></div>
+      <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" on:click={() => (showUntouchedModal = false)} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[10px] font-semibold text-[#626979]">Voltar</button><button type="button" disabled={Boolean(savingMode)} on:click={() => persistAll("confirm", true)} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-60"><CheckCircle2 size={14}/>Confirmar imagens</button></div>
+    </section>
+  </div>
+{/if}
