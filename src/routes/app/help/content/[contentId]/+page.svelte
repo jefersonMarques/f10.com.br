@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
+  import { enhance } from "$app/forms";
   import { onDestroy, onMount } from "svelte";
   import {
     AlertTriangle,
@@ -9,6 +10,9 @@
     ArrowUp,
     ArrowDown,
     FilePlus2,
+    ChevronLeft,
+    ChevronRight,
+    Pencil,
     ExternalLink,
     Eye,
     FileText,
@@ -45,6 +49,10 @@
   export let form: ActionData;
   let settingsModal: "general" | "video" | "advanced" | null = null;
   let stepModalId: string | null = null;
+  let createStepOpen = false;
+  let selectedStepId = data.content.steps[0]?.id ?? "";
+  let editBlockId: string | null = null;
+  let editBlockStepId = "";
 
   type ReviewStep = PageData["content"]["steps"][number];
   type ReviewContent = PageData["content"];
@@ -814,10 +822,8 @@
 
   onMount(() => {
     const stepId = new URLSearchParams(window.location.search).get("step");
-    if (stepId && /^[a-f0-9-]{36}$/i.test(stepId)) {
-      requestAnimationFrame(() => {
-        document.getElementById(`help-step-${stepId}`)?.scrollIntoView({ block: "center" });
-      });
+    if (stepId && data.content.steps.some((step) => step.id === stepId)) {
+      selectedStepId = stepId;
     }
   });
 
@@ -845,6 +851,40 @@
 
 
   $: editingStep = reviewSteps.find((step) => step.id === stepModalId) ?? null;
+  $: editingBlock = reviewSteps
+    .flatMap((step) => step.blocks)
+    .find((block) => block.id === editBlockId) ?? null;
+  $: selectedStepIndex = Math.max(0, reviewSteps.findIndex((step) => step.id === selectedStepId));
+  $: if (reviewSteps.length > 0 && !reviewSteps.some((step) => step.id === selectedStepId)) {
+    selectedStepId = reviewSteps[0].id;
+  }
+
+  function selectStep(stepId: string): void {
+    if (openEditors.size > 0) {
+      saveSuccess = false;
+      saveMessage = "Salve ou cancele o texto em edição antes de mudar de etapa.";
+      return;
+    }
+    selectedStepId = stepId;
+  }
+
+  function openCreateStep(): void {
+    if (!allowModal()) return;
+    createStepOpen = true;
+  }
+
+  function openBlockSettings(stepId: string, blockId: string): void {
+    if (!allowModal()) return;
+    editBlockStepId = stepId;
+    editBlockId = blockId;
+  }
+
+  function cancelCategorySelection(): void {
+    selectedCategoryIds = reviewCategories
+      .filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG)
+      .map((category) => category.id);
+    categoryPickerOpen = false;
+  }
 
   function allowModal(): boolean {
     if (hasUnsavedReview || openEditors.size > 0) {
@@ -966,9 +1006,31 @@
       </section>
     {/if}
 
-    <div class="mt-5 space-y-5">
-      {#each reviewSteps as step, index}
-        <section id={`help-step-${step.id}`} class="scroll-mt-24 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
+    <div class="mt-5 grid items-start gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <aside class="min-w-0 rounded-2xl border border-[#E2E5ED] bg-white p-3 lg:sticky lg:top-24" aria-label="Navegação das etapas">
+        <div class="mb-3 flex items-center justify-between px-2">
+          <h2 class="text-[14px] font-semibold text-[#202637]">Etapas</h2>
+          <span class="rounded-full bg-[#F2F3F7] px-2 py-1 text-[12px] font-semibold text-[#6E7584]">{reviewSteps.length}</span>
+        </div>
+        <div class="flex gap-2 overflow-x-auto pb-1 lg:max-h-[calc(100dvh-220px)] lg:flex-col lg:overflow-y-auto">
+          {#each reviewSteps as navStep, navIndex (navStep.id)}
+            <button type="button" on:click={() => selectStep(navStep.id)} aria-current={selectedStepId === navStep.id ? "step" : undefined}
+              class={`flex min-w-[180px] items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition lg:min-w-0 ${selectedStepId === navStep.id ? "border-[#BFC8F2] bg-[#EEF0FF] text-[#000A57]" : "border-transparent text-[#5F6675] hover:bg-[#F4F5FA]"}`}>
+              <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-[12px] font-bold ring-1 ring-[#E2E5ED]">{navIndex + 1}</span>
+              <span class="min-w-0 flex-1 truncate text-[13px] font-semibold" title={navStep.title}>{navStep.title}</span>
+              {#if navStep.blocks.length === 0}<CircleAlert size={15} class="shrink-0 text-[#A9510D]"/>{/if}
+            </button>
+          {/each}
+        </div>
+        {#if data.canEdit}
+          <button type="button" on:click={openCreateStep} class="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#B9C2D7] bg-white text-[13px] font-semibold text-[#000A57] hover:bg-[#F5F6FC]">
+            <Plus size={15}/>Nova etapa
+          </button>
+        {/if}
+      </aside>
+      <div class="min-w-0 space-y-4">
+      {#each reviewSteps as step, index (step.id)}
+        <section id={`help-step-${step.id}`} class={`scroll-mt-24 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white ${selectedStepId === step.id ? "" : "hidden"}`}>
           <header class="flex items-start gap-4 border-b border-[#EEF0F5] px-5 py-5 sm:px-6">
             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-[12px] font-bold text-white">{index + 1}</span>
             <div class="min-w-0 flex-1">
@@ -1080,10 +1142,21 @@
           </div>
         </section>
       {/each}
+      {#if reviewSteps.length === 0}
+        <div class="rounded-2xl border border-dashed border-[#DDE1EA] bg-white p-8 text-center">
+          <h2 class="text-[16px] font-semibold">Comece pela primeira etapa</h2>
+          <p class="mt-1 text-[13px] text-[#767D8B]">Adicione uma etapa para descrever o procedimento.</p>
+          {#if data.canEdit}<button type="button" on:click={openCreateStep} class="mt-4 rounded-xl bg-[#000A57] px-4 py-2.5 text-[13px] font-semibold text-white"><Plus size={15} class="inline"/> Criar etapa</button>{/if}
+        </div>
+      {:else}
+        <div class="flex items-center justify-between gap-2 rounded-xl border border-[#E2E5ED] bg-white px-3 py-2">
+          <button type="button" on:click={() => selectStep(reviewSteps[selectedStepIndex - 1]?.id ?? selectedStepId)} disabled={selectedStepIndex === 0} class="inline-flex min-h-9 items-center gap-1 rounded-lg px-3 text-[13px] font-semibold text-[#000A57] disabled:opacity-35"><ChevronLeft size={16}/>Anterior</button>
+          <span class="text-[12px] font-medium text-[#737989]">{selectedStepIndex + 1} de {reviewSteps.length}</span>
+          <button type="button" on:click={() => selectStep(reviewSteps[selectedStepIndex + 1]?.id ?? selectedStepId)} disabled={selectedStepIndex === reviewSteps.length - 1} class="inline-flex min-h-9 items-center gap-1 rounded-lg px-3 text-[13px] font-semibold text-[#000A57] disabled:opacity-35">Próxima<ChevronRight size={16}/></button>
+        </div>
+      {/if}
+      </div>
     </div>
-    {#if data.canEdit}
-      <form method="POST" action="?/addStep" class="mt-5"><button type="submit" disabled={hasUnsavedReview || openEditors.size > 0} class="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[#B9C2D7] bg-white text-[14px] font-semibold text-[#000A57] disabled:opacity-40"><FilePlus2 size={17}/>Adicionar etapa</button></form>
-    {/if}
   </main>
 
   {#if data.canEdit && data.humanReview.total > 0}
