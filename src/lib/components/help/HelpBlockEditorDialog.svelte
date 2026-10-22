@@ -86,7 +86,7 @@
             </label>
           {/if}
         {/if}
-        {#if errorMessage}<p role="alert" class="text-[13px] font-medium text-[#9B2C2C]">{form.message}</p>{/if}
+        {#if errorMessage}<p role="alert" class="text-[13px] font-medium text-[#9B2C2C]">{errorMessage}</p>{/if}
         <div class="flex justify-end gap-2">
           <button type="button" on:click={onClose} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[13px] font-semibold">Cancelar</button>
           <button type="submit" class="min-h-10 rounded-xl bg-[#000A57] px-5 text-[13px] font-semibold text-white">Salvar bloco</button>
