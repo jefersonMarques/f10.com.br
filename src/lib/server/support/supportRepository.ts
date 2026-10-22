@@ -702,6 +702,7 @@ export async function getSupportTicket(
         visibility: ticketMessages.visibility,
         channel: ticketMessages.channel,
         body: ticketMessages.body,
+        externalMetadata: ticketMessages.externalMetadata,
         createdAt: ticketMessages.createdAt,
       })
       .from(ticketMessages)
@@ -727,7 +728,39 @@ export async function getSupportTicket(
       .limit(100),
   ]);
 
-  return { ticket, messages, events };
+  return {
+    ticket,
+    messages: messages.map(({ externalMetadata, ...message }) => ({
+      ...message,
+      inlineImages: (
+        Array.isArray(externalMetadata?.inlineImages) ? externalMetadata.inlineImages : []
+      ).flatMap((raw): Array<{ src: string; alt: string; external: boolean }> => {
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
+        const image = raw as Record<string, unknown>;
+        const src = typeof image.src === "string" ? image.src : "";
+        const external = image.external === true;
+        const safePath = `/api/app/tickets/${ticketId}/attachments/`;
+        const internalAllowed = src.startsWith(safePath) &&
+          /^[a-f0-9-]{36}$/i.test(src.slice(safePath.length));
+        let remoteAllowed = false;
+        if (external && src.length <= 2048) {
+          try {
+            const url = new URL(src);
+            remoteAllowed = url.protocol === "https:" && !url.username && !url.password;
+          } catch {
+            remoteAllowed = false;
+          }
+        }
+        if (!(external ? remoteAllowed : internalAllowed)) return [];
+        return [{
+          src,
+          alt: typeof image.alt === "string" ? image.alt.slice(0, 160) : "",
+          external,
+        }];
+      }),
+    })),
+    events,
+  };
 }
 
 export async function addTicketMessage(
