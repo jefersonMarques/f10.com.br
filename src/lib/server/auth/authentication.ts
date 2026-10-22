@@ -13,7 +13,7 @@ const DUMMY_PASSWORD_HASH =
 
 export type AuthenticationResult =
   | { ok: true; user: { id: string; name: string; email: string } }
-  | { ok: false; reason: "invalid" | "throttled" };
+  | { ok: false; reason: "invalid" | "throttled"; retryAfterSeconds?: number };
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -33,7 +33,7 @@ function createAttemptKey(email: string, clientAddress: string): string {
   return loginAttemptKeyPrefix(email) + hashValue(clientAddress);
 }
 
-async function isBlocked(attemptKey: string, now: Date): Promise<boolean> {
+async function blockedSeconds(attemptKey: string, now: Date): Promise<number> {
   const db = getDatabase();
   const [attempt] = await db
     .select()
@@ -41,13 +41,13 @@ async function isBlocked(attemptKey: string, now: Date): Promise<boolean> {
     .where(eq(authLoginAttempts.key, attemptKey))
     .limit(1);
 
-  return Boolean(attempt?.blockedUntil && attempt.blockedUntil.getTime() > now.getTime());
+  return Math.max(0, Math.ceil(((attempt?.blockedUntil?.getTime() ?? 0) - now.getTime()) / 1000));
 }
 
-async function recordFailedAttempt(attemptKey: string, now: Date): Promise<void> {
+async function recordFailedAttempt(attemptKey: string, now: Date): Promise<number> {
   const db = getDatabase();
 
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     // Inicializar primeiro e bloquear a linha evita perder tentativas quando
     // o navegador envia duas requisições simultaneamente.
     await tx.insert(authLoginAttempts).values({
@@ -77,6 +77,7 @@ async function recordFailedAttempt(attemptKey: string, now: Date): Promise<void>
       blockedUntil,
       updatedAt: now,
     }).where(eq(authLoginAttempts.key, attemptKey));
+    return Math.max(0, Math.ceil(((blockedUntil?.getTime() ?? 0) - now.getTime()) / 1000));
   });
 }
 
@@ -94,12 +95,13 @@ export async function authenticateUser(
   const attemptKey = createAttemptKey(normalizedEmail, clientAddress);
   const now = new Date();
 
-  if (await isBlocked(attemptKey, now)) {
+  const remainingSeconds = await blockedSeconds(attemptKey, now);
+  if (remainingSeconds > 0) {
     await recordAuditEvent({
       action: "auth.login_throttled",
       metadata: { emailHash: hashValue(normalizedEmail) },
     });
-    return { ok: false, reason: "throttled" };
+    return { ok: false, reason: "throttled", retryAfterSeconds: remainingSeconds };
   }
 
   const db = getDatabase();
@@ -113,7 +115,7 @@ export async function authenticateUser(
   const canLogin = Boolean(user && user.status === "active" && passwordMatches);
 
   if (!user || !canLogin) {
-    await recordFailedAttempt(attemptKey, now);
+    const retryAfterSeconds = await recordFailedAttempt(attemptKey, now);
     await recordAuditEvent({
       actorUserId: user?.id ?? null,
       action: "auth.login_failed",
@@ -126,7 +128,9 @@ export async function authenticateUser(
               : "password_mismatch",
       },
     });
-    return { ok: false, reason: "invalid" };
+    return retryAfterSeconds > 0
+      ? { ok: false, reason: "throttled", retryAfterSeconds }
+      : { ok: false, reason: "invalid" };
   }
 
   await clearFailedAttempts(attemptKey);
