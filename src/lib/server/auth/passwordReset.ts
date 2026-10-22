@@ -1,9 +1,9 @@
 import { dev } from "$app/environment";
 import { env } from "$env/dynamic/private";
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, like, sql } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
-import { normalizeEmail } from "$lib/server/auth/authentication";
+import { loginAttemptKeyPrefix, normalizeEmail } from "$lib/server/auth/authentication";
 import { hashPassword } from "$lib/server/auth/password";
 import { getDatabase } from "$lib/server/db";
 import { authLoginAttempts, sessions, users } from "$lib/server/db/schema";
@@ -166,13 +166,16 @@ export async function requestPasswordReset(
   }
 
   const db = getDatabase();
-  const [user] = await db
+  const accounts = await db
     .select({ id: users.id, name: users.name, email: users.email })
     .from(users)
-    .where(and(eq(users.email, email), eq(users.status, "active")))
-    .limit(1);
+    .where(and(sql`lower(btrim(${users.email})) = ${email}`, eq(users.status, "active")))
+    .limit(2);
 
-  // A resposta pública é sempre a mesma para não revelar quais e-mails possuem conta.
+  // Não adivinhar qual conta usar se um legado tiver duplicidade de caixa.
+  // A resposta pública permanece genérica para não revelar existência de conta.
+  if (accounts.length !== 1) return;
+  const user = accounts[0];
   if (!user) return;
 
   const token = randomBytes(32).toString("base64url");
@@ -246,7 +249,7 @@ export async function completePasswordReset(
   const now = new Date();
 
   const [candidate] = await db
-    .select({ userId: passwordResetTokens.userId })
+    .select({ userId: passwordResetTokens.userId, email: users.email })
     .from(passwordResetTokens)
     .innerJoin(users, eq(users.id, passwordResetTokens.userId))
     .where(
@@ -286,6 +289,12 @@ export async function completePasswordReset(
       .update(sessions)
       .set({ revokedAt: now })
       .where(and(eq(sessions.userId, claimed.userId), isNull(sessions.revokedAt)));
+
+    // A senha alterada deve permitir acesso imediato sem esperar o bloqueio
+    // de uma senha antiga ou de tentativas anteriores na mesma conta.
+    await tx.delete(authLoginAttempts).where(
+      like(authLoginAttempts.key, loginAttemptKeyPrefix(candidate.email) + "%"),
+    );
 
     await tx
       .update(passwordResetTokens)

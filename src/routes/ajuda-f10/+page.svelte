@@ -137,7 +137,6 @@
           </button>
         </div>
         <div class="mt-3 flex flex-wrap items-center justify-center gap-3">
-          <span class="text-[12px] text-white/70">Busca por texto · não utiliza créditos de IA</span>
           {#if data.helpPublicAi.available}
             <button type="button" disabled={loading || question.trim().length < 3} on:click={() => void askHelp()} class="inline-flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45">
               {#if loading}<LoaderCircle size={15} class="animate-spin"/>{:else}<Sparkles size={15}/>{/if}

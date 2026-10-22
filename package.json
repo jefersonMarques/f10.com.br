@@ -13,6 +13,7 @@
     "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
     "admin:bootstrap": "node --env-file-if-exists=.env scripts/bootstrap-super-admin.mjs",
     "operations:doctor": "node --env-file-if-exists=.env scripts/operations-doctor.mjs",
+    "auth:diagnose": "node --env-file-if-exists=.env scripts/diagnose-login.mjs",
     "operations:smoke": "node --env-file-if-exists=.env scripts/operations-smoke.mjs",
     "support:doctor": "node --env-file-if-exists=.env scripts/support-doctor.mjs",
     "production:doctor": "npm run operations:doctor && npm run support:doctor",
