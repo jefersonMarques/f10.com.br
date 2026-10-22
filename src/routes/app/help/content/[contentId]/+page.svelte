@@ -1000,15 +1000,18 @@
 
     {#if data.content.featuredVideo}
       {@const featuredEmbed = youtubeEmbedUrl(data.content.featuredVideo.sourceUrl)}
-      <section class="mt-5 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
+      <details class="mt-3 overflow-hidden rounded-[18px] border border-[#E2E5ED] bg-white">
+        <summary class="flex min-h-12 cursor-pointer items-center gap-2 px-4 text-[13px] font-semibold text-[#000A57]"><PlayCircle size={17}/>Vídeo principal</summary>
+        <div class="border-t border-[#EEF0F5]">
         {#if featuredEmbed}<div class="aspect-video overflow-hidden bg-black"><iframe src={featuredEmbed} title={data.content.featuredVideo.altText || `Vídeo: ${data.content.title}`} class="h-full w-full" allowfullscreen></iframe></div>{:else if data.content.featuredVideo.storageKey}<video controls preload="metadata" class="aspect-video h-auto w-full bg-black" src={assetUrl(data.content.featuredVideo.id)}><track kind="captions" /></video>{:else if data.content.featuredVideo.sourceUrl}<a href={data.content.featuredVideo.sourceUrl} target="_blank" rel="noopener noreferrer" class="flex min-h-20 items-center justify-between gap-3 px-5 py-4 text-[13px] font-semibold text-[#000A57]"><span class="inline-flex items-center gap-2"><PlayCircle size={18}/>Assistir ao vídeo principal</span><ExternalLink size={13}/></a>{/if}
-      </section>
+        </div>
+      </details>
     {/if}
 
     {#if reviewQuickGuide || data.canEdit}
-      <section class="mt-4 rounded-[20px] border border-[#D8DDF4] bg-[#F8F9FF] px-5 py-5">
-        <div class="flex items-center gap-2"><Sparkles size={16} class="text-[#EA6D0B]"/><h2 class="text-[13px] font-semibold text-[#000A57]">Resumo rápido</h2></div>
-        <div class="mt-3">
+      <details class="mt-3 rounded-[18px] border border-[#D8DDF4] bg-[#F8F9FF]">
+        <summary class="flex min-h-12 cursor-pointer items-center gap-2 px-4 text-[13px] font-semibold text-[#000A57]"><Sparkles size={16} class="text-[#EA6D0B]"/>Resumo rápido</summary>
+        <div class="border-t border-[#D8DDF4] px-4 py-4">
           <HelpInlineTextEditor
             contentId={data.content.id}
             operation="quick_guide"
@@ -1021,7 +1024,7 @@
             on:editing={(event) => editorState("quick-guide", event.detail.active)}
           />
         </div>
-      </section>
+      </details>
     {/if}
 
     <div class="mt-5 grid items-start gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
