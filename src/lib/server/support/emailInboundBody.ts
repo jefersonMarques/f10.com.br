@@ -112,11 +112,12 @@ export function selectInboundEmailBody(input: {
     }
   }
 
-  if (chosen?.source === "plain" && html && /(?:\*\*|\w\*\w)/.test(html)) {
+  // Prefer safe rich-text conversion when it contains every word from the
+  // selected source, even if HTML also preserves additional signature text.
+  if (chosen && chosen.source !== "html" && html &&
+      /(?:\\*\\*[^*]+\\*\\*|\\*[^*\\n]+\\*)/.test(html)) {
     const htmlWords = options[2].words;
-    const plainWords = options[1].words;
-    if (htmlWords.length === plainWords.length &&
-        missingWordCount(htmlWords, plainWords) === 0) {
+    if (missingWordCount(htmlWords, chosen.words) === 0) {
       chosen = options[2];
     }
   }
