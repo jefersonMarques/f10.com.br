@@ -914,22 +914,6 @@
         {/if}
       </div>
 
-      {#if categoryPickerOpen}
-        <div class="mt-3 rounded-2xl border border-[#DDE1EA] bg-[#FAFAFC] p-3">
-          <div class="grid gap-2 sm:grid-cols-2">
-            {#each data.categories.filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG) as category}
-              <button type="button" on:click={() => toggleCategory(category.id)} class={`flex min-h-10 items-center justify-between rounded-xl border px-3 text-left text-[10px] font-semibold ${selectedCategoryIds.includes(category.id) ? "border-[#BFC7F4] bg-[#EEF0FF] text-[#000A57]" : "border-[#E1E4EB] bg-white text-[#606777]"}`}>
-                <span class="flex items-center gap-2"><HelpCategoryIcon name={category.icon} size={13}/>{category.name}</span>
-                {#if selectedCategoryIds.includes(category.id)}<Check size={13}/>{/if}
-              </button>
-            {/each}
-          </div>
-          <div class="mt-3 flex justify-end gap-2">
-            <button type="button" on:click={() => (categoryPickerOpen = false)} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] text-[#6C7383]" aria-label="Cancelar"><X size={14}/></button>
-            <button type="button" on:click={saveCategories} disabled={categorySaving || selectedCategoryIds.length === 0} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#000A57] text-white disabled:opacity-40" aria-label="Salvar categorias">{#if categorySaving}<LoaderCircle size={13} class="animate-spin"/>{:else}<Check size={14}/>{/if}</button>
-          </div>
-        </div>
-      {/if}
 
       <h1 class="mt-3 text-[24px] font-semibold tracking-[-0.035em] text-[#010D28] sm:text-[30px]">{data.content.title}</h1>
       <div class="mt-2 max-w-[800px]">
@@ -1080,48 +1064,7 @@
                   {/if}
                 </div>
 
-                {#if addPanel?.stepId === step.id}
-                  <div class="mt-3 rounded-2xl border border-[#DDE1EA] bg-[#FAFAFC] p-3">
-                    {#if addPanel.type === "image"}
-                      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                        {#if data.canGenerateVideoFrames}
-                          <button type="button" on:click={() => addStepImage("generate")} disabled={Boolean(imageAddingMode)} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">
-                            {#if imageAddingMode === "generate"}<LoaderCircle size={14} class="animate-spin"/>{:else}<Sparkles size={14}/>{/if}
-                            Gerar do vídeo
-                          </button>
-                        {/if}
-                        <label class="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 py-2">
-                          <ImagePlus size={14} class="shrink-0 text-[#000A57]"/>
-                          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" on:change={chooseStepImageFile} class="min-w-0 flex-1 text-[9px]"/>
-                        </label>
-                        <button type="button" on:click={() => addStepImage("upload")} disabled={!addImageFile || Boolean(imageAddingMode)} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-4 text-[10px] font-semibold text-[#000A57] disabled:opacity-40">
-                          {#if imageAddingMode === "upload"}<LoaderCircle size={14} class="animate-spin"/>{:else}<Check size={14}/>{/if}
-                          Enviar
-                        </button>
-                      </div>
-                    {:else if addPanel.type === "link"}
-                      <div class="grid gap-2 sm:grid-cols-2">
-                        <input bind:value={addLinkLabel} maxlength="240" placeholder="Texto do link" class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"/>
-                        <input bind:value={addLinkUrl} placeholder="https://..." class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[11px]"/>
-                      </div>
-                    {:else}
-                      <textarea bind:value={addText} rows={4} maxlength="50000" placeholder={addPanel.type === "notice" ? "Texto do aviso" : "Novo texto"} class="w-full resize-y rounded-xl border border-[#DDE1EA] bg-white px-3 py-2.5 text-[11px] leading-5"></textarea>
-                      {#if addPanel.type === "notice"}
-                        <div class="mt-2 flex flex-wrap gap-2">
-                          {#each [["info","Informação"],["warning","Atenção"],["success","Sucesso"],["danger","Importante"]] as option}
-                            <button type="button" on:click={() => (addNoticeVariant = option[0])} class={`rounded-lg border px-3 py-2 text-[9px] font-semibold ${addNoticeVariant === option[0] ? "border-[#000A57] bg-[#000A57] text-white" : "border-[#DDE1EA] bg-white text-[#687080]"}`}>{option[1]}</button>
-                          {/each}
-                        </div>
-                      {/if}
-                    {/if}
-                    <div class="mt-3 flex justify-end gap-2">
-                      <button type="button" on:click={() => (addPanel = null)} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] text-[#6C7383]" aria-label="Cancelar"><X size={14}/></button>
-                      {#if addPanel.type !== "image"}
-                        <button type="button" on:click={addBlock} disabled={addSaving} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#000A57] text-white disabled:opacity-50" aria-label="Adicionar">{#if addSaving}<LoaderCircle size={13} class="animate-spin"/>{:else}<Check size={14}/>{/if}</button>
-                      {/if}
-                    </div>
-                  </div>
-                {/if}
+
               </div>
             {/if}
           </div>
@@ -1295,5 +1238,74 @@
       <div class="flex items-start justify-between gap-4"><div><h2 class="text-[16px] font-semibold text-[#11182C]">Imagens sem interação</h2><p class="mt-1 text-[10px] text-[#777D8D]">{untouchedCount} {untouchedCount === 1 ? "imagem ainda não foi alterada." : "imagens ainda não foram alteradas."}</p></div><button type="button" on:click={() => (showUntouchedModal = false)} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3F4F7] text-[#6E7482]" aria-label="Fechar"><X size={16}/></button></div>
       <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" on:click={() => (showUntouchedModal = false)} class="min-h-10 rounded-xl border border-[#DDE1EA] px-4 text-[10px] font-semibold text-[#626979]">Voltar</button><button type="button" disabled={Boolean(savingMode)} on:click={() => persistAll("confirm", true)} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-60"><CheckCircle2 size={14}/>Confirmar imagens</button></div>
     </section>
+  </div>
+{/if}
+
+{#if categoryPickerOpen}
+  <div class="fixed inset-0 z-[146] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
+      {#if true}
+        <div role="dialog" aria-modal="true" aria-label="Selecionar categorias" class="max-h-[85vh] w-full max-w-[560px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+          <div class="grid gap-2 sm:grid-cols-2">
+            {#each data.categories.filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG) as category}
+              <button type="button" on:click={() => toggleCategory(category.id)} class={`flex min-h-10 items-center justify-between rounded-xl border px-3 text-left text-[13px] font-semibold ${selectedCategoryIds.includes(category.id) ? "border-[#BFC7F4] bg-[#EEF0FF] text-[#000A57]" : "border-[#E1E4EB] bg-white text-[#606777]"}`}>
+                <span class="flex items-center gap-2"><HelpCategoryIcon name={category.icon} size={13}/>{category.name}</span>
+                {#if selectedCategoryIds.includes(category.id)}<Check size={13}/>{/if}
+              </button>
+            {/each}
+          </div>
+          <div class="mt-3 flex justify-end gap-2">
+            <button type="button" on:click={() => (categoryPickerOpen = false)} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] text-[#6C7383]" aria-label="Cancelar"><X size={14}/></button>
+            <button type="button" on:click={saveCategories} disabled={categorySaving || selectedCategoryIds.length === 0} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#000A57] text-white disabled:opacity-40" aria-label="Salvar categorias">{#if categorySaving}<LoaderCircle size={13} class="animate-spin"/>{:else}<Check size={14}/>{/if}</button>
+          </div>
+        </div>
+      {/if}
+
+  </div>
+{/if}
+
+{#if addPanel}
+  <div class="fixed inset-0 z-[146] flex items-center justify-center bg-[#050A1A]/60 px-4 py-6" role="presentation">
+                {#if true}
+                  <div role="dialog" aria-modal="true" aria-label="Adicionar bloco" class="max-h-[85vh] w-full max-w-[620px] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+                    {#if addPanel.type === "image"}
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        {#if data.canGenerateVideoFrames}
+                          <button type="button" on:click={() => addStepImage("generate")} disabled={Boolean(imageAddingMode)} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[13px] font-semibold text-white disabled:opacity-50">
+                            {#if imageAddingMode === "generate"}<LoaderCircle size={14} class="animate-spin"/>{:else}<Sparkles size={14}/>{/if}
+                            Gerar do vídeo
+                          </button>
+                        {/if}
+                        <label class="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 py-2">
+                          <ImagePlus size={14} class="shrink-0 text-[#000A57]"/>
+                          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" on:change={chooseStepImageFile} class="min-w-0 flex-1 text-[12px]"/>
+                        </label>
+                        <button type="button" on:click={() => addStepImage("upload")} disabled={!addImageFile || Boolean(imageAddingMode)} class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#D8DDF4] bg-[#F8F9FF] px-4 text-[13px] font-semibold text-[#000A57] disabled:opacity-40">
+                          {#if imageAddingMode === "upload"}<LoaderCircle size={14} class="animate-spin"/>{:else}<Check size={14}/>{/if}
+                          Enviar
+                        </button>
+                      </div>
+                    {:else if addPanel.type === "link"}
+                      <div class="grid gap-2 sm:grid-cols-2">
+                        <input bind:value={addLinkLabel} maxlength="240" placeholder="Texto do link" class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px]"/>
+                        <input bind:value={addLinkUrl} placeholder="https://..." class="h-10 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px]"/>
+                      </div>
+                    {:else}
+                      <textarea bind:value={addText} rows={4} maxlength="50000" placeholder={addPanel.type === "notice" ? "Texto do aviso" : "Novo texto"} class="w-full resize-y rounded-xl border border-[#DDE1EA] bg-white px-3 py-2.5 text-[13px] leading-5"></textarea>
+                      {#if addPanel.type === "notice"}
+                        <div class="mt-2 flex flex-wrap gap-2">
+                          {#each [["info","Informação"],["warning","Atenção"],["success","Sucesso"],["danger","Importante"]] as option}
+                            <button type="button" on:click={() => (addNoticeVariant = option[0])} class={`rounded-lg border px-3 py-2 text-[12px] font-semibold ${addNoticeVariant === option[0] ? "border-[#000A57] bg-[#000A57] text-white" : "border-[#DDE1EA] bg-white text-[#687080]"}`}>{option[1]}</button>
+                          {/each}
+                        </div>
+                      {/if}
+                    {/if}
+                    <div class="mt-3 flex justify-end gap-2">
+                      <button type="button" on:click={() => (addPanel = null)} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] text-[#6C7383]" aria-label="Cancelar"><X size={14}/></button>
+                      {#if addPanel.type !== "image"}
+                        <button type="button" on:click={addBlock} disabled={addSaving} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#000A57] text-white disabled:opacity-50" aria-label="Adicionar">{#if addSaving}<LoaderCircle size={13} class="animate-spin"/>{:else}<Check size={14}/>{/if}</button>
+                      {/if}
+                    </div>
+                  </div>
+                {/if}
   </div>
 {/if}
