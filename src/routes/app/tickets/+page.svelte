@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { goto, invalidateAll } from "$app/navigation";
+  import { goto, invalidate, invalidateAll } from "$app/navigation";
+  import { onMount } from "svelte";
   import { CheckCircle2, CircleAlert } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import TicketBoard from "$lib/components/operations/tickets/TicketBoard.svelte";
@@ -46,6 +47,7 @@
   let detailsLoading = false;
   let modalOpen = false;
   let splitInitializedFor = "";
+  let ticketRefreshInFlight = false;
 
   $: if (
     view === "split"
@@ -199,6 +201,35 @@
       draggingTicketId = null;
     }
   }
+
+  async function refreshTicketWorkspace(): Promise<void> {
+    if (document.hidden || moving || draggingTicketId || ticketRefreshInFlight) return;
+    ticketRefreshInFlight = true;
+    try {
+      // Atualiza lista e quadro sem recarregar o layout, abrir modais ou perder filtros.
+      await invalidate("app:tickets:workspace");
+    } catch {
+      // A próxima consulta recupera falhas temporárias.
+    } finally {
+      ticketRefreshInFlight = false;
+    }
+  }
+
+  onMount(() => {
+    const refreshWhenVisible = () => {
+      if (!document.hidden) void refreshTicketWorkspace();
+    };
+    const timer = setInterval(refreshWhenVisible, 5_000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("focus", refreshWhenVisible);
+    window.addEventListener("pageshow", refreshWhenVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("focus", refreshWhenVisible);
+      window.removeEventListener("pageshow", refreshWhenVisible);
+    };
+  });
 
   async function openTicketDetails(ticketId: string, panel: TicketMainPanel = "conversation"): Promise<void> {
     activeTicketPanel = panel;

@@ -151,7 +151,8 @@ function actionErrorMessage(cause: unknown): string {
   return messages[cause.message] ?? "Não foi possível concluir a operação.";
 }
 
-export const load: PageServerLoad = async ({ parent, url }) => {
+export const load: PageServerLoad = async ({ parent, url, depends }) => {
+  depends("app:tickets:workspace");
   const layout = await parent();
   const permissionMap = createPermissionMap(layout.permissions);
   const viewScope = getPermissionScope(permissionMap, "tickets.view");
