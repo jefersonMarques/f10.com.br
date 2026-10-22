@@ -51,5 +51,11 @@ jobs:
       - name: Run Svelte and TypeScript checks
         run: npm run check
 
+      - name: Test Brevo email body completeness
+        run: |
+          node --check scripts/diagnose-brevo-inbound-body.mjs
+          node --check scripts/repair-brevo-inbound-body.mjs
+          node --experimental-strip-types --test tests/emailInboundBody.test.mjs
+
       - name: Build production bundle
         run: npm run build

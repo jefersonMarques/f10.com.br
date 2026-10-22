@@ -55,6 +55,7 @@ export type BrevoEmailMessage = {
   messageType: string;
   subject: string;
   text: string;
+  bodySource?: "markdown" | "plain" | "html" | "fallback";
   createdAt: Date;
   from: EmailAddress | null;
   to: EmailAddress[];
@@ -572,6 +573,7 @@ function messageMetadata(message: BrevoEmailMessage): Record<string, unknown> {
     cc: message.cc,
     bcc: message.bcc,
     attachments: message.attachments,
+    inboundBodySource: message.bodySource ?? null,
     inlineImages: [],
     isForward: message.isForward,
   };
