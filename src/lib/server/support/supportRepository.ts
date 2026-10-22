@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   and,
   asc,
@@ -14,6 +15,11 @@ import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaServic
 import { notifyTicketFollowers } from "$lib/server/support/ticketFollowerRepository";
 import { notifyCustomerOfTicketStatus, sendTicketPublicReplyEmail } from "$lib/server/support/ticketEmailService";
 import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
+import { ticketMessageAttachments } from "$lib/server/db/supportChatEntrySchema";
+import {
+  deleteStoredSupportImages,
+  uploadSupportAgentMessageAttachments,
+} from "$lib/server/support/supportMessageAttachmentRepository";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { serviceRequests } from "$lib/server/db/serviceRequestSchema";
 import { users } from "$lib/server/db/schema";
@@ -769,6 +775,7 @@ export async function addTicketMessage(
   body: string,
   visibility: "public" | "internal",
   mentionedUserIds: string[] = [],
+  files: File[] = [],
 ): Promise<{ emailDelivery: "sent" | "skipped" | "failed" }> {
   const permissionCode =
     visibility === "internal" && getPermissionScope(permissions, "tickets.comment_internal")
@@ -801,15 +808,32 @@ export async function addTicketMessage(
         .where(and(inArray(users.id, uniqueMentionIds), eq(users.status, "active")))
     : [];
 
+  const messageId = randomUUID();
+  const storedAttachments = await uploadSupportAgentMessageAttachments(ticketId, messageId, files);
+  try {
   await db.transaction(async (tx) => {
     await tx.insert(ticketMessages).values({
+      id: messageId,
       ticketId,
       authorType: "user",
       authorUserId: actorUserId,
       visibility,
       channel: "manual",
-      body: body.trim(),
+      body: body.trim() || (visibility === "public" ? "Arquivo(s) enviado(s)." : "Anexo(s) internos."),
     });
+    if (storedAttachments.length) {
+      await tx.insert(ticketMessageAttachments).values(
+        storedAttachments.map((attachment) => ({
+          messageId,
+          ticketId,
+          storageKey: attachment.storageKey,
+          originalName: attachment.originalName,
+          mimeType: attachment.mimeType,
+          sizeBytes: attachment.sizeBytes,
+          checksumSha256: attachment.checksumSha256,
+        })),
+      );
+    }
 
     const ticketUpdate: Partial<typeof tickets.$inferInsert> = {
       updatedAt: now,
@@ -845,11 +869,23 @@ export async function addTicketMessage(
       );
     }
   });
+  } catch (cause) {
+    await deleteStoredSupportImages(storedAttachments);
+    throw cause;
+  }
 
   let emailDelivery: "sent" | "skipped" | "failed" = "skipped";
   if (visibility === "public") {
     try {
-      emailDelivery = await sendTicketPublicReplyEmail(ticketId, body.trim())
+      const outgoingAttachments = await Promise.all(files.map(async (file) => ({
+        name: file.name,
+        content: Buffer.from(await file.arrayBuffer()).toString("base64"),
+      })));
+      emailDelivery = await sendTicketPublicReplyEmail(
+        ticketId,
+        body.trim() || "Arquivo(s) enviado(s).",
+        outgoingAttachments,
+      )
         ? "sent"
         : "skipped";
     } catch (cause) {
