@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
+  import { page } from "$app/stores";
   import { enhance } from "$app/forms";
   import { onDestroy, onMount } from "svelte";
   import {
@@ -52,6 +53,7 @@
   let stepModalId: string | null = null;
   let createStepOpen = false;
   let selectedStepId = data.content.steps[0]?.id ?? "";
+  let lastRequestedStepId = "";
   let editBlockId: string | null = null;
   let editBlockStepId = "";
 
@@ -864,6 +866,15 @@
   $: selectedStepIndex = Math.max(0, reviewSteps.findIndex((step) => step.id === selectedStepId));
   $: if (reviewSteps.length > 0 && !reviewSteps.some((step) => step.id === selectedStepId)) {
     selectedStepId = reviewSteps[0].id;
+  }
+  // React to in-app redirects after saving/adding a step, without requiring a page reload.
+  $: {
+    const requestedStepId = $page.url.searchParams.get("step") ?? "";
+    if (!requestedStepId) lastRequestedStepId = "";
+    else if (requestedStepId !== lastRequestedStepId && reviewSteps.some((step) => step.id === requestedStepId)) {
+      lastRequestedStepId = requestedStepId;
+      selectedStepId = requestedStepId;
+    }
   }
 
   function selectStep(stepId: string): void {
