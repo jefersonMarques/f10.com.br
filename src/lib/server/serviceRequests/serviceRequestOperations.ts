@@ -81,6 +81,8 @@ const FIELD_LABELS: Record<string, string> = {
   usesNationalNfseEnvironment: "Usa ambiente nacional da NFS-e",
   cityHallLogin: "Login da prefeitura",
   serviceRpsBatchNumber: "Número do lote RPS",
+  rpsBatchRequestStatus: "Solicitação de lote de RPS",
+  webserviceEmissionRequestStatus: "Liberação para emissão via Webservice",
   serviceListItem: "Item da lista de serviço",
   taxationCode: "Código de tributação",
   taxationPlace: "Local de tributação",
@@ -154,7 +156,7 @@ export type ServiceRequestFieldView = {
   value: string | number | boolean | null;
   displayValue: string;
   editable: boolean;
-  inputKind: "text" | "number" | "boolean" | "textarea" | "readonly";
+  inputKind: "text" | "number" | "boolean" | "textarea" | "select" | "readonly";
 };
 
 export type ServiceRequestSecretView = {
@@ -239,6 +241,10 @@ function attachmentLabel(fieldKey: string): string {
 }
 
 function displayValue(fieldKey: string, value: unknown): string {
+  if (fieldKey === "rpsBatchRequestStatus" || fieldKey === "webserviceEmissionRequestStatus") {
+    if (value === "requested") return "Já solicitado à prefeitura";
+    if (value === "not_needed") return "Não é necessário";
+  }
   if (fieldKey === "contract") {
     if (value && typeof value === "object") {
       const accepted = (value as Record<string, unknown>).accepted;
@@ -263,6 +269,7 @@ function historyValue(value: unknown): string {
 
 function inputKind(fieldKey: string, value: unknown): ServiceRequestFieldView["inputKind"] {
   if (IMMUTABLE_FIELDS.has(fieldKey) || value === null || typeof value === "object") return "readonly";
+  if (fieldKey === "rpsBatchRequestStatus" || fieldKey === "webserviceEmissionRequestStatus") return "select";
   if (typeof value === "boolean") return "boolean";
   if (typeof value === "number") return "number";
   if (typeof value === "string" && (/description|complement|message/i.test(fieldKey) || value.length > 140)) {
