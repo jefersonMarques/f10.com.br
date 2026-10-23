@@ -82,7 +82,7 @@
       <div class={workspace ? "flex rounded-lg bg-[#F3F4F7] p-0.5" : "flex rounded-xl bg-[#F3F4F7] p-1"}>
         <button type="button" on:click={() => switchScope("mine")} class={`application-text-caption h-8 rounded-lg px-3 font-semibold ${scope === "mine" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Minha fila</button>
         <button type="button" on:click={() => switchScope("unassigned")} class={`application-text-caption h-8 rounded-lg px-3 font-semibold ${scope === "unassigned" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Sem responsável</button>
-        <button type="button" on:click={() => switchScope("all")} class={`application-text-caption h-8 rounded-lg px-3 font-semibold ${scope === "all" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Todos</button>
+        <button type="button" on:click={() => switchScope("all")} class={`application-text-caption h-8 rounded-lg px-3 font-semibold ${scope === "all" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Todos permitidos</button>
       </div>
 
       <form on:submit|preventDefault={onApply} class={workspace ? "relative min-w-[170px] flex-[1_1_220px]" : "relative min-w-[220px] flex-1 xl:min-w-[300px]"}>
