@@ -22,6 +22,7 @@
   export let targetId = "";
   export let text = "";
   export let canEdit = false;
+  export let canStartEdit: () => boolean = () => true;
   export let mode: "plain" | "rich" = "rich";
   export let className = "";
   export let rows = 4;
@@ -45,7 +46,7 @@
   }
 
   function startEdit(): void {
-    if (!canEdit) return;
+    if (!canEdit || !canStartEdit()) return;
     draft = text;
     message = "";
     editing = true;
@@ -138,7 +139,14 @@
       </div>
     {/if}
     <textarea bind:this={textarea} bind:value={draft} {rows} {placeholder} maxlength={operation === "summary" ? 320 : operation === "quick_guide" ? 12000 : operation === "step_description" ? 2000 : operation === "step_title" ? 180 : 50000} class="w-full resize-y rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] px-3 py-2.5 text-[12px] leading-6 outline-none focus:border-[#000A57]"></textarea>
-    {#if message}<p class="mt-2 text-[9px] font-medium text-[#9B2C2C]">{message}</p>{/if}
+    <div class="mt-2 rounded-lg border border-[#E3E7F0] bg-white p-3" aria-label="Prévia do conteúdo">
+      {#if mode === "rich"}
+        <HelpRichText text={draft} className={className}/>
+      {:else}
+        <div class={className}>{draft}</div>
+      {/if}
+    </div>
+    {#if message}<p class="mt-2 text-[12px] font-medium text-[#9B2C2C]">{message}</p>{/if}
     <div class="mt-2 flex justify-end gap-1.5">
       <button type="button" on:click={cancelEdit} disabled={saving} class="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE1EA] text-[#6D7483]" aria-label="Cancelar" title="Cancelar"><X size={14}/></button>
       <button type="button" on:click={save} disabled={saving || ((operation === "step_title" || operation === "block_text") && !draft.trim())} class="flex h-9 w-9 items-center justify-center rounded-lg bg-[#000A57] text-white disabled:opacity-40" aria-label="Salvar" title="Salvar"><Check size={15}/></button>
