@@ -231,6 +231,7 @@
   <ApplicationSidebar
     bind:collapsed={sidebarCollapsed}
     permissions={data.permissions}
+    roles={data.roles}
     {notifications}
   />
 
