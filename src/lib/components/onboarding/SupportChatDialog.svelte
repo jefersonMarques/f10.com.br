@@ -1,6 +1,10 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { SUPPORT_CHAT_SESSION_KEY } from "$lib/support/supportChatRestore";
+  import {
+    readRestorableSupportGuestMessages,
+    SUPPORT_CHAT_GUEST_KEY,
+    SUPPORT_CHAT_SESSION_KEY,
+  } from "$lib/support/supportChatRestore";
   import { onDestroy, tick } from "svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
   import {
@@ -124,7 +128,7 @@
 
   const STORAGE_KEY = SUPPORT_CHAT_SESSION_KEY;
   const DRAFT_KEY = "f10-support-chat-draft-v1";
-  const GUEST_KEY = "f10-support-assistant-conversation-v1";
+  const GUEST_KEY = SUPPORT_CHAT_GUEST_KEY;
   const BOTTOM_THRESHOLD = 100;
   const MAX_IMAGES = 4;
   const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -183,7 +187,7 @@
   $: if (browser) syncStatusPolling(isOpen);
   $: if (browser && isOpen && !entryOptionsLoaded && !entryOptionsLoading) void refreshEntryOptions();
   $: if (browser && restored) persistDraft(reply);
-  $: if (browser && restored) persistGuestConversation();
+  $: if (browser && restored && guestMessages) persistGuestConversation();
   $: selectedUnits = authState.groups.find((group) => group.id === selectedGroupId)?.units ?? [];
 
   function initializeAuthState(): void {
@@ -235,19 +239,7 @@
     restored = true;
     reply = window.sessionStorage.getItem(DRAFT_KEY) ?? "";
 
-    const guestRaw = window.sessionStorage.getItem(GUEST_KEY);
-    if (guestRaw) {
-      try {
-        const stored = JSON.parse(guestRaw) as GuestMessage[];
-        if (Array.isArray(stored)) {
-          guestMessages = stored
-            .filter((message) => message && (message.role === "assistant" || message.role === "customer") && typeof message.body === "string")
-            .slice(-30);
-        }
-      } catch {
-        window.sessionStorage.removeItem(GUEST_KEY);
-      }
-    }
+    guestMessages = readRestorableSupportGuestMessages(window.sessionStorage, GUEST_KEY);
     ensureGuestGreeting();
 
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
