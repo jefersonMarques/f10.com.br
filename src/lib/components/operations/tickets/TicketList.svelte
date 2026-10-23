@@ -168,6 +168,16 @@
                     <span class="shrink-0 text-[11px] font-medium text-[#7B5561]">{priorityLabels[ticket.priority] ?? ticket.priority}</span>
                   {/if}
                 </div>
+                {#if ticket.labels.length > 0}
+                  <div class="mt-1.5 flex min-w-0 items-center gap-1 overflow-hidden">
+                    {#each ticket.labels.slice(0, 2) as label (label.id)}
+                      <span class={`max-w-[110px] truncate rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${labelClasses[label.color] ?? labelClasses.gray}`} title={label.name}>{label.name}</span>
+                    {/each}
+                    {#if ticket.labels.length > 2}
+                      <span class="shrink-0 text-[11px] text-[#868E9D]">+{ticket.labels.length - 2}</span>
+                    {/if}
+                  </div>
+                {/if}
                 {#if ticket.workflowState?.areaWorkflowId}
                   <p class="mt-0.5 truncate text-[11px] text-[#989EAA]">{processLabel(ticket)}</p>
                 {/if}
@@ -266,6 +276,16 @@
           <span>·</span>
           <span class="truncate">{ticket.assignedUserName ?? "Sem responsável"}</span>
         </div>
+        {#if ticket.labels.length > 0}
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            {#each ticket.labels.slice(0, 3) as label (label.id)}
+              <span class={`max-w-[135px] truncate rounded-md px-2 py-1 text-[11px] font-semibold ${labelClasses[label.color] ?? labelClasses.gray}`} title={label.name}>{label.name}</span>
+            {/each}
+            {#if ticket.labels.length > 3}
+              <span class="text-[11px] text-[#868E9D]">+{ticket.labels.length - 3}</span>
+            {/if}
+          </div>
+        {/if}
       </button>
     {/each}
   </div>
