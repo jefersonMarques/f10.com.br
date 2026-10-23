@@ -28,7 +28,6 @@
 
     <nav class="flex shrink-0 items-center gap-1 sm:gap-2" aria-label="Área do Cliente">
       <a href="/cliente/chamados" aria-current={pathname.startsWith("/cliente/chamados") ? "page" : undefined} class={`rounded-lg px-2.5 py-2 text-[12px] font-semibold transition sm:px-3 ${pathname.startsWith("/cliente/chamados") ? "bg-[#000A57] text-white" : "text-[#606878] hover:bg-[#F5F6F9] hover:text-[#000A57]"}`}>Chamados</a>
-      <a href="/cliente/solicitacoes" aria-current={pathname.startsWith("/cliente/solicitacoes") ? "page" : undefined} class={`rounded-lg px-2.5 py-2 text-[12px] font-semibold transition sm:px-3 ${pathname.startsWith("/cliente/solicitacoes") ? "bg-[#000A57] text-white" : "text-[#606878] hover:bg-[#F5F6F9] hover:text-[#000A57]"}`}>Solicitações</a>
       <a href="/ajuda-f10" class="flex h-9 w-9 items-center justify-center rounded-lg text-[#606878] transition hover:bg-[#F5F6F9] hover:text-[#000A57]" aria-label="Central de ajuda" title="Central de ajuda"><CircleHelp size={18}/></a>
       {#if canCreateTicket}
         <a href="/cliente/chamados/novo" class="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#000A57] px-2.5 text-[12px] font-semibold text-white transition hover:bg-[#141F77] sm:px-3" aria-label="Novo chamado" title="Novo chamado"><Plus size={17}/><span class="hidden lg:inline">Novo chamado</span></a>
