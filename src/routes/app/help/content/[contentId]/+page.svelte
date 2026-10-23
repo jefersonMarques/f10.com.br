@@ -15,7 +15,6 @@
     FilePlus2,
     ChevronLeft,
     ChevronRight,
-    Pencil,
     ExternalLink,
     Eye,
     FileText,
@@ -42,7 +41,7 @@
   import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
   import HelpInlineTextEditor from "$lib/components/help/HelpInlineTextEditor.svelte";
   import HelpNewStepDialog from "$lib/components/help/HelpNewStepDialog.svelte";
-  import HelpBlockEditorDialog from "$lib/components/help/HelpBlockEditorDialog.svelte";
+  import HelpInlineBlockEditor from "$lib/components/help/HelpInlineBlockEditor.svelte";
   import HelpRichText from "$lib/components/help/HelpRichText.svelte";
   import HelpScreenshotReviewCarousel from "$lib/components/help/HelpScreenshotReviewCarousel.svelte";
   import { UNCATEGORIZED_HELP_CATEGORY_SLUG } from "$lib/help/helpCategoryConstants";
@@ -58,8 +57,6 @@
   let readinessOpen = false;
   let selectedStepId = data.content.steps[0]?.id ?? "";
   let lastRequestedStepId = "";
-  let editBlockId: string | null = null;
-  let editBlockStepId = "";
 
   type ReviewStep = PageData["content"]["steps"][number];
   type ReviewContent = PageData["content"];
@@ -299,6 +296,7 @@
 
   function inlineSaved(event: CustomEvent<{ content: unknown }>): void {
     applyUpdatedContent(event.detail.content);
+    void invalidateAll();
   }
 
   async function persistAll(
@@ -874,9 +872,6 @@
 
 
   $: editingStep = reviewSteps.find((step) => step.id === stepModalId) ?? null;
-  $: editingBlock = reviewSteps
-    .flatMap((step) => step.blocks)
-    .find((block) => block.id === editBlockId) ?? null;
   $: selectedStepIndex = Math.max(0, reviewSteps.findIndex((step) => step.id === selectedStepId));
   $: if (reviewSteps.length > 0 && !reviewSteps.some((step) => step.id === selectedStepId)) {
     selectedStepId = reviewSteps[0].id;
@@ -905,7 +900,6 @@
     if (result.type === "redirect" || result.type === "success") {
       createStepOpen = false;
       stepModalId = null;
-      editBlockId = null;
       settingsModal = null;
     }
     await update({ reset: false });
@@ -914,12 +908,6 @@
   function openCreateStep(): void {
     if (!allowModal()) return;
     createStepOpen = true;
-  }
-
-  function openBlockSettings(stepId: string, blockId: string): void {
-    if (!allowModal()) return;
-    editBlockStepId = stepId;
-    editBlockId = blockId;
   }
 
   function cancelCategorySelection(): void {
@@ -1123,24 +1111,31 @@
 
           <div class="space-y-5 px-5 py-6 sm:px-6">
             {#each step.blocks as block, blockIndex (block.id)}
-              {#if block.blockType === "text"}
-                <div class="rounded-2xl border border-transparent p-1 transition hover:border-[#E4E7ED]">
-                  <HelpInlineTextEditor
-                    contentId={data.content.id}
-                    operation="block_text"
-                    targetId={block.id}
-                    text={block.textContent}
-                    canEdit={data.canEdit}
-                    className="space-y-1.5 pr-10 text-[13px] leading-7 text-[#505767]"
-                    rows={6}
-                    on:saved={inlineSaved}
-                    on:editing={(event) => editorState(`block:${block.id}`, event.detail.active)}
-                  />
-                </div>
-              {:else if block.blockType === "notice"}
-                <div class={`rounded-2xl border px-4 py-3 ${block.noticeVariant === "warning" || block.noticeVariant === "danger" ? "border-[#F0D0C8] bg-[#FFF8F5]" : "border-[#D8DEF2] bg-[#F8F9FF]"}`}>
-                  <div class="flex gap-3">{#if block.noticeVariant === "warning" || block.noticeVariant === "danger"}<AlertTriangle size={16} class="mt-1 shrink-0 text-[#A9510D]"/>{:else}<Info size={16} class="mt-1 shrink-0 text-[#000A57]"/>{/if}<div class="min-w-0 flex-1"><HelpInlineTextEditor contentId={data.content.id} operation="block_text" targetId={block.id} text={block.textContent} canEdit={data.canEdit} className="space-y-1 pr-10 text-[13px] leading-6 text-[#555D6C]" rows={4} on:saved={inlineSaved} on:editing={(event) => editorState(`block:${block.id}`, event.detail.active)}/></div></div>
-                </div>
+              <HelpInlineBlockEditor
+                contentId={data.content.id}
+                {block}
+                {blockIndex}
+                blockCount={step.blocks.length}
+                canEdit={data.canEdit}
+                canStartEdit={allowModal}
+                on:updated={inlineSaved}
+                on:editing={(event) => editorState(`block:${block.id}`, event.detail.active)}
+              >
+                {#if block.blockType === "text"}
+                  <HelpRichText text={block.textContent} className="space-y-1.5 text-[13px] leading-7 text-[#505767]"/>
+                {:else if block.blockType === "notice"}
+                  <div class={`rounded-2xl border px-4 py-3 ${block.noticeVariant === "warning" || block.noticeVariant === "danger" ? "border-[#F0D0C8] bg-[#FFF8F5]" : "border-[#D8DEF2] bg-[#F8F9FF]"}`}>
+                    <div class="flex gap-3">
+                      {#if block.noticeVariant === "warning" || block.noticeVariant === "danger"}
+                        <AlertTriangle size={16} class="mt-1 shrink-0 text-[#A9510D]"/>
+                      {:else}
+                        <Info size={16} class="mt-1 shrink-0 text-[#000A57]"/>
+                      {/if}
+                      <div class="min-w-0 flex-1">
+                        <HelpRichText text={block.textContent} className="space-y-1 text-[13px] leading-6 text-[#555D6C]"/>
+                      </div>
+                    </div>
+                  </div>
               {:else if block.blockType === "image" && block.asset}
                 {@const review = data.screenshotReview.find((item) => item.blockId === block.id)}
                 {@const humanStatus = data.humanReview.items.find((item) => item.blockId === block.id)}
@@ -1166,13 +1161,7 @@
                 {/if}
                 <a href={block.linkUrl} target="_blank" rel="noopener noreferrer" class="application-text-caption mt-2 inline-flex items-center gap-2 rounded-xl bg-[#EEF0FF] px-4 py-2.5 font-semibold text-[#000A57]">{block.linkLabel || "Abrir link"}<ExternalLink size={12}/></a>
               {/if}
-              {#if data.canEdit}
-                <div class="flex justify-end border-b border-[#EEF0F5] pb-3">
-                  <button type="button" on:click={() => openBlockSettings(step.id, block.id)} class="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#DDE1EA] bg-white px-3 text-[12px] font-semibold text-[#000A57]" aria-label="Editar ou organizar bloco" title="Editar bloco">
-                    <Pencil size={14}/>Editar bloco
-                  </button>
-                </div>
-              {/if}
+              </HelpInlineBlockEditor>
             {/each}
 
             {#if data.canEdit}
@@ -1213,8 +1202,8 @@
     <div class="sticky bottom-4 z-20 mt-5 flex flex-col gap-3 rounded-2xl border border-[#D8DDF4] bg-white/95 px-4 py-3 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between">
       <div class="flex items-center gap-2"><PenTool size={14} class="text-[#000A57]"/><span class="text-[12px] font-semibold text-[#707788]">{reviewPending === 0 && !hasUnsavedReview ? "Imagens revisadas" : `${data.humanReview.total - reviewPending}/${data.humanReview.total} imagens revisadas`}</span></div>
       <div class="flex shrink-0 flex-wrap gap-2">
-        <button type="button" disabled={Boolean(savingMode)} on:click={saveDraft} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#D8DDF4] bg-white px-4 text-[12px] font-semibold text-[#000A57] disabled:opacity-60">{#if savingMode === "draft"}<LoaderCircle size={14} class="animate-spin"/>{:else}<Save size={14}/>{/if}Salvar imagens</button>
-        <button type="button" disabled={Boolean(savingMode)} on:click={concludeReview} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white disabled:opacity-60">{#if savingMode === "confirm"}<LoaderCircle size={14} class="animate-spin"/>{:else}<CheckCircle2 size={14}/>{/if}Concluir imagens</button>
+        <button type="button" disabled={Boolean(savingMode)} on:click={saveDraft} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#D8DDF4] bg-white px-4 text-[12px] font-semibold text-[#000A57] disabled:opacity-60">{#if savingMode === "draft"}<LoaderCircle size={14} class="animate-spin"/>{:else}<Save size={14}/>{/if}Salvar conteúdo</button>
+        <button type="button" disabled={Boolean(savingMode)} on:click={concludeReview} class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white disabled:opacity-60">{#if savingMode === "confirm"}<LoaderCircle size={14} class="animate-spin"/>{:else}<CheckCircle2 size={14}/>{/if}Concluir conteúdo</button>
       </div>
     </div>
   {/if}
@@ -1538,18 +1527,6 @@
 {#if createStepOpen && data.canEdit}
   <HelpNewStepDialog
     onClose={() => (createStepOpen = false)}
-    {submitEditorModal}
-    errorMessage={form?.message ?? null}
-  />
-{/if}
-
-{#if editingBlock && data.canEdit}
-  <HelpBlockEditorDialog
-    {editingBlock}
-    {editBlockStepId}
-    editingBlockIndex={reviewSteps.find((step) => step.id === editBlockStepId)?.blocks.findIndex((block) => block.id === editingBlock.id) ?? -1}
-    editingBlockCount={reviewSteps.find((step) => step.id === editBlockStepId)?.blocks.length ?? 0}
-    onClose={() => (editBlockId = null)}
     {submitEditorModal}
     errorMessage={form?.message ?? null}
   />
