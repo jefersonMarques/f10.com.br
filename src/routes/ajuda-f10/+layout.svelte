@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { hasRestorableSupportChat } from "$lib/support/supportChatRestore";
   import { page } from "$app/stores";
   import { MessageCircleMore } from "lucide-svelte";
   import HelpPublicAiAssistant from "$lib/components/help/HelpPublicAiAssistant.svelte";
@@ -23,6 +24,7 @@
 
   onMount(() => {
     mounted = true;
+    chatOpen = hasRestorableSupportChat(window.sessionStorage);
     const handleOpenHelpAssistant = (): void => openChat();
     window.addEventListener("f10:open-help-assistant", handleOpenHelpAssistant);
 
