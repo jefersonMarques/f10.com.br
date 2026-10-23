@@ -598,8 +598,8 @@
                 </div>
                 {#if ticketData.canReply && ticketData.attachmentsEnabled}
                   <form method="POST" action={actionUrl("uploadAttachment")} on:submit|preventDefault={(event) => void submitForm(event, "uploadAttachment", true)} class="flex flex-wrap items-center gap-3">
-                    <input name="file" type="file" required accept="image/png,image/jpeg,image/webp,application/pdf,text/plain,.docx,.xlsx,.zip,.csv" class="max-w-[260px] text-[12px] text-[#6C7381]"/>
-                    <label class="inline-flex items-center gap-2 text-[12px] font-medium text-[#4B5362]" title="Envia uma resposta pública com o arquivo. Arquivos maiores que 12 MB não podem ser enviados por e-mail.">
+                    <input name="file" type="file" required accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,.docx,.xlsx,.zip,.csv" class="max-w-[260px] text-[12px] text-[#6C7381]"/>
+                    <label class="inline-flex items-center gap-2 text-[12px] font-medium text-[#4B5362]" title="Cria uma resposta pública com o arquivo. Até 10 MB por arquivo; GIF é permitido somente em anexos internos.">
                       <input type="checkbox" name="sendToCustomer" class="h-4 w-4 rounded border-app-border-control"/>
                       Enviar também por e-mail
                     </label>
