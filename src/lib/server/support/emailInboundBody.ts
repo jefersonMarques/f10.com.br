@@ -13,7 +13,7 @@ export type SelectedInboundBody = {
   htmlWords: number;
 };
 
-import { normalizeEmailBodyText, visibleEmailHtml } from "$lib/support/emailBodyText";
+import { normalizeEmailBodyText, visibleEmailHtml } from "../../support/emailBodyText.ts";
 
 export { visibleEmailHtml };
 
