@@ -678,6 +678,7 @@ export async function saveIncomingMessage(input: {
     previousMessage
       ? "Cliente respondeu por e-mail."
       : "Novo ticket recebido por e-mail.",
+    { newTicket: !previousMessage },
   ).catch((cause) => {
     console.error("[ticket.email.notification]", {
       ticketId: input.ticketId,
