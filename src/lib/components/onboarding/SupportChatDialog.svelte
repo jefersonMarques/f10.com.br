@@ -983,7 +983,7 @@
                         {/each}
                       </div>
                     {/if}
-                    {#if message.body}<SupportChatMarkdown text={message.body} isCustomer={message.authorType === "customer"} className={message.attachments?.length ? "mt-2" : ""}/>{/if}
+                    {#if message.body}<SupportChatMarkdown text={message.body} isCustomer className={message.attachments?.length ? "mt-2" : ""}/>{/if}
                     <span class="mt-1 block text-[8px] text-white/55">{message.optimistic ? "Enviando..." : formatTime(message.createdAt)}</span>
                   </div>
                 </div>
@@ -1007,7 +1007,7 @@
                           {/each}
                         </div>
                       {/if}
-                      {#if message.body}<SupportChatMarkdown text={message.body} isCustomer={message.authorType === "customer"} className={message.attachments?.length ? "mt-2" : ""}/>{/if}
+                      {#if message.body}<SupportChatMarkdown text={message.body} className={message.attachments?.length ? "mt-2" : ""}/>{/if}
                       <span class="mt-1 block text-[8px] text-[#969CAA]">{formatTime(message.createdAt)}</span>
                     </div>
                   </div>
@@ -1022,14 +1022,14 @@
             {#if message.role === "customer"}
               <div class="flex justify-end">
                 <div class="max-w-[84%] rounded-2xl rounded-br-md bg-[#000A57] px-3.5 py-2.5 text-white">
-                  <SupportChatMarkdown text={message.body} isCustomer={message.role === "customer"}/>
+                  <SupportChatMarkdown text={message.body} isCustomer/>
                 </div>
               </div>
             {:else}
               <div class="flex items-start gap-2">
                 <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFF0E4] text-[#EA6D0B]"><Sparkles size={14}/></span>
                 <div class="max-w-[84%] rounded-2xl rounded-tl-md border border-[#E1E4EB] bg-white px-3.5 py-2.5 text-[#343B4C] shadow-sm">
-                  <SupportChatMarkdown text={message.body} isCustomer={message.role === "customer"}/>
+                  <SupportChatMarkdown text={message.body}/>
                 </div>
               </div>
             {/if}
