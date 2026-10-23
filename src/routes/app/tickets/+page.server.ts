@@ -275,6 +275,11 @@ export const load: PageServerLoad = async ({ parent, url, depends }) => {
       globalWorkflow: workflowBoard.globalWorkflow,
       areaWorkflows: workflowBoard.areaWorkflows,
     },
+    accessSummary: {
+      permissionScope: viewScope,
+      restrictedByProcess: areaRestriction !== null,
+      allowedProcessCount: areaRestriction?.length ?? null,
+    },
     canCreate,
     canReply,
     canManageWorkflow,
