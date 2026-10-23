@@ -158,7 +158,7 @@
   let attachmentError = "";
   let newMessageCount = 0;
   let handoffRequested = false;
-  let authStep: "login" | "unit" = "login";
+  let authStep: "login" | "unit" | "ready" = "login";
   let loginEmail = "";
   let loginPassword = "";
   let authSubmitting = false;
@@ -373,6 +373,11 @@
     if (error === "INVALID_CREDENTIALS") return "E-mail ou senha inválidos. Use os mesmos dados de acesso do F10.";
     if (error === "CUSTOMER_AUTH_REQUIRED") return "Sua sessão F10 expirou. Entre novamente para continuar.";
     if (error === "UNIT_NOT_AUTHORIZED") return "Esta unidade não está disponível para sua conta F10.";
+    if (error === "UNIT_SELECTION_UNAVAILABLE") return "Não foi possível confirmar sua unidade. Tente novamente.";
+    if (error === "CHAT_UNAVAILABLE") return "Não foi possível abrir o atendimento humano agora. Tente novamente.";
+    if (error === "INVALID_MESSAGE") return "Escreva uma mensagem para iniciar o atendimento.";
+    if (error === "HUMAN_HANDOFF_REQUIRED") return "Tente novamente pelo botão Falar com uma pessoa.";
+    if (error === "SUPPORT_QUEUE_UNAVAILABLE") return "O atendimento humano está indisponível no momento.";
     if (error === "INVALID_SESSION") return "Este atendimento expirou. Inicie uma nova conversa.";
     if (error === "CHAT_CLOSED") return "Este atendimento foi encerrado. Inicie uma nova conversa se ainda precisar de ajuda.";
     if (error === "INVALID_ENTRY_OPTION") return "Esta opção de atendimento não está mais disponível.";
@@ -493,6 +498,7 @@
         await scrollToLatest();
         return;
       }
+      authStep = "ready";
       await startHumanChat();
       return;
     }
@@ -570,6 +576,7 @@
   }
 
   async function continueAfterAuthentication(): Promise<void> {
+    authStep = "ready";
     if (session) {
       handoffRequested = false;
       await refreshMessages(true);
@@ -581,6 +588,7 @@
   async function startHumanChat(): Promise<void> {
     if (session || starting || !authState.authenticated) return;
     starting = true;
+    authStep = "ready";
     errorMessage = "";
 
     const lastCustomerMessage = [...guestMessages].reverse().find((message) => message.role === "customer")?.body;
@@ -1067,6 +1075,12 @@
                   <label class="block text-[9px] font-semibold text-[#596171]">Unidade<select bind:value={selectedUnitId} required class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 text-[11px] font-normal outline-none"><option value={0} disabled>Selecione</option>{#each selectedUnits as unit}<option value={unit.id}>{unit.name}</option>{/each}</select></label>
                   <button type="submit" disabled={authSubmitting || !selectedGroupId || !selectedUnitId} class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">{#if authSubmitting}<LoaderCircle class="animate-spin" size={15}/>{/if}Continuar atendimento</button>
                 </form>
+              {:else if authState.authenticated}
+                <div class="flex items-start gap-2.5">
+                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><CheckCircle2 size={16}/></span>
+                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">Acesso confirmado</h3><p class="mt-1 text-[10px] leading-4 text-[#7B8292]">Seu grupo e unidade foram identificados. Tente conectar ao atendimento novamente.</p></div>
+                </div>
+                <button type="button" on:click={() => void startHumanChat()} disabled={starting} class="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:opacity-50">Tentar conectar ao atendimento</button>
               {/if}
               {#if errorMessage}<p class="mt-3 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[9px] leading-4 text-[#9A4E3D]">{errorMessage}</p>{/if}
             </div>
