@@ -29,7 +29,14 @@ export const load: LayoutServerLoad = async ({ parent, params }) => {
   const permissions = permissionMap(layout.permissions);
   const scope = getPermissionScope(permissions, "tickets.view");
   if (!scope) throw error(403, "Acesso não autorizado.");
-  await requireTicketAccess(layout.user.id, scope, params.ticketId);
+  try {
+    await requireTicketAccess(layout.user.id, scope, params.ticketId);
+  } catch (cause) {
+    if (cause instanceof Error && cause.message === "TICKET_NOT_ACCESSIBLE") {
+      throw error(403, "Você não tem permissão para visualizar este ticket.");
+    }
+    throw cause;
+  }
 
   await markTicketFirstAgentView(layout.user.id, params.ticketId).catch((cause) => {
     console.error("[ticket.customer_progress.first_view]", {
