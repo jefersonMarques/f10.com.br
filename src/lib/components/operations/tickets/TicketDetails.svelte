@@ -158,11 +158,20 @@
     return `/app/tickets/${ticketData.details.ticket.id}?/${action}`;
   }
 
-  function formatDate(value: string): string {
+  function formatDate(value: string | null | undefined): string {
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Sem data";
+
     const [year, month, day] = value.split("-").map(Number);
-    return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(
-      new Date(year, month - 1, day),
-    );
+    const date = new Date(year, month - 1, day);
+    if (
+      date.getFullYear() !== year ||
+      date.getMonth() !== month - 1 ||
+      date.getDate() !== day
+    ) {
+      return "Sem data";
+    }
+
+    return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(date);
   }
 
   function deadlineText(value: string | Date | null): string {
