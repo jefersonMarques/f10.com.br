@@ -283,9 +283,23 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
     }
 
     const diagnosticCode = diagnoseChatStartFailure(cause);
+    const databaseCause = cause instanceof Error ? cause.cause : null;
+    const databaseError =
+      databaseCause && typeof databaseCause === "object"
+        ? databaseCause as {
+            code?: string;
+            constraint_name?: string;
+            column_name?: string;
+            table_name?: string;
+          }
+        : null;
+
     console.error("[support.chat.start]", {
       diagnosticCode,
-      causeCode: cause instanceof Error ? cause.message : null,
+      sqlState: databaseError?.code ?? null,
+      constraintName: databaseError?.constraint_name ?? null,
+      columnName: databaseError?.column_name ?? null,
+      tableName: databaseError?.table_name ?? null,
       causeType: cause instanceof Error ? cause.name : typeof cause,
     });
 
