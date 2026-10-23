@@ -158,15 +158,32 @@ export const load: PageServerLoad = async ({ params, parent }) => {
       permissions,
       params.ticketId,
     );
-    await markEntityNotificationsRead(layout.user.id, "ticket", params.ticketId);
+    await markEntityNotificationsRead(layout.user.id, "ticket", params.ticketId).catch((cause) => {
+      console.error("[operations.ticket.read_receipt_failed]", {
+        ticketId: params.ticketId,
+        causeType: cause instanceof Error ? cause.name : typeof cause,
+      });
+    });
     return details;
   } catch (cause) {
-    console.error("[operations.ticket.load]", {
+    const errorCode = cause instanceof Error ? cause.message : "";
+    if (errorCode === "TICKET_NOT_FOUND") {
+      throw error(404, "Ticket não encontrado.");
+    }
+    if (errorCode === "TICKET_NOT_ACCESSIBLE" || errorCode === "TICKET_PERMISSION_NOT_ALLOWED") {
+      throw error(403, "Você não tem permissão para visualizar este ticket.");
+    }
+
+    const databaseCause = cause instanceof Error ? cause.cause : null;
+    const databaseCode = databaseCause && typeof databaseCause === "object" && "code" in databaseCause
+      ? String(databaseCause.code)
+      : null;
+    console.error("[operations.ticket.load_failed]", {
       ticketId: params.ticketId,
-      causeType: cause instanceof Error ? cause.name : typeof cause,
-      causeMessage: cause instanceof Error ? cause.message : "unknown",
+      errorType: cause instanceof Error ? cause.name : typeof cause,
+      databaseCode,
     });
-    throw error(404, "Ticket não encontrado ou fora do seu escopo de acesso.");
+    throw error(500, "Não foi possível carregar este ticket.");
   }
 };
 
