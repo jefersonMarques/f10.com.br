@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { users } from "$lib/server/db/schema";
 import { customerContacts, tickets } from "$lib/server/db/supportSchema";
+import { serviceRequestEmailRecipients, serviceRequests } from "$lib/server/db/serviceRequestSchema";
 import { buildEmailHtml } from "$lib/server/email/emailTemplate";
 import { sendTransactionalEmail } from "$lib/server/email/transactionalEmail";
 import { getTicketOperatorEmailSettings } from "$lib/server/settings/ticketOperatorEmailSettings";
@@ -13,6 +14,22 @@ export async function notifyTicketOperatorsByEmail(ticketId: string): Promise<vo
 
   const eligible = await listEligibleTicketResponders();
   const recipientIds = new Set(settings.recipientUserIds);
+
+  const [serviceRequest] = await getDatabase()
+    .select({ type: serviceRequests.requestType })
+    .from(serviceRequests)
+    .where(eq(serviceRequests.ticketId, ticketId))
+    .limit(1);
+
+  if (serviceRequest) {
+    const alreadyNotified = await getDatabase()
+      .select({ userId: serviceRequestEmailRecipients.recipientUserId })
+      .from(serviceRequestEmailRecipients)
+      .where(eq(serviceRequestEmailRecipients.requestType, serviceRequest.type));
+
+    for (const entry of alreadyNotified) recipientIds.delete(entry.userId);
+  }
+
   const recipients = eligible.filter((user) => recipientIds.has(user.id));
   if (recipients.length === 0) return;
 
