@@ -22,6 +22,7 @@ import {
 } from "$lib/server/db/supportRoutingSchema";
 import { supportQueues, ticketEvents, tickets } from "$lib/server/db/supportSchema";
 import { ticketAreas, ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
+import { getUserTicketAreaRestriction } from "$lib/server/support/supportAccess";
 import {
   listSupportAgentPresence,
   SUPPORT_AWAY_AFTER_MS,
@@ -383,6 +384,15 @@ export async function autoAssignTicketIfConfigured(
   const responders = isChat
     ? await listEligibleChatResponders()
     : await listEligibleTicketResponders();
+  const ticketCandidateAccess = isChat
+    ? new Map<string, { canView: boolean; areas: string[] | null }>()
+    : new Map(await Promise.all(responders.map(async (user) => {
+        const permissions = await resolveUserPermissions(user.id);
+        return [user.id, {
+          canView: hasPermission(permissions, "tickets.view"),
+          areas: await getUserTicketAreaRestriction(user.id),
+        }] as const;
+      })));
   const responderIds = responders.map((user) => user.id);
   if (responderIds.length === 0) return null;
 
@@ -398,6 +408,7 @@ export async function autoAssignTicketIfConfigured(
         ticketNumber: tickets.ticketNumber,
         queueTeamId: supportQueues.teamId,
         areaTeamId: ticketAreas.teamId,
+        areaId: ticketWorkflowStates.areaId,
       })
       .from(tickets)
       .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
@@ -410,14 +421,23 @@ export async function autoAssignTicketIfConfigured(
     const effectiveTeamId = !isChat && ticket.areaTeamId
       ? ticket.areaTeamId
       : ticket.queueTeamId;
-    let eligibleResponderIds = responderIds;
+    let eligibleResponderIds = isChat
+      ? responderIds
+      : responderIds.filter((userId) => {
+          const access = ticketCandidateAccess.get(userId);
+          if (!access?.canView) return false;
+          return access.areas === null ||
+            (ticket.areaId !== null && access.areas.includes(ticket.areaId));
+        });
+    if (eligibleResponderIds.length === 0) return null;
+
     if (effectiveTeamId) {
       const membershipRows = await tx
         .select({ userId: teamMembers.userId })
         .from(teamMembers)
         .where(eq(teamMembers.teamId, effectiveTeamId));
       const teamUserIds = new Set(membershipRows.map((row) => row.userId));
-      eligibleResponderIds = responderIds.filter((userId) => teamUserIds.has(userId));
+      eligibleResponderIds = eligibleResponderIds.filter((userId) => teamUserIds.has(userId));
       if (eligibleResponderIds.length === 0) return null;
     }
 
