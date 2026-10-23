@@ -330,6 +330,12 @@
                 <span class="application-text-caption mb-1.5 block font-semibold text-[#555D6E]">{field.label}</span>
                 {#if field.inputKind === "boolean"}
                   <select name={`field:${field.key}`} value={String(field.value)} class="application-text-caption h-11 w-full rounded-xl border border-[var(--app-border-control)] bg-white px-3 outline-none focus:border-[var(--app-primary)]"><option value="true">Sim</option><option value="false">Não</option></select>
+                {:else if field.inputKind === "select"}
+                  <select name={`field:${field.key}`} value={String(field.value ?? "")} class="application-text-caption h-11 w-full rounded-xl border border-[var(--app-border-control)] bg-white px-3 outline-none focus:border-[var(--app-primary)]">
+                    <option value="" disabled>Selecione a situação</option>
+                    <option value="requested">Já solicitado à prefeitura</option>
+                    <option value="not_needed">Não é necessário</option>
+                  </select>
                 {:else if field.inputKind === "number"}
                   <input name={`field:${field.key}`} type="number" step="any" value={field.value ?? ""} class="application-text-caption h-11 w-full rounded-xl border border-[var(--app-border-control)] px-3 outline-none focus:border-[var(--app-primary)]" />
                 {:else if field.inputKind === "textarea"}
