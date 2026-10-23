@@ -369,6 +369,22 @@
           label: "Frase de segurança",
           value: data.securityPhrase,
         },
+        ...(hasServiceNote ? [
+          {
+            key: "rpsBatchRequestStatus",
+            label: "Solicitação de lote de RPS",
+            value: data.rpsBatchRequestStatus === "requested"
+              ? "Já solicitado à prefeitura"
+              : "Não é necessário",
+          },
+          {
+            key: "webserviceEmissionRequestStatus",
+            label: "Liberação de emissão via Webservice",
+            value: data.webserviceEmissionRequestStatus === "requested"
+              ? "Já solicitado à prefeitura"
+              : "Não é necessário",
+          },
+        ] : []),
         {
           key: "serviceRpsBatchNumber",
           label: "Lote RPS",
@@ -645,6 +661,13 @@
         data.noteKind === "service_and_commerce";
 
       if (shouldValidateService) {
+        if (!data.rpsBatchRequestStatus) {
+          next.rpsBatchRequestStatus = "Selecione a situação do lote de RPS.";
+        }
+        if (!data.webserviceEmissionRequestStatus) {
+          next.webserviceEmissionRequestStatus = "Selecione a situação da liberação via Webservice.";
+        }
+
         if (!data.cityHallLogin.trim()) {
           next.cityHallLogin = "Informe o login da prefeitura.";
         } else {
