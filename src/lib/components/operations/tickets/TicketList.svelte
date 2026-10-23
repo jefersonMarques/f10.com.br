@@ -155,6 +155,7 @@
                 <div class="flex min-w-0 items-center gap-2">
                   <span class="shrink-0 text-[11px] font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
                   <strong class="min-w-0 flex-1 truncate text-[13px] font-semibold text-[#303645]">{shortTicketSubject(ticket.subject)}</strong>
+                  {#if ticket.unread}<span class="h-2.5 w-2.5 shrink-0 rounded-full bg-[#EA6D0B]" aria-label="Ticket não visualizado" title="Não visualizado"></span>{/if}
                 </div>
                 <div class="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] text-[#737989]">
                   <span class="min-w-0 flex-1 truncate">{ticket.customerName ?? ticket.assignedUserName ?? "Cliente pendente"}</span>
