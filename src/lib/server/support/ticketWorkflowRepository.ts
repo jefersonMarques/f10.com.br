@@ -288,6 +288,124 @@ export async function listTicketWorkflowEntryPoints(): Promise<TicketWorkflowEnt
     }));
 }
 
+export async function listTicketOnboardingAreas() {
+  const [configuration, activeAreas] = await Promise.all([
+    listTicketWorkflowConfiguration(),
+    listTicketAreas(),
+  ]);
+  const global = configuration.find((workflow) => workflow.kind === "global");
+  const activeAreaIds = new Set(activeAreas.map((area) => area.id));
+
+  return configuration
+    .filter((workflow) =>
+      workflow.kind === "area" &&
+      workflow.areaId !== null &&
+      activeAreaIds.has(workflow.areaId) &&
+      workflow.stages.length > 0,
+    )
+    .map((workflow) => {
+      const gateway = global?.stages.find((stage) =>
+        stage.stageType === "area_gateway" &&
+        stage.linkedAreaId === workflow.areaId,
+      );
+
+      return {
+        areaId: workflow.areaId as string,
+        areaName: workflow.areaName ?? workflow.name,
+        stageId: gateway?.id ?? null,
+        ready: gateway?.allowTicketStart === true,
+      };
+    })
+    .sort((first, second) => first.areaName.localeCompare(second.areaName, "pt-BR"));
+}
+
+export async function ensureTicketOnboardingEntryPoint(areaId: string): Promise<string> {
+  const db = getDatabase();
+
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"ticket-onboarding:" + areaId}))`);
+
+    const [[area], [areaWorkflow], [globalWorkflow]] = await Promise.all([
+      tx
+        .select({ id: ticketAreas.id, name: ticketAreas.name })
+        .from(ticketAreas)
+        .where(and(eq(ticketAreas.id, areaId), eq(ticketAreas.active, true)))
+        .limit(1),
+      tx
+        .select({ id: ticketWorkflows.id })
+        .from(ticketWorkflows)
+        .where(and(
+          eq(ticketWorkflows.areaId, areaId),
+          eq(ticketWorkflows.kind, "area"),
+          eq(ticketWorkflows.active, true),
+        ))
+        .limit(1),
+      tx
+        .select({ id: ticketWorkflows.id })
+        .from(ticketWorkflows)
+        .where(and(eq(ticketWorkflows.kind, "global"), eq(ticketWorkflows.active, true)))
+        .limit(1),
+    ]);
+
+    if (!area || !areaWorkflow) throw new Error("TICKET_ONBOARDING_AREA_NOT_AVAILABLE");
+    if (!globalWorkflow) throw new Error("TICKET_ONBOARDING_GLOBAL_WORKFLOW_MISSING");
+
+    const [initialAreaStage] = await tx
+      .select({ id: ticketWorkflowStages.id })
+      .from(ticketWorkflowStages)
+      .where(and(
+        eq(ticketWorkflowStages.workflowId, areaWorkflow.id),
+        eq(ticketWorkflowStages.active, true),
+      ))
+      .orderBy(desc(ticketWorkflowStages.isInitial), asc(ticketWorkflowStages.sortOrder))
+      .limit(1);
+    if (!initialAreaStage) throw new Error("TICKET_ONBOARDING_AREA_EMPTY");
+
+    const [gateway] = await tx
+      .select({ id: ticketWorkflowStages.id, allowTicketStart: ticketWorkflowStages.allowTicketStart })
+      .from(ticketWorkflowStages)
+      .where(and(
+        eq(ticketWorkflowStages.workflowId, globalWorkflow.id),
+        eq(ticketWorkflowStages.stageType, "area_gateway"),
+        eq(ticketWorkflowStages.linkedAreaId, areaId),
+        eq(ticketWorkflowStages.active, true),
+      ))
+      .orderBy(asc(ticketWorkflowStages.sortOrder))
+      .limit(1);
+
+    if (gateway) {
+      if (!gateway.allowTicketStart) {
+        await tx
+          .update(ticketWorkflowStages)
+          .set({ allowTicketStart: true, updatedAt: new Date() })
+          .where(eq(ticketWorkflowStages.id, gateway.id));
+      }
+      return gateway.id;
+    }
+
+    const [lastStage] = await tx
+      .select({ maxSortOrder: max(ticketWorkflowStages.sortOrder) })
+      .from(ticketWorkflowStages)
+      .where(eq(ticketWorkflowStages.workflowId, globalWorkflow.id));
+
+    const [created] = await tx
+      .insert(ticketWorkflowStages)
+      .values({
+        workflowId: globalWorkflow.id,
+        name: area.name.slice(0, 80),
+        stageType: "area_gateway",
+        linkedAreaId: area.id,
+        lifecycleStatus: "open",
+        sortOrder: Number(lastStage?.maxSortOrder ?? 0) + 100,
+        allowTicketStart: true,
+        isInitial: false,
+      })
+      .returning({ id: ticketWorkflowStages.id });
+    if (!created) throw new Error("TICKET_ONBOARDING_GATEWAY_FAILED");
+    return created.id;
+  });
+}
+
 export async function updateTicketWorkflowStageEntryPoint(
   stageId: string,
   allowTicketStart: boolean,
