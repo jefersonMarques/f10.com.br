@@ -184,6 +184,7 @@
     document.addEventListener("visibilitychange", syncNotifications);
     window.addEventListener("focus", syncNotifications);
     window.addEventListener("pageshow", syncNotifications);
+    window.addEventListener("f10:notifications:changed", syncNotifications);
     syncNotifications();
 
     if (canRespondToChat) {
@@ -196,6 +197,7 @@
         document.removeEventListener("visibilitychange", syncNotifications);
         window.removeEventListener("focus", syncNotifications);
         window.removeEventListener("pageshow", syncNotifications);
+        window.removeEventListener("f10:notifications:changed", syncNotifications);
         window.removeEventListener("pointerdown", handleActivity);
         window.removeEventListener("keydown", handleActivity);
         window.removeEventListener("touchstart", handleActivity);
@@ -205,6 +207,7 @@
       document.removeEventListener("visibilitychange", syncNotifications);
       window.removeEventListener("focus", syncNotifications);
       window.removeEventListener("pageshow", syncNotifications);
+      window.removeEventListener("f10:notifications:changed", syncNotifications);
     };
   });
 
