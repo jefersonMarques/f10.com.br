@@ -57,6 +57,7 @@ jobs:
           node --check scripts/repair-brevo-inbound-body.mjs
           node --experimental-strip-types --test tests/emailInboundBody.test.mjs
           node --experimental-strip-types --test tests/chatMarkdown.test.mjs
+          node --experimental-strip-types --test tests/supportChatRestore.test.mjs
 
       - name: Build production bundle
         run: npm run build
