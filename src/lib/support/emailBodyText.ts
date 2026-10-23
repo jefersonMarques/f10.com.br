@@ -30,6 +30,7 @@ export function visibleEmailHtml(html: string): string {
   if (!html.trim()) return "";
   const cleaned = html.slice(0, MAX_BODY_CHARS * 4)
     .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<!doctype\b[^>]*>/gi, "")
     .replace(/<(head|script|style|noscript|template|svg|iframe|object)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "")
     .replace(/<\s*(?:meta|link|base)\b[^>]*>/gi, "")
     .replace(/<\s*br\b[^>]*>/gi, "\n")
