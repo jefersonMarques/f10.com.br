@@ -617,7 +617,17 @@
           authStep = "login";
           handoffRequested = true;
         }
-        errorMessage = apiErrorMessage(typeof payload.error === "string" ? payload.error : "");
+        const error = typeof payload.error === "string" ? payload.error : "";
+        const diagnostic = typeof payload.diagnosticCode === "string" ? payload.diagnosticCode : "";
+        if (error === "CHAT_UNAVAILABLE" && diagnostic === "SUPPORT_QUEUE_UNAVAILABLE") {
+          errorMessage = "A fila de atendimento humano está indisponível. A equipe F10 precisa verificar a configuração.";
+        } else if (error === "CHAT_UNAVAILABLE" && diagnostic === "RATE_LIMIT_NOT_CONFIGURED") {
+          errorMessage = "O atendimento humano precisa de uma configuração no servidor F10.";
+        } else if (error === "CHAT_UNAVAILABLE" && diagnostic === "DATABASE_UNAVAILABLE") {
+          errorMessage = "A conexão com o atendimento está indisponível. Tente novamente em instantes.";
+        } else {
+          errorMessage = apiErrorMessage(error);
+        }
         return;
       }
 
