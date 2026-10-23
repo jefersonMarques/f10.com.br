@@ -1,6 +1,7 @@
 import { redirect } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { recordAuditEvent } from "$lib/server/auth/audit";
+import { removeDeviceSubscriptionById } from "$lib/server/notifications/devicePush";
 import {
   getSessionUser,
   revokeSession,
@@ -16,6 +17,8 @@ export const POST: RequestHandler = async ({ cookies }) => {
       await revokeSession(token);
 
       if (session) {
+        await removeDeviceSubscriptionById(session.user.id, cookies.get("f10_push_device_id"))
+          .catch(() => undefined);
         await recordAuditEvent({
           actorUserId: session.user.id,
           action: "auth.logout",
@@ -26,6 +29,7 @@ export const POST: RequestHandler = async ({ cookies }) => {
     }
   }
 
+  cookies.delete("f10_push_device_id", { path: "/app" });
   cookies.delete(SESSION_COOKIE_NAME, { path: "/" });
   throw redirect(303, "/login");
 };
