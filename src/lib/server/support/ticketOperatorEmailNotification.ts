@@ -10,9 +10,13 @@ import { sendTransactionalEmail } from "$lib/server/email/transactionalEmail";
 import { getTicketOperatorEmailSettings } from "$lib/server/settings/ticketOperatorEmailSettings";
 import { listEligibleTicketResponders } from "$lib/server/support/supportRoutingRepository";
 
-export async function notifyTicketOperatorsByEmail(ticketId: string): Promise<void> {
+export async function notifyTicketOperatorsByEmail(
+  ticketId: string,
+  event: "created" | "customer_attachment" = "created",
+): Promise<void> {
   const settings = await getTicketOperatorEmailSettings();
   if (!settings.enabled || settings.recipientUserIds.length === 0) return;
+  if (event === "customer_attachment" && !settings.customerAttachments) return;
 
   const eligible = await listEligibleTicketResponders();
   const recipientIds = new Set(settings.recipientUserIds);
@@ -23,7 +27,7 @@ export async function notifyTicketOperatorsByEmail(ticketId: string): Promise<vo
     .where(eq(serviceRequests.ticketId, ticketId))
     .limit(1);
 
-  if (serviceRequest) {
+  if (serviceRequest && event === "created") {
     const alreadyNotified = await getDatabase()
       .select({ userId: serviceRequestEmailRecipients.recipientUserId })
       .from(serviceRequestEmailRecipients)
@@ -64,7 +68,9 @@ export async function notifyTicketOperatorsByEmail(ticketId: string): Promise<vo
   if (!ticket) return;
 
   const ticketUrl = `https://f10.com.br/app/tickets/${encodeURIComponent(ticketId)}`;
-  const title = `Novo ticket #${ticket.number}`;
+  const title = event === "customer_attachment"
+    ? `Novo anexo do cliente no ticket #${ticket.number}`
+    : `Novo ticket #${ticket.number}`;
   const message = ticket.subject.trim().slice(0, 180);
 
   const outcomes = await Promise.allSettled(recipients.map(async (recipient) => {
@@ -80,7 +86,7 @@ export async function notifyTicketOperatorsByEmail(ticketId: string): Promise<vo
         `Abrir atendimento: ${ticketUrl}`,
       ].join("\n"),
       htmlContent: buildEmailHtml({
-        eyebrow: "Novo atendimento",
+        eyebrow: event === "customer_attachment" ? "Novo anexo" : "Novo atendimento",
         title,
         greeting: `Olá, ${recipient.name}.`,
         body: [
@@ -91,7 +97,7 @@ export async function notifyTicketOperatorsByEmail(ticketId: string): Promise<vo
         action: { label: "Abrir ticket", href: ticketUrl },
         footer: "Aviso automático do F10 Operations.",
       }),
-      tags: ["ticket-created"],
+      tags: [event === "customer_attachment" ? "ticket-customer-attachment" : "ticket-created"],
     });
   }));
 
@@ -100,6 +106,7 @@ export async function notifyTicketOperatorsByEmail(ticketId: string): Promise<vo
       console.error("[ticket.operator_email.failed]", {
         ticketId,
         recipientUserId: recipients[index]?.id,
+        event,
         errorCode: outcome.reason instanceof Error ? outcome.reason.message : "SEND_FAILED",
       });
     }
