@@ -22,18 +22,14 @@ import {
   customerContacts,
   customerOrganizations,
   supportQueues,
-  ticketFollowers,
   ticketTags,
   tickets,
 } from "$lib/server/db/supportSchema";
 import {
-  ticketAreas,
   ticketWorkflowStates,
 } from "$lib/server/db/ticketWorkflowSchema";
 import {
-  getUserSupportQueueIds,
-  getUserSupportTeamIds,
-  getUserTicketAreaRestriction,
+  buildTicketAccessCondition,
   type SupportPermissionMap,
 } from "$lib/server/support/supportAccess";
 import type {
@@ -164,14 +160,8 @@ export async function listTicketWorkspaceTickets(
   if (!viewScope) throw new Error("SUPPORT_PERMISSION_NOT_ALLOWED");
 
   const db = getDatabase();
-  const [teamIds, queueIds, areaRestriction, followerRows, tagRows] = await Promise.all([
-    viewScope === "team" ? getUserSupportTeamIds(actorUserId) : Promise.resolve([]),
-    viewScope === "team" ? getUserSupportQueueIds(actorUserId) : Promise.resolve([]),
-    getUserTicketAreaRestriction(actorUserId),
-    db
-      .select({ ticketId: ticketFollowers.ticketId })
-      .from(ticketFollowers)
-      .where(eq(ticketFollowers.userId, actorUserId)),
+  const [scopedCondition, tagRows] = await Promise.all([
+    buildTicketAccessCondition(actorUserId, viewScope),
     filters.tagId
       ? db
           .select({ ticketId: ticketTags.ticketId })
@@ -179,48 +169,6 @@ export async function listTicketWorkspaceTickets(
           .where(eq(ticketTags.tagId, filters.tagId))
       : Promise.resolve([]),
   ]);
-
-  const followerTicketIds = followerRows.map((row) => row.ticketId);
-  const teamAreaRows =
-    viewScope === "team" && teamIds.length > 0
-      ? await db
-          .select({ id: ticketAreas.id })
-          .from(ticketAreas)
-          .where(inArray(ticketAreas.teamId, teamIds))
-      : [];
-  const teamAreaIds = teamAreaRows.map((row) => row.id);
-
-  const ownCondition = or(
-    eq(tickets.assignedUserId, actorUserId),
-    eq(tickets.createdByUserId, actorUserId),
-  );
-
-  let scopeCondition: SQL | undefined;
-  if (viewScope === "own") {
-    scopeCondition = ownCondition;
-  } else if (viewScope === "team") {
-    const teamConditions: SQL[] = [ownCondition];
-    if (queueIds.length > 0) teamConditions.push(inArray(tickets.queueId, queueIds));
-    if (teamAreaIds.length > 0) {
-      teamConditions.push(inArray(ticketWorkflowStates.areaId, teamAreaIds));
-    }
-    scopeCondition = or(...teamConditions);
-  }
-
-  const processCondition =
-    areaRestriction === null
-      ? undefined
-      : areaRestriction.length > 0
-        ? inArray(ticketWorkflowStates.areaId, areaRestriction)
-        : sql`false`;
-
-  const scopedCondition =
-    followerTicketIds.length > 0
-      ? or(
-          inArray(tickets.id, followerTicketIds),
-          combine([scopeCondition, processCondition]) ?? sql`true`,
-        )
-      : combine([scopeCondition, processCondition]);
 
   const requestedScope =
     filters.scope === "mine"
