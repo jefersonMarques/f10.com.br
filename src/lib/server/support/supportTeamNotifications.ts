@@ -1,11 +1,13 @@
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { getPermissionScope, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { webChatSessions } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { sendDevicePushAlerts } from "$lib/server/notifications/devicePush";
 import { teamMembers, users } from "$lib/server/db/schema";
 import { ticketAreas, ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
+import { canAccessTicket } from "$lib/server/support/supportAccess";
 import { autoAssignChatIfConfigured } from "$lib/server/support/supportChatRoutingRepository";
 import { notifyTicketOperatorsByEmail } from "$lib/server/support/ticketOperatorEmailNotification";
 import {
@@ -160,6 +162,16 @@ export async function notifySupportTicketNeedsAttention(
     recipientIds = responders.map((responder) => responder.id);
   }
 
+  if (recipientIds.length === 0) return;
+
+  const accessResults = await Promise.all(
+    recipientIds.map(async (userId) => {
+      const permissions = await resolveUserPermissions(userId);
+      const scope = getPermissionScope(permissions, "tickets.view");
+      return scope ? canAccessTicket(userId, scope, ticketId) : false;
+    }),
+  );
+  recipientIds = recipientIds.filter((userId, index) => accessResults[index]);
   if (recipientIds.length === 0) return;
 
   const [chatSession] = ticket.channel === "web_chat"
