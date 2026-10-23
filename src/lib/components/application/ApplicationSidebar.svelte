@@ -179,7 +179,7 @@
         {#if expanded}
           <img src="/branding/f10-helpdesk.webp" alt="F10 Helpdesk" class="h-auto max-h-[69px] w-[142px] shrink-0 object-contain" width="142" height="71"/>
         {:else}
-          <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-primary text-sm font-bold text-white">F10</span>
+          <img src="/branding/f10-helpdesk.webp" alt="F10 Helpdesk" class="h-auto max-h-10 w-[60px] object-contain" width="60" height="30"/>
         {/if}
       </a>
 
