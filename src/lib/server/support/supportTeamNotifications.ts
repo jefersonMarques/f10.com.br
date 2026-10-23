@@ -164,16 +164,6 @@ export async function notifySupportTicketNeedsAttention(
 
   if (recipientIds.length === 0) return;
 
-  const accessResults = await Promise.all(
-    recipientIds.map(async (userId) => {
-      const permissions = await resolveUserPermissions(userId);
-      const scope = getPermissionScope(permissions, "tickets.view");
-      return scope ? canAccessTicket(userId, scope, ticketId) : false;
-    }),
-  );
-  recipientIds = recipientIds.filter((userId, index) => accessResults[index]);
-  if (recipientIds.length === 0) return;
-
   const [chatSession] = ticket.channel === "web_chat"
     ? await db
         .select({ id: webChatSessions.id })
@@ -182,6 +172,18 @@ export async function notifySupportTicketNeedsAttention(
         .limit(1)
     : [];
   const isChatNotification = Boolean(chatSession?.id);
+
+  if (!isChatNotification) {
+    const accessResults = await Promise.all(
+      recipientIds.map(async (userId) => {
+        const permissions = await resolveUserPermissions(userId);
+        const scope = getPermissionScope(permissions, "tickets.view");
+        return scope ? canAccessTicket(userId, scope, ticketId) : false;
+      }),
+    );
+    recipientIds = recipientIds.filter((userId, index) => accessResults[index]);
+    if (recipientIds.length === 0) return;
+  }
   const kind = isChatNotification ? "chat.needs_attention" : "ticket.needs_attention";
   const href = isChatNotification
     ? `/app/chat/${chatSession.id}`
