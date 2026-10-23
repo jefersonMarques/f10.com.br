@@ -155,7 +155,43 @@
       </section>
 
       <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
-        <div class="flex items-start gap-3"><ShieldCheck size={18} class="mt-0.5 shrink-0 text-[#EA6D0B]" aria-hidden="true" /><div><h2 class="text-[12px] font-semibold text-[#353B4A]">Acesso por perfil</h2><p class="application-text-caption mt-2 leading-5 text-[#777D8D]">Os acessos são definidos pelo perfil atribuído ao usuário. A equipe continua definindo onde ele atua.</p></div></div>
+        <div class="flex items-center gap-2">
+          <ShieldCheck size={18} class="shrink-0 text-[#EA6D0B]" aria-hidden="true" />
+          <h2 class="text-[13px] font-semibold text-[#353B4A]">Acesso aos tickets</h2>
+        </div>
+        <dl class="mt-4 space-y-3 text-[12px]">
+          <div class="flex items-center justify-between gap-3">
+            <dt class="text-[#777D8D]">Permissão efetiva</dt>
+            <dd class="font-semibold text-[#353B4A]">{data.ticketAccess.scope ? scopeLabels[data.ticketAccess.scope] : "Sem acesso"}</dd>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <dt class="text-[#777D8D]">Equipes vinculadas</dt>
+            <dd class="font-semibold text-[#353B4A]">{data.ticketAccess.teamCount}</dd>
+          </div>
+          <div class="flex items-start justify-between gap-3">
+            <dt class="text-[#777D8D]">Processos</dt>
+            <dd class="max-w-[58%] text-right font-semibold text-[#353B4A]">
+              {data.ticketAccess.allowedAreas === null
+                ? "Sem restrição"
+                : data.ticketAccess.allowedAreas.length > 0
+                  ? data.ticketAccess.allowedAreas.join(", ")
+                  : "Nenhum liberado"}
+            </dd>
+          </div>
+        </dl>
+        {#if data.ticketAccess.override}
+          <p class="mt-3 rounded-lg bg-[#FFF8EC] px-3 py-2 text-[12px] leading-5 text-[#8D5B18]">
+            Há uma permissão individual que substitui a configuração do perfil para visualizar tickets.
+          </p>
+        {:else if data.ticketAccess.scope === "team" && data.ticketAccess.teamCount === 0}
+          <p class="mt-3 rounded-lg bg-[#FFF8EC] px-3 py-2 text-[12px] leading-5 text-[#8D5B18]">
+            Este usuário precisa participar de uma equipe com tickets para visualizar atendimentos da equipe.
+          </p>
+        {:else if data.ticketAccess.allowedAreas !== null && data.ticketAccess.allowedAreas.length === 0}
+          <p class="mt-3 rounded-lg bg-[#FFF8EC] px-3 py-2 text-[12px] leading-5 text-[#8D5B18]">
+            O perfil restringe processos, mas nenhum está liberado. Revise o perfil de acesso.
+          </p>
+        {/if}
       </section>
     </aside>
 
