@@ -11,7 +11,9 @@ import {
 } from "$lib/server/settings/supportHoursRepository";
 import {
   getSupportQueueTeamSettings,
+  getSupportEmailInboxTeamSettings,
   updateSupportQueueTeam,
+  updateSupportEmailInboxTeam,
 } from "$lib/server/settings/supportQueueSettingsRepository";
 import {
   createSupportChatEntryOption,
@@ -80,13 +82,14 @@ function readEntryOption(formData: FormData) {
 
 export const load: PageServerLoad = async ({ cookies }) => {
   await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
-  const [settings, queue, routing, chatEntry] = await Promise.all([
+  const [settings, queue, routing, chatEntry, emailInboxes] = await Promise.all([
     getSupportHoursSettings(),
     getSupportQueueTeamSettings(),
     getSupportRoutingSettings(),
     getSupportChatEntrySettings(),
+    getSupportEmailInboxTeamSettings(),
   ]);
-  return { settings, queue, routing, chatEntry };
+  return { settings, queue, routing, chatEntry, emailInboxes };
 };
 
 export const actions: Actions = {
@@ -109,6 +112,36 @@ export const actions: Actions = {
       return { success: true, action: "saveTeam", message: "Equipe responsável pelo suporte atualizada." };
     } catch {
       return fail(400, { success: false, action: "saveTeam", message: "Não foi possível vincular esta equipe à fila de suporte." });
+    }
+  },
+
+  saveEmailInboxTeam: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
+    const formData = await request.formData();
+    const queueId = readString(formData, "queueId");
+    const teamId = readString(formData, "teamId");
+
+    if (!isUuid(queueId) || !isUuid(teamId)) {
+      return fail(400, {
+        success: false,
+        action: "saveEmailInboxTeam",
+        message: "Selecione uma equipe válida para a caixa de e-mail.",
+      });
+    }
+
+    try {
+      await updateSupportEmailInboxTeam(session.user.id, queueId, teamId);
+      return {
+        success: true,
+        action: "saveEmailInboxTeam",
+        message: "Equipe da caixa de entrada atualizada. A alteração também vale para tickets existentes.",
+      };
+    } catch {
+      return fail(400, {
+        success: false,
+        action: "saveEmailInboxTeam",
+        message: "Não foi possível configurar a equipe desta caixa de e-mail.",
+      });
     }
   },
 
