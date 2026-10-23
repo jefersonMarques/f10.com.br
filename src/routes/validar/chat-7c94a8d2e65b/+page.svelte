@@ -1,7 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { MessageCircleMore, ShieldCheck } from "lucide-svelte";
-  import { hasRestorableSupportChat } from "$lib/support/supportChatRestore";
+  import {
+    hasRestorableSupportChat,
+    readRestorableSupportGuestMessages,
+    SUPPORT_CHAT_GUEST_KEY,
+  } from "$lib/support/supportChatRestore";
   import SupportChatDialog from "$lib/components/onboarding/SupportChatDialog.svelte";
   import type { PageData } from "./$types";
 
@@ -10,7 +14,8 @@
   let chatOpen = false;
 
   onMount(() => {
-    chatOpen = hasRestorableSupportChat(window.sessionStorage);
+    chatOpen = hasRestorableSupportChat(window.sessionStorage) ||
+      readRestorableSupportGuestMessages(window.sessionStorage, SUPPORT_CHAT_GUEST_KEY).length > 0;
   });
 </script>
 
