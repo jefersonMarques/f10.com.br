@@ -1,6 +1,10 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { SUPPORT_CHAT_SESSION_KEY } from "$lib/support/supportChatRestore";
+  import {
+    readRestorableSupportGuestMessages,
+    SUPPORT_ASSISTANT_GUEST_KEY,
+    SUPPORT_CHAT_SESSION_KEY,
+  } from "$lib/support/supportChatRestore";
   import { onDestroy, tick } from "svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
   import {
@@ -106,6 +110,7 @@
   };
 
   const SESSION_KEY = SUPPORT_CHAT_SESSION_KEY;
+  const GUEST_KEY = SUPPORT_ASSISTANT_GUEST_KEY;
   const HANDOFF_KEY = "f10-support-assistant-handoff-v1";
   const HANDOFF_TTL_MS = 60 * 60 * 1000;
   const MAX_IMAGES = 4;
@@ -151,6 +156,7 @@
 
   $: if (!initialized) initializeAuthState();
   $: if (browser && isOpen && !restored) restoreState();
+  $: if (browser && restored && guestMessages) persistGuestConversation();
   $: if (browser) syncPolling(isOpen && !authRequired, session?.sessionId ?? "");
   $: selectedUnits = authState.groups.find((group) => group.id === selectedGroupId)?.units ?? [];
 
@@ -198,7 +204,7 @@
 
   function restoreState(): void {
     restored = true;
-    guestMessages = [];
+    guestMessages = readRestorableSupportGuestMessages(window.sessionStorage, GUEST_KEY);
     unresolvedCount = 0;
     ensureGreeting();
 
@@ -224,6 +230,10 @@
   function persistSession(value: ChatSession): void {
     if (!browser) return;
     window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(value));
+  }
+
+  function persistGuestConversation(): void {
+    window.sessionStorage.setItem(GUEST_KEY, JSON.stringify(guestMessages.slice(-30)));
   }
 
   function persistPendingHandoff(reason: string): void {
