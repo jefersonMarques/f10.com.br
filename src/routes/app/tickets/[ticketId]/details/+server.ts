@@ -1,6 +1,7 @@
 import { error, json, type RequestHandler } from "@sveltejs/kit";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { markTicketFirstAgentView } from "$lib/server/support/ticketCustomerProgressRepository";
+import { markEntityNotificationsRead } from "$lib/server/notifications/notificationRepository";
 import { getTicketDetailsData } from "$lib/server/support/ticketDetailsService";
 
 function isUuid(value: string): boolean {
@@ -23,6 +24,7 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
       params.ticketId,
     );
 
+    await markEntityNotificationsRead(session.user.id, "ticket", params.ticketId);
     await markTicketFirstAgentView(session.user.id, params.ticketId).catch((cause) => {
       console.error("[ticket.customer_progress.card_view]", {
         ticketId: params.ticketId,
