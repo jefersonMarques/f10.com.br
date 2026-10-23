@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { SUPPORT_CHAT_SESSION_KEY } from "$lib/support/supportChatRestore";
   import { onDestroy, tick } from "svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
   import {
@@ -104,7 +105,7 @@
     groups: [],
   };
 
-  const SESSION_KEY = "f10-support-chat-session-v1";
+  const SESSION_KEY = SUPPORT_CHAT_SESSION_KEY;
   const HANDOFF_KEY = "f10-support-assistant-handoff-v1";
   const HANDOFF_TTL_MS = 60 * 60 * 1000;
   const MAX_IMAGES = 4;
