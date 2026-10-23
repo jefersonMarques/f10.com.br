@@ -30,7 +30,7 @@
 
   const siteUrl = "https://f10.com.br";
   const defaultOgImage = `${siteUrl}/cover.png?v=2`;
-  const standalonePaths = new Set(["/apresentacao/cebrac-crm-whatsapp"]);
+  const standalonePaths = new Set(["/apresentacao/cebrac-crm-whatsapp", "/validar/chat-7c94a8d2e65b"]);
   const seoOverrides: Record<string, SeoOverride> = {
     "/contato": {
       title: "Contato | F10 Software",
