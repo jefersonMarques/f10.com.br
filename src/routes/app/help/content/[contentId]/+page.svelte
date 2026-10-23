@@ -90,7 +90,7 @@
   let addSaving = false;
   let imageAddingMode: "generate" | "upload" | null = null;
   let openEditors = new Set<string>();
-  let appliedContentUpdatedAt = "";
+  let lastLoadedDataUpdatedAt = "";
   let reviewSummary = "";
   let reviewQuickGuide = "";
   let reviewSteps: ReviewStep[] = [];
@@ -159,8 +159,8 @@
 
   $: {
     const signature = String(data.content.updatedAt);
-    if (signature !== appliedContentUpdatedAt && !hasUnsavedReview) {
-      appliedContentUpdatedAt = signature;
+    if (signature !== lastLoadedDataUpdatedAt && !hasUnsavedReview) {
+      lastLoadedDataUpdatedAt = signature;
       reviewSummary = data.content.summary;
       reviewQuickGuide = data.content.quickGuide;
       reviewSteps = data.content.steps.map((step) => ({
@@ -282,7 +282,6 @@
     selectedCategoryIds = updated.categories
       .filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG)
       .map((category) => category.id);
-    appliedContentUpdatedAt = String(updated.updatedAt);
     saveSuccess = true;
     saveMessage = "Alteração salva.";
   }
