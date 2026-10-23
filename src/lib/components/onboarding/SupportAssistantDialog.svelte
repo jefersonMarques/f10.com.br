@@ -233,7 +233,11 @@
   }
 
   function persistGuestConversation(): void {
-    window.sessionStorage.setItem(GUEST_KEY, JSON.stringify(guestMessages.slice(-30)));
+    try {
+      window.sessionStorage.setItem(GUEST_KEY, JSON.stringify(guestMessages.slice(-30)));
+    } catch {
+      // Falhas de armazenamento não devem interromper o atendimento.
+    }
   }
 
   function persistPendingHandoff(reason: string): void {
