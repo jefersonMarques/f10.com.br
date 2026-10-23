@@ -5,7 +5,7 @@ import {
   isDeviceSubscriptionLinked,
 } from "$lib/server/notifications/devicePush";
 
-export const PUSH_DEVICE_COOKIE = "f10_push_device_id";
+const PUSH_DEVICE_COOKIE = "f10_push_device_id";
 
 async function userFromCookies(cookies: Parameters<RequestHandler>[0]["cookies"]) {
   const token = cookies.get(SESSION_COOKIE_NAME);
