@@ -56,7 +56,7 @@
         </p>
 
         <div class="mt-9 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-          <a href={destination} class="floating-cta inline-flex min-h-13 w-full items-center justify-center gap-3 rounded-2xl bg-[#EA6D0B] px-6 py-3.5 text-[14px] font-bold text-white shadow-[0_15px_35px_rgba(234,109,11,0.3)] transition-[background-color,box-shadow] hover:bg-[#FA7B17] hover:shadow-[0_17px_38px_rgba(234,109,11,0.4)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white sm:w-auto">
+          <a href={destination} class="floating-cta inline-flex min-h-[52px] w-full items-center justify-center gap-3 rounded-2xl bg-[#EA6D0B] px-6 py-3.5 text-[14px] font-bold text-white shadow-[0_15px_35px_rgba(234,109,11,0.3)] transition-[background-color,box-shadow] hover:bg-[#FA7B17] hover:shadow-[0_17px_38px_rgba(234,109,11,0.4)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white sm:w-auto">
             Começar configuração
             <ArrowRight size={18} aria-hidden="true"/>
           </a>
