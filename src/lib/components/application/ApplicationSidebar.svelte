@@ -174,13 +174,13 @@
   }}
 >
   <div class={`flex h-full w-full flex-col bg-app-surface transition-[width] duration-200 lg:absolute lg:left-0 lg:top-0 lg:h-[100dvh] lg:border-r lg:border-app-border ${expanded ? "lg:w-[256px]" : "lg:w-[76px]"} ${collapsed && expanded ? "lg:shadow-2xl" : ""}`}>
-    <div class={`flex h-[68px] items-center border-b border-app-border-soft px-4 transition-all lg:px-3 ${!expanded ? "lg:justify-center lg:gap-1" : "justify-between lg:px-5"}`}>
-      <a href="/app" class={`flex min-w-0 items-center ${!expanded ? "lg:justify-center" : "gap-3"}`} title={!expanded ? "F10 Operations" : ""}>
-        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-primary text-sm font-bold text-white">F10</span>
-        <span class={!expanded ? "lg:hidden" : ""}>
-          <strong class="block text-[14px] font-semibold leading-4">Operations</strong>
-          <small class="mt-0.5 block text-[13px] font-medium text-app-text-soft">Área interna</small>
-        </span>
+    <div class={`flex h-[80px] items-center border-b border-app-border-soft px-4 transition-all lg:px-3 ${!expanded ? "lg:justify-center lg:gap-1" : "justify-between lg:px-4"}`}>
+      <a href="/app" class={`flex min-w-0 items-center ${!expanded ? "lg:justify-center" : ""}`} aria-label="F10 Helpdesk — área interna" title={!expanded ? "F10 Helpdesk" : ""}>
+        {#if expanded}
+          <img src="/branding/f10-helpdesk.webp" alt="F10 Helpdesk" class="h-auto max-h-[69px] w-[142px] shrink-0 object-contain" width="142" height="71"/>
+        {:else}
+          <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-primary text-sm font-bold text-white">F10</span>
+        {/if}
       </a>
 
       <button
