@@ -17,13 +17,16 @@
 
 <header class="application-ui border-b border-[#E4E7EE] bg-white">
   <div class="mx-auto flex min-h-16 max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-6">
-    <div class="min-w-0">
-      <a href="/cliente/chamados" class="block truncate text-[14px] font-semibold text-[#010D28]">Área do Cliente F10</a>
-      {#if customer}
-        <p class="mt-0.5 hidden truncate text-[11px] text-[#747B8A] sm:block">
-          {customer.name} · {customer.groupName || customer.email}
-        </p>
-      {/if}
+    <div class="flex min-w-0 items-center gap-3">
+      <a href="/cliente/chamados" class="block shrink-0" aria-label="F10 Helpdesk — Área do Cliente">
+        <img src="/branding/f10-helpdesk.webp" alt="F10 Helpdesk" class="h-[44px] w-auto object-contain sm:h-[58px]" width="116" height="58"/>
+      </a>
+      <div class="hidden min-w-0 md:block">
+        <strong class="block truncate text-[13px] font-semibold text-[#010D28]">Área do Cliente</strong>
+        {#if customer}
+          <p class="mt-0.5 truncate text-[11px] text-[#747B8A]">{customer.name} · {customer.groupName || customer.email}</p>
+        {/if}
+      </div>
     </div>
 
     <nav class="flex shrink-0 items-center gap-1 sm:gap-2" aria-label="Área do Cliente">
