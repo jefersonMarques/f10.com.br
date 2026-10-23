@@ -17,6 +17,7 @@ export type TicketWorkflowState = {
 export type TicketItem = {
   id: string;
   ticketNumber: number;
+  unread?: boolean;
   subject: string;
   status: string;
   priority: string;
