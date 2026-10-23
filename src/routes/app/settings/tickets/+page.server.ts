@@ -1,6 +1,7 @@
 import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
+import { hasPermission } from "$lib/server/auth/permissions";
 import {
   getServiceRequestEmailSettings,
   updateServiceRequestEmailRecipients,
@@ -9,7 +10,7 @@ import {
   getTicketOnboardingSettings,
   updateTicketOnboardingSettings,
 } from "$lib/server/settings/operationsSettingsRepository";
-import { listTicketWorkflowEntryPoints } from "$lib/server/support/ticketWorkflowRepository";
+import { ensureTicketOnboardingEntryPoint, listTicketOnboardingAreas } from "$lib/server/support/ticketWorkflowRepository";
 import { listEligibleTicketResponders } from "$lib/server/support/supportRoutingRepository";
 import {
   getTicketOperatorEmailSettings,
@@ -32,11 +33,11 @@ function readRecipients(formData: FormData, key: string): string[] {
 }
 
 export const load: PageServerLoad = async ({ cookies }) => {
-  const { session } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/tickets");
-  const [settings, onboarding, entryPoints, operatorSettings, operatorUsers, canConfigureOperatorEmails] = await Promise.all([
+  const { session, permissions } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/tickets");
+  const [settings, onboarding, onboardingAreas, operatorSettings, operatorUsers, canConfigureOperatorEmails] = await Promise.all([
     getServiceRequestEmailSettings(),
     getTicketOnboardingSettings(),
-    listTicketWorkflowEntryPoints(),
+    listTicketOnboardingAreas(),
     getTicketOperatorEmailSettings(),
     listEligibleTicketResponders(),
     isSuperAdminUser(session.user.id),
@@ -45,7 +46,10 @@ export const load: PageServerLoad = async ({ cookies }) => {
     nfse: settings.find((setting) => setting.requestType === "nfse")!,
     cellCoin: settings.find((setting) => setting.requestType === "cell_coin")!,
     onboarding,
-    entryPoints,
+    onboardingAreas,
+    selectedOnboardingAreaId:
+      onboardingAreas.find((area) => area.stageId === onboarding.startStageId)?.areaId ?? "",
+    canManageWorkflows: hasPermission(permissions, "tickets.manage", "all"),
     operatorSettings,
     operatorUsers,
     canConfigureOperatorEmails,
@@ -54,32 +58,43 @@ export const load: PageServerLoad = async ({ cookies }) => {
 
 export const actions: Actions = {
   saveOnboarding: async ({ cookies, request }) => {
-    const { session } = await requireAppPermission(
+    const { session, permissions } = await requireAppPermission(
       cookies,
       "system.settings.manage",
       "/app/settings/tickets",
     );
 
-    const formData = await request.formData();
-    const value = formData.get("startStageId");
-    const startStageId = typeof value === "string" && value.trim() ? value.trim() : null;
+    const value = (await request.formData()).get("areaId");
+    const areaId = typeof value === "string" ? value.trim() : "";
+    if (areaId && !hasPermission(permissions, "tickets.manage", "all")) {
+      return fail(403, {
+        success: false,
+        action: "saveOnboarding",
+        message: "Para configurar a entrada, é necessário administrar todos os fluxos de tickets.",
+      });
+    }
 
     try {
-      const entryPoints = await listTicketWorkflowEntryPoints();
-      if (startStageId && !entryPoints.some((entryPoint) => entryPoint.stageId === startStageId)) {
-        throw new Error("TICKET_ONBOARDING_STAGE_INVALID");
-      }
+      const startStageId = areaId
+        ? await ensureTicketOnboardingEntryPoint(areaId)
+        : null;
       await updateTicketOnboardingSettings(session.user.id, { startStageId });
       return {
         success: true,
         action: "saveOnboarding",
-        message: "Processo de onboarding atualizado.",
+        message: areaId
+          ? "Processo de onboarding configurado para os próximos tickets."
+          : "Entrada de onboarding desativada.",
       };
-    } catch {
+    } catch (cause) {
+      console.error("[operations.ticket_onboarding.save_failed]", {
+        causeType: cause instanceof Error ? cause.name : typeof cause,
+        errorCode: cause instanceof Error ? cause.message : "unknown",
+      });
       return fail(400, {
         success: false,
         action: "saveOnboarding",
-        message: "Selecione um processo disponível para receber novos clientes.",
+        message: "Não foi possível configurar o processo. Confira se o fluxo global e a área estão ativos.",
       });
     }
   },
