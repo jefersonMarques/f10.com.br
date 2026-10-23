@@ -368,8 +368,34 @@ export const actions: Actions = {
     }
 
     try {
+      if (formData.get("sendToCustomer") === "on") {
+        const result = await addTicketMessage(
+          session.user.id,
+          permissions,
+          params.ticketId,
+          "Arquivo enviado pela equipe F10.",
+          "public",
+          [],
+          [file],
+        );
+
+        return {
+          success: true,
+          action: "uploadAttachment",
+          message: result.emailDelivery === "sent"
+            ? "Arquivo registrado e enviado ao cliente por e-mail."
+            : result.emailDelivery === "failed"
+              ? "Arquivo registrado, mas o e-mail falhou. Verifique o histórico antes de reenviar."
+              : "Arquivo registrado. Cliente sem endereço de e-mail para envio.",
+        };
+      }
+
       await uploadTicketAttachment(session.user.id, permissions, params.ticketId, file);
-      return { success: true, action: "uploadAttachment", message: "Anexo adicionado." };
+      return {
+        success: true,
+        action: "uploadAttachment",
+        message: "Anexo interno salvo. Nenhum e-mail foi enviado.",
+      };
     } catch (cause) {
       return fail(409, {
         success: false,
