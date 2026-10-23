@@ -50,6 +50,10 @@ test("chat links use only safe protocols and do not execute HTML", () => {
   assert.equal(tokens.filter((token) => token.kind === "link").length, 1);
   assert.equal(tokens.find((token) => token.kind === "link")?.href, "/ajuda-f10");
   assert.ok(tokens.some((token) => token.kind === "text" && token.text.includes("<script>")));
+  assert.equal(
+    tokenizeChatMarkdown("Veja /ajuda-f10/pauta-de-chamada#help-block-1.").find((token) => token.kind === "link")?.href,
+    "/ajuda-f10/pauta-de-chamada#help-block-1",
+  );
 });
 
 test("URLs do not absorb trailing punctuation", () => {
