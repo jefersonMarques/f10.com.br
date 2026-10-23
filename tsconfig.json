@@ -1,7 +1,11 @@
 {
   "extends": "./.svelte-kit/tsconfig.json",
   "compilerOptions": {
-    "types": ["svelte", "node"],
-    "skipLibCheck": true
+    "types": [
+      "svelte",
+      "node"
+    ],
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true
   }
 }
