@@ -79,6 +79,46 @@
 
   <section class="mt-4 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
     <div class="flex items-start gap-3">
+      <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Users size={18}/></span>
+      <div>
+        <h2 class="text-[14px] font-semibold text-[#252C3D]">Equipes das caixas de e-mail</h2>
+        <p class="mt-1 text-[12px] leading-5 text-[#858B99]">Defina quem recebe e pode visualizar os chamados de cada caixa. Vale também para os tickets antigos.</p>
+      </div>
+    </div>
+
+    {#if data.emailInboxes.teams.length > 0}
+      <div class="mt-4 space-y-2">
+        {#each data.emailInboxes.inboxes as inbox (inbox.id)}
+          <form method="POST" action="?/saveEmailInboxTeam" class="flex flex-wrap items-end gap-3 rounded-xl border border-[#E7E9EF] p-3">
+            <input type="hidden" name="queueId" value={inbox.id}/>
+            <div class="min-w-[120px] flex-1">
+              <strong class="block text-[12px] font-semibold text-[#353B4A]">{inbox.name}</strong>
+              <span class="mt-0.5 block text-[11px] text-[#858B99]">{inbox.addressLabel}{inbox.active ? "" : " · inativa"}</span>
+            </div>
+            <label class="min-w-[180px] flex-[2_1_210px]">
+              <span class="mb-1 block text-[12px] font-semibold text-[#555B6B]">Equipe responsável</span>
+              <select name="teamId" required disabled={!inbox.active} class="h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-3 text-[12px] disabled:bg-[#F5F6F8]">
+                {#if !inbox.teamId || !data.emailInboxes.teams.some((team) => team.id === inbox.teamId)}
+                  <option value="" selected disabled>Selecione uma equipe</option>
+                {/if}
+                {#each data.emailInboxes.teams as team}
+                  <option value={team.id} selected={team.id === inbox.teamId}>{team.name}</option>
+                {/each}
+              </select>
+            </label>
+            <button type="submit" disabled={!inbox.active} class="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white disabled:opacity-40"><Save size={14}/>Salvar</button>
+          </form>
+        {:else}
+          <p class="text-[12px] text-[#858B99]">Nenhuma caixa configurada.</p>
+        {/each}
+      </div>
+    {:else}
+      <p class="mt-4 text-[12px] text-[#858B99]">Cadastre uma equipe na página Equipe para configurar as caixas de e-mail.</p>
+    {/if}
+  </section>
+
+  <section class="mt-4 rounded-[22px] border border-[#E2E5ED] bg-white p-5 sm:p-6">
+    <div class="flex items-start gap-3">
       <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFF2E8] text-[#C85C08]"><MessagesSquare size={18}/></span>
       <div>
         <h2 class="text-[14px] font-semibold text-[#252C3D]">Entrada do chat</h2>
