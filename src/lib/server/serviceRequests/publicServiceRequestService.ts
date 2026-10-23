@@ -295,6 +295,7 @@ export async function createPublicServiceRequest(
     await notifySupportTicketNeedsAttention(
       result.ticketId,
       `Nova solicitação pública de ${label} aguardando atendimento.`,
+      { newTicket: true },
     ).catch((cause) => {
       console.error("[service-request.public.notification]", {
         ticketId: result.ticketId,
