@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { SUPPORT_CHAT_SESSION_KEY } from "$lib/support/supportChatRestore";
   import { onDestroy, tick } from "svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
   import {
@@ -121,7 +122,7 @@
     groups: [],
   };
 
-  const STORAGE_KEY = "f10-support-chat-session-v1";
+  const STORAGE_KEY = SUPPORT_CHAT_SESSION_KEY;
   const DRAFT_KEY = "f10-support-chat-draft-v1";
   const GUEST_KEY = "f10-support-assistant-conversation-v1";
   const BOTTOM_THRESHOLD = 100;
