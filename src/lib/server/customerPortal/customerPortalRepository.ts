@@ -8,6 +8,7 @@ import {
   customerPortalSessions,
 } from "$lib/server/db/customerPortalSchema";
 import { ticketMessageAttachments } from "$lib/server/db/supportChatEntrySchema";
+import { notifyTicketOperatorsByEmail } from "$lib/server/support/ticketOperatorEmailNotification";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import {
   customerContacts,
@@ -436,4 +437,13 @@ export async function replyCustomerPortalTicket(
       causeType: cause instanceof Error ? cause.name : typeof cause,
     });
   });
+
+  if (storedAttachments.length > 0) {
+    await notifyTicketOperatorsByEmail(ticketId, "customer_attachment").catch((cause) => {
+      console.error("[ticket.customer.attachment_email]", {
+        ticketId,
+        causeType: cause instanceof Error ? cause.name : typeof cause,
+      });
+    });
+  }
 }
