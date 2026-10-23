@@ -1,6 +1,7 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { onDestroy, tick } from "svelte";
+  import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
   import {
     ArrowDown,
     CheckCircle2,
@@ -967,7 +968,7 @@
                     <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><MessageCircleMore size={15}/></span>
                     <div class="min-w-0 flex-1">
                       <strong class="text-[10px] font-semibold text-[#303746]">{systemCardTitle(message.presentation)}</strong>
-                      <p class="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-[#687080]">{message.body}</p>
+                      <SupportChatMarkdown text={message.body} className="mt-1 text-[#687080]"/>
                       <span class="mt-1 block text-[8px] text-[#A0A5B0]">{formatTime(message.createdAt)}</span>
                     </div>
                   </div>
@@ -982,7 +983,7 @@
                         {/each}
                       </div>
                     {/if}
-                    {#if message.body}<p class={`${message.attachments?.length ? "mt-2" : ""} whitespace-pre-wrap text-[11px] leading-5`}>{message.body}</p>{/if}
+                    {#if message.body}<SupportChatMarkdown text={message.body} isCustomer={message.authorType === "customer"} className={message.attachments?.length ? "mt-2" : ""}/>{/if}
                     <span class="mt-1 block text-[8px] text-white/55">{message.optimistic ? "Enviando..." : formatTime(message.createdAt)}</span>
                   </div>
                 </div>
@@ -1006,7 +1007,7 @@
                           {/each}
                         </div>
                       {/if}
-                      {#if message.body}<p class={`${message.attachments?.length ? "mt-2" : ""} whitespace-pre-wrap text-[11px] leading-5`}>{message.body}</p>{/if}
+                      {#if message.body}<SupportChatMarkdown text={message.body} isCustomer={message.authorType === "customer"} className={message.attachments?.length ? "mt-2" : ""}/>{/if}
                       <span class="mt-1 block text-[8px] text-[#969CAA]">{formatTime(message.createdAt)}</span>
                     </div>
                   </div>
@@ -1021,14 +1022,14 @@
             {#if message.role === "customer"}
               <div class="flex justify-end">
                 <div class="max-w-[84%] rounded-2xl rounded-br-md bg-[#000A57] px-3.5 py-2.5 text-white">
-                  <p class="whitespace-pre-wrap text-[11px] leading-5">{message.body}</p>
+                  <SupportChatMarkdown text={message.body} isCustomer={message.role === "customer"}/>
                 </div>
               </div>
             {:else}
               <div class="flex items-start gap-2">
                 <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFF0E4] text-[#EA6D0B]"><Sparkles size={14}/></span>
                 <div class="max-w-[84%] rounded-2xl rounded-tl-md border border-[#E1E4EB] bg-white px-3.5 py-2.5 text-[#343B4C] shadow-sm">
-                  <p class="whitespace-pre-wrap text-[11px] leading-5">{message.body}</p>
+                  <SupportChatMarkdown text={message.body} isCustomer={message.role === "customer"}/>
                 </div>
               </div>
             {/if}
