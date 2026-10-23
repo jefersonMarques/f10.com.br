@@ -5,6 +5,8 @@ import { hasPermission } from "$lib/server/auth/permissions";
 import { regenerateManagedUserInvite } from "$lib/server/users/userInviteManagement";
 import { sendManagedUserInviteEmail } from "$lib/server/users/userInviteMailer";
 import { listAssignableAccessProfiles } from "$lib/server/users/accessProfileRepository";
+import { getUserTicketAreaRestriction } from "$lib/server/support/supportAccess";
+import { listTicketAreas } from "$lib/server/support/ticketWorkflowRepository";
 import {
   getManagedUserDetails,
   setManagedUserProfile,
@@ -36,15 +38,28 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   if (!isUuid(params.userId)) throw error(404, "Usuário não encontrado.");
 
   try {
-    const [details, supportTeams, accessProfiles] = await Promise.all([
+    const [details, supportTeams, accessProfiles, allowedAreaIds, ticketAreas] = await Promise.all([
       getManagedUserDetails(layout.user.id, layout.roles, params.userId),
       listUserSupportTeams(params.userId),
       listAssignableAccessProfiles(layout.user.id, layout.roles),
+      getUserTicketAreaRestriction(params.userId),
+      listTicketAreas(),
     ]);
+
+    const ticketPermission = details.permissions.find((item) => item.code === "tickets.view");
+    const areaNames = new Map(ticketAreas.map((area) => [area.id, area.name]));
     return {
       details,
       supportTeams,
       accessProfiles,
+      ticketAccess: {
+        scope: ticketPermission?.effectiveScope ?? null,
+        override: ticketPermission?.override ?? null,
+        allowedAreas: allowedAreaIds === null
+          ? null
+          : allowedAreaIds.map((id) => areaNames.get(id) ?? "Processo não disponível"),
+        teamCount: supportTeams.filter((team) => team.included && team.active).length,
+      },
       canManage:
         hasPermission(permissionMap, "users.manage") &&
         layout.user.id !== params.userId &&
