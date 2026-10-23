@@ -10,6 +10,12 @@ import {
   updateTicketOnboardingSettings,
 } from "$lib/server/settings/operationsSettingsRepository";
 import { listTicketWorkflowEntryPoints } from "$lib/server/support/ticketWorkflowRepository";
+import { listEligibleTicketResponders } from "$lib/server/support/supportRoutingRepository";
+import {
+  getTicketOperatorEmailSettings,
+  isSuperAdminUser,
+  saveTicketOperatorEmailSettings,
+} from "$lib/server/settings/ticketOperatorEmailSettings";
 
 function readRecipients(formData: FormData, key: string): string[] {
   const values = formData
@@ -26,17 +32,23 @@ function readRecipients(formData: FormData, key: string): string[] {
 }
 
 export const load: PageServerLoad = async ({ cookies }) => {
-  await requireAppPermission(cookies, "system.settings.manage", "/app/settings/tickets");
-  const [settings, onboarding, entryPoints] = await Promise.all([
+  const { session } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/tickets");
+  const [settings, onboarding, entryPoints, operatorSettings, operatorUsers, canConfigureOperatorEmails] = await Promise.all([
     getServiceRequestEmailSettings(),
     getTicketOnboardingSettings(),
     listTicketWorkflowEntryPoints(),
+    getTicketOperatorEmailSettings(),
+    listEligibleTicketResponders(),
+    isSuperAdminUser(session.user.id),
   ]);
   return {
     nfse: settings.find((setting) => setting.requestType === "nfse")!,
     cellCoin: settings.find((setting) => setting.requestType === "cell_coin")!,
     onboarding,
     entryPoints,
+    operatorSettings,
+    operatorUsers,
+    canConfigureOperatorEmails,
   };
 };
 
@@ -68,6 +80,33 @@ export const actions: Actions = {
         success: false,
         action: "saveOnboarding",
         message: "Selecione um processo disponível para receber novos clientes.",
+      });
+    }
+  },
+
+  saveOperatorEmails: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(
+      cookies,
+      "system.settings.manage",
+      "/app/settings/tickets",
+    );
+
+    try {
+      const formData = await request.formData();
+      await saveTicketOperatorEmailSettings(session.user.id, {
+        enabled: formData.get("operatorEmailEnabled") === "on",
+        recipientUserIds: readRecipients(formData, "operatorRecipientUserId"),
+      });
+      return {
+        success: true,
+        action: "saveOperatorEmails",
+        message: "Avisos por e-mail aos operadores atualizados.",
+      };
+    } catch {
+      return fail(403, {
+        success: false,
+        action: "saveOperatorEmails",
+        message: "Não foi possível salvar. Verifique suas permissões e os operadores selecionados.",
       });
     }
   },
