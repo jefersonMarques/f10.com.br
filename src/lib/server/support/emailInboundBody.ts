@@ -13,56 +13,11 @@ export type SelectedInboundBody = {
   htmlWords: number;
 };
 
+import { normalizeEmailBodyText, visibleEmailHtml } from "$lib/support/emailBodyText";
+
+export { visibleEmailHtml };
+
 const MAX_BODY_CHARS = 150_000;
-const entities: Record<string, string> = {
-  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
-  ndash: "–", mdash: "—", hellip: "…", bull: "•",
-  copy: "©", reg: "®", trade: "™", euro: "€", rsquo: "’", lsquo: "‘",
-  rdquo: "”", ldquo: "“", laquo: "«", raquo: "»",
-  aacute: "á", agrave: "à", acirc: "â", atilde: "ã",
-  eacute: "é", ecirc: "ê", iacute: "í", oacute: "ó",
-  ocirc: "ô", otilde: "õ", uacute: "ú", uuml: "ü",
-  ccedil: "ç", ntilde: "ñ",
-};
-
-function decodeEntities(text: string): string {
-  return text.replace(/&(#(?:[xX][0-9a-fA-F]+|\d+)|[a-zA-Z][a-zA-Z\d]+);/g, (whole, raw: string) => {
-    if (raw.startsWith("#")) {
-      const hex = raw[1]?.toLowerCase() === "x";
-      const numeric = Number.parseInt(raw.slice(hex ? 2 : 1), hex ? 16 : 10);
-      return numeric > 0 && numeric <= 0x10ffff &&
-        !(numeric >= 0xd800 && numeric <= 0xdfff)
-        ? String.fromCodePoint(numeric) : whole;
-    }
-    const replacement = entities[raw.toLowerCase()];
-    if (!replacement) return whole;
-    return /^[A-Z]/.test(raw) && replacement.length === 1
-      ? replacement.toUpperCase() : replacement;
-  });
-}
-
-export function visibleEmailHtml(html: string): string {
-  if (!html.trim()) return "";
-  const cleaned = html.slice(0, MAX_BODY_CHARS * 4)
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<(head|script|style|noscript|template|svg|iframe|object)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "")
-    .replace(/<\s*br\b[^>]*>/gi, "\n")
-    .replace(/<\s*li\b[^>]*>/gi, "\n- ")
-    .replace(/<\/\s*(?:p|div|tr|td|th|table|ul|ol|li|blockquote|h[1-6])\s*>/gi, "\n")
-    .replace(/<\s*(?:b|strong)\b[^>]*>/gi, "**")
-    .replace(/<\/\s*(?:b|strong)\s*>/gi, "**")
-    .replace(/<\s*(?:i|em)\b[^>]*>/gi, "*")
-    .replace(/<\/\s*(?:i|em)\s*>/gi, "*")
-    .replace(/<[^>]+>/g, "");
-  return decodeEntities(cleaned)
-    .replace(/\u00a0/g, " ")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n[ \t]+/g, "\n")
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim()
-    .slice(0, MAX_BODY_CHARS);
-}
 
 function meaningfulWords(text: string): string[] {
   const withoutSyntax = text
@@ -91,8 +46,12 @@ export function selectInboundEmailBody(input: {
   plain?: unknown;
   html?: unknown;
 }): SelectedInboundBody {
-  const markdown = typeof input.markdown === "string" ? input.markdown.trim().slice(0, MAX_BODY_CHARS) : "";
-  const plain = typeof input.plain === "string" ? input.plain.trim().slice(0, MAX_BODY_CHARS) : "";
+  const markdown = typeof input.markdown === "string"
+    ? normalizeEmailBodyText(input.markdown.slice(0, MAX_BODY_CHARS))
+    : "";
+  const plain = typeof input.plain === "string"
+    ? normalizeEmailBodyText(input.plain.slice(0, MAX_BODY_CHARS))
+    : "";
   const html = visibleEmailHtml(typeof input.html === "string" ? input.html : "");
   const options: Array<{ source: InboundBodySource; text: string; words: string[] }> = [
     { source: "markdown", text: markdown, words: meaningfulWords(markdown) },
