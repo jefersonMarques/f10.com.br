@@ -17,6 +17,7 @@ import {
   markTicketCustomerWaitingForResponse,
 } from "$lib/server/support/ticketSlaService";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
+import { notifyTicketOperatorsByEmail } from "$lib/server/support/ticketOperatorEmailNotification";
 import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
 import {
   supportEmailInboundEvents,
@@ -706,6 +707,14 @@ export async function saveIncomingMessage(input: {
       .where(eq(ticketMessages.id, savedMessageId));
   }
 
+  if (created && previousMessage && input.message.attachments.length > 0) {
+    await notifyTicketOperatorsByEmail(input.ticketId, "customer_attachment").catch((cause) => {
+      console.error("[ticket.email.customer_attachment_notification]", {
+        ticketId: input.ticketId,
+        causeType: cause instanceof Error ? cause.name : typeof cause,
+      });
+    });
+  }
 
   return Boolean(created);
 }
