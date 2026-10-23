@@ -64,8 +64,6 @@ test("restricted browser storage does not prevent page loading", () => {
 });
 
 test("recent assistant dialogue is restored in the same browser tab", () => {
-  const storage = createStorage();
-  storage.removeItem(SUPPORT_CHAT_SESSION_KEY);
   const messages = [
     {
       id: "assistant-1",
