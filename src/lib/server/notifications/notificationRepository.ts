@@ -32,7 +32,7 @@ export async function createInternalNotification(input: CreateNotificationInput)
   }).returning({ id: internalNotifications.id });
   if (saved && (input.entityType === "ticket" || input.entityType === "chat" ||
     input.kind.startsWith("chat.") || input.kind.startsWith("ticket."))) {
-    await sendDevicePushAlerts([{
+    void sendDevicePushAlerts([{
       userId: input.userId, id: saved.id, title: input.title, body: input.body ?? "",
       kind: input.kind,
     }]).catch(() => undefined);
@@ -64,7 +64,7 @@ export async function createInternalNotifications(inputs: CreateNotificationInpu
       body: internalNotifications.body,
       entityType: internalNotifications.entityType,
     });
-  await sendDevicePushAlerts(created.filter(item =>
+  void sendDevicePushAlerts(created.filter(item =>
     item.entityType === "ticket" || item.entityType === "chat" ||
     item.kind.startsWith("chat.") || item.kind.startsWith("ticket.")
   )).catch(() => undefined);
