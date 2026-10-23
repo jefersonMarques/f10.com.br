@@ -301,7 +301,7 @@ export async function listTicketOnboardingAreas() {
       workflow.kind === "area" &&
       workflow.areaId !== null &&
       activeAreaIds.has(workflow.areaId) &&
-      workflow.stages.length > 0,
+      workflow.stages.some((stage) => stage.isInitial),
     )
     .map((workflow) => {
       const gateway = global?.stages.find((stage) =>
