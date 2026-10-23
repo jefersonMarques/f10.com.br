@@ -1,7 +1,8 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { webChatSessions } from "$lib/server/db/chatSchema";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
+import { sendDevicePushAlerts } from "$lib/server/notifications/devicePush";
 import { teamMembers, users } from "$lib/server/db/schema";
 import { ticketAreas, ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
@@ -10,6 +11,22 @@ import {
   autoAssignTicketIfConfigured,
   listEligibleTicketResponders,
 } from "$lib/server/support/supportRoutingRepository";
+
+async function pushAssignedNotification(userId: string, entityId: string, kind: string) {
+  const [notification] = await getDatabase().select({
+    id: internalNotifications.id,
+    title: internalNotifications.title,
+    body: internalNotifications.body,
+    kind: internalNotifications.kind,
+  }).from(internalNotifications).where(and(
+    eq(internalNotifications.userId, userId),
+    eq(internalNotifications.entityId, entityId),
+    eq(internalNotifications.kind, kind),
+  )).orderBy(desc(internalNotifications.createdAt)).limit(1);
+  if (notification) {
+    void sendDevicePushAlerts([{ userId, ...notification }]).catch(() => undefined);
+  }
+}
 
 export async function notifySupportChatNeedsAttention(
   sessionId: string,
@@ -30,7 +47,10 @@ export async function notifySupportChatNeedsAttention(
 
   if (!chat.assignedUserId) {
     const autoAssignedUserId = await autoAssignChatIfConfigured(sessionId);
-    if (autoAssignedUserId) return;
+    if (autoAssignedUserId) {
+      await pushAssignedNotification(autoAssignedUserId, sessionId, "chat.assigned");
+      return;
+    }
   }
 
   let recipientIds: string[] = [];
@@ -62,7 +82,7 @@ export async function notifySupportChatNeedsAttention(
   const pendingRecipients = recipientIds.filter((userId) => !alreadyNotified.has(userId));
   if (pendingRecipients.length === 0) return;
 
-  await db.insert(internalNotifications).values(
+  const added = await db.insert(internalNotifications).values(
     pendingRecipients.map((userId) => ({
       userId,
       kind: "chat.needs_attention",
@@ -72,7 +92,14 @@ export async function notifySupportChatNeedsAttention(
       entityType: "chat",
       entityId: sessionId,
     })),
-  );
+  ).returning({
+    id: internalNotifications.id,
+    userId: internalNotifications.userId,
+    title: internalNotifications.title,
+    body: internalNotifications.body,
+    kind: internalNotifications.kind,
+  });
+  void sendDevicePushAlerts(added).catch(() => undefined);
 }
 
 export async function notifySupportTicketNeedsAttention(
@@ -100,7 +127,10 @@ export async function notifySupportTicketNeedsAttention(
 
   if (!ticket.assignedUserId) {
     const autoAssignedUserId = await autoAssignTicketIfConfigured(ticketId);
-    if (autoAssignedUserId) return;
+    if (autoAssignedUserId) {
+      await pushAssignedNotification(autoAssignedUserId, ticketId, "ticket.assigned");
+      return;
+    }
   }
 
   const teamId = ticket.areaTeamId ?? ticket.queueTeamId;
@@ -153,7 +183,7 @@ export async function notifySupportTicketNeedsAttention(
   const pendingRecipients = recipientIds.filter((userId) => !alreadyNotified.has(userId));
   if (pendingRecipients.length === 0) return;
 
-  await db.insert(internalNotifications).values(
+  const added = await db.insert(internalNotifications).values(
     pendingRecipients.map((userId) => ({
       userId,
       kind,
@@ -163,5 +193,12 @@ export async function notifySupportTicketNeedsAttention(
       entityType: "ticket",
       entityId: ticketId,
     })),
-  );
+  ).returning({
+    id: internalNotifications.id,
+    userId: internalNotifications.userId,
+    title: internalNotifications.title,
+    body: internalNotifications.body,
+    kind: internalNotifications.kind,
+  });
+  void sendDevicePushAlerts(added).catch(() => undefined);
 }

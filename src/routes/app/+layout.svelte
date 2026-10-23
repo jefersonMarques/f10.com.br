@@ -15,6 +15,7 @@
   import GoogleCalendarSyncPulse from "$lib/components/operations/GoogleCalendarSyncPulse.svelte";
   import HelpVideoProcessingPulse from "$lib/components/operations/HelpVideoProcessingPulse.svelte";
   import NotificationAlertStack from "$lib/components/operations/NotificationAlertStack.svelte";
+  import DevicePushSettings from "$lib/components/operations/DevicePushSettings.svelte";
   import { resolveOperationsRouteMetadata } from "$lib/application/routeMetadata";
   import type { LayoutData } from "./$types";
 
@@ -25,6 +26,7 @@
   let presenceOpen = false;
   let profileOpen = false;
   let notificationTimer: ReturnType<typeof setInterval> | null = null;
+  let notificationStream: EventSource | null = null;
   let notificationRefreshInFlight = false;
   let presenceTimer: ReturnType<typeof setInterval> | null = null;
   let notifications = data.notifications;
@@ -165,7 +167,20 @@
     const syncNotifications = () => {
       if (!document.hidden) void refreshNotifications();
     };
-    notificationTimer = setInterval(syncNotifications, 5_000);
+    notificationTimer = setInterval(syncNotifications, 8_000);
+    // Server events update badge and toast as soon as changes are persisted.
+    // Polling remains a fallback if a reverse proxy buffers or blocks the stream.
+    if (typeof EventSource !== "undefined") {
+      notificationStream = new EventSource("/app/notifications/events");
+      notificationStream.onmessage = (event) => {
+        try {
+          const next = JSON.parse(event.data);
+          if (typeof next?.unreadCount === "number" && Array.isArray(next.recent)) {
+            notifications = next as typeof notifications;
+          }
+        } catch { /* Ignore malformed stream messages. */ }
+      };
+    }
     document.addEventListener("visibilitychange", syncNotifications);
     window.addEventListener("focus", syncNotifications);
     window.addEventListener("pageshow", syncNotifications);
@@ -194,6 +209,8 @@
   });
 
   onDestroy(() => {
+    notificationStream?.close();
+    notificationStream = null;
     if (notificationTimer) clearInterval(notificationTimer);
     if (presenceTimer) clearInterval(presenceTimer);
   });
@@ -271,6 +288,7 @@
                 {/if}
               </div>
 
+              <DevicePushSettings />
               {#if notifications.recent.length > 0}
                 <div class="max-h-[420px] overflow-y-auto p-1.5">
                   {#each notifications.recent as notification}

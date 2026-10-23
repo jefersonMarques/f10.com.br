@@ -1,6 +1,7 @@
 import { and, count, desc, eq, inArray, isNull, like, ne, notLike, or } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
+import { sendDevicePushAlerts } from "$lib/server/notifications/devicePush";
 
 export type NotificationEntityType = "ticket" | "task" | "chat" | "system";
 
@@ -19,7 +20,7 @@ export async function createInternalNotification(input: CreateNotificationInput)
   if (input.actorUserId && input.actorUserId === input.userId) return;
 
   const db = getDatabase();
-  await db.insert(internalNotifications).values({
+  const [saved] = await db.insert(internalNotifications).values({
     userId: input.userId,
     actorUserId: input.actorUserId ?? null,
     kind: input.kind.slice(0, 80),
@@ -28,7 +29,14 @@ export async function createInternalNotification(input: CreateNotificationInput)
     href: input.href.slice(0, 1000),
     entityType: input.entityType ?? null,
     entityId: input.entityId ?? null,
-  });
+  }).returning({ id: internalNotifications.id });
+  if (saved && (input.entityType === "ticket" || input.entityType === "chat" ||
+    input.kind.startsWith("chat.") || input.kind.startsWith("ticket."))) {
+    void sendDevicePushAlerts([{
+      userId: input.userId, id: saved.id, title: input.title, body: input.body ?? "",
+      kind: input.kind,
+    }]).catch(() => undefined);
+  }
 }
 
 export async function createInternalNotifications(inputs: CreateNotificationInput[]): Promise<void> {
@@ -47,7 +55,19 @@ export async function createInternalNotifications(inputs: CreateNotificationInpu
 
   if (rows.length === 0) return;
   const db = getDatabase();
-  await db.insert(internalNotifications).values(rows);
+  const created = await db.insert(internalNotifications).values(rows)
+    .returning({
+      id: internalNotifications.id,
+      userId: internalNotifications.userId,
+      kind: internalNotifications.kind,
+      title: internalNotifications.title,
+      body: internalNotifications.body,
+      entityType: internalNotifications.entityType,
+    });
+  void sendDevicePushAlerts(created.filter(item =>
+    item.entityType === "ticket" || item.entityType === "chat" ||
+    item.kind.startsWith("chat.") || item.kind.startsWith("ticket.")
+  )).catch(() => undefined);
 }
 
 export async function getNotificationSummary(userId: string) {
