@@ -10,6 +10,7 @@ const MAX_RECIPIENTS = 100;
 
 export type TicketOperatorEmailSettings = {
   enabled: boolean;
+  customerAttachments: boolean;
   recipientUserIds: string[];
 };
 
@@ -38,6 +39,7 @@ export async function getTicketOperatorEmailSettings(): Promise<TicketOperatorEm
 
   return {
     enabled: value?.enabled === true,
+    customerAttachments: value?.customerAttachments !== false,
     recipientUserIds: Array.from(new Set(selected)).slice(0, MAX_RECIPIENTS),
   };
 }
@@ -63,6 +65,7 @@ export async function saveTicketOperatorEmailSettings(
 
   const normalized: TicketOperatorEmailSettings = {
     enabled: value.enabled,
+    customerAttachments: value.customerAttachments,
     recipientUserIds,
   };
   const now = new Date();
@@ -90,6 +93,7 @@ export async function saveTicketOperatorEmailSettings(
     entityId: SETTINGS_KEY,
     metadata: {
       enabled: normalized.enabled,
+      customerAttachments: normalized.customerAttachments,
       recipientCount: normalized.recipientUserIds.length,
     },
   });
