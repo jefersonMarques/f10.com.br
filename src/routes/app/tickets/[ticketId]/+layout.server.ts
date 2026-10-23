@@ -5,7 +5,7 @@ import {
   hasPermission,
   type PermissionScope,
 } from "$lib/server/auth/permissions";
-import { requireTicketAccess } from "$lib/server/support/supportAccess";
+import { diagnoseTicketAccessDenial, requireTicketAccess } from "$lib/server/support/supportAccess";
 import { markTicketFirstAgentView } from "$lib/server/support/ticketCustomerProgressRepository";
 import {
   getTicketWorkflowBoard,
@@ -33,6 +33,14 @@ export const load: LayoutServerLoad = async ({ parent, params }) => {
     await requireTicketAccess(layout.user.id, scope, params.ticketId);
   } catch (cause) {
     if (cause instanceof Error && cause.message === "TICKET_NOT_ACCESSIBLE") {
+      const reason = await diagnoseTicketAccessDenial(layout.user.id, scope, params.ticketId)
+        .catch(() => "diagnostic_unavailable");
+      console.warn("[operations.ticket.access_denied]", {
+        userId: layout.user.id,
+        ticketId: params.ticketId,
+        scope,
+        reason,
+      });
       throw error(403, "Você não tem permissão para visualizar este ticket.");
     }
     throw cause;
