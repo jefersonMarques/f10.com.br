@@ -50,7 +50,8 @@ function pushEndpoint(value: string): URL | null {
       "fcm.googleapis.com", "updates.push.services.mozilla.com",
       "web.push.apple.com", "api.push.apple.com",
     ];
-    if (!permitted.includes(host) && !host.endsWith(".push.apple.com")) return null;
+    if (!permitted.includes(host) && !host.endsWith(".push.apple.com") &&
+      !host.endsWith(".notify.windows.com")) return null;
     return url;
   } catch {
     return null;
@@ -203,7 +204,9 @@ export async function sendDevicePushAlerts(
             "Content-Encoding": "aes128gcm",
             "Content-Type": "application/octet-stream",
             "TTL": "3600",
-            "Urgency": "high",
+            ...(url.hostname.toLowerCase().endsWith(".notify.windows.com")
+              ? { "X-WNS-Type": "wns/raw" }
+              : { "Urgency": "high" }),
           },
           body: new Uint8Array(encrypted),
           cache: "no-store",
