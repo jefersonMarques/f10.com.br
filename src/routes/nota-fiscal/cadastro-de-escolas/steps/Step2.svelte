@@ -6,6 +6,7 @@
     specialRegimeOptions,
     issRequirementOptions,
     yesNoOptions,
+    municipalRequestOptions,
     cstIcmsOptions,
     cstIpiOptions,
     cstPisCofinsOptions,
@@ -109,6 +110,48 @@
             <p class="mt-1 text-[12px] text-red-600">{errors.securityPhrase}</p>
           {/if}
         </div>
+      </div>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div>
+        <label for="rpsBatchRequestStatus" class="mb-2 block text-[13px] font-semibold text-black/75">
+          Solicitação de lote de RPS
+        </label>
+        <select
+          id="rpsBatchRequestStatus"
+          bind:value={$formDataStore.rpsBatchRequestStatus}
+          aria-invalid={Boolean(errors.rpsBatchRequestStatus)}
+          class={`h-11 w-full rounded-xl border bg-white px-3 text-[13px] font-semibold ${errors.rpsBatchRequestStatus ? "border-red-400" : "border-black/15"}`}
+        >
+          <option value="" disabled>Selecione a situação</option>
+          {#each municipalRequestOptions as option}
+            <option value={option.value}>{option.label}</option>
+          {/each}
+        </select>
+        {#if errors.rpsBatchRequestStatus}
+          <p class="mt-1 text-[12px] text-red-600">{errors.rpsBatchRequestStatus}</p>
+        {/if}
+      </div>
+
+      <div>
+        <label for="webserviceEmissionRequestStatus" class="mb-2 block text-[13px] font-semibold text-black/75">
+          Liberação para emissão via Webservice
+        </label>
+        <select
+          id="webserviceEmissionRequestStatus"
+          bind:value={$formDataStore.webserviceEmissionRequestStatus}
+          aria-invalid={Boolean(errors.webserviceEmissionRequestStatus)}
+          class={`h-11 w-full rounded-xl border bg-white px-3 text-[13px] font-semibold ${errors.webserviceEmissionRequestStatus ? "border-red-400" : "border-black/15"}`}
+        >
+          <option value="" disabled>Selecione a situação</option>
+          {#each municipalRequestOptions as option}
+            <option value={option.value}>{option.label}</option>
+          {/each}
+        </select>
+        {#if errors.webserviceEmissionRequestStatus}
+          <p class="mt-1 text-[12px] text-red-600">{errors.webserviceEmissionRequestStatus}</p>
+        {/if}
       </div>
     </div>
 
