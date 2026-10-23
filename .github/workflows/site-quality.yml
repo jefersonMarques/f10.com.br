@@ -59,6 +59,7 @@ jobs:
           node --experimental-strip-types --test tests/chatMarkdown.test.mjs
           node --experimental-strip-types --test tests/supportChatRestore.test.mjs
           node --experimental-strip-types --test tests/accessPolicies.test.mjs
+          node --experimental-strip-types --test tests/nfseRequestStatus.test.mjs
 
       - name: Build production bundle
         run: npm run build
