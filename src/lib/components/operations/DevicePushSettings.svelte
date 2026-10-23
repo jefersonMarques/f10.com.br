@@ -48,6 +48,13 @@
     loading = true;
     error = "";
     try {
+      // Safari/iOS require permission to be requested directly from this click.
+      if (!enabled && Notification.permission !== "granted") {
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") {
+          throw new Error("Autorize as notificações nas configurações deste navegador.");
+        }
+      }
       const registration = await navigator.serviceWorker.register("/f10-notifications-sw.js", {
         scope: "/app/",
         updateViaCache: "none",
@@ -65,10 +72,6 @@
         }
         enabled = false;
         return;
-      }
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        throw new Error("Autorize as notificações nas configurações deste navegador.");
       }
       const current = subscription ?? await registration.pushManager.subscribe({
         userVisibleOnly: true,
