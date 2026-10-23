@@ -45,7 +45,7 @@
   export let canStartEdit: () => boolean = () => true;
 
   const dispatch = createEventDispatcher<{
-    updated: { content: unknown };
+    updated: { content: unknown; operation: string };
     editing: { active: boolean };
   }>();
 
@@ -154,7 +154,7 @@
         editing = false;
         dispatch("editing", { active: false });
       }
-      dispatch("updated", { content: payload.content });
+      dispatch("updated", { content: payload.content, operation });
       return true;
     } catch {
       error = "A conexão foi interrompida. Tente novamente.";
