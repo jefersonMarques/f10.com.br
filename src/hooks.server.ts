@@ -1,7 +1,7 @@
 // src/hooks.server.ts
 // Redirecionamentos de URLs antigas para preservar autoridade, tráfego e indexação.
 
-import { redirect, type Handle } from "@sveltejs/kit";
+import { redirect, type Handle, type HandleServerError } from "@sveltejs/kit";
 import { startHelpVideoProcessingWorker } from "$lib/server/help/helpVideoProcessingWorker";
 import { startSupportEmailInboundWorker } from "$lib/server/support/emailInboundWorker";
 import { resolveMovideskLegacyArticleId } from "$lib/server/help/movideskLegacyLinks";
@@ -318,4 +318,22 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   return resolve(event);
+};
+
+export const handleError: HandleServerError = ({ error, event, status, message }) => {
+  if (/^\/app\/tickets\/[0-9a-f-]{36}(?:\/|$)/i.test(event.url.pathname)) {
+    const cause = error instanceof Error ? error : null;
+    const nestedCause = cause?.cause instanceof Error ? cause.cause : null;
+    const frames = cause?.stack?.split("\n").slice(1, 6).map((line) => line.trim()) ?? [];
+
+    console.error("[operations.ticket.render_failed]", {
+      path: event.url.pathname,
+      status,
+      errorType: cause?.name ?? typeof error,
+      causeType: nestedCause?.name ?? null,
+      stackFrames: frames,
+    });
+  }
+
+  return { message };
 };
