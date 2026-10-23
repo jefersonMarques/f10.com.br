@@ -1,5 +1,5 @@
 /* F10 device notifications: no private data is cached by this service worker. */
-self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("install", event => event.waitUntil(self.skipWaiting()));
 self.addEventListener("activate", event => event.waitUntil(self.clients.claim()));
 
 self.addEventListener("push", event => {

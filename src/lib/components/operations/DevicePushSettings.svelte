@@ -43,6 +43,43 @@
     })();
   });
 
+  // register() can finish while the browser is still installing the worker.
+  // PushManager.subscribe() must only run after activation is complete.
+  async function waitForActiveWorker(registration: ServiceWorkerRegistration): Promise<void> {
+    if (registration.active?.state === "activated") return;
+
+    await new Promise<void>((resolve, reject) => {
+      const tracked = new Set<ServiceWorker>();
+      let settled = false;
+      const timeout = window.setTimeout(() => {
+        finish(new Error("Não foi possível iniciar os avisos. Recarregue a página e tente novamente."));
+      }, 15_000);
+
+      function finish(error?: Error): void {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        registration.removeEventListener("updatefound", check);
+        for (const worker of tracked) worker.removeEventListener("statechange", check);
+        if (error) reject(error);
+        else resolve();
+      }
+
+      function check(): void {
+        for (const worker of [registration.installing, registration.waiting, registration.active]) {
+          if (worker && !tracked.has(worker)) {
+            tracked.add(worker);
+            worker.addEventListener("statechange", check);
+          }
+        }
+        if (registration.active?.state === "activated") finish();
+      }
+
+      registration.addEventListener("updatefound", check);
+      check();
+    });
+  }
+
   async function toggle(): Promise<void> {
     if (!available || !configured || loading) return;
     loading = true;
@@ -73,6 +110,8 @@
         enabled = false;
         return;
       }
+      // Initial installation may take a moment. Never subscribe to an inactive worker.
+      if (!subscription) await waitForActiveWorker(registration);
       const current = subscription ?? await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: keyBytes(publicKey),
