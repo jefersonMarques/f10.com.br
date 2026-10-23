@@ -1,4 +1,5 @@
 import { error } from "@sveltejs/kit";
+import { canViewHelpInsights } from "$lib/auth/accessPolicies";
 import type { PageServerLoad } from "./$types";
 import { hasPermission } from "$lib/server/auth/permissions";
 import { getHelpSearchInsights } from "$lib/server/help/helpSearchInsightsRepository";
@@ -9,7 +10,7 @@ export const load: PageServerLoad = async ({ parent }) => {
     layout.permissions.map((permission) => [permission.code, permission.scope]),
   );
 
-  if (!hasPermission(permissions, "help.view")) {
+  if (!canViewHelpInsights(layout.roles) || !hasPermission(permissions, "help.view")) {
     throw error(403, "Acesso não autorizado.");
   }
 
