@@ -1,4 +1,6 @@
 import { eq } from "drizzle-orm";
+import { getPermissionScope, resolveUserPermissions } from "$lib/server/auth/permissions";
+import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { getDatabase } from "$lib/server/db";
 import { users } from "$lib/server/db/schema";
 import { customerContacts, tickets } from "$lib/server/db/supportSchema";
@@ -30,7 +32,20 @@ export async function notifyTicketOperatorsByEmail(ticketId: string): Promise<vo
     for (const entry of alreadyNotified) recipientIds.delete(entry.userId);
   }
 
-  const recipients = eligible.filter((user) => recipientIds.has(user.id));
+  const selectedRecipients = eligible.filter((user) => recipientIds.has(user.id));
+  const accessResults = await Promise.all(selectedRecipients.map(async (user) => {
+    const permissions = await resolveUserPermissions(user.id);
+    const scope = getPermissionScope(permissions, "tickets.view");
+    if (!scope) return false;
+
+    try {
+      await requireTicketAccess(user.id, scope, ticketId);
+      return true;
+    } catch {
+      return false;
+    }
+  }));
+  const recipients = selectedRecipients.filter((user, index) => accessResults[index]);
   if (recipients.length === 0) return;
 
   const [ticket] = await getDatabase()
