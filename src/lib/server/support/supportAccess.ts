@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import type { PermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import {
@@ -97,65 +97,90 @@ export async function isTicketFollower(
   return Boolean(row);
 }
 
+export async function buildTicketAccessCondition(
+  userId: string,
+  scope: PermissionScope,
+): Promise<SQL> {
+  const db = getDatabase();
+  const [areaRestriction, teamIds] = await Promise.all([
+    getUserTicketAreaRestriction(userId),
+    scope === "team" ? getUserSupportTeamIds(userId) : Promise.resolve([]),
+  ]);
+
+  const followerCondition = sql`exists (
+    select 1
+    from ${ticketFollowers}
+    where ${ticketFollowers.ticketId} = ${tickets.id}
+      and ${ticketFollowers.userId} = ${userId}
+  )`;
+
+  const ownCondition = or(
+    eq(tickets.assignedUserId, userId),
+    eq(tickets.createdByUserId, userId),
+  );
+
+  let scopeCondition: SQL = sql`true`;
+  if (scope === "own") {
+    scopeCondition = ownCondition ?? sql`false`;
+  } else if (scope === "team") {
+    const conditions: SQL[] = ownCondition ? [ownCondition] : [];
+
+    if (teamIds.length > 0) {
+      const [queues, areas] = await Promise.all([
+        db
+          .select({ id: supportQueues.id })
+          .from(supportQueues)
+          .where(inArray(supportQueues.teamId, teamIds)),
+        db
+          .select({ id: ticketAreas.id })
+          .from(ticketAreas)
+          .where(inArray(ticketAreas.teamId, teamIds)),
+      ]);
+
+      if (queues.length > 0) {
+        conditions.push(inArray(tickets.queueId, queues.map((queue) => queue.id)));
+      }
+      if (areas.length > 0) {
+        conditions.push(inArray(
+          ticketWorkflowStates.areaId,
+          areas.map((area) => area.id),
+        ));
+      }
+    }
+
+    scopeCondition = or(...conditions) ?? sql`false`;
+  }
+
+  const restrictedCondition = areaRestriction === null
+    ? scopeCondition
+    : and(
+        scopeCondition,
+        areaRestriction.length > 0
+          ? inArray(ticketWorkflowStates.areaId, areaRestriction)
+          : sql`false`,
+      ) ?? sql`false`;
+
+  return or(followerCondition, restrictedCondition) ?? sql`false`;
+}
+
 export async function canAccessTicket(
   userId: string,
   scope: PermissionScope,
   ticketId: string,
 ): Promise<boolean> {
-  const db = getDatabase();
-  const [[ticket], [state], follower, areaRestriction] = await Promise.all([
-    db
-      .select({
-        assignedUserId: tickets.assignedUserId,
-        createdByUserId: tickets.createdByUserId,
-        queueId: tickets.queueId,
-      })
-      .from(tickets)
-      .where(eq(tickets.id, ticketId))
-      .limit(1),
-    db
-      .select({ areaId: ticketWorkflowStates.areaId })
-      .from(ticketWorkflowStates)
-      .where(eq(ticketWorkflowStates.ticketId, ticketId))
-      .limit(1),
-    isTicketFollower(userId, ticketId),
-    getUserTicketAreaRestriction(userId),
-  ]);
-
-  if (!ticket) return false;
-  if (follower) return true;
-
-  if (
-    areaRestriction !== null &&
-    (!state?.areaId || !areaRestriction.includes(state.areaId))
-  ) {
-    return false;
-  }
-
-  if (scope === "all") return true;
-  if (ticket.assignedUserId === userId || ticket.createdByUserId === userId) {
-    return true;
-  }
-  if (scope === "own") return false;
-
-  const teamIds = await getUserSupportTeamIds(userId);
-  if (teamIds.length === 0) return false;
-
-  const [queue] = await db
-    .select({ teamId: supportQueues.teamId })
-    .from(supportQueues)
-    .where(eq(supportQueues.id, ticket.queueId))
-    .limit(1);
-  if (queue?.teamId && teamIds.includes(queue.teamId)) return true;
-
-  if (!state?.areaId) return false;
-  const [area] = await db
-    .select({ teamId: ticketAreas.teamId })
-    .from(ticketAreas)
-    .where(eq(ticketAreas.id, state.areaId))
+  const accessCondition = await buildTicketAccessCondition(userId, scope);
+  const [ticket] = await getDatabase()
+    .select({ id: tickets.id })
+    .from(tickets)
+    .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
+    .leftJoin(
+      ticketWorkflowStates,
+      eq(ticketWorkflowStates.ticketId, tickets.id),
+    )
+    .where(and(eq(tickets.id, ticketId), accessCondition))
     .limit(1);
 
-  return Boolean(area?.teamId && teamIds.includes(area.teamId));
+  return Boolean(ticket);
 }
 
 export async function requireTicketAccess(
