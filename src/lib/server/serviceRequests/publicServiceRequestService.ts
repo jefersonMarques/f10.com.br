@@ -7,7 +7,8 @@ import {
   serviceRequestFieldChanges,
   serviceRequests,
 } from "$lib/server/db/serviceRequestSchema";
-import { ticketEvents, ticketMessages, tickets } from "$lib/server/db/supportSchema";
+import { supportTags, ticketEvents, ticketMessages, ticketTags, tickets } from "$lib/server/db/supportSchema";
+import { getTicketOnboardingSettings } from "$lib/server/settings/operationsSettingsRepository";
 import { ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
 import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
@@ -104,6 +105,15 @@ export async function createPublicServiceRequest(
   const normalized = normalizeServiceRequestFields(input.requestType, input.fields);
   const encryptedSecrets = encryptServiceRequestSecrets(normalized.secrets);
   const intake = await resolveServiceRequestIntake(input.requestType, input.flow ?? null);
+  const onboarding = input.flow === "onboarding";
+  const onboardingSettings = onboarding ? await getTicketOnboardingSettings() : null;
+  const [onboardingTag] = onboardingSettings?.tagId
+    ? await getDatabase()
+        .select({ id: supportTags.id })
+        .from(supportTags)
+        .where(eq(supportTags.id, onboardingSettings.tagId))
+        .limit(1)
+    : [];
   const serviceRequestId = randomUUID();
   const ticketId = randomUUID();
   const storedAttachments = await uploadServiceRequestAttachments(
@@ -156,7 +166,9 @@ export async function createPublicServiceRequest(
           customerContactId: null,
           queueId: intake.queueId,
           assignedUserId: null,
-          subject: `${label} · ${subjectDetail(normalized.data)}`,
+          subject: onboarding
+            ? `Onboarding de novo cliente · ${subjectDetail(normalized.data)}`
+            : `${label} · ${subjectDetail(normalized.data)}`,
           status: intake.lifecycleStatus,
           priority: "normal",
           channel: "manual",
@@ -172,7 +184,9 @@ export async function createPublicServiceRequest(
         authorType: "system",
         visibility: "public",
         channel: "manual",
-        body: `Solicitação pública de ${label} recebida. O solicitante externo não foi cadastrado automaticamente como cliente F10; os dados enviados estão disponíveis na solicitação estruturada.`,
+        body: onboarding
+          ? "Cadastro de implantação recebido. Os dados da empresa e os documentos estão disponíveis neste ticket. O cadastro do cliente e o acesso à Área do Cliente são tratados pelo fluxo de onboarding."
+          : `Solicitação pública de ${label} recebida. O solicitante externo não foi cadastrado automaticamente como cliente F10; os dados enviados estão disponíveis na solicitação estruturada.`,
       });
 
       await tx
@@ -219,6 +233,12 @@ export async function createPublicServiceRequest(
         secretsEncrypted: encryptedSecrets,
         updatedAt: now,
       });
+
+      if (onboardingTag) {
+        await tx.insert(ticketTags)
+          .values({ ticketId, tagId: onboardingTag.id })
+          .onConflictDoNothing();
+      }
 
       if (storedAttachments.length > 0) {
         await tx.insert(serviceRequestAttachments).values(
@@ -294,7 +314,9 @@ export async function createPublicServiceRequest(
 
     await notifySupportTicketNeedsAttention(
       result.ticketId,
-      `Nova solicitação pública de ${label} aguardando atendimento.`,
+      onboarding
+        ? "Novo cadastro de cliente recebido pelo onboarding e aguardando atendimento."
+        : `Nova solicitação pública de ${label} aguardando atendimento.`,
       { newTicket: true },
     ).catch((cause) => {
       console.error("[service-request.public.notification]", {
