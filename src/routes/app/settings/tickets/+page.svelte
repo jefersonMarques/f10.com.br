@@ -61,6 +61,11 @@
         <span class="application-text-caption font-semibold text-app-text">Ativar avisos por e-mail</span>
       </label>
 
+      <label class="mt-2 flex items-center gap-3 rounded-xl border border-app-border-control bg-app-subtle px-4 py-3">
+        <input type="checkbox" name="customerAttachmentEmails" checked={data.operatorSettings.customerAttachments} class="h-4 w-4 rounded border-app-border-control"/>
+        <span class="application-text-caption font-semibold text-app-text">Avisar novos anexos enviados pelo cliente</span>
+      </label>
+
       <div class="mt-4">
         <UserMultiSelectCard
           title="Operadores"
