@@ -276,7 +276,11 @@
 
   function persistGuestConversation(): void {
     if (!browser) return;
-    window.sessionStorage.setItem(GUEST_KEY, JSON.stringify(guestMessages.slice(-30)));
+    try {
+      window.sessionStorage.setItem(GUEST_KEY, JSON.stringify(guestMessages.slice(-30)));
+    } catch {
+      // Falhas de armazenamento não devem interromper o atendimento.
+    }
   }
 
   function clearStoredSession(): void {
