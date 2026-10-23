@@ -24,7 +24,12 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
       params.ticketId,
     );
 
-    await markEntityNotificationsRead(session.user.id, "ticket", params.ticketId);
+    await markEntityNotificationsRead(session.user.id, "ticket", params.ticketId).catch((cause) => {
+      console.error("[ticket.notifications.mark_read]", {
+        ticketId: params.ticketId,
+        causeType: cause instanceof Error ? cause.name : typeof cause,
+      });
+    });
     await markTicketFirstAgentView(session.user.id, params.ticketId).catch((cause) => {
       console.error("[ticket.customer_progress.card_view]", {
         ticketId: params.ticketId,
