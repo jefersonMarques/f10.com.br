@@ -66,7 +66,11 @@
   let moreMenuOpen = false;
   let composerMode: ComposerMode = ticketData.canReply ? "reply" : "note";
   let replyDraft = "";
-  let showExternalEmailImages = false;
+  let allowedExternalImageMessages = new Set<string>();
+
+  function showExternalImagesForMessage(messageId: string): void {
+    allowedExternalImageMessages = new Set([...allowedExternalImageMessages, messageId]);
+  }
   let noteDraft = "";
   let composerFileInput: HTMLInputElement | null = null;
   let composerFiles: File[] = [];
@@ -469,21 +473,22 @@
                         <span class="text-[10px] text-[#858C99]">{formatDateTime(message.createdAt)}</span>
                       </div>
                       {#if message.channel === "email"}
-                        <EmailMessageBody text={message.body} className="mt-1.5 text-[14px] leading-[1.6] text-[#343A47]"/>
+                        <EmailMessageBody text={message.body} hasInlineImages={Boolean(message.inlineImages?.length)} className="mt-1.5 text-[14px] leading-[1.6] text-[#343A47]"/>
                       {:else}
-                        <p class="mt-1.5 whitespace-pre-wrap text-[14px] leading-[1.6] text-[#343A47]">{message.body}</p>
+                        <EmailMessageBody text={message.body} className="mt-1.5 text-[14px] leading-[1.6] text-[#343A47]"/>
                       {/if}
                       {#if message.inlineImages?.length}
                         <div class="mt-3 space-y-2">
-                          {#each message.inlineImages as emailImage}
-                            {#if !emailImage.external || showExternalEmailImages}
+                          {#if message.inlineImages.some((image) => image.external) && !allowedExternalImageMessages.has(message.id)}
+                            <button type="button" on:click={() => showExternalImagesForMessage(message.id)} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[12px] font-semibold text-[#000A57]">
+                              <FileText size={15}/>Mostrar imagens externas ({message.inlineImages.filter((image) => image.external).length})
+                            </button>
+                          {/if}
+                          {#each message.inlineImages.filter((image, index, images) => images.findIndex((candidate) => candidate.src === image.src) === index) as emailImage (emailImage.src)}
+                            {#if !emailImage.external || allowedExternalImageMessages.has(message.id)}
                               <a href={emailImage.src} target="_blank" rel="noopener noreferrer" class="block">
                                 <img src={emailImage.src} alt={emailImage.alt || "Imagem do e-mail"} loading="lazy" referrerpolicy="no-referrer" class="max-h-[480px] max-w-full rounded-xl border border-[#DDE1EA] bg-white object-contain"/>
                               </a>
-                            {:else}
-                              <button type="button" on:click={() => (showExternalEmailImages = true)} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[13px] font-semibold text-[#000A57]">
-                                <FileText size={15}/>Mostrar imagens externas
-                              </button>
                             {/if}
                           {/each}
                         </div>
