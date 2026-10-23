@@ -13,7 +13,7 @@ export type ChatMarkdownBlock = {
 };
 
 const INLINE_PATTERN =
-  /(\[([^\]\n]+)\]\(([^)\s]+)\))|(https?:\/\/[^\s<>"']+)|(\x60([^\x60\n]+)\x60)|(\*\*([^*\n]+)\*\*|__([^_\n]+)__)|(\*([^*\n]+)\*|_([^_\n]+)_)|(~~([^~\n]+)~~)/g;
+  /(\[([^\]\n]+)\]\(([^)\s]+)\))|(https?:\/\/[^\s<>"']+|\/(?:ajuda-f10|cliente)(?:\/[^\s<>"']*)?)|(\x60([^\x60\n]+)\x60)|(\*\*([^*\n]+)\*\*|__([^_\n]+)__)|(\*([^*\n]+)\*|_([^_\n]+)_)|(~~([^~\n]+)~~)/g;
 
 function addText(tokens: ChatMarkdownToken[], text: string): void {
   if (!text) return;
