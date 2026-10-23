@@ -104,14 +104,19 @@ function decodeJwtPayload(token: string): F10JwtPayload {
 }
 
 async function requestGroups(token: string): Promise<CustomerF10GroupSnapshot[]> {
-  const response = await fetch(backendUrl("/adm/user/groups"), {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
+  let response: Response;
+  try {
+    response = await fetch(backendUrl("/adm/user/groups"), {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch {
+    throw new Error("F10_CUSTOMER_BACKEND_UNAVAILABLE");
+  }
   const payload = await readJson(response) as F10GroupsResponse & Record<string, unknown>;
   if (!response.ok) {
     if (response.status === 401 || response.status === 403 || response.status === 400) {
