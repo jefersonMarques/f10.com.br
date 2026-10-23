@@ -248,8 +248,12 @@
       ticketDetails = await response.json() as TicketDetailsData;
       justViewedTicketIds = new Set([...justViewedTicketIds, ticketId]);
       window.dispatchEvent(new Event("f10:notifications:changed"));
-      await invalidate("app:tickets:workspace");
-      justViewedTicketIds = new Set();
+      try {
+        await invalidate("app:tickets:workspace");
+        justViewedTicketIds = new Set();
+      } catch {
+        // A próxima atualização da lista recupera o estado de leitura.
+      }
     } catch {
       window.alert("Não foi possível abrir o ticket.");
     } finally {
