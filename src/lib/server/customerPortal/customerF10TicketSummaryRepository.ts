@@ -101,10 +101,11 @@ function buildWhere(
   if (!contextCondition) return null;
 
   const conditions: SQL[] = [eq(tickets.customerContactId, session.contactId)];
-  const allowLegacyWithoutContext = authorizedContexts.length === 1 && contextsForAuthorization.length === 1;
-  const authorizedTicketCondition = allowLegacyWithoutContext
-    ? or(contextCondition, isNull(ticketCustomerContexts.ticketId))
-    : contextCondition;
+  // Follow the exact same ownership rule as listCustomerF10Tickets:
+  // unscoped tickets belonging to this contact remain visible without a group filter.
+  const authorizedTicketCondition = hasContextFilter
+    ? contextCondition
+    : or(contextCondition, isNull(ticketCustomerContexts.ticketId));
   if (authorizedTicketCondition) conditions.push(authorizedTicketCondition);
 
   if (filters.status !== null) conditions.push(eq(tickets.status, filters.status));

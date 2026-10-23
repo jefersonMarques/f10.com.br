@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import LivePageSync from "$lib/components/application/LivePageSync.svelte";
   import {
     Activity,
     ArrowRight,
@@ -203,6 +204,8 @@
 </script>
 
 <svelte:head><title>Meus chamados | F10 Software</title></svelte:head>
+
+<LivePageSync endpoint="/cliente/chamados/updates" intervalMs={8_000} />
 
 <ApplicationContent width="wide" className="pb-10">
   <section class="mb-5 rounded-[22px] border border-[#E1E4EC] bg-white p-4 shadow-[0_8px_28px_rgba(1,13,40,0.035)] sm:p-5">

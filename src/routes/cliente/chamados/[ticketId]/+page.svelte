@@ -1,5 +1,6 @@
 <script lang="ts">
   import EmailMessageBody from "$lib/components/operations/tickets/EmailMessageBody.svelte";
+  import LivePageSync from "$lib/components/application/LivePageSync.svelte";
   import {
     Activity,
     CalendarDays,
@@ -128,6 +129,8 @@
 </script>
 
 <svelte:head><title>Chamado #{data.details.ticket.ticketNumber} | F10 Software</title></svelte:head>
+
+<LivePageSync endpoint={`/cliente/chamados/updates?ticketId=${data.details.ticket.id}`} initialRevision={String(new Date(data.details.ticket.updatedAt).getTime())} />
 
 <ApplicationContent width="standard" className="pb-10">
   <ApplicationBackLink href="/cliente/chamados" label="Meus chamados" className="mb-4" />

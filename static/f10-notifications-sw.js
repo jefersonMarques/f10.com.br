@@ -27,14 +27,25 @@ self.addEventListener("notificationclick", event => {
     !/^\/app\/notifications\/open\/[a-f0-9-]{36}$/.test(path)) return;
   event.waitUntil((async () => {
     const url = new URL(path, self.location.origin).toString();
-    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    for (const client of windows) {
-      if (new URL(client.url).origin === self.location.origin && "focus" in client) {
-        await client.focus();
-        if ("navigate" in client) await client.navigate(url);
+    // A click must navigate to the notification target, not merely focus an
+    // unrelated F10 tab. openWindow also reuses an existing tab when supported.
+    try {
+      const opened = await self.clients.openWindow(url);
+      if (opened) {
+        if ("focus" in opened) await opened.focus();
         return;
       }
+    } catch { /* Browser may disallow new windows; try an existing tab. */ }
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of windows) {
+      if (new URL(client.url).origin !== self.location.origin || !("navigate" in client)) continue;
+      try {
+        const navigated = await client.navigate(url);
+        if (navigated) {
+          await navigated.focus();
+          return;
+        }
+      } catch { /* Try another F10 window. */ }
     }
-    await self.clients.openWindow(url);
   })());
 });
