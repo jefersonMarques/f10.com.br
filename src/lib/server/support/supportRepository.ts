@@ -38,7 +38,7 @@ import {
   tickets,
 } from "$lib/server/db/supportSchema";
 import {
-  getUserSupportQueueIds,
+  buildTicketAccessCondition,
   getUserTicketAreaRestriction,
   isTicketFollower,
   requireTicketAccess,
@@ -216,21 +216,7 @@ export async function listSupportTickets(
 ) {
   const scope = requireSupportScope(permissions, "tickets.view");
   const db = getDatabase();
-  const ownCondition = or(
-    eq(tickets.assignedUserId, actorUserId),
-    eq(tickets.createdByUserId, actorUserId),
-  );
-  let condition = ownCondition;
-
-  if (scope === "all") {
-    condition = undefined;
-  } else if (scope === "team") {
-    const queueIds = await getUserSupportQueueIds(actorUserId);
-    condition =
-      queueIds.length > 0
-        ? or(ownCondition, inArray(tickets.queueId, queueIds))
-        : ownCondition;
-  }
+  const condition = await buildTicketAccessCondition(actorUserId, scope);
 
   const query = db
     .select({
@@ -252,6 +238,10 @@ export async function listSupportTickets(
     })
     .from(tickets)
     .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
+    .leftJoin(
+      ticketWorkflowStates,
+      eq(ticketWorkflowStates.ticketId, tickets.id),
+    )
     .leftJoin(users, eq(tickets.assignedUserId, users.id))
     .leftJoin(customerContacts, eq(tickets.customerContactId, customerContacts.id))
     .leftJoin(
@@ -261,7 +251,7 @@ export async function listSupportTickets(
     .orderBy(desc(tickets.updatedAt))
     .limit(500);
 
-  return condition ? query.where(condition) : query;
+  return query.where(condition);
 }
 
 function normalizedPhone(value: string): string {
