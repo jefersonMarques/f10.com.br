@@ -9,7 +9,7 @@ import {
   or,
   sql,
 } from "drizzle-orm";
-import { getPermissionScope } from "$lib/server/auth/permissions";
+import { getPermissionScope, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
 import { notifyTicketFollowers } from "$lib/server/support/ticketFollowerRepository";
@@ -40,6 +40,7 @@ import {
 import {
   getUserSupportQueueIds,
   getUserTicketAreaRestriction,
+  isTicketFollower,
   requireTicketAccess,
   type SupportPermissionMap,
 } from "$lib/server/support/supportAccess";
@@ -1055,6 +1056,25 @@ export async function assignTicket(
 
   if (!agent) throw new Error("AGENT_NOT_ACTIVE");
   if (!ticket) throw new Error("TICKET_NOT_FOUND");
+
+  const recipientPermissions = await resolveUserPermissions(assignedUserId);
+  if (!getPermissionScope(recipientPermissions, "tickets.view")) {
+    throw new Error("TICKET_ASSIGNEE_NO_ACCESS");
+  }
+  const [areaRestriction, alreadyFollowing] = await Promise.all([
+    getUserTicketAreaRestriction(assignedUserId),
+    isTicketFollower(assignedUserId, ticketId),
+  ]);
+  if (areaRestriction !== null && !alreadyFollowing) {
+    const [state] = await db
+      .select({ areaId: ticketWorkflowStates.areaId })
+      .from(ticketWorkflowStates)
+      .where(eq(ticketWorkflowStates.ticketId, ticketId))
+      .limit(1);
+    if (!state?.areaId || !areaRestriction.includes(state.areaId)) {
+      throw new Error("TICKET_ASSIGNEE_AREA_DENIED");
+    }
+  }
 
   await db.transaction(async (tx) => {
     await tx
