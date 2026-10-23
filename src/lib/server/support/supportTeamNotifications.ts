@@ -24,7 +24,7 @@ async function pushAssignedNotification(userId: string, entityId: string, kind: 
     eq(internalNotifications.kind, kind),
   )).orderBy(desc(internalNotifications.createdAt)).limit(1);
   if (notification) {
-    await sendDevicePushAlerts([{ userId, ...notification }]).catch(() => undefined);
+    void sendDevicePushAlerts([{ userId, ...notification }]).catch(() => undefined);
   }
 }
 
@@ -99,7 +99,7 @@ export async function notifySupportChatNeedsAttention(
     body: internalNotifications.body,
     kind: internalNotifications.kind,
   });
-  await sendDevicePushAlerts(added).catch(() => undefined);
+  void sendDevicePushAlerts(added).catch(() => undefined);
 }
 
 export async function notifySupportTicketNeedsAttention(
@@ -200,5 +200,5 @@ export async function notifySupportTicketNeedsAttention(
     body: internalNotifications.body,
     kind: internalNotifications.kind,
   });
-  await sendDevicePushAlerts(added).catch(() => undefined);
+  void sendDevicePushAlerts(added).catch(() => undefined);
 }
