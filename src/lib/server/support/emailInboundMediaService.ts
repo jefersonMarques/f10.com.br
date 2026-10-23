@@ -148,6 +148,7 @@ export async function persistInboundAttachments(input: {
 
 export function extractEmailImages(html: string): Array<{ src: string; alt: string }> {
   const images: Array<{ src: string; alt: string }> = [];
+  const seen = new Set<string>();
   for (const tag of html.match(/<img\b[^>]*>/gi) ?? []) {
     const attr = (key: string) => {
       const expression = new RegExp(`\\b${key}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i");
@@ -155,7 +156,16 @@ export function extractEmailImages(html: string): Array<{ src: string; alt: stri
       return (parts?.[1] ?? parts?.[2] ?? parts?.[3] ?? "").replace(/&amp;/gi, "&").trim();
     };
     const src = attr("src");
-    if (!src || src.length > 2048) continue;
+    if (!src || src.length > 2048 || seen.has(src)) continue;
+
+    const width = attr("width");
+    const height = attr("height");
+    const style = attr("style");
+    const isTrackingPixel =
+      (width !== "" && /^\d+$/.test(width) && Number(width) <= 2) ||
+      (height !== "" && /^\d+$/.test(height) && Number(height) <= 2) ||
+      /(?:display\s*:\s*none|visibility\s*:\s*hidden)/i.test(style);
+    if (isTrackingPixel) continue;
     const cid = /^cid:(.+)$/i.exec(src)?.[1]?.replace(/^<|>$/g, "").toLowerCase();
     if (cid) {
       images.push({ src: `cid:${cid}`, alt: attr("alt").slice(0, 160) });
@@ -167,6 +177,11 @@ export function extractEmailImages(html: string): Array<{ src: string; alt: stri
       } catch {
         // Unsupported embedded format is ignored, never injected into HTML.
       }
+    }
+    if (images.length > 0 && images[images.length - 1]?.src === src) {
+      seen.add(src);
+    } else if (images.some((image) => image.src === src)) {
+      seen.add(src);
     }
     if (images.length >= 12) break;
   }
