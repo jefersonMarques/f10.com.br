@@ -92,7 +92,11 @@ function responseMessage(code: string): string {
   }
 }
 
-export const POST: RequestHandler = async ({ cookies, params, request }) => {
+export const POST: RequestHandler = async ({ cookies, params, request, url }) => {
+  const origin = request.headers.get("origin");
+  if (origin && origin !== url.origin) {
+    return json({ success: false, message: "Origem inválida." }, { status: 403 });
+  }
   if (!isUuid(params.contentId)) {
     return json({ success: false, message: "Conteúdo não encontrado." }, { status: 404 });
   }
