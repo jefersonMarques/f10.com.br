@@ -37,6 +37,23 @@
       </select>
     </label>
 
+    <div class="mt-4 grid gap-3 md:grid-cols-2">
+      <label class="block">
+        <span class="application-text-caption font-semibold text-app-text-muted">Etiqueta do onboarding</span>
+        <select name="tagId" value={data.onboarding.tagId ?? ""} disabled={!data.canManageWorkflows} class="application-text-caption mt-2 h-11 w-full rounded-xl border border-app-border-control bg-app-surface px-3 text-app-text disabled:opacity-60">
+          <option value="">Escolher etiqueta</option>
+          {#each data.labels as label}
+            <option value={label.id}>{label.name}</option>
+          {/each}
+        </select>
+      </label>
+      <label class="block">
+        <span class="application-text-caption font-semibold text-app-text-muted">Ou criar nova etiqueta</span>
+        <input type="text" name="newTagName" maxlength="40" minlength="2" placeholder="Ex.: Novo cliente" disabled={!data.canManageWorkflows} class="application-text-caption mt-2 h-11 w-full rounded-xl border border-app-border-control bg-app-surface px-3 text-app-text disabled:opacity-60"/>
+      </label>
+    </div>
+    <p class="application-text-meta mt-2 text-app-text-soft">A etiqueta será aplicada automaticamente aos novos tickets do onboarding. Ao preencher um novo nome, ele tem prioridade sobre a seleção.</p>
+
     {#if data.onboardingAreas.length === 0}
       <p class="mt-3 rounded-xl bg-app-warning-bg px-3 py-3 text-[12px] leading-5 text-app-warning-text">
         Nenhum processo ativo com etapas foi encontrado.
@@ -49,7 +66,7 @@
     {/if}
 
     <div class="mt-5 flex justify-end border-t border-app-border-soft pt-4">
-      <button type="submit" disabled={!data.canManageWorkflows || data.onboardingAreas.length === 0} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><Save size={14}/>Salvar processo</button>
+      <button type="submit" disabled={!data.canManageWorkflows || data.onboardingAreas.length === 0} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><Save size={14}/>Salvar onboarding</button>
     </div>
   </form>
 
