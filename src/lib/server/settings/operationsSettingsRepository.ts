@@ -26,6 +26,7 @@ export type HelpVideoAutomationSettings = {
 
 export type TicketOnboardingSettings = {
   startStageId: string | null;
+  tagId: string | null;
 };
 
 export type IframeF10VisibilitySettings = {
@@ -58,6 +59,7 @@ export const DEFAULT_HELP_VIDEO_AUTOMATION_SETTINGS: HelpVideoAutomationSettings
 
 export const DEFAULT_TICKET_ONBOARDING_SETTINGS: TicketOnboardingSettings = {
   startStageId: null,
+  tagId: null,
 };
 
 export const DEFAULT_IFRAME_F10_VISIBILITY_SETTINGS: IframeF10VisibilitySettings = {
@@ -166,7 +168,12 @@ export async function getTicketOnboardingSettings(): Promise<TicketOnboardingSet
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.startStageId)
       ? value.startStageId
       : null;
-  return { startStageId };
+  const tagId =
+    typeof value.tagId === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.tagId)
+      ? value.tagId
+      : null;
+  return { startStageId, tagId };
 }
 
 export async function getIframeF10VisibilitySettings(): Promise<IframeF10VisibilitySettings> {
@@ -242,6 +249,7 @@ export async function updateTicketOnboardingSettings(
 ): Promise<void> {
   const normalized: TicketOnboardingSettings = {
     startStageId: value.startStageId,
+    tagId: value.tagId,
   };
   const now = new Date();
   await getDatabase()
