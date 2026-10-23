@@ -103,26 +103,54 @@
       <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
         <div class="flex items-start gap-3">
           <UsersRound size={18} class="mt-0.5 shrink-0 text-[#EA6D0B]" aria-hidden="true" />
-          <div><h2 class="text-[12px] font-semibold text-[#353B4A]">Áreas de atuação</h2><p class="application-text-caption mt-1 leading-5 text-[#777D8D]">A participação é definida pela equipe responsável pela área. Uma equipe pode atender mais de uma área.</p></div>
+          <div class="min-w-0 flex-1">
+            <h2 class="text-[13px] font-semibold text-[#353B4A]">Equipes de atendimento</h2>
+            <p class="mt-1 text-[12px] leading-5 text-[#777D8D]">
+              {data.supportTeams.filter((team) => team.included).length} equipe(s) vinculada(s) ao funcionário.
+            </p>
+          </div>
         </div>
+
         {#if data.supportTeams.length > 0}
           <div class="mt-4 space-y-2">
-            {#each data.supportTeams as supportTeam}
+            {#each data.supportTeams as supportTeam (supportTeam.teamId)}
               <form method="POST" action="?/supportTeam" class="rounded-xl border border-[#E7E9EF] p-3">
                 <input type="hidden" name="teamId" value={supportTeam.teamId} />
-                <div class="flex items-start gap-3">
-                  <input name="included" type="checkbox" checked={supportTeam.included} disabled={!data.canManage} class="mt-0.5 h-4 w-4 rounded border-[#C9CEDA]" />
-                  <div class="min-w-0 flex-1">
-                    <strong class="application-text-caption block text-[#3E4555]">{supportTeam.teamName}</strong>
-                    <span class="application-text-meta mt-1 block leading-4 text-[#8A909E]">{supportTeam.areas.join(" · ")}</span>
-                  </div>
-                </div>
-                {#if data.canManage}<button type="submit" class="application-text-meta mt-3 h-8 w-full rounded-lg border border-[#DDE1EA] bg-white font-semibold text-[#000A57]">Salvar atuação</button>{/if}
+                <label class="flex cursor-pointer items-start gap-3">
+                  <input
+                    name="included"
+                    type="checkbox"
+                    checked={supportTeam.included}
+                    disabled={!data.canManage}
+                    class="mt-1 h-4 w-4 shrink-0 rounded border-[#C9CEDA]"
+                  />
+                  <span class="min-w-0 flex-1">
+                    <span class="flex flex-wrap items-center gap-2">
+                      <strong class="text-[12px] font-semibold text-[#3E4555]">{supportTeam.teamName}</strong>
+                      {#if !supportTeam.active}
+                        <span class="rounded-full bg-[#F1F2F5] px-2 py-0.5 text-[10px] font-semibold text-[#777D8C]">Inativa</span>
+                      {:else if supportTeam.included}
+                        <span class="rounded-full bg-[#EEF8F1] px-2 py-0.5 text-[10px] font-semibold text-[#2F7045]">Vinculada</span>
+                      {/if}
+                    </span>
+                    {#if supportTeam.queues.length > 0}
+                      <span class="mt-1 block text-[11px] leading-4 text-[#7E8593]">Filas: {supportTeam.queues.join(" · ")}</span>
+                    {/if}
+                    {#if supportTeam.areas.length > 0}
+                      <span class="mt-1 block text-[11px] leading-4 text-[#7E8593]">Processos: {supportTeam.areas.join(" · ")}</span>
+                    {/if}
+                  </span>
+                </label>
+                {#if data.canManage}
+                  <button type="submit" class="mt-3 min-h-9 w-full rounded-lg border border-[#DDE1EA] bg-white px-3 text-[12px] font-semibold text-[#000A57] transition hover:bg-[#F5F6FF]">Salvar vínculo</button>
+                {/if}
               </form>
             {/each}
           </div>
         {:else}
-          <p class="application-text-caption mt-4 rounded-xl bg-[#F8F9FC] px-3 py-3 leading-5 text-[#858B99]">Nenhuma área com equipe responsável está configurada.</p>
+          <p class="mt-4 rounded-xl bg-[#F8F9FC] px-3 py-3 text-[12px] leading-5 text-[#858B99]">
+            Nenhuma equipe disponível. Cadastre uma equipe na página Equipe.
+          </p>
         {/if}
       </section>
 
