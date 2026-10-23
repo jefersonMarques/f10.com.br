@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { onMount } from "svelte";
+  import { canViewHelpInsights } from "$lib/auth/accessPolicies";
   import {
     BarChart3,
     BookOpen,
@@ -28,6 +29,7 @@
 
   export let collapsed = true;
   export let permissions: Array<{ code: string; scope: string }> = [];
+  export let roles: string[] = [];
   export let notifications: {
     chatUnreadCount: number;
     ticketUnreadCount: number;
@@ -38,6 +40,7 @@
     label: string;
     icon: typeof LayoutDashboard;
     href: string;
+    adminOnly?: boolean;
   };
 
   type NavigationItem = {
@@ -46,6 +49,7 @@
     href?: string;
     permission?: string;
     permissionsAny?: string[];
+    adminOnly?: boolean;
     children?: NavigationChild[];
   };
 
@@ -85,7 +89,7 @@
           icon: BookOpen,
           permission: "help.view",
           children: [
-            { label: "Visão geral", icon: BarChart3, href: "/app/help" },
+            { label: "Visão geral", icon: BarChart3, href: "/app/help", adminOnly: true },
             { label: "Conteúdos", icon: FileText, href: "/app/help/content" },
             { label: "Novidades", icon: Megaphone, href: "/app/novidades" },
             { label: "Avisos", icon: BellRing, href: "/app/avisos" },
@@ -94,7 +98,7 @@
           ],
         },
         { label: "Pesquisa de Suporte", icon: Search, href: "/app/help/search", permission: "help.view" },
-        { label: "Insights da Central", icon: BarChart3, href: "/app/help/insights", permission: "help.view" },
+        { label: "Insights da Central", icon: BarChart3, href: "/app/help/insights", permission: "help.view", adminOnly: true },
       ],
     },
     {
@@ -108,15 +112,21 @@
   ];
 
   $: permissionCodes = new Set(permissions.map((permission) => permission.code));
+  $: canViewInsights = canViewHelpInsights(roles);
   $: pathname = $page.url.pathname;
   $: visibleNavigationSections = navigationSections
     .map((section) => ({
       ...section,
-      items: section.items.filter(
-        (item) =>
+      items: section.items
+        .filter((item) =>
           (!item.permission || permissionCodes.has(item.permission))
-          && (!item.permissionsAny || item.permissionsAny.some((permission) => permissionCodes.has(permission))),
-      ),
+          && (!item.permissionsAny || item.permissionsAny.some((permission) => permissionCodes.has(permission)))
+          && (!item.adminOnly || canViewInsights),
+        )
+        .map((item) => ({
+          ...item,
+          children: item.children?.filter((child) => !child.adminOnly || canViewInsights),
+        })),
     }))
     .filter((section) => section.items.length > 0);
 
