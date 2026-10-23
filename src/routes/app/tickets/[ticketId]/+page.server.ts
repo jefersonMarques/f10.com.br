@@ -118,6 +118,8 @@ function actionErrorMessage(cause: unknown): string {
 
   const messages: Record<string, string> = {
     TICKET_WORKFLOW_AREA_ACCESS_DENIED: "Você não possui acesso ao processo interno desta área.",
+    TICKET_ASSIGNEE_NO_ACCESS: "O operador não possui permissão para visualizar tickets.",
+    TICKET_ASSIGNEE_AREA_DENIED: "O operador não tem acesso à área deste ticket.",
     TICKET_WORKFLOW_AREA_NOT_COMPLETE: "Entre na área e conclua o fluxo antes de movimentar o ticket.",
     TICKET_WORKFLOW_AREA_NOT_CONFIGURED: "Esta área não possui workflow ativo.",
     TICKET_WORKFLOW_AREA_EMPTY: "Esta área não possui colunas ativas.",
@@ -704,11 +706,11 @@ export const actions: Actions = {
         "Ticket atribuído a um atendente humano.",
       );
       return { success: true, action: "assign", message: "Responsável atualizado." };
-    } catch {
+    } catch (cause) {
       return fail(403, {
         success: false,
         action: "assign",
-        message: "Não foi possível atribuir este ticket.",
+        message: actionErrorMessage(cause),
       });
     }
   },
