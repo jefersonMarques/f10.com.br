@@ -272,7 +272,7 @@
     });
   }
 
-  function applyUpdatedContent(value: unknown): void {
+  function applyUpdatedContent(value: unknown, feedback = "Alteração salva."): void {
     if (!value || typeof value !== "object") return;
     const updated = value as ReviewContent;
     reviewSummary = updated.summary;
@@ -283,7 +283,7 @@
       .filter((category) => category.slug !== UNCATEGORIZED_HELP_CATEGORY_SLUG)
       .map((category) => category.id);
     saveSuccess = true;
-    saveMessage = "Alteração salva.";
+    saveMessage = feedback;
   }
 
   function editorState(key: string, active: boolean): void {
@@ -293,8 +293,13 @@
     openEditors = next;
   }
 
-  function inlineSaved(event: CustomEvent<{ content: unknown }>): void {
-    applyUpdatedContent(event.detail.content);
+  function inlineSaved(event: CustomEvent<{ content: unknown; operation?: string }>): void {
+    const feedback = event.detail.operation === "delete_block"
+      ? "Bloco excluído."
+      : event.detail.operation === "move_block"
+        ? "Ordem dos blocos atualizada."
+        : "Alteração salva.";
+    applyUpdatedContent(event.detail.content, feedback);
     void invalidateAll();
   }
 
