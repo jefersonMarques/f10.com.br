@@ -321,6 +321,7 @@ export async function createCustomerServiceRequest(
     await notifySupportTicketNeedsAttention(
       result.ticketId,
       `Nova solicitação de ${label} enviada pelo Portal do Cliente.`,
+      { newTicket: true },
     ).catch((cause) => {
       console.error("[service-request.notification]", {
         ticketId: result.ticketId,
