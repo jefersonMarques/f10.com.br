@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { selectInboundEmailBody, visibleEmailHtml } from "../src/lib/server/support/emailInboundBody.ts";
+import { normalizeEmailBodyText, splitEmailConversation } from "../src/lib/support/emailBodyText.ts";
 
 test("rich Brevo email keeps text omitted by extracted Markdown", () => {
   const selected = selectInboundEmailBody({
@@ -54,4 +55,38 @@ test("HTML complete formatting wins when it covers the text body", () => {
   assert.equal(selected.source, "html");
   assert.match(selected.text, /\*\*NEGRITO\*\*/);
   assert.match(selected.text, /\*ITALICO\*/);
+});
+
+test("escaped HTML in Brevo Markdown is normalized instead of being shown literally", () => {
+  const selected = selectInboundEmailBody({
+    markdown: "&lt;html&gt;&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;&lt;body&gt;&lt;p&gt;Contrato recebido.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;",
+  });
+
+  assert.match(selected.text, /Contrato recebido/);
+  assert.doesNotMatch(selected.text, /&lt;|<html|<meta|Content-Type/i);
+});
+
+test("archived HTML and encoded line breaks render as readable text", () => {
+  const cleaned = normalizeEmailBodyText("Olá, cliente&lt;br&gt;Ticket atualizado.&lt;br&gt;Obrigado.");
+  assert.equal(cleaned, "Olá, cliente\nTicket atualizado.\nObrigado.");
+});
+
+test("email addresses inside angle brackets are preserved", () => {
+  const visible = visibleEmailHtml("<p>Para: <atendimento@f10.com.br></p>");
+  assert.match(visible, /<atendimento@f10\.com\.br>/);
+});
+
+test("quoted email thread is folded without deleting the archived messages", () => {
+  const body = "Olá, sua solicitação foi concluída.\n\n## - Não escreva abaixo dessa linha - ##\n\n| Nome | Resposta |\n| --- | --- |\n| Rafael | Atendimento anterior |";
+  const conversation = splitEmailConversation(body);
+  assert.equal(conversation.main, "Olá, sua solicitação foi concluída.");
+  assert.match(conversation.quoted, /Rafael/);
+  assert.match(conversation.quoted, /Atendimento anterior/);
+});
+
+test("old malformed quoted tables are placed in the history section", () => {
+  const body = "Solicitação concluída.\n\n| | |\n| --- | --- |\n| Rafael | Mensagem anterior |";
+  const conversation = splitEmailConversation(body);
+  assert.equal(conversation.main, "Solicitação concluída.");
+  assert.match(conversation.quoted, /Rafael/);
 });
