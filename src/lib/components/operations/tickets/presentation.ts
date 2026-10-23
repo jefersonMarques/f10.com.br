@@ -74,8 +74,16 @@ export function stageColumnClass(workflow: TicketWorkflow | null, stage: TicketS
   return "ticket-stage ticket-stage--gray";
 }
 
-export function formatDateTime(value: string | Date): string {
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+export function formatDateTime(value: string | Date | null | undefined): string {
+  if (!value) return "Data indisponível";
+
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Data indisponível";
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
 }
 
 export function formatBytes(value: number): string {
