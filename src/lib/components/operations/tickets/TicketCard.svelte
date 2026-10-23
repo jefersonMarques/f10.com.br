@@ -52,9 +52,12 @@
   <button type="button" on:click={() => void onOpen(ticket.id)} class="block w-full text-left">
     {#if ticket.labels.length > 0}
       <div class="mb-2 flex flex-wrap gap-1">
-        {#each ticket.labels.slice(0, 5) as label}
-          <span class={`h-2 w-10 rounded-full ${labelClasses[label.color] ?? labelClasses.gray}`} title={label.name}></span>
+        {#each ticket.labels.slice(0, 3) as label (label.id)}
+          <span class={`max-w-[170px] truncate rounded-md px-2 py-1 text-[11px] font-semibold ${labelClasses[label.color] ?? labelClasses.gray}`} title={label.name}>{label.name}</span>
         {/each}
+        {#if ticket.labels.length > 3}
+          <span class="text-[11px] text-[#858B99]">+{ticket.labels.length - 3}</span>
+        {/if}
       </div>
     {/if}
 
