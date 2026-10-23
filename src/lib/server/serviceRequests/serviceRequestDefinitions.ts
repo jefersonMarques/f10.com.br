@@ -164,6 +164,16 @@ export function normalizeServiceRequestFields(
     data[fieldKey] = normalizeDataValue(rawValue, 0, state);
   }
 
+  if (requestType === "nfse") {
+    for (const fieldKey of ["rpsBatchRequestStatus", "webserviceEmissionRequestStatus"]) {
+      const value = data[fieldKey];
+      // Keep compatibility with requests created before these fields existed.
+      if (value !== undefined && value !== "" && value !== "requested" && value !== "not_needed") {
+        throw new Error(`SERVICE_REQUEST_STATUS_INVALID:${fieldKey}`);
+      }
+    }
+  }
+
   const serializedSize = Buffer.byteLength(JSON.stringify(data), "utf8");
   if (serializedSize > MAX_SERIALIZED_DATA_BYTES) throw new Error("SERVICE_REQUEST_DATA_TOO_LARGE");
 
