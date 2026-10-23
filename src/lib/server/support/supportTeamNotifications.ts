@@ -7,6 +7,7 @@ import { teamMembers, users } from "$lib/server/db/schema";
 import { ticketAreas, ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
 import { supportQueues, tickets } from "$lib/server/db/supportSchema";
 import { autoAssignChatIfConfigured } from "$lib/server/support/supportChatRoutingRepository";
+import { notifyTicketOperatorsByEmail } from "$lib/server/support/ticketOperatorEmailNotification";
 import {
   autoAssignTicketIfConfigured,
   listEligibleTicketResponders,
@@ -105,6 +106,7 @@ export async function notifySupportChatNeedsAttention(
 export async function notifySupportTicketNeedsAttention(
   ticketId: string,
   reason: string,
+  options: { newTicket?: boolean } = {},
 ): Promise<void> {
   const db = getDatabase();
   const [ticket] = await db
@@ -124,6 +126,15 @@ export async function notifySupportTicketNeedsAttention(
     .limit(1);
 
   if (!ticket) return;
+
+  if (options.newTicket) {
+    await notifyTicketOperatorsByEmail(ticketId).catch((cause) => {
+      console.error("[ticket.operator_email.notification]", {
+        ticketId,
+        errorCode: cause instanceof Error ? cause.message : "TICKET_EMAIL_NOTIFICATION_FAILED",
+      });
+    });
+  }
 
   if (!ticket.assignedUserId) {
     const autoAssignedUserId = await autoAssignTicketIfConfigured(ticketId);
