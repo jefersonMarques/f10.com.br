@@ -2,6 +2,12 @@
 import { writable } from "svelte/store";
 
 export type YesNo = "yes" | "no";
+export type MunicipalRequestStatus = "" | "requested" | "not_needed";
+
+export const municipalRequestOptions = [
+  { value: "requested", label: "Já solicitado à prefeitura" },
+  { value: "not_needed", label: "Não é necessário" },
+] as const;
 export type NoteKind = "service" | "commerce" | "service_and_commerce";
 
 export const noteKindOptions: Array<{ value: NoteKind; label: string }> = [
@@ -218,6 +224,8 @@ export type FormData = {
   serviceListItem: string;
   taxationCode: string;
   serviceRpsBatchNumber: string;
+  rpsBatchRequestStatus: MunicipalRequestStatus;
+  webserviceEmissionRequestStatus: MunicipalRequestStatus;
   taxationPlace: TaxationPlace;
   specialRegime: SpecialRegime;
   issRequirement: IssRequirement;
@@ -291,6 +299,8 @@ export const formDataStore = writable<FormData>({
   serviceListItem: "",
   taxationCode: "",
   serviceRpsBatchNumber: "",
+  rpsBatchRequestStatus: "",
+  webserviceEmissionRequestStatus: "",
   taxationPlace: "in_city",
   specialRegime: "none",
   issRequirement: "payable",
