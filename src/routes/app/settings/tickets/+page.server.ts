@@ -12,6 +12,7 @@ import {
 } from "$lib/server/settings/operationsSettingsRepository";
 import { ensureTicketOnboardingEntryPoint, listTicketOnboardingAreas } from "$lib/server/support/ticketWorkflowRepository";
 import { listEligibleTicketResponders } from "$lib/server/support/supportRoutingRepository";
+import { ensureTicketLabel, listTicketLabels } from "$lib/server/support/ticketCardRepository";
 import {
   getTicketOperatorEmailSettings,
   isSuperAdminUser,
@@ -34,10 +35,11 @@ function readRecipients(formData: FormData, key: string): string[] {
 
 export const load: PageServerLoad = async ({ cookies }) => {
   const { session, permissions } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/tickets");
-  const [settings, onboarding, onboardingAreas, operatorSettings, operatorUsers, canConfigureOperatorEmails] = await Promise.all([
+  const [settings, onboarding, onboardingAreas, labels, operatorSettings, operatorUsers, canConfigureOperatorEmails] = await Promise.all([
     getServiceRequestEmailSettings(),
     getTicketOnboardingSettings(),
     listTicketOnboardingAreas(),
+    listTicketLabels(),
     getTicketOperatorEmailSettings(),
     listEligibleTicketResponders(),
     isSuperAdminUser(session.user.id),
@@ -47,6 +49,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
     cellCoin: settings.find((setting) => setting.requestType === "cell_coin")!,
     onboarding,
     onboardingAreas,
+    labels,
     selectedOnboardingAreaId:
       onboardingAreas.find((area) => area.stageId === onboarding.startStageId)?.areaId ?? "",
     canManageWorkflows: hasPermission(permissions, "tickets.manage", "all"),
@@ -64,26 +67,53 @@ export const actions: Actions = {
       "/app/settings/tickets",
     );
 
-    const value = (await request.formData()).get("areaId");
-    const areaId = typeof value === "string" ? value.trim() : "";
-    if (areaId && !hasPermission(permissions, "tickets.manage", "all")) {
+    if (!hasPermission(permissions, "tickets.manage", "all")) {
       return fail(403, {
         success: false,
         action: "saveOnboarding",
-        message: "Para configurar a entrada, é necessário administrar todos os fluxos de tickets.",
+        message: "Para configurar o onboarding, é necessário administrar todos os fluxos de tickets.",
+      });
+    }
+
+    const formData = await request.formData();
+    const rawArea = formData.get("areaId");
+    const areaId = typeof rawArea === "string" ? rawArea.trim() : "";
+    const rawTag = formData.get("tagId");
+    const selectedTagId = typeof rawTag === "string" ? rawTag.trim() : "";
+    const rawName = formData.get("newTagName");
+    const newTagName = typeof rawName === "string" ? rawName.trim() : "";
+
+    if (areaId && !selectedTagId && !newTagName) {
+      return fail(400, {
+        success: false,
+        action: "saveOnboarding",
+        message: "Selecione ou crie uma etiqueta para identificar o onboarding.",
       });
     }
 
     try {
+      let tagId: string | null = null;
+      if (areaId) {
+        if (newTagName) {
+          tagId = await ensureTicketLabel(newTagName, "sky");
+        } else {
+          const labels = await listTicketLabels();
+          if (!labels.some((label) => label.id === selectedTagId)) {
+            throw new Error("TICKET_ONBOARDING_LABEL_INVALID");
+          }
+          tagId = selectedTagId;
+        }
+      }
+
       const startStageId = areaId
         ? await ensureTicketOnboardingEntryPoint(areaId)
         : null;
-      await updateTicketOnboardingSettings(session.user.id, { startStageId });
+      await updateTicketOnboardingSettings(session.user.id, { startStageId, tagId });
       return {
         success: true,
         action: "saveOnboarding",
         message: areaId
-          ? "Processo de onboarding configurado para os próximos tickets."
+          ? "Onboarding configurado. Os próximos cadastros receberão a etiqueta selecionada."
           : "Entrada de onboarding desativada.",
       };
     } catch (cause) {
@@ -94,7 +124,7 @@ export const actions: Actions = {
       return fail(400, {
         success: false,
         action: "saveOnboarding",
-        message: "Não foi possível configurar o processo. Confira se o fluxo global e a área estão ativos.",
+        message: "Não foi possível configurar o onboarding. Confira o processo e a etiqueta.",
       });
     }
   },
