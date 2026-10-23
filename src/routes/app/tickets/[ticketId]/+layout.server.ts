@@ -35,12 +35,12 @@ export const load: LayoutServerLoad = async ({ parent, params }) => {
     if (cause instanceof Error && cause.message === "TICKET_NOT_ACCESSIBLE") {
       const reason = await diagnoseTicketAccessDenial(layout.user.id, scope, params.ticketId)
         .catch(() => "diagnostic_unavailable");
-      console.warn("[operations.ticket.access_denied]", {
+      console.warn("[operations.ticket.access_denied]", JSON.stringify({
         userId: layout.user.id,
         ticketId: params.ticketId,
         scope,
         reason,
-      });
+      }));
       throw error(403, "Você não tem permissão para visualizar este ticket.");
     }
     throw cause;
