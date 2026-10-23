@@ -95,6 +95,7 @@ export const actions: Actions = {
       const formData = await request.formData();
       await saveTicketOperatorEmailSettings(session.user.id, {
         enabled: formData.get("operatorEmailEnabled") === "on",
+        customerAttachments: formData.get("customerAttachmentEmails") === "on",
         recipientUserIds: readRecipients(formData, "operatorRecipientUserId"),
       });
       return {
