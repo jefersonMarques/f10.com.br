@@ -47,15 +47,18 @@ export function safeChatHref(value: string): string | null {
 function splitTrailingPunctuation(value: string): { url: string; suffix: string } {
   let end = value.length;
 
-  while (end > 0 && /[.,;:!?]/.test(value[end - 1] ?? "")) {
-    end--;
-  }
+  while (end > 0) {
+    const character = value[end - 1] ?? "";
+    if (/[.,;:!?]/.test(character)) {
+      end--;
+      continue;
+    }
 
-  while (end > 0 && value[end - 1] === ")") {
+    if (character !== ")") break;
+
     const current = value.slice(0, end);
     const opening = (current.match(/\(/g) ?? []).length;
     const closing = (current.match(/\)/g) ?? []).length;
-
     if (closing <= opening) break;
     end--;
   }
@@ -128,7 +131,7 @@ export function parseChatMarkdown(value: string): ChatMarkdownBlock[] {
         const next = lines[index + 1] ?? "";
         index++;
 
-        if (next.trim().startsWith(delimiter[0].repeat(delimiter.length))) {
+        if (next.trim().startsWith(delimiter.charAt(0).repeat(delimiter.length))) {
           break;
         }
 
