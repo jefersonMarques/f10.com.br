@@ -597,9 +597,13 @@
                   <p class="mt-0.5 text-[10.5px] text-[#8B919F]">{ticketData.attachments.length} arquivo(s)</p>
                 </div>
                 {#if ticketData.canReply && ticketData.attachmentsEnabled}
-                  <form method="POST" action={actionUrl("uploadAttachment")} on:submit|preventDefault={(event) => void submitForm(event, "uploadAttachment", true)} class="flex items-center gap-2">
-                    <input name="file" type="file" required accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,.docx,.xlsx,.zip" class="max-w-[260px] text-[11px] text-[#6C7381]"/>
-                    <button type="submit" class="h-9 rounded-xl bg-[var(--app-primary)] px-3 text-[11px] font-semibold text-white">Enviar</button>
+                  <form method="POST" action={actionUrl("uploadAttachment")} on:submit|preventDefault={(event) => void submitForm(event, "uploadAttachment", true)} class="flex flex-wrap items-center gap-3">
+                    <input name="file" type="file" required accept="image/png,image/jpeg,image/webp,application/pdf,text/plain,.docx,.xlsx,.zip,.csv" class="max-w-[260px] text-[12px] text-[#6C7381]"/>
+                    <label class="inline-flex items-center gap-2 text-[12px] font-medium text-[#4B5362]" title="Envia uma resposta pública com o arquivo. Arquivos maiores que 12 MB não podem ser enviados por e-mail.">
+                      <input type="checkbox" name="sendToCustomer" class="h-4 w-4 rounded border-app-border-control"/>
+                      Enviar também por e-mail
+                    </label>
+                    <button type="submit" class="h-9 rounded-xl bg-[var(--app-primary)] px-3 text-[12px] font-semibold text-white">Salvar anexo</button>
                   </form>
                 {/if}
               </div>
