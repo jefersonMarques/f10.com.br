@@ -91,7 +91,7 @@ export type TicketServiceRequestField = {
   value: string | number | boolean | null;
   displayValue: string;
   editable: boolean;
-  inputKind: "text" | "number" | "boolean" | "textarea" | "readonly";
+  inputKind: "text" | "number" | "boolean" | "textarea" | "select" | "readonly";
 };
 
 export type TicketServiceRequest = {
