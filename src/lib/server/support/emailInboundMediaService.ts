@@ -178,11 +178,7 @@ export function extractEmailImages(html: string): Array<{ src: string; alt: stri
         // Unsupported embedded format is ignored, never injected into HTML.
       }
     }
-    if (images.length > 0 && images[images.length - 1]?.src === src) {
-      seen.add(src);
-    } else if (images.some((image) => image.src === src)) {
-      seen.add(src);
-    }
+    if (images.some((image) => image.src === src)) seen.add(src);
     if (images.length >= 12) break;
   }
   return images;
