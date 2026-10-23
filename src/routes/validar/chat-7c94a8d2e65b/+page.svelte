@@ -1,11 +1,17 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { MessageCircleMore, ShieldCheck } from "lucide-svelte";
+  import { hasRestorableSupportChat } from "$lib/support/supportChatRestore";
   import SupportChatDialog from "$lib/components/onboarding/SupportChatDialog.svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;
 
   let chatOpen = false;
+
+  onMount(() => {
+    chatOpen = hasRestorableSupportChat(window.sessionStorage);
+  });
 </script>
 
 <svelte:head>
