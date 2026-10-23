@@ -487,7 +487,7 @@
                           {#each message.inlineImages.filter((image, index, images) => images.findIndex((candidate) => candidate.src === image.src) === index) as emailImage (emailImage.src)}
                             {#if !emailImage.external || allowedExternalImageMessages.has(message.id)}
                               <a href={emailImage.src} target="_blank" rel="noopener noreferrer" class="block">
-                                <img src={emailImage.src} alt={emailImage.alt || "Imagem do e-mail"} loading="lazy" referrerpolicy="no-referrer" class="max-h-[480px] max-w-full rounded-xl border border-[#DDE1EA] bg-white object-contain"/>
+                                <img src={emailImage.src} alt={emailImage.alt || "Imagem do e-mail"} loading="lazy" referrerpolicy="no-referrer" class="max-h-[320px] max-w-full rounded-xl border border-[#DDE1EA] bg-white object-contain"/>
                               </a>
                             {/if}
                           {/each}
