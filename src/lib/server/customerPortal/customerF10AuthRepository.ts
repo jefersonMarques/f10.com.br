@@ -376,7 +376,19 @@ export async function selectF10CustomerUnit(
   const current = await authorizeF10CustomerPortalSession(sessionToken);
   if (!current) throw new Error("F10_CUSTOMER_SESSION_INVALID");
 
-  const groups = await refreshAuthorizedGroups(current);
+  let groups: CustomerF10GroupSnapshot[];
+  try {
+    groups = await refreshAuthorizedGroups(current);
+  } catch (cause) {
+    // A valid session already contains the group/unit grants authenticated by F10.
+    // Only reuse those grants for transient backend outages: never ignore an
+    // explicit token rejection or an invalid/missing stored credential.
+    if (!(cause instanceof Error) || cause.message !== "F10_CUSTOMER_BACKEND_UNAVAILABLE") {
+      throw cause;
+    }
+    groups = current.groups;
+    console.warn("[customer.auth.unit] F10 backend unavailable; using the authenticated session snapshot");
+  }
   const group = groups.find((item) => item.grupo_id === groupId);
   const unit = group?.unidades.find((item) => item.unidade_id === unitId);
   if (!group || !unit) throw new Error("F10_CUSTOMER_UNIT_NOT_AUTHORIZED");

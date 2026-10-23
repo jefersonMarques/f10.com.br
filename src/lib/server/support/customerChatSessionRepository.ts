@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lte } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { webChatSessions } from "$lib/server/db/chatSchema";
 import type { PublicChatCustomerContext } from "$lib/server/support/publicChatRepository";
@@ -32,6 +32,20 @@ export async function resumeActiveCustomerChatSession(input: {
   const tokenHash = hashSessionToken(token);
 
   return db.transaction(async (tx) => {
+    // The unique index covers all non-closed sessions, including expired ones.
+    // Retire expired chats in the same customer context before searching for a
+    // resumable session or creating another chat for that context.
+    await tx
+      .update(webChatSessions)
+      .set({ closedAt: now, updatedAt: now })
+      .where(and(
+        eq(webChatSessions.legacyUserId, input.customerContext.legacyUserId),
+        eq(webChatSessions.groupId, input.customerContext.groupId),
+        eq(webChatSessions.unitId, input.customerContext.unitId),
+        isNull(webChatSessions.closedAt),
+        lte(webChatSessions.expiresAt, now),
+      ));
+
     const [session] = await tx
       .select({
         id: webChatSessions.id,
