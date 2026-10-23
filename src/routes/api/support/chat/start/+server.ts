@@ -1,4 +1,3 @@
-import { dev } from "$app/environment";
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
 import { recordCustomerActivity } from "$lib/server/customerPortal/customerActivityRepository";
@@ -293,7 +292,8 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
     return json(
       {
         error: "CHAT_UNAVAILABLE",
-        ...(dev ? { diagnosticCode } : {}),
+        // Only broad non-sensitive classifications are returned for diagnostics.
+        diagnosticCode,
       },
       { status: 503 },
     );
