@@ -1,7 +1,7 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { onDestroy, tick } from "svelte";
-  import HelpRichText from "$lib/components/help/HelpRichText.svelte";
+  import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
   import {
     ArrowUpRight,
     Image as ImageIcon,
@@ -667,9 +667,9 @@
             <div class={`flex ${message.role === "customer" ? "justify-end" : "justify-start"}`}>
               <div class={`max-w-[86%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-5 ${message.role === "customer" ? "rounded-br-md bg-[#000A57] text-white" : "rounded-bl-md border border-[#E4E7EE] bg-white text-[#394052] shadow-[0_3px_12px_rgba(1,13,40,0.035)]"}`}>
                 {#if message.role === "assistant"}
-                  <HelpRichText text={message.body} className="space-y-1.5" />
+                  <SupportChatMarkdown text={message.body}/>
                 {:else}
-                  <p class="whitespace-pre-wrap">{message.body}</p>
+                  <SupportChatMarkdown text={message.body} isCustomer/>
                 {/if}
                 {#if message.actionUrl && message.actionLabel}
                   <a href={message.actionUrl} class="mt-2.5 inline-flex items-center gap-1.5 rounded-xl bg-[#000A57] px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-[#111B71]">{message.actionLabel}<ArrowUpRight size={13} /></a>
@@ -692,9 +692,9 @@
                 {#if message.authorType === "user" && message.authorUserName}<p class="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#6E7690]">{message.authorUserName}{message.authorOnline ? " · online" : ""}</p>{/if}
                 {#if message.body}
                   {#if message.authorType === "customer"}
-                    <p class="whitespace-pre-wrap">{message.body}</p>
+                    <SupportChatMarkdown text={message.body} isCustomer/>
                   {:else}
-                    <HelpRichText text={message.body} className="space-y-1.5" />
+                    <SupportChatMarkdown text={message.body}/>
                   {/if}
                 {/if}
                 {#if message.attachments?.length}
