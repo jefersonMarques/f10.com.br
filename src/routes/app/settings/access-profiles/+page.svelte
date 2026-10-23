@@ -109,7 +109,7 @@
                     <input name="restrictTicketAreas" type="checkbox" checked={selectedProfile.restrictTicketAreas} class="h-4 w-4 rounded border-app-border-control"/>
                     Restringir tickets por processo
                   </label>
-                  <p class="application-text-meta mt-1 text-app-text-soft">Quando ativo, este perfil só enxerga tickets dos processos marcados abaixo.</p>
+                  <p class="application-text-meta mt-1 text-app-text-soft">Mesmo com “Visualizar tickets → Tudo”, esta opção limita o acesso aos processos selecionados. Desmarque para permitir todos os processos.</p>
 
                   <div class="mt-3 grid gap-2 sm:grid-cols-2">
                     {#each data.ticketAreas as area}
@@ -136,7 +136,7 @@
                   <select name={"scope:" + permission.code} value={grantScope(permission.code)} class="application-text-caption h-9 rounded-lg border border-app-border-control bg-app-surface px-2">
                     <option value="own">Próprio</option>
                     <option value="team">Equipe</option>
-                    <option value="all">Tudo</option>
+                    <option value="all">Tudo (acesso global)</option>
                   </select>
                 </div>
               {/each}
