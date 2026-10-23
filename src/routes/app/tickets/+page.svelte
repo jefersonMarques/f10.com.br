@@ -48,6 +48,7 @@
   let modalOpen = false;
   let splitInitializedFor = "";
   let ticketRefreshInFlight = false;
+  let justViewedTicketIds = new Set<string>();
 
   $: if (
     view === "split"
@@ -65,7 +66,10 @@
     : data.workflowBoard.areaWorkflows.find((workflow) => workflow.id === workflowId)
       ?? data.workflowBoard.globalWorkflow;
 
-  $: filteredTickets = data.tickets;
+  $: filteredTickets = data.tickets.map((ticket) => ({
+    ...ticket,
+    unread: Boolean(ticket.unread) && !justViewedTicketIds.has(ticket.id),
+  }));
 
   function workspaceUrl(page = 1): string {
     const params = new URLSearchParams();
@@ -242,6 +246,10 @@
       const response = await fetch(`/app/tickets/${ticketId}/details`, { cache: "no-store" });
       if (!response.ok) throw new Error("TICKET_DETAILS_LOAD_FAILED");
       ticketDetails = await response.json() as TicketDetailsData;
+      justViewedTicketIds = new Set([...justViewedTicketIds, ticketId]);
+      window.dispatchEvent(new Event("f10:notifications:changed"));
+      await invalidate("app:tickets:workspace");
+      justViewedTicketIds = new Set();
     } catch {
       window.alert("Não foi possível abrir o ticket.");
     } finally {
