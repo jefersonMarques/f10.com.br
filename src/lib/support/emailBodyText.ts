@@ -53,6 +53,7 @@ export function visibleEmailHtml(html: string): string {
 
 const MARKUP_PATTERN = /<(?:!doctype|\/?(?:html|head|body|meta|div|p|br|table|tr|td|li|blockquote|strong|em|span|a|h[1-6]))\b/i;
 const EMAIL_THREAD_MARKER = /(?:^|\n)\s*(?:#{1,4}\s*)?-\s*não escreva abaixo dessa linha\s*-\s*#{0,4}\s*(?=\n|$)/i;
+const EMAIL_QUOTED_TABLE = /\n\s*\|\s*\|\s*\|\s*\n\s*\|\s*-{2,}/;
 
 export function normalizeEmailBodyText(value: string): string {
   if (!value.trim()) return "";
@@ -81,7 +82,7 @@ export function splitEmailConversation(value: string): {
   quoted: string;
 } {
   const text = normalizeEmailBodyText(value);
-  const marker = EMAIL_THREAD_MARKER.exec(text);
+  const marker = EMAIL_THREAD_MARKER.exec(text) ?? EMAIL_QUOTED_TABLE.exec(text);
   if (!marker || marker.index === undefined) {
     return { main: text, quoted: "" };
   }
