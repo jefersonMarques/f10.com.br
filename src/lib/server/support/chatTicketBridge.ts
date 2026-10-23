@@ -2,6 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { getPermissionScope, hasPermission } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
+import { notifyTicketOperatorsByEmail } from "$lib/server/support/ticketOperatorEmailNotification";
 import {
   webChatMessageAttachments,
   webChatMessages,
@@ -84,7 +85,7 @@ export async function createTicketFromChat(
     return { ticketId: existing.id, ticketNumber: existing.ticketNumber, created: false };
   }
 
-  return db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('f10-chat-ticket-conversion'))`);
 
     const [lockedChat] = await tx
@@ -215,4 +216,15 @@ export async function createTicketFromChat(
 
     return { ticketId: ticket.id, ticketNumber: ticket.ticketNumber, created: true };
   });
+
+  if (result.created) {
+    await notifyTicketOperatorsByEmail(result.ticketId).catch((cause) => {
+      console.error("[chat.ticket.operator_email]", {
+        ticketId: result.ticketId,
+        causeType: cause instanceof Error ? cause.name : typeof cause,
+      });
+    });
+  }
+
+  return result;
 }
