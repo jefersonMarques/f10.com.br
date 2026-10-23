@@ -33,8 +33,8 @@
   }
 
   function parseInline(value: string): InlineToken[] {
-    // Brevo sometimes double-escapes emphasis markers in the selected body.
-    // Normalize the escapes before tokenizing, rather than displaying literal *.
+    // A Brevo pode escapar os marcadores de ênfase mais de uma vez.
+    // Remove os escapes antes de interpretar a formatação.
     value = value.replace(/\\([*_])/g, "$1");
     const tokens: InlineToken[] = [];
     const pattern = /(!?\[([^\]\n]{1,240})\]\(([^)\s]+)\))|(?<!\\)\*\*([^*\n]+)\*\*|(?<!\\)__([^_\n]+)__|(?<!\\)\*([^*\n]+)\*|(?<!\\)_([^_\n]+)_|(?<!\\)\x60([^\x60\n]+)\x60|(https?:\/\/[^\s<>"\x27]+)/g;
