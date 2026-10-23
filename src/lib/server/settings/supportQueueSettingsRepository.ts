@@ -52,7 +52,7 @@ export async function updateSupportQueueTeam(
       .set({ teamId: team.id, updatedAt: new Date() })
       .where(
         and(
-          inArray(supportQueues.code, ["service_nfse", "service_cell_coin"]),
+          inArray(supportQueues.code, ["sucesso", "service_nfse", "service_cell_coin"]),
           eq(supportQueues.active, true),
           isNull(supportQueues.teamId),
         ),
@@ -88,5 +88,83 @@ export async function updateSupportQueueTeam(
       inheritedServiceQueueCount: result.inheritedQueueCount,
       inheritedServiceAreaCount: result.inheritedAreaCount,
     },
+  });
+}
+
+const EMAIL_INBOX_QUEUE_CODES = ["support", "sucesso", "financeiro"] as const;
+
+export async function getSupportEmailInboxTeamSettings() {
+  const db = getDatabase();
+  const [queueRows, availableTeams] = await Promise.all([
+    db
+      .select({
+        id: supportQueues.id,
+        code: supportQueues.code,
+        name: supportQueues.name,
+        teamId: supportQueues.teamId,
+        active: supportQueues.active,
+      })
+      .from(supportQueues)
+      .where(inArray(supportQueues.code, [...EMAIL_INBOX_QUEUE_CODES])),
+    db
+      .select({ id: teams.id, name: teams.name })
+      .from(teams)
+      .where(eq(teams.active, true))
+      .orderBy(asc(teams.name)),
+  ]);
+
+  const queuesByCode = new Map(queueRows.map((queue) => [queue.code, queue]));
+  const inboxes = EMAIL_INBOX_QUEUE_CODES.flatMap((code) => {
+    const queue = queuesByCode.get(code);
+    if (!queue) return [];
+    return [{
+      ...queue,
+      addressLabel: code === "support" ? "suporte@" : code === "sucesso" ? "sucesso@" : "financeiro@",
+    }];
+  });
+
+  return { inboxes, teams: availableTeams };
+}
+
+export async function updateSupportEmailInboxTeam(
+  actorUserId: string,
+  queueId: string,
+  teamId: string,
+): Promise<void> {
+  const db = getDatabase();
+  const [[queue], [team]] = await Promise.all([
+    db
+      .select({ id: supportQueues.id, code: supportQueues.code })
+      .from(supportQueues)
+      .where(and(
+        eq(supportQueues.id, queueId),
+        eq(supportQueues.active, true),
+        inArray(supportQueues.code, [...EMAIL_INBOX_QUEUE_CODES]),
+      ))
+      .limit(1),
+    db
+      .select({ id: teams.id })
+      .from(teams)
+      .where(and(eq(teams.id, teamId), eq(teams.active, true)))
+      .limit(1),
+  ]);
+  if (!queue || !team) throw new Error("SUPPORT_EMAIL_INBOX_TEAM_INVALID");
+
+  if (queue.code === "support") {
+    await updateSupportQueueTeam(actorUserId, teamId);
+    return;
+  }
+
+  await db
+    .update(supportQueues)
+    .set({ teamId, updatedAt: new Date() })
+    .where(eq(supportQueues.id, queueId));
+
+  await recordAuditEvent({
+    actorUserId,
+    action: "operations.support_email_inbox.team.updated",
+    entityType: "support_queue",
+    entityId: queueId,
+    metadata: { inboxCode: queue.code, teamId },
   });
 }
