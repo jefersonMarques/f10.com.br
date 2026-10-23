@@ -487,7 +487,7 @@ export const actions: Actions = {
             ? "Resposta registrada e enviada por e-mail."
             : result.emailDelivery === "failed"
               ? "Resposta registrada, mas o e-mail não pôde ser enviado."
-              : "Resposta registrada.",
+              : "Resposta registrada, mas o cliente não possui e-mail disponível para notificação.",
       };
     } catch (cause) {
       return fail(400, {
