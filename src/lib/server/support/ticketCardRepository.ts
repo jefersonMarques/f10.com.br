@@ -168,6 +168,30 @@ export async function getTicketCard(
   };
 }
 
+export async function ensureTicketLabel(name: string, color = "sky"): Promise<string> {
+  const cleanName = name.trim();
+  if (cleanName.length < 2 || cleanName.length > 40) {
+    throw new Error("TICKET_LABEL_NAME_INVALID");
+  }
+  if (!LABEL_COLORS.has(color)) throw new Error("TICKET_LABEL_COLOR_INVALID");
+
+  const db = getDatabase();
+  const [created] = await db
+    .insert(supportTags)
+    .values({ name: cleanName, color })
+    .onConflictDoNothing()
+    .returning({ id: supportTags.id });
+  if (created) return created.id;
+
+  const [existing] = await db
+    .select({ id: supportTags.id })
+    .from(supportTags)
+    .where(eq(supportTags.name, cleanName))
+    .limit(1);
+  if (!existing) throw new Error("TICKET_LABEL_NOT_CREATED");
+  return existing.id;
+}
+
 export async function createTicketLabel(
   actorUserId: string,
   permissions: SupportPermissionMap,
