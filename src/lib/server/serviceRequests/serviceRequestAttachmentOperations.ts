@@ -12,6 +12,7 @@ import type { CustomerF10PortalSession } from "$lib/server/customerPortal/custom
 import { getCustomerF10Ticket } from "$lib/server/customerPortal/customerF10TicketRepository";
 import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
+import { notifyTicketOperatorsByEmail } from "$lib/server/support/ticketOperatorEmailNotification";
 import { serviceRequestLabel, type ServiceRequestType } from "$lib/server/serviceRequests/serviceRequestDefinitions";
 import {
   deleteStoredServiceRequestAttachments,
@@ -241,6 +242,12 @@ async function replaceRequestAttachment(params: {
         ticketId: params.row.ticketId,
         requestType: params.row.requestType,
         fieldKey,
+        causeType: cause instanceof Error ? cause.name : typeof cause,
+      });
+    });
+    await notifyTicketOperatorsByEmail(params.row.ticketId, "customer_attachment").catch((cause) => {
+      console.error("[service-request.customer.attachment_email]", {
+        ticketId: params.row.ticketId,
         causeType: cause instanceof Error ? cause.name : typeof cause,
       });
     });
