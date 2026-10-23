@@ -320,6 +320,23 @@
       workspace={view === "split"}
     />
 
+    {#if data.pagination.total === 0 && scope === "all"}
+      <div role="status" class="flex items-center gap-2 border-b border-[#E9DCC7] bg-[#FFF9F1] px-4 py-2.5 text-[12px] text-[#745426]">
+        <CircleAlert size={16} class="shrink-0"/>
+        <span>
+          {#if data.accessSummary.permissionScope !== "all"}
+            Seu perfil permite visualizar apenas tickets próprios ou da equipe. Para acesso global, solicite “Visualizar tickets → Tudo”.
+          {:else if data.accessSummary.restrictedByProcess}
+            O acesso está restrito aos processos autorizados ({data.accessSummary.allowedProcessCount ?? 0}). Revise “Restringir tickets por processo” no perfil.
+          {:else if !includeFinished}
+            Nenhum ticket ativo encontrado. Ative “Ver finalizados” para incluir os concluídos.
+          {:else}
+            Nenhum ticket corresponde aos filtros selecionados.
+          {/if}
+        </span>
+      </div>
+    {/if}
+
     {#if view === "board"}
       {#if data.pagination.boardLimited}
         <div class="border-b border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] px-4 py-2.5 text-[11px] font-medium text-[#8A531F]">
