@@ -46,6 +46,37 @@
     </div>
   </form>
 
+  {#if data.canConfigureOperatorEmails}
+    <form method="POST" action="?/saveOperatorEmails" class="mb-5 rounded-[22px] border border-app-border bg-app-surface p-5 sm:p-6">
+      <div class="flex items-start gap-3">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-app-info-bg text-app-primary"><Mail size={18}/></span>
+        <div>
+          <h2 class="text-[14px] font-semibold text-app-text">E-mail ao abrir novos tickets</h2>
+          <p class="application-text-meta mt-1 text-app-text-soft">Selecione os operadores que devem receber avisos de novos tickets.</p>
+        </div>
+      </div>
+
+      <label class="mt-4 flex items-center gap-3 rounded-xl border border-app-border-control bg-app-subtle px-4 py-3">
+        <input type="checkbox" name="operatorEmailEnabled" checked={data.operatorSettings.enabled} class="h-4 w-4 rounded border-app-border-control"/>
+        <span class="application-text-caption font-semibold text-app-text">Ativar avisos por e-mail</span>
+      </label>
+
+      <div class="mt-4">
+        <UserMultiSelectCard
+          title="Operadores"
+          description="Pessoas autorizadas a responder tickets"
+          name="operatorRecipientUserId"
+          users={data.operatorUsers}
+          selectedUserIds={data.operatorSettings.recipientUserIds}
+        />
+      </div>
+
+      <div class="mt-4 flex justify-end border-t border-app-border-soft pt-4">
+        <button type="submit" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white"><Save size={14}/>Salvar avisos de novos tickets</button>
+      </div>
+    </form>
+  {/if}
+
   <form method="POST" action="?/saveNotifications" class="rounded-[22px] border border-app-border bg-app-surface p-5 sm:p-6">
     <div class="flex items-start gap-3">
       <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-app-warning-bg text-app-accent"><Ticket size={18}/></span>
