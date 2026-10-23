@@ -20,7 +20,7 @@
     value: string | number | boolean | null;
     displayValue: string;
     editable: boolean;
-    inputKind: "text" | "number" | "boolean" | "textarea" | "readonly";
+    inputKind: "text" | "number" | "boolean" | "textarea" | "select" | "readonly";
   };
 
   type SecretView = { key: string; label: string; present: boolean };
