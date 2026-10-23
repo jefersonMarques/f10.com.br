@@ -6,6 +6,7 @@ import {
 } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
+import { listUnreadTicketIds } from "$lib/server/notifications/notificationRepository";
 import {
   getPermissionScope,
   hasPermission,
@@ -227,12 +228,14 @@ export const load: PageServerLoad = async ({ parent, url, depends }) => {
       : allEntryPoints.filter((entryPoint) => areaRestriction.includes(entryPoint.areaId));
 
   const ticketIds = workspace.tickets.map((ticket) => ticket.id);
-  const [contexts, workflowBoard, labelRows] = await Promise.all([
+  const [contexts, workflowBoard, labelRows, unreadTicketIds] = await Promise.all([
     listTicketCustomerContexts(ticketIds),
     getTicketWorkflowBoardWithAppearance(layout.user.id, permissionMap, ticketIds),
     listTicketLabelsForTickets(ticketIds),
+    listUnreadTicketIds(layout.user.id, ticketIds),
   ]);
 
+  const unreadTicketIdSet = new Set(unreadTicketIds);
   const contextByTicket = new Map(contexts.map((context) => [context.ticketId, context]));
   const stateByTicket = new Map(workflowBoard.states.map((state) => [state.ticketId, state]));
   const labelsByTicket = new Map<string, typeof labelRows>();
@@ -245,6 +248,7 @@ export const load: PageServerLoad = async ({ parent, url, depends }) => {
   return {
     tickets: workspace.tickets.map((ticket) => ({
       ...ticket,
+      unread: unreadTicketIdSet.has(ticket.id),
       customerContext: contextByTicket.get(ticket.id) ?? null,
       workflowState: stateByTicket.get(ticket.id) ?? ticket.workflowState,
       labels: labelsByTicket.get(ticket.id) ?? [],
