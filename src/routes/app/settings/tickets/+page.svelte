@@ -29,20 +29,27 @@
 
     <label class="mt-5 block">
       <span class="application-text-caption font-semibold text-app-text-muted">Processo inicial</span>
-      <select name="startStageId" value={data.onboarding.startStageId ?? ""} class="application-text-caption mt-2 h-11 w-full rounded-xl border border-app-border-control bg-app-surface px-3 text-app-text">
+      <select name="areaId" value={data.selectedOnboardingAreaId} disabled={!data.canManageWorkflows || data.onboardingAreas.length === 0} class="application-text-caption mt-2 h-11 w-full rounded-xl border border-app-border-control bg-app-surface px-3 text-app-text disabled:opacity-60">
         <option value="">Não configurado</option>
-        {#each data.entryPoints as entryPoint}
-          <option value={entryPoint.stageId}>{entryPoint.areaName}</option>
+        {#each data.onboardingAreas as area}
+          <option value={area.areaId}>{area.areaName}</option>
         {/each}
       </select>
     </label>
 
-    {#if data.entryPoints.length === 0}
-      <p class="application-text-meta mt-3 rounded-xl bg-app-warning-bg px-3 py-2 text-app-warning-text">Marque uma área do workflow como entrada de novos tickets antes de configurar o onboarding.</p>
+    {#if data.onboardingAreas.length === 0}
+      <p class="mt-3 rounded-xl bg-app-warning-bg px-3 py-3 text-[12px] leading-5 text-app-warning-text">
+        Nenhum processo ativo com etapas foi encontrado.
+        <a href="/app/tickets/workflows" class="font-semibold underline">Criar ou revisar os fluxos</a>
+      </p>
+    {:else if !data.canManageWorkflows}
+      <p class="mt-3 rounded-xl bg-app-warning-bg px-3 py-3 text-[12px] leading-5 text-app-warning-text">Seu perfil não permite administrar os fluxos de tickets.</p>
+    {:else}
+      <p class="application-text-meta mt-2 text-app-text-soft">Ao salvar, a entrada será vinculada automaticamente ao fluxo global.</p>
     {/if}
 
     <div class="mt-5 flex justify-end border-t border-app-border-soft pt-4">
-      <button type="submit" class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white"><Save size={14}/>Salvar processo</button>
+      <button type="submit" disabled={!data.canManageWorkflows || data.onboardingAreas.length === 0} class="application-text-caption inline-flex min-h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><Save size={14}/>Salvar processo</button>
     </div>
   </form>
 
