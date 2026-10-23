@@ -36,6 +36,7 @@
   } from "./presentation";
   import type { TicketDetailsData, TicketMainPanel, TicketWorkflow } from "./types";
   import EmailMessageBody from "./EmailMessageBody.svelte";
+  import LivePageSync from "$lib/components/application/LivePageSync.svelte";
 
   type TicketSurface = "page" | "split" | "modal";
   type ComposerMode = "reply" | "note";
@@ -325,6 +326,8 @@
   }
 
 </script>
+
+<LivePageSync endpoint={`/app/tickets/${ticketData.details.ticket.id}/updates`} initialRevision={String(new Date(ticketData.details.ticket.updatedAt).getTime())} onRefresh={refreshDetails} />
 
 <svelte:window on:keydown={handleMenuKeydown}/>
 
