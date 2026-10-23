@@ -554,6 +554,7 @@ export async function createCustomerF10Ticket(
   await notifySupportTicketNeedsAttention(
     ticket.id,
     "Novo chamado aberto pelo Portal do Cliente.",
+    { newTicket: true },
   ).catch((cause) => {
     console.error("[customer.portal.ticket.notification]", {
       ticketId: ticket.id,
