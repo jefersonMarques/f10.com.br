@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull, like, ne, notLike, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, like, ne, notLike, or, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { internalNotifications } from "$lib/server/db/notificationSchema";
 import { sendDevicePushAlerts } from "$lib/server/notifications/devicePush";
@@ -109,7 +109,7 @@ export async function getNotificationSummary(userId: string) {
       .from(internalNotifications)
       .where(and(eq(internalNotifications.userId, userId), isNull(internalNotifications.readAt))),
     db
-      .select({ value: count() })
+      .select({ value: sql<number>`count(distinct ${internalNotifications.entityId})` })
       .from(internalNotifications)
       .where(
         and(
@@ -203,4 +203,21 @@ export async function deleteNotificationsForEntities(
   await db
     .delete(internalNotifications)
     .where(and(eq(internalNotifications.entityType, entityType), inArray(internalNotifications.entityId, entityIds)));
+}
+
+export async function listUnreadTicketIds(userId: string, ticketIds: string[]): Promise<string[]> {
+  if (ticketIds.length === 0) return [];
+
+  const rows = await getDatabase()
+    .selectDistinct({ entityId: internalNotifications.entityId })
+    .from(internalNotifications)
+    .where(and(
+      eq(internalNotifications.userId, userId),
+      eq(internalNotifications.entityType, "ticket"),
+      notLike(internalNotifications.href, "/app/chat/%"),
+      isNull(internalNotifications.readAt),
+      inArray(internalNotifications.entityId, ticketIds),
+    ));
+
+  return rows.flatMap((row) => row.entityId ? [row.entityId] : []);
 }
