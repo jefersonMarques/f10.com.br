@@ -1007,6 +1007,7 @@
           operation="summary"
           text={reviewSummary}
           canEdit={data.canEdit}
+          canStartEdit={allowModal}
           className="space-y-1 text-[12px] leading-6 text-[#707788]"
           placeholder="Resumo público"
           on:saved={inlineSaved}
@@ -1034,6 +1035,7 @@
             operation="quick_guide"
             text={reviewQuickGuide}
             canEdit={data.canEdit}
+          canStartEdit={allowModal}
             className="space-y-1.5 text-[12px] leading-6 text-[#4E5565]"
             rows={7}
             placeholder="Resumo rápido do procedimento"
@@ -1078,6 +1080,7 @@
                 targetId={step.id}
                 text={step.title}
                 canEdit={data.canEdit}
+          canStartEdit={allowModal}
                 mode="plain"
                 className="pr-10 text-[17px] font-semibold text-[#252B3B]"
                 rows={2}
@@ -1091,6 +1094,7 @@
                   targetId={step.id}
                   text={step.description}
                   canEdit={data.canEdit}
+          canStartEdit={allowModal}
                   className="space-y-1 pr-10 text-[13px] leading-5 text-[#7A8190]"
                   rows={3}
                   placeholder="Descrição opcional"
@@ -1149,7 +1153,7 @@
                   initialInteractions={review?.draftInteractions ?? []}
                   reviewed={humanStatus?.reviewed ?? false}
                   canGenerateFrames={data.canGenerateVideoFrames}
-                  disabled={!data.canEdit}
+                  disabled={!data.canEdit || openEditors.size > 0}
                   on:interaction={markInteraction}
                 />
               {:else if block.blockType === "file" && block.asset}
