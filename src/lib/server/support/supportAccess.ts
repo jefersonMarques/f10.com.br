@@ -183,6 +183,49 @@ export async function canAccessTicket(
   return Boolean(ticket);
 }
 
+export async function diagnoseTicketAccessDenial(
+  userId: string,
+  scope: PermissionScope,
+  ticketId: string,
+): Promise<string> {
+  const db = getDatabase();
+  const [ticket] = await db
+    .select({
+      assignedUserId: tickets.assignedUserId,
+      createdByUserId: tickets.createdByUserId,
+      queueTeamId: supportQueues.teamId,
+      areaId: ticketWorkflowStates.areaId,
+      areaTeamId: ticketAreas.teamId,
+    })
+    .from(tickets)
+    .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
+    .leftJoin(ticketWorkflowStates, eq(ticketWorkflowStates.ticketId, tickets.id))
+    .leftJoin(ticketAreas, eq(ticketAreas.id, ticketWorkflowStates.areaId))
+    .where(eq(tickets.id, ticketId))
+    .limit(1);
+
+  if (!ticket) return "ticket_not_found";
+
+  const [allowedAreas, teamIds, isFollower] = await Promise.all([
+    getUserTicketAreaRestriction(userId),
+    scope === "team" ? getUserSupportTeamIds(userId) : Promise.resolve([]),
+    isTicketFollower(userId, ticketId),
+  ]);
+
+  if (isFollower) return "follower_access_mismatch";
+  if (allowedAreas !== null && (!ticket.areaId || !allowedAreas.includes(ticket.areaId))) {
+    return "process_not_permitted";
+  }
+  if (scope === "all") return "global_access_mismatch";
+  if (ticket.assignedUserId === userId || ticket.createdByUserId === userId) {
+    return "own_ticket_access_mismatch";
+  }
+  if (scope === "own") return "ticket_not_owned";
+  if (teamIds.length === 0) return "no_team_membership";
+  if (!ticket.queueTeamId && !ticket.areaTeamId) return "ticket_without_team";
+  return "ticket_outside_assigned_teams";
+}
+
 export async function requireTicketAccess(
   userId: string,
   scope: PermissionScope,
