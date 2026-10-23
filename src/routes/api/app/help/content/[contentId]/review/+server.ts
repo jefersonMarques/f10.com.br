@@ -1,9 +1,11 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
+import { moveHelpBlock } from "$lib/server/help/helpContentOrdering";
 import { updateHelpQuickGuide } from "$lib/server/help/helpQuickGuideRepository";
 import {
   addStructuredHelpBlock,
+  deleteStructuredHelpBlock,
   getStructuredHelpContent,
   updateStructuredHelpBlock,
   updateStructuredHelpContent,
@@ -166,6 +168,85 @@ export const POST: RequestHandler = async ({ cookies, params, request }) => {
         block.id,
         blockInput(block, text),
       );
+    } else if (operation === "update_block") {
+      if (!isUuid(targetId)) {
+        return json({ success: false, message: "Bloco inválido." }, { status: 400 });
+      }
+      const block = content.steps
+        .flatMap((step) => step.blocks)
+        .find((item) => item.id === targetId);
+      if (!block) {
+        return json({ success: false, message: "Bloco não encontrado." }, { status: 404 });
+      }
+
+      const input = blockInput(block, block.textContent);
+      const readField = (key: string, maxLength: number): string | null => {
+        const value = payload[key];
+        return typeof value === "string" && value.length <= maxLength ? value.trim() : null;
+      };
+
+      if (block.blockType === "text" || block.blockType === "notice") {
+        const value = readField("textContent", 50_000);
+        if (!value) {
+          return json({ success: false, message: "Informe o texto do bloco." }, { status: 400 });
+        }
+        input.textContent = value;
+        if (block.blockType === "notice") {
+          const variant = readField("noticeVariant", 20);
+          if (!variant || !["info", "warning", "success", "danger"].includes(variant)) {
+            return json({ success: false, message: "Tipo de aviso inválido." }, { status: 400 });
+          }
+          input.noticeVariant = variant;
+        }
+      } else if (block.blockType === "link") {
+        const label = readField("linkLabel", 240);
+        const url = readField("linkUrl", 2_000);
+        if (!label || !url || !isHttpUrl(url)) {
+          return json({ success: false, message: "Informe um texto e um link válido." }, { status: 400 });
+        }
+        input.linkLabel = label;
+        input.linkUrl = url;
+      } else {
+        const sourceUrl = readField("sourceUrl", 2_000);
+        const altText = readField("altText", 500);
+        const assistantDescription = readField("assistantDescription", 20_000);
+        const extractedText = readField("extractedText", 200_000);
+        const linkLabel = block.blockType === "file"
+          ? readField("linkLabel", 240)
+          : input.linkLabel;
+        if (
+          sourceUrl === null ||
+          altText === null ||
+          assistantDescription === null ||
+          extractedText === null ||
+          linkLabel === null ||
+          (sourceUrl && !isHttpUrl(sourceUrl)) ||
+          (block.asset?.storageKey && sourceUrl !== (block.asset.sourceUrl ?? ""))
+        ) {
+          return json({ success: false, message: "Revise os dados do arquivo." }, { status: 400 });
+        }
+        input.sourceUrl = sourceUrl;
+        input.altText = altText;
+        input.assistantDescription = assistantDescription;
+        input.extractedText = extractedText;
+        input.linkLabel = linkLabel;
+      }
+      await updateStructuredHelpBlock(session.user.id, content.id, block.id, input);
+    } else if (operation === "delete_block" || operation === "move_block") {
+      if (!isUuid(targetId) || !content.steps.some((step) =>
+        step.blocks.some((block) => block.id === targetId)
+      )) {
+        return json({ success: false, message: "Bloco não encontrado." }, { status: 404 });
+      }
+      if (operation === "delete_block") {
+        await deleteStructuredHelpBlock(session.user.id, content.id, targetId);
+      } else {
+        const direction = payload.direction;
+        if (direction !== "up" && direction !== "down") {
+          return json({ success: false, message: "Movimentação inválida." }, { status: 400 });
+        }
+        await moveHelpBlock(session.user.id, content.id, targetId, direction);
+      }
     } else if (operation === "categories") {
       const categoryIds = Array.isArray(payload.categoryIds)
         ? Array.from(new Set(payload.categoryIds.filter((item): item is string =>
