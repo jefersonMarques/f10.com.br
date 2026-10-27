@@ -465,6 +465,35 @@ export async function processCustomerImportBatch(batchId: string, actorUserId: s
   return processed;
 }
 
+export async function getCustomerImportReport(batchId: string) {
+  const result = await getDatabase().execute(sql`
+    SELECT line_number, source_id, source_group_id,
+           record ->> 'unitName' AS unit_name,
+           record ->> 'groupName' AS group_name,
+           record ->> 'holderName' AS holder_name,
+           record ->> 'commercialStatus' AS commercial_status,
+           record ->> 'plan' AS plan,
+           decision, warnings, error_code, applied_at
+    FROM customer_import_rows
+    WHERE batch_id = ${batchId}::uuid
+    ORDER BY line_number
+  `);
+  return rowsOf(result).map((row) => ({
+    lineNumber: Number(row.line_number),
+    sourceId: readText(row.source_id),
+    sourceGroupId: readText(row.source_group_id),
+    unitName: readText(row.unit_name),
+    groupName: readText(row.group_name),
+    holderName: readText(row.holder_name),
+    commercialStatus: readText(row.commercial_status),
+    plan: readText(row.plan),
+    decision: readText(row.decision),
+    warnings: ((row.warnings as string[]) ?? []).join("; "),
+    errorCode: readText(row.error_code),
+    applied: Boolean(row.applied_at),
+  }));
+}
+
 export async function listImportedCustomerUnits(query: string, limit = 100) {
   const db = getDatabase();
   return rowsOf(await db.execute(sql`
