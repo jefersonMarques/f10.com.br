@@ -61,6 +61,7 @@
         </button>
       </form>
       <p class="application-text-meta mt-3 text-app-muted">O envio não cadastra clientes nem cria acessos.</p>
+      <p class="application-text-meta mt-1 text-app-muted">Mapeamento proposto: Grupo = rede · Aluno = unidade · Titular = contato comercial.</p>
     </section>
     <section class="rounded-[20px] border border-app-border bg-app-surface p-5">
       <h2 class="application-text-caption mb-3 font-bold text-app-heading">Lotes recentes</h2>
