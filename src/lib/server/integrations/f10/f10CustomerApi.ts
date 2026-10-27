@@ -2,16 +2,26 @@ import { env } from "$env/dynamic/private";
 import {
   parseF10Contracts,
   parseF10Person,
+  parseF10UnitId,
   type F10CustomerPerson,
 } from "$lib/server/integrations/f10/f10CustomerSyncParsing";
 
 const BASE_URL = "https://api.f10.com.br";
-const UNIT_ID = 1;
 const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 
+export function getConfiguredF10UnitId(): number {
+  return parseF10UnitId(env.F10_UID);
+}
+
 export function isF10CustomerApiConfigured(): boolean {
-  return Boolean(env.F10_API_BEARER_TOKEN?.trim());
+  if (!env.F10_API_BEARER_TOKEN?.trim()) return false;
+  try {
+    getConfiguredF10UnitId();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function apiGet(path: string): Promise<unknown> {
@@ -60,13 +70,15 @@ async function apiGet(path: string): Promise<unknown> {
   throw new Error("F10_API_UNAVAILABLE");
 }
 
-export async function listF10CustomerContractOwners() {
-  const response = await apiGet(`/unidade/contratos/${UNIT_ID}`);
+export async function listF10CustomerContractOwners(unitId: number) {
+  if (!Number.isSafeInteger(unitId) || unitId <= 0) throw new Error("F10_UID_INVALID");
+  const response = await apiGet(`/unidade/contratos/${unitId}`);
   return parseF10Contracts(response);
 }
 
-export async function getF10CustomerPerson(personId: number): Promise<F10CustomerPerson> {
+export async function getF10CustomerPerson(unitId: number, personId: number): Promise<F10CustomerPerson> {
+  if (!Number.isSafeInteger(unitId) || unitId <= 0) throw new Error("F10_UID_INVALID");
   if (!Number.isSafeInteger(personId) || personId <= 0) throw new Error("F10_PERSON_ID_INVALID");
-  const response = await apiGet(`/unidade/pessoas/${UNIT_ID}/${personId}`);
+  const response = await apiGet(`/unidade/pessoas/${unitId}/${personId}`);
   return parseF10Person(response, personId);
 }
