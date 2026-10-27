@@ -218,30 +218,36 @@ export async function resolveCustomerImportRow(
 ): Promise<void> {
   if (!["create", "link", "skip"].includes(decision)) throw new Error("DECISION_INVALID");
   const db = getDatabase();
-  if (decision === "link") {
-    if (!targetOrganizationId) throw new Error("ORGANIZATION_REQUIRED");
-    const matches = rowsOf(await db.execute(sql`
-      SELECT id FROM customer_organizations WHERE id = ${targetOrganizationId}::uuid
+
+  await db.transaction(async (transaction) => {
+    if (decision === "link") {
+      if (!targetOrganizationId) throw new Error("ORGANIZATION_REQUIRED");
+      const matches = rowsOf(await transaction.execute(sql`
+        SELECT id FROM customer_organizations WHERE id = ${targetOrganizationId}::uuid
+      `));
+      if (!matches.length) throw new Error("ORGANIZATION_NOT_FOUND");
+    }
+
+    const updated = rowsOf(await transaction.execute(sql`
+      UPDATE customer_import_rows AS row
+      SET decision = ${decision},
+          target_organization_id = ${decision === "link" ? targetOrganizationId : null}::uuid,
+          error_code = NULL
+      FROM customer_import_batches AS batch
+      WHERE row.batch_id = batch.id
+        AND batch.id = ${batchId}::uuid
+        AND row.id = ${rowId}::uuid
+        AND batch.status = 'review' AND batch.confirmed_at IS NULL
+      RETURNING row.id
     `));
-    if (!matches.length) throw new Error("ORGANIZATION_NOT_FOUND");
-  }
-  const updated = rowsOf(await db.execute(sql`
-    UPDATE customer_import_rows AS row
-    SET decision = ${decision}, target_organization_id = ${decision === "link" ? targetOrganizationId : null}::uuid,
-        error_code = NULL
-    FROM customer_import_batches AS batch
-    WHERE row.batch_id = batch.id
-      AND batch.id = ${batchId}::uuid
-      AND row.id = ${rowId}::uuid
-      AND batch.status = 'review' AND batch.confirmed_at IS NULL
-    RETURNING row.id
-  `));
-  if (!updated.length) throw new Error("ROW_NOT_EDITABLE");
-  await db.execute(sql`
-    INSERT INTO customer_import_events (batch_id, row_id, actor_user_id, action, metadata)
-    VALUES (${batchId}::uuid, ${rowId}::uuid, ${actorUserId}::uuid, 'resolved',
-            ${JSON.stringify({ decision, targetOrganizationId: decision === "link" ? targetOrganizationId : null })}::jsonb)
-  `);
+    if (!updated.length) throw new Error("ROW_NOT_EDITABLE");
+
+    await transaction.execute(sql`
+      INSERT INTO customer_import_events (batch_id, row_id, actor_user_id, action, metadata)
+      VALUES (${batchId}::uuid, ${rowId}::uuid, ${actorUserId}::uuid, 'resolved',
+              ${JSON.stringify({ decision, targetOrganizationId: decision === "link" ? targetOrganizationId : null })}::jsonb)
+    `);
+  });
 }
 
 export async function confirmCustomerImport(actorUserId: string, batchId: string): Promise<boolean> {
