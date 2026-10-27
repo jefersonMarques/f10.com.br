@@ -15,6 +15,16 @@ export type F10CustomerPerson = {
 const MAX_CONTRACTS = 50_000;
 const MAX_PEOPLE = 10_000;
 
+export function parseF10UnitId(value: string | undefined): number {
+  const raw = value?.trim() ?? "";
+  if (!/^[1-9][0-9]*$/.test(raw)) throw new Error("F10_UID_INVALID");
+  const unitId = Number(raw);
+  if (!Number.isSafeInteger(unitId) || unitId > 2_147_483_647) {
+    throw new Error("F10_UID_INVALID");
+  }
+  return unitId;
+}
+
 function positiveId(value: unknown): number | null {
   if (typeof value !== "number" && typeof value !== "string") return null;
   const number = Number(value);

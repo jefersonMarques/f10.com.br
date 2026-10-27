@@ -2,7 +2,7 @@ import { error, fail, redirect, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
-import { isF10CustomerApiConfigured } from "$lib/server/integrations/f10/f10CustomerApi";
+import { getConfiguredF10UnitId, isF10CustomerApiConfigured } from "$lib/server/integrations/f10/f10CustomerApi";
 import {
   getF10CustomerSyncPreview,
   processF10CustomerSyncOnce,
@@ -11,6 +11,14 @@ import {
 
 const RETURN_TO = "/app/customers/sync";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function sourceUnitId(): number | null {
+  try {
+    return getConfiguredF10UnitId();
+  } catch {
+    return null;
+  }
+}
 
 async function authorize(cookies: Parameters<typeof requireAppPermission>[0]) {
   const context = await requireAppPermission(cookies, "customers.manage", RETURN_TO);
@@ -32,8 +40,10 @@ export const load: PageServerLoad = async ({ parent, url, setHeaders }) => {
   const value = Number(url.searchParams.get("page") ?? "1");
   const page = Number.isInteger(value) ? Math.max(1, Math.min(value, 10000)) : 1;
 
+  const unitId = sourceUnitId();
   return {
-    ...(await getF10CustomerSyncPreview(batchId, page)),
+    ...(await getF10CustomerSyncPreview(batchId, page, unitId ?? 0)),
+    sourceUnitId: unitId,
     apiConfigured: isF10CustomerApiConfigured(),
   };
 };
@@ -42,10 +52,10 @@ export const actions: Actions = {
   start: async ({ cookies }) => {
     const actor = await authorize(cookies);
     if (!isF10CustomerApiConfigured()) {
-      return fail(503, { message: "Configure F10_API_BEARER_TOKEN no servidor antes de consultar a API." });
+      return fail(503, { message: "Configure F10_UID e F10_API_BEARER_TOKEN no servidor antes de consultar a API." });
     }
     try {
-      const batchId = await queueF10CustomerSync(actor);
+      const batchId = await queueF10CustomerSync(actor, getConfiguredF10UnitId());
       throw redirect(303, RETURN_TO + "?batch=" + batchId);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
@@ -58,7 +68,7 @@ export const actions: Actions = {
       return fail(503, { message: "A integração com a API F10 não está configurada." });
     }
     try {
-      await processF10CustomerSyncOnce();
+      await processF10CustomerSyncOnce(getConfiguredF10UnitId());
       throw redirect(303, RETURN_TO);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;

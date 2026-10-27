@@ -41,7 +41,7 @@
     <div>
       <a href="/app/customers" class="application-text-meta mb-2 inline-flex items-center gap-1 font-semibold text-app-primary"><ArrowLeft size={15}/> Clientes</a>
       <h1 class="text-xl font-bold text-app-text">Sincronizar clientes</h1>
-      <p class="application-text-caption mt-1 text-app-text-muted">API F10 · Unidade 1 · Todas as pessoas com contrato, inclusive cancelados.</p>
+      <p class="application-text-caption mt-1 text-app-text-muted">API F10 · Unidade {data.sourceUnitId ?? "não configurada"} · Todas as pessoas com contrato, inclusive cancelados.</p>
     </div>
     <span class="application-text-caption inline-flex items-center gap-2 rounded-xl border border-app-border px-3 py-2 text-app-text-muted"><ShieldCheck size={17}/> Somente leitura</span>
   </div>
@@ -57,7 +57,7 @@
       <form method="POST" action="?/start">
         <button type="submit" disabled={!data.apiConfigured} class="application-text-caption inline-flex h-11 items-center gap-2 rounded-xl bg-app-primary px-5 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><RefreshCw size={17}/> Buscar atualizações</button>
       </form>
-      {#if !data.apiConfigured}<p role="alert" class="application-text-caption mt-3 text-app-warning-text">Configure F10_API_BEARER_TOKEN no servidor para habilitar a conexão.</p>{/if}
+      {#if !data.apiConfigured}<p role="alert" class="application-text-caption mt-3 text-app-warning-text">Configure F10_UID e F10_API_BEARER_TOKEN no servidor para habilitar a conexão.</p>{/if}
     </section>
     <section class="rounded-[20px] border border-app-border bg-app-surface p-5">
       <h2 class="application-text-caption mb-3 font-bold text-app-text">Diagnósticos recentes</h2>
@@ -83,7 +83,7 @@
           {#if data.batch.status === "review"}<CheckCircle2 size={19} class="text-app-success-text"/>{:else}<Clock3 size={19} class="text-app-text-muted"/>{/if}
           <div>
             <h2 class="application-text-caption font-bold text-app-text">{statusNames[String(data.batch.status)] ?? String(data.batch.status)}</h2>
-            <p class="application-text-meta text-app-text-muted">Criado em {dateLabel(data.batch.created_at)}</p>
+            <p class="application-text-meta text-app-text-muted">Unidade {String(data.batch.unit_id)} · Criado em {dateLabel(data.batch.created_at)}</p>
           </div>
         </div>
         {#if data.batch.status === "queued" || data.batch.status === "scanning"}
