@@ -7,6 +7,7 @@ import {
   getCustomerImportPage,
   processCustomerImportBatch,
   resolveCustomerImportRow,
+  retryCustomerImportRow,
   stageCustomerImport,
 } from "$lib/server/support/customerImportRepository";
 import {
@@ -115,6 +116,17 @@ export const actions: Actions = {
     }
     if (!await confirmCustomerImport(actorUserId, batchId)) {
       return fail(409, { message: "Existem linhas pendentes de revisão ou o lote já foi confirmado." });
+    }
+    throw redirect(303, RETURN_TO + "?batch=" + batchId);
+  },
+
+  retry: async ({ cookies, request }) => {
+    const actorUserId = await authorize(cookies);
+    const data = await request.formData();
+    const batchId = readUuid(data, "batchId");
+    const rowId = readUuid(data, "rowId");
+    if (!await retryCustomerImportRow(actorUserId, batchId, rowId)) {
+      return fail(409, { message: "Esta linha não pode ser reprocessada." });
     }
     throw redirect(303, RETURN_TO + "?batch=" + batchId);
   },
