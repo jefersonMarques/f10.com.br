@@ -135,14 +135,14 @@
     <section class="mt-5 overflow-hidden rounded-[22px] border border-app-border bg-app-surface">
       <div class="flex flex-wrap items-center justify-between gap-2 border-b border-app-border-soft p-4">
         <div>
-          <h2 class="application-text-caption font-bold text-app-heading">Unidades comerciais</h2>
-          <p class="application-text-meta mt-1 text-app-muted">Grupos e unidades importados, inclusive sem contato pessoal.</p>
+          <h2 class="application-text-caption font-bold text-app-text">Unidades comerciais</h2>
+          <p class="application-text-meta mt-1 text-app-text-muted">Grupos e unidades importados, inclusive sem contato pessoal.</p>
         </div>
-        <span class="application-text-meta text-app-muted">Até 100 resultados por pesquisa</span>
+        <span class="application-text-meta text-app-text-muted">Até 100 resultados por pesquisa</span>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full min-w-[700px] text-left">
-          <thead class="application-text-meta bg-app-subtle text-app-muted">
+          <thead class="application-text-meta bg-app-subtle text-app-text-muted">
             <tr>
               <th class="px-4 py-3">Unidade</th>
               <th class="px-4 py-3">Grupo</th>
@@ -153,10 +153,10 @@
           <tbody class="divide-y divide-app-border-soft">
             {#each data.importedUnits as unit}
               <tr>
-                <td class="application-text-caption px-4 py-3 align-top font-semibold text-app-heading">{String(unit.name)}<div class="application-text-meta mt-1 font-normal text-app-muted">ID {String(unit.source_id)}</div></td>
-                <td class="application-text-caption px-4 py-3 align-top text-app-muted">{String(unit.group_name ?? "Sem grupo")}</td>
-                <td class="application-text-caption px-4 py-3 align-top text-app-muted">{String(unit.holder_name ?? "Não informado")}</td>
-                <td class="application-text-caption px-4 py-3 align-top text-app-muted">{String(unit.commercial_status)}<div class="application-text-meta mt-1">{String(unit.contracted_plan ?? "")}</div></td>
+                <td class="application-text-caption px-4 py-3 align-top font-semibold text-app-text">{String(unit.name)}<div class="application-text-meta mt-1 font-normal text-app-text-muted">ID {String(unit.source_id)}</div></td>
+                <td class="application-text-caption px-4 py-3 align-top text-app-text-muted">{String(unit.group_name ?? "Sem grupo")}</td>
+                <td class="application-text-caption px-4 py-3 align-top text-app-text-muted">{String(unit.holder_name ?? "Não informado")}</td>
+                <td class="application-text-caption px-4 py-3 align-top text-app-text-muted">{String(unit.commercial_status)}<div class="application-text-meta mt-1">{String(unit.contracted_plan ?? "")}</div></td>
               </tr>
             {/each}
           </tbody>
