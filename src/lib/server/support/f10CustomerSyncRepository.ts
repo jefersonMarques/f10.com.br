@@ -163,7 +163,7 @@ async function classifyPerson(person: F10CustomerPerson) {
   return { result, matchedContactId: existing ? String(existing.id) : null, candidateCount: candidates.length };
 }
 
-async function scanPerson(batchId: string, personId: number): Promise<void> {
+async function scanPerson(batchId: string, personId: number): Promise<"ok" | "fatal"> {
   const db = getDatabase();
   try {
     const person = await getF10CustomerPerson(personId);
@@ -177,21 +177,32 @@ async function scanPerson(batchId: string, personId: number): Promise<void> {
       WHERE batch_id = ${batchId}::uuid AND person_id = ${personId} AND result = 'pending'
       RETURNING person_id
     `));
-    if (!applied.length) return;
+    if (!applied.length) return "ok";
   } catch (cause) {
-    await db.execute(sql`
-      UPDATE f10_customer_sync_rows SET result = 'failed', error_code = ${messageCode(cause)},
+    const code = messageCode(cause);
+    if (["F10_API_UNAUTHORIZED", "F10_API_NOT_CONFIGURED", "F10_API_RATE_LIMITED"].includes(code)) {
+      await db.execute(sql`
+        UPDATE f10_customer_sync_batches SET status = 'failed',
+          last_error_code = ${code}, completed_at = now(), updated_at = now()
+        WHERE id = ${batchId}::uuid AND status = 'scanning'
+      `);
+      return "fatal";
+    }
+    const failed = rowsOf(await db.execute(sql`
+      UPDATE f10_customer_sync_rows SET result = 'failed', error_code = ${code},
         checked_at = now()
       WHERE batch_id = ${batchId}::uuid AND person_id = ${personId} AND result = 'pending'
-    `);
+      RETURNING person_id
+    `));
+    if (!failed.length) return "ok";
   }
   await db.execute(sql`
     UPDATE f10_customer_sync_batches
     SET processed_people = processed_people + 1, updated_at = now()
     WHERE id = ${batchId}::uuid
   `);
+  return "ok";
 }
-
 async function completeF10CustomerSync(batchId: string): Promise<void> {
   const db = getDatabase();
   await db.transaction(async (tx) => {
@@ -252,6 +263,7 @@ export async function processF10CustomerSyncOnce(): Promise<void> {
   }
   for (let offset = 0; offset < pending.length; offset += 4) {
     const group = pending.slice(offset, offset + 4);
-    await Promise.all(group.map((row) => scanPerson(batchId, Number(row.person_id))));
+    const outcomes = await Promise.all(group.map((row) => scanPerson(batchId, Number(row.person_id))));
+    if (outcomes.includes("fatal")) return;
   }
 }
