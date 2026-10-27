@@ -190,7 +190,7 @@ export async function getCustomerImportPage(batchId: string | null, page: number
     line_number: Number(row.line_number),
     source_id: readText(row.source_id),
     source_group_id: row.source_group_id as string | null,
-    record: readRecord(row.record),
+    record: { ...readRecord(row.record), billingUrl: "" },
     warnings: (row.warnings as string[]) ?? [],
     decision: row.decision as Decision,
     target_organization_id: row.target_organization_id as string | null,
