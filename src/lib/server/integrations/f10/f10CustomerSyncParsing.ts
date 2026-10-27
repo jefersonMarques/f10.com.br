@@ -82,7 +82,7 @@ export function parseF10Person(payload: unknown, expectedId: number): F10Custome
   const name = cleanText(person.nome, 120);
   if (name.length < 2) throw new Error("F10_PERSON_NAME_MISSING");
   const rawEmail = cleanText(person.email, 254).toLowerCase();
-  const email = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(rawEmail) ? rawEmail : "";
+  const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail) ? rawEmail : "";
   return {
     personId: expectedId,
     name,
