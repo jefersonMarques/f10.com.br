@@ -363,43 +363,103 @@ async function applyCustomerImportRow(
   `);
 }
 
-export async function processCustomerImportBatch(batchId: string, actorUserId: string): Promise<number> {
+export async function listRunningCustomerImportBatches(): Promise<string[]> {
+  const result = await getDatabase().execute(sql`
+    SELECT id FROM customer_import_batches
+    WHERE status = 'running' AND confirmed_at IS NOT NULL
+    ORDER BY confirmed_at LIMIT 3
+  `);
+  return rowsOf(result).map((row) => readText(row.id));
+}
+
+export async function retryCustomerImportRow(
+  actorUserId: string,
+  batchId: string,
+  rowId: string,
+): Promise<boolean> {
+  const db = getDatabase();
+  return db.transaction(async (transaction) => {
+    const rows = rowsOf(await transaction.execute(sql`
+      UPDATE customer_import_rows AS row
+      SET error_code = NULL
+      FROM customer_import_batches AS batch
+      WHERE row.batch_id = batch.id AND row.id = ${rowId}::uuid
+        AND batch.id = ${batchId}::uuid AND batch.confirmed_at IS NOT NULL
+        AND row.applied_at IS NULL AND row.error_code IS NOT NULL
+      RETURNING row.id
+    `));
+    if (!rows.length) return false;
+    await transaction.execute(sql`
+      UPDATE customer_import_batches SET status = 'running', completed_at = NULL
+      WHERE id = ${batchId}::uuid
+    `);
+    await transaction.execute(sql`
+      INSERT INTO customer_import_events (batch_id, row_id, actor_user_id, action)
+      VALUES (${batchId}::uuid, ${rowId}::uuid, ${actorUserId}::uuid, 'retry')
+    `);
+    return true;
+  });
+}
+
+export async function processCustomerImportBatch(batchId: string, actorUserId: string | null): Promise<number> {
   const db = getDatabase();
   let processed = 0;
+
   for (let index = 0; index < 25; index += 1) {
-    const performed = await db.transaction(async (transaction) => {
-      const available = rowsOf(await transaction.execute(sql`
-        SELECT row.id, row.source_id, row.record, row.decision, row.target_organization_id
-        FROM customer_import_rows AS row
-        JOIN customer_import_batches AS batch ON batch.id = row.batch_id
-        WHERE row.batch_id = ${batchId}::uuid AND batch.status = 'running'
-          AND batch.confirmed_at IS NOT NULL AND row.applied_at IS NULL
-          AND row.error_code IS NULL AND row.decision <> 'review'
-        ORDER BY row.line_number
-        LIMIT 1 FOR UPDATE OF row SKIP LOCKED
-      `));
-      const row = available[0];
-      if (!row) return false;
-      await applyCustomerImportRow(transaction, batchId, row);
-      return true;
-    });
-    if (!performed) break;
-    processed += 1;
+    let failedRowId: string | null = null;
+    try {
+      const performed = await db.transaction(async (transaction) => {
+        const available = rowsOf(await transaction.execute(sql`
+          SELECT row.id, row.source_id, row.record, row.decision, row.target_organization_id
+          FROM customer_import_rows AS row
+          JOIN customer_import_batches AS batch ON batch.id = row.batch_id
+          WHERE row.batch_id = ${batchId}::uuid AND batch.status = 'running'
+            AND batch.confirmed_at IS NOT NULL AND row.applied_at IS NULL
+            AND row.error_code IS NULL AND row.decision <> 'review'
+          ORDER BY row.line_number
+          LIMIT 1 FOR UPDATE OF row SKIP LOCKED
+        `));
+        const row = available[0];
+        if (!row) return false;
+        failedRowId = readText(row.id);
+        await applyCustomerImportRow(transaction, batchId, row);
+        return true;
+      });
+      if (!performed) break;
+      processed += 1;
+    } catch {
+      if (!failedRowId) throw new Error("IMPORT_BATCH_UNAVAILABLE");
+      await db.execute(sql`
+        UPDATE customer_import_rows
+        SET error_code = 'ROW_FAILED'
+        WHERE id = ${failedRowId}::uuid AND applied_at IS NULL
+      `);
+      await db.execute(sql`
+        INSERT INTO customer_import_events (batch_id, row_id, action)
+        VALUES (${batchId}::uuid, ${failedRowId}::uuid, 'failed')
+      `);
+    }
   }
 
   await db.execute(sql`
     UPDATE customer_import_batches AS batch
-    SET status = 'completed', completed_at = now()
+    SET status = CASE WHEN EXISTS (
+      SELECT 1 FROM customer_import_rows AS row
+      WHERE row.batch_id = batch.id AND row.error_code IS NOT NULL
+    ) THEN 'failed' ELSE 'completed' END,
+    completed_at = now()
     WHERE batch.id = ${batchId}::uuid AND batch.status = 'running'
       AND NOT EXISTS (
         SELECT 1 FROM customer_import_rows AS row
-        WHERE row.batch_id = batch.id AND row.applied_at IS NULL
+        WHERE row.batch_id = batch.id
+          AND row.applied_at IS NULL AND row.error_code IS NULL
       )
   `);
   if (processed) {
     await db.execute(sql`
       INSERT INTO customer_import_events (batch_id, actor_user_id, action, metadata)
-      VALUES (${batchId}::uuid, ${actorUserId}::uuid, 'processed', ${JSON.stringify({ processed })}::jsonb)
+      VALUES (${batchId}::uuid, ${actorUserId}::uuid, 'processed',
+              ${JSON.stringify({ processed })}::jsonb)
     `);
   }
   return processed;
