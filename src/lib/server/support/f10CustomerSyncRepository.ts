@@ -18,6 +18,11 @@ function messageCode(cause: unknown): string {
 
 export async function queueF10CustomerSync(actorUserId: string): Promise<string> {
   const db = getDatabase();
+  // As prévias contêm dados pessoais mínimos e expiram após 30 dias.
+  await db.execute(sql`
+    DELETE FROM f10_customer_sync_batches
+    WHERE status IN ('review', 'failed') AND created_at < now() - interval '30 days'
+  `);
   const created = rowsOf(await db.execute(sql`
     INSERT INTO f10_customer_sync_batches (created_by)
     VALUES (${actorUserId}::uuid)
@@ -135,6 +140,7 @@ async function classifyPerson(person: F10CustomerPerson) {
       SELECT c.id FROM customer_contacts c
       WHERE
         (${person.email} <> '' AND lower(btrim(coalesce(c.email, ''))) = ${person.email})
+        OR (lower(btrim(c.name)) = ${person.name.toLowerCase()})
         OR (${phoneDigits.length >= 10} AND (
           regexp_replace(coalesce(c.whatsapp, ''), '[^0-9]', '', 'g') = ${phoneDigits}
           OR regexp_replace(coalesce(c.phone, ''), '[^0-9]', '', 'g') = ${phoneDigits}
