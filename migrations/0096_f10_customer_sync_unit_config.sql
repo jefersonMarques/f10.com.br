@@ -1,0 +1,1 @@
+-- Sincronização utiliza F10_UID como identificador de unidade.
