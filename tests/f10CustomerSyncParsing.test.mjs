@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   parseF10Contracts,
   parseF10Person,
+  parseF10UnitId,
   classifyF10CustomerMatch,
 } from "../src/lib/server/integrations/f10/f10CustomerSyncParsing.ts";
 
@@ -47,4 +48,12 @@ test("never automatically merges a plausible match", () => {
   assert.equal(classifyF10CustomerMatch({ mappedContact: null, candidates: [{ id: "x" }], person }), "possible_match");
   assert.equal(classifyF10CustomerMatch({ mappedContact: { id: "1", name: "Pessoa A", email: "a@example.com", phone: null, whatsapp: null }, candidates: [], person }), "unchanged");
   assert.equal(classifyF10CustomerMatch({ mappedContact: { id: "1", name: "Outro", email: "a@example.com", phone: null, whatsapp: null }, candidates: [], person }), "update");
+});
+
+test("uses configured F10_UID and rejects unsafe or missing values", () => {
+  assert.equal(parseF10UnitId("1"), 1);
+  assert.equal(parseF10UnitId(" 42 "), 42);
+  for (const value of [undefined, "", "0", "-1", "1.5", "1e3", "wrong", "9007199254740992"]) {
+    assert.throws(() => parseF10UnitId(value), /F10_UID_INVALID/);
+  }
 });
