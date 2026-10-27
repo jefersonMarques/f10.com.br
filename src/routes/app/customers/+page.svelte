@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Building2, FileSpreadsheet, Mail, MessageCircleMore, Phone, Search } from "lucide-svelte";
+  import { Building2, FileSpreadsheet, Mail, MessageCircleMore, Phone, RefreshCw, Search } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { PageData } from "./$types";
 
@@ -52,6 +52,9 @@
       <div class="flex flex-wrap items-center gap-3">
         <div class="application-text-caption flex items-center gap-2 text-[#777D8D]"><Building2 size={15}/><strong class="text-[#303746]">{data.total}</strong> contato(s)</div>
         {#if data.canImport}
+          <form method="POST" action="/app/customers/sync?/start">
+            <button type="submit" class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl border border-app-border-control px-4 font-semibold text-app-text"><RefreshCw size={16}/> Sincronizar</button>
+          </form>
           <a href="/app/customers/import" class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white"><FileSpreadsheet size={16}/> Importar clientes</a>
         {/if}
       </div>
