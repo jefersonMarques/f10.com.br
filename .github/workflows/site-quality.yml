@@ -61,6 +61,7 @@ jobs:
           node --experimental-strip-types --test tests/accessPolicies.test.mjs
           node --experimental-strip-types --test tests/nfseRequestStatus.test.mjs
           node --experimental-strip-types --test tests/customerImportFile.test.mjs
+          node --experimental-strip-types --test tests/f10CustomerSyncParsing.test.mjs
 
       - name: Build production bundle
         run: npm run build
