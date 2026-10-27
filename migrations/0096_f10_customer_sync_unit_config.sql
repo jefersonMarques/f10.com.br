@@ -11,3 +11,9 @@ ALTER TABLE f10_customer_external_identities
   DROP CONSTRAINT IF EXISTS f10_customer_external_identities_unit_id_check;
 ALTER TABLE f10_customer_external_identities
   ADD CONSTRAINT f10_customer_external_identities_unit_positive CHECK (unit_id > 0);
+
+-- Pode haver uma consulta em andamento por unidade, sem bloquear outras origens.
+DROP INDEX IF EXISTS f10_customer_sync_one_running_idx;
+CREATE UNIQUE INDEX f10_customer_sync_one_running_idx
+  ON f10_customer_sync_batches (unit_id)
+  WHERE status IN ('queued', 'scanning');
