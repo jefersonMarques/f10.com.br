@@ -65,15 +65,21 @@ export const actions: Actions = {
       return fail(413, { message: "O arquivo deve ter no máximo 5 MB." });
     }
 
+    let parsed;
     try {
-      const parsed = parseCustomerImportFile(value.name, new Uint8Array(await value.arrayBuffer()));
+      parsed = parseCustomerImportFile(value.name, new Uint8Array(await value.arrayBuffer()));
+    } catch (cause) {
+      return fail(400, {
+        message: cause instanceof Error ? cause.message : "Não foi possível analisar a planilha.",
+      });
+    }
+
+    try {
       const batchId = await stageCustomerImport(actorUserId, value.name, parsed);
       throw redirect(303, RETURN_TO + "?batch=" + batchId);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
-      return fail(400, {
-        message: cause instanceof Error ? cause.message : "Não foi possível analisar a planilha.",
-      });
+      return fail(500, { message: "Falha ao preparar a prévia. Nenhum cliente foi gravado." });
     }
   },
 
