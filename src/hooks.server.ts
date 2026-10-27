@@ -4,11 +4,13 @@
 import { redirect, type Handle, type HandleServerError } from "@sveltejs/kit";
 import { startHelpVideoProcessingWorker } from "$lib/server/help/helpVideoProcessingWorker";
 import { startSupportEmailInboundWorker } from "$lib/server/support/emailInboundWorker";
+import { startCustomerImportWorker } from "$lib/server/support/customerImportWorker";
 import { resolveMovideskLegacyArticleId } from "$lib/server/help/movideskLegacyLinks";
 import { getPublicHelpCollectionBySlug } from "$lib/server/help/helpCollectionRepository";
 
 startHelpVideoProcessingWorker();
 startSupportEmailInboundWorker();
+startCustomerImportWorker();
 // Migração Movidesk encerrada: não iniciar trabalhadores de importação,
 // recuperação de imagens ou publicação em massa no servidor.
 // Os artigos e os redirecionamentos legados permanecem preservados.

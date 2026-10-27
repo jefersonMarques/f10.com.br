@@ -12,6 +12,7 @@ module.exports = {
         BODY_SIZE_LIMIT: "100M",
         F10_HELP_VIDEO_WORKER: "0",
         F10_BREVO_EMAIL_WORKER: "0",
+        F10_CUSTOMER_IMPORT_WORKER: "0",
       },
       env_production: {
         NODE_ENV: "production",
@@ -19,6 +20,7 @@ module.exports = {
         BODY_SIZE_LIMIT: "100M",
         F10_HELP_VIDEO_WORKER: "0",
         F10_BREVO_EMAIL_WORKER: "0",
+        F10_CUSTOMER_IMPORT_WORKER: "0",
       },
     },
     {
@@ -37,6 +39,7 @@ module.exports = {
         BODY_SIZE_LIMIT: "100M",
         F10_HELP_VIDEO_WORKER: "1",
         F10_BREVO_EMAIL_WORKER: "1",
+        F10_CUSTOMER_IMPORT_WORKER: "1",
       },
       env_production: {
         NODE_ENV: "production",
@@ -46,6 +49,7 @@ module.exports = {
         BODY_SIZE_LIMIT: "100M",
         F10_HELP_VIDEO_WORKER: "1",
         F10_BREVO_EMAIL_WORKER: "1",
+        F10_CUSTOMER_IMPORT_WORKER: "1",
       },
     },
   ],

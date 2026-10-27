@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Building2, Mail, MessageCircleMore, Phone, Search } from "lucide-svelte";
+  import { Building2, FileSpreadsheet, Mail, MessageCircleMore, Phone, Search } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { PageData } from "./$types";
 
@@ -49,7 +49,12 @@
         </label>
         <button type="submit" class="application-text-caption h-10 rounded-xl bg-app-primary px-4 font-semibold text-white">Buscar</button>
       </form>
-      <div class="application-text-caption flex items-center gap-2 text-[#777D8D]"><Building2 size={15}/><strong class="text-[#303746]">{data.total}</strong> cliente(s)</div>
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="application-text-caption flex items-center gap-2 text-[#777D8D]"><Building2 size={15}/><strong class="text-[#303746]">{data.total}</strong> contato(s)</div>
+        {#if data.canImport}
+          <a href="/app/customers/import" class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white"><FileSpreadsheet size={16}/> Importar clientes</a>
+        {/if}
+      </div>
     </div>
 
     {#if data.rows.length === 0}
@@ -125,4 +130,38 @@
       {/if}
     {/if}
   </section>
+
+  {#if data.importedUnits.length > 0}
+    <section class="mt-5 overflow-hidden rounded-[22px] border border-app-border bg-app-surface">
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-app-border-soft p-4">
+        <div>
+          <h2 class="application-text-caption font-bold text-app-text">Unidades comerciais</h2>
+          <p class="application-text-meta mt-1 text-app-text-muted">Grupos e unidades importados, inclusive sem contato pessoal.</p>
+        </div>
+        <span class="application-text-meta text-app-text-muted">Até 100 resultados por pesquisa</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[700px] text-left">
+          <thead class="application-text-meta bg-app-subtle text-app-text-muted">
+            <tr>
+              <th class="px-4 py-3">Unidade</th>
+              <th class="px-4 py-3">Grupo</th>
+              <th class="px-4 py-3">Responsável</th>
+              <th class="px-4 py-3">Situação / Plano</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-app-border-soft">
+            {#each data.importedUnits as unit}
+              <tr>
+                <td class="application-text-caption px-4 py-3 align-top font-semibold text-app-text">{String(unit.name)}<div class="application-text-meta mt-1 font-normal text-app-text-muted">ID {String(unit.source_id)}</div></td>
+                <td class="application-text-caption px-4 py-3 align-top text-app-text-muted">{String(unit.group_name ?? "Sem grupo")}</td>
+                <td class="application-text-caption px-4 py-3 align-top text-app-text-muted">{String(unit.holder_name ?? "Não informado")}</td>
+                <td class="application-text-caption px-4 py-3 align-top text-app-text-muted">{String(unit.commercial_status)}<div class="application-text-meta mt-1">{String(unit.contracted_plan ?? "")}</div></td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {/if}
 </ApplicationContent>
