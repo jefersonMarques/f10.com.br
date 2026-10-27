@@ -53,7 +53,7 @@ test("never automatically merges a plausible match", () => {
 test("uses configured F10_UID and rejects unsafe or missing values", () => {
   assert.equal(parseF10UnitId("1"), 1);
   assert.equal(parseF10UnitId(" 42 "), 42);
-  for (const value of [undefined, "", "0", "-1", "1.5", "1e3", "wrong", "9007199254740992"]) {
+  for (const value of [undefined, "", "0", "-1", "1.5", "1e3", "wrong", "2147483648", "9007199254740992"]) {
     assert.throws(() => parseF10UnitId(value), /F10_UID_INVALID/);
   }
 });
