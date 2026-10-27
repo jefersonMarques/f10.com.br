@@ -16,7 +16,7 @@ function messageCode(cause: unknown): string {
   return /^F10_[A-Z_]+$/.test(code) ? code : "F10_SYNC_UNEXPECTED_ERROR";
 }
 
-export async function queueF10CustomerSync(actorUserId: string): Promise<string> {
+export async function queueF10CustomerSync(actorUserId: string, unitId: number): Promise<string> {
   const db = getDatabase();
   // As prévias contêm dados pessoais mínimos e expiram após 30 dias.
   await db.execute(sql`
@@ -24,34 +24,34 @@ export async function queueF10CustomerSync(actorUserId: string): Promise<string>
     WHERE status IN ('review', 'failed') AND created_at < now() - interval '30 days'
   `);
   const created = rowsOf(await db.execute(sql`
-    INSERT INTO f10_customer_sync_batches (created_by)
-    VALUES (${actorUserId}::uuid)
+    INSERT INTO f10_customer_sync_batches (created_by, unit_id)
+    VALUES (${actorUserId}::uuid, ${unitId})
     ON CONFLICT DO NOTHING
     RETURNING id
   `));
   if (created.length) return String(created[0].id);
   const current = rowsOf(await db.execute(sql`
     SELECT id FROM f10_customer_sync_batches
-    WHERE status IN ('queued', 'scanning')
+    WHERE unit_id = ${unitId} AND status IN ('queued', 'scanning')
     ORDER BY created_at DESC LIMIT 1
   `));
   if (!current.length) throw new Error("F10_SYNC_QUEUE_FAILED");
   return String(current[0].id);
 }
 
-export async function getF10CustomerSyncPreview(batchId: string | null, requestedPage: number) {
+export async function getF10CustomerSyncPreview(batchId: string | null, requestedPage: number, unitId: number) {
   const db = getDatabase();
   const batches = rowsOf(await db.execute(sql`
-    SELECT id, status, total_contracts, total_people, processed_people, last_error_code, created_at
-    FROM f10_customer_sync_batches ORDER BY created_at DESC LIMIT 12
+    SELECT id, unit_id, status, total_contracts, total_people, processed_people, last_error_code, created_at
+    FROM f10_customer_sync_batches WHERE unit_id = ${unitId} ORDER BY created_at DESC LIMIT 12
   `));
   const selectedId = batchId ?? (batches[0] ? String(batches[0].id) : null);
   if (!selectedId) return { batches, batch: null, summary: null, rows: [], page: 1, pages: 1 };
 
   const found = rowsOf(await db.execute(sql`
-    SELECT id, status, total_contracts, skipped_contracts, total_people,
+    SELECT id, unit_id, status, total_contracts, skipped_contracts, total_people,
            processed_people, last_error_code, created_at, completed_at
-    FROM f10_customer_sync_batches WHERE id = ${selectedId}::uuid
+    FROM f10_customer_sync_batches WHERE id = ${selectedId}::uuid AND unit_id = ${unitId}
   `));
   if (!found.length) return { batches, batch: null, summary: null, rows: [], page: 1, pages: 1 };
 
@@ -80,7 +80,7 @@ export async function getF10CustomerSyncPreview(batchId: string | null, requeste
   return { batches, batch: found[0], summary: summaryRows[0], rows, page, pages };
 }
 
-async function seedF10CustomerSync(batchId: string): Promise<void> {
+async function seedF10CustomerSync(batchId: string, unitId: number): Promise<void> {
   const db = getDatabase();
   const claimed = rowsOf(await db.execute(sql`
     UPDATE f10_customer_sync_batches SET status = 'scanning', started_at = now(), updated_at = now()
@@ -90,7 +90,7 @@ async function seedF10CustomerSync(batchId: string): Promise<void> {
   if (!claimed.length) return;
 
   try {
-    const contracts = await listF10CustomerContractOwners();
+    const contracts = await listF10CustomerContractOwners(unitId);
     await db.transaction(async (tx) => {
       for (let index = 0; index < contracts.owners.length; index += 100) {
         const batch = contracts.owners.slice(index, index + 100);
@@ -123,13 +123,13 @@ async function seedF10CustomerSync(batchId: string): Promise<void> {
   }
 }
 
-async function classifyPerson(person: F10CustomerPerson) {
+async function classifyPerson(unitId: number, person: F10CustomerPerson) {
   const db = getDatabase();
   const mapped = rowsOf(await db.execute(sql`
     SELECT c.id, c.name, c.email, c.phone, c.whatsapp
     FROM f10_customer_external_identities i
     JOIN customer_contacts c ON c.id = i.customer_contact_id
-    WHERE i.unit_id = 1 AND i.person_id = ${person.personId}
+    WHERE i.unit_id = ${unitId} AND i.person_id = ${person.personId}
   `));
   const existing = mapped[0] ?? null;
   const phoneDigits = person.whatsapp.replace(/\D/g, "") || person.phone.replace(/\D/g, "");
@@ -163,11 +163,11 @@ async function classifyPerson(person: F10CustomerPerson) {
   return { result, matchedContactId: existing ? String(existing.id) : null, candidateCount: candidates.length };
 }
 
-async function scanPerson(batchId: string, personId: number): Promise<"ok" | "fatal"> {
+async function scanPerson(batchId: string, unitId: number, personId: number): Promise<"ok" | "fatal"> {
   const db = getDatabase();
   try {
-    const person = await getF10CustomerPerson(personId);
-    const comparison = await classifyPerson(person);
+    const person = await getF10CustomerPerson(unitId, personId);
+    const comparison = await classifyPerson(unitId, person);
     const applied = rowsOf(await db.execute(sql`
       UPDATE f10_customer_sync_rows SET
         customer_name = ${person.name}, email = ${person.email}, phone = ${person.phone},
@@ -225,17 +225,19 @@ async function completeF10CustomerSync(batchId: string): Promise<void> {
   });
 }
 
-export async function processF10CustomerSyncOnce(): Promise<void> {
+export async function processF10CustomerSyncOnce(unitId?: number): Promise<void> {
   const db = getDatabase();
   const current = rowsOf(await db.execute(sql`
-    SELECT id, status, total_people FROM f10_customer_sync_batches
-    WHERE status IN ('queued','scanning')
+    SELECT id, unit_id, status, total_people FROM f10_customer_sync_batches
+    WHERE (${unitId ?? null}::integer IS NULL OR unit_id = ${unitId ?? null})
+      AND status IN ('queued','scanning')
     ORDER BY created_at LIMIT 1
   `));
   if (!current.length) return;
   const batchId = String(current[0].id);
+  const sourceUnitId = Number(current[0].unit_id);
 
-  if (current[0].status === "queued") await seedF10CustomerSync(batchId);
+  if (current[0].status === "queued") await seedF10CustomerSync(batchId, sourceUnitId);
   const batch = rowsOf(await db.execute(sql`
     SELECT status, total_people, started_at, updated_at FROM f10_customer_sync_batches WHERE id = ${batchId}::uuid
   `));
@@ -263,7 +265,7 @@ export async function processF10CustomerSyncOnce(): Promise<void> {
   }
   for (let offset = 0; offset < pending.length; offset += 4) {
     const group = pending.slice(offset, offset + 4);
-    const outcomes = await Promise.all(group.map((row) => scanPerson(batchId, Number(row.person_id))));
+    const outcomes = await Promise.all(group.map((row) => scanPerson(batchId, sourceUnitId, Number(row.person_id))));
     if (outcomes.includes("fatal")) return;
   }
 }
