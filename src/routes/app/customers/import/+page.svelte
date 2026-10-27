@@ -1,10 +1,19 @@
 <script lang="ts">
   import { AlertTriangle, ArrowLeft, CheckCircle2, FileSpreadsheet, ShieldCheck, Upload } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
+  import { onMount } from "svelte";
+  import { invalidateAll } from "$app/navigation";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
   export let form: ActionData;
+
+  onMount(() => {
+    const interval = setInterval(() => {
+      if (data.batch?.status === "running") void invalidateAll();
+    }, 5_000);
+    return () => clearInterval(interval);
+  });
 
   function pageHref(page: number): string {
     return "/app/customers/import?batch=" + data.batch?.id + "&page=" + page;
@@ -82,10 +91,13 @@
         {:else if data.batch.status === "completed"}
           <span class="application-text-meta inline-flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 font-bold text-green-800"><CheckCircle2 size={14}/> Concluído</span>
         {:else}
-          <span class="application-text-meta rounded-full bg-blue-100 px-3 py-1 font-bold text-blue-800">Em processamento</span>
+          <span class="application-text-meta rounded-full bg-blue-100 px-3 py-1 font-bold text-blue-800">{data.batch.status === "failed" ? "Com falhas" : "Em processamento"}</span>
         {/if}
       </div>
 
+      <div class="flex justify-end px-4 pt-3">
+        <a href={"/app/customers/import/export?batch=" + String(data.batch.id)} class="application-text-caption rounded-lg border border-app-border-control px-3 py-2 font-semibold text-app-heading">Baixar relatório CSV</a>
+      </div>
       <div class="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4 lg:grid-cols-7">
         {#each [
           { label: "Linhas", count: data.summary.total },
@@ -115,11 +127,13 @@
             <button type="submit" disabled={Number(data.summary.review) !== 0} class="application-text-caption h-10 rounded-xl bg-app-primary px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Confirmar importação</button>
           </form>
         {:else if data.batch.status === "running"}
-          <p class="application-text-caption text-app-muted">Progresso salvo no servidor. Lotes de até 25 linhas.</p>
+          <p class="application-text-caption text-app-muted">Processando automaticamente. Pode fechar esta página.</p>
           <form method="POST" action="?/process">
             <input type="hidden" name="batchId" value={String(data.batch.id)}/>
             <button type="submit" class="application-text-caption h-10 rounded-xl bg-app-primary px-4 font-semibold text-white">Processar próximo lote</button>
           </form>
+        {:else if data.batch.status === "failed"}
+          <p class="application-text-caption text-amber-800">Algumas linhas falharam. Reprocesse somente as pendentes.</p>
         {:else}
           <p class="application-text-caption text-app-muted">Importação finalizada. O reenvio é idempotente por ID de origem.</p>
         {/if}
@@ -180,7 +194,16 @@
                       {#each row.warnings as warning}<div>{warning}</div>{/each}
                     </div>
                   {/if}
-                  {#if row.error_code}<div role="alert" class="application-text-meta mt-2 text-red-700">{row.error_code}</div>{/if}
+                  {#if row.error_code}
+                    <div role="alert" class="application-text-meta mt-2 text-red-700">Falha nesta linha</div>
+                    {#if data.batch.status === "failed"}
+                      <form method="POST" action="?/retry" class="mt-2">
+                        <input type="hidden" name="batchId" value={String(data.batch.id)}/>
+                        <input type="hidden" name="rowId" value={row.id}/>
+                        <button type="submit" class="application-text-meta rounded-lg border border-app-border-control px-3 py-1.5 font-semibold text-app-heading">Reprocessar</button>
+                      </form>
+                    {/if}
+                  {/if}
                 </td>
               </tr>
             {/each}
