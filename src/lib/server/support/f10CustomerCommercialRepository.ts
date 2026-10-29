@@ -57,6 +57,8 @@ export async function stageF10CustomerSheet(
     : null;
   previewPhase = "batch_insert";
   return await db.transaction(async (tx) => {
+    // O Drizzle/postgres-js não serializa Date corretamente em sql`...` bruto.
+    // Para campos timestamptz, gerar o horário diretamente no PostgreSQL.
     const batches = rowsOf(await tx.execute(sql`
       INSERT INTO f10_customer_sheet_batches (
         unit_id, created_by, file_name, file_hash, total_rows, record_version,
