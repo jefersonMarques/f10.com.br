@@ -510,68 +510,120 @@ export async function listImportedCustomerUnits(options: {
   const db = getDatabase();
   const query = options.query.trim().slice(0, 120);
   const pageSize = Math.min(50, Math.max(10, options.pageSize ?? 20));
-  const search = "%" + query + "%";
-  const filter = sql`
-    u.source_system LIKE 'f10_sheet%'
-    AND (${query === ""} OR
-      coalesce(u.apelido, u.name) ILIKE ${search}
-      OR u.name ILIKE ${search}
-      OR u.source_id ILIKE ${search}
-      OR o.name ILIKE ${search}
-      OR coalesce(g.name, '') ILIKE ${search}
-    )
-    AND (${!options.groupId} OR g.id = ${options.groupId ?? null}::uuid)
-    AND (${!options.status} OR u.commercial_status = ${options.status ?? null})
-  `;
+  const pattern = `%${query}%`;
+  const searchConditions = [
+    sql`u.source_system LIKE 'f10_sheet%'`,
+    ...(query ? [sql`(
+      coalesce(u.apelido, u.name) ILIKE ${pattern}
+      OR u.source_id ILIKE ${pattern}
+      OR o.name ILIKE ${pattern}
+      OR coalesce(g.name, '') ILIKE ${pattern}
+    )`] : []),
+    ...(options.groupId ? [sql`u.group_id = ${options.groupId}::uuid`] : []),
+    ...(options.status ? [sql`u.commercial_status = ${options.status}`] : []),
+  ];
+  const filter = sql.join(searchConditions, sql` AND `);
   const base = sql`
     FROM customer_units u
     JOIN customer_organizations o ON o.id = u.organization_id
     LEFT JOIN customer_groups g ON g.id = u.group_id
   `;
-  const [summary, filtered, groups, statuses] = await Promise.all([
-    db.execute(sql`
-      SELECT count(*)::integer AS total,
-             count(*) FILTER (WHERE u.commercial_status = 'Ativo')::integer AS active,
-             count(DISTINCT u.group_id)::integer AS groups
-      ${base}
+  let phase = "summary";
+  try {
+    const summary = rowsOf(await db.execute(sql`
+      SELECT count(*)::int AS total,
+             count(*) FILTER (WHERE u.commercial_status = 'Ativo')::int AS active,
+             count(DISTINCT u.group_id)::int AS groups
+      FROM customer_units u
       WHERE u.source_system LIKE 'f10_sheet%'
-    `),
-    db.execute(sql`SELECT count(*)::integer AS total ${base} WHERE ${filter}`),
-    db.execute(sql`
-      SELECT g.id, g.name, count(*)::integer AS units
+    `));
+    phase = "filter_count";
+    const count = rowsOf(await db.execute(sql`
+      SELECT count(*)::int AS total ${base} WHERE ${filter}
+    `));
+    const totalMatched = Number(count[0]?.total ?? 0);
+    const pageCount = Math.max(1, Math.ceil(totalMatched / pageSize));
+    const page = Math.min(Math.max(1, options.page), pageCount);
+    phase = "rows";
+    const rows = rowsOf(await db.execute(sql`
+      SELECT u.id, u.source_id AS numero_contrato,
+             coalesce(nullif(u.apelido, ''), u.name) AS apelido,
+             u.commercial_status, u.contracted_plan, u.city,
+             u.f10_person_id, u.f10_contract_id,
+             g.name AS group_name, o.name AS client_name,
+             (SELECT c.customer_contact_id FROM customer_unit_contacts c
+              WHERE c.unit_id = u.id AND c.contact_kind = 'general'
+              LIMIT 1) AS customer_contact_id
+      ${base}
+      WHERE ${filter}
+      ORDER BY coalesce(nullif(u.apelido, ''), u.name), u.source_id, u.id
+      LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
+    `));
+    phase = "groups";
+    const groups = rowsOf(await db.execute(sql`
+      SELECT g.id, g.name, count(*)::int AS units
       FROM customer_units u
       JOIN customer_groups g ON g.id = u.group_id
       WHERE u.source_system LIKE 'f10_sheet%'
       GROUP BY g.id, g.name ORDER BY g.name LIMIT 300
-    `),
-    db.execute(sql`
-      SELECT u.commercial_status AS value, count(*)::integer AS total
+    `));
+    phase = "statuses";
+    const statuses = rowsOf(await db.execute(sql`
+      SELECT u.commercial_status AS value, count(*)::int AS total
       FROM customer_units u WHERE u.source_system LIKE 'f10_sheet%'
       GROUP BY u.commercial_status ORDER BY u.commercial_status
-    `),
-  ]);
-  const totalMatched = Number(rowsOf(filtered)[0]?.total ?? 0);
-  const pageCount = Math.max(1, Math.ceil(totalMatched / pageSize));
-  const page = Math.min(Math.max(1, options.page), pageCount);
-  const rows = rowsOf(await db.execute(sql`
-    SELECT u.id, u.source_id AS numero_contrato,
-           coalesce(nullif(u.apelido, ''), u.name) AS apelido,
-           u.commercial_status, u.contracted_plan, u.city,
-           u.f10_person_id, u.f10_contract_id,
-           g.name AS group_name, o.name AS client_name,
-           general.customer_contact_id
-    ${base}
-    LEFT JOIN customer_unit_contacts general
-      ON general.unit_id = u.id AND general.contact_kind = 'general'
-    WHERE ${filter}
-    ORDER BY coalesce(nullif(u.apelido, ''), u.name), u.source_id
-    LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
-  `));
-  return {
-    rows,
-    summary: rowsOf(summary)[0] ?? { total: 0, active: 0, groups: 0 },
-    groups: rowsOf(groups),
-    statuses: rowsOf(statuses),
-    totalMatched, page, pageCount,
-  };
+    `));
+    return {
+      rows, summary: summary[0] ?? { total: 0, active: 0, groups: 0 },
+      groups, statuses, totalMatched, page, pageCount, unavailable: false,
+    };
+  } catch (cause) {
+    // Erros SQL não podem derrubar toda a área de clientes.
+    // Logar só o código e a etapa; SQL e dados pessoais não são registrados.
+    let errorCode: string | null = null;
+    let current: unknown = cause;
+    for (let i = 0; i < 6 && current && typeof current === "object"; i += 1) {
+      const entry = current as { code?: unknown; cause?: unknown };
+      if (typeof entry.code === "string" && /^[0-9A-Z]{5}$/.test(entry.code)) errorCode = entry.code;
+      current = entry.cause;
+    }
+    console.error("[f10.customers.units]", {
+      phase, code: errorCode ?? "UNEXPECTED",
+    });
+
+    // Leitura mínima de compatibilidade para preservar acesso às unidades
+    // mesmo que a nova consulta ou algum filtro falhe.
+    try {
+      const fallback = rowsOf(await db.execute(sql`
+        SELECT u.id, u.source_id AS numero_contrato, u.name AS apelido,
+               u.commercial_status, u.contracted_plan, u.city,
+               u.f10_person_id, u.f10_contract_id,
+               g.name AS group_name, o.name AS client_name,
+               NULL::uuid AS customer_contact_id
+        FROM customer_units u
+        JOIN customer_organizations o ON o.id = u.organization_id
+        LEFT JOIN customer_groups g ON g.id = u.group_id
+        WHERE u.source_system LIKE 'f10_sheet%'
+        ORDER BY u.name, u.source_id
+        LIMIT 20
+      `));
+      return {
+        rows: fallback,
+        summary: { total: fallback.length, active: 0, groups: 0 },
+        groups: [], statuses: [], totalMatched: fallback.length,
+        page: 1, pageCount: 1, unavailable: true,
+      };
+    } catch (fallbackCause) {
+      const entry = fallbackCause as { code?: unknown };
+      console.error("[f10.customers.units.fallback]", {
+        code: typeof entry?.code === "string" && /^[0-9A-Z]{5}$/.test(entry.code)
+          ? entry.code : "UNEXPECTED",
+      });
+      return {
+        rows: [], summary: { total: 0, active: 0, groups: 0 },
+        groups: [], statuses: [], totalMatched: 0,
+        page: 1, pageCount: 1, unavailable: true,
+      };
+    }
+  }
 }
