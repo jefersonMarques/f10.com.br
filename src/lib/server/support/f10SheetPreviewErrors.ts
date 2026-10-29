@@ -16,6 +16,19 @@ const PHASES: Record<string, string> = {
   validate_sheet_ids: "validação dos IDs",
   rows_insert: "gravação temporária das linhas",
   cache_match: "conferência dos contratos",
+  lock: "proteção contra importações simultâneas",
+  batch_lock: "verificação do lote",
+  contracts_upsert: "gravação dos contratos",
+  contracts_validate: "validação dos vínculos",
+  groups_upsert: "gravação das franquias",
+  organizations_insert: "gravação das organizações",
+  units_upsert: "gravação das unidades",
+  contacts_upsert: "gravação dos clientes",
+  identities_upsert: "vínculo com pessoas da API",
+  unit_contacts_upsert: "gravação dos contatos das unidades",
+  holder_contacts_upsert: "gravação dos titulares",
+  profiles_upsert: "gravação dos perfis comerciais",
+  finish: "finalização da importação",
 };
 
 export function getF10SheetPreviewDiagnostic(cause: unknown): TechnicalPreviewDiagnostic {
@@ -83,6 +96,37 @@ export function getF10SheetPreviewError(cause: unknown): PublicPreviewError {
   return {
     code: "F10_IMPORT_PREVIEW_FAILED",
     message: "Falha na etapa de " + (PHASES[diagnostic.phase] ?? "importação") + ".",
+    phase: diagnostic.phase,
+  };
+}
+
+export function getF10SheetApplyError(cause: unknown): PublicPreviewError {
+  const diagnostic = getF10SheetPreviewDiagnostic(cause);
+  let current: unknown = cause;
+  for (let depth = 0; depth < 12; depth += 1) {
+    if (!current || typeof current !== "object") break;
+    const entry = current as { message?: unknown; code?: unknown; cause?: unknown };
+    if (entry.message === "F10_IMPORT_SCHEMA_OUTDATED"
+      || entry.code === "42703" || entry.code === "42P01") {
+      return {
+        code: "F10_IMPORT_SCHEMA_OUTDATED",
+        message: "Banco desatualizado. Confirme a aplicação das migrations 0094 a 0100.",
+        phase: diagnostic.phase,
+      };
+    }
+    if (entry.message === "F10_SHEET_REVIEW_REQUIRED") {
+      return {
+        code: "F10_SHEET_REVIEW_REQUIRED",
+        message: "Os vínculos com a API mudaram. Gere uma nova prévia antes de importar.",
+        phase: diagnostic.phase,
+      };
+    }
+    current = entry.cause;
+  }
+  const description = PHASES[diagnostic.phase] ?? "gravação dos dados";
+  return {
+    code: diagnostic.dbCode ? "F10_IMPORT_DB_" + diagnostic.dbCode : "F10_IMPORT_APPLY_FAILED",
+    message: "Falha na etapa de " + description + ". A importação foi cancelada sem gravações parciais.",
     phase: diagnostic.phase,
   };
 }
