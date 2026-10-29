@@ -500,18 +500,78 @@ export async function getCustomerImportReport(batchId: string) {
   }));
 }
 
-export async function listImportedCustomerUnits(query: string, limit = 100) {
+export async function listImportedCustomerUnits(options: {
+  query: string;
+  page: number;
+  groupId?: string;
+  status?: string;
+  pageSize?: number;
+}) {
   const db = getDatabase();
-  return rowsOf(await db.execute(sql`
-    SELECT u.id, u.name, u.source_id, u.commercial_status, u.contracted_plan,
-           u.city, g.name AS group_name, o.id AS organization_id,
-           (SELECT c.name FROM customer_unit_contacts c
-            WHERE c.unit_id = u.id AND c.contact_kind = 'holder' LIMIT 1) AS holder_name
+  const query = options.query.trim().slice(0, 120);
+  const pageSize = Math.min(50, Math.max(10, options.pageSize ?? 20));
+  const search = "%" + query + "%";
+  const filter = sql`
+    u.source_system LIKE 'f10_sheet%'
+    AND (${query === ""} OR
+      coalesce(u.apelido, u.name) ILIKE ${search}
+      OR u.name ILIKE ${search}
+      OR u.source_id ILIKE ${search}
+      OR o.name ILIKE ${search}
+      OR coalesce(g.name, '') ILIKE ${search}
+    )
+    AND (${!options.groupId} OR g.id = ${options.groupId ?? null}::uuid)
+    AND (${!options.status} OR u.commercial_status = ${options.status ?? null})
+  `;
+  const base = sql`
     FROM customer_units u
     JOIN customer_organizations o ON o.id = u.organization_id
     LEFT JOIN customer_groups g ON g.id = u.group_id
-    WHERE ${!query.trim()} OR u.name ILIKE ${"%" + query.trim() + "%"}
-       OR g.name ILIKE ${"%" + query.trim() + "%"}
-    ORDER BY u.name LIMIT ${Math.min(100, Math.max(10, limit))}
+  `;
+  const [summary, filtered, groups, statuses] = await Promise.all([
+    db.execute(sql`
+      SELECT count(*)::integer AS total,
+             count(*) FILTER (WHERE u.commercial_status = 'Ativo')::integer AS active,
+             count(DISTINCT u.group_id)::integer AS groups
+      ${base}
+      WHERE u.source_system LIKE 'f10_sheet%'
+    `),
+    db.execute(sql`SELECT count(*)::integer AS total ${base} WHERE ${filter}`),
+    db.execute(sql`
+      SELECT g.id, g.name, count(*)::integer AS units
+      FROM customer_units u
+      JOIN customer_groups g ON g.id = u.group_id
+      WHERE u.source_system LIKE 'f10_sheet%'
+      GROUP BY g.id, g.name ORDER BY g.name LIMIT 300
+    `),
+    db.execute(sql`
+      SELECT u.commercial_status AS value, count(*)::integer AS total
+      FROM customer_units u WHERE u.source_system LIKE 'f10_sheet%'
+      GROUP BY u.commercial_status ORDER BY u.commercial_status
+    `),
+  ]);
+  const totalMatched = Number(rowsOf(filtered)[0]?.total ?? 0);
+  const pageCount = Math.max(1, Math.ceil(totalMatched / pageSize));
+  const page = Math.min(Math.max(1, options.page), pageCount);
+  const rows = rowsOf(await db.execute(sql`
+    SELECT u.id, u.source_id AS numero_contrato,
+           coalesce(nullif(u.apelido, ''), u.name) AS apelido,
+           u.commercial_status, u.contracted_plan, u.city,
+           u.f10_person_id, u.f10_contract_id,
+           g.name AS group_name, o.name AS client_name,
+           general.customer_contact_id
+    ${base}
+    LEFT JOIN customer_unit_contacts general
+      ON general.unit_id = u.id AND general.contact_kind = 'general'
+    WHERE ${filter}
+    ORDER BY coalesce(nullif(u.apelido, ''), u.name), u.source_id
+    LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
   `));
+  return {
+    rows,
+    summary: rowsOf(summary)[0] ?? { total: 0, active: 0, groups: 0 },
+    groups: rowsOf(groups),
+    statuses: rowsOf(statuses),
+    totalMatched, page, pageCount,
+  };
 }
