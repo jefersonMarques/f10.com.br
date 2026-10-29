@@ -18,10 +18,16 @@ export function redactEmail(value) {
   return local[0] + "***@" + domain;
 }
 
-function idOf(value) {
+function userIdOf(value) {
   if (typeof value !== "number" && typeof value !== "string") return null;
   const text = String(value).trim();
-  return /^\d+$/.test(text) ? text : null;
+  return /^[a-zA-Z0-9_-]{1,128}$/.test(text) ? text : null;
+}
+
+function groupIdOf(value) {
+  const text = userIdOf(value);
+  return text && /^\d+$/.test(text) && Number.isSafeInteger(Number(text))
+    && Number(text) > 0 ? text : null;
 }
 
 export function describeF10Login(loginResponse, jwtClaims, groupResponse) {
@@ -35,17 +41,17 @@ export function describeF10Login(loginResponse, jwtClaims, groupResponse) {
     throw new Error("F10_TEST_GROUPS_INVALID");
   }
 
-  const userId = idOf(loginResponse.user_id);
-  const jwtId = idOf(jwtClaims.id);
+  const userId = userIdOf(loginResponse.user_id);
+  const jwtId = userIdOf(jwtClaims.id);
   const groups = groupResponse.grupos.map((raw) => {
     if (!raw || typeof raw !== "object" || !Array.isArray(raw.unidades)) {
       throw new Error("F10_TEST_GROUPS_INVALID");
     }
-    const id = idOf(raw.grupo_id);
+    const id = groupIdOf(raw.grupo_id);
     if (!id) throw new Error("F10_TEST_GROUPS_INVALID");
     const units = raw.unidades.map((unit) => {
       if (!unit || typeof unit !== "object") throw new Error("F10_TEST_GROUPS_INVALID");
-      const unitId = idOf(unit.unidade_id);
+      const unitId = groupIdOf(unit.unidade_id);
       if (!unitId) throw new Error("F10_TEST_GROUPS_INVALID");
       return {
         unidade_id: unitId,
@@ -80,6 +86,8 @@ export function describeF10Login(loginResponse, jwtClaims, groupResponse) {
       jwtIdMatchesUserId: Boolean(userId && jwtId === userId),
       jwtNamePresent: typeof jwtClaims.nome === "string" && jwtClaims.nome.length > 0,
       jwtLogin: redactEmail(jwtClaims.login),
+      jwtLoginMatchesSubmitted: typeof jwtClaims.login === "string" && typeof loginResponse.login === "string"
+        ? jwtClaims.login.trim().toLowerCase() === loginResponse.login.trim().toLowerCase() : null,
     },
     access: {
       classification: scope,
