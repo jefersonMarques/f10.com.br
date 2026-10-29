@@ -2,7 +2,14 @@
   import { ArrowLeft, Building2, Link2, Search, ShieldAlert, Users, CheckCircle2 } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { PageData, ActionData } from "./$types";
-  import { F10_CUSTOMER_ROLES } from "$lib/server/support/f10CustomerAccessParsing";
+  const F10_CUSTOMER_ROLES = [
+    { value: "responsavel", label: "Responsável" },
+    { value: "gestor", label: "Gestor" },
+    { value: "financeiro", label: "Financeiro" },
+    { value: "comercial", label: "Comercial" },
+    { value: "operacional", label: "Operacional" },
+    { value: "contato", label: "Contato" },
+  ] as const;
 
   export let data: PageData;
   export let form: ActionData;
