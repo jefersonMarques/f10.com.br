@@ -170,7 +170,7 @@
     </section>
   {/if}
 
-  <section class="mt-5 overflow-hidden rounded-[20px] border border-app-border bg-app-surface">
+  <section id="contratos" class="mt-5 overflow-hidden rounded-[20px] border border-app-border bg-app-surface">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-app-border-soft p-4">
       <div>
         <h2 class="application-text-caption font-bold text-app-text">Contratos e unidades</h2>
