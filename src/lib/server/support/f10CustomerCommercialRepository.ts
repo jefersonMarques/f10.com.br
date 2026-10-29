@@ -191,9 +191,12 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
   const source = sourceSystem(unitId);
   const apiSource = "f10_api:" + unitId;
   const sheetSource = "f10_sheet:" + unitId;
-  return db.transaction(async (tx) => {
+  let importPhase = "lock";
+  try {
+  return await db.transaction(async (tx) => {
     // Uma importação por unidade; o lock protege também de lotes simultâneos.
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${source}), hashtext('f10_sheet_import'))`);
+    importPhase = "batch_lock";
     const batch = rowsOf(await tx.execute(sql`
       SELECT id, file_hash FROM f10_customer_sheet_batches
       WHERE id = ${batchId}::uuid AND unit_id = ${unitId} AND status = 'review'
@@ -202,6 +205,7 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
     `));
     if (!batch.length) return false;
 
+    importPhase = "contracts_upsert";
     // Contratos vindos da API são persistidos somente após confirmação.
     // Cada snapshot foi gerado pelo parser da API, não pela planilha.
     await tx.execute(sql`
@@ -246,6 +250,7 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
         last_seen_at = now()
     `);
 
+    importPhase = "contracts_validate";
     const conflicts = rowsOf(await tx.execute(sql`
       SELECT count(*)::int AS total FROM f10_customer_sheet_rows r
       WHERE r.batch_id = ${batchId}::uuid
@@ -257,6 +262,7 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
     `));
     if (Number(conflicts[0]?.total ?? 0)) throw new Error("F10_SHEET_REVIEW_REQUIRED");
 
+    importPhase = "groups_upsert";
     // Cadastro principal: sempre considerar TODAS as linhas da planilha.
     await tx.execute(sql`
       INSERT INTO customer_groups (source_system, source_group_id, name)
@@ -269,6 +275,7 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
       ON CONFLICT (source_system, source_group_id) DO UPDATE SET name = excluded.name
     `);
 
+    importPhase = "organizations_insert";
     // Organização independente por unidade contratual: nunca fundir pela semelhança de nomes.
     await tx.execute(sql`
       INSERT INTO customer_organizations (name, external_reference, active)
@@ -283,6 +290,7 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
         )
     `);
 
+    importPhase = "units_upsert";
     await tx.execute(sql`
       INSERT INTO customer_units (
         organization_id, group_id, source_system, source_id, name, apelido,
@@ -331,6 +339,7 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
         updated_at = now()
     `);
 
+    importPhase = "contacts_upsert";
     // Um cliente da API pode possuir muitas unidades, cada uma mantendo seu contrato.
     // Para contratos ausentes na API a identidade é o ID da própria planilha.
     await tx.execute(sql`
@@ -374,6 +383,7 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
         updated_at = now()
     `);
 
+    importPhase = "identities_upsert";
     // Se um contato já tinha vínculo explícito com a API, respeitá-lo.
     await tx.execute(sql`
       INSERT INTO f10_customer_external_identities (unit_id, person_id, customer_contact_id)
@@ -387,6 +397,7 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
       ON CONFLICT DO NOTHING
     `);
 
+    importPhase = "unit_contacts_upsert";
     await tx.execute(sql`
       INSERT INTO customer_unit_contacts (
         unit_id, contact_kind, name, email, phone, mobile, commercial_phone, customer_contact_id
@@ -418,6 +429,7 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
                                        customer_unit_contacts.customer_contact_id)
     `);
 
+    importPhase = "holder_contacts_upsert";
     await tx.execute(sql`
       INSERT INTO customer_unit_contacts (
         unit_id, contact_kind, name, email, phone, mobile, commercial_phone
@@ -443,6 +455,7 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
         commercial_phone = excluded.commercial_phone
     `);
 
+    importPhase = "profiles_upsert";
     // Só associa contratos quando a API confirma número e ID sem ambiguidade.
     await tx.execute(sql`
       INSERT INTO f10_customer_contract_profiles (
@@ -481,6 +494,7 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
         updated_at = now()
     `);
 
+    importPhase = "finish";
     await tx.execute(sql`
       UPDATE f10_customer_sheet_rows SET applied_at = now()
       WHERE batch_id = ${batchId}::uuid
@@ -491,6 +505,9 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
     `);
     return true;
   });
+  } catch (cause) {
+    throw Object.assign(new Error("F10_SHEET_IMPORT_FAILED", { cause }), { previewPhase: importPhase });
+  }
 }
 
 export async function getF10CustomerContractDirectory(
