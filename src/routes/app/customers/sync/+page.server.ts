@@ -9,6 +9,17 @@ import {
   queueF10CustomerSync,
 } from "$lib/server/support/f10CustomerSyncRepository";
 
+import {
+  applyF10CustomerSheet,
+  getF10CustomerContractDirectory,
+  getF10CustomerSheetPage,
+  stageF10CustomerSheet,
+} from "$lib/server/support/f10CustomerCommercialRepository";
+import {
+  CUSTOMER_IMPORT_MAX_BYTES,
+  parseCustomerImportFile,
+} from "$lib/server/support/customerImportFile";
+
 const RETURN_TO = "/app/customers/sync";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -40,9 +51,21 @@ export const load: PageServerLoad = async ({ parent, url, setHeaders }) => {
   const value = Number(url.searchParams.get("page") ?? "1");
   const page = Number.isInteger(value) ? Math.max(1, Math.min(value, 10000)) : 1;
 
+  const sheetBatchId = url.searchParams.get("sheetBatch");
+  if (sheetBatchId && !UUID_PATTERN.test(sheetBatchId)) throw error(400, "Lote da planilha inválido.");
   const unitId = sourceUnitId();
+  const contractQuery = (url.searchParams.get("q") ?? "").trim().slice(0, 120);
+  const readPage = (name: string) => {
+    const value = Number(url.searchParams.get(name) ?? "1");
+    return Number.isInteger(value) ? Math.max(1, Math.min(value, 10000)) : 1;
+  };
+  const [sync, contracts, sheet] = await Promise.all([
+    getF10CustomerSyncPreview(batchId, page, unitId ?? 0),
+    getF10CustomerContractDirectory(unitId ?? 0, contractQuery, readPage("contractsPage")),
+    getF10CustomerSheetPage(unitId ?? 0, sheetBatchId, readPage("sheetPage")),
+  ]);
   return {
-    ...(await getF10CustomerSyncPreview(batchId, page, unitId ?? 0)),
+    ...sync, contracts, sheet, contractQuery,
     sourceUnitId: unitId,
     apiConfigured: isF10CustomerApiConfigured(),
   };
@@ -75,4 +98,52 @@ export const actions: Actions = {
       return fail(502, { message: "O diagnóstico não pôde continuar. Confira o worker e a API F10." });
     }
   },
+  sheetUpload: async ({ cookies, request }) => {
+    const actorId = await authorize(cookies);
+    const unitId = sourceUnitId();
+    if (!unitId) return fail(503, { message: "Configure F10_UID antes de importar." });
+    const form = await request.formData();
+    const file = form.get("file");
+    if (!file || typeof file === "string" || typeof file.arrayBuffer !== "function") {
+      return fail(400, { message: "Escolha a planilha Clientes F10.xlsx." });
+    }
+    if (file.size > CUSTOMER_IMPORT_MAX_BYTES) {
+      return fail(413, { message: "O arquivo deve ter até 5 MB." });
+    }
+    try {
+      const parsed = parseCustomerImportFile(file.name, new Uint8Array(await file.arrayBuffer()));
+      const batchId = await stageF10CustomerSheet(unitId, actorId, file.name, parsed);
+      throw redirect(303, RETURN_TO + "?sheetBatch=" + batchId);
+    } catch (cause) {
+      if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
+      const message = cause instanceof Error && cause.message === "F10_CONTRACTS_NOT_IMPORTED"
+        ? "Sincronize primeiro os contratos da API antes de anexar a planilha."
+        : cause instanceof Error && !cause.message.startsWith("F10_")
+          ? cause.message
+          : "Não foi possível analisar a planilha. Nenhum cadastro foi alterado.";
+      return fail(400, { message });
+    }
+  },
+  sheetApply: async ({ cookies, request }) => {
+    await authorize(cookies);
+    const unitId = sourceUnitId();
+    if (!unitId) return fail(503, { message: "Configure F10_UID antes de conciliar." });
+    const form = await request.formData();
+    const batchId = form.get("batchId");
+    if (typeof batchId !== "string" || !UUID_PATTERN.test(batchId)) {
+      return fail(400, { message: "Lote inválido." });
+    }
+    if (form.get("confirmation") !== "VINCULAR") {
+      return fail(400, { message: "Digite VINCULAR para confirmar." });
+    }
+    try {
+      const applied = await applyF10CustomerSheet(unitId, batchId);
+      if (!applied) return fail(409, { message: "Este lote já foi aplicado ou não pertence à operação." });
+      throw redirect(303, RETURN_TO + "?sheetBatch=" + batchId);
+    } catch (cause) {
+      if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
+      return fail(500, { message: "Não foi possível conciliar. Nenhum vínculo parcial foi salvo." });
+    }
+  },
+
 };
