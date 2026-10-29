@@ -115,7 +115,7 @@
           </p>
           {#if data.sheet.batch.api_match_source === "live"}
             <p class="application-text-caption mt-2 text-app-text">
-              API consultada agora: <strong>{Number(data.sheet.batch.api_contract_count ?? 0)} contratos retornados</strong> ·
+              Consulta paginada concluída: <strong>{Number(data.sheet.batch.api_contract_count ?? 0)} contratos da API</strong> ·
               {Number(data.sheet.summary.matched ?? 0)} encontrados ·
               {Number(data.sheet.summary.missing ?? 0)} sem correspondência ·
               {Number(data.sheet.summary.ambiguous ?? 0)} duplicados.
@@ -123,17 +123,17 @@
           {:else}
             <p role="alert" class="application-text-caption mt-2 flex items-start gap-2 text-app-warning-text">
               <AlertTriangle size={16} class="mt-0.5 shrink-0"/>
-              A API não foi consultada nesta prévia. A comparação usou os contratos gravados localmente e pode estar incompleta.
+              {#if data.sheet.batch.api_match_source === "unavailable"}
+                A consulta da API falhou ou ficou incompleta{data.sheet.batch.api_error_code ? " (" + String(data.sheet.batch.api_error_code) + ")" : ""}. A comparação usou apenas o cache local.
+              {:else}
+                A API não está configurada; a comparação usou apenas o cache local.
+              {/if}
             </p>
           {/if}
           <p class="application-text-meta mt-1 text-app-text-muted">
             Contratos atualmente no banco local: {Number(data.sheet.apiCacheTotal ?? 0)}
           </p>
-          {#if data.sheet.batch.api_match_source === "live" && Number(data.sheet.batch.api_contract_count ?? 0) === 100}
-            <p class="application-text-caption mt-2 text-app-warning-text">
-              A consulta retornou exatamente 100 contratos. Pode haver um limite de paginação na API; não trate a comparação como completa sem confirmar.
-            </p>
-          {/if}
+
         </div>
 
         {#if Number(data.sheet.summary.missing ?? 0) + Number(data.sheet.summary.ambiguous ?? 0) > 0}
