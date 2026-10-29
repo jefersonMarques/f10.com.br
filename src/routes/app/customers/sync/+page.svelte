@@ -18,7 +18,7 @@
 
   onMount(() => {
     const timer = setInterval(() => {
-      if (data.batch && ["queued", "scanning"].includes(String(data.batch.status))) void invalidateAll();
+      if (data.view === "sync" && data.batch && ["queued", "scanning"].includes(String(data.batch.status))) void invalidateAll();
     }, 5_000);
     return () => clearInterval(timer);
   });
@@ -133,11 +133,9 @@
         {/if}
       </div>
 
-      <div class="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-7">
+      <div class="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-5">
         {#each [
-          { label: "Contratos", value: data.batch.total_contracts },
-          { label: "Pessoas", value: data.batch.total_people },
-          { label: "Analisadas", value: data.batch.processed_people },
+          { label: "Consultadas", value: data.batch.processed_people },
           { label: "Novos", value: data.summary.create_count },
           { label: "Atualizações", value: data.summary.update_count },
           { label: "Revisar", value: data.summary.review_count },
@@ -152,9 +150,6 @@
       {#if Number(data.batch.skipped_contracts) > 0}
         <p role="alert" class="application-text-caption mx-4 mb-3 text-app-warning-text">{data.batch.skipped_contracts} contrato(s) sem pessoa identificada foram preservados, mas não participam da conciliação de clientes.</p>
       {/if}
-      {#if data.batch.last_error_code}
-        <p role="alert" class="application-text-caption mx-4 mb-3 text-app-danger-text">Não foi possível concluir: {String(data.batch.last_error_code)}. Verifique a credencial e a API.</p>
-      {/if}
       {#if data.batch.status === "review"}
         <div class="mx-4 mb-4 rounded-xl border border-app-border-control bg-app-subtle p-3">
           <p class="application-text-caption flex items-center gap-2 text-app-text"><ShieldCheck size={17}/> Prévia concluída. Nenhum cadastro foi criado ou atualizado.</p>
@@ -164,7 +159,9 @@
         <p class="application-text-caption mx-4 mb-4 text-app-text-muted">A busca pode continuar no worker, mesmo após fechar esta página.</p>
       {/if}
 
-      <div class="overflow-x-auto border-t border-app-border-soft">
+      <details class="border-t border-app-border-soft">
+        <summary class="application-text-caption cursor-pointer p-4 font-semibold text-app-primary">Ver pessoas consultadas</summary>
+        <div class="overflow-x-auto">
         <table class="w-full min-w-[880px] text-left">
           <thead class="application-text-meta bg-app-subtle text-app-text-muted">
             <tr><th class="px-4 py-3">Pessoa F10</th><th class="px-4 py-3">Contato</th><th class="px-4 py-3">Contratos</th><th class="px-4 py-3">Resultado</th></tr>
@@ -207,13 +204,14 @@
           </div>
         </div>
       {/if}
+      </details>
     </section>
   {/if}
 
   {/if}
 
   {#if data.view === "contracts"}
-  <section id="contratos" class="mt-5 overflow-hidden rounded-[20px] border border-app-border bg-app-surface">
+  <section id="contratos" class="overflow-hidden rounded-[20px] border border-app-border bg-app-surface">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-app-border-soft p-4">
       <div>
         <h2 class="application-text-caption font-bold text-app-text">Contratos e unidades</h2>
