@@ -20,6 +20,11 @@ export async function stageF10CustomerSheet(
   unitId: number, actorId: string, fileName: string, parsed: ParsedCustomerImport,
 ): Promise<string> {
   const db = getDatabase();
+  // Descarta apenas prévias antigas; perfis e vínculos aplicados continuam persistidos.
+  await db.execute(sql`
+    DELETE FROM f10_customer_sheet_batches
+    WHERE created_at < now() - interval '90 days'
+  `);
   const available = rowsOf(await db.execute(sql`
     SELECT EXISTS(
       SELECT 1 FROM f10_customer_contracts WHERE unit_id = ${unitId}
