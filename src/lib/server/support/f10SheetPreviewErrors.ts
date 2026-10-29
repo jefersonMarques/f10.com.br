@@ -18,6 +18,12 @@ export function getF10SheetPreviewError(cause: unknown): PublicPreviewError {
         message: "Há um conflito de registros no banco. Gere uma nova prévia.",
       };
     }
+    if (/^[0-9A-Z]{5}$/.test(dbCode)) {
+      return {
+        code: "F10_IMPORT_DB_" + dbCode,
+        message: "A prévia encontrou um erro de gravação no banco. Código: " + dbCode + ".",
+      };
+    }
     if (item.message === "F10_SHEET_DUPLICATE_IDS") {
       return {
         code: "F10_SHEET_DUPLICATE_IDS",
