@@ -29,17 +29,33 @@ export const load: PageServerLoad = async ({ parent, url }) => {
   const groupId = GROUP_ID.test(requestedGroup) ? requestedGroup : "";
   const status = (url.searchParams.get("situacao") ?? "").trim().slice(0, 60);
 
-  const [directory, importedUnits] = await Promise.all([
-    listCustomerDirectory(layout.user.id, permissions, {
-      query: view === "contacts" ? query : "",
-      page: view === "contacts" ? page : 1,
-      pageSize: 20,
-    }),
-    canViewImportedUnits
-      ? listImportedCustomerUnits({ query: view === "units" ? query : "", page: view === "units" ? page : 1,
-          groupId: view === "units" ? groupId : "", status: view === "units" ? status : "", pageSize: 20 })
-      : Promise.resolve(null),
-  ]);
+  // Não consultar contatos, tickets e chats quando a aba comercial está aberta.
+  // Esse levantamento tem filtros e custos diferentes da lista de unidades.
+  let directoryUnavailable = false;
+  const directory = view === "contacts"
+    ? await listCustomerDirectory(layout.user.id, permissions, {
+        query, page, pageSize: 20,
+      }).catch((cause: unknown) => {
+        directoryUnavailable = true;
+        let current: unknown = cause;
+        let dbCode: string | null = null;
+        for (let depth = 0; depth < 6 && current && typeof current === "object"; depth += 1) {
+          const item = current as { code?: unknown; cause?: unknown };
+          if (typeof item.code === "string" && /^[0-9A-Z]{5}$/.test(item.code)) {
+            dbCode = item.code;
+          }
+          current = item.cause;
+        }
+        console.error("[f10.customers.contacts]", { code: dbCode ?? "UNEXPECTED" });
+        return { rows: [], total: 0, page: 1, pageSize: 20, pageCount: 1 };
+      })
+    : { rows: [], total: 0, page: 1, pageSize: 20, pageCount: 1 };
+
+  const importedUnits = canViewImportedUnits && view === "units"
+    ? await listImportedCustomerUnits({
+        query, page, groupId, status, pageSize: 20,
+      })
+    : null;
 
   return {
     ...directory,
@@ -47,6 +63,8 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     page: view === "contacts" ? directory.page : importedUnits?.page ?? 1,
     view, groupId, status,
     importedUnits,
+    canViewImportedUnits,
+    directoryUnavailable,
     canImport: hasPermission(permissions, "customers.manage", "all"),
     canManage: hasPermission(permissions, "customers.manage"),
   };
