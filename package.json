@@ -14,6 +14,7 @@
     "admin:bootstrap": "node --env-file-if-exists=.env scripts/bootstrap-super-admin.mjs",
     "operations:doctor": "node --env-file-if-exists=.env scripts/operations-doctor.mjs",
     "auth:diagnose": "node --env-file-if-exists=.env --env-file-if-exists=.env.production scripts/diagnose-login.mjs",
+    "f10:inspect-login": "node --env-file-if-exists=.env --env-file-if-exists=.env.production scripts/inspect-f10-customer-login.mjs",
     "operations:smoke": "node --env-file-if-exists=.env scripts/operations-smoke.mjs",
     "support:doctor": "node --env-file-if-exists=.env scripts/support-doctor.mjs",
     "production:doctor": "npm run operations:doctor && npm run support:doctor",
