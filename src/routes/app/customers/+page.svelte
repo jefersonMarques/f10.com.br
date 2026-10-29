@@ -55,7 +55,8 @@
           <form method="POST" action="/app/customers/sync?/start">
             <button type="submit" class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl border border-app-border-control px-4 font-semibold text-app-text"><RefreshCw size={16}/> Sincronizar</button>
           </form>
-          <a href="/app/customers/import" class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white"><FileSpreadsheet size={16}/> Importar clientes</a>
+          <a href="/app/customers/sync#contratos" class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white"><Building2 size={16}/> Contratos API</a>
+          <a href="/app/customers/import" class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl border border-app-border-control px-4 font-semibold text-app-text"><FileSpreadsheet size={16}/> Importações anteriores</a>
         {/if}
       </div>
     </div>
