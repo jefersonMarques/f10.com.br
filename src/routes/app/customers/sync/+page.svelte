@@ -71,7 +71,9 @@
             <strong class="application-text-caption text-app-text">{String(data.sheet.batch.file_name)}</strong>
             <p class="application-text-meta text-app-text-muted">Prévia de {dateLabel(data.sheet.batch.created_at)}</p>
           </div>
-          {#if data.sheet.batch.status === "applied"}
+          {#if Number(data.sheet.batch.record_version) < 2}
+            <span class="application-text-caption rounded-full bg-app-warning-bg px-3 py-1 font-semibold text-app-warning-text">Prévia antiga</span>
+          {:else if data.sheet.batch.status === "applied"}
             <span class="application-text-caption inline-flex items-center gap-1 rounded-full bg-app-success-bg px-3 py-1 font-semibold text-app-success-text"><CheckCircle2 size={15}/> Importação concluída</span>
           {:else}
             <span class="application-text-caption rounded-full bg-app-subtle px-3 py-1 font-semibold text-app-text">Pronta para importar</span>
@@ -99,7 +101,11 @@
           </p>
         {/if}
 
-        {#if data.sheet.batch.status === "review"}
+        {#if Number(data.sheet.batch.record_version) < 2}
+          <p role="alert" class="application-text-caption mt-4 text-app-warning-text">
+            Esta prévia é de uma versão anterior. Envie novamente a planilha para importar todos os dados.
+          </p>
+        {:else if data.sheet.batch.status === "review"}
           <form method="POST" action="?/sheetApply" class="mt-5 flex flex-wrap items-center gap-3"
             on:submit={(event) => {
               if (importing || !window.confirm("Importar " + Number(data.sheet.batch.total_rows) + " registros da planilha? Clientes existentes serão atualizados, sem criar acessos ao portal.")) {
