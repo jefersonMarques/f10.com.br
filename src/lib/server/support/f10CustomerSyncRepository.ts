@@ -39,6 +39,15 @@ export async function queueF10CustomerSync(actorUserId: string, unitId: number):
   return String(current[0].id);
 }
 
+export async function getF10CustomerSyncState(unitId: number) {
+  const rows = rowsOf(await getDatabase().execute(sql`
+    SELECT id, status, last_error_code, created_at, processed_people, total_people
+    FROM f10_customer_sync_batches WHERE unit_id = ${unitId}
+    ORDER BY created_at DESC LIMIT 1
+  `));
+  return { batch: rows[0] ?? null };
+}
+
 export async function getF10CustomerSyncPreview(batchId: string | null, requestedPage: number, unitId: number) {
   const db = getDatabase();
   const batches = rowsOf(await db.execute(sql`
