@@ -9,6 +9,9 @@
   export let form: ActionData;
 
   let importing = false;
+  $: previewFailed = Boolean(form && "previewFailed" in form && form.previewFailed);
+  $: previewErrorCode = form && "errorCode" in form && typeof form.errorCode === "string"
+    ? form.errorCode : null;
   $: activeSync = data.batch?.status === "queued" || data.batch?.status === "scanning";
 
   onMount(() => {
@@ -44,10 +47,10 @@
       <AlertTriangle size={17} class="mt-0.5 shrink-0"/>
       <span>
         {form.message}
-        {#if form.errorCode}
-          <span class="application-text-meta ml-2 opacity-80">({form.errorCode})</span>
+        {#if previewErrorCode}
+          <span class="application-text-meta ml-2 opacity-80">({previewErrorCode})</span>
         {/if}
-        {#if form.previewFailed}
+        {#if previewFailed}
           <span class="mt-1 block">A prévia anterior foi ocultada. Nenhum cadastro foi importado nesta tentativa.</span>
         {/if}
       </span>
@@ -75,7 +78,7 @@
       </button>
     </form>
 
-    {#if data.sheet.batch && data.sheet.summary && !form?.previewFailed}
+    {#if data.sheet.batch && data.sheet.summary && !previewFailed}
       <div class="mt-5 border-t border-app-border-soft pt-5">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div>
