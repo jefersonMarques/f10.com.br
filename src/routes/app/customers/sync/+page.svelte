@@ -40,7 +40,18 @@
   </header>
 
   {#if form?.message}
-    <div role="alert" class="application-text-caption mb-4 flex items-center gap-2 rounded-xl bg-app-warning-bg p-3 text-app-warning-text"><AlertTriangle size={17}/>{form.message}</div>
+    <div role="alert" class="application-text-caption mb-4 flex items-start gap-2 rounded-xl bg-app-warning-bg p-3 text-app-warning-text">
+      <AlertTriangle size={17} class="mt-0.5 shrink-0"/>
+      <span>
+        {form.message}
+        {#if form.errorCode}
+          <span class="application-text-meta ml-2 opacity-80">({form.errorCode})</span>
+        {/if}
+        {#if form.previewFailed}
+          <span class="mt-1 block">A prévia anterior foi ocultada. Nenhum cadastro foi importado nesta tentativa.</span>
+        {/if}
+      </span>
+    </div>
   {/if}
 
   <section class="rounded-2xl border border-app-border bg-app-surface p-5">
@@ -64,14 +75,14 @@
       </button>
     </form>
 
-    {#if data.sheet.batch && data.sheet.summary}
+    {#if data.sheet.batch && data.sheet.summary && !form?.previewFailed}
       <div class="mt-5 border-t border-app-border-soft pt-5">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div>
             <strong class="application-text-caption text-app-text">{String(data.sheet.batch.file_name)}</strong>
             <p class="application-text-meta text-app-text-muted">Prévia de {dateLabel(data.sheet.batch.created_at)}</p>
           </div>
-          {#if Number(data.sheet.batch.record_version) < 2}
+          {#if Number(data.sheet.batch.record_version) < 3}
             <span class="application-text-caption rounded-full bg-app-warning-bg px-3 py-1 font-semibold text-app-warning-text">Prévia antiga</span>
           {:else if data.sheet.batch.status === "applied"}
             <span class="application-text-caption inline-flex items-center gap-1 rounded-full bg-app-success-bg px-3 py-1 font-semibold text-app-success-text"><CheckCircle2 size={15}/> Importação concluída</span>
@@ -115,6 +126,11 @@
           <p class="application-text-meta mt-1 text-app-text-muted">
             Contratos atualmente no banco local: {Number(data.sheet.apiCacheTotal ?? 0)}
           </p>
+          {#if data.sheet.batch.api_match_source === "live" && Number(data.sheet.batch.api_contract_count ?? 0) === 100}
+            <p class="application-text-caption mt-2 text-app-warning-text">
+              A consulta retornou exatamente 100 contratos. Pode haver um limite de paginação na API; não trate a comparação como completa sem confirmar.
+            </p>
+          {/if}
         </div>
 
         {#if Number(data.sheet.summary.missing ?? 0) + Number(data.sheet.summary.ambiguous ?? 0) > 0}
@@ -124,7 +140,7 @@
           </p>
         {/if}
 
-        {#if Number(data.sheet.batch.record_version) < 2}
+        {#if Number(data.sheet.batch.record_version) < 3}
           <p role="alert" class="application-text-caption mt-4 text-app-warning-text">
             Esta prévia é de uma versão anterior. Envie novamente a planilha para importar todos os dados.
           </p>
