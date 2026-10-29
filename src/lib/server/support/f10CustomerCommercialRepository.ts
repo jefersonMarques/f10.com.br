@@ -65,7 +65,7 @@ export async function stageF10CustomerSheet(
       VALUES (
         ${unitId}, ${actorId}::uuid, ${fileName.slice(0, 180)}, ${parsed.fileHash},
         ${parsed.rows.length}, 3, ${apiMatchSource}, ${fresh?.contractsCount ?? null},
-        ${apiErrorCode}, ${fresh ? new Date() : null}
+        ${apiErrorCode}, CASE WHEN ${fresh !== null} THEN now() ELSE NULL END
       )
       RETURNING id
     `));
