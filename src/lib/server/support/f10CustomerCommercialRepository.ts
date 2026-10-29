@@ -1,4 +1,6 @@
 import { sql } from "drizzle-orm";
+import { isF10CustomerApiConfigured, listF10CustomerContractOwners } from "$lib/server/integrations/f10/f10CustomerApi";
+import { matchSheetContractNumbers } from "$lib/server/support/f10SheetContractMatching";
 import { getDatabase } from "$lib/server/db";
 import type { ParsedCustomerImport } from "$lib/server/support/customerImportFile";
 import { toF10CommercialRecord } from "$lib/server/support/f10CustomerCommercialFields";
@@ -24,10 +26,33 @@ export async function stageF10CustomerSheet(
     DELETE FROM f10_customer_sheet_batches
     WHERE created_at < now() - interval '90 days'
   `);
+  let fresh: Awaited<ReturnType<typeof listF10CustomerContractOwners>> | null = null;
+  let apiMatchSource = "not_configured";
+  let apiErrorCode: string | null = null;
+  if (isF10CustomerApiConfigured()) {
+    try {
+      fresh = await listF10CustomerContractOwners(unitId);
+      apiMatchSource = "live";
+    } catch (cause) {
+      apiMatchSource = "unavailable";
+      const code = cause instanceof Error ? cause.message : "";
+      apiErrorCode = /^F10_[A-Z_]+$/.test(code) ? code : "F10_API_UNAVAILABLE";
+    }
+  }
+  const freshMatches = fresh
+    ? matchSheetContractNumbers(parsed.rows.map(({ record }) => record.sourceId), fresh.contracts)
+    : null;
   return db.transaction(async (tx) => {
     const batches = rowsOf(await tx.execute(sql`
-      INSERT INTO f10_customer_sheet_batches (unit_id, created_by, file_name, file_hash, total_rows, record_version)
-      VALUES (${unitId}, ${actorId}::uuid, ${fileName.slice(0, 180)}, ${parsed.fileHash}, ${parsed.rows.length}, 2)
+      INSERT INTO f10_customer_sheet_batches (
+        unit_id, created_by, file_name, file_hash, total_rows, record_version,
+        api_match_source, api_contract_count, api_error_code, api_checked_at
+      )
+      VALUES (
+        ${unitId}, ${actorId}::uuid, ${fileName.slice(0, 180)}, ${parsed.fileHash},
+        ${parsed.rows.length}, 2, ${apiMatchSource}, ${fresh?.contractsCount ?? null},
+        ${apiErrorCode}, ${fresh ? new Date() : null}
+      )
       RETURNING id
     `));
     const batchId = String(batches[0].id);
@@ -38,19 +63,70 @@ export async function stageF10CustomerSheet(
       sourceIds.add(record.sourceId);
     }
 
+    if (fresh && freshMatches) {
+      const matchedIds = new Set(
+        [...freshMatches.values()]
+          .filter((value) => value.status === "matched")
+          .map((value) => value.contractId),
+      );
+      const matchedContracts = fresh.contracts.filter(
+        (contract) => matchedIds.has(contract.contractId),
+      );
+      // Apenas os contratos conciliados precisam ser persistidos para aplicação.
+      for (let i = 0; i < matchedContracts.length; i += 100) {
+        const chunk = matchedContracts.slice(i, i + 100);
+        const values = chunk.map((contract) => sql`(
+          ${unitId}, ${contract.contractId}, ${contract.contractNumber},
+          ${contract.personId}, ${contract.holderId}, ${contract.status},
+          ${contract.statusLabel}, ${contract.courseId}, ${contract.sourceId},
+          ${contract.sellerId}, ${contract.telemarketingId},
+          ${contract.enrollmentDate}, ${contract.completionDate},
+          ${contract.cancellationDate}, ${JSON.stringify(contract.sourceRecord)}::jsonb
+        )`);
+        await tx.execute(sql`
+          INSERT INTO f10_customer_contracts (
+            unit_id, contract_id, numero_contrato, pessoa_id, titular_id, status,
+            x_status, curso_id, fonte_id, vendedor_id, telemarketing_id,
+            matricula, conclusao, data_cancelamento, source_record
+          ) VALUES ${sql.join(values, sql`, `)}
+          ON CONFLICT (unit_id, contract_id) DO UPDATE SET
+            numero_contrato = excluded.numero_contrato,
+            pessoa_id = excluded.pessoa_id,
+            titular_id = excluded.titular_id,
+            status = excluded.status,
+            x_status = excluded.x_status,
+            curso_id = excluded.curso_id,
+            fonte_id = excluded.fonte_id,
+            vendedor_id = excluded.vendedor_id,
+            telemarketing_id = excluded.telemarketing_id,
+            matricula = excluded.matricula,
+            conclusao = excluded.conclusao,
+            data_cancelamento = excluded.data_cancelamento,
+            source_record = excluded.source_record,
+            last_seen_at = now()
+        `);
+      }
+    }
+
     for (let i = 0; i < parsed.rows.length; i += 100) {
       const items = parsed.rows.slice(i, i + 100);
-      const entries = items.map(({ lineNumber, record }) => sql`(
-        ${batchId}::uuid, ${lineNumber}, ${record.sourceId},
-        ${JSON.stringify(toF10CommercialRecord(record))}::jsonb
-      )`);
+      const entries = items.map(({ lineNumber, record }) => {
+        const match = freshMatches?.get(record.sourceId);
+        return sql`(
+          ${batchId}::uuid, ${lineNumber}, ${record.sourceId},
+          ${JSON.stringify(toF10CommercialRecord(record))}::jsonb,
+          ${match?.status ?? "pending"}, ${match?.contractId ?? null}
+        )`;
+      });
       await tx.execute(sql`
-        INSERT INTO f10_customer_sheet_rows (batch_id, line_number, source_id, record)
-        VALUES ${sql.join(entries, sql`, `)}
+        INSERT INTO f10_customer_sheet_rows (
+          batch_id, line_number, source_id, record, match_status, contract_id
+        ) VALUES ${sql.join(entries, sql`, `)}
       `);
     }
 
-    // Aceita apenas número comercial EXATO e único em ambas as origens.
+    if (!fresh) {
+      // Fallback explícito: cache local, que pode estar incompleto.
     await tx.execute(sql`
       WITH candidate AS (
         SELECT r.id,
@@ -71,6 +147,7 @@ export async function stageF10CustomerSheet(
                              THEN candidate.found_id ELSE NULL END
       FROM candidate WHERE r.id = candidate.id
     `);
+    }
     return batchId;
   });
 }
@@ -89,7 +166,8 @@ export async function getF10CustomerSheetPage(
   if (!batchId) return { batches, batch: null, summary: null };
 
   const found = rowsOf(await db.execute(sql`
-    SELECT id, file_name, status, total_rows, record_version, created_at, applied_at
+    SELECT id, file_name, status, total_rows, record_version, created_at, applied_at,
+           api_match_source, api_contract_count, api_error_code, api_checked_at
     FROM f10_customer_sheet_batches
     WHERE id = ${batchId}::uuid AND unit_id = ${unitId}
   `));
@@ -107,8 +185,15 @@ export async function getF10CustomerSheetPage(
     LEFT JOIN customer_units u ON u.source_system = ${source} AND u.source_id = r.source_id
     WHERE r.batch_id = ${batchId}::uuid
   `));
+  const cache = rowsOf(await db.execute(sql`
+    SELECT count(*)::int AS total
+    FROM f10_customer_contracts WHERE unit_id = ${unitId}
+  `));
   // A prévia é agregada: não enviar telefones, emails ou links financeiros ao navegador.
-  return { batches, batch: found[0], summary: summary[0] };
+  return {
+    batches, batch: found[0], summary: summary[0],
+    apiCacheTotal: Number(cache[0]?.total ?? 0),
+  };
 
 }
 
