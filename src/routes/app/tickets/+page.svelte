@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto, invalidate, invalidateAll } from "$app/navigation";
+  import { browser } from "$app/environment";
   import { onMount } from "svelte";
   import { CheckCircle2, CircleAlert } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
@@ -51,7 +52,8 @@
   let justViewedTicketIds = new Set<string>();
 
   $: if (
-    view === "split"
+    browser
+    && view === "split"
     && data.tickets.length > 0
     && !ticketDetails
     && !detailsLoading
@@ -236,6 +238,7 @@
   });
 
   async function openTicketDetails(ticketId: string, panel: TicketMainPanel = "conversation"): Promise<void> {
+    if (!browser) return;
     activeTicketPanel = panel;
     if (ticketDetails?.details.ticket.id === ticketId) return;
     modalOpen = view !== "split";
