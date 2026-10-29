@@ -242,7 +242,7 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
         status, x_status, curso_id, fonte_id, vendedor_id, telemarketing_id,
         matricula, conclusao, data_cancelamento, source_record
       )
-      SELECT ${unitId},
+      SELECT ${unitId}::integer,
         (r.record #>> '{_f10ContractSnapshot,contractId}')::bigint,
         r.record #>> '{_f10ContractSnapshot,contractNumber}',
         (r.record #>> '{_f10ContractSnapshot,personId}')::bigint,
@@ -335,7 +335,7 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
              nullif(r.record ->> 'cancellationReason', ''),
              nullif(r.record ->> 'cancellationDate', ''),
              nullif(r.record ->> 'billingUrl', ''),
-             ${unitId}, c.contract_id, c.pessoa_id, c.titular_id
+             ${unitId}::integer, c.contract_id, c.pessoa_id, c.titular_id
       FROM f10_customer_sheet_rows r
       LEFT JOIN customer_units existing
         ON existing.source_system = ${source} AND existing.source_id = r.source_id
@@ -412,10 +412,11 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
     `);
 
     importPhase = "identities_upsert";
-    // Se um contato já tinha vínculo explícito com a API, respeitá-lo.
+    // SELECT DISTINCT infere parâmetros sem cast como texto; unit_id é integer.
+    // Preservar os vínculos já existentes, sem recriá-los.
     await tx.execute(sql`
       INSERT INTO f10_customer_external_identities (unit_id, person_id, customer_contact_id)
-      SELECT DISTINCT ${unitId}, c.pessoa_id, imported.id
+      SELECT DISTINCT ${unitId}::integer, c.pessoa_id, imported.id
       FROM f10_customer_sheet_rows r
       JOIN f10_customer_contracts c ON c.unit_id = ${unitId}
         AND c.contract_id = r.contract_id AND c.numero_contrato = r.source_id
@@ -491,7 +492,7 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
         spreadsheet_student_name, spreadsheet_holder_name, commercial_status,
         contracted_plan, city, account_executive, source_file_hash
       )
-      SELECT ${unitId}, r.contract_id,
+      SELECT ${unitId}::integer, r.contract_id,
              left(nullif(r.record ->> 'apelido', ''), 240),
              g.id, u.id,
              nullif(r.record ->> 'unitName', ''),
