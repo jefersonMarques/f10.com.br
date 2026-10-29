@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowRight, Building2, FileSpreadsheet, Mail, MessageCircleMore, Phone, Search, Users } from "lucide-svelte";
+  import { ArrowRight, Building2, FileSpreadsheet, Mail, MessageCircleMore, Phone, Search, Users, Link2 } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { PageData } from "./$types";
 
@@ -51,9 +51,14 @@
       {/if}
     </div>
     {#if data.canImport}
+      <div class="flex flex-wrap gap-2">
+        <a href="/app/customers/access" class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl border border-app-border-control px-4 font-semibold text-app-text">
+          <Link2 size={16}/> Atribuir pessoas
+        </a>
       <a href="/app/customers/sync" class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white">
         <FileSpreadsheet size={17}/> Importar / atualizar
       </a>
+      </div>
     {/if}
   </header>
 
