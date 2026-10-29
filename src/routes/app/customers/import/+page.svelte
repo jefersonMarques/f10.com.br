@@ -61,7 +61,7 @@
         </button>
       </form>
       <p class="application-text-meta mt-3 text-app-text-muted">O envio não cadastra clientes nem cria acessos.</p>
-      <p class="application-text-meta mt-1 text-app-text-muted">Mapeamento proposto: Grupo = rede · Aluno = unidade · Titular = contato comercial.</p>
+      <p class="application-text-meta mt-1 text-app-text-muted">Para conciliar apelidos e franquias por número de contrato, use <a href="/app/customers/sync" class="font-semibold text-app-primary underline">Sincronizar clientes</a>. A importação antiga permanece disponível para lotes anteriores.</p>
     </section>
     <section class="rounded-[20px] border border-app-border bg-app-surface p-5">
       <h2 class="application-text-caption mb-3 font-bold text-app-text">Lotes recentes</h2>
