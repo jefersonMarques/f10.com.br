@@ -6,6 +6,8 @@ import {
   type F10CustomerPerson,
 } from "$lib/server/integrations/f10/f10CustomerSyncParsing";
 
+import { collectF10ContractPages } from "$lib/server/integrations/f10/f10ContractPagination";
+
 const BASE_URL = "https://api.f10.com.br";
 const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
@@ -72,8 +74,10 @@ async function apiGet(path: string): Promise<unknown> {
 
 export async function listF10CustomerContractOwners(unitId: number) {
   if (!Number.isSafeInteger(unitId) || unitId <= 0) throw new Error("F10_UID_INVALID");
-  const response = await apiGet(`/unidade/contratos/${unitId}`);
-  return parseF10Contracts(response);
+  const contracts = await collectF10ContractPages((lastId) =>
+    apiGet(`/unidade/contratos/${unitId}${lastId === null ? "" : `?lastId=${lastId}`}`),
+  );
+  return parseF10Contracts(contracts);
 }
 
 export async function getF10CustomerPerson(unitId: number, personId: number): Promise<F10CustomerPerson> {
