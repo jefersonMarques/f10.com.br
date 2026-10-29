@@ -296,11 +296,11 @@
   {/if}
 
   {#if data.view === "sheet"}
-  <section class="mt-5 overflow-hidden rounded-[20px] border border-app-border bg-app-surface">
+  <section class="overflow-hidden rounded-[20px] border border-app-border bg-app-surface">
     <div class="border-b border-app-border-soft p-4">
       <div class="flex items-center gap-2 font-bold text-app-text"><FileSpreadsheet size={18}/> Apelidos e franquias</div>
       <p class="application-text-caption mt-1 text-app-text-muted">
-        A API identifica contratos e pessoas. Use a planilha somente para completar apelido, grupo e plano.
+        Complete apelidos e franquias pelo número do contrato.
       </p>
     </div>
     <div class="p-4">
@@ -327,9 +327,9 @@
         </div>
         <div class="mt-3 grid grid-cols-3 gap-2">
           {#each [
-            { title: "Conciliados", value: data.sheet.summary.matched },
-            { title: "Ausentes na API", value: data.sheet.summary.missing },
-            { title: "Ambíguos", value: data.sheet.summary.ambiguous },
+            { title: "Encontrados", value: data.sheet.summary.matched },
+            { title: "Não encontrados", value: data.sheet.summary.missing },
+            { title: "Duplicados", value: data.sheet.summary.ambiguous },
           ] as entry}
             <div class="rounded-lg bg-app-subtle p-3">
               <div class="text-lg font-bold tabular-nums text-app-text">{Number(entry.value ?? 0)}</div>
@@ -338,17 +338,17 @@
           {/each}
         </div>
         {#if data.sheet.batch.status === "review"}
-          <form method="POST" action="?/sheetApply" class="mt-4 flex flex-wrap items-end gap-2">
+          <form method="POST" action="?/sheetApply" class="mt-4 flex flex-wrap items-center gap-3"
+            on:submit={(event) => {
+              if (!window.confirm("Aplicar " + Number(data.sheet.summary.matched ?? 0) + " vínculos de apelidos e franquias? Os registros não encontrados continuarão pendentes.")) event.preventDefault();
+            }}>
             <input type="hidden" name="batchId" value={String(data.sheet.batch.id)}/>
-            <label class="application-text-meta text-app-text-muted">
-              Digite <strong>VINCULAR</strong> para salvar os conciliados
-              <input name="confirmation" placeholder="VINCULAR" required autocomplete="off"
-                class="application-text-caption mt-1 block h-10 w-36 rounded-lg border border-app-border-control bg-app-subtle px-3 text-app-text"/>
-            </label>
+            <input type="hidden" name="confirmation" value="VINCULAR"/>
             <button type="submit" disabled={Number(data.sheet.summary.matched ?? 0) === 0}
               class="application-text-caption h-10 rounded-lg bg-app-primary px-4 font-semibold text-white disabled:opacity-40">
-              Aplicar vínculos
+              Aplicar {Number(data.sheet.summary.matched ?? 0)} vínculos
             </button>
+            <span class="application-text-meta text-app-text-muted">Somente números com correspondência única.</span>
           </form>
         {:else}
           <p class="application-text-caption mt-3 flex items-center gap-2 text-app-success-text">
@@ -356,7 +356,9 @@
           </p>
         {/if}
       </div>
-      <div class="overflow-x-auto border-t border-app-border-soft">
+      <details class="border-t border-app-border-soft">
+        <summary class="application-text-caption cursor-pointer p-4 font-semibold text-app-primary">Ver contratos e pendências</summary>
+        <div class="overflow-x-auto">
         <table class="w-full min-w-[650px] text-left">
           <thead class="application-text-meta bg-app-subtle text-app-text-muted">
             <tr><th class="px-4 py-3">Nº contrato</th><th class="px-4 py-3">Apelido</th><th class="px-4 py-3">Franquia</th><th class="px-4 py-3">Conciliação</th></tr>
@@ -373,7 +375,7 @@
                 </td>
                 <td class="application-text-caption px-4 py-3">
                   {#if item.match_status === "matched"}
-                    <span class="font-semibold text-app-success-text">Vinculado ao ID {String(item.contract_id)}</span>
+                    <span class="font-semibold text-app-success-text">Encontrado · ID {String(item.contract_id)}</span>
                   {:else if item.match_status === "not_found"}
                     <span class="font-semibold text-app-warning-text">Não localizado na API</span>
                   {:else}
@@ -400,6 +402,7 @@
           </div>
         </div>
       {/if}
+      </details>
     {/if}
   </section>
   {/if}
