@@ -5,7 +5,6 @@ import { toF10CommercialRecord } from "$lib/server/support/f10CustomerCommercial
 
 type DatabaseRow = Record<string, unknown>;
 const PAGE_SIZE = 20;
-const SHEET_PAGE_SIZE = 20;
 
 function rowsOf(result: unknown): DatabaseRow[] {
   return result as DatabaseRow[];
@@ -77,7 +76,7 @@ export async function stageF10CustomerSheet(
 }
 
 export async function getF10CustomerSheetPage(
-  unitId: number, selectedBatch: string | null, requestedPage: number,
+  unitId: number, selectedBatch: string | null,
 ) {
   const db = getDatabase();
   const batches = rowsOf(await db.execute(sql`
@@ -87,7 +86,7 @@ export async function getF10CustomerSheetPage(
     ORDER BY created_at DESC LIMIT 10
   `));
   const batchId = selectedBatch ?? (batches[0] ? String(batches[0].id) : null);
-  if (!batchId) return { batches, batch: null, summary: null, rows: [], page: 1, pages: 1 };
+  if (!batchId) return { batches, batch: null, summary: null };
 
   const found = rowsOf(await db.execute(sql`
     SELECT id, file_name, status, total_rows, created_at, applied_at
@@ -108,18 +107,9 @@ export async function getF10CustomerSheetPage(
     LEFT JOIN customer_units u ON u.source_system = ${source} AND u.source_id = r.source_id
     WHERE r.batch_id = ${batchId}::uuid
   `));
-  const pages = Math.max(1, Math.ceil(Number(found[0].total_rows) / SHEET_PAGE_SIZE));
-  const page = Math.max(1, Math.min(requestedPage, pages));
-  const rows = rowsOf(await db.execute(sql`
-    SELECT r.line_number, r.source_id, r.record, r.match_status, r.contract_id,
-           c.pessoa_id, c.titular_id, c.x_status AS api_status
-    FROM f10_customer_sheet_rows r
-    LEFT JOIN f10_customer_contracts c ON c.unit_id = ${unitId} AND c.contract_id = r.contract_id
-    WHERE r.batch_id = ${batchId}::uuid
-    ORDER BY CASE WHEN r.match_status = 'matched' THEN 1 ELSE 0 END, r.line_number
-    LIMIT ${SHEET_PAGE_SIZE} OFFSET ${(page - 1) * SHEET_PAGE_SIZE}
-  `));
-  return { batches, batch: found[0], summary: summary[0], rows, page, pages };
+  // A prévia é agregada: não enviar telefones, emails ou links financeiros ao navegador.
+  return { batches, batch: found[0], summary: summary[0] };
+
 }
 
 export async function applyF10CustomerSheet(unitId: number, batchId: string): Promise<boolean> {
