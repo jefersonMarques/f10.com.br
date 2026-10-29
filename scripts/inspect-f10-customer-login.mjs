@@ -99,8 +99,12 @@ async function inspectLocalRecords(userId, login) {
       return {
         available: true,
         explicitIdentityCount: explicit.length,
+        explicitContactId: explicit.length === 1 ? explicit[0] : null,
         conflictingExplicitIdentities: explicit.length > 1,
         emailCandidateCount: emails.length,
+        uniqueEmailCandidateId: emails.length === 1 ? emails[0].id : null,
+        explicitIdentityMatchesEmailCandidate: explicit.length === 1 && emails.length === 1
+          ? explicit[0] === emails[0].id : null,
         emailCandidateLimitReached: emails.length > 100,
         hasExactlyOneEmailCandidate: emails.length === 1,
         linkedUnitCountShown: units.length,
@@ -125,6 +129,7 @@ async function inspectLocalRecords(userId, login) {
   }
 }
 
+process.stdout.write("Servidor de autenticação: " + url.host + "\n");
 let password = await hiddenPassword();
 try {
   const response = await fetch(new URL("/adm/user/login", base), {
