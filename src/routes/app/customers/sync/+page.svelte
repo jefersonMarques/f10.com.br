@@ -43,7 +43,7 @@
       <h1 class="text-xl font-bold text-app-text">Sincronizar clientes</h1>
       <p class="application-text-caption mt-1 text-app-text-muted">API F10 · Unidade {data.sourceUnitId ?? "não configurada"} · Todas as pessoas com contrato, inclusive cancelados.</p>
     </div>
-    <span class="application-text-caption inline-flex items-center gap-2 rounded-xl border border-app-border px-3 py-2 text-app-text-muted"><ShieldCheck size={17}/> Somente leitura</span>
+    <span class="application-text-caption inline-flex items-center gap-2 rounded-xl border border-app-border px-3 py-2 text-app-text-muted"><ShieldCheck size={17}/> Clientes protegidos</span>
   </div>
 
   {#if form?.message}
@@ -53,7 +53,7 @@
   <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(240px,310px)]">
     <section class="rounded-[20px] border border-app-border bg-app-surface p-5">
       <div class="mb-3 flex items-center gap-2 font-bold text-app-text"><RefreshCw size={18}/> Nova busca na API</div>
-      <p class="application-text-caption mb-4 text-app-text-muted">Consulta contratos, identifica pessoas únicas e compara com os contatos existentes. Não cria clientes nem altera cadastros nesta etapa.</p>
+      <p class="application-text-caption mb-4 text-app-text-muted">Salva os contratos e seus números para consultas futuras. Identifica pessoas e prepara a prévia sem criar ou alterar clientes.</p>
       <form method="POST" action="?/start">
         <button type="submit" disabled={!data.apiConfigured} class="application-text-caption inline-flex h-11 items-center gap-2 rounded-xl bg-app-primary px-5 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><RefreshCw size={17}/> Buscar atualizações</button>
       </form>
@@ -110,7 +110,7 @@
         {/each}
       </div>
       {#if Number(data.batch.skipped_contracts) > 0}
-        <p role="alert" class="application-text-caption mx-4 mb-3 text-app-warning-text">{data.batch.skipped_contracts} contrato(s) com identificação incompleta foram ignorados na busca.</p>
+        <p role="alert" class="application-text-caption mx-4 mb-3 text-app-warning-text">{data.batch.skipped_contracts} contrato(s) sem pessoa identificada foram preservados, mas não participam da conciliação de clientes.</p>
       {/if}
       {#if data.batch.last_error_code}
         <p role="alert" class="application-text-caption mx-4 mb-3 text-app-danger-text">Não foi possível concluir: {String(data.batch.last_error_code)}. Verifique a credencial e a API.</p>
@@ -142,6 +142,7 @@
                 </td>
                 <td class="application-text-caption px-4 py-3 align-top text-app-text-muted">
                   <span>{Array.isArray(row.contract_ids) ? row.contract_ids.length : 0} contrato(s)</span>
+                  <div class="application-text-meta mt-1 text-app-text">Nº {Array.isArray(row.contract_numbers) && row.contract_numbers.length ? row.contract_numbers.slice(0, 5).map(String).join(", ") : "não informado"}</div>
                   <div class="application-text-meta mt-1">{Number(row.active_contracts)} ativo(s)</div>
                 </td>
                 <td class="application-text-caption px-4 py-3 align-top">
