@@ -71,7 +71,7 @@ export async function getF10CustomerSyncPreview(batchId: string | null, requeste
   const offset = (page - 1) * PAGE_SIZE;
 
   const rows = rowsOf(await db.execute(sql`
-    SELECT person_id, contract_ids, active_contracts, customer_name, email, phone,
+    SELECT person_id, contract_ids, contract_numbers, active_contracts, customer_name, email, phone,
            whatsapp, result, matched_contact_id, potential_match_count, error_code
     FROM f10_customer_sync_rows
     WHERE batch_id = ${selectedId}::uuid
@@ -92,15 +92,49 @@ async function seedF10CustomerSync(batchId: string, unitId: number): Promise<voi
   try {
     const contracts = await listF10CustomerContractOwners(unitId);
     await db.transaction(async (tx) => {
+      // Contratos e prévia entram juntos; uma falha não deixa um lote parcial.
+      for (let index = 0; index < contracts.contracts.length; index += 100) {
+        const batch = contracts.contracts.slice(index, index + 100);
+        const entries = batch.map((contract) => sql`(
+          ${unitId}, ${contract.contractId}, ${contract.contractNumber},
+          ${contract.personId}, ${contract.holderId}, ${contract.status}, ${contract.statusLabel},
+          ${contract.courseId}, ${contract.sourceId}, ${contract.sellerId}, ${contract.telemarketingId},
+          ${contract.enrollmentDate}, ${contract.completionDate}, ${contract.cancellationDate},
+          ${JSON.stringify(contract.sourceRecord)}::jsonb, ${batchId}::uuid
+        )`);
+        await tx.execute(sql`
+          INSERT INTO f10_customer_contracts (
+            unit_id, contract_id, numero_contrato, pessoa_id, titular_id, status, x_status,
+            curso_id, fonte_id, vendedor_id, telemarketing_id, matricula, conclusao,
+            data_cancelamento, source_record, last_batch_id
+          ) VALUES ${sql.join(entries, sql`, `)}
+          ON CONFLICT (unit_id, contract_id) DO UPDATE SET
+            numero_contrato = excluded.numero_contrato,
+            pessoa_id = excluded.pessoa_id,
+            titular_id = excluded.titular_id,
+            status = excluded.status,
+            x_status = excluded.x_status,
+            curso_id = excluded.curso_id,
+            fonte_id = excluded.fonte_id,
+            vendedor_id = excluded.vendedor_id,
+            telemarketing_id = excluded.telemarketing_id,
+            matricula = excluded.matricula,
+            conclusao = excluded.conclusao,
+            data_cancelamento = excluded.data_cancelamento,
+            source_record = excluded.source_record,
+            last_batch_id = excluded.last_batch_id,
+            last_seen_at = now()
+        `);
+      }
       for (let index = 0; index < contracts.owners.length; index += 100) {
         const batch = contracts.owners.slice(index, index + 100);
         const entries = batch.map((owner: F10ContractOwner) => sql`(
           ${batchId}::uuid, ${owner.personId}, ${JSON.stringify(owner.contractIds)}::jsonb,
-          ${owner.activeContracts}
+          ${JSON.stringify(owner.contractNumbers)}::jsonb, ${owner.activeContracts}
         )`);
         await tx.execute(sql`
           INSERT INTO f10_customer_sync_rows
-            (batch_id, person_id, contract_ids, active_contracts)
+            (batch_id, person_id, contract_ids, contract_numbers, active_contracts)
           VALUES ${sql.join(entries, sql`, `)}
           ON CONFLICT (batch_id, person_id) DO NOTHING
         `);
