@@ -9,7 +9,7 @@
   export let form: ActionData;
 
   let importing = false;
-  const activeSync = data.batch?.status === "queued" || data.batch?.status === "scanning";
+  $: activeSync = data.batch?.status === "queued" || data.batch?.status === "scanning";
 
   onMount(() => {
     const timer = setInterval(() => {
