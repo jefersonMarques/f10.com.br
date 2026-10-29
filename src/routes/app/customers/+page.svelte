@@ -68,7 +68,7 @@
     </div>
   {/if}
 
-  {#if data.importedUnits}
+  {#if data.canViewImportedUnits}
     <nav aria-label="Visualizações de clientes" class="mb-4 flex flex-wrap gap-2 border-b border-app-border pb-3">
       <a href={pageHref(1, "units")} aria-current={data.view === "units" ? "page" : undefined}
         class={data.view === "units"
@@ -83,6 +83,12 @@
         <Users size={17}/> Pessoas e contatos
       </a>
     </nav>
+  {/if}
+
+  {#if data.view === "contacts" && data.directoryUnavailable}
+    <div role="alert" class="application-text-caption mb-4 rounded-xl border border-app-border bg-app-surface p-3 text-app-warning-text">
+      Não foi possível carregar os contatos. Os cadastros permanecem preservados. Tente novamente ou acesse a aba Unidades.
+    </div>
   {/if}
 
   <section class="overflow-hidden rounded-[20px] border border-app-border bg-app-surface">
@@ -190,11 +196,11 @@
       {/if}
     {:else}
       <div class="flex items-center justify-between border-b border-app-border-soft px-4 py-3">
-        <strong class="application-text-caption text-app-text">{data.total} pessoas/contatos</strong>
+        <strong class="application-text-caption text-app-text">{data.directoryUnavailable ? "Contatos temporariamente indisponíveis" : data.total + " pessoas/contatos"}</strong>
         <span class="application-text-meta text-app-text-muted">Cadastro de atendimento</span>
       </div>
       {#if data.rows.length === 0}
-        <p class="application-text-caption px-4 py-12 text-center text-app-text-muted">Nenhuma pessoa encontrada.</p>
+        <p class="application-text-caption px-4 py-12 text-center text-app-text-muted">{data.directoryUnavailable ? "A consulta não pôde ser concluída." : "Nenhuma pessoa encontrada."}</p>
       {:else}
         <div class="overflow-x-auto">
           <table class="w-full min-w-[840px] text-left">
