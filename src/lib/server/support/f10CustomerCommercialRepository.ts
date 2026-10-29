@@ -191,9 +191,37 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
   const source = sourceSystem(unitId);
   const apiSource = "f10_api:" + unitId;
   const sheetSource = "f10_sheet:" + unitId;
-  let importPhase = "lock";
+  let importPhase = "schema_check";
   try {
   return await db.transaction(async (tx) => {
+    // As colunas da migration 0099 são usadas somente na gravação definitiva,
+    // por isso uma prévia válida não garante que o esquema esteja completo.
+    const required = rowsOf(await tx.execute(sql`
+      WITH required(table_name, column_name) AS (
+        VALUES
+          ('customer_units', 'apelido'),
+          ('customer_units', 'f10_unit_id'),
+          ('customer_units', 'f10_contract_id'),
+          ('customer_units', 'f10_person_id'),
+          ('customer_units', 'f10_holder_id'),
+          ('customer_contacts', 'import_source'),
+          ('customer_contacts', 'import_source_id'),
+          ('customer_unit_contacts', 'customer_contact_id'),
+          ('f10_customer_contract_profiles', 'customer_unit_id'),
+          ('f10_customer_sheet_batches', 'record_version')
+      )
+      SELECT count(*)::integer AS missing FROM required r
+      WHERE NOT EXISTS (
+        SELECT 1 FROM information_schema.columns c
+        WHERE c.table_schema = current_schema()
+          AND c.table_name = r.table_name AND c.column_name = r.column_name
+      )
+    `));
+    if (Number(required[0]?.missing ?? -1) !== 0) {
+      throw new Error("F10_IMPORT_SCHEMA_OUTDATED");
+    }
+
+    importPhase = "lock";
     // Uma importação por unidade; o lock protege também de lotes simultâneos.
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${source}), hashtext('f10_sheet_import'))`);
     importPhase = "batch_lock";
