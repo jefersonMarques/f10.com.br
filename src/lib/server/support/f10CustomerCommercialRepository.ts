@@ -20,12 +20,25 @@ function sourceSystem(unitId: number): string {
 export async function stageF10CustomerSheet(
   unitId: number, actorId: string, fileName: string, parsed: ParsedCustomerImport,
 ): Promise<string> {
+  let previewPhase = "schema_check";
+  try {
   const db = getDatabase();
+  // Migrações 0098–0100 são obrigatórias; detectar ausência antes de gravar.
+  const columns = rowsOf(await db.execute(sql`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = 'f10_customer_sheet_batches'
+      AND column_name IN ('unit_id', 'record_version', 'api_match_source',
+                          'api_contract_count', 'api_error_code', 'api_checked_at')
+  `));
+  if (columns.length !== 6) throw new Error("F10_IMPORT_SCHEMA_OUTDATED");
+  previewPhase = "cleanup";
   // Descarta apenas prévias antigas; perfis e vínculos aplicados continuam persistidos.
   await db.execute(sql`
     DELETE FROM f10_customer_sheet_batches
     WHERE created_at < now() - interval '90 days'
   `);
+  previewPhase = "api_match";
   let fresh: Awaited<ReturnType<typeof listF10CustomerContractOwners>> | null = null;
   let apiMatchSource = "not_configured";
   let apiErrorCode: string | null = null;
@@ -42,7 +55,8 @@ export async function stageF10CustomerSheet(
   const freshMatches = fresh
     ? matchSheetContractNumbers(parsed.rows.map(({ record }) => record.sourceId), fresh.contracts)
     : null;
-  return db.transaction(async (tx) => {
+  previewPhase = "batch_insert";
+  return await db.transaction(async (tx) => {
     const batches = rowsOf(await tx.execute(sql`
       INSERT INTO f10_customer_sheet_batches (
         unit_id, created_by, file_name, file_hash, total_rows, record_version,
@@ -57,6 +71,7 @@ export async function stageF10CustomerSheet(
     `));
     const batchId = String(batches[0].id);
 
+    previewPhase = "validate_sheet_ids";
     const sourceIds = new Set<string>();
     for (const { record } of parsed.rows) {
       if (sourceIds.has(record.sourceId)) throw new Error("F10_SHEET_DUPLICATE_IDS");
@@ -69,6 +84,7 @@ export async function stageF10CustomerSheet(
       fresh?.contracts.map((contract) => [contract.contractId, contract]) ?? [],
     );
 
+    previewPhase = "rows_insert";
     for (let i = 0; i < parsed.rows.length; i += 100) {
       const items = parsed.rows.slice(i, i + 100);
       const entries = items.map(({ lineNumber, record }) => {
@@ -91,6 +107,7 @@ export async function stageF10CustomerSheet(
       `);
     }
 
+    previewPhase = "cache_match";
     if (!fresh) {
       // Fallback explícito: cache local, que pode estar incompleto.
     await tx.execute(sql`
@@ -116,6 +133,10 @@ export async function stageF10CustomerSheet(
     }
     return batchId;
   });
+  } catch (cause) {
+    // Somente etapa e código técnico chegam aos logs/UI; jamais a query ou os dados da planilha.
+    throw Object.assign(new Error("F10_SHEET_STAGE_FAILED", { cause }), { previewPhase });
+  }
 }
 
 export async function getF10CustomerSheetPage(
