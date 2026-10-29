@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
-import type { CustomerImportRecord, ParsedCustomerImport } from "$lib/server/support/customerImportFile";
+import type { ParsedCustomerImport } from "$lib/server/support/customerImportFile";
+import { toF10CommercialRecord } from "$lib/server/support/f10CustomerCommercialFields";
 
 type DatabaseRow = Record<string, unknown>;
 const PAGE_SIZE = 50;
@@ -13,15 +14,6 @@ function rowsOf(result: unknown): DatabaseRow[] {
 function sourceSystem(unitId: number): string {
   // Compatível com grupos da planilha já importados para a unidade 1.
   return unitId === 1 ? "f10_sheet" : "f10_sheet_unit_" + unitId;
-}
-
-function commercialRecord(record: CustomerImportRecord) {
-  return {
-    sourceId: record.sourceId, unitName: record.unitName,
-    holderName: record.holderName, sourceGroupId: record.sourceGroupId,
-    groupName: record.groupName, commercialStatus: record.commercialStatus,
-    plan: record.plan, city: record.city, accountExecutive: record.accountExecutive,
-  };
 }
 
 export async function stageF10CustomerSheet(
@@ -47,7 +39,7 @@ export async function stageF10CustomerSheet(
       const items = parsed.rows.slice(i, i + 100);
       const entries = items.map(({ lineNumber, record }) => sql`(
         ${batchId}::uuid, ${lineNumber}, ${record.sourceId},
-        ${JSON.stringify(commercialRecord(record))}::jsonb
+        ${JSON.stringify(toF10CommercialRecord(record))}::jsonb
       )`);
       await tx.execute(sql`
         INSERT INTO f10_customer_sheet_rows (batch_id, line_number, source_id, record)
@@ -151,8 +143,7 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
         contracted_plan, city, account_executive, source_file_hash
       )
       SELECT ${unitId}, r.contract_id,
-             left(coalesce(nullif(r.record ->> 'holderName', ''),
-                           nullif(r.record ->> 'unitName', '')), 240),
+             left(nullif(r.record ->> 'apelido', ''), 240),
              g.id, u.id,
              nullif(r.record ->> 'unitName', ''),
              nullif(r.record ->> 'holderName', ''),
