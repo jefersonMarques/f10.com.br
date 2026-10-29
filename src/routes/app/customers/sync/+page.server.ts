@@ -18,6 +18,7 @@ import {
   CUSTOMER_IMPORT_MAX_BYTES,
   parseCustomerImportFile,
 } from "$lib/server/support/customerImportFile";
+import { getF10SheetPreviewError } from "$lib/server/support/f10SheetPreviewErrors";
 
 const RETURN_TO = "/app/customers/sync";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -111,10 +112,13 @@ export const actions: Actions = {
       throw redirect(303, RETURN_TO + "?sheetBatch=" + batchId);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
-      return fail(500, {
-        message: cause instanceof Error && cause.message === "F10_SHEET_DUPLICATE_IDS"
-          ? "Há números de contrato repetidos na planilha. Corrija os IDs duplicados e gere outra prévia."
-          : "Não foi possível gerar a prévia da importação.",
+      const issue = getF10SheetPreviewError(cause);
+      // Não registrar query, parâmetros, dados de clientes ou credenciais.
+      console.error("[f10.sheet.preview]", { code: issue.code, unitId });
+      return fail(issue.code === "F10_SHEET_DUPLICATE_IDS" ? 400 : 500, {
+        message: issue.message,
+        errorCode: issue.code,
+        previewFailed: true,
       });
     }
   },

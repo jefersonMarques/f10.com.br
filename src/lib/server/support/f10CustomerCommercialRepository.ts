@@ -50,7 +50,7 @@ export async function stageF10CustomerSheet(
       )
       VALUES (
         ${unitId}, ${actorId}::uuid, ${fileName.slice(0, 180)}, ${parsed.fileHash},
-        ${parsed.rows.length}, 2, ${apiMatchSource}, ${fresh?.contractsCount ?? null},
+        ${parsed.rows.length}, 3, ${apiMatchSource}, ${fresh?.contractsCount ?? null},
         ${apiErrorCode}, ${fresh ? new Date() : null}
       )
       RETURNING id
@@ -63,50 +63,11 @@ export async function stageF10CustomerSheet(
       sourceIds.add(record.sourceId);
     }
 
-    if (fresh && freshMatches) {
-      const matchedIds = new Set(
-        [...freshMatches.values()]
-          .filter((value) => value.status === "matched")
-          .map((value) => value.contractId),
-      );
-      const matchedContracts = fresh.contracts.filter(
-        (contract) => matchedIds.has(contract.contractId),
-      );
-      // Apenas os contratos conciliados precisam ser persistidos para aplicação.
-      for (let i = 0; i < matchedContracts.length; i += 100) {
-        const chunk = matchedContracts.slice(i, i + 100);
-        const values = chunk.map((contract) => sql`(
-          ${unitId}, ${contract.contractId}, ${contract.contractNumber},
-          ${contract.personId}, ${contract.holderId}, ${contract.status},
-          ${contract.statusLabel}, ${contract.courseId}, ${contract.sourceId},
-          ${contract.sellerId}, ${contract.telemarketingId},
-          ${contract.enrollmentDate}, ${contract.completionDate},
-          ${contract.cancellationDate}, ${JSON.stringify(contract.sourceRecord)}::jsonb
-        )`);
-        await tx.execute(sql`
-          INSERT INTO f10_customer_contracts (
-            unit_id, contract_id, numero_contrato, pessoa_id, titular_id, status,
-            x_status, curso_id, fonte_id, vendedor_id, telemarketing_id,
-            matricula, conclusao, data_cancelamento, source_record
-          ) VALUES ${sql.join(values, sql`, `)}
-          ON CONFLICT (unit_id, contract_id) DO UPDATE SET
-            numero_contrato = excluded.numero_contrato,
-            pessoa_id = excluded.pessoa_id,
-            titular_id = excluded.titular_id,
-            status = excluded.status,
-            x_status = excluded.x_status,
-            curso_id = excluded.curso_id,
-            fonte_id = excluded.fonte_id,
-            vendedor_id = excluded.vendedor_id,
-            telemarketing_id = excluded.telemarketing_id,
-            matricula = excluded.matricula,
-            conclusao = excluded.conclusao,
-            data_cancelamento = excluded.data_cancelamento,
-            source_record = excluded.source_record,
-            last_seen_at = now()
-        `);
-      }
-    }
+    // Uma prévia apenas registra o resultado da consulta: não altera contratos
+    // existentes antes de o administrador confirmar a importação.
+    const sourceContracts = new Map(
+      fresh?.contracts.map((contract) => [contract.contractId, contract]) ?? [],
+    );
 
     for (let i = 0; i < parsed.rows.length; i += 100) {
       const items = parsed.rows.slice(i, i + 100);
@@ -114,7 +75,12 @@ export async function stageF10CustomerSheet(
         const match = freshMatches?.get(record.sourceId);
         return sql`(
           ${batchId}::uuid, ${lineNumber}, ${record.sourceId},
-          ${JSON.stringify(toF10CommercialRecord(record))}::jsonb,
+          ${JSON.stringify({
+            ...toF10CommercialRecord(record),
+            _f10ContractSnapshot: match?.status === "matched" && match.contractId !== null
+              ? sourceContracts.get(match.contractId) ?? null
+              : null,
+          })}::jsonb,
           ${match?.status ?? "pending"}, ${match?.contractId ?? null}
         )`;
       });
@@ -208,10 +174,54 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
     const batch = rowsOf(await tx.execute(sql`
       SELECT id, file_hash FROM f10_customer_sheet_batches
       WHERE id = ${batchId}::uuid AND unit_id = ${unitId} AND status = 'review'
-        AND record_version = 2
+        AND record_version = 3
       FOR UPDATE
     `));
     if (!batch.length) return false;
+
+    // Contratos vindos da API são persistidos somente após confirmação.
+    // Cada snapshot foi gerado pelo parser da API, não pela planilha.
+    await tx.execute(sql`
+      INSERT INTO f10_customer_contracts (
+        unit_id, contract_id, numero_contrato, pessoa_id, titular_id,
+        status, x_status, curso_id, fonte_id, vendedor_id, telemarketing_id,
+        matricula, conclusao, data_cancelamento, source_record
+      )
+      SELECT ${unitId},
+        (r.record #>> '{_f10ContractSnapshot,contractId}')::bigint,
+        r.record #>> '{_f10ContractSnapshot,contractNumber}',
+        (r.record #>> '{_f10ContractSnapshot,personId}')::bigint,
+        (r.record #>> '{_f10ContractSnapshot,holderId}')::bigint,
+        (r.record #>> '{_f10ContractSnapshot,status}')::integer,
+        r.record #>> '{_f10ContractSnapshot,statusLabel}',
+        (r.record #>> '{_f10ContractSnapshot,courseId}')::bigint,
+        (r.record #>> '{_f10ContractSnapshot,sourceId}')::bigint,
+        (r.record #>> '{_f10ContractSnapshot,sellerId}')::bigint,
+        (r.record #>> '{_f10ContractSnapshot,telemarketingId}')::bigint,
+        r.record #>> '{_f10ContractSnapshot,enrollmentDate}',
+        r.record #>> '{_f10ContractSnapshot,completionDate}',
+        r.record #>> '{_f10ContractSnapshot,cancellationDate}',
+        r.record #> '{_f10ContractSnapshot,sourceRecord}'
+      FROM f10_customer_sheet_rows r
+      WHERE r.batch_id = ${batchId}::uuid
+        AND r.match_status = 'matched'
+        AND jsonb_typeof(r.record -> '_f10ContractSnapshot') = 'object'
+      ON CONFLICT (unit_id, contract_id) DO UPDATE SET
+        numero_contrato = excluded.numero_contrato,
+        pessoa_id = excluded.pessoa_id,
+        titular_id = excluded.titular_id,
+        status = excluded.status,
+        x_status = excluded.x_status,
+        curso_id = excluded.curso_id,
+        fonte_id = excluded.fonte_id,
+        vendedor_id = excluded.vendedor_id,
+        telemarketing_id = excluded.telemarketing_id,
+        matricula = excluded.matricula,
+        conclusao = excluded.conclusao,
+        data_cancelamento = excluded.data_cancelamento,
+        source_record = excluded.source_record,
+        last_seen_at = now()
+    `);
 
     const conflicts = rowsOf(await tx.execute(sql`
       SELECT count(*)::int AS total FROM f10_customer_sheet_rows r
