@@ -18,3 +18,8 @@ ALTER TABLE customer_contacts
 CREATE UNIQUE INDEX IF NOT EXISTS customer_contacts_import_identity_idx
   ON customer_contacts (import_source, import_source_id)
   WHERE import_source IS NOT NULL AND import_source_id IS NOT NULL;
+
+-- Lotes antigos eram apenas conciliações, sem os contatos completos da planilha.
+-- Exigir nova prévia evita tratá-los como importações integrais.
+ALTER TABLE f10_customer_sheet_batches
+  ADD COLUMN IF NOT EXISTS record_version integer NOT NULL DEFAULT 1;
