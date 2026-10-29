@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { AlertTriangle, ArrowLeft, CheckCircle2, Clock3, RefreshCw, ShieldCheck, Users } from "lucide-svelte";
+  import { AlertTriangle, ArrowLeft, CheckCircle2, Clock3, FileSpreadsheet, RefreshCw, ShieldCheck, Users } from "lucide-svelte";
   import { onMount } from "svelte";
   import { invalidateAll } from "$app/navigation";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
@@ -169,4 +169,194 @@
       {/if}
     </section>
   {/if}
+
+  <section class="mt-5 overflow-hidden rounded-[20px] border border-app-border bg-app-surface">
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-app-border-soft p-4">
+      <div>
+        <h2 class="application-text-caption font-bold text-app-text">Contratos e unidades</h2>
+        <p class="application-text-meta mt-1 text-app-text-muted">
+          {Number(data.contracts.summary?.total ?? 0)} contratos ·
+          {Number(data.contracts.summary?.with_nickname ?? 0)} com apelido ·
+          {Number(data.contracts.summary?.with_group ?? 0)} com grupo
+        </p>
+      </div>
+      <form method="GET" action="/app/customers/sync" class="flex w-full gap-2 sm:w-auto">
+        <input type="search" name="q" value={data.contractQuery}
+          placeholder="Nº, apelido, grupo ou pessoa"
+          class="application-text-caption h-10 min-w-0 flex-1 rounded-xl border border-app-border-control bg-app-subtle px-3 text-app-text sm:w-64"/>
+        <button type="submit" class="application-text-caption h-10 rounded-xl bg-app-primary px-4 font-semibold text-white">Buscar</button>
+      </form>
+    </div>
+    {#if data.contracts.rows.length}
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[830px] text-left">
+          <thead class="application-text-meta bg-app-subtle text-app-text-muted">
+            <tr>
+              <th class="px-4 py-3">Contrato</th>
+              <th class="px-4 py-3">Apelido / unidade</th>
+              <th class="px-4 py-3">Franquia</th>
+              <th class="px-4 py-3">Pessoa / responsável</th>
+              <th class="px-4 py-3">Situação</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-app-border-soft">
+            {#each data.contracts.rows as contract}
+              <tr>
+                <td class="application-text-caption px-4 py-3 align-top">
+                  <strong class="text-app-text">Nº {String(contract.numero_contrato ?? "—")}</strong>
+                  <div class="application-text-meta text-app-text-muted">ID {String(contract.contract_id)}</div>
+                </td>
+                <td class="application-text-caption px-4 py-3 align-top">
+                  <strong class="text-app-text">{String(contract.apelido ?? "Não informado")}</strong>
+                  {#if contract.contracted_plan}
+                    <div class="application-text-meta mt-1 text-app-text-muted">{String(contract.contracted_plan)}</div>
+                  {/if}
+                  {#if contract.city}
+                    <div class="application-text-meta text-app-text-muted">{String(contract.city)}</div>
+                  {/if}
+                </td>
+                <td class="application-text-caption px-4 py-3 align-top text-app-text-muted">
+                  {String(contract.group_name ?? "Sem grupo")}
+                </td>
+                <td class="application-text-caption px-4 py-3 align-top">
+                  <div class="text-app-text">{String(contract.person_name ?? contract.spreadsheet_student_name ?? "Não informado")}</div>
+                  <div class="application-text-meta mt-1 text-app-text-muted">Pessoa {String(contract.pessoa_id ?? "—")} · Titular {String(contract.titular_id ?? "—")}</div>
+                </td>
+                <td class="application-text-caption px-4 py-3 align-top text-app-text-muted">
+                  {String(contract.x_status ?? "Não informado")}
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+      {#if data.contracts.pages > 1}
+        <div class="flex flex-wrap items-center justify-between gap-2 border-t border-app-border-soft p-4">
+          <span class="application-text-caption text-app-text-muted">Página {data.contracts.page} de {data.contracts.pages}</span>
+          <div class="flex gap-2">
+            {#if data.contracts.page > 1}
+              <a class="application-text-caption rounded-lg border border-app-border-control px-3 py-2 font-semibold text-app-text"
+                href={"/app/customers/sync?q=" + encodeURIComponent(data.contractQuery) + "&contractsPage=" + (data.contracts.page - 1)}>Anterior</a>
+            {/if}
+            {#if data.contracts.page < data.contracts.pages}
+              <a class="application-text-caption rounded-lg bg-app-primary px-3 py-2 font-semibold text-white"
+                href={"/app/customers/sync?q=" + encodeURIComponent(data.contractQuery) + "&contractsPage=" + (data.contracts.page + 1)}>Próxima</a>
+            {/if}
+          </div>
+        </div>
+      {/if}
+    {:else}
+      <div class="application-text-caption p-6 text-center text-app-text-muted">
+        {Number(data.contracts.summary?.total ?? 0) === 0 ? "Sincronize a API para listar os contratos." : "Nenhum contrato corresponde ao filtro."}
+      </div>
+    {/if}
+  </section>
+
+  <section class="mt-5 overflow-hidden rounded-[20px] border border-app-border bg-app-surface">
+    <div class="border-b border-app-border-soft p-4">
+      <div class="flex items-center gap-2 font-bold text-app-text"><FileSpreadsheet size={18}/> Apelidos e franquias</div>
+      <p class="application-text-caption mt-1 text-app-text-muted">
+        A API identifica contratos e pessoas. Use a planilha somente para completar apelido, grupo e plano.
+      </p>
+    </div>
+    <div class="p-4">
+      <form method="POST" action="?/sheetUpload" enctype="multipart/form-data" class="flex flex-wrap items-end gap-3">
+        <label class="application-text-caption min-w-[220px] flex-1 font-semibold text-app-text">
+          Planilha Clientes F10
+          <input type="file" name="file" accept=".xlsx,.csv" required
+            class="application-text-caption mt-2 block w-full rounded-lg border border-app-border-control bg-app-subtle p-2.5 text-app-text"/>
+        </label>
+        <button type="submit" disabled={Number(data.contracts.summary?.total ?? 0) === 0}
+          class="application-text-caption h-11 rounded-xl bg-app-primary px-5 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">
+          Conferir vínculos
+        </button>
+      </form>
+    </div>
+    {#if data.sheet.batch && data.sheet.summary}
+      <div class="border-t border-app-border-soft p-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <strong class="application-text-caption text-app-text">{String(data.sheet.batch.file_name)}</strong>
+            <span class="application-text-meta ml-2 text-app-text-muted">{String(data.sheet.batch.status === "applied" ? "Aplicada" : "Prévia")}</span>
+          </div>
+          <span class="application-text-meta text-app-text-muted">{Number(data.sheet.batch.total_rows)} linhas</span>
+        </div>
+        <div class="mt-3 grid grid-cols-3 gap-2">
+          {#each [
+            { title: "Conciliados", value: data.sheet.summary.matched },
+            { title: "Ausentes na API", value: data.sheet.summary.missing },
+            { title: "Ambíguos", value: data.sheet.summary.ambiguous },
+          ] as entry}
+            <div class="rounded-lg bg-app-subtle p-3">
+              <div class="text-lg font-bold tabular-nums text-app-text">{Number(entry.value ?? 0)}</div>
+              <div class="application-text-meta text-app-text-muted">{entry.title}</div>
+            </div>
+          {/each}
+        </div>
+        {#if data.sheet.batch.status === "review"}
+          <form method="POST" action="?/sheetApply" class="mt-4 flex flex-wrap items-end gap-2">
+            <input type="hidden" name="batchId" value={String(data.sheet.batch.id)}/>
+            <label class="application-text-meta text-app-text-muted">
+              Digite <strong>VINCULAR</strong> para salvar os conciliados
+              <input name="confirmation" placeholder="VINCULAR" required autocomplete="off"
+                class="application-text-caption mt-1 block h-10 w-36 rounded-lg border border-app-border-control bg-app-subtle px-3 text-app-text"/>
+            </label>
+            <button type="submit" disabled={Number(data.sheet.summary.matched ?? 0) === 0}
+              class="application-text-caption h-10 rounded-lg bg-app-primary px-4 font-semibold text-white disabled:opacity-40">
+              Aplicar vínculos
+            </button>
+          </form>
+        {:else}
+          <p class="application-text-caption mt-3 flex items-center gap-2 text-app-success-text">
+            <CheckCircle2 size={16}/> Apelidos e franquias vinculados aos contratos.
+          </p>
+        {/if}
+      </div>
+      <div class="overflow-x-auto border-t border-app-border-soft">
+        <table class="w-full min-w-[650px] text-left">
+          <thead class="application-text-meta bg-app-subtle text-app-text-muted">
+            <tr><th class="px-4 py-3">Nº contrato</th><th class="px-4 py-3">Apelido</th><th class="px-4 py-3">Franquia</th><th class="px-4 py-3">Conciliação</th></tr>
+          </thead>
+          <tbody class="divide-y divide-app-border-soft">
+            {#each data.sheet.rows as item}
+              <tr>
+                <td class="application-text-caption px-4 py-3 text-app-text">{String(item.source_id)}</td>
+                <td class="application-text-caption px-4 py-3 text-app-text">
+                  {String((item.record as Record<string, unknown>).holderName || (item.record as Record<string, unknown>).unitName || "—")}
+                </td>
+                <td class="application-text-caption px-4 py-3 text-app-text-muted">
+                  {String((item.record as Record<string, unknown>).groupName || "—")}
+                </td>
+                <td class="application-text-caption px-4 py-3">
+                  {#if item.match_status === "matched"}
+                    <span class="font-semibold text-app-success-text">Vinculado ao ID {String(item.contract_id)}</span>
+                  {:else if item.match_status === "not_found"}
+                    <span class="font-semibold text-app-warning-text">Não localizado na API</span>
+                  {:else}
+                    <span class="font-semibold text-app-danger-text">Revisar duplicidade</span>
+                  {/if}
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+      {#if data.sheet.pages > 1}
+        <div class="flex items-center justify-between gap-2 border-t border-app-border-soft p-4">
+          <span class="application-text-caption text-app-text-muted">Página {data.sheet.page} de {data.sheet.pages}</span>
+          <div class="flex gap-2">
+            {#if data.sheet.page > 1}
+              <a href={"/app/customers/sync?sheetBatch=" + String(data.sheet.batch.id) + "&sheetPage=" + (data.sheet.page - 1)}
+                class="application-text-caption rounded-lg border border-app-border-control px-3 py-2 text-app-text">Anterior</a>
+            {/if}
+            {#if data.sheet.page < data.sheet.pages}
+              <a href={"/app/customers/sync?sheetBatch=" + String(data.sheet.batch.id) + "&sheetPage=" + (data.sheet.page + 1)}
+                class="application-text-caption rounded-lg bg-app-primary px-3 py-2 font-semibold text-white">Próxima</a>
+            {/if}
+          </div>
+        </div>
+      {/if}
+    {/if}
+  </section>
+
 </ApplicationContent>
