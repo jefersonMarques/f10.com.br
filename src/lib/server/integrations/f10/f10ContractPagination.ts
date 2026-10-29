@@ -36,13 +36,16 @@ export async function collectF10ContractPages(
       return [...byId.values()];
     }
 
-    let lastId = cursor;
+    let lastId: number | null = null;
     for (const record of payload) {
       const id = readContractId(record);
-      if (lastId !== null && id < lastId && id > (cursor ?? 0)) {
+      if (lastId !== null && id < lastId) {
         throw new Error("F10_API_PAGINATION_ORDER");
       }
       const previous = byId.get(id);
+      if (cursor !== null && id <= cursor && previous === undefined) {
+        throw new Error("F10_API_PAGINATION_ORDER");
+      }
       if (previous !== undefined) {
         if (JSON.stringify(previous) !== JSON.stringify(record)) {
           throw new Error("F10_CONTRACT_ID_CONFLICT");
