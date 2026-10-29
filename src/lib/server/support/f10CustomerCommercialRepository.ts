@@ -126,7 +126,7 @@ export async function stageF10CustomerSheet(
     }
 
     if (!fresh) {
-    // Aceita apenas número comercial EXATO e único em ambas as origens.
+      // Fallback explícito: cache local, que pode estar incompleto.
     await tx.execute(sql`
       WITH candidate AS (
         SELECT r.id,
@@ -166,7 +166,8 @@ export async function getF10CustomerSheetPage(
   if (!batchId) return { batches, batch: null, summary: null };
 
   const found = rowsOf(await db.execute(sql`
-    SELECT id, file_name, status, total_rows, record_version, created_at, applied_at
+    SELECT id, file_name, status, total_rows, record_version, created_at, applied_at,
+           api_match_source, api_contract_count, api_error_code, api_checked_at
     FROM f10_customer_sheet_batches
     WHERE id = ${batchId}::uuid AND unit_id = ${unitId}
   `));
@@ -184,8 +185,15 @@ export async function getF10CustomerSheetPage(
     LEFT JOIN customer_units u ON u.source_system = ${source} AND u.source_id = r.source_id
     WHERE r.batch_id = ${batchId}::uuid
   `));
+  const cache = rowsOf(await db.execute(sql`
+    SELECT count(*)::int AS total
+    FROM f10_customer_contracts WHERE unit_id = ${unitId}
+  `));
   // A prévia é agregada: não enviar telefones, emails ou links financeiros ao navegador.
-  return { batches, batch: found[0], summary: summary[0] };
+  return {
+    batches, batch: found[0], summary: summary[0],
+    apiCacheTotal: Number(cache[0]?.total ?? 0),
+  };
 
 }
 
