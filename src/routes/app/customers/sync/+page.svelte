@@ -36,45 +36,85 @@
 
 <svelte:head><title>Sincronizar clientes | F10 Operations</title></svelte:head>
 
+
 <ApplicationContent width="wide">
-  <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+  <header class="mb-4 flex flex-wrap items-center justify-between gap-3">
     <div>
-      <a href="/app/customers" class="application-text-meta mb-2 inline-flex items-center gap-1 font-semibold text-app-primary"><ArrowLeft size={15}/> Clientes</a>
-      <h1 class="text-xl font-bold text-app-text">Sincronizar clientes</h1>
-      <p class="application-text-caption mt-1 text-app-text-muted">API F10 · Unidade {data.sourceUnitId ?? "não configurada"} · Todas as pessoas com contrato, inclusive cancelados.</p>
+      <a href="/app/customers" class="application-text-meta mb-1 inline-flex items-center gap-1 font-semibold text-app-primary"><ArrowLeft size={15}/> Clientes</a>
+      <h1 class="text-xl font-bold text-app-text">Clientes F10</h1>
+      <p class="application-text-caption mt-1 text-app-text-muted">
+        Unidade {data.sourceUnitId ?? "não configurada"} ·
+        {data.batch ? "Última consulta: " + dateLabel(data.batch.created_at) : "Ainda não sincronizado"}
+      </p>
     </div>
-    <span class="application-text-caption inline-flex items-center gap-2 rounded-xl border border-app-border px-3 py-2 text-app-text-muted"><ShieldCheck size={17}/> Clientes protegidos</span>
-  </div>
+    <form method="POST" action="?/start">
+      <button type="submit" disabled={!data.apiConfigured || data.batch?.status === "queued" || data.batch?.status === "scanning"}
+        class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
+        <RefreshCw size={17}/> {data.batch?.status === "queued" || data.batch?.status === "scanning" ? "Atualizando..." : "Atualizar API"}
+      </button>
+    </form>
+  </header>
 
   {#if form?.message}
     <div role="alert" class="application-text-caption mb-4 flex items-center gap-2 rounded-xl border border-app-warning-bg bg-app-warning-bg p-3 text-app-warning-text"><AlertTriangle size={17}/>{form.message}</div>
   {/if}
+  {#if !data.apiConfigured}
+    <p role="alert" class="application-text-caption mb-4 rounded-xl bg-app-warning-bg p-3 text-app-warning-text">
+      API indisponível. Verifique F10_UID e F10_API_BEARER_TOKEN.
+    </p>
+  {/if}
+  {#if data.batch?.last_error_code}
+    <p role="alert" class="application-text-caption mb-4 rounded-xl bg-app-danger-bg p-3 text-app-danger-text">
+      Falha na consulta: {String(data.batch.last_error_code)}. Confira a integração.
+    </p>
+  {/if}
 
-  <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(240px,310px)]">
-    <section class="rounded-[20px] border border-app-border bg-app-surface p-5">
-      <div class="mb-3 flex items-center gap-2 font-bold text-app-text"><RefreshCw size={18}/> Nova busca na API</div>
-      <p class="application-text-caption mb-4 text-app-text-muted">Salva os contratos e seus números para consultas futuras. Identifica pessoas e prepara a prévia sem criar ou alterar clientes.</p>
-      <form method="POST" action="?/start">
-        <button type="submit" disabled={!data.apiConfigured} class="application-text-caption inline-flex h-11 items-center gap-2 rounded-xl bg-app-primary px-5 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><RefreshCw size={17}/> Buscar atualizações</button>
-      </form>
-      {#if !data.apiConfigured}<p role="alert" class="application-text-caption mt-3 text-app-warning-text">Configure F10_UID e F10_API_BEARER_TOKEN no servidor para habilitar a conexão.</p>{/if}
-    </section>
-    <section class="rounded-[20px] border border-app-border bg-app-surface p-5">
-      <h2 class="application-text-caption mb-3 font-bold text-app-text">Diagnósticos recentes</h2>
+  <div class="mb-4 grid grid-cols-3 gap-2 sm:gap-3">
+    {#each [
+      { label: "Contratos", value: data.contracts.summary?.total ?? 0 },
+      { label: "Com apelido", value: data.contracts.summary?.with_nickname ?? 0 },
+      { label: "Com franquia", value: data.contracts.summary?.with_group ?? 0 },
+    ] as metric}
+      <div class="rounded-xl border border-app-border bg-app-surface px-3 py-3 sm:px-4">
+        <div class="text-xl font-bold tabular-nums text-app-text">{Number(metric.value)}</div>
+        <div class="application-text-caption mt-1 text-app-text-muted">{metric.label}</div>
+      </div>
+    {/each}
+  </div>
+
+  <nav aria-label="Seções de clientes F10" class="mb-4 flex flex-wrap gap-2 border-b border-app-border pb-3">
+    <a href="/app/customers/sync?view=contracts" aria-current={data.view === "contracts" ? "page" : undefined}
+      class={data.view === "contracts" ? "application-text-caption inline-flex h-10 items-center gap-2 rounded-lg border px-3 font-semibold border-app-primary bg-app-subtle text-app-primary" : "application-text-caption inline-flex h-10 items-center gap-2 rounded-lg border px-3 font-semibold border-app-border-control text-app-text"}>
+      <Users size={16}/> Contratos
+    </a>
+    <a href="/app/customers/sync?view=sheet" aria-current={data.view === "sheet" ? "page" : undefined}
+      class={data.view === "sheet" ? "application-text-caption inline-flex h-10 items-center gap-2 rounded-lg border px-3 font-semibold border-app-primary bg-app-subtle text-app-primary" : "application-text-caption inline-flex h-10 items-center gap-2 rounded-lg border px-3 font-semibold border-app-border-control text-app-text"}>
+      <FileSpreadsheet size={16}/> Apelidos e franquias
+    </a>
+    <a href="/app/customers/sync?view=sync" aria-current={data.view === "sync" ? "page" : undefined}
+      class={data.view === "sync" ? "application-text-caption inline-flex h-10 items-center gap-2 rounded-lg border px-3 font-semibold border-app-primary bg-app-subtle text-app-primary" : "application-text-caption inline-flex h-10 items-center gap-2 rounded-lg border px-3 font-semibold border-app-border-control text-app-text"}>
+      <Clock3 size={16}/> Diagnóstico
+    </a>
+  </nav>
+
+  {#if data.view === "sync"}
+    <details class="mb-4 rounded-xl border border-app-border bg-app-surface">
+      <summary class="application-text-caption cursor-pointer p-4 font-semibold text-app-text">Histórico de consultas ({data.batches.length})</summary>
       {#if data.batches.length === 0}
-        <p class="application-text-caption text-app-text-muted">Nenhuma busca realizada.</p>
+        <p class="application-text-caption px-4 pb-4 text-app-text-muted">Nenhuma consulta realizada.</p>
       {:else}
-        <div class="max-h-44 space-y-1 overflow-auto">
+        <div class="max-h-56 space-y-1 overflow-auto px-4 pb-4">
           {#each data.batches as batch}
-            <a href={"/app/customers/sync?batch=" + String(batch.id)} class="application-text-caption flex justify-between gap-2 rounded-lg px-2 py-2 hover:bg-app-subtle" class:bg-app-subtle={batch.id === data.batch?.id}>
-              <span class="text-app-text">{dateLabel(batch.created_at)}</span>
+            <a href={"/app/customers/sync?batch=" + String(batch.id)}
+              class="application-text-caption flex flex-wrap justify-between gap-2 rounded-lg px-2 py-2 hover:bg-app-subtle"
+              class:bg-app-subtle={batch.id === data.batch?.id}>
+              <span>{dateLabel(batch.created_at)}</span>
               <span class="text-app-text-muted">{statusNames[String(batch.status)] ?? String(batch.status)}</span>
             </a>
           {/each}
         </div>
       {/if}
-    </section>
-  </div>
+    </details>
 
   {#if data.batch && data.summary}
     <section class="mt-5 overflow-hidden rounded-[20px] border border-app-border bg-app-surface">
@@ -170,6 +210,9 @@
     </section>
   {/if}
 
+  {/if}
+
+  {#if data.view === "contracts"}
   <section id="contratos" class="mt-5 overflow-hidden rounded-[20px] border border-app-border bg-app-surface">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-app-border-soft p-4">
       <div>
@@ -252,6 +295,9 @@
     {/if}
   </section>
 
+  {/if}
+
+  {#if data.view === "sheet"}
   <section class="mt-5 overflow-hidden rounded-[20px] border border-app-border bg-app-surface">
     <div class="border-b border-app-border-soft p-4">
       <div class="flex items-center gap-2 font-bold text-app-text"><FileSpreadsheet size={18}/> Apelidos e franquias</div>
@@ -358,5 +404,6 @@
       {/if}
     {/if}
   </section>
+  {/if}
 
 </ApplicationContent>
