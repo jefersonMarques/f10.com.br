@@ -4,14 +4,13 @@ import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import { getConfiguredF10UnitId, isF10CustomerApiConfigured } from "$lib/server/integrations/f10/f10CustomerApi";
 import {
-  getF10CustomerSyncPreview,
+  getF10CustomerSyncState,
   processF10CustomerSyncOnce,
   queueF10CustomerSync,
 } from "$lib/server/support/f10CustomerSyncRepository";
 
 import {
   applyF10CustomerSheet,
-  getF10CustomerContractDirectory,
   getF10CustomerSheetPage,
   stageF10CustomerSheet,
 } from "$lib/server/support/f10CustomerCommercialRepository";
@@ -46,30 +45,15 @@ export const load: PageServerLoad = async ({ parent, url, setHeaders }) => {
     throw error(403, "Acesso não autorizado.");
   }
   setHeaders({ "Cache-Control": "private, no-store" });
-  const batchId = url.searchParams.get("batch");
-  if (batchId && !UUID_PATTERN.test(batchId)) throw error(400, "Diagnóstico inválido.");
-  const value = Number(url.searchParams.get("page") ?? "1");
-  const page = Number.isInteger(value) ? Math.max(1, Math.min(value, 10000)) : 1;
-
   const sheetBatchId = url.searchParams.get("sheetBatch");
-  if (sheetBatchId && !UUID_PATTERN.test(sheetBatchId)) throw error(400, "Lote da planilha inválido.");
-  const requestedView = url.searchParams.get("view");
-  const view = requestedView === "contracts" || requestedView === "sheet" || requestedView === "sync"
-    ? requestedView
-    : sheetBatchId ? "sheet" : batchId ? "sync" : "contracts";
+  if (sheetBatchId && !UUID_PATTERN.test(sheetBatchId)) throw error(400, "Lote inválido.");
   const unitId = sourceUnitId();
-  const contractQuery = (url.searchParams.get("q") ?? "").trim().slice(0, 120);
-  const readPage = (name: string) => {
-    const value = Number(url.searchParams.get(name) ?? "1");
-    return Number.isInteger(value) ? Math.max(1, Math.min(value, 10000)) : 1;
-  };
-  const [sync, contracts, sheet] = await Promise.all([
-    getF10CustomerSyncPreview(batchId, page, unitId ?? 0),
-    getF10CustomerContractDirectory(unitId ?? 0, contractQuery, readPage("contractsPage")),
-    getF10CustomerSheetPage(unitId ?? 0, sheetBatchId, readPage("sheetPage")),
+  const [sync, sheet] = await Promise.all([
+    getF10CustomerSyncState(unitId ?? 0),
+    getF10CustomerSheetPage(unitId ?? 0, sheetBatchId),
   ]);
   return {
-    ...sync, contracts, sheet, contractQuery, view,
+    ...sync, sheet,
     sourceUnitId: unitId,
     apiConfigured: isF10CustomerApiConfigured(),
   };
@@ -128,9 +112,9 @@ export const actions: Actions = {
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
       return fail(500, {
-        message: cause instanceof Error && cause.message === "F10_CONTRACTS_NOT_IMPORTED"
-          ? "Sincronize primeiro os contratos da API antes de anexar a planilha."
-          : "Não foi possível preparar a conciliação. Nenhum dado foi alterado.",
+        message: cause instanceof Error && cause.message === "F10_SHEET_DUPLICATE_IDS"
+          ? "Há números de contrato repetidos na planilha. Corrija os IDs duplicados e gere outra prévia."
+          : "Não foi possível gerar a prévia da importação.",
       });
     }
   },
@@ -143,8 +127,8 @@ export const actions: Actions = {
     if (typeof batchId !== "string" || !UUID_PATTERN.test(batchId)) {
       return fail(400, { message: "Lote inválido." });
     }
-    if (form.get("confirmation") !== "VINCULAR") {
-      return fail(400, { message: "Digite VINCULAR para confirmar." });
+    if (form.get("confirmation") !== "IMPORTAR") {
+      return fail(400, { message: "Confirme a importação para continuar." });
     }
     try {
       const applied = await applyF10CustomerSheet(unitId, batchId);
@@ -152,7 +136,7 @@ export const actions: Actions = {
       throw redirect(303, RETURN_TO + "?sheetBatch=" + batchId);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
-      return fail(500, { message: "Não foi possível conciliar. Nenhum vínculo parcial foi salvo." });
+      return fail(500, { message: "Não foi possível importar. Nenhum cadastro parcial foi salvo." });
     }
   },
 

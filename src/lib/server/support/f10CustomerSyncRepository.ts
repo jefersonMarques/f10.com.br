@@ -39,6 +39,15 @@ export async function queueF10CustomerSync(actorUserId: string, unitId: number):
   return String(current[0].id);
 }
 
+export async function getF10CustomerSyncState(unitId: number) {
+  const rows = rowsOf(await getDatabase().execute(sql`
+    SELECT id, status, last_error_code, created_at, processed_people, total_people
+    FROM f10_customer_sync_batches WHERE unit_id = ${unitId}
+    ORDER BY created_at DESC LIMIT 1
+  `));
+  return { batch: rows[0] ?? null };
+}
+
 export async function getF10CustomerSyncPreview(batchId: string | null, requestedPage: number, unitId: number) {
   const db = getDatabase();
   const batches = rowsOf(await db.execute(sql`
@@ -126,6 +135,62 @@ async function seedF10CustomerSync(batchId: string, unitId: number): Promise<voi
             last_seen_at = now()
         `);
       }
+      // A planilha pode ter sido importada antes desta consulta: enriquecer vínculos depois.
+      // Só usar número comercial que seja único na unidade da API.
+      const sheetSource = unitId === 1 ? "f10_sheet" : "f10_sheet_unit_" + unitId;
+      await tx.execute(sql`
+        WITH unique_contract AS (
+          SELECT numero_contrato, min(contract_id) AS contract_id
+          FROM f10_customer_contracts
+          WHERE unit_id = ${unitId} AND numero_contrato IS NOT NULL
+          GROUP BY numero_contrato HAVING count(*) = 1
+        )
+        UPDATE customer_units u
+        SET f10_unit_id = ${unitId},
+            f10_contract_id = c.contract_id,
+            f10_person_id = c.pessoa_id,
+            f10_holder_id = c.titular_id,
+            updated_at = now()
+        FROM unique_contract link
+        JOIN f10_customer_contracts c ON c.unit_id = ${unitId}
+          AND c.contract_id = link.contract_id
+        WHERE u.source_system = ${sheetSource} AND u.source_id = link.numero_contrato
+          AND (u.f10_contract_id IS DISTINCT FROM c.contract_id
+            OR u.f10_person_id IS DISTINCT FROM c.pessoa_id
+            OR u.f10_holder_id IS DISTINCT FROM c.titular_id)
+      `);
+      await tx.execute(sql`
+        WITH unique_contract AS (
+          SELECT numero_contrato, min(contract_id) AS contract_id
+          FROM f10_customer_contracts
+          WHERE unit_id = ${unitId} AND numero_contrato IS NOT NULL
+          GROUP BY numero_contrato HAVING count(*) = 1
+        )
+        INSERT INTO f10_customer_contract_profiles (
+          unit_id, contract_id, apelido, group_id, customer_unit_id,
+          spreadsheet_student_name, commercial_status, contracted_plan,
+          city, account_executive
+        )
+        SELECT ${unitId}, c.contract_id, u.apelido, u.group_id, u.id,
+               o.name, u.commercial_status, u.contracted_plan,
+               u.city, u.account_executive
+        FROM customer_units u
+        JOIN unique_contract link ON link.numero_contrato = u.source_id
+        JOIN f10_customer_contracts c ON c.unit_id = ${unitId}
+          AND c.contract_id = link.contract_id
+        JOIN customer_organizations o ON o.id = u.organization_id
+        WHERE u.source_system = ${sheetSource}
+        ON CONFLICT (unit_id, contract_id) DO UPDATE SET
+          apelido = excluded.apelido,
+          group_id = excluded.group_id,
+          customer_unit_id = excluded.customer_unit_id,
+          spreadsheet_student_name = excluded.spreadsheet_student_name,
+          commercial_status = excluded.commercial_status,
+          contracted_plan = excluded.contracted_plan,
+          city = excluded.city,
+          account_executive = excluded.account_executive,
+          updated_at = now()
+      `);
       for (let index = 0; index < contracts.owners.length; index += 100) {
         const batch = contracts.owners.slice(index, index + 100);
         const entries = batch.map((owner: F10ContractOwner) => sql`(
