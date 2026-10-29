@@ -42,7 +42,7 @@
   <header class="mb-4 flex flex-wrap items-center justify-between gap-3">
     <div>
       <h1 class="text-xl font-bold text-app-text">Clientes F10</h1>
-      {#if data.importedUnits}
+      {#if data.importedUnits && !data.importedUnits.unavailable}
         <p class="application-text-caption mt-1 text-app-text-muted">
           {Number(data.importedUnits.summary.total)} unidades ·
           {Number(data.importedUnits.summary.groups)} franquias/redes ·
@@ -56,6 +56,12 @@
       </a>
     {/if}
   </header>
+
+  {#if data.importedUnits?.unavailable}
+    <div role="alert" class="application-text-caption mb-4 rounded-xl border border-app-border bg-app-surface p-3 text-app-warning-text">
+      A listagem de unidades está em modo simplificado. Os cadastros continuam preservados; filtros e totalizadores podem estar temporariamente indisponíveis.
+    </div>
+  {/if}
 
   {#if data.importedUnits}
     <nav aria-label="Visualizações de clientes" class="mb-4 flex flex-wrap gap-2 border-b border-app-border pb-3">
@@ -87,7 +93,7 @@
               class="application-text-caption h-10 w-full rounded-xl border border-app-border-control bg-app-subtle pl-10 pr-3 text-app-text outline-none focus:border-app-primary"/>
           </span>
         </label>
-        {#if data.view === "units" && data.importedUnits}
+        {#if data.view === "units" && data.importedUnits && !data.importedUnits.unavailable}
           <label class="min-w-[155px] flex-1 sm:flex-none">
             <span class="application-text-meta mb-1 block font-semibold text-app-text-muted">Franquia / rede</span>
             <select name="grupo" class="application-text-caption h-10 w-full rounded-xl border border-app-border-control bg-app-subtle px-3 text-app-text sm:max-w-[225px]">
@@ -113,7 +119,7 @@
 
     {#if data.view === "units" && data.importedUnits}
       <div class="flex items-center justify-between border-b border-app-border-soft px-4 py-3">
-        <strong class="application-text-caption text-app-text">{data.importedUnits.totalMatched} unidades</strong>
+        <strong class="application-text-caption text-app-text">{data.importedUnits.unavailable ? "Listagem simplificada" : data.importedUnits.totalMatched + " unidades"}</strong>
         <span class="application-text-meta text-app-text-muted">Dados comerciais da planilha</span>
       </div>
       {#if data.importedUnits.rows.length === 0}
