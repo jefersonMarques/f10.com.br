@@ -25,13 +25,6 @@ export async function stageF10CustomerSheet(
     DELETE FROM f10_customer_sheet_batches
     WHERE created_at < now() - interval '90 days'
   `);
-  const available = rowsOf(await db.execute(sql`
-    SELECT EXISTS(
-      SELECT 1 FROM f10_customer_contracts WHERE unit_id = ${unitId}
-    ) AS has_contracts
-  `));
-  if (!available[0]?.has_contracts) throw new Error("F10_CONTRACTS_NOT_IMPORTED");
-
   return db.transaction(async (tx) => {
     const batches = rowsOf(await tx.execute(sql`
       INSERT INTO f10_customer_sheet_batches (unit_id, created_by, file_name, file_hash, total_rows)
@@ -39,6 +32,12 @@ export async function stageF10CustomerSheet(
       RETURNING id
     `));
     const batchId = String(batches[0].id);
+
+    const sourceIds = new Set<string>();
+    for (const { record } of parsed.rows) {
+      if (sourceIds.has(record.sourceId)) throw new Error("F10_SHEET_DUPLICATE_IDS");
+      sourceIds.add(record.sourceId);
+    }
 
     for (let i = 0; i < parsed.rows.length; i += 100) {
       const items = parsed.rows.slice(i, i + 100);
@@ -97,12 +96,17 @@ export async function getF10CustomerSheetPage(
   `));
   if (!found.length) return { batches, batch: null, summary: null, rows: [], page: 1, pages: 1 };
 
+  const source = sourceSystem(unitId);
   const summary = rowsOf(await db.execute(sql`
-    SELECT count(*) FILTER (WHERE match_status='matched')::int AS matched,
-           count(*) FILTER (WHERE match_status='not_found')::int AS missing,
-           count(*) FILTER (WHERE match_status='ambiguous')::int AS ambiguous,
-           count(*) FILTER (WHERE applied_at IS NOT NULL)::int AS applied
-    FROM f10_customer_sheet_rows WHERE batch_id = ${batchId}::uuid
+    SELECT count(*) FILTER (WHERE r.match_status='matched')::int AS matched,
+           count(*) FILTER (WHERE r.match_status='not_found')::int AS missing,
+           count(*) FILTER (WHERE r.match_status='ambiguous')::int AS ambiguous,
+           count(*) FILTER (WHERE r.applied_at IS NOT NULL)::int AS applied,
+           count(*) FILTER (WHERE u.id IS NULL)::int AS create_count,
+           count(*) FILTER (WHERE u.id IS NOT NULL)::int AS update_count
+    FROM f10_customer_sheet_rows r
+    LEFT JOIN customer_units u ON u.source_system = ${source} AND u.source_id = r.source_id
+    WHERE r.batch_id = ${batchId}::uuid
   `));
   const pages = Math.max(1, Math.ceil(Number(found[0].total_rows) / SHEET_PAGE_SIZE));
   const page = Math.max(1, Math.min(requestedPage, pages));
