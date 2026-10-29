@@ -110,18 +110,24 @@ export const actions: Actions = {
     if (file.size > CUSTOMER_IMPORT_MAX_BYTES) {
       return fail(413, { message: "O arquivo deve ter até 5 MB." });
     }
+    let parsed;
     try {
-      const parsed = parseCustomerImportFile(file.name, new Uint8Array(await file.arrayBuffer()));
+      parsed = parseCustomerImportFile(file.name, new Uint8Array(await file.arrayBuffer()));
+    } catch (cause) {
+      return fail(400, {
+        message: cause instanceof Error ? cause.message : "Planilha inválida.",
+      });
+    }
+    try {
       const batchId = await stageF10CustomerSheet(unitId, actorId, file.name, parsed);
       throw redirect(303, RETURN_TO + "?sheetBatch=" + batchId);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
-      const message = cause instanceof Error && cause.message === "F10_CONTRACTS_NOT_IMPORTED"
-        ? "Sincronize primeiro os contratos da API antes de anexar a planilha."
-        : cause instanceof Error && !cause.message.startsWith("F10_")
-          ? cause.message
-          : "Não foi possível analisar a planilha. Nenhum cadastro foi alterado.";
-      return fail(400, { message });
+      return fail(500, {
+        message: cause instanceof Error && cause.message === "F10_CONTRACTS_NOT_IMPORTED"
+          ? "Sincronize primeiro os contratos da API antes de anexar a planilha."
+          : "Não foi possível preparar a conciliação. Nenhum dado foi alterado.",
+      });
     }
   },
   sheetApply: async ({ cookies, request }) => {
