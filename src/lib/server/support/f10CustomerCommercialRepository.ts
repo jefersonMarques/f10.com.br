@@ -26,8 +26,8 @@ export async function stageF10CustomerSheet(
   `);
   return db.transaction(async (tx) => {
     const batches = rowsOf(await tx.execute(sql`
-      INSERT INTO f10_customer_sheet_batches (unit_id, created_by, file_name, file_hash, total_rows)
-      VALUES (${unitId}, ${actorId}::uuid, ${fileName.slice(0, 180)}, ${parsed.fileHash}, ${parsed.rows.length})
+      INSERT INTO f10_customer_sheet_batches (unit_id, created_by, file_name, file_hash, total_rows, record_version)
+      VALUES (${unitId}, ${actorId}::uuid, ${fileName.slice(0, 180)}, ${parsed.fileHash}, ${parsed.rows.length}, 2)
       RETURNING id
     `));
     const batchId = String(batches[0].id);
@@ -80,7 +80,7 @@ export async function getF10CustomerSheetPage(
 ) {
   const db = getDatabase();
   const batches = rowsOf(await db.execute(sql`
-    SELECT id, status, total_rows, created_at, applied_at
+    SELECT id, status, total_rows, record_version, created_at, applied_at
     FROM f10_customer_sheet_batches
     WHERE unit_id = ${unitId}
     ORDER BY created_at DESC LIMIT 10
@@ -89,7 +89,7 @@ export async function getF10CustomerSheetPage(
   if (!batchId) return { batches, batch: null, summary: null };
 
   const found = rowsOf(await db.execute(sql`
-    SELECT id, file_name, status, total_rows, created_at, applied_at
+    SELECT id, file_name, status, total_rows, record_version, created_at, applied_at
     FROM f10_customer_sheet_batches
     WHERE id = ${batchId}::uuid AND unit_id = ${unitId}
   `));
@@ -123,6 +123,7 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
     const batch = rowsOf(await tx.execute(sql`
       SELECT id, file_hash FROM f10_customer_sheet_batches
       WHERE id = ${batchId}::uuid AND unit_id = ${unitId} AND status = 'review'
+        AND record_version = 2
       FOR UPDATE
     `));
     if (!batch.length) return false;
