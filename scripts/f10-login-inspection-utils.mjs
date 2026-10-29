@@ -30,7 +30,7 @@ function groupIdOf(value) {
     && Number(text) > 0 ? text : null;
 }
 
-export function describeF10Login(loginResponse, jwtClaims, groupResponse) {
+export function describeF10Login(loginResponse, jwtClaims, groupResponse, expectedLogin = "") {
   if (!loginResponse || typeof loginResponse !== "object" || Array.isArray(loginResponse)) {
     throw new Error("F10_TEST_LOGIN_RESPONSE_INVALID");
   }
@@ -86,8 +86,8 @@ export function describeF10Login(loginResponse, jwtClaims, groupResponse) {
       jwtIdMatchesUserId: Boolean(userId && jwtId === userId),
       jwtNamePresent: typeof jwtClaims.nome === "string" && jwtClaims.nome.length > 0,
       jwtLogin: redactEmail(jwtClaims.login),
-      jwtLoginMatchesSubmitted: typeof jwtClaims.login === "string" && typeof loginResponse.login === "string"
-        ? jwtClaims.login.trim().toLowerCase() === loginResponse.login.trim().toLowerCase() : null,
+      jwtLoginMatchesSubmitted: typeof jwtClaims.login === "string" && Boolean(expectedLogin)
+        ? jwtClaims.login.trim().toLowerCase() === expectedLogin.trim().toLowerCase() : null,
     },
     access: {
       classification: scope,
