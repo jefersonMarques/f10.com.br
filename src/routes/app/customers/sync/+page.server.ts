@@ -53,6 +53,10 @@ export const load: PageServerLoad = async ({ parent, url, setHeaders }) => {
 
   const sheetBatchId = url.searchParams.get("sheetBatch");
   if (sheetBatchId && !UUID_PATTERN.test(sheetBatchId)) throw error(400, "Lote da planilha inválido.");
+  const requestedView = url.searchParams.get("view");
+  const view = requestedView === "contracts" || requestedView === "sheet" || requestedView === "sync"
+    ? requestedView
+    : sheetBatchId ? "sheet" : batchId ? "sync" : "contracts";
   const unitId = sourceUnitId();
   const contractQuery = (url.searchParams.get("q") ?? "").trim().slice(0, 120);
   const readPage = (name: string) => {
@@ -65,7 +69,7 @@ export const load: PageServerLoad = async ({ parent, url, setHeaders }) => {
     getF10CustomerSheetPage(unitId ?? 0, sheetBatchId, readPage("sheetPage")),
   ]);
   return {
-    ...sync, contracts, sheet, contractQuery,
+    ...sync, contracts, sheet, contractQuery, view,
     sourceUnitId: unitId,
     apiConfigured: isF10CustomerApiConfigured(),
   };

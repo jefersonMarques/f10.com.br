@@ -4,8 +4,8 @@ import type { ParsedCustomerImport } from "$lib/server/support/customerImportFil
 import { toF10CommercialRecord } from "$lib/server/support/f10CustomerCommercialFields";
 
 type DatabaseRow = Record<string, unknown>;
-const PAGE_SIZE = 50;
-const SHEET_PAGE_SIZE = 30;
+const PAGE_SIZE = 20;
+const SHEET_PAGE_SIZE = 20;
 
 function rowsOf(result: unknown): DatabaseRow[] {
   return result as DatabaseRow[];

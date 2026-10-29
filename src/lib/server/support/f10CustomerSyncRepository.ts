@@ -4,7 +4,7 @@ import { classifyF10CustomerMatch, type F10ContractOwner, type F10CustomerPerson
 import { getF10CustomerPerson, listF10CustomerContractOwners } from "$lib/server/integrations/f10/f10CustomerApi";
 
 type DatabaseRow = Record<string, unknown>;
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 20;
 const CHUNK_SIZE = 20;
 
 function rowsOf(value: unknown): DatabaseRow[] {
