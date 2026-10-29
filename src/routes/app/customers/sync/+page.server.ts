@@ -4,7 +4,7 @@ import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
 import { getConfiguredF10UnitId, isF10CustomerApiConfigured } from "$lib/server/integrations/f10/f10CustomerApi";
 import {
-  getF10CustomerSyncPreview,
+  getF10CustomerSyncState,
   processF10CustomerSyncOnce,
   queueF10CustomerSync,
 } from "$lib/server/support/f10CustomerSyncRepository";
@@ -45,17 +45,12 @@ export const load: PageServerLoad = async ({ parent, url, setHeaders }) => {
     throw error(403, "Acesso não autorizado.");
   }
   setHeaders({ "Cache-Control": "private, no-store" });
-  const batchId = url.searchParams.get("batch");
-  if (batchId && !UUID_PATTERN.test(batchId)) throw error(400, "Diagnóstico inválido.");
-  const value = Number(url.searchParams.get("page") ?? "1");
-  const page = Number.isInteger(value) ? Math.max(1, Math.min(value, 10000)) : 1;
-
   const sheetBatchId = url.searchParams.get("sheetBatch");
-  if (sheetBatchId && !UUID_PATTERN.test(sheetBatchId)) throw error(400, "Lote da planilha inválido.");
+  if (sheetBatchId && !UUID_PATTERN.test(sheetBatchId)) throw error(400, "Lote inválido.");
   const unitId = sourceUnitId();
   const [sync, sheet] = await Promise.all([
-    getF10CustomerSyncPreview(batchId, page, unitId ?? 0),
-    getF10CustomerSheetPage(unitId ?? 0, sheetBatchId, 1),
+    getF10CustomerSyncState(unitId ?? 0),
+    getF10CustomerSheetPage(unitId ?? 0, sheetBatchId),
   ]);
   return {
     ...sync, sheet,
