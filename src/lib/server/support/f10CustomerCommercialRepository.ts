@@ -1,4 +1,6 @@
 import { sql } from "drizzle-orm";
+import { isF10CustomerApiConfigured, listF10CustomerContractOwners } from "$lib/server/integrations/f10/f10CustomerApi";
+import { matchSheetContractNumbers } from "$lib/server/support/f10SheetContractMatching";
 import { getDatabase } from "$lib/server/db";
 import type { ParsedCustomerImport } from "$lib/server/support/customerImportFile";
 import { toF10CommercialRecord } from "$lib/server/support/f10CustomerCommercialFields";
@@ -24,10 +26,33 @@ export async function stageF10CustomerSheet(
     DELETE FROM f10_customer_sheet_batches
     WHERE created_at < now() - interval '90 days'
   `);
+  let fresh: Awaited<ReturnType<typeof listF10CustomerContractOwners>> | null = null;
+  let apiMatchSource = "not_configured";
+  let apiErrorCode: string | null = null;
+  if (isF10CustomerApiConfigured()) {
+    try {
+      fresh = await listF10CustomerContractOwners(unitId);
+      apiMatchSource = "live";
+    } catch (cause) {
+      apiMatchSource = "unavailable";
+      const code = cause instanceof Error ? cause.message : "";
+      apiErrorCode = /^F10_[A-Z_]+$/.test(code) ? code : "F10_API_UNAVAILABLE";
+    }
+  }
+  const freshMatches = fresh
+    ? matchSheetContractNumbers(parsed.rows.map(({ record }) => record.sourceId), fresh.contracts)
+    : null;
   return db.transaction(async (tx) => {
     const batches = rowsOf(await tx.execute(sql`
-      INSERT INTO f10_customer_sheet_batches (unit_id, created_by, file_name, file_hash, total_rows, record_version)
-      VALUES (${unitId}, ${actorId}::uuid, ${fileName.slice(0, 180)}, ${parsed.fileHash}, ${parsed.rows.length}, 2)
+      INSERT INTO f10_customer_sheet_batches (
+        unit_id, created_by, file_name, file_hash, total_rows, record_version,
+        api_match_source, api_contract_count, api_error_code, api_checked_at
+      )
+      VALUES (
+        ${unitId}, ${actorId}::uuid, ${fileName.slice(0, 180)}, ${parsed.fileHash},
+        ${parsed.rows.length}, 2, ${apiMatchSource}, ${fresh?.contractsCount ?? null},
+        ${apiErrorCode}, ${fresh ? new Date() : null}
+      )
       RETURNING id
     `));
     const batchId = String(batches[0].id);
