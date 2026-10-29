@@ -1,7 +1,25 @@
 export type F10ContractOwner = {
   personId: number;
   contractIds: number[];
+  contractNumbers: string[];
   activeContracts: number;
+};
+
+export type F10ContractSnapshot = {
+  contractId: number;
+  personId: number | null;
+  holderId: number | null;
+  contractNumber: string | null;
+  status: number | null;
+  statusLabel: string | null;
+  courseId: number | null;
+  sourceId: number | null;
+  sellerId: number | null;
+  telemarketingId: number | null;
+  enrollmentDate: string | null;
+  completionDate: string | null;
+  cancellationDate: string | null;
+  sourceRecord: Record<string, unknown>;
 };
 
 export type F10CustomerPerson = {
@@ -31,6 +49,17 @@ function positiveId(value: unknown): number | null {
   return Number.isSafeInteger(number) && number > 0 ? number : null;
 }
 
+function statusNumber(value: unknown): number | null {
+  const number = typeof value === "number" || typeof value === "string" ? Number(value) : NaN;
+  return Number.isSafeInteger(number) ? number : null;
+}
+
+function optionalText(value: unknown, maxLength: number): string | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const text = String(value).trim();
+  return text ? text.slice(0, maxLength) : null;
+}
+
 function cleanText(value: unknown, maxLength: number): string {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
@@ -39,45 +68,89 @@ export function parseF10Contracts(payload: unknown): {
   contractsCount: number;
   skippedContracts: number;
   owners: F10ContractOwner[];
+  contracts: F10ContractSnapshot[];
 } {
   if (!Array.isArray(payload)) throw new Error("F10_CONTRACTS_INVALID");
   if (!payload.length) throw new Error("F10_CONTRACTS_EMPTY");
   if (payload.length > MAX_CONTRACTS) throw new Error("F10_CONTRACTS_TOO_LARGE");
 
-  const people = new Map<number, { contractIds: Set<number>; activeContracts: number }>();
+  const people = new Map<number, {
+    contractIds: Set<number>;
+    contractNumbers: Set<string>;
+    activeContracts: number;
+  }>();
+  const contracts = new Map<number, F10ContractSnapshot>();
   let skippedContracts = 0;
 
   for (const item of payload) {
     if (!item || typeof item !== "object" || Array.isArray(item)) {
-      skippedContracts += 1;
-      continue;
+      throw new Error("F10_CONTRACT_RECORD_INVALID");
     }
-    const contract = item as Record<string, unknown>;
-    const personId = positiveId(contract.pessoa_id);
-    const contractId = positiveId(contract.contrato_id);
-    if (!personId || !contractId) {
-      skippedContracts += 1;
-      continue;
-    }
-    const existing = people.get(personId) ?? { contractIds: new Set<number>(), activeContracts: 0 };
-    if (!existing.contractIds.has(contractId)) {
-      existing.contractIds.add(contractId);
-      const label = cleanText(contract.x_status, 60).toLowerCase();
-      if (label === "ativo" || (label === "" && Number(contract.status) === 1)) {
-        existing.activeContracts += 1;
+    const sourceRecord = item as Record<string, unknown>;
+    const contractId = positiveId(sourceRecord.contrato_id);
+    if (!contractId) throw new Error("F10_CONTRACT_ID_INVALID");
+
+    const existingContract = contracts.get(contractId);
+    if (existingContract) {
+      if (JSON.stringify(existingContract.sourceRecord) !== JSON.stringify(sourceRecord)) {
+        throw new Error("F10_CONTRACT_ID_CONFLICT");
       }
+      continue;
     }
-    people.set(personId, existing);
+
+    const personId = positiveId(sourceRecord.pessoa_id);
+    const contractNumber = optionalText(sourceRecord.numero_contrato, 120);
+    const status = statusNumber(sourceRecord.status);
+    const statusLabel = optionalText(sourceRecord.x_status, 120);
+
+    const snapshot: F10ContractSnapshot = {
+      contractId,
+      personId,
+      holderId: positiveId(sourceRecord.titular_id),
+      contractNumber,
+      status,
+      statusLabel,
+      courseId: positiveId(sourceRecord.curso_id),
+      sourceId: positiveId(sourceRecord.fonte_id),
+      sellerId: positiveId(sourceRecord.vendedor_id),
+      telemarketingId: positiveId(sourceRecord.telemarketing_id),
+      enrollmentDate: optionalText(sourceRecord.matricula, 80),
+      completionDate: optionalText(sourceRecord.conclusao, 80),
+      cancellationDate: optionalText(sourceRecord.data_cancelamento, 80),
+      sourceRecord,
+    };
+    contracts.set(contractId, snapshot);
+
+    if (!personId) {
+      skippedContracts += 1;
+      continue;
+    }
+
+    const person = people.get(personId) ?? {
+      contractIds: new Set<number>(),
+      contractNumbers: new Set<string>(),
+      activeContracts: 0,
+    };
+    person.contractIds.add(contractId);
+    if (contractNumber) person.contractNumbers.add(contractNumber);
+    if (statusLabel?.toLowerCase() === "ativo" || (!statusLabel && status === 1)) {
+      person.activeContracts += 1;
+    }
+    people.set(personId, person);
     if (people.size > MAX_PEOPLE) throw new Error("F10_PEOPLE_TOO_LARGE");
   }
 
   if (!people.size) throw new Error("F10_CONTRACTS_NO_VALID_PEOPLE");
+
   return {
-    contractsCount: payload.length,
+    contractsCount: contracts.size,
     skippedContracts,
+    contracts: Array.from(contracts.values()),
     owners: Array.from(people, ([personId, value]) => ({
       personId,
       contractIds: [...value.contractIds].sort((a, b) => a - b),
+      contractNumbers: [...value.contractNumbers].sort((a, b) =>
+        a.localeCompare(b, "pt-BR", { numeric: true })),
       activeContracts: value.activeContracts,
     })).sort((a, b) => a.personId - b.personId),
   };
