@@ -83,7 +83,7 @@
         <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {#each [
             { label: "Total da planilha", value: data.sheet.batch.total_rows },
-            { label: "Novos cadastros", value: data.sheet.summary.create_count },
+            { label: "Novas unidades", value: data.sheet.summary.create_count },
             { label: "Atualizações", value: data.sheet.summary.update_count },
             { label: "Com dados da API", value: data.sheet.summary.matched },
           ] as metric}
@@ -94,10 +94,33 @@
           {/each}
         </div>
 
+        <div class="mt-4 rounded-xl border border-app-border p-3">
+          <div class="application-text-caption font-semibold text-app-text">Conferência dos números de contrato</div>
+          <p class="application-text-caption mt-1 text-app-text-muted">
+            ID da planilha = numero_contrato da API (não contrato_id).
+          </p>
+          {#if data.sheet.batch.api_match_source === "live"}
+            <p class="application-text-caption mt-2 text-app-text">
+              API consultada agora: <strong>{Number(data.sheet.batch.api_contract_count ?? 0)} contratos retornados</strong> ·
+              {Number(data.sheet.summary.matched ?? 0)} encontrados ·
+              {Number(data.sheet.summary.missing ?? 0)} sem correspondência ·
+              {Number(data.sheet.summary.ambiguous ?? 0)} duplicados.
+            </p>
+          {:else}
+            <p role="alert" class="application-text-caption mt-2 flex items-start gap-2 text-app-warning-text">
+              <AlertTriangle size={16} class="mt-0.5 shrink-0"/>
+              A API não foi consultada nesta prévia. A comparação usou os contratos gravados localmente e pode estar incompleta.
+            </p>
+          {/if}
+          <p class="application-text-meta mt-1 text-app-text-muted">
+            Contratos atualmente no banco local: {Number(data.sheet.apiCacheTotal ?? 0)}
+          </p>
+        </div>
+
         {#if Number(data.sheet.summary.missing ?? 0) + Number(data.sheet.summary.ambiguous ?? 0) > 0}
           <p class="application-text-caption mt-3 flex items-center gap-2 text-app-text-muted">
             <AlertTriangle size={16} class="shrink-0 text-app-warning-text"/>
-            {Number(data.sheet.summary.missing ?? 0) + Number(data.sheet.summary.ambiguous ?? 0)} registro(s) sem vínculo único com a API serão importados normalmente.
+            {Number(data.sheet.summary.missing ?? 0) + Number(data.sheet.summary.ambiguous ?? 0)} registro(s) não têm vínculo único na fonte consultada. A planilha continua sendo a base da importação.
           </p>
         {/if}
 
@@ -108,7 +131,7 @@
         {:else if data.sheet.batch.status === "review"}
           <form method="POST" action="?/sheetApply" class="mt-5 flex flex-wrap items-center gap-3"
             on:submit={(event) => {
-              if (importing || !window.confirm("Importar " + Number(data.sheet.batch.total_rows) + " registros da planilha? Clientes existentes serão atualizados, sem criar acessos ao portal.")) {
+              if (importing || !window.confirm("Importar " + Number(data.sheet.batch.total_rows) + " registros da planilha? " + Number(data.sheet.summary.missing ?? 0) + " estão sem correspondência na fonte consultada. Clientes existentes serão atualizados, sem criar acessos ao portal.")) {
                 event.preventDefault();
               } else {
                 importing = true;
