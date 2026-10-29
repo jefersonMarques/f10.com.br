@@ -156,8 +156,9 @@ try {
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   const groupsPayload = await readObject(groupsResponse, "F10_TEST_GROUPS");
-  const inspection = describeF10Login(loginPayload, claims, groupsPayload);
-  if (!inspection.identity.user_id || !inspection.identity.jwtIdMatchesUserId) {
+  const inspection = describeF10Login(loginPayload, claims, groupsPayload, email);
+  if (!inspection.identity.user_id || !inspection.identity.jwtIdMatchesUserId
+      || inspection.identity.jwtLoginMatchesSubmitted === false) {
     throw new Error("F10_TEST_IDENTITY_MISMATCH");
   }
   const local = await inspectLocalRecords(inspection.identity.user_id, email);
