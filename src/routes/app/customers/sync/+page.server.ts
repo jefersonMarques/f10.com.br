@@ -18,7 +18,11 @@ import {
   CUSTOMER_IMPORT_MAX_BYTES,
   parseCustomerImportFile,
 } from "$lib/server/support/customerImportFile";
-import { getF10SheetPreviewDiagnostic, getF10SheetPreviewError } from "$lib/server/support/f10SheetPreviewErrors";
+import {
+  getF10SheetApplyError,
+  getF10SheetPreviewDiagnostic,
+  getF10SheetPreviewError,
+} from "$lib/server/support/f10SheetPreviewErrors";
 
 const RETURN_TO = "/app/customers/sync";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -141,7 +145,12 @@ export const actions: Actions = {
       throw redirect(303, RETURN_TO + "?sheetBatch=" + batchId);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
-      return fail(500, { message: "Não foi possível importar. Nenhum cadastro parcial foi salvo." });
+      const issue = getF10SheetApplyError(cause);
+      // Nunca logar SQL, parâmetros, dados pessoais ou credenciais.
+      console.error("[f10.sheet.apply]", {
+        unitId, code: issue.code, ...getF10SheetPreviewDiagnostic(cause),
+      });
+      return fail(500, { message: issue.message, errorCode: issue.code });
     }
   },
 
