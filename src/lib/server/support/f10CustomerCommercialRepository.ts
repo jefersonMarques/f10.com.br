@@ -140,12 +140,11 @@ export async function applyF10CustomerSheet(unitId: number, batchId: string): Pr
     const conflicts = rowsOf(await tx.execute(sql`
       SELECT count(*)::int AS total FROM f10_customer_sheet_rows r
       WHERE r.batch_id = ${batchId}::uuid
-        AND (r.match_status = 'ambiguous'
-          OR (r.match_status = 'matched' AND NOT EXISTS (
-            SELECT 1 FROM f10_customer_contracts c
-            WHERE c.unit_id = ${unitId} AND c.contract_id = r.contract_id
-              AND c.numero_contrato = r.source_id
-          )))
+        AND r.match_status = 'matched' AND NOT EXISTS (
+          SELECT 1 FROM f10_customer_contracts c
+          WHERE c.unit_id = ${unitId} AND c.contract_id = r.contract_id
+            AND c.numero_contrato = r.source_id
+        )
     `));
     if (Number(conflicts[0]?.total ?? 0)) throw new Error("F10_SHEET_REVIEW_REQUIRED");
 
