@@ -62,6 +62,7 @@ jobs:
           node --experimental-strip-types --test tests/nfseRequestStatus.test.mjs
           node --experimental-strip-types --test tests/customerImportFile.test.mjs
           node --experimental-strip-types --test tests/f10CustomerSyncParsing.test.mjs
+          node --experimental-strip-types --test tests/f10ContractPagination.test.mjs
           node --experimental-strip-types --test tests/f10CustomerCommercialFields.test.mjs
           node --experimental-strip-types --test tests/f10SheetContractMatching.test.mjs
           node --experimental-strip-types --test tests/f10SheetPreviewErrors.test.mjs
