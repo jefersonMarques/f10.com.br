@@ -96,6 +96,21 @@
     return query ? `/app/tickets?${query}` : "/app/tickets";
   }
 
+  function changeTicketSort(nextSort: string): void {
+    const allowedSorts = new Set<PageData["filters"]["sort"]>([
+      "updated_desc", "updated_asc",
+      "number_asc", "number_desc",
+      "subject_asc", "subject_desc",
+      "priority_asc", "priority_desc",
+      "customer_asc", "customer_desc",
+      "assignee_asc", "assignee_desc",
+      "sla_asc", "sla_desc",
+    ]);
+    if (!allowedSorts.has(nextSort as PageData["filters"]["sort"])) return;
+    sort = nextSort as PageData["filters"]["sort"];
+    applyFilters();
+  }
+
   function applyFilters(): void {
     if (browser) {
       try { localStorage.setItem(VIEW_STORAGE_KEY, view); } catch { /* Preferência indisponível */ }
@@ -400,6 +415,8 @@
               areaWorkflows={data.workflowBoard.areaWorkflows}
               selectedTicketId={ticketDetails?.details.ticket.id ?? null}
               compact
+              sort={sort}
+              onSort={changeTicketSort}
               onOpenTicketService={(ticketId) => openTicketDetails(ticketId, "service")}
               onQuickAction={data.canReply ? quickTicketAction : null}
               labels={data.filterOptions.labels}
@@ -432,6 +449,8 @@
         globalWorkflow={data.workflowBoard.globalWorkflow}
         areaWorkflows={data.workflowBoard.areaWorkflows}
         onOpenTicket={openTicketDetails}
+        sort={sort}
+        onSort={changeTicketSort}
         onOpenTicketService={(ticketId) => openTicketDetails(ticketId, "service")}
         onQuickAction={data.canReply ? quickTicketAction : null}
         labels={data.filterOptions.labels}

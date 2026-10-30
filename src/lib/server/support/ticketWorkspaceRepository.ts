@@ -46,7 +46,15 @@ export type TicketWorkspaceSort =
   | "number_desc"
   | "number_asc"
   | "priority_desc"
-  | "subject_asc";
+  | "priority_asc"
+  | "subject_asc"
+  | "subject_desc"
+  | "customer_asc"
+  | "customer_desc"
+  | "assignee_asc"
+  | "assignee_desc"
+  | "sla_asc"
+  | "sla_desc";
 
 export type TicketWorkspaceFilters = {
   scope: TicketWorkspaceScope;
@@ -78,30 +86,44 @@ function activeTicketCondition(): SQL {
 }
 
 function ticketSortOrder(sort: TicketWorkspaceSort): SQL[] {
-  if (sort === "updated_asc") {
-    return [asc(tickets.updatedAt), asc(tickets.ticketNumber)];
+  const priorityRank = sql`case ${tickets.priority}
+    when 'urgent' then 4 when 'high' then 3
+    when 'normal' then 2 else 1 end`;
+  const slaDue = sql`coalesce(
+    case when ${tickets.firstResponseAt} is null then ${tickets.firstResponseDueAt}
+         else coalesce(${tickets.nextResponseDueAt}, ${tickets.resolutionDueAt}) end,
+    ${tickets.resolutionDueAt}
+  )`;
+  switch (sort) {
+    case "updated_asc":
+      return [asc(tickets.updatedAt), asc(tickets.ticketNumber)];
+    case "number_desc":
+      return [desc(tickets.ticketNumber)];
+    case "number_asc":
+      return [asc(tickets.ticketNumber)];
+    case "priority_desc":
+      return [sql`${priorityRank} DESC`, desc(tickets.updatedAt)];
+    case "priority_asc":
+      return [sql`${priorityRank} ASC`, desc(tickets.updatedAt)];
+    case "subject_asc":
+      return [asc(tickets.subject), desc(tickets.updatedAt)];
+    case "subject_desc":
+      return [desc(tickets.subject), desc(tickets.updatedAt)];
+    case "customer_asc":
+      return [asc(customerContacts.name), desc(tickets.updatedAt)];
+    case "customer_desc":
+      return [desc(customerContacts.name), desc(tickets.updatedAt)];
+    case "assignee_asc":
+      return [asc(users.name), desc(tickets.updatedAt)];
+    case "assignee_desc":
+      return [desc(users.name), desc(tickets.updatedAt)];
+    case "sla_asc":
+      return [sql`${slaDue} ASC NULLS LAST`, desc(tickets.updatedAt)];
+    case "sla_desc":
+      return [sql`${slaDue} DESC NULLS LAST`, desc(tickets.updatedAt)];
+    default:
+      return [desc(tickets.updatedAt), desc(tickets.ticketNumber)];
   }
-  if (sort === "number_desc") {
-    return [desc(tickets.ticketNumber)];
-  }
-  if (sort === "number_asc") {
-    return [asc(tickets.ticketNumber)];
-  }
-  if (sort === "priority_desc") {
-    return [
-      sql`case ${tickets.priority}
-        when 'urgent' then 4
-        when 'high' then 3
-        when 'normal' then 2
-        else 1
-      end desc`,
-      desc(tickets.updatedAt),
-    ];
-  }
-  if (sort === "subject_asc") {
-    return [asc(tickets.subject), desc(tickets.updatedAt)];
-  }
-  return [desc(tickets.updatedAt), desc(tickets.ticketNumber)];
 }
 
 function slaCondition(

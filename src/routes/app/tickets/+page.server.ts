@@ -117,6 +117,14 @@ function parseSort(value: string | null): TicketWorkspaceSort {
     || value === "number_asc"
     || value === "priority_desc"
     || value === "subject_asc"
+    || value === "subject_desc"
+    || value === "priority_asc"
+    || value === "customer_asc"
+    || value === "customer_desc"
+    || value === "assignee_asc"
+    || value === "assignee_desc"
+    || value === "sla_asc"
+    || value === "sla_desc"
   ) {
     return value;
   }

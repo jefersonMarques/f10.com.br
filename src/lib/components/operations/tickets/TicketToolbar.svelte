@@ -1,6 +1,5 @@
 <script lang="ts">
   import {
-    ArrowUpDown,
     Columns3,
     List,
     PanelRight,
@@ -75,9 +74,9 @@
 </script>
 
 <div class={workspace
-  ? "relative z-30 shrink-0 border-b border-[var(--app-border)] bg-white"
+  ? "relative z-30 w-full min-w-0 shrink-0 border-b border-[var(--app-border)] bg-white"
   : "border-b border-[#EEF0F5] bg-white"}>
-  <div class={workspace ? "flex min-h-[54px] flex-wrap items-center gap-2 px-3 py-1.5" : "flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between"}>
+  <div class={workspace ? "flex w-full min-w-0 min-h-[54px] flex-wrap items-center gap-2 px-4 py-2" : "flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between"}>
     <div class={workspace ? "flex min-w-0 flex-1 flex-wrap items-center gap-2" : "flex min-w-0 flex-wrap items-center gap-2"}>
       <div class={workspace ? "flex rounded-lg bg-[#F3F4F7] p-0.5" : "flex rounded-xl bg-[#F3F4F7] p-1"}>
         <button type="button" on:click={() => switchScope("mine")} class={`application-text-caption h-8 rounded-lg px-3 font-semibold ${scope === "mine" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Minha fila</button>
@@ -217,24 +216,6 @@
     </div>
 
     <div class={workspace ? "flex shrink-0 flex-wrap items-center gap-2" : "flex flex-wrap items-center gap-2"}>
-      {#if view === "list"}
-        <label class="relative flex h-10 items-center rounded-xl border border-[#DDE1EA] bg-white pl-8 text-[#525A69]">
-          <ArrowUpDown size={14} class="pointer-events-none absolute left-2.5 text-[#7C8392]"/>
-          <select
-            bind:value={sort}
-            on:change={onApply}
-            aria-label="Ordenar tickets"
-            class="application-text-caption h-full rounded-xl bg-transparent py-0 pl-0 pr-8 font-semibold outline-none"
-          >
-            <option value="updated_desc">Atualizados recentemente</option>
-            <option value="updated_asc">Atualizados há mais tempo</option>
-            <option value="priority_desc">Maior prioridade</option>
-            <option value="number_desc">Ticket maior primeiro</option>
-            <option value="number_asc">Ticket menor primeiro</option>
-            <option value="subject_asc">Assunto A–Z</option>
-          </select>
-        </label>
-      {/if}
       <div class={workspace ? "flex rounded-lg bg-[#F3F4F7] p-0.5" : "flex rounded-xl bg-[#F3F4F7] p-1"}>
         <button type="button" title="Lista" aria-label="Lista" on:click={() => switchView("list")} class={`flex h-8 items-center gap-1 rounded-lg px-2.5 ${view === "list" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><List size={14}/><span class={workspace ? "sr-only" : "application-text-caption font-semibold"}>Lista</span></button>
         <button type="button" title="Visão dividida" aria-label="Visão dividida" on:click={() => switchView("split")} class={`flex h-8 items-center gap-1 rounded-lg px-2.5 ${view === "split" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}><PanelRight size={14}/><span class={workspace ? "sr-only" : "application-text-caption hidden font-semibold sm:inline"}>Dividida</span></button>

@@ -15,7 +15,6 @@
     MessageSquare,
     MonitorCog,
     Paperclip,
-    ChevronDown,
     ListChecks,
     Route,
     Send,
@@ -67,7 +66,6 @@
   let workflowId = "";
   let stageId = "";
   export let activeMainPanel: TicketMainPanel = "conversation";
-  let moreMenuOpen = false;
   let composerMode: ComposerMode = ticketData.canReply ? "reply" : "note";
   let replyDraft = "";
   let allowedExternalImageMessages = new Set<string>();
@@ -79,7 +77,6 @@
   let composerFileInput: HTMLInputElement | null = null;
   let replyTextarea: HTMLTextAreaElement | null = null;
   let composerFiles: File[] = [];
-  let showMarkdownPreview = false;
 
   function setComposerFiles(files: File[]): void {
     const unique = new Map<string, File>();
@@ -129,7 +126,8 @@
       formatReply(event.key.toLowerCase() === "b" ? "**" : "*");
     }
   }
-  $: isInfoPanel = surface !== "page" && ["service", "customer", "tasks", "collaboration", "history"].includes(activeMainPanel);
+  $: isInfoPanel = surface !== "page" && ["service", "customer", "tasks"].includes(activeMainPanel);
+  $: if (activeMainPanel === "collaboration" || activeMainPanel === "history") activeMainPanel = "service";
 
   function tabClass(panel: TicketMainPanel, currentPanel: TicketMainPanel): string {
     const base = "inline-flex h-full shrink-0 items-center gap-1.5 border-b-2 px-1 text-[12px] font-semibold transition-colors";
@@ -140,12 +138,8 @@
 
   function selectTab(panel: TicketMainPanel): void {
     activeMainPanel = panel;
-    moreMenuOpen = false;
   }
 
-  function handleMenuKeydown(event: KeyboardEvent): void {
-    if (event.key === "Escape") moreMenuOpen = false;
-  }
 
   $: workflowStateKey = [
     ticketData.details.ticket.id,
@@ -393,7 +387,6 @@
 
 <LivePageSync endpoint={`/app/tickets/${ticketData.details.ticket.id}/updates`} initialRevision={String(new Date(ticketData.details.ticket.updatedAt).getTime())} onRefresh={refreshDetails} />
 
-<svelte:window on:keydown={handleMenuKeydown}/>
 
 <div class={surface === "page"
   ? "bg-[var(--app-bg)]"
@@ -456,22 +449,13 @@
         {/if}
         <button type="button" class={tabClass("attachments", activeMainPanel)} aria-pressed={activeMainPanel === "attachments"} on:click={() => selectTab("attachments")}><Paperclip size={14}/>Anexos {#if ticketData.attachments.length > 0}<span class="text-[11px] text-[#858C99]">{ticketData.attachments.length}</span>{/if}</button>
         {#if surface !== "page"}
-          <button type="button" class={tabClass("service", activeMainPanel)} aria-pressed={activeMainPanel === "service"} on:click={() => selectTab("service")}><Headphones size={14}/>Atendimento</button>
           <button type="button" class={tabClass("customer", activeMainPanel)} aria-pressed={activeMainPanel === "customer"} on:click={() => selectTab("customer")}><UserRound size={14}/>Cliente</button>
           {#if ticketData.canViewTasks}
             <button type="button" class={tabClass("tasks", activeMainPanel)} aria-pressed={activeMainPanel === "tasks"} on:click={() => selectTab("tasks")}><ListChecks size={14}/>Tarefas</button>
           {/if}
+          <button type="button" class={tabClass("service", activeMainPanel)} aria-pressed={activeMainPanel === "service"} on:click={() => selectTab("service")}><Headphones size={14}/>Atendimento</button>
         {/if}
       </div>
-      {#if surface !== "page"}
-        <details class="relative z-30 ml-2 shrink-0" bind:open={moreMenuOpen}>
-          <summary class={`flex h-9 cursor-pointer list-none items-center gap-1 rounded-lg px-2 text-[12px] font-semibold hover:bg-[var(--app-surface-muted)] ${activeMainPanel === "collaboration" || activeMainPanel === "history" ? "text-[#000A57]" : "text-[#6F7685]"}`} aria-label="Mais seções"><span>Mais</span><ChevronDown size={14}/></summary>
-          <div class="absolute right-0 top-full z-40 mt-1 w-52 rounded-xl border border-[var(--app-border)] bg-white p-1.5 shadow-[0_12px_32px_rgba(1,13,40,0.16)]">
-            <button type="button" on:click={() => selectTab("collaboration")} class={`flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[12px] font-medium hover:bg-[var(--app-surface-subtle)] ${activeMainPanel === "collaboration" ? "text-[#000A57]" : "text-[#525A69]"}`}><UsersRound size={15}/>Colaboração e etiquetas</button>
-            <button type="button" on:click={() => selectTab("history")} class={`flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[12px] font-medium hover:bg-[var(--app-surface-subtle)] ${activeMainPanel === "history" ? "text-[#000A57]" : "text-[#525A69]"}`}><ShieldCheck size={15}/>Histórico</button>
-          </div>
-        </details>
-      {/if}
     </nav>
 
     {#if visibleFeedback?.message}
@@ -579,7 +563,7 @@
                   action={actionUrl(composerMode === "note" ? "note" : "reply")}
                   on:submit|preventDefault={submitComposer}
                   on:paste={pasteComposer}
-                  class={`flex min-h-[48px] flex-wrap items-center gap-2 rounded-xl border bg-white px-2 py-1 ${composerMode === "note" ? "border-[var(--app-warning-border)]" : "border-[var(--app-border-control)]"}`}
+                  class={`flex min-h-[48px] w-full flex-wrap items-center gap-2 rounded-xl border bg-white px-3 py-2 ${composerMode === "note" ? "border-[var(--app-warning-border)]" : "border-[var(--app-border-control)]"}`}
                 >
                   <div class="flex shrink-0 items-center gap-0.5 rounded-lg bg-[var(--app-surface-muted)] p-0.5">
                     {#if ticketData.canReply}
@@ -588,6 +572,17 @@
                     {#if ticketData.canCommentInternal}
                       <button type="button" on:click={() => (composerMode = "note")} title="Visível só para a equipe" aria-pressed={composerMode === "note"} class={`h-8 rounded-md px-2 text-[11px] font-semibold ${composerMode === "note" ? "bg-white text-[#8A4D13] shadow-sm" : "text-[#6F7685]"}`}>Nota</button>
                     {/if}
+                  </div>
+                  <div class="flex w-full items-center gap-1 border-t border-[var(--app-border-soft)] pt-2" aria-label="Formatação Markdown">
+                    {#if composerMode === "reply"}
+                      <button type="button" on:click={() => formatReply("**")} title="Negrito (Ctrl+B)" aria-label="Negrito"
+                        class="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Bold size={16}/></button>
+                      <button type="button" on:click={() => formatReply("*")} title="Itálico (Ctrl+I)" aria-label="Itálico"
+                        class="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Italic size={16}/></button>
+                      <button type="button" on:click={() => formatReply("`")} title="Código" aria-label="Código"
+                        class="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Code size={16}/></button>
+                    {/if}
+                    <span class="application-text-meta ml-auto text-[var(--app-text-soft)]">Markdown · visualização automática</span>
                   </div>
 
                   {#if composerFiles.length > 0}
@@ -639,30 +634,17 @@
                     {/if}
                   </div>
 
-                  <div class="flex w-full flex-wrap items-center gap-1 border-t border-[var(--app-border-soft)] px-1 py-1">
-                    {#if composerMode === "reply"}
-                      <button type="button" on:click={() => formatReply("**")} title="Negrito (Ctrl+B)" aria-label="Negrito"
-                        class="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Bold size={15}/></button>
-                      <button type="button" on:click={() => formatReply("*")} title="Itálico (Ctrl+I)" aria-label="Itálico"
-                        class="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Italic size={15}/></button>
-                      <button type="button" on:click={() => formatReply("`")} title="Código" aria-label="Código"
-                        class="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Code size={15}/></button>
-                    {/if}
-                    <button type="button" on:click={() => (showMarkdownPreview = !showMarkdownPreview)}
-                      aria-pressed={showMarkdownPreview}
-                      class="application-text-meta ml-auto rounded-lg px-2 py-1 text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]">
-                      {showMarkdownPreview ? "Editar" : "Visualizar"}
-                    </button>
-                  </div>
-                  {#if showMarkdownPreview && (composerMode === "reply" ? replyDraft : noteDraft)}
-                    <div class="w-full rounded-lg bg-[var(--app-surface-subtle)] p-3 text-[var(--app-text)]">
+                  <div class="w-full rounded-lg bg-[var(--app-surface-subtle)] px-3 py-2 text-[var(--app-text)]" aria-label="Visualização da mensagem">
+                    {#if (composerMode === "reply" ? replyDraft : noteDraft).trim()}
                       <SupportChatMarkdown text={composerMode === "reply" ? replyDraft : noteDraft}/>
-                    </div>
-                  {/if}
+                    {:else}
+                      <span class="application-text-caption italic text-[var(--app-text-soft)]">A mensagem formatada aparece aqui enquanto você digita.</span>
+                    {/if}
+                  </div>
                   <input bind:this={composerFileInput} type="file" name="files" multiple accept="image/png,image/jpeg,image/webp,.pdf,.docx,.xlsx,.zip,.txt,.csv" class="sr-only" on:change={pickComposerFiles} aria-label="Anexar arquivos à mensagem"/>
-                  <button type="button" on:click={() => composerFileInput?.click()} class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#777E8D] hover:bg-[var(--app-surface-muted)] hover:text-[#000A57]" aria-label="Anexar arquivos à mensagem" title={composerMode === "note" ? "Anexo interno (não enviar ao cliente)" : "Anexar à resposta do cliente"}><Paperclip size={17}/></button>
-                  <button type="submit" disabled={Boolean(actionLoading) || composerFiles.length > 4 || composerFiles.reduce((total, item) => total + item.size, 0) > 12 * 1024 * 1024} aria-label={composerMode === "note" ? "Adicionar nota interna" : "Enviar resposta"} class={`inline-flex h-8 shrink-0 items-center gap-2 rounded-lg px-3 text-[12px] font-semibold text-white disabled:opacity-50 ${composerMode === "note" ? "bg-[#9A5A1B]" : "bg-[var(--app-primary)]"}`}>
-                    <Send size={15}/><span class="hidden sm:inline">{actionLoading ? "Enviando..." : composerMode === "note" ? "Salvar nota" : "Enviar"}</span>
+                  <button type="button" on:click={() => composerFileInput?.click()} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#777E8D] hover:bg-[var(--app-surface-muted)] hover:text-[#000A57]" aria-label="Anexar arquivos à mensagem" title={composerMode === "note" ? "Anexo interno (não enviar ao cliente)" : "Anexar à resposta do cliente"}><Paperclip size={17}/></button>
+                  <button type="submit" disabled={Boolean(actionLoading) || composerFiles.length > 4 || composerFiles.reduce((total, item) => total + item.size, 0) > 12 * 1024 * 1024} aria-label={composerMode === "note" ? "Adicionar nota interna" : "Enviar resposta"} class={`ml-auto inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-4 text-[12px] font-semibold text-white disabled:opacity-50 ${composerMode === "note" ? "bg-[#9A5A1B]" : "bg-[var(--app-primary)]"}`}>
+                    <Send size={15}/><span>{actionLoading ? "Enviando..." : composerMode === "note" ? "Salvar nota" : "Enviar"}</span>
                   </button>
                 </form>
               </div>
@@ -728,7 +710,7 @@
           : "min-h-0 w-full overflow-y-auto bg-white px-3 py-4 sm:px-6"}
       >
         {#if surface === "page" || activeMainPanel === "service"}
-        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto w-full max-w-[940px] p-2 sm:p-4"}>
+        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4"  : "w-full p-2 sm:p-4"}>
           <h3 class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><Headphones size={14}/>Atendimento</h3>
 
           <div class="mt-3 border-t border-[var(--app-border-soft)] pt-3">
@@ -750,7 +732,7 @@
             {/if}
           </div>
 
-          <div class="mt-3 grid gap-3 border-t border-[var(--app-border-soft)] pt-3">
+          <div class={surface === "page" ? "mt-3 grid gap-3 border-t border-[var(--app-border-soft)] pt-3" : "mt-3 grid gap-3 border-t border-[var(--app-border-soft)] pt-3 sm:grid-cols-2"}>
             <label>
               <span class="mb-1 block text-[10.5px] font-medium text-[#777E8D]">Status</span>
               <select name="status" value={ticketData.details.ticket.status} disabled={!ticketData.canReply || Boolean(actionLoading)} on:change={(event) => void updateField("status", "status", event)} class="h-9 w-full rounded-xl border border-[var(--app-border-control)] bg-white px-2.5 text-[11px] disabled:bg-[var(--app-surface-muted)]">
@@ -794,7 +776,7 @@
         {/if}
 
         {#if surface === "page" || activeMainPanel === "customer"}
-        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto w-full max-w-[940px] p-2 sm:p-4"}>
+        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "w-full p-2 sm:p-4"}>
           <h3 class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><UserRound size={14}/>Cliente F10</h3>
           {#if ticketData.details.ticket.customerContactId}
             <dl class="mt-3 space-y-2.5 text-[11px]">
@@ -827,9 +809,13 @@
         </section>
         {/if}
 
-        {#if surface === "page" || activeMainPanel === "collaboration"}
-        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto w-full max-w-[940px] p-2 sm:p-4"}>
-          <h3 class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><UsersRound size={14}/>Colaboração</h3>
+        {#if surface === "page" || activeMainPanel === "service"}
+        <details open={surface === "page"} class={surface === "page" ? "" : "mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-3"}>
+          <summary class="application-text-caption flex cursor-pointer items-center gap-2 font-semibold text-[var(--app-text)]">
+            <UsersRound size={15}/>Colaboração e etiquetas
+          </summary>
+        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "w-full p-2 sm:p-4"}>
+          <h3 class="sr-only">Seguidores e etiquetas</h3>
 
           <div class="mt-3">
             <span class="text-[10px] font-semibold text-[#858B99]">Seguidores</span>
@@ -883,7 +869,7 @@
         </section>
 
         {#if ticketData.satisfaction}
-          <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto mt-4 w-full max-w-[940px] p-2 sm:p-4"}>
+          <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4"  : "w-full mt-4 p-2 sm:p-4"}>
             <h3 class="text-[12px] font-semibold text-[#3D4452]">Satisfação</h3>
             {#if ticketData.satisfaction.answeredAt && ticketData.satisfaction.score}
               <div class="mt-3 flex items-center gap-1 text-[#EA6D0B]" aria-label={`${ticketData.satisfaction.score} de 5 estrelas`}>
@@ -896,10 +882,11 @@
           </section>
         {/if}
 
+        </details>
         {/if}
 
         {#if ticketData.canViewTasks && (surface === "page" || activeMainPanel === "tasks")}
-          <div class={surface === "page" ? "" : "mx-auto w-full max-w-[940px]"}>
+          <div class={surface === "page" ? ""  : "w-full"}>
           <TicketTaskPanel
             ticketId={ticketData.details.ticket.id}
             ticketNumber={ticketData.details.ticket.ticketNumber}
@@ -912,8 +899,8 @@
           </div>
         {/if}
 
-        {#if surface === "page" || activeMainPanel === "history"}
-        <details open={surface !== "page"} class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto w-full max-w-[940px] p-2 sm:p-4"}>
+        {#if surface === "page" || activeMainPanel === "service"}
+        <details class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "w-full p-2 sm:p-4"}>
           <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
             <span class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><ShieldCheck size={14}/>Histórico</span>
             <span class="rounded-full bg-[var(--app-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[#777E8D]">{ticketData.details.events.length}</span>
