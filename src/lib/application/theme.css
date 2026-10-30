@@ -627,3 +627,105 @@ html[data-application-theme="dark"] .operations-shell .ticket-stage--lime { --ti
 html[data-application-theme="dark"] .operations-shell .ticket-stage--pink { --ticket-stage-border: #684356; --ticket-stage-bg: #2D1C25; }
 html[data-application-theme="dark"] .operations-shell .ticket-stage--gateway { --ticket-stage-border: #76502F; --ticket-stage-bg: #2E2117; }
 html[data-application-theme="dark"] .operations-shell .ticket-stage--terminal { --ticket-stage-border: #315D45; --ticket-stage-bg: #15291F; }
+
+/* Ajustes de contraste em detalhes, menus e solicitações de tickets. */
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="text-[#454C5C]"],
+  [class~="text-[#424A5B]"],
+  [class~="text-[#343A47]"],
+  [class~="text-[#414857]"],
+  [class~="text-[#414958]"],
+  [class~="text-[#4E4339]"],
+  [class~="text-[#404858]"],
+  [class~="text-[#4A5160]"],
+  [class~="text-[#4B5262]"],
+  [class~="text-[#4C5363]"],
+  [class~="text-[#505868]"],
+  [class~="text-[#525A69]"],
+  [class~="text-[#555D6E]"],
+  [class~="text-[#5D6574]"],
+  [class~="text-[#5C6372]"],
+  [class~="text-[#626877]"],
+  [class~="text-[#3E4453]"],
+  [class~="text-[#4B5362]"]
+) {
+  color: var(--app-text) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="text-[#969CAA]"],
+  [class~="text-[#687080]"],
+  [class~="text-[#9297A4]"],
+  [class~="text-[#8B91A0]"],
+  [class~="text-[#868E9D]"],
+  [class~="text-[#69707E]"],
+  [class~="text-[#858C99]"],
+  [class~="text-[#858C9C]"],
+  [class~="text-[#707787]"],
+  [class~="text-[#989EAA]"],
+  [class~="text-[#747C8A]"],
+  [class~="text-[#838997]"],
+  [class~="text-[#666D7C]"],
+  [class~="text-[#858B98]"],
+  [class~="text-[#8B919E]"],
+  [class~="text-[#69707F]"],
+  [class~="text-[#A17D5C]"],
+  [class~="text-[#858C9B]"],
+  [class~="text-[#737B8C]"],
+  [class~="text-[#6A7180]"],
+  [class~="text-[#8B5A2B]"],
+  [class~="text-[#AAA098]"],
+  [class~="text-[#9B9FAC]"],
+  [class~="text-[#6B7280]"],
+  [class~="text-[#646B7A]"]
+) {
+  color: var(--app-text-muted) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="text-[#35509A]"]
+) {
+  color: var(--app-info-text) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="text-[#8A4D13]"],
+  [class~="text-[#76512F]"],
+  [class~="text-[#7B4A1F]"],
+  [class~="text-[#9A541A]"],
+  [class~="text-[#745426]"]
+) {
+  color: var(--app-warning-text) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="text-[#36754A]"],
+  [class~="text-[#396351]"],
+  [class~="text-[#356347]"],
+  [class~="text-[#176B35]"]
+) {
+  color: var(--app-success-text) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="text-[#9B3C3C]"],
+  [class~="text-[#A04435]"]
+) {
+  color: var(--app-danger-text) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell :is(
+  [class~="border-[#D9DDE5]"],
+  [class~="border-[#D2D6DF]"],
+  [class~="border-[#E5E8EE]"],
+  [class~="border-[#ECDDC8]"],
+  [class~="border-[#E6E8EF]"],
+  [class~="border-[#E9DCC7]"],
+  [class~="border-[#AEB7E8]"]
+) {
+  border-color: var(--app-border-control) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell [class~="bg-[#FFF2E5]"] {
+  background-color: var(--app-warning-bg) !important;
+}

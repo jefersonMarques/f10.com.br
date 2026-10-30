@@ -12,12 +12,36 @@
   export let compact = false;
   export let onOpenTicket: (ticketId: string) => void | Promise<void>;
   export let onOpenTicketService: ((ticketId: string) => void | Promise<void>) | null = null;
+  export let onQuickAction: ((ticketId: string, action: "status" | "addLabel", value: string) => Promise<void>) | null = null;
+  export let labels: Array<{ id: string; name: string }> = [];
 
   let menuTicket: TicketItem | null = null;
   let menuTop = 0;
   let menuLeft = 0;
   let menuElement: HTMLDivElement;
   let copiedTicketId: string | null = null;
+  let hoveredTicket: TicketItem | null = null;
+  let previewTop = 0;
+  let previewLeft = 0;
+
+  function showPreview(event: MouseEvent, ticket: TicketItem): void {
+    if (menuTicket) return;
+    const element = event.currentTarget as HTMLElement;
+    const rect = element.getBoundingClientRect();
+    previewLeft = Math.max(8, Math.min(rect.left + 140, window.innerWidth - 370));
+    previewTop = Math.min(rect.bottom + 6, window.innerHeight - 180);
+    hoveredTicket = ticket;
+  }
+
+  function hidePreview(): void {
+    hoveredTicket = null;
+  }
+
+  async function quickAction(action: "status" | "addLabel", value: string): Promise<void> {
+    const id = menuTicket?.id;
+    closeTicketMenu();
+    if (id && value) await onQuickAction?.(id, action, value);
+  }
 
   function closeTicketMenu(): void {
     menuTicket = null;
@@ -32,12 +56,13 @@
 
     const button = event.currentTarget as HTMLButtonElement;
     const rect = button.getBoundingClientRect();
-    const height = 192;
+    const height = onQuickAction ? 360 : 192;
     menuTop = window.innerHeight - rect.bottom >= height + 8
       ? rect.bottom + 6
       : Math.max(8, rect.top - height - 6);
     menuLeft = Math.max(8, Math.min(rect.right - 224, window.innerWidth - 232));
     menuTicket = ticket;
+    hidePreview();
     await tick();
     menuElement?.querySelector<HTMLElement>("[data-first-action]")?.focus();
   }
@@ -201,8 +226,8 @@
     </section>
   {:else}
   <div class="hidden overflow-x-auto md:block">
-    <div class={compact ? "min-w-[760px]" : "min-w-[1020px]"}>
-      <div class={`grid border-b border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] px-4 py-2.5 ${compact ? "grid-cols-[88px_minmax(220px,1.5fr)_minmax(160px,1fr)_120px]" : "grid-cols-[90px_minmax(220px,1.5fr)_minmax(160px,1fr)_minmax(180px,1fr)_110px_180px_120px_110px]"}`}>
+    <div class={compact ? "min-w-[760px]" : "min-w-[1480px]"}>
+      <div class={`grid border-b border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] px-4 py-2.5 ${compact ? "grid-cols-[88px_minmax(220px,1.5fr)_minmax(160px,1fr)_120px]" : "grid-cols-[90px_minmax(320px,2fr)_minmax(220px,1.4fr)_minmax(175px,1fr)_115px_minmax(160px,1fr)_125px_110px_54px]"}`}>
         <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Ticket</span>
         <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Assunto</span>
         <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Cliente</span>
@@ -213,14 +238,20 @@
           <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">SLA</span>
         {/if}
         <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Atualizado</span>
+        {#if !compact}<span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Ações</span>{/if}
       </div>
 
       <div class="divide-y divide-[#EEF0F4]">
         {#each tickets as ticket}
+          <div class="relative group">
           <button
             type="button"
+            on:mouseenter={(event) => showPreview(event, ticket)}
+            on:mouseleave={hidePreview}
+            on:focus={(event) => showPreview(event as unknown as MouseEvent, ticket)}
+            on:blur={hidePreview}
             on:click={() => void onOpenTicket(ticket.id)}
-            class={`grid w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-[var(--app-surface-subtle)] ${selectedTicketId === ticket.id ? "bg-[var(--app-info-bg)]" : ""} ${compact ? "grid-cols-[88px_minmax(220px,1.5fr)_minmax(160px,1fr)_120px]" : "grid-cols-[90px_minmax(220px,1.5fr)_minmax(160px,1fr)_minmax(180px,1fr)_110px_180px_120px_110px]"}`}
+            class={`grid w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-[var(--app-surface-subtle)] ${selectedTicketId === ticket.id ? "bg-[var(--app-info-bg)]" : ""} ${compact ? "grid-cols-[88px_minmax(220px,1.5fr)_minmax(160px,1fr)_120px]" : "grid-cols-[90px_minmax(320px,2fr)_minmax(220px,1.4fr)_minmax(175px,1fr)_115px_minmax(160px,1fr)_125px_110px_54px]"}`}
           >
             <span class="application-text-caption flex items-center gap-1.5 font-bold text-[#000A57]">
               #{ticket.ticketNumber}
@@ -254,7 +285,14 @@
             {/if}
 
             <span class="application-text-caption text-[#858B99]">{relativeUpdated(ticket.updatedAt)}</span>
+            {#if !compact}<span aria-hidden="true"></span>{/if}
           </button>
+          {#if !compact}
+            <button type="button" on:click={(event) => void toggleTicketMenu(event, ticket)}
+              class="absolute right-4 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg border border-[var(--app-border-control)] bg-[var(--app-surface)] text-[var(--app-text-muted)] hover:text-[var(--app-primary)]"
+              aria-label={`Ações rápidas do ticket #${ticket.ticketNumber}`} title="Ações rápidas"><MoreHorizontal size={17}/></button>
+          {/if}
+          </div>
         {/each}
       </div>
     </div>
@@ -302,7 +340,7 @@
     bind:this={menuElement}
     role="menu"
     aria-label={`Ações do ticket #${menuTicket.ticketNumber}`}
-    class="fixed z-[80] w-56 overflow-hidden rounded-xl border border-[var(--app-border)] bg-white py-1.5 shadow-[0_16px_45px_rgba(1,13,40,0.18)]"
+    class="fixed z-[80] max-h-[min(470px,90vh)] w-56 overflow-y-auto rounded-xl border border-[var(--app-border)] bg-white py-1.5 shadow-[0_16px_45px_rgba(1,13,40,0.18)]"
     style:top={`${menuTop}px`}
     style:left={`${menuLeft}px`}
   >
@@ -332,6 +370,33 @@
       on:click={closeTicketMenu}
     ><ExternalLink size={15}/>Abrir página completa</a>
 
+    {#if onQuickAction}
+      <div class="my-1 border-t border-[var(--app-border-soft)]"></div>
+      <label class="block px-3 py-1.5">
+        <span class="application-text-meta block font-semibold text-[var(--app-text-muted)]">Alterar status</span>
+        <select value="" aria-label="Alterar status do ticket"
+          on:click|stopPropagation
+          on:change={(event) => void quickAction("status", event.currentTarget.value)}
+          class="application-text-caption mt-1 h-9 w-full rounded-lg border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2 text-[var(--app-text)]">
+          <option value="" disabled>Escolher status</option>
+          <option value="open">Aberto</option><option value="in_progress">Em andamento</option>
+          <option value="waiting_customer">Aguardando cliente</option>
+          <option value="resolved">Resolvido</option><option value="closed">Fechado</option>
+        </select>
+      </label>
+      {#if labels.length}
+        <label class="block px-3 py-1.5">
+          <span class="application-text-meta block font-semibold text-[var(--app-text-muted)]">Adicionar etiqueta</span>
+          <select value="" aria-label="Adicionar etiqueta ao ticket"
+            on:click|stopPropagation
+            on:change={(event) => void quickAction("addLabel", event.currentTarget.value)}
+            class="application-text-caption mt-1 h-9 w-full rounded-lg border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2 text-[var(--app-text)]">
+            <option value="" disabled>Escolher etiqueta</option>
+            {#each labels as label}<option value={label.id}>{label.name}</option>{/each}
+          </select>
+        </label>
+      {/if}
+    {/if}
     <div class="my-1 border-t border-[var(--app-border-soft)]"></div>
     <button
       type="button"
@@ -339,6 +404,13 @@
       on:click={() => { if (menuTicket) void copyTicketLink(menuTicket.id); }}
       class="flex h-9 w-full items-center gap-2.5 px-3 text-left text-[12px] font-medium text-[#4C5363] hover:bg-[var(--app-surface-subtle)]"
     ><Copy size={15}/>Copiar link</button>
+  </div>
+{/if}
+
+{#if hoveredTicket && !menuTicket}
+  <div class="pointer-events-none fixed z-[75] w-[min(350px,calc(100vw-2rem))] rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 text-left shadow-xl" style:top={`${Math.max(8,previewTop)}px`} style:left={`${previewLeft}px`} role="status">
+    <strong class="application-text-caption block font-semibold text-[var(--app-text)]">#{hoveredTicket.ticketNumber} · {hoveredTicket.subject}</strong>
+    <p class="application-text-caption mt-2 line-clamp-5 whitespace-pre-wrap break-words text-[var(--app-text-muted)]">{hoveredTicket.descriptionPreview || "Não há descrição pública disponível."}</p>
   </div>
 {/if}
 
