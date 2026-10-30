@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onDestroy, tick } from "svelte";
+  import { onDestroy, onMount, tick } from "svelte";
+  import { tokenizeChatMarkdown } from "$lib/support/chatMarkdown";
   import { Bold, Code, Italic, Paperclip, Send, X } from "lucide-svelte";
 
   export let value = "";
@@ -217,6 +218,33 @@
     editor.querySelectorAll("img[data-ticket-file-key]").forEach((image) => image.remove());
     void tick().then(syncFileInput);
   }
+
+  onMount(() => {
+    if (value.trim()) {
+      for (const line of value.split("\n")) {
+        const paragraph = document.createElement("div");
+        for (const token of tokenizeChatMarkdown(line)) {
+          let tag: "strong" | "em" | "code" | null = null;
+          if (token.kind === "strong") tag = "strong";
+          if (token.kind === "emphasis") tag = "em";
+          if (token.kind === "code") tag = "code";
+          if (tag) {
+            const formatted = document.createElement(tag);
+            formatted.textContent = token.text;
+            paragraph.append(formatted);
+          } else {
+            paragraph.append(document.createTextNode(token.text));
+          }
+        }
+        editor.append(paragraph);
+      }
+      lastValue = value;
+    }
+    for (const file of files) {
+      if (file.type.startsWith("image/")) insertImage(file);
+    }
+    syncFileInput();
+  });
 
   onDestroy(() => {
     for (const url of imageUrls.values()) URL.revokeObjectURL(url);
