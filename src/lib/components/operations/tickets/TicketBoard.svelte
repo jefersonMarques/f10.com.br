@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import { ArrowLeft, ArrowRight, Boxes, GitBranch } from "lucide-svelte";
   import TicketCard from "./TicketCard.svelte";
   import { stageColumnClass } from "./presentation";
@@ -12,6 +13,41 @@
   export let onDropTicket: (event: DragEvent, stageId: string) => void | Promise<void>;
   export let onStartDrag: (event: DragEvent, ticketId: string) => void;
   export let onOpenTicket: (ticketId: string) => void | Promise<void>;
+
+  let boardScroller: HTMLDivElement | null = null;
+  let scrollFrame: number | null = null;
+  let scrollDirection = 0;
+
+  function stopEdgeScroll(): void {
+    scrollDirection = 0;
+    if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
+    scrollFrame = null;
+  }
+
+  function scrollAtEdge(): void {
+    if (!boardScroller || !scrollDirection) {
+      stopEdgeScroll();
+      return;
+    }
+    boardScroller.scrollLeft += scrollDirection * 12;
+    scrollFrame = requestAnimationFrame(scrollAtEdge);
+  }
+
+  function trackEdgeScroll(clientX: number): void {
+    if (!boardScroller) return;
+    const bounds = boardScroller.getBoundingClientRect();
+    const threshold = 72;
+    const direction = clientX < bounds.left + threshold ? -1
+      : clientX > bounds.right - threshold ? 1 : 0;
+    if (direction === scrollDirection) return;
+    stopEdgeScroll();
+    if (direction) {
+      scrollDirection = direction;
+      scrollFrame = requestAnimationFrame(scrollAtEdge);
+    }
+  }
+
+  onDestroy(stopEdgeScroll);
 
   $: stages = activeWorkflow?.stages ?? [];
 
@@ -57,8 +93,8 @@
   </select>
 </div>
 
-<div class="overflow-x-auto p-4">
-  <div class="grid min-w-max gap-4" style={`grid-template-columns: repeat(${Math.max(stages.length, 1)}, minmax(280px, 300px));`}>
+<div bind:this={boardScroller} class="min-h-0 flex-1 overflow-x-auto p-4" on:pointermove={(event) => trackEdgeScroll(event.clientX)} on:dragover={(event) => trackEdgeScroll(event.clientX)} on:pointerleave={stopEdgeScroll} on:dragleave={stopEdgeScroll} on:drop={stopEdgeScroll}>
+  <div class="grid min-w-full gap-4" style={`grid-template-columns: repeat(${Math.max(stages.length, 1)}, minmax(300px, 1fr));`}>
     {#each stages as stage}
       <section class={`min-h-[390px] rounded-[16px] border p-3 ${stageColumnClass(activeWorkflow, stage)}`} role="group" aria-label={`Coluna ${stage.name}`} on:dragover|preventDefault on:drop={(event) => void onDropTicket(event, stage.id)}>
         <header class="mb-3 flex items-start justify-between gap-3">
