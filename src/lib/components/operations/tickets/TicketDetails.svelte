@@ -15,7 +15,6 @@
     MessageSquare,
     MonitorCog,
     Paperclip,
-    ChevronDown,
     ListChecks,
     Route,
     Send,
@@ -67,7 +66,6 @@
   let workflowId = "";
   let stageId = "";
   export let activeMainPanel: TicketMainPanel = "conversation";
-  let moreMenuOpen = false;
   let composerMode: ComposerMode = ticketData.canReply ? "reply" : "note";
   let replyDraft = "";
   let allowedExternalImageMessages = new Set<string>();
@@ -140,12 +138,8 @@
 
   function selectTab(panel: TicketMainPanel): void {
     activeMainPanel = panel;
-    moreMenuOpen = false;
   }
 
-  function handleMenuKeydown(event: KeyboardEvent): void {
-    if (event.key === "Escape") moreMenuOpen = false;
-  }
 
   $: workflowStateKey = [
     ticketData.details.ticket.id,
@@ -393,7 +387,6 @@
 
 <LivePageSync endpoint={`/app/tickets/${ticketData.details.ticket.id}/updates`} initialRevision={String(new Date(ticketData.details.ticket.updatedAt).getTime())} onRefresh={refreshDetails} />
 
-<svelte:window on:keydown={handleMenuKeydown}/>
 
 <div class={surface === "page"
   ? "bg-[var(--app-bg)]"
