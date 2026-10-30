@@ -113,6 +113,9 @@ test("Markdown images in email are displayed only as safe text, never as remote 
   const parsed = normalizeEmailMarkdown("Imagem: ![Comprovante](https://example.com/remote.png)");
   assert.equal(parsed, "Imagem: Comprovante");
   assert.equal(parseChatMarkdown(parsed)[0]?.tokens?.filter((token) => token.kind === "link").length, 0);
+
+  const escapedImage = String.raw`!\\[Comprovante\\]\\(https://example.com/remote.png\\)`;
+  assert.equal(normalizeEmailMarkdown(escapedImage), "Comprovante");
 });
 
 test("unsafe links and HTML are not promoted into actionable markup", () => {
