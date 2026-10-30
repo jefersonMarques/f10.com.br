@@ -2,6 +2,8 @@
   import { invalidateAll } from "$app/navigation";
   import {
     Clock3,
+    Copy,
+    Check,
     Download,
     Eye,
     EyeOff,
@@ -136,6 +138,29 @@
 
   $: presentSecretCount = serviceRequest.secrets.filter((secret) => secret.present).length;
   $: attachmentSlots = ATTACHMENT_SLOTS[serviceRequest.requestType];
+  let copiedField = "";
+
+  async function copyValue(key: string, value: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(value);
+      copiedField = key;
+      window.setTimeout(() => {
+        if (copiedField === key) copiedField = "";
+      }, 1800);
+    } catch {
+      copiedField = "";
+    }
+  }
+
+  function copyAllFields(): void {
+    // Credenciais protegidas nunca entram na ação de cópia em lote.
+    const content = serviceRequest.fields
+      .filter((field) => field.displayValue && field.displayValue !== "Não informado")
+      .map((field) => field.label + ": " + field.displayValue)
+      .join("\n");
+    void copyValue("all", content);
+  }
+
 
   function formatDate(value: string): string {
     return new Intl.DateTimeFormat("pt-BR", {
@@ -300,7 +325,13 @@
       <p class="application-text-meta mt-1 text-[#858C9C]">Versão {serviceRequest.version} · atualizado em {formatDate(serviceRequest.updatedAt)}</p>
     </div>
     <div class="flex shrink-0 flex-wrap gap-2">
-      <button type="button" on:click={openView} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[var(--app-border-control)] bg-white px-3 font-semibold text-[#000A57] transition hover:bg-[var(--app-info-bg)]"><Eye size={14} />Ver dados</button>
+      {#if mode === "customer"}<button type="button" on:click={openView} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[var(--app-border-control)] bg-white px-3 font-semibold text-[#000A57] transition hover:bg-[var(--app-info-bg)]"><Eye size={14} />Ver dados</button>{:else}
+        <button type="button" on:click={copyAllFields}
+          class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[var(--app-border-control)] bg-white px-3 font-semibold text-[var(--app-primary)]">
+          {#if copiedField === "all"}<Check size={14}/>{:else}<Copy size={14}/>{/if}
+          {copiedField === "all" ? "Copiado" : "Copiar tudo"}
+        </button>
+      {/if}
       {#if canEdit}<button type="button" on:click={openEdit} class="application-text-caption inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[var(--app-primary)] px-3 font-semibold text-white"><Pencil size={14} />Editar dados</button>{/if}
     </div>
   </div>
@@ -310,6 +341,69 @@
     <div class="rounded-xl border border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] px-3 py-3"><span class="application-text-meta block text-[#9298A5]">Documentos</span><strong class="mt-1 block text-[12px] text-[#424A5B]">{serviceRequest.attachments.length}</strong></div>
     <div class="rounded-xl border border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] px-3 py-3"><span class="application-text-meta block text-[#9298A5]">Credenciais protegidas</span><strong class="mt-1 block text-[12px] text-[#424A5B]">{presentSecretCount}</strong></div>
   </div>
+  {#if mode === "support"}
+    <div class="mt-5 border-t border-[var(--app-border-soft)] pt-4">
+      <h3 class="application-text-caption mb-3 font-semibold text-[var(--app-text)]">Dados informados</h3>
+      <dl class="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {#each serviceRequest.fields as field}
+          <div class="flex min-w-0 items-start justify-between gap-2 rounded-xl border border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] p-3">
+            <div class="min-w-0 flex-1">
+              <dt class="application-text-meta font-semibold text-[var(--app-text-muted)]">{field.label}</dt>
+              <dd class="application-text-caption mt-1 whitespace-pre-wrap break-words font-medium text-[var(--app-text)]">{field.displayValue || "—"}</dd>
+            </div>
+            <button type="button" on:click={() => void copyValue(field.key, field.displayValue)}
+              aria-label={`Copiar ${field.label}`} title="Copiar valor"
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--app-border-control)] bg-[var(--app-surface)] text-[var(--app-text-muted)] hover:text-[var(--app-primary)]">
+              {#if copiedField === field.key}<Check size={14}/>{:else}<Copy size={14}/>{/if}
+            </button>
+          </div>
+        {/each}
+      </dl>
+    </div>
+    {#if serviceRequest.secrets.length > 0}
+      <div class="mt-5 border-t border-[var(--app-border-soft)] pt-4">
+        <h3 class="application-text-caption mb-2 flex items-center gap-2 font-semibold text-[var(--app-text)]"><ShieldCheck size={15}/>Credenciais protegidas</h3>
+        <div class="grid gap-2 sm:grid-cols-2">
+          {#each serviceRequest.secrets as secret}
+            <div class="flex min-w-0 items-center gap-2 rounded-xl border border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] p-3">
+              <div class="min-w-0 flex-1">
+                <span class="application-text-meta block text-[var(--app-text-muted)]">{secret.label}</span>
+                <span class="application-text-caption mt-1 block break-all font-mono text-[var(--app-text)]">
+                  {revealedSecrets[secret.key] ?? (secret.present ? "••••••••" : "Não informada")}
+                </span>
+              </div>
+              {#if revealedSecrets[secret.key]}
+                <button type="button" aria-label={`Copiar ${secret.label}`}
+                  on:click={() => void copyValue(secret.key, revealedSecrets[secret.key])}
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--app-primary)]">
+                  {#if copiedField === secret.key}<Check size={15}/>{:else}<Copy size={15}/>{/if}
+                </button>
+                <button type="button" on:click={() => hideSecret(secret.key)}
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--app-text-muted)]" aria-label="Ocultar credencial"><EyeOff size={15}/></button>
+              {:else if secret.present}
+                <button type="button" disabled={revealLoading === secret.key} on:click={() => revealSecret(secret.key)}
+                  class="application-text-caption rounded-lg border border-[var(--app-border-control)] px-2 py-1.5 font-semibold text-[var(--app-primary)] disabled:opacity-50"><Eye size={14} class="inline"/> Revelar</button>
+              {/if}
+            </div>
+          {/each}
+        </div>
+        {#if revealError}<p role="alert" class="application-text-caption mt-2 text-[var(--app-danger-text)]">{revealError}</p>{/if}
+      </div>
+    {/if}
+    {#if serviceRequest.attachments.length > 0}
+      <div class="mt-5 border-t border-[var(--app-border-soft)] pt-4">
+        <h3 class="application-text-caption mb-2 flex items-center gap-2 font-semibold text-[var(--app-text)]"><Paperclip size={15}/>Documentos enviados</h3>
+        <div class="grid gap-2 sm:grid-cols-2">
+          {#each serviceRequest.attachments as attachment}
+            <a href={attachment.href} target="_blank" rel="noopener noreferrer"
+              class="application-text-caption flex min-w-0 items-center gap-2 rounded-lg border border-[var(--app-border-control)] p-3 text-[var(--app-primary)]">
+              <Download size={15} class="shrink-0"/><span class="min-w-0 flex-1 truncate">{attachment.originalName}</span>
+            </a>
+          {/each}
+        </div>
+      </div>
+    {/if}
+  {/if}
 </section>
 
 {#if modalMode !== "closed"}
