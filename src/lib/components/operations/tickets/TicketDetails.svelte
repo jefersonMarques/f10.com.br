@@ -29,6 +29,7 @@
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
   import TicketRichTextEditor from "$lib/components/operations/tickets/TicketRichTextEditor.svelte";
   import TicketCustomerPicker from "$lib/components/operations/TicketCustomerPicker.svelte";
+  import TicketCommercialUnitPicker from "$lib/components/operations/TicketCommercialUnitPicker.svelte";
   import TicketTaskPanel from "$lib/components/operations/TicketTaskPanel.svelte";
   import ServiceRequestDetailsCard from "$lib/components/serviceRequests/ServiceRequestDetailsCard.svelte";
   import {
@@ -723,7 +724,33 @@
 
         {#if surface === "page" || activeMainPanel === "customer"}
         <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "w-full p-2 sm:p-4"}>
-          <h3 class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><UserRound size={14}/>Cliente F10</h3>
+          <h3 class="application-text-caption flex items-center gap-2 font-semibold text-[var(--app-text)]"><Building2 size={16}/>Cliente / unidade comercial</h3>
+          {#if ticketData.commercialUnit}
+            <div class="mt-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-subtle)] p-3">
+              <strong class="application-text-caption block font-semibold text-[var(--app-text)]">{ticketData.commercialUnit.name}</strong>
+              <span class="application-text-meta mt-1 block text-[var(--app-text-muted)]">{ticketData.commercialUnit.groupName} · Contrato {ticketData.commercialUnit.contractNumber}</span>
+            </div>
+          {:else}
+            <p class="application-text-caption mt-2 text-[var(--app-text-muted)]">Nenhuma unidade comercial vinculada.</p>
+          {/if}
+          {#if ticketData.canLinkCustomer}
+            <details class="mt-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3">
+              <summary class="application-text-caption cursor-pointer font-semibold text-[var(--app-primary)]">{ticketData.commercialUnit ? "Trocar unidade" : "Vincular unidade manualmente"}</summary>
+              <form method="POST" action={actionUrl("linkCommercialUnit")} on:submit|preventDefault={(event) => void submitForm(event, "linkCommercialUnit")} class="mt-3">
+                {#key ticketData.commercialUnit?.id ?? ""}
+                  <TicketCommercialUnitPicker current={ticketData.commercialUnit}/>
+                {/key}
+              </form>
+              {#if ticketData.commercialUnit}
+                <form method="POST" action={actionUrl("linkCommercialUnit")} on:submit|preventDefault={(event) => void submitForm(event, "linkCommercialUnit")} class="mt-2 text-right">
+                  <input type="hidden" name="operation" value="remove"/>
+                  <button type="submit" class="application-text-caption rounded-lg px-3 py-2 text-[var(--app-danger-text)] hover:bg-[var(--app-danger-bg)]">Remover vínculo comercial</button>
+                </form>
+              {/if}
+            </details>
+          {/if}
+          <div class="mt-4 border-t border-[var(--app-border-soft)] pt-3">
+            <h4 class="application-text-caption flex items-center gap-2 font-semibold text-[var(--app-text)]"><UserRound size={15}/>Pessoa / contato</h4>
           {#if ticketData.details.ticket.customerContactId}
             <dl class="mt-3 space-y-2.5 text-[11px]">
               <div><dt class="text-[10px] text-[#969CAA]">Nome</dt><dd class="mt-0.5 font-semibold text-[#414857]">{ticketData.details.ticket.customerName ?? "Não informado"}</dd></div>
@@ -731,15 +758,19 @@
               <div><dt class="text-[10px] text-[#969CAA]">Telefone</dt><dd class="mt-0.5 text-[#555D6C]">{ticketData.details.ticket.customerPhone ?? "Não informado"}</dd></div>
             </dl>
           {:else}
-            <p class="mt-2 text-[11px] leading-5 text-[#8B919F]">Ticket sem cliente vinculado.</p>
+            <p class="application-text-caption mt-2 text-[var(--app-text-muted)]">Nenhuma pessoa identificada para este ticket.</p>
             {#if ticketData.canLinkCustomer}
-              <form method="POST" action={actionUrl("linkCustomer")} on:submit|preventDefault={(event) => void submitForm(event, "linkCustomer")} class="mt-3 grid gap-2">
-                <TicketCustomerPicker enabled={true}/>
-                <button type="submit" class="h-9 rounded-xl bg-[var(--app-primary)] px-3 text-[11px] font-semibold text-white">Vincular cliente</button>
-              </form>
+              <details class="mt-2">
+                <summary class="application-text-caption cursor-pointer font-semibold text-[var(--app-primary)]">Vincular contato pessoal (opcional)</summary>
+                <form method="POST" action={actionUrl("linkCustomer")} on:submit|preventDefault={(event) => void submitForm(event, "linkCustomer")} class="mt-3 grid gap-2">
+                  <TicketCustomerPicker enabled={true}/>
+                  <button type="submit" class="application-text-caption h-10 rounded-xl bg-[var(--app-primary)] px-3 font-semibold text-white">Vincular pessoa</button>
+                </form>
+              </details>
             {/if}
           {/if}
 
+          </div>
           {#if ticketData.customerContext}
             <div class="mt-4 border-t border-[var(--app-border-soft)] pt-3">
               <div class="flex items-center gap-2"><Building2 size={13} class="text-[#000A57]"/><span class="text-[10px] font-bold uppercase tracking-[0.06em] text-[#858C9B]">Contexto F10</span></div>
