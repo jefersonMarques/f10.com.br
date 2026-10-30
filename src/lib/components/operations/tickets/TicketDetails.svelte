@@ -475,11 +475,17 @@
                       {#if message.attachments?.length}
                         <div class="mt-3 space-y-1.5 border-t border-[#ECDDC8] pt-2">
                           {#each message.attachments as attachment}
-                            <a href={attachment.href} target="_blank" rel="noopener noreferrer" class="flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 text-[12px] font-semibold text-[#8A4D13]">
-                              <Paperclip size={14} class="shrink-0"/>
-                              <span class="min-w-0 flex-1 truncate">{attachment.originalName}</span>
-                              <span class="text-[11px] font-normal">{formatBytes(attachment.sizeBytes)}</span>
-                            </a>
+                            {#if attachment.contentType.startsWith("image/")}
+                              <a href={attachment.href} target="_blank" rel="noopener noreferrer" class="block w-fit max-w-full">
+                                <img src={attachment.href} alt={attachment.originalName} loading="lazy" class="max-h-[300px] max-w-full rounded-lg border border-[var(--app-warning-border)] object-contain"/>
+                              </a>
+                            {:else}
+                              <a href={attachment.href} target="_blank" rel="noopener noreferrer" class="flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 text-[12px] font-semibold text-[#8A4D13]">
+                                <Paperclip size={14} class="shrink-0"/>
+                                <span class="min-w-0 flex-1 truncate">{attachment.originalName}</span>
+                                <span class="text-[11px] font-normal">{formatBytes(attachment.sizeBytes)}</span>
+                              </a>
+                            {/if}
                           {/each}
                           <p class="text-[11px] text-[#8A4D13]">Visível apenas para a equipe F10.</p>
                         </div>
@@ -517,11 +523,18 @@
                       {#if message.attachments?.length}
                         <div class="mt-3 space-y-1.5 border-t border-[#DDE1EA] pt-3">
                           {#each message.attachments as file}
-                            <a href={file.href} target="_blank" rel="noopener noreferrer" class="flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 text-[12px] font-semibold text-[#000A57]">
-                              <Paperclip size={15} class="shrink-0"/>
-                              <span class="min-w-0 flex-1 truncate">{file.originalName}</span>
-                              <span class="shrink-0 text-[11px] font-normal text-[#737989]">{formatBytes(file.sizeBytes)}</span>
-                            </a>
+                            {#if file.contentType.startsWith("image/")}
+                              <a href={file.href} target="_blank" rel="noopener noreferrer" class="block w-fit max-w-full">
+                                <img src={file.href} alt={file.originalName} loading="lazy"
+                                  class="max-h-[360px] max-w-full rounded-lg border border-[var(--app-border)] object-contain"/>
+                              </a>
+                            {:else}
+                              <a href={file.href} target="_blank" rel="noopener noreferrer" class="flex min-h-9 items-center gap-2 rounded-lg bg-[var(--app-surface)] px-3 text-[12px] font-semibold text-[var(--app-primary)]">
+                                <Paperclip size={15} class="shrink-0"/>
+                                <span class="min-w-0 flex-1 truncate">{file.originalName}</span>
+                                <span class="shrink-0 text-[11px] font-normal text-[var(--app-text-muted)]">{formatBytes(file.sizeBytes)}</span>
+                              </a>
+                            {/if}
                           {/each}
                         </div>
                       {/if}
