@@ -8,6 +8,7 @@
   export let users: MentionUser[] = [];
   export let name = "body";
   export let rows = 4;
+  export let required = true;
   export let maxlength = 5000;
   export let placeholder = "Escreva uma mensagem...";
   export let className = "";
@@ -114,7 +115,7 @@
     {rows}
     {maxlength}
     {placeholder}
-    required
+    {required}
     class={className}
     on:input={handleInput}
     on:click={refreshMentionState}
