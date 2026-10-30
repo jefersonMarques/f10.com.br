@@ -42,6 +42,8 @@ test("chat links use only safe protocols and do not execute HTML", () => {
   assert.equal(safeChatHref("javascript:alert(1)"), null);
   assert.equal(safeChatHref("//untrusted.example"), null);
   assert.equal(safeChatHref("data:text/html,hello"), null);
+  assert.equal(safeChatHref("https://user:password@example.com"), null);
+  assert.equal(safeChatHref("https://example.com/" + "a".repeat(2050)), null);
   assert.equal(safeChatHref("/ajuda-f10/guia"), "/ajuda-f10/guia");
 
   const tokens = tokenizeChatMarkdown(
