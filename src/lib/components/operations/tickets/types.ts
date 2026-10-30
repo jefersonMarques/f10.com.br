@@ -19,6 +19,7 @@ export type TicketItem = {
   ticketNumber: number;
   unread?: boolean;
   subject: string;
+  descriptionPreview?: string | null;
   status: string;
   priority: string;
   channel: string;
