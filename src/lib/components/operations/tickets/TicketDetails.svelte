@@ -26,6 +26,7 @@
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
   import TicketRichTextEditor from "$lib/components/operations/tickets/TicketRichTextEditor.svelte";
+  import TicketRemotePanel from "$lib/components/operations/tickets/TicketRemotePanel.svelte";
   import TicketCustomerPicker from "$lib/components/operations/TicketCustomerPicker.svelte";
   import TicketCommercialUnitPicker from "$lib/components/operations/TicketCommercialUnitPicker.svelte";
   import TicketTaskPanel from "$lib/components/operations/TicketTaskPanel.svelte";
@@ -456,12 +457,6 @@
         </div>
 
         <div class="flex shrink-0 items-center gap-2">
-          <a
-            href={`/app/tickets/${ticketData.details.ticket.id}/remote`}
-            class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] bg-white text-[#69707E] transition hover:bg-[var(--app-surface-muted)] hover:text-[#000A57]"
-            aria-label="Acesso remoto"
-            title="Acesso remoto"
-          ><MonitorCog size={15}/></a>
           {#if surface === "modal" && onClose}
             <button type="button" on:click={onClose} class="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] text-[#69707E] hover:bg-[var(--app-surface-muted)]" aria-label="Fechar"><X size={16}/></button>
           {/if}
@@ -476,6 +471,9 @@
           <button type="button" class={tabClass("request", activeMainPanel)} aria-pressed={activeMainPanel === "request"} on:click={() => selectTab("request")}><FileText size={14}/>Solicitação</button>
         {/if}
         <button type="button" class={tabClass("attachments", activeMainPanel)} aria-pressed={activeMainPanel === "attachments"} on:click={() => selectTab("attachments")}><Paperclip size={14}/>Anexos {#if ticketData.attachments.length > 0}<span class="text-[11px] text-[#858C99]">{ticketData.attachments.length}</span>{/if}</button>
+        {#if ticketData.canRequestRemote}
+          <button type="button" class={tabClass("remote", activeMainPanel)} aria-pressed={activeMainPanel === "remote"} on:click={() => selectTab("remote")}><MonitorCog size={14}/>Acesso remoto</button>
+        {/if}
         {#if surface !== "page"}
           <button type="button" class={tabClass("customer", activeMainPanel)} aria-pressed={activeMainPanel === "customer"} on:click={() => selectTab("customer")}><UserRound size={14}/>Cliente</button>
           {#if ticketData.canViewTasks}
@@ -675,6 +673,8 @@
               onUpdated={refreshDetails}
             />
           </div>
+        {:else if activeMainPanel === "remote" && ticketData.canRequestRemote}
+          <TicketRemotePanel ticketId={ticketData.details.ticket.id} onRefresh={refreshDetails} onSelectCustomer={() => selectTab("customer")}/>
         {:else if activeMainPanel === "attachments"}
           <section class="min-h-0 flex-1 overflow-y-auto bg-[var(--app-surface-subtle)] p-4 sm:p-5">
             <div class="w-full rounded-[20px] border border-[var(--app-border)] bg-white p-4 sm:p-5">
