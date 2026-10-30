@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount, tick } from "svelte";
   import { tokenizeChatMarkdown } from "$lib/support/chatMarkdown";
-  import { Bold, Code, Italic, Paperclip, Send, X } from "lucide-svelte";
+  import { Bold, Code, Italic, Paperclip, X } from "lucide-svelte";
 
   export let value = "";
   export let files: File[] = [];
@@ -177,6 +177,10 @@
     appendFiles(Array.from((event.currentTarget as HTMLInputElement).files ?? []));
   }
 
+  export function openFilePicker(): void {
+    if (!disabled && !submitting) fileInput?.click();
+  }
+
   function removeFile(file: File): void {
     const key = fileKey(file);
     files = files.filter((item) => fileKey(item) !== key);
@@ -269,6 +273,8 @@
     class="ticket-rich-editor mt-2 min-h-[105px] max-h-[320px] w-full overflow-y-auto break-words rounded-lg px-2 py-2 text-[14px] leading-6 text-[var(--app-text)] outline-none focus:ring-1 focus:ring-[var(--app-primary)]"
   ></div>
   <input name="body" type="hidden" value={value}/>
+  <input bind:this={fileInput} name="files" type="file" multiple accept="image/png,image/jpeg,image/webp,.pdf,.docx,.xlsx,.zip,.txt,.csv"
+    class="sr-only" on:change={handleFileSelection}/>
   <div class="mt-2 flex flex-wrap gap-2">
     {#each files as file (fileKey(file))}
       <span class="application-text-caption inline-flex max-w-[240px] items-center gap-1.5 rounded-lg bg-[var(--app-surface-muted)] px-2.5 py-1.5 text-[var(--app-text)]">
@@ -276,16 +282,6 @@
         <button type="button" on:click={() => removeFile(file)} aria-label={`Remover ${file.name}`} class="rounded p-0.5 hover:bg-[var(--app-border)]"><X size={13}/></button>
       </span>
     {/each}
-  </div>
-  <div class="mt-2 flex items-center justify-end gap-2 border-t border-[var(--app-border-soft)] pt-2">
-    <input bind:this={fileInput} name="files" type="file" multiple accept="image/png,image/jpeg,image/webp,.pdf,.docx,.xlsx,.zip,.txt,.csv"
-      class="sr-only" on:change={handleFileSelection}/>
-    <button type="button" on:click={() => fileInput?.click()} title="Anexar arquivo ou imagem" aria-label="Anexar arquivo ou imagem"
-      class="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)] hover:text-[var(--app-primary)]"><Paperclip size={18}/></button>
-    <button type="submit" disabled={disabled || submitting || files.length > 4 || files.reduce((total, file) => total + file.size, 0) > 12 * 1024 * 1024 || (value.trim().length === 0 && files.length === 0) || value.length > 10000}
-      class="application-text-caption flex h-10 items-center gap-2 rounded-lg bg-[var(--app-primary)] px-4 font-semibold text-white disabled:opacity-50">
-      <Send size={16}/>{submitting ? "Enviando..." : "Enviar"}
-    </button>
   </div>
   {#if files.length > 4 || files.reduce((total, file) => total + file.size, 0) > 12 * 1024 * 1024}
     <p role="alert" class="application-text-caption mt-2 text-[var(--app-danger-text)]">Máximo de 4 arquivos e 12 MB por mensagem.</p>
