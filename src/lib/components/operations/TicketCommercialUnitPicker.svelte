@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import { Building2, Check, Search, X } from "lucide-svelte";
-  import type { TicketCommercialUnit } from "$lib/server/support/ticketCommercialUnitRepository";
+  import type { TicketCommercialUnit } from "$lib/components/operations/tickets/types";
 
   export let current: TicketCommercialUnit | null = null;
 
