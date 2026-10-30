@@ -279,6 +279,27 @@
     }
   }
 
+  async function quickTicketAction(
+    ticketId: string,
+    action: "status" | "addLabel",
+    value: string,
+  ): Promise<void> {
+    const body = new FormData();
+    body.set(action === "status" ? "status" : "tagId", value);
+    try {
+      const response = await fetch(`/app/tickets/${ticketId}?/${action}`, {
+        method: "POST",
+        headers: { "x-sveltekit-action": "true" },
+        body,
+      });
+      if (!response.ok) throw new Error("QUICK_ACTION_FAILED");
+      await invalidateAll();
+      if (ticketDetails?.details.ticket.id === ticketId) await refreshTicketDetails();
+    } catch {
+      window.alert("Não foi possível executar a ação neste ticket.");
+    }
+  }
+
   async function refreshTicketDetails(): Promise<void> {
     if (!ticketDetails) return;
     const ticketId = ticketDetails.details.ticket.id;
@@ -380,6 +401,8 @@
               selectedTicketId={ticketDetails?.details.ticket.id ?? null}
               compact
               onOpenTicketService={(ticketId) => openTicketDetails(ticketId, "service")}
+              onQuickAction={data.canReply ? quickTicketAction : null}
+              labels={data.filterOptions.labels}
               onOpenTicket={openTicketDetails}
             />
           </div>
@@ -409,6 +432,9 @@
         globalWorkflow={data.workflowBoard.globalWorkflow}
         areaWorkflows={data.workflowBoard.areaWorkflows}
         onOpenTicket={openTicketDetails}
+        onOpenTicketService={(ticketId) => openTicketDetails(ticketId, "service")}
+        onQuickAction={data.canReply ? quickTicketAction : null}
+        labels={data.filterOptions.labels}
       />
     {/if}
 
