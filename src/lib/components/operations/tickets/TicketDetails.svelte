@@ -776,7 +776,7 @@
         {/if}
 
         {#if surface === "page" || activeMainPanel === "customer"}
-        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto w-full max-w-[940px] p-2 sm:p-4"}>
+        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "w-full p-2 sm:p-4"}>
           <h3 class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><UserRound size={14}/>Cliente F10</h3>
           {#if ticketData.details.ticket.customerContactId}
             <dl class="mt-3 space-y-2.5 text-[11px]">
@@ -814,8 +814,8 @@
           <summary class="application-text-caption flex cursor-pointer items-center gap-2 font-semibold text-[var(--app-text)]">
             <UsersRound size={15}/>Colaboração e etiquetas
           </summary>
-        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto w-full max-w-[940px] p-2 sm:p-4"}>
-          <h3 class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><UsersRound size={14}/>Colaboração</h3>
+        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "w-full p-2 sm:p-4"}>
+          <h3 class="sr-only">Seguidores e etiquetas</h3>
 
           <div class="mt-3">
             <span class="text-[10px] font-semibold text-[#858B99]">Seguidores</span>
@@ -900,7 +900,7 @@
         {/if}
 
         {#if surface === "page" || activeMainPanel === "service"}
-        <details class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "mx-auto w-full max-w-[940px] p-2 sm:p-4"}>
+        <details class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "w-full p-2 sm:p-4"}>
           <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
             <span class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><ShieldCheck size={14}/>Histórico</span>
             <span class="rounded-full bg-[var(--app-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[#777E8D]">{ticketData.details.events.length}</span>
