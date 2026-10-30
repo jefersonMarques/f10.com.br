@@ -16,6 +16,7 @@
   };
 
   export let notifications: NotificationItem[] = [];
+  export let showAlerts = false;
 
   const DISMISSED_STORAGE_KEY = "f10_notification_alerts_dismissed";
   const MAX_VISIBLE_ALERTS = 5;
@@ -160,6 +161,7 @@
   });
 </script>
 
+{#if showAlerts}
 <div
   class="pointer-events-none fixed bottom-5 right-5 z-[90] flex w-[min(390px,calc(100vw-2rem))] flex-col gap-3"
   aria-live="polite"
@@ -204,3 +206,4 @@
     </article>
   {/each}
 </div>
+{/if}
