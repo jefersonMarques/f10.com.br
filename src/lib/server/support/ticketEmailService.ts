@@ -190,6 +190,7 @@ export async function sendTicketPublicReplyEmail(
       title: ticket.subject,
       ...(recipientName ? { greeting: `Olá, ${recipientName}.` } : {}),
       body: emailParagraphs(body),
+      markdownBody: true,
       action: { label: "Ver chamado no painel", href: ticketUrl },
       footer: "Responda diretamente a este e-mail para continuar o atendimento no mesmo ticket.",
     }),

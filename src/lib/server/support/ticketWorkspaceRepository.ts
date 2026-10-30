@@ -15,7 +15,7 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
-import { getPermissionScope } from "$lib/server/auth/permissions";
+import { getPermissionScope, hasPermission } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import { users } from "$lib/server/db/schema";
 import {
@@ -182,6 +182,7 @@ export async function listTicketWorkspaceTickets(
   if (!viewScope) throw new Error("SUPPORT_PERMISSION_NOT_ALLOWED");
 
   const db = getDatabase();
+  const canViewCommercialCustomer = hasPermission(permissions, "customers.view");
   const [scopedCondition, tagRows] = await Promise.all([
     buildTicketAccessCondition(actorUserId, viewScope),
     filters.tagId
@@ -205,6 +206,17 @@ export async function listTicketWorkspaceTickets(
         ilike(tickets.subject, searchPattern),
         ilike(customerContacts.name, searchPattern),
         ilike(customerOrganizations.name, searchPattern),
+        canViewCommercialCustomer ? sql`EXISTS (
+          SELECT 1 FROM ticket_commercial_unit_links link
+          JOIN customer_units unit ON unit.id = link.customer_unit_id
+          JOIN customer_groups grp ON grp.id = unit.group_id
+          WHERE link.ticket_id = ${tickets.id}
+            AND (
+              unit.source_id ILIKE ${searchPattern}
+              OR coalesce(nullif(unit.apelido, ''), unit.name) ILIKE ${searchPattern}
+              OR grp.name ILIKE ${searchPattern}
+            )
+        )` : undefined,
         ilike(supportQueues.name, searchPattern),
         sql`cast(${tickets.ticketNumber} as text) ilike ${searchPattern}`,
       )
@@ -275,9 +287,17 @@ export async function listTicketWorkspaceTickets(
       queueId: tickets.queueId,
       queueName: supportQueues.name,
       customerContactId: tickets.customerContactId,
-      customerName: customerContacts.name,
+      customerName: canViewCommercialCustomer ? sql<string | null>`coalesce(${customerContacts.name},
+        (SELECT coalesce(nullif(unit.apelido, ''), unit.name)
+         FROM ticket_commercial_unit_links link
+         JOIN customer_units unit ON unit.id = link.customer_unit_id
+         WHERE link.ticket_id = ${tickets.id} LIMIT 1))` : customerContacts.name,
       customerEmail: customerContacts.email,
-      organizationName: customerOrganizations.name,
+      organizationName: canViewCommercialCustomer ? sql<string | null>`coalesce(${customerOrganizations.name},
+        (SELECT org.name FROM ticket_commercial_unit_links link
+         JOIN customer_units unit ON unit.id = link.customer_unit_id
+         JOIN customer_organizations org ON org.id = unit.organization_id
+         WHERE link.ticket_id = ${tickets.id} LIMIT 1))` : customerOrganizations.name,
       globalWorkflowId: ticketWorkflowStates.globalWorkflowId,
       globalStageId: ticketWorkflowStates.globalStageId,
       areaId: ticketWorkflowStates.areaId,
