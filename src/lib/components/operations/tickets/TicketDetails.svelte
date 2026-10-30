@@ -513,7 +513,7 @@
                         <strong class="min-w-0 break-words text-[12px] font-semibold text-[var(--app-warning-text)]">{message.authorUserName ?? "Equipe F10"} · Nota interna</strong>
                         <span class="ml-auto shrink-0 whitespace-nowrap text-[11px] text-[var(--app-text-muted)]">{formatDateTime(message.createdAt)}</span>
                       </div>
-                      <SupportChatMarkdown text={message.body} size="md" className="mt-2 text-[var(--app-warning-text)]"/>
+                      <SupportChatMarkdown text={message.body} repairMultilineFormatting size="md" className="mt-2 text-[var(--app-warning-text)]"/>
                       {#if message.attachments?.length}
                         <div class="mt-3 min-w-0 space-y-2 border-t border-[var(--app-warning-border)] pt-3">
                           {#each message.attachments as attachment}
@@ -544,7 +544,7 @@
                       {#if message.channel === "email"}
                         <EmailMessageBody text={message.body} hasInlineImages={Boolean(message.inlineImages?.length)} className="mt-2 min-w-0 text-[var(--app-text)]"/>
                       {:else}
-                        <SupportChatMarkdown text={message.body} size="md" className="mt-2 text-[var(--app-text)]"/>
+                        <SupportChatMarkdown text={message.body} repairMultilineFormatting size="md" className="mt-2 text-[var(--app-text)]"/>
                       {/if}
                       {#if message.inlineImages?.length}
                         <div class="mt-3 min-w-0 space-y-2">
