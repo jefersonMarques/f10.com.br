@@ -5,11 +5,12 @@
   export let text = "";
   export let isCustomer = false;
   export let className = "";
+  export let size: "sm" | "md" = "sm";
 
   $: blocks = parseChatMarkdown(text);
 </script>
 
-<div class={`min-w-0 break-words space-y-1 text-[12px] leading-[1.7] ${className}`}>
+<div class={`min-w-0 space-y-1 break-words ${size === "md" ? "text-[14px] leading-[1.65]" : "text-[12px] leading-[1.7]"} ${className}`}>
   {#each blocks as block}
     {#if block.kind === "space"}
       <div class="h-1" aria-hidden="true"></div>
@@ -29,7 +30,7 @@
         <SupportChatMarkdownTokens tokens={block.tokens ?? []} {isCustomer}/>
       </blockquote>
     {:else if block.kind === "code"}
-      <pre class={`max-w-full overflow-x-auto whitespace-pre-wrap break-words rounded-lg p-2 font-mono text-[11px] leading-5 ${isCustomer ? "bg-white/10" : "bg-[#F1F3FA]"}`}><code>{block.code}</code></pre>
+      <pre class={`max-w-full overflow-x-auto whitespace-pre-wrap break-words rounded-lg p-2 font-mono leading-5 ${size === "md" ? "text-[12px]" : "text-[11px]"} ${isCustomer ? "bg-white/10" : "bg-[#F1F3FA]"}`}><code>{block.code}</code></pre>
     {:else}
       <p><SupportChatMarkdownTokens tokens={block.tokens ?? []} {isCustomer}/></p>
     {/if}
