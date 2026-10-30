@@ -7,6 +7,7 @@ import { getSupportServiceRequestForTicket } from "$lib/server/serviceRequests/s
 import { requireTicketAccess, type SupportPermissionMap } from "$lib/server/support/supportAccess";
 import { getTicketCard } from "$lib/server/support/ticketCardRepository";
 import { getTicketCustomerContext } from "$lib/server/support/ticketCustomerContextRepository";
+import { getTicketCommercialUnit } from "$lib/server/support/ticketCommercialUnitRepository";
 import {
   listTicketFollowerCandidates,
   listTicketFollowers,
@@ -70,6 +71,7 @@ export async function getTicketDetailsData(
     customerContext,
     satisfaction,
     workflowBoard,
+    commercialUnit,
   ] = await Promise.all([
     getTicketCard(actorUserId, permissions, ticketId),
     canReply || canCommentInternal || canAssign
@@ -89,6 +91,9 @@ export async function getTicketDetailsData(
     getTicketCustomerContext(ticketId),
     getTicketSatisfaction(ticketId).catch(() => null),
     getTicketWorkflowBoardWithAppearance(actorUserId, permissions, [ticketId]),
+    hasPermission(permissions, "customers.view")
+      ? getTicketCommercialUnit(ticketId)
+      : Promise.resolve(null),
   ]);
 
   const mentionUsers = canCommentInternal
@@ -111,6 +116,7 @@ export async function getTicketDetailsData(
       areaWorkflows: workflowBoard.areaWorkflows,
     },
     customerContext,
+    commercialUnit,
     serviceRequest,
     satisfaction,
     linkedTasks,
