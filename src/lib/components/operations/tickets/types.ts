@@ -141,6 +141,16 @@ export type TicketCustomerContextData = {
   unitSchema: string | null;
 };
 
+export type TicketCommercialUnit = {
+  id: string;
+  contractNumber: string;
+  name: string;
+  organizationName: string;
+  groupName: string;
+  groupSourceId: string;
+  status: string;
+};
+
 export type TicketDetailsData = {
   details: {
     ticket: {
@@ -211,6 +221,7 @@ export type TicketDetailsData = {
   attachmentsEnabled: boolean;
   serviceRequest: TicketServiceRequest | null;
   customerContext: TicketCustomerContextData | null;
+  commercialUnit: TicketCommercialUnit | null;
   satisfaction: {
     score: number | null;
     comment: string | null;
