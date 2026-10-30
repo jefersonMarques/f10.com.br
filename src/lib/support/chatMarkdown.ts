@@ -162,7 +162,7 @@ export function parseChatMarkdown(value: string): ChatMarkdownBlock[] {
       continue;
     }
 
-    const bullet = trimmed.match(/^[-*+]\s+(.+)$/);
+    const bullet = trimmed.match(/^[-*+•]\s+(.+)$/);
     if (bullet) {
       blocks.push({ kind: "bullet", marker: "•", tokens: tokenizeChatMarkdown(bullet[1] ?? "") });
       continue;
