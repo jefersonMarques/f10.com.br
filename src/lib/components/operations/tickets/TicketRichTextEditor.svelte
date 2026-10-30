@@ -35,11 +35,54 @@
 
   function syncValue(): void {
     if (!editor) return;
+    const presentImageKeys = new Set(Array.from(
+      editor.querySelectorAll<HTMLImageElement>("img[data-ticket-file-key]"),
+    ).map((image) => image.dataset.ticketFileKey ?? ""));
+    let imagesRemoved = false;
+    for (const [key, url] of imageUrls) {
+      if (presentImageKeys.has(key)) continue;
+      URL.revokeObjectURL(url);
+      imageUrls.delete(key);
+      files = files.filter((file) => fileKey(file) !== key);
+      imagesRemoved = true;
+    }
+    if (imagesRemoved) syncFileInput();
     value = Array.from(editor.childNodes).map(serialize).join("")
       .replace(/\u00a0/g, " ")
       .replace(/\n{3,}/g, "\n\n")
       .trimEnd();
     lastValue = value;
+  }
+
+  function applyMarkdownShortcut(): void {
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    if (!range.collapsed || range.startContainer.nodeType !== Node.TEXT_NODE) return;
+    const node = range.startContainer as Text;
+    if (!editor.contains(node) || node.parentElement?.closest("strong, b, em, i, code")) return;
+    const before = node.data.slice(0, range.startOffset);
+    const match = before.match(/(?:^|\s)(\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`)$/);
+    if (!match) return;
+    const tag = match[2] !== undefined ? "strong" : match[3] !== undefined ? "em" : "code";
+    const text = match[2] ?? match[3] ?? match[4] ?? "";
+    const formatted = document.createElement(tag);
+    formatted.textContent = text;
+    const segment = document.createRange();
+    segment.setStart(node, range.startOffset - match[1].length);
+    segment.setEnd(node, range.startOffset);
+    segment.deleteContents();
+    segment.insertNode(formatted);
+    const caret = document.createRange();
+    caret.setStartAfter(formatted);
+    caret.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(caret);
+  }
+
+  function updateEditor(): void {
+    applyMarkdownShortcut();
+    syncValue();
   }
 
   function focusEditor(): void {
@@ -193,7 +236,7 @@
 
   <div bind:this={editor} contenteditable={!disabled && !submitting}
     role="textbox" aria-label="Mensagem formatada" aria-multiline="true" data-placeholder="Escreva uma resposta..."
-    on:input={syncValue} on:keydown={formatShortcut} on:paste={pasteContent}
+    on:input={updateEditor} on:keydown={formatShortcut} on:paste={pasteContent}
     on:drop={dropContent} on:dragover|preventDefault
     class="ticket-rich-editor mt-2 min-h-[105px] max-h-[320px] w-full overflow-y-auto break-words rounded-lg px-2 py-2 text-[14px] leading-6 text-[var(--app-text)] outline-none focus:ring-1 focus:ring-[var(--app-primary)]"
   ></div>
