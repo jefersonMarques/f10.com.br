@@ -197,15 +197,18 @@
                 on:click={() => { closeTicketMenu(); void onOpenTicket(ticket.id); }}
                 aria-pressed={selectedTicketId === ticket.id}
                 title={ticket.subject}
-                class="block w-full px-3 py-3 pr-11 text-left"
+                class="block w-full px-3 py-3 text-left"
               >
-                <div class="flex min-w-0 items-center gap-2">
-                  {#if ticket.unread}
-                    <span class="h-2 w-2 shrink-0 rounded-full bg-[#EA6D0B]" aria-label="Ticket não visualizado" title="Não visualizado"></span>
-                  {/if}
-                  <span class="shrink-0 text-[11px] font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
-                  <strong class="min-w-0 flex-1 truncate text-[13px] font-semibold text-[#303645]">{shortTicketSubject(ticket.subject)}</strong>
+                <div class="flex min-w-0 items-center justify-between gap-3 pr-9">
+                  <div class="flex min-w-0 items-center gap-2">
+                    {#if ticket.unread}
+                      <span class="h-2 w-2 shrink-0 rounded-full bg-[#EA6D0B]" aria-label="Ticket não visualizado" title="Não visualizado"></span>
+                    {/if}
+                    <span class="shrink-0 text-[11px] font-bold text-[#000A57]">#{ticket.ticketNumber}</span>
+                  </div>
+                  <span class="shrink-0 whitespace-nowrap text-[11px] text-[#9298A5]">{relativeUpdated(ticket.updatedAt)}</span>
                 </div>
+                <strong class="mt-1 block min-w-0 whitespace-normal break-words text-[13px] font-semibold leading-5 text-[#303645]">{ticket.subject}</strong>
                 <div class="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] text-[#737989]">
                   <span class="min-w-0 flex-1 truncate">{ticket.customerName ?? ticket.assignedUserName ?? "Cliente pendente"}</span>
                   {#if ticket.channel === "email"}<Mail size={13} class="shrink-0" aria-label="Recebido por e-mail"/>{/if}
@@ -230,7 +233,6 @@
                 {/if}
               </button>
               <div class="absolute right-2 top-2 flex items-center gap-1">
-                <span class="hidden max-w-[65px] truncate text-[10px] text-[#9298A5] sm:block">{relativeUpdated(ticket.updatedAt)}</span>
                 <button
                   type="button"
                   on:click={(event) => void toggleTicketMenu(event, ticket)}
