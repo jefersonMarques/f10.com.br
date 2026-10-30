@@ -16,6 +16,8 @@ export const eventLabels: Record<string, string> = {
   "ticket.due_date.changed": "alterou a conclusão planejada",
   "ticket.assignee.changed": "alterou o responsável",
   "ticket.customer.linked": "vinculou o cliente F10",
+  "ticket.commercial_unit.linked": "vinculou uma unidade comercial",
+  "ticket.commercial_unit.unlinked": "removeu o vínculo da unidade comercial",
   "ticket.task.linked": "vinculou uma tarefa",
   "service_request.created": "criou a solicitação estruturada",
   "service_request.updated": "alterou os dados da solicitação",
