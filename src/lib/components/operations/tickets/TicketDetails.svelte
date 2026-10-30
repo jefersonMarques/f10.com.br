@@ -99,6 +99,13 @@
     await focusComposer();
   }
 
+  function collapseComposerOnOutsidePointerDown(event: PointerEvent): void {
+    if (!composerExpanded || actionLoading || !composerForm) return;
+    if (event.composedPath().includes(composerForm)) return;
+
+    composerExpanded = false;
+  }
+
   async function selectComposerMode(mode: ComposerMode): Promise<void> {
     if (actionLoading || mode === composerMode) return;
     composerMode = mode;
@@ -404,6 +411,8 @@
 
 </script>
 
+<svelte:window on:pointerdown={collapseComposerOnOutsidePointerDown}/>
+
 <LivePageSync endpoint={`/app/tickets/${ticketData.details.ticket.id}/updates`} initialRevision={String(new Date(ticketData.details.ticket.updatedAt).getTime())} onRefresh={refreshDetails} />
 
 
@@ -597,11 +606,11 @@
                     <span class="min-w-0 flex-1 truncate">{composerMode === "reply" ? "Escreva uma resposta" : "Escreva uma nota interna"}</span>
                     <Send size={18} class="shrink-0 text-[var(--app-primary)]"/>
                   </button>
-                {:else}
-                  <form bind:this={composerForm} method="POST" action={actionUrl(composerMode === "note" ? "note" : "reply")}
+                {/if}
+                <form bind:this={composerForm} method="POST" action={actionUrl(composerMode === "note" ? "note" : "reply")}
                     on:submit|preventDefault={submitComposer}
                     on:paste={pasteComposer}
-                    class="w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] p-3">
+                    class="w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] p-3" class:hidden={!composerExpanded}>
                     {#if composerMode === "reply"}
                       <TicketRichTextEditor bind:this={replyEditor} bind:value={replyDraft} bind:files={replyFiles} submitting={Boolean(actionLoading)}/>
                     {:else}
@@ -652,7 +661,6 @@
                       </div>
                     </div>
                   </form>
-                {/if}
               </div>
             {/if}
           </section>
