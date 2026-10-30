@@ -1,6 +1,6 @@
 <script lang="ts">
   import { shortTicketSubject } from "./shortSubject";
-  import { Check, Clock3, Copy, ExternalLink, Mail, MessageSquare, MoreHorizontal, PanelRightOpen, TicketCheck, UserRound } from "lucide-svelte";
+  import { ArrowDown, ArrowUp, ArrowUpDown, Check, Clock3, Copy, ExternalLink, Mail, MessageSquare, MoreHorizontal, PanelRightOpen, TicketCheck, UserRound } from "lucide-svelte";
   import { tick } from "svelte";
   import { labelClasses, priorityLabels } from "./presentation";
   import type { TicketItem, TicketWorkflow } from "./types";
@@ -14,6 +14,28 @@
   export let onOpenTicketService: ((ticketId: string) => void | Promise<void>) | null = null;
   export let onQuickAction: ((ticketId: string, action: "status" | "addLabel", value: string) => Promise<void>) | null = null;
   export let labels: Array<{ id: string; name: string }> = [];
+  export let sort = "updated_desc";
+  export let onSort: ((value: string) => void) | null = null;
+  const SORT_COLUMNS = {
+    ticket: ["number_asc", "number_desc"],
+    subject: ["subject_asc", "subject_desc"],
+    customer: ["customer_asc", "customer_desc"],
+    priority: ["priority_desc", "priority_asc"],
+    assignee: ["assignee_asc", "assignee_desc"],
+    sla: ["sla_asc", "sla_desc"],
+    updated: ["updated_desc", "updated_asc"],
+  } as const;
+
+  function toggleSort(column: keyof typeof SORT_COLUMNS): void {
+    const [primary, secondary] = SORT_COLUMNS[column];
+    onSort?.(sort === primary ? secondary : primary);
+  }
+
+  function sortDirection(column: keyof typeof SORT_COLUMNS): "asc" | "desc" | null {
+    if (!SORT_COLUMNS[column].includes(sort as never)) return null;
+    return sort.endsWith("_asc") ? "asc" : "desc";
+  }
+
 
   let menuTicket: TicketItem | null = null;
   let menuTop = 0;
@@ -228,16 +250,51 @@
   <div class="hidden overflow-x-auto md:block">
     <div class={compact ? "min-w-[760px]" : "min-w-[1480px]"}>
       <div class={`grid border-b border-[var(--app-border-soft)] bg-[var(--app-surface-subtle)] px-4 py-2.5 ${compact ? "grid-cols-[88px_minmax(220px,1.5fr)_minmax(160px,1fr)_120px]" : "grid-cols-[90px_minmax(320px,2fr)_minmax(220px,1.4fr)_minmax(175px,1fr)_115px_minmax(160px,1fr)_125px_110px_54px]"}`}>
-        <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Ticket</span>
-        <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Assunto</span>
-        <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Cliente</span>
+        <button type="button" on:click={() => toggleSort("ticket")}
+          aria-label={`Ordenar por Ticket`} title={`Ordenar por Ticket`}
+          class="application-text-caption inline-flex min-w-0 items-center gap-1 text-left font-bold uppercase tracking-[0.07em] text-[var(--app-text-muted)] hover:text-[var(--app-primary)]">
+          Ticket
+          {#if sortDirection("ticket") === "asc"}<ArrowUp size={13}/>{:else if sortDirection("ticket") === "desc"}<ArrowDown size={13}/>{:else}<ArrowUpDown size={12} class="opacity-50"/>{/if}
+        </button>
+        <button type="button" on:click={() => toggleSort("subject")}
+          aria-label={`Ordenar por Assunto`} title={`Ordenar por Assunto`}
+          class="application-text-caption inline-flex min-w-0 items-center gap-1 text-left font-bold uppercase tracking-[0.07em] text-[var(--app-text-muted)] hover:text-[var(--app-primary)]">
+          Assunto
+          {#if sortDirection("subject") === "asc"}<ArrowUp size={13}/>{:else if sortDirection("subject") === "desc"}<ArrowDown size={13}/>{:else}<ArrowUpDown size={12} class="opacity-50"/>{/if}
+        </button>
+        <button type="button" on:click={() => toggleSort("customer")}
+          aria-label={`Ordenar por Cliente`} title={`Ordenar por Cliente`}
+          class="application-text-caption inline-flex min-w-0 items-center gap-1 text-left font-bold uppercase tracking-[0.07em] text-[var(--app-text-muted)] hover:text-[var(--app-primary)]">
+          Cliente
+          {#if sortDirection("customer") === "asc"}<ArrowUp size={13}/>{:else if sortDirection("customer") === "desc"}<ArrowDown size={13}/>{:else}<ArrowUpDown size={12} class="opacity-50"/>{/if}
+        </button>
         {#if !compact}
-          <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Processo</span>
-          <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Prioridade</span>
-          <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Responsável</span>
-          <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">SLA</span>
+          <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[var(--app-text-muted)]">Processo</span>
+          <button type="button" on:click={() => toggleSort("priority")}
+          aria-label={`Ordenar por Prioridade`} title={`Ordenar por Prioridade`}
+          class="application-text-caption inline-flex min-w-0 items-center gap-1 text-left font-bold uppercase tracking-[0.07em] text-[var(--app-text-muted)] hover:text-[var(--app-primary)]">
+          Prioridade
+          {#if sortDirection("priority") === "asc"}<ArrowUp size={13}/>{:else if sortDirection("priority") === "desc"}<ArrowDown size={13}/>{:else}<ArrowUpDown size={12} class="opacity-50"/>{/if}
+        </button>
+          <button type="button" on:click={() => toggleSort("assignee")}
+          aria-label={`Ordenar por Responsável`} title={`Ordenar por Responsável`}
+          class="application-text-caption inline-flex min-w-0 items-center gap-1 text-left font-bold uppercase tracking-[0.07em] text-[var(--app-text-muted)] hover:text-[var(--app-primary)]">
+          Responsável
+          {#if sortDirection("assignee") === "asc"}<ArrowUp size={13}/>{:else if sortDirection("assignee") === "desc"}<ArrowDown size={13}/>{:else}<ArrowUpDown size={12} class="opacity-50"/>{/if}
+        </button>
+          <button type="button" on:click={() => toggleSort("sla")}
+          aria-label={`Ordenar por SLA`} title={`Ordenar por SLA`}
+          class="application-text-caption inline-flex min-w-0 items-center gap-1 text-left font-bold uppercase tracking-[0.07em] text-[var(--app-text-muted)] hover:text-[var(--app-primary)]">
+          SLA
+          {#if sortDirection("sla") === "asc"}<ArrowUp size={13}/>{:else if sortDirection("sla") === "desc"}<ArrowDown size={13}/>{:else}<ArrowUpDown size={12} class="opacity-50"/>{/if}
+        </button>
         {/if}
-        <span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Atualizado</span>
+        <button type="button" on:click={() => toggleSort("updated")}
+          aria-label={`Ordenar por Atualizado`} title={`Ordenar por Atualizado`}
+          class="application-text-caption inline-flex min-w-0 items-center gap-1 text-left font-bold uppercase tracking-[0.07em] text-[var(--app-text-muted)] hover:text-[var(--app-primary)]">
+          Atualizado
+          {#if sortDirection("updated") === "asc"}<ArrowUp size={13}/>{:else if sortDirection("updated") === "desc"}<ArrowDown size={13}/>{:else}<ArrowUpDown size={12} class="opacity-50"/>{/if}
+        </button>
         {#if !compact}<span class="application-text-caption font-bold uppercase tracking-[0.07em] text-[#969CAA]">Ações</span>{/if}
       </div>
 
@@ -259,7 +316,7 @@
             </span>
 
             <div class="min-w-0">
-              <strong class="block truncate text-[13px] font-semibold text-[#2D3342]">{shortTicketSubject(ticket.subject)}</strong>
+              <strong class="block whitespace-normal break-words text-[13px] font-semibold leading-5 text-[var(--app-text)]">{ticket.subject}</strong>
               {#if ticket.labels.length > 0}
                 <div class="mt-1 flex min-w-0 gap-1 overflow-hidden">
                   {#each ticket.labels.slice(0, 3) as label}
