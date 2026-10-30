@@ -74,9 +74,9 @@
 </script>
 
 <div class={workspace
-  ? "relative z-30 shrink-0 border-b border-[var(--app-border)] bg-white"
+  ? "relative z-30 w-full min-w-0 shrink-0 border-b border-[var(--app-border)] bg-white"
   : "border-b border-[#EEF0F5] bg-white"}>
-  <div class={workspace ? "flex min-h-[54px] flex-wrap items-center gap-2 px-3 py-1.5" : "flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between"}>
+  <div class={workspace ? "flex w-full min-w-0 min-h-[54px] flex-wrap items-center gap-2 px-4 py-2" : "flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between"}>
     <div class={workspace ? "flex min-w-0 flex-1 flex-wrap items-center gap-2" : "flex min-w-0 flex-wrap items-center gap-2"}>
       <div class={workspace ? "flex rounded-lg bg-[#F3F4F7] p-0.5" : "flex rounded-xl bg-[#F3F4F7] p-1"}>
         <button type="button" on:click={() => switchScope("mine")} class={`application-text-caption h-8 rounded-lg px-3 font-semibold ${scope === "mine" ? "bg-white text-[#000A57] shadow-sm" : "text-[#737989]"}`}>Minha fila</button>
