@@ -27,6 +27,7 @@
   } from "lucide-svelte";
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
+  import TicketRichTextEditor from "$lib/components/operations/tickets/TicketRichTextEditor.svelte";
   import TicketCustomerPicker from "$lib/components/operations/TicketCustomerPicker.svelte";
   import TicketTaskPanel from "$lib/components/operations/TicketTaskPanel.svelte";
   import ServiceRequestDetailsCard from "$lib/components/serviceRequests/ServiceRequestDetailsCard.svelte";
@@ -75,7 +76,6 @@
   }
   let noteDraft = "";
   let composerFileInput: HTMLInputElement | null = null;
-  let replyTextarea: HTMLTextAreaElement | null = null;
   let composerFiles: File[] = [];
 
   function setComposerFiles(files: File[]): void {
@@ -94,38 +94,15 @@
   }
 
   function pasteComposer(event: ClipboardEvent): void {
-    const files = [...(event.clipboardData?.files ?? [])];
-    if (!files.length) return;
+    if (composerMode !== "note") return;
+    const pastedFiles = Array.from(event.clipboardData?.files ?? []);
+    if (!pastedFiles.length) return;
     event.preventDefault();
-    setComposerFiles([...composerFiles, ...files]);
-    const plainText = event.clipboardData?.getData("text/plain") ?? "";
-    const target = event.target;
-    if (plainText && target instanceof HTMLTextAreaElement) {
-      target.setRangeText(plainText, target.selectionStart, target.selectionEnd, "end");
-      target.dispatchEvent(new Event("input", { bubbles: true }));
-    }
+    setComposerFiles([...composerFiles, ...pastedFiles]);
+    const text = event.clipboardData?.getData("text/plain") ?? "";
+    if (text) noteDraft += text;
   }
 
-  function formatReply(marker: string): void {
-    if (!replyTextarea) return;
-    const start = replyTextarea.selectionStart;
-    const end = replyTextarea.selectionEnd;
-    const selection = replyDraft.slice(start, end);
-    const replacement = marker + (selection || "texto") + marker;
-    replyDraft = replyDraft.slice(0, start) + replacement + replyDraft.slice(end);
-    requestAnimationFrame(() => {
-      replyTextarea?.focus();
-      replyTextarea?.setSelectionRange(start + marker.length, start + replacement.length - marker.length);
-    });
-  }
-
-  function handleReplyShortcut(event: KeyboardEvent): void {
-    if (!(event.ctrlKey || event.metaKey)) return;
-    if (event.key.toLowerCase() === "b" || event.key.toLowerCase() === "i") {
-      event.preventDefault();
-      formatReply(event.key.toLowerCase() === "b" ? "**" : "*");
-    }
-  }
   $: isInfoPanel = surface !== "page" && ["service", "customer", "tasks"].includes(activeMainPanel);
   $: if (activeMainPanel === "collaboration" || activeMainPanel === "history") activeMainPanel = "service";
 
@@ -557,95 +534,51 @@
             </div>
 
             {#if (ticketData.canReply || ticketData.canCommentInternal) && ticketData.details.ticket.status !== "closed"}
-              <div class={surface === "split" ? "shrink-0 border-t border-[var(--app-border)] bg-white px-3 py-2 sm:px-5" : "shrink-0 border-t border-[var(--app-border)] bg-[var(--app-surface)] p-2 sm:px-3 sm:py-2"}>
-                <form
-                  method="POST"
-                  action={actionUrl(composerMode === "note" ? "note" : "reply")}
+              <div class="shrink-0 border-t border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2 sm:px-5">
+                <form method="POST" action={actionUrl(composerMode === "note" ? "note" : "reply")}
                   on:submit|preventDefault={submitComposer}
                   on:paste={pasteComposer}
-                  class={`flex min-h-[48px] w-full flex-wrap items-center gap-2 rounded-xl border bg-white px-3 py-2 ${composerMode === "note" ? "border-[var(--app-warning-border)]" : "border-[var(--app-border-control)]"}`}
-                >
-                  <div class="flex shrink-0 items-center gap-0.5 rounded-lg bg-[var(--app-surface-muted)] p-0.5">
+                  class="w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] p-3">
+                  <div class="mb-2 flex w-fit items-center gap-1 rounded-lg bg-[var(--app-surface-muted)] p-1">
                     {#if ticketData.canReply}
-                      <button type="button" on:click={() => (composerMode = "reply")} title="Resposta pública" aria-pressed={composerMode === "reply"} class={`h-8 rounded-md px-2 text-[11px] font-semibold ${composerMode === "reply" ? "bg-white text-[#000A57] shadow-sm" : "text-[#6F7685]"}`}>Responder</button>
+                      <button type="button" on:click={() => (composerMode = "reply")} aria-pressed={composerMode === "reply"}
+                        class={`application-text-caption rounded-md px-3 py-1.5 font-semibold ${composerMode === "reply" ? "bg-[var(--app-surface)] text-[var(--app-primary)] shadow-sm" : "text-[var(--app-text-muted)]"}`}>Responder</button>
                     {/if}
                     {#if ticketData.canCommentInternal}
-                      <button type="button" on:click={() => (composerMode = "note")} title="Visível só para a equipe" aria-pressed={composerMode === "note"} class={`h-8 rounded-md px-2 text-[11px] font-semibold ${composerMode === "note" ? "bg-white text-[#8A4D13] shadow-sm" : "text-[#6F7685]"}`}>Nota</button>
+                      <button type="button" on:click={() => (composerMode = "note")} aria-pressed={composerMode === "note"}
+                        class={`application-text-caption rounded-md px-3 py-1.5 font-semibold ${composerMode === "note" ? "bg-[var(--app-surface)] text-[var(--app-warning-text)] shadow-sm" : "text-[var(--app-text-muted)]"}`}>Nota</button>
                     {/if}
                   </div>
-                  <div class="flex w-full items-center gap-1 border-t border-[var(--app-border-soft)] pt-2" aria-label="Formatação Markdown">
-                    {#if composerMode === "reply"}
-                      <button type="button" on:click={() => formatReply("**")} title="Negrito (Ctrl+B)" aria-label="Negrito"
-                        class="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Bold size={16}/></button>
-                      <button type="button" on:click={() => formatReply("*")} title="Itálico (Ctrl+I)" aria-label="Itálico"
-                        class="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Italic size={16}/></button>
-                      <button type="button" on:click={() => formatReply("`")} title="Código" aria-label="Código"
-                        class="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Code size={16}/></button>
+                  {#if composerMode === "reply"}
+                    <TicketRichTextEditor bind:value={replyDraft} bind:files={composerFiles} submitting={Boolean(actionLoading)}/>
+                  {:else}
+                    <MentionTextarea users={ticketData.mentionUsers} name="body" bind:value={noteDraft}
+                      rows={3} maxlength={10000} autoGrow suggestionsAbove
+                      placeholder="Escreva uma nota interna..."
+                      className="block min-h-[100px] max-h-[240px] w-full resize-y rounded-lg bg-[var(--app-surface)] p-3 text-[14px] leading-6 text-[var(--app-text)] outline-none"/>
+                    {#if composerFiles.length > 0}
+                      <div class="mt-2 flex flex-wrap gap-2">
+                        {#each composerFiles as file}
+                          <span class="application-text-caption inline-flex items-center gap-1 rounded-lg bg-[var(--app-surface-muted)] px-2 py-1 text-[var(--app-text)]">
+                            <Paperclip size={13}/>{file.name}
+                            <button type="button" on:click={() => setComposerFiles(composerFiles.filter((item) => item !== file))}
+                              aria-label={`Remover ${file.name}`}><X size={13}/></button>
+                          </span>
+                        {/each}
+                      </div>
                     {/if}
-                    <span class="application-text-meta ml-auto text-[var(--app-text-soft)]">Markdown · visualização automática</span>
-                  </div>
-
-                  {#if composerFiles.length > 0}
-                    <div class="flex w-full flex-wrap items-center gap-2 border-b border-[#E5E8EE] px-2 py-2">
-                      {#each composerFiles as attached}
-                        <span class="inline-flex max-w-[210px] items-center gap-1.5 rounded-lg bg-[#F1F3F8] px-2.5 py-1.5 text-[12px] text-[#404858]">
-                          <Paperclip size={13} class="shrink-0"/>
-                          <span class="truncate">{attached.name}</span>
-                          <button type="button" aria-label={`Remover ${attached.name}`}
-                            on:click={() => setComposerFiles(composerFiles.filter((item) => item !== attached))}
-                            class="flex h-5 w-5 items-center justify-center rounded-full hover:bg-[var(--app-border-soft)]"><X size={12}/></button>
-                        </span>
-                      {/each}
-                      <span class="text-[12px] font-semibold {composerMode === "note" ? 'text-[#8A4D13]' : 'text-[#396351]'}">
-                        {composerMode === "note" ? "Somente equipe · não enviado por e-mail" : "Enviado ao cliente na resposta"}
-                      {#if composerFiles.length > 4 || composerFiles.reduce((total, item) => total + item.size, 0) > 12 * 1024 * 1024}
-                        <span role="alert" class="text-[12px] font-semibold text-[#A33A3A]">Máximo de 4 arquivos e 12 MB por mensagem.</span>
-                      {/if}
-                      </span>
+                    <div class="mt-2 flex items-center justify-end gap-2 border-t border-[var(--app-border-soft)] pt-2">
+                      <input bind:this={composerFileInput} name="files" type="file" multiple
+                        accept="image/png,image/jpeg,image/webp,.pdf,.docx,.xlsx,.zip,.txt,.csv"
+                        class="sr-only" on:change={pickComposerFiles}/>
+                      <button type="button" on:click={() => composerFileInput?.click()} aria-label="Anexar à nota interna"
+                        class="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Paperclip size={18}/></button>
+                      <button type="submit" disabled={Boolean(actionLoading) || composerFiles.length > 4 || composerFiles.reduce((total, file) => total + file.size, 0) > 12 * 1024 * 1024 || (!noteDraft.trim() && !composerFiles.length)}
+                        class="application-text-caption flex h-10 items-center gap-2 rounded-lg bg-[var(--app-warning-text)] px-4 font-semibold text-white disabled:opacity-50">
+                        <Send size={16}/>{actionLoading ? "Salvando..." : "Salvar nota"}
+                      </button>
                     </div>
                   {/if}
-                  <div class="min-w-[140px] flex-1">
-                    {#if composerMode === "reply"}
-                      <textarea
-                        bind:this={replyTextarea}
-                        name="body"
-                        bind:value={replyDraft}
-                        required={composerFiles.length === 0}
-                        maxlength="10000"
-                        rows="1"
-                        on:input={resizeReply}
-                        on:keydown={handleReplyShortcut}
-                        on:focus={resizeReply}
-                        placeholder="Escreva uma resposta..."
-                        class="block min-h-[34px] max-h-[144px] w-full resize-none border-0 bg-transparent px-1 py-1.5 text-[13px] leading-5 text-[#343A47] outline-none placeholder:text-[#A0A5B0]"
-                      ></textarea>
-                    {:else}
-                      <MentionTextarea
-                        users={ticketData.mentionUsers}
-                        name="body"
-                        bind:value={noteDraft}
-                        rows={1}
-                        maxlength={10000}
-                        autoGrow
-                        suggestionsAbove
-                        placeholder="Escreva uma nota interna..."
-                        className="block min-h-[34px] max-h-[144px] w-full resize-none border-0 bg-transparent px-1 py-1.5 text-[13px] leading-5 text-[#4E4339] outline-none placeholder:text-[#AAA098]"
-                      />
-                    {/if}
-                  </div>
-
-                  <div class="w-full rounded-lg bg-[var(--app-surface-subtle)] px-3 py-2 text-[var(--app-text)]" aria-label="Visualização da mensagem">
-                    {#if (composerMode === "reply" ? replyDraft : noteDraft).trim()}
-                      <SupportChatMarkdown text={composerMode === "reply" ? replyDraft : noteDraft}/>
-                    {:else}
-                      <span class="application-text-caption italic text-[var(--app-text-soft)]">A mensagem formatada aparece aqui enquanto você digita.</span>
-                    {/if}
-                  </div>
-                  <input bind:this={composerFileInput} type="file" name="files" multiple accept="image/png,image/jpeg,image/webp,.pdf,.docx,.xlsx,.zip,.txt,.csv" class="sr-only" on:change={pickComposerFiles} aria-label="Anexar arquivos à mensagem"/>
-                  <button type="button" on:click={() => composerFileInput?.click()} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#777E8D] hover:bg-[var(--app-surface-muted)] hover:text-[#000A57]" aria-label="Anexar arquivos à mensagem" title={composerMode === "note" ? "Anexo interno (não enviar ao cliente)" : "Anexar à resposta do cliente"}><Paperclip size={17}/></button>
-                  <button type="submit" disabled={Boolean(actionLoading) || composerFiles.length > 4 || composerFiles.reduce((total, item) => total + item.size, 0) > 12 * 1024 * 1024} aria-label={composerMode === "note" ? "Adicionar nota interna" : "Enviar resposta"} class={`ml-auto inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-4 text-[12px] font-semibold text-white disabled:opacity-50 ${composerMode === "note" ? "bg-[#9A5A1B]" : "bg-[var(--app-primary)]"}`}>
-                    <Send size={15}/><span>{actionLoading ? "Enviando..." : composerMode === "note" ? "Salvar nota" : "Enviar"}</span>
-                  </button>
                 </form>
               </div>
             {/if}
