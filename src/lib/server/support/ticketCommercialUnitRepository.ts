@@ -1,4 +1,5 @@
 import { eq, sql } from "drizzle-orm";
+import type { TicketCommercialUnit } from "$lib/components/operations/tickets/types";
 import { getDatabase } from "$lib/server/db";
 import { getConfiguredF10UnitId } from "$lib/server/integrations/f10/f10CustomerApi";
 import { getPermissionScope, hasPermission } from "$lib/server/auth/permissions";
@@ -6,16 +7,6 @@ import { requireTicketAccess, type SupportPermissionMap } from "$lib/server/supp
 import { ticketEvents, tickets } from "$lib/server/db/supportSchema";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-export type TicketCommercialUnit = {
-  id: string;
-  contractNumber: string;
-  name: string;
-  organizationName: string;
-  groupName: string;
-  groupSourceId: string;
-  status: string;
-};
 
 function sourceSystem(): string {
   const unitId = getConfiguredF10UnitId();
