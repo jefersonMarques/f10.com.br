@@ -205,8 +205,7 @@
         </div>
       </section>
 
-      {#if data.canManage}
-        <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
+      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
           <div class="flex items-center justify-between gap-3">
             <div>
               <h2 class="text-[13px] font-semibold">Computadores conhecidos</h2>
@@ -236,7 +235,6 @@
             </div>
           {/if}
         </section>
-      {/if}
     </div>
     {/if}
   </div>
