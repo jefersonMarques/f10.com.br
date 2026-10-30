@@ -70,6 +70,7 @@
         { label: "Visão geral", icon: LayoutDashboard, href: "/app" },
         { label: "Agenda", icon: CalendarDays, href: "/app/tasks/calendar", permissionsAny: ["tasks.view", "tickets.view"] },
         { label: "Tarefas", icon: CheckSquare2, href: "/app/tasks", permission: "tasks.view" },
+        { label: "Acesso remoto", icon: MonitorCog, href: "/app/remote", permission: "remote.use" },
       ],
     },
     {
@@ -78,7 +79,6 @@
         { label: "Tickets", icon: Headphones, href: "/app/tickets", permission: "tickets.view" },
         { label: "Clientes", icon: Building2, href: "/app/customers", permission: "customers.view" },
         { label: "Chat", icon: MessageCircleMore, href: "/app/chat", permission: "chat.view" },
-        { label: "Acesso remoto", icon: MonitorCog, href: "/app/remote", permission: "remote.use" },
       ],
     },
     {

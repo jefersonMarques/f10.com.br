@@ -137,5 +137,7 @@ export async function getTicketDetailsData(
     canLinkCustomer,
     canViewTasks,
     canCreateTask,
+    canRequestRemote: hasPermission(permissions, "remote.request"),
+    canUseRemote: hasPermission(permissions, "remote.use"),
   };
 }

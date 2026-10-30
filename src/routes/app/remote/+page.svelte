@@ -5,6 +5,9 @@
 
   export let data: PageData;
 
+  type RemoteView = "sessions" | "devices" | "metrics";
+  let activeView: RemoteView = "sessions";
+
   const statusLabels: Record<string, string> = {
     requested: "Aguardando autorização",
     authorized: "Pronto para iniciar",
@@ -49,6 +52,19 @@
     </span>
   </div>
 
+  <nav class="mt-4 flex flex-wrap gap-2 border-b border-[var(--app-border)] pb-3" aria-label="Áreas do acesso remoto">
+    <button type="button" aria-pressed={activeView === "sessions"} on:click={() => (activeView = "sessions")}
+      class={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-[13px] font-semibold ${activeView === "sessions" ? "bg-[var(--app-info-bg)] text-[var(--app-primary)]" : "text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"}`}>Sessões</button>
+    {#if data.canManage}
+      <button type="button" aria-pressed={activeView === "devices"} on:click={() => (activeView = "devices")}
+        class={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-[13px] font-semibold ${activeView === "devices" ? "bg-[var(--app-info-bg)] text-[var(--app-primary)]" : "text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"}`}>Computadores</button>
+      {#if data.sla}
+        <button type="button" aria-pressed={activeView === "metrics"} on:click={() => (activeView = "metrics")}
+          class={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-[13px] font-semibold ${activeView === "metrics" ? "bg-[var(--app-info-bg)] text-[var(--app-primary)]" : "text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"}`}>Indicadores</button>
+      {/if}
+    {/if}
+  </nav>
+
   <section class="mt-3 grid gap-3 md:grid-cols-3">
     <div class="rounded-2xl border border-[#E2E5ED] bg-white p-5">
       <MonitorCog size={19} class="text-[#000A57]"/>
@@ -67,7 +83,7 @@
     </div>
   </section>
 
-  {#if data.canManage && data.sla}
+  {#if activeView === "metrics" && data.canManage && data.sla}
     <section class="mt-5 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
       <header class="border-b border-[#EEF0F5] px-5 py-4">
         <div class="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
@@ -144,7 +160,8 @@
     </section>
   {/if}
 
-  <div class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
+  <div class="mt-5">
+    {#if activeView === "sessions"}
     <section class="overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white">
       <header class="border-b border-[#EEF0F5] px-5 py-4">
         <h2 class="text-[14px] font-semibold">Sessões</h2>
@@ -174,20 +191,21 @@
         </div>
       {/if}
     </section>
+    {/if}
 
+    {#if activeView === "devices" && data.canManage}
     <div class="space-y-5">
       <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
         <div class="flex items-start gap-3">
           <ShieldCheck size={18} class="mt-0.5 shrink-0 text-[#000A57]"/>
           <div>
             <h2 class="text-[13px] font-semibold">Como os computadores entram aqui</h2>
-            <p class="application-text-meta mt-2 leading-5 text-[#7B8190]">Não é mais necessário cadastrar Node ID manualmente. No ticket, escolha <strong>Enviar instalador de Suporte Remoto F10</strong>. O agente baixado já pertence ao grupo daquele cliente e o Operations faz o vínculo quando o computador aparece no MeshCentral.</p>
+            <p class="application-text-meta mt-2 leading-5 text-[#7B8190]">Instale o agente na aba <strong>Acesso remoto</strong> do ticket. O computador aparece aqui após a sincronização.</p>
           </div>
         </div>
       </section>
 
-      {#if data.canManage}
-        <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
+      <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
           <div class="flex items-center justify-between gap-3">
             <div>
               <h2 class="text-[13px] font-semibold">Computadores conhecidos</h2>
@@ -217,7 +235,7 @@
             </div>
           {/if}
         </section>
-      {/if}
     </div>
+    {/if}
   </div>
 </ApplicationContent>

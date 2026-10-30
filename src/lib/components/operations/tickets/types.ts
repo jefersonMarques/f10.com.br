@@ -1,6 +1,6 @@
 export type TicketScope = "mine" | "unassigned" | "all";
 export type TicketView = "board" | "list" | "split";
-export type TicketMainPanel = "conversation" | "request" | "attachments" | "service" | "customer" | "tasks" | "collaboration" | "history";
+export type TicketMainPanel = "conversation" | "request" | "attachments" | "remote" | "service" | "customer" | "tasks" | "collaboration" | "history";
 
 export type TicketLabel = {
   id: string;
@@ -250,5 +250,7 @@ export type TicketDetailsData = {
   canLinkCustomer: boolean;
   canViewTasks: boolean;
   canCreateTask: boolean;
+  canRequestRemote: boolean;
+  canUseRemote: boolean;
 };
 
