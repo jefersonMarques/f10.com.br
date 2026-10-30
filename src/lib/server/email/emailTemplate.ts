@@ -7,11 +7,20 @@ export function escapeEmailHtml(value: string): string {
     .replaceAll("'", "&#039;");
 }
 
+export function renderSafeEmailMarkdown(value: string): string {
+  const escaped = escapeEmailHtml(value);
+  return escaped
+    .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*\n]+)\*/g, "<em>$1</em>")
+    .replace(/\x60([^\x60\n]+)\x60/g, "<code>$1</code>");
+}
+
 export function buildEmailHtml(input: {
   eyebrow?: string;
   title: string;
   greeting?: string;
   body: string[];
+  markdownBody?: boolean;
   action?: { label: string; href: string };
   secondaryAction?: { label: string; href: string };
   ratingLinks?: Array<{ score: number; href: string }>;
@@ -24,7 +33,7 @@ export function buildEmailHtml(input: {
     ? `<p style="margin:0 0 16px">${escapeEmailHtml(input.greeting)}</p>`
     : "";
   const body = input.body
-    .map((paragraph) => `<p style="margin:0 0 14px">${escapeEmailHtml(paragraph)}</p>`)
+    .map((paragraph) => `<p style="margin:0 0 14px">${input.markdownBody ? renderSafeEmailMarkdown(paragraph) : escapeEmailHtml(paragraph)}</p>`)
     .join("");
   const action = input.action
     ? `<div style="margin:26px 0"><a href="${escapeEmailHtml(input.action.href)}" style="display:inline-block;background:#000A57;color:#fff;text-decoration:none;font-weight:700;padding:13px 20px;border-radius:12px">${escapeEmailHtml(input.action.label)}</a></div>`
