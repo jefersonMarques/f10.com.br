@@ -1,13 +1,15 @@
 <script lang="ts">
   import SupportChatMarkdownTokens from "$lib/components/support/SupportChatMarkdownTokens.svelte";
   import { parseChatMarkdown } from "$lib/support/chatMarkdown";
+  import { normalizeTicketMessageMarkdown } from "$lib/support/ticketMarkdown";
 
   export let text = "";
   export let isCustomer = false;
   export let className = "";
   export let size: "sm" | "md" = "sm";
+  export let repairMultilineFormatting = false;
 
-  $: blocks = parseChatMarkdown(text);
+  $: blocks = parseChatMarkdown(repairMultilineFormatting ? normalizeTicketMessageMarkdown(text) : text);
 </script>
 
 <div class={`min-w-0 space-y-1 break-words ${size === "md" ? "text-[14px] leading-[1.65]" : "text-[12px] leading-[1.7]"} ${className}`}>

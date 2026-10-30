@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount, tick } from "svelte";
   import { tokenizeChatMarkdown } from "$lib/support/chatMarkdown";
+  import { serializeTicketRichText } from "$lib/support/ticketRichTextSerialization";
   import { Bold, Code, Italic, Paperclip, X } from "lucide-svelte";
 
   export let value = "";
@@ -17,23 +18,6 @@
     return [file.name, file.size, file.lastModified].join(":");
   }
 
-  function serialize(node: Node): string {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return (node.textContent ?? "").replace(/\u200b/g, "");
-    }
-    if (node.nodeType !== Node.ELEMENT_NODE) return "";
-    const element = node as HTMLElement;
-    const tag = element.tagName.toLowerCase();
-    if (tag === "img") return "";
-    if (tag === "br") return "\n";
-    const content = Array.from(element.childNodes).map(serialize).join("");
-    if (tag === "strong" || tag === "b") return content.trim() ? "**" + content + "**" : content;
-    if (tag === "em" || tag === "i") return content.trim() ? "*" + content + "*" : content;
-    if (tag === "code") return content.trim() ? "\x60" + content.replace(/\x60/g, "") + "\x60" : content;
-    if (tag === "div" || tag === "p") return content + "\n";
-    return content;
-  }
-
   function syncValue(): void {
     if (!editor) return;
     const presentImageKeys = new Set(Array.from(
@@ -48,10 +32,7 @@
       imagesRemoved = true;
     }
     if (imagesRemoved) syncFileInput();
-    value = Array.from(editor.childNodes).map(serialize).join("")
-      .replace(/\u00a0/g, " ")
-      .replace(/\n{3,}/g, "\n\n")
-      .trimEnd();
+    value = serializeTicketRichText(editor);
     lastValue = value;
   }
 
