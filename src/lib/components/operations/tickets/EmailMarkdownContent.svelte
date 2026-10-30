@@ -9,4 +9,4 @@
   $: formattedText = normalizeEmailMarkdown(text);
 </script>
 
-<SupportChatMarkdown text={formattedText} {className} {size}/>
+<SupportChatMarkdown text={formattedText} {className} {size} repairMultilineFormatting/>
