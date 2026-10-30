@@ -97,7 +97,7 @@ export function splitEmailConversation(value: string): {
 
 export function normalizeEmailMarkdown(value: string): string {
   return value
-    .replace(/!\[([^\]\n]{1,240})\]\([^)\s]+\)/g, "$1")
-    .replace(/\\+([\\`*_{}\[\]()#+\-.!>~])/g, "$1");
+    .replace(/\\+([\\`*_{}\[\]()#+\-.!>~])/g, "$1")
+    .replace(/!\[([^\]\n]{1,240})\]\([^)\s]+\)/g, "$1");
 }
 
