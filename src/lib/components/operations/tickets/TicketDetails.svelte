@@ -78,6 +78,7 @@
   let noteDraft = "";
   let composerFileInput: HTMLInputElement | null = null;
   let composerFiles: File[] = [];
+  let replyFiles: File[] = [];
 
   function setComposerFiles(files: File[]): void {
     const unique = new Map<string, File>();
@@ -301,10 +302,14 @@
     const action = composerMode === "note" ? "note" : "reply";
     const saved = await postAction(action, new FormData(form));
     if (!saved) return;
-    if (action === "note") noteDraft = "";
-    else replyDraft = "";
-    composerFiles = [];
-    if (composerFileInput) composerFileInput.value = "";
+    if (action === "note") {
+      noteDraft = "";
+      composerFiles = [];
+      if (composerFileInput) composerFileInput.value = "";
+    } else {
+      replyDraft = "";
+      replyFiles = [];
+    }
   }
 
   async function updateField(
@@ -564,7 +569,7 @@
                     {/if}
                   </div>
                   {#if composerMode === "reply"}
-                    <TicketRichTextEditor bind:value={replyDraft} bind:files={composerFiles} submitting={Boolean(actionLoading)}/>
+                    <TicketRichTextEditor bind:value={replyDraft} bind:files={replyFiles} submitting={Boolean(actionLoading)}/>
                   {:else}
                     <MentionTextarea users={ticketData.mentionUsers} name="body" bind:value={noteDraft}
                       rows={3} maxlength={10000} autoGrow suggestionsAbove
