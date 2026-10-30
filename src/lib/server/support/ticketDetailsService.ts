@@ -104,6 +104,11 @@ export async function getTicketDetailsData(
     ...card,
     details: {
       ...card.details,
+      ticket: {
+        ...card.details.ticket,
+        customerName: card.details.ticket.customerName ?? commercialUnit?.name ?? null,
+        organizationName: card.details.ticket.organizationName ?? commercialUnit?.organizationName ?? null,
+      },
       messages: card.details.messages.map((message) => ({
         ...message,
         attachments: card.attachments.filter(
