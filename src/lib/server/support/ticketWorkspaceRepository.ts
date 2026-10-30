@@ -206,7 +206,7 @@ export async function listTicketWorkspaceTickets(
         ilike(tickets.subject, searchPattern),
         ilike(customerContacts.name, searchPattern),
         ilike(customerOrganizations.name, searchPattern),
-        ...(canViewCommercialCustomer ? [sql`EXISTS (
+        canViewCommercialCustomer ? sql`EXISTS (
           SELECT 1 FROM ticket_commercial_unit_links link
           JOIN customer_units unit ON unit.id = link.customer_unit_id
           JOIN customer_groups grp ON grp.id = unit.group_id
@@ -216,7 +216,7 @@ export async function listTicketWorkspaceTickets(
               OR coalesce(nullif(unit.apelido, ''), unit.name) ILIKE ${searchPattern}
               OR grp.name ILIKE ${searchPattern}
             )
-        )`,] : []),
+        )` : undefined,
         ilike(supportQueues.name, searchPattern),
         sql`cast(${tickets.ticketNumber} as text) ilike ${searchPattern}`,
       )
