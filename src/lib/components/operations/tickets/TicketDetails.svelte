@@ -606,7 +606,7 @@
                       <TicketRichTextEditor bind:this={replyEditor} bind:value={replyDraft} bind:files={replyFiles} submitting={Boolean(actionLoading)}/>
                     {:else}
                       <MentionTextarea users={ticketData.mentionUsers} name="body" bind:value={noteDraft}
-                        rows={3} maxlength={10000} autoGrow suggestionsAbove
+                        rows={3} maxlength={10000} autoGrow suggestionsAbove required={composerFiles.length === 0}
                         placeholder="Escreva uma nota interna..."
                         className="block min-h-[100px] max-h-[240px] w-full resize-y rounded-lg bg-[var(--app-surface)] p-3 text-[14px] leading-6 text-[var(--app-text)] outline-none"/>
                       <input bind:this={composerFileInput} name="files" type="file" multiple
