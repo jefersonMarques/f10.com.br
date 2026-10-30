@@ -79,7 +79,6 @@
   let composerFileInput: HTMLInputElement | null = null;
   let replyTextarea: HTMLTextAreaElement | null = null;
   let composerFiles: File[] = [];
-  let showMarkdownPreview = false;
 
   function setComposerFiles(files: File[]): void {
     const unique = new Map<string, File>();
@@ -579,7 +578,7 @@
                   action={actionUrl(composerMode === "note" ? "note" : "reply")}
                   on:submit|preventDefault={submitComposer}
                   on:paste={pasteComposer}
-                  class={`flex min-h-[48px] flex-wrap items-center gap-2 rounded-xl border bg-white px-2 py-1 ${composerMode === "note" ? "border-[var(--app-warning-border)]" : "border-[var(--app-border-control)]"}`}
+                  class={`flex min-h-[48px] w-full flex-wrap items-center gap-2 rounded-xl border bg-white px-3 py-2 ${composerMode === "note" ? "border-[var(--app-warning-border)]" : "border-[var(--app-border-control)]"}`}
                 >
                   <div class="flex shrink-0 items-center gap-0.5 rounded-lg bg-[var(--app-surface-muted)] p-0.5">
                     {#if ticketData.canReply}
@@ -588,6 +587,17 @@
                     {#if ticketData.canCommentInternal}
                       <button type="button" on:click={() => (composerMode = "note")} title="Visível só para a equipe" aria-pressed={composerMode === "note"} class={`h-8 rounded-md px-2 text-[11px] font-semibold ${composerMode === "note" ? "bg-white text-[#8A4D13] shadow-sm" : "text-[#6F7685]"}`}>Nota</button>
                     {/if}
+                  </div>
+                  <div class="flex w-full items-center gap-1 border-t border-[var(--app-border-soft)] pt-2" aria-label="Formatação Markdown">
+                    {#if composerMode === "reply"}
+                      <button type="button" on:click={() => formatReply("**")} title="Negrito (Ctrl+B)" aria-label="Negrito"
+                        class="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Bold size={16}/></button>
+                      <button type="button" on:click={() => formatReply("*")} title="Itálico (Ctrl+I)" aria-label="Itálico"
+                        class="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Italic size={16}/></button>
+                      <button type="button" on:click={() => formatReply("`")} title="Código" aria-label="Código"
+                        class="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Code size={16}/></button>
+                    {/if}
+                    <span class="application-text-meta ml-auto text-[var(--app-text-soft)]">Markdown · visualização automática</span>
                   </div>
 
                   {#if composerFiles.length > 0}
@@ -639,30 +649,17 @@
                     {/if}
                   </div>
 
-                  <div class="flex w-full flex-wrap items-center gap-1 border-t border-[var(--app-border-soft)] px-1 py-1">
-                    {#if composerMode === "reply"}
-                      <button type="button" on:click={() => formatReply("**")} title="Negrito (Ctrl+B)" aria-label="Negrito"
-                        class="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Bold size={15}/></button>
-                      <button type="button" on:click={() => formatReply("*")} title="Itálico (Ctrl+I)" aria-label="Itálico"
-                        class="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Italic size={15}/></button>
-                      <button type="button" on:click={() => formatReply("`")} title="Código" aria-label="Código"
-                        class="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Code size={15}/></button>
-                    {/if}
-                    <button type="button" on:click={() => (showMarkdownPreview = !showMarkdownPreview)}
-                      aria-pressed={showMarkdownPreview}
-                      class="application-text-meta ml-auto rounded-lg px-2 py-1 text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]">
-                      {showMarkdownPreview ? "Editar" : "Visualizar"}
-                    </button>
-                  </div>
-                  {#if showMarkdownPreview && (composerMode === "reply" ? replyDraft : noteDraft)}
-                    <div class="w-full rounded-lg bg-[var(--app-surface-subtle)] p-3 text-[var(--app-text)]">
+                  <div class="w-full rounded-lg bg-[var(--app-surface-subtle)] px-3 py-2 text-[var(--app-text)]" aria-label="Visualização da mensagem">
+                    {#if (composerMode === "reply" ? replyDraft : noteDraft).trim()}
                       <SupportChatMarkdown text={composerMode === "reply" ? replyDraft : noteDraft}/>
-                    </div>
-                  {/if}
+                    {:else}
+                      <span class="application-text-caption italic text-[var(--app-text-soft)]">A mensagem formatada aparece aqui enquanto você digita.</span>
+                    {/if}
+                  </div>
                   <input bind:this={composerFileInput} type="file" name="files" multiple accept="image/png,image/jpeg,image/webp,.pdf,.docx,.xlsx,.zip,.txt,.csv" class="sr-only" on:change={pickComposerFiles} aria-label="Anexar arquivos à mensagem"/>
-                  <button type="button" on:click={() => composerFileInput?.click()} class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#777E8D] hover:bg-[var(--app-surface-muted)] hover:text-[#000A57]" aria-label="Anexar arquivos à mensagem" title={composerMode === "note" ? "Anexo interno (não enviar ao cliente)" : "Anexar à resposta do cliente"}><Paperclip size={17}/></button>
-                  <button type="submit" disabled={Boolean(actionLoading) || composerFiles.length > 4 || composerFiles.reduce((total, item) => total + item.size, 0) > 12 * 1024 * 1024} aria-label={composerMode === "note" ? "Adicionar nota interna" : "Enviar resposta"} class={`inline-flex h-8 shrink-0 items-center gap-2 rounded-lg px-3 text-[12px] font-semibold text-white disabled:opacity-50 ${composerMode === "note" ? "bg-[#9A5A1B]" : "bg-[var(--app-primary)]"}`}>
-                    <Send size={15}/><span class="hidden sm:inline">{actionLoading ? "Enviando..." : composerMode === "note" ? "Salvar nota" : "Enviar"}</span>
+                  <button type="button" on:click={() => composerFileInput?.click()} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#777E8D] hover:bg-[var(--app-surface-muted)] hover:text-[#000A57]" aria-label="Anexar arquivos à mensagem" title={composerMode === "note" ? "Anexo interno (não enviar ao cliente)" : "Anexar à resposta do cliente"}><Paperclip size={17}/></button>
+                  <button type="submit" disabled={Boolean(actionLoading) || composerFiles.length > 4 || composerFiles.reduce((total, item) => total + item.size, 0) > 12 * 1024 * 1024} aria-label={composerMode === "note" ? "Adicionar nota interna" : "Enviar resposta"} class={`ml-auto inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-4 text-[12px] font-semibold text-white disabled:opacity-50 ${composerMode === "note" ? "bg-[#9A5A1B]" : "bg-[var(--app-primary)]"}`}>
+                    <Send size={15}/><span>{actionLoading ? "Enviando..." : composerMode === "note" ? "Salvar nota" : "Enviar"}</span>
                   </button>
                 </form>
               </div>
