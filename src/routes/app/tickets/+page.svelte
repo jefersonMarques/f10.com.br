@@ -96,6 +96,11 @@
     return query ? `/app/tickets?${query}` : "/app/tickets";
   }
 
+  function changeTicketSort(nextSort: string): void {
+    sort = nextSort;
+    applyFilters();
+  }
+
   function applyFilters(): void {
     if (browser) {
       try { localStorage.setItem(VIEW_STORAGE_KEY, view); } catch { /* Preferência indisponível */ }
@@ -400,6 +405,8 @@
               areaWorkflows={data.workflowBoard.areaWorkflows}
               selectedTicketId={ticketDetails?.details.ticket.id ?? null}
               compact
+              sort={sort}
+              onSort={changeTicketSort}
               onOpenTicketService={(ticketId) => openTicketDetails(ticketId, "service")}
               onQuickAction={data.canReply ? quickTicketAction : null}
               labels={data.filterOptions.labels}
@@ -432,6 +439,8 @@
         globalWorkflow={data.workflowBoard.globalWorkflow}
         areaWorkflows={data.workflowBoard.areaWorkflows}
         onOpenTicket={openTicketDetails}
+        sort={sort}
+        onSort={changeTicketSort}
         onOpenTicketService={(ticketId) => openTicketDetails(ticketId, "service")}
         onQuickAction={data.canReply ? quickTicketAction : null}
         labels={data.filterOptions.labels}
