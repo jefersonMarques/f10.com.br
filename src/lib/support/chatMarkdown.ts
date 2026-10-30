@@ -29,6 +29,7 @@ function addText(tokens: ChatMarkdownToken[], text: string): void {
 
 export function safeChatHref(value: string): string | null {
   const href = value.trim();
+  if (!href || href.length > 2048) return null;
 
   if (href.startsWith("/") && !href.startsWith("//") && !href.includes("\\")) {
     return href;
@@ -36,7 +37,9 @@ export function safeChatHref(value: string): string | null {
 
   try {
     const url = new URL(href);
-    return url.protocol === "https:" || url.protocol === "http:"
+    return (url.protocol === "https:" || url.protocol === "http:")
+      && !url.username
+      && !url.password
       ? url.toString()
       : null;
   } catch {
@@ -159,7 +162,7 @@ export function parseChatMarkdown(value: string): ChatMarkdownBlock[] {
       continue;
     }
 
-    const bullet = trimmed.match(/^[-*+]\s+(.+)$/);
+    const bullet = trimmed.match(/^[-*+•]\s+(.+)$/);
     if (bullet) {
       blocks.push({ kind: "bullet", marker: "•", tokens: tokenizeChatMarkdown(bullet[1] ?? "") });
       continue;

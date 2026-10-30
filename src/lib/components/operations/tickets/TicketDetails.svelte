@@ -493,12 +493,12 @@
         {#if activeMainPanel === "conversation"}
           <section class={surface === "page" ? "flex min-h-[720px] flex-col" : "flex min-h-0 flex-1 flex-col"}>
             <div class={surface === "page"
-              ? "flex-1 space-y-3 bg-[var(--app-surface-subtle)] px-4 py-5 sm:px-6"
-              : "min-h-0 flex-1 space-y-2 overflow-y-auto bg-white px-3 py-4 sm:px-6"}>
+              ? "min-w-0 flex-1 space-y-3 bg-[var(--app-surface-subtle)] px-3 py-4 sm:px-5"
+              : "min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto bg-[var(--app-surface-subtle)] px-3 py-4 sm:px-5"}>
               {#each ticketData.details.messages as message}
                 {#if message.authorType === "system"}
-                  <div class="flex justify-center py-1">
-                    <article class="max-w-[88%] rounded-xl bg-[var(--app-surface-muted)] px-3.5 py-2.5 text-center">
+                  <div class="flex min-w-0 justify-center py-1">
+                    <article class="min-w-0 max-w-[95%] rounded-xl bg-[var(--app-surface-muted)] px-3.5 py-2.5 text-center sm:max-w-[84%]">
                       <div class="flex items-center justify-center gap-2 text-[10px] text-[#8B919E]">
                         <strong class="font-semibold text-[#69707F]">Sistema</strong>
                         <span>{formatDateTime(message.createdAt)}</span>
@@ -507,22 +507,22 @@
                     </article>
                   </div>
                 {:else if message.visibility === "internal"}
-                  <div class="flex justify-center py-1">
-                    <article class="w-full max-w-[88%] rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] px-4 py-3">
-                      <div class="flex flex-wrap items-center justify-between gap-2">
-                        <strong class="text-[11px] font-semibold text-[#7B4A1F]">{message.authorUserName ?? "Equipe F10"} · Nota interna</strong>
-                        <span class="text-[10px] text-[#A17D5C]">{formatDateTime(message.createdAt)}</span>
+                  <div class="flex min-w-0 justify-center py-1">
+                    <article class="w-fit min-w-0 max-w-[95%] rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] px-3.5 py-3 sm:max-w-[84%] sm:px-4">
+                      <div class="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <strong class="min-w-0 break-words text-[12px] font-semibold text-[var(--app-warning-text)]">{message.authorUserName ?? "Equipe F10"} · Nota interna</strong>
+                        <span class="ml-auto shrink-0 whitespace-nowrap text-[11px] text-[var(--app-text-muted)]">{formatDateTime(message.createdAt)}</span>
                       </div>
-                      <SupportChatMarkdown text={message.body} className="mt-1.5 text-[var(--app-warning-text)]"/>
+                      <SupportChatMarkdown text={message.body} size="md" className="mt-2 text-[var(--app-warning-text)]"/>
                       {#if message.attachments?.length}
-                        <div class="mt-3 space-y-1.5 border-t border-[#ECDDC8] pt-2">
+                        <div class="mt-3 min-w-0 space-y-2 border-t border-[var(--app-warning-border)] pt-3">
                           {#each message.attachments as attachment}
                             {#if attachment.contentType.startsWith("image/")}
                               <a href={attachment.href} target="_blank" rel="noopener noreferrer" class="block w-fit max-w-full">
                                 <img src={attachment.href} alt={attachment.originalName} loading="lazy" class="max-h-[300px] max-w-full rounded-lg border border-[var(--app-warning-border)] object-contain"/>
                               </a>
                             {:else}
-                              <a href={attachment.href} target="_blank" rel="noopener noreferrer" class="flex min-h-9 items-center gap-2 rounded-lg bg-white px-3 text-[12px] font-semibold text-[#8A4D13]">
+                              <a href={attachment.href} target="_blank" rel="noopener noreferrer" class="flex min-h-9 min-w-0 items-center gap-2 rounded-lg bg-[var(--app-surface)] px-3 text-[12px] font-semibold text-[var(--app-warning-text)]">
                                 <Paperclip size={14} class="shrink-0"/>
                                 <span class="min-w-0 flex-1 truncate">{attachment.originalName}</span>
                                 <span class="text-[11px] font-normal">{formatBytes(attachment.sizeBytes)}</span>
@@ -535,19 +535,19 @@
                     </article>
                   </div>
                 {:else}
-                  <div class={`flex ${message.authorType === "customer" ? "justify-start" : "justify-end"}`}>
-                    <article class={`max-w-[82%] rounded-2xl px-4 py-3 ${message.authorType === "customer" ? "rounded-bl-md bg-[var(--app-surface-muted)]" : "rounded-br-md bg-[var(--app-info-bg)]"}`}>
-                      <div class="flex flex-wrap items-center justify-between gap-x-5 gap-y-1">
-                        <strong class="text-[11px] font-semibold text-[#4A5160]">{message.authorUserName ?? message.customerName ?? "Atendimento F10"}</strong>
-                        <span class="text-[10px] text-[#858C99]">{formatDateTime(message.createdAt)}</span>
+                  <div class={`flex w-full min-w-0 ${message.authorType === "customer" ? "justify-start" : "justify-end"}`}>
+                    <article class={`w-fit min-w-0 max-w-[95%] rounded-2xl px-3.5 py-3 text-left sm:max-w-[84%] sm:px-4 ${message.authorType === "customer" ? "rounded-bl-md bg-[var(--app-surface-muted)]" : "rounded-br-md bg-[var(--app-info-bg)]"}`}>
+                      <div class="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <strong class="min-w-0 break-words text-[12px] font-semibold text-[var(--app-text)]">{message.authorUserName ?? message.customerName ?? "Atendimento F10"}</strong>
+                        <span class="ml-auto shrink-0 whitespace-nowrap text-[11px] text-[var(--app-text-muted)]">{formatDateTime(message.createdAt)}</span>
                       </div>
                       {#if message.channel === "email"}
-                        <EmailMessageBody text={message.body} hasInlineImages={Boolean(message.inlineImages?.length)} className="mt-1.5 text-[14px] leading-[1.6] text-[#343A47]"/>
+                        <EmailMessageBody text={message.body} hasInlineImages={Boolean(message.inlineImages?.length)} className="mt-2 min-w-0 text-[var(--app-text)]"/>
                       {:else}
-                        <SupportChatMarkdown text={message.body} className="mt-1.5 text-[var(--app-text)]"/>
+                        <SupportChatMarkdown text={message.body} size="md" className="mt-2 text-[var(--app-text)]"/>
                       {/if}
                       {#if message.inlineImages?.length}
-                        <div class="mt-3 space-y-2">
+                        <div class="mt-3 min-w-0 space-y-2">
                           {#if message.inlineImages.some((image) => image.external) && !allowedExternalImageMessages.has(message.id)}
                             <button type="button" on:click={() => showExternalImagesForMessage(message.id)} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#DDE1EA] bg-white px-3 text-[12px] font-semibold text-[#000A57]">
                               <FileText size={15}/>Mostrar imagens externas ({message.inlineImages.filter((image) => image.external).length})
@@ -563,7 +563,7 @@
                         </div>
                       {/if}
                       {#if message.attachments?.length}
-                        <div class="mt-3 space-y-1.5 border-t border-[#DDE1EA] pt-3">
+                        <div class="mt-3 min-w-0 space-y-2 border-t border-[var(--app-border)] pt-3">
                           {#each message.attachments as file}
                             {#if file.contentType.startsWith("image/")}
                               <a href={file.href} target="_blank" rel="noopener noreferrer" class="block w-fit max-w-full">
@@ -571,7 +571,7 @@
                                   class="max-h-[360px] max-w-full rounded-lg border border-[var(--app-border)] object-contain"/>
                               </a>
                             {:else}
-                              <a href={file.href} target="_blank" rel="noopener noreferrer" class="flex min-h-9 items-center gap-2 rounded-lg bg-[var(--app-surface)] px-3 text-[12px] font-semibold text-[var(--app-primary)]">
+                              <a href={file.href} target="_blank" rel="noopener noreferrer" class="flex min-h-9 min-w-0 items-center gap-2 rounded-lg bg-[var(--app-surface)] px-3 text-[12px] font-semibold text-[var(--app-primary)]">
                                 <Paperclip size={15} class="shrink-0"/>
                                 <span class="min-w-0 flex-1 truncate">{file.originalName}</span>
                                 <span class="shrink-0 text-[11px] font-normal text-[var(--app-text-muted)]">{formatBytes(file.sizeBytes)}</span>

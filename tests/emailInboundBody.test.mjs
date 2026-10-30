@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { selectInboundEmailBody, visibleEmailHtml } from "../src/lib/server/support/emailInboundBody.ts";
-import { normalizeEmailBodyText, splitEmailConversation } from "../src/lib/support/emailBodyText.ts";
+import { normalizeEmailBodyText, normalizeEmailMarkdown, splitEmailConversation } from "../src/lib/support/emailBodyText.ts";
+import { parseChatMarkdown } from "../src/lib/support/chatMarkdown.ts";
 
 test("rich Brevo email keeps text omitted by extracted Markdown", () => {
   const selected = selectInboundEmailBody({
@@ -89,4 +90,40 @@ test("old malformed quoted tables are placed in the history section", () => {
   const conversation = splitEmailConversation(body);
   assert.equal(conversation.main, "Solicitação concluída.");
   assert.match(conversation.quoted, /Rafael/);
+});
+
+test("sent and received emails render emphasis with the same safe chat Markdown parser", () => {
+  const incoming = String.raw`\\*\\*Importante\\*\\* e \\*urgente\\*
+
+\\- Abra o menu
+\\- Confirme o acesso`;
+  const outgoing = "**Importante** e *urgente*\n\n- Abra o menu\n- Confirme o acesso";
+
+  for (const message of [incoming, outgoing]) {
+    const blocks = parseChatMarkdown(normalizeEmailMarkdown(message));
+    assert.deepEqual(blocks.map((block) => block.kind), [
+      "paragraph", "space", "bullet", "bullet",
+    ]);
+    assert.equal(blocks[0]?.tokens?.[0]?.kind, "strong");
+    assert.equal(blocks[0]?.tokens?.[2]?.kind, "emphasis");
+  }
+});
+
+test("Markdown images in email are displayed only as safe text, never as remote loads", () => {
+  const parsed = normalizeEmailMarkdown("Imagem: ![Comprovante](https://example.com/remote.png)");
+  assert.equal(parsed, "Imagem: Comprovante");
+  assert.equal(parseChatMarkdown(parsed)[0]?.tokens?.filter((token) => token.kind === "link").length, 0);
+
+  const escapedImage = String.raw`!\\[Comprovante\\]\\(https://example.com/remote.png\\)`;
+  assert.equal(normalizeEmailMarkdown(escapedImage), "Comprovante");
+});
+
+test("unsafe links and HTML are not promoted into actionable markup", () => {
+  const text = normalizeEmailMarkdown(
+    '[Abrir](javascript:alert) <script>alert("x")</script> **Atenção**',
+  );
+  const tokens = parseChatMarkdown(text)[0]?.tokens ?? [];
+  assert.equal(tokens.filter((token) => token.kind === "link").length, 0);
+  assert.ok(tokens.some((token) => token.kind === "text" && token.text.includes("<script>")));
+  assert.ok(tokens.some((token) => token.kind === "strong" && token.text === "Atenção"));
 });
