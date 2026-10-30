@@ -24,6 +24,7 @@ import {
   removeTicketFollower,
 } from "$lib/server/support/ticketFollowerRepository";
 import { parseTicketCustomerLinkForm } from "$lib/server/support/ticketCustomerForm";
+import { setTicketCommercialUnit } from "$lib/server/support/ticketCommercialUnitRepository";
 import { isTicketDueDate } from "$lib/server/support/ticketDueDate";
 import {
   addTicketMessage,
@@ -711,6 +712,66 @@ export const actions: Actions = {
         success: false,
         action: "assign",
         message: actionErrorMessage(cause),
+      });
+    }
+  },
+
+  linkCommercialUnit: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, {
+        success: false,
+        action: "linkCommercialUnit",
+        message: "Ticket não encontrado.",
+      });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies,
+      "tickets.reply",
+      `/app/tickets/${params.ticketId}`,
+    );
+    if (!hasPermission(permissions, "customers.view")) {
+      return fail(403, {
+        success: false,
+        action: "linkCommercialUnit",
+        message: "Você não possui acesso aos clientes importados.",
+      });
+    }
+    const formData = await request.formData();
+    const remove = formData.get("operation") === "remove";
+    const unit = formData.get("customerUnitId");
+    if (!remove && (typeof unit !== "string" || !isUuid(unit))) {
+      return fail(400, {
+        success: false,
+        action: "linkCommercialUnit",
+        message: "Selecione uma unidade comercial da lista.",
+      });
+    }
+    try {
+      await setTicketCommercialUnit(
+        session.user.id,
+        permissions,
+        params.ticketId,
+        remove ? null : unit as string,
+      );
+      return {
+        success: true,
+        action: "linkCommercialUnit",
+        message: remove ? "Vínculo comercial removido." : "Unidade comercial vinculada ao ticket.",
+      };
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : "";
+      const invalid = code === "TICKET_COMMERCIAL_UNIT_INVALID"
+        || code === "TICKET_COMMERCIAL_UNIT_NOT_FOUND";
+      console.error("[ticket.commercial_unit.manual_link]", {
+        ticketId: params.ticketId,
+        errorCode: invalid ? code : "FAILED",
+      });
+      return fail(invalid ? 400 : 409, {
+        success: false,
+        action: "linkCommercialUnit",
+        message: invalid
+          ? "Unidade não encontrada entre os contratos importados."
+          : "Não foi possível atualizar o vínculo comercial.",
       });
     }
   },
