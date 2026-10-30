@@ -493,8 +493,8 @@
         {#if activeMainPanel === "conversation"}
           <section class={surface === "page" ? "flex min-h-[720px] flex-col" : "flex min-h-0 flex-1 flex-col"}>
             <div class={surface === "page"
-              ? "min-w-0 flex-1 space-y-3 bg-[var(--app-surface-subtle)] px-3 py-4 sm:px-6"
-              : "min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto bg-[var(--app-surface-subtle)] px-3 py-4 sm:px-6"}>
+              ? "min-w-0 flex-1 space-y-3 bg-[var(--app-surface-subtle)] px-3 py-4 sm:px-5"
+              : "min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto bg-[var(--app-surface-subtle)] px-3 py-4 sm:px-5"}>
               {#each ticketData.details.messages as message}
                 {#if message.authorType === "system"}
                   <div class="flex min-w-0 justify-center py-1">
