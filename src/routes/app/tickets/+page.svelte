@@ -21,6 +21,7 @@
   type BoardStage = BoardWorkflow["stages"][number];
 
   const AREA_EXIT_MESSAGE = "Entre na área e conclua o fluxo antes de movimentar o ticket.";
+  const VIEW_STORAGE_KEY = "f10:tickets:preferred-view";
 
   let scope: TicketScope = data.filters.scope;
   let view: TicketView = data.filters.view;
@@ -96,6 +97,9 @@
   }
 
   function applyFilters(): void {
+    if (browser) {
+      try { localStorage.setItem(VIEW_STORAGE_KEY, view); } catch { /* Preferência indisponível */ }
+    }
     if (status === "resolved" || status === "closed") includeFinished = true;
     if (areaId) {
       workflowId = data.workflowBoard.areaWorkflows.find(
@@ -222,6 +226,17 @@
   }
 
   onMount(() => {
+    if (!new URLSearchParams(window.location.search).has("view")) {
+      try {
+        const saved = localStorage.getItem(VIEW_STORAGE_KEY);
+        if (saved === "split" || saved === "list" || saved === "board") {
+          if (saved !== view) {
+            view = saved;
+            void goto(workspaceUrl(data.pagination.page), { replaceState: true, noScroll: true });
+          }
+        }
+      } catch { /* O navegador pode bloquear preferências locais */ }
+    }
     const refreshWhenVisible = () => {
       if (!document.hidden) void refreshTicketWorkspace();
     };
@@ -284,8 +299,8 @@
 
 <ApplicationContent
   width="full"
-  padding={view === "split" ? "none" : "default"}
-  className={view === "split" ? "bg-white lg:h-[calc(100dvh-var(--application-header-height))] lg:min-h-[540px] lg:overflow-hidden" : ""}
+  padding="none"
+  className="bg-[var(--app-surface)] lg:h-[calc(100dvh-var(--application-header-height))] lg:min-h-[540px] lg:overflow-hidden"
 >
   {#if form?.message}
     <div class={`mb-3 flex items-center gap-2 rounded-xl border px-4 py-3 text-[11px] ${form.success ? "border-[var(--app-success-border)] bg-[var(--app-success-bg)] text-[#176B35]" : "border-[var(--app-danger-border)] bg-[var(--app-danger-bg)] text-[#9B2C2C]"}`}>
@@ -293,9 +308,7 @@
     </div>
   {/if}
 
-  <section class={view === "split"
-    ? "tickets-workspace flex min-h-[540px] flex-col bg-white lg:h-full lg:min-h-0"
-    : "overflow-hidden rounded-[22px] border border-[var(--app-border)] bg-white"}>
+  <section class="tickets-workspace flex min-h-[540px] flex-col bg-[var(--app-surface)] lg:h-full lg:min-h-0">
     <TicketToolbar
       bind:scope
       bind:view
@@ -320,7 +333,7 @@
       onApply={applyFilters}
       onClear={clearFilters}
       onCreate={() => (createOpen = true)}
-      workspace={view === "split"}
+      workspace={true}
     />
 
     {#if data.pagination.total === 0 && scope === "all"}
@@ -357,7 +370,7 @@
         onOpenTicket={openTicketDetails}
       />
     {:else if view === "split"}
-      <div class="grid min-h-[540px] bg-white lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)]">
+      <div class="grid min-h-[540px] bg-white lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(330px,390px)_minmax(0,1fr)]">
         <aside class="flex min-h-[240px] max-h-[38dvh] flex-col overflow-hidden border-b border-[var(--app-border)] bg-white lg:max-h-none lg:min-h-0 lg:border-b-0 lg:border-r">
           <div class="min-h-0 flex-1">
             <TicketList
