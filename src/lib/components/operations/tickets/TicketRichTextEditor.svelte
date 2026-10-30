@@ -226,18 +226,18 @@
 
 <div class="w-full min-w-0" aria-label="Editor visual da resposta">
   <div class="flex items-center gap-1 border-b border-[var(--app-border-soft)] pb-2">
-    <button type="button" on:click={() => formatText("bold")} title="Negrito (Ctrl+B)" aria-label="Negrito"
+    <button type="button" on:mousedown|preventDefault on:click={() => formatText("bold")} title="Negrito (Ctrl+B)" aria-label="Negrito"
       class="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Bold size={16}/></button>
-    <button type="button" on:click={() => formatText("italic")} title="Itálico (Ctrl+I)" aria-label="Itálico"
+    <button type="button" on:mousedown|preventDefault on:click={() => formatText("italic")} title="Itálico (Ctrl+I)" aria-label="Itálico"
       class="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Italic size={16}/></button>
-    <button type="button" on:click={() => formatText("code")} title="Código" aria-label="Código"
+    <button type="button" on:mousedown|preventDefault on:click={() => formatText("code")} title="Código" aria-label="Código"
       class="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Code size={16}/></button>
   </div>
 
   <div bind:this={editor} contenteditable={!disabled && !submitting}
     role="textbox" aria-label="Mensagem formatada" aria-multiline="true" data-placeholder="Escreva uma resposta..."
     on:input={updateEditor} on:keydown={formatShortcut} on:paste={pasteContent}
-    on:drop={dropContent} on:dragover|preventDefault
+    on:drop={dropContent} on:dragover|preventDefault={() => undefined}
     class="ticket-rich-editor mt-2 min-h-[105px] max-h-[320px] w-full overflow-y-auto break-words rounded-lg px-2 py-2 text-[14px] leading-6 text-[var(--app-text)] outline-none focus:ring-1 focus:ring-[var(--app-primary)]"
   ></div>
   <input name="body" type="hidden" value={value}/>
@@ -245,7 +245,7 @@
     {#each files as file (fileKey(file))}
       <span class="application-text-caption inline-flex max-w-[240px] items-center gap-1.5 rounded-lg bg-[var(--app-surface-muted)] px-2.5 py-1.5 text-[var(--app-text)]">
         <Paperclip size={13}/><span class="truncate">{file.name}</span>
-        <button type="button" on:click={() => removeFile(file)} aria-label={\`Remover \${file.name}\`} class="rounded p-0.5 hover:bg-[var(--app-border)]"><X size={13}/></button>
+        <button type="button" on:click={() => removeFile(file)} aria-label={`Remover ${file.name}`} class="rounded p-0.5 hover:bg-[var(--app-border)]"><X size={13}/></button>
       </span>
     {/each}
   </div>
