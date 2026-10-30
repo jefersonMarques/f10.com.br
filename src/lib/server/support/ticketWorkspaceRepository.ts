@@ -228,6 +228,16 @@ export async function listTicketWorkspaceTickets(
       id: tickets.id,
       ticketNumber: tickets.ticketNumber,
       subject: tickets.subject,
+      descriptionPreview: sql<string | null>`(
+        SELECT left(m.body, 600)
+        FROM ticket_messages m
+        WHERE m.ticket_id = ${tickets.id}
+          AND m.visibility = 'public'
+          AND m.author_type = 'customer'
+          AND length(btrim(m.body)) > 0
+        ORDER BY m.created_at ASC
+        LIMIT 1
+      )`,
       status: tickets.status,
       priority: tickets.priority,
       channel: tickets.channel,
