@@ -139,19 +139,18 @@ async function inspect(db, source, apply) {
     );
     if (sessions.length > 0) throw new Error("CHAT_SESSION_ALREADY_LINKED");
 
+    const normalizedBody = (value) => value.replace(/\r\n/g, "\n").trim();
     const sourceDescription = typeof source.action.description === "string"
-      ? source.action.description.trim() : "";
-    if (!sourceDescription || original.body.trim() !== sourceDescription) {
+      ? source.action.description : "";
+    if (!sourceDescription || normalizedBody(original.body) !== normalizedBody(sourceDescription)) {
       throw new Error("SOURCE_BODY_MISMATCH");
     }
     const messages = splitTranscript(original.body);
     const normalized = messages.map((message) =>
       authorFor(
         message,
-        typeof record(source.ticket.clients?.[0]).businessName === "string"
-          ? record(source.ticket.clients[0]).businessName.trim() : "",
-        typeof record(source.ticket.owner).businessName === "string"
-          ? record(source.ticket.owner).businessName.trim() : "",
+        String(record(source.ticket.clients?.[0]).businessName || record(source.ticket.clients?.[0]).name || "").trim(),
+        String(record(source.ticket.owner).businessName || record(source.ticket.owner).name || "").trim(),
         ticket.customer_contact_id,
         ticket.assigned_user_id,
       ),
