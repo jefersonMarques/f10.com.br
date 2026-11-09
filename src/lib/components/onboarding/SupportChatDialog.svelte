@@ -982,7 +982,7 @@
         </div>
       </div>
       <div class="flex items-center gap-1.5">
-        {#if !session}
+        {#if !session && entryDepartment === "support"}
           <button type="button" on:click={() => void requestHumanSupport()} class="hidden rounded-full border border-[#DDE1E9] px-3 py-2 text-[9px] font-semibold text-[#000A57] transition hover:bg-[#F5F6FA] sm:inline-flex">
             Falar com uma pessoa
           </button>
@@ -1056,7 +1056,7 @@
         {/if}
       {:else}
         <div class="space-y-3">
-          {#each guestMessages as message (message.id)}
+          {#each (entryDepartment === "support" ? guestMessages : []) as message (message.id)}
             {#if message.role === "customer"}
               <div class="flex justify-end">
                 <div class="max-w-[84%] rounded-2xl rounded-br-md bg-[#000A57] px-3.5 py-2.5 text-white">
@@ -1073,7 +1073,7 @@
             {/if}
           {/each}
 
-          {#if guestMessages.length <= 3 && !handoffRequested}
+          {#if entryDepartment === "support" && guestMessages.length <= 3 && !handoffRequested}
             <div class="ml-10 space-y-2 pt-1">
               <p class="text-[8px] font-bold uppercase tracking-[0.12em] text-[#9A9FAA]">Opções rápidas</p>
               {#if entryOptionsLoading}
@@ -1093,7 +1093,7 @@
             </div>
           {/if}
 
-          {#if assistantSending}
+          {#if entryDepartment === "support" && assistantSending}
             <div class="flex items-start gap-2">
               <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFF0E4] text-[#EA6D0B]"><Sparkles size={14}/></span>
               <div class="rounded-2xl rounded-tl-md border border-[#E1E4EB] bg-white px-3.5 py-3 text-[#7B8292]"><LoaderCircle class="animate-spin" size={15}/></div>
@@ -1107,7 +1107,7 @@
               {:else if authStep === "login" && !authState.authenticated}
                 <div class="flex items-start gap-2.5">
                   <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><LockKeyhole size={16}/></span>
-                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">Entre para falar com a equipe</h3><p class="mt-1 text-[9px] leading-4 text-[#7B8292]">Use o mesmo e-mail e senha do F10. A senha é validada e não fica armazenada.</p></div>
+                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">{entryDepartment === "finance" ? "Entre para falar com o Financeiro" : "Entre para falar com a equipe"}</h3><p class="mt-1 text-[9px] leading-4 text-[#7B8292]">Use o mesmo e-mail e senha do F10. A senha é validada e não fica armazenada.</p></div>
                 </div>
                 <form class="mt-4 space-y-3" on:submit|preventDefault={submitLogin}>
                   <label class="block text-[9px] font-semibold text-[#596171]">E-mail F10<input bind:value={loginEmail} type="email" required maxlength="254" autocomplete="username" class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] px-3 text-[11px] font-normal outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10"/></label>
@@ -1156,7 +1156,7 @@
         </div>
         <div class="mt-2 flex items-center justify-between gap-2"><span class="text-[8px] text-[#999EAA]">Enter envia · Shift+Enter quebra linha</span><button type="button" on:click={startAnotherChat} class="text-[8px] font-semibold text-[#6D7485] hover:text-[#000A57]">Novo atendimento</button></div>
       </form>
-    {:else}
+    {:else if entryDepartment === "support"}
       <form class="shrink-0 border-t border-[#E6E8EF] bg-white px-3 py-3" on:submit|preventDefault={sendGuestMessage}>
         {#if errorMessage && !handoffRequested}<p class="mb-2 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[9px] leading-4 text-[#9A4E3D]">{errorMessage}</p>{/if}
         <div class="flex items-end gap-2">
