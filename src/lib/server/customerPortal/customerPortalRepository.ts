@@ -295,6 +295,7 @@ export async function getCustomerPortalTicket(contactId: string, ticketId: strin
         and(
           eq(ticketMessages.ticketId, ticket.id),
           eq(ticketMessages.visibility, "public"),
+          sql`coalesce(${ticketMessages.externalMetadata}->>'portalAccessApproved', 'true') <> 'false'`,
         ),
       )
       .orderBy(asc(ticketMessages.createdAt)),
