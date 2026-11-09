@@ -120,7 +120,7 @@
     errorMessage = "";
   }
 
-  async function toggleOpen() {
+  function toggleOpen() {
     errorMessage = "";
 
     if (variant === "support") {
@@ -138,7 +138,7 @@
     selectedDepartment = null;
   }
 
-  async function handleSelectDepartment(dep: Department) {
+  function handleSelectDepartment(dep: Department) {
     errorMessage = "";
 
     if (dep === "sales") {
