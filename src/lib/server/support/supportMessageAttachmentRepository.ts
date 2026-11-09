@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { webChatMessageAttachments } from "$lib/server/db/chatSchema";
 import { ticketMessageAttachments } from "$lib/server/db/supportChatEntrySchema";
@@ -326,6 +326,8 @@ export async function getPublicSupportMessageAttachment(attachmentId: string, ti
       eq(ticketMessageAttachments.id, attachmentId),
       eq(ticketMessageAttachments.ticketId, ticketId),
       eq(ticketMessages.visibility, "public"),
+      sql`coalesce(${ticketMessages.externalMetadata}->>'portalAccessApproved', 'true') <> 'false'`,
+      sql`(${ticketMessages.externalMessageId} IS NULL OR ${ticketMessages.externalMessageId} NOT LIKE 'movidesk:chat:%')`,
     ))
     .limit(1);
   return attachment ?? null;
