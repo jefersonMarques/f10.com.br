@@ -81,9 +81,20 @@ async function inspect(db, apply) {
         message.external_metadata?.sourceChatSessionId !== archive.session_id,
     );
     const remainingInternal = messages.filter((message) => message.visibility === "internal").length;
+    const metadataTypes = messages.reduce((counts, message) => {
+      const metadata = message.external_metadata;
+      const kind = Array.isArray(metadata)
+        ? "array"
+        : metadata === null
+          ? "null"
+          : typeof metadata;
+      counts[kind] = (counts[kind] ?? 0) + 1;
+      return counts;
+    }, {});
     if (!apply) {
       return { ...result("preview", archive.ticket_id, archive.session_id, messages),
-        metadataRequiresRepair: missingProtection };
+        metadataRequiresRepair: missingProtection,
+        metadataTypes };
     }
     if (!missingProtection && remainingInternal === 0) {
       return result("already_updated", archive.ticket_id, archive.session_id, messages);
@@ -92,7 +103,9 @@ async function inspect(db, apply) {
     const updated = await tx.unsafe(
       "UPDATE ticket_messages SET " +
       "visibility = 'public', " +
-      "external_metadata = coalesce(external_metadata, '{}'::jsonb) || " +
+      "external_metadata = (CASE " +
+      "WHEN jsonb_typeof(external_metadata) = 'object' THEN external_metadata " +
+      "ELSE jsonb_build_object('legacyMetadata', external_metadata) END) || " +
       "jsonb_build_object(" +
       "'source', 'movidesk', " +
       "'sourceTicketId', $3::text, " +
@@ -100,14 +113,19 @@ async function inspect(db, apply) {
       "'historical', true, " +
       "'portalAccessApproved', false) " +
       "WHERE ticket_id = $1::uuid AND external_message_id LIKE $2 " +
-      "RETURNING id::text, visibility, external_metadata",
+      "RETURNING id::text, visibility, " +
+      "jsonb_typeof(external_metadata) AS metadata_type, " +
+      "external_metadata->>'portalAccessApproved' AS portal_approval, " +
+      "external_metadata->>'sourceTicketId' AS source_ticket_id, " +
+      "external_metadata->>'sourceChatSessionId' AS source_session_id",
       [archive.ticket_id, MESSAGE_PREFIX + "%", SOURCE_ID, archive.session_id],
     );
     if (updated.length !== EXPECTED_MESSAGES ||
       updated.some((message) => message.visibility !== "public" ||
-        message.external_metadata?.portalAccessApproved !== false ||
-        message.external_metadata?.sourceTicketId !== SOURCE_ID ||
-        message.external_metadata?.sourceChatSessionId !== archive.session_id)) {
+        message.metadata_type !== "object" ||
+        message.portal_approval !== "false" ||
+        message.source_ticket_id !== SOURCE_ID ||
+        message.source_session_id !== archive.session_id)) {
       throw new Error("HISTORICAL_VISIBILITY_REPAIR_FAILED");
     }
 
@@ -115,6 +133,7 @@ async function inspect(db, apply) {
       ...result("updated", archive.ticket_id, archive.session_id, messages, updated.length),
       visibilityChanged: remainingInternal,
       metadataRepaired: missingProtection,
+      previousMetadataTypes: metadataTypes,
     };
   });
 }
