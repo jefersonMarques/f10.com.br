@@ -21,6 +21,7 @@ const SEARCH_FILLER_TERMS = new Set([
   "cadastrar",
   "como",
   "consigo",
+  "configurar",
   "criar",
   "depois",
   "dentro",
