@@ -100,3 +100,12 @@ test("use planned search terms when the follow-up has no explicit topic", () => 
   assert.ok(ranked.some((article) => article.slug === "interface-matricula"));
   assert.ok(!ranked.some((article) => article.slug === "whatsapp"));
 });
+
+test("short product keywords remain searchable without generic wording", () => {
+  const ranked = rankRelevantHelpCandidates("Como configurar Pix?", "pix", [
+    { contentId: "five", slug: "pix", title: "Configurar PIX", summary: "", categoryText: "", rank: 1, score: 1 },
+    { contentId: "six", slug: "crm", title: "Configurar CRM", summary: "", categoryText: "", rank: 2, score: 50 },
+  ]);
+
+  assert.deepEqual(ranked.map((article) => article.slug), ["pix"]);
+});
