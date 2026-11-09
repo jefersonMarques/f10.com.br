@@ -3,13 +3,16 @@ export type PublicChatDepartment = "support" | "finance";
 type ChatEntryRoute = {
   label: string;
   queueCode?: string;
+  teamName?: string | null;
 };
 
 export function isFinancialChatOption(option: ChatEntryRoute): boolean {
-  const searchableText = `${option.label} ${option.queueCode ?? ""}`
-    .normalize("NFD")
+  const teamName = option.teamName
+    ?.normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+    .toLowerCase()
+    .trim();
 
-  return /(?:^|[^a-z])(?:financeir\w*|financ\w*|cobranc\w*)(?:[^a-z]|$)/.test(searchableText);
+  if (!teamName) return false;
+  return /(?:^|[^a-z])financeir\w*(?:[^a-z]|$)/.test(teamName);
 }
