@@ -125,7 +125,7 @@ export const actions: Actions = {
       return fail(400, {
         success: false,
         action: "saveEmailInboxTeam",
-        message: "Selecione uma equipe válida para a caixa de e-mail.",
+        message: "Selecione uma equipe válida para a fila.",
       });
     }
 
@@ -134,13 +134,13 @@ export const actions: Actions = {
       return {
         success: true,
         action: "saveEmailInboxTeam",
-        message: "Equipe da caixa de entrada atualizada. A alteração também vale para tickets existentes.",
+        message: "Equipe da fila atualizada. A alteração também vale para tickets existentes.",
       };
     } catch {
       return fail(400, {
         success: false,
         action: "saveEmailInboxTeam",
-        message: "Não foi possível configurar a equipe desta caixa de e-mail.",
+        message: "Não foi possível configurar a equipe desta fila.",
       });
     }
   },

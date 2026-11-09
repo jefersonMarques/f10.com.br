@@ -160,7 +160,27 @@ export async function buildTicketAccessCondition(
           : sql`false`,
       ) ?? sql`false`;
 
-  return or(followerCondition, restrictedCondition) ?? sql`false`;
+  const serviceQueueAccess = sql`(
+    ${supportQueues.code} NOT IN ('service_nfse', 'service_cell_coin')
+    OR EXISTS (
+      SELECT 1
+      FROM ${userRoles} protected_user_role
+      INNER JOIN ${roles} protected_role ON protected_role.id = protected_user_role.role_id
+      WHERE protected_user_role.user_id = ${userId}
+        AND protected_role.code = 'SUPER_ADMIN'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM ${teamMembers} protected_membership
+      WHERE protected_membership.user_id = ${userId}
+        AND protected_membership.team_id = ${supportQueues.teamId}
+    )
+  )`;
+
+  return and(
+    serviceQueueAccess,
+    or(followerCondition, restrictedCondition) ?? sql`false`,
+  ) ?? sql`false`;
 }
 
 export async function canAccessTicket(

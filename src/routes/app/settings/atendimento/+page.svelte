@@ -81,8 +81,8 @@
     <div class="flex items-start gap-3">
       <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><Users size={18}/></span>
       <div>
-        <h2 class="text-[14px] font-semibold text-[#252C3D]">Equipes das caixas de e-mail</h2>
-        <p class="mt-1 text-[12px] leading-5 text-[#858B99]">Defina quem recebe e pode visualizar os chamados de cada caixa. Vale também para os tickets antigos.</p>
+        <h2 class="text-[14px] font-semibold text-[#252C3D]">Equipes das filas de atendimento</h2>
+        <p class="mt-1 text-[12px] leading-5 text-[#858B99]">Associe cada fila à equipe autorizada. A regra também vale para tickets existentes.</p>
       </div>
     </div>
 
@@ -109,11 +109,11 @@
             <button type="submit" disabled={!inbox.active} class="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white disabled:opacity-40"><Save size={14}/>Salvar</button>
           </form>
         {:else}
-          <p class="text-[12px] text-[#858B99]">Nenhuma caixa configurada.</p>
+          <p class="text-[12px] text-[#858B99]">Nenhuma fila configurada.</p>
         {/each}
       </div>
     {:else}
-      <p class="mt-4 text-[12px] text-[#858B99]">Cadastre uma equipe na página Equipe para configurar as caixas de e-mail.</p>
+      <p class="mt-4 text-[12px] text-[#858B99]">Cadastre uma equipe na página Equipe para configurar as filas.</p>
     {/if}
   </section>
 
