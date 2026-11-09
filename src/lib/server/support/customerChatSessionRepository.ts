@@ -20,6 +20,7 @@ export type ResumedCustomerChatSession = {
 };
 
 export async function resumeActiveCustomerChatSession(input: {
+  requiredQueueId?: string | null;
   customerContext: PublicChatCustomerContext;
   contextUrl: string;
   contextData: Record<string, unknown>;
@@ -49,6 +50,7 @@ export async function resumeActiveCustomerChatSession(input: {
     const [session] = await tx
       .select({
         id: webChatSessions.id,
+        queueId: webChatSessions.queueId,
         chatNumber: webChatSessions.chatNumber,
         aiState: webChatSessions.aiState,
         contextData: webChatSessions.contextData,
@@ -67,6 +69,9 @@ export async function resumeActiveCustomerChatSession(input: {
       .limit(1);
 
     if (!session) return null;
+    if (input.requiredQueueId && session.queueId !== input.requiredQueueId) {
+      throw new Error("CHAT_QUEUE_MISMATCH");
+    }
 
     const nextAiState = session.aiState === "active" ? "escalated" : session.aiState;
     const nextContextData: Record<string, unknown> = {
