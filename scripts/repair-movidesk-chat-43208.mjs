@@ -47,14 +47,19 @@ function splitTranscript(body) {
     }
   }
   if (current) messages.push(current);
-  if (messages.length < MINIMUM_MESSAGES) throw new Error("TRANSCRIPT_PATTERN_NOT_CONFIRMED");
   if (leading.some((line) => !/^(Fuso horário:|Equipe F10|Nota interna)/i.test(line.trim()))) {
     throw new Error("UNRECOGNIZED_TRANSCRIPT_HEADER");
   }
-  if (messages.some((message) => !message.body.trim())) {
-    throw new Error("EMPTY_CHAT_MESSAGE");
+
+  const meaningfulMessages = messages.filter((message) => message.body.trim().length > 0);
+  if (meaningfulMessages.length < MINIMUM_MESSAGES) {
+    throw new Error("TRANSCRIPT_PATTERN_NOT_CONFIRMED");
   }
-  return messages;
+
+  return {
+    messages: meaningfulMessages,
+    emptyEntriesSkipped: messages.length - meaningfulMessages.length,
+  };
 }
 
 function authorFor(message, clientName, ownerName, contactId, ownerId) {
@@ -145,7 +150,7 @@ async function inspect(db, source, apply) {
     if (!sourceDescription || normalizedBody(original.body) !== normalizedBody(sourceDescription)) {
       throw new Error("SOURCE_BODY_MISMATCH");
     }
-    const messages = splitTranscript(original.body);
+    const { messages, emptyEntriesSkipped } = splitTranscript(original.body);
     const normalized = messages.map((message) =>
       authorFor(
         message,
@@ -161,6 +166,7 @@ async function inspect(db, source, apply) {
       ticketNumber: ticket.ticket_number,
       chatOrigin: source.ticket.origin,
       messages: messages.length,
+      emptyEntriesSkipped,
       customers: normalized.filter((message) => message.type === "customer").length,
       operators: normalized.filter((message) => message.type === "user").length,
       system: normalized.filter((message) => message.type === "system").length,
