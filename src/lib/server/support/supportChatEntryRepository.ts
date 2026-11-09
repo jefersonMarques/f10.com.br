@@ -24,11 +24,13 @@ export async function listPublicSupportChatEntryOptions() {
       id: supportChatEntryOptions.id,
       label: supportChatEntryOptions.label,
       queueCode: supportQueues.code,
+      teamName: teams.name,
       description: supportChatEntryOptions.description,
       initialHandling: supportChatEntryOptions.initialHandling,
     })
     .from(supportChatEntryOptions)
     .innerJoin(supportQueues, eq(supportChatEntryOptions.queueId, supportQueues.id))
+    .leftJoin(teams, and(eq(teams.id, supportQueues.teamId), eq(teams.active, true)))
     .where(
       and(
         eq(supportChatEntryOptions.active, true),
