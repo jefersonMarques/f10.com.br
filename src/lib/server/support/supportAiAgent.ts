@@ -4,7 +4,7 @@ import {
   isAiTaskConfigured,
 } from "$lib/server/ai/aiConfigurationRepository";
 import { AI_PROVIDER_DEFINITIONS } from "$lib/server/ai/aiTypes";
-import { runF10Assistant } from "$lib/server/assistant/f10AssistantEngine";
+import { runF10Assistant, type F10AssistantAction } from "$lib/server/assistant/f10AssistantEngine";
 import { getDatabase } from "$lib/server/db";
 import { supportAiRuns } from "$lib/server/db/supportAiSchema";
 import { recordHelpKnowledgeRun } from "$lib/server/help/helpKnowledgeTelemetryRepository";
@@ -22,6 +22,7 @@ export type SupportAiSource = {
 };
 
 export type SupportAiResult = {
+  action: F10AssistantAction;
   runId: string;
   searchEventId: string | null;
   resolution: "answered" | "escalate" | "failed";
@@ -174,6 +175,7 @@ export async function runSupportAi(
     });
 
     return {
+      action: assistant.action,
       runId,
       searchEventId: assistant.searchEventId,
       resolution,
@@ -223,6 +225,7 @@ export async function runSupportAi(
     });
 
     return {
+      action: "clarify",
       runId,
       searchEventId: null,
       resolution: "failed",

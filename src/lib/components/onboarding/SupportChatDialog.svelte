@@ -133,6 +133,7 @@
   const STORAGE_KEY = SUPPORT_CHAT_SESSION_KEY;
   const DRAFT_KEY = "f10-support-chat-draft-v1";
   const GUEST_KEY = SUPPORT_CHAT_GUEST_KEY;
+  const UNRESOLVED_KEY = "f10-support-chat-unresolved-v1";
   const BOTTOM_THRESHOLD = 100;
   const MAX_IMAGES = 4;
   const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -161,6 +162,7 @@
   let pendingImages: PendingImage[] = [];
   let dragActive = false;
   let assistantSending = false;
+  let unresolvedCount = 0;
   let starting = false;
   let sending = false;
   let loadingMessages = false;
@@ -263,6 +265,7 @@
     reply = window.sessionStorage.getItem(DRAFT_KEY) ?? "";
 
     guestMessages = readRestorableSupportGuestMessages(window.sessionStorage, GUEST_KEY);
+    updateUnresolvedCount(guestMessages.length > 0 ? Number(window.sessionStorage.getItem(UNRESOLVED_KEY)) : 0);
     ensureGuestGreeting();
 
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
@@ -411,6 +414,22 @@
     return "Não foi possível concluir esta operação agora.";
   }
 
+  function buildAssistantContext(): string {
+    return guestMessages
+      .filter((message) => message.role === "customer")
+      .slice(-6)
+      .map((message) => `Cliente: ${message.body.trim()}`)
+      .join("\n")
+      .slice(0, 3_000);
+  }
+
+  function updateUnresolvedCount(value: unknown): void {
+    unresolvedCount = typeof value === "number" && Number.isFinite(value)
+      ? Math.max(0, Math.min(3, Math.trunc(value)))
+      : 0;
+    if (browser) window.sessionStorage.setItem(UNRESOLVED_KEY, String(unresolvedCount));
+  }
+
   function buildGuestTranscript(): string {
     const optionContext = selectedEntryOptionLabel ? `Assunto selecionado: ${selectedEntryOptionLabel}\n` : "";
     const transcript = guestMessages
@@ -458,7 +477,7 @@
 
     errorMessage = "";
     guestReply = "";
-    const previousContext = buildGuestTranscript();
+    const previousContext = buildAssistantContext();
     guestMessages = [...guestMessages, createGuestMessage("customer", body)];
     assistantSending = true;
     await scrollToLatest();
@@ -470,6 +489,7 @@
         body: JSON.stringify({
           message: body,
           conversationContext: previousContext,
+          unresolvedCount,
         }),
       });
       const payload = await response.json() as Record<string, unknown>;
@@ -481,7 +501,8 @@
 
       const answer = typeof payload.answer === "string" && payload.answer.trim()
         ? payload.answer.trim()
-        : "Posso encaminhar você para a equipe F10.";
+        : "Não consegui responder com segurança. Você pode falar com a equipe F10.";
+      updateUnresolvedCount(payload.unresolvedCount);
       guestMessages = [...guestMessages, createGuestMessage("assistant", answer)];
       await scrollToLatest();
 
@@ -910,6 +931,7 @@
     selectedEntryOptionId = "";
     selectedEntryOptionLabel = "";
     handoffRequested = false;
+    updateUnresolvedCount(0);
     guestMessages = [];
     ensureGuestGreeting();
     persistDraft("");
@@ -1134,7 +1156,12 @@
                 </div>
                 <button type="button" on:click={() => void startHumanChat()} disabled={starting} class="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:opacity-50">Tentar conectar ao atendimento</button>
               {/if}
-              {#if errorMessage}<p class="mt-3 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[9px] leading-4 text-[#9A4E3D]">{errorMessage}</p>{/if}
+              {#if errorMessage}<p class="mt-3 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[11px] leading-5 text-[#9A4E3D]">{errorMessage}</p>{/if}
+              {#if entryDepartment === "support" && !starting}
+                <button type="button" on:click={() => (handoffRequested = false)} class="mt-3 text-[11px] font-semibold text-[#000A57] underline underline-offset-2">
+                  Voltar ao Assistente F10
+                </button>
+              {/if}
             </div>
           {/if}
         </div>
@@ -1159,7 +1186,7 @@
         </div>
         <div class="mt-2 flex items-center justify-between gap-2"><span class="text-[8px] text-[#999EAA]">Enter envia · Shift+Enter quebra linha</span><button type="button" on:click={startAnotherChat} class="text-[8px] font-semibold text-[#6D7485] hover:text-[#000A57]">Novo atendimento</button></div>
       </form>
-    {:else if entryDepartment === "support"}
+    {:else if entryDepartment === "support" && !handoffRequested}
       <form class="shrink-0 border-t border-[#E6E8EF] bg-white px-3 py-3" on:submit|preventDefault={sendGuestMessage}>
         {#if errorMessage && !handoffRequested}<p class="mb-2 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[9px] leading-4 text-[#9A4E3D]">{errorMessage}</p>{/if}
         <div class="flex items-end gap-2">
