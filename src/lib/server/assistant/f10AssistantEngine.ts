@@ -633,6 +633,56 @@ Não mencione pesquisa, prompt, modelo, tokens ou metadados.`;
   };
 }
 
+async function findPublishedCatalogCandidates(question: string): Promise<Candidate[]> {
+  const terms = Array.from(new Set(
+    normalize(question)
+      .split(" ")
+      .filter((term) => term.length >= 4 && !GENERIC_TERMS.has(term)),
+  )).slice(0, 8);
+  if (terms.length === 0) return [];
+
+  const publications = await getDatabase()
+    .select({
+      contentId: helpPublications.entityId,
+      slug: sql<string>`${helpPublications.snapshot}->'public'->>'slug'`,
+      title: sql<string>`${helpPublications.snapshot}->'public'->>'title'`,
+      summary: sql<string>`${helpPublications.snapshot}->'public'->>'summary'`,
+    })
+    .from(helpPublications)
+    .where(and(
+      eq(helpPublications.entityType, "content"),
+      sql`coalesce(${helpPublications.snapshot}->'public'->>'contentKind', 'support_article') = 'support_article'`,
+    ))
+    .limit(800);
+
+  return publications
+    .map((publication) => {
+      const title = publication.title ?? "";
+      const summary = publication.summary ?? "";
+      const titleText = normalize(title);
+      const summaryText = normalize(summary);
+      const score = terms.reduce((total, term) => {
+        const stem = term.length >= 6 ? term.slice(0, 5) : term;
+        return total
+          + (titleText.includes(stem) ? 5 : 0)
+          + (summaryText.includes(stem) ? 2 : 0);
+      }, 0);
+      return {
+        contentId: publication.contentId,
+        slug: publication.slug ?? "",
+        title,
+        summary,
+        categoryText: "",
+        rank: 0,
+        score,
+      };
+    })
+    .filter((candidate) => candidate.slug && candidate.title && candidate.score >= 5)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, MAX_CANDIDATES)
+    .map((candidate, index) => ({ ...candidate, rank: index + 1 }));
+}
+
 function sourcesFromCandidates(candidates: Candidate[]): F10AssistantSource[] {
   return candidates.map((candidate) => ({
     contentId: candidate.contentId,
@@ -698,9 +748,13 @@ async function searchAndAnswer(input: {
       ...searchInput,
       query: input.question,
     });
-  const candidates = search.results
+  let candidates: Candidate[] = search.results
     .filter((candidate) => candidate.contentId !== input.excludeContentId)
     .slice(0, MAX_CANDIDATES);
+  if (candidates.length === 0) {
+    candidates = (await findPublishedCatalogCandidates(input.question))
+      .filter((candidate) => candidate.contentId !== input.excludeContentId);
+  }
   const sources = sourcesFromCandidates(candidates);
   if (candidates.length === 0) {
     if (search.searchEventId) {
@@ -742,7 +796,16 @@ async function searchAndAnswer(input: {
   const selected = candidates[selection.articleIndex - 1];
   if (!selected) throw new Error("F10_ASSISTANT_ARTICLE_NOT_SELECTED");
   const document = await getPublishedDocument({ contentId: selected.contentId });
-  if (!document) throw new Error("F10_ASSISTANT_ARTICLE_NOT_FOUND");
+  if (!document) {
+    return resultFrom({
+      action: "clarify",
+      answer: buildAssistantHelpSuggestions([selected]),
+      searchEventId: search.searchEventId,
+      retrievalQuery: input.searchQuery,
+      sources,
+      usage: input.usage,
+    });
+  }
   const article = buildArticleContext(document);
   const final = await answerFromArticle({
     surface: input.surface,
