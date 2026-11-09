@@ -7,6 +7,7 @@
   } from "$lib/support/supportChatRestore";
   import { onDestroy, tick } from "svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
+  import { isFinancialChatOption } from "$lib/support/chatEntryRouting";
   import {
     ArrowDown,
     CheckCircle2,
@@ -190,21 +191,26 @@
   $: if (browser && isOpen && !entryOptionsLoaded && !entryOptionsLoading) void refreshEntryOptions();
   $: if (browser && isOpen && restored && initializedDepartment !== entryDepartment) {
     initializedDepartment = entryDepartment;
-    if (entryDepartment === "finance" && !session) {
+    if (entryDepartment === "finance") {
       handoffRequested = true;
       authStep = authState.authenticated
         ? authState.requiresUnitSelection ? "unit" : "ready"
         : "login";
-      if (authStep === "ready") void startHumanChat();
+      if (authStep === "ready" && !session) void startHumanChat();
     } else if (entryDepartment === "support" && !session) {
       handoffRequested = false;
       authStep = "login";
+      selectedEntryOptionId = "";
+      selectedEntryOptionLabel = "";
     }
   }
   $: if (!isOpen) initializedDepartment = null;
   $: if (browser && restored) persistDraft(reply);
   $: if (browser && restored && guestMessages) persistGuestConversation();
   $: selectedUnits = authState.groups.find((group) => group.id === selectedGroupId)?.units ?? [];
+  $: financeSessionMismatch = entryDepartment === "finance"
+    && session !== null
+    && !isFinancialChatOption({ label: session.entryOptionLabel ?? "" });
 
   function initializeAuthState(): void {
     authState = {
@@ -976,7 +982,12 @@
     </header>
 
     <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="min-h-0 flex-1 overflow-y-auto bg-[#F7F8FB] px-4 py-4" aria-live="polite">
-      {#if session}
+      {#if session && (entryDepartment !== "finance" || authState.authenticated)}
+        {#if financeSessionMismatch}
+          <div role="status" class="mb-3 rounded-xl border border-[#F1CFB5] bg-[#FFF8F1] p-3 text-[11px] leading-5 text-[#81512A]">
+            Há um atendimento em andamento em outra fila. Para falar com o Financeiro, solicite a transferência nesta conversa.
+          </div>
+        {/if}
         {#if messages.length === 0 && loadingMessages}
           <div class="flex h-full items-center justify-center text-[#8A909E]"><LoaderCircle class="animate-spin" size={21}/></div>
         {:else}
@@ -1124,7 +1135,7 @@
       <button type="button" on:click={() => void scrollToLatest()} class="absolute bottom-20 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#000A57] px-3 py-2 text-[9px] font-semibold text-white shadow-lg">{newMessageCount} nova{newMessageCount > 1 ? "s" : ""}<ArrowDown size={12}/></button>
     {/if}
 
-    {#if session}
+    {#if session && (entryDepartment !== "finance" || authState.authenticated)}
       <form class={`relative shrink-0 border-t bg-white px-3 py-3 ${dragActive ? "border-[#EA6D0B] ring-2 ring-inset ring-[#EA6D0B]/20" : "border-[#E6E8EF]"}`} on:submit|preventDefault={sendReply} on:dragenter={handleDragEnter} on:dragover={handleDragOver} on:dragleave={handleDragLeave} on:drop={handleDrop}>
         {#if dragActive}<div class="pointer-events-none absolute inset-2 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-[#EA6D0B] bg-[#FFF8F1]/95 text-[10px] font-semibold text-[#B9570A]"><ImageIcon size={16} class="mr-2"/>Solte a imagem para anexar</div>{/if}
         {#if errorMessage}<p class="mb-2 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[9px] leading-4 text-[#9A4E3D]">{errorMessage}</p>{/if}
