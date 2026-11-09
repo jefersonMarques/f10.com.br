@@ -389,6 +389,8 @@
     if (error === "UNIT_NOT_AUTHORIZED") return "Esta unidade não está disponível para sua conta F10.";
     if (error === "UNIT_SELECTION_UNAVAILABLE") return "Não foi possível confirmar sua unidade. Tente novamente.";
     if (error === "CHAT_UNAVAILABLE") return "Não foi possível abrir o atendimento humano agora. Tente novamente.";
+    if (error === "FINANCE_QUEUE_UNAVAILABLE") return "O atendimento financeiro ainda não está configurado. Entre em contato com a equipe F10.";
+    if (error === "CHAT_QUEUE_MISMATCH") return "Já existe uma conversa em outra fila. Finalize esse atendimento antes de iniciar um novo com o Financeiro.";
     if (error === "INVALID_MESSAGE") return "Escreva uma mensagem para iniciar o atendimento.";
     if (error === "HUMAN_HANDOFF_REQUIRED") return "Tente novamente pelo botão Falar com uma pessoa.";
     if (error === "SUPPORT_QUEUE_UNAVAILABLE") return "O atendimento humano está indisponível no momento.";
@@ -611,36 +613,14 @@
       : lastCustomerMessage?.trim() || "Solicito atendimento com a equipe F10.";
 
     try {
-      let entryOptionId = selectedEntryOptionId || null;
-      if (entryDepartment === "finance") {
-        const response = await fetch("/api/support/chat/options", { cache: "no-store" });
-        if (!response.ok) {
-          errorMessage = "Não foi possível consultar o atendimento financeiro. Tente novamente.";
-          return;
-        }
-        const payload = await response.json() as { options?: EntryOption[] };
-        const options = Array.isArray(payload.options) ? payload.options : [];
-        const financeOption = options.find((option) =>
-          /financeir|cobranca/i.test(
-            option.label.normalize("NFD").replace(/[\u0300-\u036f]/g, ""),
-          ),
-        );
-        if (!financeOption) {
-          errorMessage = "O atendimento financeiro ainda não está configurado. Entre em contato com a equipe F10.";
-          return;
-        }
-        entryOptionId = financeOption.id;
-        selectedEntryOptionId = financeOption.id;
-        selectedEntryOptionLabel = financeOption.label;
-      }
-
       const response = await fetch("/api/support/chat/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phone: "",
           message,
-          entryOptionId,
+          entryOptionId: entryDepartment === "support" ? selectedEntryOptionId || null : null,
+          department: entryDepartment,
           contextUrl: browser ? window.location.href : "",
           pageTitle: browser ? document.title : "",
           helpContext: entryDepartment === "finance" ? "Financeiro F10" : "Central de Ajuda F10",
@@ -658,7 +638,9 @@
         }
         const error = typeof payload.error === "string" ? payload.error : "";
         const diagnostic = typeof payload.diagnosticCode === "string" ? payload.diagnosticCode : "";
-        if (error === "CHAT_UNAVAILABLE" && diagnostic === "SUPPORT_QUEUE_UNAVAILABLE") {
+        if (error === "FINANCE_QUEUE_UNAVAILABLE" || error === "CHAT_QUEUE_MISMATCH") {
+          errorMessage = apiErrorMessage(error);
+        } else if (error === "CHAT_UNAVAILABLE" && diagnostic === "SUPPORT_QUEUE_UNAVAILABLE") {
           errorMessage = "A fila de atendimento humano está indisponível. A equipe F10 precisa verificar a configuração.";
         } else if (error === "CHAT_UNAVAILABLE" && diagnostic === "RATE_LIMIT_NOT_CONFIGURED") {
           errorMessage = "O atendimento humano precisa de uma configuração no servidor F10.";
