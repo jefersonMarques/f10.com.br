@@ -51,7 +51,7 @@ function requestsTicketCreation(message: string): boolean {
 
 function requestsHumanSupport(message: string): boolean {
   const normalized = normalizeText(message);
-  return /(?:quero|preciso|gostaria|posso|pode|chama|chamar|falar|conversar).{0,28}(?:atendente|humano|pessoa)|(?:atendente humano|suporte humano|falar com alguem)/i.test(normalized);
+  return /(?:quero|preciso|gostaria|posso|pode|chama|chamar|falar|conversar|transferir|transfira|encaminhar|encaminhe|passar|passe).{0,48}(?:atendente|humano|pessoa|operador|equipe|suporte)|(?:atendente humano|suporte humano|falar com alguem|atendimento humano)/i.test(normalized);
 }
 
 function isGenericSupportRequest(message: string): boolean {
@@ -193,7 +193,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
 
     if (requestsHumanSupport(message)) {
       return json(assistantPayload({
-        answer: "Certo. Vou tentar chamar um atendente da equipe F10 para continuar com você por aqui.",
+        answer: "Para falar com um atendente, confirme seu acesso F10 no formulário abaixo. O encaminhamento acontecerá após a identificação.",
         action: "handoff",
         handoffReason: "O cliente pediu explicitamente atendimento humano.",
         aiAvailable,
@@ -234,7 +234,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
       });
     }
 
-    if (result.resolution === "answered") {
+    if (result.action === "answer" && result.resolution === "answered") {
       return json(assistantPayload({
         answer: result.answer,
         action: "answer",
@@ -254,9 +254,9 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
       }), { headers: { "Cache-Control": "no-store" } });
     }
 
-    if (unresolvedCount >= MAX_UNRESOLVED_COUNT - 1) {
+    if (result.action === "handoff" || unresolvedCount >= MAX_UNRESOLVED_COUNT - 1) {
       return json(assistantPayload({
-        answer: "Não consegui resolver por aqui. Vou encaminhar para a equipe F10 continuar com você.",
+        answer: "Não consegui encontrar uma resposta segura. Para continuar com um atendente, confirme seu acesso F10 no formulário abaixo.",
         action: "handoff",
         handoffReason: result.escalationReason || "O Assistente F10 solicitou atendimento humano.",
         aiAvailable,
