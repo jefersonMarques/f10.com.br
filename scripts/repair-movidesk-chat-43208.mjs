@@ -171,7 +171,7 @@ async function inspect(db, source, apply) {
       operators: normalized.filter((message) => message.type === "user").length,
       system: normalized.filter((message) => message.type === "system").length,
       archivedOriginal: apply,
-      portalVisibility: "internal",
+      portalVisibility: "withheld",
     };
     if (!apply) return summary;
 
@@ -213,7 +213,7 @@ async function inspect(db, source, apply) {
         "ticket_id, author_type, author_user_id, customer_contact_id, " +
         "visibility, channel, body, external_message_id, external_metadata, " +
         "created_at, updated_at) " +
-        "VALUES ($1::uuid, $2, $3::uuid, $4::uuid, 'internal', 'web_chat', " +
+         "VALUES ($1::uuid, $2, $3::uuid, $4::uuid, 'public', 'web_chat', " +
         "$5, $6, $7::jsonb, $8, $8)",
         [
           ticket.id, author.type, author.userId, author.contactId,
