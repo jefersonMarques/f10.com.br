@@ -152,16 +152,14 @@ async function historicalContact(tx, person) {
   throw new Error("SOURCE_CONTACT_CONFLICT");
 }
 
-async function authorFor(tx, action, client, contactId) {
+async function authorFor(tx, action, clients) {
   const person = object(action.createdBy);
-  if (personId(person) && personId(person) === personId(client)) {
-    return { authorType: "customer", userId: null, contactId };
-  }
   if ([1, 3].includes(Number(person.profileType))) {
     const userId = await uniqueAgent(tx, person);
     if (userId) return { authorType: "user", userId, contactId: null };
   }
-  if (Number(person.profileType) === 2) {
+  if (Number(person.profileType) === 2 || clients.some((client) =>
+    personId(client) && personId(client) === personId(person))) {
     return {
       authorType: "customer",
       userId: null,
@@ -171,7 +169,7 @@ async function authorFor(tx, action, client, contactId) {
   return { authorType: "system", userId: null, contactId: null };
 }
 
-async function importActions(tx, ticket, ticketId, client, contactId) {
+async function importActions(tx, ticket, ticketId, clients) {
   let created = 0;
   for (const item of list(ticket.actions)) {
     const action = object(item);
@@ -185,7 +183,7 @@ async function importActions(tx, ticket, ticketId, client, contactId) {
       [personId(ticket), actionId],
     );
     if (existing.length) continue;
-    const author = await authorFor(tx, action, client, contactId);
+    const author = await authorFor(tx, action, clients);
     const createdAt = safeDate(action.createdDate, safeDate(ticket.createdDate, new Date()));
     const sourceVisibility = Number(action.type) === 1 ? "internal" : "public";
     const metadata = {
@@ -227,6 +225,80 @@ async function importActions(tx, ticket, ticketId, client, contactId) {
   return created;
 }
 
+function activeClientPeople(ticket) {
+  const unique = new Map();
+  for (const source of list(ticket.clients)) {
+    const person = object(source);
+    const id = personId(person);
+    if (id && person.isDeleted !== true && !unique.has(id)) {
+      unique.set(id, person);
+    }
+  }
+  for (const sourceAction of list(ticket.actions)) {
+    const author = object(object(sourceAction).createdBy);
+    const id = personId(author);
+    if (id && Number(author.profileType) === 2 && !unique.has(id)) {
+      unique.set(id, author);
+    }
+  }
+  return [...unique.values()];
+}
+
+function primaryClient(ticket, clients) {
+  const byId = new Map(clients.map((person) => [personId(person), person]));
+  const creatorId = personId(ticket.createdBy);
+  if (byId.has(creatorId)) return byId.get(creatorId);
+  const orderedActions = list(ticket.actions)
+    .filter((action) => object(action).isDeleted !== true)
+    .sort((left, right) =>
+      String(object(left).createdDate ?? "").localeCompare(String(object(right).createdDate ?? "")));
+  for (const action of orderedActions) {
+    const authorId = personId(object(action).createdBy);
+    if (byId.has(authorId)) return byId.get(authorId);
+  }
+  return clients.length === 1 ? clients[0] : null;
+}
+
+async function insertParticipant(tx, ticketId, identity) {
+  await tx.unsafe(
+    "INSERT INTO ticket_participants " +
+    "(ticket_id, participant_type, customer_contact_id, user_id, source_system, source_person_id) " +
+    "VALUES ($1::uuid, $2, $3::uuid, $4::uuid, 'movidesk', $5) " +
+    "ON CONFLICT DO NOTHING",
+    [ticketId, identity.type, identity.contactId, identity.userId, identity.sourceId],
+  );
+}
+
+async function importParticipants(tx, ticket, ticketId, clients) {
+  let customerCount = 0;
+  let operatorCount = 0;
+  for (const client of clients) {
+    const contactId = client ? await historicalContact(tx, client) : null;
+    await insertParticipant(tx, ticketId, {
+      type: "customer", contactId, userId: null, sourceId: personId(client),
+    });
+    customerCount += 1;
+  }
+
+  const agents = new Map();
+  for (const person of [ticket.owner, ticket.createdBy,
+    ...list(ticket.actions).map((action) => object(action).createdBy)]) {
+    const agent = object(person);
+    if ([1, 3].includes(Number(agent.profileType)) && personId(agent)) {
+      agents.set(personId(agent), agent);
+    }
+  }
+  for (const agent of agents.values()) {
+    const userId = await uniqueAgent(tx, agent);
+    if (!userId) continue;
+    await insertParticipant(tx, ticketId, {
+      type: "operator", contactId: null, userId, sourceId: personId(agent),
+    });
+    operatorCount += 1;
+  }
+  return { customerCount, operatorCount, unmatchedOperators: agents.size - operatorCount };
+}
+
 async function importTicket(db, ticket, queueId) {
   const id = personId(ticket);
   if (!OPEN_STATUSES.has(trimmed(ticket.baseStatus))) {
@@ -235,11 +307,11 @@ async function importTicket(db, ticket, queueId) {
   if (Number(ticket.origin) === 5) {
     return { id, result: "requires_chat_migration", actions: 0 };
   }
-  const clients = list(ticket.clients).filter((person) => !object(person).isDeleted);
-  if (clients.length !== 1 || !personId(clients[0])) {
+  const clients = activeClientPeople(ticket);
+  if (clients.length === 0) {
     return { id, result: "requires_customer_review", actions: 0 };
   }
-  const client = object(clients[0]);
+  const client = primaryClient(ticket, clients);
   const createdAt = safeDate(ticket.createdDate);
   if (!createdAt) throw new Error("INVALID_CREATED_DATE");
   return db.begin(async (tx) => {
@@ -248,7 +320,7 @@ async function importTicket(db, ticket, queueId) {
       "SELECT ticket_id::text FROM movidesk_ticket_imports WHERE source_ticket_id = $1",
       [id],
     );
-    const contactId = await historicalContact(tx, client);
+    const contactId = client ? await historicalContact(tx, client) : null;
     let ticketId = existing[0]?.ticket_id;
     let result = "history_updated";
     if (!ticketId) {
@@ -276,8 +348,10 @@ async function importTicket(db, ticket, queueId) {
       const event = {
         source: "movidesk",
         sourceTicketId: id,
-        sourceClientId: personId(client),
-        sourceClientEmail: trimmed(client.email) || null,
+        sourceClientId: client ? personId(client) : null,
+        sourceClientEmail: client ? trimmed(client.email) || null : null,
+        sourceClientIds: clients.map(personId),
+        primaryClientRequiresReview: !client,
         sourceOwnerId: personId(ticket.owner),
         sourceStatus: trimmed(ticket.status),
         ownerHistories: list(ticket.ownerHistories),
@@ -292,8 +366,10 @@ async function importTicket(db, ticket, queueId) {
       );
       result = "created";
     }
-    const actions = await importActions(tx, ticket, ticketId, client, contactId);
-    return { id, ticketId, result, actions };
+    const participants = await importParticipants(tx, ticket, ticketId, clients);
+    const actions = await importActions(tx, ticket, ticketId, clients);
+    return { id, ticketId, result, actions, participants,
+      primaryClientRequiresReview: !client };
   });
 }
 
@@ -317,6 +393,10 @@ async function main() {
       );
       if (!rows[0]?.active) throw new Error("QUEUE_NOT_FOUND_OR_INACTIVE");
       if (options.apply && !migration[0].ready) throw new Error("MIGRATION_0103_REQUIRED");
+      const participants = await tx.unsafe(
+        "SELECT to_regclass('public.ticket_participants') IS NOT NULL AS ready",
+      );
+      if (options.apply && !participants[0].ready) throw new Error("MIGRATION_0106_REQUIRED");
       return rows[0];
     });
     const references = await api.discover(options.limit);
@@ -340,7 +420,10 @@ async function main() {
             id: reference.id,
             result: "preview",
             baseStatus: ticket.baseStatus,
-            clients: list(ticket.clients).length,
+            clients: activeClientPeople(ticket).length,
+            primaryClientId: personId(primaryClient(ticket, activeClientPeople(ticket))) || null,
+            requiresPrimaryClientReview:
+              primaryClient(ticket, activeClientPeople(ticket)) === null,
             actions: list(ticket.actions).length,
           });
         }
@@ -362,6 +445,7 @@ async function main() {
       chatsSkipped: results.filter((row) => row.result === "requires_chat_migration").length,
       results,
       notes: [
+        "Multiple historical customer participants are preserved; uncertain primary contacts remain unassigned.",
         "Historical customer contacts have no login email.",
         "All imported messages are internal in F10 pending portal access review.",
         "Original visibility and attachment metadata are preserved.",

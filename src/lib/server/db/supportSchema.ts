@@ -155,6 +155,40 @@ export const tickets = pgTable(
   ],
 );
 
+export const ticketParticipants = pgTable(
+  "ticket_participants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ticketId: uuid("ticket_id").notNull().references(() => tickets.id, { onDelete: "cascade" }),
+    participantType: text("participant_type").$type<"customer" | "operator">().notNull(),
+    customerContactId: uuid("customer_contact_id").references(() => customerContacts.id, {
+      onDelete: "cascade",
+    }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    sourceSystem: text("source_system"),
+    sourcePersonId: text("source_person_id"),
+    addedByUserId: uuid("added_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    addedByContactId: uuid("added_by_contact_id").references(() => customerContacts.id, {
+      onDelete: "set null",
+    }),
+    portalAccessEnabled: boolean("portal_access_enabled").notNull().default(false),
+    notificationsEnabled: boolean("notifications_enabled").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("ticket_participants_customer_unique")
+      .on(table.ticketId, table.customerContactId)
+      .where(sql`${table.customerContactId} IS NOT NULL`),
+    uniqueIndex("ticket_participants_operator_unique")
+      .on(table.ticketId, table.userId)
+      .where(sql`${table.userId} IS NOT NULL`),
+    index("ticket_participants_customer_idx").on(table.customerContactId, table.ticketId),
+    index("ticket_participants_user_idx").on(table.userId, table.ticketId),
+  ],
+);
+
 export const ticketMessages = pgTable(
   "ticket_messages",
   {
