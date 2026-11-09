@@ -152,13 +152,14 @@ async function historicalContact(tx, person) {
   throw new Error("SOURCE_CONTACT_CONFLICT");
 }
 
-async function authorFor(tx, action) {
+async function authorFor(tx, action, clients) {
   const person = object(action.createdBy);
   if ([1, 3].includes(Number(person.profileType))) {
     const userId = await uniqueAgent(tx, person);
     if (userId) return { authorType: "user", userId, contactId: null };
   }
-  if (Number(person.profileType) === 2) {
+  if (Number(person.profileType) === 2 || clients.some((client) =>
+    personId(client) && personId(client) === personId(person))) {
     return {
       authorType: "customer",
       userId: null,
@@ -168,7 +169,7 @@ async function authorFor(tx, action) {
   return { authorType: "system", userId: null, contactId: null };
 }
 
-async function importActions(tx, ticket, ticketId) {
+async function importActions(tx, ticket, ticketId, clients) {
   let created = 0;
   for (const item of list(ticket.actions)) {
     const action = object(item);
@@ -182,7 +183,7 @@ async function importActions(tx, ticket, ticketId) {
       [personId(ticket), actionId],
     );
     if (existing.length) continue;
-    const author = await authorFor(tx, action);
+    const author = await authorFor(tx, action, clients);
     const createdAt = safeDate(action.createdDate, safeDate(ticket.createdDate, new Date()));
     const sourceVisibility = Number(action.type) === 1 ? "internal" : "public";
     const metadata = {
@@ -319,7 +320,7 @@ async function importTicket(db, ticket, queueId) {
       "SELECT ticket_id::text FROM movidesk_ticket_imports WHERE source_ticket_id = $1",
       [id],
     );
-    const contactId = await historicalContact(tx, client);
+    const contactId = client ? await historicalContact(tx, client) : null;
     let ticketId = existing[0]?.ticket_id;
     let result = "history_updated";
     if (!ticketId) {
@@ -366,7 +367,7 @@ async function importTicket(db, ticket, queueId) {
       result = "created";
     }
     const participants = await importParticipants(tx, ticket, ticketId, clients);
-    const actions = await importActions(tx, ticket, ticketId);
+    const actions = await importActions(tx, ticket, ticketId, clients);
     return { id, ticketId, result, actions, participants,
       primaryClientRequiresReview: !client };
   });
