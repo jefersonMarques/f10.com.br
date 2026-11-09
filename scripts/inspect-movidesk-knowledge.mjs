@@ -43,23 +43,23 @@ async function inspectCoverage() {
     SELECT
       count(*)::integer AS imported,
       count(*) FILTER (WHERE c.status = 'draft')::integer AS drafts,
-      count(*) FILTER (WHERE c.status = 'published')::integer AS publishedStatus,
+      count(*) FILTER (WHERE c.status = 'published')::integer AS "publishedStatus",
       count(*) FILTER (WHERE c.status = 'archived')::integer AS archived,
-      count(*) FILTER (WHERE p.entity_id IS NOT NULL)::integer AS publicSnapshots,
-      count(*) FILTER (WHERE p.entity_id IS NOT NULL AND d.content_id IS NOT NULL)::integer AS indexedPublications,
-      count(*) FILTER (WHERE p.entity_id IS NOT NULL AND d.content_id IS NULL)::integer AS missingSearchDocuments,
+      count(*) FILTER (WHERE p.entity_id IS NOT NULL)::integer AS "publicSnapshots",
+      count(*) FILTER (WHERE p.entity_id IS NOT NULL AND d.content_id IS NOT NULL)::integer AS "indexedPublications",
+      count(*) FILTER (WHERE p.entity_id IS NOT NULL AND d.content_id IS NULL)::integer AS "missingSearchDocuments",
       count(*) FILTER (
         WHERE p.entity_id IS NOT NULL
           AND (
             p.snapshot -> 'knowledge' ->> 'version' IS DISTINCT FROM '1'
             OR jsonb_typeof(p.snapshot -> 'knowledge' -> 'fragments') IS DISTINCT FROM 'array'
           )
-      )::integer AS invalidKnowledgeSnapshots,
+      )::integer AS "invalidKnowledgeSnapshots",
       count(*) FILTER (
         WHERE p.entity_id IS NOT NULL
           AND d.content_id IS NOT NULL
           AND btrim(concat_ws(' ', d.public_text, d.assistant_text)) = ''
-      )::integer AS emptyIndexedContent
+      )::integer AS "emptyIndexedContent"
     FROM help_contents c
     LEFT JOIN help_publications p
       ON p.entity_type = 'content'
@@ -77,7 +77,7 @@ async function inspectMissingIndex() {
       c.id,
       c.title,
       c.status,
-      p.published_at AS publishedAt
+      p.published_at AS "publishedAt"
     FROM help_contents c
     JOIN help_publications p
       ON p.entity_type = 'content'
@@ -109,7 +109,7 @@ async function inspectRelatedArticles() {
             ELSE '[]'::jsonb
           END
         ), 0
-      ) AS knowledgeFragments
+      ) AS "knowledgeFragments"
     FROM help_contents c
     LEFT JOIN help_publications p
       ON p.entity_type = 'content'
@@ -147,8 +147,8 @@ try {
   if (
     !infrastructure.migrationApplied
     || !infrastructure.publicationTriggerEnabled
-    || Number(coverage.missingsearchdocuments ?? coverage.missingSearchDocuments) > 0
-    || Number(coverage.invalidknowledgesnapshots ?? coverage.invalidKnowledgeSnapshots) > 0
+    || Number(coverage.missingSearchDocuments) > 0
+    || Number(coverage.invalidKnowledgeSnapshots) > 0
   ) {
     process.exitCode = 1;
   }
