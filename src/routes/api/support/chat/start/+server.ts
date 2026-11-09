@@ -5,7 +5,11 @@ import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/
 import { getDatabase } from "$lib/server/db";
 import { webChatSessions } from "$lib/server/db/chatSchema";
 import { markHelpSearchOutcome } from "$lib/server/help/helpSearchRepository";
-import { listPublicSupportChatEntryOptions } from "$lib/server/support/supportChatEntryRepository";
+import {
+  listPublicSupportChatEntryOptions,
+  resolveSupportChatEntryOption,
+} from "$lib/server/support/supportChatEntryRepository";
+import { isFinancialChatOption, type PublicChatDepartment } from "$lib/support/chatEntryRouting";
 import { resumeActiveCustomerChatSession } from "$lib/server/support/customerChatSessionRepository";
 import {
   addPublicChatMessage,
@@ -50,7 +54,17 @@ function sanitizeContextUrl(value: string): string {
   }
 }
 
-async function resolveEffectiveEntryOptionId(entryOptionId: string | null): Promise<string | null> {
+async function resolveEffectiveEntryOptionId(
+  entryOptionId: string | null,
+  department: PublicChatDepartment,
+): Promise<string | null> {
+  if (department === "finance") {
+    const options = await listPublicSupportChatEntryOptions();
+    const financeOption = options.find(isFinancialChatOption);
+    if (!financeOption) throw new Error("FINANCE_QUEUE_UNAVAILABLE");
+    return financeOption.id;
+  }
+
   if (entryOptionId) return entryOptionId;
   const options = await listPublicSupportChatEntryOptions();
   const preferred = options.find((option) => option.initialHandling === "human") ?? options[0];
@@ -123,6 +137,10 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
   const phone = readString(body.phone);
   const message = readString(body.message);
   const entryOptionId = readString(body.entryOptionId) || null;
+  if (body.department !== undefined && body.department !== "support" && body.department !== "finance") {
+    return json({ error: "INVALID_DEPARTMENT" }, { status: 400 });
+  }
+  const department: PublicChatDepartment = body.department === "finance" ? "finance" : "support";
   const contextUrl = sanitizeContextUrl(readString(body.contextUrl));
   const pageTitle = readString(body.pageTitle).slice(0, 200);
   const helpContext = readString(body.helpContext).slice(0, 200);
@@ -161,17 +179,23 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
     helpContext: helpContext || null,
     authenticatedCustomer: true,
     assistantHandoff: true,
+    department,
     handoffReason: handoffReason || null,
     handoffTranscript: handoffTranscript || null,
   };
 
   try {
     const [effectiveEntryOptionId, availability] = await Promise.all([
-      resolveEffectiveEntryOptionId(entryOptionId),
+      resolveEffectiveEntryOptionId(entryOptionId, department),
       getSupportAvailabilityStatus(),
     ]);
 
+    const requestedQueueId = department === "finance"
+      ? (await resolveSupportChatEntryOption(effectiveEntryOptionId)).queueId
+      : null;
+
     const resumedSession = await resumeActiveCustomerChatSession({
+      requiredQueueId: requestedQueueId,
       customerContext,
       contextUrl,
       contextData: handoffContextData,
@@ -275,6 +299,12 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
       { status: reused ? 200 : 201, headers: { "Cache-Control": "no-store" } },
     );
   } catch (cause) {
+    if (cause instanceof Error && cause.message === "FINANCE_QUEUE_UNAVAILABLE") {
+      return json({ error: "FINANCE_QUEUE_UNAVAILABLE" }, { status: 503 });
+    }
+    if (cause instanceof Error && cause.message === "CHAT_QUEUE_MISMATCH") {
+      return json({ error: "CHAT_QUEUE_MISMATCH" }, { status: 409 });
+    }
     if (cause instanceof Error && cause.message === "CHAT_RATE_LIMITED") {
       return json({ error: "RATE_LIMITED" }, { status: 429 });
     }
