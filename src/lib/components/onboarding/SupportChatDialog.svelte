@@ -7,7 +7,6 @@
   } from "$lib/support/supportChatRestore";
   import { onDestroy, tick } from "svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
-  import { isFinancialChatOption } from "$lib/support/chatEntryRouting";
   import {
     ArrowDown,
     CheckCircle2,
@@ -61,6 +60,7 @@
     expiresAt: string;
     aiState: "active" | "escalated" | "human" | "disabled";
     entryOptionLabel?: string;
+    department?: "support" | "finance";
   };
 
   type ChatAttachment = {
@@ -208,9 +208,8 @@
   $: if (browser && restored) persistDraft(reply);
   $: if (browser && restored && guestMessages) persistGuestConversation();
   $: selectedUnits = authState.groups.find((group) => group.id === selectedGroupId)?.units ?? [];
-  $: financeSessionMismatch = entryDepartment === "finance"
-    && session !== null
-    && !isFinancialChatOption({ label: session.entryOptionLabel ?? "" });
+  $: departmentSessionMismatch = session !== null
+    && (session.department ?? "support") !== entryDepartment;
 
   function initializeAuthState(): void {
     authState = {
@@ -665,6 +664,7 @@
         expiresAt: String(payload.expiresAt ?? ""),
         aiState: (payload.aiState ?? "disabled") as ChatSession["aiState"],
         entryOptionLabel: String(payload.entryOptionLabel ?? selectedEntryOptionLabel ?? ""),
+        department: payload.department === "finance" ? "finance" : "support",
       };
 
       if (!nextSession.sessionId || !nextSession.token || !nextSession.expiresAt) {
@@ -969,7 +969,7 @@
         </span>
         <div class="min-w-0">
           <h2 id="support-chat-title" class="truncate text-[14px] font-semibold text-[#111A30]">
-            {entryDepartment === "finance" ? "Financeiro F10" : session && session.aiState !== "active" ? "Atendimento F10" : "Assistente F10"}
+            {departmentSessionMismatch ? "Atendimento em andamento" : entryDepartment === "finance" ? "Financeiro F10" : session && session.aiState !== "active" ? "Atendimento F10" : "Assistente F10"}
           </h2>
           <div class="mt-0.5 flex items-center gap-1.5 text-[9px] text-[#7D8494]">
             <span class={`h-2 w-2 rounded-full ${session ? "bg-[#38A169]" : "bg-[#EA6D0B]"}`}></span>
@@ -991,9 +991,9 @@
 
     <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="min-h-0 flex-1 overflow-y-auto bg-[#F7F8FB] px-4 py-4" aria-live="polite">
       {#if session && (entryDepartment !== "finance" || authState.authenticated)}
-        {#if financeSessionMismatch}
+        {#if departmentSessionMismatch}
           <div role="status" class="mb-3 rounded-xl border border-[#F1CFB5] bg-[#FFF8F1] p-3 text-[11px] leading-5 text-[#81512A]">
-            Há um atendimento em andamento em outra fila. Para falar com o Financeiro, solicite a transferência nesta conversa.
+            Existe um atendimento em andamento em outro setor. Solicite a transferência nesta conversa antes de continuar.
           </div>
         {/if}
         {#if messages.length === 0 && loadingMessages}
