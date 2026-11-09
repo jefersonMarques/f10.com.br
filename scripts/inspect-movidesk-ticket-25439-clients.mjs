@@ -100,6 +100,22 @@ async function main() {
   const clients = allClients.map(clientSummary);
   const db = postgres(databaseUrl, { max: 1, prepare: false, connect_timeout: 10 });
   try {
+    const actions = (Array.isArray(ticket.actions) ? ticket.actions : []).map((item) => {
+      const action = record(item);
+      const author = record(action.createdBy);
+      return {
+        actionId: action.id ?? null,
+        type: action.type ?? null,
+        createdDate: stringValue(action.createdDate),
+        authorId: sourceId(author),
+        authorName: stringValue(author.businessName) || stringValue(author.name),
+        authorEmail: stringValue(author.email).toLowerCase(),
+        authorProfileType: author.profileType ?? null,
+        matchesClientPositions: clients
+          .filter((client) => client.id && client.id === sourceId(author))
+          .map((client) => client.position),
+      };
+    });
     const f10 = await inspectF10(db, clients);
     console.log(JSON.stringify({
       readOnly: true,
@@ -108,6 +124,9 @@ async function main() {
       subject: stringValue(ticket.subject),
       baseStatus: stringValue(ticket.baseStatus),
       origin: ticket.origin ?? null,
+      sourceCreatedById: sourceId(ticket.createdBy),
+      sourceCreatedDate: stringValue(ticket.createdDate),
+      actions,
       clientsTotal: clients.length,
       activeClients: clients.filter((client) => !client.isDeleted).length,
       clients,
@@ -119,6 +138,7 @@ async function main() {
       decision: "manual_review_required",
       notes: [
         "Multiple Movidesk clients do not establish a head-office/branch relationship.",
+        "Action authors identify actual message participants; the first action author is not necessarily the ticket creator.",
         "Exact name and email matches are candidates only, not identity proof.",
         "No ticket, customer, organization or portal visibility was modified.",
       ],
