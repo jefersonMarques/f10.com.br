@@ -911,6 +911,14 @@
     guestMessages = [];
     ensureGuestGreeting();
     persistDraft("");
+
+    if (entryDepartment === "finance") {
+      handoffRequested = true;
+      authStep = !authState.authenticated
+        ? "login"
+        : authState.requiresUnitSelection ? "unit" : "ready";
+      if (authStep === "ready") void startHumanChat();
+    }
   }
 
   function formatTime(value: string): string {
