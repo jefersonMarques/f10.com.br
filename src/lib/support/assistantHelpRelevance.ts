@@ -27,8 +27,6 @@ const SEARCH_FILLER_TERMS = new Set([
   "dessa",
   "desse",
   "dizer",
-  "dessa",
-  "desse",
   "editar",
   "entender",
   "essa",
