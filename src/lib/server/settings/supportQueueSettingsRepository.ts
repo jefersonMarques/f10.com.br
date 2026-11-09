@@ -1,8 +1,9 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { recordAuditEvent } from "$lib/server/auth/audit";
 import { getDatabase } from "$lib/server/db";
 import { teams } from "$lib/server/db/schema";
 import { supportQueues } from "$lib/server/db/supportSchema";
+import { ticketAreas } from "$lib/server/db/ticketWorkflowSchema";
 
 export async function getSupportQueueTeamSettings() {
   const db = getDatabase();
@@ -124,10 +125,21 @@ export async function updateSupportEmailInboxTeam(
     return;
   }
 
-  await db
-    .update(supportQueues)
-    .set({ teamId, updatedAt: new Date() })
-    .where(eq(supportQueues.id, queueId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(supportQueues)
+      .set({ teamId, updatedAt: new Date() })
+      .where(eq(supportQueues.id, queueId));
+
+    if (queue.code === "service_nfse" || queue.code === "service_cell_coin") {
+      await tx
+        .update(ticketAreas)
+        .set({ teamId, updatedAt: new Date() })
+        .where(sql`${ticketAreas.id} IN (
+          SELECT area_id FROM service_request_routes WHERE queue_id = ${queueId}
+        )`);
+    }
+  });
 
   await recordAuditEvent({
     actorUserId,
