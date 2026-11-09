@@ -1,4 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
+import { buildAssistantHelpSuggestions } from "$lib/support/assistantHelpFallback";
 import {
   AiGatewayError,
   createAiStructuredResponse,
@@ -471,6 +472,7 @@ async function selectArticle(input: {
 Analise a intenção completa da pergunta e compare com título, categorias e resumo dos artigos.
 Não escolha por simples coincidência de palavra. Escolha articleIndex de 1 a ${input.candidates.length} somente quando o artigo realmente puder responder ao que o usuário quer fazer.
 Considere que a pergunta é sobre o F10. Não pergunte “F10 ou serviço externo”.
+Se vários artigos ensinarem variações da mesma tarefa, priorize o mais próximo do objetivo atual e deixe o usuário seguir o passo a passo. Não peça novamente informações que já estão no histórico.
 Se nenhum artigo for compatível, use articleIndex=0 e escreva em reply UMA pergunta curta e específica para melhorar uma próxima pesquisa.
 Não invente domínios, URLs, telas ou procedimentos. Quando escolher um artigo, deixe reply vazio.
 Não responda o procedimento nesta etapa.`;
@@ -678,19 +680,42 @@ async function searchAndAnswer(input: {
   maxOutputTokens: number;
   usage: UsageState;
 }): Promise<F10AssistantResult> {
-  const search = await searchPublishedHelp({
-    query: input.searchQuery,
+  const searchInput = {
     source: searchSourceFor(input.surface),
     actorUserId: input.actorUserId ?? null,
     customerContactId: input.customerContactId ?? null,
     limit: MAX_CANDIDATES,
     includeAssistantKnowledge: true,
-    relevanceMode: "broad",
+    relevanceMode: "broad" as const,
+  };
+  const initialSearch = await searchPublishedHelp({
+    ...searchInput,
+    query: input.searchQuery,
   });
+  const search = initialSearch.results.length > 0 || normalize(input.searchQuery) === normalize(input.question)
+    ? initialSearch
+    : await searchPublishedHelp({
+      ...searchInput,
+      query: input.question,
+    });
   const candidates = search.results
     .filter((candidate) => candidate.contentId !== input.excludeContentId)
     .slice(0, MAX_CANDIDATES);
   const sources = sourcesFromCandidates(candidates);
+  if (candidates.length === 0) {
+    if (search.searchEventId) {
+      await markHelpSearchOutcome(search.searchEventId, { aiAnswered: false });
+    }
+    return resultFrom({
+      action: "clarify",
+      answer: buildAssistantHelpSuggestions([]),
+      searchEventId: search.searchEventId,
+      retrievalQuery: input.searchQuery,
+      sources,
+      usage: input.usage,
+    });
+  }
+
   const selection = await selectArticle({
     surface: input.surface,
     question: input.question,
@@ -706,7 +731,7 @@ async function searchAndAnswer(input: {
     }
     return resultFrom({
       action: "clarify",
-      answer: selection.reply,
+      answer: buildAssistantHelpSuggestions(candidates),
       searchEventId: search.searchEventId,
       retrievalQuery: input.searchQuery,
       sources,
@@ -739,7 +764,9 @@ async function searchAndAnswer(input: {
 
   return resultFrom({
     action: final.response.resolved ? "answer" : "clarify",
-    answer: final.response.answer,
+    answer: final.response.resolved
+      ? final.response.answer
+      : buildAssistantHelpSuggestions([selected]),
     target: final.target,
     searchEventId: search.searchEventId,
     retrievalQuery: input.searchQuery,
