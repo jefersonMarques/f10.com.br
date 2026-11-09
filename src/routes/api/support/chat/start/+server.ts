@@ -67,7 +67,10 @@ async function resolveEffectiveEntryOptionId(
 
   if (entryOptionId) return entryOptionId;
   const options = await listPublicSupportChatEntryOptions();
-  const preferred = options.find((option) => option.initialHandling === "human") ?? options[0];
+  const supportOptions = options.filter((option) => !isFinancialChatOption(option));
+  const preferred = supportOptions.find((option) => option.queueCode === "support")
+    ?? supportOptions.find((option) => option.initialHandling === "human")
+    ?? supportOptions[0];
   return preferred?.id ?? null;
 }
 
