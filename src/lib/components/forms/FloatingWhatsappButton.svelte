@@ -2,7 +2,6 @@
   import { createEventDispatcher, onMount } from "svelte";
   import ArrowRight from "lucide-svelte/icons/arrow-right";
   import LifeBuoy from "lucide-svelte/icons/life-buoy";
-  import MessageCircleMore from "lucide-svelte/icons/message-circle-more";
   import whatsappIconUrl from "$lib/assets/brand/whatsapp-white-icon.svg?url&no-inline";
   import { salesContact } from "$lib/config/contactConfig";
   import { openSupportEventName } from "$lib/support/supportEvents";
@@ -49,6 +48,7 @@
   let isOpen = false;
   let selectedDepartment: Department | null = null;
   let chatOpen = false;
+  let chatDepartment: "support" | "finance" = "support";
   let name = "";
   let phone = "";
   let schoolName = "";
@@ -74,7 +74,8 @@
     });
   }
 
-  function openNativeSupport(): void {
+  function openNativeSupport(department: "support" | "finance" = "support"): void {
+    chatDepartment = department;
     isOpen = false;
     selectedDepartment = null;
     showOnlineHint = false;
@@ -92,15 +93,6 @@
     if (digits.startsWith("55") && digits.length >= 12) return digits;
     if (digits.length === 10 || digits.length === 11) return `55${digits}`;
     return digits;
-  }
-
-  function openWhatsApp(numberRaw: string, message: string) {
-    const targetNumber = toWaMeNumber(numberRaw);
-    if (!targetNumber) return;
-
-    const encodedMessage = encodeURIComponent(message);
-    const whatsAppUrl = `https://wa.me/${targetNumber}?text=${encodedMessage}`;
-    if (typeof window !== "undefined") window.open(whatsAppUrl, "_blank");
   }
 
   function getCurrentPath(): string | undefined {
@@ -151,11 +143,7 @@
       return;
     }
 
-    const currentPath = getCurrentPath() || "/";
-    const msg = `${financeMessage}\n\nPágina: ${currentPath}`;
-    openWhatsApp(financeWhatsAppNumber, msg);
-    isOpen = false;
-    selectedDepartment = null;
+    openNativeSupport("finance");
   }
 
   function normalizePhone(rawPhone: string): string {
@@ -338,11 +326,11 @@
                 type="button"
                 class="group w-full rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-left shadow-sm shadow-slate-900/5 hover:shadow-md hover:shadow-slate-900/10 hover:border-slate-300 transition"
                 on:click={() => handleSelectDepartment("sales")}
-                aria-label="Falar com Vendas"
+                aria-label="Falar com Comercial"
               >
                 <div class="flex items-center justify-between gap-3">
                   <div class="min-w-0">
-                    <p class="text-sm font-semibold text-slate-900">Vendas</p>
+                    <p class="text-sm font-semibold text-slate-900">Comercial</p>
                     <p class="mt-0.5 text-xs text-slate-600">Planos, implantação e demonstração</p>
                   </div>
                   <span class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#EA6D0B]/10 text-[#EA6D0B] group-hover:bg-[#EA6D0B]/15 transition" aria-hidden="true">
@@ -387,7 +375,7 @@
             </div>
 
             <p class="mt-3 text-[10px] text-slate-400 text-center">
-              Vendas abre formulário. Suporte abre o chat F10. Financeiro abre WhatsApp.
+              Comercial usa WhatsApp. Suporte e Financeiro usam o chat F10.
             </p>
           </div>
         {:else if selectedDepartment === "sales"}
@@ -399,7 +387,7 @@
             <div class="flex items-start justify-between gap-3">
               <div class="text-left">
                 <p class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-[3px] text-[11px] font-semibold text-emerald-700">
-                  Atendimento F10 • Vendas
+                  Atendimento F10 • Comercial
                 </p>
 
                 <h3 class="mt-2 text-sm font-semibold text-slate-900">Vamos acelerar seu atendimento 👇</h3>
@@ -502,18 +490,6 @@
         {/if}
       {/if}
 
-      {#if variant === "contact" && !chatOpen}
-        <button
-          type="button"
-          on:click={openNativeSupport}
-          class="flex h-14 w-14 items-center justify-center rounded-full bg-[#000A57] text-white shadow-lg shadow-[#000A57]/25 transition hover:bg-[#111B71] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#000A57]/50 focus-visible:ring-offset-2"
-          aria-label="Abrir chat de suporte F10"
-          title="Conversar com o suporte F10"
-        >
-          <MessageCircleMore size={25} aria-hidden="true" />
-        </button>
-      {/if}
-
       <button
         type="button"
         data-track="1"
@@ -544,4 +520,4 @@
   </div>
 </div>
 
-<SupportChatDialog isOpen={chatOpen} onClose={() => (chatOpen = false)} />
+<SupportChatDialog isOpen={chatOpen} entryDepartment={chatDepartment} onClose={() => (chatOpen = false)} />

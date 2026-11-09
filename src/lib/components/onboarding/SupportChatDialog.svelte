@@ -7,6 +7,7 @@
   } from "$lib/support/supportChatRestore";
   import { onDestroy, tick } from "svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
+  import { isFinancialChatOption } from "$lib/support/chatEntryRouting";
   import {
     ArrowDown,
     CheckCircle2,
@@ -60,6 +61,7 @@
     expiresAt: string;
     aiState: "active" | "escalated" | "human" | "disabled";
     entryOptionLabel?: string;
+    department?: "support" | "finance";
   };
 
   type ChatAttachment = {
@@ -104,6 +106,7 @@
   type EntryOption = {
     id: string;
     label: string;
+    teamName?: string | null;
     description: string;
     initialHandling: "ai" | "human";
   };
@@ -115,6 +118,7 @@
   };
 
   export let isOpen = false;
+  export let entryDepartment: "support" | "finance" = "support";
   export let onClose: () => void = () => undefined;
   export let customerSupport: CustomerSupportContext = {
     authenticated: false,
@@ -171,6 +175,7 @@
   let selectedGroupId = 0;
   let selectedUnitId = 0;
   let authRequiredForSession = false;
+  let initializedDepartment: "support" | "finance" | null = null;
   let authState: AuthState = {
     authenticated: false,
     name: "",
@@ -186,9 +191,27 @@
   $: if (browser) syncPolling(isOpen && !authRequiredForSession, session?.sessionId ?? "");
   $: if (browser) syncStatusPolling(isOpen);
   $: if (browser && isOpen && !entryOptionsLoaded && !entryOptionsLoading) void refreshEntryOptions();
+  $: if (browser && isOpen && restored && initializedDepartment !== entryDepartment) {
+    initializedDepartment = entryDepartment;
+    if (entryDepartment === "finance") {
+      handoffRequested = true;
+      authStep = authState.authenticated
+        ? authState.requiresUnitSelection ? "unit" : "ready"
+        : "login";
+      if (authStep === "ready" && !session) void startHumanChat();
+    } else if (entryDepartment === "support" && !session) {
+      handoffRequested = false;
+      authStep = "login";
+      selectedEntryOptionId = "";
+      selectedEntryOptionLabel = "";
+    }
+  }
+  $: if (!isOpen) initializedDepartment = null;
   $: if (browser && restored) persistDraft(reply);
   $: if (browser && restored && guestMessages) persistGuestConversation();
   $: selectedUnits = authState.groups.find((group) => group.id === selectedGroupId)?.units ?? [];
+  $: departmentSessionMismatch = session !== null
+    && (session.department ?? "support") !== entryDepartment;
 
   function initializeAuthState(): void {
     authState = {
@@ -373,6 +396,8 @@
     if (error === "UNIT_NOT_AUTHORIZED") return "Esta unidade não está disponível para sua conta F10.";
     if (error === "UNIT_SELECTION_UNAVAILABLE") return "Não foi possível confirmar sua unidade. Tente novamente.";
     if (error === "CHAT_UNAVAILABLE") return "Não foi possível abrir o atendimento humano agora. Tente novamente.";
+    if (error === "FINANCE_QUEUE_UNAVAILABLE") return "O atendimento financeiro ainda não está configurado. Entre em contato com a equipe F10.";
+    if (error === "CHAT_QUEUE_MISMATCH") return "Já existe uma conversa em outra fila. Finalize esse atendimento antes de iniciar um novo com o Financeiro.";
     if (error === "INVALID_MESSAGE") return "Escreva uma mensagem para iniciar o atendimento.";
     if (error === "HUMAN_HANDOFF_REQUIRED") return "Tente novamente pelo botão Falar com uma pessoa.";
     if (error === "SUPPORT_QUEUE_UNAVAILABLE") return "O atendimento humano está indisponível no momento.";
@@ -590,7 +615,9 @@
     errorMessage = "";
 
     const lastCustomerMessage = [...guestMessages].reverse().find((message) => message.role === "customer")?.body;
-    const message = lastCustomerMessage?.trim() || "Solicito atendimento com a equipe F10.";
+    const message = entryDepartment === "finance"
+      ? "Solicito atendimento financeiro."
+      : lastCustomerMessage?.trim() || "Solicito atendimento com a equipe F10.";
 
     try {
       const response = await fetch("/api/support/chat/start", {
@@ -599,10 +626,11 @@
         body: JSON.stringify({
           phone: "",
           message,
-          entryOptionId: selectedEntryOptionId || null,
+          entryOptionId: entryDepartment === "support" ? selectedEntryOptionId || null : null,
+          department: entryDepartment,
           contextUrl: browser ? window.location.href : "",
           pageTitle: browser ? document.title : "",
-          helpContext: "Central de Ajuda F10",
+          helpContext: entryDepartment === "finance" ? "Financeiro F10" : "Central de Ajuda F10",
           forceHuman: true,
           handoffTranscript: buildGuestTranscript(),
         }),
@@ -617,7 +645,9 @@
         }
         const error = typeof payload.error === "string" ? payload.error : "";
         const diagnostic = typeof payload.diagnosticCode === "string" ? payload.diagnosticCode : "";
-        if (error === "CHAT_UNAVAILABLE" && diagnostic === "SUPPORT_QUEUE_UNAVAILABLE") {
+        if (error === "FINANCE_QUEUE_UNAVAILABLE" || error === "CHAT_QUEUE_MISMATCH") {
+          errorMessage = apiErrorMessage(error);
+        } else if (error === "CHAT_UNAVAILABLE" && diagnostic === "SUPPORT_QUEUE_UNAVAILABLE") {
           errorMessage = "A fila de atendimento humano está indisponível. A equipe F10 precisa verificar a configuração.";
         } else if (error === "CHAT_UNAVAILABLE" && diagnostic === "RATE_LIMIT_NOT_CONFIGURED") {
           errorMessage = "O atendimento humano precisa de uma configuração no servidor F10.";
@@ -636,6 +666,7 @@
         expiresAt: String(payload.expiresAt ?? ""),
         aiState: (payload.aiState ?? "disabled") as ChatSession["aiState"],
         entryOptionLabel: String(payload.entryOptionLabel ?? selectedEntryOptionLabel ?? ""),
+        department: payload.department === "finance" ? "finance" : "support",
       };
 
       if (!nextSession.sessionId || !nextSession.token || !nextSession.expiresAt) {
@@ -882,6 +913,14 @@
     guestMessages = [];
     ensureGuestGreeting();
     persistDraft("");
+
+    if (entryDepartment === "finance") {
+      handoffRequested = true;
+      authStep = !authState.authenticated
+        ? "login"
+        : authState.requiresUnitSelection ? "unit" : "ready";
+      if (authStep === "ready") void startHumanChat();
+    }
   }
 
   function formatTime(value: string): string {
@@ -932,7 +971,7 @@
         </span>
         <div class="min-w-0">
           <h2 id="support-chat-title" class="truncate text-[14px] font-semibold text-[#111A30]">
-            {session && session.aiState !== "active" ? "Atendimento F10" : "Assistente F10"}
+            {departmentSessionMismatch ? "Atendimento em andamento" : entryDepartment === "finance" ? "Financeiro F10" : session && session.aiState !== "active" ? "Atendimento F10" : "Assistente F10"}
           </h2>
           <div class="mt-0.5 flex items-center gap-1.5 text-[9px] text-[#7D8494]">
             <span class={`h-2 w-2 rounded-full ${session ? "bg-[#38A169]" : "bg-[#EA6D0B]"}`}></span>
@@ -941,7 +980,7 @@
         </div>
       </div>
       <div class="flex items-center gap-1.5">
-        {#if !session}
+        {#if !session && entryDepartment === "support"}
           <button type="button" on:click={() => void requestHumanSupport()} class="hidden rounded-full border border-[#DDE1E9] px-3 py-2 text-[9px] font-semibold text-[#000A57] transition hover:bg-[#F5F6FA] sm:inline-flex">
             Falar com uma pessoa
           </button>
@@ -953,7 +992,12 @@
     </header>
 
     <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="min-h-0 flex-1 overflow-y-auto bg-[#F7F8FB] px-4 py-4" aria-live="polite">
-      {#if session}
+      {#if session && (entryDepartment !== "finance" || authState.authenticated)}
+        {#if departmentSessionMismatch}
+          <div role="status" class="mb-3 rounded-xl border border-[#F1CFB5] bg-[#FFF8F1] p-3 text-[11px] leading-5 text-[#81512A]">
+            Existe um atendimento em andamento em outro setor. Solicite a transferência nesta conversa antes de continuar.
+          </div>
+        {/if}
         {#if messages.length === 0 && loadingMessages}
           <div class="flex h-full items-center justify-center text-[#8A909E]"><LoaderCircle class="animate-spin" size={21}/></div>
         {:else}
@@ -1015,7 +1059,7 @@
         {/if}
       {:else}
         <div class="space-y-3">
-          {#each guestMessages as message (message.id)}
+          {#each (entryDepartment === "support" ? guestMessages : []) as message (message.id)}
             {#if message.role === "customer"}
               <div class="flex justify-end">
                 <div class="max-w-[84%] rounded-2xl rounded-br-md bg-[#000A57] px-3.5 py-2.5 text-white">
@@ -1032,14 +1076,14 @@
             {/if}
           {/each}
 
-          {#if guestMessages.length <= 3 && !handoffRequested}
+          {#if entryDepartment === "support" && guestMessages.length <= 3 && !handoffRequested}
             <div class="ml-10 space-y-2 pt-1">
               <p class="text-[8px] font-bold uppercase tracking-[0.12em] text-[#9A9FAA]">Opções rápidas</p>
               {#if entryOptionsLoading}
                 <div class="py-2 text-[#8A909E]"><LoaderCircle class="animate-spin" size={16}/></div>
               {:else}
                 <div class="flex flex-wrap gap-2">
-                  {#each entryOptions as option}
+                  {#each entryOptions.filter((option) => !isFinancialChatOption(option)) as option}
                     <button type="button" on:click={() => void selectEntryOption(option)} class="rounded-xl border border-[#DDE1E9] bg-white px-3 py-2 text-left text-[9px] font-semibold text-[#3D4556] shadow-sm transition hover:border-[#BFC5D2] hover:text-[#000A57]">
                       {option.label}
                     </button>
@@ -1052,7 +1096,7 @@
             </div>
           {/if}
 
-          {#if assistantSending}
+          {#if entryDepartment === "support" && assistantSending}
             <div class="flex items-start gap-2">
               <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFF0E4] text-[#EA6D0B]"><Sparkles size={14}/></span>
               <div class="rounded-2xl rounded-tl-md border border-[#E1E4EB] bg-white px-3.5 py-3 text-[#7B8292]"><LoaderCircle class="animate-spin" size={15}/></div>
@@ -1066,7 +1110,7 @@
               {:else if authStep === "login" && !authState.authenticated}
                 <div class="flex items-start gap-2.5">
                   <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><LockKeyhole size={16}/></span>
-                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">Entre para falar com a equipe</h3><p class="mt-1 text-[9px] leading-4 text-[#7B8292]">Use o mesmo e-mail e senha do F10. A senha é validada e não fica armazenada.</p></div>
+                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">{entryDepartment === "finance" ? "Entre para falar com o Financeiro" : "Entre para falar com a equipe"}</h3><p class="mt-1 text-[9px] leading-4 text-[#7B8292]">Use o mesmo e-mail e senha do F10. A senha é validada e não fica armazenada.</p></div>
                 </div>
                 <form class="mt-4 space-y-3" on:submit|preventDefault={submitLogin}>
                   <label class="block text-[9px] font-semibold text-[#596171]">E-mail F10<input bind:value={loginEmail} type="email" required maxlength="254" autocomplete="username" class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] px-3 text-[11px] font-normal outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10"/></label>
@@ -1101,7 +1145,7 @@
       <button type="button" on:click={() => void scrollToLatest()} class="absolute bottom-20 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#000A57] px-3 py-2 text-[9px] font-semibold text-white shadow-lg">{newMessageCount} nova{newMessageCount > 1 ? "s" : ""}<ArrowDown size={12}/></button>
     {/if}
 
-    {#if session}
+    {#if session && (entryDepartment !== "finance" || authState.authenticated)}
       <form class={`relative shrink-0 border-t bg-white px-3 py-3 ${dragActive ? "border-[#EA6D0B] ring-2 ring-inset ring-[#EA6D0B]/20" : "border-[#E6E8EF]"}`} on:submit|preventDefault={sendReply} on:dragenter={handleDragEnter} on:dragover={handleDragOver} on:dragleave={handleDragLeave} on:drop={handleDrop}>
         {#if dragActive}<div class="pointer-events-none absolute inset-2 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-[#EA6D0B] bg-[#FFF8F1]/95 text-[10px] font-semibold text-[#B9570A]"><ImageIcon size={16} class="mr-2"/>Solte a imagem para anexar</div>{/if}
         {#if errorMessage}<p class="mb-2 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[9px] leading-4 text-[#9A4E3D]">{errorMessage}</p>{/if}
@@ -1115,7 +1159,7 @@
         </div>
         <div class="mt-2 flex items-center justify-between gap-2"><span class="text-[8px] text-[#999EAA]">Enter envia · Shift+Enter quebra linha</span><button type="button" on:click={startAnotherChat} class="text-[8px] font-semibold text-[#6D7485] hover:text-[#000A57]">Novo atendimento</button></div>
       </form>
-    {:else}
+    {:else if entryDepartment === "support"}
       <form class="shrink-0 border-t border-[#E6E8EF] bg-white px-3 py-3" on:submit|preventDefault={sendGuestMessage}>
         {#if errorMessage && !handoffRequested}<p class="mb-2 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[9px] leading-4 text-[#9A4E3D]">{errorMessage}</p>{/if}
         <div class="flex items-end gap-2">

@@ -60,6 +60,7 @@ jobs:
           node --experimental-strip-types --test tests/ticketRichTextSerialization.test.mjs
           node --experimental-strip-types --test tests/ticketReplyMarkdownEmail.test.mjs
           node --experimental-strip-types --test tests/supportChatRestore.test.mjs
+          node --experimental-strip-types --test tests/chatEntryRouting.test.mjs
           node --experimental-strip-types --test tests/accessPolicies.test.mjs
           node --experimental-strip-types --test tests/nfseRequestStatus.test.mjs
           node --experimental-strip-types --test tests/customerImportFile.test.mjs
