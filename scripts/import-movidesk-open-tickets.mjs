@@ -232,6 +232,9 @@ async function importTicket(db, ticket, queueId) {
   if (!OPEN_STATUSES.has(trimmed(ticket.baseStatus))) {
     return { id, result: "not_open", actions: 0 };
   }
+  if (Number(ticket.origin) === 5) {
+    return { id, result: "requires_chat_migration", actions: 0 };
+  }
   const clients = list(ticket.clients).filter((person) => !object(person).isDeleted);
   if (clients.length !== 1 || !personId(clients[0])) {
     return { id, result: "requires_customer_review", actions: 0 };
@@ -326,6 +329,10 @@ async function main() {
           results.push({ id: reference.id, result: "not_open" });
           continue;
         }
+        if (Number(ticket.origin) === 5) {
+          results.push({ id: reference.id, result: "requires_chat_migration" });
+          continue;
+        }
         if (options.apply) {
           results.push(await importTicket(db, ticket, queue.id));
         } else {
@@ -352,12 +359,14 @@ async function main() {
       created: results.filter((row) => row.result === "created").length,
       updatedHistory: results.filter((row) => row.result === "history_updated").length,
       failed: results.filter((row) => row.result === "failed").length,
+      chatsSkipped: results.filter((row) => row.result === "requires_chat_migration").length,
       results,
       notes: [
         "Historical customer contacts have no login email.",
         "All imported messages are internal in F10 pending portal access review.",
         "Original visibility and attachment metadata are preserved.",
         "Existing ticket statuses are not overwritten on re-import.",
+        "Movidesk chat-origin tickets are excluded until chat history has a dedicated migration.",
         "Run this command again to append new Movidesk actions.",
       ],
     }, null, 2));
