@@ -293,6 +293,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies,
         // Mantido temporariamente para compatibilidade com o componente existente do chat.
         ticketNumber: chatIdentity.chatNumber,
         entryOptionLabel: session.entryOptionLabel,
+        department,
         expiresAt: session.expiresAt.toISOString(),
         aiState: session.aiState,
         outsideSupportHours: availability.isOpen === false,
