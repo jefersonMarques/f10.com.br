@@ -23,6 +23,7 @@ export async function listPublicSupportChatEntryOptions() {
     .select({
       id: supportChatEntryOptions.id,
       label: supportChatEntryOptions.label,
+      queueCode: supportQueues.code,
       description: supportChatEntryOptions.description,
       initialHandling: supportChatEntryOptions.initialHandling,
     })
