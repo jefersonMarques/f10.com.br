@@ -55,6 +55,7 @@ jobs:
         run: |
           node --check scripts/diagnose-brevo-inbound-body.mjs
           node --check scripts/repair-brevo-inbound-body.mjs
+          node --check scripts/inspect-movidesk-knowledge.mjs
           node --experimental-strip-types --test tests/emailInboundBody.test.mjs
           node --experimental-strip-types --test tests/chatMarkdown.test.mjs
           node --experimental-strip-types --test tests/ticketRichTextSerialization.test.mjs
