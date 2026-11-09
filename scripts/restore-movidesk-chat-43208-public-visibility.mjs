@@ -53,7 +53,32 @@ async function inspect(db, apply) {
       [archive.ticket_id, archive.session_id, SOURCE_ID],
     );
     if (messages.length !== EXPECTED_MESSAGES) {
-      throw new Error("UNEXPECTED_IMPORTED_MESSAGE_COUNT");
+      const [diagnostics] = await tx.unsafe(
+        "SELECT " +
+        "count(*) FILTER (WHERE external_message_id LIKE $2) AS source_prefix_count, " +
+        "count(*) FILTER (WHERE external_metadata->>'sourceTicketId' = $3) AS source_metadata_count, " +
+        "count(*) FILTER (WHERE external_metadata->>'sourceChatSessionId' = $4) AS session_metadata_count, " +
+        "count(*) FILTER (WHERE external_metadata->>'sourceTicketId' = $3 " +
+        "AND external_metadata->>'sourceChatSessionId' = $4) AS matching_metadata_count " +
+        "FROM ticket_messages WHERE ticket_id = $1::uuid",
+        [archive.ticket_id, "movidesk:chat:" + SOURCE_ID + ":%", SOURCE_ID, archive.session_id],
+      );
+      return {
+        state: "requires_review",
+        code: "UNEXPECTED_IMPORTED_MESSAGE_COUNT",
+        sourceTicketId: SOURCE_ID,
+        ticketId: archive.ticket_id,
+        sessionId: archive.session_id,
+        expectedMessages: EXPECTED_MESSAGES,
+        matchedMessages: messages.length,
+        diagnostics: {
+          sourcePrefixCount: Number(diagnostics.source_prefix_count),
+          sourceMetadataCount: Number(diagnostics.source_metadata_count),
+          sessionMetadataCount: Number(diagnostics.session_metadata_count),
+          matchingMetadataCount: Number(diagnostics.matching_metadata_count),
+        },
+        changesApplied: 0,
+      };
     }
     for (const message of messages) {
       const metadata = message.external_metadata;
@@ -120,6 +145,7 @@ async function main() {
   try {
     const result = await inspect(db, args.includes("--apply"));
     console.log(JSON.stringify(result, null, 2));
+    if (result.state === "requires_review") process.exitCode = 2;
   } finally {
     await db.end();
   }
