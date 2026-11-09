@@ -25,7 +25,20 @@ function getConfiguration() {
     throw new Error("ASSET_STORAGE_NOT_CONFIGURED");
   }
   const endpoint = new URL(config.endpoint);
-  if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password) {
+  const hostname = endpoint.hostname.toLowerCase();
+  const ipv4 = hostname.match(/^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$/);
+  const octets = ipv4?.slice(1).map(Number);
+  const privateIpv4 = octets?.every((value) => value <= 255) &&
+    (octets[0] === 10 ||
+      octets[0] === 127 ||
+      (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
+      (octets[0] === 192 && octets[1] === 168));
+  const localHostname = hostname === "localhost" || hostname === "[::1]" ||
+    /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(hostname);
+  const localHttp = endpoint.protocol === "http:" && (privateIpv4 || localHostname);
+
+  if ((endpoint.protocol !== "https:" && !localHttp) ||
+      endpoint.username || endpoint.password || endpoint.search || endpoint.hash) {
     throw new Error("INVALID_STORAGE_ENDPOINT");
   }
   return { ...config, endpoint };
