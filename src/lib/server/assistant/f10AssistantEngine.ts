@@ -1,6 +1,10 @@
 import { and, eq, sql } from "drizzle-orm";
 import { buildAssistantHelpSuggestions } from "$lib/support/assistantHelpFallback";
 import {
+  hasRelevantHelpTitle,
+  rankRelevantHelpCandidates,
+} from "$lib/support/assistantHelpRelevance";
+import {
   AiGatewayError,
   createAiStructuredResponse,
   type AiStructuredResponse,
@@ -573,6 +577,7 @@ async function answerFromArticle(input: {
 Leia o artigo inteiro antes de responder e considere a intenção completa da pergunta.
 Use somente o conteúdo recebido como fonte factual sobre o F10. Não invente telas, campos, permissões, regras ou passos.
 Não copie transcrições e não despeje o artigo. Interprete e explique de forma natural, objetiva e útil.
+Se o artigo contiver um procedimento pertinente, explique os passos na ordem documentada e informe o local do procedimento. Não substitua os passos por uma lista genérica de artigos.
 Se o artigo sustentar a resposta, use resolved=true e indique em fragmentIndex o TRECHO que melhor localiza a explicação.
 ${linkRequired ? "Quando resolved=true, inclua naturalmente na resposta o URL exato do TRECHO escolhido em Markdown." : "Como o usuário já está neste artigo, repetir o link da mesma página é opcional."}
 Se o artigo não responder realmente à dúvida, use resolved=false, fragmentIndex=0 e faça UMA pergunta curta e específica. Não aproveite informação lateral apenas para produzir alguma resposta.
@@ -742,19 +747,49 @@ async function searchAndAnswer(input: {
     ...searchInput,
     query: input.searchQuery,
   });
-  const search = initialSearch.results.length > 0 || normalize(input.searchQuery) === normalize(input.question)
-    ? initialSearch
-    : await searchPublishedHelp({
+  let search = initialSearch;
+  let candidates: Candidate[] = rankRelevantHelpCandidates(
+    input.question,
+    input.searchQuery,
+    initialSearch.results,
+  ).filter((candidate) => candidate.contentId !== input.excludeContentId);
+
+  if (
+    !hasRelevantHelpTitle(input.question, input.searchQuery, initialSearch.results)
+    && normalize(input.searchQuery) !== normalize(input.question)
+  ) {
+    const directSearch = await searchPublishedHelp({
       ...searchInput,
       query: input.question,
     });
-  let candidates: Candidate[] = search.results
-    .filter((candidate) => candidate.contentId !== input.excludeContentId)
-    .slice(0, MAX_CANDIDATES);
-  if (candidates.length === 0) {
-    candidates = (await findPublishedCatalogCandidates(input.question))
-      .filter((candidate) => candidate.contentId !== input.excludeContentId);
+    const directCandidates = rankRelevantHelpCandidates(
+      input.question,
+      input.searchQuery,
+      directSearch.results,
+    ).filter((candidate) => candidate.contentId !== input.excludeContentId);
+
+    if (directCandidates.length > 0) {
+      search = directSearch;
+      candidates = directCandidates;
+    }
   }
+
+  if (!hasRelevantHelpTitle(input.question, input.searchQuery, candidates)) {
+    const catalogCandidates = rankRelevantHelpCandidates(
+      input.question,
+      input.searchQuery,
+      await findPublishedCatalogCandidates(input.question),
+    ).filter((candidate) => candidate.contentId !== input.excludeContentId);
+
+    if (
+      hasRelevantHelpTitle(input.question, input.searchQuery, catalogCandidates)
+      || candidates.length === 0
+    ) {
+      candidates = catalogCandidates;
+    }
+  }
+
+  candidates = candidates.slice(0, MAX_CANDIDATES);
   const sources = sourcesFromCandidates(candidates);
   if (candidates.length === 0) {
     if (search.searchEventId) {
@@ -785,7 +820,7 @@ async function searchAndAnswer(input: {
     }
     return resultFrom({
       action: "clarify",
-      answer: buildAssistantHelpSuggestions(candidates),
+      answer: buildAssistantHelpSuggestions([]),
       searchEventId: search.searchEventId,
       retrievalQuery: input.searchQuery,
       sources,
@@ -799,7 +834,7 @@ async function searchAndAnswer(input: {
   if (!document) {
     return resultFrom({
       action: "clarify",
-      answer: buildAssistantHelpSuggestions([selected]),
+      answer: buildAssistantHelpSuggestions([]),
       searchEventId: search.searchEventId,
       retrievalQuery: input.searchQuery,
       sources,
@@ -829,7 +864,7 @@ async function searchAndAnswer(input: {
     action: final.response.resolved ? "answer" : "clarify",
     answer: final.response.resolved
       ? final.response.answer
-      : buildAssistantHelpSuggestions([selected]),
+      : buildAssistantHelpSuggestions([]),
     target: final.target,
     searchEventId: search.searchEventId,
     retrievalQuery: input.searchQuery,

@@ -63,6 +63,7 @@ jobs:
           node --experimental-strip-types --test tests/supportChatRestore.test.mjs
           node --experimental-strip-types --test tests/chatEntryRouting.test.mjs
           node --experimental-strip-types --test tests/assistantHelpFallback.test.mjs
+          node --experimental-strip-types --test tests/assistantHelpRelevance.test.mjs
           node --experimental-strip-types --test tests/accessPolicies.test.mjs
           node --experimental-strip-types --test tests/nfseRequestStatus.test.mjs
           node --experimental-strip-types --test tests/customerImportFile.test.mjs
