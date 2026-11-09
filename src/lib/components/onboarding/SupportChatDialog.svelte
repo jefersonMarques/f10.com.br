@@ -7,6 +7,7 @@
   } from "$lib/support/supportChatRestore";
   import { onDestroy, tick } from "svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
+  import { isFinancialChatOption } from "$lib/support/chatEntryRouting";
   import {
     ArrowDown,
     CheckCircle2,
@@ -105,6 +106,7 @@
   type EntryOption = {
     id: string;
     label: string;
+    teamName?: string | null;
     description: string;
     initialHandling: "ai" | "human";
   };
@@ -1081,7 +1083,7 @@
                 <div class="py-2 text-[#8A909E]"><LoaderCircle class="animate-spin" size={16}/></div>
               {:else}
                 <div class="flex flex-wrap gap-2">
-                  {#each entryOptions as option}
+                  {#each entryOptions.filter((option) => !isFinancialChatOption(option)) as option}
                     <button type="button" on:click={() => void selectEntryOption(option)} class="rounded-xl border border-[#DDE1E9] bg-white px-3 py-2 text-left text-[9px] font-semibold text-[#3D4556] shadow-sm transition hover:border-[#BFC5D2] hover:text-[#000A57]">
                       {option.label}
                     </button>
