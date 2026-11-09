@@ -115,6 +115,7 @@
   };
 
   export let isOpen = false;
+  export let entryDepartment: "support" | "finance" = "support";
   export let onClose: () => void = () => undefined;
   export let customerSupport: CustomerSupportContext = {
     authenticated: false,
@@ -171,6 +172,7 @@
   let selectedGroupId = 0;
   let selectedUnitId = 0;
   let authRequiredForSession = false;
+  let initializedDepartment: "support" | "finance" | null = null;
   let authState: AuthState = {
     authenticated: false,
     name: "",
@@ -186,6 +188,20 @@
   $: if (browser) syncPolling(isOpen && !authRequiredForSession, session?.sessionId ?? "");
   $: if (browser) syncStatusPolling(isOpen);
   $: if (browser && isOpen && !entryOptionsLoaded && !entryOptionsLoading) void refreshEntryOptions();
+  $: if (browser && isOpen && restored && initializedDepartment !== entryDepartment) {
+    initializedDepartment = entryDepartment;
+    if (entryDepartment === "finance" && !session) {
+      handoffRequested = true;
+      authStep = authState.authenticated
+        ? authState.requiresUnitSelection ? "unit" : "ready"
+        : "login";
+      if (authStep === "ready") void startHumanChat();
+    } else if (entryDepartment === "support" && !session) {
+      handoffRequested = false;
+      authStep = "login";
+    }
+  }
+  $: if (!isOpen) initializedDepartment = null;
   $: if (browser && restored) persistDraft(reply);
   $: if (browser && restored && guestMessages) persistGuestConversation();
   $: selectedUnits = authState.groups.find((group) => group.id === selectedGroupId)?.units ?? [];
@@ -590,19 +606,44 @@
     errorMessage = "";
 
     const lastCustomerMessage = [...guestMessages].reverse().find((message) => message.role === "customer")?.body;
-    const message = lastCustomerMessage?.trim() || "Solicito atendimento com a equipe F10.";
+    const message = entryDepartment === "finance"
+      ? "Solicito atendimento financeiro."
+      : lastCustomerMessage?.trim() || "Solicito atendimento com a equipe F10.";
 
     try {
+      let entryOptionId = selectedEntryOptionId || null;
+      if (entryDepartment === "finance") {
+        const response = await fetch("/api/support/chat/options", { cache: "no-store" });
+        if (!response.ok) {
+          errorMessage = "Não foi possível consultar o atendimento financeiro. Tente novamente.";
+          return;
+        }
+        const payload = await response.json() as { options?: EntryOption[] };
+        const options = Array.isArray(payload.options) ? payload.options : [];
+        const financeOption = options.find((option) =>
+          /financeir|cobranca/i.test(
+            option.label.normalize("NFD").replace(/[\u0300-\u036f]/g, ""),
+          ),
+        );
+        if (!financeOption) {
+          errorMessage = "O atendimento financeiro ainda não está configurado. Entre em contato com a equipe F10.";
+          return;
+        }
+        entryOptionId = financeOption.id;
+        selectedEntryOptionId = financeOption.id;
+        selectedEntryOptionLabel = financeOption.label;
+      }
+
       const response = await fetch("/api/support/chat/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phone: "",
           message,
-          entryOptionId: selectedEntryOptionId || null,
+          entryOptionId,
           contextUrl: browser ? window.location.href : "",
           pageTitle: browser ? document.title : "",
-          helpContext: "Central de Ajuda F10",
+          helpContext: entryDepartment === "finance" ? "Financeiro F10" : "Central de Ajuda F10",
           forceHuman: true,
           handoffTranscript: buildGuestTranscript(),
         }),
@@ -932,7 +973,7 @@
         </span>
         <div class="min-w-0">
           <h2 id="support-chat-title" class="truncate text-[14px] font-semibold text-[#111A30]">
-            {session && session.aiState !== "active" ? "Atendimento F10" : "Assistente F10"}
+            {entryDepartment === "finance" ? "Financeiro F10" : session && session.aiState !== "active" ? "Atendimento F10" : "Assistente F10"}
           </h2>
           <div class="mt-0.5 flex items-center gap-1.5 text-[9px] text-[#7D8494]">
             <span class={`h-2 w-2 rounded-full ${session ? "bg-[#38A169]" : "bg-[#EA6D0B]"}`}></span>
