@@ -97,3 +97,55 @@ export async function putStoredObject(key, bytes, contentType) {
   if (!response.ok) throw new Error("ASSET_STORAGE_PUT_" + response.status);
   return { key, size: bytes.byteLength, checksumSha256: bodyHash };
 }
+
+
+export async function getStoredObject(key) {
+  const config = getConfiguration();
+  const url = new URL(config.endpoint);
+  const basePath = url.pathname.replace(/\/$/, "");
+  url.pathname = (basePath + "/" + encodedPath(config.bucket) + "/" + encodedPath(key))
+    .replace(/\/+/g, "/");
+  url.search = "";
+  url.hash = "";
+
+  const isoDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const date = isoDate.slice(0, 8);
+  const bodyHash = sha256(new Uint8Array());
+  const headers = [
+    ["host", url.host],
+    ["x-amz-content-sha256", bodyHash],
+    ["x-amz-date", isoDate],
+  ].sort(([left], [right]) => left.localeCompare(right));
+  const canonicalHeaders = headers.map(([name, value]) => name + ":" + value + "\n").join("");
+  const signedHeaders = headers.map(([name]) => name).join(";");
+  const scope = date + "/" + config.region + "/s3/aws4_request";
+  const canonicalRequest = [
+    "GET", url.pathname, "", canonicalHeaders, signedHeaders, bodyHash,
+  ].join("\n");
+  const stringToSign = [
+    "AWS4-HMAC-SHA256", isoDate, scope, sha256(canonicalRequest),
+  ].join("\n");
+  const dateKey = hmac("AWS4" + config.secretKey, date);
+  const regionKey = hmac(dateKey, config.region);
+  const serviceKey = hmac(regionKey, "s3");
+  const signingKey = hmac(serviceKey, "aws4_request");
+  const signature = createHmac("sha256", signingKey).update(stringToSign).digest("hex");
+
+  const requestHeaders = new Headers({
+    "x-amz-content-sha256": bodyHash,
+    "x-amz-date": isoDate,
+    "Authorization": "AWS4-HMAC-SHA256 Credential=" + config.accessKey + "/" + scope +
+      ", SignedHeaders=" + signedHeaders + ", Signature=" + signature,
+  });
+  const response = await fetch(url, {
+    method: "GET",
+    headers: requestHeaders,
+    redirect: "error",
+    signal: AbortSignal.timeout(120000),
+  });
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new Error("ASSET_STORAGE_GET_" + response.status);
+  }
+  return response;
+}
