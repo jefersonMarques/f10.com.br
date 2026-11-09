@@ -326,11 +326,11 @@
                 type="button"
                 class="group w-full rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-left shadow-sm shadow-slate-900/5 hover:shadow-md hover:shadow-slate-900/10 hover:border-slate-300 transition"
                 on:click={() => handleSelectDepartment("sales")}
-                aria-label="Falar com Vendas"
+                aria-label="Falar com Comercial"
               >
                 <div class="flex items-center justify-between gap-3">
                   <div class="min-w-0">
-                    <p class="text-sm font-semibold text-slate-900">Vendas</p>
+                    <p class="text-sm font-semibold text-slate-900">Comercial</p>
                     <p class="mt-0.5 text-xs text-slate-600">Planos, implantação e demonstração</p>
                   </div>
                   <span class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#EA6D0B]/10 text-[#EA6D0B] group-hover:bg-[#EA6D0B]/15 transition" aria-hidden="true">
@@ -375,7 +375,7 @@
             </div>
 
             <p class="mt-3 text-[10px] text-slate-400 text-center">
-              Comercial segue pelo WhatsApp. Suporte e Financeiro usam o chat F10.
+              Comercial usa WhatsApp. Suporte e Financeiro usam o chat F10.
             </p>
           </div>
         {:else if selectedDepartment === "sales"}
@@ -387,7 +387,7 @@
             <div class="flex items-start justify-between gap-3">
               <div class="text-left">
                 <p class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-[3px] text-[11px] font-semibold text-emerald-700">
-                  Atendimento F10 • Vendas
+                  Atendimento F10 • Comercial
                 </p>
 
                 <h3 class="mt-2 text-sm font-semibold text-slate-900">Vamos acelerar seu atendimento 👇</h3>
