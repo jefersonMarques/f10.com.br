@@ -26,7 +26,7 @@ function getConfiguration() {
   }
   const endpoint = new URL(config.endpoint);
   const hostname = endpoint.hostname.toLowerCase();
-  const ipv4 = hostname.match(/^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$/);
+  const ipv4 = hostname.match(/^([0-9]{1,3})[.]([0-9]{1,3})[.]([0-9]{1,3})[.]([0-9]{1,3})$/);
   const octets = ipv4?.slice(1).map(Number);
   const privateIpv4 = octets?.every((value) => value <= 255) &&
     (octets[0] === 10 ||
