@@ -1,8 +1,7 @@
-import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { chmod, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import archiver from "archiver";
@@ -53,10 +52,6 @@ function optionsFromArgs(args) {
     throw new Error("INVALID_BACKUP_OPTIONS");
   }
   return options;
-}
-
-function digest(bytes) {
-  return createHash("sha256").update(bytes).digest("hex");
 }
 
 function jsonBytes(data) {
@@ -305,6 +300,11 @@ async function exportMedia(assets, folder, options) {
 async function createZip(folder, output) {
   const target = resolve(output);
   const temporary = target + ".partial";
+  const existing = await stat(target).catch((error) => {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  });
+  if (existing) throw new Error("BACKUP_OUTPUT_ALREADY_EXISTS");
   await mkdir(dirname(target), { recursive: true, mode: 0o700 });
   await rm(temporary, { force: true });
   const stream = createWriteStream(temporary, { mode: 0o600, flags: "wx" });
@@ -336,9 +336,28 @@ async function main() {
   const db = postgres(databaseUrl, { max: 1, prepare: false, connect_timeout: 10 });
   try {
     const data = await exportF10(db, folder);
-    const source = options.cachedOnly
-      ? { state: "cached_only", catalogCount: null, detailed: 0, failures: [] }
-      : await exportMovidesk(new MovideskReader(token), folder, data.cachedMovidesk);
+    let source = {
+      state: "cached_only",
+      catalogCount: null,
+      reportedTotal: null,
+      detailed: 0,
+      failures: [],
+    };
+    if (!options.cachedOnly) {
+      try {
+        source = await exportMovidesk(new MovideskReader(token), folder, data.cachedMovidesk);
+      } catch (error) {
+        source = {
+          state: "live_export_failed",
+          catalogCount: null,
+          reportedTotal: null,
+          detailed: 0,
+          failures: [{
+            code: error instanceof Error ? error.message : "UNKNOWN_ERROR",
+          }],
+        };
+      }
+    }
     const media = await exportMedia(data.tables.help_assets, folder, options);
     const failures = source.failures.length +
       media.filter((row) => row.state === "failed" || row.state === "checksum_mismatch").length;
@@ -371,7 +390,7 @@ async function main() {
       complete: !options.cachedOnly && failures === 0 &&
         source.catalogCount === source.detailed &&
         (source.reportedTotal === null || source.reportedTotal === source.catalogCount) &&
-        media.every((row) => row.state === "stored" || row.state === "not_stored"),
+        media.every((row) => row.state === "stored"),
     };
     await saveJson(folder, "inventory.json", inventory);
     await writeFile(join(folder, "README.txt"),
