@@ -3,6 +3,7 @@ import {
   buildAssistantHelpSuggestions,
   buildRelatedHelpSuggestions,
 } from "$lib/support/assistantHelpFallback";
+import { composeHelpEvidence } from "$lib/support/assistantArticleSynthesis";
 import {
   hasRelevantHelpTitle,
   rankRelevantHelpCandidates,
@@ -374,27 +375,16 @@ function buildArticleContext(document: HelpKnowledgeDocument): ArticleContext {
 }
 
 function combineArticleContexts(articles: ArticleContext[]): ArticleContext {
-  const selected = articles.slice(0, MAX_SYNTHESIS_ARTICLES);
-  const first = selected[0];
+  const first = articles[0];
   if (!first) throw new Error("F10_ASSISTANT_ARTICLE_NOT_SELECTED");
 
-  const budgetPerArticle = Math.floor(MAX_SYNTHESIS_CONTEXT_CHARS / selected.length);
-  const fragments = selected.flatMap((article) => {
-    let remaining = budgetPerArticle;
-    return article.fragments.flatMap((fragment) => {
-      if (remaining < 120) return [];
+  const evidence = composeHelpEvidence(
+    articles,
+    MAX_SYNTHESIS_ARTICLES,
+    MAX_SYNTHESIS_CONTEXT_CHARS,
+  );
 
-      const text = trim(fragment.text, remaining);
-      remaining -= text.length;
-      return text ? [{ ...fragment, text }] : [];
-    });
-  });
-
-  return {
-    ...first,
-    title: selected.map((article) => article.title).join(" | "),
-    fragments,
-  };
+  return { ...first, ...evidence };
 }
 
 function planInstructions(surface: F10AssistantSurface): string {
