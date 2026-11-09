@@ -296,6 +296,7 @@ export async function getCustomerPortalTicket(contactId: string, ticketId: strin
           eq(ticketMessages.ticketId, ticket.id),
           eq(ticketMessages.visibility, "public"),
           sql`coalesce(${ticketMessages.externalMetadata}->>'portalAccessApproved', 'true') <> 'false'`,
+          sql`${ticketMessages.externalMessageId} IS NULL OR ${ticketMessages.externalMessageId} NOT LIKE 'movidesk:chat:%'`,
         ),
       )
       .orderBy(asc(ticketMessages.createdAt)),
