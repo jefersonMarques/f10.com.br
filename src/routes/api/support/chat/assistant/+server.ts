@@ -234,6 +234,17 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
       });
     }
 
+    if (result.action === "ticket_offer") {
+      return json(assistantPayload({
+        answer: result.answer,
+        action: "ticket_offer",
+        ticketUrl: "/cliente/chamados/novo",
+        aiAvailable,
+        unresolvedCount: 0,
+        searchEventId: result.searchEventId,
+      }), { headers: { "Cache-Control": "no-store" } });
+    }
+
     if (result.action === "answer" && result.resolution === "answered") {
       return json(assistantPayload({
         answer: result.answer,
