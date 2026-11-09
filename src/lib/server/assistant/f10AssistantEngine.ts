@@ -774,12 +774,19 @@ async function searchAndAnswer(input: {
     }
   }
 
-  if (candidates.length === 0) {
-    candidates = rankRelevantHelpCandidates(
+  if (!hasRelevantHelpTitle(input.question, input.searchQuery, candidates)) {
+    const catalogCandidates = rankRelevantHelpCandidates(
       input.question,
       input.searchQuery,
       await findPublishedCatalogCandidates(input.question),
     ).filter((candidate) => candidate.contentId !== input.excludeContentId);
+
+    if (
+      hasRelevantHelpTitle(input.question, input.searchQuery, catalogCandidates)
+      || candidates.length === 0
+    ) {
+      candidates = catalogCandidates;
+    }
   }
 
   candidates = candidates.slice(0, MAX_CANDIDATES);
