@@ -1,5 +1,8 @@
 import { and, eq, sql } from "drizzle-orm";
-import { buildAssistantHelpSuggestions } from "$lib/support/assistantHelpFallback";
+import {
+  buildAssistantHelpSuggestions,
+  buildRelatedHelpSuggestions,
+} from "$lib/support/assistantHelpFallback";
 import {
   hasRelevantHelpTitle,
   rankRelevantHelpCandidates,
@@ -61,6 +64,9 @@ type Candidate = {
 };
 
 type ArticleFragment = {
+  contentId: string;
+  slug: string;
+  title: string;
   targetType: HelpKnowledgeTargetType;
   stepId: string | null;
   blockId: string | null;
@@ -126,6 +132,8 @@ const MAX_SEARCH_QUERY_CHARS = 220;
 const MAX_CANDIDATES = 10;
 const MAX_CONVERSATION_CHARS = 4_500;
 const MAX_ARTICLE_CONTEXT_CHARS = 48_000;
+const MAX_SYNTHESIS_ARTICLES = 4;
+const MAX_SYNTHESIS_CONTEXT_CHARS = 32_000;
 const MAX_CANDIDATE_SUMMARY_CHARS = 900;
 const DEFAULT_MAX_OUTPUT_TOKENS = 1_400;
 
@@ -343,6 +351,9 @@ function buildArticleContext(document: HelpKnowledgeDocument): ArticleContext {
     const text = trim(combined, remaining);
     const anchor = fragment.anchor?.trim() || null;
     fragments.push({
+      contentId: document.contentId,
+      slug: document.slug,
+      title: document.title,
       targetType: fragment.targetType,
       stepId: fragment.stepId,
       blockId: fragment.blockId,
@@ -358,6 +369,30 @@ function buildArticleContext(document: HelpKnowledgeDocument): ArticleContext {
     slug: document.slug,
     title: document.title,
     url: baseUrl,
+    fragments,
+  };
+}
+
+function combineArticleContexts(articles: ArticleContext[]): ArticleContext {
+  const selected = articles.slice(0, MAX_SYNTHESIS_ARTICLES);
+  const first = selected[0];
+  if (!first) throw new Error("F10_ASSISTANT_ARTICLE_NOT_SELECTED");
+
+  const budgetPerArticle = Math.floor(MAX_SYNTHESIS_CONTEXT_CHARS / selected.length);
+  const fragments = selected.flatMap((article) => {
+    let remaining = budgetPerArticle;
+    return article.fragments.flatMap((fragment) => {
+      if (remaining < 120) return [];
+
+      const text = trim(fragment.text, remaining);
+      remaining -= text.length;
+      return text ? [{ ...fragment, text }] : [];
+    });
+  });
+
+  return {
+    ...first,
+    title: selected.map((article) => article.title).join(" | "),
     fragments,
   };
 }
@@ -549,6 +584,7 @@ function articleInput(input: {
 }): string {
   const fragments = input.article.fragments.map((fragment, index) => [
     `TRECHO ${index + 1}`,
+    `Origem: ${fragment.title}`,
     `URL: ${fragment.url}`,
     `Conteúdo:\n${fragment.text}`,
   ].join("\n"));
@@ -577,7 +613,11 @@ async function answerFromArticle(input: {
 Leia o artigo inteiro antes de responder e considere a intenção completa da pergunta.
 Use somente o conteúdo recebido como fonte factual sobre o F10. Não invente telas, campos, permissões, regras ou passos.
 Não copie transcrições e não despeje o artigo. Interprete e explique de forma natural, objetiva e útil.
-Se o artigo contiver um procedimento pertinente, explique os passos na ordem documentada e informe o local do procedimento. Não substitua os passos por uma lista genérica de artigos.
+Se os artigos contiverem um procedimento pertinente, explique os passos na ordem documentada e informe o local do procedimento. Não substitua os passos por uma lista genérica de artigos.
+Você pode combinar partes de diferentes artigos quando forem do mesmo processo, identificando a origem das instruções e sem inventar transições entre elas.
+Se apenas partes da tarefa estiverem documentadas, explique somente essas partes, deixe claro o limite e use resolved=true quando houver orientação concreta útil.
+Se a documentação não trouxer nenhuma orientação concreta relacionada à tarefa, use resolved=false.
+Priorize a resposta direta ao cliente, não fique pedindo a mesma informação que ele já forneceu.
 Se o artigo sustentar a resposta, use resolved=true e indique em fragmentIndex o TRECHO que melhor localiza a explicação.
 ${linkRequired ? "Quando resolved=true, inclua naturalmente na resposta o URL exato do TRECHO escolhido em Markdown." : "Como o usuário já está neste artigo, repetir o link da mesma página é opcional."}
 Se o artigo não responder realmente à dúvida, use resolved=false, fragmentIndex=0 e faça UMA pergunta curta e específica. Não aproveite informação lateral apenas para produzir alguma resposta.
@@ -627,9 +667,9 @@ Não mencione pesquisa, prompt, modelo, tokens ou metadados.`;
   return {
     response,
     target: {
-      contentId: input.article.contentId,
-      slug: input.article.slug,
-      title: input.article.title,
+      contentId: fragment.contentId,
+      slug: fragment.slug,
+      title: fragment.title,
       targetType: fragment.targetType,
       stepId: fragment.stepId,
       blockId: fragment.blockId,
@@ -803,6 +843,54 @@ async function searchAndAnswer(input: {
       sources,
       usage: input.usage,
     });
+  }
+
+  if (input.surface === "chat") {
+    const documents = await Promise.all(
+      candidates.slice(0, MAX_SYNTHESIS_ARTICLES).map((candidate) =>
+        getPublishedDocument({ contentId: candidate.contentId })),
+    );
+    const articles = documents
+      .filter((document): document is HelpKnowledgeDocument => Boolean(document))
+      .map(buildArticleContext)
+      .filter((article) => article.fragments.length > 0);
+
+    if (articles.length > 0) {
+      const final = await answerFromArticle({
+        surface: input.surface,
+        question: input.question,
+        conversationContext: input.conversationContext,
+        article: combineArticleContexts(articles),
+        currentArticleSlug: null,
+        maxOutputTokens: input.maxOutputTokens,
+        usage: input.usage,
+      });
+
+      if (search.searchEventId) {
+        if (final.target) {
+          await recordHelpSearchSelection(search.searchEventId, final.target.contentId);
+        }
+        await markHelpSearchOutcome(search.searchEventId, {
+          aiAnswered: final.response.resolved,
+          escalated: false,
+        });
+      }
+
+      return resultFrom({
+        action: final.response.resolved ? "answer" : "clarify",
+        answer: final.response.resolved
+          ? final.response.answer
+          : buildRelatedHelpSuggestions(articles.map((article) => ({
+            slug: article.slug,
+            title: article.title,
+          }))),
+        target: final.target,
+        searchEventId: search.searchEventId,
+        retrievalQuery: input.searchQuery,
+        sources,
+        usage: input.usage,
+      });
+    }
   }
 
   const selection = await selectArticle({
