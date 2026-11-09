@@ -6,8 +6,13 @@ type HelpCandidate = {
   score: number;
 };
 
+const SHORT_PRODUCT_TERMS = new Set(["api", "cpf", "crm", "nfe", "pix", "sla"]);
+
 const SEARCH_FILLER_TERMS = new Set([
   "acessar",
+  "agora",
+  "ainda",
+  "antes",
   "ajuda",
   "ajudar",
   "alguem",
@@ -17,11 +22,17 @@ const SEARCH_FILLER_TERMS = new Set([
   "como",
   "consigo",
   "criar",
+  "depois",
+  "dentro",
   "dessa",
   "desse",
   "dizer",
+  "dessa",
+  "desse",
   "editar",
   "entender",
+  "essa",
+  "esse",
   "faco",
   "fazer",
   "f10",
@@ -30,6 +41,8 @@ const SEARCH_FILLER_TERMS = new Set([
   "isso",
   "disto",
   "mesmo",
+  "nova",
+  "novo",
   "nesse",
   "neste",
   "anterior",
@@ -38,15 +51,22 @@ const SEARCH_FILLER_TERMS = new Set([
   "passos",
   "mostrar",
   "onde",
+  "outro",
+  "outra",
+  "para",
   "poderia",
+  "posso",
   "preciso",
   "qual",
+  "porque",
   "quais",
   "quero",
   "realizar",
   "saber",
   "sistema",
   "sobre",
+  "tambem",
+  "tenho",
   "tela",
   "tutorial",
   "usar",
@@ -66,7 +86,9 @@ function extractTopicTerms(value: string): string[] {
   return Array.from(new Set(
     normalizeSearchText(value)
       .split(" ")
-      .filter((term) => term.length >= 4 && !SEARCH_FILLER_TERMS.has(term)),
+      .filter((term) =>
+        (term.length >= 4 || SHORT_PRODUCT_TERMS.has(term))
+        && !SEARCH_FILLER_TERMS.has(term)),
   )).slice(0, 8);
 }
 
@@ -76,7 +98,9 @@ function getTopicTerms(question: string, searchQuery: string): string[] {
 }
 
 function hasMatchingTerm(text: string, term: string): boolean {
-  const stemLength = Math.min(7, Math.max(4, term.length - 1));
+  const stemLength = term.length <= 4
+    ? term.length
+    : Math.min(7, term.length - 1);
   const stem = term.slice(0, stemLength);
 
   return normalizeSearchText(text)
