@@ -58,6 +58,14 @@ async function inspect(tx) {
         WHERE m.external_metadata->>'sourceActionId' IS DISTINCT FROM a.source_action_id::text
       )::integer AS mismatched_metadata_action_ids,
       count(*) FILTER (
+        WHERE (m.external_metadata->>'sourceVisibility' IS NOT NULL
+          AND m.external_metadata->>'sourceVisibility' != a.source_visibility)
+          OR (m.external_metadata->>'sourceTicketId' IS NOT NULL
+          AND m.external_metadata->>'sourceTicketId' != a.source_ticket_id)
+          OR (m.external_metadata->>'sourceActionId' IS NOT NULL
+          AND m.external_metadata->>'sourceActionId' != a.source_action_id::text)
+      )::integer AS conflicting_metadata,
+      count(*) FILTER (
         WHERE a.source_visibility = 'public'
           AND m.external_metadata->>'portalAccessApproved' IS DISTINCT FROM 'false'
       )::integer AS missing_portal_protection
@@ -80,6 +88,7 @@ function summarize(rows) {
     privateVisibilityMismatches: 0,
     invalidSourceMappings: 0,
     missingPortalProtection: 0,
+    conflictingMetadata: 0,
     mappingDiagnostics: {
       externalId: 0,
       ticketId: 0,
@@ -97,6 +106,7 @@ function summarize(rows) {
     ["private_visibility_mismatches", "privateVisibilityMismatches"],
     ["invalid_source_mappings", "invalidSourceMappings"],
     ["missing_portal_protection", "missingPortalProtection"],
+    ["conflicting_metadata", "conflictingMetadata"],
   ];
   for (const row of rows) {
     for (const [source, target] of keys) totals[target] += row[source];
@@ -113,15 +123,56 @@ async function restore(tx) {
   const rows = await inspect(tx);
   const totals = summarize(rows);
   const invalid = totals.privateVisibilityMismatches > 0 ||
-    totals.invalidSourceMappings > 0 ||
-    totals.actions !== totals.sourcePublic + totals.sourceInternal;
+    totals.mappingDiagnostics.externalId > 0 ||
+    totals.mappingDiagnostics.ticketId > 0 ||
+    totals.conflictingMetadata > 0 ||
+    totals.actions !== totals.sourcePublic + totals.sourceInternal ||
+    totals.sourcePublic !== totals.toRestore + totals.alreadyPublic;
   if (invalid) {
     return { state: "blocked_invalid_source_data", readOnly: true, totals, tickets: rows };
   }
 
   if (!apply) {
-    return { state: "preview", readOnly: true, totals, tickets: rows };
+    return {
+      state: "preview",
+      readOnly: true,
+      metadataRequiringRepair: totals.invalidSourceMappings,
+      totals,
+      tickets: rows,
+    };
   }
+
+  const repaired = await tx.unsafe(`
+    UPDATE ticket_messages m
+    SET external_metadata = (
+      CASE
+        WHEN jsonb_typeof(m.external_metadata) = 'object'
+          THEN m.external_metadata
+        ELSE jsonb_build_object('legacyMetadata', m.external_metadata)
+      END
+    ) || jsonb_build_object(
+      'source', 'movidesk',
+      'sourceTicketId', a.source_ticket_id,
+      'sourceActionId', a.source_action_id,
+      'sourceVisibility', a.source_visibility,
+      'historical', true,
+      'portalAccessApproved', false
+    )
+    FROM movidesk_ticket_action_imports a
+    JOIN movidesk_ticket_imports i ON i.source_ticket_id = a.source_ticket_id
+    WHERE a.message_id = m.id
+      AND m.ticket_id = i.ticket_id
+      AND m.external_message_id = (
+        'movidesk:' || a.source_ticket_id || ':' || a.source_action_id
+      )
+      AND (
+        m.external_metadata->>'sourceTicketId' IS DISTINCT FROM a.source_ticket_id
+        OR m.external_metadata->>'sourceActionId' IS DISTINCT FROM a.source_action_id::text
+        OR m.external_metadata->>'sourceVisibility' IS DISTINCT FROM a.source_visibility
+        OR m.external_metadata->>'portalAccessApproved' IS DISTINCT FROM 'false'
+      )
+    RETURNING m.id
+  `);
 
   const updated = await tx.unsafe(`
     UPDATE ticket_messages m
@@ -145,28 +196,10 @@ async function restore(tx) {
     throw new Error("VISIBILITY_UPDATE_COUNT_MISMATCH");
   }
 
-  const repaired = await tx.unsafe(`
-    UPDATE ticket_messages m
-    SET external_metadata = jsonb_set(
-      CASE WHEN jsonb_typeof(m.external_metadata) = 'object'
-        THEN m.external_metadata ELSE '{}'::jsonb END,
-      '{portalAccessApproved}',
-      'false'::jsonb,
-      true
-    )
-    FROM movidesk_ticket_action_imports a
-    JOIN movidesk_ticket_imports i ON i.source_ticket_id = a.source_ticket_id
-    WHERE a.message_id = m.id
-      AND m.ticket_id = i.ticket_id
-      AND a.source_visibility = 'public'
-      AND m.visibility = 'public'
-      AND m.external_metadata->>'portalAccessApproved' IS DISTINCT FROM 'false'
-    RETURNING m.id
-  `);
-
   const after = summarize(await inspect(tx));
   if (after.toRestore !== 0 || after.privateVisibilityMismatches !== 0 ||
-      after.invalidSourceMappings !== 0 || after.missingPortalProtection !== 0) {
+      after.invalidSourceMappings !== 0 || after.missingPortalProtection !== 0 ||
+      after.conflictingMetadata !== 0) {
     throw new Error("VISIBILITY_POSTCHECK_FAILED");
   }
 
@@ -174,7 +207,7 @@ async function restore(tx) {
     state: "updated",
     readOnly: false,
     updatedMessages: updated.length,
-    repairedProtection: repaired.length,
+    repairedMetadata: repaired.length,
     notificationsSent: 0,
     totals: after,
   };
