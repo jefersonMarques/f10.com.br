@@ -85,42 +85,113 @@ class MovideskApi {
   }
 }
 
-async function discover(api) {
-  const unique = new Map();
-  const coverage = [];
-  for (const route of ROUTES) {
-    for (const status of STATUSES) {
-      let complete = false;
-      let count = 0;
-      for (let page = 0; page < 1000; page += 1) {
-        const rows = await api.get(route, {
-          $select: "id,baseStatus,lastUpdate,origin",
-          $filter: "baseStatus eq '" + status + "'",
-          $orderby: "lastUpdate desc,id desc",
-          $top: PAGE_SIZE,
-          $skip: page * PAGE_SIZE,
-        });
-        if (!Array.isArray(rows) || rows.length > PAGE_SIZE) throw new Error("INVALID_SOURCE_LIST");
-        for (const row of rows) {
-          const id = String(row?.id ?? "");
-          if (!/^\d+$/.test(id) || row.baseStatus !== status) throw new Error("INVALID_SOURCE_ROW");
-          if (!unique.has(id)) unique.set(id, { sourceId: id, route, status, origin: row.origin });
-        }
-        count += rows.length;
-        if (rows.length < PAGE_SIZE) {
-          complete = true;
-          break;
-        }
-        if ((page + 1) % 10 === 0) {
-          console.log(JSON.stringify({ phase: "discovery", route, status, pages: page + 1, rows: count }));
-        }
+function validateDiscoveryCheckpoint(checkpoint) {
+  const cursor = checkpoint?.cursor;
+  if (checkpoint?.version !== 1 ||
+      !Array.isArray(checkpoint.tickets) ||
+      !Array.isArray(checkpoint.coverage) ||
+      !Number.isSafeInteger(cursor?.routeIndex) ||
+      !Number.isSafeInteger(cursor?.statusIndex) ||
+      !Number.isSafeInteger(cursor?.page) ||
+      !Number.isSafeInteger(cursor?.rows) ||
+      cursor.routeIndex < 0 || cursor.routeIndex > ROUTES.length ||
+      cursor.statusIndex < 0 || cursor.statusIndex >= STATUSES.length ||
+      cursor.page < 0 || cursor.page > 1000 || cursor.rows < 0) {
+    throw new Error("INVALID_DISCOVERY_CHECKPOINT");
+  }
+
+  const ids = new Set();
+  for (const reference of checkpoint.tickets) {
+    const id = String(reference?.sourceId ?? "");
+    if (!/^\d+$/.test(id) || ids.has(id) ||
+        !ROUTES.includes(reference.route) ||
+        !STATUSES.includes(reference.status)) {
+      throw new Error("INVALID_DISCOVERY_CHECKPOINT_RECORD");
+    }
+    ids.add(id);
+  }
+}
+
+async function discover(api, checkpointPath) {
+  const checkpoint = existsSync(checkpointPath)
+    ? JSON.parse(readFileSync(checkpointPath, "utf8"))
+    : {
+        version: 1,
+        createdAt: new Date().toISOString(),
+        coverage: [],
+        tickets: [],
+        cursor: { routeIndex: 0, statusIndex: 0, page: 0, rows: 0 },
+      };
+  validateDiscoveryCheckpoint(checkpoint);
+
+  const unique = new Map(checkpoint.tickets.map((ticket) => [ticket.sourceId, ticket]));
+  while (checkpoint.cursor.routeIndex < ROUTES.length) {
+    const cursor = checkpoint.cursor;
+    const route = ROUTES[cursor.routeIndex];
+    const status = STATUSES[cursor.statusIndex];
+    if (cursor.page >= 1000) throw new Error("PAGINATION_LIMIT_REACHED");
+
+    const rows = await api.get(route, {
+      $select: "id,baseStatus,lastUpdate,origin",
+      $filter: "baseStatus eq '" + status + "'",
+      $orderby: "lastUpdate desc,id desc",
+      $top: PAGE_SIZE,
+      $skip: cursor.page * PAGE_SIZE,
+    });
+    if (!Array.isArray(rows) || rows.length > PAGE_SIZE) {
+      throw new Error("INVALID_SOURCE_LIST");
+    }
+
+    for (const row of rows) {
+      const id = String(row?.id ?? "");
+      if (!/^\d+$/.test(id) || row.baseStatus !== status) {
+        throw new Error("INVALID_SOURCE_ROW");
       }
-      coverage.push({ route, status, rows: count, complete });
-      console.log(JSON.stringify({ phase: "discovery", route, status, rows: count, complete, unique: unique.size }));
-      if (!complete) throw new Error("PAGINATION_LIMIT_REACHED");
+      if (!unique.has(id)) {
+        unique.set(id, { sourceId: id, route, status, origin: row.origin });
+      }
+    }
+
+    cursor.rows += rows.length;
+    const completed = rows.length < PAGE_SIZE;
+    const completedPages = cursor.page + 1;
+    if (completed) {
+      checkpoint.coverage.push({ route, status, rows: cursor.rows, complete: true });
+      cursor.page = 0;
+      cursor.rows = 0;
+      cursor.statusIndex += 1;
+      if (cursor.statusIndex === STATUSES.length) {
+        cursor.statusIndex = 0;
+        cursor.routeIndex += 1;
+      }
+    } else {
+      cursor.page += 1;
+    }
+
+    checkpoint.tickets = [...unique.values()];
+    checkpoint.updatedAt = new Date().toISOString();
+    saveAtomic(checkpointPath, checkpoint);
+
+    if (completed || completedPages % 10 === 0) {
+      console.log(JSON.stringify({
+        phase: "discovery",
+        route,
+        status,
+        pages: completedPages,
+        rows: completed ? checkpoint.coverage.at(-1).rows : cursor.rows,
+        complete: completed,
+        unique: unique.size,
+      }));
     }
   }
-  return { version: 1, createdAt: new Date().toISOString(), coverage, tickets: [...unique.values()] };
+
+  return {
+    version: 1,
+    createdAt: checkpoint.createdAt,
+    completedAt: new Date().toISOString(),
+    coverage: checkpoint.coverage,
+    tickets: checkpoint.tickets,
+  };
 }
 
 async function main() {
@@ -132,12 +203,13 @@ async function main() {
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   chmodSync(directory, 0o700);
   const inventoryPath = directory + "/inventory.json";
+  const checkpointPath = directory + "/discovery-checkpoint.json";
   const snapshotPath = directory + "/tickets.jsonl";
   const summaryPath = directory + "/summary.json";
   const api = new MovideskApi(token);
   const inventory = existsSync(inventoryPath)
     ? JSON.parse(readFileSync(inventoryPath, "utf8"))
-    : await discover(api);
+    : await discover(api, checkpointPath);
   if (!existsSync(inventoryPath)) saveAtomic(inventoryPath, inventory);
   if (inventory.version !== 1 || !Array.isArray(inventory.tickets)) throw new Error("INVALID_INVENTORY");
   const done = readExported(snapshotPath);
