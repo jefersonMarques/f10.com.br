@@ -597,7 +597,7 @@
 
                 <li class="mt-2 flex items-center gap-2 px-2 pb-2">
                   <a
-                    href="https://ajuda.f10.com.br/kb"
+                    href="/ajuda-f10"
                     class="flex-1 inline-flex h-[48px] items-center justify-center
                          rounded-[50px] border border-text px-2
                          text-[16px] font-semibold text-text hover:bg-text hover:text-white transition-colors"
