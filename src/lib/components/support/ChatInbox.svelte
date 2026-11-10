@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { isChatAwaitingAgent, isChatOpen } from "$lib/support/chatInboxClassification";
   import { Clock3, History, MessageCircleMore, Search, UserRound } from "lucide-svelte";
 
   type ChatInboxItem = {
@@ -10,6 +11,7 @@
     ticketNumber: number | null;
     subject: string;
     status: string;
+    closedAt: string | Date | null;
     aiState: string;
     assignedUserId: string | null;
     assignedUserName: string | null;
@@ -26,7 +28,7 @@
     } | null;
   };
 
-  type InboxScope = "mine" | "unassigned" | "waiting" | "all";
+  type InboxScope = "mine" | "unassigned" | "waiting" | "finished" | "all";
 
   export let chats: ChatInboxItem[] = [];
   export let currentUserId = "";
@@ -42,23 +44,17 @@
     { value: "waiting", label: "Aguardando" },
     { value: "mine", label: "Meus" },
     { value: "unassigned", label: "Não atribuídos" },
+    { value: "finished", label: "Finalizados" },
     { value: "all", label: "Todos" },
   ];
 
   function matchesScope(chat: ChatInboxItem, value: InboxScope): boolean {
-    if (value === "mine") {
-      return chat.assignedUserId === currentUserId && !["resolved", "closed"].includes(chat.status);
-    }
-    if (value === "unassigned") {
-      return !chat.assignedUserId && !["resolved", "closed"].includes(chat.status);
-    }
-    if (value === "waiting") {
-      return chat.aiState === "escalated" || (
-        chat.lastMessageAuthorType === "customer" &&
-        !["waiting_customer", "resolved", "closed"].includes(chat.status)
-      );
-    }
-    return true;
+    if (value === "all") return true;
+    if (value === "finished") return !isChatOpen(chat);
+    if (!isChatOpen(chat)) return false;
+    if (value === "mine") return chat.assignedUserId === currentUserId;
+    if (value === "unassigned") return !chat.assignedUserId;
+    return isChatAwaitingAgent(chat);
   }
 
   function matchesQuery(chat: ChatInboxItem, value: string): boolean {
@@ -209,9 +205,9 @@
             class={`block overflow-hidden rounded-2xl border px-3.5 py-3 transition ${selectedConversationKey === chat.conversationKey ? "border-[var(--app-info-border)] bg-[var(--app-surface-selected)] shadow-sm" : "border-[#E7E9EF] bg-white hover:border-[#CDD2DE] hover:bg-[#FAFBFD]"}`}
           >
             <div class="flex gap-3">
-              <span class={`relative mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#A44141]" : "bg-[#EEF0FF] text-[#000A57]"}`}>
+              <span class={`relative mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isChatOpen(chat) && chat.aiState === "escalated" ? "bg-[#FFF0F0] text-[#A44141]" : "bg-[#EEF0FF] text-[#000A57]"}`}>
                 <UserRound size={17} aria-hidden="true" />
-                {#if chat.lastMessageAuthorType === "customer" && !["waiting_customer", "resolved", "closed"].includes(chat.status)}
+                {#if isChatAwaitingAgent(chat) && chat.lastMessageAuthorType === "customer"}
                   <span class="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-[#EA6D0B]"></span>
                 {/if}
               </span>
@@ -238,6 +234,10 @@
                   {/if}
                 </div>
 
+                {#if !isChatOpen(chat)}
+                  <span class="mt-2 inline-flex rounded-md bg-[var(--app-surface-muted)] px-2 py-0.5 text-[11px] font-medium text-[var(--app-text-muted)]">Finalizada</span>
+                {/if}
+
                 <p class={`mt-2 line-clamp-1 text-[10.5px] leading-4 ${chat.lastMessageAuthorType === "customer" ? "font-medium text-[#474E5D]" : "text-[#777E8D]"}`}>
                   {messagePrefix(chat)}{chat.lastMessageBody ?? chat.subject}
                 </p>
@@ -245,7 +245,7 @@
                 {#if !compact}
                   <div class="mt-2 flex items-center justify-between gap-2 text-[9px] text-[#969CA9]">
                     <span class="truncate">{chat.assignedUserName ?? "Não atribuído"}</span>
-                    {#if chat.aiState === "escalated"}<span class="shrink-0 font-semibold text-[#A14A4A]">Aguardando equipe</span>{/if}
+                    {#if isChatOpen(chat) && chat.aiState === "escalated"}<span class="shrink-0 font-semibold text-[#A14A4A]">Aguardando equipe</span>{/if}
                   </div>
                 {/if}
               </div>
