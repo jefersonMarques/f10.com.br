@@ -26,7 +26,8 @@ async function audit(tx) {
        WHERE source_system = 'movidesk' AND notifications_enabled) AS notifications_enabled,
       (SELECT count(*)::integer FROM movidesk_ticket_action_imports a
        JOIN ticket_messages m ON m.id = a.message_id
-       WHERE m.visibility != 'internal') AS non_internal_imported_actions,
+       WHERE (a.source_visibility = 'internal' AND m.visibility != 'internal')
+          OR (a.source_visibility = 'public' AND m.visibility != 'public')) AS mismatched_imported_action_visibility,
       (SELECT count(*)::integer FROM ticket_messages
        WHERE external_message_id LIKE 'movidesk:chat:%'
          AND visibility != 'internal') AS non_internal_archived_chat_messages,
@@ -97,7 +98,8 @@ async function audit(tx) {
     JOIN ticket_messages m ON m.id = a.message_id
     WHERE (m.author_type = 'customer' AND m.customer_contact_id IS NULL)
       OR (m.author_type = 'user' AND m.author_user_id IS NULL)
-      OR m.visibility != 'internal'
+      OR (a.source_visibility = 'internal' AND m.visibility != 'internal')
+      OR (a.source_visibility = 'public' AND m.visibility != 'public')
     ORDER BY a.source_ticket_id::bigint, a.source_action_id
     LIMIT 100
   `);
@@ -121,7 +123,7 @@ async function audit(tx) {
   const passed = [
     summary.portal_access_enabled === 0,
     summary.notifications_enabled === 0,
-    summary.non_internal_imported_actions === 0,
+    summary.mismatched_imported_action_visibility === 0,
     summary.missing_imported_messages === 0,
     summary.missing_destination_tickets === 0,
     summary.mismatched_message_tickets === 0,
@@ -154,7 +156,7 @@ async function audit(tx) {
       "Matching operators not found in F10 cannot be reconstructed by this audit.",
       "Historic attachments were not included in the standard ticket migration.",
       "Participant access flags are verified; other portal authorization paths require separate tests.",
-      "Standard imported actions are expected to be internal; legacy chat archives are assessed separately.",
+      "Imported action visibility is checked against original source_visibility; chat archives are assessed separately.",
       "Older imports can lack ticket_participants rows until a controlled backfill.",
     ],
   };
