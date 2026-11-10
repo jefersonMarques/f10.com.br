@@ -102,6 +102,7 @@
 
                     <a
                         href="/ajuda-f10"
+                        on:click={closeModal}
                         class="group relative w-full max-w-sm h-[50px]
                                rounded-[999px] bg-white text-[#000A57] font-semibold
                                border border-[#CBD5F0] shadow-sm
