@@ -677,7 +677,7 @@
   let submitMessage = "";
 
   const successVideoUrl = "https://www.youtube.com/embed/XWWe9c7QDgo";
-  const supportLink = "https://f10.movidesk.com/kb";
+  const supportLink = "/ajuda-f10";
   const whatsappLink =
     "https://wa.me/554130274747?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20o%20cadastro.";
 
