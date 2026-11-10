@@ -211,7 +211,10 @@ async function importActions(tx, ticket, ticketId, clients) {
       "customer_contact_id, visibility, channel, body, external_message_id, " +
       "external_metadata, created_at, updated_at) " +
       "VALUES ($1::uuid, $2, $3::uuid, $4::uuid, 'internal', $5, $6, $7, $8::jsonb, $9, $9) " +
-      "RETURNING id::text",
+      "RETURNING id::text, jsonb_typeof(external_metadata) AS metadata_type, " +
+      "external_metadata->>'sourceTicketId' AS source_ticket_id, " +
+      "external_metadata->>'sourceActionId' AS source_action_id, " +
+      "external_metadata->>'sourceVisibility' AS source_visibility",
       [
         ticketId, author.authorType, author.userId, author.contactId,
         channelFor(ticket.origin), body,
@@ -219,6 +222,13 @@ async function importActions(tx, ticket, ticketId, clients) {
         JSON.stringify(metadata), createdAt,
       ],
     );
+    const inserted = messages[0];
+    if (inserted?.metadata_type !== "object" ||
+        inserted.source_ticket_id !== personId(ticket) ||
+        inserted.source_action_id !== String(actionId) ||
+        inserted.source_visibility !== sourceVisibility) {
+      throw new Error("HISTORICAL_ACTION_METADATA_INVALID");
+    }
     await tx.unsafe(
       "INSERT INTO movidesk_ticket_action_imports " +
       "(source_ticket_id, source_action_id, message_id, source_visibility) " +
