@@ -145,6 +145,8 @@
   let authInitialized = false;
   let pollingSessionId = "";
   let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let draftSyncTimer: ReturnType<typeof setTimeout> | null = null;
+  let draftHeartbeat: ReturnType<typeof setInterval> | null = null;
   let statusTimer: ReturnType<typeof setInterval> | null = null;
   let statusPollingActive = false;
 
@@ -317,6 +319,33 @@
     authRequiredForSession = false;
   }
 
+  async function publishLiveDraft(body: string, expectedSessionId?: string): Promise<void> {
+    const activeSession = session;
+    if (!activeSession || (expectedSessionId && activeSession.sessionId !== expectedSessionId)) return;
+
+    try {
+      await fetch(`/api/support/chat/${encodeURIComponent(activeSession.sessionId)}/messages`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${activeSession.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ body }),
+        keepalive: body.length === 0,
+      });
+    } catch {
+      // A prévia é temporária e não interfere no envio das mensagens.
+    }
+  }
+
+  function handleCustomerDraftInput(event: Event): void {
+    if (draftSyncTimer) clearTimeout(draftSyncTimer);
+    if (!session || !isOpen || authRequiredForSession) return;
+
+    const body = (event.currentTarget as HTMLTextAreaElement).value;
+    draftSyncTimer = setTimeout(() => void publishLiveDraft(body), 300);
+  }
+
   function syncPolling(shouldPoll: boolean, sessionId: string): void {
     const desiredSessionId = shouldPoll ? sessionId : "";
     if (desiredSessionId === pollingSessionId) return;
@@ -325,12 +354,26 @@
       clearInterval(pollTimer);
       pollTimer = null;
     }
+    if (draftHeartbeat) {
+      clearInterval(draftHeartbeat);
+      draftHeartbeat = null;
+    }
+    if (draftSyncTimer) {
+      clearTimeout(draftSyncTimer);
+      draftSyncTimer = null;
+    }
+    if (pollingSessionId && pollingSessionId !== desiredSessionId) {
+      void publishLiveDraft("", pollingSessionId);
+    }
 
     pollingSessionId = desiredSessionId;
     if (!desiredSessionId) return;
 
     void refreshMessages(true);
     pollTimer = setInterval(() => void refreshMessages(false), 4_000);
+    draftHeartbeat = setInterval(() => {
+      if (reply.trim()) void publishLiveDraft(reply, desiredSessionId);
+    }, 3_000);
   }
 
   function syncStatusPolling(shouldPoll: boolean): void {
@@ -847,6 +890,8 @@
     errorMessage = "";
     attachmentError = "";
     sending = true;
+    if (draftSyncTimer) clearTimeout(draftSyncTimer);
+    void publishLiveDraft("");
     const optimisticId = `pending-${Date.now()}`;
     const optimisticMessage: ChatMessage = {
       id: optimisticId,
@@ -908,6 +953,7 @@
       pendingImages = images;
       errorMessage = "Não foi possível enviar sua mensagem. Tente novamente.";
     } finally {
+      if (reply.trim()) void publishLiveDraft(reply);
       sending = false;
     }
   }
@@ -921,6 +967,7 @@
   }
 
   function startAnotherChat(): void {
+    void publishLiveDraft("");
     clearStoredSession();
     revokeImages(pendingImages);
     pendingImages = [];
@@ -973,6 +1020,9 @@
   }
 
   onDestroy(() => {
+    if (draftSyncTimer) clearTimeout(draftSyncTimer);
+    if (draftHeartbeat) clearInterval(draftHeartbeat);
+    void publishLiveDraft("");
     if (pollTimer) clearInterval(pollTimer);
     if (statusTimer) clearInterval(statusTimer);
     revokeImages(pendingImages);
@@ -1181,7 +1231,7 @@
         <input bind:this={fileInputElement} type="file" multiple accept="image/png,image/jpeg,image/webp" class="hidden" on:change={handleFileInput}/>
         <div class="flex items-end gap-2">
           <button type="button" on:click={() => fileInputElement?.click()} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#DDE1E9] text-[#667080] hover:text-[#000A57]" aria-label="Anexar imagem"><Paperclip size={16}/></button>
-          <textarea bind:value={reply} maxlength="4000" rows="1" placeholder="Escreva sua mensagem..." class="max-h-28 min-h-10 flex-1 resize-none rounded-xl border border-[#DDE1E9] bg-[#FAFBFC] px-3 py-2.5 text-[11px] leading-5 outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" on:keydown={handleReplyKeydown} on:paste={handleReplyPaste}></textarea>
+          <textarea bind:value={reply} maxlength="4000" rows="1" placeholder="Escreva sua mensagem..." class="max-h-28 min-h-10 flex-1 resize-none rounded-xl border border-[#DDE1E9] bg-[#FAFBFC] px-3 py-2.5 text-[11px] leading-5 outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" on:input={handleCustomerDraftInput} on:keydown={handleReplyKeydown} on:paste={handleReplyPaste}></textarea>
           <button type="submit" disabled={sending || (!reply.trim() && pendingImages.length === 0)} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EA6D0B] text-white disabled:opacity-40" aria-label="Enviar">{#if sending}<LoaderCircle class="animate-spin" size={16}/>{:else}<Send size={16}/>{/if}</button>
         </div>
         <div class="mt-2 flex items-center justify-between gap-2"><span class="text-[8px] text-[#999EAA]">Enter envia · Shift+Enter quebra linha</span><button type="button" on:click={startAnotherChat} class="text-[8px] font-semibold text-[#6D7485] hover:text-[#000A57]">Novo atendimento</button></div>
