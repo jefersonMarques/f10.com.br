@@ -188,12 +188,13 @@
         <button
           type="button"
           on:click={() => selectScope(item.value)}
+          aria-pressed={scope === item.value}
           class={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-semibold transition ${scope === item.value
             ? item.value === "waiting"
               ? "bg-[#B45309] text-white shadow-sm"
               : "bg-[#000A57] text-white shadow-sm"
             : item.value === "waiting"
-              ? "border border-[#F3B48A] bg-[#FFF1E6] text-[#8A3900] hover:bg-[#FFE1CC]"
+              ? "border border-[#F3B48A] bg-[var(--app-surface)] text-[var(--app-warning-text)] hover:bg-[var(--app-warning-surface)]"
               : "border border-[#E4E6EC] bg-white text-[#6D7382] hover:border-[#C9CEDA] hover:bg-[#F8F9FB]"}`}
         >
           {item.label}
