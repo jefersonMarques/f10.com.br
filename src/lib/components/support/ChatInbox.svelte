@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { page } from "$app/stores";
+  import { replaceState } from "$app/navigation";
   import { isChatAwaitingAgent, isChatOpen } from "$lib/support/chatInboxClassification";
+  import { readChatInboxScope, withChatInboxScope, type ChatInboxScope } from "$lib/support/chatInboxScope";
   import { Clock3, History, MessageCircleMore, Search, UserRound } from "lucide-svelte";
 
   type ChatInboxItem = {
@@ -28,7 +31,7 @@
     } | null;
   };
 
-  type InboxScope = "mine" | "unassigned" | "waiting" | "finished" | "all";
+
 
   export let chats: ChatInboxItem[] = [];
   export let currentUserId = "";
@@ -37,10 +40,10 @@
 
   let inboxChats: ChatInboxItem[] = chats;
   let query = "";
-  let scope: InboxScope = "all";
+  let scope: ChatInboxScope = readChatInboxScope($page.url);
   let searchElement: HTMLInputElement;
 
-  const scopes: Array<{ value: InboxScope; label: string }> = [
+  const scopes: Array<{ value: ChatInboxScope; label: string }> = [
     { value: "waiting", label: "Aguardando" },
     { value: "mine", label: "Meus" },
     { value: "unassigned", label: "Não atribuídos" },
@@ -48,7 +51,20 @@
     { value: "all", label: "Todos" },
   ];
 
-  function matchesScope(chat: ChatInboxItem, value: InboxScope): boolean {
+  function selectScope(value: ChatInboxScope): void {
+    if (scope === value) return;
+
+    scope = value;
+    replaceState(withChatInboxScope($page.url, value), $page.state);
+  }
+
+  function conversationHref(sessionId: string): string {
+    const url = new URL(`/app/chat/${encodeURIComponent(sessionId)}`, $page.url);
+    const filteredUrl = withChatInboxScope(url, scope);
+    return filteredUrl.pathname + filteredUrl.search;
+  }
+
+  function matchesScope(chat: ChatInboxItem, value: ChatInboxScope): boolean {
     if (value === "all") return true;
     if (value === "finished") return !isChatOpen(chat);
     if (!isChatOpen(chat)) return false;
@@ -77,7 +93,7 @@
       .includes(normalized);
   }
 
-  function scopeCount(value: InboxScope): number {
+  function scopeCount(value: ChatInboxScope): number {
     return inboxChats.filter((chat) => matchesScope(chat, value)).length;
   }
 
@@ -116,6 +132,7 @@
   }
 
   $: inboxChats = chats;
+  $: scope = readChatInboxScope($page.url);
   $: filteredChats = inboxChats.filter((chat) => matchesScope(chat, scope) && matchesQuery(chat, query));
 
   onMount(() => {
@@ -170,7 +187,7 @@
       {#each scopes as item}
         <button
           type="button"
-          on:click={() => scope = item.value}
+          on:click={() => selectScope(item.value)}
           class={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-semibold transition ${scope === item.value
             ? item.value === "waiting"
               ? "bg-[#B45309] text-white shadow-sm"
@@ -201,7 +218,7 @@
       <div class="space-y-2">
         {#each filteredChats as chat}
           <a
-            href={`/app/chat/${chat.sessionId}`}
+            href={conversationHref(chat.sessionId)}
             class={`block overflow-hidden rounded-2xl border px-3.5 py-3 transition ${selectedConversationKey === chat.conversationKey ? "border-[var(--app-info-border)] bg-[var(--app-surface-selected)] shadow-sm" : "border-[#E7E9EF] bg-white hover:border-[#CDD2DE] hover:bg-[#FAFBFD]"}`}
           >
             <div class="flex gap-3">
