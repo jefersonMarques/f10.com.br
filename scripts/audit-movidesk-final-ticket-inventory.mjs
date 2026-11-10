@@ -54,7 +54,7 @@ class MovideskApi {
       throw new Error("INVALID_SOURCE_LIST");
     }
     for (const row of rows) {
-      if (!/^\\d+$/.test(String(row?.id ?? "")) || row?.baseStatus !== status) {
+      if (!/^\d+$/.test(String(row?.id ?? "")) || row?.baseStatus !== status) {
         throw new Error("INVALID_SOURCE_ROW");
       }
     }
@@ -78,7 +78,7 @@ async function main() {
   const options = parseOptions(process.argv.slice(2));
   const token = (
     process.env.MOVIDESK_KB_API_TOKEN || process.env.MOVIDESK_API_TOKEN || ""
-  ).trim().replace(/^Bearer\\s+/i, "");
+  ).trim().replace(/^Bearer\s+/i, "");
   const databaseUrl = process.env.DATABASE_URL?.trim();
   if (!token || !databaseUrl) throw new Error("ENVIRONMENT_NOT_CONFIGURED");
 
