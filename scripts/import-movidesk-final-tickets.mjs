@@ -115,7 +115,7 @@ class MovideskApi {
     return response.map((item) => {
       const ticket = object(item);
       const id = personId(ticket);
-      if (!/^\\d+$/.test(id) || ticket.baseStatus !== baseStatus || ids.has(id)) {
+      if (!/^\d+$/.test(id) || ticket.baseStatus !== baseStatus || ids.has(id)) {
         throw new Error("INVALID_SOURCE_PAGE");
       }
       ids.add(id);
