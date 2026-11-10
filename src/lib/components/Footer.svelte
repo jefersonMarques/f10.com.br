@@ -322,7 +322,7 @@
         </li>
 
         <li>
-          <a href="https://ajuda.f10.com.br/kb" class="hover:text-[#EA6D0B]">
+          <a href="/ajuda-f10" class="hover:text-[#EA6D0B]">
             Central de Ajuda
           </a>
         </li>
