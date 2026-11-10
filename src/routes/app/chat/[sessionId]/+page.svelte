@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
+  import { browser } from "$app/environment";
   import {
     ArrowDown,
     ArrowLeft,
@@ -26,6 +27,8 @@
   } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import MentionTextarea from "$lib/components/operations/MentionTextarea.svelte";
+  import TicketRichTextEditor from "$lib/components/operations/tickets/TicketRichTextEditor.svelte";
+  import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
   import ChatInbox from "$lib/components/support/ChatInbox.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -69,6 +72,9 @@
   let liveDraftSessionId = "";
   let liveDraftStream: EventSource | null = null;
   let composerMode: ComposerMode = "reply";
+  let composerExpanded = false;
+  let composerContainer: HTMLDivElement | null = null;
+  let replyEditor: TicketRichTextEditor | null = null;
   let sending = false;
   let errorMessage = "";
   let newMessageCount = 0;
@@ -90,6 +96,7 @@
   $: openRelatedTickets = relatedTickets.filter((ticket) => !["resolved", "closed"].includes(ticket.status));
   $: closedRelatedTickets = relatedTickets.filter((ticket) => ["resolved", "closed"].includes(ticket.status));
   $: if (!canWrite && data.canInternalNote && composerMode === "reply") composerMode = "note";
+  $: if (browser && composerExpanded && draftKey && typeof messageBody === "string") persistDraft();
   $: if (data.initial.chat.sessionId !== loadedSessionId) resetConversationState();
 
   const statusLabels: Record<string, string> = {
@@ -139,6 +146,7 @@
     chat = data.initial.chat;
     messages = data.initial.messages;
     conversationInitialized = false;
+    composerExpanded = false;
     conversationKey = data.chatInbox.find((item) => item.sessionId === chat.sessionId)?.conversationKey ?? null;
     hasOlderMessages = false;
     loadingOlderMessages = false;
@@ -171,7 +179,7 @@
 
   function messageAuthor(message: ChatMessage): string {
     if (message.authorType === "customer") return chat.customerName ?? "Cliente";
-    if (message.authorType === "system") return "Atendimento F10";
+    if (message.authorType === "system") return message.authorUserName ?? "Sistema F10";
     return message.authorUserName ?? "Equipe F10";
   }
 
@@ -216,6 +224,24 @@
   function persistDraft(): void {
     if (messageBody) window.sessionStorage.setItem(draftKey, messageBody);
     else window.sessionStorage.removeItem(draftKey);
+  }
+
+  async function openComposer(): Promise<void> {
+    composerExpanded = true;
+    await tick();
+    if (composerMode === "reply") replyEditor?.focus();
+    else composerContainer?.querySelector<HTMLTextAreaElement>("textarea")?.focus();
+  }
+
+  async function selectComposerMode(mode: ComposerMode): Promise<void> {
+    composerMode = mode;
+    await openComposer();
+  }
+
+  function collapseComposerOnOutsidePointerDown(event: PointerEvent): void {
+    if (!composerExpanded || sending || !composerContainer) return;
+    if (event.composedPath().includes(composerContainer)) return;
+    composerExpanded = false;
   }
 
   function insertSchedulingLink(): void {
@@ -358,19 +384,13 @@
 
       messageBody = "";
       persistDraft();
+      composerExpanded = false;
       await refreshMessages(true);
     } catch {
       errorMessage = "Não foi possível enviar a mensagem.";
     } finally {
       sending = false;
     }
-  }
-
-  function handleComposerKeydown(event: KeyboardEvent): void {
-    if (event.isComposing || event.key !== "Enter" || event.shiftKey || event.altKey) return;
-
-    event.preventDefault();
-    if (!sending) void sendMessage();
   }
 
   onMount(() => {
@@ -396,6 +416,8 @@
   });
 </script>
 
+<svelte:window on:pointerdown={collapseComposerOnOutsidePointerDown}/>
+
 <svelte:head>
   <title>{chat.ticketNumber ? `Chamado #${chat.ticketNumber}` : "Chat"} | F10 Operations</title>
 </svelte:head>
@@ -405,7 +427,7 @@
   padding="none"
   className="h-[calc(100dvh-var(--application-header-height))] min-h-[620px] overflow-hidden bg-[#F5F6FA]"
 >
-  <div class="grid h-full min-h-0 grid-cols-1 gap-3 p-3 lg:grid-cols-[315px_minmax(0,1fr)] lg:gap-4 lg:p-4 xl:grid-cols-[315px_minmax(520px,1fr)_310px]">
+  <div class="support-chat-workspace grid h-full min-h-0 grid-cols-1 gap-3 p-3 lg:grid-cols-[315px_minmax(0,1fr)] lg:gap-4 lg:p-4 xl:grid-cols-[315px_minmax(520px,1fr)_310px]">
     <aside class="hidden min-h-0 overflow-hidden rounded-[22px] border border-[#E2E5ED] bg-white shadow-[0_12px_32px_rgba(1,13,40,0.05)] lg:block">
       <ChatInbox
         chats={data.chatInbox}
@@ -514,7 +536,7 @@
                 {:else}
                   <div class={`flex ${message.authorType === "customer" ? "justify-start" : "justify-end"}`}>
                     <article class={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3EA] bg-white text-[#4D5361]" : message.authorType === "system" ? "rounded-br-md border border-[#DDD8F4] bg-[#F2F0FF] text-[#453D78]" : "rounded-br-md bg-[#000A57] text-white"}`}>
-                      {#if message.authorType === "system"}<div class="mb-2 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.07em] text-[#6255A8]"><Bot size={12} />Atendimento F10</div>{/if}
+                      {#if message.authorType === "system"}<div class="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.07em] text-[var(--app-info-text)]"><Bot size={13} />{message.authorUserName ?? "Sistema F10"}</div>{/if}
 
                       {#if message.attachments && message.attachments.length > 0}
                         <div class={`mb-2 grid gap-2 ${message.attachments.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
@@ -526,7 +548,7 @@
                         </div>
                       {/if}
 
-                      {#if message.body}<p class="whitespace-pre-wrap text-[11.5px] leading-5">{message.body}</p>{/if}
+                      {#if message.body}<SupportChatMarkdown text={message.body} isCustomer={message.authorType === "user"} size="md" />{/if}
                       <div class={`mt-2 flex items-center gap-1.5 text-[9px] ${message.authorType === "customer" ? "text-[#989EAB]" : message.authorType === "system" ? "text-[#8178B5]" : "text-white/65"}`}><span>{messageAuthor(message)}</span><span>·</span><span>{formatTime(message.createdAt)}</span></div>
                     </article>
                   </div>
@@ -551,27 +573,79 @@
       {/if}
 
       {#if chat.status !== "closed" && (canWrite || data.canInternalNote)}
-        <footer class="shrink-0 border-t border-[var(--app-border)] bg-[var(--app-surface)] p-4">
-          <div class="mx-auto max-w-[840px] overflow-hidden rounded-2xl border border-[var(--app-border-control)] bg-[var(--app-surface)] shadow-[0_8px_22px_rgba(1,13,40,0.04)] focus-within:border-[var(--app-info-border)]">
-            <div class="flex items-center gap-2 border-b border-[#ECEEF2] px-3 py-2.5">
-              {#if canWrite}<button type="button" on:click={() => composerMode = "reply"} class={`rounded-full px-3 py-1.5 text-[10px] font-semibold transition ${composerMode === "reply" ? "bg-[#000A57] text-white" : "bg-[#F3F4F7] text-[#6D7382] hover:bg-[#ECEEF2]"}`}>Resposta</button>{/if}
-              {#if data.canInternalNote}<button type="button" on:click={() => composerMode = "note"} class={`rounded-full px-3 py-1.5 text-[10px] font-semibold transition ${composerMode === "note" ? "bg-[#9A5513] text-white" : "bg-[#FFF3E7] text-[#8B4D12] hover:bg-[#FBE9D7]"}`}>Nota interna</button>{/if}
-              {#if data.schedulingPath && canWrite && composerMode === "reply"}<button type="button" on:click={insertSchedulingLink} class="inline-flex items-center gap-1.5 rounded-full bg-[#EEF0FF] px-3 py-1.5 text-[10px] font-semibold text-[#000A57]"><CalendarClock size={12}/>Minha agenda</button>{/if}
-              <span class="ml-auto text-[9px] text-[#999FAA]">{composerMode === "note" ? "Somente equipe F10" : "Visível ao cliente"}</span>
-            </div>
-
-            {#if composerMode === "reply" && canWrite}
-              {#if chat.aiState === "active"}<div class="mx-3 mt-3 flex items-center gap-2 rounded-xl bg-[#F4F2FF] px-3 py-2 text-[9.5px] font-medium text-[#6255A8]"><Bot size={13} />Sua resposta assume a conversa e encerra a automação.</div>{/if}
-              {#if errorMessage}<div class="mx-3 mt-3 flex items-center gap-2 rounded-xl bg-[#FFF3F3] px-3 py-2 text-[9.5px] font-medium text-[#A13C3C]"><CircleAlert size={13} />{errorMessage}</div>{/if}
-              <form on:submit|preventDefault={() => void sendMessage()}>
-                <textarea bind:value={messageBody} on:input={persistDraft} on:keydown={handleComposerKeydown} maxlength="4000" rows="3" placeholder="Escreva uma mensagem para o cliente..." class="max-h-40 min-h-[86px] w-full resize-none border-0 px-4 py-3.5 text-[11.5px] leading-5 outline-none"></textarea>
-                <div class="flex items-center justify-between border-t border-[#F0F1F4] px-3.5 py-2.5"><span class="text-[9px] text-[#999FAA]">Enter envia · Shift+Enter quebra linha</span><button type="submit" disabled={sending || !messageBody.trim()} class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white transition hover:bg-[#111B71] disabled:bg-[#D6D9E2]">Enviar <Send size={13} /></button></div>
-              </form>
-            {:else if composerMode === "note" && data.canInternalNote}
-              <form method="POST" action="?/note" class="bg-[#FFFDFC]">
-                <MentionTextarea users={data.mentionUsers} name="body" rows={3} maxlength={10000} placeholder="Escreva uma nota interna. Use @ para chamar alguém da equipe..." className="min-h-[86px] w-full resize-none border-0 bg-transparent px-4 py-3.5 text-[11.5px] leading-5 outline-none" />
-                <div class="flex items-center justify-between border-t border-[#F1E7DD] px-3.5 py-2.5"><span class="text-[9px] text-[#9A744F]">O cliente nunca vê esta nota.</span><button type="submit" class="inline-flex h-9 items-center rounded-xl bg-[#9A5513] px-4 text-[10px] font-semibold text-white">Adicionar nota</button></div>
-              </form>
+        <footer class="shrink-0 border-t border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-3 sm:px-5">
+          <div class="mx-auto max-w-[840px]">
+            {#if !composerExpanded}
+              <button
+                type="button"
+                on:click={() => void openComposer()}
+                class="flex min-h-12 w-full items-center gap-3 rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-4 text-left text-[14px] text-[var(--app-text-muted)] transition-colors hover:border-[var(--app-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-primary)]"
+                aria-label={composerMode === "note" ? "Escrever uma nota interna" : "Escrever uma resposta"}
+              >
+                <span class="min-w-0 flex-1 truncate">
+                  {messageBody.trim() && composerMode === "reply" ? "Continuar resposta..." : composerMode === "note" ? "Escrever nota interna..." : "Escrever uma resposta..."}
+                </span>
+                <Send size={18} class="shrink-0 text-[var(--app-primary)]" />
+              </button>
+            {:else}
+              <div bind:this={composerContainer} class="rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] p-3">
+                <div class="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--app-border-soft)] pb-2">
+                  <div class="flex items-center gap-1 rounded-lg bg-[var(--app-surface-muted)] p-1">
+                    {#if canWrite}
+                      <button type="button" on:click={() => void selectComposerMode("reply")}
+                        aria-pressed={composerMode === "reply"}
+                        class={`rounded-md px-3 py-1.5 text-[12px] font-semibold ${composerMode === "reply" ? "bg-[var(--app-surface)] text-[var(--app-primary)] shadow-sm" : "text-[var(--app-text-muted)]"}`}>Resposta</button>
+                    {/if}
+                    {#if data.canInternalNote}
+                      <button type="button" on:click={() => void selectComposerMode("note")}
+                        aria-pressed={composerMode === "note"}
+                        class={`rounded-md px-3 py-1.5 text-[12px] font-semibold ${composerMode === "note" ? "bg-[var(--app-surface)] text-[var(--app-warning-text)] shadow-sm" : "text-[var(--app-text-muted)]"}`}>Nota interna</button>
+                    {/if}
+                  </div>
+                  {#if data.schedulingPath && canWrite && composerMode === "reply"}
+                    <button type="button" on:click={insertSchedulingLink}
+                      class="inline-flex items-center gap-1.5 rounded-lg bg-[var(--app-info-bg)] px-3 py-1.5 text-[12px] font-semibold text-[var(--app-info-text)]">
+                      <CalendarClock size={14}/>Minha agenda
+                    </button>
+                  {/if}
+                </div>
+                {#if composerMode === "reply" && canWrite}
+                  {#if chat.aiState === "active"}
+                    <div class="mb-2 flex items-center gap-2 rounded-lg bg-[var(--app-info-bg)] px-3 py-2 text-[12px] text-[var(--app-info-text)]"><Bot size={14}/>Sua resposta assume a conversa.</div>
+                  {/if}
+                  {#if errorMessage}
+                    <p class="mb-2 flex items-center gap-2 text-[12px] text-[var(--app-danger-text)]"><CircleAlert size={14}/>{errorMessage}</p>
+                  {/if}
+                  <form on:submit|preventDefault={() => void sendMessage()}>
+                    <TicketRichTextEditor
+                      bind:this={replyEditor}
+                      bind:value={messageBody}
+                      submitting={sending}
+                      showAttachments={false}
+                      sendOnEnter
+                      onSend={() => void sendMessage()}
+                      placeholder="Escreva uma mensagem para o cliente..."
+                    />
+                    <div class="mt-2 flex items-center justify-between gap-3 border-t border-[var(--app-border-soft)] pt-2">
+                      <span class="text-[11px] text-[var(--app-text-muted)]">Enter envia · Shift+Enter quebra linha</span>
+                      <button type="submit" disabled={sending || !messageBody.trim()}
+                        class="inline-flex h-10 items-center gap-2 rounded-lg bg-[var(--app-primary)] px-4 text-[12px] font-semibold text-white disabled:opacity-50">
+                        <Send size={15}/>{sending ? "Enviando..." : "Enviar"}
+                      </button>
+                    </div>
+                  </form>
+                {:else if composerMode === "note" && data.canInternalNote}
+                  <form method="POST" action="?/note" class="bg-[var(--app-surface)]">
+                    <MentionTextarea users={data.mentionUsers} name="body" rows={3} maxlength={10000}
+                      placeholder="Escreva uma nota interna. Use @ para mencionar alguém..."
+                      className="min-h-[100px] w-full resize-none rounded-lg bg-[var(--app-surface)] px-3 py-3 text-[14px] leading-6 text-[var(--app-text)] outline-none" />
+                    <div class="mt-2 flex items-center justify-between gap-3 border-t border-[var(--app-border-soft)] pt-2">
+                      <span class="text-[11px] text-[var(--app-warning-text)]">Somente equipe F10</span>
+                      <button type="submit" class="inline-flex h-10 items-center gap-2 rounded-lg bg-[var(--app-warning-text)] px-4 text-[12px] font-semibold text-white">Adicionar nota</button>
+                    </div>
+                  </form>
+                {/if}
+              </div>
             {/if}
           </div>
         </footer>
