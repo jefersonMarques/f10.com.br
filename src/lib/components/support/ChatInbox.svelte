@@ -41,6 +41,7 @@
   let inboxChats: ChatInboxItem[] = chats;
   let query = "";
   let scope: ChatInboxScope = readChatInboxScope($page.url);
+  let lastNavigatedUrl = $page.url.href;
   let searchElement: HTMLInputElement;
 
   const scopes: Array<{ value: ChatInboxScope; label: string }> = [
@@ -55,7 +56,7 @@
     if (scope === value) return;
 
     scope = value;
-    replaceState(withChatInboxScope($page.url, value), $page.state);
+    replaceState(withChatInboxScope(new URL(window.location.href), value), $page.state);
   }
 
   function conversationHref(sessionId: string): string {
@@ -132,7 +133,10 @@
   }
 
   $: inboxChats = chats;
-  $: scope = readChatInboxScope($page.url);
+  $: if ($page.url.href !== lastNavigatedUrl) {
+    lastNavigatedUrl = $page.url.href;
+    scope = readChatInboxScope($page.url);
+  }
   $: filteredChats = inboxChats.filter((chat) => matchesScope(chat, scope) && matchesQuery(chat, query));
 
   onMount(() => {
