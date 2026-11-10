@@ -189,20 +189,14 @@
           type="button"
           on:click={() => selectScope(item.value)}
           aria-pressed={scope === item.value}
-          class={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-semibold transition ${scope === item.value
-            ? item.value === "waiting"
-              ? "bg-[#B45309] text-white shadow-sm"
-              : "bg-[#000A57] text-white shadow-sm"
-            : item.value === "waiting"
-              ? "border border-[#F3B48A] bg-[var(--app-surface)] text-[var(--app-warning-text)] hover:bg-[var(--app-warning-surface)]"
-              : "border border-[#E4E6EC] bg-white text-[#6D7382] hover:border-[#C9CEDA] hover:bg-[#F8F9FB]"}`}
+          class={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors duration-150 ${scope === item.value
+            ? "bg-[var(--app-primary)] text-white shadow-sm"
+            : "border border-[var(--app-border-control)] bg-[var(--app-surface)] text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"}`}
         >
           {item.label}
-          <span class={`rounded-full px-1.5 py-0.5 text-[9px] ${scope === item.value
+          <span class={`rounded-full px-1.5 py-0.5 text-[10px] ${scope === item.value
             ? "bg-white/20 text-white"
-            : item.value === "waiting"
-              ? "bg-[#FBD4B6] text-[#873A08]"
-              : "bg-[#F1F2F5] text-[#858B99]"}`}>{scopeCount(item.value)}</span>
+            : "bg-[var(--app-surface-muted)] text-[var(--app-text-muted)]"}`}>{scopeCount(item.value)}</span>
         </button>
       {/each}
     </div>
