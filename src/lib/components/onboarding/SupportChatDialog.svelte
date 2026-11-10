@@ -146,6 +146,7 @@
   let pollingSessionId = "";
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let draftSyncTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastDraftPublishedAt = 0;
   let draftHeartbeat: ReturnType<typeof setInterval> | null = null;
   let statusTimer: ReturnType<typeof setInterval> | null = null;
   let statusPollingActive = false;
@@ -343,7 +344,17 @@
     if (!session || !isOpen || authRequiredForSession) return;
 
     const body = (event.currentTarget as HTMLTextAreaElement).value;
-    draftSyncTimer = setTimeout(() => void publishLiveDraft(body), 300);
+    const remaining = Math.max(0, 500 - (Date.now() - lastDraftPublishedAt));
+    if (remaining === 0) {
+      lastDraftPublishedAt = Date.now();
+      void publishLiveDraft(body);
+      return;
+    }
+
+    draftSyncTimer = setTimeout(() => {
+      lastDraftPublishedAt = Date.now();
+      void publishLiveDraft(body);
+    }, remaining);
   }
 
   function syncPolling(shouldPoll: boolean, sessionId: string): void {
