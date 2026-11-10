@@ -1,6 +1,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { getPermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { users } from "$lib/server/db/schema";
 import { webChatMessages, webChatSessions } from "$lib/server/db/chatSchema";
 import { ticketEvents, ticketMessages, tickets } from "$lib/server/db/supportSchema";
 import {
@@ -59,6 +60,10 @@ export async function finishInternalChat(
     throw new Error("CHAT_ASSIGNED_TO_OTHER_USER");
   }
 
+  const [actor] = await db.select({ name: users.name })
+    .from(users).where(eq(users.id, actorUserId)).limit(1);
+  if (!actor) throw new Error("CHAT_AGENT_NOT_FOUND");
+
   const now = new Date();
   await db.transaction(async (tx) => {
     await tx
@@ -87,7 +92,8 @@ export async function finishInternalChat(
         authorType: "system",
         visibility: "public",
         channel: "web_chat",
-        body: "Atendimento finalizado pela equipe F10.",
+        authorUserId: actorUserId,
+        body: `Atendimento finalizado por ${actor.name}.`,
       });
 
       await tx.insert(ticketEvents).values({
@@ -100,7 +106,8 @@ export async function finishInternalChat(
       await tx.insert(webChatMessages).values({
         sessionId,
         authorType: "system",
-        body: "Atendimento finalizado pela equipe F10.",
+        authorUserId: actorUserId,
+        body: `Atendimento finalizado por ${actor.name}.`,
       });
     }
   });
