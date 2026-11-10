@@ -731,3 +731,124 @@ html[data-application-theme="dark"] .operations-shell :is(
 html[data-application-theme="dark"] .operations-shell [class~="bg-[#FFF2E5]"] {
   background-color: var(--app-warning-bg) !important;
 }
+
+
+/* Contraste e legibilidade do atendimento no tema escuro. */
+html[data-application-theme="dark"] .operations-shell .support-chat-workspace :is(
+  [class~="border-[#E9EBF1]"],
+  [class~="border-[#ECEEF2]"],
+  [class~="border-[#D9DDE7]"],
+  [class~="border-[#C9CFE0]"],
+  [class~="border-[#E6E9EF]"],
+  [class~="border-[#EBEDF2]"],
+  [class~="border-[#DCE1F2]"],
+  [class~="border-[#DDD8F4]"]
+) {
+  border-color: var(--app-border) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell .support-chat-workspace :is(
+  [class~="border-[#F0F1F4]"],
+  [class~="border-[#ECEEF2]"],
+  [class~="border-[#E9EBF1]"]
+) {
+  border-color: var(--app-border-soft) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell .support-chat-workspace :is(
+  [class~="border-[#E9D6C1]"],
+  [class~="border-[#F1E7DD]"]
+) {
+  border-color: var(--app-warning-border) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell .support-chat-workspace :is(
+  [class~="bg-[#E3E6ED]"],
+  [class~="bg-[#ECEEF2]"],
+  [class~="bg-[#F9FAFC]"]
+) {
+  background-color: var(--app-surface-muted) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell .support-chat-workspace :is(
+  [class~="bg-[#F0EEFF]"],
+  [class~="bg-[#F2F0FF]"],
+  [class~="bg-[#F4F2FF]"],
+  [class~="bg-[#F7F8FF]"]
+) {
+  background-color: var(--app-info-bg) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell .support-chat-workspace :is(
+  [class~="bg-[#FFF3E7]"],
+  [class~="bg-[#FFFDFC]"],
+  [class~="bg-[#FBE9D7]"]
+) {
+  background-color: var(--app-warning-surface) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell .support-chat-workspace :is(
+  [class~="text-[#303644]"],
+  [class~="text-[#454B59]"],
+  [class~="text-[#454B5B]"],
+  [class~="text-[#505766]"],
+  [class~="text-[#555C6B]"],
+  [class~="text-[#453D78]"]
+) {
+  color: var(--app-text) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell .support-chat-workspace :is(
+  [class~="text-[#646B79]"],
+  [class~="text-[#747C8D]"],
+  [class~="text-[#777D8D]"],
+  [class~="text-[#989EAB]"],
+  [class~="text-[#969CA8]"],
+  [class~="text-[#999FAA]"],
+  [class~="text-[#AC8B6A]"]
+) {
+  color: var(--app-text-muted) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell .support-chat-workspace :is(
+  [class~="text-[#5E51A6]"],
+  [class~="text-[#6255A8]"],
+  [class~="text-[#8178B5]"]
+) {
+  color: var(--app-info-text) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell .support-chat-workspace :is(
+  [class~="text-[#6F4B29]"],
+  [class~="text-[#9A5513]"],
+  [class~="text-[#9A744F]"]
+) {
+  color: var(--app-warning-text) !important;
+}
+
+html[data-application-theme="dark"] .operations-shell .support-chat-workspace :is(
+  [class~="text-[#984343]"],
+  [class~="text-[#9B4343]"],
+  [class~="text-[#A13C3C]"]
+) {
+  color: var(--app-danger-text) !important;
+}
+
+/* O chat usa as mesmas fontes legíveis do restante do Operations. */
+.operations-shell .support-chat-workspace :is(
+  [class~="text-[8px]"],
+  [class~="text-[8.5px]"],
+  [class~="text-[9px]"],
+  [class~="text-[9.5px]"],
+  [class~="text-[10px]"]
+) {
+  font-size: 11px;
+}
+
+.operations-shell .support-chat-workspace :is(
+  [class~="text-[10.5px]"],
+  [class~="text-[11px]"],
+  [class~="text-[11.5px]"]
+) {
+  font-size: 12px;
+}
