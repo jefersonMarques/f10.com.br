@@ -12,6 +12,7 @@ import {
   listPublicChatMessages,
 } from "$lib/server/support/publicChatRepository";
 import { SUPPORT_IMAGE_MAX_FILES } from "$lib/server/support/supportMessageAttachmentRepository";
+import { updateLiveChatDraft } from "$lib/server/support/liveChatDrafts";
 
 const MAX_BODY_BYTES = 36 * 1024 * 1024;
 
@@ -126,6 +127,51 @@ export const GET: RequestHandler = async ({ params, request, cookies }) => {
   }
 };
 
+export const PUT: RequestHandler = async ({ params, request, cookies, url }) => {
+  const sessionId = params.sessionId ?? "";
+  const token = getBearerToken(request);
+  if (!isUuid(sessionId) || !token) {
+    return json({ error: "INVALID_SESSION" }, { status: 401 });
+  }
+  if (request.headers.get("origin") !== url.origin) {
+    return json({ error: "INVALID_ORIGIN" }, { status: 403 });
+  }
+
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (!Number.isFinite(contentLength) || contentLength > 16_384) {
+    return json({ error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+  }
+
+  let session: AuthorizedChatSession;
+  try {
+    session = await authorizePublicChatSessionForRead(sessionId, token);
+  } catch {
+    return json({ error: "INVALID_SESSION" }, { status: 401 });
+  }
+
+  if (!await authorizeF10CustomerForChat(cookies, session, false)) {
+    return json({ error: "CUSTOMER_AUTH_REQUIRED" }, { status: 401 });
+  }
+
+  let payload: unknown;
+  try {
+    payload = await request.json();
+  } catch {
+    return json({ error: "INVALID_PAYLOAD" }, { status: 400 });
+  }
+
+  const body = typeof payload === "object" && payload !== null && "body" in payload
+    ? (payload as { body: unknown }).body
+    : null;
+
+  if (typeof body !== "string" || body.length > 4000) {
+    return json({ error: "INVALID_DRAFT" }, { status: 400 });
+  }
+
+  updateLiveChatDraft(sessionId, body);
+  return json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+};
+
 export const POST: RequestHandler = async ({
   params,
   request,
@@ -189,6 +235,8 @@ export const POST: RequestHandler = async ({
       body,
       files,
     );
+
+    updateLiveChatDraft(sessionId, "");
 
     let ai: { state: "active" | "escalated" | "human" | "disabled"; processed: boolean } | null = null;
     if (messageResult.aiState === "active" && messageResult.ticketId) {
