@@ -39,9 +39,9 @@
   let searchElement: HTMLInputElement;
 
   const scopes: Array<{ value: InboxScope; label: string }> = [
+    { value: "waiting", label: "Aguardando" },
     { value: "mine", label: "Meus" },
     { value: "unassigned", label: "Não atribuídos" },
-    { value: "waiting", label: "Aguardando" },
     { value: "all", label: "Todos" },
   ];
 
@@ -175,10 +175,20 @@
         <button
           type="button"
           on:click={() => scope = item.value}
-          class={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-semibold transition ${scope === item.value ? "bg-[#000A57] text-white shadow-sm" : "border border-[#E4E6EC] bg-white text-[#6D7382] hover:border-[#C9CEDA] hover:bg-[#F8F9FB]"}`}
+          class={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-semibold transition ${scope === item.value
+            ? item.value === "waiting"
+              ? "bg-[#B45309] text-white shadow-sm"
+              : "bg-[#000A57] text-white shadow-sm"
+            : item.value === "waiting"
+              ? "border border-[#F3B48A] bg-[#FFF1E6] text-[#8A3900] hover:bg-[#FFE1CC]"
+              : "border border-[#E4E6EC] bg-white text-[#6D7382] hover:border-[#C9CEDA] hover:bg-[#F8F9FB]"}`}
         >
           {item.label}
-          <span class={`rounded-full px-1.5 py-0.5 text-[9px] ${scope === item.value ? "bg-white/15 text-white" : "bg-[#F1F2F5] text-[#858B99]"}`}>{scopeCount(item.value)}</span>
+          <span class={`rounded-full px-1.5 py-0.5 text-[9px] ${scope === item.value
+            ? "bg-white/20 text-white"
+            : item.value === "waiting"
+              ? "bg-[#FBD4B6] text-[#873A08]"
+              : "bg-[#F1F2F5] text-[#858B99]"}`}>{scopeCount(item.value)}</span>
         </button>
       {/each}
     </div>
