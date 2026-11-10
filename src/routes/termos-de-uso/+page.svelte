@@ -767,7 +767,7 @@
                     17:30h (horário de Brasília), sem intervalo, via chat
                     (localizado no interior do SOFTWARE), por meio de correio
                     eletrônico (suporte@f10.com.br), e ainda através da página
-                    de suporte (https://ajuda.f10.com.br), disponível 24 horas
+                    de suporte (https://f10.com.br/ajuda-f10), disponível 24 horas
                     por dia e todos os dias da semana) para esclarecimento de
                     dúvidas de ordem não técnica diretamente relacionadas ao
                     SOFTWARE (conforme o plano contratado). Manter as
