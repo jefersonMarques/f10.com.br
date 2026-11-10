@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm";
 import { getPermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { selectConversationSession } from "$lib/support/chatInboxClassification";
 import { webChatMessages, webChatSessions } from "$lib/server/db/chatSchema";
 import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
 import { users } from "$lib/server/db/schema";
@@ -177,23 +178,13 @@ export async function listInternalChatConversations(
 
   const conversations = [];
   for (const [conversationKey, rows] of grouped.entries()) {
-    const byRecentActivity = [...rows].sort(
-      (left, right) => right.updatedAt.getTime() - left.updatedAt.getTime(),
-    );
-    const activeRows = byRecentActivity.filter(
-      (row) => !["resolved", "closed"].includes(row.status),
-    );
-    const representative = activeRows[0] ?? byRecentActivity[0];
-    const latestActivity = byRecentActivity[0];
-    if (!representative || !latestActivity) continue;
+    const representative = selectConversationSession(rows);
+    if (!representative) continue;
 
     conversations.push({
       ...representative,
       conversationKey,
       sessionCount: rows.length,
-      lastMessageBody: latestActivity.lastMessageBody,
-      lastMessageAuthorType: latestActivity.lastMessageAuthorType,
-      updatedAt: latestActivity.updatedAt,
     });
   }
 
