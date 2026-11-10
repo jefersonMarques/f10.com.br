@@ -240,6 +240,13 @@
     }
   }
 
+  function handleComposerKeydown(event: KeyboardEvent): void {
+    if (event.isComposing || event.key !== "Enter" || event.shiftKey || event.altKey) return;
+
+    event.preventDefault();
+    if (!sending) void sendMessage();
+  }
+
   onMount(() => {
     if (!enabled) return;
 
@@ -315,7 +322,7 @@
       <form on:submit|preventDefault={() => void sendMessage()} class="border-t border-[#E5E8EE] bg-white p-3">
         {#if errorMessage}<p class="application-text-meta mb-2 rounded-lg bg-[#FFF2F2] px-2.5 py-2 font-medium text-[#A13B3B]">{errorMessage}</p>{/if}
         <div class="flex items-end gap-2">
-          <textarea bind:value={draft} rows="2" maxlength="4000" placeholder="Responder cliente..." class="application-text-caption min-h-[44px] max-h-28 flex-1 resize-y rounded-xl border border-[#D9DDE5] px-3 py-2.5 leading-5 outline-none focus:border-[#000A57]"></textarea>
+          <textarea bind:value={draft} rows="2" maxlength="4000" placeholder="Responder cliente..." on:keydown={handleComposerKeydown} class="application-text-caption min-h-[44px] max-h-28 flex-1 resize-y rounded-xl border border-[#D9DDE5] px-3 py-2.5 leading-5 outline-none focus:border-[#000A57]"></textarea>
           <button type="submit" disabled={sending || !draft.trim()} class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white disabled:cursor-not-allowed disabled:opacity-45" aria-label="Enviar mensagem"><Send size={16}/></button>
         </div>
       </form>
