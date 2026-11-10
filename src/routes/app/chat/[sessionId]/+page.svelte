@@ -65,6 +65,9 @@
   let messages: ChatMessage[] = data.initial.messages;
   let chat: ChatDetails = data.initial.chat;
   let messageBody = "";
+  let liveCustomerDraft = "";
+  let liveDraftSessionId = "";
+  let liveDraftStream: EventSource | null = null;
   let composerMode: ComposerMode = "reply";
   let sending = false;
   let errorMessage = "";
@@ -112,6 +115,25 @@
     disabled: "Aguardando equipe",
   };
 
+  function connectLiveDraft(sessionId: string): void {
+    if (typeof EventSource === "undefined" || liveDraftSessionId === sessionId) return;
+
+    liveDraftStream?.close();
+    liveDraftSessionId = sessionId;
+    liveCustomerDraft = "";
+    const stream = new EventSource(`/api/app/chat/${encodeURIComponent(sessionId)}/typing`);
+    liveDraftStream = stream;
+    stream.onmessage = (event: MessageEvent<string>) => {
+      if (liveDraftSessionId !== sessionId) return;
+      try {
+        const payload = JSON.parse(event.data) as { body?: unknown };
+        liveCustomerDraft = typeof payload.body === "string" ? payload.body : "";
+      } catch {
+        liveCustomerDraft = "";
+      }
+    };
+  }
+
   function resetConversationState(): void {
     loadedSessionId = data.initial.chat.sessionId;
     chat = data.initial.chat;
@@ -127,6 +149,7 @@
 
     if (typeof window !== "undefined") {
       messageBody = window.sessionStorage.getItem(`f10:chat-draft:${chat.sessionId}`) ?? "";
+      connectLiveDraft(chat.sessionId);
       void refreshMessages(true);
       void refreshRelatedTickets();
     }
@@ -352,6 +375,7 @@
 
   onMount(() => {
     messageBody = window.sessionStorage.getItem(draftKey) ?? "";
+    connectLiveDraft(chat.sessionId);
     void refreshMessages(true);
     void refreshRelatedTickets();
 
@@ -366,6 +390,7 @@
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       window.clearInterval(intervalId);
+      liveDraftStream?.close();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   });
@@ -515,6 +540,15 @@
           <button type="button" on:click={() => void scrollToLatest()} class="absolute bottom-4 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#000A57] px-3.5 py-2 text-[10px] font-semibold text-white shadow-lg">{newMessageCount} {newMessageCount === 1 ? "nova mensagem" : "novas mensagens"}<ArrowDown size={13} /></button>
         {/if}
       </div>
+
+      {#if liveCustomerDraft && !chat.closedAt}
+        <div class="shrink-0 border-t border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-2.5">
+          <div class="mx-auto max-w-[840px] rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface-subtle)] px-3.5 py-2.5" aria-live="polite">
+            <span class="text-[10px] font-semibold text-[var(--app-text-muted)]">Cliente digitando...</span>
+            <p class="mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap break-words text-[12px] leading-5 text-[var(--app-text)]">{liveCustomerDraft}</p>
+          </div>
+        </div>
+      {/if}
 
       {#if chat.status !== "closed" && (canWrite || data.canInternalNote)}
         <footer class="shrink-0 border-t border-[var(--app-border)] bg-[var(--app-surface)] p-4">
