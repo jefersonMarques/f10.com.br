@@ -58,6 +58,7 @@ jobs:
           node --check scripts/inspect-movidesk-knowledge.mjs
           node --experimental-strip-types --test tests/emailInboundBody.test.mjs
           node --experimental-strip-types --test tests/chatMarkdown.test.mjs
+          node --experimental-strip-types --test tests/chatLiveDrafts.test.mjs
           node --experimental-strip-types --test tests/ticketRichTextSerialization.test.mjs
           node --experimental-strip-types --test tests/ticketReplyMarkdownEmail.test.mjs
           node --experimental-strip-types --test tests/supportChatRestore.test.mjs
