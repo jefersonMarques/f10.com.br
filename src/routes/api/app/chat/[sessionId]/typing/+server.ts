@@ -33,7 +33,7 @@ export const GET: RequestHandler = async ({ params, cookies, request }) => {
   }
 
   const encoder = new TextEncoder();
-  let cleanup = () => undefined;
+  let cleanup: () => void = () => undefined;
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
