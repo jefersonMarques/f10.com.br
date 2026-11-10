@@ -66,3 +66,25 @@ test("legacy formatter leaves fenced code untouched", () => {
   const body = "```\n**A\nB**\n```\n\nTexto **formatado**";
   assert.equal(normalizeTicketMessageMarkdown(body), body);
 });
+
+test("chat replies preserve rich formatting and line breaks in the public renderer", () => {
+  const editor = createElement("div",
+    createElement("div",
+      createTextNode("Olá, "),
+      createElement("strong", createTextNode("cliente")),
+      createTextNode("!"),
+    ),
+    createElement("div",
+      createTextNode("Próximo passo: "),
+      createElement("em", createTextNode("acessar painel")),
+    ),
+  );
+
+  const savedBody = serializeTicketRichText(editor);
+  assert.equal(savedBody, "Olá, **cliente**!\nPróximo passo: *acessar painel*");
+
+  const parsed = parseChatMarkdown(savedBody);
+  assert.equal(parsed.length, 2);
+  assert.ok(parsed[0].tokens.some((token) => token.kind === "strong" && token.text === "cliente"));
+  assert.ok(parsed[1].tokens.some((token) => token.kind === "emphasis" && token.text === "acessar painel"));
+});
