@@ -42,6 +42,22 @@ async function inspect(tx) {
           OR m.external_metadata->>'sourceActionId' IS DISTINCT FROM a.source_action_id::text
       )::integer AS invalid_source_mappings,
       count(*) FILTER (
+        WHERE m.external_message_id IS DISTINCT FROM
+          ('movidesk:' || a.source_ticket_id || ':' || a.source_action_id)
+      )::integer AS mismatched_external_ids,
+      count(*) FILTER (
+        WHERE m.ticket_id != i.ticket_id
+      )::integer AS mismatched_ticket_ids,
+      count(*) FILTER (
+        WHERE m.external_metadata->>'sourceVisibility' IS DISTINCT FROM a.source_visibility
+      )::integer AS mismatched_metadata_visibility,
+      count(*) FILTER (
+        WHERE m.external_metadata->>'sourceTicketId' IS DISTINCT FROM a.source_ticket_id
+      )::integer AS mismatched_metadata_ticket_ids,
+      count(*) FILTER (
+        WHERE m.external_metadata->>'sourceActionId' IS DISTINCT FROM a.source_action_id::text
+      )::integer AS mismatched_metadata_action_ids,
+      count(*) FILTER (
         WHERE a.source_visibility = 'public'
           AND m.external_metadata->>'portalAccessApproved' IS DISTINCT FROM 'false'
       )::integer AS missing_portal_protection
@@ -64,6 +80,13 @@ function summarize(rows) {
     privateVisibilityMismatches: 0,
     invalidSourceMappings: 0,
     missingPortalProtection: 0,
+    mappingDiagnostics: {
+      externalId: 0,
+      ticketId: 0,
+      metadataVisibility: 0,
+      metadataTicketId: 0,
+      metadataActionId: 0,
+    },
   };
   const keys = [
     ["total_actions", "actions"],
@@ -77,6 +100,11 @@ function summarize(rows) {
   ];
   for (const row of rows) {
     for (const [source, target] of keys) totals[target] += row[source];
+    totals.mappingDiagnostics.externalId += row.mismatched_external_ids;
+    totals.mappingDiagnostics.ticketId += row.mismatched_ticket_ids;
+    totals.mappingDiagnostics.metadataVisibility += row.mismatched_metadata_visibility;
+    totals.mappingDiagnostics.metadataTicketId += row.mismatched_metadata_ticket_ids;
+    totals.mappingDiagnostics.metadataActionId += row.mismatched_metadata_action_ids;
   }
   return totals;
 }
