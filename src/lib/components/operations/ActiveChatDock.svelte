@@ -50,6 +50,9 @@
   let finishing = false;
   let refreshing = false;
   let errorMessage = "";
+  let liveCustomerDraft = "";
+  let liveDraftSessionId: string | null = null;
+  let liveDraftStream: EventSource | null = null;
   let messageViewport: HTMLDivElement | null = null;
 
   $: activeChat = expandedSessionId
@@ -57,6 +60,29 @@
     : null;
   $: visibleChats = visibleChatTabs(chats, expandedSessionId);
   $: hiddenChatCount = Math.max(chats.length - visibleChats.length, 0);
+  $: if (typeof EventSource !== "undefined") connectLiveDraft(expandedSessionId);
+
+  function connectLiveDraft(sessionId: string | null): void {
+    if (liveDraftSessionId === sessionId) return;
+
+    liveDraftStream?.close();
+    liveDraftStream = null;
+    liveDraftSessionId = sessionId;
+    liveCustomerDraft = "";
+    if (!sessionId || typeof EventSource === "undefined") return;
+
+    const stream = new EventSource(`/api/app/chat/${encodeURIComponent(sessionId)}/typing`);
+    liveDraftStream = stream;
+    stream.onmessage = (event: MessageEvent<string>) => {
+      if (liveDraftSessionId !== sessionId) return;
+      try {
+        const payload = JSON.parse(event.data) as { body?: unknown };
+        liveCustomerDraft = typeof payload.body === "string" ? payload.body : "";
+      } catch {
+        liveCustomerDraft = "";
+      }
+    };
+  }
 
   function visibleChatTabs(items: DockChat[], selectedSessionId: string | null): DockChat[] {
     const visible = items.slice(0, 4);
@@ -263,6 +289,7 @@
 
     return () => {
       window.clearInterval(timer);
+      liveDraftStream?.close();
       window.removeEventListener("focus", handleAttention);
       document.removeEventListener("visibilitychange", handleAttention);
     };
@@ -318,6 +345,13 @@
           <p class="application-text-caption py-10 text-center text-[#969BA7]">Carregando conversa...</p>
         {/each}
       </div>
+
+      {#if liveCustomerDraft}
+        <div class="shrink-0 border-t border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2.5" aria-live="polite">
+          <span class="application-text-meta font-semibold text-[var(--app-text-muted)]">Cliente digitando...</span>
+          <p class="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap break-words text-[12px] leading-5 text-[var(--app-text)]">{liveCustomerDraft}</p>
+        </div>
+      {/if}
 
       <form on:submit|preventDefault={() => void sendMessage()} class="border-t border-[#E5E8EE] bg-white p-3">
         {#if errorMessage}<p class="application-text-meta mb-2 rounded-lg bg-[#FFF2F2] px-2.5 py-2 font-medium text-[#A13B3B]">{errorMessage}</p>{/if}
