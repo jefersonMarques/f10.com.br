@@ -344,10 +344,10 @@
   }
 
   function handleComposerKeydown(event: KeyboardEvent): void {
-    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-      event.preventDefault();
-      void sendMessage();
-    }
+    if (event.isComposing || event.key !== "Enter" || event.shiftKey || event.altKey) return;
+
+    event.preventDefault();
+    if (!sending) void sendMessage();
   }
 
   onMount(() => {
@@ -531,7 +531,7 @@
               {#if errorMessage}<div class="mx-3 mt-3 flex items-center gap-2 rounded-xl bg-[#FFF3F3] px-3 py-2 text-[9.5px] font-medium text-[#A13C3C]"><CircleAlert size={13} />{errorMessage}</div>{/if}
               <form on:submit|preventDefault={() => void sendMessage()}>
                 <textarea bind:value={messageBody} on:input={persistDraft} on:keydown={handleComposerKeydown} maxlength="4000" rows="3" placeholder="Escreva uma mensagem para o cliente..." class="max-h-40 min-h-[86px] w-full resize-none border-0 px-4 py-3.5 text-[11.5px] leading-5 outline-none"></textarea>
-                <div class="flex items-center justify-between border-t border-[#F0F1F4] px-3.5 py-2.5"><span class="text-[9px] text-[#999FAA]">Ctrl/⌘ + Enter envia</span><button type="submit" disabled={sending || !messageBody.trim()} class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white transition hover:bg-[#111B71] disabled:bg-[#D6D9E2]">Enviar <Send size={13} /></button></div>
+                <div class="flex items-center justify-between border-t border-[#F0F1F4] px-3.5 py-2.5"><span class="text-[9px] text-[#999FAA]">Enter envia · Shift+Enter quebra linha</span><button type="submit" disabled={sending || !messageBody.trim()} class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white transition hover:bg-[#111B71] disabled:bg-[#D6D9E2]">Enviar <Send size={13} /></button></div>
               </form>
             {:else if composerMode === "note" && data.canInternalNote}
               <form method="POST" action="?/note" class="bg-[#FFFDFC]">
