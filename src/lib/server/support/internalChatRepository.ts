@@ -307,6 +307,10 @@ export async function claimInternalChat(
   }
   if (chat.assignedUserId === actorUserId) return;
 
+  const [actor] = await db.select({ name: users.name })
+    .from(users).where(eq(users.id, actorUserId)).limit(1);
+  if (!actor) throw new Error("CHAT_AGENT_NOT_FOUND");
+
   const now = new Date();
   await db.transaction(async (tx) => {
     await tx
@@ -341,14 +345,16 @@ export async function claimInternalChat(
         authorType: "system",
         visibility: "public",
         channel: "web_chat",
-        body: "Um atendente da equipe F10 assumiu o atendimento.",
+        authorUserId: actorUserId,
+        body: `${actor.name} assumiu o atendimento.`,
       });
     } else {
       await tx.insert(webChatMessages).values({
         sessionId,
         authorType: "system",
         visibility: "public",
-        body: "Um atendente da equipe F10 assumiu o atendimento.",
+        authorUserId: actorUserId,
+        body: `${actor.name} assumiu o atendimento.`,
       });
     }
   });
