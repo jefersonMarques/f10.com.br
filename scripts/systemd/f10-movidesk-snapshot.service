@@ -1,0 +1,19 @@
+[Unit]
+Description=F10 Movidesk historical ticket snapshot
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=900
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/f10.com.br
+UMask=0077
+ExecStart=/usr/bin/flock -n /var/lib/f10/movidesk-final-snapshot/export.lock /usr/bin/env node --env-file-if-exists=.env --env-file-if-exists=.env.production scripts/export-movidesk-final-ticket-snapshot.mjs
+Restart=on-failure
+RestartSec=60
+StandardOutput=append:/var/lib/f10/movidesk-final-snapshot/run.log
+StandardError=append:/var/lib/f10/movidesk-final-snapshot/run.log
+
+[Install]
+WantedBy=multi-user.target
