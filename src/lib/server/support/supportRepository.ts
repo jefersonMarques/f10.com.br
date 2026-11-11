@@ -500,7 +500,7 @@ export async function createManualTicket(
     }
   }
 
-  const ticket = await db.transaction(async (tx) => {
+  const created = await db.transaction(async (tx) => {
     const customer = await resolveTicketCustomer(tx, input);
 
     if (input.channel === "email") {
@@ -576,10 +576,11 @@ export async function createManualTicket(
       },
     });
 
-    return ticket;
+    return { ...ticket, customerContactId: customer.contactId, unitName: customer.unitName };
   });
 
-  await reuseTicketCommercialUnit(ticket.id, (await db.select({ customerContactId: tickets.customerContactId }).from(tickets).where(eq(tickets.id, ticket.id)).limit(1))[0]?.customerContactId ?? null).catch((cause) => {
+  const { customerContactId, unitName, ...ticket } = created;
+  await reuseTicketCommercialUnit(ticket.id, customerContactId, unitName).catch((cause) => {
     console.error("[ticket.commercial_unit.auto_reuse]", {
       ticketId: ticket.id,
       errorType: cause instanceof Error ? cause.name : typeof cause,
