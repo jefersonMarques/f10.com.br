@@ -187,11 +187,12 @@ export async function sendTicketPublicReplyEmail(
       `Acompanhe seu chamado no painel: ${ticketUrl}`,
     ].join("\n"),
     htmlContent: buildEmailHtml({
-      eyebrow: `Ticket #${ticket.ticketNumber}`,
-      title: ticket.subject,
+      eyebrow: "Atualização de atendimento",
+      title: "Temos uma atualização para você",
       ...(recipientName ? { greeting: `Olá, ${recipientName}.` } : {}),
       body: emailParagraphs(body),
       markdownBody: true,
+      ticket: { number: ticket.ticketNumber, subject: ticket.subject },
       action: { label: "Ver chamado no painel", href: ticketUrl },
       footer: "Responda diretamente a este e-mail para continuar o atendimento no mesmo ticket.",
     }),
@@ -336,7 +337,7 @@ export async function notifyCustomerOfTicketStatus(
   const route = resolveEmailRoute(thread?.inboxCode) || resolveEmailRoute(ticket.queueCode);
   const portalUrl = `${getCustomerPortalBaseUrl("https://f10.com.br")}/cliente/chamados/${encodeURIComponent(ticketId)}`;
   const waiting = ticket.status === "waiting_customer";
-  const headline = waiting ? "Seu atendimento aguarda uma resposta" : "Seu atendimento foi resolvido";
+  const headline = waiting ? "Precisamos de uma informação" : "Sua solicitação foi resolvida";
   const description = waiting
     ? "Precisamos da sua resposta para continuar o atendimento. Você pode responder a este e-mail ou acessar o chamado no painel."
     : "Concluímos seu atendimento. Você pode consultar os detalhes no painel de chamados.";
@@ -358,11 +359,12 @@ export async function notifyCustomerOfTicketStatus(
       `Acesse seu chamado: ${portalUrl}`,
     ].join("\n"),
     htmlContent: buildEmailHtml({
-      eyebrow: `Ticket #${ticket.number}`,
+      eyebrow: waiting ? "Precisamos de sua atenção" : "Atendimento resolvido",
       title: headline,
       ...(name ? { greeting: `Olá, ${name}.` } : {}),
-      body: [description, ticket.subject],
-      action: { label: "Acompanhar chamado", href: portalUrl },
+      body: [description],
+      ticket: { number: ticket.number, subject: ticket.subject, status: waiting ? "Aguardando cliente" : "Resolvido" },
+      action: { label: waiting ? "Responder ao atendimento" : "Consultar atendimento", href: portalUrl },
       footer: "A consulta no painel exige acesso à área do cliente.",
     }),
   });
