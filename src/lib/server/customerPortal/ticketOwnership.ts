@@ -29,13 +29,22 @@ export function customerTicketOwnershipCondition(
   contactId: string,
   verifiedEmail: string | null,
 ): SQL {
+  const explicitRequester = sql`EXISTS (
+    SELECT 1 FROM ${ticketRequesterProfiles} requester
+    WHERE requester.ticket_id = ${tickets.id}
+      AND requester.customer_contact_id = ${contactId}::uuid
+  )`;
+  const noOtherExplicitRequester = sql`NOT EXISTS (
+    SELECT 1 FROM ${ticketRequesterProfiles} requester
+    WHERE requester.ticket_id = ${tickets.id}
+      AND requester.customer_contact_id IS NOT NULL
+  )`;
+
   return or(
-    eq(tickets.customerContactId, contactId),
-    sql`EXISTS (
-      SELECT 1 FROM ${ticketRequesterProfiles} requester
-      WHERE requester.ticket_id = ${tickets.id}
-        AND requester.customer_contact_id = ${contactId}::uuid
-    )`,
-    originalEmailSenderCondition(verifiedEmail),
+    explicitRequester,
+    and(
+      noOtherExplicitRequester,
+      or(eq(tickets.customerContactId, contactId), originalEmailSenderCondition(verifiedEmail)),
+    ),
   ) ?? sql`false`;
 }
