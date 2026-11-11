@@ -252,7 +252,10 @@ export async function listSupportTickets(
     .orderBy(desc(tickets.updatedAt))
     .limit(500);
 
-  return query.where(condition);
+  return query.where(and(
+    condition,
+    sql`NOT EXISTS (SELECT 1 FROM ticket_merge_links merged WHERE merged.source_ticket_id = ${tickets.id} AND merged.unmerged_at IS NULL)`,
+  ));
 }
 
 function normalizedPhone(value: string): string {
