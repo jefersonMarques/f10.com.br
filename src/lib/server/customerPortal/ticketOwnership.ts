@@ -25,15 +25,18 @@ export function originalEmailSenderCondition(email: string | null): SQL {
   ) ?? sql`false`;
 }
 
-export function customerTicketOwnershipCondition(
-  contactId: string,
-  verifiedEmail: string | null,
-): SQL {
-  const explicitRequester = sql`EXISTS (
+export function explicitTicketRequesterCondition(contactId: string): SQL {
+  return sql`EXISTS (
     SELECT 1 FROM ${ticketRequesterProfiles} requester
     WHERE requester.ticket_id = ${tickets.id}
       AND requester.customer_contact_id = ${contactId}::uuid
   )`;
+}
+
+export function customerTicketOwnershipCondition(
+  contactId: string,
+  verifiedEmail: string | null,
+): SQL {
   const noOtherExplicitRequester = sql`NOT EXISTS (
     SELECT 1 FROM ${ticketRequesterProfiles} requester
     WHERE requester.ticket_id = ${tickets.id}
@@ -41,7 +44,7 @@ export function customerTicketOwnershipCondition(
   )`;
 
   return or(
-    explicitRequester,
+    explicitTicketRequesterCondition(contactId),
     and(
       noOtherExplicitRequester,
       or(eq(tickets.customerContactId, contactId), originalEmailSenderCondition(verifiedEmail)),
