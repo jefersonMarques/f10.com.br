@@ -1,6 +1,7 @@
 import { error, json, type RequestHandler } from "@sveltejs/kit";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { customerTicketOwnershipCondition } from "$lib/server/customerPortal/ticketOwnership";
 import { tickets } from "$lib/server/db/supportSchema";
 import { getCustomerF10Ticket } from "$lib/server/customerPortal/customerF10TicketRepository";
 import { requireCustomerTicketPortalSession } from "$lib/server/customerPortal/customerPortalSession";
@@ -28,7 +29,7 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
       latest: sql<Date | null>`max(${tickets.updatedAt})`,
     })
     .from(tickets)
-    .where(eq(tickets.customerContactId, session.contactId));
+    .where(customerTicketOwnershipCondition(session.contactId, session.email));
 
   return json({
     revision: `${state?.total ?? 0}:${state?.latest ? new Date(state.latest).getTime() : 0}`,
