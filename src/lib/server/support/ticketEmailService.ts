@@ -201,11 +201,16 @@ export async function sendTicketPublicReplyEmail(
   return true;
 }
 
-export async function sendNewEmailTicketAcknowledgement(input: {
+type TicketAcknowledgementInput = {
   ticketId: string;
   sender: { email: string; name: string | null };
   messageBody: string;
-}): Promise<boolean> {
+};
+
+async function sendTicketAcknowledgement(
+  input: TicketAcknowledgementInput,
+  requireInboundEmail: boolean,
+): Promise<boolean> {
   const db = getDatabase();
   const [ticket] = await db.select({
     number: tickets.ticketNumber,
@@ -220,7 +225,7 @@ export async function sendNewEmailTicketAcknowledgement(input: {
     .leftJoin(customerContacts, eq(tickets.customerContactId, customerContacts.id))
     .where(eq(tickets.id, input.ticketId))
     .limit(1);
-  if (!ticket || ticket.channel !== "email") return false;
+  if (!ticket || (requireInboundEmail && ticket.channel !== "email")) return false;
 
   const receipt = createTicketEmailReceiptContent({
     sender: input.sender,
@@ -243,6 +248,23 @@ export async function sendNewEmailTicketAcknowledgement(input: {
     inboxCode: route?.code ?? "ticket-reply",
   });
 
+  const description = requireInboundEmail
+    ? receipt.description
+    : ticket.channel === "portal"
+      ? [
+          "Sua solicitação foi registrada na central de atendimento F10.",
+          "Nossa equipe irá analisá-la. Você pode acompanhar o chamado ou responder a este e-mail.",
+        ]
+      : ticket.channel === "web_chat"
+        ? [
+            "Registramos o atendimento iniciado pelo chat em nossa central de suporte.",
+            "Nossa equipe irá analisá-lo. Você pode acompanhar o chamado ou responder a este e-mail.",
+          ]
+        : [
+            "Nossa equipe abriu um chamado para acompanhar sua solicitação.",
+            "Você pode consultar o atendimento ou responder a este e-mail para acrescentar informações.",
+          ];
+
   const canAccessPortal = ticket.customerContactId !== null
     && ticket.customerEmail?.trim().toLowerCase() === receipt.recipientEmail;
   const ticketUrl = canAccessPortal
@@ -260,11 +282,11 @@ export async function sendNewEmailTicketAcknowledgement(input: {
     textContent: [
       receipt.greeting,
       "",
-      ...receipt.description,
+      ...description,
       "",
       `Protocolo: #${ticket.number}`,
       `Assunto: ${ticket.subject}`,
-      ...(receipt.originalExcerpt ? ["", "Mensagem recebida:", receipt.originalExcerpt] : []),
+      ...(requireInboundEmail && receipt.originalExcerpt ? ["", "Mensagem recebida:", receipt.originalExcerpt] : []),
       ...(ticketUrl ? ["", `Acompanhe seu chamado: ${ticketUrl}`] : []),
       "",
       "Você pode responder diretamente a este e-mail para continuar o atendimento.",
@@ -273,13 +295,13 @@ export async function sendNewEmailTicketAcknowledgement(input: {
       eyebrow: "Confirmação de recebimento",
       title: "Recebemos sua solicitação",
       greeting: receipt.greeting,
-      body: receipt.description,
+      body: description,
       ticket: {
         number: ticket.number,
         subject: ticket.subject,
         status: "Solicitação recebida",
       },
-      ...(receipt.originalExcerpt
+      ...(requireInboundEmail && receipt.originalExcerpt
         ? { quote: { label: "Mensagem recebida", text: receipt.originalExcerpt } }
         : {}),
       ...(ticketUrl
@@ -290,6 +312,18 @@ export async function sendNewEmailTicketAcknowledgement(input: {
     tags: ["ticket-received"],
   });
   return true;
+}
+
+export async function sendNewEmailTicketAcknowledgement(
+  input: TicketAcknowledgementInput,
+): Promise<boolean> {
+  return sendTicketAcknowledgement(input, true);
+}
+
+export async function sendNewNonEmailTicketAcknowledgement(
+  input: TicketAcknowledgementInput,
+): Promise<boolean> {
+  return sendTicketAcknowledgement(input, false);
 }
 
 /** Called only after a persisted status transition, including workflow moves. */

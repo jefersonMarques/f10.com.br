@@ -20,6 +20,7 @@ import {
 import { ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
 import { ticketMessageAttachments } from "$lib/server/db/supportChatEntrySchema";
 import { ticketEvents, ticketMessages, tickets } from "$lib/server/db/supportSchema";
+import { customerTicketOwnershipCondition, explicitTicketRequesterCondition, originalEmailSenderCondition } from "$lib/server/customerPortal/ticketOwnership";
 import {
   getCustomerPortalTicket,
   replyCustomerPortalTicket,
@@ -36,6 +37,7 @@ import {
   CUSTOMER_TEAM_ACTIVITY_EVENT_TYPES,
 } from "$lib/server/support/ticketCustomerProgressRepository";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
+import { notifyNewTicketCustomer } from "$lib/server/support/ticketCreationNotificationService";
 import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
 import {
   deleteStoredSupportImages,
@@ -130,7 +132,7 @@ function contextAuthorizationCondition(
 
   for (const context of contexts) {
     const unitCondition = and(
-      eq(ticketCustomerContexts.legacyUserId, session.legacyUserId),
+      or(eq(ticketCustomerContexts.legacyUserId, session.legacyUserId), isNull(ticketCustomerContexts.legacyUserId)),
       eq(ticketCustomerContexts.contextScope, "unit"),
       eq(ticketCustomerContexts.groupId, context.groupId),
       eq(ticketCustomerContexts.unitId, context.unitId),
@@ -208,10 +210,10 @@ export async function listCustomerF10Tickets(
     return { tickets: [], total: 0, page: 1, pageSize: filters.pageSize, totalPages: 0 };
   }
 
-  const conditions: SQL[] = [eq(tickets.customerContactId, session.contactId)];
+  const conditions: SQL[] = [customerTicketOwnershipCondition(session.contactId, session.email)];
 
   if (isF10Session) {
-    if (authorizedContexts.length === 0) {
+    if (authorizedContexts.length === 0 && hasContextFilter) {
       return { tickets: [], total: 0, page: 1, pageSize: filters.pageSize, totalPages: 0 };
     }
 
@@ -225,13 +227,22 @@ export async function listCustomerF10Tickets(
       session as CustomerF10PortalSession,
       contextsForAuthorization,
     );
-    if (!contextCondition) {
+    if (hasContextFilter && !contextCondition) {
       return { tickets: [], total: 0, page: 1, pageSize: filters.pageSize, totalPages: 0 };
     }
 
     const authorizedTicketCondition = hasContextFilter
       ? contextCondition
-      : or(contextCondition, isNull(ticketCustomerContexts.ticketId));
+      : or(
+          contextCondition,
+          isNull(ticketCustomerContexts.ticketId),
+          and(
+            isNull(ticketCustomerContexts.legacyUserId),
+            eq(tickets.customerContactId, session.contactId),
+          ),
+          originalEmailSenderCondition(session.email),
+          explicitTicketRequesterCondition(session.contactId),
+        );
     if (authorizedTicketCondition) conditions.push(authorizedTicketCondition);
   }
 
@@ -277,6 +288,7 @@ export async function listCustomerF10Tickets(
       createdAt: tickets.createdAt,
       updatedAt: tickets.updatedAt,
       contextTicketId: ticketCustomerContexts.ticketId,
+      contextLegacyUserId: ticketCustomerContexts.legacyUserId,
       contextScope: ticketCustomerContexts.contextScope,
       groupId: ticketCustomerContexts.groupId,
       groupName: ticketCustomerContexts.groupName,
@@ -356,7 +368,14 @@ export async function listCustomerF10Tickets(
         updatedAt: row.updatedAt,
         lastTeamActivityAt,
         hasUnreadUpdate,
-        context: ticketContextFromRow(row, fallbackContext),
+        context: row.contextLegacyUserId && row.contextLegacyUserId !== session.legacyUserId
+          ? null
+          : isF10Session && row.groupId !== null && row.unitId !== null
+            && !isAuthorizedF10Context(
+              session as CustomerF10PortalSession, row.groupId, row.unitId,
+            )
+            ? null
+            : ticketContextFromRow(row, fallbackContext),
       };
     }),
     total,
@@ -370,7 +389,7 @@ export async function getCustomerF10Ticket(
   session: CustomerF10PortalSession | CustomerTicketPortalSession,
   ticketId: string,
 ) {
-  const details = await getCustomerPortalTicket(session.contactId, ticketId);
+  const details = await getCustomerPortalTicket(session.contactId, ticketId, session.email);
   if (!details) return null;
 
   if (!session.legacyUserId) {
@@ -396,7 +415,6 @@ export async function getCustomerF10Ticket(
     // A lista já permite chamados sem contexto quando pertencem ao contato
     // autenticado. Os detalhes devem usar a mesma regra: a propriedade foi
     // validada por getCustomerPortalTicket(session.contactId, ticketId).
-    if (authorizedContexts.length === 0) return null;
     return {
       ...details,
       context: authorizedContexts.length === 1
@@ -405,7 +423,17 @@ export async function getCustomerF10Ticket(
     };
   }
 
-  if (context.legacyUserId !== session.legacyUserId) return null;
+  if (context.legacyUserId && context.legacyUserId !== session.legacyUserId) {
+    const [originalSender] = await getDatabase()
+      .select({ id: tickets.id })
+      .from(tickets)
+      .where(and(
+        eq(tickets.id, ticketId),
+        or(originalEmailSenderCondition(session.email), explicitTicketRequesterCondition(session.contactId)),
+      ))
+      .limit(1);
+    return originalSender ? { ...details, context: null } : null;
+  }
   if (context.contextScope === "global") {
     return { ...details, context: globalDisplayContext() };
   }
@@ -418,7 +446,7 @@ export async function getCustomerF10Ticket(
     !context.unitSchema ||
     !isAuthorizedF10Context(session, context.groupId, context.unitId)
   ) {
-    return null;
+    return { ...details, context: null };
   }
 
   return {
@@ -572,6 +600,19 @@ export async function createCustomerF10Ticket(
     });
   });
 
+  await notifyNewTicketCustomer({
+    ticketId: ticket.id,
+    origin: "portal",
+    expectedContactId: session.contactId,
+    verifiedPortalEmail: session.email,
+    messageBody: message,
+  }).catch((cause) => {
+    console.error("[customer.portal.ticket.receipt]", {
+      ticketId: ticket.id,
+      errorType: cause instanceof Error ? cause.name : typeof cause,
+    });
+  });
+
   return ticket;
 }
 
@@ -583,7 +624,7 @@ export async function replyCustomerF10Ticket(
 ): Promise<void> {
   const ticket = await getCustomerF10Ticket(session, ticketId);
   if (!ticket) throw new Error("CUSTOMER_TICKET_NOT_FOUND");
-  await replyCustomerPortalTicket(session.contactId, ticketId, body, files);
+  await replyCustomerPortalTicket(session.contactId, ticketId, body, files, session.email);
 }
 
 export async function bindTicketF10Context(

@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, asc, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { customerTicketOwnershipCondition } from "$lib/server/customerPortal/ticketOwnership";
 import { calculateNextResponseDueAt } from "$lib/server/support/ticketSlaService";
 import { notifyTicketFollowers } from "$lib/server/support/ticketFollowerRepository";
 import {
@@ -257,7 +258,11 @@ export async function listCustomerPortalTickets(contactId: string) {
     .orderBy(desc(tickets.updatedAt));
 }
 
-export async function getCustomerPortalTicket(contactId: string, ticketId: string) {
+export async function getCustomerPortalTicket(
+  contactId: string,
+  ticketId: string,
+  verifiedEmail: string | null = null,
+) {
   const db = getDatabase();
   const [ticket] = await db
     .select({
@@ -276,7 +281,7 @@ export async function getCustomerPortalTicket(contactId: string, ticketId: strin
       updatedAt: tickets.updatedAt,
     })
     .from(tickets)
-    .where(and(eq(tickets.id, ticketId), eq(tickets.customerContactId, contactId)))
+    .where(and(eq(tickets.id, ticketId), customerTicketOwnershipCondition(contactId, verifiedEmail)))
     .limit(1);
 
   if (!ticket) return null;
@@ -343,6 +348,7 @@ export async function replyCustomerPortalTicket(
   ticketId: string,
   body: string,
   files: File[] = [],
+  verifiedEmail: string | null = null,
 ): Promise<void> {
   const db = getDatabase();
   const [ticket] = await db
@@ -355,7 +361,7 @@ export async function replyCustomerPortalTicket(
       firstResponseAt: tickets.firstResponseAt,
     })
     .from(tickets)
-    .where(and(eq(tickets.id, ticketId), eq(tickets.customerContactId, contactId)))
+    .where(and(eq(tickets.id, ticketId), customerTicketOwnershipCondition(contactId, verifiedEmail)))
     .limit(1);
 
   if (!ticket) throw new Error("CUSTOMER_TICKET_NOT_FOUND");
@@ -404,7 +410,7 @@ export async function replyCustomerPortalTicket(
           nextResponseDueAt,
           updatedAt: now,
         })
-        .where(and(eq(tickets.id, ticketId), eq(tickets.customerContactId, contactId)));
+        .where(and(eq(tickets.id, ticketId), customerTicketOwnershipCondition(contactId, verifiedEmail)));
 
       await tx.insert(ticketEvents).values({
         ticketId,
