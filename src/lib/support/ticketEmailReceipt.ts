@@ -14,17 +14,20 @@ export type TicketEmailReceiptContent = {
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const AUTOMATED_MAILBOX_PATTERN = /^(?:no[._-]?reply|do[._-]?not[._-]?reply|mailer[._-]?daemon|postmaster|bounce(?:s)?|auto[._-]?reply)(?:[+._-].*)?$/i;
-const F10_INBOUND_DOMAIN = "reply.f10.com.br";
+const DEFAULT_INBOUND_DOMAIN = "reply.f10.com.br";
 const MAX_QUOTE_LENGTH = 240;
 
-export function isEligibleTicketReceiptSender(email: string): boolean {
+export function isEligibleTicketReceiptSender(
+  email: string,
+  inboundDomain: string = DEFAULT_INBOUND_DOMAIN,
+): boolean {
   const normalized = email.trim().toLowerCase();
   if (!EMAIL_PATTERN.test(normalized)) return false;
 
   const [localPart, domain] = normalized.split("@");
   if (AUTOMATED_MAILBOX_PATTERN.test(localPart)) return false;
 
-  return domain !== F10_INBOUND_DOMAIN;
+  return domain !== inboundDomain.trim().toLowerCase().replace(/^@+/, "");
 }
 
 export function excerptTicketEmail(text: string): string | null {
@@ -44,8 +47,9 @@ export function createTicketEmailReceiptContent(input: {
   ticketNumber: number;
   subject: string;
   messageBody: string;
+  inboundDomain?: string;
 }): TicketEmailReceiptContent | null {
-  if (!isEligibleTicketReceiptSender(input.sender.email)) return null;
+  if (!isEligibleTicketReceiptSender(input.sender.email, input.inboundDomain)) return null;
 
   const recipientName = input.sender.name?.trim() || null;
   const greeting = recipientName ? `Olá, ${recipientName}.` : "Olá!";
