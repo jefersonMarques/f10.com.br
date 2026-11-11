@@ -94,6 +94,7 @@ export const supportEmailTicketReceipts = pgTable(
   {
     ticketId: uuid("ticket_id").primaryKey()
       .references(() => tickets.id, { onDelete: "cascade" }),
+    initialMessageId: text("initial_message_id").notNull(),
     status: text("status").$type<
       "pending" | "sending" | "sent" | "failed" | "skipped"
     >().notNull().default("pending"),
