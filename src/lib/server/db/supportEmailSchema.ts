@@ -89,4 +89,19 @@ export const supportEmailInboundEvents = pgTable(
   ],
 );
 
+export const supportEmailTicketReceipts = pgTable(
+  "support_email_ticket_receipts",
+  {
+    ticketId: uuid("ticket_id").primaryKey()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    status: text("status").$type<
+      "pending" | "sending" | "sent" | "failed" | "skipped"
+    >().notNull().default("pending"),
+    attemptedAt: timestamp("attempted_at", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    errorCode: text("error_code"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+);
+
 export type SupportEmailInboundEvent = typeof supportEmailInboundEvents.$inferSelect;
