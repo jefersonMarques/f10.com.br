@@ -768,9 +768,14 @@
                     <a href={attachment.href} target="_blank" rel="noreferrer" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-[#000A57]"><Paperclip size={16}/></a>
                     <div class="min-w-0 flex-1">
                       <a href={attachment.href} target="_blank" rel="noreferrer" class="block truncate text-[11.5px] font-semibold text-[#303746] hover:underline">{attachment.originalName}</a>
-                      <p class="mt-0.5 text-[10px] text-[#8B909D]">{formatBytes(attachment.sizeBytes)} · {formatDateTime(attachment.createdAt)}</p>
+                      <p class="mt-0.5 text-[11px] text-[var(--app-text-muted)]">
+                        {formatBytes(attachment.sizeBytes)} · {formatDateTime(attachment.createdAt)}
+                        {#if attachment.sourceTicketNumber && attachment.sourceTicketNumber !== ticketData.details.ticket.ticketNumber}
+                          · <a class="font-semibold text-[var(--app-primary)] hover:underline" href={`/app/tickets/${attachment.sourceTicketId}`}>#{attachment.sourceTicketNumber}</a>
+                        {/if}
+                      </p>
                     </div>
-                    {#if ticketData.canReply && attachment.source !== "email"}
+                    {#if ticketData.canReply && attachment.source !== "email" && attachment.sourceTicketId === ticketData.details.ticket.id}
                       <button type="button" on:click={() => void deleteAttachment(attachment.id)} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#A33A3A] hover:bg-[var(--app-danger-bg)]" aria-label={`Remover ${attachment.originalName}`}><Trash2 size={14}/></button>
                     {/if}
                   </article>
