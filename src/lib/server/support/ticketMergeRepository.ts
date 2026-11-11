@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { getPermissionScope, type PermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import { customerContacts, customerOrganizations, ticketEvents, tickets } from "$lib/server/db/supportSchema";
@@ -7,6 +7,18 @@ import { ensureDistinctMergeGroups, uniqueMergeMemberIds } from "$lib/support/ti
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_MERGE_DEPTH = 100;
+
+type ExecuteQuery = (statement: SQL) => Promise<unknown>;
+
+function executeDatabaseQuery(statement: SQL): Promise<unknown> {
+  return Promise.resolve(getDatabase().execute(statement));
+}
+
+function sameMergeMembers(expected: TreeRow[], actual: TreeRow[]): boolean {
+  const first = expected.map((item) => item.id).sort();
+  const second = actual.map((item) => item.id).sort();
+  return first.length === second.length && first.every((id, index) => id === second[index]);
+}
 
 export type TicketMergeMember = {
   id: string;
@@ -63,9 +75,12 @@ async function ensureMemberAccess(
   }
 }
 
-export async function getMergeRoot(ticketId: string): Promise<string> {
+async function resolveMergeRoot(
+  ticketId: string,
+  execute: ExecuteQuery,
+): Promise<string> {
   if (!UUID.test(ticketId)) throw new Error("TICKET_MERGE_INVALID_TICKET");
-  const rows = await getDatabase().execute(sql`
+  const rows = await execute(sql`
     WITH RECURSIVE ancestors AS (
       SELECT ${ticketId}::uuid AS id, 0 AS depth, ARRAY[${ticketId}::uuid] AS visited
       UNION ALL
@@ -84,8 +99,15 @@ export async function getMergeRoot(ticketId: string): Promise<string> {
   return rows[0].id;
 }
 
-export async function getMergeTree(rootId: string): Promise<TreeRow[]> {
-  const rows = await getDatabase().execute(sql`
+export async function getMergeRoot(ticketId: string): Promise<string> {
+  return resolveMergeRoot(ticketId, executeDatabaseQuery);
+}
+
+async function resolveMergeTree(
+  rootId: string,
+  execute: ExecuteQuery,
+): Promise<TreeRow[]> {
+  const rows = await execute(sql`
     WITH RECURSIVE members AS (
       SELECT ${rootId}::uuid AS id, NULL::uuid AS parent_id, NULL::uuid AS link_id,
         NULL::timestamptz AS merged_at, 0 AS depth, ARRAY[${rootId}::uuid] AS visited
@@ -104,6 +126,10 @@ export async function getMergeTree(rootId: string): Promise<TreeRow[]> {
     throw new Error("TICKET_MERGE_GROUP_TOO_DEEP");
   }
   return rows;
+}
+
+export async function getMergeTree(rootId: string): Promise<TreeRow[]> {
+  return resolveMergeTree(rootId, executeDatabaseQuery);
 }
 
 async function loadMergeMembers(rows: TreeRow[]): Promise<TicketMergeMember[]> {
@@ -217,27 +243,46 @@ export async function mergeTickets(
   const viewScope = requiredScope(permissions, "tickets.view");
   const mergeScope = requiredScope(permissions, "tickets.merge");
 
+  const [expectedPrimaryRoot, expectedSourceRoot] = await Promise.all([
+    getMergeRoot(primaryTicketId),
+    getMergeRoot(sourceTicketId),
+  ]);
+  ensureDistinctMergeGroups(expectedPrimaryRoot, expectedSourceRoot);
+
+  const [expectedPrimaryGroup, expectedSourceGroup] = await Promise.all([
+    getMergeTree(expectedPrimaryRoot),
+    getMergeTree(expectedSourceRoot),
+  ]);
+  await ensureMemberAccess(
+    actorUserId, viewScope, mergeScope,
+    uniqueMergeMemberIds([
+      expectedPrimaryGroup.map((item) => item.id),
+      expectedSourceGroup.map((item) => item.id),
+    ]),
+  );
+
   return getDatabase().transaction(async (tx) => {
-    // Serializa mudanças de grupos, evitando corridas entre mesclagens e desfazimentos.
+    // Evita uma segunda conexão enquanto a transação mantém o bloqueio.
     await tx.execute(sql`SELECT pg_advisory_xact_lock(108, 8108)`);
+    const execute: ExecuteQuery = (statement) => Promise.resolve(tx.execute(statement));
 
     const [primaryRoot, sourceRoot] = await Promise.all([
-      getMergeRoot(primaryTicketId),
-      getMergeRoot(sourceTicketId),
+      resolveMergeRoot(primaryTicketId, execute),
+      resolveMergeRoot(sourceTicketId, execute),
     ]);
     ensureDistinctMergeGroups(primaryRoot, sourceRoot);
+    if (primaryRoot !== expectedPrimaryRoot || sourceRoot !== expectedSourceRoot) {
+      throw new Error("TICKET_MERGE_STATE_CHANGED");
+    }
 
     const [primaryGroup, sourceGroup] = await Promise.all([
-      getMergeTree(primaryRoot),
-      getMergeTree(sourceRoot),
+      resolveMergeTree(primaryRoot, execute),
+      resolveMergeTree(sourceRoot, execute),
     ]);
-    await ensureMemberAccess(
-      actorUserId, viewScope, mergeScope,
-      uniqueMergeMemberIds([
-        primaryGroup.map((item) => item.id),
-        sourceGroup.map((item) => item.id),
-      ]),
-    );
+    if (!sameMergeMembers(primaryGroup, expectedPrimaryGroup)
+      || !sameMergeMembers(sourceGroup, expectedSourceGroup)) {
+      throw new Error("TICKET_MERGE_STATE_CHANGED");
+    }
 
     const [primary, source] = await Promise.all([
       tx.select({ id: tickets.id }).from(tickets).where(eq(tickets.id, primaryRoot)).limit(1),
@@ -278,33 +323,57 @@ export async function unmergeTicket(
   const viewScope = requiredScope(permissions, "tickets.view");
   const unmergeScope = requiredScope(permissions, "tickets.unmerge");
 
+  const expectedLinks = await getDatabase().execute(sql`
+    SELECT id::text, primary_ticket_id::text, source_ticket_id::text
+    FROM ticket_merge_links
+    WHERE id = ${linkId}::uuid AND unmerged_at IS NULL
+    LIMIT 1
+  `) as unknown as Array<{
+    id: string;
+    primary_ticket_id: string;
+    source_ticket_id: string;
+  }>;
+  const expected = expectedLinks[0];
+  if (!expected) throw new Error("TICKET_MERGE_LINK_NOT_FOUND");
+
+  const expectedRoot = await getMergeRoot(expected.primary_ticket_id);
+  const [expectedPrimaryGroup, expectedSourceGroup] = await Promise.all([
+    getMergeTree(expectedRoot),
+    getMergeTree(expected.source_ticket_id),
+  ]);
+  await ensureMemberAccess(
+    actorUserId, viewScope, unmergeScope,
+    uniqueMergeMemberIds([
+      expectedPrimaryGroup.map((item) => item.id),
+      expectedSourceGroup.map((item) => item.id),
+    ]),
+  );
+
   return getDatabase().transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(108, 8108)`);
+    const execute: ExecuteQuery = (statement) => Promise.resolve(tx.execute(statement));
     const links = await tx.execute(sql`
       SELECT id::text, primary_ticket_id::text, source_ticket_id::text
       FROM ticket_merge_links
       WHERE id = ${linkId}::uuid AND unmerged_at IS NULL
       LIMIT 1
-    `) as unknown as Array<{
-      id: string;
-      primary_ticket_id: string;
-      source_ticket_id: string;
-    }>;
+    `) as unknown as typeof expectedLinks;
     const link = links[0];
-    if (!link) throw new Error("TICKET_MERGE_LINK_NOT_FOUND");
+    if (!link || link.primary_ticket_id !== expected.primary_ticket_id
+      || link.source_ticket_id !== expected.source_ticket_id) {
+      throw new Error("TICKET_MERGE_STATE_CHANGED");
+    }
 
-    const primaryRoot = await getMergeRoot(link.primary_ticket_id);
+    const primaryRoot = await resolveMergeRoot(link.primary_ticket_id, execute);
+    if (primaryRoot !== expectedRoot) throw new Error("TICKET_MERGE_STATE_CHANGED");
     const [primaryGroup, sourceGroup] = await Promise.all([
-      getMergeTree(primaryRoot),
-      getMergeTree(link.source_ticket_id),
+      resolveMergeTree(primaryRoot, execute),
+      resolveMergeTree(link.source_ticket_id, execute),
     ]);
-    await ensureMemberAccess(
-      actorUserId, viewScope, unmergeScope,
-      uniqueMergeMemberIds([
-        primaryGroup.map((item) => item.id),
-        sourceGroup.map((item) => item.id),
-      ]),
-    );
+    if (!sameMergeMembers(primaryGroup, expectedPrimaryGroup)
+      || !sameMergeMembers(sourceGroup, expectedSourceGroup)) {
+      throw new Error("TICKET_MERGE_STATE_CHANGED");
+    }
 
     await tx.execute(sql`
       UPDATE ticket_merge_links SET unmerged_at = now(),
