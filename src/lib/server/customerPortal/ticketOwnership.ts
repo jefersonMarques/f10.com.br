@@ -1,6 +1,6 @@
-import { and, eq, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, isNull, or, sql, type SQL } from "drizzle-orm";
 import { ticketRequesterProfiles } from "$lib/server/db/ticketRequesterSchema";
-import { tickets } from "$lib/server/db/supportSchema";
+import { customerContacts, tickets } from "$lib/server/db/supportSchema";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -15,6 +15,14 @@ export function originalEmailSenderCondition(email: string | null): SQL {
 
   return and(
     eq(tickets.channel, "email"),
+    or(
+      isNull(tickets.customerContactId),
+      sql`EXISTS (
+        SELECT 1 FROM ${customerContacts} contact
+        WHERE contact.id = ${tickets.customerContactId}
+          AND lower(contact.email) = ${verifiedEmail}
+      )`,
+    ),
     sql`EXISTS (
       SELECT 1 FROM ticket_events original
       WHERE original.ticket_id = ${tickets.id}
