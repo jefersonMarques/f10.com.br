@@ -206,3 +206,75 @@ export async function reuseTicketCommercialUnit(
       .where(eq(tickets.id, ticketId));
   });
 }
+
+export type CommercialUnitProfile = {
+  id: string;
+  name: string;
+  contractNumber: string;
+  organizationName: string;
+  groupName: string;
+  status: string;
+  plan: string | null;
+  city: string | null;
+  generalEmail: string | null;
+  generalContactId: string | null;
+  holderName: string | null;
+  holderEmail: string | null;
+};
+
+export async function getCommercialUnitProfile(unitId: string): Promise<CommercialUnitProfile | null> {
+  if (!UUID.test(unitId)) return null;
+
+  const rows = await getDatabase().execute(sql`
+    SELECT u.id::text AS id,
+      coalesce(nullif(u.apelido, ''), u.name) AS name,
+      u.source_id AS contract_number,
+      o.name AS organization_name,
+      g.name AS group_name,
+      u.commercial_status AS status,
+      u.contracted_plan AS plan,
+      u.city,
+      general.email AS general_email,
+      general.customer_contact_id::text AS general_contact_id,
+      holder.name AS holder_name,
+      holder.email AS holder_email
+    FROM customer_units u
+    JOIN customer_groups g ON g.id = u.group_id
+    JOIN customer_organizations o ON o.id = u.organization_id
+    LEFT JOIN customer_unit_contacts general
+      ON general.unit_id = u.id AND general.contact_kind = 'general'
+    LEFT JOIN customer_unit_contacts holder
+      ON holder.unit_id = u.id AND holder.contact_kind = 'holder'
+    WHERE u.id = ${unitId}::uuid AND u.source_system = ${sourceSystem()}
+    LIMIT 1
+  `);
+  const row = (rows as unknown as Array<{
+    id: string;
+    name: string;
+    contract_number: string;
+    organization_name: string;
+    group_name: string;
+    status: string;
+    plan: string | null;
+    city: string | null;
+    general_email: string | null;
+    general_contact_id: string | null;
+    holder_name: string | null;
+    holder_email: string | null;
+  }>)[0];
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    contractNumber: row.contract_number,
+    organizationName: row.organization_name,
+    groupName: row.group_name,
+    status: row.status,
+    plan: row.plan,
+    city: row.city,
+    generalEmail: row.general_email,
+    generalContactId: row.general_contact_id,
+    holderName: row.holder_name,
+    holderEmail: row.holder_email,
+  };
+}
