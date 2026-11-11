@@ -1,4 +1,5 @@
 import type { TicketCustomerOverview } from "$lib/support/ticketCustomerOverview";
+import type { TicketMergeContext } from "$lib/server/support/ticketMergeRepository";
 
 export type TicketScope = "mine" | "unassigned" | "all";
 export type TicketView = "board" | "list" | "split";
@@ -184,6 +185,8 @@ export type TicketDetailsData = {
     };
     messages: Array<{
       id: string;
+      sourceTicketId?: string;
+      sourceTicketNumber?: number;
       authorType: string;
       authorUserName: string | null;
       customerName: string | null;
@@ -197,6 +200,8 @@ export type TicketDetailsData = {
     events: Array<{
       id: string;
       eventType: string;
+      sourceTicketId?: string;
+      sourceTicketNumber?: number;
       actorName: string | null;
       createdAt: string | Date;
     }>;
@@ -225,6 +230,7 @@ export type TicketDetailsData = {
   customerContext: TicketCustomerContextData | null;
   commercialUnit: TicketCommercialUnit | null;
   customerOverview: TicketCustomerOverview;
+  mergeContext: TicketMergeContext;
   satisfaction: {
     score: number | null;
     comment: string | null;
