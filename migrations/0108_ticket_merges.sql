@@ -31,3 +31,53 @@ CREATE INDEX IF NOT EXISTS ticket_merge_links_primary_active_idx
   ON ticket_merge_links(primary_ticket_id, merged_at) WHERE unmerged_at IS NULL;
 CREATE INDEX IF NOT EXISTS ticket_merge_links_source_history_idx
   ON ticket_merge_links(source_ticket_id, merged_at DESC);
+
+-- Atualiza a atividade do principal sem alterar status, cliente ou prazo dos tickets de origem.
+CREATE OR REPLACE FUNCTION f10_propagate_merged_ticket_activity()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.updated_at <= OLD.updated_at THEN
+    RETURN NEW;
+  END IF;
+
+  WITH RECURSIVE ancestors AS (
+    SELECT primary_ticket_id AS ticket_id
+    FROM ticket_merge_links
+    WHERE source_ticket_id = NEW.id AND unmerged_at IS NULL
+    UNION
+    SELECT link.primary_ticket_id
+    FROM ticket_merge_links link
+    INNER JOIN ancestors parent ON link.source_ticket_id = parent.ticket_id
+    WHERE link.unmerged_at IS NULL
+  )
+  UPDATE tickets
+  SET updated_at = NEW.updated_at
+  WHERE id IN (SELECT ticket_id FROM ancestors)
+    AND updated_at < NEW.updated_at;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS ticket_merge_activity_sync ON tickets;
+CREATE TRIGGER ticket_merge_activity_sync
+  AFTER UPDATE OF updated_at ON tickets
+  FOR EACH ROW EXECUTE FUNCTION f10_propagate_merged_ticket_activity();
+
+-- Chats convertidos continuam atualizando a atividade do ticket associado.
+CREATE OR REPLACE FUNCTION f10_sync_chat_merged_ticket_activity()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE tickets
+  SET updated_at = clock_timestamp()
+  WHERE id = (
+    SELECT ticket_id FROM web_chat_sessions WHERE id = NEW.session_id
+  );
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS web_chat_merged_ticket_activity ON web_chat_messages;
+CREATE TRIGGER web_chat_merged_ticket_activity
+  AFTER INSERT ON web_chat_messages
+  FOR EACH ROW EXECUTE FUNCTION f10_sync_chat_merged_ticket_activity();
