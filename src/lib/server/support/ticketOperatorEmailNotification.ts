@@ -90,11 +90,11 @@ export async function notifyTicketOperatorsByEmail(
         title,
         greeting: `Olá, ${recipient.name}.`,
         body: [
-          `Assunto: ${message}`,
           `Cliente: ${ticket.customerName ?? "Não identificado"}`,
           `Criado por: ${ticket.createdBy ?? "Cliente"}`,
         ],
-        action: { label: "Abrir ticket", href: ticketUrl },
+        ticket: { number: ticket.number, subject: message },
+        action: { label: event === "customer_attachment" ? "Consultar anexos" : "Abrir ticket", href: ticketUrl },
         footer: "Aviso automático do F10 Operations.",
       }),
       tags: [event === "customer_attachment" ? "ticket-customer-attachment" : "ticket-created"],
