@@ -4,7 +4,7 @@ import { ticketCreationNotifications } from "$lib/server/db/ticketCreationNotifi
 import { customerContacts, tickets } from "$lib/server/db/supportSchema";
 import { sendNewNonEmailTicketAcknowledgement } from "$lib/server/support/ticketEmailService";
 
-type NotificationOrigin = "manual" | "portal" | "web_chat";
+type NotificationOrigin = "manual" | "email" | "portal" | "web_chat";
 
 type TicketCreationNotificationInput = {
   ticketId: string;
