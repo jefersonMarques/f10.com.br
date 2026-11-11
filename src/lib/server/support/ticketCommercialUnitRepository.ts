@@ -160,7 +160,7 @@ export async function getSuggestedTicketCommercialUnit(
       AND previous.id <> ${ticketId}::uuid
       AND history.linked_by IS NOT NULL
       AND u.source_system = ${sourceSystem()}
-    ORDER BY u.id
+    ORDER BY id
     LIMIT 2
   `);
   const units = rows as unknown as Array<{
