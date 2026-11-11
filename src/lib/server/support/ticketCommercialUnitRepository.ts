@@ -180,11 +180,18 @@ export async function getSuggestedTicketCommercialUnit(
 export async function reuseTicketCommercialUnit(
   ticketId: string,
   customerContactId: string | null,
+  expectedUnitName: string | null = null,
 ): Promise<void> {
   if (!customerContactId) return;
 
   const suggested = await getSuggestedTicketCommercialUnit(customerContactId, ticketId);
   if (!suggested) return;
+
+  if (expectedUnitName?.trim()) {
+    const requestedName = expectedUnitName.trim().toLocaleLowerCase("pt-BR");
+    const savedName = suggested.name.trim().toLocaleLowerCase("pt-BR");
+    if (requestedName !== savedName) return;
+  }
 
   const db = getDatabase();
   await db.transaction(async (tx) => {
