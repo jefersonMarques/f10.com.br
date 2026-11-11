@@ -180,13 +180,23 @@ export async function getTicketMergeContext(
   const rows = accessible.filter((row): row is TreeRow => row !== null);
   const members = await loadMergeMembers(rows);
   const rootAccessible = rows.some((row) => row.id === rootId);
+  const mergeScope = getPermissionScope(permissions, "tickets.merge");
+  const unmergeScope = getPermissionScope(permissions, "tickets.unmerge");
+  const [canMerge, canUnmerge] = await Promise.all([
+    mergeScope && rootAccessible
+      ? canAccessTicket(actorUserId, mergeScope, rootId)
+      : Promise.resolve(false),
+    unmergeScope && rootAccessible
+      ? canAccessTicket(actorUserId, unmergeScope, rootId)
+      : Promise.resolve(false),
+  ]);
   return {
     rootId,
     isSource: rootId !== ticketId,
     rootAccessible,
     members,
-    canMerge: rootAccessible && Boolean(getPermissionScope(permissions, "tickets.merge")),
-    canUnmerge: rootAccessible && Boolean(getPermissionScope(permissions, "tickets.unmerge")),
+    canMerge,
+    canUnmerge,
   };
 }
 
