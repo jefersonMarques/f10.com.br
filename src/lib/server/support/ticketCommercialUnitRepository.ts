@@ -137,3 +137,72 @@ export async function setTicketCommercialUnit(
     });
   });
 }
+
+export type SuggestedTicketCommercialUnit = Pick<
+  TicketCommercialUnit, "id" | "name" | "contractNumber"
+>;
+
+export async function getSuggestedTicketCommercialUnit(
+  contactId: string,
+  ticketId: string,
+): Promise<SuggestedTicketCommercialUnit | null> {
+  const rows = await getDatabase().execute(sql`
+    SELECT DISTINCT u.id::text AS id,
+      coalesce(nullif(u.apelido, ''), u.name) AS name,
+      u.source_id AS contract_number
+    FROM ticket_commercial_unit_links history
+    JOIN tickets previous ON previous.id = history.ticket_id
+    LEFT JOIN ticket_requester_profiles requester
+      ON requester.ticket_id = previous.id
+    JOIN customer_units u ON u.id = history.customer_unit_id
+    WHERE coalesce(requester.customer_contact_id, previous.customer_contact_id) =
+      ${contactId}::uuid
+      AND previous.id <> ${ticketId}::uuid
+      AND history.linked_by IS NOT NULL
+      AND u.source_system = ${sourceSystem()}
+    ORDER BY u.id
+    LIMIT 2
+  `);
+  const units = rows as unknown as Array<{
+    id: string;
+    name: string;
+    contract_number: string;
+  }>;
+  if (units.length !== 1) return null;
+
+  return {
+    id: units[0].id,
+    name: units[0].name,
+    contractNumber: units[0].contract_number,
+  };
+}
+
+export async function reuseTicketCommercialUnit(
+  ticketId: string,
+  customerContactId: string | null,
+): Promise<void> {
+  if (!customerContactId) return;
+
+  const suggested = await getSuggestedTicketCommercialUnit(customerContactId, ticketId);
+  if (!suggested) return;
+
+  const db = getDatabase();
+  await db.transaction(async (tx) => {
+    const inserted = await tx.execute(sql`
+      INSERT INTO ticket_commercial_unit_links (ticket_id, customer_unit_id)
+      VALUES (${ticketId}::uuid, ${suggested.id}::uuid)
+      ON CONFLICT (ticket_id) DO NOTHING
+      RETURNING ticket_id
+    `);
+    if ((inserted as unknown as unknown[]).length === 0) return;
+
+    await tx.insert(ticketEvents).values({
+      ticketId,
+      eventType: "ticket.commercial_unit.reused",
+      metadata: { customerUnitId: suggested.id, source: "confirmed_history" },
+    });
+    await tx.update(tickets)
+      .set({ updatedAt: new Date() })
+      .where(eq(tickets.id, ticketId));
+  });
+}
