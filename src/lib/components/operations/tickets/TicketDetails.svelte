@@ -153,8 +153,8 @@
   function tabClass(panel: TicketMainPanel, currentPanel: TicketMainPanel): string {
     const base = "inline-flex h-full shrink-0 items-center gap-1.5 border-b-2 px-1 text-[12px] font-semibold transition-colors";
     return currentPanel === panel
-      ? `${base} border-[var(--app-primary)] text-[#000A57]`
-      : `${base} border-transparent text-[#6F7685] hover:text-[#000A57]`;
+      ? `${base} border-[var(--app-primary)] text-[var(--app-primary)]`
+      : `${base} border-transparent text-[var(--app-text-muted)] hover:text-[var(--app-primary)]`;
   }
 
   function selectTab(panel: TicketMainPanel): void {
