@@ -12,6 +12,7 @@ import {
 import { getPermissionScope, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import { reuseTicketCommercialUnit } from "$lib/server/support/ticketCommercialUnitRepository";
+import { notifyNewTicketCustomer } from "$lib/server/support/ticketCreationNotificationService";
 import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
 import { notifyTicketFollowers } from "$lib/server/support/ticketFollowerRepository";
 import { notifyCustomerOfTicketStatus, sendTicketPublicReplyEmail } from "$lib/server/support/ticketEmailService";
@@ -598,6 +599,18 @@ export async function createManualTicket(
     console.error("[ticket.manual.notification]", {
       ticketId: ticket.id,
       causeType: cause instanceof Error ? cause.name : typeof cause,
+    });
+  });
+
+  await notifyNewTicketCustomer({
+    ticketId: ticket.id,
+    origin: input.channel,
+    messageBody: input.message,
+    expectedContactId: customerContactId,
+  }).catch((cause) => {
+    console.error("[ticket.creation.notification]", {
+      ticketId: ticket.id,
+      errorType: cause instanceof Error ? cause.name : typeof cause,
     });
   });
 
