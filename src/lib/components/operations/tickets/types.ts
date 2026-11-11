@@ -86,6 +86,8 @@ export type TicketAttachment = {
   href: string;
   previewable: boolean;
   messageId?: string | null;
+  sourceTicketId?: string;
+  sourceTicketNumber?: number;
   source?: "ticket" | "email";
 };
 
