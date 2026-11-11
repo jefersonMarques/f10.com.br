@@ -12,6 +12,7 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { reuseTicketCommercialUnit } from "$lib/server/support/ticketCommercialUnitRepository";
 import {
   customerActivityEvents,
   ticketCustomerContexts,
@@ -550,6 +551,15 @@ export async function createCustomerF10Ticket(
     await deleteStoredSupportImages(storedAttachments);
     throw cause;
   }
+
+  await reuseTicketCommercialUnit(
+    ticket.id, session.contactId, unitContext?.unitName ?? null,
+  ).catch((cause) => {
+    console.error("[ticket.commercial_unit.auto_reuse]", {
+      ticketId: ticket.id,
+      errorType: cause instanceof Error ? cause.name : typeof cause,
+    });
+  });
 
   await notifySupportTicketNeedsAttention(
     ticket.id,
