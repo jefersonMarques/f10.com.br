@@ -370,7 +370,12 @@ export async function listCustomerF10Tickets(
         hasUnreadUpdate,
         context: row.contextLegacyUserId && row.contextLegacyUserId !== session.legacyUserId
           ? null
-          : ticketContextFromRow(row, fallbackContext),
+          : isF10Session && row.groupId !== null && row.unitId !== null
+            && !isAuthorizedF10Context(
+              session as CustomerF10PortalSession, row.groupId, row.unitId,
+            )
+            ? null
+            : ticketContextFromRow(row, fallbackContext),
       };
     }),
     total,
