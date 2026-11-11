@@ -24,7 +24,7 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
     query,
     page: 1,
     pageSize: 20,
-    requireF10Context: true,
+    requireF10Context: url.searchParams.get("purpose") !== "requester",
   });
 
   return json(

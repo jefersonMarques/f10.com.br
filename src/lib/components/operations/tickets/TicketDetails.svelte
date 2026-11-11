@@ -27,8 +27,7 @@
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
   import TicketRichTextEditor from "$lib/components/operations/tickets/TicketRichTextEditor.svelte";
   import TicketRemotePanel from "$lib/components/operations/tickets/TicketRemotePanel.svelte";
-  import TicketCustomerPicker from "$lib/components/operations/TicketCustomerPicker.svelte";
-  import TicketCommercialUnitPicker from "$lib/components/operations/TicketCommercialUnitPicker.svelte";
+  import TicketCustomerCard from "./TicketCustomerCard.svelte";
   import TicketTaskPanel from "$lib/components/operations/TicketTaskPanel.svelte";
   import ServiceRequestDetailsCard from "$lib/components/serviceRequests/ServiceRequestDetailsCard.svelte";
   import {
@@ -154,8 +153,8 @@
   function tabClass(panel: TicketMainPanel, currentPanel: TicketMainPanel): string {
     const base = "inline-flex h-full shrink-0 items-center gap-1.5 border-b-2 px-1 text-[12px] font-semibold transition-colors";
     return currentPanel === panel
-      ? `${base} border-[var(--app-primary)] text-[#000A57]`
-      : `${base} border-transparent text-[#6F7685] hover:text-[#000A57]`;
+      ? `${base} border-[var(--app-primary)] text-[var(--app-primary)]`
+      : `${base} border-transparent text-[var(--app-text-muted)] hover:text-[var(--app-primary)]`;
   }
 
   function selectTab(panel: TicketMainPanel): void {
@@ -426,7 +425,7 @@
     <header class={surface === "split" ? "shrink-0 border-b border-[var(--app-border)] bg-white px-3 py-2" : "shrink-0 border-b border-[var(--app-border)] bg-white px-3 py-2 sm:px-4"}>
       <div class={surface === "split" ? "flex min-w-0 items-center gap-2.5" : "flex items-start gap-3"}>
         <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--app-info-bg)] text-[12px] font-bold text-[#000A57]">
-          {initials(ticketData.details.ticket.customerName ?? "Cliente")}
+          {initials(ticketData.customerOverview.requesterName ?? ticketData.customerOverview.clientName ?? "Cliente")}
         </span>
 
         <div class="min-w-0 flex-1">
@@ -440,7 +439,7 @@
               <span aria-hidden="true">·</span>
               <span class="shrink-0">{priorityLabels[ticketData.details.ticket.priority] ?? ticketData.details.ticket.priority}</span>
               <span aria-hidden="true">·</span>
-              <span class="truncate">{ticketData.details.ticket.customerName ?? "Cliente pendente"}</span>
+              <span class="truncate">{ticketData.customerOverview.requesterName ?? ticketData.customerOverview.clientName ?? "Cliente pendente"}</span>
             </div>
           {:else}
             <div class="flex flex-wrap items-center gap-1.5">
@@ -451,7 +450,7 @@
             </div>
             <h1 title={ticketData.details.ticket.subject} class="mt-1 line-clamp-1 text-[15px] font-semibold leading-5 text-[#202637]">{ticketData.details.ticket.subject}</h1>
             <p class="mt-0.5 truncate text-[11px] text-[#858B98]">
-              {ticketData.details.ticket.customerName ?? "Cliente não identificado"} · {ticketData.details.ticket.queueName}
+              {ticketData.customerOverview.requesterName ?? ticketData.customerOverview.clientName ?? "Cliente não identificado"} · {ticketData.details.ticket.queueName}
             </p>
           {/if}
         </div>
@@ -467,19 +466,19 @@
     <nav class="relative z-20 flex h-11 shrink-0 items-center border-b border-[var(--app-border)] bg-white px-3 sm:px-4" aria-label="Seções do ticket">
       <div class="flex h-full min-w-0 flex-1 items-center gap-3 overflow-x-auto whitespace-nowrap sm:gap-5">
         <button type="button" class={tabClass("conversation", activeMainPanel)} aria-pressed={activeMainPanel === "conversation"} on:click={() => selectTab("conversation")}><MessageSquare size={14}/>Conversa</button>
-        {#if ticketData.serviceRequest}
-          <button type="button" class={tabClass("request", activeMainPanel)} aria-pressed={activeMainPanel === "request"} on:click={() => selectTab("request")}><FileText size={14}/>Solicitação</button>
-        {/if}
-        <button type="button" class={tabClass("attachments", activeMainPanel)} aria-pressed={activeMainPanel === "attachments"} on:click={() => selectTab("attachments")}><Paperclip size={14}/>Anexos {#if ticketData.attachments.length > 0}<span class="text-[11px] text-[#858C99]">{ticketData.attachments.length}</span>{/if}</button>
-        {#if ticketData.canRequestRemote}
-          <button type="button" class={tabClass("remote", activeMainPanel)} aria-pressed={activeMainPanel === "remote"} on:click={() => selectTab("remote")}><MonitorCog size={14}/>Acesso remoto</button>
-        {/if}
         {#if surface !== "page"}
           <button type="button" class={tabClass("customer", activeMainPanel)} aria-pressed={activeMainPanel === "customer"} on:click={() => selectTab("customer")}><UserRound size={14}/>Cliente</button>
           {#if ticketData.canViewTasks}
             <button type="button" class={tabClass("tasks", activeMainPanel)} aria-pressed={activeMainPanel === "tasks"} on:click={() => selectTab("tasks")}><ListChecks size={14}/>Tarefas</button>
           {/if}
           <button type="button" class={tabClass("service", activeMainPanel)} aria-pressed={activeMainPanel === "service"} on:click={() => selectTab("service")}><Headphones size={14}/>Atendimento</button>
+        {/if}
+        {#if ticketData.canRequestRemote}
+          <button type="button" class={tabClass("remote", activeMainPanel)} aria-pressed={activeMainPanel === "remote"} on:click={() => selectTab("remote")}><MonitorCog size={14}/>Acesso remoto</button>
+        {/if}
+        <button type="button" class={tabClass("attachments", activeMainPanel)} aria-pressed={activeMainPanel === "attachments"} on:click={() => selectTab("attachments")}><Paperclip size={14}/>Anexos {#if ticketData.attachments.length > 0}<span class="text-[11px] text-[var(--app-text-muted)]">{ticketData.attachments.length}</span>{/if}</button>
+        {#if ticketData.serviceRequest}
+          <button type="button" class={tabClass("request", activeMainPanel)} aria-pressed={activeMainPanel === "request"} on:click={() => selectTab("request")}><FileText size={14}/>Solicitação</button>
         {/if}
       </div>
     </nav>
@@ -790,67 +789,12 @@
         {/if}
 
         {#if surface === "page" || activeMainPanel === "customer"}
-        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "w-full p-2 sm:p-4"}>
-          <h3 class="application-text-caption flex items-center gap-2 font-semibold text-[var(--app-text)]"><Building2 size={16}/>Cliente / unidade comercial</h3>
-          {#if ticketData.commercialUnit}
-            <div class="mt-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-subtle)] p-3">
-              <strong class="application-text-caption block font-semibold text-[var(--app-text)]">{ticketData.commercialUnit.name}</strong>
-              <span class="application-text-meta mt-1 block text-[var(--app-text-muted)]">{ticketData.commercialUnit.groupName} · Contrato {ticketData.commercialUnit.contractNumber}</span>
-            </div>
-          {:else}
-            <p class="application-text-caption mt-2 text-[var(--app-text-muted)]">Nenhuma unidade comercial vinculada.</p>
-          {/if}
-          {#if ticketData.canLinkCustomer}
-            <details class="mt-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3">
-              <summary class="application-text-caption cursor-pointer font-semibold text-[var(--app-primary)]">{ticketData.commercialUnit ? "Trocar unidade" : "Vincular unidade manualmente"}</summary>
-              <form method="POST" action={actionUrl("linkCommercialUnit")} on:submit|preventDefault={(event) => void submitForm(event, "linkCommercialUnit")} class="mt-3">
-                {#key ticketData.commercialUnit?.id ?? ""}
-                  <TicketCommercialUnitPicker current={ticketData.commercialUnit}/>
-                {/key}
-              </form>
-              {#if ticketData.commercialUnit}
-                <form method="POST" action={actionUrl("linkCommercialUnit")} on:submit|preventDefault={(event) => void submitForm(event, "linkCommercialUnit")} class="mt-2 text-right">
-                  <input type="hidden" name="operation" value="remove"/>
-                  <button type="submit" class="application-text-caption rounded-lg px-3 py-2 text-[var(--app-danger-text)] hover:bg-[var(--app-danger-bg)]">Remover vínculo comercial</button>
-                </form>
-              {/if}
-            </details>
-          {/if}
-          <div class="mt-4 border-t border-[var(--app-border-soft)] pt-3">
-            <h4 class="application-text-caption flex items-center gap-2 font-semibold text-[var(--app-text)]"><UserRound size={15}/>Pessoa / contato</h4>
-          {#if ticketData.details.ticket.customerContactId}
-            <dl class="mt-3 space-y-2.5 text-[11px]">
-              <div><dt class="text-[10px] text-[#969CAA]">Nome</dt><dd class="mt-0.5 font-semibold text-[#414857]">{ticketData.details.ticket.customerName ?? "Não informado"}</dd></div>
-              <div><dt class="text-[10px] text-[#969CAA]">E-mail</dt><dd class="mt-0.5 break-all text-[#555D6C]">{ticketData.details.ticket.customerEmail ?? "Não informado"}</dd></div>
-              <div><dt class="text-[10px] text-[#969CAA]">Telefone</dt><dd class="mt-0.5 text-[#555D6C]">{ticketData.details.ticket.customerPhone ?? "Não informado"}</dd></div>
-            </dl>
-          {:else}
-            <p class="application-text-caption mt-2 text-[var(--app-text-muted)]">Nenhuma pessoa identificada para este ticket.</p>
-            {#if ticketData.canLinkCustomer}
-              <details class="mt-2">
-                <summary class="application-text-caption cursor-pointer font-semibold text-[var(--app-primary)]">Vincular contato pessoal (opcional)</summary>
-                <form method="POST" action={actionUrl("linkCustomer")} on:submit|preventDefault={(event) => void submitForm(event, "linkCustomer")} class="mt-3 grid gap-2">
-                  <TicketCustomerPicker enabled={true}/>
-                  <button type="submit" class="application-text-caption h-10 rounded-xl bg-[var(--app-primary)] px-3 font-semibold text-white">Vincular pessoa</button>
-                </form>
-              </details>
-            {/if}
-          {/if}
-
-          </div>
-          {#if ticketData.customerContext}
-            <div class="mt-4 border-t border-[var(--app-border-soft)] pt-3">
-              <div class="flex items-center gap-2"><Building2 size={13} class="text-[#000A57]"/><span class="text-[10px] font-bold uppercase tracking-[0.06em] text-[#858C9B]">Contexto F10</span></div>
-              <dl class="mt-2.5 space-y-2 text-[11px]">
-                <div><dt class="text-[10px] text-[#969CAA]">Escola / unidade</dt><dd class="font-semibold text-[#414857]">{ticketData.customerContext.unitName ?? "Não informada"}</dd></div>
-                <div><dt class="text-[10px] text-[#969CAA]">Grupo</dt><dd class="text-[#555D6C]">{ticketData.customerContext.groupName ?? "Não informado"}</dd></div>
-                <div><dt class="text-[10px] text-[#969CAA]">Usuário F10</dt><dd class="truncate font-mono text-[10px] text-[#5C6372]">{ticketData.customerContext.legacyUserId ?? "Ainda não autenticado"}</dd></div>
-              </dl>
-            </div>
-          {:else if ticketData.details.ticket.organizationName}
-            <p class="mt-3 border-t border-[var(--app-border-soft)] pt-3 text-[11px] text-[#646B7A]">{ticketData.details.ticket.organizationName}</p>
-          {/if}
-        </section>
+          <TicketCustomerCard
+            {ticketData}
+            {surface}
+            saving={Boolean(actionLoading)}
+            onAction={postAction}
+          />
         {/if}
 
         {#if surface === "page" || activeMainPanel === "service"}

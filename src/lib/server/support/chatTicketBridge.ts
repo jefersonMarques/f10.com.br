@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { getPermissionScope, hasPermission } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { reuseTicketCommercialUnit } from "$lib/server/support/ticketCommercialUnitRepository";
 import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
 import { notifyTicketOperatorsByEmail } from "$lib/server/support/ticketOperatorEmailNotification";
 import {
@@ -218,6 +219,14 @@ export async function createTicketFromChat(
   });
 
   if (result.created) {
+    await reuseTicketCommercialUnit(
+      result.ticketId, chat.customerContactId, chat.unitName,
+    ).catch((cause) => {
+      console.error("[ticket.commercial_unit.auto_reuse]", {
+        ticketId: result.ticketId,
+        errorType: cause instanceof Error ? cause.name : typeof cause,
+      });
+    });
     await notifyTicketOperatorsByEmail(result.ticketId).catch((cause) => {
       console.error("[chat.ticket.operator_email]", {
         ticketId: result.ticketId,

@@ -8,6 +8,7 @@ import { requireTicketAccess, type SupportPermissionMap } from "$lib/server/supp
 import { getTicketCard } from "$lib/server/support/ticketCardRepository";
 import { getTicketCustomerContext } from "$lib/server/support/ticketCustomerContextRepository";
 import { getTicketCommercialUnit } from "$lib/server/support/ticketCommercialUnitRepository";
+import { getTicketCustomerOverview } from "$lib/server/support/ticketCustomerOverviewService";
 import {
   listTicketFollowerCandidates,
   listTicketFollowers,
@@ -96,6 +97,11 @@ export async function getTicketDetailsData(
       : Promise.resolve(null),
   ]);
 
+  const customerOverview = await getTicketCustomerOverview(
+    card.details.ticket, commercialUnit, customerContext,
+    hasPermission(permissions, "customers.view"),
+  );
+
   const mentionUsers = canCommentInternal
     ? await filterMentionUsersForTicket(users, ticketId)
     : [];
@@ -106,8 +112,8 @@ export async function getTicketDetailsData(
       ...card.details,
       ticket: {
         ...card.details.ticket,
-        customerName: card.details.ticket.customerName ?? commercialUnit?.name ?? null,
-        organizationName: card.details.ticket.organizationName ?? commercialUnit?.organizationName ?? null,
+        customerName: card.details.ticket.customerName,
+        organizationName: card.details.ticket.organizationName,
       },
       messages: card.details.messages.map((message) => ({
         ...message,
@@ -122,6 +128,7 @@ export async function getTicketDetailsData(
     },
     customerContext,
     commercialUnit,
+    customerOverview,
     serviceRequest,
     satisfaction,
     linkedTasks,
@@ -135,6 +142,8 @@ export async function getTicketDetailsData(
     canManageFollowers,
     canAssign,
     canLinkCustomer,
+    canViewCustomerProfiles: hasPermission(permissions, "customers.view"),
+    canViewCommercialProfiles: hasPermission(permissions, "customers.view", "all"),
     canViewTasks,
     canCreateTask,
     canRequestRemote: hasPermission(permissions, "remote.request"),

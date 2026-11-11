@@ -12,6 +12,7 @@ import {
   sql,
 } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { findUniqueCustomerContactByEmail, reuseTicketCommercialUnit } from "$lib/server/support/ticketCommercialUnitRepository";
 import {
   calculateTicketSlaDeadlines,
   markTicketCustomerWaitingForResponse,
@@ -492,7 +493,7 @@ export async function createThreadTicket(input: {
     : null;
 
   try {
-    return await db.transaction(async (tx) => {
+    const ticketId = await db.transaction(async (tx) => {
       const [ticket] = await tx
         .insert(tickets)
         .values({
@@ -555,6 +556,17 @@ export async function createThreadTicket(input: {
 
       return ticket.id;
     });
+    try {
+      const reusableContactId = customer?.contactId
+        ?? await findUniqueCustomerContactByEmail(input.message.from?.email ?? "");
+      await reuseTicketCommercialUnit(ticketId, reusableContactId);
+    } catch (cause) {
+      console.error("[ticket.commercial_unit.auto_reuse]", {
+        ticketId,
+        errorType: cause instanceof Error ? cause.name : typeof cause,
+      });
+    }
+    return ticketId;
   } catch (cause) {
     if (cause instanceof EmailInboundError && cause.code === "BREVO_EMAIL_THREAD_RACE") {
       const racedTicketId = await findThreadTicket(input.conversationId);

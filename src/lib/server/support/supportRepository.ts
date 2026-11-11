@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm";
 import { getPermissionScope, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { reuseTicketCommercialUnit } from "$lib/server/support/ticketCommercialUnitRepository";
 import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
 import { notifyTicketFollowers } from "$lib/server/support/ticketFollowerRepository";
 import { notifyCustomerOfTicketStatus, sendTicketPublicReplyEmail } from "$lib/server/support/ticketEmailService";
@@ -499,7 +500,7 @@ export async function createManualTicket(
     }
   }
 
-  const ticket = await db.transaction(async (tx) => {
+  const created = await db.transaction(async (tx) => {
     const customer = await resolveTicketCustomer(tx, input);
 
     if (input.channel === "email") {
@@ -575,7 +576,15 @@ export async function createManualTicket(
       },
     });
 
-    return ticket;
+    return { ...ticket, customerContactId: customer.contactId, unitName: customer.unitName };
+  });
+
+  const { customerContactId, unitName, ...ticket } = created;
+  await reuseTicketCommercialUnit(ticket.id, customerContactId, unitName).catch((cause) => {
+    console.error("[ticket.commercial_unit.auto_reuse]", {
+      ticketId: ticket.id,
+      errorType: cause instanceof Error ? cause.name : typeof cause,
+    });
   });
 
   await notifySupportTicketNeedsAttention(

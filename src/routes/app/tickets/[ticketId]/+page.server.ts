@@ -25,6 +25,7 @@ import {
 } from "$lib/server/support/ticketFollowerRepository";
 import { parseTicketCustomerLinkForm } from "$lib/server/support/ticketCustomerForm";
 import { setTicketCommercialUnit } from "$lib/server/support/ticketCommercialUnitRepository";
+import { linkTicketRequesterContact, saveTicketRequesterDisplay } from "$lib/server/support/ticketRequesterRepository";
 import { isTicketDueDate } from "$lib/server/support/ticketDueDate";
 import {
   addTicketMessage,
@@ -712,6 +713,71 @@ export const actions: Actions = {
         success: false,
         action: "assign",
         message: actionErrorMessage(cause),
+      });
+    }
+  },
+
+  saveRequesterDetails: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, { success: false, action: "saveRequesterDetails", message: "Ticket não encontrado." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies, "tickets.reply", `/app/tickets/${params.ticketId}`,
+    );
+    const formData = await request.formData();
+    try {
+      await saveTicketRequesterDisplay(session.user.id, permissions, params.ticketId, {
+        name: readFormValue(formData, "requesterName"),
+        email: readFormValue(formData, "requesterEmail"),
+      });
+      return {
+        success: true,
+        action: "saveRequesterDetails",
+        message: "Dados do solicitante atualizados neste ticket.",
+      };
+    } catch (cause) {
+      const invalid = cause instanceof Error && cause.message === "TICKET_REQUESTER_DETAILS_INVALID";
+      return fail(invalid ? 400 : 403, {
+        success: false,
+        action: "saveRequesterDetails",
+        message: invalid ? "Confira o nome e o e-mail do solicitante." : actionErrorMessage(cause),
+      });
+    }
+  },
+
+  linkRequesterContact: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, { success: false, action: "linkRequesterContact", message: "Ticket não encontrado." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies, "tickets.reply", `/app/tickets/${params.ticketId}`,
+    );
+    const formData = await request.formData();
+    const contactId = readFormValue(formData, "requesterContactId");
+    if (contactId && !isUuid(contactId)) {
+      return fail(400, {
+        success: false,
+        action: "linkRequesterContact",
+        message: "Selecione um contato válido.",
+      });
+    }
+
+    try {
+      await linkTicketRequesterContact(
+        session.user.id, permissions, params.ticketId, contactId || null,
+      );
+      return {
+        success: true,
+        action: "linkRequesterContact",
+        message: contactId ? "Contato do solicitante vinculado." : "Vínculo operacional removido.",
+      };
+    } catch (cause) {
+      return fail(403, {
+        success: false,
+        action: "linkRequesterContact",
+        message: cause instanceof Error && cause.message === "CUSTOMER_NOT_ACCESSIBLE"
+          ? "O contato não está disponível no seu escopo."
+          : actionErrorMessage(cause),
       });
     }
   },
