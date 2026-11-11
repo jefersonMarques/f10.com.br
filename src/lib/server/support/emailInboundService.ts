@@ -493,13 +493,15 @@ export async function createThreadTicket(input: {
   const customer = input.message.from
     ? await findUnambiguousCustomer(input.message.from.email)
     : null;
+  const matchedContactId = customer?.contactId
+    ?? await findUniqueCustomerContactByEmail(input.message.from?.email ?? "");
 
   try {
     const ticketId = await db.transaction(async (tx) => {
       const [ticket] = await tx
         .insert(tickets)
         .values({
-          customerContactId: customer?.contactId ?? null,
+          customerContactId: matchedContactId,
           queueId: queue.id,
           assignedUserId: null,
           subject: ticketSubject(input.message),
@@ -557,16 +559,14 @@ export async function createThreadTicket(input: {
           provider: PROVIDER,
           inboxCode: input.route.code,
           senderEmail: input.message.from?.email ?? null,
-          customerMatched: Boolean(customer),
+          customerMatched: Boolean(matchedContactId),
         },
       });
 
       return ticket.id;
     });
     try {
-      const reusableContactId = customer?.contactId
-        ?? await findUniqueCustomerContactByEmail(input.message.from?.email ?? "");
-      await reuseTicketCommercialUnit(ticketId, reusableContactId);
+      await reuseTicketCommercialUnit(ticketId, matchedContactId);
     } catch (cause) {
       console.error("[ticket.commercial_unit.auto_reuse]", {
         ticketId,
