@@ -10,6 +10,7 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { customerTicketOwnershipCondition, explicitTicketRequesterCondition, originalEmailSenderCondition } from "$lib/server/customerPortal/ticketOwnership";
 import {
   customerActivityEvents,
   ticketCustomerContexts,
@@ -74,7 +75,7 @@ function contextAuthorizationCondition(
 
   for (const context of contexts) {
     const unitCondition = and(
-      eq(ticketCustomerContexts.legacyUserId, session.legacyUserId),
+      or(eq(ticketCustomerContexts.legacyUserId, session.legacyUserId), isNull(ticketCustomerContexts.legacyUserId)),
       eq(ticketCustomerContexts.contextScope, "unit"),
       eq(ticketCustomerContexts.groupId, context.groupId),
       eq(ticketCustomerContexts.unitId, context.unitId),
@@ -90,22 +91,29 @@ function buildWhere(
   filters: CustomerF10TicketSummaryFilters,
 ): SQL | null {
   const authorizedContexts = listAuthorizedF10Contexts(session);
-  if (authorizedContexts.length === 0) return null;
+  const hasContextFilter = filters.groupId !== null || filters.unitId !== null;
+  if (authorizedContexts.length === 0 && hasContextFilter) return null;
 
   const scopedContexts = filterAuthorizedContexts(authorizedContexts, filters);
-  const hasContextFilter = filters.groupId !== null || filters.unitId !== null;
   if (hasContextFilter && scopedContexts.length === 0) return null;
 
   const contextsForAuthorization = hasContextFilter ? scopedContexts : authorizedContexts;
   const contextCondition = contextAuthorizationCondition(session, contextsForAuthorization);
-  if (!contextCondition) return null;
+  if (hasContextFilter && !contextCondition) return null;
 
-  const conditions: SQL[] = [eq(tickets.customerContactId, session.contactId)];
-  // Follow the exact same ownership rule as listCustomerF10Tickets:
-  // unscoped tickets belonging to this contact remain visible without a group filter.
+  const conditions: SQL[] = [customerTicketOwnershipCondition(session.contactId, session.email)];
   const authorizedTicketCondition = hasContextFilter
     ? contextCondition
-    : or(contextCondition, isNull(ticketCustomerContexts.ticketId));
+    : or(
+        contextCondition,
+        isNull(ticketCustomerContexts.ticketId),
+        and(
+          isNull(ticketCustomerContexts.legacyUserId),
+          eq(tickets.customerContactId, session.contactId),
+        ),
+        originalEmailSenderCondition(session.email),
+        explicitTicketRequesterCondition(session.contactId),
+      );
   if (authorizedTicketCondition) conditions.push(authorizedTicketCondition);
 
   if (filters.status !== null) conditions.push(eq(tickets.status, filters.status));
