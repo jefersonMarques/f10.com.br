@@ -9,6 +9,7 @@ import {
   tickets,
 } from "$lib/server/db/supportSchema";
 import { buildEmailHtml } from "$lib/server/email/emailTemplate";
+import { createTicketEmailReceiptContent } from "$lib/support/ticketEmailReceipt";
 import { getCustomerPortalBaseUrl } from "$lib/server/customerPortal/customerPortalMailer";
 import { requestTicketSatisfaction } from "$lib/server/support/ticketSatisfactionService";
 import { sendTransactionalEmail } from "$lib/server/email/transactionalEmail";
@@ -196,6 +197,96 @@ export async function sendTicketPublicReplyEmail(
     }),
   });
 
+  return true;
+}
+
+export async function sendNewEmailTicketAcknowledgement(input: {
+  ticketId: string;
+  sender: { email: string; name: string | null };
+  messageBody: string;
+}): Promise<boolean> {
+  const db = getDatabase();
+  const [ticket] = await db.select({
+    number: tickets.ticketNumber,
+    subject: tickets.subject,
+    channel: tickets.channel,
+    customerEmail: customerContacts.email,
+    customerContactId: tickets.customerContactId,
+    queueCode: supportQueues.code,
+  })
+    .from(tickets)
+    .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
+    .leftJoin(customerContacts, eq(tickets.customerContactId, customerContacts.id))
+    .where(eq(tickets.id, input.ticketId))
+    .limit(1);
+  if (!ticket || ticket.channel !== "email") return false;
+
+  const receipt = createTicketEmailReceiptContent({
+    sender: input.sender,
+    ticketNumber: ticket.number,
+    subject: ticket.subject,
+    messageBody: input.messageBody,
+  });
+  if (!receipt) return false;
+
+  const [thread] = await db.select({ inboxCode: supportEmailThreads.inboxCode })
+    .from(supportEmailThreads)
+    .where(eq(supportEmailThreads.ticketId, input.ticketId))
+    .limit(1);
+  const route = resolveEmailRoute(thread?.inboxCode) ?? resolveEmailRoute(ticket.queueCode);
+  const replyToken = await ensureReplyToken({
+    ticketId: input.ticketId,
+    recipientEmail: receipt.recipientEmail,
+    recipientName: receipt.recipientName,
+    inboxCode: route?.code ?? "ticket-reply",
+  });
+
+  const canAccessPortal = ticket.customerContactId !== null
+    && ticket.customerEmail?.trim().toLowerCase() === receipt.recipientEmail;
+  const ticketUrl = canAccessPortal
+    ? `${getCustomerPortalBaseUrl("https://f10.com.br")}/cliente/chamados/${encodeURIComponent(input.ticketId)}`
+    : null;
+
+  await sendTransactionalEmail({
+    to: {
+      email: receipt.recipientEmail,
+      ...(receipt.recipientName ? { name: receipt.recipientName } : {}),
+    },
+    ...(route ? { sender: { email: route.email, name: route.name } } : {}),
+    replyTo: { email: replyAddress(replyToken), name: "F10 Suporte" },
+    subject: receipt.subject,
+    textContent: [
+      receipt.greeting,
+      "",
+      ...receipt.description,
+      "",
+      `Protocolo: #${ticket.number}`,
+      `Assunto: ${ticket.subject}`,
+      ...(receipt.originalExcerpt ? ["", "Mensagem recebida:", receipt.originalExcerpt] : []),
+      ...(ticketUrl ? ["", `Acompanhe seu chamado: ${ticketUrl}`] : []),
+      "",
+      "Você pode responder diretamente a este e-mail para continuar o atendimento.",
+    ].join("\n"),
+    htmlContent: buildEmailHtml({
+      eyebrow: "Confirmação de recebimento",
+      title: "Recebemos sua solicitação",
+      greeting: receipt.greeting,
+      body: receipt.description,
+      ticket: {
+        number: ticket.number,
+        subject: ticket.subject,
+        status: "Solicitação recebida",
+      },
+      ...(receipt.originalExcerpt
+        ? { quote: { label: "Mensagem recebida", text: receipt.originalExcerpt } }
+        : {}),
+      ...(ticketUrl
+        ? { action: { label: "Acompanhar chamado", href: ticketUrl } }
+        : {}),
+      footer: "Você pode responder diretamente a este e-mail para continuar o mesmo atendimento.",
+    }),
+    tags: ["ticket-received"],
+  });
   return true;
 }
 
