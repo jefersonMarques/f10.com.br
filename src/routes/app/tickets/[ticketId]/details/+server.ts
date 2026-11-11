@@ -3,6 +3,7 @@ import { requireAppPermission } from "$lib/server/auth/authorization";
 import { markTicketFirstAgentView } from "$lib/server/support/ticketCustomerProgressRepository";
 import { markEntityNotificationsRead } from "$lib/server/notifications/notificationRepository";
 import { getTicketDetailsData } from "$lib/server/support/ticketDetailsService";
+import { classifyTicketLoadFailure } from "$lib/server/support/ticketLoadFailure";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -42,7 +43,17 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
         "Cache-Control": "private, no-store, max-age=0",
       },
     });
-  } catch {
-    throw error(404, "Ticket não encontrado ou fora do seu escopo de acesso.");
+  } catch (cause) {
+    const failure = classifyTicketLoadFailure(cause);
+
+    if (failure.status === 500) {
+      console.error("[operations.ticket.details_load_failed]", {
+        ticketId: params.ticketId,
+        errorType: failure.errorType,
+        databaseCode: failure.databaseCode,
+      });
+    }
+
+    throw error(failure.status, failure.message);
   }
 };
