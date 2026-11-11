@@ -65,7 +65,7 @@ export async function getTicketDetailsData(
   const [
     card,
     users,
-    linkedTasks: allTasks,
+    linkedTasks,
     taskProjects,
     serviceRequest,
     followers,
@@ -169,7 +169,7 @@ export async function getTicketDetailsData(
     attachments: mergedAttachments,
     serviceRequest,
     satisfaction,
-    linkedTasks,
+    linkedTasks: allTasks,
     taskProjects,
     agents: canAssign ? users : [],
     mentionUsers,
