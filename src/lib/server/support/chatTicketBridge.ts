@@ -2,6 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { getPermissionScope, hasPermission } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
 import { reuseTicketCommercialUnit } from "$lib/server/support/ticketCommercialUnitRepository";
+import { notifyNewTicketCustomer } from "$lib/server/support/ticketCreationNotificationService";
 import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
 import { notifyTicketOperatorsByEmail } from "$lib/server/support/ticketOperatorEmailNotification";
 import {
@@ -219,6 +220,17 @@ export async function createTicketFromChat(
   });
 
   if (result.created) {
+    await notifyNewTicketCustomer({
+      ticketId: result.ticketId,
+      origin: "web_chat",
+      messageBody: chat.subject,
+      expectedContactId: chat.customerContactId ?? undefined,
+    }).catch((cause) => {
+      console.error("[chat.ticket.customer_receipt]", {
+        ticketId: result.ticketId,
+        errorType: cause instanceof Error ? cause.name : typeof cause,
+      });
+    });
     await reuseTicketCommercialUnit(
       result.ticketId, chat.customerContactId, chat.unitName,
     ).catch((cause) => {
