@@ -1,10 +1,10 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { TicketCommercialUnit } from "$lib/components/operations/tickets/types";
 import { getDatabase } from "$lib/server/db";
 import { getConfiguredF10UnitId } from "$lib/server/integrations/f10/f10CustomerApi";
 import { getPermissionScope, hasPermission } from "$lib/server/auth/permissions";
 import { requireTicketAccess, type SupportPermissionMap } from "$lib/server/support/supportAccess";
-import { ticketEvents, tickets } from "$lib/server/db/supportSchema";
+import { customerContacts, ticketEvents, tickets } from "$lib/server/db/supportSchema";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -284,4 +284,18 @@ export async function getCommercialUnitProfile(unitId: string): Promise<Commerci
     holderName: row.holder_name,
     holderEmail: row.holder_email,
   };
+}
+
+export async function findUniqueCustomerContactByEmail(email: string): Promise<string | null> {
+  const normalized = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return null;
+
+  const contacts = await getDatabase().select({ id: customerContacts.id })
+    .from(customerContacts)
+    .where(and(
+      eq(customerContacts.active, true),
+      sql`lower(${customerContacts.email}) = ${normalized}`,
+    ))
+    .limit(2);
+  return contacts.length === 1 ? contacts[0].id : null;
 }
