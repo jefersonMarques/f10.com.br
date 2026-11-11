@@ -7,6 +7,7 @@ export type TicketCustomerOverview = {
   requesterName: string | null;
   requesterEmail: string | null;
   requesterContactId: string | null;
+  operationalContactId: string | null;
   requesterSource: "manual" | "email" | "portal" | "chat" | "contact" | "unknown";
   channel: string;
   legacyUserId: string | null;
@@ -92,6 +93,7 @@ export function buildTicketCustomerOverview(source: CustomerOverviewSource): Tic
     requesterName,
     requesterEmail,
     requesterContactId,
+    operationalContactId: override?.contactId ?? null,
     requesterSource,
     channel: source.channel,
     legacyUserId: source.customerContext?.legacyUserId ?? null,
