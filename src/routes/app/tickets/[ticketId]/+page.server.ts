@@ -41,6 +41,7 @@ import {
 } from "$lib/server/support/supportRepository";
 import { type TaskPriority } from "$lib/server/tasks/taskRepository";
 import { getTicketDetailsData } from "$lib/server/support/ticketDetailsService";
+import { classifyTicketLoadFailure } from "$lib/server/support/ticketLoadFailure";
 import { getTicketMergeContext, mergeTickets, unmergeTicket } from "$lib/server/support/ticketMergeRepository";
 import { moveTicketToWorkflowLocationWithRules } from "$lib/server/support/ticketWorkflowService";
 
@@ -171,24 +172,16 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     });
     return details;
   } catch (cause) {
-    const errorCode = cause instanceof Error ? cause.message : "";
-    if (errorCode === "TICKET_NOT_FOUND") {
-      throw error(404, "Ticket não encontrado.");
-    }
-    if (errorCode === "TICKET_NOT_ACCESSIBLE" || errorCode === "TICKET_PERMISSION_NOT_ALLOWED") {
-      throw error(403, "Você não tem permissão para visualizar este ticket.");
+    const failure = classifyTicketLoadFailure(cause);
+    if (failure.status === 500) {
+      console.error("[operations.ticket.load_failed]", {
+        ticketId: params.ticketId,
+        errorType: failure.errorType,
+        databaseCode: failure.databaseCode,
+      });
     }
 
-    const databaseCause = cause instanceof Error ? cause.cause : null;
-    const databaseCode = databaseCause && typeof databaseCause === "object" && "code" in databaseCause
-      ? String(databaseCause.code)
-      : null;
-    console.error("[operations.ticket.load_failed]", {
-      ticketId: params.ticketId,
-      errorType: cause instanceof Error ? cause.name : typeof cause,
-      databaseCode,
-    });
-    throw error(500, "Não foi possível carregar este ticket.");
+    throw error(failure.status, failure.message);
   }
 };
 
