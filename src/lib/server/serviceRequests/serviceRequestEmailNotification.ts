@@ -51,6 +51,7 @@ async function getRecipients(requestType: ServiceRequestType) {
 
 export async function notifyServiceRequestRecipient(input: {
   requestType: ServiceRequestType;
+  ticketId: string;
   ticketNumber: number;
   data: Record<string, ServiceRequestDataValue>;
 }): Promise<void> {
@@ -59,7 +60,7 @@ export async function notifyServiceRequestRecipient(input: {
 
   const label = serviceRequestLabel(input.requestType);
   const detail = requestDetail(input.data);
-  const ticketUrl = `https://f10.com.br/app/tickets`;
+  const ticketUrl = `https://f10.com.br/app/tickets/${encodeURIComponent(input.ticketId)}`;
 
   await Promise.all(
     recipients.map((recipient) =>
@@ -77,13 +78,13 @@ export async function notifyServiceRequestRecipient(input: {
         ].join("\n"),
         htmlContent: buildEmailHtml({
           eyebrow: label,
-          title: `Novo ticket #${input.ticketNumber}`,
+          title: `Nova solicitação de ${label}`,
           greeting: `Olá, ${recipient.name}.`,
           body: [
             `Uma nova solicitação de ${label} foi recebida.`,
-            `Referência: ${detail}`,
           ],
-          action: { label: "Abrir tickets", href: ticketUrl },
+          ticket: { number: input.ticketNumber, subject: detail, status: "Recebida" },
+          action: { label: "Abrir solicitação", href: ticketUrl },
           footer: "Este aviso foi enviado automaticamente pelo F10 Operations.",
         }),
       }),

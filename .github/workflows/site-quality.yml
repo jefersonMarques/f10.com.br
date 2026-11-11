@@ -66,6 +66,8 @@ jobs:
           node --experimental-strip-types --test tests/ticketLoadFailure.test.mjs
           node --experimental-strip-types --test tests/ticketRichTextSerialization.test.mjs
           node --experimental-strip-types --test tests/ticketReplyMarkdownEmail.test.mjs
+          node --experimental-strip-types --test tests/emailTemplateDesign.test.mjs
+          node --experimental-strip-types --test tests/ticketEmailReceipt.test.mjs
           node --experimental-strip-types --test tests/supportChatRestore.test.mjs
           node --experimental-strip-types --test tests/chatEntryRouting.test.mjs
           node --experimental-strip-types --test tests/assistantHelpFallback.test.mjs

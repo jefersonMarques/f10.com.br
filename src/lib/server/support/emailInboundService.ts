@@ -19,10 +19,12 @@ import {
 } from "$lib/server/support/ticketSlaService";
 import { notifySupportTicketNeedsAttention } from "$lib/server/support/supportTeamNotifications";
 import { notifyTicketOperatorsByEmail } from "$lib/server/support/ticketOperatorEmailNotification";
+import { sendNewEmailTicketAcknowledgement } from "$lib/server/support/ticketEmailService";
 import { ticketCustomerContexts } from "$lib/server/db/customerPortalSchema";
 import {
   supportEmailInboundEvents,
   supportEmailThreads,
+  supportEmailTicketReceipts,
   type SupportEmailInboundEvent,
 } from "$lib/server/db/supportEmailSchema";
 import {
@@ -526,6 +528,11 @@ export async function createThreadTicket(input: {
         .returning({ id: supportEmailThreads.id });
       if (!thread) throw new EmailInboundError("BREVO_EMAIL_THREAD_RACE", undefined, true);
 
+      await tx.insert(supportEmailTicketReceipts).values({
+        ticketId: ticket.id,
+        initialMessageId: input.message.externalMessageId,
+      });
+
       if (customer) {
         await tx.insert(ticketCustomerContexts).values({
           ticketId: ticket.id,
@@ -590,6 +597,59 @@ function messageMetadata(message: BrevoEmailMessage): Record<string, unknown> {
     inlineImages: [],
     isForward: message.isForward,
   };
+}
+
+async function acknowledgeNewEmailTicket(input: {
+  ticketId: string;
+  message: BrevoEmailMessage;
+}): Promise<void> {
+  const [claimed] = await getDatabase()
+    .update(supportEmailTicketReceipts)
+    .set({
+      status: "sending",
+      attemptedAt: new Date(),
+    })
+    .where(and(
+      eq(supportEmailTicketReceipts.ticketId, input.ticketId),
+      eq(supportEmailTicketReceipts.initialMessageId, input.message.externalMessageId),
+      eq(supportEmailTicketReceipts.status, "pending"),
+    ))
+    .returning({ ticketId: supportEmailTicketReceipts.ticketId });
+  if (!claimed) return;
+
+  try {
+    const sent = input.message.from
+      ? await sendNewEmailTicketAcknowledgement({
+          ticketId: input.ticketId,
+          sender: input.message.from,
+          messageBody: input.message.text,
+        })
+      : false;
+
+    await getDatabase()
+      .update(supportEmailTicketReceipts)
+      .set({
+        status: sent ? "sent" : "skipped",
+        ...(sent ? { sentAt: new Date() } : {}),
+      })
+      .where(eq(supportEmailTicketReceipts.ticketId, input.ticketId));
+  } catch (cause) {
+    const errorCode = cause instanceof Error && /^BREVO_[A-Z_]+(?::\d{3})?$/.test(cause.message)
+      ? cause.message
+      : "TICKET_RECEIPT_DELIVERY_FAILED";
+
+    await getDatabase()
+      .update(supportEmailTicketReceipts)
+      .set({ status: "failed", errorCode })
+      .where(eq(supportEmailTicketReceipts.ticketId, input.ticketId))
+      .catch(() => undefined);
+
+    console.error("[ticket.email.receipt_failed]", {
+      ticketId: input.ticketId,
+      errorCode,
+      errorType: cause instanceof Error ? cause.name : typeof cause,
+    });
+  }
 }
 
 export async function saveIncomingMessage(input: {
@@ -727,6 +787,11 @@ export async function saveIncomingMessage(input: {
       });
     });
   }
+
+  await acknowledgeNewEmailTicket({
+    ticketId: input.ticketId,
+    message: input.message,
+  });
 
   return Boolean(created);
 }

@@ -9,6 +9,7 @@ import {
   tickets,
 } from "$lib/server/db/supportSchema";
 import { buildEmailHtml } from "$lib/server/email/emailTemplate";
+import { createTicketEmailReceiptContent } from "$lib/support/ticketEmailReceipt";
 import { getCustomerPortalBaseUrl } from "$lib/server/customerPortal/customerPortalMailer";
 import { requestTicketSatisfaction } from "$lib/server/support/ticketSatisfactionService";
 import { sendTransactionalEmail } from "$lib/server/email/transactionalEmail";
@@ -186,16 +187,108 @@ export async function sendTicketPublicReplyEmail(
       `Acompanhe seu chamado no painel: ${ticketUrl}`,
     ].join("\n"),
     htmlContent: buildEmailHtml({
-      eyebrow: `Ticket #${ticket.ticketNumber}`,
-      title: ticket.subject,
+      eyebrow: "Atualização de atendimento",
+      title: "Temos uma atualização para você",
       ...(recipientName ? { greeting: `Olá, ${recipientName}.` } : {}),
       body: emailParagraphs(body),
       markdownBody: true,
+      ticket: { number: ticket.ticketNumber, subject: ticket.subject },
       action: { label: "Ver chamado no painel", href: ticketUrl },
       footer: "Responda diretamente a este e-mail para continuar o atendimento no mesmo ticket.",
     }),
   });
 
+  return true;
+}
+
+export async function sendNewEmailTicketAcknowledgement(input: {
+  ticketId: string;
+  sender: { email: string; name: string | null };
+  messageBody: string;
+}): Promise<boolean> {
+  const db = getDatabase();
+  const [ticket] = await db.select({
+    number: tickets.ticketNumber,
+    subject: tickets.subject,
+    channel: tickets.channel,
+    customerEmail: customerContacts.email,
+    customerContactId: tickets.customerContactId,
+    queueCode: supportQueues.code,
+  })
+    .from(tickets)
+    .innerJoin(supportQueues, eq(tickets.queueId, supportQueues.id))
+    .leftJoin(customerContacts, eq(tickets.customerContactId, customerContacts.id))
+    .where(eq(tickets.id, input.ticketId))
+    .limit(1);
+  if (!ticket || ticket.channel !== "email") return false;
+
+  const receipt = createTicketEmailReceiptContent({
+    sender: input.sender,
+    ticketNumber: ticket.number,
+    subject: ticket.subject,
+    messageBody: input.messageBody,
+    inboundDomain: replyDomain(),
+  });
+  if (!receipt) return false;
+
+  const [thread] = await db.select({ inboxCode: supportEmailThreads.inboxCode })
+    .from(supportEmailThreads)
+    .where(eq(supportEmailThreads.ticketId, input.ticketId))
+    .limit(1);
+  const route = resolveEmailRoute(thread?.inboxCode) ?? resolveEmailRoute(ticket.queueCode);
+  const replyToken = await ensureReplyToken({
+    ticketId: input.ticketId,
+    recipientEmail: receipt.recipientEmail,
+    recipientName: receipt.recipientName,
+    inboxCode: route?.code ?? "ticket-reply",
+  });
+
+  const canAccessPortal = ticket.customerContactId !== null
+    && ticket.customerEmail?.trim().toLowerCase() === receipt.recipientEmail;
+  const ticketUrl = canAccessPortal
+    ? `${getCustomerPortalBaseUrl("https://f10.com.br")}/cliente/chamados/${encodeURIComponent(input.ticketId)}`
+    : null;
+
+  await sendTransactionalEmail({
+    to: {
+      email: receipt.recipientEmail,
+      ...(receipt.recipientName ? { name: receipt.recipientName } : {}),
+    },
+    ...(route ? { sender: { email: route.email, name: route.name } } : {}),
+    replyTo: { email: replyAddress(replyToken), name: "F10 Suporte" },
+    subject: receipt.subject,
+    textContent: [
+      receipt.greeting,
+      "",
+      ...receipt.description,
+      "",
+      `Protocolo: #${ticket.number}`,
+      `Assunto: ${ticket.subject}`,
+      ...(receipt.originalExcerpt ? ["", "Mensagem recebida:", receipt.originalExcerpt] : []),
+      ...(ticketUrl ? ["", `Acompanhe seu chamado: ${ticketUrl}`] : []),
+      "",
+      "Você pode responder diretamente a este e-mail para continuar o atendimento.",
+    ].join("\n"),
+    htmlContent: buildEmailHtml({
+      eyebrow: "Confirmação de recebimento",
+      title: "Recebemos sua solicitação",
+      greeting: receipt.greeting,
+      body: receipt.description,
+      ticket: {
+        number: ticket.number,
+        subject: ticket.subject,
+        status: "Solicitação recebida",
+      },
+      ...(receipt.originalExcerpt
+        ? { quote: { label: "Mensagem recebida", text: receipt.originalExcerpt } }
+        : {}),
+      ...(ticketUrl
+        ? { action: { label: "Acompanhar chamado", href: ticketUrl } }
+        : {}),
+      footer: "Você pode responder diretamente a este e-mail para continuar o mesmo atendimento.",
+    }),
+    tags: ["ticket-received"],
+  });
   return true;
 }
 
@@ -245,7 +338,7 @@ export async function notifyCustomerOfTicketStatus(
   const route = resolveEmailRoute(thread?.inboxCode) || resolveEmailRoute(ticket.queueCode);
   const portalUrl = `${getCustomerPortalBaseUrl("https://f10.com.br")}/cliente/chamados/${encodeURIComponent(ticketId)}`;
   const waiting = ticket.status === "waiting_customer";
-  const headline = waiting ? "Seu atendimento aguarda uma resposta" : "Seu atendimento foi resolvido";
+  const headline = waiting ? "Precisamos de uma informação" : "Sua solicitação foi resolvida";
   const description = waiting
     ? "Precisamos da sua resposta para continuar o atendimento. Você pode responder a este e-mail ou acessar o chamado no painel."
     : "Concluímos seu atendimento. Você pode consultar os detalhes no painel de chamados.";
@@ -267,11 +360,12 @@ export async function notifyCustomerOfTicketStatus(
       `Acesse seu chamado: ${portalUrl}`,
     ].join("\n"),
     htmlContent: buildEmailHtml({
-      eyebrow: `Ticket #${ticket.number}`,
+      eyebrow: waiting ? "Precisamos de sua atenção" : "Atendimento resolvido",
       title: headline,
       ...(name ? { greeting: `Olá, ${name}.` } : {}),
-      body: [description, ticket.subject],
-      action: { label: "Acompanhar chamado", href: portalUrl },
+      body: [description],
+      ticket: { number: ticket.number, subject: ticket.subject, status: waiting ? "Aguardando cliente" : "Resolvido" },
+      action: { label: waiting ? "Responder ao atendimento" : "Consultar atendimento", href: portalUrl },
       footer: "A consulta no painel exige acesso à área do cliente.",
     }),
   });

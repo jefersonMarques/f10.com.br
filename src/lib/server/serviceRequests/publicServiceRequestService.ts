@@ -327,6 +327,7 @@ export async function createPublicServiceRequest(
     });
     await notifyServiceRequestRecipient({
       requestType: input.requestType,
+      ticketId: result.ticketId,
       ticketNumber: result.ticketNumber,
       data: normalized.data,
     }).catch((cause) => {
