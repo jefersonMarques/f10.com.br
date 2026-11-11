@@ -9,6 +9,10 @@ export const priorityLabels: Record<string, string> = {
 
 export const eventLabels: Record<string, string> = {
   "ticket.created": "criou o ticket",
+  "ticket.merged.primary": "mesclou outro ticket neste atendimento",
+  "ticket.merged.source": "associou este ticket a outro atendimento",
+  "ticket.merge_reverted.primary": "desfez uma mesclagem de tickets",
+  "ticket.merge_reverted.source": "desfez o vínculo de mesclagem",
   "ticket.replied": "registrou uma resposta",
   "ticket.note.added": "adicionou uma nota interna",
   "ticket.status.changed": "alterou o status",

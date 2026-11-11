@@ -231,6 +231,7 @@ export async function listTicketWorkspaceTickets(
 
   const where = combine([
     scopedCondition,
+    sql`NOT EXISTS (SELECT 1 FROM ticket_merge_links merged WHERE merged.source_ticket_id = ${tickets.id} AND merged.unmerged_at IS NULL)`,
     requestedScope,
     searchCondition,
     filters.status

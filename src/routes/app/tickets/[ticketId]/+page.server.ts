@@ -1,4 +1,4 @@
-import { error, fail, type Actions } from "@sveltejs/kit";
+import { error, fail, redirect, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import {
@@ -41,6 +41,7 @@ import {
 } from "$lib/server/support/supportRepository";
 import { type TaskPriority } from "$lib/server/tasks/taskRepository";
 import { getTicketDetailsData } from "$lib/server/support/ticketDetailsService";
+import { getTicketMergeContext, mergeTickets, unmergeTicket } from "$lib/server/support/ticketMergeRepository";
 import { moveTicketToWorkflowLocationWithRules } from "$lib/server/support/ticketWorkflowService";
 
 type MentionUser = { id: string; name: string; email: string };
@@ -192,6 +193,70 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 };
 
 export const actions: Actions = {
+  mergeTickets: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, { success: false, action: "mergeTickets", message: "Ticket não encontrado." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies, "tickets.merge", `/app/tickets/${params.ticketId}`,
+    );
+    const formData = await request.formData();
+    const candidateId = readFormValue(formData, "candidateTicketId");
+    const principal = readFormValue(formData, "principal");
+    if (!isUuid(candidateId) || !["current", "candidate"].includes(principal)) {
+      return fail(400, { success: false, action: "mergeTickets", message: "Selecione os tickets e o principal." });
+    }
+    try {
+      const primaryId = principal === "current" ? params.ticketId : candidateId;
+      const sourceId = principal === "current" ? candidateId : params.ticketId;
+      const rootId = await mergeTickets(session.user.id, permissions, primaryId, sourceId);
+      throw redirect(303, `/app/tickets/${rootId}`);
+    } catch (cause) {
+      if (cause && typeof cause === "object" && "status" in cause
+        && cause.status === 303) throw cause;
+      const code = cause instanceof Error ? cause.message : "";
+      const messages: Record<string, string> = {
+        TICKET_MERGE_ALREADY_GROUPED: "Esses tickets já pertencem ao mesmo atendimento.",
+        TICKET_MERGE_TICKET_NOT_ACCESSIBLE: "Você não possui acesso aos dois tickets ou aos tickets já associados.",
+        TICKET_MERGE_FORBIDDEN: "Seu perfil não permite mesclar esses tickets.",
+        TICKET_MERGE_GROUP_TOO_DEEP: "Esse grupo excede a profundidade permitida.",
+        TICKET_MERGE_INVALID_TICKET: "Selecione dois tickets válidos.",
+      };
+      return fail(code === "TICKET_MERGE_TICKET_NOT_ACCESSIBLE" ? 403 : 400, {
+        success: false, action: "mergeTickets",
+        message: messages[code] ?? "Não foi possível mesclar os tickets.",
+      });
+    }
+  },
+
+  unmergeTicket: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) {
+      return fail(404, { success: false, action: "unmergeTicket", message: "Ticket não encontrado." });
+    }
+    const { session, permissions } = await requireAppPermission(
+      cookies, "tickets.unmerge", `/app/tickets/${params.ticketId}`,
+    );
+    const formData = await request.formData();
+    const linkId = readFormValue(formData, "linkId");
+    if (!isUuid(linkId)) {
+      return fail(400, { success: false, action: "unmergeTicket", message: "Vínculo inválido." });
+    }
+    try {
+      const context = await getTicketMergeContext(session.user.id, permissions, params.ticketId);
+      if (!context.members.some((member) => member.linkId === linkId)) {
+        throw new Error("TICKET_MERGE_LINK_NOT_ACCESSIBLE");
+      }
+      await unmergeTicket(session.user.id, permissions, linkId);
+      return { success: true, action: "unmergeTicket", message: "Mesclagem desfeita sem perda de histórico." };
+    } catch (cause) {
+      return fail(403, {
+        success: false, action: "unmergeTicket",
+        message: "Não foi possível desfazer a mesclagem. Confira seu acesso a todos os tickets.",
+      });
+    }
+  },
+
+
   addFollower: async ({ cookies, params, request }) => {
     if (!isUuid(params.ticketId)) {
       return fail(404, { success: false, action: "addFollower", message: "Ticket não encontrado." });

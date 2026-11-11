@@ -19,6 +19,8 @@ export const PERMISSION_CODES = [
   "tickets.reply",
   "tickets.comment_internal",
   "tickets.assign",
+  "tickets.merge",
+  "tickets.unmerge",
   "tickets.manage",
   "chat.view",
   "chat.respond",

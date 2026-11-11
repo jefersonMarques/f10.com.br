@@ -9,6 +9,8 @@
     CircleAlert,
     Clock3,
     FileText,
+    GitMerge,
+    Ellipsis,
     Headphones,
     MessageSquare,
     MonitorCog,
@@ -28,6 +30,7 @@
   import TicketRichTextEditor from "$lib/components/operations/tickets/TicketRichTextEditor.svelte";
   import TicketRemotePanel from "$lib/components/operations/tickets/TicketRemotePanel.svelte";
   import TicketCustomerCard from "./TicketCustomerCard.svelte";
+  import TicketMergeDialog from "./TicketMergeDialog.svelte";
   import TicketTaskPanel from "$lib/components/operations/TicketTaskPanel.svelte";
   import ServiceRequestDetailsCard from "$lib/components/serviceRequests/ServiceRequestDetailsCard.svelte";
   import {
@@ -62,6 +65,8 @@
 
   let actionFeedback: ActionFeedback = null;
   let actionLoading = "";
+  let mergeDialogOpen = false;
+  let ticketMenuOpen = false;
   let workflowSelectionKey = "";
   let workflowId = "";
   let stageId = "";
@@ -274,6 +279,13 @@
     await onRefresh();
   }
 
+  async function undoMergedTicket(linkId: string, ticketNumber: number): Promise<void> {
+    if (!confirm(`Desfazer a mesclagem com o ticket #${ticketNumber}? O histórico será mantido.`)) return;
+    const data = new FormData();
+    data.set("linkId", linkId);
+    await postAction("unmergeTicket", data);
+  }
+
   async function postAction(action: string, body: FormData): Promise<boolean> {
     if (actionLoading) return false;
     actionLoading = action;
@@ -456,12 +468,61 @@
         </div>
 
         <div class="flex shrink-0 items-center gap-2">
+          {#if ticketData.mergeContext.canMerge}
+            <details bind:open={ticketMenuOpen} class="relative">
+              <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-lg border border-[var(--app-border-control)] text-[var(--app-text)] hover:bg-[var(--app-surface-muted)]" aria-label="Mais opções do ticket" role="button">
+                <Ellipsis size={19}/>
+              </summary>
+              <div class="absolute right-0 top-10 z-40 min-w-[190px] rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] p-1 shadow-xl">
+                <button type="button" on:click={() => { ticketMenuOpen = false; mergeDialogOpen = true; }}
+                  class="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[12px] font-medium text-[var(--app-text)] hover:bg-[var(--app-surface-muted)]">
+                  <GitMerge size={16}/>Mesclar tickets
+                </button>
+              </div>
+            </details>
+          {/if}
           {#if surface === "modal" && onClose}
             <button type="button" on:click={onClose} class="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--app-border)] text-[#69707E] hover:bg-[var(--app-surface-muted)]" aria-label="Fechar"><X size={16}/></button>
           {/if}
         </div>
       </div>
     </header>
+
+    {#if ticketData.mergeContext.isSource}
+      <div class="flex flex-wrap items-center gap-2 border-b border-[var(--app-border)] bg-[var(--app-info-bg)] px-4 py-2.5 text-[12px] text-[var(--app-info-text)]">
+        <GitMerge size={16}/>
+        <span>Ticket associado a outro atendimento.</span>
+        {#if ticketData.mergeContext.rootAccessible}
+          <a class="font-semibold underline" href={`/app/tickets/${ticketData.mergeContext.rootId}`}>Abrir ticket principal</a>
+        {/if}
+      </div>
+    {/if}
+
+    {#if ticketData.mergeContext.members.length > 1 && ticketData.mergeContext.rootId === ticketData.details.ticket.id}
+      <section class="border-b border-[var(--app-border)] bg-[var(--app-surface-subtle)] px-4 py-3">
+        <div class="flex items-center gap-2 text-[12px] font-semibold text-[var(--app-text)]">
+          <GitMerge size={15}/>Tickets mesclados ({ticketData.mergeContext.members.length})
+        </div>
+        <div class="mt-2 flex flex-wrap gap-2">
+          {#each ticketData.mergeContext.members.filter((member) => member.id !== ticketData.details.ticket.id) as member (member.id)}
+            <span class="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2.5 py-1.5 text-[12px] text-[var(--app-text)]">
+              <a href={`/app/tickets/${member.id}`} title={member.subject} class="font-semibold text-[var(--app-primary)] hover:underline">
+                #{member.ticketNumber}
+              </a>
+              <span class="max-w-[150px] truncate text-[var(--app-text-muted)]">{member.serviceRequestType === "nfse" ? "NFS-e" : member.serviceRequestType === "cell_coin" ? "Cellcoin" : member.channel}</span>
+              {#if ticketData.mergeContext.canUnmerge && member.linkId}
+                <button type="button" on:click={() => void undoMergedTicket(member.linkId!, member.ticketNumber)}
+                  aria-label={`Desfazer vínculo do ticket #${member.ticketNumber}`}
+                  class="ml-1 flex h-6 w-6 items-center justify-center rounded text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]">
+                  <X size={13}/>
+                </button>
+              {/if}
+            </span>
+          {/each}
+        </div>
+        <p class="mt-2 text-[11px] text-[var(--app-text-muted)]">Cada origem mantém seus canais, anexos, permissões, SLA e formulários. Responda ao remetente correto abrindo o ticket de origem.</p>
+      </section>
+    {/if}
 
     <nav class="relative z-20 flex h-11 shrink-0 items-center border-b border-[var(--app-border)] bg-white px-3 sm:px-4" aria-label="Seções do ticket">
       <div class="flex h-full min-w-0 flex-1 items-center gap-3 overflow-x-auto whitespace-nowrap sm:gap-5">
@@ -502,6 +563,13 @@
               ? "min-w-0 flex-1 space-y-3 bg-[var(--app-surface-subtle)] px-3 py-4 sm:px-5"
               : "min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto bg-[var(--app-surface-subtle)] px-3 py-4 sm:px-5"}>
               {#each ticketData.details.messages as message}
+                {#if message.sourceTicketNumber && message.sourceTicketNumber !== ticketData.details.ticket.ticketNumber}
+                  <div class="flex justify-center">
+                    <span class="rounded-full border border-[var(--app-border)] bg-[var(--app-surface)] px-2.5 py-1 text-[11px] text-[var(--app-text-muted)]">
+                      Origem: #{message.sourceTicketNumber} · {message.channel ?? "Ticket"}
+                    </span>
+                  </div>
+                {/if}
                 {#if message.authorType === "system"}
                   <div class="flex min-w-0 justify-center py-1">
                     <article class="min-w-0 max-w-[95%] rounded-xl bg-[var(--app-surface-muted)] px-3.5 py-2.5 text-center sm:max-w-[84%]">
@@ -700,9 +768,14 @@
                     <a href={attachment.href} target="_blank" rel="noreferrer" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-[#000A57]"><Paperclip size={16}/></a>
                     <div class="min-w-0 flex-1">
                       <a href={attachment.href} target="_blank" rel="noreferrer" class="block truncate text-[11.5px] font-semibold text-[#303746] hover:underline">{attachment.originalName}</a>
-                      <p class="mt-0.5 text-[10px] text-[#8B909D]">{formatBytes(attachment.sizeBytes)} · {formatDateTime(attachment.createdAt)}</p>
+                      <p class="mt-0.5 text-[11px] text-[var(--app-text-muted)]">
+                        {formatBytes(attachment.sizeBytes)} · {formatDateTime(attachment.createdAt)}
+                        {#if attachment.sourceTicketNumber && attachment.sourceTicketNumber !== ticketData.details.ticket.ticketNumber}
+                          · <a class="font-semibold text-[var(--app-primary)] hover:underline" href={`/app/tickets/${attachment.sourceTicketId}`}>#{attachment.sourceTicketNumber}</a>
+                        {/if}
+                      </p>
                     </div>
-                    {#if ticketData.canReply && attachment.source !== "email"}
+                    {#if ticketData.canReply && attachment.source !== "email" && attachment.sourceTicketId === ticketData.details.ticket.id}
                       <button type="button" on:click={() => void deleteAttachment(attachment.id)} class="flex h-8 w-8 items-center justify-center rounded-lg text-[#A33A3A] hover:bg-[var(--app-danger-bg)]" aria-label={`Remover ${attachment.originalName}`}><Trash2 size={14}/></button>
                     {/if}
                   </article>
@@ -896,7 +969,7 @@
           <div class="mt-3 space-y-3 border-t border-[var(--app-border-soft)] pt-3">
             {#each ticketData.details.events as event}
               <div class="border-l-2 border-[var(--app-border)] pl-3">
-                <p class="text-[10.5px] leading-5 text-[#626877]"><strong class="font-semibold text-[#3E4453]">{event.actorName ?? "Sistema"}</strong> {eventLabels[event.eventType] ?? event.eventType}</p>
+                <p class="text-[10.5px] leading-5 text-[#626877]"><strong class="font-semibold text-[#3E4453]">{event.actorName ?? "Sistema"}</strong> {eventLabels[event.eventType] ?? event.eventType}{#if event.sourceTicketNumber && event.sourceTicketNumber !== ticketData.details.ticket.ticketNumber} · #{event.sourceTicketNumber}{/if}</p>
                 <span class="mt-0.5 block text-[9.5px] text-[#9B9FAC]">{formatDateTime(event.createdAt)}</span>
               </div>
             {/each}
@@ -908,3 +981,7 @@
     </div>
   </section>
 </div>
+
+{#if ticketData.mergeContext.canMerge}
+  <TicketMergeDialog bind:open={mergeDialogOpen} {ticketData} saving={Boolean(actionLoading)} onAction={postAction}/>
+{/if}
