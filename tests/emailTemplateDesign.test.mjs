@@ -9,6 +9,9 @@ test("all F10 emails use the approved logo, brand and external footer", () => {
   assert.ok(html.includes(logo));
   assert.match(html, /Software Escolar/);
   assert.match(html, /border-radius:6px/);
+  assert.match(html, /alt="F10" width="90"/);
+  assert.match(html, /border-radius:6px 6px 0 0/);
+  assert.match(html, /border-radius:0 0 6px 6px/);
   assert.match(html, /Equipe F10/);
   assert.match(html, /https:\/\/f10.com.br"/);
   assert.ok(html.indexOf("https://f10.com.br", html.indexOf("</table>")) >= 0);
