@@ -227,6 +227,7 @@ export async function sendNewEmailTicketAcknowledgement(input: {
     ticketNumber: ticket.number,
     subject: ticket.subject,
     messageBody: input.messageBody,
+    inboundDomain: replyDomain(),
   });
   if (!receipt) return false;
 
