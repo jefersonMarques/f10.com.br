@@ -84,7 +84,11 @@
     const body = new FormData();
     body.set("candidateTicketId", candidate.id);
     body.set("principal", principal);
-    if (await onAction("mergeTickets", body)) close();
+    if (await onAction("mergeTickets", body)) {
+      close();
+      return;
+    }
+    errorMessage = "Mesclagem não realizada. Confira seu acesso aos dois tickets e tente novamente.";
   }
 
   onDestroy(() => {
