@@ -114,12 +114,16 @@ export async function getTicketDetailsData(
     getTicketCard(actorUserId, permissions, memberId)
   ));
   const allCards = [card, ...relatedCards];
-  const mergedAttachments = allCards.flatMap((entry) => entry.attachments);
+  const mergedAttachments = allCards.flatMap((entry) => entry.attachments.map((attachment) => ({
+    ...attachment,
+    sourceTicketId: entry.details.ticket.id,
+    sourceTicketNumber: entry.details.ticket.ticketNumber,
+  })));
   const allMessages = allCards.flatMap((entry) => entry.details.messages.map((message) => ({
     ...message,
     sourceTicketId: entry.details.ticket.id,
     sourceTicketNumber: entry.details.ticket.ticketNumber,
-    attachments: entry.attachments.filter((attachment) => attachment.messageId === message.id),
+    attachments: mergedAttachments.filter((attachment) => attachment.messageId === message.id),
   }))).sort((left, right) =>
     new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
     || left.id.localeCompare(right.id)
