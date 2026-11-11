@@ -102,7 +102,7 @@
               Remover contrato
             </button>
           {/if}
-          {#if overview.requesterContactId}
+          {#if overview.operationalContactId}
             <button type="button" on:click={() => { menuOpen = false; void linkRequester(null); }}
               class="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[12px] text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]">
               Desvincular contato operacional
