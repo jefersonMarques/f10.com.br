@@ -80,18 +80,16 @@ export async function requestTicketSatisfaction(ticketId: string): Promise<boole
       ].join("\n"),
       htmlContent: buildEmailHtml({
         eyebrow: "Pesquisa de satisfação",
-        title: `Como foi o atendimento do ticket #${ticket.ticketNumber}?`,
+        title: "Como foi seu atendimento?",
         greeting: `Olá, ${name}.`,
         body: [
-          `O chamado “${ticket.subject}” foi resolvido.`,
-          "Sua avaliação leva menos de um minuto e ajuda a F10 a melhorar o atendimento.",
+          `O atendimento #${ticket.ticketNumber} — ${ticket.subject} foi resolvido.`,
+          "Sua avaliação leva apenas alguns segundos e nos ajuda a melhorar.",
         ],
         ratingLinks: [1, 2, 3, 4, 5].map((score) => ({
           score,
           href: `${surveyUrl}?score=${score}`,
         })),
-        action: { label: "Avaliar atendimento", href: surveyUrl },
-        secondaryAction: { label: "Acompanhar chamado no painel", href: ticketUrl },
         footer: "A pesquisa é vinculada somente a este atendimento.",
       }),
     });
