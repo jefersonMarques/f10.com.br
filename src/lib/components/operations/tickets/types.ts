@@ -1,3 +1,5 @@
+import type { TicketCustomerOverview } from "$lib/support/ticketCustomerOverview";
+
 export type TicketScope = "mine" | "unassigned" | "all";
 export type TicketView = "board" | "list" | "split";
 export type TicketMainPanel = "conversation" | "request" | "attachments" | "remote" | "service" | "customer" | "tasks" | "collaboration" | "history";
@@ -222,6 +224,7 @@ export type TicketDetailsData = {
   serviceRequest: TicketServiceRequest | null;
   customerContext: TicketCustomerContextData | null;
   commercialUnit: TicketCommercialUnit | null;
+  customerOverview: TicketCustomerOverview;
   satisfaction: {
     score: number | null;
     comment: string | null;
@@ -248,6 +251,8 @@ export type TicketDetailsData = {
   canManageFollowers: boolean;
   canAssign: boolean;
   canLinkCustomer: boolean;
+  canViewCustomerProfiles: boolean;
+  canViewCommercialProfiles: boolean;
   canViewTasks: boolean;
   canCreateTask: boolean;
   canRequestRemote: boolean;
