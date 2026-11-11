@@ -1,8 +1,8 @@
-import { eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { customerF10Identities } from "$lib/server/db/customerPortalSchema";
 import { supportEmailThreads } from "$lib/server/db/supportEmailSchema";
-import { customerContacts } from "$lib/server/db/supportSchema";
+import { customerContacts, ticketMessages } from "$lib/server/db/supportSchema";
 import { ticketRequesterProfiles } from "$lib/server/db/ticketRequesterSchema";
 import { getSuggestedTicketCommercialUnit } from "$lib/server/support/ticketCommercialUnitRepository";
 import {
@@ -59,6 +59,22 @@ async function getCommercialEmail(unitId: string | null): Promise<{
   };
 }
 
+function readOriginalEmailSender(metadata: Record<string, unknown> | null): {
+  name: string | null;
+  email: string | null;
+} | null {
+  const from = metadata?.from;
+  if (!from || typeof from !== "object" || Array.isArray(from)) return null;
+  const record = from as Record<string, unknown>;
+  const email = typeof record.email === "string" ? record.email.trim() : "";
+  if (!email) return null;
+
+  return {
+    name: typeof record.name === "string" ? record.name : null,
+    email,
+  };
+}
+
 export async function getTicketCustomerOverview(
   ticket: TicketSummary,
   commercialUnit: CommercialUnit | null,
@@ -66,7 +82,7 @@ export async function getTicketCustomerOverview(
   allowCommercialHistory: boolean,
 ): Promise<TicketCustomerOverview> {
   const db = getDatabase();
-  const [emailRows, requesterRows, portalRows, commercialEmail] = await Promise.all([
+  const [emailRows, requesterRows, portalRows, commercialEmail, originalMessages] = await Promise.all([
     ticket.channel === "email"
       ? db.select({
           name: supportEmailThreads.senderName,
@@ -91,6 +107,17 @@ export async function getTicketCustomerOverview(
         .limit(1)
       : Promise.resolve([]),
     getCommercialEmail(commercialUnit?.id ?? null),
+    ticket.channel === "email"
+      ? db.select({ metadata: ticketMessages.externalMetadata })
+        .from(ticketMessages)
+        .where(and(
+          eq(ticketMessages.ticketId, ticket.id),
+          eq(ticketMessages.channel, "email"),
+          eq(ticketMessages.authorType, "customer"),
+        ))
+        .orderBy(asc(ticketMessages.createdAt))
+        .limit(1)
+      : Promise.resolve([]),
   ]);
 
   const requesterRow = requesterRows[0] ?? null;
@@ -117,7 +144,8 @@ export async function getTicketCustomerOverview(
     organizationName: ticket.organizationName,
     commercialUnit,
     customerContext,
-    emailSender: emailRows[0] ?? null,
+    emailSender: readOriginalEmailSender(originalMessages[0]?.metadata ?? null)
+      ?? emailRows[0] ?? null,
     requesterOverride: requesterRow
       ? {
           ...requesterRow,
