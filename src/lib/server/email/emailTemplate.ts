@@ -130,11 +130,11 @@ export function buildEmailHtml(input: EmailTemplateInput): string {
   <body style="margin:0;padding:0;background:#f2f4f7;font-family:Arial,Helvetica,sans-serif;color:#202b3f">
     <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="width:100%;background:#f2f4f7">
       <tr><td align="center" style="padding:24px 12px">
-        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #dce1e9;border-radius:6px">
-          <tr><td bgcolor="#07142e" style="background:#07142e;padding:16px 26px">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #dce1e9;border-radius:6px;border-collapse:separate;border-spacing:0;overflow:hidden">
+          <tr><td bgcolor="#07142e" style="background:#07142e;padding:14px 26px;border-radius:6px 6px 0 0">
             <table role="presentation" border="0" cellspacing="0" cellpadding="0"><tr>
               <td style="vertical-align:middle">
-                <img src="${EMAIL_LOGO_URL}" alt="F10" width="108" style="display:block;width:108px;height:auto;max-height:58px;border:0">
+                <img src="${EMAIL_LOGO_URL}" alt="F10" width="90" style="display:block;width:90px;height:auto;max-height:48px;border:0">
               </td>
               <td style="vertical-align:middle;padding-left:15px">
                 <span style="display:inline-block;border-left:1px solid #6c7890;padding-left:15px;font-size:13px;line-height:1.5;color:#dee4ee">Software Escolar</span>
@@ -153,7 +153,7 @@ export function buildEmailHtml(input: EmailTemplateInput): string {
             ${secondaryAction}
             ${note}
           </td></tr>
-          <tr><td style="padding:17px 30px;background:#fbfcfe;border-top:1px solid #e8ebf0">
+          <tr><td style="padding:17px 30px;background:#fbfcfe;border-top:1px solid #e8ebf0;border-radius:0 0 6px 6px">
             <div style="font-size:12px;font-weight:700;color:#29354d">Equipe F10</div>
             <div style="margin-top:4px;font-size:11px;line-height:1.6;color:#808a9b">Central de Atendimento · Software Escolar</div>
           </td></tr>
