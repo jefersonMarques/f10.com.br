@@ -1,7 +1,7 @@
-import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { getPermissionScope, type PermissionScope } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
-import { customerContacts, customerOrganizations, supportQueues, ticketEvents, tickets } from "$lib/server/db/supportSchema";
+import { customerContacts, customerOrganizations, ticketEvents, tickets } from "$lib/server/db/supportSchema";
 import { canAccessTicket, type SupportPermissionMap } from "$lib/server/support/supportAccess";
 import { ensureDistinctMergeGroups, uniqueMergeMemberIds } from "$lib/support/ticketMergeRules";
 
@@ -153,13 +153,14 @@ export async function getTicketMergeContext(
   ));
   const rows = accessible.filter((row): row is TreeRow => row !== null);
   const members = await loadMergeMembers(rows);
+  const rootAccessible = rows.some((row) => row.id === rootId);
   return {
     rootId,
     isSource: rootId !== ticketId,
-    rootAccessible: rows.some((row) => row.id === rootId),
+    rootAccessible,
     members,
-    canMerge: Boolean(getPermissionScope(permissions, "tickets.merge")),
-    canUnmerge: Boolean(getPermissionScope(permissions, "tickets.unmerge")),
+    canMerge: rootAccessible && Boolean(getPermissionScope(permissions, "tickets.merge")),
+    canUnmerge: rootAccessible && Boolean(getPermissionScope(permissions, "tickets.unmerge")),
   };
 }
 
@@ -181,7 +182,13 @@ export async function listTicketMergeCandidates(
   const results = await getDatabase()
     .select({ id: tickets.id })
     .from(tickets)
-    .where(where)
+    .where(and(
+      where,
+      sql`NOT EXISTS (
+        SELECT 1 FROM ticket_merge_links active
+        WHERE active.source_ticket_id = ${tickets.id} AND active.unmerged_at IS NULL
+      )`,
+    ))
     .orderBy(desc(tickets.updatedAt))
     .limit(35);
 
