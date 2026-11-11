@@ -97,7 +97,10 @@ export async function getTicketDetailsData(
       : Promise.resolve(null),
   ]);
 
-  const customerOverview = await getTicketCustomerOverview(card.details.ticket, commercialUnit, customerContext);
+  const customerOverview = await getTicketCustomerOverview(
+    card.details.ticket, commercialUnit, customerContext,
+    hasPermission(permissions, "customers.view"),
+  );
 
   const mentionUsers = canCommentInternal
     ? await filterMentionUsersForTicket(users, ticketId)
