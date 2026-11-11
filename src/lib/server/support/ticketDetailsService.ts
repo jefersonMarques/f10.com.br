@@ -8,6 +8,7 @@ import { requireTicketAccess, type SupportPermissionMap } from "$lib/server/supp
 import { getTicketCard } from "$lib/server/support/ticketCardRepository";
 import { getTicketCustomerContext } from "$lib/server/support/ticketCustomerContextRepository";
 import { getTicketCommercialUnit } from "$lib/server/support/ticketCommercialUnitRepository";
+import { getTicketMergeContext } from "$lib/server/support/ticketMergeRepository";
 import { getTicketCustomerOverview } from "$lib/server/support/ticketCustomerOverviewService";
 import {
   listTicketFollowerCandidates,
@@ -64,7 +65,7 @@ export async function getTicketDetailsData(
   const [
     card,
     users,
-    linkedTasks,
+    linkedTasks: allTasks,
     taskProjects,
     serviceRequest,
     followers,
@@ -73,6 +74,7 @@ export async function getTicketDetailsData(
     satisfaction,
     workflowBoard,
     commercialUnit,
+    mergeContext,
   ] = await Promise.all([
     getTicketCard(actorUserId, permissions, ticketId),
     canReply || canCommentInternal || canAssign
@@ -95,12 +97,50 @@ export async function getTicketDetailsData(
     hasPermission(permissions, "customers.view")
       ? getTicketCommercialUnit(ticketId)
       : Promise.resolve(null),
+    getTicketMergeContext(actorUserId, permissions, ticketId),
   ]);
 
   const customerOverview = await getTicketCustomerOverview(
     card.details.ticket, commercialUnit, customerContext,
     hasPermission(permissions, "customers.view"),
   );
+
+  const otherMemberIds = mergeContext.rootId === ticketId
+    ? mergeContext.members
+      .filter((member) => member.id !== ticketId)
+      .map((member) => member.id)
+    : [];
+  const relatedCards = await Promise.all(otherMemberIds.map(async (memberId) =>
+    getTicketCard(actorUserId, permissions, memberId)
+  ));
+  const allCards = [card, ...relatedCards];
+  const mergedAttachments = allCards.flatMap((entry) => entry.attachments);
+  const allMessages = allCards.flatMap((entry) => entry.details.messages.map((message) => ({
+    ...message,
+    sourceTicketId: entry.details.ticket.id,
+    sourceTicketNumber: entry.details.ticket.ticketNumber,
+    attachments: entry.attachments.filter((attachment) => attachment.messageId === message.id),
+  }))).sort((left, right) =>
+    new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+    || left.id.localeCompare(right.id)
+  );
+  const allEvents = allCards.flatMap((entry) => entry.details.events.map((event) => ({
+    ...event,
+    sourceTicketId: entry.details.ticket.id,
+    sourceTicketNumber: entry.details.ticket.ticketNumber,
+  }))).sort((left, right) =>
+    new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+  );
+
+  const relatedTaskCollections = canViewTasks
+    ? await Promise.all(otherMemberIds.map((memberId) =>
+      listTicketTasks(actorUserId, permissions, memberId)
+    ))
+    : [];
+  const allTasks = Array.from(new Map(
+    [linkedTasks, ...relatedTaskCollections]
+      .flat().map((task) => [task.id, task] as const),
+  ).values());
 
   const mentionUsers = canCommentInternal
     ? await filterMentionUsersForTicket(users, ticketId)
@@ -115,12 +155,8 @@ export async function getTicketDetailsData(
         customerName: card.details.ticket.customerName,
         organizationName: card.details.ticket.organizationName,
       },
-      messages: card.details.messages.map((message) => ({
-        ...message,
-        attachments: card.attachments.filter(
-          (attachment) => attachment.messageId === message.id,
-        ),
-      })),
+      messages: allMessages,
+      events: allEvents,
     },
     workflowBoard: {
       globalWorkflow: workflowBoard.globalWorkflow,
@@ -129,6 +165,8 @@ export async function getTicketDetailsData(
     customerContext,
     commercialUnit,
     customerOverview,
+    mergeContext,
+    attachments: mergedAttachments,
     serviceRequest,
     satisfaction,
     linkedTasks,
