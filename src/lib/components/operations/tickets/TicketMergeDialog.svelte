@@ -14,6 +14,11 @@
   let results: Candidate[] = [];
   let candidate: Candidate | null = null;
   let principal: "current" | "candidate" = "current";
+  $: currentPrimary = ticketData.mergeContext.members.find(
+    (member) => member.id === ticketData.mergeContext.rootId,
+  );
+  $: currentPrimaryNumber = currentPrimary?.ticketNumber ?? ticketData.details.ticket.ticketNumber;
+
   let loading = false;
   let errorMessage = "";
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -67,7 +72,7 @@
 
   async function merge(): Promise<void> {
     if (!candidate || saving) return;
-    const currentNumber = ticketData.details.ticket.ticketNumber;
+    const currentNumber = currentPrimaryNumber;
     const primaryNumber = principal === "current" ? currentNumber : candidate.ticketNumber;
     if (!confirm(`Mesclar os tickets e manter #${primaryNumber} como principal?\nOs históricos serão preservados e o acesso dos clientes não será ampliado.`)) {
       return;
@@ -102,8 +107,8 @@
 
       <div class="min-h-0 space-y-4 overflow-y-auto p-4 sm:p-5">
         <div class="rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-subtle)] p-3">
-          <p class="text-[11px] text-[var(--app-text-muted)]">Ticket atual</p>
-          <strong class="mt-1 block text-[13px] text-[var(--app-text)]">#{ticketData.details.ticket.ticketNumber} · {ticketData.details.ticket.subject}</strong>
+          <p class="text-[11px] text-[var(--app-text-muted)]">{ticketData.mergeContext.isSource ? "Principal do grupo atual" : "Ticket atual"}</p>
+          <strong class="mt-1 block text-[13px] text-[var(--app-text)]">#{currentPrimaryNumber} · {currentPrimary?.subject ?? ticketData.details.ticket.subject}</strong>
           <p class="mt-1 text-[12px] text-[var(--app-text-muted)]">
             {ticketData.customerOverview.clientName ?? "Sem empresa"} · {ticketData.customerOverview.requesterName ?? "Sem solicitante"}
           </p>
@@ -149,7 +154,7 @@
             <legend class="text-[12px] font-semibold text-[var(--app-text)]">Qual ticket permanece principal?</legend>
             <label class="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-[var(--app-border)] p-2.5 text-[12px] text-[var(--app-text)]">
               <input type="radio" name="principal" value="current" bind:group={principal}/>
-              <span>Manter #{ticketData.details.ticket.ticketNumber} — cliente e solicitante atuais</span>
+              <span>Manter #{currentPrimaryNumber} — cliente e solicitante do principal atual</span>
             </label>
             <label class="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-[var(--app-border)] p-2.5 text-[12px] text-[var(--app-text)]">
               <input type="radio" name="principal" value="candidate" bind:group={principal}/>
