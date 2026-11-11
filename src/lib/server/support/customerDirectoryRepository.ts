@@ -292,6 +292,25 @@ export async function listCustomerDirectory(
   };
 }
 
+export async function requireAccessibleCustomerContact(
+  actorUserId: string,
+  permissions: CustomerDirectoryPermissionMap,
+  contactId: string,
+): Promise<void> {
+  const scope = requireCustomerScope(permissions, "customers.view");
+  const accessCondition = await buildCustomerAccessCondition(actorUserId, scope);
+  const [contact] = await getDatabase()
+    .select({ id: customerContacts.id })
+    .from(customerContacts)
+    .where(combineConditions(
+      eq(customerContacts.id, contactId),
+      eq(customerContacts.active, true),
+      accessCondition,
+    ))
+    .limit(1);
+  if (!contact) throw new Error("CUSTOMER_NOT_ACCESSIBLE");
+}
+
 async function getAccessibleCustomer(
   actorUserId: string,
   permissions: CustomerDirectoryPermissionMap,
