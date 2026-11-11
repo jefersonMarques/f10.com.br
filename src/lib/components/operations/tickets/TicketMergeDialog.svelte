@@ -18,6 +18,10 @@
     (member) => member.id === ticketData.mergeContext.rootId,
   );
   $: currentPrimaryNumber = currentPrimary?.ticketNumber ?? ticketData.details.ticket.ticketNumber;
+  $: selectedPrimaryStatus = principal === "current"
+    ? currentPrimary?.status ?? ticketData.details.ticket.status
+    : candidate?.status ?? "";
+  $: primaryIsFinished = ["resolved", "closed"].includes(selectedPrimaryStatus);
 
   let loading = false;
   let errorMessage = "";
@@ -161,6 +165,13 @@
               <span>Usar #{candidate.ticketNumber} — cliente e solicitante do outro ticket</span>
             </label>
           </fieldset>
+
+          {#if primaryIsFinished}
+            <p role="alert" class="rounded-lg border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] px-3 py-2.5 text-[12px] text-[var(--app-warning-text)]">
+              O principal escolhido está finalizado. A mesclagem não o reabre automaticamente;
+              altere seu status para continuar o atendimento na fila de tickets ativos.
+            </p>
+          {/if}
         {/if}
 
         <p class="text-[12px] leading-5 text-[var(--app-text-muted)]">
