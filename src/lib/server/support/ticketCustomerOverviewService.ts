@@ -63,6 +63,7 @@ export async function getTicketCustomerOverview(
   ticket: TicketSummary,
   commercialUnit: CommercialUnit | null,
   customerContext: CustomerContext | null,
+  allowCommercialHistory: boolean,
 ): Promise<TicketCustomerOverview> {
   const db = getDatabase();
   const [emailRows, requesterRows, portalRows, commercialEmail] = await Promise.all([
@@ -104,7 +105,7 @@ export async function getTicketCustomerOverview(
     : [];
 
   const contactId = requesterRow?.contactId ?? ticket.customerContactId;
-  const suggested = !commercialUnit && contactId
+  const suggested = allowCommercialHistory && !commercialUnit && contactId
     ? await getSuggestedTicketCommercialUnit(contactId, ticket.id)
     : null;
 
