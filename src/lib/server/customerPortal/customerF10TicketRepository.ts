@@ -20,7 +20,7 @@ import {
 import { ticketWorkflowStates } from "$lib/server/db/ticketWorkflowSchema";
 import { ticketMessageAttachments } from "$lib/server/db/supportChatEntrySchema";
 import { ticketEvents, ticketMessages, tickets } from "$lib/server/db/supportSchema";
-import { customerTicketOwnershipCondition, originalEmailSenderCondition } from "$lib/server/customerPortal/ticketOwnership";
+import { customerTicketOwnershipCondition, explicitTicketRequesterCondition, originalEmailSenderCondition } from "$lib/server/customerPortal/ticketOwnership";
 import {
   getCustomerPortalTicket,
   replyCustomerPortalTicket,
@@ -241,6 +241,7 @@ export async function listCustomerF10Tickets(
             eq(tickets.customerContactId, session.contactId),
           ),
           originalEmailSenderCondition(session.email),
+          explicitTicketRequesterCondition(session.contactId),
         );
     if (authorizedTicketCondition) conditions.push(authorizedTicketCondition);
   }
@@ -421,7 +422,10 @@ export async function getCustomerF10Ticket(
     const [originalSender] = await getDatabase()
       .select({ id: tickets.id })
       .from(tickets)
-      .where(and(eq(tickets.id, ticketId), originalEmailSenderCondition(session.email)))
+      .where(and(
+        eq(tickets.id, ticketId),
+        or(originalEmailSenderCondition(session.email), explicitTicketRequesterCondition(session.contactId)),
+      ))
       .limit(1);
     return originalSender ? { ...details, context: null } : null;
   }
