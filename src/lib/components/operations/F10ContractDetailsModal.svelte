@@ -3,7 +3,7 @@
   import {
     BadgeCheck, BriefcaseBusiness, Building2, CalendarDays, CreditCard,
     ExternalLink, FileText, Hash, Loader2, Mail, MapPin, Phone,
-    Smartphone, Tag, UserRound, Users, X,
+    Smartphone, Tag, UserRound, Users, RefreshCw, X,
   } from "lucide-svelte";
 
   export let contractId: string;
@@ -20,6 +20,13 @@
     accountName: string | null;
     personName: string | null;
     holderName: string | null;
+    holderDocument: string | null;
+    holderPostalCode: string | null;
+    holderStreet: string | null;
+    holderNeighborhood: string | null;
+    holderCity: string | null;
+    holderState: string | null;
+    holderAddressComplement: string | null;
     nickname: string | null;
     legalName: string | null;
     email: string | null;
@@ -58,6 +65,8 @@
   let details: Details | null = null;
   let loading = true;
   let loadError = "";
+  let refreshingHolder = false;
+  let refreshError = "";
 
   function display(value: string | number | null | undefined): string {
     return value === null || value === undefined || String(value).trim() === ""
@@ -97,19 +106,39 @@
     }
   }
 
+  async function refreshHolder(): Promise<void> {
+    if (refreshingHolder) return;
+    refreshingHolder = true;
+    refreshError = "";
+    try {
+      const response = await fetch(
+        "/api/app/customers/contracts/" + encodeURIComponent(contractId) + "/holder",
+        { method: "POST", cache: "no-store" },
+      );
+      if (!response.ok) throw new Error("HOLDER_REFRESH_FAILED");
+      await loadDetails();
+    } catch {
+      refreshError = "Não foi possível atualizar o titular pela API F10.";
+    } finally {
+      refreshingHolder = false;
+    }
+  }
+
   onMount(() => {
     void loadDetails();
   });
 
   let customerFields: Field[] = [];
   let commercialFields: Field[] = [];
+  let addressFields: Field[] = [];
   let historyFields: Field[] = [];
   let identifierFields: Field[] = [];
 
   $: customerFields = details ? [
     { label: "Cliente / empresa", value: details.accountName, icon: Building2 },
     { label: "Pessoa vinculada", value: details.personName, icon: UserRound },
-    { label: "Titular", value: details.holderName, icon: Users },
+    { label: "Titular / responsável pelo contrato", value: details.holderName, icon: Users },
+    { label: "CPF / CNPJ do titular", value: details.holderDocument, icon: FileText },
     { label: "Razão social", value: details.legalName, icon: Building2 },
     { label: "E-mail", value: details.email, icon: Mail, link: details.email ? "mailto:" + details.email : null },
     { label: "Telefone", value: details.phone, icon: Phone, link: details.phone ? "tel:" + details.phone : null },
@@ -117,6 +146,15 @@
     { label: "E-mail do titular", value: details.holderEmail, icon: Mail, link: details.holderEmail ? "mailto:" + details.holderEmail : null },
     { label: "Telefone do titular", value: details.holderPhone, icon: Phone },
     { label: "Celular do titular", value: details.holderMobile, icon: Smartphone },
+  ] satisfies Field[] : [];
+
+  $: addressFields = details ? [
+    { label: "Endereço do titular", value: details.holderStreet, icon: MapPin },
+    { label: "Complemento", value: details.holderAddressComplement, icon: MapPin },
+    { label: "Bairro", value: details.holderNeighborhood, icon: MapPin },
+    { label: "Cidade", value: details.holderCity, icon: MapPin },
+    { label: "Estado", value: details.holderState, icon: MapPin },
+    { label: "CEP", value: details.holderPostalCode, icon: MapPin },
   ] satisfies Field[] : [];
 
   $: commercialFields = details ? [
@@ -150,8 +188,9 @@
     { label: "ID do telemarketing", value: details.telemarketingId, icon: Hash },
   ] satisfies Field[] : [];
 
-  const sections: Array<{ title: string; name: "customer" | "commercial" | "history" | "ids" }> = [
+  const sections: Array<{ title: string; name: "customer" | "commercial" | "history" | "ids" | "address" }> = [
     { title: "Cliente e responsáveis", name: "customer" },
+    { title: "Endereço do responsável", name: "address" },
     { title: "Dados comerciais", name: "commercial" },
     { title: "Datas", name: "history" },
     { title: "Identificadores F10", name: "ids" },
@@ -170,7 +209,7 @@
       <div class="min-w-0">
         <span class="application-text-meta font-semibold text-app-text-muted">Contrato F10 #{contractId}</span>
         <h2 class="mt-1 break-words text-lg font-bold text-app-text">
-          {details?.accountName || details?.personName || "Detalhes do cliente"}
+          {details?.accountName || details?.holderName || details?.personName || "Detalhes do cliente"}
         </h2>
         {#if details?.accountName && details?.personName && details.accountName !== details.personName}
           <p class="application-text-caption mt-1 flex items-center gap-2 text-app-text-muted">
@@ -201,11 +240,22 @@
           <span class="application-text-meta rounded-full border border-app-border px-3 py-1 text-app-text-muted">
             {display(details.apiStatus ?? details.apiStatusCode)}
           </span>
+          {#if details.holderId}
+            <button type="button" disabled={refreshingHolder} on:click={() => void refreshHolder()}
+              class="application-text-caption inline-flex h-9 items-center gap-1.5 rounded-lg border border-app-border-control px-3 font-semibold text-app-primary disabled:opacity-50">
+              <RefreshCw size={15} class={refreshingHolder ? "animate-spin" : ""}/>
+              {refreshingHolder ? "Atualizando..." : "Atualizar titular"}
+            </button>
+          {/if}
         </div>
 
+        {#if refreshError}
+          <p role="alert" class="application-text-caption mb-3 text-app-danger-text">{refreshError}</p>
+        {/if}
         {#each sections as section}
           {@const fields = section.name === "customer" ? customerFields :
             section.name === "commercial" ? commercialFields :
+            section.name === "address" ? addressFields :
             section.name === "history" ? historyFields : identifierFields}
           <section class="mb-4 rounded-xl border border-app-border p-3 sm:p-4">
             <h3 class="application-text-caption mb-3 font-bold text-app-text">{section.title}</h3>

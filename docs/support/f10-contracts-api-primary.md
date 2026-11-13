@@ -60,3 +60,37 @@ de contatos. Compare as contagens por `unit_id` e o estado do cache da API.
   para tickets novos; não há alteração em tickets históricos.
 - Após a migração e publicação, testar a pesquisa por `tex`, contrato 24,
   criação de ticket com seleção por API e abertura do modal de detalhes.
+
+## Titular: responsável pelo contrato na API
+
+- `titular_id` é uma pessoa independente de `pessoa_id`. Exemplo:
+  contrato interno 639, número comercial 24, titular 3181
+  `TEX CURSOS E TREINAMENTOS LTDA` e pessoa vinculada 3182
+  `Robson Melo Gomes`.
+- A origem da verdade é `GET /unidade/pessoas/<unit_id>/<titular_id>`.
+- O cache `f10_customer_holder_profiles` (migração `0113`) mantém
+  apenas dados de identificação, contato e endereço do titular, sem
+  criar `customer_contacts`, usuários, organizações ou permissões.
+- O worker de importações, já ativo no PM2 em produção, detecta
+  `titular_id` ainda não sincronizados e os consulta em pequenos lotes,
+  com nova tentativa espaçada, sem bloquear a listagem.
+- O botão `Atualizar titular` no modal solicita o titular diretamente
+  à API para o contrato escolhido. Requer `customers.manage` global.
+- A listagem e a criação de ticket passam a pesquisar o nome
+  confirmado do titular, e não só o e-mail da pessoa vinculada.
+- `Cliente / empresa` e `Razão social` usam o nome do titular
+  como pessoa jurídica somente quando o documento tiver 14 dígitos
+  (CNPJ). Pessoas físicas continuam aparecendo como titulares,
+  sem serem apresentadas como empresas.
+- No ticket, `pessoa_id` continua sendo o contato operacional;
+  `titular_id` não substitui automaticamente solicitante nem email
+  de notificação. Titulares nunca são usados para consolidar
+  outras pessoas por nome, domínio de email ou telefone.
+
+### Teste pós-deploy
+
+1. Abra o contrato comercial 24 (ID API 639) em Clientes > Ver.
+2. Use `Atualizar titular` e verifique o nome do responsável e documento.
+3. Pesquise `TEX CURSOS` na lista e em Tickets > Novo ticket.
+4. Confira o nome `Robson Melo Gomes` como pessoa vinculada.
+5. O worker processa os demais titulares, sem alterar os 1.227 contratos.

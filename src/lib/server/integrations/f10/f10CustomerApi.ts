@@ -1,9 +1,11 @@
 import { env } from "$env/dynamic/private";
 import {
   parseF10Contracts,
+  parseF10ContractHolder,
   parseF10Person,
   parseF10UnitId,
   type F10CustomerPerson,
+  type F10ContractHolder,
 } from "$lib/server/integrations/f10/f10CustomerSyncParsing";
 
 import { collectF10ContractPages } from "$lib/server/integrations/f10/f10ContractPagination";
@@ -85,4 +87,14 @@ export async function getF10CustomerPerson(unitId: number, personId: number): Pr
   if (!Number.isSafeInteger(personId) || personId <= 0) throw new Error("F10_PERSON_ID_INVALID");
   const response = await apiGet(`/unidade/pessoas/${unitId}/${personId}`);
   return parseF10Person(response, personId);
+}
+
+export async function getF10ContractHolder(
+  unitId: number,
+  holderId: number,
+): Promise<F10ContractHolder> {
+  if (!Number.isSafeInteger(unitId) || unitId <= 0) throw new Error("F10_UID_INVALID");
+  if (!Number.isSafeInteger(holderId) || holderId <= 0) throw new Error("F10_PERSON_ID_INVALID");
+  const response = await apiGet(`/unidade/pessoas/${unitId}/${holderId}`);
+  return parseF10ContractHolder(response, holderId);
 }

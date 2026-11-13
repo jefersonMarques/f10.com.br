@@ -120,9 +120,10 @@ export async function getTicketCustomerOverview(
       : Promise.resolve([]),
     db.execute(sql`
       SELECT c.numero_contrato AS contract_number, c.contract_id::text AS contract_id,
-        coalesce(nullif(p.spreadsheet_student_name, ''),
+        coalesce(nullif(holder.name, ''),
           nullif(c.source_record ->> 'nome_fantasia', ''),
           nullif(c.source_record ->> 'razao_social', ''),
+          nullif(p.spreadsheet_student_name, ''),
           nullif(c.source_record ->> 'nome', ''),
           contact.name) AS account_name,
         contact.email AS customer_email
@@ -131,6 +132,8 @@ export async function getTicketCustomerOverview(
         ON c.unit_id = link.unit_id AND c.contract_id = link.contract_id
       LEFT JOIN f10_customer_contract_profiles p
         ON p.unit_id = c.unit_id AND p.contract_id = c.contract_id
+      LEFT JOIN f10_customer_holder_profiles holder
+        ON holder.unit_id = c.unit_id AND holder.holder_id = c.titular_id
       LEFT JOIN customer_contacts contact ON contact.id = ${ticket.customerContactId}::uuid
       WHERE link.ticket_id = ${ticket.id}::uuid
       LIMIT 1

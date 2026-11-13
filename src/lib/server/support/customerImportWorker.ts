@@ -1,5 +1,6 @@
 import { env } from "$env/dynamic/private";
 import { processF10CustomerSyncOnce } from "$lib/server/support/f10CustomerSyncRepository";
+import { processF10HolderSyncOnce } from "$lib/server/support/f10CustomerHolderRepository";
 import {
   listRunningCustomerImportBatches,
   processCustomerImportBatch,
@@ -25,6 +26,13 @@ async function runCustomerImportWorker(): Promise<void> {
     } catch (cause) {
       const code = cause instanceof Error ? cause.name : "UNKNOWN";
       console.error("[f10-customer-sync-worker] diagnostic unavailable", { code });
+    }
+
+    try {
+      await processF10HolderSyncOnce();
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.name : "UNKNOWN";
+      console.error("[f10-holder-sync-worker] diagnostic unavailable", { code });
     }
 
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));

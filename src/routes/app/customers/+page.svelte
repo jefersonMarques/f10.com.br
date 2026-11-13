@@ -170,8 +170,8 @@
           <table class="w-full min-w-[780px] text-left">
             <thead class="application-text-meta bg-app-subtle text-app-text-muted">
               <tr>
-                <th class="px-4 py-3 font-semibold">Cliente / contrato</th>
-                <th class="px-4 py-3 font-semibold">Pessoa / titular</th>
+                <th class="px-4 py-3 font-semibold">Titular / contrato</th>
+                <th class="px-4 py-3 font-semibold">Pessoa vinculada</th>
                 <th class="px-4 py-3 font-semibold">Franquia</th>
                 <th class="px-4 py-3 font-semibold">Situação</th>
                 <th class="px-4 py-3 font-semibold">Plano</th>

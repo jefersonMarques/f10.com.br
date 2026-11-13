@@ -23,18 +23,21 @@ export async function searchF10TicketContracts(unitId: number, search: string) {
     SELECT
       c.contract_id::text AS "contractId",
       c.numero_contrato AS "contractNumber",
-      coalesce(nullif(p.spreadsheet_student_name, ''), nullif(sheet.account_name, ''),
+      coalesce(nullif(api_holder.name, ''),
         nullif(c.source_record ->> 'nome_fantasia', ''),
+        nullif(p.spreadsheet_student_name, ''), nullif(sheet.account_name, ''),
         nullif(person.customer_name, ''),
         'Contrato F10 #' || c.contract_id::text) AS "displayName",
       coalesce(nullif(person.customer_name, ''), nullif(c.source_record ->> 'nome', '')) AS "personName",
-      coalesce(nullif(p.spreadsheet_holder_name, ''), nullif(sheet.holder_name, '')) AS "holderName",
+      coalesce(nullif(api_holder.name, ''), nullif(p.spreadsheet_holder_name, ''), nullif(sheet.holder_name, '')) AS "holderName",
       coalesce(nullif(p.apelido, ''), nullif(sheet.nickname, '')) AS "nickname",
       g.name AS "groupName",
       coalesce(nullif(c.x_status, ''), c.status::text, 'Não informado') AS "status"
     FROM f10_customer_contracts c
     LEFT JOIN f10_customer_contract_profiles p
       ON p.unit_id = c.unit_id AND p.contract_id = c.contract_id
+    LEFT JOIN f10_customer_holder_profiles api_holder
+      ON api_holder.unit_id = c.unit_id AND api_holder.holder_id = c.titular_id
     LEFT JOIN LATERAL (
       SELECT o.name AS account_name, u.apelido AS nickname,
         holder.name AS holder_name, u.group_id
@@ -74,6 +77,8 @@ export async function searchF10TicketContracts(unitId: number, search: string) {
         OR c.pessoa_id::text ILIKE ${pattern}
         OR coalesce(p.spreadsheet_student_name, '') ILIKE ${pattern}
         OR coalesce(p.spreadsheet_holder_name, '') ILIKE ${pattern}
+        OR coalesce(api_holder.name, '') ILIKE ${pattern}
+        OR coalesce(api_holder.email, '') ILIKE ${pattern}
         OR coalesce(p.apelido, '') ILIKE ${pattern}
         OR coalesce(sheet.account_name, '') ILIKE ${pattern}
         OR coalesce(sheet.nickname, '') ILIKE ${pattern}
@@ -84,7 +89,8 @@ export async function searchF10TicketContracts(unitId: number, search: string) {
       )
     ORDER BY
       (c.numero_contrato = ${query}) DESC,
-      coalesce(nullif(p.spreadsheet_student_name, ''), nullif(sheet.account_name, ''),
+      coalesce(nullif(api_holder.name, ''),
+        nullif(p.spreadsheet_student_name, ''), nullif(sheet.account_name, ''),
         nullif(person.customer_name, ''), c.numero_contrato),
       c.contract_id
     LIMIT 30
