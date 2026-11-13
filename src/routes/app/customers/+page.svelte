@@ -1,11 +1,13 @@
 <script lang="ts">
-  import { ArrowRight, Building2, FileSpreadsheet, Mail, MessageCircleMore, Phone, Search, Users, Link2, RefreshCw } from "lucide-svelte";
+  import { ArrowRight, Building2, FileSpreadsheet, Mail, MessageCircleMore, Phone, Search, Users, Link2, RefreshCw, Eye, UserRound } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
+  import F10ContractDetailsModal from "$lib/components/operations/F10ContractDetailsModal.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
   export let form: ActionData;
   let refreshing = false;
+  let selectedContractId: string | null = null;
 
   const ticketStatusLabels: Record<string, string> = {
     new: "Novo", open: "Aberto", in_progress: "Em andamento",
@@ -169,17 +171,21 @@
             <thead class="application-text-meta bg-app-subtle text-app-text-muted">
               <tr>
                 <th class="px-4 py-3 font-semibold">Cliente / contrato</th>
+                <th class="px-4 py-3 font-semibold">Pessoa / titular</th>
                 <th class="px-4 py-3 font-semibold">Franquia</th>
-                <th class="px-4 py-3 font-semibold">Cliente</th>
                 <th class="px-4 py-3 font-semibold">Situação</th>
                 <th class="px-4 py-3 font-semibold">Plano</th>
+                <th class="px-4 py-3 text-right font-semibold">Detalhes</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-app-border-soft">
               {#each data.importedUnits.rows as unit}
                 <tr class="hover:bg-app-subtle">
                   <td class="application-text-caption px-4 py-3 align-top">
-                    <strong class="block text-app-text">{String(unit.apelido || unit.client_name || "Contrato F10 #" + unit.contract_id)}</strong>
+                    <strong class="block text-app-text">{String(unit.client_name || "Contrato F10 #" + unit.contract_id)}</strong>
+                    {#if unit.apelido && String(unit.apelido) !== String(unit.client_name)}
+                      <span class="application-text-meta mt-0.5 block text-app-text-muted">Apelido: {String(unit.apelido)}</span>
+                    {/if}
                     <span class="application-text-meta mt-1 block text-app-text-muted">
                       {unit.numero_contrato ? "Contrato nº " + String(unit.numero_contrato) : "ID F10 #" + String(unit.contract_id)}
                     </span>
@@ -187,19 +193,20 @@
                       <span class="application-text-meta mt-1 inline-block rounded-md bg-app-subtle px-2 py-0.5 text-app-text-muted">Sem complemento</span>
                     {/if}
                   </td>
-                  <td class="application-text-caption px-4 py-3 align-top text-app-text-muted">{String(unit.group_name ?? "Sem grupo")}</td>
                   <td class="application-text-caption px-4 py-3 align-top">
-                    {#if unit.customer_contact_id}
-                      <a href={`/app/customers/${String(unit.customer_contact_id)}`} class="inline-flex items-center gap-1 font-semibold text-app-primary hover:underline">
-                        {String(unit.client_name)} <ArrowRight size={14}/>
-                      </a>
+                    {#if unit.person_name}
+                      <span class="flex items-center gap-1.5 text-app-text"><UserRound size={14}/>{String(unit.person_name)}</span>
                     {:else}
-                      <span class="text-app-text">{String(unit.client_name)}</span>
+                      <span class="text-app-text-muted">Não informado</span>
+                    {/if}
+                    {#if unit.holder_name && String(unit.holder_name) !== String(unit.person_name ?? "")}
+                      <span class="application-text-meta mt-1 block text-app-text-muted">Titular: {String(unit.holder_name)}</span>
                     {/if}
                     {#if unit.f10_person_id}
                       <span class="application-text-meta mt-1 block text-app-text-muted">Pessoa F10 #{String(unit.f10_person_id)}</span>
                     {/if}
                   </td>
+                  <td class="application-text-caption px-4 py-3 align-top text-app-text-muted">{String(unit.group_name ?? "Sem grupo")}</td>
                   <td class="application-text-caption px-4 py-3 align-top">
                     <span class={String(unit.commercial_status).toLowerCase() === "ativo"
                       ? "application-text-meta inline-flex rounded-full bg-app-success-bg px-2.5 py-1 font-semibold text-app-success-text"
@@ -208,6 +215,13 @@
                     </span>
                   </td>
                   <td class="application-text-caption px-4 py-3 align-top text-app-text-muted">{String(unit.contracted_plan ?? "—")}</td>
+                  <td class="px-4 py-3 text-right align-top">
+                    <button type="button" on:click={() => (selectedContractId = String(unit.contract_id))}
+                      class="application-text-caption inline-flex h-9 items-center gap-2 rounded-lg border border-app-border-control px-3 font-semibold text-app-primary hover:bg-app-subtle"
+                      aria-label={"Ver detalhes do contrato " + String(unit.numero_contrato ?? unit.contract_id)}>
+                      <Eye size={16}/> Ver
+                    </button>
+                  </td>
                 </tr>
               {/each}
             </tbody>
@@ -286,4 +300,7 @@
       {/if}
     {/if}
   </section>
+{#if selectedContractId}
+  <F10ContractDetailsModal contractId={selectedContractId} onClose={() => (selectedContractId = null)}/>
+{/if}
 </ApplicationContent>

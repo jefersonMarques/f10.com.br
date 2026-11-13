@@ -40,3 +40,23 @@ total; um segundo clique sem mudanças na API retorna zero registros.
 
 Se os totais divergirem, não reimporte a planilha nem modifique vínculos
 de contatos. Compare as contagens por `unit_id` e o estado do cache da API.
+
+## Detalhes do contrato e tickets
+
+- A listagem prioriza o nome comercial da planilha (`Aluno`) para o
+  título, quando vinculado de modo inequívoco. Nome da pessoa, titular
+  e apelido aparecem separadamente.
+- O botão **Ver** abre modal com dados confirmados da API e complementos
+  comerciais. A consulta de detalhe exige `customers.view` global e não
+  envia o objeto bruto `source_record` ao navegador.
+- Ao criar ticket, administradores com `customers.view` global podem
+  selecionar diretamente um contrato da API, mesmo sem atendimento prévio.
+- O servidor valida o contrato por `(unit_id, contract_id)` e cria ou
+  reutiliza contato pela identidade F10; nunca combina pelo nome/e-mail.
+- O vínculo do novo ticket é persistido em `ticket_f10_contract_links`
+  (migração `0112`). Contextos de escola/grupo da aplicação antiga
+  não são inventados quando ausentes na API.
+- O contato associado fica sujeito às regras normais de acesso ao portal
+  para tickets novos; não há alteração em tickets históricos.
+- Após a migração e publicação, testar a pesquisa por `tex`, contrato 24,
+  criação de ticket com seleção por API e abertura do modal de detalhes.

@@ -173,6 +173,7 @@ export const load: PageServerLoad = async ({ parent, url, depends }) => {
   const canReply = hasPermission(permissionMap, "tickets.reply");
   const canManageWorkflow = hasPermission(permissionMap, "tickets.manage", "all");
   const canSearchCustomers = canCreate;
+  const canSearchF10Contracts = canCreate && hasPermission(permissionMap, "customers.view", "all");
 
   const view = parseView(url.searchParams.get("view"));
   const page = parsePage(url.searchParams.get("page"));
@@ -292,6 +293,7 @@ export const load: PageServerLoad = async ({ parent, url, depends }) => {
     canReply,
     canManageWorkflow,
     canSearchCustomers,
+    canSearchF10Contracts,
   };
 };
 
@@ -316,8 +318,10 @@ export const actions: Actions = {
     } catch (cause) {
       const code = cause instanceof Error ? cause.message : "";
       const message = code === "CUSTOMER_F10_CONTEXT_REQUIRED"
-        ? "Selecione um cliente existente com grupo/unidade F10 ou use + para cadastrar todos os identificadores obrigatórios."
-        : "Revise os dados do cliente antes de criar o ticket.";
+        ? "Selecione um cliente da API F10, um contato com contexto ou use + para cadastrar."
+        : code === "F10_TICKET_CONTRACT_REQUIRED"
+          ? "Selecione um contrato da API F10 antes de criar o ticket."
+          : "Revise os dados do cliente antes de criar o ticket.";
       return fail(400, { success: false, action: "create", message });
     }
     if (subject.length < 3 || subject.length > 180) {
@@ -350,6 +354,13 @@ export const actions: Actions = {
       throw redirect(303, `/app/tickets/${ticket.id}`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
+      if (cause instanceof Error && cause.message.startsWith("F10_TICKET_CONTRACT_")) {
+        return fail(400, {
+          success: false,
+          action: "create",
+          message: "Contrato F10 indisponível ou sem autorização. Selecione novamente.",
+        });
+      }
       if (cause instanceof Error && cause.message === "TICKET_EMAIL_CUSTOMER_EMAIL_REQUIRED") {
         return fail(400, {
           success: false,

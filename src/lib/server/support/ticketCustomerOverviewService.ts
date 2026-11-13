@@ -82,7 +82,7 @@ export async function getTicketCustomerOverview(
   allowCommercialHistory: boolean,
 ): Promise<TicketCustomerOverview> {
   const db = getDatabase();
-  const [emailRows, requesterRows, portalRows, commercialEmail, originalMessages] = await Promise.all([
+  const [emailRows, requesterRows, portalRows, commercialEmail, originalMessages, apiContracts] = await Promise.all([
     ticket.channel === "email"
       ? db.select({
           name: supportEmailThreads.senderName,
@@ -118,6 +118,23 @@ export async function getTicketCustomerOverview(
         .orderBy(asc(ticketMessages.createdAt))
         .limit(1)
       : Promise.resolve([]),
+    db.execute(sql`
+      SELECT c.numero_contrato AS contract_number, c.contract_id::text AS contract_id,
+        coalesce(nullif(p.spreadsheet_student_name, ''),
+          nullif(c.source_record ->> 'nome_fantasia', ''),
+          nullif(c.source_record ->> 'razao_social', ''),
+          nullif(c.source_record ->> 'nome', ''),
+          contact.name) AS account_name,
+        contact.email AS customer_email
+      FROM ticket_f10_contract_links link
+      JOIN f10_customer_contracts c
+        ON c.unit_id = link.unit_id AND c.contract_id = link.contract_id
+      LEFT JOIN f10_customer_contract_profiles p
+        ON p.unit_id = c.unit_id AND p.contract_id = c.contract_id
+      LEFT JOIN customer_contacts contact ON contact.id = ${ticket.customerContactId}::uuid
+      WHERE link.ticket_id = ${ticket.id}::uuid
+      LIMIT 1
+    `),
   ]);
 
   const requesterRow = requesterRows[0] ?? null;
@@ -136,7 +153,7 @@ export async function getTicketCustomerOverview(
     ? await getSuggestedTicketCommercialUnit(contactId, ticket.id)
     : null;
 
-  return buildTicketCustomerOverview({
+  const overview = buildTicketCustomerOverview({
     channel: ticket.channel,
     customerContactId: ticket.customerContactId,
     customerName: ticket.customerName,
@@ -157,4 +174,20 @@ export async function getTicketCustomerOverview(
     commercialEmail,
     suggestedUnit: suggested,
   });
+
+  const apiContract = (apiContracts as unknown as Array<{
+    contract_number: string | null;
+    contract_id: string;
+    account_name: string | null;
+    customer_email: string | null;
+  }>)[0];
+
+  if (!apiContract) return overview;
+  return {
+    ...overview,
+    clientName: apiContract.account_name ?? overview.clientName,
+    contractNumber: apiContract.contract_number ?? "#" + apiContract.contract_id,
+    clientEmail: overview.clientEmail ?? apiContract.customer_email,
+    suggestedUnit: null,
+  };
 }

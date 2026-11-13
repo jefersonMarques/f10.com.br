@@ -23,6 +23,29 @@ function booleanValue(value: string): boolean | null {
 
 export function parseTicketCustomerLinkForm(formData: FormData): TicketCustomerLinkInput {
   const customerMode = read(formData, "customerMode");
+  if (customerMode === "api_contract") {
+    const f10ContractId = positiveInteger(read(formData, "f10ContractId"));
+    if (f10ContractId === null) throw new Error("F10_TICKET_CONTRACT_REQUIRED");
+
+    return {
+      customerMode: "api_contract",
+      customerContactId: null,
+      customerContextTicketId: null,
+      f10ContractId,
+      customerName: "",
+      customerEmail: "",
+      customerPhone: "",
+      customerWhatsapp: "",
+      organizationName: "",
+      groupId: null,
+      groupName: "",
+      subgroup: null,
+      unitId: null,
+      unitName: "",
+      unitSchema: "",
+    };
+  }
+
   if (customerMode === "existing") {
     const customerContactId = read(formData, "customerContactId");
     const customerContextTicketId = read(formData, "customerContextTicketId");
@@ -33,6 +56,7 @@ export function parseTicketCustomerLinkForm(formData: FormData): TicketCustomerL
       customerMode: "existing",
       customerContactId,
       customerContextTicketId,
+      f10ContractId: null,
       customerName: "",
       customerEmail: "",
       customerPhone: "",
@@ -93,6 +117,7 @@ export function parseTicketCustomerLinkForm(formData: FormData): TicketCustomerL
     customerMode: "new",
     customerContactId: null,
     customerContextTicketId: null,
+    f10ContractId: null,
     customerName,
     customerEmail,
     customerPhone,

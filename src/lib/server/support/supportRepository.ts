@@ -9,8 +9,10 @@ import {
   or,
   sql,
 } from "drizzle-orm";
-import { getPermissionScope, resolveUserPermissions } from "$lib/server/auth/permissions";
+import { getPermissionScope, hasPermission, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { getConfiguredF10UnitId } from "$lib/server/integrations/f10/f10CustomerApi";
+import { resolveF10TicketContract } from "$lib/server/support/f10TicketContractRepository";
 import { reuseTicketCommercialUnit } from "$lib/server/support/ticketCommercialUnitRepository";
 import { notifyNewTicketCustomer } from "$lib/server/support/ticketCreationNotificationService";
 import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
@@ -67,7 +69,8 @@ const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
 };
 
 export type TicketCustomerLinkInput = {
-  customerMode: "existing" | "new";
+  customerMode: "existing" | "new" | "api_contract";
+  f10ContractId: number | null;
   customerContactId: string | null;
   customerContextTicketId: string | null;
   customerName: string;
@@ -105,6 +108,7 @@ type ResolvedTicketCustomer = {
   unitId: number;
   unitName: string;
   unitSchema: string;
+  f10Contract: { unitId: number; contractId: number } | null;
 };
 
 type ManualTicketStart = {
@@ -298,7 +302,30 @@ function requireManualContext(input: TicketCustomerLinkInput): {
 async function resolveTicketCustomer(
   tx: SupportTransaction,
   input: TicketCustomerLinkInput,
+  permissions: SupportPermissionMap,
 ): Promise<ResolvedTicketCustomer> {
+  if (input.customerMode === "api_contract") {
+    if (!hasPermission(permissions, "customers.view", "all") ||
+        input.f10ContractId === null) {
+      throw new Error("F10_TICKET_CONTRACT_FORBIDDEN");
+    }
+
+    const source = await resolveF10TicketContract(
+      tx, getConfiguredF10UnitId(), input.f10ContractId,
+    );
+    return {
+      contactId: source.contactId,
+      legacyUserId: null,
+      groupId: null,
+      groupName: "",
+      subgroup: null,
+      unitId: null,
+      unitName: source.name,
+      unitSchema: "",
+      f10Contract: { unitId: source.unitId, contractId: source.contractId },
+    };
+  }
+
   if (input.customerMode === "existing") {
     if (!input.customerContactId || !input.customerContextTicketId) {
       throw new Error("CUSTOMER_F10_CONTEXT_REQUIRED");
@@ -356,6 +383,7 @@ async function resolveTicketCustomer(
       unitId: selected.unitId,
       unitName: selected.unitName,
       unitSchema: selected.unitSchema,
+      f10Contract: null,
     };
   }
 
@@ -437,6 +465,7 @@ async function resolveTicketCustomer(
     contactId,
     legacyUserId: null,
     ...context,
+    f10Contract: null,
   };
 }
 
@@ -445,6 +474,8 @@ async function saveTicketCustomerContext(
   ticketId: string,
   customer: ResolvedTicketCustomer,
 ): Promise<void> {
+  if (customer.f10Contract) return;
+
   await tx
     .insert(ticketCustomerContexts)
     .values({
@@ -505,7 +536,7 @@ export async function createManualTicket(
   }
 
   const created = await db.transaction(async (tx) => {
-    const customer = await resolveTicketCustomer(tx, input);
+    const customer = await resolveTicketCustomer(tx, input, permissions);
 
     if (input.channel === "email") {
       const [contact] = await tx
@@ -541,6 +572,14 @@ export async function createManualTicket(
 
     await saveTicketCustomerContext(tx, ticket.id, customer);
 
+    if (customer.f10Contract) {
+      await tx.execute(sql`
+        INSERT INTO ticket_f10_contract_links (ticket_id, unit_id, contract_id)
+        VALUES (${ticket.id}::uuid, ${customer.f10Contract.unitId},
+          ${customer.f10Contract.contractId})
+      `);
+    }
+
     if (start) {
       await tx.insert(ticketWorkflowStates).values({
         ticketId: ticket.id,
@@ -575,6 +614,8 @@ export async function createManualTicket(
         customerContactId: customer.contactId,
         groupId: customer.groupId,
         unitId: customer.unitId,
+        f10ContractId: customer.f10Contract?.contractId ?? null,
+        f10UnitId: customer.f10Contract?.unitId ?? null,
         startStageId: start?.globalStageId ?? null,
         startAreaId: start?.areaId ?? null,
       },
@@ -584,12 +625,14 @@ export async function createManualTicket(
   });
 
   const { customerContactId, unitName, ...ticket } = created;
-  await reuseTicketCommercialUnit(ticket.id, customerContactId, unitName).catch((cause) => {
-    console.error("[ticket.commercial_unit.auto_reuse]", {
-      ticketId: ticket.id,
-      errorType: cause instanceof Error ? cause.name : typeof cause,
+  if (input.customerMode !== "api_contract") {
+    await reuseTicketCommercialUnit(ticket.id, customerContactId, unitName).catch((cause) => {
+      console.error("[ticket.commercial_unit.auto_reuse]", {
+        ticketId: ticket.id,
+        errorType: cause instanceof Error ? cause.name : typeof cause,
+      });
     });
-  });
+  }
 
   await notifySupportTicketNeedsAttention(
     ticket.id,
@@ -636,7 +679,7 @@ export async function linkTicketCustomer(
     if (!ticket) throw new Error("TICKET_NOT_FOUND");
     if (ticket.customerContactId) throw new Error("TICKET_CUSTOMER_ALREADY_LINKED");
 
-    const customer = await resolveTicketCustomer(tx, input);
+    const customer = await resolveTicketCustomer(tx, input, permissions);
     const now = new Date();
 
     await tx

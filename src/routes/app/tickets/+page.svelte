@@ -523,7 +523,7 @@
 </ApplicationContent>
 
 {#if createOpen}
-  <TicketCreateDialog queues={data.queues} entryPoints={data.entryPoints} canSearchCustomers={data.canSearchCustomers} onClose={() => (createOpen = false)}/>
+  <TicketCreateDialog queues={data.queues} entryPoints={data.entryPoints} canSearchCustomers={data.canSearchCustomers} canSearchF10Contracts={data.canSearchF10Contracts} onClose={() => (createOpen = false)}/>
 {/if}
 
 {#if modalOpen && detailsLoading && view !== "split"}
