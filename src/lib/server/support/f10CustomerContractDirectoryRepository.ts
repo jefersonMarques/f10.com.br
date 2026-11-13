@@ -79,18 +79,30 @@ export async function listF10CustomerContractUnits(options: {
         c.titular_id AS f10_holder_id,
         sheet.id AS sheet_unit_id,
         coalesce(nullif(p.apelido, ''), nullif(sheet.apelido, ''), '') AS apelido,
+        coalesce(
+          nullif(p.spreadsheet_student_name, ''),
+          nullif(sheet.client_name, ''),
+          nullif(c.source_record ->> 'nome_fantasia', ''),
+          nullif(c.source_record ->> 'razao_social', '')
+        ) AS account_name,
+        coalesce(
+          nullif(person.customer_name, ''),
+          nullif(contact.name, ''),
+          nullif(c.source_record ->> 'nome', '')
+        ) AS person_name,
         coalesce(nullif(c.x_status, ''), CASE WHEN c.status = 1 THEN 'Ativo'
           ELSE c.status::text END, 'Não informado') AS commercial_status,
         coalesce(nullif(p.contracted_plan, ''), nullif(sheet.contracted_plan, '')) AS contracted_plan,
         g.id AS group_id,
         g.name AS group_name,
         coalesce(
-          nullif(contact.name, ''),
-          nullif(person.customer_name, ''),
-          nullif(c.source_record ->> 'nome', ''),
           nullif(p.spreadsheet_student_name, ''),
           nullif(sheet.client_name, ''),
-          'Pessoa F10 #' || c.pessoa_id::text,
+          nullif(c.source_record ->> 'nome_fantasia', ''),
+          nullif(c.source_record ->> 'razao_social', ''),
+          nullif(person.customer_name, ''),
+          nullif(contact.name, ''),
+          nullif(c.source_record ->> 'nome', ''),
           'Contrato F10 #' || c.contract_id::text
         ) AS client_name,
         coalesce(contact.email, person.email, sheet.unit_email, '') AS customer_email,
@@ -157,6 +169,8 @@ export async function listF10CustomerContractUnits(options: {
       OR contract_id::text ILIKE ${searchPattern}
       OR coalesce(f10_person_id::text, '') ILIKE ${searchPattern}
       OR coalesce(client_name, '') ILIKE ${searchPattern}
+      OR coalesce(account_name, '') ILIKE ${searchPattern}
+      OR coalesce(person_name, '') ILIKE ${searchPattern}
       OR coalesce(customer_email, '') ILIKE ${searchPattern}
       OR coalesce(holder_name, '') ILIKE ${searchPattern}
       OR coalesce(holder_email, '') ILIKE ${searchPattern}
@@ -191,9 +205,10 @@ export async function listF10CustomerContractUnits(options: {
       ${directory}
       SELECT unit_id, contract_id, numero_contrato, f10_person_id,
         f10_holder_id, sheet_unit_id, apelido, commercial_status,
-        contracted_plan, group_name, client_name, customer_contact_id
+        contracted_plan, group_name, client_name, account_name,
+        person_name, holder_name, customer_contact_id
       FROM directory ${where}
-      ORDER BY coalesce(nullif(apelido, ''), client_name),
+      ORDER BY client_name,
         numero_contrato NULLS LAST, contract_id
       LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
     `));

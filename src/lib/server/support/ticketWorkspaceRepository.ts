@@ -207,6 +207,19 @@ export async function listTicketWorkspaceTickets(
         ilike(customerContacts.name, searchPattern),
         ilike(customerOrganizations.name, searchPattern),
         canViewCommercialCustomer ? sql`EXISTS (
+          SELECT 1 FROM ticket_f10_contract_links link
+          JOIN f10_customer_contracts c
+            ON c.unit_id = link.unit_id AND c.contract_id = link.contract_id
+          LEFT JOIN f10_customer_contract_profiles p
+            ON p.unit_id = c.unit_id AND p.contract_id = c.contract_id
+          WHERE link.ticket_id = ${tickets.id}
+            AND (
+              coalesce(c.numero_contrato, '') ILIKE ${searchPattern}
+              OR coalesce(p.spreadsheet_student_name, '') ILIKE ${searchPattern}
+              OR coalesce(p.apelido, '') ILIKE ${searchPattern}
+            )
+        )` : undefined,
+        canViewCommercialCustomer ? sql`EXISTS (
           SELECT 1 FROM ticket_commercial_unit_links link
           JOIN customer_units unit ON unit.id = link.customer_unit_id
           JOIN customer_groups grp ON grp.id = unit.group_id
@@ -288,7 +301,16 @@ export async function listTicketWorkspaceTickets(
       queueId: tickets.queueId,
       queueName: supportQueues.name,
       customerContactId: tickets.customerContactId,
-      customerName: canViewCommercialCustomer ? sql<string | null>`coalesce(${customerContacts.name},
+      customerName: canViewCommercialCustomer ? sql<string | null>`coalesce(
+        (SELECT coalesce(nullif(profile.spreadsheet_student_name, ''),
+                         nullif(contract.source_record ->> 'nome_fantasia', ''))
+         FROM ticket_f10_contract_links link
+         JOIN f10_customer_contracts contract
+           ON contract.unit_id = link.unit_id AND contract.contract_id = link.contract_id
+         LEFT JOIN f10_customer_contract_profiles profile
+           ON profile.unit_id = contract.unit_id AND profile.contract_id = contract.contract_id
+         WHERE link.ticket_id = ${tickets.id} LIMIT 1),
+        ${customerContacts.name},
         (SELECT coalesce(nullif(unit.apelido, ''), unit.name)
          FROM ticket_commercial_unit_links link
          JOIN customer_units unit ON unit.id = link.customer_unit_id
