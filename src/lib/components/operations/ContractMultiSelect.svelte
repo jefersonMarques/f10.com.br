@@ -2,7 +2,7 @@
   import { onDestroy } from "svelte";
   import { Building2, Check, Plus, Search, X } from "lucide-svelte";
 
-  export type ContractOption = {
+  type ContractOption = {
     contractId: string;
     contractNumber: string | null;
     displayName: string;
