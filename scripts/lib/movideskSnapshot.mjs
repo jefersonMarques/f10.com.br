@@ -6,6 +6,16 @@ const CHAT_LINE = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})\s*-\s*([^:]*):\s
 const HEADER_TIME = /^(Fuso horário:[^\n]*?)(?=\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}\s*-)/i;
 const ISO_LOCAL_OFFSET = "-03:00";
 
+export function parseSnapshotDate(value, fallback = null) {
+  if (typeof value !== "string" || !value.trim()) return fallback;
+  const text = value.trim();
+  const normalized = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(text)
+    ? text + "Z"
+    : text;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? fallback : date;
+}
+
 export function mapSnapshotStatus(value) {
   switch (value) {
     case "Resolved": return "resolved";
