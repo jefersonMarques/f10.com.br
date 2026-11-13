@@ -68,13 +68,20 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
 
   const result = await getDatabase().execute(sql`
     SELECT t.customer_contact_id::text AS "contactId",
-      c.name AS "requesterName", c.email AS "requesterEmail"
+      rp.customer_contact_id::text AS "explicitContactId",
+      coalesce(nullif(rp.display_name, ''), requester.name, c.name)
+        AS "requesterName",
+      coalesce(nullif(rp.display_email, ''), requester.email, c.email)
+        AS "requesterEmail"
     FROM tickets t
+    LEFT JOIN ticket_requester_profiles rp ON rp.ticket_id = t.id
+    LEFT JOIN customer_contacts requester ON requester.id = rp.customer_contact_id
     LEFT JOIN customer_contacts c ON c.id = t.customer_contact_id
     WHERE t.id = ${ticketId}::uuid
   `);
   const ticket = (result as unknown as Array<{
     contactId: string | null;
+    explicitContactId: string | null;
     requesterName: string | null;
     requesterEmail: string | null;
   }>)[0];
@@ -92,7 +99,8 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
     requester: ticket,
     contracts,
     participants: participants.filter((person) =>
-      person.contactId !== ticket.contactId),
+      person.contactId !== ticket.contactId &&
+      person.contactId !== ticket.explicitContactId),
     allowedContracts,
     canEdit: hasPermission(permissions, "tickets.reply"),
     canManageCustomers: hasPermission(permissions, "customers.manage", "all"),

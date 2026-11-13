@@ -55,6 +55,11 @@
     }
   }
 
+  function closeFilterOnPageScroll(event: Event): void {
+    if (event.target instanceof Node && filterPanel?.contains(event.target)) return;
+    filterOpen = false;
+  }
+
   function closeFilterOnEscape(event: KeyboardEvent): void {
     if (filterOpen && event.key === "Escape") {
       filterOpen = false;
@@ -112,7 +117,8 @@
 </script>
 
 <svelte:window on:pointerdown={closeFilterOnOutside}
-  on:keydown={closeFilterOnEscape} on:resize={positionFilters}/>
+  on:keydown={closeFilterOnEscape} on:resize={positionFilters}
+  on:scroll|capture={closeFilterOnPageScroll}/>
 
 <div class={workspace
   ? "relative z-30 w-full min-w-0 shrink-0 border-b border-[var(--app-border)] bg-white"

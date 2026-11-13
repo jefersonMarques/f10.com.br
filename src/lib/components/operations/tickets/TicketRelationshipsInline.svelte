@@ -30,6 +30,7 @@
   type Relationships = {
     requester: {
       contactId: string | null;
+      explicitContactId: string | null;
       requesterName: string | null;
       requesterEmail: string | null;
     };
@@ -137,6 +138,7 @@
       if (requestId === contactRequestId) {
         contactMatches = payload.customers.filter((person) =>
           person.id !== data?.requester.contactId &&
+          person.id !== data?.requester.explicitContactId &&
           !data?.participants.some((participant) => participant.contactId === person.id));
       }
     } catch {

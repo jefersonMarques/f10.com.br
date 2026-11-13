@@ -253,12 +253,12 @@
   <meta name="googlebot" content="noindex,nofollow,noarchive" />
 </svelte:head>
 
-{#if compactMovideskPreview}
-  <div class="application-ui min-h-screen bg-[#F5F6FA] py-4"><slot /></div>
-{:else}
 <svelte:window on:pointerdown={closeMenusOnOutside}
   on:keydown={closeMenusOnEscape} on:scroll|capture={closeMenusOnPageScroll}/>
 
+{#if compactMovideskPreview}
+  <div class="application-ui min-h-screen bg-[#F5F6FA] py-4"><slot /></div>
+{:else}
 <div class={`application-ui operations-shell min-h-[100dvh] bg-[#F5F6FA] text-[#010D28] transition-[grid-template-columns] duration-200 lg:grid ${sidebarCollapsed ? "lg:grid-cols-[76px_minmax(0,1fr)]" : "lg:grid-cols-[256px_minmax(0,1fr)]"}`}>
   <ApplicationSidebar
     bind:collapsed={sidebarCollapsed}
