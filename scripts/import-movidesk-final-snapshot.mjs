@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import postgres from "postgres";
 import {
   FINAL_STATUSES,
+  contactName,
   iterateSnapshotLines,
   mapSnapshotChannel as channelFor,
   mapSnapshotStatus as statusFor,
@@ -605,8 +606,13 @@ async function main() {
         const code = typeof error?.code === "string" ? error.code
           : error instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(error.message)
             ? error.message : "IMPORT_TICKET_FAILED";
-        failures.push({ sourceId, code });
-        console.error(JSON.stringify({ phase: "ticket_failed", sourceId, code }));
+        const errorType = error instanceof Error ? error.name : "UnknownError";
+        const errorLocation = error instanceof Error
+          ? error.stack?.match(/import-movidesk-final-snapshot\.mjs:\d+:\d+/)?.[0] ?? null
+          : null;
+        const failure = { sourceId, code, errorType, errorLocation };
+        failures.push(failure);
+        console.error(JSON.stringify({ phase: "ticket_failed", ...failure }));
         if (counters.failed >= MAX_FAILURES) break;
       }
       if (counters.examined % options.progressEvery === 0) {
