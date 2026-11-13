@@ -8,9 +8,22 @@ import {
   mapSnapshotChannel,
   mapSnapshotStatus,
   parseSnapshotOptions,
+  parseSnapshotDate,
   splitMovideskChatTranscript,
   validateSnapshotRecord,
 } from "../scripts/lib/movideskSnapshot.mjs";
+
+test("timezone-free Movidesk dates use UTC, matching the exported chat time", () => {
+  assert.equal(
+    parseSnapshotDate("2026-11-09T15:15:55.3569949")?.toISOString(),
+    "2026-11-09T15:15:55.356Z",
+  );
+  assert.equal(
+    parseSnapshotDate("2026-11-09T15:15:55.3569949Z")?.toISOString(),
+    "2026-11-09T15:15:55.356Z",
+  );
+  assert.equal(parseSnapshotDate("invalid", null), null);
+});
 
 test("maps canceled tickets to closed without discarding their original state", () => {
   assert.equal(mapSnapshotStatus("Resolved"), "resolved");
