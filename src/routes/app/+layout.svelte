@@ -25,6 +25,35 @@
   let notificationOpen = false;
   let presenceOpen = false;
   let profileOpen = false;
+  let presenceMenu: HTMLDivElement;
+  let notificationMenu: HTMLDivElement;
+  let profileMenu: HTMLDivElement;
+
+  function closeMenusOnOutside(event: PointerEvent): void {
+    const target = event.target as Node;
+    if (presenceOpen && !presenceMenu?.contains(target)) presenceOpen = false;
+    if (notificationOpen && !notificationMenu?.contains(target)) {
+      notificationOpen = false;
+    }
+    if (profileOpen && !profileMenu?.contains(target)) profileOpen = false;
+  }
+
+  function closeMenusOnEscape(event: KeyboardEvent): void {
+    if (event.key !== "Escape") return;
+    presenceOpen = false;
+    notificationOpen = false;
+    profileOpen = false;
+  }
+
+  function closeMenusOnPageScroll(event: Event): void {
+    const target = event.target;
+    if (target instanceof Node &&
+        (presenceMenu?.contains(target) || notificationMenu?.contains(target) ||
+          profileMenu?.contains(target))) return;
+    presenceOpen = false;
+    notificationOpen = false;
+    profileOpen = false;
+  }
   let notificationTimer: ReturnType<typeof setInterval> | null = null;
   let notificationStream: EventSource | null = null;
   let notificationRefreshInFlight = false;
@@ -227,6 +256,9 @@
 {#if compactMovideskPreview}
   <div class="application-ui min-h-screen bg-[#F5F6FA] py-4"><slot /></div>
 {:else}
+<svelte:window on:pointerdown={closeMenusOnOutside}
+  on:keydown={closeMenusOnEscape} on:scroll|capture={closeMenusOnPageScroll}/>
+
 <div class={`application-ui operations-shell min-h-[100dvh] bg-[#F5F6FA] text-[#010D28] transition-[grid-template-columns] duration-200 lg:grid ${sidebarCollapsed ? "lg:grid-cols-[76px_minmax(0,1fr)]" : "lg:grid-cols-[256px_minmax(0,1fr)]"}`}>
   <ApplicationSidebar
     bind:collapsed={sidebarCollapsed}
@@ -252,14 +284,14 @@
         <HelpVideoProcessingPulse enabled={canTrackHelpVideoProcessing} />
 
         {#if canRespondToChat && presence}
-          <div class="relative hidden sm:block">
+          <div bind:this={presenceMenu} class="relative hidden sm:block">
             <button type="button" on:click={() => { presenceOpen = !presenceOpen; profileOpen = false; notificationOpen = false; }} class="application-text-caption flex h-10 items-center gap-2 rounded-xl bg-[#F5F6FA] px-3 font-semibold text-[#555C6D] transition hover:bg-[#EEF0FF]" aria-expanded={presenceOpen}>
               <span class={`h-2.5 w-2.5 rounded-full ${presenceDotClass(presence.effectiveStatus)}`}></span>
               {presenceLabel(presence.effectiveStatus)}
               <ChevronDown size={13}/>
             </button>
             {#if presenceOpen}
-              <div class="absolute right-0 top-12 z-50 w-44 overflow-hidden rounded-xl border border-[#E1E4EC] bg-white p-1.5 shadow-xl">
+              <div class="absolute right-0 top-12 z-50 max-h-[calc(100dvh-90px)] w-44 overflow-y-auto rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-1.5 text-[var(--app-text)] shadow-xl">
                 <button type="button" on:click={() => void setPresenceStatus("online")} class="application-text-caption flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-semibold text-[#434A5A] hover:bg-[#F6F7FB]"><span class="h-2.5 w-2.5 rounded-full bg-[#2F9E5B]"></span>Online</button>
                 <button type="button" on:click={() => void setPresenceStatus("busy")} class="application-text-caption flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-semibold text-[#434A5A] hover:bg-[#F6F7FB]"><span class="h-2.5 w-2.5 rounded-full bg-[#E59A2F]"></span>Ocupado</button>
                 <button type="button" on:click={() => void setPresenceStatus("offline")} class="application-text-caption flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-semibold text-[#434A5A] hover:bg-[#F6F7FB]"><span class="h-2.5 w-2.5 rounded-full bg-[#C7CBD4]"></span>Offline</button>
@@ -269,7 +301,7 @@
           </div>
         {/if}
 
-        <div class="relative">
+        <div bind:this={notificationMenu} class="relative">
           <button
             type="button"
             class="relative flex h-10 w-10 items-center justify-center rounded-xl bg-[#F5F6FA] text-[#555C6D] transition hover:bg-[#EEF0FF] hover:text-[#000A57]"
@@ -284,7 +316,7 @@
           </button>
 
           {#if notificationOpen}
-            <div class="absolute right-0 top-12 z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[#E1E4EC] bg-white shadow-2xl shadow-slate-900/15">
+            <div class="absolute right-0 top-12 z-50 max-h-[calc(100dvh-90px)] w-[min(360px,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-text)] shadow-2xl shadow-slate-900/15">
               <div class="flex items-center justify-between border-b border-[#EEF0F5] px-4 py-3">
                 <div><strong class="block text-[12px] text-[#202637]">Notificações</strong><span class="application-text-meta text-[#8B909E]">{notifications.unreadCount} não lida(s)</span></div>
                 {#if notifications.unreadCount > 0}
@@ -318,7 +350,7 @@
           {/if}
         </div>
 
-        <div class="relative">
+        <div bind:this={profileMenu} class="relative">
           <button
             type="button"
             class="flex h-10 items-center gap-1.5 rounded-xl bg-[#F5F6FA] px-1.5 text-[#555C6D] transition hover:bg-[#EEF0FF] hover:text-[#000A57]"
@@ -337,7 +369,7 @@
           </button>
 
           {#if profileOpen}
-            <div class="absolute right-0 top-12 z-50 w-[min(260px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[#E1E4EC] bg-white shadow-2xl shadow-slate-900/15">
+            <div class="absolute right-0 top-12 z-50 max-h-[calc(100dvh-90px)] w-[min(260px,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-text)] shadow-2xl shadow-slate-900/15">
               <a
                 href="/app/minha-conta"
                 on:click={() => (profileOpen = false)}

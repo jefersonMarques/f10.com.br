@@ -86,6 +86,7 @@ jobs:
           node --test tests/f10CustomerContractDirectory.test.mjs
           node --experimental-strip-types --test tests/f10TicketCustomerSelection.test.mjs
           node --experimental-strip-types --test tests/supportMultiContractAccess.test.mjs
+          node --test tests/ticketInlineExperience.test.mjs
           node --experimental-strip-types --test tests/f10ContractHolderIdentity.test.mjs
           node --experimental-strip-types --test tests/f10SheetContractMatching.test.mjs
           node --experimental-strip-types --test tests/f10SheetPreviewErrors.test.mjs

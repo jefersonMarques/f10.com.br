@@ -10,6 +10,7 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
   );
   if (!hasPermission(permissions, "customers.view", "all") ||
       !(hasPermission(permissions, "tickets.create") ||
+        hasPermission(permissions, "tickets.reply") ||
         hasPermission(permissions, "customers.manage", "all"))) {
     throw error(403, "Pesquisa de contratos não autorizada.");
   }
