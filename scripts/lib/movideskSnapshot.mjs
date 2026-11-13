@@ -6,6 +6,18 @@ const CHAT_LINE = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})\s*-\s*([^:]*):\s
 const HEADER_TIME = /^(Fuso horário:[^\n]*?)(?=\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}\s*-)/i;
 const ISO_LOCAL_OFFSET = "-03:00";
 
+export function contactName(person) {
+  const source = person && typeof person === "object" && !Array.isArray(person)
+    ? person : {};
+  for (const candidate of [source.businessName, source.name]) {
+    if (typeof candidate !== "string") continue;
+    const name = candidate.replace(/\u0000/g, "").trim();
+    if (name) return name;
+  }
+  const id = source.id == null ? "" : String(source.id).replace(/\u0000/g, "").trim();
+  return id ? `Movidesk contact ${id}` : "Movidesk contact";
+}
+
 export function parseSnapshotDate(value, fallback = null) {
   if (typeof value !== "string" || !value.trim()) return fallback;
   const text = value.trim();

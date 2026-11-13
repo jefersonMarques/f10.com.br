@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
+  contactName,
   iterateSnapshotLines,
   mapSnapshotChannel,
   mapSnapshotStatus,
@@ -13,6 +14,17 @@ import {
   splitMovideskChatTranscript,
   validateSnapshotRecord,
 } from "../scripts/lib/movideskSnapshot.mjs";
+
+test("resolves contact names for historical Movidesk customers and action authors", () => {
+  assert.equal(
+    contactName({ businessName: "School A", name: "Operator B" }),
+    "School A",
+  );
+  assert.equal(contactName({ businessName: " ", name: " Customer B " }), "Customer B");
+  assert.equal(contactName({ name: "Safe\u0000 Name" }), "Safe Name");
+  assert.equal(contactName({ id: "43205" }), "Movidesk contact 43205");
+  assert.equal(contactName(null), "Movidesk contact");
+});
 
 test("timezone-free Movidesk dates use UTC, matching the exported chat time", () => {
   assert.equal(
