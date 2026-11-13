@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,6 +14,18 @@ import {
   splitMovideskChatTranscript,
   validateSnapshotRecord,
 } from "../scripts/lib/movideskSnapshot.mjs";
+
+test("uses text-to-jsonb casts for sanitized snapshot metadata", () => {
+  const importer = readFileSync(
+    join(process.cwd(), "scripts/import-movidesk-final-snapshot.mjs"),
+    "utf8",
+  );
+  const placeholders = importer.match(/\$\d+(?:::[a-z]+)*::jsonb/g) ?? [];
+  assert.equal(placeholders.length, 4);
+  assert.ok(
+    placeholders.every((placeholder) => placeholder.endsWith("::text::jsonb")),
+  );
+});
 
 test("resolves contact names for historical Movidesk customers and action authors", () => {
   assert.equal(

@@ -131,7 +131,7 @@ async function importActions(tx, ticket, ticketId, clients) {
       "INSERT INTO ticket_messages (ticket_id, author_type, author_user_id, " +
       "customer_contact_id, visibility, channel, body, external_message_id, " +
       "external_metadata, created_at, updated_at) " +
-      "VALUES ($1::uuid, $2, $3::uuid, $4::uuid, 'internal', $5, $6, $7, $8::jsonb, $9, $9) " +
+      "VALUES ($1::uuid, $2, $3::uuid, $4::uuid, 'internal', $5, $6, $7, $8::text::jsonb, $9, $9) " +
       "RETURNING id::text, jsonb_typeof(external_metadata) AS metadata_type, " +
       "external_metadata->>'sourceTicketId' AS source_ticket_id, " +
       "external_metadata->>'sourceActionId' AS source_action_id, " +
@@ -324,7 +324,7 @@ async function reconstructChat(tx, ticket, ticketId, primaryClient) {
     "token_hash, expires_at, last_seen_at, closed_at, ai_state, context_data, " +
     "created_at, updated_at) " +
     "VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid, " +
-    "$6, $7, $8, $8, $8, 'disabled', $9::jsonb, $10, $8)",
+    "$6, $7, $8, $8, $8, 'disabled', $9::text::jsonb, $10, $8)",
     [
       sessionId, ticketId, row.customer_contact_id, row.assigned_user_id,
       row.queue_id, "Chat histórico Movidesk #" + personId(ticket),
@@ -357,7 +357,7 @@ async function reconstructChat(tx, ticket, ticketId, primaryClient) {
       "visibility, channel, body, external_message_id, external_metadata, " +
       "created_at, updated_at) " +
       "VALUES ($1::uuid, $2, $3::uuid, $4::uuid, 'internal', 'web_chat', " +
-      "$5, $6, $7::jsonb, $8, $8)",
+      "$5, $6, $7::text::jsonb, $8, $8)",
       [
         ticketId, author.type, author.userId, author.contactId, author.body,
         "movidesk:chat:" + personId(ticket) + ":" + index,
@@ -458,7 +458,7 @@ async function importTicket(db, ticket, queueId) {
       };
       await tx.unsafe(
         "INSERT INTO ticket_events (ticket_id, event_type, metadata, created_at) " +
-        "VALUES ($1::uuid, 'movidesk.ticket.imported', $2::jsonb, $3)",
+        "VALUES ($1::uuid, 'movidesk.ticket.imported', $2::text::jsonb, $3)",
         [ticketId, safeJson(event), createdAt],
       );
       result = "created";
