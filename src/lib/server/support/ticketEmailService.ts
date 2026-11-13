@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { env } from "$env/dynamic/private";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { supportEmailThreads } from "$lib/server/db/supportEmailSchema";
 import {
@@ -198,7 +198,134 @@ export async function sendTicketPublicReplyEmail(
     }),
   });
 
+  await sendTicketParticipantUpdateEmails({
+    ticketId,
+    ticketNumber: ticket.ticketNumber,
+    ticketSubject: ticket.subject,
+    requesterEmail: recipientEmail,
+    title: "Nova resposta no atendimento",
+    message: body,
+    inboxCode: emailRoute?.code ?? null,
+    replyToken: token,
+  });
+
   return true;
+}
+
+type ParticipantEmailRecipient = {
+  name: string;
+  email: string;
+};
+
+async function getNotifiableParticipants(
+  ticketId: string,
+  requesterEmail: string | null,
+): Promise<ParticipantEmailRecipient[]> {
+  const records = await getDatabase().execute(sql`
+    SELECT c.name, lower(btrim(c.email)) AS email
+    FROM ticket_participants participant
+    JOIN customer_contacts c ON c.id = participant.customer_contact_id
+    WHERE participant.ticket_id = ${ticketId}::uuid
+      AND participant.participant_type = 'customer'
+      AND participant.portal_access_enabled = true
+      AND participant.notifications_enabled = true
+      AND c.active = true
+      AND c.email IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM ticket_contract_links link
+        WHERE link.ticket_id = participant.ticket_id
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM ticket_contract_links link
+        WHERE link.ticket_id = participant.ticket_id
+          AND NOT EXISTS (
+            SELECT 1 FROM customer_contract_access access
+            WHERE access.customer_contact_id = participant.customer_contact_id
+              AND access.unit_id = link.unit_id
+              AND access.contract_id = link.contract_id
+          )
+      )
+    ORDER BY c.name, c.id
+    LIMIT 50
+  `);
+  const excluded = requesterEmail?.trim().toLowerCase();
+  const unique = new Set<string>();
+  const recipients: ParticipantEmailRecipient[] = [];
+  for (const record of records as unknown as ParticipantEmailRecipient[]) {
+    const email = record.email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+        email === excluded || unique.has(email)) continue;
+    unique.add(email);
+    recipients.push({ name: record.name, email });
+  }
+  return recipients;
+}
+
+async function sendTicketParticipantUpdateEmails(input: {
+  ticketId: string;
+  ticketNumber: number;
+  ticketSubject: string;
+  requesterEmail: string | null;
+  title: string;
+  message: string;
+  inboxCode: string | null;
+  replyToken?: string;
+}): Promise<void> {
+  try {
+    const recipients = await getNotifiableParticipants(
+      input.ticketId, input.requesterEmail,
+    );
+    if (!recipients.length) return;
+
+    const route = resolveEmailRoute(input.inboxCode);
+    const ticketUrl = `${getCustomerPortalBaseUrl("https://f10.com.br")}/cliente/chamados/${encodeURIComponent(input.ticketId)}`;
+    let failed = 0;
+
+    for (const recipient of recipients) {
+      try {
+        await sendTransactionalEmail({
+          to: { email: recipient.email, name: recipient.name },
+          ...(route ? { sender: { email: route.email, name: route.name } } : {}),
+          ...(input.replyToken
+            ? { replyTo: { email: replyAddress(input.replyToken), name: "Helpdesk F10" } }
+            : {}),
+          subject: `[#${input.ticketNumber}] ${input.ticketSubject}`,
+          textContent: [
+            input.title, "", input.message,
+            "", `Ticket #${input.ticketNumber}`,
+            `Acompanhe: ${ticketUrl}`,
+          ].join("\n"),
+          htmlContent: buildEmailHtml({
+            eyebrow: "Acompanhamento de ticket",
+            title: input.title,
+            greeting: `Olá, ${recipient.name}.`,
+            body: emailParagraphs(input.message),
+            markdownBody: true,
+            ticket: {
+              number: input.ticketNumber,
+              subject: input.ticketSubject,
+            },
+            action: { label: "Ver ticket", href: ticketUrl },
+            footer: "Você recebe este aviso por acompanhar o ticket no Helpdesk F10.",
+          }),
+        });
+      } catch {
+        failed += 1;
+      }
+    }
+
+    if (failed > 0) {
+      console.error("[ticket.participant.email] Delivery failures", {
+        ticketId: input.ticketId,
+        failed,
+        total: recipients.length,
+      });
+    }
+  } catch {
+    console.error("[ticket.participant.email] Recipient lookup failed", {
+      ticketId: input.ticketId,
+    });
+  }
 }
 
 type TicketAcknowledgementInput = {
@@ -349,6 +476,22 @@ export async function notifyCustomerOfTicketStatus(
 
   if (!ticket || ticket.status === previousStatus) return;
   if (!["waiting_customer", "resolved", "closed"].includes(ticket.status)) return;
+
+  await sendTicketParticipantUpdateEmails({
+    ticketId,
+    ticketNumber: ticket.number,
+    ticketSubject: ticket.subject,
+    requesterEmail: ticket.email,
+    title: ticket.status === "waiting_customer"
+      ? "Aguardando informações do solicitante"
+      : ticket.status === "resolved"
+        ? "Ticket resolvido"
+        : "Ticket fechado",
+    message: ticket.status === "waiting_customer"
+      ? "O atendimento está aguardando uma resposta."
+      : "O status do atendimento foi atualizado.",
+    inboxCode: ticket.queueCode,
+  });
 
   // The existing survey sends the resolution email and an evaluation link.
   // It is unique per ticket; never send a second satisfaction survey.

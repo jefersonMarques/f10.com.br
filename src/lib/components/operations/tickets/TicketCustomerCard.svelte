@@ -9,15 +9,15 @@
     UserRound,
   } from "lucide-svelte";
   import type { TicketDetailsData } from "./types";
-  import TicketCommercialUnitPicker from "$lib/components/operations/TicketCommercialUnitPicker.svelte";
   import TicketRequesterPicker from "./TicketRequesterPicker.svelte";
 
-  type EditorMode = "requester" | "contact" | "commercial" | null;
+  type EditorMode = "requester" | "contact" | null;
 
   export let ticketData: TicketDetailsData;
   export let surface: "page" | "split" | "modal" = "split";
   export let saving = false;
   export let onAction: (action: string, body: FormData) => Promise<boolean>;
+  export let onManageContracts: () => void = () => undefined;
 
   let editMode: EditorMode = null;
   let menuOpen = false;
@@ -90,11 +90,11 @@
           </button>
           <button type="button" on:click={() => showEditor("contact")}
             class="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[12px] text-[var(--app-text)] hover:bg-[var(--app-surface-muted)]">
-            <UserRound size={15}/>Vincular ou trocar contato
+            <UserRound size={15}/>Vincular ou trocar solicitante
           </button>
-          <button type="button" on:click={() => showEditor("commercial")}
+          <button type="button" on:click={() => { menuOpen = false; onManageContracts(); }}
             class="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[12px] text-[var(--app-text)] hover:bg-[var(--app-surface-muted)]">
-            <Building2 size={15}/>Alterar contrato
+            <Building2 size={15}/>Buscar contrato F10
           </button>
           {#if overview.contractUnitId}
             <button type="button" on:click={() => { menuOpen = false; void removeCommercialUnit(); }}
@@ -180,7 +180,7 @@
     <div class="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-subtle)] p-3 sm:p-4">
       <div class="mb-3 flex items-center justify-between gap-2">
         <strong class="text-[13px] font-semibold text-[var(--app-text)]">
-          {editMode === "requester" ? "Editar solicitante" : editMode === "contact" ? "Vincular contato" : "Alterar contrato"}
+          {editMode === "requester" ? "Editar solicitante" : "Vincular ou trocar solicitante"}
         </strong>
         <button type="button" on:click={() => showEditor(null)} class="text-[12px] text-[var(--app-text-muted)] hover:underline">Fechar</button>
       </div>
@@ -202,12 +202,6 @@
         </form>
       {:else if editMode === "contact"}
         <TicketRequesterPicker disabled={saving} onSelect={linkRequester}/>
-      {:else if editMode === "commercial"}
-        <form on:submit|preventDefault={(event) => void submitForm(event, "linkCommercialUnit")}>
-          {#key ticketData.commercialUnit?.id ?? ""}
-            <TicketCommercialUnitPicker current={ticketData.commercialUnit}/>
-          {/key}
-        </form>
       {/if}
     </div>
   {/if}

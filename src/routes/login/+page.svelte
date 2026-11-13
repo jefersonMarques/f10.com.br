@@ -25,7 +25,7 @@
 </script>
 
 <svelte:head>
-  <title>Acesso interno | F10 Operations</title>
+  <title>Acesso interno | Helpdesk F10</title>
   <meta name="robots" content="noindex,nofollow,noarchive" />
   <meta name="googlebot" content="noindex,nofollow,noarchive" />
 </svelte:head>
@@ -35,16 +35,15 @@
     <section class="grid w-full overflow-hidden rounded-[30px] border border-[#E3E6EF] bg-white shadow-[0_30px_90px_rgba(1,13,40,0.12)] lg:grid-cols-[1.05fr_0.95fr]">
       <div class="hidden min-h-[650px] flex-col justify-between bg-[#000A57] p-12 text-white lg:flex">
         <div>
-          <div class="inline-flex items-center gap-3 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold">
-            <span class="flex h-8 w-8 items-center justify-center rounded-full bg-[#EA6D0B] font-bold">F10</span>
-            Operations
+          <div class="inline-flex items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4 py-3">
+            <img src="/branding/f10-helpdesk.webp" alt="Helpdesk F10" class="max-h-16 max-w-[210px] object-contain"/>
           </div>
 
           <h1 class="mt-16 max-w-[520px] text-[48px] font-semibold leading-[1.05] tracking-[-0.04em]">
-            O trabalho da equipe F10 em um único lugar.
+            Helpdesk F10: atendimento e suporte em um só lugar.
           </h1>
           <p class="mt-6 max-w-[470px] text-[17px] leading-7 text-white/70">
-            Central de Ajuda, tarefas, atendimento, tickets e suporte remoto com controle de acesso e auditoria.
+            Tickets, conversas, clientes e suporte remoto com controle de acesso e auditoria.
           </p>
         </div>
 
@@ -67,7 +66,7 @@
           </div>
 
           <h2 class="mt-6 text-[32px] font-semibold tracking-[-0.03em] text-[#010D28]">
-            Acessar F10 Operations
+            Acessar Helpdesk F10
           </h2>
           <p class="mt-2 text-[15px] leading-6 text-[#6C7282]">
             Use suas credenciais internas para continuar.

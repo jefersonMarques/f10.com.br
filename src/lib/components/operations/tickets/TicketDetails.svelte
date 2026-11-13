@@ -7,11 +7,11 @@
     CalendarDays,
     CheckCircle2,
     CircleAlert,
-    Clock3,
     FileText,
     GitMerge,
     Ellipsis,
     Headphones,
+    History,
     MessageSquare,
     MonitorCog,
     Paperclip,
@@ -19,7 +19,6 @@
     Plus,
     Route,
     Send,
-    ShieldCheck,
     Star,
     Trash2,
     UserRound,
@@ -32,11 +31,11 @@
   import TicketRemotePanel from "$lib/components/operations/tickets/TicketRemotePanel.svelte";
   import TicketCustomerCard from "./TicketCustomerCard.svelte";
   import TicketRelationshipsInline from "./TicketRelationshipsInline.svelte";
+  import TicketHistoryPanel from "./TicketHistoryPanel.svelte";
   import TicketMergeDialog from "./TicketMergeDialog.svelte";
   import TicketTaskPanel from "$lib/components/operations/TicketTaskPanel.svelte";
   import ServiceRequestDetailsCard from "$lib/components/serviceRequests/ServiceRequestDetailsCard.svelte";
   import {
-    eventLabels,
     formatBytes,
     formatDateTime,
     labelClasses,
@@ -69,8 +68,8 @@
   let actionLoading = "";
   let mergeDialogOpen = false;
   let ticketMenuOpen = false;
-  let historyExpanded = false;
   let labelEditorOpen = false;
+  let relationshipsPanel: TicketRelationshipsInline | null = null;
   let workflowSelectionKey = "";
   let workflowId = "";
   let stageId = "";
@@ -157,7 +156,7 @@
   }
 
   $: isInfoPanel = surface !== "page" && ["service", "customer", "tasks"].includes(activeMainPanel);
-  $: if (activeMainPanel === "collaboration" || activeMainPanel === "history") activeMainPanel = "service";
+  $: if (activeMainPanel === "collaboration") activeMainPanel = "service";
 
   function tabClass(panel: TicketMainPanel, currentPanel: TicketMainPanel): string {
     const base = "inline-flex h-full shrink-0 items-center gap-1.5 border-b-2 px-1 text-[12px] font-semibold transition-colors";
@@ -247,26 +246,6 @@
     }
 
     return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(date);
-  }
-
-  function deadlineText(value: string | Date | null): string {
-    if (!value) return "Sem meta";
-    const diff = new Date(value).getTime() - Date.now();
-    const minutes = Math.max(1, Math.round(Math.abs(diff) / 60_000));
-    if (diff < 0) {
-      return minutes < 60 ? `Vencido há ${minutes} min` : `Vencido há ${Math.floor(minutes / 60)}h`;
-    }
-    return minutes < 60
-      ? `${minutes} min restantes`
-      : `${Math.floor(minutes / 60)}h ${minutes % 60}min restantes`;
-  }
-
-  function deadlineClass(value: string | Date | null): string {
-    if (!value) return "text-[#8B909D]";
-    const diff = new Date(value).getTime() - Date.now();
-    if (diff < 0) return "text-[#A33A3A]";
-    if (diff <= 60 * 60_000) return "text-[#A9510D]";
-    return "text-[#2F7045]";
   }
 
   function initials(name: string): string {
@@ -538,6 +517,8 @@
           {/if}
           <button type="button" class={tabClass("service", activeMainPanel)} aria-pressed={activeMainPanel === "service"} on:click={() => selectTab("service")}><Headphones size={14}/>Atendimento</button>
         {/if}
+        <button type="button" class={tabClass("history", activeMainPanel)} aria-pressed={activeMainPanel === "history"}
+          on:click={() => selectTab("history")}><History size={14}/>Histórico</button>
         {#if ticketData.canRequestRemote}
           <button type="button" class={tabClass("remote", activeMainPanel)} aria-pressed={activeMainPanel === "remote"} on:click={() => selectTab("remote")}><MonitorCog size={14}/>Acesso remoto</button>
         {/if}
@@ -556,7 +537,7 @@
     {/if}
 
     <div class={surface === "page"
-      ? "grid xl:grid-cols-[minmax(0,1fr)_350px]"
+      ? activeMainPanel === "history" ? "grid grid-cols-1" : "grid xl:grid-cols-[minmax(0,1fr)_350px]"
       : "relative grid min-h-0 flex-1 grid-cols-1"}>
       <main class={surface === "page"
         ? "min-w-0 bg-white"
@@ -744,6 +725,10 @@
               onUpdated={refreshDetails}
             />
           </div>
+        {:else if activeMainPanel === "history"}
+          <section class="min-h-0 flex-1 overflow-y-auto bg-[var(--app-surface-subtle)]">
+            <TicketHistoryPanel {ticketData}/>
+          </section>
         {:else if activeMainPanel === "remote" && ticketData.canRequestRemote}
           <TicketRemotePanel ticketId={ticketData.details.ticket.id} onRefresh={refreshDetails} onSelectCustomer={() => selectTab("customer")}/>
         {:else if activeMainPanel === "attachments"}
@@ -792,7 +777,7 @@
         {/if}
       </main>
 
-      {#if surface === "page" || isInfoPanel}
+      {#if (surface === "page" && activeMainPanel !== "history") || isInfoPanel}
       <aside
         aria-label={surface === "page" ? "Informações do ticket" : "Seção do ticket"}
         class={surface === "page"
@@ -854,14 +839,6 @@
             </label>
           </div>
 
-          <div class="mt-3 border-t border-[var(--app-border-soft)] pt-3">
-            <div class="mb-2 flex items-center gap-2 application-text-caption font-semibold text-[var(--app-text-muted)]"><Clock3 size={12}/>SLA</div>
-            <div class="space-y-2">
-              <div class="flex items-center justify-between gap-3"><span class="application-text-caption text-[var(--app-text-muted)]">1ª resposta</span>{#if ticketData.details.ticket.firstResponseAt}<span class="application-text-caption font-semibold text-[var(--app-success-text)]">Respondido</span>{:else}<span class={`application-text-caption font-semibold ${deadlineClass(ticketData.details.ticket.firstResponseDueAt)}`}>{deadlineText(ticketData.details.ticket.firstResponseDueAt)}</span>{/if}</div>
-              {#if ticketData.details.ticket.firstResponseAt && ticketData.details.ticket.nextResponseDueAt}<div class="flex items-center justify-between gap-3"><span class="application-text-caption text-[var(--app-text-muted)]">Próxima resposta</span><span class={`application-text-caption font-semibold ${deadlineClass(ticketData.details.ticket.nextResponseDueAt)}`}>{deadlineText(ticketData.details.ticket.nextResponseDueAt)}</span></div>{/if}
-              <div class="flex items-center justify-between gap-3"><span class="application-text-caption text-[var(--app-text-muted)]">Resolução</span>{#if ticketData.details.ticket.resolvedAt}<span class="application-text-caption font-semibold text-[var(--app-success-text)]">Concluído</span>{:else}<span class={`application-text-caption font-semibold ${deadlineClass(ticketData.details.ticket.resolutionDueAt)}`}>{deadlineText(ticketData.details.ticket.resolutionDueAt)}</span>{/if}</div>
-            </div>
-          </div>
         </section>
         {/if}
 
@@ -871,10 +848,12 @@
             {surface}
             saving={Boolean(actionLoading)}
             onAction={postAction}
+            onManageContracts={() => relationshipsPanel?.focusContracts()}
           />
           {#key ticketData.details.ticket.id}
             <div class="mt-3">
               <TicketRelationshipsInline
+                bind:this={relationshipsPanel}
                 ticketId={ticketData.details.ticket.id}
                 onRefresh={refreshDetails}
               />
@@ -882,46 +861,6 @@
           {/key}
         {/if}
 
-
-        {#if surface === "page" || activeMainPanel === "service"}
-          <section class="mt-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 sm:p-4" aria-label="Histórico do ticket">
-            <header class="flex items-center justify-between gap-2">
-              <h3 class="application-text-caption flex items-center gap-2 font-bold text-[var(--app-text)]">
-                <ShieldCheck size={17} class="text-[var(--app-primary)]"/> Histórico do ticket
-                <span class="application-text-meta rounded-full bg-[var(--app-surface-muted)] px-2 py-1 font-medium text-[var(--app-text-muted)]">
-                  {ticketData.details.events.length}
-                </span>
-              </h3>
-              {#if ticketData.details.events.length > 6}
-                <button type="button" on:click={() => (historyExpanded = !historyExpanded)}
-                  class="application-text-caption font-semibold text-[var(--app-primary)]">
-                  {historyExpanded ? "Ver menos" : "Ver tudo"}
-                </button>
-              {/if}
-            </header>
-            {#if ticketData.details.events.length === 0}
-              <p class="application-text-caption mt-3 text-[var(--app-text-muted)]">Nenhum registro no histórico.</p>
-            {:else}
-              <ol class="mt-3 space-y-3 border-l border-[var(--app-border)] pl-4">
-                {#each (historyExpanded ? ticketData.details.events : ticketData.details.events.slice(0, 6)) as event (event.id)}
-                  <li class="relative">
-                    <span class="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-[var(--app-primary)]"></span>
-                    <p class="application-text-caption leading-5 text-[var(--app-text)]">
-                      <strong class="font-semibold">{event.actorName ?? "Sistema"}</strong>
-                      {eventLabels[event.eventType] ?? event.eventType}
-                      {#if event.sourceTicketNumber && event.sourceTicketNumber !== ticketData.details.ticket.ticketNumber}
-                        · #{event.sourceTicketNumber}
-                      {/if}
-                    </p>
-                    <span class="application-text-meta mt-1 block text-[var(--app-text-muted)]">
-                      {formatDateTime(event.createdAt)}
-                    </span>
-                  </li>
-                {/each}
-              </ol>
-            {/if}
-          </section>
-        {/if}
 
         {#if surface === "page" || activeMainPanel === "service"}
         <details open={surface === "page"} class={surface === "page" ? "" : "mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-3"}>

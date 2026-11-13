@@ -16,7 +16,7 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
   }
 
   const query = (url.searchParams.get("q") ?? "").trim().slice(0, 120);
-  if (query.length < 2) {
+  if (query.length < 2 && !/^[0-9]$/.test(query)) {
     return json({ contracts: [] }, { headers: { "Cache-Control": "private, no-store" } });
   }
 
