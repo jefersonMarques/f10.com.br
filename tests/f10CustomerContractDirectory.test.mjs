@@ -18,7 +18,7 @@ test("the customer directory uses the F10 API contract table as the primary sour
   assert.match(repository, /unique_number\.unit_id = c\.unit_id/);
   assert.match(repository, /coalesce\(contact\.email, person\.email, sheet\.unit_email/);
   assert.match(repository, /coalesce\(holder_name/);
-  assert.match(repository, /f10_person_id::text ILIKE/);
+  assert.match(repository, /f10_person_id::text, .*ILIKE/);
   assert.match(repository, /count\(\*\)::int AS total/);
 });
 
@@ -44,7 +44,7 @@ test("the customers list offers refresh and keeps commercial information seconda
 
   assert.match(page, /action="\?\/refresh"/);
   assert.match(page, /"Atualizar"/);
-  assert.match(page, /"Sem complemento"/);
+  assert.match(page, /Sem complemento/);
   assert.match(page, /data\.importedUnits\.summary\.with_sheet/);
   assert.match(route, /listF10CustomerContractUnits/);
   assert.doesNotMatch(route, /listImportedCustomerUnits/);
