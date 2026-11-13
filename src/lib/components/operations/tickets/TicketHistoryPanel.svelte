@@ -10,6 +10,9 @@
   $: ticket = ticketData.details.ticket;
   $: events = ticketData.details.events;
   $: visibleEvents = showAllEvents ? events : events.slice(0, 12);
+  $: nextResponseStatus = ticket.resolvedAt || ticket.closedAt
+    ? { label: "Atendimento encerrado", color: "var(--app-text-muted)" }
+    : deadlineStatus(ticket.nextResponseDueAt, null);
 
   function dateTime(value: string | Date | null): string {
     return value ? formatDateTime(value) : "Não registrado";
@@ -55,8 +58,8 @@
       <div class="rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-subtle)] p-3">
         <p class="application-text-caption font-semibold text-[var(--app-text)]">Próxima resposta</p>
         <p class="application-text-caption mt-1 font-semibold"
-          style:color={deadlineStatus(ticket.nextResponseDueAt, null).color}>
-          {deadlineStatus(ticket.nextResponseDueAt, null).label}
+          style:color={nextResponseStatus.color}>
+          {nextResponseStatus.label}
         </p>
         <p class="application-text-meta mt-2 text-[var(--app-text-muted)]">
           Meta: {dateTime(ticket.nextResponseDueAt)}

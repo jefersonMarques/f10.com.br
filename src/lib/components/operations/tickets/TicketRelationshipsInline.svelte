@@ -164,8 +164,14 @@
   }
 
   async function updateRelationships(
-    action: "addContract" | "removeContract" | "addParticipant" | "removeParticipant",
-    options: { contractId?: string; contactId?: string; grantToRequester?: boolean },
+    action: "addContract" | "removeContract" | "addParticipant" | "removeParticipant" |
+      "setParticipantNotifications",
+    options: {
+      contractId?: string;
+      contactId?: string;
+      grantToRequester?: boolean;
+      notificationsEnabled?: boolean;
+    },
   ): Promise<void> {
     if (saving) return;
     saving = true;
@@ -331,6 +337,17 @@
               </span>
             </span>
             {#if data.canEdit}
+              <label class="application-text-meta flex shrink-0 items-center gap-1.5 text-[var(--app-text-muted)]"
+                title="Enviar e-mails de respostas públicas e alterações de status">
+                <input type="checkbox" checked={person.notificationsEnabled} disabled={saving}
+                  on:change={(event) => void updateRelationships(
+                    "setParticipantNotifications", {
+                      contactId: person.contactId,
+                      notificationsEnabled: event.currentTarget.checked,
+                    },
+                  )}/>
+                E-mails
+              </label>
               <button type="button" disabled={saving}
                 on:click={() => void updateRelationships("removeParticipant", { contactId: person.contactId })}
                 class="rounded-lg p-1.5 text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)] disabled:opacity-50"
