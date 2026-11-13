@@ -24,25 +24,39 @@ export async function getF10CustomerContractDetails(unitId: number, contractId: 
       c.first_seen_at AS "firstSeenAt",
       c.last_seen_at AS "lastSeenAt",
       coalesce(
-        nullif(p.spreadsheet_student_name, ''),
-        nullif(sheet.account_name, ''),
+        CASE WHEN length(regexp_replace(coalesce(api_holder.document, ''), '[^0-9]', '', 'g')) = 14
+          THEN nullif(api_holder.name, '') END,
         nullif(c.source_record ->> 'nome_fantasia', ''),
-        nullif(c.source_record ->> 'razao_social', '')
+        nullif(c.source_record ->> 'razao_social', ''),
+        nullif(p.spreadsheet_student_name, ''),
+        nullif(sheet.account_name, '')
       ) AS "accountName",
       coalesce(
         nullif(person.customer_name, ''),
         nullif(contact.name, ''),
         nullif(c.source_record ->> 'nome', '')
       ) AS "personName",
-      coalesce(nullif(p.spreadsheet_holder_name, ''), nullif(sheet.holder_name, '')) AS "holderName",
+      coalesce(nullif(api_holder.name, ''), nullif(p.spreadsheet_holder_name, ''), nullif(sheet.holder_name, '')) AS "holderName",
+      api_holder.document AS "holderDocument",
+      api_holder.postal_code AS "holderPostalCode",
+      api_holder.street AS "holderStreet",
+      api_holder.neighborhood AS "holderNeighborhood",
+      api_holder.city AS "holderCity",
+      api_holder.state AS "holderState",
+      api_holder.address_complement AS "holderAddressComplement",
       coalesce(nullif(p.apelido, ''), nullif(sheet.nickname, '')) AS "nickname",
       coalesce(nullif(person.email, ''), nullif(contact.email, ''), nullif(sheet.email, '')) AS "email",
       coalesce(nullif(person.phone, ''), nullif(contact.phone, ''), nullif(sheet.phone, '')) AS "phone",
       coalesce(nullif(person.whatsapp, ''), nullif(contact.whatsapp, ''), nullif(sheet.mobile, '')) AS "mobile",
-      sheet.holder_email AS "holderEmail",
-      sheet.holder_phone AS "holderPhone",
-      sheet.holder_mobile AS "holderMobile",
-      coalesce(nullif(p.razao_social, ''), nullif(c.source_record ->> 'razao_social', '')) AS "legalName",
+      coalesce(nullif(api_holder.email, ''), nullif(sheet.holder_email, '')) AS "holderEmail",
+      coalesce(nullif(api_holder.phone, ''), nullif(sheet.holder_phone, '')) AS "holderPhone",
+      coalesce(nullif(api_holder.mobile, ''), nullif(sheet.holder_mobile, '')) AS "holderMobile",
+      coalesce(
+        CASE WHEN length(regexp_replace(coalesce(api_holder.document, ''), '[^0-9]', '', 'g')) = 14
+          THEN nullif(api_holder.name, '') END,
+        nullif(p.razao_social, ''),
+        nullif(c.source_record ->> 'razao_social', '')
+      ) AS "legalName",
       coalesce(nullif(p.contracted_plan, ''), nullif(sheet.plan, '')) AS "plan",
       coalesce(nullif(p.city, ''), nullif(sheet.city, '')) AS "city",
       coalesce(nullif(p.account_executive, ''), nullif(sheet.account_executive, '')) AS "accountExecutive",
@@ -55,6 +69,8 @@ export async function getF10CustomerContractDetails(unitId: number, contractId: 
     FROM f10_customer_contracts c
     LEFT JOIN f10_customer_contract_profiles p
       ON p.unit_id = c.unit_id AND p.contract_id = c.contract_id
+    LEFT JOIN f10_customer_holder_profiles api_holder
+      ON api_holder.unit_id = c.unit_id AND api_holder.holder_id = c.titular_id
     LEFT JOIN LATERAL (
       SELECT
         u.id, o.name AS account_name,

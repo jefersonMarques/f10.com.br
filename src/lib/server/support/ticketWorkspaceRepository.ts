@@ -212,11 +212,14 @@ export async function listTicketWorkspaceTickets(
             ON c.unit_id = link.unit_id AND c.contract_id = link.contract_id
           LEFT JOIN f10_customer_contract_profiles p
             ON p.unit_id = c.unit_id AND p.contract_id = c.contract_id
+          LEFT JOIN f10_customer_holder_profiles holder
+            ON holder.unit_id = c.unit_id AND holder.holder_id = c.titular_id
           WHERE link.ticket_id = ${tickets.id}
             AND (
               coalesce(c.numero_contrato, '') ILIKE ${searchPattern}
               OR coalesce(p.spreadsheet_student_name, '') ILIKE ${searchPattern}
               OR coalesce(p.apelido, '') ILIKE ${searchPattern}
+              OR coalesce(holder.name, '') ILIKE ${searchPattern}
             )
         )` : undefined,
         canViewCommercialCustomer ? sql`EXISTS (
@@ -302,13 +305,15 @@ export async function listTicketWorkspaceTickets(
       queueName: supportQueues.name,
       customerContactId: tickets.customerContactId,
       customerName: canViewCommercialCustomer ? sql<string | null>`coalesce(
-        (SELECT coalesce(nullif(profile.spreadsheet_student_name, ''),
+        (SELECT coalesce(nullif(holder.name, ''), nullif(profile.spreadsheet_student_name, ''),
                          nullif(contract.source_record ->> 'nome_fantasia', ''))
          FROM ticket_f10_contract_links link
          JOIN f10_customer_contracts contract
            ON contract.unit_id = link.unit_id AND contract.contract_id = link.contract_id
          LEFT JOIN f10_customer_contract_profiles profile
            ON profile.unit_id = contract.unit_id AND profile.contract_id = contract.contract_id
+         LEFT JOIN f10_customer_holder_profiles holder
+           ON holder.unit_id = contract.unit_id AND holder.holder_id = contract.titular_id
          WHERE link.ticket_id = ${tickets.id} LIMIT 1),
         ${customerContacts.name},
         (SELECT coalesce(nullif(unit.apelido, ''), unit.name)

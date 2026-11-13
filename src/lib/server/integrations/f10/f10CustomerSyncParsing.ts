@@ -175,6 +175,34 @@ export function parseF10Person(payload: unknown, expectedId: number): F10Custome
   };
 }
 
+export type F10ContractHolder = F10CustomerPerson & {
+  document: string | null;
+  postalCode: string | null;
+  street: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  state: string | null;
+  addressComplement: string | null;
+};
+
+export function parseF10ContractHolder(
+  payload: unknown,
+  expectedId: number,
+): F10ContractHolder {
+  const person = parseF10Person(payload, expectedId);
+  const record = payload as Record<string, unknown>;
+  return {
+    ...person,
+    document: optionalText(record.cpf_cnpj, 30),
+    postalCode: optionalText(record.cep, 20),
+    street: optionalText(record.logradouro, 180),
+    neighborhood: optionalText(record.bairro, 120),
+    city: optionalText(record.cidade, 120),
+    state: optionalText(record.estado, 10),
+    addressComplement: optionalText(record.end_complemento, 180),
+  };
+}
+
 export function classifyF10CustomerMatch(input: {
   mappedContact: { id: string; name: string; email: string | null; phone: string | null; whatsapp: string | null } | null;
   candidates: Array<{ id: string }>;

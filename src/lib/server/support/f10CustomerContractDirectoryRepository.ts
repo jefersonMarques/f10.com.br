@@ -80,10 +80,12 @@ export async function listF10CustomerContractUnits(options: {
         sheet.id AS sheet_unit_id,
         coalesce(nullif(p.apelido, ''), nullif(sheet.apelido, ''), '') AS apelido,
         coalesce(
-          nullif(p.spreadsheet_student_name, ''),
-          nullif(sheet.client_name, ''),
+          CASE WHEN length(regexp_replace(coalesce(api_holder.document, ''), '[^0-9]', '', 'g')) = 14
+            THEN nullif(api_holder.name, '') END,
           nullif(c.source_record ->> 'nome_fantasia', ''),
-          nullif(c.source_record ->> 'razao_social', '')
+          nullif(c.source_record ->> 'razao_social', ''),
+          nullif(p.spreadsheet_student_name, ''),
+          nullif(sheet.client_name, '')
         ) AS account_name,
         coalesce(
           nullif(person.customer_name, ''),
@@ -96,22 +98,25 @@ export async function listF10CustomerContractUnits(options: {
         g.id AS group_id,
         g.name AS group_name,
         coalesce(
-          nullif(p.spreadsheet_student_name, ''),
-          nullif(sheet.client_name, ''),
+          nullif(api_holder.name, ''),
           nullif(c.source_record ->> 'nome_fantasia', ''),
           nullif(c.source_record ->> 'razao_social', ''),
+          nullif(p.spreadsheet_student_name, ''),
+          nullif(sheet.client_name, ''),
           nullif(person.customer_name, ''),
           nullif(contact.name, ''),
           nullif(c.source_record ->> 'nome', ''),
           'Contrato F10 #' || c.contract_id::text
         ) AS client_name,
         coalesce(contact.email, person.email, sheet.unit_email, '') AS customer_email,
-        coalesce(sheet.holder_name, '') AS holder_name,
-        coalesce(sheet.holder_email, '') AS holder_email,
+        coalesce(nullif(api_holder.name, ''), nullif(sheet.holder_name, '')) AS holder_name,
+        coalesce(nullif(api_holder.email, ''), nullif(sheet.holder_email, '')) AS holder_email,
         coalesce(contact.id, sheet.customer_contact_id) AS customer_contact_id
       FROM f10_customer_contracts c
       LEFT JOIN f10_customer_contract_profiles p
         ON p.unit_id = c.unit_id AND p.contract_id = c.contract_id
+      LEFT JOIN f10_customer_holder_profiles api_holder
+        ON api_holder.unit_id = c.unit_id AND api_holder.holder_id = c.titular_id
       LEFT JOIN LATERAL (
         SELECT
           u.id, u.group_id, u.apelido, u.name, u.contracted_plan,
