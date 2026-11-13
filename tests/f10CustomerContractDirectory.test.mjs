@@ -45,7 +45,7 @@ test("the customers list offers refresh and keeps commercial information seconda
   assert.match(page, /action="\?\/refresh"/);
   assert.match(page, /"Atualizar"/);
   assert.doesNotMatch(page, /Sem complemento/);
-  assert.match(page, /app\\/customers\\/contracts/);
+  assert.match(page, /app\/customers\/contracts/);
   assert.match(route, /"__active__"/);
   assert.match(route, /listF10CustomerContractUnits/);
   assert.doesNotMatch(route, /listImportedCustomerUnits/);

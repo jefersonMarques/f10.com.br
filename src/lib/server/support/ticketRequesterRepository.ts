@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { ticketRequesterProfiles } from "$lib/server/db/ticketRequesterSchema";
 import { ticketEvents, tickets } from "$lib/server/db/supportSchema";
@@ -79,6 +79,30 @@ export async function linkTicketRequesterContact(
     const [ticket] = await tx.select({ id: tickets.id })
       .from(tickets).where(eq(tickets.id, ticketId)).limit(1);
     if (!ticket) throw new Error("TICKET_NOT_FOUND");
+
+    const coverage = await tx.execute(sql`
+      SELECT
+        count(*)::int AS total,
+        count(*) FILTER (
+          WHERE ${contactId}::uuid IS NOT NULL
+            AND EXISTS (
+              SELECT 1 FROM customer_contract_access access
+              WHERE access.customer_contact_id = ${contactId}::uuid
+                AND access.unit_id = link.unit_id
+                AND access.contract_id = link.contract_id
+            )
+        )::int AS authorized
+      FROM ticket_contract_links link
+      WHERE link.ticket_id = ${ticketId}::uuid
+    `);
+    const contractScope = (coverage as unknown as Array<{
+      total: number;
+      authorized: number;
+    }>)[0];
+    if (contractScope && contractScope.total > 0 &&
+        (contactId === null || contractScope.total !== contractScope.authorized)) {
+      throw new Error("TICKET_REQUESTER_CONTRACT_FORBIDDEN");
+    }
 
     await tx.insert(ticketRequesterProfiles).values({
       ticketId,

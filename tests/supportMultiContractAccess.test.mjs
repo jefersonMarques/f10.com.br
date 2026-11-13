@@ -90,3 +90,26 @@ test("customer screens show active contracts, full details and manual-person cre
   assert.match(page, /app\/customers\/new/);
   assert.match(page, /app\/customers\/contracts/);
 });
+
+test("requester changes must preserve contract access permissions", () => {
+  const repository = source("src/lib/server/support/ticketRequesterRepository.ts");
+  assert.match(repository, /TICKET_REQUESTER_CONTRACT_FORBIDDEN/);
+  assert.match(repository, /FROM ticket_contract_links link/);
+  assert.match(repository, /FROM customer_contract_access access/);
+});
+
+test("unknown email senders receive a provisional requester without portal rights", () => {
+  const inbound = source("src/lib/server/support/emailInboundService.ts");
+  assert.match(inbound, /let requesterId = matchedContactId/);
+  assert.match(inbound, /await tx.insert\(customerContacts\)/);
+  assert.match(inbound, /provisionalRequester: !matchedContactId/);
+  assert.doesNotMatch(inbound, /customer_auth_identities.*insert/);
+});
+
+test("manual merges reassign operational tickets and revoke old sessions", () => {
+  const merge = source("src/lib/server/support/customerContactManagementRepository.ts");
+  assert.match(merge, /UPDATE tickets SET customer_contact_id/);
+  assert.match(merge, /UPDATE ticket_requester_profiles/);
+  assert.match(merge, /UPDATE ticket_participants/);
+  assert.match(merge, /UPDATE customer_portal_sessions SET revoked_at/);
+});
