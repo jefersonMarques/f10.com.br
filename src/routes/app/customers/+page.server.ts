@@ -44,7 +44,7 @@ export const load: PageServerLoad = async ({ parent, url, setHeaders }) => {
     ? "units" : "contacts";
   const requestedGroup = url.searchParams.get("grupo") ?? "";
   const groupId = GROUP_ID.test(requestedGroup) ? requestedGroup : "";
-  const status = (url.searchParams.get("situacao") ?? "").trim().slice(0, 60);
+  const status = (url.searchParams.get("situacao") ?? "__active__").trim().slice(0, 60);
   const unitId = configuredUnitId();
 
   let directoryUnavailable = false;

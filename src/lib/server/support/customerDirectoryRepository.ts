@@ -138,7 +138,13 @@ export async function listCustomerDirectory(
           ),
       )
     : undefined;
-  const whereCondition = combineConditions(accessCondition, searchCondition, f10ContextCondition);
+  const notMerged = sql`NOT EXISTS (
+    SELECT 1 FROM customer_contact_merges merged
+    WHERE merged.source_contact_id = ${customerContacts.id}
+  )`;
+  const whereCondition = combineConditions(
+    accessCondition, searchCondition, f10ContextCondition, notMerged,
+  );
   const db = getDatabase();
 
   const rowQuery = db
@@ -376,10 +382,12 @@ export async function getCustomerDirectoryDetails(
         .orderBy(desc(customerContacts.active), customerContacts.name)
     : Promise.resolve([]);
 
-  const ticketWhere = combineConditions(
-    eq(tickets.customerContactId, customerId),
-    ticketCondition,
-  );
+  const relevantContact = sql`${tickets.customerContactId} IN (
+    SELECT ${customerId}::uuid
+    UNION ALL SELECT source_contact_id FROM customer_contact_merges
+    WHERE target_contact_id = ${customerId}::uuid
+  )`;
+  const ticketWhere = combineConditions(relevantContact, ticketCondition);
 
   const [relatedContacts, ticketRows, contextRows, chatRows, taskRows, activityRows] =
     await Promise.all([
@@ -417,7 +425,11 @@ export async function getCustomerDirectoryDetails(
         .innerJoin(tickets, eq(ticketCustomerContexts.ticketId, tickets.id))
         .where(
           combineConditions(
-            eq(ticketCustomerContexts.customerContactId, customerId),
+            sql`${ticketCustomerContexts.customerContactId} IN (
+              SELECT ${customerId}::uuid
+              UNION ALL SELECT source_contact_id FROM customer_contact_merges
+              WHERE target_contact_id = ${customerId}::uuid
+            )`,
             ticketCondition,
           ),
         )
@@ -509,6 +521,15 @@ export async function updateCustomerDirectory(
   const organizationDocument = input.organizationDocument.trim() || null;
 
   await db.transaction(async (tx) => {
+    const identityCheck = await tx.execute(sql`
+      SELECT 1 FROM customer_f10_identities WHERE customer_contact_id = ${customerId}::uuid
+      UNION ALL
+      SELECT 1 FROM customer_auth_identities WHERE customer_contact_id = ${customerId}::uuid
+      LIMIT 1
+    `);
+    if ((identityCheck as unknown as Array<unknown>).length > 0) {
+      throw new Error("CUSTOMER_AUTHENTICATED_READ_ONLY");
+    }
     let organizationId = customer.organizationId;
     if (organizationName) {
       if (organizationId) {

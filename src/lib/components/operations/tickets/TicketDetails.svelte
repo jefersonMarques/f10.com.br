@@ -795,6 +795,13 @@
           ? "space-y-3 border-t border-[var(--app-border)] bg-[var(--app-bg)] p-3 xl:border-l xl:border-t-0"
           : "min-h-0 w-full overflow-y-auto bg-white px-3 py-4 sm:px-6"}
       >
+        {#if surface === "page" || activeMainPanel === "customer"}
+          <a href={"/app/tickets/" + ticketData.details.ticket.id + "/relationships"}
+            class="application-text-caption mt-3 flex min-h-10 items-center justify-center gap-2 rounded-xl border border-app-border-control bg-app-surface px-3 font-semibold text-app-primary">
+            <UsersRound size={17}/> Gerenciar empresas e pessoas
+          </a>
+        {/if}
+
         {#if surface === "page" || activeMainPanel === "service"}
         <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4"  : "w-full p-2 sm:p-4"}>
           <h3 class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><Headphones size={14}/>Atendimento</h3>

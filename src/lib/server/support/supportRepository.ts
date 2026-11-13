@@ -13,6 +13,10 @@ import { getPermissionScope, hasPermission, resolveUserPermissions } from "$lib/
 import { getDatabase } from "$lib/server/db";
 import { getConfiguredF10UnitId } from "$lib/server/integrations/f10/f10CustomerApi";
 import { resolveF10TicketContract } from "$lib/server/support/f10TicketContractRepository";
+import {
+  addInitialTicketParticipants,
+  saveTicketContracts,
+} from "$lib/server/support/customerContractAccessRepository";
 import { reuseTicketCommercialUnit } from "$lib/server/support/ticketCommercialUnitRepository";
 import { notifyNewTicketCustomer } from "$lib/server/support/ticketCreationNotificationService";
 import { calculateTicketSlaDeadlines } from "$lib/server/support/ticketSlaService";
@@ -71,6 +75,8 @@ const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
 export type TicketCustomerLinkInput = {
   customerMode: "existing" | "new" | "api_contract";
   f10ContractId: number | null;
+  contractIds?: number[];
+  participantIds?: string[];
   customerContactId: string | null;
   customerContextTicketId: string | null;
   customerName: string;
@@ -102,10 +108,10 @@ type SupportTransaction = Parameters<Parameters<SupportDatabase["transaction"]>[
 type ResolvedTicketCustomer = {
   contactId: string;
   legacyUserId: string | null;
-  groupId: number;
+  groupId: number | null;
   groupName: string;
   subgroup: boolean | null;
-  unitId: number;
+  unitId: number | null;
   unitName: string;
   unitSchema: string;
   f10Contract: { unitId: number; contractId: number } | null;
@@ -303,7 +309,83 @@ async function resolveTicketCustomer(
   tx: SupportTransaction,
   input: TicketCustomerLinkInput,
   permissions: SupportPermissionMap,
+  actorUserId: string,
 ): Promise<ResolvedTicketCustomer> {
+  if ((input.contractIds?.length ?? 0) > 0) {
+    if (!hasPermission(permissions, "customers.view", "all")) {
+      throw new Error("SUPPORT_CONTRACT_ACCESS_FORBIDDEN");
+    }
+
+    if (input.customerMode === "existing") {
+      if (!input.customerContactId) throw new Error("SUPPORT_REQUESTER_REQUIRED");
+      const [person] = await tx.select({ id: customerContacts.id })
+        .from(customerContacts)
+        .where(and(
+          eq(customerContacts.id, input.customerContactId),
+          eq(customerContacts.active, true),
+        )).limit(1);
+      if (!person) throw new Error("SUPPORT_REQUESTER_NOT_FOUND");
+      return {
+        contactId: person.id, legacyUserId: null,
+        groupId: null, groupName: "", subgroup: null,
+        unitId: null, unitName: "", unitSchema: "",
+        f10Contract: null,
+      };
+    }
+
+    if (input.customerMode !== "new" ||
+        !hasPermission(permissions, "customers.manage", "all")) {
+      throw new Error("SUPPORT_REQUESTER_CREATE_FORBIDDEN");
+    }
+
+    const name = input.customerName.trim();
+    const email = input.customerEmail.trim().toLowerCase();
+    if (name.length < 2 || name.length > 120 ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error("SUPPORT_REQUESTER_INVALID");
+    }
+
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${email}))`);
+    const duplicates = await tx.select({ id: customerContacts.id })
+      .from(customerContacts)
+      .where(and(
+        eq(customerContacts.active, true),
+        sql`lower(${customerContacts.email}) = ${email}`,
+      )).limit(1);
+    if (duplicates.length) throw new Error("SUPPORT_REQUESTER_ALREADY_EXISTS");
+
+    const [createdContact] = await tx.insert(customerContacts).values({
+      name,
+      email,
+      phone: input.customerPhone.trim() || null,
+      whatsapp: input.customerWhatsapp.trim() || null,
+    }).returning({ id: customerContacts.id });
+    if (!createdContact) throw new Error("SUPPORT_REQUESTER_NOT_CREATED");
+
+    const apiUnitId = getConfiguredF10UnitId();
+    for (const contractId of input.contractIds ?? []) {
+      const inserted = await tx.execute(sql`
+        INSERT INTO customer_contract_access(
+          customer_contact_id, unit_id, contract_id, granted_by
+        )
+        SELECT ${createdContact.id}::uuid, c.unit_id, c.contract_id, ${actorUserId}::uuid
+        FROM f10_customer_contracts c
+        WHERE c.unit_id = ${apiUnitId} AND c.contract_id = ${contractId}
+        RETURNING contract_id
+      `);
+      if ((inserted as unknown as Array<unknown>).length !== 1) {
+        throw new Error("SUPPORT_CONTRACT_NOT_FOUND");
+      }
+    }
+
+    return {
+      contactId: createdContact.id, legacyUserId: null,
+      groupId: null, groupName: "", subgroup: null,
+      unitId: null, unitName: "", unitSchema: "",
+      f10Contract: null,
+    };
+  }
+
   if (input.customerMode === "api_contract") {
     if (!hasPermission(permissions, "customers.view", "all") ||
         input.f10ContractId === null) {
@@ -474,7 +556,8 @@ async function saveTicketCustomerContext(
   ticketId: string,
   customer: ResolvedTicketCustomer,
 ): Promise<void> {
-  if (customer.f10Contract) return;
+  if (customer.f10Contract || customer.groupId === null ||
+      customer.unitId === null) return;
 
   await tx
     .insert(ticketCustomerContexts)
@@ -514,6 +597,12 @@ export async function createManualTicket(
   input: CreateManualTicketInput,
 ) {
   requireSupportScope(permissions, "tickets.create");
+  if (!input.contractIds?.length || input.contractIds.length > 500) {
+    throw new Error("SUPPORT_TICKET_CONTRACT_REQUIRED");
+  }
+  if ((input.participantIds?.length ?? 0) > 20) {
+    throw new Error("SUPPORT_PARTICIPANT_LIMIT");
+  }
 
   const db = getDatabase();
   const [queue] = await db
@@ -536,7 +625,7 @@ export async function createManualTicket(
   }
 
   const created = await db.transaction(async (tx) => {
-    const customer = await resolveTicketCustomer(tx, input, permissions);
+    const customer = await resolveTicketCustomer(tx, input, permissions, actorUserId);
 
     if (input.channel === "email") {
       const [contact] = await tx
@@ -572,7 +661,17 @@ export async function createManualTicket(
 
     await saveTicketCustomerContext(tx, ticket.id, customer);
 
-    if (customer.f10Contract) {
+    if (input.contractIds?.length) {
+      await saveTicketContracts(
+        tx, ticket.id, customer.contactId, actorUserId, input.contractIds,
+      );
+      await addInitialTicketParticipants(
+        tx, ticket.id, customer.contactId, actorUserId,
+        input.participantIds ?? [], input.contractIds,
+      );
+    }
+
+    if (customer.f10Contract && !input.contractIds?.length) {
       await tx.execute(sql`
         INSERT INTO ticket_f10_contract_links (ticket_id, unit_id, contract_id)
         VALUES (${ticket.id}::uuid, ${customer.f10Contract.unitId},
@@ -616,6 +715,8 @@ export async function createManualTicket(
         unitId: customer.unitId,
         f10ContractId: customer.f10Contract?.contractId ?? null,
         f10UnitId: customer.f10Contract?.unitId ?? null,
+        contractIds: input.contractIds ?? [],
+        participantIds: input.participantIds ?? [],
         startStageId: start?.globalStageId ?? null,
         startAreaId: start?.areaId ?? null,
       },
@@ -625,7 +726,7 @@ export async function createManualTicket(
   });
 
   const { customerContactId, unitName, ...ticket } = created;
-  if (input.customerMode !== "api_contract") {
+  if (input.customerMode !== "api_contract" && !input.contractIds?.length) {
     await reuseTicketCommercialUnit(ticket.id, customerContactId, unitName).catch((cause) => {
       console.error("[ticket.commercial_unit.auto_reuse]", {
         ticketId: ticket.id,
@@ -679,7 +780,7 @@ export async function linkTicketCustomer(
     if (!ticket) throw new Error("TICKET_NOT_FOUND");
     if (ticket.customerContactId) throw new Error("TICKET_CUSTOMER_ALREADY_LINKED");
 
-    const customer = await resolveTicketCustomer(tx, input, permissions);
+    const customer = await resolveTicketCustomer(tx, input, permissions, actorUserId);
     const now = new Date();
 
     await tx

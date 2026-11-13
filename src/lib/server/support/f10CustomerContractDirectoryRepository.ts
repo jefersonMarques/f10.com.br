@@ -94,6 +94,7 @@ export async function listF10CustomerContractUnits(options: {
         ) AS person_name,
         coalesce(nullif(c.x_status, ''), CASE WHEN c.status = 1 THEN 'Ativo'
           ELSE c.status::text END, 'Não informado') AS commercial_status,
+        (c.status = 1 AND c.data_cancelamento IS NULL) AS is_active,
         coalesce(nullif(p.contracted_plan, ''), nullif(sheet.contracted_plan, '')) AS contracted_plan,
         g.id AS group_id,
         g.name AS group_name,
@@ -182,7 +183,9 @@ export async function listF10CustomerContractUnits(options: {
       OR coalesce(group_name, '') ILIKE ${searchPattern}
     )`] : []),
     ...(options.groupId ? [sql`group_id = ${options.groupId}::uuid`] : []),
-    ...(options.status ? [sql`commercial_status = ${options.status}`] : []),
+    ...(options.status === "__active__"
+      ? [sql`is_active = true`]
+      : options.status ? [sql`commercial_status = ${options.status}`] : []),
   ];
 
   const where = filters.length > 0
@@ -193,7 +196,7 @@ export async function listF10CustomerContractUnits(options: {
     const summary = rowsOf(await db.execute(sql`
       ${directory}
       SELECT count(*)::int AS total,
-        count(*) FILTER (WHERE lower(commercial_status) = 'ativo')::int AS active,
+        count(*) FILTER (WHERE is_active = true)::int AS active,
         count(DISTINCT group_id)::int AS groups,
         count(*) FILTER (WHERE sheet_unit_id IS NOT NULL)::int AS with_sheet
       FROM directory
@@ -209,7 +212,7 @@ export async function listF10CustomerContractUnits(options: {
     const rows = rowsOf(await db.execute(sql`
       ${directory}
       SELECT unit_id, contract_id, numero_contrato, f10_person_id,
-        f10_holder_id, sheet_unit_id, apelido, commercial_status,
+        f10_holder_id, sheet_unit_id, apelido, commercial_status, is_active,
         contracted_plan, group_name, client_name, account_name,
         person_name, holder_name, customer_contact_id
       FROM directory ${where}

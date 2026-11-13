@@ -1,7 +1,17 @@
-import { error, fail, type Actions } from "@sveltejs/kit";
+import { error, fail, redirect, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { hasPermission } from "$lib/server/auth/permissions";
+import {
+  getContactContractAccess,
+  readContractSelection,
+  replaceContactContractAccess,
+} from "$lib/server/support/customerContractAccessRepository";
+import {
+  getCustomerContactIdentity,
+  listMergeCandidates,
+  mergeCustomerContacts,
+} from "$lib/server/support/customerContactManagementRepository";
 import {
   createCustomerRelatedContact,
   getCustomerDirectoryDetails,
@@ -27,7 +37,7 @@ function validContactFields(name: string, email: string, phone: string, whatsapp
   );
 }
 
-export const load: PageServerLoad = async ({ params, parent }) => {
+export const load: PageServerLoad = async ({ params, parent, url }) => {
   if (!isUuid(params.customerId)) throw error(404, "Cliente não encontrado.");
   const layout = await parent();
   const permissions = new Map(
@@ -38,7 +48,23 @@ export const load: PageServerLoad = async ({ params, parent }) => {
   }
 
   try {
-    return await getCustomerDirectoryDetails(layout.user.id, permissions, params.customerId);
+    const details = await getCustomerDirectoryDetails(layout.user.id, permissions, params.customerId);
+    const manageAll = hasPermission(permissions, "customers.manage", "all");
+    const [identity, contractAccess, mergeCandidates] = await Promise.all([
+      getCustomerContactIdentity(params.customerId),
+      getContactContractAccess(params.customerId),
+      manageAll
+        ? listMergeCandidates(params.customerId, (url.searchParams.get("mergeQ") ?? "").slice(0, 100))
+        : Promise.resolve([]),
+    ]);
+    return {
+      ...details,
+      identity,
+      contractAccess,
+      mergeCandidates,
+      mergeQuery: (url.searchParams.get("mergeQ") ?? "").slice(0, 100),
+      manageAll,
+    };
   } catch {
     throw error(404, "Cliente não encontrado ou fora do seu escopo de acesso.");
   }
@@ -54,6 +80,11 @@ export const actions: Actions = {
       "customers.manage",
       `/app/customers/${params.customerId}`,
     );
+    const identity = await getCustomerContactIdentity(params.customerId);
+    if (identity?.hasLogin) {
+      return fail(403, { success: false, action: "update",
+        message: "Cadastro autenticado: dados de identidade somente leitura." });
+    }
     const formData = await request.formData();
     const name = readFormValue(formData, "name");
     const email = readFormValue(formData, "email").toLowerCase();
@@ -133,4 +164,59 @@ export const actions: Actions = {
       return fail(409, { success: false, action: "createContact", message });
     }
   },
+  saveAccess: async ({ cookies, params, request }) => {
+    const { session, permissions } = await requireAppPermission(
+      cookies, "customers.manage", "/app/customers",
+    );
+    if (!hasPermission(permissions, "customers.manage", "all") ||
+        !isUuid(params.customerId)) throw error(403, "Acesso não autorizado.");
+    try {
+      const ids = readContractSelection(await request.formData(), "contractId");
+      await replaceContactContractAccess(session.user.id, params.customerId, ids);
+      return { success: true, action: "saveAccess",
+        message: "Contratos autorizados no suporte atualizados." };
+    } catch {
+      return fail(400, { success: false, action: "saveAccess",
+        message: "Verifique a seleção de contratos." });
+    }
+  },
+
+  merge: async ({ cookies, params, request }) => {
+    const { session, permissions } = await requireAppPermission(
+      cookies, "customers.manage", "/app/customers",
+    );
+    if (!hasPermission(permissions, "customers.manage", "all") ||
+        !isUuid(params.customerId)) throw error(403, "Acesso não autorizado.");
+
+    const form = await request.formData();
+    const otherId = String(form.get("otherId") ?? "");
+    if (!isUuid(otherId) || otherId === params.customerId ||
+        form.get("confirmed") !== "on") {
+      return fail(400, { success: false, action: "merge",
+        message: "Selecione um cadastro e confirme a mesclagem." });
+    }
+
+    const [current, other] = await Promise.all([
+      getCustomerContactIdentity(params.customerId),
+      getCustomerContactIdentity(otherId),
+    ]);
+    if (!current?.active || !other?.active || (current.hasLogin && other.hasLogin)) {
+      return fail(409, { success: false, action: "merge",
+        message: "Não é permitido mesclar duas identidades autenticadas." });
+    }
+
+    const sourceId = other.hasLogin ? params.customerId : otherId;
+    const targetId = other.hasLogin ? otherId : params.customerId;
+    try {
+      await mergeCustomerContacts(session.user.id, sourceId, targetId);
+      throw redirect(303, "/app/customers/" + targetId);
+    } catch (cause) {
+      if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) {
+        throw cause;
+      }
+      return fail(409, { success: false, action: "merge",
+        message: "Mesclagem não realizada. Verifique as identidades e os vínculos." });
+    }
+  },
+
 };
