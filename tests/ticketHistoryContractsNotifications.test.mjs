@@ -48,5 +48,5 @@ test("participant email notifications are opt-in and require every contract", ()
   assert.match(email, /participant\.portal_access_enabled = true/);
   assert.match(email, /NOT EXISTS \(\s*SELECT 1 FROM ticket_contract_links/);
   assert.match(email, /sendTicketParticipantUpdateEmails/);
-  assert.match(ui, /notificationsEnabled: event\.currentTarget\.checked/);
+  assert.match(ui, /notificationsEnabled:\s*event\.currentTarget\.checked/);
 });
