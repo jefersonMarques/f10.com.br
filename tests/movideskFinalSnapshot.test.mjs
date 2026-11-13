@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -102,6 +103,51 @@ test("the snapshot validator checks original IDs, status and inventory route", (
     }, inventory),
     /INVALID_SOURCE_TICKET_ID/,
   );
+});
+
+test("the offline importer validates a completed local snapshot without a database", () => {
+  const directory = mkdtempSync(join(tmpdir(), "movidesk-import-preview-"));
+  const importer = join(process.cwd(), "scripts/import-movidesk-final-snapshot.mjs");
+  const auditor = join(process.cwd(), "scripts/audit-movidesk-final-snapshot-import.mjs");
+  try {
+    execFileSync(process.execPath, ["--check", importer]);
+    execFileSync(process.execPath, ["--check", auditor]);
+
+    const ticket = {
+      id: "43205",
+      baseStatus: "Resolved",
+      origin: 5,
+      clients: [],
+      actions: [{ id: 1, origin: 5, type: 2,
+        description: "09/11/2026 12:16 - Example: Historical message" }],
+    };
+    writeFileSync(join(directory, "inventory.json"), JSON.stringify({
+      version: 1,
+      tickets: [{ sourceId: "43205", route: "/tickets", status: "Resolved" }],
+    }));
+    writeFileSync(join(directory, "summary.json"), JSON.stringify({
+      state: "completed", exported: 1, total: 1,
+    }));
+    writeFileSync(join(directory, "tickets.jsonl"), JSON.stringify({
+      sourceId: "43205",
+      sourceRoute: "/tickets",
+      capturedAt: "2026-11-10T12:20:54.444Z",
+      ticket,
+    }) + "\n");
+
+    const output = execFileSync(process.execPath,
+      [importer, "--directory", directory], { encoding: "utf8" });
+    const result = JSON.parse(output.trim());
+
+    assert.equal(result.phase, "validated");
+    assert.equal(result.readOnly, true);
+    assert.equal(result.total, 1);
+    assert.equal(result.counts.chats, 1);
+    assert.equal(result.counts.chatTranscriptsParsable, 1);
+    assert.equal(result.counts.actions, 1);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("streams JSONL line-by-line and rejects malformed records", async () => {
