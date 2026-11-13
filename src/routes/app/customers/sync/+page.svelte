@@ -38,7 +38,7 @@
     <div>
       <a href="/app/customers" class="application-text-meta mb-1 inline-flex items-center gap-1 font-semibold text-app-primary"><ArrowLeft size={15}/> Clientes</a>
       <h1 class="text-xl font-bold text-app-text">Importar clientes F10</h1>
-      <p class="application-text-caption mt-1 text-app-text-muted">Planilha como origem · API F10 como complemento · Unidade {data.sourceUnitId ?? "não configurada"}</p>
+      <p class="application-text-caption mt-1 text-app-text-muted">API F10 como origem · planilha como complemento · Unidade {data.sourceUnitId ?? "não configurada"}</p>
     </div>
   </header>
 
@@ -61,8 +61,8 @@
     <div class="mb-4 flex flex-wrap items-center gap-3">
       <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-app-subtle text-app-primary"><FileSpreadsheet size={21}/></span>
       <div>
-        <h2 class="application-text-caption font-bold text-app-text">Planilha de clientes</h2>
-        <p class="application-text-caption text-app-text-muted">Novos e existentes serão identificados automaticamente pelo ID do contrato.</p>
+        <h2 class="application-text-caption font-bold text-app-text">Complemento comercial da planilha</h2>
+        <p class="application-text-caption text-app-text-muted">A planilha complementa apelidos, franquias e dados comerciais dos contratos da API.</p>
       </div>
     </div>
 
@@ -139,7 +139,7 @@
         {#if Number(data.sheet.summary.missing ?? 0) + Number(data.sheet.summary.ambiguous ?? 0) > 0}
           <p class="application-text-caption mt-3 flex items-center gap-2 text-app-text-muted">
             <AlertTriangle size={16} class="shrink-0 text-app-warning-text"/>
-            {Number(data.sheet.summary.missing ?? 0) + Number(data.sheet.summary.ambiguous ?? 0)} registro(s) não têm vínculo único na fonte consultada. A planilha continua sendo a base da importação.
+            {Number(data.sheet.summary.missing ?? 0) + Number(data.sheet.summary.ambiguous ?? 0)} registro(s) não têm vínculo único na fonte consultada. A API continua sendo a base dos contratos.
           </p>
         {/if}
 
@@ -162,7 +162,7 @@
               class="application-text-caption inline-flex h-11 items-center gap-2 rounded-xl bg-app-primary px-5 font-semibold text-white disabled:opacity-40">
               <CheckCircle2 size={17}/> {importing ? "Importando..." : "Realizar importação"}
             </button>
-            <span class="application-text-caption text-app-text-muted">Importação completa em uma única operação.</span>
+            <span class="application-text-caption text-app-text-muted">Complementos processados em uma única operação.</span>
           </form>
         {:else}
           <p class="application-text-caption mt-4 flex items-center gap-2 font-semibold text-app-success-text">
