@@ -112,7 +112,10 @@ function parseSla(value: string | null): TicketWorkspaceSlaFilter {
 
 function parseSort(value: string | null): TicketWorkspaceSort {
   if (
-    value === "updated_asc"
+    value === "created_desc"
+    || value === "created_asc"
+    || value === "updated_desc"
+    || value === "updated_asc"
     || value === "number_desc"
     || value === "number_asc"
     || value === "priority_desc"
@@ -128,7 +131,7 @@ function parseSort(value: string | null): TicketWorkspaceSort {
   ) {
     return value;
   }
-  return "updated_desc";
+  return "created_desc";
 }
 
 function parsePageSize(value: string | null): 25 | 50 | 100 {

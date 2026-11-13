@@ -82,7 +82,7 @@
     if (search.trim()) params.set("q", search.trim());
     if (status) params.set("status", status);
     if (includeFinished) params.set("finished", "1");
-    if (view === "list" && sort !== "updated_desc") params.set("sort", sort);
+    if (view === "list" && sort !== "created_desc") params.set("sort", sort);
     if (view === "list" && pageSize !== 50) params.set("pageSize", String(pageSize));
     if (priority) params.set("priority", priority);
     if (queueId) params.set("queueId", queueId);
@@ -99,7 +99,7 @@
 
   function changeTicketSort(nextSort: string): void {
     const allowedSorts = new Set<PageData["filters"]["sort"]>([
-      "updated_desc", "updated_asc",
+      "created_desc", "created_asc", "updated_desc", "updated_asc",
       "number_asc", "number_desc",
       "subject_asc", "subject_desc",
       "priority_asc", "priority_desc",

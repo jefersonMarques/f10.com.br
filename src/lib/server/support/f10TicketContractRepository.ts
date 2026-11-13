@@ -15,7 +15,7 @@ function sourceSystem(unitId: number): string {
 
 export async function searchF10TicketContracts(unitId: number, search: string) {
   const query = search.trim().slice(0, 120);
-  if (query.length < 2) return [];
+  if (query.length < 2 && !/^[0-9]$/.test(query)) return [];
   const pattern = "%" + query + "%";
   const sheetSource = sourceSystem(unitId);
 

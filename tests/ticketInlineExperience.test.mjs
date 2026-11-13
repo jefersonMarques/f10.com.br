@@ -17,15 +17,17 @@ test("ticket customers are managed inline without requiring another page", () =>
   assert.ok(inline.includes("onRefresh"));
 });
 
-test("ticket history is visible before collaboration, with a compact expansion control", () => {
+test("ticket history owns its tab and includes SLA details", () => {
   const details = source("src/lib/components/operations/tickets/TicketDetails.svelte");
-  const history = details.indexOf("Histórico do ticket");
-  const collaboration = details.indexOf("Colaboração e etiquetas");
-  assert.ok(history > 0);
-  assert.ok(collaboration > history);
-  assert.ok(details.includes("historyExpanded"));
-  assert.ok(details.includes("ticketData.details.events.slice(0, 6)"));
-  assert.ok(!details.includes('<summary class="flex cursor-pointer list-none items-center justify-between gap-3">'));
+  const history = source("src/lib/components/operations/tickets/TicketHistoryPanel.svelte");
+  assert.ok(details.includes('tabClass("history", activeMainPanel)'));
+  assert.ok(details.includes("<TicketHistoryPanel"));
+  assert.ok(!details.includes("historyExpanded"));
+  assert.ok(history.includes("Primeira resposta"));
+  assert.ok(history.includes("Próxima resposta"));
+  assert.ok(history.includes("Resolução"));
+  assert.ok(history.includes("Histórico do ticket"));
+  assert.ok(history.includes("showAllEvents"));
 });
 
 test("quick ticket menu supports multiple labels and inline creation", () => {

@@ -43,6 +43,11 @@
 
   export let ticketId: string;
   export let onRefresh: () => void | Promise<void> = () => undefined;
+  let contractSearchInput: HTMLInputElement;
+
+  export function focusContracts(): void {
+    contractSearchInput?.focus();
+  }
 
   let data: Relationships | null = null;
   let loading = true;
@@ -58,8 +63,8 @@
   let contractRequestId = 0;
   let contactRequestId = 0;
 
-  $: if (contractSearch.trim().length >= 2) scheduleContractSearch(contractSearch);
-  $: if (contractSearch.trim().length < 2) {
+  $: if (contractSearch.trim().length >= 2 || /^[0-9]$/.test(contractSearch.trim())) scheduleContractSearch(contractSearch);
+  $: if (contractSearch.trim().length < 2 && !/^[0-9]$/.test(contractSearch.trim())) {
     contractMatches = [];
     contractRequestId += 1;
     if (contractTimer) clearTimeout(contractTimer);
@@ -251,13 +256,13 @@
     {#if data.canEdit && data.requester.contactId}
       <div class="relative">
         <Search size={16} class="pointer-events-none absolute left-3 top-3 text-[var(--app-text-muted)]"/>
-        <input bind:value={contractSearch} maxlength="120"
+        <input bind:this={contractSearchInput} bind:value={contractSearch} maxlength="120"
           placeholder="Buscar empresa ou número do contrato"
           aria-label="Pesquisar empresas para vincular"
           class="application-text-caption h-10 w-full rounded-lg border border-[var(--app-border-control)] bg-[var(--app-surface)] pl-9 pr-3 text-[var(--app-text)]"/>
       </div>
 
-      {#if contractSearch.trim().length >= 2}
+      {#if contractSearch.trim().length >= 2 || /^[0-9]$/.test(contractSearch.trim())}
         <div class="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-[var(--app-border)] p-1">
           {#each contractMatches.filter((contract) => !isLinked(contract.contractId)) as contract (contract.contractId)}
             <div class="flex min-w-0 items-center justify-between gap-2 rounded-lg px-2 py-2 hover:bg-[var(--app-surface-subtle)]">

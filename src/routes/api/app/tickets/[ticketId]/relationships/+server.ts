@@ -12,19 +12,21 @@ import {
   listTicketCustomers,
   removeTicketContract,
   removeTicketCustomerParticipant,
+  updateTicketParticipantNotifications,
 } from "$lib/server/support/customerContractAccessRepository";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type UpdateAction = "addContract" | "removeContract" |
-  "addParticipant" | "removeParticipant";
+  "addParticipant" | "removeParticipant" | "setParticipantNotifications";
 
 type UpdateInput = {
   action: UpdateAction;
   contractId?: string;
   contactId?: string;
   grantToRequester?: boolean;
+  notificationsEnabled?: boolean;
 };
 
 function requiredTicketId(value: string | undefined): string {
@@ -140,7 +142,8 @@ export const POST: RequestHandler = async ({ cookies, params, url, request }) =>
         );
         break;
       case "addParticipant":
-      case "removeParticipant": {
+      case "removeParticipant":
+      case "setParticipantNotifications": {
         if (!input.contactId || !UUID_PATTERN.test(input.contactId)) {
           throw error(400, "Pessoa inválida.");
         }
@@ -148,9 +151,16 @@ export const POST: RequestHandler = async ({ cookies, params, url, request }) =>
           await addTicketCustomerParticipant(
             ticketId, input.contactId, userId,
           );
-        } else {
+        } else if (input.action === "removeParticipant") {
           await removeTicketCustomerParticipant(
             ticketId, input.contactId, userId,
+          );
+        } else {
+          if (typeof input.notificationsEnabled !== "boolean") {
+            throw error(400, "Preferência de e-mail inválida.");
+          }
+          await updateTicketParticipantNotifications(
+            ticketId, input.contactId, userId, input.notificationsEnabled,
           );
         }
         break;
@@ -169,6 +179,8 @@ export const POST: RequestHandler = async ({ cookies, params, url, request }) =>
       SUPPORT_TICKET_CONTRACT_FORBIDDEN: "Solicitante sem autorização para este contrato.",
       SUPPORT_PARTICIPANT_CONTRACT_FORBIDDEN: "A pessoa não possui acesso a todas as empresas do ticket.",
       SUPPORT_PARTICIPANT_IS_REQUESTER: "O solicitante já acompanha o ticket.",
+      SUPPORT_PARTICIPANT_EMAIL_REQUIRED: "O acompanhante precisa ter e-mail válido.",
+      SUPPORT_PARTICIPANT_NOT_FOUND: "Acompanhante não encontrado.",
       SUPPORT_CONTRACT_NOT_FOUND: "Contrato não encontrado na API F10.",
     };
     throw error(409, messages[code] ?? "Não foi possível salvar as alterações.");

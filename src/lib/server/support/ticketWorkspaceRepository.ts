@@ -41,6 +41,8 @@ export type TicketWorkspaceScope = "mine" | "unassigned" | "all";
 export type TicketWorkspaceSlaFilter = "overdue" | "risk" | "first_response" | null;
 export type TicketWorkspaceChannel = "manual" | "web_chat" | "portal" | "email" | "whatsapp";
 export type TicketWorkspaceSort =
+  | "created_desc"
+  | "created_asc"
   | "updated_desc"
   | "updated_asc"
   | "number_desc"
@@ -95,6 +97,10 @@ function ticketSortOrder(sort: TicketWorkspaceSort): SQL[] {
     ${tickets.resolutionDueAt}
   )`;
   switch (sort) {
+    case "created_desc":
+      return [desc(tickets.createdAt), desc(tickets.id)];
+    case "created_asc":
+      return [asc(tickets.createdAt), asc(tickets.id)];
     case "updated_asc":
       return [asc(tickets.updatedAt), asc(tickets.ticketNumber)];
     case "number_desc":

@@ -15,7 +15,7 @@
   export let onQuickAction: ((ticketId: string, action: "status" | "addLabel", value: string) => Promise<boolean | void>) | null = null;
   export let onCreateLabel: ((ticketId: string, name: string, color: string) => Promise<boolean>) | null = null;
   export let labels: Array<{ id: string; name: string }> = [];
-  export let sort = "updated_desc";
+  export let sort = "created_desc";
   export let onSort: ((value: string) => void) | null = null;
   const SORT_COLUMNS = {
     ticket: ["number_asc", "number_desc"],

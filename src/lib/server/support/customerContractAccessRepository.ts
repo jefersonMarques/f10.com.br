@@ -330,7 +330,7 @@ export async function addTicketCustomerParticipant(
         portal_access_enabled, notifications_enabled
       )
       VALUES (${ticketId}::uuid, 'customer', ${contactId}::uuid,
-        ${actorUserId}::uuid, true, false)
+        ${actorUserId}::uuid, true, true)
       ON CONFLICT (ticket_id, customer_contact_id)
         WHERE customer_contact_id IS NOT NULL DO NOTHING
     `);
@@ -389,7 +389,7 @@ export async function addInitialTicketParticipants(
         ticket_id, participant_type, customer_contact_id, added_by_user_id,
         portal_access_enabled, notifications_enabled
       ) VALUES (${ticketId}::uuid, 'customer', ${contactId}::uuid,
-        ${actorUserId}::uuid, true, false)
+        ${actorUserId}::uuid, true, true)
       ON CONFLICT (ticket_id, customer_contact_id)
         WHERE customer_contact_id IS NOT NULL DO NOTHING
     `);
@@ -502,6 +502,74 @@ export async function removeTicketContract(
     `);
     await tx.execute(sql`
       UPDATE tickets SET updated_at = now() WHERE id = ${ticketId}::uuid
+    `);
+  });
+}
+
+export async function updateTicketParticipantNotifications(
+  ticketId: string,
+  contactId: string,
+  actorUserId: string,
+  enabled: boolean,
+): Promise<void> {
+  if (![ticketId, contactId, actorUserId].every(validId)) {
+    throw new Error("SUPPORT_PARTICIPANT_INVALID");
+  }
+
+  await getDatabase().transaction(async (tx) => {
+    const locked = rows(await tx.execute(sql`
+      SELECT id FROM tickets WHERE id = ${ticketId}::uuid FOR UPDATE
+    `));
+    if (!locked.length) throw new Error("SUPPORT_TICKET_NOT_FOUND");
+    const participants = rows(await tx.execute(sql`
+      SELECT customer_contact_id
+      FROM ticket_participants
+      WHERE ticket_id = ${ticketId}::uuid
+        AND customer_contact_id = ${contactId}::uuid
+        AND participant_type = 'customer'
+      FOR UPDATE
+    `));
+    if (!participants.length) throw new Error("SUPPORT_PARTICIPANT_NOT_FOUND");
+
+    if (enabled) {
+      const [coverage] = rows(await tx.execute(sql`
+        SELECT COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE EXISTS (
+            SELECT 1 FROM customer_contract_access access
+            WHERE access.customer_contact_id = ${contactId}::uuid
+              AND access.unit_id = link.unit_id
+              AND access.contract_id = link.contract_id
+          ))::int AS authorized
+        FROM ticket_contract_links link
+        WHERE link.ticket_id = ${ticketId}::uuid
+      `));
+      if (!coverage || Number(coverage.total) === 0 ||
+          Number(coverage.total) !== Number(coverage.authorized)) {
+        throw new Error("SUPPORT_PARTICIPANT_CONTRACT_FORBIDDEN");
+      }
+
+      const [contact] = rows(await tx.execute(sql`
+        SELECT email FROM customer_contacts
+        WHERE id = ${contactId}::uuid AND active = true
+      `));
+      if (!contact || typeof contact.email !== "string" ||
+          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) {
+        throw new Error("SUPPORT_PARTICIPANT_EMAIL_REQUIRED");
+      }
+    }
+
+    await tx.execute(sql`
+      UPDATE ticket_participants
+      SET notifications_enabled = ${enabled}
+      WHERE ticket_id = ${ticketId}::uuid
+        AND customer_contact_id = ${contactId}::uuid
+        AND participant_type = 'customer'
+    `);
+    await tx.execute(sql`
+      INSERT INTO ticket_events(ticket_id, actor_user_id, event_type, metadata)
+      VALUES (${ticketId}::uuid, ${actorUserId}::uuid,
+        'ticket.participant.notifications.updated',
+        ${JSON.stringify({ contactId, enabled })}::jsonb)
     `);
   });
 }
