@@ -1,13 +1,11 @@
 <script lang="ts">
-  import { ArrowRight, Building2, FileSpreadsheet, Mail, MessageCircleMore, Phone, Search, Users, Link2, RefreshCw, Eye, UserRound } from "lucide-svelte";
+  import { Building2, Mail, MessageCircleMore, Phone, Search, Users, RefreshCw, UserRound, Plus, ArrowRight } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
-  import F10ContractDetailsModal from "$lib/components/operations/F10ContractDetailsModal.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
   export let form: ActionData;
   let refreshing = false;
-  let selectedContractId: string | null = null;
 
   const ticketStatusLabels: Record<string, string> = {
     new: "Novo", open: "Aberto", in_progress: "Em andamento",
@@ -49,8 +47,7 @@
       {#if data.importedUnits && !data.importedUnits.unavailable}
         <p class="application-text-caption mt-1 text-app-text-muted">
           {Number(data.importedUnits.summary.total)} contratos da API ·
-          {Number(data.importedUnits.summary.with_sheet)} com complemento ·
-          {Number(data.importedUnits.summary.active)} ativos
+{Number(data.importedUnits.summary.active)} ativos
         </p>
       {/if}
     </div>
@@ -69,12 +66,6 @@
             </button>
           </form>
         {/if}
-        <a href="/app/customers/access" class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl border border-app-border-control px-4 font-semibold text-app-text">
-          <Link2 size={16}/> Atribuir pessoas
-        </a>
-      <a href="/app/customers/sync" class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white">
-        <FileSpreadsheet size={17}/> Complementar planilha
-      </a>
       </div>
     {/if}
   </header>
@@ -135,19 +126,11 @@
           </span>
         </label>
         {#if data.view === "units" && data.importedUnits && !data.importedUnits.unavailable}
-          <label class="min-w-[155px] flex-1 sm:flex-none">
-            <span class="application-text-meta mb-1 block font-semibold text-app-text-muted">Franquia / rede</span>
-            <select name="grupo" class="application-text-caption h-10 w-full rounded-xl border border-app-border-control bg-app-subtle px-3 text-app-text sm:max-w-[225px]">
-              <option value="">Todas</option>
-              {#each data.importedUnits.groups as group}
-                <option value={String(group.id)} selected={data.groupId === String(group.id)}>{String(group.name)} ({Number(group.units)})</option>
-              {/each}
-            </select>
-          </label>
           <label class="min-w-[145px] flex-1 sm:flex-none">
             <span class="application-text-meta mb-1 block font-semibold text-app-text-muted">Situação</span>
             <select name="situacao" class="application-text-caption h-10 w-full rounded-xl border border-app-border-control bg-app-subtle px-3 text-app-text">
-              <option value="">Todas</option>
+              <option value="__active__" selected={data.status === "__active__"}>Ativos</option>
+              <option value="" selected={data.status === ""}>Todas as situações</option>
               {#each data.importedUnits.statuses as status}
                 <option value={String(status.value)} selected={data.status === String(status.value)}>{String(status.value)} ({Number(status.total)})</option>
               {/each}
@@ -161,7 +144,7 @@
     {#if data.view === "units" && data.importedUnits}
       <div class="flex items-center justify-between border-b border-app-border-soft px-4 py-3">
         <strong class="application-text-caption text-app-text">{data.importedUnits.unavailable ? "Listagem indisponível" : data.importedUnits.totalMatched + " contratos"}</strong>
-        <span class="application-text-meta text-app-text-muted">Origem: API F10 · planilha complementar</span>
+        <span class="application-text-meta text-app-text-muted">Fonte: API F10</span>
       </div>
       {#if data.importedUnits.rows.length === 0}
         <p class="application-text-caption px-4 py-12 text-center text-app-text-muted">Nenhum contrato encontrado.</p>
@@ -172,9 +155,7 @@
               <tr>
                 <th class="px-4 py-3 font-semibold">Titular / contrato</th>
                 <th class="px-4 py-3 font-semibold">Pessoa vinculada</th>
-                <th class="px-4 py-3 font-semibold">Franquia</th>
                 <th class="px-4 py-3 font-semibold">Situação</th>
-                <th class="px-4 py-3 font-semibold">Plano</th>
                 <th class="px-4 py-3 text-right font-semibold">Detalhes</th>
               </tr>
             </thead>
@@ -182,16 +163,16 @@
               {#each data.importedUnits.rows as unit}
                 <tr class="hover:bg-app-subtle">
                   <td class="application-text-caption px-4 py-3 align-top">
-                    <strong class="block text-app-text">{String(unit.client_name || "Contrato F10 #" + unit.contract_id)}</strong>
+                    <a href={"/app/customers/contracts/" + String(unit.contract_id)}
+                      class="inline-flex items-center gap-1.5 font-bold text-app-primary hover:underline">
+                      {String(unit.client_name || "Contrato F10 #" + unit.contract_id)} <ArrowRight size={15}/>
+                    </a>
                     {#if unit.apelido && String(unit.apelido) !== String(unit.client_name)}
                       <span class="application-text-meta mt-0.5 block text-app-text-muted">Apelido: {String(unit.apelido)}</span>
                     {/if}
                     <span class="application-text-meta mt-1 block text-app-text-muted">
                       {unit.numero_contrato ? "Contrato nº " + String(unit.numero_contrato) : "ID F10 #" + String(unit.contract_id)}
                     </span>
-                    {#if !unit.sheet_unit_id}
-                      <span class="application-text-meta mt-1 inline-block rounded-md bg-app-subtle px-2 py-0.5 text-app-text-muted">Sem complemento</span>
-                    {/if}
                   </td>
                   <td class="application-text-caption px-4 py-3 align-top">
                     {#if unit.person_name}
@@ -206,21 +187,18 @@
                       <span class="application-text-meta mt-1 block text-app-text-muted">Pessoa F10 #{String(unit.f10_person_id)}</span>
                     {/if}
                   </td>
-                  <td class="application-text-caption px-4 py-3 align-top text-app-text-muted">{String(unit.group_name ?? "Sem grupo")}</td>
-                  <td class="application-text-caption px-4 py-3 align-top">
+                                    <td class="application-text-caption px-4 py-3 align-top">
                     <span class={String(unit.commercial_status).toLowerCase() === "ativo"
                       ? "application-text-meta inline-flex rounded-full bg-app-success-bg px-2.5 py-1 font-semibold text-app-success-text"
                       : "application-text-meta inline-flex rounded-full bg-app-subtle px-2.5 py-1 text-app-text-muted"}>
                       {String(unit.commercial_status)}
                     </span>
                   </td>
-                  <td class="application-text-caption px-4 py-3 align-top text-app-text-muted">{String(unit.contracted_plan ?? "—")}</td>
                   <td class="px-4 py-3 text-right align-top">
-                    <button type="button" on:click={() => (selectedContractId = String(unit.contract_id))}
-                      class="application-text-caption inline-flex h-9 items-center gap-2 rounded-lg border border-app-border-control px-3 font-semibold text-app-primary hover:bg-app-subtle"
-                      aria-label={"Ver detalhes do contrato " + String(unit.numero_contrato ?? unit.contract_id)}>
-                      <Eye size={16}/> Ver
-                    </button>
+                    <a href={"/app/customers/contracts/" + String(unit.contract_id)}
+                      class="application-text-caption inline-flex h-9 items-center gap-2 rounded-lg border border-app-border-control px-3 font-semibold text-app-primary hover:bg-app-subtle">
+                      <ArrowRight size={16}/> Abrir
+                    </a>
                   </td>
                 </tr>
               {/each}
@@ -244,7 +222,11 @@
     {:else}
       <div class="flex items-center justify-between border-b border-app-border-soft px-4 py-3">
         <strong class="application-text-caption text-app-text">{data.directoryUnavailable ? "Contatos temporariamente indisponíveis" : data.total + " pessoas/contatos"}</strong>
-        <span class="application-text-meta text-app-text-muted">Cadastro de atendimento</span>
+        {#if data.canImport}
+          <a href="/app/customers/new" class="application-text-caption inline-flex h-9 items-center gap-2 rounded-lg bg-app-primary px-3 font-semibold text-white">
+            <Plus size={16}/> Nova pessoa
+          </a>
+        {/if}
       </div>
       {#if data.rows.length === 0}
         <p class="application-text-caption px-4 py-12 text-center text-app-text-muted">{data.directoryUnavailable ? "A consulta não pôde ser concluída." : "Nenhuma pessoa encontrada."}</p>
@@ -300,7 +282,4 @@
       {/if}
     {/if}
   </section>
-{#if selectedContractId}
-  <F10ContractDetailsModal contractId={selectedContractId} onClose={() => (selectedContractId = null)}/>
-{/if}
 </ApplicationContent>

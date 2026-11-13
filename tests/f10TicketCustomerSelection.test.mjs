@@ -43,7 +43,7 @@ test("API contract selections require global customer visibility and stable IDs"
   assert.match(source, /hasPermission\(permissions, "customers.view", "all"\)/);
   assert.match(source, /resolveF10TicketContract/);
   assert.match(source, /INSERT INTO ticket_f10_contract_links/);
-  assert.match(source, /if \(customer\.f10Contract\) return/);
+  assert.match(source, /customer\.f10Contract \|\| customer\.groupId === null/);
   assert.match(resolver, /c\.unit_id = \$\{unitId\} AND c\.contract_id = \$\{contractId\}/);
   assert.match(resolver, /f10_customer_external_identities/);
   assert.match(resolver, /ON CONFLICT \(import_source, import_source_id\)/);
@@ -58,24 +58,24 @@ test("ticket picker includes API contracts, existing helpdesk contacts and contr
   assert.match(picker, /\/api\/app\/customers\/search/);
   assert.match(picker, /name="f10ContractId"/);
   assert.match(picker, /function selectContract/);
-  assert.match(picker, /selectedContract\.displayName/);
-  assert.match(picker, /Titular: /);
+  assert.match(picker, /selectedContracts/);
+  assert.match(picker, /Solicitante principal/);
+  assert.match(picker, /Pessoas acompanhantes/);
 });
 
 test("contract details are protected, loaded on click and separate account from person", () => {
   const directory = file("src/lib/server/support/f10CustomerContractDirectoryRepository.ts");
   const page = file("src/routes/app/customers/+page.svelte");
-  const modal = file("src/lib/components/operations/F10ContractDetailsModal.svelte");
+  const detailsPage = file("src/routes/app/customers/contracts/[contractId]/+page.svelte");
   const detailApi = file("src/routes/api/app/customers/contracts/[contractId]/+server.ts");
 
   assert.match(directory, /p\.spreadsheet_student_name/);
   assert.match(directory, /AS account_name/);
   assert.match(directory, /AS person_name/);
-  assert.match(page, /selectedContractId/);
-  assert.match(page, /F10ContractDetailsModal/);
-  assert.match(modal, /Cliente \/ empresa/);
-  assert.match(modal, /Pessoa vinculada/);
-  assert.match(modal, /Titular/);
-  assert.match(modal, /<svelte:component this=\{field.icon\}/);
+  assert.match(page, /\/app\/customers\/contracts\//);
+  assert.doesNotMatch(page, /F10ContractDetailsModal/);
+  assert.match(detailsPage, /Pessoa vinculada/);
+  assert.match(detailsPage, /Titular/);
+  assert.match(detailsPage, /<svelte:component this=\{field.icon\}/);
   assert.match(detailApi, /hasPermission\(permissions, "customers.view", "all"\)/);
 });

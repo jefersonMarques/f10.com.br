@@ -207,6 +207,18 @@ export async function listTicketWorkspaceTickets(
         ilike(customerContacts.name, searchPattern),
         ilike(customerOrganizations.name, searchPattern),
         canViewCommercialCustomer ? sql`EXISTS (
+          SELECT 1 FROM ticket_contract_links link
+          JOIN f10_customer_contracts c
+            ON c.unit_id = link.unit_id AND c.contract_id = link.contract_id
+          LEFT JOIN f10_customer_holder_profiles holder
+            ON holder.unit_id = c.unit_id AND holder.holder_id = c.titular_id
+          WHERE link.ticket_id = ${tickets.id}
+            AND (
+              coalesce(c.numero_contrato, '') ILIKE ${searchPattern}
+              OR coalesce(holder.name, '') ILIKE ${searchPattern}
+            )
+        )` : undefined,
+        canViewCommercialCustomer ? sql`EXISTS (
           SELECT 1 FROM ticket_f10_contract_links link
           JOIN f10_customer_contracts c
             ON c.unit_id = link.unit_id AND c.contract_id = link.contract_id

@@ -7,6 +7,7 @@
   export let entryPoints: TicketEntryPoint[] = [];
   export let canSearchCustomers = false;
   export let canSearchF10Contracts = false;
+  export let canManageCustomers = false;
   export let onClose: () => void;
 </script>
 
@@ -16,7 +17,7 @@
     <form method="POST" action="?/create" class="grid gap-3 sm:grid-cols-2">
       <div class="flex items-center justify-between sm:col-span-2"><h2 class="text-[16px] font-semibold">Novo ticket</h2><button type="button" on:click={onClose}><X size={16}/></button></div>
       <input name="subject" required maxlength="180" placeholder="Assunto" class="application-text-caption h-10 rounded-xl border border-[#DDE1EA] px-3 sm:col-span-2"/>
-      <TicketCustomerPicker enabled={canSearchCustomers} {canSearchF10Contracts}/>
+      <TicketCustomerPicker enabled={canSearchCustomers} {canSearchF10Contracts} {canManageCustomers}/>
       {#if entryPoints.length > 0}
         <label class="sm:col-span-2">
           <span class="application-text-meta mb-1.5 block font-bold uppercase tracking-[0.07em] text-app-text-soft">Processo inicial</span>

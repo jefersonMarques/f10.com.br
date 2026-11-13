@@ -174,6 +174,7 @@ export const load: PageServerLoad = async ({ parent, url, depends }) => {
   const canManageWorkflow = hasPermission(permissionMap, "tickets.manage", "all");
   const canSearchCustomers = canCreate;
   const canSearchF10Contracts = canCreate && hasPermission(permissionMap, "customers.view", "all");
+  const canManageCustomers = hasPermission(permissionMap, "customers.manage", "all");
 
   const view = parseView(url.searchParams.get("view"));
   const page = parsePage(url.searchParams.get("page"));
@@ -294,6 +295,7 @@ export const load: PageServerLoad = async ({ parent, url, depends }) => {
     canManageWorkflow,
     canSearchCustomers,
     canSearchF10Contracts,
+    canManageCustomers,
   };
 };
 
@@ -354,7 +356,8 @@ export const actions: Actions = {
       throw redirect(303, `/app/tickets/${ticket.id}`);
     } catch (cause) {
       if (cause && typeof cause === "object" && "status" in cause && cause.status === 303) throw cause;
-      if (cause instanceof Error && cause.message.startsWith("F10_TICKET_CONTRACT_")) {
+      if (cause instanceof Error && (cause.message.startsWith("F10_TICKET_CONTRACT_") ||
+          cause.message.startsWith("SUPPORT_"))) {
         return fail(400, {
           success: false,
           action: "create",

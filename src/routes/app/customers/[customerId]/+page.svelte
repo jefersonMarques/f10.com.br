@@ -5,10 +5,11 @@
     Mail,
     MessageCircleMore,
     Phone,
-    Users,
+    Users, ShieldCheck, Link2, Search, UserRound,
   } from "lucide-svelte";
   import ApplicationBackLink from "$lib/components/application/ApplicationBackLink.svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
+  import ContractMultiSelect from "$lib/components/operations/ContractMultiSelect.svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -28,6 +29,14 @@
     high: "Alta",
     urgent: "Urgente",
   };
+
+  $: initialContracts = data.contractAccess.map((contract) => ({
+    contractId: String(contract.contractId),
+    contractNumber: contract.contractNumber ? String(contract.contractNumber) : null,
+    displayName: String(contract.name),
+    holderName: null,
+    status: String(contract.status ?? ""),
+  }));
 
   $: openTickets = data.tickets.filter((ticket) => !["resolved", "closed"].includes(ticket.status));
   $: activeChats = data.chats.filter((chat) => !chat.closedAt && chat.status !== "closed");
@@ -63,7 +72,9 @@
       <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-2">
           <span class={`application-text-meta rounded-full px-2.5 py-1 font-bold ${data.customer.active ? "bg-[#EEF8F1] text-[#2F7045]" : "bg-[#F1F2F5] text-[#777D8C]"}`}>{data.customer.active ? "Ativo" : "Inativo"}</span>
-          {#if data.customer.organizationName}<span class="application-text-meta rounded-full bg-[#EEF0FF] px-2.5 py-1 font-bold text-[#000A57]">{data.customer.organizationName}</span>{/if}
+          <span class="application-text-meta inline-flex items-center gap-1 rounded-full bg-app-subtle px-2.5 py-1 font-semibold text-app-text">
+            {#if data.identity?.hasLogin}<ShieldCheck size={13}/> Login validado{:else}<UserRound size={13}/> Cadastro manual{/if}
+          </span>
         </div>
         <h2 class="mt-2 text-[24px] font-semibold tracking-[-0.025em] text-[#202637]">{data.customer.name}</h2>
         <div class="application-text-caption mt-2 flex flex-wrap gap-x-4 gap-y-2 text-[#687080]">
@@ -142,7 +153,7 @@
       </section>
 
       <section class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
-        <div class="flex items-center justify-between"><h3 class="flex items-center gap-2 text-[13px] font-semibold text-[#303746]"><Building2 size={15}/>Unidades F10</h3><span class="application-text-meta text-[#9297A5]">{data.units.length}</span></div>
+        <div class="flex items-center justify-between"><h3 class="flex items-center gap-2 text-[13px] font-semibold text-[#303746]"><Building2 size={15}/>Contextos F10 históricos</h3><span class="application-text-meta text-[#9297A5]">{data.units.length}</span></div>
         {#if data.units.length === 0}<p class="application-text-meta mt-3 leading-4 text-[#9297A5]">Nenhuma unidade foi identificada nos atendimentos acessíveis.</p>{:else}<div class="mt-3 space-y-2">{#each data.units as unit}<div class="rounded-xl bg-[#F7F8FB] p-3"><strong class="application-text-caption block text-[#3D4454]">{unit.unitName}</strong><span class="application-text-meta mt-1 block text-[#9297A5]">{unit.groupName}</span></div>{/each}</div>{/if}
       </section>
 
@@ -160,7 +171,60 @@
         </div>
       </section>
 
-      {#if data.canManage}
+      {#if data.manageAll}
+        <section class="rounded-[22px] border border-app-border bg-app-surface p-5">
+          <h3 class="mb-3 flex items-center gap-2 text-base font-bold text-app-text">
+            <ShieldCheck size={18}/> Acesso aos contratos no suporte
+          </h3>
+          <form method="POST" action="?/saveAccess" class="space-y-3">
+            <ContractMultiSelect name="contractId" initial={initialContracts}/>
+            <button type="submit" class="application-text-caption h-10 w-full rounded-lg bg-app-primary font-semibold text-white">
+              Salvar permissões
+            </button>
+          </form>
+        </section>
+      {/if}
+
+      {#if data.manageAll && !data.identity?.wasMerged}
+        <section class="rounded-[22px] border border-app-border bg-app-surface p-5">
+          <h3 class="mb-3 flex items-center gap-2 text-base font-bold text-app-text">
+            <Link2 size={18}/> Mesclar cadastros
+          </h3>
+          <form method="GET" class="flex gap-2">
+            <input name="mergeQ" value={data.mergeQuery} minlength="2" placeholder="Buscar nome ou e-mail"
+              class="application-text-caption h-10 min-w-0 flex-1 rounded-lg border border-app-border-control px-3"/>
+            <button type="submit" aria-label="Buscar cadastro" class="rounded-lg border border-app-border-control px-3">
+              <Search size={17}/>
+            </button>
+          </form>
+          {#if data.mergeCandidates.length > 0}
+            <div class="mt-3 space-y-3">
+              {#each data.mergeCandidates as candidate}
+                <form method="POST" action="?/merge" class="rounded-lg border border-app-border p-3">
+                  <input type="hidden" name="otherId" value={String(candidate.id)}/>
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="min-w-0">
+                      <strong class="application-text-caption block truncate text-app-text">{String(candidate.name)}</strong>
+                      <span class="application-text-meta text-app-text-muted">{String(candidate.email ?? "Sem e-mail")}</span>
+                    </span>
+                    <span class="application-text-meta text-app-text-muted">{candidate.hasLogin ? "Com login" : "Manual"}</span>
+                  </div>
+                  <label class="application-text-meta mt-3 flex items-center gap-2 text-app-text-muted">
+                    <input type="checkbox" name="confirmed" required/>
+                    Confirmo a mesclagem dos históricos e permissões
+                  </label>
+                  <button type="submit" disabled={Boolean(candidate.hasLogin && data.identity?.hasLogin)}
+                    class="application-text-caption mt-3 h-9 w-full rounded-lg border border-app-border-control font-semibold text-app-primary disabled:opacity-40">
+                    Mesclar com esta pessoa
+                  </button>
+                </form>
+              {/each}
+            </div>
+          {/if}
+        </section>
+      {/if}
+
+      {#if data.canManage && !data.identity?.hasLogin && !data.identity?.wasMerged}
         <details class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
           <summary class="application-text-caption cursor-pointer list-none font-semibold text-[#000A57]">Editar cadastro</summary>
           <form method="POST" action="?/update" class="mt-4 space-y-3">
@@ -174,17 +238,6 @@
           </form>
         </details>
 
-        {#if data.customer.organizationId}
-          <details class="rounded-[22px] border border-[#E2E5ED] bg-white p-5">
-            <summary class="application-text-caption cursor-pointer list-none font-semibold text-[#000A57]">+ Adicionar contato</summary>
-            <form method="POST" action="?/createContact" class="mt-4 space-y-3">
-              <input name="name" required minlength="2" maxlength="120" placeholder="Nome do contato" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] px-3"/>
-              <input name="email" type="email" maxlength="254" placeholder="E-mail" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] px-3"/>
-              <div class="grid grid-cols-2 gap-2"><input name="phone" maxlength="40" placeholder="Telefone" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] px-3"/><input name="whatsapp" maxlength="40" placeholder="WhatsApp" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] px-3"/></div>
-              <button type="submit" class="application-text-caption h-10 w-full rounded-xl border border-[#DDE1EA] bg-white font-semibold text-[#000A57]">Adicionar contato</button>
-            </form>
-          </details>
-        {/if}
       {/if}
 
       {#if data.activity.length > 0}

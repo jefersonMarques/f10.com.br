@@ -254,7 +254,7 @@ export async function listCustomerPortalTickets(contactId: string) {
       updatedAt: tickets.updatedAt,
     })
     .from(tickets)
-    .where(eq(tickets.customerContactId, contactId))
+    .where(customerTicketOwnershipCondition(contactId, null))
     .orderBy(desc(tickets.updatedAt));
 }
 
