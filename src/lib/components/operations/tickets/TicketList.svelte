@@ -83,7 +83,9 @@
         repositionMenu();
       }
     } catch {
-      menuError = "Não foi possível adicionar a etiqueta.";
+      menuError = action === "status"
+        ? "Não foi possível alterar o status."
+        : "Não foi possível adicionar a etiqueta.";
     } finally {
       menuBusy = false;
     }
