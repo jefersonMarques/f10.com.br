@@ -85,8 +85,14 @@ export function splitMovideskChatTranscript(source) {
     const match = line.match(CHAT_LINE);
     if (match) {
       if (current && current.body.trim()) messages.push(current);
+      let createdAt;
+      try {
+        createdAt = parseChatDate(match);
+      } catch {
+        return null;
+      }
       current = {
-        createdAt: parseChatDate(match),
+        createdAt,
         authorName: match[6].trim(),
         body: match[7],
       };
