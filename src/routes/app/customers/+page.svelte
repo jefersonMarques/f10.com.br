@@ -1,9 +1,11 @@
 <script lang="ts">
-  import { ArrowRight, Building2, FileSpreadsheet, Mail, MessageCircleMore, Phone, Search, Users, Link2 } from "lucide-svelte";
+  import { ArrowRight, Building2, FileSpreadsheet, Mail, MessageCircleMore, Phone, Search, Users, Link2, RefreshCw } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
-  import type { PageData } from "./$types";
+  import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
+  export let form: ActionData;
+  let refreshing = false;
 
   const ticketStatusLabels: Record<string, string> = {
     new: "Novo", open: "Aberto", in_progress: "Em andamento",
@@ -44,27 +46,53 @@
       <h1 class="text-xl font-bold text-app-text">Clientes F10</h1>
       {#if data.importedUnits && !data.importedUnits.unavailable}
         <p class="application-text-caption mt-1 text-app-text-muted">
-          {Number(data.importedUnits.summary.total)} unidades ·
-          {Number(data.importedUnits.summary.groups)} franquias/redes ·
-          {Number(data.importedUnits.summary.active)} ativas
+          {Number(data.importedUnits.summary.total)} contratos da API ·
+          {Number(data.importedUnits.summary.with_sheet)} com complemento ·
+          {Number(data.importedUnits.summary.active)} ativos
         </p>
       {/if}
     </div>
     {#if data.canImport}
       <div class="flex flex-wrap gap-2">
+        {#if data.canRefresh && data.view === "units"}
+          <form method="POST" action="?/refresh" on:submit={() => { refreshing = true; }}>
+            <input type="hidden" name="q" value={data.query}/>
+            <input type="hidden" name="grupo" value={data.groupId}/>
+            <input type="hidden" name="situacao" value={data.status}/>
+            <button type="submit" disabled={refreshing || !data.apiConfigured}
+              title={!data.apiConfigured ? "Integração F10 não configurada" : "Buscar novos contratos na API F10"}
+              class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl border border-app-border-control px-4 font-semibold text-app-text disabled:opacity-40">
+              <RefreshCw size={16} class={refreshing ? "animate-spin" : ""}/>
+              {refreshing ? "Atualizando..." : "Atualizar"}
+            </button>
+          </form>
+        {/if}
         <a href="/app/customers/access" class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl border border-app-border-control px-4 font-semibold text-app-text">
           <Link2 size={16}/> Atribuir pessoas
         </a>
       <a href="/app/customers/sync" class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white">
-        <FileSpreadsheet size={17}/> Importar / atualizar
+        <FileSpreadsheet size={17}/> Complementar planilha
       </a>
       </div>
     {/if}
   </header>
 
+  {#if form && "refreshError" in form && form.refreshError}
+    <div role="alert" class="application-text-caption mb-4 rounded-xl border border-app-border bg-app-warning-bg p-3 text-app-warning-text">{form.refreshError}</div>
+  {/if}
+  {#if data.refreshedCount !== null}
+    <div role="status" class="application-text-caption mb-4 rounded-xl border border-app-border bg-app-success-bg p-3 text-app-success-text">
+      {data.refreshedCount > 0 ? data.refreshedCount + " novo(s) contrato(s) importado(s) da API." : "Contratos atualizados: nenhum novo registro encontrado na API."}
+    </div>
+  {/if}
+  {#if data.unitUnavailable}
+    <div role="alert" class="application-text-caption mb-4 rounded-xl border border-app-border bg-app-warning-bg p-3 text-app-warning-text">
+      Configure F10_UID no servidor para consultar os contratos da API.
+    </div>
+  {/if}
   {#if data.importedUnits?.unavailable}
     <div role="alert" class="application-text-caption mb-4 rounded-xl border border-app-border bg-app-surface p-3 text-app-warning-text">
-      A listagem de unidades está em modo simplificado. Os cadastros continuam preservados; filtros e totalizadores podem estar temporariamente indisponíveis.
+      Não foi possível carregar a lista de contratos da API. Os dados permanecem preservados; tente novamente.
     </div>
   {/if}
 
@@ -100,7 +128,7 @@
           <span class="relative block">
             <Search size={17} class="absolute left-3 top-1/2 -translate-y-1/2 text-app-text-muted"/>
             <input name="q" value={data.query}
-              placeholder={data.view === "units" ? "Apelido, cliente, franquia ou nº contrato" : "Nome, e-mail ou telefone"}
+              placeholder={data.view === "units" ? "Cliente, titular, contrato, apelido ou e-mail" : "Nome, e-mail ou telefone"}
               class="application-text-caption h-10 w-full rounded-xl border border-app-border-control bg-app-subtle pl-10 pr-3 text-app-text outline-none focus:border-app-primary"/>
           </span>
         </label>
@@ -130,8 +158,8 @@
 
     {#if data.view === "units" && data.importedUnits}
       <div class="flex items-center justify-between border-b border-app-border-soft px-4 py-3">
-        <strong class="application-text-caption text-app-text">{data.importedUnits.unavailable ? "Listagem simplificada" : data.importedUnits.totalMatched + " unidades"}</strong>
-        <span class="application-text-meta text-app-text-muted">Dados comerciais da planilha</span>
+        <strong class="application-text-caption text-app-text">{data.importedUnits.unavailable ? "Listagem simplificada" : data.importedUnits.totalMatched + " contratos"}</strong>
+        <span class="application-text-meta text-app-text-muted">Origem: API F10 · planilha complementar</span>
       </div>
       {#if data.importedUnits.rows.length === 0}
         <p class="application-text-caption px-4 py-12 text-center text-app-text-muted">Nenhuma unidade encontrada.</p>
@@ -140,7 +168,7 @@
           <table class="w-full min-w-[780px] text-left">
             <thead class="application-text-meta bg-app-subtle text-app-text-muted">
               <tr>
-                <th class="px-4 py-3 font-semibold">Unidade / contrato</th>
+                <th class="px-4 py-3 font-semibold">Cliente / contrato</th>
                 <th class="px-4 py-3 font-semibold">Franquia</th>
                 <th class="px-4 py-3 font-semibold">Cliente</th>
                 <th class="px-4 py-3 font-semibold">Situação</th>
@@ -151,8 +179,13 @@
               {#each data.importedUnits.rows as unit}
                 <tr class="hover:bg-app-subtle">
                   <td class="application-text-caption px-4 py-3 align-top">
-                    <strong class="block text-app-text">{String(unit.apelido)}</strong>
-                    <span class="application-text-meta mt-1 block text-app-text-muted">Contrato nº {String(unit.numero_contrato)}</span>
+                    <strong class="block text-app-text">{String(unit.apelido || unit.client_name || "Contrato F10 #" + unit.contract_id)}</strong>
+                    <span class="application-text-meta mt-1 block text-app-text-muted">
+                      {unit.numero_contrato ? "Contrato nº " + String(unit.numero_contrato) : "ID F10 #" + String(unit.contract_id)}
+                    </span>
+                    {#if !unit.sheet_unit_id}
+                      <span class="application-text-meta mt-1 inline-block rounded-md bg-app-subtle px-2 py-0.5 text-app-text-muted">Sem complemento</span>
+                    {/if}
                   </td>
                   <td class="application-text-caption px-4 py-3 align-top text-app-text-muted">{String(unit.group_name ?? "Sem grupo")}</td>
                   <td class="application-text-caption px-4 py-3 align-top">
@@ -168,7 +201,7 @@
                     {/if}
                   </td>
                   <td class="application-text-caption px-4 py-3 align-top">
-                    <span class={String(unit.commercial_status) === "Ativo"
+                    <span class={String(unit.commercial_status).toLowerCase() === "ativo"
                       ? "application-text-meta inline-flex rounded-full bg-app-success-bg px-2.5 py-1 font-semibold text-app-success-text"
                       : "application-text-meta inline-flex rounded-full bg-app-subtle px-2.5 py-1 text-app-text-muted"}>
                       {String(unit.commercial_status)}

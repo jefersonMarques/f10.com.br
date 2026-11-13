@@ -83,6 +83,7 @@ jobs:
           node --check scripts/inspect-f10-customer-login.mjs
           node --experimental-strip-types --test tests/f10ContractPagination.test.mjs
           node --experimental-strip-types --test tests/f10CustomerCommercialFields.test.mjs
+          node --test tests/f10CustomerContractDirectory.test.mjs
           node --experimental-strip-types --test tests/f10SheetContractMatching.test.mjs
           node --experimental-strip-types --test tests/f10SheetPreviewErrors.test.mjs
 
