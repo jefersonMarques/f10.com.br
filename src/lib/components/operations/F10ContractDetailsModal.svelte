@@ -101,6 +101,11 @@
     void loadDetails();
   });
 
+  let customerFields: Field[] = [];
+  let commercialFields: Field[] = [];
+  let historyFields: Field[] = [];
+  let identifierFields: Field[] = [];
+
   $: customerFields = details ? [
     { label: "Cliente / empresa", value: details.accountName, icon: Building2 },
     { label: "Pessoa vinculada", value: details.personName, icon: UserRound },
