@@ -23,7 +23,12 @@ function list(value) {
 }
 
 function trimmed(value) {
-  return typeof value === "string" ? value.trim() : "";
+  return typeof value === "string" ? value.replace(/\u0000/g, "").trim() : "";
+}
+
+function safeJson(value) {
+  return JSON.stringify(value, (_key, item) =>
+    typeof item === "string" ? item.replace(/\u0000/g, "") : item);
 }
 
 function personId(person) {
@@ -138,7 +143,7 @@ async function importActions(tx, ticket, ticketId, clients) {
         ticketId, author.authorType, author.userId, author.contactId,
         channelFor(ticket.origin), body,
         "movidesk:" + personId(ticket) + ":" + actionId,
-        JSON.stringify(metadata), createdAt,
+        safeJson(metadata), createdAt,
       ],
     );
     const inserted = messages[0];
@@ -326,7 +331,7 @@ async function reconstructChat(tx, ticket, ticketId, primaryClient) {
     [
       sessionId, ticketId, row.customer_contact_id, row.assigned_user_id,
       row.queue_id, "Chat histórico Movidesk #" + personId(ticket),
-      tokenHash, finishedAt, JSON.stringify({
+      tokenHash, finishedAt, safeJson({
         source: "movidesk",
         sourceTicketId: personId(ticket),
         historical: true,
@@ -359,7 +364,7 @@ async function reconstructChat(tx, ticket, ticketId, primaryClient) {
       [
         ticketId, author.type, author.userId, author.contactId, author.body,
         "movidesk:chat:" + personId(ticket) + ":" + index,
-        JSON.stringify({
+        safeJson({
           source: "movidesk",
           sourceTicketId: personId(ticket),
           sourceActionId: Number(sourceAction.id),
@@ -433,6 +438,12 @@ async function importTicket(db, ticket, queueId) {
         primaryClientRequiresReview: !client,
         sourceOwnerId: personId(ticket.owner),
         sourceStatus: trimmed(ticket.status),
+        sourceBaseStatus: ticket.baseStatus,
+        sourceOrigin: Number(ticket.origin),
+        sourceCategory: trimmed(ticket.category),
+        sourceUrgency: trimmed(ticket.urgency),
+        sourceCanceledAt: trimmed(ticket.canceledIn) || null,
+        snapshot: "movidesk-final-snapshot",
         ownerHistories: list(ticket.ownerHistories),
         statusHistories: list(ticket.statusHistories),
         portalAccessApproved: false,
@@ -441,7 +452,7 @@ async function importTicket(db, ticket, queueId) {
       await tx.unsafe(
         "INSERT INTO ticket_events (ticket_id, event_type, metadata, created_at) " +
         "VALUES ($1::uuid, 'movidesk.ticket.imported', $2::jsonb, $3)",
-        [ticketId, JSON.stringify(event), createdAt],
+        [ticketId, safeJson(event), createdAt],
       );
       result = "created";
     }
