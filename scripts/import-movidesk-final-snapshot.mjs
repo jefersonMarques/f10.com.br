@@ -8,6 +8,7 @@ import {
   mapSnapshotChannel as channelFor,
   mapSnapshotStatus as statusFor,
   parseSnapshotOptions,
+  parseSnapshotDate as safeDate,
   splitMovideskChatTranscript,
   validateSnapshotRecord,
 } from "./lib/movideskSnapshot.mjs";
@@ -34,11 +35,6 @@ function safeJson(value) {
 function personId(person) {
   const value = object(person).id;
   return value === null || value === undefined ? "" : String(value);
-}
-
-function safeDate(value, fallback = null) {
-  const result = new Date(trimmed(value));
-  return Number.isFinite(result.getTime()) ? result : fallback;
 }
 
 async function uniqueAgent(tx, person) {
