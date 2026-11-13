@@ -98,12 +98,15 @@ No diretório da aplicação:
 
 ```bash
 node --env-file-if-exists=.env --env-file-if-exists=.env.production \
-  scripts/audit-movidesk-ticket-import-integrity.mjs
+  scripts/audit-movidesk-final-snapshot-import.mjs
 ```
 
-O auditor antigo exige algumas regras de visibilidade para importações anteriores
-e pode sinalizar divergências por causa dos registros de chat em arquivo: não
-faça restauração automática de visibilidade sem antes conferir esse resultado.
+O auditor específico compara os IDs do inventário com os mapeamentos e
+a quantidade de ações de cada ticket, além de indicar chats reconstruídos e
+pendências. Para verificar também as flags de acesso, execute separadamente
+`scripts/audit-movidesk-ticket-import-integrity.mjs`. O auditor antigo pode
+sinalizar divergências de visibilidade em mensagens históricas deliberadamente
+mantidas internas. Não faça restauração automática de visibilidade sem revisão.
 
 Conferir também o banco em modo leitura (por exemplo, via `psql`):
 
