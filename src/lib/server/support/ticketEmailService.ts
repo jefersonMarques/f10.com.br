@@ -251,7 +251,7 @@ async function getNotifiableParticipants(
   const excluded = requesterEmail?.trim().toLowerCase();
   const unique = new Set<string>();
   const recipients: ParticipantEmailRecipient[] = [];
-  for (const record of records as ParticipantEmailRecipient[]) {
+  for (const record of records as unknown as ParticipantEmailRecipient[]) {
     const email = record.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
         email === excluded || unique.has(email)) continue;
