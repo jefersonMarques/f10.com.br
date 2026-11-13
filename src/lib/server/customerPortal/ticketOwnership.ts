@@ -101,7 +101,7 @@ export function customerTicketOwnershipCondition(
   const participant = sql`EXISTS (
     SELECT 1 FROM ticket_participants participant
     WHERE participant.ticket_id = ${tickets.id}
-      AND participant.customer_contact_id = ${contactId}::uuid
+      AND ${contactOrMergedSourceCondition(sql`participant.customer_contact_id`, contactId)}
       AND participant.participant_type = 'customer'
       AND participant.portal_access_enabled = true
   )`;

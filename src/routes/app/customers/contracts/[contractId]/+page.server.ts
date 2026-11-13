@@ -30,15 +30,19 @@ export const load: PageServerLoad = async ({ parent, params, setHeaders }) => {
   const details = await getF10CustomerContractDetails(unitId, contractId);
   if (!details) throw error(404, "Contrato não encontrado.");
 
-  const [ticketCounts, recentTickets] = await Promise.all([
-    getContractTicketCounts(unitId, contractId),
-    listContractTickets(unitId, contractId),
-  ]);
+  const showTicketHistory = hasPermission(permissions, "tickets.view", "all");
+  const [ticketCounts, recentTickets] = showTicketHistory
+    ? await Promise.all([
+        getContractTicketCounts(unitId, contractId),
+        listContractTickets(unitId, contractId),
+      ])
+    : [{ total: 0, open: 0 }, []];
 
   return {
     details,
     ticketCounts,
     recentTickets,
+    showTicketHistory,
     canManage: hasPermission(permissions, "customers.manage", "all"),
   };
 };

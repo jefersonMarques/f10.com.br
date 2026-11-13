@@ -155,6 +155,13 @@ export async function listCustomerDirectory(
       phone: customerContacts.phone,
       whatsapp: customerContacts.whatsapp,
       active: customerContacts.active,
+      hasLogin: sql<boolean>`EXISTS (
+        SELECT 1 FROM customer_f10_identities identity
+        WHERE identity.customer_contact_id = ${customerContacts.id}
+      ) OR EXISTS (
+        SELECT 1 FROM customer_auth_identities identity
+        WHERE identity.customer_contact_id = ${customerContacts.id}
+      )`,
       organizationId: customerOrganizations.id,
       organizationName: customerOrganizations.name,
       organizationDocument: customerOrganizations.document,

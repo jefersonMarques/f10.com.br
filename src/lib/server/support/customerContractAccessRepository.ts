@@ -303,6 +303,14 @@ export async function addTicketCustomerParticipant(
     if (!ticket) throw new Error("SUPPORT_TICKET_NOT_FOUND");
     if (ticket.contact_id === contactId) throw new Error("SUPPORT_PARTICIPANT_IS_REQUESTER");
 
+    const contractCount = rows(await tx.execute(sql`
+      SELECT count(*)::int AS total FROM ticket_contract_links
+      WHERE ticket_id = ${ticketId}::uuid
+    `));
+    if (Number(contractCount[0]?.total ?? 0) === 0) {
+      throw new Error("SUPPORT_TICKET_CONTRACT_REQUIRED");
+    }
+
     const matches = rows(await tx.execute(sql`
       SELECT count(*)::int AS total
       FROM ticket_contract_links t

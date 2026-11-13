@@ -498,10 +498,25 @@ export async function createThreadTicket(input: {
 
   try {
     const ticketId = await db.transaction(async (tx) => {
+      let requesterId = matchedContactId;
+      if (!requesterId) {
+        const senderEmail = input.message.from?.email?.trim().toLowerCase() ?? "";
+        const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(senderEmail);
+        const displayName = input.message.from?.name?.trim().slice(0, 120) ||
+          (validEmail ? senderEmail : "Remetente não identificado");
+        const [provisional] = await tx.insert(customerContacts).values({
+          name: displayName,
+          email: validEmail ? senderEmail : null,
+          active: true,
+        }).returning({ id: customerContacts.id });
+        if (!provisional) throw new EmailInboundError("BREVO_EMAIL_REQUESTER_NOT_CREATED");
+        requesterId = provisional.id;
+      }
+
       const [ticket] = await tx
         .insert(tickets)
         .values({
-          customerContactId: matchedContactId,
+          customerContactId: requesterId,
           queueId: queue.id,
           assignedUserId: null,
           subject: ticketSubject(input.message),
@@ -560,6 +575,7 @@ export async function createThreadTicket(input: {
           inboxCode: input.route.code,
           senderEmail: input.message.from?.email ?? null,
           customerMatched: Boolean(matchedContactId),
+          provisionalRequester: !matchedContactId,
         },
       });
 

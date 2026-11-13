@@ -109,14 +109,14 @@
         <Ticket size={17}/>
         <span class="application-text-caption">Tickets em aberto</span>
       </div>
-      <strong class="mt-2 block text-2xl text-app-text">{data.ticketCounts.open}</strong>
+      <strong class="mt-2 block text-2xl text-app-text">{data.showTicketHistory ? data.ticketCounts.open : "—"}</strong>
     </div>
     <div class="rounded-xl border border-app-border bg-app-surface p-4">
       <div class="flex items-center gap-2 text-app-text-muted">
         <FileText size={17}/>
         <span class="application-text-caption">Tickets totais</span>
       </div>
-      <strong class="mt-2 block text-2xl text-app-text">{data.ticketCounts.total}</strong>
+      <strong class="mt-2 block text-2xl text-app-text">{data.showTicketHistory ? data.ticketCounts.total : "—"}</strong>
     </div>
   </div>
 
@@ -144,7 +144,9 @@
       <Ticket size={18} class="text-app-primary"/>
       <h2 class="text-base font-bold text-app-text">Tickets deste contrato</h2>
     </header>
-    {#if data.recentTickets.length === 0}
+    {#if !data.showTicketHistory}
+      <p class="application-text-caption p-5 text-app-text-muted">Histórico disponível somente para operadores com acesso global aos tickets.</p>
+    {:else if data.recentTickets.length === 0}
       <p class="application-text-caption p-5 text-app-text-muted">Nenhum ticket vinculado a este contrato.</p>
     {:else}
       <div class="divide-y divide-app-border-soft">

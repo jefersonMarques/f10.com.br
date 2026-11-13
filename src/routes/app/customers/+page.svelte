@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Building2, FileSpreadsheet, Mail, MessageCircleMore, Phone, Search, Users, Link2, RefreshCw, UserRound, Plus, ArrowRight } from "lucide-svelte";
+  import { Building2, Mail, MessageCircleMore, Phone, Search, Users, RefreshCw, UserRound, Plus, ArrowRight } from "lucide-svelte";
   import ApplicationContent from "$lib/components/application/ApplicationContent.svelte";
   import type { ActionData, PageData } from "./$types";
 
@@ -47,8 +47,7 @@
       {#if data.importedUnits && !data.importedUnits.unavailable}
         <p class="application-text-caption mt-1 text-app-text-muted">
           {Number(data.importedUnits.summary.total)} contratos da API ·
-          {Number(data.importedUnits.summary.with_sheet)} com complemento ·
-          {Number(data.importedUnits.summary.active)} ativos
+{Number(data.importedUnits.summary.active)} ativos
         </p>
       {/if}
     </div>
@@ -67,12 +66,6 @@
             </button>
           </form>
         {/if}
-        <a href="/app/customers/access" class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl border border-app-border-control px-4 font-semibold text-app-text">
-          <Link2 size={16}/> Atribuir pessoas
-        </a>
-      <a href="/app/customers/sync" class="application-text-caption inline-flex h-10 items-center gap-2 rounded-xl bg-app-primary px-4 font-semibold text-white">
-        <FileSpreadsheet size={17}/> Complementar planilha
-      </a>
       </div>
     {/if}
   </header>
@@ -163,7 +156,7 @@
                 <th class="px-4 py-3 font-semibold">Titular / contrato</th>
                 <th class="px-4 py-3 font-semibold">Pessoa vinculada</th>
                 <th class="px-4 py-3 font-semibold">Situação</th>
-                <th class="px-4 py-3 text-right font-semibold">Tickets</th>
+                <th class="px-4 py-3 text-right font-semibold">Detalhes</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-app-border-soft">
@@ -180,9 +173,6 @@
                     <span class="application-text-meta mt-1 block text-app-text-muted">
                       {unit.numero_contrato ? "Contrato nº " + String(unit.numero_contrato) : "ID F10 #" + String(unit.contract_id)}
                     </span>
-                    {#if !unit.sheet_unit_id}
-                      <span class="application-text-meta mt-1 inline-block rounded-md bg-app-subtle px-2 py-0.5 text-app-text-muted">Sem complemento</span>
-                    {/if}
                   </td>
                   <td class="application-text-caption px-4 py-3 align-top">
                     {#if unit.person_name}

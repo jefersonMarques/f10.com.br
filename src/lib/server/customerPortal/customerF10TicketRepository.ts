@@ -242,6 +242,7 @@ export async function listCustomerF10Tickets(
           ),
           originalEmailSenderCondition(session.email),
           explicitTicketRequesterCondition(session.contactId),
+          customerTicketOwnershipCondition(session.contactId, session.email),
         );
     if (authorizedTicketCondition) conditions.push(authorizedTicketCondition);
   }
@@ -424,15 +425,8 @@ export async function getCustomerF10Ticket(
   }
 
   if (context.legacyUserId && context.legacyUserId !== session.legacyUserId) {
-    const [originalSender] = await getDatabase()
-      .select({ id: tickets.id })
-      .from(tickets)
-      .where(and(
-        eq(tickets.id, ticketId),
-        or(originalEmailSenderCondition(session.email), explicitTicketRequesterCondition(session.contactId)),
-      ))
-      .limit(1);
-    return originalSender ? { ...details, context: null } : null;
+    // O acesso ao ticket já foi validado pela identidade do suporte.
+    return { ...details, context: null };
   }
   if (context.contextScope === "global") {
     return { ...details, context: globalDisplayContext() };

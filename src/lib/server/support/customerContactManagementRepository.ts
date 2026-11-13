@@ -143,6 +143,60 @@ export async function mergeCustomerContacts(
       ON CONFLICT (customer_contact_id, unit_id, contract_id) DO NOTHING
     `);
     await tx.execute(sql`
+      UPDATE customer_portal_sessions SET revoked_at = now()
+      WHERE customer_contact_id = ${sourceId}::uuid AND revoked_at IS NULL
+    `);
+    await tx.execute(sql`
+      UPDATE customer_portal_login_tokens
+      SET expires_at = now()
+      WHERE customer_contact_id = ${sourceId}::uuid AND expires_at > now()
+    `);
+
+    await tx.execute(sql`
+      INSERT INTO ticket_events(ticket_id, actor_user_id, event_type, metadata)
+      SELECT t.id, ${actorUserId}::uuid, 'ticket.customer.merged',
+        jsonb_build_object(
+          'sourceContactId', ${sourceId}::text,
+          'targetContactId', ${targetId}::text
+        )
+      FROM tickets t WHERE t.customer_contact_id = ${sourceId}::uuid
+    `);
+
+    await tx.execute(sql`
+      UPDATE tickets SET customer_contact_id = ${targetId}::uuid,
+        updated_at = now()
+      WHERE customer_contact_id = ${sourceId}::uuid
+    `);
+    await tx.execute(sql`
+      UPDATE ticket_requester_profiles
+      SET customer_contact_id = ${targetId}::uuid,
+        updated_at = now()
+      WHERE customer_contact_id = ${sourceId}::uuid
+    `);
+
+    await tx.execute(sql`
+      DELETE FROM ticket_participants source
+      WHERE source.customer_contact_id = ${sourceId}::uuid
+        AND EXISTS (
+          SELECT 1 FROM ticket_participants target
+          WHERE target.ticket_id = source.ticket_id
+            AND target.customer_contact_id = ${targetId}::uuid
+        )
+    `);
+    await tx.execute(sql`
+      UPDATE ticket_participants
+      SET customer_contact_id = ${targetId}::uuid
+      WHERE customer_contact_id = ${sourceId}::uuid
+    `);
+    await tx.execute(sql`
+      DELETE FROM ticket_participants p
+      USING tickets t
+      WHERE p.ticket_id = t.id
+        AND p.customer_contact_id = ${targetId}::uuid
+        AND t.customer_contact_id = ${targetId}::uuid
+    `);
+
+    await tx.execute(sql`
       UPDATE customer_contacts SET active = false, updated_at = now()
       WHERE id = ${sourceId}::uuid
     `);
