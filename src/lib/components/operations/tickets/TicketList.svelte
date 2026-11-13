@@ -1,6 +1,6 @@
 <script lang="ts">
   import { shortTicketSubject } from "./shortSubject";
-  import { ArrowDown, ArrowUp, ArrowUpDown, Check, Clock3, Copy, ExternalLink, Mail, MessageSquare, MoreHorizontal, PanelRightOpen, TicketCheck, UserRound } from "lucide-svelte";
+  import { ArrowDown, ArrowUp, ArrowUpDown, Check, Clock3, Copy, ExternalLink, Mail, MessageSquare, MoreHorizontal, PanelRightOpen, Plus, TicketCheck, UserRound, X } from "lucide-svelte";
   import { tick } from "svelte";
   import { labelClasses, priorityLabels } from "./presentation";
   import type { TicketItem, TicketWorkflow } from "./types";
@@ -12,7 +12,8 @@
   export let compact = false;
   export let onOpenTicket: (ticketId: string) => void | Promise<void>;
   export let onOpenTicketService: ((ticketId: string) => void | Promise<void>) | null = null;
-  export let onQuickAction: ((ticketId: string, action: "status" | "addLabel", value: string) => Promise<void>) | null = null;
+  export let onQuickAction: ((ticketId: string, action: "status" | "addLabel", value: string) => Promise<boolean | void>) | null = null;
+  export let onCreateLabel: ((ticketId: string, name: string, color: string) => Promise<boolean>) | null = null;
   export let labels: Array<{ id: string; name: string }> = [];
   export let sort = "updated_desc";
   export let onSort: ((value: string) => void) | null = null;
@@ -41,6 +42,13 @@
   let menuTop = 0;
   let menuLeft = 0;
   let menuElement: HTMLDivElement;
+  let menuAnchor: DOMRect | null = null;
+  let newLabelOpen = false;
+  let newLabelName = "";
+  let newLabelColor = "blue";
+  let menuBusy = false;
+  let menuError = "";
+  let justAddedLabels: string[] = [];
   let copiedTicketId: string | null = null;
   let hoveredTicket: TicketItem | null = null;
   let previewTop = 0;
@@ -61,12 +69,83 @@
 
   async function quickAction(action: "status" | "addLabel", value: string): Promise<void> {
     const id = menuTicket?.id;
-    closeTicketMenu();
-    if (id && value) await onQuickAction?.(id, action, value);
+    if (!id || !value || menuBusy) return;
+    menuBusy = true;
+    menuError = "";
+    try {
+      const saved = await onQuickAction?.(id, action, value);
+      if (saved === false) throw new Error("Não foi possível atualizar o ticket.");
+      if (action === "status") {
+        closeTicketMenu();
+      } else {
+        justAddedLabels = [...justAddedLabels, value];
+        await tick();
+        repositionMenu();
+      }
+    } catch {
+      menuError = action === "status"
+        ? "Não foi possível alterar o status."
+        : "Não foi possível adicionar a etiqueta.";
+    } finally {
+      menuBusy = false;
+    }
+  }
+
+  async function createQuickLabel(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    const ticketId = menuTicket?.id;
+    const name = newLabelName.trim();
+    if (!ticketId || !onCreateLabel || menuBusy ||
+        name.length < 2 || name.length > 40) return;
+    menuBusy = true;
+    menuError = "";
+    try {
+      const saved = await onCreateLabel(ticketId, name, newLabelColor);
+      if (!saved) throw new Error("LABEL_CREATION_FAILED");
+      newLabelName = "";
+      newLabelOpen = false;
+      await tick();
+      repositionMenu();
+    } catch {
+      menuError = "Não foi possível criar a etiqueta.";
+    } finally {
+      menuBusy = false;
+    }
+  }
+
+  async function toggleLabelEditor(): Promise<void> {
+    newLabelOpen = !newLabelOpen;
+    await tick();
+    repositionMenu();
   }
 
   function closeTicketMenu(): void {
     menuTicket = null;
+    menuAnchor = null;
+    newLabelOpen = false;
+    menuError = "";
+    justAddedLabels = [];
+  }
+
+  function repositionMenu(): void {
+    if (!menuAnchor || !menuElement) return;
+    const height = Math.min(menuElement.scrollHeight, window.innerHeight - 16);
+    const width = Math.min(280, window.innerWidth - 16);
+    menuLeft = Math.max(8, Math.min(
+      menuAnchor.right - width, window.innerWidth - width - 8,
+    ));
+    menuTop = window.innerHeight - menuAnchor.bottom >= height + 8
+      ? menuAnchor.bottom + 6
+      : Math.max(8, menuAnchor.top - height - 6);
+    menuTop = Math.max(8, Math.min(
+      menuTop, window.innerHeight - height - 8,
+    ));
+  }
+
+  function closeMenuOnPageScroll(event: Event): void {
+    if (event.target instanceof Node &&
+        menuElement?.contains(event.target)) return;
+    closeTicketMenu();
   }
 
   async function toggleTicketMenu(event: MouseEvent, ticket: TicketItem): Promise<void> {
@@ -77,15 +156,16 @@
     }
 
     const button = event.currentTarget as HTMLButtonElement;
-    const rect = button.getBoundingClientRect();
-    const height = onQuickAction ? 360 : 192;
-    menuTop = window.innerHeight - rect.bottom >= height + 8
-      ? rect.bottom + 6
-      : Math.max(8, rect.top - height - 6);
-    menuLeft = Math.max(8, Math.min(rect.right - 224, window.innerWidth - 232));
+    menuAnchor = button.getBoundingClientRect();
+    menuTop = menuAnchor.bottom + 6;
+    menuLeft = menuAnchor.left;
     menuTicket = ticket;
+    newLabelOpen = false;
+    justAddedLabels = [];
+    menuError = "";
     hidePreview();
     await tick();
+    repositionMenu();
     menuElement?.querySelector<HTMLElement>("[data-first-action]")?.focus();
   }
 
@@ -178,7 +258,8 @@
   }
 </script>
 
-<svelte:window on:click={closeTicketMenu} on:keydown={handleMenuKeydown} on:scroll|capture={closeTicketMenu} on:resize={closeTicketMenu}/>
+<svelte:window on:click={closeTicketMenu} on:keydown={handleMenuKeydown}
+  on:scroll|capture={closeMenuOnPageScroll} on:resize={closeTicketMenu}/>
 
 {#if tickets.length > 0}
   {#if compact}
@@ -399,7 +480,8 @@
     bind:this={menuElement}
     role="menu"
     aria-label={`Ações do ticket #${menuTicket.ticketNumber}`}
-    class="fixed z-[80] max-h-[min(470px,90vh)] w-56 overflow-y-auto rounded-xl border border-[var(--app-border)] bg-white py-1.5 shadow-[0_16px_45px_rgba(1,13,40,0.18)]"
+    class="fixed z-[80] max-h-[calc(100dvh-16px)] w-[min(280px,calc(100vw-16px))] overflow-y-auto overscroll-contain rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] py-1.5 text-[var(--app-text)] shadow-[0_16px_45px_rgba(1,13,40,0.18)]"
+    on:click|stopPropagation
     style:top={`${menuTop}px`}
     style:left={`${menuLeft}px`}
   >
@@ -408,7 +490,7 @@
       role="menuitem"
       data-first-action
       on:click={() => { const id = menuTicket?.id; closeTicketMenu(); if (id) void onOpenTicket(id); }}
-      class="flex h-9 w-full items-center gap-2.5 px-3 text-left text-[12px] font-medium text-[#4C5363] hover:bg-[var(--app-surface-subtle)]"
+      class="flex h-9 w-full items-center gap-2.5 px-3 text-left text-[12px] font-medium text-[var(--app-text)] hover:bg-[var(--app-surface-subtle)]"
     ><MessageSquare size={15}/>Abrir conversa</button>
 
     {#if onOpenTicketService}
@@ -416,7 +498,7 @@
         type="button"
         role="menuitem"
         on:click={() => { if (menuTicket) openTicketService(menuTicket.id); }}
-        class="flex h-9 w-full items-center gap-2.5 px-3 text-left text-[12px] font-medium text-[#4C5363] hover:bg-[var(--app-surface-subtle)]"
+        class="flex h-9 w-full items-center gap-2.5 px-3 text-left text-[12px] font-medium text-[var(--app-text)] hover:bg-[var(--app-surface-subtle)]"
       ><PanelRightOpen size={15}/>Abrir Atendimento</button>
     {/if}
 
@@ -425,7 +507,7 @@
       href={`/app/tickets/${menuTicket.id}`}
       target="_blank"
       rel="noopener noreferrer"
-      class="flex h-9 items-center gap-2.5 px-3 text-[12px] font-medium text-[#4C5363] hover:bg-[var(--app-surface-subtle)]"
+      class="flex h-9 items-center gap-2.5 px-3 text-[12px] font-medium text-[var(--app-text)] hover:bg-[var(--app-surface-subtle)]"
       on:click={closeTicketMenu}
     ><ExternalLink size={15}/>Abrir página completa</a>
 
@@ -443,25 +525,68 @@
           <option value="resolved">Resolvido</option><option value="closed">Fechado</option>
         </select>
       </label>
-      {#if labels.length}
-        <label class="block px-3 py-1.5">
-          <span class="application-text-meta block font-semibold text-[var(--app-text-muted)]">Adicionar etiqueta</span>
-          <select value="" aria-label="Adicionar etiqueta ao ticket"
+      <div class="px-3 py-2">
+        <div class="mb-2 flex items-center justify-between gap-2">
+          <span class="application-text-caption font-semibold text-[var(--app-text)]">
+            Etiquetas
+          </span>
+          {#if onCreateLabel}
+            <button type="button" on:click={() => void toggleLabelEditor()}
+              aria-expanded={newLabelOpen}
+              class="application-text-caption inline-flex items-center gap-1 rounded-lg border border-[var(--app-border-control)] px-2 py-1.5 font-semibold text-[var(--app-primary)]">
+              <Plus size={14}/> Nova
+            </button>
+          {/if}
+        </div>
+        {#if labels.length > 0}
+          <select value="" aria-label="Adicionar outra etiqueta"
             on:click|stopPropagation
-            on:change={(event) => void quickAction("addLabel", event.currentTarget.value)}
-            class="application-text-caption mt-1 h-9 w-full rounded-lg border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2 text-[var(--app-text)]">
-            <option value="" disabled>Escolher etiqueta</option>
-            {#each labels as label}<option value={label.id}>{label.name}</option>{/each}
+            on:change={(event) => {
+              const id = event.currentTarget.value;
+              event.currentTarget.value = "";
+              void quickAction("addLabel", id);
+            }}
+            disabled={menuBusy}
+            class="application-text-caption h-10 w-full rounded-lg border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2 text-[var(--app-text)]">
+            <option value="" disabled>+ Adicionar etiqueta...</option>
+            {#each labels.filter((label) => !menuTicket?.labels.some((current) => current.id === label.id) && !justAddedLabels.includes(label.id)) as label}
+              <option value={label.id}>{label.name}</option>
+            {/each}
           </select>
-        </label>
-      {/if}
+        {:else}
+          <p class="application-text-meta text-[var(--app-text-muted)]">Nenhuma etiqueta cadastrada.</p>
+        {/if}
+        {#if newLabelOpen}
+          <form class="mt-2 space-y-2" on:submit={createQuickLabel}>
+            <input bind:value={newLabelName} required minlength="2" maxlength="40"
+              aria-label="Nome da nova etiqueta" placeholder="Nome da etiqueta"
+              class="application-text-caption h-10 w-full rounded-lg border border-[var(--app-border-control)] bg-[var(--app-surface)] px-3 text-[var(--app-text)]"/>
+            <div class="flex gap-2">
+              <select bind:value={newLabelColor} aria-label="Cor da etiqueta"
+                class="application-text-caption h-10 min-w-0 flex-1 rounded-lg border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2 text-[var(--app-text)]">
+                <option value="blue">Azul</option><option value="green">Verde</option>
+                <option value="yellow">Amarela</option><option value="orange">Laranja</option>
+                <option value="red">Vermelha</option><option value="purple">Roxa</option>
+                <option value="gray">Cinza</option>
+              </select>
+              <button type="submit" disabled={menuBusy}
+                class="application-text-caption rounded-lg bg-[var(--app-primary)] px-3 font-semibold text-white disabled:opacity-50">
+                Criar
+              </button>
+            </div>
+          </form>
+        {/if}
+        {#if menuError}
+          <p role="alert" class="application-text-caption mt-2 text-[var(--app-danger-text)]">{menuError}</p>
+        {/if}
+      </div>
     {/if}
     <div class="my-1 border-t border-[var(--app-border-soft)]"></div>
     <button
       type="button"
       role="menuitem"
       on:click={() => { if (menuTicket) void copyTicketLink(menuTicket.id); }}
-      class="flex h-9 w-full items-center gap-2.5 px-3 text-left text-[12px] font-medium text-[#4C5363] hover:bg-[var(--app-surface-subtle)]"
+      class="flex h-9 w-full items-center gap-2.5 px-3 text-left text-[12px] font-medium text-[var(--app-text)] hover:bg-[var(--app-surface-subtle)]"
     ><Copy size={15}/>Copiar link</button>
   </div>
 {/if}

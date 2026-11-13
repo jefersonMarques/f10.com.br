@@ -395,3 +395,113 @@ export async function addInitialTicketParticipants(
     `);
   }
 }
+
+export async function addTicketContract(
+  ticketId: string,
+  actorUserId: string,
+  contractId: number,
+  grantToRequester: boolean,
+): Promise<void> {
+  if (!validId(ticketId) || !validId(actorUserId) ||
+      !Number.isSafeInteger(contractId) || contractId <= 0) {
+    throw new Error("SUPPORT_CONTRACT_SELECTION_INVALID");
+  }
+
+  const unitId = getConfiguredF10UnitId();
+  await getDatabase().transaction(async (tx) => {
+    const [ticket] = rows(await tx.execute(sql`
+      SELECT customer_contact_id::text AS contact_id
+      FROM tickets WHERE id = ${ticketId}::uuid FOR UPDATE
+    `));
+    if (!ticket || typeof ticket.contact_id !== "string") {
+      throw new Error("SUPPORT_TICKET_REQUESTER_REQUIRED");
+    }
+
+    await assertContact(tx, ticket.contact_id);
+    await assertContracts(tx, unitId, [contractId]);
+    if (grantToRequester) {
+      await tx.execute(sql`
+        INSERT INTO customer_contract_access(
+          customer_contact_id, unit_id, contract_id, granted_by
+        ) VALUES (
+          ${ticket.contact_id}::uuid, ${unitId}, ${contractId},
+          ${actorUserId}::uuid
+        )
+        ON CONFLICT (customer_contact_id, unit_id, contract_id) DO NOTHING
+      `);
+    }
+
+    const existing = rows(await tx.execute(sql`
+      SELECT contract_id::text AS contract_id
+      FROM ticket_contract_links
+      WHERE ticket_id = ${ticketId}::uuid
+      ORDER BY is_primary DESC, created_at, contract_id
+    `)).map((row) => Number(row.contract_id));
+
+    if (existing.includes(contractId)) return;
+    const selected = [...existing, contractId];
+    if (selected.length > MAX_CONTRACT_SELECTION) {
+      throw new Error("SUPPORT_CONTRACT_SELECTION_LIMIT");
+    }
+    await saveTicketContracts(
+      tx, ticketId, ticket.contact_id, actorUserId, selected,
+    );
+    await tx.execute(sql`
+      INSERT INTO ticket_events(ticket_id, actor_user_id, event_type, metadata)
+      VALUES (${ticketId}::uuid, ${actorUserId}::uuid,
+        'ticket.contracts.updated',
+        ${JSON.stringify({
+          contractIds: selected,
+          grantToRequester,
+        })}::jsonb)
+    `);
+    await tx.execute(sql`
+      UPDATE tickets SET updated_at = now() WHERE id = ${ticketId}::uuid
+    `);
+  });
+}
+
+export async function removeTicketContract(
+  ticketId: string,
+  actorUserId: string,
+  contractId: number,
+): Promise<void> {
+  if (!validId(ticketId) || !validId(actorUserId) ||
+      !Number.isSafeInteger(contractId) || contractId <= 0) {
+    throw new Error("SUPPORT_CONTRACT_SELECTION_INVALID");
+  }
+
+  await getDatabase().transaction(async (tx) => {
+    const [ticket] = rows(await tx.execute(sql`
+      SELECT customer_contact_id::text AS contact_id
+      FROM tickets WHERE id = ${ticketId}::uuid FOR UPDATE
+    `));
+    if (!ticket || typeof ticket.contact_id !== "string") {
+      throw new Error("SUPPORT_TICKET_REQUESTER_REQUIRED");
+    }
+
+    const selected = rows(await tx.execute(sql`
+      SELECT contract_id::text AS contract_id
+      FROM ticket_contract_links WHERE ticket_id = ${ticketId}::uuid
+      ORDER BY is_primary DESC, created_at, contract_id
+    `)).map((row) => Number(row.contract_id));
+    if (!selected.includes(contractId)) return;
+    const remaining = selected.filter((id) => id !== contractId);
+    if (remaining.length === 0) {
+      throw new Error("SUPPORT_TICKET_CONTRACT_REQUIRED");
+    }
+
+    await saveTicketContracts(
+      tx, ticketId, ticket.contact_id, actorUserId, remaining,
+    );
+    await tx.execute(sql`
+      INSERT INTO ticket_events(ticket_id, actor_user_id, event_type, metadata)
+      VALUES (${ticketId}::uuid, ${actorUserId}::uuid,
+        'ticket.contracts.updated',
+        ${JSON.stringify({ contractIds: remaining })}::jsonb)
+    `);
+    await tx.execute(sql`
+      UPDATE tickets SET updated_at = now() WHERE id = ${ticketId}::uuid
+    `);
+  });
+}

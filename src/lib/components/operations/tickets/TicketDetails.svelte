@@ -16,6 +16,7 @@
     MonitorCog,
     Paperclip,
     ListChecks,
+    Plus,
     Route,
     Send,
     ShieldCheck,
@@ -30,6 +31,7 @@
   import TicketRichTextEditor from "$lib/components/operations/tickets/TicketRichTextEditor.svelte";
   import TicketRemotePanel from "$lib/components/operations/tickets/TicketRemotePanel.svelte";
   import TicketCustomerCard from "./TicketCustomerCard.svelte";
+  import TicketRelationshipsInline from "./TicketRelationshipsInline.svelte";
   import TicketMergeDialog from "./TicketMergeDialog.svelte";
   import TicketTaskPanel from "$lib/components/operations/TicketTaskPanel.svelte";
   import ServiceRequestDetailsCard from "$lib/components/serviceRequests/ServiceRequestDetailsCard.svelte";
@@ -67,6 +69,8 @@
   let actionLoading = "";
   let mergeDialogOpen = false;
   let ticketMenuOpen = false;
+  let historyExpanded = false;
+  let labelEditorOpen = false;
   let workflowSelectionKey = "";
   let workflowId = "";
   let stageId = "";
@@ -795,74 +799,67 @@
           ? "space-y-3 border-t border-[var(--app-border)] bg-[var(--app-bg)] p-3 xl:border-l xl:border-t-0"
           : "min-h-0 w-full overflow-y-auto bg-white px-3 py-4 sm:px-6"}
       >
-        {#if surface === "page" || activeMainPanel === "customer"}
-          <a href={"/app/tickets/" + ticketData.details.ticket.id + "/relationships"}
-            class="application-text-caption mt-3 flex min-h-10 items-center justify-center gap-2 rounded-xl border border-app-border-control bg-app-surface px-3 font-semibold text-app-primary">
-            <UsersRound size={17}/> Gerenciar empresas e pessoas
-          </a>
-        {/if}
-
         {#if surface === "page" || activeMainPanel === "service"}
-        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4"  : "w-full p-2 sm:p-4"}>
-          <h3 class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><Headphones size={14}/>Atendimento</h3>
+        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-[var(--app-surface)] p-4"  : "w-full p-2 sm:p-4"}>
+          <h3 class="flex items-center gap-2 text-[13px] font-semibold text-[var(--app-text)]"><Route size={17} class="text-[var(--app-primary)]"/>Fluxo e andamento</h3>
 
           <div class="mt-3 border-t border-[var(--app-border-soft)] pt-3">
-            <div class="flex items-center gap-2 text-[10.5px] font-semibold text-[#626978]"><Route size={12}/>Área e coluna</div>
-            <p class="mt-1 text-[10.5px] leading-4 text-[#858B99]">{ticketData.workflowContext?.areaName ? `${ticketData.workflowContext.areaName} · ${ticketData.workflowContext.areaStageName ?? "Sem etapa"}` : ticketData.workflowContext?.globalStageName ?? "Fluxo global"}</p>
+            <div class="flex items-center gap-2 application-text-caption font-semibold text-[var(--app-text-muted)]"><Route size={12}/>Área e coluna</div>
+            <p class="mt-1 application-text-caption leading-4 text-[var(--app-text-muted)]">{ticketData.workflowContext?.areaName ? `${ticketData.workflowContext.areaName} · ${ticketData.workflowContext.areaStageName ?? "Sem etapa"}` : ticketData.workflowContext?.globalStageName ?? "Fluxo global"}</p>
             {#if ticketData.canReply && workflowId}
-              <form method="POST" action={actionUrl("moveTicketLocation")} on:submit|preventDefault={(event) => void submitForm(event, "moveTicketLocation")} class="mt-2.5">
-                <select name="workflowId" value={workflowId} on:change={changeWorkflow} class="h-9 w-full rounded-xl border border-[var(--app-border-control)] bg-white px-2.5 text-[11px]">
+              <form method="POST" action={actionUrl("moveTicketLocation")} on:submit|preventDefault={(event) => void submitForm(event, "moveTicketLocation")} class="mt-2.5 grid gap-2 sm:grid-cols-2">
+                <select name="workflowId" value={workflowId} on:change={changeWorkflow} class="h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2.5 application-text-caption">
                   {#if ticketData.workflowBoard.globalWorkflow}<option value={ticketData.workflowBoard.globalWorkflow.id}>Fluxo global</option>{/if}
                   {#each movableAreaWorkflows as workflow}<option value={workflow.id}>Área · {workflow.areaName}</option>{/each}
                 </select>
-                <div class="mt-2 flex gap-2">
-                  <select name="stageId" bind:value={stageId} required class="h-9 min-w-0 flex-1 rounded-xl border border-[var(--app-border-control)] bg-white px-2.5 text-[11px]">
+                <div class="flex min-w-0 gap-2">
+                  <select name="stageId" bind:value={stageId} required class="h-10 min-w-0 flex-1 rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2.5 application-text-caption">
                     {#each stageOptions as stage}<option value={stage.id}>{stage.name}{stage.stageType === "area_gateway" ? ` · ${stage.linkedAreaName ?? "Área"}` : ""}</option>{/each}
                   </select>
-                  <button type="submit" disabled={Boolean(actionLoading)} class="h-9 rounded-xl bg-[var(--app-primary)] px-3 text-[10.5px] font-semibold text-white disabled:opacity-50">Mover</button>
+                  <button type="submit" disabled={Boolean(actionLoading)} class="h-10 rounded-xl bg-[var(--app-primary)] px-3 application-text-caption font-semibold text-white disabled:opacity-50">Mover</button>
                 </div>
               </form>
             {/if}
           </div>
 
-          <div class={surface === "page" ? "mt-3 grid gap-3 border-t border-[var(--app-border-soft)] pt-3" : "mt-3 grid gap-3 border-t border-[var(--app-border-soft)] pt-3 sm:grid-cols-2"}>
+          <div class={"mt-3 grid gap-3 border-t border-[var(--app-border-soft)] pt-3 sm:grid-cols-2"}>
             <label>
-              <span class="mb-1 block text-[10.5px] font-medium text-[#777E8D]">Status</span>
-              <select name="status" value={ticketData.details.ticket.status} disabled={!ticketData.canReply || Boolean(actionLoading)} on:change={(event) => void updateField("status", "status", event)} class="h-9 w-full rounded-xl border border-[var(--app-border-control)] bg-white px-2.5 text-[11px] disabled:bg-[var(--app-surface-muted)]">
+              <span class="mb-1 block application-text-caption font-medium text-[var(--app-text-muted)]">Status</span>
+              <select name="status" value={ticketData.details.ticket.status} disabled={!ticketData.canReply || Boolean(actionLoading)} on:change={(event) => void updateField("status", "status", event)} class="h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2.5 application-text-caption disabled:bg-[var(--app-surface-muted)]">
                 <option value="new">Novo</option><option value="open">Aberto</option><option value="in_progress">Em andamento</option><option value="waiting_customer">Aguardando cliente</option><option value="resolved">Resolvido</option><option value="closed">Fechado</option>
               </select>
             </label>
 
             <label>
-              <span class="mb-1 block text-[10.5px] font-medium text-[#777E8D]">Prioridade</span>
-              <select name="priority" value={ticketData.details.ticket.priority} disabled={!ticketData.canReply || Boolean(actionLoading)} on:change={(event) => void updateField("priority", "priority", event)} class="h-9 w-full rounded-xl border border-[var(--app-border-control)] bg-white px-2.5 text-[11px] disabled:bg-[var(--app-surface-muted)]">
+              <span class="mb-1 block application-text-caption font-medium text-[var(--app-text-muted)]">Prioridade</span>
+              <select name="priority" value={ticketData.details.ticket.priority} disabled={!ticketData.canReply || Boolean(actionLoading)} on:change={(event) => void updateField("priority", "priority", event)} class="h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2.5 application-text-caption disabled:bg-[var(--app-surface-muted)]">
                 <option value="low">Baixa</option><option value="normal">Normal</option><option value="high">Alta</option><option value="urgent">Urgente</option>
               </select>
             </label>
 
             <label>
-              <span class="mb-1 block text-[10.5px] font-medium text-[#777E8D]">Conclusão planejada</span>
-              <input name="dueOn" type="date" required value={ticketData.details.ticket.dueOn} disabled={!ticketData.canReply || Boolean(actionLoading)} on:change={(event) => void updateField("dueOn", "dueOn", event)} class="h-9 w-full rounded-xl border border-[var(--app-border-control)] bg-white px-2.5 text-[11px] disabled:bg-[var(--app-surface-muted)]"/>
+              <span class="mb-1 block application-text-caption font-medium text-[var(--app-text-muted)]">Conclusão planejada</span>
+              <input name="dueOn" type="date" required value={ticketData.details.ticket.dueOn} disabled={!ticketData.canReply || Boolean(actionLoading)} on:change={(event) => void updateField("dueOn", "dueOn", event)} class="h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2.5 application-text-caption disabled:bg-[var(--app-surface-muted)]"/>
             </label>
 
             <label>
-              <span class="mb-1 block text-[10.5px] font-medium text-[#777E8D]">Responsável</span>
+              <span class="mb-1 block application-text-caption font-medium text-[var(--app-text-muted)]">Responsável</span>
               {#if ticketData.canAssign}
-                <select name="assignedUserId" disabled={Boolean(actionLoading)} on:change={(event) => void updateField("assign", "assignedUserId", event)} class="h-9 w-full rounded-xl border border-[var(--app-border-control)] bg-white px-2.5 text-[11px]">
+                <select name="assignedUserId" disabled={Boolean(actionLoading)} on:change={(event) => void updateField("assign", "assignedUserId", event)} class="h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2.5 application-text-caption">
                   {#each ticketData.agents as agent}<option value={agent.id} selected={agent.id === ticketData.details.ticket.assignedUserId}>{agent.name}</option>{/each}
                 </select>
               {:else}
-                <div class="rounded-xl bg-[var(--app-surface-subtle)] px-3 py-2.5 text-[11px] font-semibold text-[#4E5565]">{ticketData.details.ticket.assignedUserName ?? "Não atribuído"}</div>
+                <div class="rounded-xl bg-[var(--app-surface-subtle)] px-3 py-2.5 application-text-caption font-semibold text-[var(--app-text)]">{ticketData.details.ticket.assignedUserName ?? "Não atribuído"}</div>
               {/if}
             </label>
           </div>
 
           <div class="mt-3 border-t border-[var(--app-border-soft)] pt-3">
-            <div class="mb-2 flex items-center gap-2 text-[10.5px] font-semibold text-[#626978]"><Clock3 size={12}/>SLA</div>
+            <div class="mb-2 flex items-center gap-2 application-text-caption font-semibold text-[var(--app-text-muted)]"><Clock3 size={12}/>SLA</div>
             <div class="space-y-2">
-              <div class="flex items-center justify-between gap-3"><span class="text-[10.5px] text-[#777E8D]">1ª resposta</span>{#if ticketData.details.ticket.firstResponseAt}<span class="text-[10.5px] font-semibold text-[#2F7045]">Respondido</span>{:else}<span class={`text-[10.5px] font-semibold ${deadlineClass(ticketData.details.ticket.firstResponseDueAt)}`}>{deadlineText(ticketData.details.ticket.firstResponseDueAt)}</span>{/if}</div>
-              {#if ticketData.details.ticket.firstResponseAt && ticketData.details.ticket.nextResponseDueAt}<div class="flex items-center justify-between gap-3"><span class="text-[10.5px] text-[#777E8D]">Próxima resposta</span><span class={`text-[10.5px] font-semibold ${deadlineClass(ticketData.details.ticket.nextResponseDueAt)}`}>{deadlineText(ticketData.details.ticket.nextResponseDueAt)}</span></div>{/if}
-              <div class="flex items-center justify-between gap-3"><span class="text-[10.5px] text-[#777E8D]">Resolução</span>{#if ticketData.details.ticket.resolvedAt}<span class="text-[10.5px] font-semibold text-[#2F7045]">Concluído</span>{:else}<span class={`text-[10.5px] font-semibold ${deadlineClass(ticketData.details.ticket.resolutionDueAt)}`}>{deadlineText(ticketData.details.ticket.resolutionDueAt)}</span>{/if}</div>
+              <div class="flex items-center justify-between gap-3"><span class="application-text-caption text-[var(--app-text-muted)]">1ª resposta</span>{#if ticketData.details.ticket.firstResponseAt}<span class="application-text-caption font-semibold text-[var(--app-success-text)]">Respondido</span>{:else}<span class={`application-text-caption font-semibold ${deadlineClass(ticketData.details.ticket.firstResponseDueAt)}`}>{deadlineText(ticketData.details.ticket.firstResponseDueAt)}</span>{/if}</div>
+              {#if ticketData.details.ticket.firstResponseAt && ticketData.details.ticket.nextResponseDueAt}<div class="flex items-center justify-between gap-3"><span class="application-text-caption text-[var(--app-text-muted)]">Próxima resposta</span><span class={`application-text-caption font-semibold ${deadlineClass(ticketData.details.ticket.nextResponseDueAt)}`}>{deadlineText(ticketData.details.ticket.nextResponseDueAt)}</span></div>{/if}
+              <div class="flex items-center justify-between gap-3"><span class="application-text-caption text-[var(--app-text-muted)]">Resolução</span>{#if ticketData.details.ticket.resolvedAt}<span class="application-text-caption font-semibold text-[var(--app-success-text)]">Concluído</span>{:else}<span class={`application-text-caption font-semibold ${deadlineClass(ticketData.details.ticket.resolutionDueAt)}`}>{deadlineText(ticketData.details.ticket.resolutionDueAt)}</span>{/if}</div>
             </div>
           </div>
         </section>
@@ -875,6 +872,55 @@
             saving={Boolean(actionLoading)}
             onAction={postAction}
           />
+          {#key ticketData.details.ticket.id}
+            <div class="mt-3">
+              <TicketRelationshipsInline
+                ticketId={ticketData.details.ticket.id}
+                onRefresh={refreshDetails}
+              />
+            </div>
+          {/key}
+        {/if}
+
+
+        {#if surface === "page" || activeMainPanel === "service"}
+          <section class="mt-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 sm:p-4" aria-label="Histórico do ticket">
+            <header class="flex items-center justify-between gap-2">
+              <h3 class="application-text-caption flex items-center gap-2 font-bold text-[var(--app-text)]">
+                <ShieldCheck size={17} class="text-[var(--app-primary)]"/> Histórico do ticket
+                <span class="application-text-meta rounded-full bg-[var(--app-surface-muted)] px-2 py-1 font-medium text-[var(--app-text-muted)]">
+                  {ticketData.details.events.length}
+                </span>
+              </h3>
+              {#if ticketData.details.events.length > 6}
+                <button type="button" on:click={() => (historyExpanded = !historyExpanded)}
+                  class="application-text-caption font-semibold text-[var(--app-primary)]">
+                  {historyExpanded ? "Ver menos" : "Ver tudo"}
+                </button>
+              {/if}
+            </header>
+            {#if ticketData.details.events.length === 0}
+              <p class="application-text-caption mt-3 text-[var(--app-text-muted)]">Nenhum registro no histórico.</p>
+            {:else}
+              <ol class="mt-3 space-y-3 border-l border-[var(--app-border)] pl-4">
+                {#each (historyExpanded ? ticketData.details.events : ticketData.details.events.slice(0, 6)) as event (event.id)}
+                  <li class="relative">
+                    <span class="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-[var(--app-primary)]"></span>
+                    <p class="application-text-caption leading-5 text-[var(--app-text)]">
+                      <strong class="font-semibold">{event.actorName ?? "Sistema"}</strong>
+                      {eventLabels[event.eventType] ?? event.eventType}
+                      {#if event.sourceTicketNumber && event.sourceTicketNumber !== ticketData.details.ticket.ticketNumber}
+                        · #{event.sourceTicketNumber}
+                      {/if}
+                    </p>
+                    <span class="application-text-meta mt-1 block text-[var(--app-text-muted)]">
+                      {formatDateTime(event.createdAt)}
+                    </span>
+                  </li>
+                {/each}
+              </ol>
+            {/if}
+          </section>
         {/if}
 
         {#if surface === "page" || activeMainPanel === "service"}
@@ -882,24 +928,24 @@
           <summary class="application-text-caption flex cursor-pointer items-center gap-2 font-semibold text-[var(--app-text)]">
             <UsersRound size={15}/>Colaboração e etiquetas
           </summary>
-        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "w-full p-2 sm:p-4"}>
+        <section class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-[var(--app-surface)] p-4" : "w-full p-2 sm:p-4"}>
           <h3 class="sr-only">Seguidores e etiquetas</h3>
 
           <div class="mt-3">
-            <span class="text-[10px] font-semibold text-[#858B99]">Seguidores</span>
+            <span class="text-[10px] font-semibold text-[var(--app-text-muted)]">Seguidores</span>
             <div class="mt-2 flex flex-wrap gap-2">
               {#each ticketData.followers as follower}
-                <span class="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-surface-subtle)] py-1 pl-1 pr-2 text-[10.5px] font-semibold text-[#555D6C]">
+                <span class="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-surface-subtle)] py-1 pl-1 pr-2 application-text-caption font-semibold text-[var(--app-text)]">
                   <span class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--app-info-bg)] text-[9px] font-bold text-[#000A57]">{initials(follower.name)}</span>
                   {follower.name}
                   {#if ticketData.canManageFollowers}<button type="button" on:click={() => void removeFollower(follower.id)} aria-label={`Remover ${follower.name}`} class="text-[#9B3C3C]">×</button>{/if}
                 </span>
               {:else}
-                <span class="text-[10.5px] text-[#9297A4]">Ninguém acompanhando.</span>
+                <span class="application-text-caption text-[var(--app-text-muted)]">Ninguém acompanhando.</span>
               {/each}
             </div>
             {#if ticketData.canManageFollowers}
-              <select on:change={(event) => void addFollower(event)} class="mt-2.5 h-9 w-full rounded-xl border border-[var(--app-border-control)] bg-white px-2.5 text-[11px]">
+              <select on:change={(event) => void addFollower(event)} class="mt-2.5 h-9 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2.5 text-[11px]">
                 <option value="">Adicionar seguidor...</option>
                 {#each ticketData.followerCandidates.filter((candidate) => !ticketData.followers.some((follower) => follower.id === candidate.id)) as candidate}<option value={candidate.id}>{candidate.name}</option>{/each}
               </select>
@@ -907,31 +953,53 @@
           </div>
 
           <div class="mt-4 border-t border-[var(--app-border-soft)] pt-3">
-            <span class="text-[10px] font-semibold text-[#858B99]">Etiquetas</span>
+            <span class="text-[10px] font-semibold text-[var(--app-text-muted)]">Etiquetas</span>
             <div class="mt-2 flex flex-wrap gap-1.5">
               {#each ticketData.selectedLabels as label}
-                <span class={`inline-flex items-center gap-1 rounded px-2 py-1 text-[10.5px] font-semibold ${labelClasses[label.color] ?? labelClasses.gray}`}>
+                <span class={`inline-flex items-center gap-1 rounded px-2 py-1 application-text-caption font-semibold ${labelClasses[label.color] ?? labelClasses.gray}`}>
                   {label.name}
                   {#if ticketData.canReply}<button type="button" on:click={() => void removeLabel(label.id)} aria-label={`Remover etiqueta ${label.name}`}>×</button>{/if}
                 </span>
               {:else}
-                <span class="text-[10.5px] text-[#9297A4]">Sem etiquetas.</span>
+                <span class="application-text-caption text-[var(--app-text-muted)]">Sem etiquetas.</span>
               {/each}
             </div>
 
             {#if ticketData.canReply}
-              <select on:change={(event) => void addLabel(event)} class="mt-2.5 h-9 w-full rounded-xl border border-[var(--app-border-control)] bg-white px-2.5 text-[11px]">
-                <option value="">Adicionar etiqueta...</option>
-                {#each ticketData.labels.filter((label) => !ticketData.selectedLabels.some((selected) => selected.id === label.id)) as label}<option value={label.id}>{label.name}</option>{/each}
-              </select>
-              <details class="mt-2">
-                <summary class="cursor-pointer list-none text-[10.5px] font-semibold text-[#000A57]">+ Criar etiqueta</summary>
-                <form method="POST" action={actionUrl("createLabel")} on:submit|preventDefault={(event) => void submitForm(event, "createLabel", true)} class="mt-2 grid grid-cols-[1fr_96px] gap-2">
-                  <input name="name" required minlength="2" maxlength="40" placeholder="Nome" class="h-9 rounded-xl border border-[var(--app-border-control)] px-2.5 text-[11px]"/>
-                  <select name="color" class="h-9 rounded-xl border border-[var(--app-border-control)] bg-white px-2 text-[10.5px]"><option value="blue">Azul</option><option value="green">Verde</option><option value="yellow">Amarela</option><option value="orange">Laranja</option><option value="red">Vermelha</option><option value="purple">Roxa</option><option value="gray">Cinza</option></select>
-                  <button type="submit" class="col-span-2 h-9 rounded-xl border border-[var(--app-border-control)] text-[10.5px] font-semibold text-[#4E5565]">Criar e adicionar</button>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <select on:change={(event) => void addLabel(event)}
+                  aria-label="Adicionar etiqueta existente"
+                  class="application-text-caption h-10 min-w-0 flex-1 rounded-lg border border-[var(--app-border-control)] bg-[var(--app-surface)] px-3 text-[var(--app-text)]">
+                  <option value="">Adicionar etiqueta existente...</option>
+                  {#each ticketData.labels.filter((label) => !ticketData.selectedLabels.some((selected) => selected.id === label.id)) as label}
+                    <option value={label.id}>{label.name}</option>
+                  {/each}
+                </select>
+                <button type="button" on:click={() => (labelEditorOpen = !labelEditorOpen)}
+                  class="application-text-caption inline-flex h-10 items-center gap-1.5 rounded-lg border border-[var(--app-border-control)] px-3 font-semibold text-[var(--app-primary)]"
+                  aria-expanded={labelEditorOpen}>
+                  <Plus size={16}/> Nova
+                </button>
+              </div>
+              {#if labelEditorOpen}
+                <form method="POST" action={actionUrl("createLabel")}
+                  on:submit|preventDefault={(event) => void submitForm(event, "createLabel", true)}
+                  class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_110px_auto]">
+                  <input name="name" required minlength="2" maxlength="40" placeholder="Nome da etiqueta"
+                    class="application-text-caption h-10 min-w-0 rounded-lg border border-[var(--app-border-control)] bg-[var(--app-surface)] px-3 text-[var(--app-text)]"/>
+                  <select name="color" aria-label="Cor da etiqueta"
+                    class="application-text-caption h-10 rounded-lg border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2 text-[var(--app-text)]">
+                    <option value="blue">Azul</option><option value="green">Verde</option>
+                    <option value="yellow">Amarela</option><option value="orange">Laranja</option>
+                    <option value="red">Vermelha</option><option value="purple">Roxa</option>
+                    <option value="gray">Cinza</option>
+                  </select>
+                  <button type="submit" disabled={Boolean(actionLoading)}
+                    class="application-text-caption h-10 rounded-lg bg-[var(--app-primary)] px-3 font-semibold text-white disabled:opacity-50">
+                    Criar e adicionar
+                  </button>
                 </form>
-              </details>
+              {/if}
             {/if}
           </div>
         </section>
@@ -943,9 +1011,9 @@
               <div class="mt-3 flex items-center gap-1 text-[#EA6D0B]" aria-label={`${ticketData.satisfaction.score} de 5 estrelas`}>
                 {#each [1, 2, 3, 4, 5] as value}<Star size={15} fill={value <= ticketData.satisfaction.score ? "currentColor" : "none"} class={value <= ticketData.satisfaction.score ? "text-[#EA6D0B]" : "text-[#C7CBD4]"}/>{/each}
               </div>
-              {#if ticketData.satisfaction.comment}<p class="mt-2 whitespace-pre-wrap text-[11px] leading-5 text-[#6D7482]">“{ticketData.satisfaction.comment}”</p>{/if}
+              {#if ticketData.satisfaction.comment}<p class="mt-2 whitespace-pre-wrap text-[11px] leading-5 text-[var(--app-text-muted)]">“{ticketData.satisfaction.comment}”</p>{/if}
             {:else}
-              <p class="mt-2 text-[11px] text-[#9297A4]">Aguardando avaliação do cliente.</p>
+              <p class="mt-2 text-[11px] text-[var(--app-text-muted)]">Aguardando avaliação do cliente.</p>
             {/if}
           </section>
         {/if}
@@ -967,22 +1035,6 @@
           </div>
         {/if}
 
-        {#if surface === "page" || activeMainPanel === "service"}
-        <details class={surface === "page" ? "rounded-[18px] border border-[var(--app-border)] bg-white p-4" : "w-full p-2 sm:p-4"}>
-          <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
-            <span class="flex items-center gap-2 text-[12px] font-semibold text-[#3D4452]"><ShieldCheck size={14}/>Histórico</span>
-            <span class="rounded-full bg-[var(--app-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[#777E8D]">{ticketData.details.events.length}</span>
-          </summary>
-          <div class="mt-3 space-y-3 border-t border-[var(--app-border-soft)] pt-3">
-            {#each ticketData.details.events as event}
-              <div class="border-l-2 border-[var(--app-border)] pl-3">
-                <p class="text-[10.5px] leading-5 text-[#626877]"><strong class="font-semibold text-[#3E4453]">{event.actorName ?? "Sistema"}</strong> {eventLabels[event.eventType] ?? event.eventType}{#if event.sourceTicketNumber && event.sourceTicketNumber !== ticketData.details.ticket.ticketNumber} · #{event.sourceTicketNumber}{/if}</p>
-                <span class="mt-0.5 block text-[9.5px] text-[#9B9FAC]">{formatDateTime(event.createdAt)}</span>
-              </div>
-            {/each}
-          </div>
-        </details>
-        {/if}
       </aside>
       {/if}
     </div>

@@ -9,6 +9,7 @@
     SlidersHorizontal,
     X,
   } from "lucide-svelte";
+  import { tick } from "svelte";
   import type {
     TicketLabel,
     TicketScope,
@@ -40,6 +41,48 @@
   export let onClear: () => void;
   export let onCreate: () => void;
   export let workspace = false;
+
+  let filterOpen = false;
+  let filterDetails: HTMLDetailsElement;
+  let filterPanel: HTMLDivElement;
+  let filterTop = 0;
+  let filterLeft = 0;
+
+  function closeFilterOnOutside(event: PointerEvent): void {
+    if (filterOpen && filterDetails &&
+        !filterDetails.contains(event.target as Node)) {
+      filterOpen = false;
+    }
+  }
+
+  function closeFilterOnPageScroll(event: Event): void {
+    if (event.target instanceof Node && filterPanel?.contains(event.target)) return;
+    filterOpen = false;
+  }
+
+  function closeFilterOnEscape(event: KeyboardEvent): void {
+    if (filterOpen && event.key === "Escape") {
+      filterOpen = false;
+      filterDetails?.querySelector("summary")?.focus();
+    }
+  }
+
+  async function positionFilters(): Promise<void> {
+    if (!filterOpen || !filterDetails) return;
+    await tick();
+    const trigger = filterDetails.querySelector("summary");
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const width = Math.min(640, window.innerWidth - 24);
+    const height = Math.min(filterPanel?.scrollHeight ?? 440, window.innerHeight - 24);
+    const preferredTop = rect.bottom + 8;
+    const availableBelow = window.innerHeight - preferredTop;
+    filterTop = availableBelow >= Math.min(height, 270)
+      ? preferredTop
+      : Math.max(12, rect.top - height - 8);
+    filterTop = Math.max(12, Math.min(filterTop, window.innerHeight - height - 12));
+    filterLeft = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
+  }
 
   $: selectedAreaWorkflow = areaId
     ? workflowBoard.areaWorkflows.find((workflow) => workflow.areaId === areaId) ?? null
@@ -73,6 +116,10 @@
   }
 </script>
 
+<svelte:window on:pointerdown={closeFilterOnOutside}
+  on:keydown={closeFilterOnEscape} on:resize={positionFilters}
+  on:scroll|capture={closeFilterOnPageScroll}/>
+
 <div class={workspace
   ? "relative z-30 w-full min-w-0 shrink-0 border-b border-[var(--app-border)] bg-white"
   : "border-b border-[#EEF0F5] bg-white"}>
@@ -89,24 +136,27 @@
         <input bind:value={search} placeholder="Buscar ticket, cliente, empresa ou fila" class={workspace ? "application-text-control h-9 w-full rounded-lg border border-[#E6E8EF] bg-[#F8F9FC] pl-9 pr-3 text-[13px]" : "application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-[#FAFAFC] pl-9 pr-3"}/>
       </form>
 
-      <details class="relative">
+      <details class="relative" bind:this={filterDetails} bind:open={filterOpen}
+        on:toggle={() => void positionFilters()}>
         <summary class={`application-text-caption flex cursor-pointer list-none items-center gap-2 rounded-lg border px-3 font-semibold ${workspace ? "h-9" : "h-10"} ${activeFilterCount > 0 ? "border-[#AEB7E8] bg-[#F3F5FF] text-[#000A57]" : "border-[#DDE1EA] bg-white text-[#525A69]"}`}>
           <SlidersHorizontal size={14}/>
           Filtros
           {#if activeFilterCount > 0}<span class="rounded-full bg-[#000A57] px-1.5 py-0.5 text-[9px] text-white">{activeFilterCount}</span>{/if}
         </summary>
 
-        <div class="absolute left-0 top-12 z-50 w-[min(640px,calc(100vw-32px))] rounded-2xl border border-[#DDE1EA] bg-white p-4 shadow-[0_18px_50px_rgba(1,13,40,0.16)]">
+        <div bind:this={filterPanel}
+          class="fixed z-[90] max-h-[calc(100dvh-24px)] w-[min(640px,calc(100vw-24px))] overflow-y-auto rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 text-[var(--app-text)] shadow-[0_18px_50px_rgba(1,13,40,0.16)]"
+          style:top={filterTop + "px"} style:left={filterLeft + "px"}>
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {#if workspace}
               <label class="flex items-center gap-2 sm:col-span-2 lg:col-span-3">
                 <input type="checkbox" bind:checked={includeFinished} on:change={onApply} class="h-4 w-4 accent-[#000A57]" />
-                <span class="application-text-caption font-semibold text-[#525A69]">Ver finalizados</span>
+                <span class="application-text-caption font-semibold text-[var(--app-text)]">Ver finalizados</span>
               </label>
             {/if}
             <label>
-              <span class="application-text-caption mb-1 block font-semibold text-[#687080]">Status</span>
-              <select bind:value={status} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-2">
+              <span class="application-text-caption mb-1 block font-semibold text-[var(--app-text-muted)]">Status</span>
+              <select bind:value={status} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2">
                 <option value="">{includeFinished ? "Todos" : "Ativos"}</option>
                 <option value="new">Novo</option>
                 <option value="open">Aberto</option>
@@ -118,8 +168,8 @@
             </label>
 
             <label>
-              <span class="application-text-caption mb-1 block font-semibold text-[#687080]">Prioridade</span>
-              <select bind:value={priority} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-2">
+              <span class="application-text-caption mb-1 block font-semibold text-[var(--app-text-muted)]">Prioridade</span>
+              <select bind:value={priority} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2">
                 <option value="">Todas</option>
                 <option value="urgent">Urgente</option>
                 <option value="high">Alta</option>
@@ -129,8 +179,8 @@
             </label>
 
             <label>
-              <span class="application-text-caption mb-1 block font-semibold text-[#687080]">SLA</span>
-              <select bind:value={sla} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-2">
+              <span class="application-text-caption mb-1 block font-semibold text-[var(--app-text-muted)]">SLA</span>
+              <select bind:value={sla} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2">
                 <option value="">Todos</option>
                 <option value="overdue">Vencido</option>
                 <option value="risk">Vence em até 1h</option>
@@ -139,8 +189,8 @@
             </label>
 
             <label>
-              <span class="application-text-caption mb-1 block font-semibold text-[#687080]">Processo</span>
-              <select bind:value={areaId} on:change={changeArea} class="application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-2">
+              <span class="application-text-caption mb-1 block font-semibold text-[var(--app-text-muted)]">Processo</span>
+              <select bind:value={areaId} on:change={changeArea} class="application-text-control h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2">
                 <option value="">Todos</option>
                 {#each workflowBoard.areaWorkflows as workflow}
                   <option value={workflow.areaId ?? ""}>{workflow.areaName ?? "Processo"}</option>
@@ -149,16 +199,16 @@
             </label>
 
             <label>
-              <span class="application-text-caption mb-1 block font-semibold text-[#687080]">Etapa</span>
-              <select bind:value={stageId} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-2">
+              <span class="application-text-caption mb-1 block font-semibold text-[var(--app-text-muted)]">Etapa</span>
+              <select bind:value={stageId} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2">
                 <option value="">Todas</option>
                 {#each stageOptions as stage}<option value={stage.id}>{stage.name}</option>{/each}
               </select>
             </label>
 
             <label>
-              <span class="application-text-caption mb-1 block font-semibold text-[#687080]">Responsável</span>
-              <select bind:value={assigneeId} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-2">
+              <span class="application-text-caption mb-1 block font-semibold text-[var(--app-text-muted)]">Responsável</span>
+              <select bind:value={assigneeId} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2">
                 <option value="">Todos</option>
                 <option value="unassigned">Sem responsável</option>
                 {#each agents as agent}<option value={agent.id}>{agent.name}</option>{/each}
@@ -166,16 +216,16 @@
             </label>
 
             <label>
-              <span class="application-text-caption mb-1 block font-semibold text-[#687080]">Fila</span>
-              <select bind:value={queueId} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-2">
+              <span class="application-text-caption mb-1 block font-semibold text-[var(--app-text-muted)]">Fila</span>
+              <select bind:value={queueId} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2">
                 <option value="">Todas</option>
                 {#each queues as queue}<option value={queue.id}>{queue.name}</option>{/each}
               </select>
             </label>
 
             <label>
-              <span class="application-text-caption mb-1 block font-semibold text-[#687080]">Canal</span>
-              <select bind:value={channel} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-2">
+              <span class="application-text-caption mb-1 block font-semibold text-[var(--app-text-muted)]">Canal</span>
+              <select bind:value={channel} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2">
                 <option value="">Todos</option>
                 <option value="manual">Manual</option>
                 <option value="portal">Portal</option>
@@ -186,8 +236,8 @@
             </label>
 
             <label>
-              <span class="application-text-caption mb-1 block font-semibold text-[#687080]">Etiqueta</span>
-              <select bind:value={tagId} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[#DDE1EA] bg-white px-2">
+              <span class="application-text-caption mb-1 block font-semibold text-[var(--app-text-muted)]">Etiqueta</span>
+              <select bind:value={tagId} on:change={onApply} class="application-text-control h-10 w-full rounded-xl border border-[var(--app-border-control)] bg-[var(--app-surface)] px-2">
                 <option value="">Todas</option>
                 {#each labels as label}<option value={label.id}>{label.name}</option>{/each}
               </select>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto, invalidate, invalidateAll } from "$app/navigation";
+  import { deserialize } from "$app/forms";
   import { browser } from "$app/environment";
   import { onMount } from "svelte";
   import { CheckCircle2, CircleAlert } from "lucide-svelte";
@@ -294,25 +295,46 @@
     }
   }
 
-  async function quickTicketAction(
+  async function runTicketQuickAction(
     ticketId: string,
-    action: "status" | "addLabel",
-    value: string,
-  ): Promise<void> {
+    action: "status" | "addLabel" | "createLabel",
+    values: Record<string, string>,
+  ): Promise<boolean> {
     const body = new FormData();
-    body.set(action === "status" ? "status" : "tagId", value);
+    for (const [key, value] of Object.entries(values)) body.set(key, value);
     try {
       const response = await fetch(`/app/tickets/${ticketId}?/${action}`, {
         method: "POST",
         headers: { "x-sveltekit-action": "true" },
         body,
       });
-      if (!response.ok) throw new Error("QUICK_ACTION_FAILED");
+      const result = deserialize(await response.text());
+      if (result.type !== "success") return false;
       await invalidateAll();
-      if (ticketDetails?.details.ticket.id === ticketId) await refreshTicketDetails();
+      if (ticketDetails?.details.ticket.id === ticketId) {
+        await refreshTicketDetails();
+      }
+      return true;
     } catch {
-      window.alert("Não foi possível executar a ação neste ticket.");
+      return false;
     }
+  }
+
+  async function quickTicketAction(
+    ticketId: string,
+    action: "status" | "addLabel",
+    value: string,
+  ): Promise<boolean> {
+    const field = action === "status" ? "status" : "tagId";
+    return runTicketQuickAction(ticketId, action, { [field]: value });
+  }
+
+  async function createQuickTicketLabel(
+    ticketId: string,
+    name: string,
+    color: string,
+  ): Promise<boolean> {
+    return runTicketQuickAction(ticketId, "createLabel", { name, color });
   }
 
   async function refreshTicketDetails(): Promise<void> {
@@ -419,6 +441,7 @@
               onSort={changeTicketSort}
               onOpenTicketService={(ticketId) => openTicketDetails(ticketId, "service")}
               onQuickAction={data.canReply ? quickTicketAction : null}
+        onCreateLabel={data.canReply ? createQuickTicketLabel : null}
               labels={data.filterOptions.labels}
               onOpenTicket={openTicketDetails}
             />
@@ -453,6 +476,7 @@
         onSort={changeTicketSort}
         onOpenTicketService={(ticketId) => openTicketDetails(ticketId, "service")}
         onQuickAction={data.canReply ? quickTicketAction : null}
+        onCreateLabel={data.canReply ? createQuickTicketLabel : null}
         labels={data.filterOptions.labels}
       />
     {/if}
