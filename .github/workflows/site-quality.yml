@@ -69,6 +69,8 @@ jobs:
           node --experimental-strip-types --test tests/emailTemplateDesign.test.mjs
           node --experimental-strip-types --test tests/ticketEmailReceipt.test.mjs
           node --test tests/movideskFinalSnapshot.test.mjs
+          node --check scripts/recover-movidesk-duplicate-actions.mjs
+          node --test tests/movideskActionRecovery.test.mjs
           node --experimental-strip-types --test tests/supportChatRestore.test.mjs
           node --experimental-strip-types --test tests/chatEntryRouting.test.mjs
           node --experimental-strip-types --test tests/assistantHelpFallback.test.mjs
