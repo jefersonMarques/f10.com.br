@@ -82,7 +82,7 @@
   {/if}
   {#if data.refreshedCount !== null}
     <div role="status" class="application-text-caption mb-4 rounded-xl border border-app-border bg-app-success-bg p-3 text-app-success-text">
-      {data.refreshedCount > 0 ? data.refreshedCount + " novo(s) contrato(s) importado(s) da API." : "Contratos atualizados: nenhum novo registro encontrado na API."}
+      {data.refreshedCount > 0 ? data.refreshedCount + " novo(s) contrato(s) importado(s) da API." : "Consulta concluída: nenhum novo contrato encontrado na API."}
     </div>
   {/if}
   {#if data.unitUnavailable}
@@ -102,7 +102,7 @@
         class={data.view === "units"
           ? "application-text-caption inline-flex h-10 items-center gap-2 rounded-lg bg-app-primary px-4 font-semibold text-white"
           : "application-text-caption inline-flex h-10 items-center gap-2 rounded-lg border border-app-border-control px-4 font-semibold text-app-text"}>
-        <Building2 size={17}/> Unidades
+        <Building2 size={17}/> Contratos
       </a>
       <a href={pageHref(1, "contacts")} aria-current={data.view === "contacts" ? "page" : undefined}
         class={data.view === "contacts"
@@ -158,11 +158,11 @@
 
     {#if data.view === "units" && data.importedUnits}
       <div class="flex items-center justify-between border-b border-app-border-soft px-4 py-3">
-        <strong class="application-text-caption text-app-text">{data.importedUnits.unavailable ? "Listagem simplificada" : data.importedUnits.totalMatched + " contratos"}</strong>
+        <strong class="application-text-caption text-app-text">{data.importedUnits.unavailable ? "Listagem indisponível" : data.importedUnits.totalMatched + " contratos"}</strong>
         <span class="application-text-meta text-app-text-muted">Origem: API F10 · planilha complementar</span>
       </div>
       {#if data.importedUnits.rows.length === 0}
-        <p class="application-text-caption px-4 py-12 text-center text-app-text-muted">Nenhuma unidade encontrada.</p>
+        <p class="application-text-caption px-4 py-12 text-center text-app-text-muted">Nenhum contrato encontrado.</p>
       {:else}
         <div class="overflow-x-auto">
           <table class="w-full min-w-[780px] text-left">
