@@ -1,8 +1,12 @@
-import { getConfiguredF10UnitId } from "$lib/server/integrations/f10/f10CustomerApi";
+import { sql } from "drizzle-orm";
+import { getDatabase } from "$lib/server/db";
+import {
+  getConfiguredF10UnitId,
+  getF10ContractHolder,
+} from "$lib/server/integrations/f10/f10CustomerApi";
 import {
   isExistingPixPayable,
   normalizePaymentInstallments,
-  normalizePayerDocument,
   parseF10FinanceContracts,
   requirePaymentRecord,
   type FinanceContract,
@@ -20,18 +24,116 @@ export type AuthorizedFinancePayer = {
   contracts: FinanceContract[];
 };
 
-export async function authorizeFinancePayer(
-  document: string,
-  birth: string,
-): Promise<AuthorizedFinancePayer> {
-  const normalizedDocument = normalizePayerDocument(document, birth);
-  const token = await validateF10PaymentPayer({
-    unitId: getConfiguredF10UnitId(),
-    document: normalizedDocument,
-    birth,
-  });
 
-  const contracts = parseF10FinanceContracts(await listF10PaymentContracts(token));
+type FinanceCandidate = {
+  contractId: string;
+  holderId: string | null;
+};
+
+export type FinanceScope =
+  | { kind: "customer"; groupId: number; unitId: number }
+  | { kind: "operator"; ticketId: string };
+
+async function getCustomerFinanceCandidates(groupId: number): Promise<FinanceCandidate[]> {
+  const unitId = getConfiguredF10UnitId();
+  const source = unitId === 1 ? "f10_sheet" : `f10_sheet_unit_${unitId}`;
+  const rows = await getDatabase().execute(sql`
+    SELECT DISTINCT contract.contract_id::text AS "contractId",
+      contract.titular_id::text AS "holderId"
+    FROM f10_customer_contracts contract
+    WHERE contract.unit_id = ${unitId}
+      AND (
+        EXISTS (
+          SELECT 1
+          FROM customer_units customer_unit
+          JOIN customer_groups customer_group ON customer_group.id = customer_unit.group_id
+          WHERE customer_unit.f10_unit_id = contract.unit_id
+            AND customer_unit.f10_contract_id = contract.contract_id
+            AND customer_unit.source_system = ${source}
+            AND customer_group.source_system = ${source}
+            AND customer_group.source_group_id = ${String(groupId)}
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM f10_customer_contract_profiles profile
+          JOIN customer_groups customer_group ON customer_group.id = profile.group_id
+          WHERE profile.unit_id = contract.unit_id
+            AND profile.contract_id = contract.contract_id
+            AND customer_group.source_system = ${source}
+            AND customer_group.source_group_id = ${String(groupId)}
+        )
+      )
+    ORDER BY contract.contract_id
+    LIMIT 51
+  `);
+  return rows as unknown as FinanceCandidate[];
+}
+
+async function getOperatorFinanceCandidates(ticketId: string): Promise<FinanceCandidate[]> {
+  const unitId = getConfiguredF10UnitId();
+  const rows = await getDatabase().execute(sql`
+    SELECT DISTINCT contract.contract_id::text AS "contractId",
+      contract.titular_id::text AS "holderId"
+    FROM ticket_contract_links link
+    JOIN f10_customer_contracts contract
+      ON contract.unit_id = link.unit_id AND contract.contract_id = link.contract_id
+    JOIN tickets ticket ON ticket.id = link.ticket_id
+    WHERE link.ticket_id = ${ticketId}::uuid
+      AND ticket.customer_contact_id IS NOT NULL
+      AND link.unit_id = ${unitId}
+    ORDER BY contract.contract_id
+    LIMIT 51
+  `);
+  return rows as unknown as FinanceCandidate[];
+}
+
+function determineFinancePayer(rows: FinanceCandidate[]): {
+  holderId: number;
+  contractIds: Set<number>;
+} {
+  if (!rows.length) throw new Error("FINANCE_COMPANY_NOT_LINKED");
+  if (rows.length > 50) throw new Error("FINANCE_COMPANY_AMBIGUOUS");
+
+  const holderIds = new Set<number>();
+  const contractIds = new Set<number>();
+  for (const row of rows) {
+    const contractId = Number(row.contractId);
+    const holderId = Number(row.holderId);
+    if (!Number.isSafeInteger(contractId) || contractId <= 0 ||
+        !Number.isSafeInteger(holderId) || holderId <= 0) {
+      throw new Error("FINANCE_COMPANY_UNRESOLVED");
+    }
+    holderIds.add(holderId);
+    contractIds.add(contractId);
+  }
+  if (holderIds.size !== 1) throw new Error("FINANCE_COMPANY_AMBIGUOUS");
+  return { holderId: [...holderIds][0], contractIds };
+}
+
+export async function authorizeFinancePayerForScope(
+  scope: FinanceScope,
+): Promise<AuthorizedFinancePayer> {
+  const candidates = scope.kind === "customer"
+    ? await getCustomerFinanceCandidates(scope.groupId)
+    : await getOperatorFinanceCandidates(scope.ticketId);
+  const { holderId, contractIds } = determineFinancePayer(candidates);
+  const unitId = getConfiguredF10UnitId();
+
+  const company = await getF10ContractHolder(unitId, holderId);
+  const document = company.document?.replace(/\D/g, "") ?? "";
+  if (document.length !== 14) {
+    throw new Error("FINANCE_COMPANY_UNRESOLVED");
+  }
+
+  const token = await validateF10PaymentPayer({
+    unitId,
+    personId: company.personId,
+    document,
+    birth: "",
+  });
+  const contracts = parseF10FinanceContracts(await listF10PaymentContracts(token))
+    .filter((contract) => contractIds.has(contract.id));
+  if (!contracts.length) throw new Error("FINANCE_COMPANY_NOT_LINKED");
   return { token, contracts };
 }
 
