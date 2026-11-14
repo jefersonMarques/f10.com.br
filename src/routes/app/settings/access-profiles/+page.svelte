@@ -67,6 +67,7 @@
     </aside>
 
     {#if selectedProfile}
+      {#key selectedProfile}
       <section class="overflow-hidden rounded-[22px] border border-app-border bg-app-surface">
         <header class="border-b border-app-border-soft px-5 py-5 sm:px-6">
           <div class="flex flex-wrap items-center justify-between gap-3">
@@ -152,6 +153,7 @@
           </form>
         {/if}
       </section>
+      {/key}
     {/if}
   </div>
 </ApplicationContent>
