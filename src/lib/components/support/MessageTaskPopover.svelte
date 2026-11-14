@@ -26,12 +26,15 @@
   let members: ProjectMember[] = [];
   let canAssign = false;
   let loadingMembers = false;
+  let memberRequestId = 0;
   let saving = false;
   let errorMessage = "";
   let requestKey = "";
 
   async function loadMembers(): Promise<void> {
-    if (!selectedProjectId) {
+    const requestId = ++memberRequestId;
+    const projectId = selectedProjectId;
+    if (!projectId) {
       members = [];
       return;
     }
@@ -39,7 +42,7 @@
     loadingMembers = true;
     try {
       const response = await fetch(
-        `/api/app/messages/tasks?projectId=${encodeURIComponent(selectedProjectId)}`,
+        `/api/app/messages/tasks?projectId=${encodeURIComponent(projectId)}`,
         { cache: "no-store" },
       );
       if (!response.ok) throw new Error("PROJECT_MEMBERS_UNAVAILABLE");
@@ -49,17 +52,19 @@
         canAssign: boolean;
         currentUserId: string;
       };
+      if (requestId !== memberRequestId) return;
       members = result.members;
       canAssign = result.canAssign;
       assigneeId = result.canAssign
         ? members.find((member) => member.id === result.currentUserId)?.id ?? members[0]?.id ?? ""
         : result.currentUserId;
     } catch {
+      if (requestId !== memberRequestId) return;
       errorMessage = "Não foi possível consultar os responsáveis deste projeto.";
       members = [];
       assigneeId = "";
     } finally {
-      loadingMembers = false;
+      if (requestId === memberRequestId) loadingMembers = false;
     }
   }
 
