@@ -1,6 +1,7 @@
 import { error, fail, type Actions } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { recordCustomerActivity } from "$lib/server/customerPortal/customerActivityRepository";
+import { isMessageReactionCode, toggleMessageReaction } from "$lib/server/support/supportMessageReactionRepository";
 import {
   getCustomerF10Ticket,
   replyCustomerF10Ticket,
@@ -45,6 +46,21 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
 };
 
 export const actions: Actions = {
+  react: async ({ cookies, params, request }) => {
+    if (!isUuid(params.ticketId)) return fail(404, { success: false, message: "Chamado não encontrado." });
+    const session = await requireCustomerTicketPortalSession(cookies, `/cliente/chamados/${params.ticketId}`);
+    const details = await getCustomerF10Ticket(session, params.ticketId);
+    if (!details) return fail(404, { success: false, message: "Chamado não encontrado." });
+    const data = await request.formData();
+    const messageId = data.get("messageId");
+    const reaction = data.get("reaction");
+    if (typeof messageId !== "string" || !isUuid(messageId) || !isMessageReactionCode(reaction) ||
+      !details.messages.some((message) => message.id === messageId && message.authorType !== "system")) {
+      return fail(404, { success: false, message: "Mensagem não encontrada." });
+    }
+    await toggleMessageReaction("ticket", messageId, "customer", session.contactId, reaction);
+    return { success: true, action: "react" };
+  },
   reply: async ({ cookies, params, request }) => {
     if (!isUuid(params.ticketId)) {
       return fail(404, { success: false, message: "Chamado não encontrado." });
