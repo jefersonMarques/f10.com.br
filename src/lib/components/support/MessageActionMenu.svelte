@@ -43,7 +43,7 @@
 
 <div class="pointer-events-none absolute -top-3 right-1.5 z-30 flex max-w-full items-start gap-1">
   {#if reactions.some((item) => item.count > 0)}
-    <div class="pointer-events-auto flex items-center gap-0.5 rounded-full border border-[var(--app-border)] bg-[var(--app-surface)] px-1 py-0.5 shadow-sm">
+    <div class="pointer-events-auto flex items-center gap-0.5 rounded-full border border-[var(--app-border)] bg-white px-1 py-0.5 shadow-sm">
       {#each reactions.filter((item) => item.count > 0) as reaction (reaction.code)}
         <button type="button" disabled={busy} on:click={() => void chooseReaction(reaction.code)}
           aria-label={`${labelOf(reaction.code)}: ${reaction.count}`}
@@ -59,18 +59,18 @@
 
   <details bind:open={menuOpen} class="pointer-events-auto relative shrink-0">
     <summary aria-label="Ações da mensagem" title="Ações da mensagem"
-      class="flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-text-muted)] shadow-sm transition hover:text-[var(--app-primary)] focus-visible:ring-2 focus-visible:ring-[var(--app-primary)] md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+      class="flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-full border border-[var(--app-border)] bg-white text-[#485163] shadow-sm transition hover:text-[#000A57] focus-visible:ring-2 focus-visible:ring-[var(--app-primary)] md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
       <Ellipsis size={15}/>
     </summary>
 
-    <div class="absolute right-0 top-8 z-40 min-w-[188px] rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-2 text-[var(--app-text)] shadow-xl">
+    <div class="absolute bottom-9 right-0 z-[70] min-w-[188px] rounded-xl border border-[#D9DEE8] bg-white p-2 text-[#192237] shadow-[0_14px_44px_rgba(1,13,40,0.22)]" style="background-color: #ffffff; color: #192237;">
       <span class="mb-2 block px-1 text-[12px] font-semibold text-[var(--app-text-muted)]">Reagir</span>
       <div class="flex items-center gap-1">
         {#each choices as choice (choice.code)}
           <button type="button" disabled={busy} aria-label={choice.label}
             aria-pressed={myReaction === choice.code} title={choice.label}
             on:click={() => void chooseReaction(choice.code)}
-            class="flex h-9 w-9 items-center justify-center rounded-lg text-[18px] hover:bg-[var(--app-surface-muted)] disabled:opacity-50">
+            class="flex h-9 w-9 items-center justify-center rounded-lg text-[18px] hover:bg-[#F2F4F9] disabled:opacity-50">
             {choice.emoji}
           </button>
         {/each}
