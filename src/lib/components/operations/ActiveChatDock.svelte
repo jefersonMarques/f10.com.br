@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
+  import MessageActionMenu from "$lib/components/support/MessageActionMenu.svelte";
+  import MessageTaskPopover from "$lib/components/support/MessageTaskPopover.svelte";
   import {
     CheckCircle2,
     EllipsisVertical,
@@ -36,6 +38,11 @@
     visibility: string;
     body: string;
     createdAt: string | Date;
+    sourceSessionId?: string;
+    storageSource?: "chat" | "ticket";
+    reactions?: Array<{ code: "like" | "heart" | "check" | "eyes"; count: number }>;
+    myReaction?: "like" | "heart" | "check" | "eyes" | null;
+    taskLinks?: Array<{ id: string; title: string }>;
     attachments?: Array<{
       id: string;
       originalName: string;
@@ -47,6 +54,9 @@
   let messages: DockMessage[] = [];
   let expandedSessionId: string | null = null;
   let draft = "";
+  let taskProjects: Array<{ id: string; name: string }> = [];
+  let taskMessage: DockMessage | null = null;
+  let taskSessionId: string | null = null;
   let pendingFiles: File[] = [];
   let fileInput: HTMLInputElement;
   let sending = false;
@@ -250,6 +260,55 @@
     pendingFiles = [...pendingFiles, ...files].slice(0, 4);
   }
 
+  async function loadTaskProjects(): Promise<void> {
+    try {
+      const response = await fetch("/api/app/messages/tasks", { cache: "no-store" });
+      if (!response.ok) return;
+      const result = await response.json() as { projects?: Array<{ id: string; name: string }> };
+      taskProjects = result.projects ?? [];
+    } catch {
+      taskProjects = [];
+    }
+  }
+
+  async function reactMessage(
+    message: DockMessage,
+    code: "like" | "heart" | "check" | "eyes",
+  ): Promise<void> {
+    if (!expandedSessionId) return;
+    const response = await fetch("/api/app/messages/reactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceKind: message.storageSource ?? "chat",
+        sourceSessionId: message.sourceSessionId ?? expandedSessionId,
+        messageId: message.id,
+        reaction: code,
+      }),
+    });
+    if (!response.ok) {
+      errorMessage = "Não foi possível registrar a reação.";
+      return;
+    }
+    await refreshMessages(expandedSessionId);
+  }
+
+  function openTaskForMessage(message: DockMessage): void {
+    if (!expandedSessionId || taskProjects.length === 0) return;
+    taskSessionId = expandedSessionId;
+    taskMessage = message;
+  }
+
+  async function handleTaskCreated(task: { id: string; title: string }): Promise<void> {
+    if (!taskMessage) return;
+    const messageId = taskMessage.id;
+    messages = messages.map((message) =>
+      message.id === messageId
+        ? { ...message, taskLinks: [...(message.taskLinks ?? []), task] }
+        : message,
+    );
+  }
+
   async function sendMessage(): Promise<void> {
     if (!expandedSessionId || sending) return;
     const body = draft.trim();
@@ -299,6 +358,7 @@
     if (!enabled) return;
 
     void refreshDock();
+    void loadTaskProjects();
     const timer = window.setInterval(() => void refreshDock(), 5_000);
     const handleAttention = () => {
       if (expandedSessionId && hasUserAttention()) {
@@ -351,7 +411,7 @@
             <div class="application-text-meta mx-auto max-w-[88%] rounded-lg bg-[#ECEEF3] px-3 py-2 text-center leading-4 text-[#737A89]">{message.body}</div>
           {:else}
             <div class={`flex ${message.authorType === "customer" ? "justify-start" : "justify-end"}`}>
-              <div class={`max-w-[84%] rounded-2xl px-3 py-2.5 ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3E9] bg-white text-[#424957]" : "rounded-br-md bg-[#000A57] text-white"}`}>
+              <div class={`group relative max-w-[84%] rounded-2xl px-3 py-2.5 ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3E9] bg-white text-[#424957]" : "rounded-br-md bg-[#000A57] text-white"}`}>
                 {#if message.authorUserName && message.authorType !== "customer"}<span class="application-text-meta mb-1 block font-semibold opacity-70">{message.authorUserName}</span>{/if}
                 <p class="application-text-caption whitespace-pre-wrap break-words leading-5">{message.body}</p>
                 {#if message.attachments?.length}
@@ -360,6 +420,10 @@
                   </div>
                 {/if}
                 <span class="application-text-meta mt-1 block text-right opacity-55">{formatMessageTime(message.createdAt)}</span>
+                <MessageActionMenu reactions={message.reactions ?? []} myReaction={message.myReaction ?? null}
+                  taskLinks={message.taskLinks ?? []} onReact={(code) => reactMessage(message, code)}
+                  canCreateTask={taskProjects.length > 0}
+                  onCreateTask={() => openTaskForMessage(message)}/>
               </div>
             </div>
           {/if}
@@ -401,6 +465,18 @@
         </div>
       </form>
     </section>
+  {/if}
+
+  {#if taskMessage && taskSessionId}
+    <MessageTaskPopover
+      sourceKind={taskMessage.storageSource ?? "chat"}
+      messageId={taskMessage.id}
+      messageBody={taskMessage.body}
+      sourceSessionId={taskMessage.sourceSessionId ?? taskSessionId}
+      projects={taskProjects}
+      onCreated={handleTaskCreated}
+      onClose={() => { taskMessage = null; taskSessionId = null; }}
+    />
   {/if}
 
   <div class="fixed -bottom-3 right-3 z-[96] flex max-w-[calc(100vw-1.5rem)] items-start justify-end gap-1.5">
