@@ -1,8 +1,6 @@
 <script lang="ts">
   import { Ellipsis, ListTodo } from "lucide-svelte";
-  import type {
-    MessageReactionCode,
-  } from "$lib/server/db/supportMessageReactionSchema";
+  type MessageReactionCode = "like" | "heart" | "check" | "eyes";
 
   type ReactionCount = { code: MessageReactionCode; count: number };
 
