@@ -62,6 +62,7 @@
     if (value === "busy") return "Ocupado";
     if (value === "away") return "Ausente";
     if (value === "future") return "Horário futuro";
+    if (value === "untracked") return "Sem registro histórico";
     return "Offline";
   }
 
@@ -218,6 +219,7 @@
                     class:busy-line={segment.status === "busy"}
                     class:away-line={segment.status === "away"}
                     class:future-line={segment.status === "future"}
+                    class:untracked-line={segment.status === "untracked"}
                     class="absolute top-0 h-full min-w-[2px] rounded-[2px]"
                     style={`left: ${segment.leftPercent}%; width: ${segment.widthPercent}%;`}
                     on:mouseenter={() => (hoveredSegment = `${user.id}-${index}`)}
@@ -270,4 +272,5 @@
   .busy-line { background: #d99424; }
   .away-line { background: #b8bec9; }
   .future-line { background: #e7ebf0; }
+  .untracked-line { background: repeating-linear-gradient(45deg, #aeb6c2 0, #aeb6c2 2px, #e7ebf0 2px, #e7ebf0 5px); }
 </style>
