@@ -1,15 +1,14 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { getPermissionScope, hasPermission } from "$lib/server/auth/permissions";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import { getDatabase } from "$lib/server/db";
 import { webChatMessages } from "$lib/server/db/chatSchema";
-import { users } from "$lib/server/db/schema";
 import { ticketMessages } from "$lib/server/db/supportSchema";
 import { getInternalChat } from "$lib/server/support/internalChatRepository";
 import { getSupportTicket } from "$lib/server/support/supportRepository";
 import { createTask, listTaskProjects } from "$lib/server/tasks/taskRepository";
-import { listProjectMembers } from "$lib/server/tasks/taskProjectRepository";
+import { listAssignableTaskMembers } from "$lib/server/tasks/taskAssigneeAccess";
 import { ensureTaskProjectAccess } from "$lib/server/tasks/taskAccess";
 import type { TaskMessageOrigin } from "$lib/server/db/supportMessageTaskSchema";
 
@@ -89,7 +88,7 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
   );
   const projectId = url.searchParams.get("projectId");
   if (!projectId) {
-    const projects = await listTaskProjects(session.user.id, permissions).catch(() => []);
+    const projects = await listTaskProjects(session.user.id, permissions, "tasks.create").catch(() => []);
     return json({ projects }, { headers: { "Cache-Control": "private, no-store" } });
   }
   if (!isUuid(projectId)) return json({ error: "INVALID_PROJECT" }, { status: 400 });
@@ -99,20 +98,10 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
 
   try {
     await ensureTaskProjectAccess(session.user.id, scope, projectId);
-    const members = await listProjectMembers(projectId);
-    const activeUsers = members.length
-      ? await getDatabase()
-        .select({ id: users.id })
-        .from(users)
-        .where(and(
-          inArray(users.id, members.map((member) => member.id)),
-          eq(users.status, "active"),
-        ))
-      : [];
-    const allowed = new Set(activeUsers.map((user) => user.id));
+    const members = await listAssignableTaskMembers(session.user.id, permissions, projectId);
     return json({
-      canAssign: hasPermission(permissions, "tasks.assign"),
-      members: members.filter((member) => allowed.has(member.id)),
+      canAssign: hasPermission(permissions, "tasks.assign", "team"),
+      members,
       currentUserId: session.user.id,
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
