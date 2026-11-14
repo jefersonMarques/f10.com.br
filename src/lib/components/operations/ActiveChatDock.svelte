@@ -236,6 +236,20 @@
     }
   }
 
+  function createMessageForm(body: string): FormData {
+    const form = new FormData();
+    form.set("body", body);
+    for (const file of pendingFiles) form.append("files", file, file.name);
+    return form;
+  }
+
+  function pasteFiles(event: ClipboardEvent): void {
+    const files = Array.from(event.clipboardData?.files ?? []);
+    if (!files.length) return;
+    event.preventDefault();
+    pendingFiles = [...pendingFiles, ...files].slice(0, 4);
+  }
+
   async function sendMessage(): Promise<void> {
     if (!expandedSessionId || sending) return;
     const body = draft.trim();
@@ -252,12 +266,7 @@
         `/api/app/chat/${encodeURIComponent(expandedSessionId)}/messages`,
         {
           method: "POST",
-          body: (() => {
-            const form = new FormData();
-            form.set("body", body);
-            for (const file of pendingFiles) form.append("files", file, file.name);
-            return form;
-          })(),
+          body: createMessageForm(body),
         },
       );
       if (!response.ok) {
@@ -385,7 +394,7 @@
         {/if}
         {#if errorMessage}<p class="application-text-meta mb-2 rounded-lg bg-[#FFF2F2] px-2.5 py-2 font-medium text-[#A13B3B]">{errorMessage}</p>{/if}
         <div class="flex items-end gap-2">
-          <textarea bind:value={draft} rows="2" maxlength="4000" placeholder="Responder cliente..." on:keydown={handleComposerKeydown} class="application-text-caption min-h-[44px] max-h-28 flex-1 resize-y rounded-xl border border-[#D9DDE5] px-3 py-2.5 leading-5 outline-none focus:border-[#000A57]"></textarea>
+          <textarea bind:value={draft} rows="2" maxlength="4000" placeholder="Responder cliente..." on:keydown={handleComposerKeydown} on:paste={pasteFiles} class="application-text-caption min-h-[44px] max-h-28 flex-1 resize-y rounded-xl border border-[#D9DDE5] px-3 py-2.5 leading-5 outline-none focus:border-[#000A57]"></textarea>
           <button type="button" on:click={() => fileInput?.click()} aria-label="Anexar arquivo"
             class="flex h-11 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Paperclip size={17}/></button>
           <button type="submit" disabled={sending || (!draft.trim() && pendingFiles.length === 0)} class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white disabled:cursor-not-allowed disabled:opacity-45" aria-label="Enviar mensagem"><Send size={16}/></button>
