@@ -165,6 +165,16 @@
     }
   }
 
+
+  function calendarDay(value: string | Date): string {
+    return new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    }).format(new Date(value));
+  }
+
   function formatTime(value: string | Date): string {
     return new Intl.DateTimeFormat("pt-BR", {
       hour: "2-digit",
@@ -535,16 +545,25 @@
                   </div>
                 {/if}
 
+
+                {#if index === 0 || calendarDay(messages[index - 1].createdAt) !== calendarDay(message.createdAt)}
+                  <div class="my-3 flex items-center justify-center">
+                    <span class="rounded-full bg-[var(--app-surface-muted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--app-text-muted)]">
+                      {calendarDay(message.createdAt)}
+                    </span>
+                  </div>
+                {/if}
+
                 {#if message.visibility === "internal"}
                   <div class="flex justify-center py-1">
-                    <article class="w-full max-w-[88%] rounded-2xl border border-[#E9D6C1] bg-[#FFF9F3] px-4 py-3 text-[#6F4B29] shadow-sm">
-                      <div class="mb-2 flex items-center justify-between gap-3"><span class="text-[9px] font-bold uppercase tracking-[0.08em] text-[#9A5513]">Nota interna · {messageAuthor(message)}</span><span class="text-[9px] text-[#AC8B6A]">{formatTime(message.createdAt)}</span></div>
-                      <p class="whitespace-pre-wrap text-[11.5px] leading-5">{message.body}</p>
+                    <article class="w-full max-w-[88%] rounded-2xl border border-[var(--app-warning-border)] bg-[var(--app-warning-bg)] px-4 py-3 text-[var(--app-text)] shadow-sm">
+                      <div class="mb-2 flex items-center justify-between gap-3"><span class="text-[12px] font-semibold text-[var(--app-warning-text)]">Nota interna · {messageAuthor(message)}</span><span class="text-[11px] text-[var(--app-text-muted)]">{formatTime(message.createdAt)}</span></div>
+                      <SupportChatMarkdown text={message.body} size="md" className="mt-2 text-[var(--app-text)]"/>
                     </article>
                   </div>
                 {:else}
                   <div class={`flex ${message.authorType === "customer" ? "justify-start" : "justify-end"}`}>
-                    <article class={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3EA] bg-white text-[#4D5361]" : message.authorType === "system" ? "rounded-br-md border border-[#DDD8F4] bg-[#F2F0FF] text-[#453D78]" : "rounded-br-md bg-[#000A57] text-white"}`}>
+                    <article class={`max-w-[88%] rounded-2xl px-4 py-3 shadow-sm ${message.authorType === "customer" ? "rounded-bl-md border border-[#E0E3EA] bg-white text-[#4D5361]" : message.authorType === "system" ? "rounded-br-md border border-[#DDD8F4] bg-[#F2F0FF] text-[#453D78]" : "rounded-br-md bg-[#000A57] text-white"}`}>
                       {#if message.authorType === "system"}<div class="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.07em] text-[var(--app-info-text)]"><Bot size={13} />{message.authorUserName ?? "Sistema F10"}</div>{/if}
 
                       {#if message.attachments && message.attachments.length > 0}
@@ -563,7 +582,7 @@
                       {/if}
 
                       {#if message.body}<SupportChatMarkdown text={message.body} isCustomer={message.authorType === "user"} size="md" />{/if}
-                      <div class={`mt-2 flex items-center gap-1.5 text-[9px] ${message.authorType === "customer" ? "text-[#989EAB]" : message.authorType === "system" ? "text-[#8178B5]" : "text-white/65"}`}><span>{messageAuthor(message)}</span><span>·</span><span>{formatTime(message.createdAt)}</span></div>
+                      <div class={`mt-2 flex items-center gap-1.5 text-[11px] ${message.authorType === "customer" ? "text-[#989EAB]" : message.authorType === "system" ? "text-[#8178B5]" : "text-white/65"}`}><span>{messageAuthor(message)}</span><span>·</span><span>{formatTime(message.createdAt)}</span></div>
                     </article>
                   </div>
                 {/if}

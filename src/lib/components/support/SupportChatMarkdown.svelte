@@ -12,10 +12,10 @@
   $: blocks = parseChatMarkdown(repairMultilineFormatting ? normalizeTicketMessageMarkdown(text) : text);
 </script>
 
-<div class={`min-w-0 space-y-1 break-words ${size === "md" ? "text-[14px] leading-[1.65]" : "text-[12px] leading-[1.7]"} ${className}`}>
+<div class={`min-w-0 space-y-2 break-words ${size === "md" ? "text-[14px] leading-[1.75]" : "text-[13px] leading-[1.75]"} ${className}`}>
   {#each blocks as block}
     {#if block.kind === "space"}
-      <div class="h-1" aria-hidden="true"></div>
+      <div class="h-1.5" aria-hidden="true"></div>
     {:else if block.kind === "heading"}
       <div class={`font-semibold ${block.level === 1 ? "pt-1 text-[15px]" : block.level === 2 ? "text-[14px]" : "text-[13px]"}`}>
         <SupportChatMarkdownTokens tokens={block.tokens ?? []} {isCustomer}/>
@@ -28,11 +28,11 @@
         </div>
       </div>
     {:else if block.kind === "quote"}
-      <blockquote class={`border-l-[3px] pl-3 italic ${isCustomer ? "border-white/50" : "border-[#C8D0F0]"}`}>
+      <blockquote class={`border-l-[3px] pl-3 italic ${isCustomer ? "border-white/50" : "border-[var(--app-border)]"}`}>
         <SupportChatMarkdownTokens tokens={block.tokens ?? []} {isCustomer}/>
       </blockquote>
     {:else if block.kind === "code"}
-      <pre class={`max-w-full overflow-x-auto whitespace-pre-wrap break-words rounded-lg p-2 font-mono leading-5 ${size === "md" ? "text-[12px]" : "text-[11px]"} ${isCustomer ? "bg-white/10" : "bg-[#F1F3FA]"}`}><code>{block.code}</code></pre>
+      <pre class={`max-w-full overflow-x-auto whitespace-pre-wrap break-words rounded-lg p-2 font-mono leading-5 ${size === "md" ? "text-[12px]" : "text-[11px]"} ${isCustomer ? "bg-white/10" : "bg-[var(--app-surface-muted)]"}`}><code>{block.code}</code></pre>
     {:else}
       <p><SupportChatMarkdownTokens tokens={block.tokens ?? []} {isCustomer}/></p>
     {/if}

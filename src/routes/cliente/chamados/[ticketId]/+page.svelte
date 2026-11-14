@@ -1,5 +1,6 @@
 <script lang="ts">
   import EmailMessageBody from "$lib/components/operations/tickets/EmailMessageBody.svelte";
+  import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
   import LivePageSync from "$lib/components/application/LivePageSync.svelte";
   import {
     Activity,
@@ -235,28 +236,34 @@
         {#each timelineEntries as entry}
           {#if entry.kind === "message"}
             <div class={`relative z-10 flex ${entry.message.authorType === "customer" ? "justify-end" : "justify-start"}`}>
-              <div class={`flex w-full items-end gap-2 md:w-[48%] ${entry.message.authorType === "customer" ? "justify-end" : "justify-start"}`}>
+              <div class={`flex w-full items-end gap-2 md:max-w-[75%] ${entry.message.authorType === "customer" ? "justify-end" : "justify-start"}`}>
                 {#if entry.message.authorType !== "customer"}
                   <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#DDE2EC] bg-white text-[10px] font-bold text-[#000A57] shadow-sm">F10</div>
                 {/if}
 
-                <div class={`max-w-[88%] rounded-2xl px-4 py-3 shadow-[0_5px_16px_rgba(1,13,40,0.045)] ${entry.message.authorType === "customer" ? "bg-[#000A57] text-white" : "border border-[#E0E4EC] bg-white text-[#343B4C]"}`}>
+                <div class={`max-w-[94%] rounded-2xl px-4 py-3.5 shadow-[0_5px_16px_rgba(1,13,40,0.045)] ${entry.message.authorType === "customer" ? "bg-[#000A57] text-white" : "border border-[#E0E4EC] bg-white text-[#343B4C]"}`}>
                   {#if entry.message.body}
                     {#if entry.message.channel === "email"}
-                      <EmailMessageBody text={entry.message.body} className="text-[12px] leading-5"/>
+                      <EmailMessageBody text={entry.message.body} className="text-[14px] leading-6"/>
                     {:else}
-                      <p class="whitespace-pre-wrap text-[12px] leading-5">{entry.message.body}</p>
+                      <SupportChatMarkdown text={entry.message.body} size="md" isCustomer={entry.message.authorType === "customer"}/>
                     {/if}
                   {/if}
                   {#if entry.message.attachments.length > 0}
                     <div class={`space-y-2 ${entry.message.body ? "mt-3" : ""}`}>
                       {#each entry.message.attachments as attachment}
+                        {#if attachment.mimeType?.startsWith("image/")}
+                          <a href={attachment.href} target="_blank" rel="noopener noreferrer" class="block w-fit max-w-full">
+                            <img src={attachment.href} alt={attachment.originalName} loading="lazy" class="max-h-[340px] max-w-full rounded-xl border border-[var(--app-border)] object-contain"/>
+                          </a>
+                        {:else}
                         <a href={attachment.href} target="_blank" rel="noopener noreferrer" class={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-semibold ${entry.message.authorType === "customer" ? "border-white/20 bg-white/10 text-white" : "border-[#E1E4EC] bg-[#F8F9FB] text-[#4F5768]"}`}>
                           <Paperclip size={14} />
                           <span class="min-w-0 flex-1 truncate">{attachment.originalName}</span>
                           <span class="shrink-0 opacity-60">{formatBytes(attachment.sizeBytes)}</span>
                           <Download size={13} class="shrink-0" />
                         </a>
+                        {/if}
                       {/each}
                     </div>
                   {/if}

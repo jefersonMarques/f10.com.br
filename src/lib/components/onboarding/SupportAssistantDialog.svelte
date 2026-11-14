@@ -687,7 +687,7 @@
         <div class="space-y-3">
           {#each guestMessages as message}
             <div class={`flex ${message.role === "customer" ? "justify-end" : "justify-start"}`}>
-              <div class={`max-w-[86%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-5 ${message.role === "customer" ? "rounded-br-md bg-[#000A57] text-white" : "rounded-bl-md border border-[#E4E7EE] bg-white text-[#394052] shadow-[0_3px_12px_rgba(1,13,40,0.035)]"}`}>
+              <div class={`max-w-[86%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-5 ${message.role === "customer" ? "rounded-br-md bg-[#000A57] text-white" : "rounded-bl-md border border-[#E4E7EE] bg-[var(--app-surface)] text-[var(--app-text)] shadow-[0_3px_12px_rgba(1,13,40,0.035)]"}`}>
                 {#if message.role === "assistant"}
                   <SupportChatMarkdown text={message.body}/>
                 {:else}
@@ -710,8 +710,8 @@
         <div class="space-y-3">
           {#each messages as message}
             <div class={`flex ${message.authorType === "customer" ? "justify-end" : "justify-start"}`}>
-              <div class={`max-w-[86%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-5 ${message.authorType === "customer" ? "rounded-br-md bg-[#000A57] text-white" : message.authorType === "system" ? "border border-[#E7E9EF] bg-[#F0F2F6] text-[#6C7382]" : "rounded-bl-md border border-[#E4E7EE] bg-white text-[#394052]"}`}>
-                {#if message.authorType === "user" && message.authorUserName}<p class="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#6E7690]">{message.authorUserName}{message.authorOnline ? " · online" : ""}</p>{/if}
+              <div class={`max-w-[86%] rounded-2xl px-3.5 py-2.5 text-[14px] leading-6 ${message.authorType === "customer" ? "rounded-br-md bg-[#000A57] text-white" : message.authorType === "system" ? "border border-[#E7E9EF] bg-[#F0F2F6] text-[#6C7382]" : "rounded-bl-md border border-[#E4E7EE] bg-[var(--app-surface)] text-[var(--app-text)]"}`}>
+                {#if message.authorType === "user" && message.authorUserName}<p class="mb-1 text-[12px] font-semibold text-[#6E7690]">{message.authorUserName}{message.authorOnline ? " · online" : ""}</p>{/if}
                 {#if message.body}
                   {#if message.authorType === "customer"}
                     <SupportChatMarkdown text={message.body} isCustomer/>
@@ -762,7 +762,7 @@
     {:else if !session}
       <form class="border-t border-[#E3E6ED] bg-white p-3" on:submit|preventDefault={sendGuestMessage}>
         <div class="flex items-end gap-2 rounded-2xl border border-[#DDE1E9] bg-white p-2 focus-within:border-[#000A57] focus-within:ring-4 focus-within:ring-[#000A57]/8">
-          <textarea bind:value={guestReply} rows="1" maxlength="2000" placeholder="Digite sua dúvida sobre o F10..." class="max-h-28 min-h-9 flex-1 resize-none bg-transparent px-1 py-2 text-[13px] leading-5 outline-none" on:keydown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendGuestMessage(); } }}></textarea>
+          <textarea bind:value={guestReply} rows="1" maxlength="2000" placeholder="Digite sua dúvida sobre o F10..." class="max-h-28 min-h-9 flex-1 resize-none bg-transparent px-1 py-2 text-[14px] leading-6 outline-none" on:keydown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendGuestMessage(); } }}></textarea>
           <button type="submit" disabled={assistantSending || !guestReply.trim()} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white transition disabled:opacity-40" aria-label="Enviar mensagem"><Send size={16} /></button>
         </div>
       </form>
@@ -775,7 +775,7 @@
         <div class="flex items-end gap-2 rounded-2xl border border-[#DDE1E9] p-2 focus-within:border-[#000A57]">
           <input bind:this={fileInputElement} type="file" accept="image/png,image/jpeg,image/webp,application/pdf" multiple class="hidden" on:change={handleFiles} />
           <button type="button" on:click={() => fileInputElement?.click()} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[#6F7787] transition hover:bg-[#F2F4F8] hover:text-[#000A57]" aria-label="Anexar arquivos"><Paperclip size={16} /></button>
-          <textarea bind:value={reply} rows="1" maxlength="4000" placeholder="Escreva para a equipe F10..." class="max-h-28 min-h-9 flex-1 resize-none bg-transparent px-1 py-2 text-[13px] leading-5 outline-none" on:paste={handleReplyPaste} on:keydown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendHumanMessage(); } }}></textarea>
+          <textarea bind:value={reply} rows="1" maxlength="4000" placeholder="Escreva para a equipe F10..." class="max-h-28 min-h-9 flex-1 resize-none bg-transparent px-1 py-2 text-[14px] leading-6 outline-none" on:paste={handleReplyPaste} on:keydown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendHumanMessage(); } }}></textarea>
           <button type="submit" disabled={sending || (!reply.trim() && pendingImages.length === 0)} class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white disabled:opacity-40" aria-label="Enviar mensagem">{#if sending}<LoaderCircle size={15} class="animate-spin" />{:else}<Send size={16} />{/if}</button>
         </div>
         <p class="mt-1.5 flex items-center gap-1 text-[10px] text-[#9298A5]"><ImageIcon size={10} />PNG, JPG, WebP ou PDF · até 10 MB cada</p>
