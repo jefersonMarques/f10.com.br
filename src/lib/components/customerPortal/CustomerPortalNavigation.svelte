@@ -19,7 +19,7 @@
   <div class="mx-auto flex min-h-[72px] max-w-[1440px] items-center justify-between gap-2 px-3 sm:px-6">
     <div class="flex min-w-0 items-center gap-3">
       <a href="/cliente/chamados" class="block shrink-0" aria-label="Helpdesk F10 — início">
-        <img src="/branding/f10-helpdesk.webp" alt="Helpdesk F10"
+        <img src="/branding/f10-helpdesk-white.png" alt="Helpdesk F10"
           class="h-auto w-[104px] object-contain sm:w-[140px]" width="140" height="57"/>
       </a>
       <div class="hidden min-w-0 border-l border-white/15 pl-3 md:block">
