@@ -104,7 +104,7 @@
     {
       label: "Gestão",
       items: [
-        { label: "Performance", icon: BarChart3, href: "/app/performance", permission: "reports.view" },
+        { label: "Performance", icon: BarChart3, href: "/app/performance", permission: "performance.view" },
         { label: "Equipe", icon: Users, href: "/app/team", permission: "users.view" },
         { label: "Configurações", icon: Settings, href: "/app/settings", permission: "system.settings.manage" },
       ],
