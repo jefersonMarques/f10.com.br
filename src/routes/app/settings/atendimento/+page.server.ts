@@ -1,4 +1,5 @@
 import { fail } from "@sveltejs/kit";
+import { isFinanceReadOnlyEnabled, updateFinanceReadOnlySettings } from "$lib/server/finance/financeSettings";
 import type { Actions, PageServerLoad } from "./$types";
 import { requireAppPermission } from "$lib/server/auth/authorization";
 import {
@@ -82,17 +83,25 @@ function readEntryOption(formData: FormData) {
 
 export const load: PageServerLoad = async ({ cookies }) => {
   await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
-  const [settings, queue, routing, chatEntry, emailInboxes] = await Promise.all([
+  const [settings, queue, routing, chatEntry, emailInboxes, financeReadOnlyEnabled] = await Promise.all([
     getSupportHoursSettings(),
     getSupportQueueTeamSettings(),
     getSupportRoutingSettings(),
     getSupportChatEntrySettings(),
     getSupportEmailInboxTeamSettings(),
+    isFinanceReadOnlyEnabled(),
   ]);
-  return { settings, queue, routing, chatEntry, emailInboxes };
+  return { settings, queue, routing, chatEntry, emailInboxes, financeReadOnlyEnabled };
 };
 
 export const actions: Actions = {
+  saveFinanceReadOnly: async ({ cookies, request }) => {
+    const { session } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
+    const enabled = (await request.formData()).has("enabled");
+    await updateFinanceReadOnlySettings(session.user.id, enabled);
+    return { success: true, action: "saveFinanceReadOnly", message: "Consultas financeiras atualizadas." };
+  },
+
   save: async ({ cookies, request }) => {
     const { session } = await requireAppPermission(cookies, "system.settings.manage", "/app/settings/atendimento");
     const settings = readSettings(await request.formData());
