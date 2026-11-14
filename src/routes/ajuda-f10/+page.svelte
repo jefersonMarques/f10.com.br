@@ -11,7 +11,7 @@
   } from "lucide-svelte";
   import HelpCategoryIcon from "$lib/components/help/HelpCategoryIcon.svelte";
   import HelpRichText from "$lib/components/help/HelpRichText.svelte";
-  import SupportChatDialog from "$lib/components/onboarding/SupportChatDialog.svelte";
+  import { onMount } from "svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;
@@ -31,7 +31,13 @@
     answer: string;
   };
 
-  let chatOpen = data.openChat;
+  function openSupportChat(): void {
+    window.dispatchEvent(new Event("f10:open-help-assistant"));
+  }
+
+  onMount(() => {
+    if (data.openChat) openSupportChat();
+  });
   let question = data.search.query;
   let answer = "";
   let resolution: HelpResolution | null = null;
@@ -253,9 +259,8 @@
 
     <section class="mt-10 flex flex-col gap-5 rounded-[28px] border border-[#D9DDE7] bg-[#010D28] px-6 py-7 text-white sm:flex-row sm:items-center sm:justify-between sm:px-8">
       <div class="flex items-start gap-4"><span class="inline-flex h-11 min-w-11 items-center justify-center rounded-2xl bg-white/10 text-[#FF9A4B]"><LifeBuoy size={21}/></span><div><h2 class="text-[18px] font-semibold">Ainda precisa de ajuda?</h2><p class="mt-1.5 max-w-[620px] text-[11px] leading-5 text-white/65">Converse com o atendimento F10. O chat também consulta esta mesma Base de Conhecimento antes de oferecer atendimento humano.</p></div></div>
-      <button type="button" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-[#EA6D0B] px-5 text-[11px] font-semibold text-white transition hover:bg-[#D96208]" on:click={() => (chatOpen = true)}>Abrir atendimento</button>
+      <button type="button" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-[#EA6D0B] px-5 text-[11px] font-semibold text-white transition hover:bg-[#D96208]" on:click={openSupportChat}>Abrir atendimento</button>
     </section>
   </div>
 </main>
 
-<SupportChatDialog isOpen={chatOpen} onClose={() => (chatOpen = false)} customerSupport={data.customerSupport}/>
