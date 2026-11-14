@@ -73,6 +73,7 @@ jobs:
           node --test tests/publicChatUnifiedExperience.test.mjs
           node --test tests/publicChatReactionPopover.test.mjs
           node --test tests/publicHelpdeskBranding.test.mjs
+          node --test tests/mentionSuggestionsVisibility.test.mjs
           node --experimental-strip-types --test tests/chatEntryRouting.test.mjs
           node --experimental-strip-types --test tests/assistantHelpFallback.test.mjs
           node --experimental-strip-types --test tests/assistantArticleSynthesis.test.mjs
