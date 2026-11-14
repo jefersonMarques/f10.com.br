@@ -899,7 +899,9 @@
             onAction={postAction}
             onManageContracts={() => relationshipsPanel?.focusContracts()}
           />
-          <FinancePaymentPanel scope="operator" ticketId={ticketData.details.ticket.id}/>
+          {#key ticketData.details.ticket.id}
+            <FinancePaymentPanel scope="operator" ticketId={ticketData.details.ticket.id}/>
+          {/key}
           {#key ticketData.details.ticket.id}
             <div class="mt-3">
               <TicketRelationshipsInline
