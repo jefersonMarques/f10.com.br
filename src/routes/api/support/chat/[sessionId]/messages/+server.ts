@@ -216,7 +216,7 @@ export const POST: RequestHandler = async ({
   if (body.length > 4000 || (body.length < 1 && files.length === 0)) {
     return json({ error: "INVALID_MESSAGE" }, { status: 400 });
   }
-  if (files.length > SUPPORT_IMAGE_MAX_FILES) {
+  if (files.length > SUPPORT_ATTACHMENT_MAX_FILES) {
     return json({ error: "TOO_MANY_ATTACHMENTS" }, { status: 400 });
   }
 
