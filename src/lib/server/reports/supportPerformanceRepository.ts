@@ -1,5 +1,6 @@
 import { and, asc, eq, gte, isNotNull, isNull, lt } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
+import { userProfiles } from "$lib/server/db/userProfileSchema";
 import { remoteSupportSessions } from "$lib/server/db/operationsSettingsSchema";
 import { users } from "$lib/server/db/schema";
 import { ticketEvents, ticketMessages, tickets } from "$lib/server/db/supportSchema";
@@ -17,6 +18,7 @@ type MutableUserMetrics = {
   id: string;
   name: string;
   email: string;
+  hasAvatar: boolean;
   publicReplies: number;
   internalNotes: number;
   handledTickets: Set<string>;
@@ -276,8 +278,14 @@ export async function getSupportPerformance(periodDays: SupportPerformancePeriod
   const timezone = resolveTimezone(generalSettings.timezone);
 
   const userRows = await db
-    .select({ id: users.id, name: users.name, email: users.email })
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      avatarKey: userProfiles.avatarKey,
+    })
     .from(users)
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
     .where(eq(users.status, "active"))
     .orderBy(asc(users.name));
 
@@ -285,7 +293,10 @@ export async function getSupportPerformance(periodDays: SupportPerformancePeriod
     userRows.map((user) => [
       user.id,
       {
-        ...user,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        hasAvatar: Boolean(user.avatarKey),
         publicReplies: 0,
         internalNotes: 0,
         handledTickets: new Set<string>(),
@@ -441,6 +452,7 @@ export async function getSupportPerformance(periodDays: SupportPerformancePeriod
     id: user.id,
     name: user.name,
     email: user.email,
+    hasAvatar: user.hasAvatar,
     publicReplies: user.publicReplies,
     internalNotes: user.internalNotes,
     handledTickets: user.handledTickets.size,
