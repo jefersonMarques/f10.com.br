@@ -3,6 +3,7 @@
   import {
     readRestorableSupportGuestMessages,
     SUPPORT_CHAT_GUEST_KEY,
+    SUPPORT_ASSISTANT_GUEST_KEY,
     SUPPORT_CHAT_SESSION_KEY,
   } from "$lib/support/supportChatRestore";
   import { onDestroy, tick } from "svelte";
@@ -14,12 +15,12 @@
     CheckCircle2,
     Image as ImageIcon,
     LifeBuoy,
+    Headset,
     LoaderCircle,
     LockKeyhole,
     MessageCircleMore,
     Paperclip,
     Send,
-    Sparkles,
     UserRound,
     X,
   } from "lucide-svelte";
@@ -261,7 +262,7 @@
     guestMessages = [
       createGuestMessage(
         "assistant",
-        "Olá! Sou o Assistente F10. Posso tentar resolver sua dúvida agora. Você também pode pedir para falar com alguém da equipe a qualquer momento.",
+        "Olá! Sou o Assistente F10. Como posso ajudar?",
       ),
     ];
   }
@@ -271,6 +272,16 @@
     reply = window.sessionStorage.getItem(DRAFT_KEY) ?? "";
 
     guestMessages = readRestorableSupportGuestMessages(window.sessionStorage, GUEST_KEY);
+    if (guestMessages.length === 0) {
+      const priorMessages = readRestorableSupportGuestMessages(
+        window.sessionStorage,
+        SUPPORT_ASSISTANT_GUEST_KEY,
+      );
+      if (priorMessages.length > 0) {
+        guestMessages = priorMessages;
+        window.sessionStorage.setItem(GUEST_KEY, JSON.stringify(priorMessages));
+      }
+    }
     updateUnresolvedCount(guestMessages.length > 0 ? Number(window.sessionStorage.getItem(UNRESOLVED_KEY)) : 0);
     ensureGuestGreeting();
 
@@ -459,7 +470,7 @@
     if (error === "FINANCE_QUEUE_UNAVAILABLE") return "O atendimento financeiro ainda não está configurado. Entre em contato com a equipe F10.";
     if (error === "CHAT_QUEUE_MISMATCH") return "Já existe uma conversa em outra fila. Finalize esse atendimento antes de iniciar um novo com o Financeiro.";
     if (error === "INVALID_MESSAGE") return "Escreva uma mensagem para iniciar o atendimento.";
-    if (error === "HUMAN_HANDOFF_REQUIRED") return "Tente novamente pelo botão Falar com uma pessoa.";
+    if (error === "HUMAN_HANDOFF_REQUIRED") return "Tente novamente pelo botão Falar com a equipe.";
     if (error === "SUPPORT_QUEUE_UNAVAILABLE") return "O atendimento humano está indisponível no momento.";
     if (error === "INVALID_SESSION") return "Este atendimento expirou. Inicie uma nova conversa.";
     if (error === "CHAT_CLOSED") return "Este atendimento foi encerrado. Inicie uma nova conversa se ainda precisar de ajuda.";
@@ -571,7 +582,7 @@
         ...guestMessages,
         createGuestMessage(
           "assistant",
-          "Não consegui consultar o assistente agora. Tente novamente ou, se preferir, use “Falar com uma pessoa”.",
+          "Não consegui consultar o assistente agora. Tente novamente ou, se preferir, use “Falar com a equipe”.",
         ),
       ];
       await scrollToLatest();
@@ -1073,13 +1084,13 @@
     <header class="flex shrink-0 items-center justify-between gap-3 border-b border-[#E7E9EF] bg-white px-4 py-3.5">
       <div class="flex min-w-0 items-center gap-3">
         <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#FFF0E4] text-[#EA6D0B]">
-          {#if session && session.aiState !== "active"}<UserRound size={19} aria-hidden="true" />{:else}<Sparkles size={19} aria-hidden="true" />{/if}
+          {#if session && session.aiState !== "active"}<UserRound size={19} aria-hidden="true" />{:else}<Headset size={19} aria-hidden="true" />{/if}
         </span>
         <div class="min-w-0">
           <h2 id="support-chat-title" class="truncate text-[14px] font-semibold text-[#111A30]">
-            {departmentSessionMismatch ? "Atendimento em andamento" : entryDepartment === "finance" ? "Financeiro F10" : session && session.aiState !== "active" ? "Atendimento F10" : "Assistente F10"}
+            {departmentSessionMismatch ? "Atendimento em andamento" : entryDepartment === "finance" ? "Financeiro F10" : session && session.aiState !== "active" ? "Atendimento F10" : "Helpdesk F10"}
           </h2>
-          <div class="mt-0.5 flex items-center gap-1.5 text-[9px] text-[#7D8494]">
+          <div class="mt-0.5 flex items-center gap-1.5 text-[12px] text-[#6C7484]">
             <span class={`h-2 w-2 rounded-full ${session ? "bg-[#38A169]" : "bg-[#EA6D0B]"}`}></span>
             <span class="truncate">{session ? `#${session.ticketNumber} · ${sessionStatusText()}` : availabilityText()}</span>
           </div>
@@ -1087,8 +1098,11 @@
       </div>
       <div class="flex items-center gap-1.5">
         {#if !session && entryDepartment === "support"}
-          <button type="button" on:click={() => void requestHumanSupport()} class="hidden rounded-full border border-[#DDE1E9] px-3 py-2 text-[11px] font-semibold text-[#000A57] transition hover:bg-[#F5F6FA] sm:inline-flex">
-            Falar com uma pessoa
+          <button type="button" on:click={() => void requestHumanSupport()}
+            class="inline-flex min-h-9 shrink-0 items-center rounded-full border border-[#DDE1E9] bg-white px-2.5 text-[11px] font-semibold text-[#000A57] transition hover:bg-[#F5F6FA] sm:px-3"
+            aria-label="Falar com a equipe F10">
+            <span class="sm:hidden">Equipe</span>
+            <span class="hidden sm:inline">Falar com a equipe</span>
           </button>
         {/if}
         <button type="button" on:click={onClose} class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#F2F3F7] text-[#5F6676] transition hover:bg-[#E7E9EF] hover:text-[#000A57]" aria-label="Fechar chat">
@@ -1097,7 +1111,7 @@
       </div>
     </header>
 
-    <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="min-h-0 flex-1 overflow-y-auto bg-[var(--app-surface-subtle)] px-4 py-4" aria-live="polite">
+    <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="min-h-0 flex-1 overflow-y-auto bg-[#F8F9FC] px-4 py-4" aria-live="polite">
       {#if session && (entryDepartment !== "finance" || authState.authenticated)}
         {#if departmentSessionMismatch}
           <div role="status" class="mb-3 rounded-xl border border-[#F1CFB5] bg-[#FFF8F1] p-3 text-[11px] leading-5 text-[#81512A]">
@@ -1116,7 +1130,7 @@
                     <div class="min-w-0 flex-1">
                       <strong class="text-[13px] font-semibold text-[#303746]">{systemCardTitle(message.presentation)}</strong>
                       <SupportChatMarkdown text={message.body} className="mt-1 text-[#687080]"/>
-                      <span class="mt-1 block text-[8px] text-[#A0A5B0]">{formatTime(message.createdAt)}</span>
+                      <span class="mt-1 block text-[11px] text-[#A0A5B0]">{formatTime(message.createdAt)}</span>
                     </div>
                   </div>
                 </div>
@@ -1144,7 +1158,7 @@
                 </div>
               {:else}
                 <div class="flex items-start gap-2">
-                  <span class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#E0E4EC] bg-white text-[8px] font-bold text-[#000A57]">
+                  <span class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#E0E4EC] bg-white text-[11px] font-bold text-[#000A57]">
                     {#if message.authorType === "user"}
                       {initials(message.authorUserName ?? "F10")}
                       {#if message.avatarUrl}<img src={message.avatarUrl} alt="" class="absolute inset-0 h-full w-full object-cover" on:error={hideBrokenImage}/>{/if}
@@ -1190,7 +1204,7 @@
               </div>
             {:else}
               <div class="flex items-start gap-2">
-                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFF0E4] text-[#EA6D0B]"><Sparkles size={14}/></span>
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFF0E4] text-[#EA6D0B]"><Headset size={14}/></span>
                 <div class="max-w-[84%] rounded-2xl rounded-tl-md border border-[#E1E4EB] bg-[var(--app-surface)] px-3.5 py-3 text-[var(--app-text)] shadow-sm">
                   <SupportChatMarkdown text={message.body}/>
                 </div>
@@ -1200,7 +1214,7 @@
 
           {#if entryDepartment === "support" && guestMessages.length <= 3 && !handoffRequested}
             <div class="ml-10 space-y-2 pt-1">
-              <p class="text-[8px] font-bold uppercase tracking-[0.12em] text-[#9A9FAA]">Opções rápidas</p>
+              <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-[#9A9FAA]">Opções rápidas</p>
               {#if entryOptionsLoading}
                 <div class="py-2 text-[#8A909E]"><LoaderCircle class="animate-spin" size={16}/></div>
               {:else}
@@ -1210,9 +1224,6 @@
                       {option.label}
                     </button>
                   {/each}
-                  <button type="button" on:click={() => void requestHumanSupport()} class="inline-flex items-center gap-1.5 rounded-xl border border-[#F1CFB5] bg-[#FFF8F1] px-3 py-2 text-[11px] font-semibold text-[#B9570A] transition hover:bg-[#FFF1E4]">
-                    <UserRound size={12}/> Falar com uma pessoa
-                  </button>
                 </div>
               {/if}
             </div>
@@ -1220,7 +1231,7 @@
 
           {#if entryDepartment === "support" && assistantSending}
             <div class="flex items-start gap-2">
-              <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFF0E4] text-[#EA6D0B]"><Sparkles size={14}/></span>
+              <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFF0E4] text-[#EA6D0B]"><Headset size={14}/></span>
               <div class="rounded-2xl rounded-tl-md border border-[#E1E4EB] bg-white px-3.5 py-3 text-[#7B8292]"><LoaderCircle class="animate-spin" size={15}/></div>
             </div>
           {/if}
@@ -1228,7 +1239,7 @@
           {#if handoffRequested}
             <div class="ml-10 rounded-2xl border border-[#DDE2EB] bg-white p-4 shadow-sm">
               {#if authState.authenticated && starting}
-                <div class="flex items-center gap-2.5 text-[10px] font-semibold text-[#4C5363]"><LoaderCircle class="animate-spin" size={16}/>Criando seu atendimento identificado...</div>
+                <div class="flex items-center gap-2.5 text-[12px] font-semibold text-[#4C5363]"><LoaderCircle class="animate-spin" size={16}/>Criando seu atendimento identificado...</div>
               {:else if authStep === "login" && !authState.authenticated}
                 <div class="flex items-start gap-2.5">
                   <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><LockKeyhole size={16}/></span>
@@ -1237,7 +1248,7 @@
                 <form class="mt-4 space-y-3" on:submit|preventDefault={submitLogin}>
                   <label class="block text-[11px] font-semibold text-[#596171]">E-mail F10<input bind:value={loginEmail} type="email" required maxlength="254" autocomplete="username" class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] px-3 text-[11px] font-normal outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10"/></label>
                   <label class="block text-[11px] font-semibold text-[#596171]">Senha<input bind:value={loginPassword} type="password" required maxlength="512" autocomplete="current-password" class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] px-3 text-[11px] font-normal outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10"/></label>
-                  <button type="submit" disabled={authSubmitting || !loginEmail.trim() || !loginPassword} class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">{#if authSubmitting}<LoaderCircle class="animate-spin" size={15}/>{/if}Entrar e continuar</button>
+                  <button type="submit" disabled={authSubmitting || !loginEmail.trim() || !loginPassword} class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white disabled:opacity-50">{#if authSubmitting}<LoaderCircle class="animate-spin" size={15}/>{/if}Entrar e continuar</button>
                 </form>
               {:else if authStep === "unit"}
                 <div class="flex items-start gap-2.5">
@@ -1247,12 +1258,12 @@
                 <form class="mt-4 space-y-3" on:submit|preventDefault={submitUnitSelection}>
                   <label class="block text-[11px] font-semibold text-[#596171]">Grupo<select value={selectedGroupId || ""} on:change={handleGroupChange} required class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 text-[11px] font-normal outline-none"><option value="" disabled>Selecione</option>{#each authState.groups as group}<option value={group.id}>{group.name}</option>{/each}</select></label>
                   <label class="block text-[11px] font-semibold text-[#596171]">Unidade<select bind:value={selectedUnitId} required class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 text-[11px] font-normal outline-none"><option value={0} disabled>Selecione</option>{#each selectedUnits as unit}<option value={unit.id}>{unit.name}</option>{/each}</select></label>
-                  <button type="submit" disabled={authSubmitting || !selectedGroupId || !selectedUnitId} class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">{#if authSubmitting}<LoaderCircle class="animate-spin" size={15}/>{/if}Continuar atendimento</button>
+                  <button type="submit" disabled={authSubmitting || !selectedGroupId || !selectedUnitId} class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[12px] font-semibold text-white disabled:opacity-50">{#if authSubmitting}<LoaderCircle class="animate-spin" size={15}/>{/if}Continuar atendimento</button>
                 </form>
               {:else if authState.authenticated}
                 <div class="flex items-start gap-2.5">
                   <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><CheckCircle2 size={16}/></span>
-                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">Acesso confirmado</h3><p class="mt-1 text-[10px] leading-4 text-[#7B8292]">Seu grupo e unidade foram identificados. Tente conectar ao atendimento novamente.</p></div>
+                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">Acesso confirmado</h3><p class="mt-1 text-[12px] leading-4 text-[#7B8292]">Seu grupo e unidade foram identificados. Tente conectar ao atendimento novamente.</p></div>
                 </div>
                 <button type="button" on:click={() => void startHumanChat()} disabled={starting} class="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[11px] font-semibold text-white disabled:opacity-50">Tentar conectar ao atendimento</button>
               {/if}
@@ -1274,13 +1285,13 @@
 
     {#if session && (entryDepartment !== "finance" || authState.authenticated)}
       <form class={`relative shrink-0 border-t bg-white px-3 py-3 ${dragActive ? "border-[#EA6D0B] ring-2 ring-inset ring-[#EA6D0B]/20" : "border-[#E6E8EF]"}`} on:submit|preventDefault={sendReply} on:dragenter={handleDragEnter} on:dragover={handleDragOver} on:dragleave={handleDragLeave} on:drop={handleDrop}>
-        {#if dragActive}<div class="pointer-events-none absolute inset-2 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-[#EA6D0B] bg-[#FFF8F1]/95 text-[10px] font-semibold text-[#B9570A]"><ImageIcon size={16} class="mr-2"/>Solte o arquivo para anexar</div>{/if}
+        {#if dragActive}<div class="pointer-events-none absolute inset-2 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-[#EA6D0B] bg-[#FFF8F1]/95 text-[12px] font-semibold text-[#B9570A]"><ImageIcon size={16} class="mr-2"/>Solte o arquivo para anexar</div>{/if}
         {#if errorMessage}<p class="mb-2 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[12px] leading-5 text-[#9A4E3D]">{errorMessage}</p>{/if}
         {#if attachmentError}<p class="mb-2 rounded-xl bg-[#FFF8EE] px-3 py-2 text-[12px] leading-5 text-[#8B5B24]">{attachmentError}</p>{/if}
         {#if pendingImages.length > 0}<div class="mb-2 flex gap-2 overflow-x-auto">{#each pendingImages as image (image.id)}<div class="relative h-14 w-16 shrink-0 overflow-hidden rounded-xl border border-[#DDE1E9]">{#if image.file.type.startsWith("image/")}
           <img src={image.previewUrl} alt={image.file.name || "Imagem"} class="h-full w-full object-cover"/>
         {:else}
-          <span class="flex h-full w-full flex-col items-center justify-center bg-[var(--app-surface-muted)] text-[var(--app-text)]"><Paperclip size={17}/><span class="max-w-full truncate px-1 text-[10px]">PDF</span></span>
+          <span class="flex h-full w-full flex-col items-center justify-center bg-[var(--app-surface-muted)] text-[var(--app-text)]"><Paperclip size={17}/><span class="max-w-full truncate px-1 text-[12px]">PDF</span></span>
         {/if}<button type="button" on:click={() => removePendingImage(image.id)} class="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/65 text-white" aria-label="Remover imagem"><X size={10}/></button></div>{/each}</div>{/if}
         <input bind:this={fileInputElement} type="file" multiple accept="image/png,image/jpeg,image/webp,application/pdf" class="hidden" on:change={handleFileInput}/>
         <div class="flex items-end gap-2">
@@ -1288,7 +1299,7 @@
           <textarea bind:value={reply} maxlength="4000" rows="1" placeholder="Escreva sua mensagem..." class="max-h-28 min-h-10 flex-1 resize-none rounded-xl border border-[#DDE1E9] bg-[#FAFBFC] px-3 py-2.5 text-[14px] leading-6 outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" on:input={handleCustomerDraftInput} on:keydown={handleReplyKeydown} on:paste={handleReplyPaste}></textarea>
           <button type="submit" disabled={sending || (!reply.trim() && pendingImages.length === 0)} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EA6D0B] text-white disabled:opacity-40" aria-label="Enviar">{#if sending}<LoaderCircle class="animate-spin" size={16}/>{:else}<Send size={16}/>{/if}</button>
         </div>
-        <div class="mt-2 flex flex-wrap items-center justify-between gap-2"><span class="text-[9px] text-[#777E8D]">Texto visível à equipe · Enter envia · Shift+Enter quebra linha</span><button type="button" on:click={startAnotherChat} class="text-[8px] font-semibold text-[#6D7485] hover:text-[#000A57]">Novo atendimento</button></div>
+        <div class="mt-2 flex flex-wrap items-center justify-between gap-2"><span class="text-[11px] text-[#777E8D]">Texto visível à equipe · Enter envia · Shift+Enter quebra linha</span><button type="button" on:click={startAnotherChat} class="text-[11px] font-semibold text-[#6D7485] hover:text-[#000A57]">Novo atendimento</button></div>
       </form>
     {:else if entryDepartment === "support" && !handoffRequested}
       <form class="shrink-0 border-t border-[#E6E8EF] bg-white px-3 py-3" on:submit|preventDefault={sendGuestMessage}>
@@ -1298,8 +1309,8 @@
           <button type="submit" disabled={assistantSending || handoffRequested || !guestReply.trim()} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white disabled:opacity-40" aria-label="Enviar para o Assistente F10">{#if assistantSending}<LoaderCircle class="animate-spin" size={16}/>{:else}<Send size={16}/>{/if}</button>
         </div>
         <div class="mt-2 flex items-center justify-between gap-2">
-          <span class="text-[8px] text-[#999EAA]">O Assistente responde com base no conteúdo publicado pela F10.</span>
-          {#if !handoffRequested}<button type="button" on:click={() => void requestHumanSupport()} class="shrink-0 text-[8px] font-semibold text-[#000A57] hover:underline">Falar com pessoa</button>{/if}
+          <span class="text-[11px] text-[#999EAA]">O Assistente responde com base no conteúdo publicado pela F10.</span>
+
         </div>
       </form>
     {/if}

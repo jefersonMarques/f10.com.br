@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { MessageCircleMore } from "lucide-svelte";
-  import SupportAssistantDialog from "$lib/components/onboarding/SupportAssistantDialog.svelte";
+  import SupportChatDialog from "$lib/components/onboarding/SupportChatDialog.svelte";
   import type { LayoutData } from "./$types";
 
   type StoredChatSession = {
@@ -152,7 +152,7 @@
   {/if}
 </div>
 
-<SupportAssistantDialog
+<SupportChatDialog
   isOpen={chatOpen}
   onClose={closeChat}
   customerSupport={customerSupport}
