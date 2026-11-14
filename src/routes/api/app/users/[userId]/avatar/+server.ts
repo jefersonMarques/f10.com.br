@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { error, type RequestHandler } from "@sveltejs/kit";
 import { requireAppAnyPermission } from "$lib/server/auth/authorization";
 import { getUserAvatarResponse } from "$lib/server/account/userAccountRepository";
@@ -20,7 +20,7 @@ export const GET: RequestHandler = async ({ cookies, params, url }) => {
   const [user] = await getDatabase()
     .select({ id: users.id })
     .from(users)
-    .where(and(eq(users.id, userId)))
+    .where(eq(users.id, userId))
     .limit(1);
   if (!user) throw error(404, "Usuário não encontrado.");
 
