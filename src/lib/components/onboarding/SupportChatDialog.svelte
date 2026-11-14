@@ -470,7 +470,7 @@
     if (error === "FINANCE_QUEUE_UNAVAILABLE") return "O atendimento financeiro ainda não está configurado. Entre em contato com a equipe F10.";
     if (error === "CHAT_QUEUE_MISMATCH") return "Já existe uma conversa em outra fila. Finalize esse atendimento antes de iniciar um novo com o Financeiro.";
     if (error === "INVALID_MESSAGE") return "Escreva uma mensagem para iniciar o atendimento.";
-    if (error === "HUMAN_HANDOFF_REQUIRED") return "Tente novamente pelo botão Falar com uma pessoa.";
+    if (error === "HUMAN_HANDOFF_REQUIRED") return "Tente novamente pelo botão Falar com a equipe.";
     if (error === "SUPPORT_QUEUE_UNAVAILABLE") return "O atendimento humano está indisponível no momento.";
     if (error === "INVALID_SESSION") return "Este atendimento expirou. Inicie uma nova conversa.";
     if (error === "CHAT_CLOSED") return "Este atendimento foi encerrado. Inicie uma nova conversa se ainda precisar de ajuda.";
@@ -582,7 +582,7 @@
         ...guestMessages,
         createGuestMessage(
           "assistant",
-          "Não consegui consultar o assistente agora. Tente novamente ou, se preferir, use “Falar com uma pessoa”.",
+          "Não consegui consultar o assistente agora. Tente novamente ou, se preferir, use “Falar com a equipe”.",
         ),
       ];
       await scrollToLatest();
