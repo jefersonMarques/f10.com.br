@@ -153,7 +153,8 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     const canInternalNote = hasTicket ? canManageTicket : canRespond;
     const canAssign = hasPermission(permissions, "chat.manage") || hasPermission(permissions, "tickets.assign");
     const canViewTasks = hasTicket && hasPermission(permissions, "tasks.view");
-    const canCreateTask = canManageTicket && hasPermission(permissions, "tasks.create");
+    const canCreateTask = hasPermission(permissions, "tasks.create") &&
+      (hasTicket ? canManageTicket : hasPermission(permissions, "chat.view"));
     const canRequestRemote = hasTicket && hasPermission(permissions, "remote.request");
     const canUseRemote = hasTicket && hasPermission(permissions, "remote.use");
     const provider = getRemoteProviderStatus();
