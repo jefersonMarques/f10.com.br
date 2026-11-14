@@ -164,11 +164,11 @@ export async function listManagedUsers(actorRoles: string[]) {
 
   return userRows
     .map((user) => {
+      const { avatarKey, ...publicUser } = user;
       const assignedRoles = rolesByUser.get(user.id) ?? [];
       return {
-        ...user,
-        hasAvatar: Boolean(user.avatarKey),
-        avatarKey: undefined,
+        ...publicUser,
+        hasAvatar: Boolean(avatarKey),
         roles: assignedRoles.map((role) => role.code),
         roleNames: assignedRoles.map((role) => role.name),
       };
@@ -310,8 +310,9 @@ export async function getManagedUserDetails(
     overrideRows.map((override) => [override.permissionCode, override]),
   );
 
+  const { avatarKey, ...publicTarget } = target;
   return {
-    user: { ...target, avatarKey: undefined, hasAvatar: Boolean(target.avatarKey) },
+    user: { ...publicTarget, hasAvatar: Boolean(avatarKey) },
     roles: targetRoles,
     roleNames: roleNameRows.map((role) => role.name),
     permissions: permissionRows
