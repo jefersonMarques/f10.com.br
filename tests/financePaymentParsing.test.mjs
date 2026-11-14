@@ -5,6 +5,7 @@ import {
   normalizePayerDocument,
   normalizePaymentInstallments,
   positivePaymentId,
+  parseF10FinanceContracts,
 } from "../src/lib/server/finance/financePaymentParsing.ts";
 
 test("finance identifiers accept only positive safe integers", () => {
@@ -65,4 +66,32 @@ test("PIX is never returned for another contract, paid or expired receivable", (
   assert.equal(isExistingPixPayable({ ...valid, pago: true }, 118, 1049994), false);
   assert.equal(isExistingPixPayable({ ...valid, expirado: true }, 118, 1049994), false);
   assert.equal(isExistingPixPayable({ ...valid, qrcode_text: "" }, 118, 1049994), false);
+});
+
+test("finance contracts come from the payer-scoped F10 API identifiers", () => {
+  const contracts = parseF10FinanceContracts([
+    { contrato_id: 4821, numero_contrato: "F10-2026-34", pessoa_id: 123 },
+    { contrato_id: "4822", numero_contrato: 202635, pessoa_id: 123 },
+    { contrato_id: 4821, numero_contrato: "F10-2026-34", pessoa_id: 123 },
+  ]);
+  assert.deepEqual(contracts, [
+    { id: 4821, number: "F10-2026-34" },
+    { id: 4822, number: "202635" },
+  ]);
+});
+
+test("empty authorized F10 contracts are distinct from unvalidated payers", () => {
+  assert.deepEqual(parseF10FinanceContracts([]), []);
+  assert.throws(() => parseF10FinanceContracts({ contracts: [] }), /FINANCE_RESPONSE_INVALID/);
+  assert.throws(() => parseF10FinanceContracts([{ numero_contrato: "123" }]), /FINANCE_RESPONSE_INVALID/);
+  assert.throws(() => parseF10FinanceContracts([null]), /FINANCE_RESPONSE_INVALID/);
+  assert.throws(() => parseF10FinanceContracts([
+    { contrato_id: 12, numero_contrato: "A" },
+    { contrato_id: 12, numero_contrato: "B" },
+  ]), /FINANCE_RESPONSE_INVALID/);
+});
+
+test("CPF requires payer birth validation, CNPJ does not", () => {
+  assert.throws(() => normalizePayerDocument("12345678901", ""), /FINANCE_BIRTH_INVALID/);
+  assert.equal(normalizePayerDocument("12345678000190", ""), "12345678000190");
 });

@@ -1,3 +1,8 @@
+export type FinanceContract = {
+  id: number;
+  number: string;
+};
+
 export type FinanceInstallment = {
   receivableId: number;
   installment: number;
@@ -51,7 +56,7 @@ export function normalizePayerDocument(document: string, birth: string): string 
   if (digits.length !== 11 && digits.length !== 14) {
     throw new Error("FINANCE_DOCUMENT_INVALID");
   }
-  if (birth && !/^\d{2}\/\d{2}\/\d{4}$/.test(birth)) {
+  if ((digits.length === 11 && !birth) || (birth && !/^\d{2}\/\d{2}\/\d{4}$/.test(birth))) {
     throw new Error("FINANCE_BIRTH_INVALID");
   }
   return digits;
@@ -70,4 +75,32 @@ export function isExistingPixPayable(
     && detail.expirado === false
     && code.length >= 20
     && code.length <= 2500;
+}
+
+export function parseF10FinanceContracts(value: unknown): FinanceContract[] {
+  if (!Array.isArray(value) || value.length > 1000) {
+    throw new Error("FINANCE_RESPONSE_INVALID");
+  }
+
+  const contracts = new Map<number, FinanceContract>();
+
+  for (const item of value) {
+    const source = requirePaymentRecord(item);
+    const id = positivePaymentId(source.contrato_id);
+    if (!id) throw new Error("FINANCE_RESPONSE_INVALID");
+
+    const number = typeof source.numero_contrato === "string"
+      || typeof source.numero_contrato === "number"
+      ? String(source.numero_contrato).trim().slice(0, 100)
+      : "";
+    const parsedContract = { id, number: number || String(id) };
+    const existing = contracts.get(id);
+    if (existing && existing.number !== parsedContract.number) {
+      throw new Error("FINANCE_RESPONSE_INVALID");
+    }
+
+    contracts.set(id, parsedContract);
+  }
+
+  return [...contracts.values()];
 }

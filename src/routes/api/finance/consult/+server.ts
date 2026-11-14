@@ -1,4 +1,4 @@
-import { json, type RequestHandler } from "@sveltejs/kit";
+import { json, type Cookies, type RequestHandler } from "@sveltejs/kit";
 import { and, eq, sql } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { customerActivityEvents } from "$lib/server/db/customerPortalSchema";
@@ -10,38 +10,46 @@ import { requireTicketAccess } from "$lib/server/support/supportAccess";
 import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
 import { consumeSupportPublicRateLimit } from "$lib/server/support/supportPublicRateLimit";
 import {
+  authorizeFinancePayer,
   consultFinanceInstallments,
   consultFinancePix,
-  listCustomerFinanceContracts,
-  listTicketFinanceContracts,
-  type FinanceContract,
 } from "$lib/server/finance/financePaymentService";
 import { isFinanceReadOnlyEnabled } from "$lib/server/finance/financeSettings";
 
 const HEADERS = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" };
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_BODY_BYTES = 2048;
+
+type FinanceAction = "contracts" | "installments" | "pix";
 
 type FinanceAccess = {
-  sessionKey: string;
-  contracts: FinanceContract[];
+  actorId: string;
+  scope: "customer" | "operator";
 };
 
 function errorResponse(code: string, status: number) {
   return json({ error: code }, { status, headers: HEADERS });
 }
 
+function isFinanceAction(value: unknown): value is FinanceAction {
+  return value === "contracts" || value === "installments" || value === "pix";
+}
+
 async function authorizeFinanceAccess(
   scope: string,
   ticketId: string,
-  cookies: Parameters<NonNullable<RequestHandler>>[0]["cookies"],
+  cookies: Cookies,
 ): Promise<FinanceAccess | null> {
   if (scope === "customer") {
     const customer = await getOptionalCustomerF10PortalSession(cookies);
-    if (!customer || customer.selectedUnitId === null || customer.selectedGroupId === null) return null;
-    return {
-      sessionKey: customer.sessionId,
-      contracts: await listCustomerFinanceContracts(customer.contactId),
-    };
+    if (
+      !customer ||
+      customer.selectedUnitId === null ||
+      customer.selectedGroupId === null
+    ) {
+      return null;
+    }
+    return { actorId: customer.sessionId, scope: "customer" };
   }
 
   if (scope !== "operator" || !UUID_PATTERN.test(ticketId)) return null;
@@ -50,8 +58,9 @@ async function authorizeFinanceAccess(
   if (!operator) return null;
 
   const permissions = await resolveUserPermissions(operator.user.id);
-  const scopeGrant = getPermissionScope(permissions, "tickets.view");
-  if (!scopeGrant) return null;
+  const ticketScope = getPermissionScope(permissions, "tickets.view");
+  if (!ticketScope) return null;
+
   const membership = await getDatabase()
     .select({ id: teamMembers.teamId })
     .from(teamMembers)
@@ -64,21 +73,47 @@ async function authorizeFinanceAccess(
   if (membership.length === 0) return null;
 
   try {
-    await requireTicketAccess(operator.user.id, scopeGrant, ticketId);
+    await requireTicketAccess(operator.user.id, ticketScope, ticketId);
   } catch {
     return null;
   }
 
-  return {
-    sessionKey: operator.user.id,
-    contracts: await listTicketFinanceContracts(ticketId),
-  };
+  return { actorId: operator.user.id, scope: "operator" };
+}
+
+async function recordFinanceConsultation(
+  access: FinanceAccess,
+  action: FinanceAction,
+  ticketId: string,
+  contractId: number | null,
+): Promise<void> {
+  const metadata = { operation: action, ...(contractId ? { contractId } : {}) };
+
+  if (access.scope === "operator") {
+    await recordAuditEvent({
+      actorUserId: access.actorId,
+      action: "operations.finance.read",
+      entityType: "ticket",
+      entityId: ticketId,
+      metadata,
+    });
+    return;
+  }
+
+  await getDatabase().insert(customerActivityEvents).values({
+    portalSessionId: access.actorId,
+    eventType: "finance.read",
+    source: "customer_portal",
+    path: "/api/finance/consult",
+    metadata,
+  });
 }
 
 export const GET: RequestHandler = async ({ url, cookies }) => {
   if (!(await isFinanceReadOnlyEnabled())) {
-    return json({ enabled: false, contracts: [] }, { headers: HEADERS });
+    return json({ enabled: false }, { headers: HEADERS });
   }
+
   try {
     const access = await authorizeFinanceAccess(
       url.searchParams.get("scope") ?? "",
@@ -87,10 +122,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
     );
     if (!access) return errorResponse("FINANCE_NOT_AUTHORIZED", 403);
 
-    return json({
-      enabled: true,
-      contracts: access.contracts.map((item) => ({ id: item.id, number: item.number })),
-    }, { headers: HEADERS });
+    return json({ enabled: true }, { headers: HEADERS });
   } catch {
     return errorResponse("FINANCE_UNAVAILABLE", 503);
   }
@@ -102,73 +134,90 @@ export const POST: RequestHandler = async ({
   if (request.headers.get("origin") !== url.origin) {
     return errorResponse("INVALID_ORIGIN", 403);
   }
-  if (Number(request.headers.get("content-length") ?? "0") > 2048) {
+  if (!(await isFinanceReadOnlyEnabled())) {
+    return errorResponse("FINANCE_DISABLED", 403);
+  }
+
+  const contentLength = Number(request.headers.get("content-length") ?? "0");
+  if (!Number.isFinite(contentLength) || contentLength > MAX_BODY_BYTES) {
     return errorResponse("PAYLOAD_TOO_LARGE", 413);
   }
-  if (!(await isFinanceReadOnlyEnabled())) return errorResponse("FINANCE_DISABLED", 403);
+
+  let body: Record<string, unknown>;
+  try {
+    const rawBody = await request.text();
+    if (Buffer.byteLength(rawBody, "utf8") > MAX_BODY_BYTES) {
+      return errorResponse("PAYLOAD_TOO_LARGE", 413);
+    }
+    const parsed: unknown = JSON.parse(rawBody);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return errorResponse("INVALID_REQUEST", 400);
+    }
+    body = parsed as Record<string, unknown>;
+  } catch {
+    return errorResponse("INVALID_REQUEST", 400);
+  }
+
+  const { scope, ticketId, document, birth, action } = body;
+  const contractId = body.contractId;
+  const receivableId = body.receivableId;
+
+  if (
+    (scope !== "customer" && scope !== "operator") ||
+    (typeof ticketId !== "string" && ticketId !== undefined) ||
+    typeof document !== "string" || document.length > 30 ||
+    typeof birth !== "string" || birth.length > 10 ||
+    !isFinanceAction(action) ||
+    (action !== "contracts" && (
+      typeof contractId !== "number" ||
+      !Number.isSafeInteger(contractId) ||
+      contractId <= 0
+    )) ||
+    (action === "pix" && (
+      typeof receivableId !== "number" ||
+      !Number.isSafeInteger(receivableId) ||
+      receivableId <= 0
+    ))
+  ) {
+    return errorResponse("INVALID_REQUEST", 400);
+  }
 
   try {
-    const body = await request.json() as Record<string, unknown>;
-    if (!body || typeof body !== "object" || Array.isArray(body)) {
-      return errorResponse("INVALID_REQUEST", 400);
-    }
-    const scope = body.scope;
-    const ticketId = body.ticketId;
-    const contractId = body.contractId;
-    const document = body.document;
-    const birth = body.birth;
-    const action = body.action;
-    if (
-      (scope !== "customer" && scope !== "operator") ||
-      (typeof ticketId !== "string" && ticketId !== undefined) ||
-      typeof contractId !== "number" || !Number.isSafeInteger(contractId) ||
-      typeof document !== "string" || document.length > 30 ||
-      typeof birth !== "string" || birth.length > 10 ||
-      (action !== "installments" && action !== "pix")
-    ) {
-      return errorResponse("INVALID_REQUEST", 400);
-    }
-
-    const access = await authorizeFinanceAccess(scope, typeof ticketId === "string" ? ticketId : "", cookies);
+    const normalizedTicketId = typeof ticketId === "string" ? ticketId : "";
+    const access = await authorizeFinanceAccess(scope, normalizedTicketId, cookies);
     if (!access) return errorResponse("FINANCE_NOT_AUTHORIZED", 403);
-    const selected = access.contracts.find((item) => item.id === contractId);
-    if (!selected) return errorResponse("FINANCE_CONTRACT_NOT_AUTHORIZED", 403);
 
-    const clientAddress = getClientAddress();
     const allowed = await consumeSupportPublicRateLimit(
       "finance-payment",
-      `${scope}:${access.sessionKey}:${clientAddress}`,
+      `${scope}:${access.actorId}:${getClientAddress()}`,
       { maxRequests: 12, windowMs: 15 * 60_000, blockMs: 15 * 60_000 },
     );
     if (!allowed) return errorResponse("FINANCE_RATE_LIMITED", 429);
 
-    if (scope === "operator") {
-      await recordAuditEvent({
-        actorUserId: access.sessionKey,
-        action: "operations.finance.read",
-        entityType: "ticket",
-        entityId: typeof ticketId === "string" ? ticketId : "",
-        metadata: { contractId, operation: action },
-      });
-    } else {
-      await getDatabase().insert(customerActivityEvents).values({
-        portalSessionId: access.sessionKey,
-        eventType: "finance.read",
-        source: "customer_portal",
-        path: "/api/finance/consult",
-        metadata: { contractId, operation: action },
-      });
+    const payer = await authorizeFinancePayer(document, birth);
+    if (action !== "contracts" && !payer.contracts.some((item) => item.id === contractId)) {
+      return errorResponse("FINANCE_CONTRACT_NOT_AUTHORIZED", 403);
     }
 
+    await recordFinanceConsultation(
+      access,
+      action,
+      normalizedTicketId,
+      action === "contracts" ? null : contractId as number,
+    );
+
+    if (action === "contracts") {
+      return json({ contracts: payer.contracts }, { headers: HEADERS });
+    }
     if (action === "installments") {
-      const result = await consultFinanceInstallments(selected, document, birth);
+      const result = await consultFinanceInstallments(payer, contractId as number);
       return json(result, { headers: HEADERS });
     }
-
-    if (typeof body.receivableId !== "number" || !Number.isSafeInteger(body.receivableId)) {
-      return errorResponse("INVALID_REQUEST", 400);
-    }
-    const result = await consultFinancePix(selected, body.receivableId, document, birth);
+    const result = await consultFinancePix(
+      payer,
+      contractId as number,
+      receivableId as number,
+    );
     return json(result, { headers: HEADERS });
   } catch (cause) {
     const code = cause instanceof Error ? cause.message : "FINANCE_UNAVAILABLE";

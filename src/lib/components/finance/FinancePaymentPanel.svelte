@@ -31,6 +31,8 @@
   let initialized = false;
   let contracts: Contract[] = [];
   let selectedContractId = 0;
+  let contractsLoaded = false;
+  let lookupVersion = 0;
   let document = "";
   let birth = "";
   let openInstallments: Installment[] = [];
@@ -44,10 +46,11 @@
 
   $: birthRequired = document.replace(/\D/g, "").length === 11;
   $: documentValid = [11, 14].includes(document.replace(/\D/g, "").length);
-  $: canConsult = Boolean(selectedContractId && documentValid && (!birthRequired || /^\d{2}\/\d{2}\/\d{4}$/.test(birth)));
+  $: canIdentify = documentValid && (!birthRequired || /^\d{2}\/\d{2}\/\d{4}$/.test(birth));
+  $: canConsult = Boolean(contractsLoaded && selectedContractId && canIdentify);
 
   onMount(() => {
-    void loadContracts();
+    void checkAvailability();
   });
 
   function url(): string {
@@ -67,7 +70,7 @@
     return "Não foi possível consultar o Financeiro agora.";
   }
 
-  async function loadContracts(): Promise<void> {
+  async function checkAvailability(): Promise<void> {
     pending = "contracts";
     try {
       const response = await fetch(url(), { cache: "no-store" });
@@ -76,10 +79,8 @@
         return;
       }
       if (!response.ok) throw new Error("FINANCE_UNAVAILABLE");
-      const data = await response.json() as { enabled: boolean; contracts: Contract[] };
+      const data = await response.json() as { enabled: boolean };
       enabled = data.enabled === true;
-      contracts = Array.isArray(data.contracts) ? data.contracts : [];
-      selectedContractId = contracts[0]?.id ?? 0;
     } catch {
       errorMessage = "Consulta financeira indisponível.";
     } finally {
@@ -88,7 +89,16 @@
     }
   }
 
+  function resetPayer(): void {
+    lookupVersion += 1;
+    contractsLoaded = false;
+    contracts = [];
+    selectedContractId = 0;
+    clearSelection();
+  }
+
   function clearSelection(): void {
+    lookupVersion += 1;
     openInstallments = [];
     paidInstallments = [];
     pix = null;
@@ -97,12 +107,25 @@
     errorMessage = "";
   }
 
-  async function query(action: "installments" | "pix", receivableId?: number): Promise<void> {
-    if (!canConsult || pending) return;
+  async function query(
+    action: "contracts" | "installments" | "pix",
+    receivableId?: number,
+  ): Promise<void> {
+    if (!canIdentify || pending || (action !== "contracts" && !canConsult)) return;
+
+    const activeVersion = lookupVersion;
     pending = action;
     errorMessage = "";
     feedback = "";
-    if (action === "installments") {
+    if (action === "contracts") {
+      contractsLoaded = false;
+      contracts = [];
+      selectedContractId = 0;
+      openInstallments = [];
+      paidInstallments = [];
+      showPaid = false;
+    }
+    if (action !== "pix") {
       pix = null;
       qrSvg = "";
     }
@@ -123,9 +146,14 @@
         }),
       });
       const data = await response.json() as Record<string, unknown>;
+      if (activeVersion !== lookupVersion) return;
       if (!response.ok) throw new Error(String(data.error ?? "FINANCE_UNAVAILABLE"));
 
-      if (action === "installments") {
+      if (action === "contracts") {
+        contracts = Array.isArray(data.contracts) ? data.contracts as Contract[] : [];
+        selectedContractId = contracts[0]?.id ?? 0;
+        contractsLoaded = true;
+      } else if (action === "installments") {
         openInstallments = Array.isArray(data.open) ? data.open as Installment[] : [];
         paidInstallments = Array.isArray(data.paid) ? data.paid as Installment[] : [];
       } else {
@@ -133,6 +161,7 @@
         qrSvg = renderPixQrCode(pix.copyPaste);
       }
     } catch (cause) {
+      if (activeVersion !== lookupVersion) return;
       errorMessage = describeError(cause instanceof Error ? cause.message : "");
       if (action === "pix") {
         pix = null;
@@ -179,10 +208,37 @@
       <h3 class="text-[14px] font-semibold">Financeiro</h3>
     </div>
 
-    {#if contracts.length === 0}
-      <p class="mt-3 text-[12px] text-[#747D8F]">Nenhum contrato vinculado a este acesso.</p>
-    {:else}
-      <div class="mt-3 space-y-3">
+    <div class="mt-3 space-y-3">
+      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <label class="block text-[12px] font-medium text-[#4D5769]">
+          CPF/CNPJ do pagador
+          <input bind:value={document} on:input={resetPayer} inputmode="numeric"
+            autocomplete="off" maxlength="30" placeholder="Somente números"
+            class="mt-1 h-10 w-full rounded-xl border border-[#DDE2EB] bg-white px-3 text-[13px]"/>
+        </label>
+        {#if birthRequired}
+          <label class="block text-[12px] font-medium text-[#4D5769]">
+            Data de nascimento
+            <input bind:value={birth} on:input={resetPayer} placeholder="DD/MM/AAAA"
+              autocomplete="off" maxlength="10"
+              class="mt-1 h-10 w-full rounded-xl border border-[#DDE2EB] bg-white px-3 text-[13px]"/>
+          </label>
+        {/if}
+      </div>
+      <button type="button" disabled={!canIdentify || Boolean(pending)}
+        on:click={() => void query("contracts")}
+        class="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 text-[13px] font-semibold text-white disabled:opacity-40">
+        {#if pending === "contracts"}<LoaderCircle size={16} class="animate-spin"/>{:else}<CreditCard size={16}/>{/if}
+        Buscar contratos
+      </button>
+
+      {#if contractsLoaded && contracts.length === 0}
+        <p role="status" class="text-[12px] text-[#747D8F]">
+          A F10 não retornou contratos para os dados validados.
+        </p>
+      {/if}
+
+      {#if contracts.length > 0}
         <label class="block text-[12px] font-medium text-[#4D5769]">
           Contrato
           <select bind:value={selectedContractId} on:change={clearSelection}
@@ -192,28 +248,13 @@
             {/each}
           </select>
         </label>
-        <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <label class="block text-[12px] font-medium text-[#4D5769]">
-            CPF/CNPJ do pagador
-            <input bind:value={document} on:input={clearSelection} inputmode="numeric"
-              autocomplete="off" maxlength="30" placeholder="Somente números"
-              class="mt-1 h-10 w-full rounded-xl border border-[#DDE2EB] bg-white px-3 text-[13px]"/>
-          </label>
-          {#if birthRequired}
-            <label class="block text-[12px] font-medium text-[#4D5769]">
-              Data de nascimento
-              <input bind:value={birth} on:input={clearSelection} placeholder="DD/MM/AAAA"
-                autocomplete="off" maxlength="10"
-                class="mt-1 h-10 w-full rounded-xl border border-[#DDE2EB] bg-white px-3 text-[13px]"/>
-            </label>
-          {/if}
-        </div>
         <button type="button" disabled={!canConsult || Boolean(pending)}
           on:click={() => void query("installments")}
           class="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-3 text-[13px] font-semibold text-white disabled:opacity-40">
           {#if pending === "installments"}<LoaderCircle size={16} class="animate-spin"/>{:else}<CreditCard size={16}/>{/if}
           Consultar parcelas
         </button>
+      {/if}
 
         {#if openInstallments.length > 0}
           <div class="space-y-2">
@@ -287,8 +328,7 @@
         {/if}
         {#if feedback}<p role="status" class="text-[12px] font-medium text-[#2F7045]">{feedback}</p>{/if}
         {#if errorMessage}<p role="alert" class="text-[12px] text-[#9B3C3C]">{errorMessage}</p>{/if}
-      </div>
-    {/if}
+    </div>
   </section>
 {:else if initialized && allowed && errorMessage}
   <p role="status" class="mb-3 text-[12px] text-[#9B3C3C]">{errorMessage}</p>
