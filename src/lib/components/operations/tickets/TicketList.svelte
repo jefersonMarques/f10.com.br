@@ -1,4 +1,5 @@
 <script lang="ts">
+  import UserAvatar from "$lib/components/application/UserAvatar.svelte";
   import { shortTicketSubject } from "./shortSubject";
   import { ArrowDown, ArrowUp, ArrowUpDown, Check, Clock3, Copy, ExternalLink, Mail, MessageSquare, MoreHorizontal, PanelRightOpen, Plus, TicketCheck, UserRound, X } from "lucide-svelte";
   import { tick } from "svelte";
@@ -418,7 +419,7 @@
               <span class="application-text-caption truncate font-semibold text-[#5D6574]" title={processLabel(ticket)}>{processLabel(ticket)}</span>
               <span class="application-text-caption font-semibold text-[#626978]">{priorityLabels[ticket.priority] ?? ticket.priority}</span>
               <span class="flex min-w-0 items-center gap-2">
-                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--app-info-bg)] text-[10px] font-bold text-[#000A57]">{initials(ticket.assignedUserName)}</span>
+                <UserAvatar userId={ticket.assignedUserId} name={ticket.assignedUserName ?? "Não atribuído"} hasAvatar={ticket.assignedUserHasAvatar ?? false} size="xs"/>
                 <span class="application-text-caption truncate font-semibold text-[#5D6574]">{ticket.assignedUserName ?? "Sem responsável"}</span>
               </span>
               <span class={`application-text-caption inline-flex w-fit items-center gap-1 rounded-full px-2 py-1 font-bold ${slaClass(ticket)}`}><Clock3 size={11}/>{slaText(ticket)}</span>
