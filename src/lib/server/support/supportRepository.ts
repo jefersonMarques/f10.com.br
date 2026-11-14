@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm";
 import { getPermissionScope, hasPermission, resolveUserPermissions } from "$lib/server/auth/permissions";
 import { getDatabase } from "$lib/server/db";
+import { listMessageReactionSummaries, EMPTY_REACTION_SUMMARY } from "$lib/server/support/supportMessageReactionRepository";
 import { getConfiguredF10UnitId } from "$lib/server/integrations/f10/f10CustomerApi";
 import { resolveF10TicketContract } from "$lib/server/support/f10TicketContractRepository";
 import {
@@ -907,10 +908,18 @@ export async function getSupportTicket(
       .limit(100),
   ]);
 
+  const reactionSummaries = await listMessageReactionSummaries(
+    "ticket",
+    messages.map((message) => message.id),
+    "agent",
+    actorUserId,
+  );
+
   return {
     ticket,
     messages: messages.map(({ externalMetadata, ...message }) => ({
       ...message,
+      ...(reactionSummaries.get(message.id) ?? EMPTY_REACTION_SUMMARY),
       inlineImages: (
         Array.isArray(externalMetadata?.inlineImages) ? externalMetadata.inlineImages : []
       ).flatMap((raw): Array<{ src: string; alt: string; external: boolean }> => {
