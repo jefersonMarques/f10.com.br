@@ -1064,7 +1064,7 @@
       </div>
       <div class="flex items-center gap-1.5">
         {#if !session && entryDepartment === "support"}
-          <button type="button" on:click={() => void requestHumanSupport()} class="hidden rounded-full border border-[#DDE1E9] px-3 py-2 text-[9px] font-semibold text-[#000A57] transition hover:bg-[#F5F6FA] sm:inline-flex">
+          <button type="button" on:click={() => void requestHumanSupport()} class="hidden rounded-full border border-[#DDE1E9] px-3 py-2 text-[11px] font-semibold text-[#000A57] transition hover:bg-[#F5F6FA] sm:inline-flex">
             Falar com uma pessoa
           </button>
         {/if}
@@ -1074,7 +1074,7 @@
       </div>
     </header>
 
-    <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="min-h-0 flex-1 overflow-y-auto bg-[#F7F8FB] px-4 py-4" aria-live="polite">
+    <div bind:this={messagesElement} on:scroll={handleMessagesScroll} class="min-h-0 flex-1 overflow-y-auto bg-[var(--app-surface-subtle)] px-4 py-4" aria-live="polite">
       {#if session && (entryDepartment !== "finance" || authState.authenticated)}
         {#if departmentSessionMismatch}
           <div role="status" class="mb-3 rounded-xl border border-[#F1CFB5] bg-[#FFF8F1] p-3 text-[11px] leading-5 text-[#81512A]">
@@ -1091,7 +1091,7 @@
                   <div class="flex items-start gap-2.5">
                     <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><MessageCircleMore size={15}/></span>
                     <div class="min-w-0 flex-1">
-                      <strong class="text-[10px] font-semibold text-[#303746]">{systemCardTitle(message.presentation)}</strong>
+                      <strong class="text-[13px] font-semibold text-[#303746]">{systemCardTitle(message.presentation)}</strong>
                       <SupportChatMarkdown text={message.body} className="mt-1 text-[#687080]"/>
                       <span class="mt-1 block text-[8px] text-[#A0A5B0]">{formatTime(message.createdAt)}</span>
                     </div>
@@ -1112,7 +1112,7 @@
                       </div>
                     {/if}
                     {#if message.body}<SupportChatMarkdown text={message.body} isCustomer className={message.attachments?.length ? "mt-2" : ""}/>{/if}
-                    <span class="mt-1 block text-[8px] text-white/55">{message.optimistic ? "Enviando..." : formatTime(message.createdAt)}</span>
+                    <span class="mt-1 block text-[11px] text-white/70">{message.optimistic ? "Enviando..." : formatTime(message.createdAt)}</span>
                   </div>
                 </div>
               {:else}
@@ -1126,8 +1126,8 @@
                     {/if}
                   </span>
                   <div class="max-w-[84%]">
-                    <div class="mb-1 px-1 text-[8px] font-semibold text-[#596171]">{message.authorType === "user" ? (message.authorUserName ?? "Equipe F10") : "Atendimento F10"}</div>
-                    <div class="rounded-2xl rounded-tl-md border border-[#E0E4EC] bg-white px-3.5 py-2.5 text-[#343B4C]">
+                    <div class="mb-1 px-1 text-[12px] font-semibold text-[#596171]">{message.authorType === "user" ? (message.authorUserName ?? "Equipe F10") : "Atendimento F10"}</div>
+                    <div class="rounded-2xl rounded-tl-md border border-[#E0E4EC] bg-[var(--app-surface)] px-3.5 py-3 text-[var(--app-text)]">
                       {#if message.attachments?.length}
                         <div class={`grid gap-1.5 ${message.attachments.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
                           {#each message.attachments as attachment}
@@ -1140,7 +1140,7 @@
                         </div>
                       {/if}
                       {#if message.body}<SupportChatMarkdown text={message.body} className={message.attachments?.length ? "mt-2" : ""}/>{/if}
-                      <span class="mt-1 block text-[8px] text-[#969CAA]">{formatTime(message.createdAt)}</span>
+                      <span class="mt-1 block text-[11px] text-[#6D7485]">{formatTime(message.createdAt)}</span>
                     </div>
                   </div>
                 </div>
@@ -1160,7 +1160,7 @@
             {:else}
               <div class="flex items-start gap-2">
                 <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFF0E4] text-[#EA6D0B]"><Sparkles size={14}/></span>
-                <div class="max-w-[84%] rounded-2xl rounded-tl-md border border-[#E1E4EB] bg-white px-3.5 py-2.5 text-[#343B4C] shadow-sm">
+                <div class="max-w-[84%] rounded-2xl rounded-tl-md border border-[#E1E4EB] bg-[var(--app-surface)] px-3.5 py-3 text-[var(--app-text)] shadow-sm">
                   <SupportChatMarkdown text={message.body}/>
                 </div>
               </div>
@@ -1175,11 +1175,11 @@
               {:else}
                 <div class="flex flex-wrap gap-2">
                   {#each entryOptions.filter((option) => !isFinancialChatOption(option)) as option}
-                    <button type="button" on:click={() => void selectEntryOption(option)} class="rounded-xl border border-[#DDE1E9] bg-white px-3 py-2 text-left text-[9px] font-semibold text-[#3D4556] shadow-sm transition hover:border-[#BFC5D2] hover:text-[#000A57]">
+                    <button type="button" on:click={() => void selectEntryOption(option)} class="rounded-xl border border-[#DDE1E9] bg-white px-3 py-2 text-left text-[11px] font-semibold text-[#3D4556] shadow-sm transition hover:border-[#BFC5D2] hover:text-[#000A57]">
                       {option.label}
                     </button>
                   {/each}
-                  <button type="button" on:click={() => void requestHumanSupport()} class="inline-flex items-center gap-1.5 rounded-xl border border-[#F1CFB5] bg-[#FFF8F1] px-3 py-2 text-[9px] font-semibold text-[#B9570A] transition hover:bg-[#FFF1E4]">
+                  <button type="button" on:click={() => void requestHumanSupport()} class="inline-flex items-center gap-1.5 rounded-xl border border-[#F1CFB5] bg-[#FFF8F1] px-3 py-2 text-[11px] font-semibold text-[#B9570A] transition hover:bg-[#FFF1E4]">
                     <UserRound size={12}/> Falar com uma pessoa
                   </button>
                 </div>
@@ -1201,21 +1201,21 @@
               {:else if authStep === "login" && !authState.authenticated}
                 <div class="flex items-start gap-2.5">
                   <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><LockKeyhole size={16}/></span>
-                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">{entryDepartment === "finance" ? "Entre para falar com o Financeiro" : "Entre para falar com a equipe"}</h3><p class="mt-1 text-[9px] leading-4 text-[#7B8292]">Use o mesmo e-mail e senha do F10. A senha é validada e não fica armazenada.</p></div>
+                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">{entryDepartment === "finance" ? "Entre para falar com o Financeiro" : "Entre para falar com a equipe"}</h3><p class="mt-1 text-[12px] leading-5 text-[#7B8292]">Use o mesmo e-mail e senha do F10. A senha é validada e não fica armazenada.</p></div>
                 </div>
                 <form class="mt-4 space-y-3" on:submit|preventDefault={submitLogin}>
-                  <label class="block text-[9px] font-semibold text-[#596171]">E-mail F10<input bind:value={loginEmail} type="email" required maxlength="254" autocomplete="username" class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] px-3 text-[11px] font-normal outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10"/></label>
-                  <label class="block text-[9px] font-semibold text-[#596171]">Senha<input bind:value={loginPassword} type="password" required maxlength="512" autocomplete="current-password" class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] px-3 text-[11px] font-normal outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10"/></label>
+                  <label class="block text-[11px] font-semibold text-[#596171]">E-mail F10<input bind:value={loginEmail} type="email" required maxlength="254" autocomplete="username" class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] px-3 text-[11px] font-normal outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10"/></label>
+                  <label class="block text-[11px] font-semibold text-[#596171]">Senha<input bind:value={loginPassword} type="password" required maxlength="512" autocomplete="current-password" class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] px-3 text-[11px] font-normal outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10"/></label>
                   <button type="submit" disabled={authSubmitting || !loginEmail.trim() || !loginPassword} class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">{#if authSubmitting}<LoaderCircle class="animate-spin" size={15}/>{/if}Entrar e continuar</button>
                 </form>
               {:else if authStep === "unit"}
                 <div class="flex items-start gap-2.5">
                   <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF0FF] text-[#000A57]"><CheckCircle2 size={16}/></span>
-                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">Selecione a unidade</h3><p class="mt-1 text-[9px] leading-4 text-[#7B8292]">Sua conta já está autenticada. Escolha o grupo e a unidade para vincular o atendimento corretamente.</p></div>
+                  <div><h3 class="text-[12px] font-semibold text-[#252C3D]">Selecione a unidade</h3><p class="mt-1 text-[12px] leading-5 text-[#7B8292]">Sua conta já está autenticada. Escolha o grupo e a unidade para vincular o atendimento corretamente.</p></div>
                 </div>
                 <form class="mt-4 space-y-3" on:submit|preventDefault={submitUnitSelection}>
-                  <label class="block text-[9px] font-semibold text-[#596171]">Grupo<select value={selectedGroupId || ""} on:change={handleGroupChange} required class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 text-[11px] font-normal outline-none"><option value="" disabled>Selecione</option>{#each authState.groups as group}<option value={group.id}>{group.name}</option>{/each}</select></label>
-                  <label class="block text-[9px] font-semibold text-[#596171]">Unidade<select bind:value={selectedUnitId} required class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 text-[11px] font-normal outline-none"><option value={0} disabled>Selecione</option>{#each selectedUnits as unit}<option value={unit.id}>{unit.name}</option>{/each}</select></label>
+                  <label class="block text-[11px] font-semibold text-[#596171]">Grupo<select value={selectedGroupId || ""} on:change={handleGroupChange} required class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 text-[11px] font-normal outline-none"><option value="" disabled>Selecione</option>{#each authState.groups as group}<option value={group.id}>{group.name}</option>{/each}</select></label>
+                  <label class="block text-[11px] font-semibold text-[#596171]">Unidade<select bind:value={selectedUnitId} required class="mt-1.5 h-10 w-full rounded-xl border border-[#DDE1E9] bg-white px-3 text-[11px] font-normal outline-none"><option value={0} disabled>Selecione</option>{#each selectedUnits as unit}<option value={unit.id}>{unit.name}</option>{/each}</select></label>
                   <button type="submit" disabled={authSubmitting || !selectedGroupId || !selectedUnitId} class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#000A57] px-4 text-[10px] font-semibold text-white disabled:opacity-50">{#if authSubmitting}<LoaderCircle class="animate-spin" size={15}/>{/if}Continuar atendimento</button>
                 </form>
               {:else if authState.authenticated}
@@ -1238,14 +1238,14 @@
     </div>
 
     {#if newMessageCount > 0}
-      <button type="button" on:click={() => void scrollToLatest()} class="absolute bottom-20 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#000A57] px-3 py-2 text-[9px] font-semibold text-white shadow-lg">{newMessageCount} nova{newMessageCount > 1 ? "s" : ""}<ArrowDown size={12}/></button>
+      <button type="button" on:click={() => void scrollToLatest()} class="absolute bottom-20 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#000A57] px-3 py-2 text-[11px] font-semibold text-white shadow-lg">{newMessageCount} nova{newMessageCount > 1 ? "s" : ""}<ArrowDown size={12}/></button>
     {/if}
 
     {#if session && (entryDepartment !== "finance" || authState.authenticated)}
       <form class={`relative shrink-0 border-t bg-white px-3 py-3 ${dragActive ? "border-[#EA6D0B] ring-2 ring-inset ring-[#EA6D0B]/20" : "border-[#E6E8EF]"}`} on:submit|preventDefault={sendReply} on:dragenter={handleDragEnter} on:dragover={handleDragOver} on:dragleave={handleDragLeave} on:drop={handleDrop}>
         {#if dragActive}<div class="pointer-events-none absolute inset-2 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-[#EA6D0B] bg-[#FFF8F1]/95 text-[10px] font-semibold text-[#B9570A]"><ImageIcon size={16} class="mr-2"/>Solte o arquivo para anexar</div>{/if}
-        {#if errorMessage}<p class="mb-2 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[9px] leading-4 text-[#9A4E3D]">{errorMessage}</p>{/if}
-        {#if attachmentError}<p class="mb-2 rounded-xl bg-[#FFF8EE] px-3 py-2 text-[9px] leading-4 text-[#8B5B24]">{attachmentError}</p>{/if}
+        {#if errorMessage}<p class="mb-2 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[12px] leading-5 text-[#9A4E3D]">{errorMessage}</p>{/if}
+        {#if attachmentError}<p class="mb-2 rounded-xl bg-[#FFF8EE] px-3 py-2 text-[12px] leading-5 text-[#8B5B24]">{attachmentError}</p>{/if}
         {#if pendingImages.length > 0}<div class="mb-2 flex gap-2 overflow-x-auto">{#each pendingImages as image (image.id)}<div class="relative h-14 w-16 shrink-0 overflow-hidden rounded-xl border border-[#DDE1E9]">{#if image.file.type.startsWith("image/")}
           <img src={image.previewUrl} alt={image.file.name || "Imagem"} class="h-full w-full object-cover"/>
         {:else}
@@ -1254,16 +1254,16 @@
         <input bind:this={fileInputElement} type="file" multiple accept="image/png,image/jpeg,image/webp,application/pdf" class="hidden" on:change={handleFileInput}/>
         <div class="flex items-end gap-2">
           <button type="button" on:click={() => fileInputElement?.click()} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#DDE1E9] text-[#667080] hover:text-[#000A57]" aria-label="Anexar arquivo"><Paperclip size={16}/></button>
-          <textarea bind:value={reply} maxlength="4000" rows="1" placeholder="Escreva sua mensagem..." class="max-h-28 min-h-10 flex-1 resize-none rounded-xl border border-[#DDE1E9] bg-[#FAFBFC] px-3 py-2.5 text-[11px] leading-5 outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" on:input={handleCustomerDraftInput} on:keydown={handleReplyKeydown} on:paste={handleReplyPaste}></textarea>
+          <textarea bind:value={reply} maxlength="4000" rows="1" placeholder="Escreva sua mensagem..." class="max-h-28 min-h-10 flex-1 resize-none rounded-xl border border-[#DDE1E9] bg-[#FAFBFC] px-3 py-2.5 text-[14px] leading-6 outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10" on:input={handleCustomerDraftInput} on:keydown={handleReplyKeydown} on:paste={handleReplyPaste}></textarea>
           <button type="submit" disabled={sending || (!reply.trim() && pendingImages.length === 0)} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EA6D0B] text-white disabled:opacity-40" aria-label="Enviar">{#if sending}<LoaderCircle class="animate-spin" size={16}/>{:else}<Send size={16}/>{/if}</button>
         </div>
         <div class="mt-2 flex flex-wrap items-center justify-between gap-2"><span class="text-[9px] text-[#777E8D]">Texto visível à equipe · Enter envia · Shift+Enter quebra linha</span><button type="button" on:click={startAnotherChat} class="text-[8px] font-semibold text-[#6D7485] hover:text-[#000A57]">Novo atendimento</button></div>
       </form>
     {:else if entryDepartment === "support" && !handoffRequested}
       <form class="shrink-0 border-t border-[#E6E8EF] bg-white px-3 py-3" on:submit|preventDefault={sendGuestMessage}>
-        {#if errorMessage && !handoffRequested}<p class="mb-2 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[9px] leading-4 text-[#9A4E3D]">{errorMessage}</p>{/if}
+        {#if errorMessage && !handoffRequested}<p class="mb-2 rounded-xl bg-[#FFF4F1] px-3 py-2 text-[12px] leading-5 text-[#9A4E3D]">{errorMessage}</p>{/if}
         <div class="flex items-end gap-2">
-          <textarea bind:value={guestReply} maxlength="2000" rows="1" placeholder="Digite sua dúvida..." disabled={assistantSending || handoffRequested} class="max-h-28 min-h-10 flex-1 resize-none rounded-xl border border-[#DDE1E9] bg-[#FAFBFC] px-3 py-2.5 text-[11px] leading-5 outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10 disabled:opacity-55" on:keydown={handleGuestKeydown}></textarea>
+          <textarea bind:value={guestReply} maxlength="2000" rows="1" placeholder="Digite sua dúvida..." disabled={assistantSending || handoffRequested} class="max-h-28 min-h-10 flex-1 resize-none rounded-xl border border-[#DDE1E9] bg-[#FAFBFC] px-3 py-2.5 text-[14px] leading-6 outline-none focus:border-[#000A57] focus:ring-3 focus:ring-[#000A57]/10 disabled:opacity-55" on:keydown={handleGuestKeydown}></textarea>
           <button type="submit" disabled={assistantSending || handoffRequested || !guestReply.trim()} class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white disabled:opacity-40" aria-label="Enviar para o Assistente F10">{#if assistantSending}<LoaderCircle class="animate-spin" size={16}/>{:else}<Send size={16}/>{/if}</button>
         </div>
         <div class="mt-2 flex items-center justify-between gap-2">
