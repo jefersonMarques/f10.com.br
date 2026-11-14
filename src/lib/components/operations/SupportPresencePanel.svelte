@@ -13,6 +13,7 @@
   let statusFilter = "all";
   let sortBy = "name";
   let hoveredSegment: string | null = null;
+  let missingAvatars: string[] = [];
   let loading = false;
   let errorMessage = "";
   let latestRequest = 0;
@@ -46,6 +47,10 @@
       }
       return first.name.localeCompare(second.name, "pt-BR");
     });
+
+  function handleAvatarError(userId: string): void {
+    missingAvatars = [...missingAvatars, userId];
+  }
 
   function initials(name: string): string {
     return name.trim().split(/\s+/).slice(0, 2)
@@ -122,7 +127,7 @@
         <button type="button" disabled={loading} on:click={() => void refresh(presence.date)}
           aria-label="Atualizar presença" title="Atualizar presença"
           class="flex h-10 w-10 items-center justify-center rounded-lg border border-app-border-control text-app-text disabled:opacity-50">
-          <RefreshCw size={17} class:animate-spin={loading}/>
+          <RefreshCw size={17} class={loading ? "animate-spin" : ""}/>
         </button>
       </div>
     </div>
@@ -181,10 +186,10 @@
           <div class="flex min-w-0 items-center gap-2.5">
             <span class="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-app-info-bg application-text-caption font-semibold text-app-primary">
               {initials(user.name)}
-              {#if user.hasAvatar}
+              {#if user.hasAvatar && !missingAvatars.includes(user.id)}
                 <img src={`/api/app/performance/avatar/${user.id}`} alt={`Foto de ${user.name}`}
                   class="absolute inset-0 h-full w-full object-cover"
-                  on:error={(event) => (event.currentTarget.hidden = true)}/>
+                  on:error={() => handleAvatarError(user.id)}/>
               {/if}
             </span>
             <span class="min-w-0">
@@ -219,7 +224,7 @@
                     on:mouseleave={() => (hoveredSegment = null)}
                     on:focus={() => (hoveredSegment = `${user.id}-${index}`)}
                     on:blur={() => (hoveredSegment = null)}
-                    on:click={() => (hoveredSegment = hoveredSegment === `${user.id}-${index}` ? null : `${user.id}-${index}`)}>
+                    on:click={() => (hoveredSegment = `${user.id}-${index}`)}>
                   </button>
                   {#if hoveredSegment === `${user.id}-${index}`}
                     <div role="tooltip" class="pointer-events-none absolute bottom-6 z-30 min-w-[190px] rounded-lg border border-app-border bg-app-surface p-3 text-left shadow-lg"
