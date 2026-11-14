@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowLeft, KeyRound, Mail, ShieldCheck } from "lucide-svelte";
+  import { ArrowLeft, KeyRound, Mail } from "lucide-svelte";
   import type { ActionData, PageData } from "./$types";
 
   export let data: PageData;
@@ -15,8 +15,8 @@
 </script>
 
 <svelte:head>
-  <title>Área do Cliente | F10 Software</title>
-  <meta name="description" content="Entre na Área do Cliente para acompanhar chamados e solicitações." />
+  <title>Helpdesk F10 | Acesso do cliente</title>
+  <meta name="description" content="Acesse o Helpdesk F10 para acompanhar chamados e solicitações." />
 </svelte:head>
 
 <main class="min-h-screen bg-[#F7F8FB] px-5 py-8 text-[#10172A] sm:py-14">
@@ -25,9 +25,9 @@
 
     <section class="mt-5 overflow-hidden rounded-[28px] border border-[#E1E4EC] bg-white shadow-[0_18px_55px_rgba(1,13,40,0.07)]">
       <header class="bg-[#010D28] px-6 py-7 text-white sm:px-8 sm:py-8">
-        <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-[#FF9A4B]"><ShieldCheck size={21} /></span>
-        <p class="application-text-caption mt-5 font-bold uppercase tracking-[0.14em] text-[#FF9A4B]">Área do Cliente F10</p>
-        <h1 class="mt-2 text-[28px] font-semibold tracking-[-0.04em] sm:text-[34px]">Entre na Área do Cliente</h1>
+        <img src="/branding/f10-helpdesk.webp" alt="Helpdesk F10"
+          class="h-auto w-[174px] max-w-full object-contain" width="174" height="70"/>
+        <h1 class="mt-5 text-[26px] font-semibold tracking-[-0.04em] sm:text-[32px]">Acesse o Helpdesk F10</h1>
         <p class="application-text-control mt-3 leading-6 text-white/65">Informe seu e-mail e senha para continuar.</p>
       </header>
 
