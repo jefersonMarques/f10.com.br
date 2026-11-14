@@ -114,7 +114,10 @@
   <section class="border-b border-[#E4E7EE] bg-[#010D28] text-white">
     <div class="mx-auto max-w-[980px] px-5 py-14 sm:px-8 sm:py-20">
       <div class="mx-auto max-w-[820px] text-center">
-        <div class="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-white/70"><Sparkles size={14}/>Central de Ajuda F10</div>
+        <a href="/ajuda-f10" aria-label="Helpdesk F10 — Central de Ajuda" class="inline-flex items-center justify-center">
+          <img src="/branding/f10-helpdesk.webp" alt="Helpdesk F10"
+            class="h-auto w-[186px] max-w-full object-contain" width="186" height="76"/>
+        </a>
         <h1 class="mt-5 text-[34px] font-semibold tracking-[-0.045em] sm:text-[50px]">O que você precisa fazer no F10?</h1>
         <p class="mx-auto mt-4 max-w-[680px] text-[14px] leading-7 text-white/68 sm:text-[15px]">Pesquise pelo título, assunto ou procedimento. Encontre orientações mesmo quando a IA estiver indisponível.</p>
       </div>
@@ -136,14 +139,7 @@
             <Search size={17}/>Buscar
           </button>
         </div>
-        <div class="mt-3 flex flex-wrap items-center justify-center gap-3">
-          {#if data.helpPublicAi.available}
-            <button type="button" disabled={loading || question.trim().length < 3} on:click={() => void askHelp()} class="inline-flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45">
-              {#if loading}<LoaderCircle size={15} class="animate-spin"/>{:else}<Sparkles size={15}/>{/if}
-              Perguntar à IA
-            </button>
-          {/if}
-        </div>
+
       </form>
     </div>
   </section>
