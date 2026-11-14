@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { invalidateAll } from "$app/navigation";
   import EmailMessageBody from "$lib/components/operations/tickets/EmailMessageBody.svelte";
+  import MessageActionMenu from "$lib/components/support/MessageActionMenu.svelte";
   import SupportChatMarkdown from "$lib/components/support/SupportChatMarkdown.svelte";
   import LivePageSync from "$lib/components/application/LivePageSync.svelte";
   import {
@@ -27,6 +29,27 @@
   export let form: ActionData;
 
   let satisfactionScore = 0;
+  let reactionError = "";
+
+  async function reactTicketMessage(
+    messageId: string,
+    code: "like" | "heart" | "check" | "eyes",
+  ): Promise<void> {
+    reactionError = "";
+    const form = new FormData();
+    form.set("messageId", messageId);
+    form.set("reaction", code);
+    try {
+      const response = await fetch(`/cliente/chamados/${data.details.ticket.id}?/react`, {
+        method: "POST",
+        body: form,
+      });
+      if (!response.ok) throw new Error("REACTION_FAILED");
+      await invalidateAll();
+    } catch {
+      reactionError = "Não foi possível registrar a reação.";
+    }
+  }
 
   const statusLabels: Record<string, string> = {
     new: "Aguardando atendimento",
@@ -220,6 +243,7 @@
       {/if}
     </section>
   {/if}
+  {#if reactionError}<p role="alert" class="application-text-caption mt-3 text-[var(--app-danger-text)]">{reactionError}</p>{/if}
   <section class="mt-4 overflow-hidden rounded-[22px] border border-[#E1E4EC] bg-white shadow-[0_8px_28px_rgba(1,13,40,0.025)]">
     <header class="border-b border-[#ECEEF3] px-5 py-4 sm:px-6">
       <div class="flex items-center gap-2">
@@ -241,7 +265,7 @@
                   <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#DDE2EC] bg-white text-[10px] font-bold text-[#000A57] shadow-sm">F10</div>
                 {/if}
 
-                <div class={`max-w-[94%] rounded-2xl px-4 py-3.5 shadow-[0_5px_16px_rgba(1,13,40,0.045)] ${entry.message.authorType === "customer" ? "bg-[#000A57] text-white" : "border border-[#E0E4EC] bg-white text-[#343B4C]"}`}>
+                <div class={`group relative max-w-[94%] rounded-2xl px-4 py-3.5 shadow-[0_5px_16px_rgba(1,13,40,0.045)] ${entry.message.authorType === "customer" ? "bg-[#000A57] text-white" : "border border-[#E0E4EC] bg-white text-[#343B4C]"}`}>
                   {#if entry.message.body}
                     {#if entry.message.channel === "email"}
                       <EmailMessageBody text={entry.message.body} className="text-[14px] leading-6"/>
@@ -268,6 +292,10 @@
                     </div>
                   {/if}
                   <span class={`application-text-meta mt-2 block ${entry.message.authorType === "customer" ? "text-white/60" : "text-[#969CAA]"}`}>{entry.message.authorType === "customer" ? "Você" : "Equipe F10"} · {formatDate(entry.message.createdAt)}</span>
+                  {#if entry.message.authorType !== "system"}
+                    <MessageActionMenu reactions={entry.message.reactions ?? []} myReaction={entry.message.myReaction ?? null}
+                      onReact={(code) => reactTicketMessage(entry.message.id, code)}/>
+                  {/if}
                 </div>
 
                 {#if entry.message.authorType === "customer"}
