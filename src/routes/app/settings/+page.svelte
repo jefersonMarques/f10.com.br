@@ -5,7 +5,7 @@
   export let data: PageData;
   export let form: ActionData;
 
-  let activeSection: "general" | "webview" = "general";
+  let activeSection: "general" | "webview" = form?.action === "saveIframeF10" ? "webview" : "general";
 </script>
 
 <svelte:head><title>Configurações | Helpdesk F10</title></svelte:head>
