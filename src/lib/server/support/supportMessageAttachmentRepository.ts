@@ -183,6 +183,19 @@ export async function uploadSupportMessageAttachments(
   });
 }
 
+export async function uploadSupportChatMessageAttachments(
+  sessionId: string,
+  messageId: string,
+  files: File[],
+): Promise<StoredSupportAttachment[]> {
+  return storeAttachments(`chats/${sessionId}`, messageId, files, {
+    maxFiles: SUPPORT_ATTACHMENT_MAX_FILES,
+    maxBytes: SUPPORT_ATTACHMENT_MAX_BYTES,
+    allowedTypes: ALLOWED_PORTAL_TYPES,
+    detectType: detectedPortalType,
+    errorPrefix: "SUPPORT_ATTACHMENT",
+  });
+}
 
 const AGENT_ATTACHMENT_TYPES = new Map<string, string>([
   ["image/png", "png"], ["image/jpeg", "jpg"], ["image/webp", "webp"],
@@ -192,9 +205,8 @@ const AGENT_ATTACHMENT_TYPES = new Map<string, string>([
   ["application/zip", "zip"], ["text/plain", "txt"], ["text/csv", "csv"],
 ]);
 
-/** Files belong to the message, not the ticket-level upload drawer. */
-export async function uploadSupportAgentMessageAttachments(
-  ticketId: string,
+async function storeSupportAgentMessageAttachments(
+  storageScope: string,
   messageId: string,
   files: File[],
 ): Promise<StoredSupportAttachment[]> {
@@ -222,7 +234,7 @@ export async function uploadSupportAgentMessageAttachments(
       if (isOffice ? !isZip : isText ? bytes.includes(0) : detected !== mime) {
         throw new Error("SUPPORT_ATTACHMENT_TYPE_INVALID");
       }
-      const key = `support/tickets/${ticketId}/${messageId}/${randomUUID()}.${extension}`;
+      const key = `support/${storageScope}/${messageId}/${randomUUID()}.${extension}`;
       const item = await putAssetObject(key, bytes, mime);
       stored.push({
         storageKey: item.key,
@@ -237,6 +249,23 @@ export async function uploadSupportAgentMessageAttachments(
     await deleteStoredSupportImages(stored);
     throw cause;
   }
+}
+
+
+export async function uploadSupportAgentMessageAttachments(
+  ticketId: string,
+  messageId: string,
+  files: File[],
+): Promise<StoredSupportAttachment[]> {
+  return storeSupportAgentMessageAttachments(`tickets/${ticketId}`, messageId, files);
+}
+
+export async function uploadSupportAgentChatMessageAttachments(
+  sessionId: string,
+  messageId: string,
+  files: File[],
+): Promise<StoredSupportAttachment[]> {
+  return storeSupportAgentMessageAttachments(`chats/${sessionId}`, messageId, files);
 }
 
 export async function deleteStoredSupportImages(images: StoredSupportAttachment[]): Promise<void> {
