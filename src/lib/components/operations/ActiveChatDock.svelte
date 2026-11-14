@@ -6,6 +6,7 @@
     ExternalLink,
     MessageCircleMore,
     Minus,
+    Paperclip,
     Send,
     TicketCheck,
     UserRound,
@@ -46,6 +47,8 @@
   let messages: DockMessage[] = [];
   let expandedSessionId: string | null = null;
   let draft = "";
+  let pendingFiles: File[] = [];
+  let fileInput: HTMLInputElement;
   let sending = false;
   let finishing = false;
   let refreshing = false;
@@ -236,7 +239,11 @@
   async function sendMessage(): Promise<void> {
     if (!expandedSessionId || sending) return;
     const body = draft.trim();
-    if (!body) return;
+    if (!body && pendingFiles.length === 0) return;
+    if (pendingFiles.length > 4 || pendingFiles.reduce((sum, file) => sum + file.size, 0) > 12 * 1024 * 1024) {
+      errorMessage = "Limite: 4 arquivos e 12 MB por mensagem.";
+      return;
+    }
 
     sending = true;
     errorMessage = "";
@@ -245,8 +252,12 @@
         `/api/app/chat/${encodeURIComponent(expandedSessionId)}/messages`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ body }),
+          body: (() => {
+            const form = new FormData();
+            form.set("body", body);
+            for (const file of pendingFiles) form.append("files", file, file.name);
+            return form;
+          })(),
         },
       );
       if (!response.ok) {
@@ -257,6 +268,8 @@
       }
 
       draft = "";
+      pendingFiles = [];
+      if (fileInput) fileInput.value = "";
       await refreshDock();
       await scrollMessagesToEnd();
     } catch {
@@ -354,10 +367,28 @@
       {/if}
 
       <form on:submit|preventDefault={() => void sendMessage()} class="border-t border-[#E5E8EE] bg-white p-3">
+        <input bind:this={fileInput} type="file" multiple accept="image/png,image/jpeg,image/webp,.pdf,.docx,.xlsx,.zip,.txt,.csv"
+          class="sr-only" on:change={(event) => {
+            const selected = Array.from(event.currentTarget.files ?? []);
+            pendingFiles = [...pendingFiles, ...selected].slice(0, 4);
+          }}/>
+        {#if pendingFiles.length}
+          <div class="mb-2 flex flex-wrap gap-1.5">
+            {#each pendingFiles as file}
+              <span class="flex min-w-0 items-center gap-1 rounded-lg bg-[var(--app-surface-muted)] px-2 py-1 text-[12px] text-[var(--app-text)]">
+                <span class="max-w-[150px] truncate">{file.name}</span>
+                <button type="button" aria-label={`Remover ${file.name}`}
+                  on:click={() => (pendingFiles = pendingFiles.filter((item) => item !== file))}>×</button>
+              </span>
+            {/each}
+          </div>
+        {/if}
         {#if errorMessage}<p class="application-text-meta mb-2 rounded-lg bg-[#FFF2F2] px-2.5 py-2 font-medium text-[#A13B3B]">{errorMessage}</p>{/if}
         <div class="flex items-end gap-2">
           <textarea bind:value={draft} rows="2" maxlength="4000" placeholder="Responder cliente..." on:keydown={handleComposerKeydown} class="application-text-caption min-h-[44px] max-h-28 flex-1 resize-y rounded-xl border border-[#D9DDE5] px-3 py-2.5 leading-5 outline-none focus:border-[#000A57]"></textarea>
-          <button type="submit" disabled={sending || !draft.trim()} class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white disabled:cursor-not-allowed disabled:opacity-45" aria-label="Enviar mensagem"><Send size={16}/></button>
+          <button type="button" on:click={() => fileInput?.click()} aria-label="Anexar arquivo"
+            class="flex h-11 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--app-text-muted)] hover:bg-[var(--app-surface-muted)]"><Paperclip size={17}/></button>
+          <button type="submit" disabled={sending || (!draft.trim() && pendingFiles.length === 0)} class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#000A57] text-white disabled:cursor-not-allowed disabled:opacity-45" aria-label="Enviar mensagem"><Send size={16}/></button>
         </div>
       </form>
     </section>
