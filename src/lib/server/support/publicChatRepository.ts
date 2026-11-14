@@ -38,8 +38,8 @@ import {
   deleteStoredSupportImages,
   listSupportChatMessageAttachments,
   listSupportMessageAttachments,
-  uploadSupportChatMessageImages,
-  uploadSupportMessageImages,
+  uploadSupportChatMessageAttachments,
+  uploadSupportMessageAttachments,
 } from "$lib/server/support/supportMessageAttachmentRepository";
 
 const CHAT_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
@@ -458,7 +458,7 @@ export async function addPublicChatMessage(
   const normalizedBody = body.trim();
 
   if (!session.ticketId) {
-    const storedImages = await uploadSupportChatMessageImages(sessionId, messageId, files);
+    const storedImages = await uploadSupportChatMessageAttachments(sessionId, messageId, files);
     try {
       await db.transaction(async (tx) => {
         await tx.insert(webChatMessages).values({
@@ -494,7 +494,7 @@ export async function addPublicChatMessage(
             userId: session.assignedUserId,
             kind: "chat.customer_reply",
             title: "Cliente respondeu no chat",
-            body: normalizedBody.slice(0, 500) || "Cliente enviou uma imagem.",
+            body: normalizedBody.slice(0, 500) || "Cliente enviou um anexo.",
             href: `/app/chat/${sessionId}`,
             entityType: "chat",
             entityId: sessionId,
@@ -522,7 +522,7 @@ export async function addPublicChatMessage(
     .limit(1);
   if (!ticket || ticket.status === "closed") throw new Error("CHAT_TICKET_CLOSED");
 
-  const storedImages = await uploadSupportMessageImages(ticketId, messageId, files);
+  const storedImages = await uploadSupportMessageAttachments(ticketId, messageId, files);
   try {
     await db.transaction(async (tx) => {
       await tx.insert(ticketMessages).values({
@@ -575,7 +575,7 @@ export async function addPublicChatMessage(
           userId: ticket.assignedUserId,
           kind: "chat.customer_reply",
           title: `Cliente respondeu o ticket #${ticket.ticketNumber}`,
-          body: normalizedBody.slice(0, 500) || "Cliente enviou uma imagem.",
+          body: normalizedBody.slice(0, 500) || "Cliente enviou um anexo.",
           href: `/app/chat/${sessionId}`,
           entityType: "ticket",
           entityId: ticketId,
