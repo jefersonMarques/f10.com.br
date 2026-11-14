@@ -1,7 +1,5 @@
-import { json, type Cookies, type RequestHandler } from "@sveltejs/kit";
-import { isAuthorizedF10Context } from "$lib/server/customerPortal/customerF10AuthRepository";
-import { getOptionalCustomerF10PortalSession } from "$lib/server/customerPortal/customerPortalSession";
-import { getTicketCustomerContext } from "$lib/server/support/ticketCustomerContextRepository";
+import { json, type RequestHandler } from "@sveltejs/kit";
+import { getAuthenticatedPublicChatCustomer } from "$lib/server/support/publicChatCustomerAccess";
 import { handoffSupportChatForAttachment } from "$lib/server/support/supportAiAttachmentHandoff";
 import { processSupportAiChatMessage } from "$lib/server/support/supportAiChat";
 import { handlePureSupportGreeting } from "$lib/server/support/supportChatLocalIntent";
@@ -57,37 +55,6 @@ async function readMessagePayload(request: Request): Promise<{ body: string; fil
   };
 }
 
-async function authorizeF10CustomerForChat(
-  cookies: Cookies,
-  session: AuthorizedChatSession,
-  touchActivity: boolean,
-): Promise<boolean> {
-  const customer = await getOptionalCustomerF10PortalSession(cookies, { touchActivity });
-  if (!customer) return false;
-
-  if (
-    session.legacyUserId &&
-    session.groupId !== null &&
-    session.unitId !== null
-  ) {
-    return session.legacyUserId === customer.legacyUserId &&
-      isAuthorizedF10Context(customer, session.groupId, session.unitId);
-  }
-
-  if (!session.ticketId) return false;
-  const context = await getTicketCustomerContext(session.ticketId);
-  if (
-    !context ||
-    context.scope !== "unit" ||
-    context.legacyUserId !== customer.legacyUserId ||
-    context.groupId === null ||
-    context.unitId === null
-  ) {
-    return false;
-  }
-  return isAuthorizedF10Context(customer, context.groupId, context.unitId);
-}
-
 export const GET: RequestHandler = async ({ params, request, cookies }) => {
   const sessionId = params.sessionId ?? "";
   const token = getBearerToken(request);
@@ -102,7 +69,7 @@ export const GET: RequestHandler = async ({ params, request, cookies }) => {
     return json({ error: "INVALID_SESSION" }, { status: 401 });
   }
 
-  if (!await authorizeF10CustomerForChat(cookies, session, false)) {
+  if (!await getAuthenticatedPublicChatCustomer(cookies, session, false)) {
     return json(
       {
         error: "CUSTOMER_AUTH_REQUIRED",
@@ -149,7 +116,7 @@ export const PUT: RequestHandler = async ({ params, request, cookies, url }) => 
     return json({ error: "INVALID_SESSION" }, { status: 401 });
   }
 
-  if (!await authorizeF10CustomerForChat(cookies, session, false)) {
+  if (!await getAuthenticatedPublicChatCustomer(cookies, session, false)) {
     return json({ error: "CUSTOMER_AUTH_REQUIRED" }, { status: 401 });
   }
 
@@ -191,7 +158,7 @@ export const POST: RequestHandler = async ({
     return json({ error: "INVALID_SESSION" }, { status: 401 });
   }
 
-  if (!await authorizeF10CustomerForChat(cookies, chatSession, true)) {
+  if (!await getAuthenticatedPublicChatCustomer(cookies, chatSession, true)) {
     return json(
       {
         error: "CUSTOMER_AUTH_REQUIRED",
