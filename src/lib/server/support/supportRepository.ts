@@ -251,6 +251,7 @@ export async function listSupportTickets(
       updatedAt: tickets.updatedAt,
       assignedUserId: tickets.assignedUserId,
       assignedUserName: users.name,
+      assignedUserHasAvatar: sql<boolean>`${userProfiles.avatarKey} IS NOT NULL`,
       queueName: supportQueues.name,
       customerContactId: tickets.customerContactId,
       customerName: customerContacts.name,
@@ -264,6 +265,7 @@ export async function listSupportTickets(
       eq(ticketWorkflowStates.ticketId, tickets.id),
     )
     .leftJoin(users, eq(tickets.assignedUserId, users.id))
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
     .leftJoin(customerContacts, eq(tickets.customerContactId, customerContacts.id))
     .leftJoin(
       customerOrganizations,
