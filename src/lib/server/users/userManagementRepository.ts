@@ -311,7 +311,7 @@ export async function getManagedUserDetails(
   );
 
   return {
-    user: target,
+    user: { ...target, avatarKey: undefined, hasAvatar: Boolean(target.avatarKey) },
     roles: targetRoles,
     roleNames: roleNameRows.map((role) => role.name),
     permissions: permissionRows
